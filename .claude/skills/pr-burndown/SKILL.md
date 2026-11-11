@@ -1,7 +1,7 @@
 ---
 name: pr-burndown
 description: "Burn down the open PRs that wait on the owner. Background headless jobs do the prep that needs no owner call (rebase, regenerate snapshots, write promised tests, fix review findings, re-fire post-plan). The owner sees only the decisions that are theirs: a status card per PR (CI on the current head, review threads, post-plan verdict, door and blast radius, conflicts, hold reasons, visual links) with a recommended option, answered in a batch."
-last_verified: 2026-11-10
+last_verified: 2026-11-11
 ---
 
 # /pr-burndown
@@ -45,6 +45,16 @@ This skill moves existing PRs. To find and queue new work, run `/reset-ready` fi
 - You add `human-approved`, tick a manual-test box, or arm `gh pr merge --auto` only
   after the owner approves that specific PR in chat. Quote their words and the date in
   the PR comment you leave. Nothing in this skill approves a PR on its own.
+- When the owner approves a PR for merge in chat, arm auto-merge on it right away:
+  `gh pr merge N --squash --auto`. Don't wait for post-plan to arm it. GitHub then
+  merges it once every required check passes and the branch is up to date with master.
+  The merge line updates only armed PRs, so arming also starts the update from master.
+  The required checks still gate the merge, including `human-signoff`, which waits for
+  the `human-approved` label. Arming never skips a check.
+  When no job will push to the PR, add the label and arm it in this session. When a
+  job will push (a rebase, an asked-for fix), the job arms it after its last push
+  (Step 6, step 7). Run the Step 6 live-run check before you arm. If a post-plan run is
+  live, arm after it ends: its fix round disarms any PR that gets armed mid-run.
 - Never touch a PR's worktree while a post-plan run is live in it. Check `launchctl list`
   first (Step 6 has the command). A run started from a terminal has no launchctl label,
   so also treat a `post-plan-running` label or a `pgrep -f <abs worktree path>` hit as
@@ -83,9 +93,10 @@ Order the PRs that need the owner:
 3. Dev tooling `chore:` PRs last. Offer to batch these once the GM-facing ones are done.
 
 A merge conflict (`DIRTY`) or an out-of-date branch (`BEHIND`) never drops a PR from
-the list or moves it down. Rank it as if it were clean. Every PR that reaches
+the list or moves it down. Rank it as if it were clean. A `DIRTY` PR that reaches
 Step 4 or Step 6 gets rebased onto master, so a rebase is one more chore for that job.
-The owner's review of the PR comes first.
+A `BEHIND` PR with no conflict gets no rebase from this skill (Step 4 § Rebase only what
+the merge line can't fix). The owner's review of the PR comes first.
 
 Then put each PR in one pile:
 
@@ -194,7 +205,9 @@ A conflict or a `BEHIND` branch gets ⚠️ on the Conflicts line and on the
 "merge conflict (DIRTY)" hold reason. A `BEHIND` branch with no clash is ⚠️ too, never
 ✅. Neither gets ❌. It never makes a "fix conflicts
 first" option or a recommendation to wait. The pick the owner makes (Ship, Fix X)
-already includes the rebase in Step 6. The one exception is a conflict that needs the
+already covers it. Step 6 rebases a `DIRTY` PR, and the merge line updates a `BEHIND` one
+once the PR is armed. When the clash is with another approved PR in this run, say on
+the Conflicts line that this PR rebases after that one merges. The one exception is a conflict that needs the
 owner's call to resolve, such as two PRs that change the same rule in opposite ways.
 Mark that one 🚨 and put the call in the options.
 
@@ -214,6 +227,31 @@ re-fires post-plan does the same work twice.
 - **Prep job.** Any chore post-plan can't do: a `DIRTY` conflict, a snapshot or golden
   fixture to regenerate, a promised test the plan names, or a finding post-plan's fix
   round already tried and left open.
+
+### Rebase only what the merge line can't fix
+
+Master takes a PR only when it is up to date with master. So when several approved PRs
+get rebased at once, one merges and the rest fall behind again. Their rebases and CI runs
+were wasted. The merge line already handles `BEHIND`. On every master push,
+`.github/workflows/update-behind-prs.yml` (`bin/merge-line-watch` locally) asks
+`bin/merge-line-select` for the oldest armed PR with no conflict and no red required
+check, and updates only that one (ADR-0081). Each armed PR gets updated once, when its
+turn comes.
+
+- **`BEHIND` with no conflict.** Don't rebase it. List no rebase in the job's chores. Once
+  the PR is armed, the merge line keeps it current. A Ship pick needs only the label and
+  the arm. Do both in this session, with no job.
+- **`DIRTY`.** Rebase it in the job. The merge line skips conflicted PRs, so nothing else
+  will.
+- **Two approved PRs that clash with each other.** Rebase and ship the higher-ranked one
+  first. Hold the other's rebase until the first merges, then launch its job. Rebasing
+  both now leaves the second conflicted again.
+- **Arm order.** The merge line goes by the time each PR was armed, oldest first, with
+  `hotfix` PRs ahead. Arm approved PRs in the Step 2 rank order, so they merge in that
+  order.
+
+Post-plan still merges master on each run. Firing several at once still costs one CI run
+each before the line takes over. The rules above stop the skill from adding a second one.
 
 Count rounds per PR in this run. A round is one prep job or one re-fire. Stop after 2
 rounds whose post-plan verdict still holds on a new finding. Don't start a third. Move the
@@ -278,7 +316,8 @@ Owner decision on PR #N (branch <branch>), <date>: "<owner's words>". <What it c
    First check for a live post-plan run: launchctl list | grep -E 'com\.ibl5\.(postplan-now-<branch>-|post-plan-fleet-N$)'.
    Use the flattened branch slug for <branch> (post-plan-now flattens it): `printf '%s' "<branch>" | tr -cs 'A-Za-z0-9._-' '-'`. A branch with `/` never matches raw.
    If one is listed, do not touch the worktree. Write "blocked: post-plan run live" to $D/jobs/pN.result and stop.
-2. Rebase onto origin/master (or merge it). Expected conflicts: <files>. Keep both sides' intent.
+2. <Only when the PR is DIRTY:> Rebase onto origin/master (or merge it). Expected conflicts: <files>. Keep both sides' intent.
+   <When it is only BEHIND, write instead:> Do not rebase or merge master. The merge line updates the branch once the PR is armed.
 3. <The change the owner asked for, with the exact behavior. A bug fix gets a test that fails without it.>
    For each review thread you fix, also fix every site its "other instances" line names.
    Resolve a thread only after a commit changes the code it points at, or after the owner
@@ -297,11 +336,12 @@ Owner decision on PR #N (branch <branch>), <date>: "<owner's words>". <What it c
    to start here. The parent session re-fires post-plan after you finish.
 7. <One of:>
    - Ship: add `human-approved` to every approved PR, tick the manual boxes the owner
-     confirmed, and comment "Owner approved <date>: <words>." Do NOT arm gh pr merge.
-     Post-plan arms it after the verdict on the new head has no blocking finding and CI is
-     green. The label also clears post-plan condition (7) for a PR whose plan says
-     auto_merge: false, while the recorded fingerprint matches the diff. After labeling,
-     re-fire post-plan for that PR so it arms.
+     confirmed, and comment "Owner approved <date>: <words>." Then, after the push in
+     step 5, arm it: gh pr merge N --squash --auto. GitHub merges it once every required
+     check passes and the branch is up to date with master. The label also clears
+     post-plan condition (7) for a PR whose plan says auto_merge: false, while the
+     recorded fingerprint matches the diff. Arm after the last push, because a push that
+     changes the PR's changed lines drops the label.
      Master refuses any merge while a review thread is open (ci-gotchas.md § Conversation
      resolution). Before you report the PR as shipping, list its open threads. File each
      finding the owner deferred to the backlog, reply "Deferred to
@@ -360,8 +400,8 @@ can do it, and stop any watcher this session started (`TaskStop`).
      Exit 9 (a pre-fire check refused) and exit 10 (the check could not run) stop before
      post-plan starts. They print to stdout and send no DM, so without this step the
      watcher fails silently.
-- **New T3 thread.** Use it when the follow-up needs judgment, such as arming an
-  `auto_merge: false` PR after reading the new verdict, or building a sign-off card. Call
+- **New T3 thread.** Use it when the follow-up needs judgment, such as reading a new
+  verdict on a PR the owner has not approved yet, or building a sign-off card. Call
   `t3_thread_launch` with a title like "PR #N: <goal>" and a `clientRequestId` like
   `prb-<run>-N`. The brief holds only what that PR needs: the goal, the owner's words and
   date, why it's held, the `.result` path and job pid, and numbered steps. The steps: wait
@@ -377,8 +417,9 @@ check exits before then, so whoever fires `post-plan-now` reports a non-zero exi
 
 Post-plan holds condition 7 when the plan says `auto_merge: false`. The hold lasts until
 `human-approved` is on the PR and the `human-signoff` workflow has recorded the diff
-fingerprint. The next post-plan run then arms the PR. A push that changes the PR's changed
-lines drops the label, and the hold comes back.
+fingerprint. A PR the owner approved in chat is already armed by then, so it merges once
+`human-signoff` passes. A push that changes the PR's changed lines drops the label, and
+the hold comes back. The PR stays armed but can't merge until someone adds the label again.
 
 ## Step 7: Wrap up
 

@@ -1,9 +1,9 @@
 ---
-description: CSS architecture: all styles live in ibl5/design/components/; inline CSS is banned; daisyUI (d- prefix) is the base layer on converted pages. Includes extraction gotchas, orphan-CSS audit, and mobile responsive hiding.
+description: CSS architecture: all styles live in ibl5/design/components/; inline CSS is banned; daisyUI (d- prefix) is the base layer on converted pages. Includes extraction gotchas, orphan-CSS audit, and mobile responsive hiding. Long-form sections live in css-architecture-detail.md (Read on demand).
 paths:
   - "**/design/**/*.css"
   - "**/*View.php"
-last_verified: 2026-10-20
+last_verified: 2026-11-11
 ---
 
 # CSS Architecture Reference
@@ -27,15 +27,7 @@ Tailwind 4 owns the layer order — only four layers exist: `@layer theme, base,
 
 ## daisyUI Components
 
-daisyUI 5 is the base layer for shared UI pieces (buttons, form controls, cards, alerts) on converted pages. The Player Search form and the Free Agency offer page are the first two. Every other page keeps its `ibl-*` classes until it is converted.
-
-- **Prefix.** Every daisyUI class carries `d-`: `d-btn`, `d-card`, `d-label`. The prefix keeps it clear of `ibl-*` and Tailwind classes, so adoption is additive. Never unprefix it.
-- **Config.** The `@plugin "daisyui"` block sits right after `@import 'tailwindcss';` in `design/input.css`. It excludes `rootcolor`, `rootscrollgutter`, `scrollbar`, and `properties`, which would otherwise restyle every page. The `@plugin "daisyui/theme"` block defines the light `ibl` theme and points each color at the `@theme` palette with `var(--color-*)`. It is the one block outside `@theme` that may name `--color-*`, because Tailwind keeps every theme variable that emitted CSS references.
-- **Layer.** daisyUI puts its component rules in nested sublayers inside `@layer utilities`. An override in `@layer components` always loses to them.
-- **Overrides.** Brand overrides live in one unnested `@layer utilities` block at the end of `design/input.css`. An unnested utilities rule beats every nested daisyUI sublayer whatever its specificity. Reference bare token aliases there, as in component CSS.
-- **The `:where()` trick.** Wrap an override in `:where()` when a Tailwind utility on the same element must still win. `:where(.d-label)` has zero specificity, so `text-sm` keeps its size while the layer still beats daisyUI. A plain `.d-label` rule sits later in source order than `.text-sm` and would beat it.
-- **Theme colors make utilities.** Each theme color makes Tailwind emit matching utilities. `--color-error` produces `.text-error`, which beats the Updater's `components` rule of the same name, so a guard rule in the override block keeps the Updater red. Before adding a theme color, grep the views for bare `text-<name>`, `bg-<name>`, and `border-<name>` classes.
-- **Scope.** `ibl-*` classes stay for unconverted pages, and their CSS stays untouched while any page uses it. Stat tables keep `.ibl-data-table` permanently.
+Moved to `.claude/rules/css-architecture-detail.md` § daisyUI Components. daisyUI 5 is the base layer for shared UI on converted pages, and every daisyUI class carries the `d-` prefix (never unprefix it).
 
 ## Token Naming
 
@@ -47,27 +39,11 @@ Font weights and stacking levels follow the same rule. Write `var(--font-weight-
 
 ## Table Patterns
 
-Pick by need (cells get sticky-col classes — see Cell/Row Modifiers below):
-
-| Pattern | Wrapper | Table class | Use case |
-|---------|---------|-------------|----------|
-| 1. Simple scroll | `.table-scroll-wrapper` > `.table-scroll-container` | `.ibl-data-table` | Wide tables scrolling horizontally |
-| 2. Sticky columns | `.table-scroll-wrapper` > `.table-scroll-container` | `.ibl-data-table.responsive-table` | Mobile: left col(s) freeze, rest scrolls |
-| 3. Sticky header+column | `.sticky-scroll-wrapper` > `.sticky-scroll-container` | `.ibl-data-table.sticky-table` | Both-axis: header AND first col freeze (`th.sticky-corner` + `td.sticky-col`) |
-| 3a. ...+viewport | `.sticky-scroll-wrapper.page-sticky` > `.sticky-scroll-container` | `.ibl-data-table.sticky-table` | Same as 3, header sticks to viewport on desktop via JS (`sticky-page-header.js`) |
-| 4. Sticky header (viewport) | none | `.ibl-data-table.sticky-header` | Desktop: header sticks to viewport on scroll (pure CSS, no horizontal scroll) |
-
-Simple non-scrolling table → `.ibl-data-table`; team-colored → add `.team-table`.
+Moved to `.claude/rules/css-architecture-detail.md` § Table Patterns. Pick a table pattern by need; every table uses `.ibl-data-table` plus variants, and cells take the sticky-col classes.
 
 ### Sticky Header Gotchas (read before implementing)
 
-- **Fixed nav offset:** nav is 72px tall — all sticky `top` values must be `72px`, not `0`.
-- **`overflow` captures sticky:** any element with `overflow` other than `visible`/`clip` on ANY axis becomes a scroll container and captures `position: sticky` (per spec, no workaround). And `overflow-x: auto; overflow-y: visible` → the browser promotes `visible` to `auto`. `overflow-y: clip` is NOT promoted, but the element is still a scroll container if the other axis is `auto`/`scroll` (sticky is captured per-element, not per-axis).
-- **Consequence:** pure CSS can't do page-level sticky headers inside a horizontal scroll container. Pattern 3a uses JS (`sticky-page-header.js`) to clone the thead into a fixed overlay.
-- **`base.css` scopes `overflow-x: auto` to `table:not(.ibl-data-table)`** — modern tables unaffected. Sticky variants still set `overflow: visible` to override `.ibl-data-table`'s `overflow: hidden` (border-radius clipping).
-- **Rounded corners need `overflow: hidden`** to clip, which breaks sticky. Fix: `overflow: visible` on the table + `border-radius` on corner cells. Pattern 4 corner `th` cells also need `box-shadow` in `var(--page-bg, #eeeeee)` to mask rows scrolling behind the rounded corners.
-- **`--page-bg`** is set on `<body>` by `theme.php` from `$bgcolor1` (dev `#BBBBBB`, prod `#EEEEEE`).
-- **`css:watch` may not rebuild.** After editing CSS, verify: `grep -c "your-class" themes/IBL/style/style.css`. If 0, manually rebuild (sanctioned recovery — see `.claude/rules/css-auto-rebuild.md`).
+Moved to `.claude/rules/css-architecture-detail.md` § Sticky Header Gotchas (read before implementing). Read it before building a sticky header: any `overflow` other than `visible`/`clip` on any axis captures `position: sticky`.
 
 ## Overflow Rules
 
@@ -90,28 +66,11 @@ Enforced by `BanInlineCssRule` (`ibl.inlineCss`): allows `style="--..."` custom 
 
 ## `white-space: nowrap` Locations
 
-Check these before debugging text-wrapping:
-
-| File | Selector |
-|------|----------|
-| `tables.css` | `.ibl-data-table th`, `td.player-cell`, `.responsive-table td` |
-| `navigation.css` | `.ibl-tab`, `.plr-nav__group-label`, `.plr-nav__pill` |
-| `cards.css` | `.ibl-card__meta` |
-| `player-cards.css` | `.stats-grid a`, `th`, `td` |
-| `existing-components.css` | various (7 legacy selectors) |
+Moved to `.claude/rules/css-architecture-detail.md` § `white-space: nowrap` Locations. Check these selectors before debugging text-wrapping.
 
 ## Cell/Row Modifier Classes
 
-| Class | Purpose | On |
-|-------|---------|-----|
-| `.sep-team` / `.sep-weak` | team-colored / gray vertical separator | `td`,`th` |
-| `.salary` | left-aligned salary column | `td`,`th` |
-| `.sticky-col` / `.sticky-col-1/2/3` | single / multi sticky column | `td`,`th` |
-| `.sticky-corner` | top-left corner cell (sticky header+col) | `th` |
-| `.ratings-separator` | zero-padding divider row | `tr` |
-| `.user-team-row` | yellow highlight for user's team | `tr` |
-| `.drafted` | grayed-out drafted player | `tr` |
-| `.career-row` | bold career totals | `tr` |
+Moved to `.claude/rules/css-architecture-detail.md` § Cell/Row Modifier Classes. Cells and rows take the modifier classes listed there, such as `.sticky-col`, `.sep-team`, and `.user-team-row`.
 
 ## `!important` Policy
 
@@ -128,18 +87,11 @@ Before writing CSS/HTML, read the relevant `ibl5/design/components/` file — th
 
 ## Extraction & Global-Selector Gotchas
 
-- **Never `@import` page-scoped CSS with unscoped global selectors into `design/input.css`.** `input.css` compiles into the global Tailwind bundle loaded on every page. Bare selectors (`table`, `td`, `th`, `body`, `h1`) from a standalone admin stylesheet break VR baselines sitewide. Load the stylesheet directly via `<link>` in that page's `<head>`, or wrap every selector with a page-scope class (`.block-fa-admin table { ... }`) before adding to the global bundle.
-- **Heading element promotions can silently pick up compound `element+class` selectors.** Before promoting `h3` → `h2`, run: `grep -rn 'h2\.ibl-title\|h2\.' ibl5/design/`. If the TARGET element has an `h2.ibl-title` rule but the source element does not, the promotion is not VR-neutral — 6% desktop diff, 14px height change. Use `aria-level="2"` on `h3` instead: axe sees level-2 in the ARIA tree; CSS sees the original `h3` element.
-- **Tailwind watcher env vars are no-ops.** `CHOKIDAR_USEPOLLING`, `CHOKIDAR_INTERVAL`, and `PARCEL_WATCHER_BACKEND` are not read by Tailwind v4's `@parcel/watcher`. Don't chase these for git-op CSS staleness — the git hook (`bin/rebuild-css-if-source-changed`, installed by `bin/install-git-hooks`) is the fix. See `css-auto-rebuild.md`.
+Moved to `.claude/rules/css-architecture-detail.md` § Extraction & Global-Selector Gotchas. Never `@import` page-scoped CSS with unscoped global selectors into `design/input.css`.
 
 ## Orphan-CSS Audit
 
-Source-token miss from `bin/check-orphan-css` is a **worklist, not a "dead" verdict**. A miss means only "the literal string isn't in source" — not that the rule is unused. Before removing any candidate:
-
-1. **Run `--crawl`** against a prod-seeded app (`http://main.localhost/ibl5/` or a `bin/db-sync-prod` worktree) — it drops candidates that render live (composed/state-gated classes, `txn-badge--N`, `--active` modifiers).
-2. **Open the emitting view**, not just grep snippets. For a descendant selector (`.parent .child`), trace BOTH hops — a live `.parent` does not make `.child` live.
-
-CSS removal is UI-touching → route through `/plan` with a crawl or VR diff that empirically proves the rule was dead.
+Moved to `.claude/rules/css-architecture-detail.md` § Orphan-CSS Audit. A `bin/check-orphan-css` miss is a worklist. Run `--crawl` and open the emitting view before removing any candidate.
 
 ## Mobile-Only Scope
 

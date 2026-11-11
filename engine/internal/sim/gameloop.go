@@ -107,7 +107,8 @@ func simGameWith(b bundle.Bundle, g bundle.Game, r *rng.RNG, opts Options) (resu
 	playPeriod := func(period, seconds int) {
 		gs.period = period
 		gs.clock = seconds
-		gs.transitionShotRate = 0 // Stage-3 decay resets per period ("within a period")
+		gs.transitionShotRate = 0                // Stage-3 decay resets per period ("within a period")
+		visitor.teamFouls, home.teamFouls = 0, 0 // JSB 5.60 team-foul reset at each period advance (94467-94468)
 		prevOutcome := possNormal
 		for gs.clock > 0 {
 			// Dead-ball substitution sweep for both teams before the possession

@@ -646,7 +646,7 @@ jobs:
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
-        git add .claude/rules/codebase-map.md
+        git add .claude/rules/codebase-map.md .claude/rules/codebase-map-detail.md
         if git diff --cached --quiet; then
           echo "No codebase-map changes"
         else

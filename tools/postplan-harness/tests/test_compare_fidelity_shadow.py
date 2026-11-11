@@ -302,3 +302,37 @@ def test_live_sample_uses_shadow_pr_id(tmp_path, monkeypatch, capsys, redirect_v
     assert sample["table"]["18"]["agree-hold"] == 1
     assert sample["table"]["3"]["agree-clear"] == 1
     assert "Live sample (1 of 1 eligible runs" in text
+
+
+# --- add-only replay ---------------------------------------------------------------------
+
+def test_add_only_counts_reviewer_only_holds(tmp_path, capsys):
+    out = tmp_path / "out"
+    write_run(out, "a", shadow_rec(hold3=True, old={"3": "clear", "18": "clear"}), pr=1)
+    write_run(out, "b", shadow_rec(hold3=True, old={"3": "hold", "18": "clear"}), pr=2)
+    write_run(out, "c", shadow_rec(status="invalid:bad-json", old={"3": "clear", "18": "clear"}),
+              pr=3)
+    write_run(out, "d", shadow_rec(hold18=True, old={"3": "clear", "18": "clear"}), pr=4)
+    res = cfs.add_only_replay(str(out))
+    assert res["prs_scanned"] == 4
+    assert res["newly_held_prs"] == [1, 4]
+    assert res["by_condition"] == {"3": 1, "18": 1}
+    rc, text = run_cli(["--add-only", "--out-dir", str(out)], capsys)
+    assert rc == 0
+    assert "add-only replay: 2 of 4 PRs newly held" in text
+    assert "by condition: planned_landed=1 merge_danger=1" in text
+
+
+def test_add_only_dedups_by_pr(tmp_path):
+    out = tmp_path / "out"
+    write_run(out, "x-1-older", shadow_rec(hold3=True, old={"3": "clear", "18": "clear"}), pr=7)
+    write_run(out, "x-2-newer", shadow_rec(hold3=False, old={"3": "clear", "18": "clear"}), pr=7)
+    res = cfs.add_only_replay(str(out))
+    assert res["prs_scanned"] == 1
+    assert res["newly_held_prs"] == []
+
+
+def test_add_only_with_seeded_rejected(tmp_path, capsys):
+    with pytest.raises(SystemExit) as exc:
+        cfs.main(["--add-only", "--seeded", "--canned", str(tmp_path), "--out-dir", str(tmp_path)])
+    assert exc.value.code == 2

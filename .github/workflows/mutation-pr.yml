@@ -31,7 +31,7 @@ jobs:
     name: Infection PHP (per-PR diff)
     needs: [mirror-ready]
     runs-on: ubuntu-26.04
-    timeout-minutes: 15
+    timeout-minutes: 30
 
     services:
       mariadb:

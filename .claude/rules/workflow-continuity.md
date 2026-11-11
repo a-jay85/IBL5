@@ -1,6 +1,6 @@
 ---
 description: All work happens in a worktree; where plans live (outside the repo); worktree setup; post-plan handoff triggers.
-last_verified: 2026-11-10
+last_verified: 2026-11-11
 ---
 
 # Workflow Continuity Rule
@@ -49,8 +49,8 @@ Never run `/post-plan` **inline**. That costs several times a fresh run. Run it 
 
 - **Do NOT commit first** when shipping plan-driven work or a fresh ad-hoc branch. Leave it **dirty**. `/post-plan` commits the uncommitted tree in Phase 2 and opens the PR.
 - **A held branch ships with its hold commit.** `bin/post-plan-now` runs with commits ahead of `origin/master`. Never reset or squash the hold commit to get a dirty tree back.
-- **Matrix check first.** With a plan, `git add -A` and run `bin/lib/plan-matrix-assertions <plan> <(git diff --cached origin/master)`. Write the test for each `UNREALISED-ASSERTION` row and rerun; if you cannot, do not fire. No plan: skip.
-- **Only fire when verification passed.** On failing tests, an unresolved blocker, or a question for the user, do **not** fire. Leave the worktree dirty and hand off in prose. Turn-end is not done; that judgment is yours. `bin/post-plan-now` runs `bin/lib/prefire-verify` (full PHPUnit, the plan's post-impl CLI matrix rows, the plan's Executable Mutations rows) and exits 9 until all three pass on the current tree. Exit 9 means the gate refused the tree: fix the check it names. Exit 10 means the gate could not run (Docker or the DB is down, or a prerequisite is missing): fix the environment and rerun, and do not hunt for a failing check. CI's required check `Infection PHP (per-PR diff)` gates mutation score. Run it first with `--plan <plan> --stage matrix`, then `phpunit`, then `exec-mutations`, one foreground call each. The fire point reruns exec-mutations with larger limits. A pass is cached by tree hash. With no plan, the matrix stage skips. A human may bypass with `--skip-verify=<reason>`; it is logged and refused under `CLAUDE_HEADLESS`.
+- **Matrix check first.** With a plan, run the matrix-assertion check before you fire. Command and procedure: `.claude/rules/workflow-continuity-prefire.md` § Matrix check.
+- **Only fire when verification passed.** On failing tests, an unresolved blocker, or a question for the user, do **not** fire. Leave the worktree dirty and hand off in prose. Turn-end is not done; that judgment is yours. `bin/post-plan-now` refuses the tree with exit 9 until `bin/lib/prefire-verify` passes, and exits 10 when the gate cannot run. Read `.claude/rules/workflow-continuity-prefire.md` § Prefire verification before you fire.
 - **No watcher after the fire.** When `bin/post-plan-now` or `bin/plan-now` is the last step, end the turn. Do not arm a Monitor or ScheduleWakeup on the run.
 
 Engine (harness vs. Sonnet skill fallback), what `--auto`'s skip gate does, plan-blind ad-hoc runs, and where auto-merge is armed: `.claude/rules/workflow-continuity-detail.md`.

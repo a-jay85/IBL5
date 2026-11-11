@@ -67,6 +67,7 @@ interface JsbImportServiceInterface
 
     /**
      * Process raw .asw data and upsert records into `ibl_jsb_allstar_`* tables.
+     * Rejects the file and writes nothing when its rosters equal another stored season (stale .asw).
      *
      * @param int $seasonYear Season year for the All-Star data
      * @return JsbImportResult Summary of import results

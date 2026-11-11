@@ -1,12 +1,12 @@
-"""Phase 6.5 — the twenty ported arming conditions as pure, typed functions.
+"""Phase 6.5 — the twenty-one arming conditions as pure, typed functions.
 
 The numbers track the SKILL's condition numbers, not this list's position. The set is
-now {1..20} with no gaps: condition (11) shells out to
+now {1..21} with no gaps: condition (11) shells out to
 `bin/lib/pr-armable.sh::pr_unresolved_findings_hold` for unresolved review-thread
 findings, condition (14) reads the run-local conflict-resolved flag, condition (15)
 probes for already-red CI checks at arm time, condition (16) checks the
 pre-push local meta-check gate, and condition (17) holds when the gate backtest
-flagged clean PRs or could not run.
+flagged clean PRs or could not run. Condition (21) adds the Phase 5.5 reviewer's typed holds and never clears one.
 
 Sole arming authority. Ported from the retired post-plan skill Phase 6.5 (2026-10-19); the skill carries no arming logic.
 Shell halves live in bin/lib/pr-armable.sh. Historically each condition was a separate model-driven
@@ -366,6 +366,7 @@ class ArmInputs:
     branch: str = ""                              # git.branch(); "" fails the docs-refresh branch clause (fail-closed)
     retried_stages: list[str] = field(default_factory=list)   # RunResult.retries keys; only decorates a no-verdict hold reason, never clears one
     conformance_fix_note: str = ""   # Phase 5.0-pre fixer summary appended to the condition-(3) hold line; "" = fixer did not run
+    reviewer_arming_holds: list[str] = field(default_factory=list)  # fidelity.reviewer_arming_holds(); condition (21), add-only; [] = neutral
 
 
 def select_fidelity_verdict(v1, v2, tree2, current_tree):
@@ -751,6 +752,11 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     rg_blocked = rg is None or len(rg) > 0
     rg_reason = "state=UNCOMPUTED" if rg is None else "; ".join(rg)
     cs.append(ConditionResult(20, "removed-guards", rg_blocked, rg_reason if rg_blocked else ""))
+
+    # Condition (21): reviewer arming hold. The Phase 5.5 reviewer's typed block may ADD a
+    # hold for planned files or merge danger. It never clears (3) or (18). [] = neutral.
+    rv = inp.reviewer_arming_holds
+    cs.append(ConditionResult(21, "reviewer-arming-hold", bool(rv), "; ".join(rv) if rv else ""))
 
     # Post-pass: the only code here that releases a hold. Fail-closed on every path.
     cands = second_review_candidates(inp, cs)

@@ -928,6 +928,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                                                            git.diff_vs_base(), log),
                 retried_stages=sorted(res.retries),
                 removed_guards_holds=_rg_holds,
+                reviewer_arming_holds=fidelity.reviewer_arming_holds(
+                    (res.fidelity or {}).get(fidelity.SHADOW_KEY), git.conformance_files(),
+                    git.diff_vs_base(), log),
             )
             if not live and (fixture or {}).get("current_tree"):
                 # replay-only seam, the checks_outcome pattern: live mode never reads it

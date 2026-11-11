@@ -418,9 +418,9 @@ step67-unavailable() {
 }
 
 extract_prefire_command() {
-    # Extract the backtick-quoted command from the **Matrix check first.** line in workflow-continuity.md
+    # Extract the backtick-quoted command from the **Matrix check first.** line in workflow-continuity-prefire.md (moved there from workflow-continuity.md)
     local rule_file
-    rule_file="$(dirname "$0")/../.claude/rules/workflow-continuity.md"
+    rule_file="$(dirname "$0")/../.claude/rules/workflow-continuity-prefire.md"
     grep '\*\*Matrix check first\.\*\*' "$rule_file" | grep -o '`bin/lib/plan-matrix-assertions[^`]*`' | tr -d '`'
 }
 

@@ -205,10 +205,13 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 			return possNormal
 		case outcomeAndOne:
 			gs.madeFieldGoal(offense, bh, result.ShotTwoPoint, result.OriginTransition, periodIdx)
-			gs.freeThrows(offense, defense, bh, def, 1, periodIdx)
+			gs.resolveFoul(offense, defense, bh, def, 1, true, false, periodIdx) // and-one always clears the guard
 			return possNormal
 		case outcomeFoulOnly:
-			gs.freeThrows(offense, defense, bh, def, 2, periodIdx)
+			if !gs.resolveFoul(offense, defense, bh, def, 2, false, false, periodIdx) {
+				trip--   // a retained foul does not spend the offensive-rebound budget
+				continue // below the bonus: offense keeps the ball (transition)
+			}
 			return possNormal
 		case outcomeTurnover:
 			// Negligible independent [2,5] check: unforced change of possession, no

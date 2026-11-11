@@ -138,7 +138,8 @@ def test_downgrade_refuses_ctx_none(tmp_path):
 
 
 def test_downgrade_refuses_ready_verdict(tmp_path):
-    path = _verdict(tmp_path, "READY", KEEP_ITEM)
+    # A READY word over a [BLOCKING] bullet now parses NOT READY; the NOTE form keeps the intent: a passing verdict is never downgraded.
+    path = _verdict(tmp_path, "READY", KEEP_ITEM.replace("[BLOCKING]", "[NOTE]", 1))
     assert us.downgrade_applies(path, _ctx(), KEPT_BODY) is False
 
 

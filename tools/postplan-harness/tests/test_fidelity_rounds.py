@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness import fidelity
 from harness.adapters.ghad import RecordingGh
-from harness.adapters.gitad import ReplayGit
+from harness.adapters.gitad import ReplayGit, classify_local_gate_denial
 from harness.adapters.llm import FixtureLlm
 from harness.state import HarnessError, UsageLedger
 
@@ -105,9 +105,11 @@ class _ScriptedLlm(FixtureLlm):
         super().__init__(ledger, {k: v[0] for k, v in scripts.items()})
         self.scripts = {k: list(v) for k, v in scripts.items()}
         self.calls: list[tuple[str, str]] = []
+        self.prompt_log: list[tuple[str, str]] = []
 
     def call_tooled(self, purpose, model, prompt, **kw):
         self.calls.append((purpose, model))
+        self.prompt_log.append((purpose, prompt))
         queue = self.scripts.get(purpose)
         if queue is None:
             raise HarnessError("llm-fixture-missing", purpose)
@@ -121,16 +123,93 @@ def _fixer_calls(llm):
     return [c for c in llm.calls if c[0] == "fidelity-remediation"]
 
 
-def _drive(tmp_path, llm, git, pr, log=None, **kw):
+def _fixer_prompts(llm):
+    return [p for purpose, p in llm.prompt_log if purpose == "fidelity-remediation"]
+
+
+def _drive(tmp_path, llm, git, pr, log=None, gh=None, **kw):
     res = _Res()
     runner._run_fidelity(
-        llm, str(tmp_path), str(tmp_path), git, RecordingGh(str(tmp_path)), _plan(),
+        llm, str(tmp_path), str(tmp_path), git, gh or RecordingGh(str(tmp_path)), _plan(),
         "diff", "body", pr, "dead" * 10, TREE_1, False,
         log if log is not None else (lambda _m: None), res, **kw)
     return res
 
 
+def _steady_body_gh(tmp_path):
+    """A gh whose live body reads as one non-empty copy, so the gate-retry reset can prove it."""
+    from test_fidelity_body_only_round import _BodySeqGh
+    return _BodySeqGh(str(tmp_path), ["body"])
+
+
 NOT_READY = "6d checks\n\n- finding one\n\nNOT READY\n"
+
+# PR #3605's pre-commit denial, built from bin/check-rules-byte-budget's own format.
+DENIAL_3605 = (
+    "418 docs verified.\n"
+    "FAIL  .claude/rules/workflow-continuity-detail.md  16444 bytes  "
+    "lazy (path-scoped) tier  cap 16000  over by 444  "
+    "-- compress this companion; do not raise the cap\n")
+
+# PR #3715's real verdict (run live-pr-burndown-body-only-fix-20261104-182249-71860):
+# one [BLOCKING] body-claim bullet beside code findings, so the round is mixed. Long
+# bullets are cut at a sentence boundary; nothing is paraphrased. `## DIGEST` is dropped.
+VERDICT_3715 = """\
+Phase 4B ran on 2026-11-05 (02:26:35Z). Its findings are on [PR 3715](https://github.com/a-jay85/IBL5/pull/3715). It reviewed head `7b60ec6f6a10208e661784ece66d21361832e0f5`. The branch head is now `4ade64fc4e76a50cb3fc8b25d0ce4cae8f705f2d`, after the reflog's rebase onto `26c0209d69af9c58668a55b45de7619a95c3f598`. This review did not compare net changed lines between those heads. Both 4B line citations (`bin/lib/pr-body-only-fix:133` and `:264`) still point at the cited code in today's diff, which is partial evidence only.
+REVIEW-COVERAGE: UNKNOWN
+
+2. Phases 1 and 3 add behavior the plan never specified, and each addition reaches the phase's goal by a safer route.
+3. PB14 to PB18 and the extra `Body-only blockers` wording in `.claude/skills/pr-burndown/SKILL.md` have no plan phase, and they only tighten routing.
+4. The PR body overstates what `beyond-body-request` catches, omits two helper exemptions, and cites PR 3694 output this review did not re-run.
+Passed: 1, 5, 6.
+
+## FINDINGS
+- [BLOCKING] Correct the PR body claim about `beyond-body-request`. It matches the check 4 clause for a hand-written body claim the diff contradicts.
+- [NOTE] Phase 1 adds a `beyond-body-request` check and treats prose after a blank line as its own unmarked finding in `bin/lib/pr-body-only-fix`. The plan's classify steps list neither.
+- [NOTE] Phase 3 replaces the plan's `--jq .body >` saves with `printf '%s' "$(...)"` in `.claude/skills/pr-burndown/SKILL.md`. This is better than the plan's text because the added newline can no longer reach the live body or fail the read-back on a good edit.
+- [NOTE] Keep the Phase 4B finding at `bin/lib/pr-body-only-fix:264` open for Phase 6.5. Phase 1's no-anchor path is built as written, but a raw substring match lets `Change "one" to "two"` rewrite `none` when that is the only hit, the risk plan trade-off 4 warns about.
+- [NOTE] Keep the Phase 4B finding at `bin/lib/pr-body-only-fix:133` open for Phase 6.5. A code-defect clause such as `The helper drops the last row.` passes when its opener is allowed and no listed word appears, though the finding still has to state only a body correction.
+
+## SHADOW-ARMING
+```json
+{
+  "schema": "fidelity-shadow/1",
+  "planned_landed": {"hold": false, "missing": []},
+  "merge_danger": {"door": "two-way", "hold": false, "why": "The diff edits skill prose, adds bin/lib/pr-body-only-fix, and adds cases to bin/test-burndown, with no migration or send on merge."},
+  "body_numbers": {"consistent": true, "mismatches": []}
+}
+```
+
+NOT READY
+"""
+
+# PR #3810's real verdict (run live-engine-unfreeze-jsb-port-adr-20261109-130753-66017):
+# a top-level [BLOCKING] bullet under a closing `READY WITH NOTES` word. `## DIGEST` is dropped.
+VERDICT_3810 = """\
+REVIEW-COVERAGE: CURRENT
+
+1. Phase 8 has no diff footprint by design, and this packet cannot confirm the backlog#265 comment was posted.
+2. Phases 4 and 6 each told the author to record a result in the PR body, and the body records neither.
+4. The PR body says no PHP files change, but `bin/check-docs` is a PHP script and this diff edits it.
+Passed: 3, 5, 6.
+
+## FINDINGS
+- [BLOCKING] Correct the "No PHP" claim in the PR body. This matched the check 4 clause for a hand-written body claim the diff contradicts. The Summary bullet reads "No PHP, CSS, or migration files change." `bin/check-docs` is a PHP script: its hunk context shows `declare(strict_types=1);`, and the diff deletes `FROZEN_DOC_PREFIXES` and `isFrozenDocPath()` from it.
+- [NOTE] Add the engine staleness count and the freeze-wording hit list to the PR body. Phase 4 step 4 asks for "list their count in the PR body" for new `engine/` staleness-report entries.
+- [NOTE] Confirm the Phase 8 comment on backlog#265 before merge. Phase 8 is a `**No diff:**` phase, so its absence from the diff is expected.
+
+## SHADOW-ARMING
+```json
+{
+  "schema": "fidelity-shadow/1",
+  "planned_landed": {"hold": false, "missing": []},
+  "merge_danger":   {"door": "two-way", "hold": false, "why": "bin/check-engine-freeze drops Gate A and adds a path allowlist; a revert restores the old gate with no data effect"},
+  "body_numbers":   {"consistent": true, "mismatches": []}
+}
+```
+
+READY WITH NOTES
+"""
 
 
 # --- transient kinds retry once, then the round continues ---------------------
@@ -205,8 +284,7 @@ def test_divergent_live_body_alone_is_not_a_body_only_round(tmp_path, git_shim):
 
 # --- terminal kinds break after one call --------------------------------------
 
-@pytest.mark.parametrize("kind", ["rebase-conflict", "push-retry-cap", "local-gate",
-                                  "gate-path-edit"])
+@pytest.mark.parametrize("kind", ["rebase-conflict", "push-retry-cap", "gate-path-edit"])
 def test_each_terminal_kind_breaks(tmp_path, git_shim, kind):
     llm = _ScriptedLlm(UsageLedger(), {
         "plan-fidelity-review": [NOT_READY],
@@ -220,6 +298,97 @@ def test_each_terminal_kind_breaks(tmp_path, git_shim, kind):
         assert res.fidelity["remediation_sha"] is None
     finally:
         _cleanup(9303, "9303-2")
+
+
+def test_3715_mixed_body_and_code_not_ready_enters_round(tmp_path, git_shim):
+    """PR #3715's mixed verdict reaches round 1 on the current loop.
+
+    Characterization, not a fix: the closer A/B arm zeroed this loop in all five
+    #3715 runs and commit 42de492fa2 (#3729) removed the arm. The test goes red if a
+    future gate keeps a NOT READY verdict out of round 1 again.
+    """
+    llm = _ScriptedLlm(UsageLedger(), {
+        "plan-fidelity-review": [VERDICT_3715],
+        "fidelity-remediation": [{"raise": {"kind": "rebase-conflict", "detail": "no"}}],
+    })
+    try:
+        # Mixed findings: the body-only recheck path does not apply.
+        assert fidelity.body_only_findings_text(VERDICT_3715) is None
+        res = _drive(tmp_path, llm, _counting_git(), 9311)
+        assert len(_fixer_calls(llm)) == 1
+        assert res.fidelity["rounds"][0]["model"] == "sonnet"
+        assert res.fidelity["rounds"][0]["outcome"] == "rebase-conflict"
+    finally:
+        _cleanup(9311, "9311-2")
+
+
+def test_blocking_bullet_under_ready_with_notes_enters_round(tmp_path, git_shim):
+    """PR #3810: a [BLOCKING] bullet under `READY WITH NOTES` still gets a fixer round."""
+    llm = _ScriptedLlm(UsageLedger(), {
+        "plan-fidelity-review": [VERDICT_3810],
+        "fidelity-remediation": [{"raise": {"kind": "rebase-conflict", "detail": "no"}}],
+    })
+    try:
+        res = _drive(tmp_path, llm, _counting_git(), 9312)
+        assert len(_fixer_calls(llm)) == 1
+        assert res.fidelity["rounds"][0]["outcome"] == "rebase-conflict"
+    finally:
+        _cleanup(9312, "9312-2")
+
+
+def test_3605_local_gate_denial_retries_once_with_gate_output(tmp_path, git_shim):
+    """PR #3605: a refused round commit gets one retry whose prompt carries the hook output."""
+    llm = _ScriptedLlm(UsageLedger(), {
+        "plan-fidelity-review": [NOT_READY],
+        "fidelity-remediation": [
+            {"raise": {"kind": "local-gate", "detail": DENIAL_3605}},
+            {"raise": {"kind": "rebase-conflict", "detail": "no"}},
+        ],
+    })
+    try:
+        assert classify_local_gate_denial(DENIAL_3605) == "unknown"
+        res = _drive(tmp_path, llm, _counting_git(), 9313, gh=_steady_body_gh(tmp_path))
+        assert len(_fixer_calls(llm)) == 2
+        first, second = _fixer_prompts(llm)
+        assert "over by 444" not in first
+        assert "over by 444" in second
+        assert res.fidelity["rounds"][0]["retries"] == 1
+        assert res.fidelity["rounds"][0]["outcome"] == "rebase-conflict"
+    finally:
+        _cleanup(9313, "9313-2")
+
+
+def test_second_local_gate_denial_is_terminal(tmp_path, git_shim):
+    llm = _ScriptedLlm(UsageLedger(), {
+        "plan-fidelity-review": [NOT_READY],
+        "fidelity-remediation": [{"raise": {"kind": "local-gate", "detail": DENIAL_3605}}],
+    })
+    try:
+        res = _drive(tmp_path, llm, _counting_git(), 9314, gh=_steady_body_gh(tmp_path))
+        assert len(_fixer_calls(llm)) == 2
+        assert res.fidelity["rounds"][0]["outcome"] == "local-gate"
+        assert res.fidelity["rounds_completed"] == 0
+        assert res.fidelity["remediation_sha"] is None
+    finally:
+        _cleanup(9314, "9314-2")
+
+
+def test_adr_local_gate_denial_does_not_retry(tmp_path, git_shim):
+    llm = _ScriptedLlm(UsageLedger(), {
+        "plan-fidelity-review": [NOT_READY],
+        "fidelity-remediation": [{"raise": {
+            "kind": "local-gate",
+            "detail": "pre-commit-adr-gate: new bin/ script needs an ADR"}}],
+    })
+    try:
+        # Same steady body gh as the retrying 3605 test: the retry reset succeeds, so
+        # only the ADR no-retry class keeps this to one fixer call.
+        res = _drive(tmp_path, llm, _counting_git(), 9315, gh=_steady_body_gh(tmp_path))
+        assert len(_fixer_calls(llm)) == 1
+        assert res.fidelity["rounds"][0]["retries"] == 0
+        assert res.fidelity["rounds"][0]["outcome"] == "local-gate"
+    finally:
+        _cleanup(9315, "9315-2")
 
 
 def test_push_failed_still_propagates(tmp_path, git_shim):

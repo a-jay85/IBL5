@@ -1385,6 +1385,8 @@ _MAX_PUSH_RETRIES = 3
 _TRANSIENT_ROUND_KINDS = ("llm-invalid-output", "llm-tooled-cli", "llm-tooled-empty")
 _TRANSIENT_ROUND_REASONS = ("no-edits",)
 _MAX_ROUND_RETRIES = 1
+_NO_RETRY_GATE_CLASSES = ("adr", "stale-base")
+_GATE_DENIAL_TAIL_CHARS = 2000
 
 # A body-only round: the fixer answered the finding in the PR body with its own raw
 # `gh pr edit` and committed nothing. That is real work, so it takes a truthy stand-in
@@ -3141,6 +3143,49 @@ _GATE_FIX_NOTE = ("Local gate auto-fix: tools/postplan-harness/harness/gatefix.p
                   "the tree after a local gate denial; see the PR body gate-fix block.")
 
 
+def _gate_retry_ready(e, attempt, *, git, gh, pr, raw_before_round, head_before, log,
+                      round_num) -> bool:
+    """True when a Phase 5.5 round may re-run its fixer once after a commit-time
+    local-gate denial: a retry is left, the hook class is one a re-edit can clear,
+    and _reset_for_gate_retry put the tree and the PR body back."""
+    if e.kind != "local-gate" or attempt >= _MAX_ROUND_RETRIES:
+        return False
+    if classify_local_gate_denial(e.detail or "") in _NO_RETRY_GATE_CLASSES:
+        return False
+    return _reset_for_gate_retry(git, gh, pr, raw_before_round, head_before, log,
+                                 round_num)
+
+
+def _reset_for_gate_retry(git, gh, pr, raw_before_round, head_before, log,
+                          round_num) -> bool:
+    """Restore the worktree and the PR body to their pre-round state after a
+    refused commit. True only when HEAD never moved, the fixer's paths are
+    restored and the tree is clean, and the body is back to the pre-round copy.
+    False keeps the existing fail-closed terminal path."""
+    try:
+        if git.head() != head_before:  # a landed commit is never rolled back here
+            return False
+        dirty = git.dirty_paths()
+        if dirty:
+            git.restore_paths(dirty)
+        if git.dirty_paths() or git.is_dirty():
+            log(f"phase5.5 round {round_num}: tree still dirty after the "
+                "local-gate reset - no retry")
+            return False
+    except Exception:  # noqa: BLE001 - any doubt keeps the fail-closed path
+        return False
+    if not raw_before_round:  # no pre-round snapshot: the body cannot be proven restored
+        return False
+    live = gh.pr_body_fresh()
+    if not live:  # unreadable body: keep the fail-closed path
+        return False
+    if live != raw_before_round:
+        gh.pr_edit_body(pr, raw_before_round)
+        log(f"phase5.5 round {round_num}: restored the pre-round PR body "
+            "for the local-gate retry")
+    return True
+
+
 def _attempt_gate_fix(e, *, llm, worktree, res, log, phase):
     """One headless fixer attempt for a local-gate denial, or None when ineligible.
 
@@ -3734,6 +3779,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
             break
         sha, terminal = None, False
         raw_before_round = ""  # pinned to attempt 0; used for the per-round restore
+        gate_denial = ""  # set by a local-gate denial; fed to the retry's fixer
         # The retry lives INSIDE the iteration, so a retry can never advance round_num
         # and the fixer spawn count stays bounded at 2 * MAX_FIDELITY_ROUNDS.
         for attempt in range(_MAX_ROUND_RETRIES + 1):
@@ -3762,7 +3808,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                                                      res=res, gh=gh,
                                                      pr=(pr if isinstance(git, LiveGit) else None)),
                     pr_number=pr, model=model, work_list=work, outcome=outcome,
-                    withheld=withheld)
+                    withheld=withheld, prior_denial=gate_denial)
             except HarnessError as e:
                 if raw_before_round and "## Manual Testing" in raw_before_round:
                     _live = gh.pr_body_fresh()
@@ -3795,6 +3841,15 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                     + (f" - {why}" if why else "") + local
                     + (f" - drafted ADR {res.adr_path} is committed locally"
                        if res.adr_path else ""))
+                if _gate_retry_ready(e, attempt, git=git, gh=gh, pr=pr,
+                                     raw_before_round=raw_before_round,
+                                     head_before=head_before, log=log,
+                                     round_num=round_num):
+                    gate_denial = _redact(e.detail or "")[-_GATE_DENIAL_TAIL_CHARS:]
+                    rec["retries"] += 1
+                    log(f"phase5.5 round {round_num}: local gate refused the fix - "
+                        "retrying the fixer once with the gate output")
+                    continue
                 if e.kind in _TRANSIENT_ROUND_KINDS and attempt < _MAX_ROUND_RETRIES:
                     rec["retries"] += 1
                     continue

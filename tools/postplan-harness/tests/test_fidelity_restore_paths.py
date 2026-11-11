@@ -56,6 +56,11 @@ class _LiveBodyGh(_BodySeqGh):
         return value
 
 
+# An ADR-class denial: the round does not retry it, so these tests keep one terminal
+# local-gate raise and the read counts they assert.
+ADR_DENIAL = "pre-commit-adr-gate: new bin/ script needs an ADR"
+
+
 def _llm(remediation):
     return _ScriptedLlm(UsageLedger(), {
         "plan-fidelity-review": [NOT_READY],
@@ -79,7 +84,8 @@ def _assert_restored(written):
 def test_terminal_denial_restores_manual_testing_at_the_handler(tmp_path, git_shim, kind):
     gh = _LiveBodyGh(str(tmp_path), [BEFORE, CORRUPTED, _LAST_WRITE],
                      fixture={"pr_number": 9881})
-    llm = _llm([{"raise": {"kind": kind, "detail": "denied"}}])
+    llm = _llm([{"raise": {"kind": kind,
+                           "detail": ADR_DENIAL if kind == "local-gate" else "denied"}}])
     lines: list[str] = []
     try:
         _run(tmp_path, gh, _counting_git(), llm, 9881, lines)
@@ -174,7 +180,7 @@ def test_spent_transient_kind_restores_manual_testing_after_the_round(tmp_path, 
 def test_snapshot_without_manual_testing_skips_restore(tmp_path, git_shim, scenario):
     if scenario == "terminal":
         gh = _LiveBodyGh(str(tmp_path), [NO_SECTION, CORRUPTED], fixture={"pr_number": 9885})
-        llm, git, reads = _llm([{"raise": {"kind": "local-gate", "detail": "no"}}]), \
+        llm, git, reads = _llm([{"raise": {"kind": "local-gate", "detail": ADR_DENIAL}}]), \
             _counting_git(), 1
     else:
         gh = _LiveBodyGh(str(tmp_path), [NO_SECTION], fixture={"pr_number": 9885})
@@ -206,7 +212,8 @@ def test_intact_manual_testing_section_is_not_rewritten(tmp_path, git_shim):
 @pytest.mark.parametrize("kind,reads", [("local-gate", 3), ("push-failed", 2)])
 def test_empty_live_read_skips_restore(tmp_path, git_shim, kind, reads):
     gh = _LiveBodyGh(str(tmp_path), [BEFORE, ""], fixture={"pr_number": 9887})
-    llm = _llm([{"raise": {"kind": kind, "detail": "no"}}])
+    llm = _llm([{"raise": {"kind": kind,
+                           "detail": ADR_DENIAL if kind == "local-gate" else "no"}}])
     lines: list[str] = []
     try:
         if kind == "push-failed":
@@ -238,7 +245,9 @@ def test_restore_disabled_leaves_the_body_corrupted(tmp_path, git_shim, monkeypa
         monkeypatch.setattr(runner, "restore_manual_testing_section",
                             lambda after, before: (after, False))
     gh = _LiveBodyGh(str(tmp_path), script, fixture={"pr_number": 9888})
-    remediation = ([{"raise": {"kind": kind, "detail": "no"}}] if kind
+    remediation = ([{"raise": {"kind": kind,
+                               "detail": ADR_DENIAL if kind == "local-gate" else "no"}}]
+                   if kind
                    else ["looked, changed nothing"])
     git = _counting_git(commit_returns=commits) if commits else _counting_git()
     lines: list[str] = []

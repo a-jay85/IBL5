@@ -137,6 +137,69 @@ class SeasonHighsRepositoryTest extends DatabaseTestCase
         self::assertSame([], $result['BLOCKS']);
     }
 
+    public function testGetSeasonHighsBatchTeamBranchPinsRowsAndOrder(): void
+    {
+        // Rows B and C are both team rows of one game, so they tie on value
+        // and date. The ascending box-score id must order them.
+        $idA = $this->insertTeamBoxscoreRow('2098-03-05', 'Metros', 1, 1, 2);
+        $idB = $this->insertTeamBoxscoreRow('2098-03-06', 'Stars', 1, 2, 3);
+        $idC = $this->insertTeamBoxscoreRow('2098-03-06', 'Cougars', 1, 2, 3);
+        $idF = $this->insertTeamBoxscoreRow('2098-03-01', 'Metros', 1, 1, 3);
+        // One day past the end of the range: must be excluded.
+        $idE = $this->insertTeamBoxscoreRow('2098-04-01', 'Metros', 1, 1, 2);
+
+        $this->setTeamBoxscoreAssists($idA, 31);
+        $this->setTeamBoxscoreAssists($idB, 27);
+        $this->setTeamBoxscoreAssists($idC, 27);
+        $this->setTeamBoxscoreAssists($idF, 12);
+        $this->setTeamBoxscoreAssists($idE, 50);
+
+        $result = $this->repo->getSeasonHighsBatch(
+            ['ASSISTS' => '`game_ast`'],
+            '_teams',
+            '2098-03-01',
+            '2098-03-31',
+        );
+
+        self::assertSame(['ASSISTS'], array_keys($result));
+        $rows = $result['ASSISTS'];
+        self::assertSame(['Metros', 'Stars', 'Cougars', 'Metros'], array_column($rows, 'name'));
+        self::assertSame([31, 27, 27, 12], array_column($rows, 'value'));
+        self::assertSame([1, 2, 3, 1], array_column($rows, 'teamid'));
+        self::assertSame(['2098-03-05', '2098-03-06', '2098-03-06', '2098-03-01'], array_column($rows, 'date'));
+        self::assertSame([$idA, $idB, $idC, $idF], array_column($rows, 'sortId'));
+    }
+
+    public function testGetSeasonHighsBatchTeamBranchExcludesUnmatchedTeamName(): void
+    {
+        // 'NoSuchTeam' has no ibl_team_info row. The inner join must drop it
+        // even though it holds the highest value in range.
+        $idUnmatched = $this->insertTeamBoxscoreRow('2098-03-07', 'NoSuchTeam', 1, 1, 2);
+        $idStars = $this->insertTeamBoxscoreRow('2098-03-08', 'Stars', 1, 2, 1);
+
+        $this->setTeamBoxscoreAssists($idUnmatched, 40);
+        $this->setTeamBoxscoreAssists($idStars, 9);
+
+        $result = $this->repo->getSeasonHighsBatch(
+            ['ASSISTS' => '`game_ast`'],
+            '_teams',
+            '2098-03-07',
+            '2098-03-08',
+        );
+
+        self::assertSame(['Stars'], array_column($result['ASSISTS'], 'name'));
+        self::assertSame([9], array_column($result['ASSISTS'], 'value'));
+    }
+
+    private function setTeamBoxscoreAssists(int $boxId, int $assists): void
+    {
+        $stmt = $this->db->prepare('UPDATE `ibl_box_scores_teams` SET `game_ast` = ? WHERE `id` = ?');
+        self::assertNotFalse($stmt, 'Failed to prepare game_ast UPDATE: ' . $this->db->error);
+        $stmt->bind_param('ii', $assists, $boxId);
+        $stmt->execute();
+        $stmt->close();
+    }
+
     public function testGetRcbSeasonHighsReturnsRows(): void
     {
         // Insert test data within transaction to avoid seed dependency issues

@@ -1,6 +1,6 @@
 ---
 name: plan-architect
-description: Software architect that designs implementation plans for the /plan command. Returns a step-by-step plan, identifies the critical files, and weighs architectural trade-offs. Runs at high effort. Use only as the Step-3 planning agent invoked by /plan. It is the default tier. The tier is an Opus judgment that bin/plan-tier-hint makes (see /plan Step 3).
+description: Opus planner for /plan and the default tier. Returns a phased implementation plan with critical files and trade-offs. Use only as the planning agent selected by /plan Step 3.
 model: opus
 effort: high
 disallowedTools: ExitPlanMode, Edit, Write, NotebookEdit

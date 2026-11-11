@@ -1,6 +1,6 @@
 ---
 name: plan-architect-xhigh
-description: Software architect for high-stakes implementation plans, running on Fable at high effort (Fable 5.2 is 2 times Opus 5.5 per token). Selected only when Opus is judged likely to get the plan wrong AND a wrong plan would be expensive. The tier is an Opus judgment that bin/plan-tier-hint makes (see /plan Step 3). Use only as the Step-3 escalated planning agent invoked by /plan.
+description: Fable planner for /plan, for a high-stakes plan that Opus would likely get wrong. Use only as the planning agent selected by /plan Step 3.
 model: fable
 effort: high
 disallowedTools: ExitPlanMode, Edit, Write, NotebookEdit

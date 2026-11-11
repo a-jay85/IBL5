@@ -1,6 +1,6 @@
 ---
 name: automouse-delegate
-description: Executes exactly one `### Delegate` packet from a plan phase during an automouse implementation run. Pinned to Sonnet 5.5 so the delegate tier stays fixed when the `sonnet` alias moves. Use only as the Sonnet-tier delegate target named by bin/automouse/prompt-impl; omit the model param so the pin wins.
+description: Runs one `### Delegate` packet from a plan phase in an automouse run. Spawned by name from bin/automouse/prompt-impl and pinned to Sonnet 5.5, so omit the model param.
 model: claude-sonnet-5-5
 disallowedTools: Agent, Artifact, ExitPlanMode
 ---

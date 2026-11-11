@@ -72,7 +72,17 @@ wtlock_acquire() {
         echo unknown; return 1
     fi
     wtlock_pid_dead "$old" || { printf '%s\n' "$old"; return 1; }
-    rm -rf "$d"
+    # Move the stale dir aside atomically so only one racer takes it, then confirm it still
+    # holds the dead pid. If another run already replaced it, put the new lock back and refuse.
+    local stale="$d.stale.$$.$RANDOM" got
+    if mv "$d" "$stale" 2>/dev/null; then
+        got=$(wtlock_read_pid "$stale") || got=""
+        if [ "$got" != "$old" ]; then
+            mv "$stale" "$d" 2>/dev/null || rm -rf "$stale"
+            printf '%s\n' "${got:-unknown}"; return 1
+        fi
+        rm -rf "$stale"
+    fi
     if mkdir "$d" 2>/dev/null; then wtlock_write_pid "$d" "$me" || { echo unknown; return 1; }; return 0; fi
     echo unknown; return 1
 }

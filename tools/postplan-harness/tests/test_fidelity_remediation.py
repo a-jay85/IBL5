@@ -296,8 +296,8 @@ def test_extract_notes_returns_list_from_llm(tmp_path):
     assert result == notes_fixture
 
 
-def test_extract_notes_keeps_only_followup_kind(tmp_path):
-    """The three junk kinds — and an absent kind — are dropped; only followup files."""
+def test_extract_notes_keeps_followup_and_misstated_pr_copy(tmp_path):
+    """Followups and misstated pr-copy notes file; every other kind and an absent kind drop."""
     notes_fixture = [
         {"title": "Assert the parsed value, not itself", "kind": "followup",
          "detail": "The new test compares a value to itself, so it cannot fail."},
@@ -313,7 +313,9 @@ def test_extract_notes_keeps_only_followup_kind(tmp_path):
     ]
     llm = FixtureLlm(UsageLedger(), {"fidelity-notes": notes_fixture})
     result = fidelity.extract_notes(llm, _verdict(tmp_path, "READY WITH NOTES"))
-    assert [n["title"] for n in result] == ["Assert the parsed value, not itself"]
+    assert [n["title"] for n in result] == [
+        "Assert the parsed value, not itself",
+        "Remove the stale Residual Phases block from PR body"]
 
 
 def test_extract_notes_drops_followups_that_say_already_done(tmp_path):

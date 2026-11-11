@@ -25,7 +25,21 @@ with open(_CORPUS_PATH, encoding="utf-8") as _fh:
 _ENTRY_COUNT = 430
 _PR_COPY_NOTES = 524
 _KEPT_FOLLOWUPS = 73
-_KEPT_PR_COPY = 0
+_KEPT_PR_COPY = 60
+
+_OMISSION_TITLES = (
+    "Mention the jq-failure fallback in the PR body",
+    "Add Phase 4.5 rollback loop to PR #3105 body",
+    "Document inline dispose_entry move in PR body",
+    "Add before and after corpus histograms to the PR body",
+    "Mention the two new exit 10 messages in the PR body",
+)
+_MISSTATEMENT_TITLES = (
+    "Remove the stale Residual Phases block from PR body",
+    "Regenerate the stale scope-notes block in PR body",
+    "Fix false positives in PR body's Unplanned changes block",
+    "Reword PR body claim that merge danger derivation changed",
+)
 
 
 @pytest.fixture(scope="module")
@@ -56,3 +70,37 @@ def test_corpus_kept_followup_count_pinned(kept_by_run):
 
 def test_corpus_kept_pr_copy_count(kept_by_run):
     assert _count(kept_by_run, "pr-copy") == _KEPT_PR_COPY
+
+
+def test_corpus_followups_precede_pr_copy_in_every_run(kept_by_run):
+    for run, notes in kept_by_run.items():
+        kinds = [n.get("kind") for n in notes]
+        if "pr-copy" in kinds:
+            first_pc = kinds.index("pr-copy")
+            assert "followup" not in kinds[first_pc:], run
+
+
+def _fixture_titles():
+    return {n["title"] for e in _ENTRIES for n in e["notes"]}
+
+
+def _kept_titles(kept_by_run):
+    return {n["title"] for notes in kept_by_run.values() for n in notes}
+
+
+def test_corpus_omission_notes_never_file(kept_by_run):
+    present = _fixture_titles()
+    for title in _OMISSION_TITLES:
+        assert title in present, title
+    kept = _kept_titles(kept_by_run)
+    for title in _OMISSION_TITLES:
+        assert title not in kept, title
+
+
+def test_corpus_misstatement_notes_file(kept_by_run):
+    present = _fixture_titles()
+    for title in _MISSTATEMENT_TITLES:
+        assert title in present, title
+    kept = _kept_titles(kept_by_run)
+    for title in _MISSTATEMENT_TITLES:
+        assert title in kept, title

@@ -1,0 +1,26 @@
+diff --git a/tools/demo/greet.py b/tools/demo/greet.py
+new file mode 100644
+index 0000000..1a2b3c4
+--- /dev/null
++++ b/tools/demo/greet.py
+@@ -0,0 +1,5 @@
++"""Greeting helper."""
++
++
++def greet(name=None):
++    return f"hello {name or 'world'}"
+diff --git a/tools/demo/tests/test_greet.py b/tools/demo/tests/test_greet.py
+new file mode 100644
+index 0000000..1a2b3c4
+--- /dev/null
++++ b/tools/demo/tests/test_greet.py
+@@ -0,0 +1,9 @@
++from tools.demo.greet import greet
++
++
++def test_default():
++    assert greet() == "hello world"
++
++
++def test_named():
++    assert greet("bob") == "hello bob"

@@ -669,10 +669,19 @@ def _seeded_door(case):
     return md.derive_merge_danger(changed, text, [], lambda _path: None)
 
 
+def test_procedure_6f_prefers_matrix_over_file_list():
+    from pathlib import Path
+    text = (Path(__file__).resolve().parents[3] / ".claude/review-shared/_plan-fidelity-review.md").read_text()
+    start = text.index("**6f.")
+    nxt = text.find("\n**6", start + 1)
+    section = text[start:nxt if nxt != -1 else len(text)]
+    assert "When the Verification Matrix and the file list disagree, follow the test table." in section
+
+
 class TestSeededCases:
     def test_seeded_cases_well_formed(self):
         cases = _seeded_cases()
-        assert len(cases) == 7
+        assert len(cases) == 8
         for case in cases:
             assert set(os.listdir(os.path.join(SEEDED, case))) == _SEEDED_FILES, case
             data = json.loads(_seeded_read(case, "expect.json"))

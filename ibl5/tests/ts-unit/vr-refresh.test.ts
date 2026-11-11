@@ -475,6 +475,14 @@ describe('singleDispatchError', () => {
     expect(singleDispatchError({ kind: 'single', pr: 7 }, skippedSel, tidy)).toBeNull();
   });
 
+  it('single dispatch with only a banner action or noop is still an error', () => {
+    const sel = { targets: [], skipped: [{ pr: 7, reason: 'behind-master' as const }] };
+    const action = { actions: [{ pr: 7, kind: 'banner' as const, base: 'master', staleSha: 'abc' }], noops: [] };
+    const noop = { actions: [], noops: [{ pr: 7, kind: 'banner' as const }] };
+    expect(singleDispatchError({ kind: 'single', pr: 7 }, sel, action)).toContain('behind-master');
+    expect(singleDispatchError({ kind: 'single', pr: 7 }, sel, noop)).toContain('behind-master');
+  });
+
   it('non-single modes never raise a dispatch error', () => {
     const tidy = { actions: [], noops: [] };
     expect(singleDispatchError({ kind: 'stale', staleDays: 7 }, skippedSel, tidy)).toBeNull();

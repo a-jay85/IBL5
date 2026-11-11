@@ -320,7 +320,13 @@ export function singleDispatchError(mode: SelectMode, sel: Selection, tidy: Tidy
   if (mode.kind !== 'single') return null;
   const n = mode.pr;
   if (sel.targets.some((t) => t.pr === n)) return null;
-  if (tidy.actions.some((a) => a.pr === n) || tidy.noops.some((a) => a.pr === n)) return null;
+  // Only a cleanup (stacked PR, nothing to refresh) excuses the skip. A banner means the PR still has a stale gallery.
+  if (
+    tidy.actions.some((a) => a.pr === n && a.kind === 'cleanup') ||
+    tidy.noops.some((a) => a.pr === n && a.kind === 'cleanup')
+  ) {
+    return null;
+  }
   const reason: SkipReason = sel.skipped.find((s) => s.pr === n)?.reason ?? 'not-open';
   if (reason === 'fresh') return null;
   return `PR #${n} was not refreshed: ${reason} (${SKIP_REASON_TEXT[reason]})`;

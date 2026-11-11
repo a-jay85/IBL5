@@ -89,7 +89,7 @@ class SeasonHighsRepository extends \Database\BaseMysqliRepository implements Se
                     COALESCE(bs.`game_of_that_day`, 0) AS game_of_that_day,
                     (" . $statExpression . ") AS stat_value
                     FROM `ibl_box_scores_teams` bs
-                    JOIN `ibl_team_info` t ON bs.name = t.team_name
+                    STRAIGHT_JOIN `ibl_team_info` t ON bs.name = t.team_name
                     LEFT JOIN `ibl_schedule` sch ON sch.game_date = bs.game_date AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
                     WHERE bs.`game_date` BETWEEN ? AND ?
                     ORDER BY stat_value DESC, bs.`game_date` ASC, bs.`id` ASC

@@ -413,6 +413,10 @@ describe('VR path filter', () => {
     ]) {
       expect(isVrRelevantPath(p), p).toBe(false);
     }
+    // A near miss of the `ibl5/tests/e2e/**` dir glob. It is still relevant, but only through
+    // `**.ts`; the same name ending in .md (above) is not. A `*` that compiled to `.*` would
+    // also match docker-compose/x.yml, which the list above rejects.
+    expect(isVrRelevantPath('ibl5/tests/e2e-old/x.ts')).toBe(true);
   });
 
   it('VR_RELEVANT_PATHS equals the e2e-tests push paths', () => {

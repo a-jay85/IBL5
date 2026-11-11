@@ -10,7 +10,7 @@ use TradeSuggestions\Valuation\CapRoomAsset;
 
 /**
  * Cheap legality screen before scoring. It encodes two league rules and
- * nothing more (docs/LEAGUE_RULES.md § Trades): after the trade every team is
+ * nothing more (ibl5/docs/LEAGUE_RULES.md § Trades): after the trade every team is
  * at or under 15 players (injured players count) and at or under the hard
  * cap. Picks move no salary and take no roster spot. `Trading\TradeValidator`
  * stays the final gate.

@@ -9,6 +9,13 @@ export const GALLERY_DIR_RE = /github\.io\/IBL5\/(?:([0-9a-f]{40})|pr\/([1-9][0-
 export const VISUAL_REVIEW_MARKER = '<!-- Sticky Pull Request Commentvisual-review -->';
 export const DEFAULT_STALE_DAYS = 7;
 export const DEFAULT_MAX_PRS = 10;
+export const MANUAL_ROW_MARKER = '<!-- Sticky Pull Request Commentmanual-row-screenshots -->';
+export const BASE_SHA_MARKER_RE = /<!-- vr-base-sha: ([0-9a-f]{40}) -->/;
+export const STALE_BANNER_MARKER = '<!-- vr-stale-banner -->';
+export const STALE_BANNER_TEXT = 'Taken against an older master. Push or run VR Refresh to update.';
+export const STACKED_NOTE_PREFIX = 'Screenshots removed while this PR is stacked on';
+// Begin markers of the two PR-body VR blocks. vr-pr-body.ts owns them; a ts-unit drift test pins equality.
+export const VR_BODY_BEGIN_MARKERS = ['<!-- vr-new-screens:begin -->', '<!-- vr-agent-shots:begin -->'] as const;
 
 export interface OpenPr {
   number: number;
@@ -46,9 +53,42 @@ export interface Selection {
   targets: RefreshTarget[];
   skipped: { pr: number; reason: SkipReason }[];
 }
+export type TidyKind = 'cleanup' | 'banner';
+export interface TidyAction {
+  pr: number;
+  kind: TidyKind;
+  base: string; // the PR's base ref; 'master' for a banner
+  staleSha: string | null; // banner only: the base-sha marker the comment carried, null = none
+}
+export interface TidyPlan {
+  actions: TidyAction[];
+  noops: { pr: number; kind: TidyKind }[]; // already in the target state
+}
 
 const SECONDS_PER_DAY = 86400;
 const SHA_40_RE = /^[0-9a-f]{40}$/;
+
+export function baseShaMarker(sha: string): string {
+  return `<!-- vr-base-sha: ${sha.toLowerCase()} -->`;
+}
+export function parseBaseSha(text: string): string | null {
+  const m = BASE_SHA_MARKER_RE.exec(text);
+  return m === null ? null : (m[1] as string);
+}
+export function staleBannerLine(): string {
+  return `> ⚠️ ${STALE_BANNER_TEXT} ${STALE_BANNER_MARKER}`;
+}
+export function normalizeComment(text: string): string {
+  return text.replace(/\r\n/g, '\n').trim();
+}
+// The whole visual-review comment body for a stacked PR: one visible line, plus the
+// marocchino header marker so the next E2E sticky post overwrites this same comment.
+export function stackedNoteBody(base: string): string {
+  return `${STACKED_NOTE_PREFIX} \`${base.replace(/`/g, '')}\`. They come back when it targets master.\n${VISUAL_REVIEW_MARKER}`;
+}
+export function isStackedNote(comment: string): boolean {
+  return comment.includes(STACKED_NOTE_PREFIX);
+}
 
 // Every gallery-URL SHA in text: lowercased, de-duplicated, first-appearance order.
 export function extractGalleryShas(text: string): string[] {

@@ -682,6 +682,7 @@ jobs:
             --gallery=ibl5/vr-gallery.json \
             --coverage=coverage.json \
             --pages-url="https://a-jay85.github.io/IBL5/$VRCTX_KEY/visual-review/" \
+            --base-sha="$VRCTX_BASE_SHA" \
             --out=vr-review-comment.md
           cat vr-review-comment.md
 

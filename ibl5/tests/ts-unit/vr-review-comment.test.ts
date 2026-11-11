@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { VrRow } from '../e2e/vr-manifest';
 import {
+  applyStaleBanner,
   buildComment,
   classifyCells,
   titleToModule,
@@ -258,5 +259,33 @@ describe('buildComment — change-driven prose truth (V6b/V6c)', () => {
     });
     expect(md).not.toContain('stays red until then');
     expect(md).not.toContain('failed to render');
+  });
+});
+
+describe('base-sha marker and stale banner', () => {
+  const SHA = 'a'.repeat(40);
+  const input = {
+    diffCells: [{ module: 'standings', viewport: 'desktop', title: 'standings' }] as DiffCell[],
+    uncoveredChangedPaths: [],
+    globalChange: false,
+    pagesUrl: PAGES_URL,
+  };
+
+  it('buildComment writes the base-sha marker', () => {
+    const md = buildComment({ ...input, baseSha: SHA });
+    expect(md.split('\n')[0]).toBe(`<!-- vr-base-sha: ${SHA} -->`);
+  });
+
+  it('buildComment without baseSha has no marker', () => {
+    expect(buildComment(input)).not.toContain('vr-base-sha');
+    expect(buildComment({ ...input, baseSha: '' })).not.toContain('vr-base-sha');
+  });
+
+  it('applyStaleBanner is idempotent', () => {
+    const body = `## Visual review\n\nbody\n<!-- Sticky Pull Request Commentvisual-review -->`;
+    const once = applyStaleBanner(body);
+    expect(once).toContain('<!-- vr-stale-banner -->');
+    expect(applyStaleBanner(once)).toBe(once);
+    expect(once).toContain('<!-- Sticky Pull Request Commentvisual-review -->');
   });
 });

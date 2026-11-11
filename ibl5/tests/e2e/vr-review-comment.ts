@@ -5,6 +5,7 @@
 //
 // Follows the "script writes a .md consumed by marocchino" sticky-comment pattern.
 import type { VrRow, Viewport } from './vr-manifest';
+import { baseShaMarker, STALE_BANNER_MARKER, staleBannerLine } from './vr-refresh';
 
 export const COMMENT_HEADER = '🖼️ Visual review';
 
@@ -60,6 +61,8 @@ export type BuildCommentInput = {
   globalChange: boolean;
   /** Per-SHA Pages base URL, e.g. https://a-jay85.github.io/IBL5/<sha>/visual-review/ */
   pagesUrl: string;
+  /** Master SHA the gallery was shot against; written as a hidden marker VR Refresh reads. */
+  baseSha?: string;
 };
 
 function reportLink(pagesUrl: string, title: string): string {
@@ -81,6 +84,7 @@ export function buildComment(input: BuildCommentInput): string {
   const hasPixelWork = diffCells.length > 0; // changed + new are both DiffCells
   const lines: string[] = [];
 
+  if (input.baseSha !== undefined && input.baseSha !== '') lines.push(baseShaMarker(input.baseSha));
   lines.push(`## ${COMMENT_HEADER}`);
   lines.push('');
 
@@ -205,4 +209,11 @@ export function buildComment(input: BuildCommentInput): string {
   }
 
   return lines.join('\n').replace(/\n+$/, '') + '\n';
+}
+
+// Prepends the stale-master banner once. A fresh publish rebuilds the comment through
+// buildComment, which never emits the banner, so the banner drops on the next run.
+export function applyStaleBanner(body: string): string {
+  if (body.includes(STALE_BANNER_MARKER)) return body;
+  return `${staleBannerLine()}\n\n${body}`;
 }

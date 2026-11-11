@@ -63,7 +63,7 @@ Runs pending SQL migrations against a Docker MariaDB container. Tracks applied m
 
 ## Local Database Integration Tests
 
-Moved to `.claude/rules/database-access-detail.md` § Local Database Integration Tests. In a worktree, ALWAYS run DB-integration tests via `bin/db-test-up <slug>`, never a hand-run host-side `phpunit --group database`.
+Moved to `.claude/rules/database-access-detail.md` § Local Database Integration Tests. In a worktree, ALWAYS run DB-integration tests via `bin/db-test-up <slug>`. A hand-run host-side `phpunit --group database` is the wrong path.
 
 ## MariaDB Strict Mode & Triggers
 

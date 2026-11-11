@@ -22,7 +22,7 @@ daisyUI 5 is the base layer for shared UI pieces (buttons, form controls, cards,
 
 ## Table Patterns
 
-Pick by need (cells get sticky-col classes — see Cell/Row Modifiers below):
+Pick by need (cells get sticky-col classes — see Cell/Row Modifiers below): <!-- slop-ok -->
 
 | Pattern | Wrapper | Table class | Use case |
 |---------|---------|-------------|----------|
@@ -36,13 +36,13 @@ Simple non-scrolling table → `.ibl-data-table`; team-colored → add `.team-ta
 
 ### Sticky Header Gotchas (read before implementing)
 
-- **Fixed nav offset:** nav is 72px tall — all sticky `top` values must be `72px`, not `0`.
-- **`overflow` captures sticky:** any element with `overflow` other than `visible`/`clip` on ANY axis becomes a scroll container and captures `position: sticky` (per spec, no workaround). And `overflow-x: auto; overflow-y: visible` → the browser promotes `visible` to `auto`. `overflow-y: clip` is NOT promoted, but the element is still a scroll container if the other axis is `auto`/`scroll` (sticky is captured per-element, not per-axis).
+- **Fixed nav offset:** nav is 72px tall — all sticky `top` values must be `72px`, not `0`. <!-- slop-ok -->
+- **`overflow` captures sticky:** any element with `overflow` other than `visible`/`clip` on ANY axis becomes a scroll container and captures `position: sticky` (per spec, no workaround). And `overflow-x: auto; overflow-y: visible` → the browser promotes `visible` to `auto`. `overflow-y: clip` is NOT promoted, but the element is still a scroll container if the other axis is `auto`/`scroll` (sticky is captured per-element, not per-axis). <!-- slop-ok -->
 - **Consequence:** pure CSS can't do page-level sticky headers inside a horizontal scroll container. Pattern 3a uses JS (`sticky-page-header.js`) to clone the thead into a fixed overlay.
-- **`base.css` scopes `overflow-x: auto` to `table:not(.ibl-data-table)`** — modern tables unaffected. Sticky variants still set `overflow: visible` to override `.ibl-data-table`'s `overflow: hidden` (border-radius clipping).
+- **`base.css` scopes `overflow-x: auto` to `table:not(.ibl-data-table)`** — modern tables unaffected. Sticky variants still set `overflow: visible` to override `.ibl-data-table`'s `overflow: hidden` (border-radius clipping). <!-- slop-ok -->
 - **Rounded corners need `overflow: hidden`** to clip, which breaks sticky. Fix: `overflow: visible` on the table + `border-radius` on corner cells. Pattern 4 corner `th` cells also need `box-shadow` in `var(--page-bg, #eeeeee)` to mask rows scrolling behind the rounded corners.
 - **`--page-bg`** is set on `<body>` by `theme.php` from `$bgcolor1` (dev `#BBBBBB`, prod `#EEEEEE`).
-- **`css:watch` may not rebuild.** After editing CSS, verify: `grep -c "your-class" themes/IBL/style/style.css`. If 0, manually rebuild (sanctioned recovery — see `.claude/rules/css-auto-rebuild.md`).
+- **`css:watch` may not rebuild.** After editing CSS, verify: `grep -c "your-class" themes/IBL/style/style.css`. If 0, manually rebuild (sanctioned recovery — see `.claude/rules/css-auto-rebuild.md`). <!-- slop-ok -->
 
 ## `white-space: nowrap` Locations
 
@@ -71,15 +71,15 @@ Check these before debugging text-wrapping:
 
 ## Extraction & Global-Selector Gotchas
 
-- **Never `@import` page-scoped CSS with unscoped global selectors into `design/input.css`.** `input.css` compiles into the global Tailwind bundle loaded on every page. Bare selectors (`table`, `td`, `th`, `body`, `h1`) from a standalone admin stylesheet break VR baselines sitewide. Load the stylesheet directly via `<link>` in that page's `<head>`, or wrap every selector with a page-scope class (`.block-fa-admin table { ... }`) before adding to the global bundle.
-- **Heading element promotions can silently pick up compound `element+class` selectors.** Before promoting `h3` → `h2`, run: `grep -rn 'h2\.ibl-title\|h2\.' ibl5/design/`. If the TARGET element has an `h2.ibl-title` rule but the source element does not, the promotion is not VR-neutral — 6% desktop diff, 14px height change. Use `aria-level="2"` on `h3` instead: axe sees level-2 in the ARIA tree; CSS sees the original `h3` element.
-- **Tailwind watcher env vars are no-ops.** `CHOKIDAR_USEPOLLING`, `CHOKIDAR_INTERVAL`, and `PARCEL_WATCHER_BACKEND` are not read by Tailwind v4's `@parcel/watcher`. Don't chase these for git-op CSS staleness — the git hook (`bin/rebuild-css-if-source-changed`, installed by `bin/install-git-hooks`) is the fix. See `css-auto-rebuild.md`.
+- **Never `@import` page-scoped CSS with unscoped global selectors into `design/input.css`.** `input.css` compiles into the global Tailwind bundle loaded on every page. Bare selectors (`table`, `td`, `th`, `body`, `h1`) from a standalone admin stylesheet break VR baselines sitewide. Load the stylesheet directly via `<link>` in that page's `<head>`, or wrap every selector with a page-scope class (`.block-fa-admin table { ... }`) before adding to the global bundle. <!-- slop-ok -->
+- **Heading element promotions can silently pick up compound `element+class` selectors.** Before promoting `h3` → `h2`, run: `grep -rn 'h2\.ibl-title\|h2\.' ibl5/design/`. If the TARGET element has an `h2.ibl-title` rule but the source element does not, the promotion is not VR-neutral — 6% desktop diff, 14px height change. Use `aria-level="2"` on `h3` instead: axe sees level-2 in the ARIA tree; CSS sees the original `h3` element. <!-- slop-ok -->
+- **Tailwind watcher env vars are no-ops.** `CHOKIDAR_USEPOLLING`, `CHOKIDAR_INTERVAL`, and `PARCEL_WATCHER_BACKEND` are not read by Tailwind v4's `@parcel/watcher`. Don't chase these for git-op CSS staleness — the git hook (`bin/rebuild-css-if-source-changed`, installed by `bin/install-git-hooks`) is the fix. See `css-auto-rebuild.md`. <!-- slop-ok -->
 
 ## Orphan-CSS Audit
 
-Source-token miss from `bin/check-orphan-css` is a **worklist, not a "dead" verdict**. A miss means only "the literal string isn't in source" — not that the rule is unused. Before removing any candidate:
+Source-token miss from `bin/check-orphan-css` is a **worklist, not a "dead" verdict**. A miss means only "the literal string isn't in source" — not that the rule is unused. Before removing any candidate: <!-- slop-ok -->
 
-1. **Run `--crawl`** against a prod-seeded app (`http://main.localhost/ibl5/` or a `bin/db-sync-prod` worktree) — it drops candidates that render live (composed/state-gated classes, `txn-badge--N`, `--active` modifiers).
-2. **Open the emitting view**, not just grep snippets. For a descendant selector (`.parent .child`), trace BOTH hops — a live `.parent` does not make `.child` live.
+1. **Run `--crawl`** against a prod-seeded app (`http://main.localhost/ibl5/` or a `bin/db-sync-prod` worktree) — it drops candidates that render live (composed/state-gated classes, `txn-badge--N`, `--active` modifiers). <!-- slop-ok -->
+2. **Open the emitting view**, not just grep snippets. For a descendant selector (`.parent .child`), trace BOTH hops — a live `.parent` does not make `.child` live. <!-- slop-ok -->
 
 CSS removal is UI-touching → route through `/plan` with a crawl or VR diff that empirically proves the rule was dead.

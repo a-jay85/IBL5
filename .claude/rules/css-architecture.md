@@ -91,7 +91,7 @@ Moved to `.claude/rules/css-architecture-detail.md` § Extraction & Global-Selec
 
 ## Orphan-CSS Audit
 
-Moved to `.claude/rules/css-architecture-detail.md` § Orphan-CSS Audit. A `bin/check-orphan-css` miss is a worklist, not a dead verdict; run `--crawl` and open the emitting view before removing any candidate.
+Moved to `.claude/rules/css-architecture-detail.md` § Orphan-CSS Audit. A `bin/check-orphan-css` miss is a worklist. Run `--crawl` and open the emitting view before removing any candidate.
 
 ## Mobile-Only Scope
 

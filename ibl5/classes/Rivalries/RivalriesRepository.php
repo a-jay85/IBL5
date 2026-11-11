@@ -47,6 +47,9 @@ final class RivalriesRepository extends \Database\BaseMysqliRepository implement
     private const GAME_COLUMNS = 'game_date, game_of_that_day, season_year, game_type, visitor_teamid, home_teamid,
     visitor_label, home_label, visitor_pts AS visitor_points, home_pts AS home_points';
 
+    /** @var array<string, list<array{game_date: string, game_of_that_day: int, visitor_teamid: int, home_teamid: int, v_gm: string, h_gm: string}>> */
+    private array $pairGameKeys = [];
+
     /**
      * The pair game list columns, plus each side's era colors.
      */
@@ -135,7 +138,10 @@ FROM games
 WHERE (visitor_teamid = ? AND home_teamid = ?) OR (visitor_teamid = ? AND home_teamid = ?)
 ORDER BY game_date ASC, game_of_that_day ASC, visitor_teamid ASC';
 
-        return $this->mapGames($this->fetchAll($sql, 'iiiiiiii', $a, $b, $b, $a, $a, $b, $b, $a));
+        $rows = $this->fetchAll($sql, 'iiiiiiii', $a, $b, $b, $a, $a, $b, $b, $a);
+        $this->rememberPairGames('team|' . $a . '|' . $b, $rows);
+
+        return $this->mapGames($rows);
     }
 
     /**
@@ -156,6 +162,7 @@ WHERE v_gm <> h_gm AND ((v_gm = ? AND h_gm = ?) OR (v_gm = ? AND h_gm = ?))
 ORDER BY game_date ASC, game_of_that_day ASC, visitor_teamid ASC';
 
         $rows = $this->fetchAll($sql, $resolution['types'] . 'ssss', ...$resolution['params'], ...[$a, $b, $b, $a]);
+        $this->rememberPairGames('gm|' . $a . '|' . $b, $rows);
 
         return $this->mapGames($rows);
     }
@@ -214,6 +221,11 @@ ORDER BY year ASC, round ASC, winner_tid ASC, loser_tid ASC',
      */
     public function getFranchiseTopPerformers(int $a, int $b): array
     {
+        $memo = $this->memoTopPerformers('team|' . $a . '|' . $b, self::TEAM_SIDE_EXPR);
+        if ($memo !== null) {
+            return $memo;
+        }
+
         $pairCte = $this->gamesCte(self::FRANCHISE_PAIR_FILTER) . ',
 pair_games AS (
     SELECT * FROM games
@@ -228,6 +240,11 @@ pair_games AS (
      */
     public function getGmTopPerformers(string $a, string $b): array
     {
+        $memo = $this->memoTopPerformers('gm|' . $a . '|' . $b, self::GM_SIDE_EXPR);
+        if ($memo !== null) {
+            return $memo;
+        }
+
         $resolution = $this->gmPairResolution($a, $b);
         if ($resolution === null) {
             return ['totals' => [], 'highs' => []];
@@ -482,6 +499,60 @@ ORDER BY id ASC',
             'types' => str_repeat('iii', 2 * count($spans)),
             'params' => [...$params, ...$params],
         ];
+    }
+
+    /**
+     * Keeps one pair's game keys for this request, so performers can skip the CTE chain.
+     * A row with a NULL game key column is never memoized, since NULL never joins.
+     *
+     * @param array<int, array<string, mixed>> $rows
+     */
+    private function rememberPairGames(string $key, array $rows): void
+    {
+        $games = [];
+        foreach ($rows as $row) {
+            if (($row['game_of_that_day'] ?? null) === null) {
+                return;
+            }
+            $games[] = [
+                'game_date' => self::str($row['game_date'] ?? null),
+                'game_of_that_day' => self::int($row['game_of_that_day']),
+                'visitor_teamid' => self::int($row['visitor_teamid'] ?? null),
+                'home_teamid' => self::int($row['home_teamid'] ?? null),
+                'v_gm' => self::str($row['visitor_side'] ?? null),
+                'h_gm' => self::str($row['home_side'] ?? null),
+            ];
+        }
+        $this->pairGameKeys[$key] = $games;
+    }
+
+    /**
+     * Top performers from memoized pair games; null when this pair's games were not fetched yet.
+     *
+     * @return array{totals: list<PerformerTotal>, highs: list<PerformerHigh>}|null
+     */
+    private function memoTopPerformers(string $key, string $sideExpr): ?array
+    {
+        if (!array_key_exists($key, $this->pairGameKeys)) {
+            return null;
+        }
+        if ($this->pairGameKeys[$key] === []) {
+            return ['totals' => [], 'highs' => []];
+        }
+
+        $selects = [];
+        $params = [];
+        foreach ($this->pairGameKeys[$key] as $game) {
+            $selects[] = 'SELECT CAST(? AS DATE) AS game_date, ? AS game_of_that_day, ? AS visitor_teamid, ? AS home_teamid, ? AS v_gm, ? AS h_gm';
+            array_push($params, $game['game_date'], $game['game_of_that_day'], $game['visitor_teamid'], $game['home_teamid'], $game['v_gm'], $game['h_gm']);
+        }
+
+        return $this->topPerformers(
+            "WITH pair_games AS (\n    " . implode("\n    UNION ALL ", $selects) . "\n)",
+            $sideExpr,
+            str_repeat('siiiss', count($selects)),
+            $params,
+        );
     }
 
     /**

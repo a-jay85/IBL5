@@ -186,7 +186,7 @@ setup_ppn() {
     printf '#!/bin/sh\nexit 1\n' > "$PPN/shims/security"
     printf '#!/bin/sh\nexit 0\n' > "$PPN/shims/launchctl"
     # claude shim sits in $HOME/.local/bin, which $CMD's own PATH export keeps.
-    printf '#!/bin/sh\nsleep "${FAKE_CLAUDE_SLEEP:-0}"\nexit 0\n' > "$PPN/.local/bin/claude"
+    printf '#!/bin/sh\n[ -z "${FAKE_CLAUDE_MARK:-}" ] || : > "$FAKE_CLAUDE_MARK"\nsleep "${FAKE_CLAUDE_SLEEP:-0}"\nexit 0\n' > "$PPN/.local/bin/claude"
     chmod +x "$PPN/shims/security" "$PPN/shims/launchctl" "$PPN/.local/bin/claude"
     unset CLAUDE_HEADLESS
     export POST_PLAN_SKILL=1  # skill engine: the fake claude shim runs, never the real harness
@@ -225,6 +225,8 @@ if should_run held-live; then
     run_ppn --foreground
     h_eq "held-live: exit 6" "6" "$PRC"
     h_contains "held-live: stdout names the lock" "$POUT" "holds the worktree lock"
+    # Only the submitter's own refusal says this; the far-side adopt refusal does not.
+    h_contains "held-live: submitter refuses before the far side" "$POUT" "refusing to start a second one"
     h_eq "held-live: holder pid untouched" "$LIVE" "$(cat "$PL/pid")"
     reset_ppn
 fi
@@ -253,13 +255,18 @@ fi
 
 if should_run release-term; then
     setup_ppn; dirty_wt; reset_ppn
-    (cd "$PWT" && FAKE_CLAUDE_SLEEP=3 POST_PLAN_MAIN_ROOT="$PMAIN" POST_PLAN_SELF_BIN="$PMAIN/bin" HOME="$PPN" \
+    rm -f "$PPN/claude-started"
+    (cd "$PWT" && FAKE_CLAUDE_SLEEP=3 FAKE_CLAUDE_MARK="$PPN/claude-started" POST_PLAN_MAIN_ROOT="$PMAIN" POST_PLAN_SELF_BIN="$PMAIN/bin" HOME="$PPN" \
         exec "$REPO/bin/post-plan-now" --foreground >/dev/null 2>&1) &
     pp=$!
-    for _ in $(seq 1 25); do
-        if [ -r "$PL/pid" ] && [ "$(cat "$PL/pid" 2>/dev/null)" = "$pp" ]; then break; fi
+    # Wait for the fake claude to start: the TERM must land on the far side of the
+    # exec, where PP_UNLOCK_TRAP releases the lock. Before that, the submitter's own
+    # EXIT trap would release it and hide a missing far-side release.
+    for _ in $(seq 1 100); do
+        if [ -e "$PPN/claude-started" ]; then break; fi
         sleep 0.2
     done
+    h_exists "release-term: run reached the far side (claude started)" "$PPN/claude-started"
     h_eq "release-term: lock holds the run's pid" "$pp" "$(cat "$PL/pid" 2>/dev/null || true)"
     kill -TERM "$pp" 2>/dev/null || true
     wait "$pp" 2>/dev/null || true

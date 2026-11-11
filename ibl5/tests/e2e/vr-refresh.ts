@@ -205,6 +205,8 @@ export function classifyTidy(prs: OpenPr[], masterSha: string, advanced: Record<
     }
     const last = visual[visual.length - 1];
     if (last === undefined || isStackedNote(last)) continue;
+    // A no-diff comment links no gallery. VR Refresh skips it as not-visual, so a banner could never clear.
+    if (linkedGalleryDir(pr) === null) continue;
     const sha = parseBaseSha(last);
     const stale = sha === null || (sha !== master && advanced[sha] !== false);
     if (!stale) continue;

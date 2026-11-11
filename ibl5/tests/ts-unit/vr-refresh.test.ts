@@ -380,6 +380,11 @@ describe('classifyTidy', () => {
     expect(plan.noops).toEqual([]);
   });
 
+  it('tidy never banners a no-diff comment that links no gallery', () => {
+    const p = pr({ comments: [`_No visual diffs detected..._\n${VISUAL_REVIEW_MARKER}`] });
+    expect(classifyTidy([p], SHA_E, {})).toEqual({ actions: [], noops: [] });
+  });
+
   it('tidy leaves an already-bannered gallery alone', () => {
     const p = pr({
       body: '',

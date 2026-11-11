@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand only (no auto-attach trigger). The inline-edit trial to 2026-11-23, its routing change for chunks under 5 files, how `bin/lib/opus-trial-cost.jq` measures it, the measurement limits, and the 2026-11-23 review command and criteria. Parent work-triage.md carries the resident rule; work-triage-detail.md links here.
-last_verified: 2026-11-01
+last_verified: 2026-11-11
 paths: ".claude/rules/work-triage-inline-trial.md"
 ---
 
@@ -35,3 +35,9 @@ bin/lib/automouse-pricer --index --since SPLIT |
 ```
 
 Keep inline if the after median is at or below baseline and both `n` ≥ 20. Otherwise restore delegation. Either way, drop the trial label from `work-triage.md` in the same PR.
+
+## Resident rule text (moved from work-triage.md)
+
+**Inline-edit trial until 2026-11-23.** When both hold and the chunk touches **fewer than 5 distinct files**, Opus edits inline, then runs the chunk's check itself. At 5 or more files, **hand off by default**, without pausing for permission, and spawn **one** Sonnet sub-agent (format: `.claude/skills/plan/_architect-contract.md` § Delegation packets for verbose phases). State the routing call in one line either way. Design and final diff review stay on Opus.
+
+**Trial review due 2026-11-23.** Command, keep-or-restore criteria, and limits: `work-triage-inline-trial.md` § Review.

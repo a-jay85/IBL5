@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for doc-freshness. NO auto-attach trigger (its `paths:` entry is out-of-repo and never matches); Read it when doc-freshness.md cites it. Covers `paths:` residency rationale and evidence, on-touch gate mechanics (future-date history, --since working-tree view), source-comment scanning, and retired-figure rationale and scope limit.
-last_verified: 2026-10-01
+last_verified: 2026-11-11
 paths:
   - "~/.claude/hooks/plan-gate-edit.sh"
 ---
@@ -13,7 +13,7 @@ Operative rules live in `doc-freshness.md`. This file holds the rationale behind
 
 - **Repo-relative only.** Verified 2026-07-28 across session transcripts: `work-triage-detail.md` attached zero times in sessions that edited the hook its `paths:` named. An out-of-repo entry is not a trigger, even when the doc exists to explain that out-of-repo file.
 - **Never glob an always-loaded rule's own path.** Compaction restore re-materializes the resident set as file attachments, and that re-materialization is itself a *touch*. A companion globbing its parent therefore re-attaches every window, self-sustaining, with no tool call touching the trigger (three companions did this until PR #1730). The per-window cost varies by session, since the restore set is "whatever was resident". Measure it on your own transcript rather than trusting a quoted figure.
-- **Broad globs are not the defect.** A deliberately broad glob aimed at a real surface (this doc's `**/*.md`, `meta-tooling-bar.md`'s `.claude/**`) re-attaches on restores too, and that is intended: both docs govern the surface being restored. The defect is a glob whose *only* purpose is to ride its parent's residency.
+- **Broad globs are not the defect.** A deliberately broad glob aimed at a real surface (this doc's list of doc directories, `meta-tooling-bar.md`'s `.claude/**`) re-attaches on restores too, and that is intended: both docs govern the surface being restored. The defect is a glob whose *only* purpose is to ride its parent's residency.
 - **Read-on-demand companions.** Legitimate when the always-loaded parent cites the companion by name at each decision point. Say so in the `description`, so the next reader doesn't assume it auto-attaches.
 
 ## On-touch gate mechanics

@@ -8,6 +8,7 @@ use PHPUnit\Framework\Attributes\Group;
 
 use RecordHolders\RecordHoldersRepository;
 use RecordHolders\RecordStatDefinitions;
+use Updater\Steps\RefreshTeamSeasonRecordsStep;
 
 #[Group('database')]
 class RecordHoldersRepositoryTest extends DatabaseTestCase
@@ -269,6 +270,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
     {
         $this->insertTeamBoxscoreRow('2098-01-15', 'Metros', 1, 2, 1);
         $this->insertTeamBoxscoreRow('2098-01-15', 'Sharks', 1, 2, 1);
+        (new RefreshTeamSeasonRecordsStep($this->db))->rebuildWithinCurrentTransaction();
 
         $result = $this->repo->getBestWorstSeasonRecord('DESC');
 
@@ -284,6 +286,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
     {
         $this->insertTeamBoxscoreRow('2098-01-15', 'Metros', 1, 2, 1);
         $this->insertTeamBoxscoreRow('2098-01-15', 'Sharks', 1, 2, 1);
+        (new RefreshTeamSeasonRecordsStep($this->db))->rebuildWithinCurrentTransaction();
 
         $result = $this->repo->getBestWorstSeasonRecord('ASC');
 
@@ -1076,6 +1079,7 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
         // Both seasons are 0.000 with 0 wins, so only year can order them.
         $this->insertGamePair('1901-01-10', 90, 100);
         $this->insertGamePair('1902-01-10', 100, 90);
+        (new RefreshTeamSeasonRecordsStep($this->db))->rebuildWithinCurrentTransaction();
 
         $result = $this->repo->getBestWorstSeasonRecord('ASC');
 

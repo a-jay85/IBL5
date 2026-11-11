@@ -605,6 +605,10 @@ class TestReviewerArmingHolds:
             rec, [], "+def test_ab():\n", lambda m: None) == kept_m
         assert fidelity.reviewer_arming_holds(
             rec, [], " def test_a():\n", lambda m: None) == kept_m
+        # a call or comment naming the method is not a declaration
+        assert fidelity.reviewer_arming_holds(
+            rec, [], "+    # test_a is still missing\n+    run(test_a)\n",
+            lambda m: None) == kept_m
 
     def test_reason_is_one_line(self):
         rec = self._rec(planned_hold=False)

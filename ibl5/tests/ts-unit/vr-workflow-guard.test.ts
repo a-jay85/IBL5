@@ -366,6 +366,8 @@ describe('vr-refresh.yml write guard', () => {
     expect(cond).toContain("github.ref == 'refs/heads/master'");
     expect(cond).toContain("github.event_name != 'pull_request'");
     expect(cond).toContain('!inputs.dry_run');
+    expect(tidy).toContain('pull-requests: write');
+    expect(tidy).not.toContain('contents: write');
   });
 
   it('vr-refresh select job keeps pull-requests read', () => {

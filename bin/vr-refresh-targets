@@ -104,6 +104,11 @@ function gatherPrs(raws: RawPr[], only: number | null): OpenPr[] {
     .map((r) => toOpenPr(r, r.isCrossRepository ? [] : fetchComments(r.number).map((c) => c.body)));
 }
 
+function fetchBody(prNumber: number): string {
+  const out = run(['gh', 'api', `repos/{owner}/{repo}/pulls/${prNumber}`, '--jq', '.body // ""']);
+  return out.replace(/\n$/, '');
+}
+
 function fetchMasterSha(): string {
   const sha = run(['gh', 'api', 'repos/{owner}/{repo}/commits/master', '--jq', '.sha']).trim().toLowerCase();
   if (!/^[0-9a-f]{40}$/.test(sha)) throw new Error(`master SHA lookup returned '${sha}'`);
@@ -193,9 +198,8 @@ try {
     const dir = mkdtempSync(join(tmpdir(), 'vr-tidy-'));
     let failures = 0;
     for (const action of plan.actions) {
-      const pr = prs.find((p) => p.number === action.pr) as OpenPr;
       try {
-        const edits = planTidyEdits(action, fetchComments(action.pr), pr.body);
+        const edits = planTidyEdits(action, fetchComments(action.pr), fetchBody(action.pr));
         stdoutBuf += `${opts.dryRun ? 'would ' : ''}${action.kind} PR #${action.pr}: ${edits.map((e: { op: string }) => e.op).join(', ') || 'no edits'}\n`;
         if (opts.dryRun) continue;
         for (const e of edits) applyTidyEdit(action.pr, e, dir);

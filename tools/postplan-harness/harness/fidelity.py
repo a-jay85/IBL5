@@ -1381,14 +1381,34 @@ def _is_harmless_tooling(note: dict) -> bool:
             and note.get("harm") not in NOTE_HARMS)
 
 
+# A pr-copy note files only when it says the PR title or body states something false
+# or stale. "Add X to the Summary" asks for more words and stays dropped (backlog#1811).
+_BODY_MISSTATES_RE = re.compile(
+    r"\b(?:wrong(?:ly)?|incorrect(?:ly)?|inaccurate(?:ly)?|stale|false(?:ly)?|untrue"
+    r"|outdated|out of date|no longer"
+    r"|mis(?:stat|label|lead|report|nam|count|match|quot|attribut)\w*"
+    r"|over-?stat\w*|contradict\w*|does(?:n't| not) (?:match|exist|appear)"
+    r"|not in the diff|absent from the diff|never (?:ran|run|landed|shipped|added))\b",
+    re.IGNORECASE)
+
+
+def _is_misstated_pr_copy(note: dict) -> bool:
+    """True when a pr-copy note says the PR copy is false or stale, or names a harm."""
+    if note.get("harm") in NOTE_HARMS:
+        return True
+    return _BODY_MISSTATES_RE.search(f"{note['title']} {note['detail']}") is not None
+
+
 def extract_notes(llm, verdict_path: str, log=None,
                   pr_number: int | None = None) -> list[dict]:
     """Extract the filable non-blocking notes from a READY WITH NOTES verdict.
 
-    Only `kind == "followup"` survives — a note that names code work outliving the
-    merge. Anything else (a blessed plan deviation, a PR-copy nit, the reviewer's own
-    bookkeeping) is dropped, including a missing or unrecognized kind: dropping is
-    fail-closed and matches how this function already handles an LLM failure.
+    Two kinds survive. A `followup` names code work that outlives the merge. A
+    `pr-copy` note survives only when it says the PR title or body states something
+    false or stale (`_BODY_MISSTATES_RE`) or names a harm in `NOTE_HARMS`. A pr-copy
+    note that only asks the body to say more stays dropped (backlog#1811). Every other
+    kind, and a missing or unrecognized kind, is dropped: dropping is fail-closed and
+    matches how this function already handles an LLM failure.
 
     A `followup` whose own text says the work already happened is dropped too. Haiku
     kept tagging those `followup` after the four-kind prompt shipped; the 2026-09-24
@@ -1403,6 +1423,11 @@ def extract_notes(llm, verdict_path: str, log=None,
 
     A `followup` about tooling alone is dropped unless it names a harm in `NOTE_HARMS`.
     Website notes file with or without one.
+
+    The already-done and plan-artifact checks apply to both kinds. The comment-nit and
+    tooling checks apply to followups only, because a false PR body misleads whatever
+    the PR touches. Followups come first in the returned list, so they claim the
+    per-PR filing slots before any pr-copy note.
     """
     log = log or _noop_log
     try:
@@ -1416,17 +1441,20 @@ def extract_notes(llm, verdict_path: str, log=None,
                        validate=lambda r: isinstance(r, list))
         if not isinstance(raw, list):
             return []
-        kept = [d for d in raw if isinstance(d, dict)
-                and d.get("title") and d.get("detail")
-                and d.get("kind") == "followup"
-                and not _says_already_done(f"{d['title']} {d['detail']}", pr_number)
-                and not _is_plan_artifact(d["title"])
-                and not _is_comment_nit(d["title"], d["detail"])
-                and not _is_harmless_tooling(d)]
+        notes = [d for d in raw if isinstance(d, dict)
+                 and d.get("title") and d.get("detail")
+                 and not _says_already_done(f"{d['title']} {d['detail']}", pr_number)
+                 and not _is_plan_artifact(d["title"])]
+        followups = [d for d in notes if d.get("kind") == "followup"
+                     and not _is_comment_nit(d["title"], d["detail"])
+                     and not _is_harmless_tooling(d)]
+        pr_copy = [d for d in notes if d.get("kind") == "pr-copy"
+                   and _is_misstated_pr_copy(d)]
+        kept = followups + pr_copy
         dropped = len([d for d in raw if isinstance(d, dict)]) - len(kept)
         if dropped:
-            log(f"phase5.5 notes: dropped {dropped} non-followup, already-done, "
-                "plan-artifact, comment-nit or harmless-tooling note(s)")
+            log(f"phase5.5 notes: dropped {dropped} unfilable, already-done, "
+                "plan-artifact, comment-nit, harmless-tooling or omission-only note(s)")
         return kept
     except HarnessError:
         return []
@@ -1441,8 +1469,11 @@ def file_note_issues(gh, notes: list[dict], pr_number: int, log=None,
     was always off-topic and ended mid-sentence. The full verdict is the PR's sticky
     comment, one click from the link.
 
-    Notes carry no severity, so they file in the order the reviewer listed them. Past the
-    per-PR cap of 3 they fold into one roll-up issue (`harness/followcap.py`).
+    Notes carry no severity. They file in list order, and `extract_notes` puts every
+    followup before any pr-copy note, so followups claim the per-PR cap of 3 first.
+    Past the cap they fold into one roll-up issue (`harness/followcap.py`). A pr-copy
+    note's title gains a `PR #<n> copy: ` prefix and its body gains the `gh pr edit`
+    command that fixes the copy after merge.
 
     When `filed` is a list, one dict per note is appended in order: `{"title", "issue",
     "state"}` with state `filed`, `already tracked` or `not filed`. The return value is
@@ -1462,6 +1493,11 @@ def file_note_issues(gh, notes: list[dict], pr_number: int, log=None,
     for note in notes:
         title = note.get("title", "")
         detail = note.get("detail", "")
+        if note.get("kind") == "pr-copy":
+            title = f"PR #{pr_number} copy: {title}"
+            detail = (f"{detail}\n\nThe PR copy stays editable after merge: "
+                      f"`gh pr edit {pr_number} -R a-jay85/IBL5 --body-file <file>` "
+                      "(or `--title`).")
         key = _norm_title(title)
         if key in seen:
             log(f"phase5.5 notes: skipping duplicate '{title[:50]}'")

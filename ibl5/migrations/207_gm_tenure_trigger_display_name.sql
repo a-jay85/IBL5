@@ -29,8 +29,9 @@
 -- open row per franchise must hold when it takes over. The guard runs before any DROP, so an abort
 -- leaves both triggers in place.
 --
--- Backup: before the backfill, every row it will rewrite (open and closed tenures stored under a username)
--- is copied whole into ibl_gm_tenures_backup_207, using the backfill's own WHERE. Drop that table in a later migration once the backfill has held.
+-- Backup: before the backfill, every row it will rewrite (open and closed tenures stored under a
+-- username) is copied whole into ibl_gm_tenures_backup_207, using the backfill's own WHERE. Drop
+-- that table in a later migration once the backfill has held.
 --
 -- Rollback: re-run the trigger block of migration 192 (trg_gm_tenure_track), then apply
 -- ibl5/scripts/undo/207_gm_tenure_trigger_display_name.sql by hand. It restores gm_display_name

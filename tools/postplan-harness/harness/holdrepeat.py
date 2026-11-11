@@ -32,7 +32,7 @@ DECLINE_EXIT = 10
 # 5 golden snapshot, 6 dependency merge order, 9 pr-time safety verdict
 # (may carry LLM-verdict text), 10 pipeline-authored floor (bug-pipeline
 # PRs are held by design and fired once), 12 fidelity verdict (LLM),
-# 15 red CI, 16 meta-checks. All of these can clear on a re-run.
+# 15 red CI, 16 meta-checks, 21 reviewer arming hold (LLM). All of these can clear on a re-run.
 STRUCTURAL_CONDITIONS = frozenset({3, 7, 8, 13})
 # Conditions only a human can clear (3 = plan files missing, 7 = plan
 # auto_merge: false, 8 = UI signoff floor). A DIRTY PR whose last hold is

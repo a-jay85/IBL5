@@ -192,16 +192,17 @@ def test_fidelity_default_is_fail_closed():
 
 
 def test_condition_set_is_skill_numbered():
-    """The set is {1..20} with no gaps. The numbers track the SKILL's condition numbers,
+    """The set is {1..21} with no gaps. The numbers track the SKILL's condition numbers,
     not this list's position: (11) shells out to bin/lib/pr-armable.sh for unresolved
     review-thread findings, (14) reads the conflict-resolved flag, (15) checks for
     already-red CI checks on the PR head at arm time, and (16) checks the pre-push
     local meta-check gate. (17) holds when the gate backtest flagged clean PRs or could
     not run. (18) holds unless the body's Merge danger line is well-formed and two-way.
     (19) holds unless every executable mutation tripped and the tree verified clean.
-    (20) holds unless every flagged guard removal carries a substantive Reason."""
+    (20) holds unless every flagged guard removal carries a substantive Reason.
+    (21) holds when the Phase 5.5 reviewer's typed block says hold."""
     nums = sorted(c.number for c in evaluate(inputs()).conditions)
-    assert nums == list(range(1, 21))   # [1..20], one entry per SKILL condition
+    assert nums == list(range(1, 22))   # [1..21], one entry per SKILL condition
 
 
 def test_condition_removed_guards_uncomputed_blocks():
@@ -239,7 +240,7 @@ def test_conditions_1_to_19_unchanged_by_removed_guards():
         before = [(c.number, c.blocked, c.reason) for c in clean.conditions if c.number <= 19]
         after = [(c.number, c.blocked, c.reason) for c in held.conditions if c.number <= 19]
         assert before == after
-        assert [c.number for c in clean.conditions][-1] == 20
+        assert [c.number for c in clean.conditions][-1] == 21
 
 
 def test_fidelity_is_additive_and_releases_nothing():

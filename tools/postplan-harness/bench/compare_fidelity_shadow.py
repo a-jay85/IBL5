@@ -3,6 +3,7 @@
   python3 compare_fidelity_shadow.py [--out-dir DIR] [--json PATH] [--gate]
   python3 compare_fidelity_shadow.py --seeded (--live | --canned DIR) [...]
   python3 compare_fidelity_shadow.py --live-sample N [--seed S] [...]
+  python3 compare_fidelity_shadow.py --add-only [--out-dir DIR] [--json PATH]
 
 Default mode walks `<out-dir>/live-*/result.json` and makes zero LLM calls. For conditions
 (3) and (18) it buckets each run by the NEW state (`fidelity.shadow`, via
@@ -19,6 +20,12 @@ corpus runs. Its packets live under `<out-dir>/shadow-compare/<run>/` with pr id
 Prints a FLIP EXIT CRITERIA block (E1-E7). PENDING means not enough data and E7 is always
 MANUAL. With --gate the exit code is 1 unless E1-E6 are all PASS. Exit 2 on a bad
 flag. Stdlib plus the harness package.
+
+--add-only replays the stored corpus through `fidelity.reviewer_arming_holds` and counts the
+PRs (latest run each) where arming condition (21) would newly hold: a reviewer hold on a
+condition the old code cleared. Zero LLM calls. E1 to E7 were flip criteria for a full swap
+that is cancelled. Arming is add-only through condition (21), so they stay as reviewer
+precision data and gate no change.
 """
 import argparse
 import glob
@@ -101,6 +108,44 @@ def bucket(new: str, old: str) -> str:
 
 def _rate(num: int, den: int):
     return None if den == 0 else num / den
+
+
+# --- add-only replay ---------------------------------------------------------------------
+
+def _pr_of(result: dict):
+    return result.get("pr_number")
+
+
+def add_only_replay(out_dir: str) -> dict:
+    """PRs where condition (21) would newly hold: a reviewer hold where Python cleared.
+
+    Offline, so the landed-later filter has no diff and the count is an upper bound.
+    """
+    latest = {}
+    for run in sorted(glob.glob(os.path.join(out_dir, "live-*", "result.json"))):
+        try:
+            with open(run) as fh:
+                result = json.load(fh)
+        except (OSError, ValueError):
+            continue
+        if not isinstance(result, dict):
+            continue
+        pr_key = _pr_of(result)
+        if pr_key is None:
+            continue
+        shadow = (result.get("fidelity") or {}).get("shadow")
+        parts = fidelity.reviewer_arming_holds(shadow, (), "", lambda _m: None)
+        old = old_outcomes(result)
+        newly = []
+        if any(p.startswith("planned-landed:") for p in parts) and old.get("3") == "clear":
+            newly.append("3")
+        if any(p.startswith("merge-danger:") for p in parts) and old.get("18") == "clear":
+            newly.append("18")
+        latest[pr_key] = newly
+    held = {pr: n for pr, n in latest.items() if n}
+    return {"prs_scanned": len(latest),
+            "newly_held_prs": sorted(held, key=str),
+            "by_condition": {c: sum(1 for n in held.values() if c in n) for c in ("3", "18")}}
 
 
 # --- corpus mode -------------------------------------------------------------------------
@@ -495,10 +540,14 @@ def parse_args(argv):
     ap.add_argument("--seeded", action="store_true", help="score the Phase 6 cases")
     ap.add_argument("--live", action="store_true", help="with --seeded: call the real reviewer")
     ap.add_argument("--canned", metavar="DIR", help="with --seeded: <DIR>/<case>.md replies")
+    ap.add_argument("--add-only", action="store_true",
+                    help="count PRs condition (21) would newly hold")
     ap.add_argument("--live-sample", type=int, metavar="N",
                     help=f"re-run the reviewer on N corpus runs ({MIN_SAMPLE}..{MAX_SAMPLE})")
     ap.add_argument("--seed", type=int, default=0, help="sampling seed (default 0)")
     ns = ap.parse_args(argv)
+    if ns.add_only and ns.seeded:
+        ap.error("--add-only and --seeded are exclusive")
     if ns.live_sample is not None and not MIN_SAMPLE <= ns.live_sample <= MAX_SAMPLE:
         ap.error(f"--live-sample must be {MIN_SAMPLE}..{MAX_SAMPLE}")
     if ns.seeded and not (ns.live or ns.canned):
@@ -517,6 +566,18 @@ def parse_args(argv):
 def main(argv=None) -> int:
     ns = parse_args(sys.argv[1:] if argv is None else argv)
     out_dir = os.path.abspath(ns.out_dir)
+    if ns.add_only:
+        rep_res = add_only_replay(out_dir)
+        if ns.json:
+            with open(ns.json, "w", encoding="utf-8") as fh:
+                json.dump(rep_res, fh, indent=2)
+        n = len(rep_res["newly_held_prs"])
+        print(f"add-only replay: {n} of {rep_res['prs_scanned']} PRs newly held "
+              "(upper bound, no diff filter)")
+        print("newly held PRs: " + ", ".join(str(p) for p in rep_res["newly_held_prs"]))
+        by = rep_res["by_condition"]
+        print(f"by condition: planned_landed={by['3']} merge_danger={by['18']}")
+        return 0
     ledger = UsageLedger()
     res: dict = {"corpus": None, "seeded": None, "live_sample": None}
     if ns.seeded:

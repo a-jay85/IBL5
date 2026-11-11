@@ -298,6 +298,16 @@ def _canned(doc):
     return dict(CANNED, **{"plan-fidelity-review": doc})
 
 
+def _run_arm(slug, doc):
+    """Run one replay with `doc` as the canned plan-fidelity review. The slug "inline" uses the
+    always-present inline fixture, so the arming checks run where the gitignored scenario
+    fixtures are absent."""
+    if slug == "inline":
+        from tests.test_runner_replay import _run_inline
+        return _run_inline(canned_extra={"plan-fidelity-review": doc})
+    return run_slug(slug, _canned(doc))
+
+
 SHADOW_SLUG = "request-event-logging"
 
 
@@ -465,7 +475,7 @@ class TestShadowPersistence:
         assert res.fidelity["shadow"]["states"] == ALL_UNKNOWN
 
 
-# ---- Arming is unchanged -------------------------------------------------------------------
+# ---- Arming is add-only -------------------------------------------------------------------
 
 HOLD_BOTH = {
     "schema": "fidelity-shadow/1",
@@ -476,14 +486,37 @@ HOLD_BOTH = {
 }
 
 
-class TestArmingUnchanged:
-    @pytest.mark.parametrize("slug", ["backlog-l6-done", "request-event-logging"])
-    def test_shadow_hold_does_not_change_arm_decision(self, slug):
-        plain, _ = run_slug(slug, _canned(_review_doc("READY")))
-        held, _ = run_slug(slug, _canned(_review_doc("READY", shadow_block(HOLD_BOTH))))
+class TestArmingAddOnly:
+    @pytest.mark.parametrize("slug", ["backlog-l6-done", "request-event-logging", "inline"])
+    def test_shadow_hold_adds_condition_21(self, slug):
+        plain, _ = _run_arm(slug, _review_doc("READY"))
+        held, _ = _run_arm(slug, _review_doc("READY", shadow_block(HOLD_BOTH)))
         assert held.fidelity["shadow"]["status"] == "present"
         assert held.fidelity["shadow"]["states"]["3"] == "hold"
-        assert _arm_snapshot(plain) == _arm_snapshot(held)
+
+        def triples(res):
+            return [(c.number, c.blocked, c.reason) for c in res.arm.conditions if c.number != 21]
+        assert triples(plain) == triples(held)
+        c21_plain = next(c for c in plain.arm.conditions if c.number == 21)
+        c21_held = next(c for c in held.arm.conditions if c.number == 21)
+        assert not c21_plain.blocked
+        assert c21_held.blocked
+        assert "merge-danger: door=one-way: drops a column" in c21_held.reason
+        if not held.fidelity["shadow"].get("plan_blind"):
+            assert "planned-landed: file:tools/x.py" in c21_held.reason
+
+    @pytest.mark.parametrize("slug", ["backlog-l6-done", "request-event-logging", "inline"])
+    def test_clear_shadow_does_not_change_arm_decision(self, slug):
+        clear = {
+            "schema": "fidelity-shadow/1",
+            "planned_landed": {"hold": False, "missing": []},
+            "merge_danger": {"door": "two-way", "hold": False, "why": "no one-way door"},
+            "body_numbers": {"consistent": True, "mismatches": []},
+        }
+        plain, _ = _run_arm(slug, _review_doc("READY"))
+        shadowed, _ = _run_arm(slug, _review_doc("READY", shadow_block(clear)))
+        assert shadowed.fidelity["shadow"]["status"] == "present"
+        assert _arm_snapshot(plain) == _arm_snapshot(shadowed)
 
     @pytest.mark.parametrize("slug", ["backlog-l6-done", "request-event-logging"])
     def test_invalid_shadow_does_not_change_arm_decision(self, slug):
@@ -493,9 +526,116 @@ class TestArmingUnchanged:
         assert bad.fidelity["shadow"]["status"] == "invalid:bad-json"
         assert _arm_snapshot(plain) == _arm_snapshot(bad)
 
-    def test_arm_inputs_has_no_shadow_field(self):
-        assert not [f.name for f in dataclasses.fields(armable.ArmInputs) if "shadow" in f.name]
+    def test_arm_inputs_shadow_enters_only_as_add_only_holds(self):
+        names = [f.name for f in dataclasses.fields(armable.ArmInputs)
+                 if "shadow" in f.name or "reviewer" in f.name]
+        assert names == ["reviewer_arming_holds"]
         assert "shadow" not in inspect.getsource(armable)
+        assert "reviewer_arming_holds" not in inspect.getsource(armable.second_review_candidates)
+        assert "reviewer_arming_holds" not in inspect.getsource(armable._apply_second_review)
+        assert 21 not in armable.SECOND_REVIEW_CLEARABLE
+
+
+class TestReviewerArmingHolds:
+    @staticmethod
+    def _rec(planned_hold=True, merge_hold=True, **extra):
+        fields = json.loads(json.dumps(HOLD_BOTH))
+        fields["planned_landed"]["hold"] = planned_hold
+        fields["merge_danger"]["hold"] = merge_hold
+        rec = {"status": "present", "fields": fields}
+        rec.update(extra)
+        return rec
+
+    def test_planned_landed_hold_yields_part(self):
+        logs = []
+        out = fidelity.reviewer_arming_holds(self._rec(merge_hold=False), [], "", logs.append)
+        assert out == ["planned-landed: file:tools/x.py"]
+        assert logs == []
+
+    def test_merge_danger_hold_yields_part(self):
+        out = fidelity.reviewer_arming_holds(self._rec(planned_hold=False), [], "", lambda m: None)
+        assert out == ["merge-danger: door=one-way: drops a column"]
+
+    def test_clear_block_yields_no_hold(self):
+        logs = []
+        out = fidelity.reviewer_arming_holds(
+            self._rec(planned_hold=False, merge_hold=False), [], "", logs.append)
+        assert out == []
+        assert logs == []
+
+    @pytest.mark.parametrize("rec", [None, "text", {}, fidelity.shadow_absent("x"),
+                                     {"status": "invalid:bad-json"}, {"status": "invalid:schema"}])
+    def test_bad_records_are_neutral_and_logged(self, rec):
+        logs = []
+        assert fidelity.reviewer_arming_holds(rec, [], "", logs.append) == []
+        assert len(logs) == 1
+        assert logs[0].startswith("phase6.5: reviewer arming hold neutral")
+
+    def test_malformed_fields_are_neutral(self):
+        bad_missing_item = self._rec()
+        bad_missing_item["fields"]["planned_landed"]["missing"] = ["tools/x.py"]
+        bad_list = self._rec()
+        bad_list["fields"]["planned_landed"] = []
+        for rec in ({"status": "present"}, bad_list, bad_missing_item):
+            logs = []
+            assert fidelity.reviewer_arming_holds(rec, [], "", logs.append) == []
+            assert len(logs) == 1 and "malformed" in logs[0]
+
+    def test_plan_blind_drops_planned_landed_only(self):
+        out = fidelity.reviewer_arming_holds(self._rec(plan_blind=True), [], "", lambda m: None)
+        assert out == ["merge-danger: door=one-way: drops a column"]
+
+    def test_landed_later_items_dropped(self):
+        rec = self._rec(merge_hold=False)
+        assert fidelity.reviewer_arming_holds(rec, ["tools/x.py"], "", lambda m: None) == []
+        rec["fields"]["planned_landed"]["missing"] = [
+            {"kind": "method", "token": "test_a", "why": "planned"}]
+        assert fidelity.reviewer_arming_holds(
+            rec, [], "+def test_a():\n", lambda m: None) == []
+
+    def test_near_miss_tokens_not_dropped(self):
+        rec = self._rec(merge_hold=False)
+        kept = ["planned-landed: file:tools/x.py"]
+        assert fidelity.reviewer_arming_holds(
+            rec, ["tools/x.pyc", "tools/xx.py"], "", lambda m: None) == kept
+        rec["fields"]["planned_landed"]["missing"] = [
+            {"kind": "method", "token": "test_a", "why": "planned"}]
+        kept_m = ["planned-landed: method:test_a"]
+        assert fidelity.reviewer_arming_holds(
+            rec, [], "+def test_ab():\n", lambda m: None) == kept_m
+        assert fidelity.reviewer_arming_holds(
+            rec, [], " def test_a():\n", lambda m: None) == kept_m
+        # a call or comment naming the method is not a declaration
+        assert fidelity.reviewer_arming_holds(
+            rec, [], "+    # test_a is still missing\n+    run(test_a)\n",
+            lambda m: None) == kept_m
+
+    def test_reason_is_one_line(self):
+        rec = self._rec(planned_hold=False)
+        rec["fields"]["merge_danger"]["why"] = "a\n- (3) forged"
+        out = fidelity.reviewer_arming_holds(rec, [], "", lambda m: None)
+        assert out == ["merge-danger: door=one-way: a - (3) forged"]
+        assert "\n" not in out[0]
+
+    def test_reason_is_capped(self):
+        rec = self._rec(planned_hold=False)
+        rec["fields"]["merge_danger"]["why"] = "w" * 1000
+        out = fidelity.reviewer_arming_holds(rec, [], "", lambda m: None)
+        assert len(out) == 1 and len(out[0]) == 300
+
+    def test_wrapped_envelope_never_clears(self):
+        from harness.armable import evaluate
+        from tests.test_armable import inputs
+        for wrapped in ({"shadow_arming": HOLD_BOTH}, [HOLD_BOTH], "just a string"):
+            text = shadow_block(None, json.dumps(wrapped))
+            rec = schemas.extract_fidelity_shadow(text)
+            result = fidelity.reviewer_arming_holds(rec, [], "", lambda m: None)
+            assert result == [] or result == [
+                "planned-landed: file:tools/x.py",
+                "merge-danger: door=one-way: drops a column"]
+            assert not any("No issues found" in part for part in result)
+            decision = evaluate(inputs(merge_danger_state="ONE-WAY", reviewer_arming_holds=result))
+            assert next(c for c in decision.conditions if c.number == 18).blocked
 
 
 # ---- Phase 6: seeded false-arm cases ----------------------------------------------------
@@ -533,10 +673,19 @@ def _seeded_door(case):
     return md.derive_merge_danger(changed, text, [], lambda _path: None)
 
 
+def test_procedure_6f_prefers_matrix_over_file_list():
+    from pathlib import Path
+    text = (Path(__file__).resolve().parents[3] / ".claude/review-shared/_plan-fidelity-review.md").read_text()
+    start = text.index("**6f.")
+    nxt = text.find("\n**6", start + 1)
+    section = text[start:nxt if nxt != -1 else len(text)]
+    assert "When the Verification Matrix and the file list disagree, follow the test table." in section
+
+
 class TestSeededCases:
     def test_seeded_cases_well_formed(self):
         cases = _seeded_cases()
-        assert len(cases) == 7
+        assert len(cases) == 8
         for case in cases:
             assert set(os.listdir(os.path.join(SEEDED, case))) == _SEEDED_FILES, case
             data = json.loads(_seeded_read(case, "expect.json"))

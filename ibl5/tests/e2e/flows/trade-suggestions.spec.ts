@@ -281,6 +281,10 @@ test.describe('Trade suggestions panel (GM)', () => {
     // The worktree-stack pre-prod row exercises a populated panel.
     const links = page.locator('[data-testid="trade-suggestion-open"]');
     const count = await links.count();
+    if (count === 0) {
+      // No links means the panel must say so; an empty panel is a failure.
+      await expect(page.locator('[data-testid="trade-suggestions-empty"]')).toBeVisible();
+    }
     const pattern =
       /^modules\.php\?name=Trading&op=offertrade&partner=[^&]+&prefill=[01]%3A\d+(%2C[01]%3A\d+)*$/;
     for (let i = 0; i < count; i++) {

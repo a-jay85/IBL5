@@ -58,9 +58,11 @@ final class DealScorer
             ];
             foreach ($sides as $tid => [$afterState, $received, $sent]) {
                 $before = TeamStateRebuilder::before($s, $tid, $offset);
-                $base = SideGain::fromStates($before, $afterState, $s, $c, $tid);
+                $odds = self::receivedOdds($s, $tid, $received);
+                $walkFactor = self::receivedFactors($s, $offset, $odds);
+                $base = SideGain::fromStates($before, $afterState, $s, $c, $tid, $walkFactor);
                 if ($offset >= 1) {
-                    $base = self::mixWalkers($s, $c, $tid, $offset, $memo, $base, $received, $sent);
+                    $base = self::mixWalkers($s, $c, $tid, $offset, $memo, $base, $received, $sent, $odds, $walkFactor);
                 }
                 $components[$tid][$offset] = $base;
                 $deltas[$tid][$offset] = ProfileDelta::fromStates($before, $afterState);
@@ -91,6 +93,42 @@ final class DealScorer
     }
 
     /**
+     * Re-sign odds for each received player against the receiving team (F10),
+     * not against the team the snapshot scored him with. Players with no
+     * offset-0 salary have no odds, as in the snapshot.
+     *
+     * @param list<int> $received
+     * @return array<int, array{likelihood: float, walks: bool}>
+     */
+    private static function receivedOdds(LeagueSnapshot $s, int $tid, array $received): array
+    {
+        $odds = [];
+        foreach ($received as $pid) {
+            $p = $s->players[$pid];
+            if ($p->salaryAt(0) <= 0) {
+                continue;
+            }
+            $odds[$pid] = ResignOdds::forTeam($p, $tid, $s->lineups[0], $s->slotRanks[0], $s->teamFactors);
+        }
+
+        return $odds;
+    }
+
+    /**
+     * @param array<int, array{likelihood: float, walks: bool}> $odds
+     * @return array<int, float> received pid => F10 factor at $offset
+     */
+    private static function receivedFactors(LeagueSnapshot $s, int $offset, array $odds): array
+    {
+        $factors = [];
+        foreach ($odds as $pid => $o) {
+            $factors[$pid] = ResignLikelihood::futureValueFactor($offset, $s->players[$pid]->onRosterAt($offset), $o['walks'], $o['likelihood']);
+        }
+
+        return $factors;
+    }
+
+    /**
      * Mixes the slot, bench, profile and balance components over every
      * outcome of the moved walkers on this side. A received walker who leaves
      * drops out of the after roster; a sent walker who would have left drops
@@ -101,16 +139,21 @@ final class DealScorer
      * @param array<string, float> $base
      * @param list<int> $received
      * @param list<int> $sent
+     * @param array<int, array{likelihood: float, walks: bool}> $odds received pid => odds against the receiving team
+     * @param array<int, float> $walkFactor received pid => factor at this offset
      * @return array<string, float>
      */
-    private static function mixWalkers(LeagueSnapshot $s, TradeCandidate $c, int $tid, int $offset, PairRecordMemo $memo, array $base, array $received, array $sent): array
+    private static function mixWalkers(LeagueSnapshot $s, TradeCandidate $c, int $tid, int $offset, PairRecordMemo $memo, array $base, array $received, array $sent, array $odds, array $walkFactor): array
     {
         $walkers = [];
-        foreach ([[$received, true], [$sent, false]] as [$pids, $isReceived]) {
-            foreach ($pids as $pid) {
-                if (($s->likelyToWalk[$pid] ?? false) && $s->players[$pid]->onRosterAt($offset)) {
-                    $walkers[] = [$pid, $isReceived, ResignLikelihood::futureValueFactor($offset, true, true, $s->resignLikelihood[$pid] ?? 1.0)];
-                }
+        foreach ($received as $pid) {
+            if (($odds[$pid]['walks'] ?? false) && $s->players[$pid]->onRosterAt($offset)) {
+                $walkers[] = [$pid, true, $walkFactor[$pid]];
+            }
+        }
+        foreach ($sent as $pid) {
+            if (($s->likelyToWalk[$pid] ?? false) && $s->players[$pid]->onRosterAt($offset)) {
+                $walkers[] = [$pid, false, ResignLikelihood::futureValueFactor($offset, true, true, $s->resignLikelihood[$pid] ?? 1.0)];
             }
         }
         if ($walkers === []) {
@@ -142,7 +185,7 @@ final class DealScorer
                 : TeamStateRebuilder::beforeWithout($s, $tid, $offset, $memo, $goneBefore);
             $afterPair = TeamStateRebuilder::after($s, $c, $offset, $memo, $goneAfter);
             $after = $tid === $c->userTid ? $afterPair['user'] : $afterPair['partner'];
-            $outcome = SideGain::fromStates($before, $after, $s, $c, $tid);
+            $outcome = SideGain::fromStates($before, $after, $s, $c, $tid, $walkFactor);
             foreach (self::MIXED_KEYS as $key) {
                 $mixed[$key] += $weight * $outcome[$key];
             }

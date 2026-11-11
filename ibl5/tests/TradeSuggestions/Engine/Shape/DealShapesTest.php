@@ -141,12 +141,9 @@ final class DealShapesTest extends TestCase
     public static function missingPatternProvider(): iterable
     {
         $userGives = new NeedPair(0, NeedPair::KIND_SLOT, 'PG', self::USER, self::PARTNER, 3, 20, 1.0);
-        $partnerGives = new NeedPair(0, NeedPair::KIND_SLOT, 'SF', self::PARTNER, self::USER, 3, 20, 1.0);
         $otherOffset = new NeedPair(1, NeedPair::KIND_SLOT, 'SF', self::PARTNER, self::USER, 3, 20, 1.0);
         yield 'one for one, one-sided need' => [new OneForOne(), [$userGives]];
         yield 'one for one, offsets differ' => [new OneForOne(), [$userGives, $otherOffset]];
-        yield 'two for one, partner gives only' => [new TwoForOne(), [$partnerGives]];
-        yield 'one for two, user gives only' => [new OneForTwo(), [$userGives]];
     }
 
     /**
@@ -159,6 +156,52 @@ final class DealShapesTest extends TestCase
         $thin = new AssetPool($pool->userPids, $pool->partnerPids, $pool->userPicks, $pool->partnerPicks, $pairs);
 
         self::assertSame([], self::collect($shape, $s, $thin));
+    }
+
+    /**
+     * Giver and receiver slot ranks at offset 0. A rank of 12 is neither
+     * strong nor weak; 1 and 2 are strong; 25 is weak.
+     *
+     * @return iterable<string, array{DealShapeInterface, bool, array<string, int>, array<string, list<int>>, array<string, int>, bool}>
+     */
+    public static function buriedOrDepthProvider(): iterable
+    {
+        $mid = ['PG' => 12, 'SG' => 12, 'SF' => 12, 'PF' => 12, 'C' => 12];
+        $oneStrong = ['PG' => 1] + $mid;
+        $twoStrong = ['PG' => 1, 'SF' => 2] + $mid;
+        $weakSg = ['SG' => 25] + $mid;
+        foreach ([[new TwoForOne(), true, 'two for one'], [new OneForTwo(), false, 'one for two']] as [$shape, $userGives, $name]) {
+            yield "{$name}, weak slot, one surplus slot, no buried player" => [$shape, $userGives, $oneStrong, [], $weakSg, false];
+            yield "{$name}, buried player at a slot the receiver is not weak at" => [$shape, $userGives, $oneStrong, ['PF' => [1]], $weakSg, false];
+            yield "{$name}, buried player but the receiver has no weak slot" => [$shape, $userGives, $twoStrong, ['SG' => [1]], $mid, false];
+            yield "{$name}, buried player at the weak slot with a mid starter" => [$shape, $userGives, $mid, ['SG' => [1]], $weakSg, true];
+            yield "{$name}, two surplus slots and a weak slot" => [$shape, $userGives, $twoStrong, [], $weakSg, true];
+        }
+    }
+
+    /**
+     * @param array<string, int> $giverRanks
+     * @param array<string, list<int>> $giverBuried slot => buried pids (the pids are placeholders)
+     * @param array<string, int> $receiverRanks
+     */
+    #[DataProvider('buriedOrDepthProvider')]
+    public function testTwoForOneShapesFireOnlyOnBuriedPlayerOrTwoSurplusSlots(
+        DealShapeInterface $shape,
+        bool $userGives,
+        array $giverRanks,
+        array $giverBuried,
+        array $receiverRanks,
+        bool $fires,
+    ): void {
+        [$s, $pool] = self::rich();
+        $giver = $userGives ? self::USER : self::PARTNER;
+        $receiver = $userGives ? self::PARTNER : self::USER;
+        $positionStrength = $s->positionStrength;
+        $positionStrength[0][$giver] = self::strengths($giverRanks, $giverBuried);
+        $positionStrength[0][$receiver] = self::strengths($receiverRanks, []);
+        $s = self::with($s, ['positionStrength' => $positionStrength]);
+
+        self::assertSame($fires, self::collect($shape, $s, $pool) !== []);
     }
 
     public function testChangeOfSceneryYieldsNothingWhenPartnerSlotIsNotWeak(): void
@@ -327,6 +370,21 @@ final class DealShapesTest extends TestCase
         foreach ($candidates as $c) {
             self::assertSame([self::USER_BURIED], $c->userPids);
         }
+    }
+
+    /**
+     * @param array<string, int> $ranks slot => starter rank
+     * @param array<string, list<int>> $buried slot => buried pids
+     * @return array<string, SlotStrength>
+     */
+    private static function strengths(array $ranks, array $buried): array
+    {
+        $out = [];
+        foreach ($ranks as $slot => $rank) {
+            $out[$slot] = new SlotStrength($slot, $rank, null, 3, false, $buried[$slot] ?? []);
+        }
+
+        return $out;
     }
 
     /**

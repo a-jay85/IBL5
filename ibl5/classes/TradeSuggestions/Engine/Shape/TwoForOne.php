@@ -11,12 +11,11 @@ use TradeSuggestions\Engine\Shape\Contracts\DealShapeInterface;
 use TradeSuggestions\TradeCandidate;
 
 /**
- * Fires only when the partner has a slot deficit the user's slot surplus
- * matches (`NeedPairGate::slotNeed`), and the receiving side has a weak slot (`SlotStrength::isWeak`) and
- * the giving side has a buried player at that slot (`buriedPids`) or two
- * surplus slots (Phase 4 docblock). Yields user pairs (6 choose 2 = 15) for
- * one of the partner's first 2 pool players (30 max). `OneForTwo` is the
- * mirror.
+ * Fires only when the partner has a weak slot (`SlotStrength::isWeak`) and
+ * the user has a buried player at that slot (`buriedPids`) or two surplus
+ * slots (`NeedPairGate::buriedOrDepth`, Phase 4 docblock). Yields user pairs
+ * (6 choose 2 = 15) for one of the partner's first 2 pool players (30 max).
+ * `OneForTwo` is the mirror.
  */
 final class TwoForOne implements DealShapeInterface
 {
@@ -29,7 +28,7 @@ final class TwoForOne implements DealShapeInterface
 
     public function generate(LeagueSnapshot $s, int $userTid, int $partnerTid, AssetPool $pool): iterable
     {
-        if (!NeedPairGate::slotNeed($pool, $userTid, $partnerTid)) {
+        if (!NeedPairGate::buriedOrDepth($s, $userTid, $partnerTid)) {
             return;
         }
         $userPids = array_values(array_slice($pool->userPids, 0, CandidateBudget::PLAYERS_PER_PARTNER));

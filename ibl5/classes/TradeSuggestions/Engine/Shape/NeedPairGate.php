@@ -5,14 +5,18 @@ declare(strict_types=1);
 namespace TradeSuggestions\Engine\Shape;
 
 use TradeSuggestions\Engine\AssetPool;
-use TradeSuggestions\Engine\NeedPair;
+use TradeSuggestions\Engine\LeagueSnapshot;
 
 /**
  * The matcher-pattern checks the player-for-player shapes share. A shape asks
- * the pool whether its pattern is present and yields nothing when it is not.
+ * the pool or the snapshot whether its pattern is present and yields nothing
+ * when it is not.
  */
 final class NeedPairGate
 {
+    /** Surplus slots a giver needs to fire without a buried player. */
+    public const int SURPLUS_SLOTS_FOR_DEPTH = 2;
+
     /**
      * True when each side has a surplus that matches the other side's deficit
      * at one shared offset.
@@ -33,17 +37,34 @@ final class NeedPairGate
     }
 
     /**
-     * True when `$giverTid` has a slot surplus that matches `$receiverTid`'s
-     * slot deficit.
+     * True when `$receiverTid` has a weak slot at offset 0
+     * (`SlotStrength::isWeak`) and `$giverTid` either has a buried player at
+     * that slot (`SlotStrength::$buriedPids`) or has at least two surplus
+     * slots (`SlotStrength::isStrong`).
      */
-    public static function slotNeed(AssetPool $pool, int $giverTid, int $receiverTid): bool
+    public static function buriedOrDepth(LeagueSnapshot $s, int $giverTid, int $receiverTid): bool
     {
-        foreach ($pool->needPairs as $pair) {
-            if ($pair->kind === NeedPair::KIND_SLOT && $pair->giverTid === $giverTid && $pair->receiverTid === $receiverTid) {
+        $giver = $s->positionStrength[0][$giverTid] ?? [];
+        $hasWeak = false;
+        foreach ($s->positionStrength[0][$receiverTid] ?? [] as $slot => $strength) {
+            if (!$strength->isWeak()) {
+                continue;
+            }
+            $hasWeak = true;
+            if (isset($giver[$slot]) && $giver[$slot]->buriedPids !== []) {
                 return true;
             }
         }
+        if (!$hasWeak) {
+            return false;
+        }
+        $surplus = 0;
+        foreach ($giver as $strength) {
+            if ($strength->isStrong()) {
+                $surplus++;
+            }
+        }
 
-        return false;
+        return $surplus >= self::SURPLUS_SLOTS_FOR_DEPTH;
     }
 }

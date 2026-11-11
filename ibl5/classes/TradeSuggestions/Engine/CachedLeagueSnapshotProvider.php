@@ -40,7 +40,7 @@ final class CachedLeagueSnapshotProvider implements LeagueSnapshotProviderInterf
         if ($cached !== null) {
             try {
                 return SnapshotCodec::decode($cached);
-            } catch (\UnexpectedValueException | \TypeError) {
+            } catch (\UnexpectedValueException | \TypeError) { // @phpstan-ignore catch.neverThrown (a cached payload can still fail a typed constructor at runtime; treat it as a miss)
                 // A malformed payload is a miss; the rebuild below overwrites it.
             }
         }

@@ -42,7 +42,7 @@ final class SnapshotKeyRepository extends \Database\BaseMysqliRepository impleme
         );
         $marker = $row['m'] ?? null;
         $picks = $this->fetchOne(
-            "SELECT SHA1(GROUP_CONCAT(CONCAT_WS(':', pickid, owner_teamid) ORDER BY pickid)) AS p FROM `ibl_draft_picks` WHERE round <= 2",
+            "SELECT SHA1(GROUP_CONCAT(CONCAT_WS(':', pickid, owner_teamid) ORDER BY pickid)) AS p FROM `ibl_draft_picks` WHERE round <= 2", // @phpstan-ignore ibl.orderByMissingTiebreaker (pickid is the PK of ibl_draft_picks, so it is unique)
             ''
         );
         $picksDigest = $picks['p'] ?? null;

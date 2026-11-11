@@ -1407,6 +1407,23 @@ CREATE TABLE `ibl_gm_tenures` (
   CONSTRAINT `fk_gt_franchise` FOREIGN KEY (`franchise_id`) REFERENCES `ibl_team_info` (`teamid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `ibl_gm_tenures_backup_207`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ibl_gm_tenures_backup_207` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `franchise_id` int(11) NOT NULL COMMENT 'FK to ibl_team_info.teamid',
+  `gm_display_name` varchar(60) NOT NULL,
+  `start_season_year` smallint(5) unsigned NOT NULL COMMENT 'First season of tenure',
+  `end_season_year` smallint(5) unsigned DEFAULT NULL COMMENT 'Last season of tenure (NULL=current)',
+  `is_mid_season_start` tinyint(1) NOT NULL DEFAULT 0 COMMENT '1=took over mid-season',
+  `is_mid_season_end` tinyint(1) NOT NULL DEFAULT 0 COMMENT '1=left mid-season',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_tenure` (`franchise_id`,`gm_display_name`,`start_season_year`),
+  KEY `idx_gm` (`gm_display_name`),
+  KEY `idx_franchise` (`franchise_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ibl_google_sheet_connections`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;

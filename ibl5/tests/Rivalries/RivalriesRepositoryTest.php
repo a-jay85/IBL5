@@ -38,10 +38,16 @@ final class RivalriesRepositoryTest extends TestCase
         $this->stubTenures($hostile, 'Rival Gm');
         $this->repo->getGmPairGames($hostile, 'Rival Gm');
 
-        // Two tenure spans, each bound once per side (3 ints apiece), then the four GM names.
-        self::assertSame('iiiiiiiiiiiissss', $this->mockDb->getLastBoundTypes());
+        // Two franchise tuples, two tenure spans bound once per side, the CASE branches bound once
+        // per side (franchise, from, to, name), then the four GM names.
+        self::assertSame('iiiiiiiiiiiiiiiiiiisiiisiiisiiisssss', $this->mockDb->getLastBoundTypes());
         self::assertSame(
-            [1, 2000, 2005, 2, 1990, 9999, 1, 2000, 2005, 2, 1990, 9999, $hostile, 'Rival Gm', 'Rival Gm', $hostile],
+            [
+                1, 2, 2, 1,
+                1, 2000, 2005, 2, 1990, 9999, 1, 2000, 2005, 2, 1990, 9999,
+                1, 2000, 2005, $hostile, 2, 1990, 9999, 'Rival Gm', 1, 2000, 2005, $hostile, 2, 1990, 9999, 'Rival Gm',
+                $hostile, 'Rival Gm', 'Rival Gm', $hostile,
+            ],
             $this->mockDb->getLastBoundParams(),
         );
         foreach ($this->mockDb->getPreparedQueries() as $query) {
@@ -80,15 +86,71 @@ final class RivalriesRepositoryTest extends TestCase
         self::assertNotSame([], $queries);
         $query = $queries[array_key_last($queries)];
         self::assertStringContainsString('GROUP BY b.game_date, b.visitor_teamid, b.home_teamid, b.game_of_that_day', $query);
-        self::assertStringContainsString('+ t.is_mid_season_start', $query);
+        self::assertStringContainsString('+ t.is_mid_season_start', $queries[0]);
+        self::assertStringContainsString('ORDER BY t.start_season_year ASC, t.id ASC', $queries[0]);
         self::assertStringContainsString('v_gm <> h_gm', $query);
+    }
+
+    public function testGmPairGamesResolvesGmsWithoutCorrelatedSubquery(): void
+    {
+        $this->mockDb->onQuery('gm_display_name IN', [
+            ['gm_display_name' => 'A Gm', 'franchise_id' => 1, 'from_year' => 2000, 'to_year' => 2005, 'is_pair' => 1],
+            ['gm_display_name' => 'B Gm', 'franchise_id' => 2, 'from_year' => 1990, 'to_year' => 9999, 'is_pair' => 1],
+            ['gm_display_name' => 'C Gm', 'franchise_id' => 2, 'from_year' => 1995, 'to_year' => 1999, 'is_pair' => 0],
+        ]);
+        $this->repo->getGmPairGames('A Gm', 'B Gm');
+
+        $queries = $this->mockDb->getPreparedQueries();
+        $query = $queries[array_key_last($queries)];
+        self::assertStringNotContainsString('LIMIT 1', $query);
+        // The non-pair GM C still gets a CASE branch, so a side C ran resolves to C and not to the pair GM.
+        $filter = "AND ((b.visitor_teamid = ? AND b.home_teamid = ?) OR (b.visitor_teamid = ? AND b.home_teamid = ?))\n"
+            . "      AND ((b.visitor_teamid = ? AND b.season_year BETWEEN ? AND ?) OR (b.visitor_teamid = ? AND b.season_year BETWEEN ? AND ?))\n"
+            . '      AND ((b.home_teamid = ? AND b.season_year BETWEEN ? AND ?) OR (b.home_teamid = ? AND b.season_year BETWEEN ? AND ?))';
+        self::assertStringContainsString($filter, $query);
+        $branches = 'WHEN %s = ? AND g.season_year BETWEEN ? AND ? THEN ? ';
+        $case = 'CONVERT((CASE ' . str_repeat($branches, 3) . 'ELSE NULL END) USING utf8mb4) COLLATE utf8mb4_unicode_ci';
+        self::assertStringContainsString("gm_games AS (\n    SELECT g.*,\n        " . sprintf($case, 'g.visitor_teamid', 'g.visitor_teamid', 'g.visitor_teamid') . ' AS v_gm,', $query);
+        self::assertStringContainsString("\n        " . sprintf($case, 'g.home_teamid', 'g.home_teamid', 'g.home_teamid') . " AS h_gm\n    FROM games g\n)", $query);
+
+        self::assertSame('iiiiiiiiiiiiiiiiiiisiiisiiisiiisiiisiiisssss', $this->mockDb->getLastBoundTypes());
+        self::assertSame(
+            [
+                1, 2, 2, 1,
+                1, 2000, 2005, 2, 1990, 9999, 1, 2000, 2005, 2, 1990, 9999,
+                1, 2000, 2005, 'A Gm', 2, 1990, 9999, 'B Gm', 2, 1995, 1999, 'C Gm',
+                1, 2000, 2005, 'A Gm', 2, 1990, 9999, 'B Gm', 2, 1995, 1999, 'C Gm',
+                'A Gm', 'B Gm', 'B Gm', 'A Gm',
+            ],
+            $this->mockDb->getLastBoundParams(),
+        );
+    }
+
+    public function testGmPairGamesSkipsQueryWhenPairSharesOneFranchise(): void
+    {
+        $this->mockDb->onQuery('gm_display_name IN', [
+            ['gm_display_name' => 'A Gm', 'franchise_id' => 1, 'from_year' => 2000, 'to_year' => 2005, 'is_pair' => 1],
+            ['gm_display_name' => 'B Gm', 'franchise_id' => 1, 'from_year' => 2006, 'to_year' => 9999, 'is_pair' => 1],
+        ]);
+
+        self::assertSame([], $this->repo->getGmPairGames('A Gm', 'B Gm'));
+        self::assertCount(1, $this->mockDb->getPreparedQueries());
+
+        $fresh = new MockDatabase();
+        $fresh->setMockData([]);
+        $fresh->onQuery('gm_display_name IN', [
+            ['gm_display_name' => 'A Gm', 'franchise_id' => 1, 'from_year' => 2000, 'to_year' => 2005, 'is_pair' => 1],
+            ['gm_display_name' => 'B Gm', 'franchise_id' => 1, 'from_year' => 2006, 'to_year' => 9999, 'is_pair' => 1],
+        ]);
+        self::assertSame(['totals' => [], 'highs' => []], (new RivalriesRepository($fresh))->getGmTopPerformers('A Gm', 'B Gm'));
+        self::assertCount(1, $fresh->getPreparedQueries());
     }
 
     private function stubTenures(string $a, string $b): void
     {
         $this->mockDb->onQuery('gm_display_name IN', [
-            ['gm_display_name' => $a, 'franchise_id' => 1, 'from_year' => 2000, 'to_year' => 2005],
-            ['gm_display_name' => $b, 'franchise_id' => 2, 'from_year' => 1990, 'to_year' => 9999],
+            ['gm_display_name' => $a, 'franchise_id' => 1, 'from_year' => 2000, 'to_year' => 2005, 'is_pair' => 1],
+            ['gm_display_name' => $b, 'franchise_id' => 2, 'from_year' => 1990, 'to_year' => 9999, 'is_pair' => 1],
         ]);
     }
 }

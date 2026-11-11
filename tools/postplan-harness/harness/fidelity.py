@@ -1665,7 +1665,7 @@ def _landed_later(item, changed_files, diff_text: str) -> bool:
     if kind in ("file", "test"):
         return any(p == tok or p.endswith("/" + tok) for p in changed_files)
     if kind == "method":
-        return re.search(rf"^\+.*\b{re.escape(tok)}\b", diff_text, re.M) is not None
+        return re.search(rf"^\+(?!\+\+ ).*\b{re.escape(tok)}\b", diff_text, re.M) is not None
     return False
 
 

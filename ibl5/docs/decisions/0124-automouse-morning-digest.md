@@ -1,6 +1,6 @@
 ---
 description: bin/automouse/morning-digest sends one aggregated Discord DM per morning summarising overnight automouse outcomes; bin/automouse/morning-digest-cron-setup generates and installs the launchd LaunchAgent that fires it at 07:00 local.
-last_verified: 2026-09-10
+last_verified: 2026-11-10
 owner: ajaynicolas
 ---
 

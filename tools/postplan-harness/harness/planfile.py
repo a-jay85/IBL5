@@ -859,7 +859,8 @@ _LIST_ITEM = r"`(?:(?:[A-Za-z_][A-Za-z0-9_]*)?::)?([A-Za-z_][A-Za-z0-9_]*)(?:\(\
 _ITEM_NOTE = r"(?:\s*\(([^()]*)\))?"
 _LABELLED_LIST_RE = re.compile(
     rf"^({_LIST_ITEM}{_ITEM_NOTE}(?:\s*,\s*{_LIST_ITEM}{_ITEM_NOTE})*)"
-    r"(?:\s*[.;]?\s*$|[.;]\s+\S.*$)")
+    r"(?:\s*[.;]?\s*$|(?P<prose>[.;]\s+\S.*$))")
+_BARE_LABEL_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(?:\(\))?$")
 _ITEM_WITH_NOTE_RE = re.compile(_LIST_ITEM + _ITEM_NOTE)
 _REMOVED_NOTE_RE = re.compile(
     r"(?:^|[,;]\s*)(?:removed|deleted|dropped)\b(?:\s+(?:in|by|at|after|during|before)\b)?", re.I)
@@ -879,7 +880,8 @@ def _labelled_list_methods(stripped: str) -> list[str] | None:
     Each item may carry a ' (...)' note. An item whose note says removed, deleted or
     dropped is skipped, since the plan says the final diff will not hold it ('`testA`
     (Phase 1, removed in Phase 4)'). The list may end the line, or be followed by '.'
-    or ';' plus prose. A bare word after the list ('- x: `a` is checked')
+    or ';' plus prose, unless the label is a single bare identifier (then it is the method
+    and the prose keeps it). A bare word after the list ('- x: `a` is checked')
     rejects the line, so prose that only mentions a name never becomes a method. The
     first colon outside backticks ends the label, so '::' inside a name never splits it.
     """
@@ -890,12 +892,14 @@ def _labelled_list_methods(stripped: str) -> list[str] | None:
     else:
         return None
     rest = None
+    label = None
     in_tick = False
     for i, ch in enumerate(s):
         if ch == "`":
             in_tick = not in_tick
         elif ch == ":" and not in_tick:
             rest = s[i + 1:].lstrip(" *")
+            label = s[:i].strip()
             break
     if rest is None or not rest.startswith("`"):
         pm = _PATH_LABEL_RE.match(s)
@@ -904,6 +908,10 @@ def _labelled_list_methods(stripped: str) -> list[str] | None:
         return None
     lm = _LABELLED_LIST_RE.match(rest)
     if not lm:
+        return None
+    if lm.group("prose") and label and _BARE_LABEL_RE.match(label):
+        # '- testFoo: `bar`. Clamps it.' : the label is itself a method name and the
+        # tail is prose, so the label stays (Pass 2) and `bar` is not taken.
         return None
     return [m.group(1) for m in _ITEM_WITH_NOTE_RE.finditer(lm.group(1))
             if not (m.group(2) and _REMOVED_NOTE_RE.search(m.group(2)))]

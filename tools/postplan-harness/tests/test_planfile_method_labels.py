@@ -186,3 +186,7 @@ def test_item_marked_removed_is_skipped_and_later_items_kept():
 def test_note_that_only_mentions_a_deleted_thing_keeps_the_method():
     got = _methods("- `ibl5/tests/FooTest.php`: `testChecksDeletedRow` (asserts the deleted row is gone)")
     assert got == ["testChecksDeletedRow"]
+
+
+def test_bare_identifier_label_with_sentence_tail_keeps_label():
+    assert _methods("- testCapsAtMax: `MAX_SALARY`. Clamps values above it.") == ["testCapsAtMax"]

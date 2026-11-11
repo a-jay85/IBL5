@@ -109,6 +109,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
           INPUT_PR: ${{ inputs.pr }}
         run: |
+          set -o pipefail
           args=(--mode=tidy --dry-run)
           if [ -n "$INPUT_PR" ]; then args+=("--pr=$INPUT_PR"); fi
           {
@@ -235,6 +236,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
           INPUT_PR: ${{ inputs.pr }}
         run: |
+          set -o pipefail
           args=(--mode=tidy)
           if [ -n "$INPUT_PR" ]; then args+=("--pr=$INPUT_PR"); fi
           bin/vr-refresh-targets "${args[@]}" | tee -a "$GITHUB_STEP_SUMMARY"

@@ -439,6 +439,8 @@ final class SimRecapContextRepositoryTest extends DatabaseTestCase
         self::assertSame([200000311], array_column($games[0]['injuries'], 'pid'));
         self::assertSame('Wrist', $games[0]['injuries'][0]['injuryDescription']);
         self::assertSame(30, $games[0]['injuries'][0]['injuryGamesMissed']);
+        // 30 calendar days from 2031-06-03, same rule as the team pages' return date.
+        self::assertSame('2031-07-03', $games[0]['injuries'][0]['returnDate']);
         self::assertSame([], $games[1]['injuries']);
     }
 

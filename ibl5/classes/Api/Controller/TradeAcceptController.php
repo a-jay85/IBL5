@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Api\Controller;
 
 use Api\Contracts\ControllerInterface;
+use Api\Middleware\ServiceKeyGuard;
+use Api\Repository\ApiKeyRepository;
 use Api\Response\JsonResponder;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Discord\Discord;
@@ -15,14 +17,18 @@ class TradeAcceptController implements ControllerInterface
     private \Trading\Contracts\TradeOfferRepositoryInterface $offerRepository;
     private \Trading\Contracts\TradeProcessorInterface $processor;
 
+    private ServiceKeyGuard $serviceKeys;
+
     public function __construct(
         TeamIdentityRepositoryInterface $commonRepository,
         \Trading\Contracts\TradeOfferRepositoryInterface $offerRepository,
-        \Trading\Contracts\TradeProcessorInterface $processor
+        \Trading\Contracts\TradeProcessorInterface $processor,
+        ApiKeyRepository $apiKeys
     ) {
         $this->commonRepository = $commonRepository;
         $this->offerRepository = $offerRepository;
         $this->processor = $processor;
+        $this->serviceKeys = new ServiceKeyGuard($apiKeys);
     }
 
     /**
@@ -30,6 +36,13 @@ class TradeAcceptController implements ControllerInterface
      */
     public function handle(array $params, array $query, JsonResponder $responder, ?array $body = null): void
     {
+        // Runs before any param or body field is read, so a rejected request reads and writes nothing.
+        // discord_user_id is body data and Discord ids are public, so the caller must also be the bot's key.
+        if (!$this->serviceKeys->callerIsServiceKey()) {
+            $responder->error(403, 'forbidden', 'Only the IBLbot service key can accept trades.');
+            return;
+        }
+
         $offerId = isset($params['offerId']) ? (int) $params['offerId'] : 0;
         if ($offerId === 0) {
             $responder->error(400, 'bad_request', 'Missing or invalid offerId.');

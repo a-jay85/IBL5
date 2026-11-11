@@ -46,6 +46,10 @@ final class GainWeightsTest extends TestCase
         self::assertCount(Horizon::SEASONS, GainWeights::SEASON_WEIGHTS['middle']);
     }
 
+    /**
+     * `GainWeights::modeKey(Middle)` picks the middle season row, so a Middle
+     * team never borrows the rebuild weights.
+     */
     public function testMiddleModeKeyIsMiddleRow(): void
     {
         self::assertSame('middle', GainWeights::modeKey(TeamMode::Middle));

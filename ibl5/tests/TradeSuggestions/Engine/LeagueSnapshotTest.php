@@ -21,6 +21,10 @@ final class LeagueSnapshotTest extends TestCase
         return self::$league ??= SnapshotFactory::league();
     }
 
+    /**
+     * `LeagueSnapshot::mode` and `lineup` throw on a tid the snapshot lacks.
+     * A fallback to `TeamMode::WinNow` would score a stray team as a contender.
+     */
     public function testModeAndLineupReadersThrowOnUnknownTeam(): void
     {
         $s = self::league();

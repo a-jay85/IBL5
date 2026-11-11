@@ -114,6 +114,8 @@ final class RivalriesRepositoryTest extends TestCase
         self::assertStringContainsString("gm_games AS (\n    SELECT g.*,\n        " . sprintf($case, 'g.visitor_teamid', 'g.visitor_teamid', 'g.visitor_teamid') . ' AS v_gm,', $query);
         self::assertStringContainsString("\n        " . sprintf($case, 'g.home_teamid', 'g.home_teamid', 'g.home_teamid') . " AS h_gm\n    FROM games g\n)", $query);
 
+        self::assertStringContainsString("\n) SELECT game_date, game_of_that_day, season_year, game_type, visitor_teamid, home_teamid,\n    visitor_label, home_label, visitor_pts AS visitor_points, home_pts AS home_points,\n    (SELECT eb.color1", $query);
+        self::assertStringContainsString("AS home_era_color2, v_gm AS visitor_side, h_gm AS home_side\nFROM gm_games\nWHERE v_gm <> h_gm AND ((v_gm = ? AND h_gm = ?) OR (v_gm = ? AND h_gm = ?))\nORDER BY game_date ASC", $query);
         self::assertSame('iiiiiiiiiiiiiiiiiiisiiisiiisiiisiiisiiisssss', $this->mockDb->getLastBoundTypes());
         self::assertSame(
             [
@@ -125,6 +127,17 @@ final class RivalriesRepositoryTest extends TestCase
             ],
             $this->mockDb->getLastBoundParams(),
         );
+    }
+
+    public function testGmPairGamesSkipsQueryWhenOneGmHasNoTenure(): void
+    {
+        $this->mockDb->onQuery('gm_display_name IN', [
+            ['gm_display_name' => 'A Gm', 'franchise_id' => 1, 'from_year' => 2000, 'to_year' => 2005, 'is_pair' => 1],
+            ['gm_display_name' => 'A Gm', 'franchise_id' => 2, 'from_year' => 2006, 'to_year' => 9999, 'is_pair' => 1],
+        ]);
+
+        self::assertSame([], $this->repo->getGmPairGames('A Gm', 'Ghost Gm'));
+        self::assertCount(1, $this->mockDb->getPreparedQueries());
     }
 
     public function testGmPairGamesSkipsQueryWhenPairSharesOneFranchise(): void
@@ -153,9 +166,19 @@ final class RivalriesRepositoryTest extends TestCase
         $this->mockDb->onQuery('FROM gm_games', $this->stubGameRows('A Gm', 'B Gm'));
         $this->repo->getGmPairGames('A Gm', 'B Gm');
         $before = count($this->mockDb->getPreparedQueries());
+        $this->mockDb->onQuery('FROM per_game', [
+            ['pid' => 7, 'name' => 'Pat', 'side' => 'A Gm', 'points' => 20, 'game_date' => '2001-02-03', 'game_of_that_day' => 1],
+        ]);
 
-        $this->repo->getGmTopPerformers('A Gm', 'B Gm');
+        $result = $this->repo->getGmTopPerformers('A Gm', 'B Gm');
 
+        self::assertSame(
+            [
+                'totals' => [['pid' => 7, 'name' => 'Pat', 'side' => 'A Gm', 'games' => 1, 'total_points' => 20]],
+                'highs' => [['pid' => 7, 'name' => 'Pat', 'side' => 'A Gm', 'points' => 20, 'game_date' => '2001-02-03', 'game_of_that_day' => 1]],
+            ],
+            $result,
+        );
         $queries = $this->mockDb->getPreparedQueries();
         self::assertCount($before + 1, $queries);
         $query = $queries[array_key_last($queries)];

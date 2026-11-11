@@ -146,6 +146,113 @@ final class RivalriesRepositoryTest extends TestCase
         self::assertCount(1, $fresh->getPreparedQueries());
     }
 
+    public function testGmTopPerformersReusesMemoizedPairGames(): void
+    {
+        $this->stubTenures('A Gm', 'B Gm');
+        $this->mockDb->onQuery('FROM gm_games', $this->stubGameRows('A Gm', 'B Gm'));
+        $this->repo->getGmPairGames('A Gm', 'B Gm');
+        $before = count($this->mockDb->getPreparedQueries());
+
+        $this->repo->getGmTopPerformers('A Gm', 'B Gm');
+
+        $queries = $this->mockDb->getPreparedQueries();
+        self::assertCount($before + 1, $queries);
+        $query = $queries[array_key_last($queries)];
+        self::assertStringNotContainsString('unique_games', $query);
+        self::assertStringContainsString($this->memoBlock(), $query);
+        self::assertSame('siiisssiiiss', $this->mockDb->getLastBoundTypes());
+        self::assertSame(
+            ['2001-02-03', 1, 1, 2, 'A Gm', 'B Gm', '2002-03-04', 2, 2, 1, 'B Gm', 'A Gm'],
+            $this->mockDb->getLastBoundParams(),
+        );
+    }
+
+    public function testFranchiseTopPerformersReusesMemoizedPairGames(): void
+    {
+        $this->mockDb->onQuery('FROM games', $this->stubGameRows('1', '2'));
+        $this->repo->getFranchisePairGames(1, 2);
+        $before = count($this->mockDb->getPreparedQueries());
+
+        $this->repo->getFranchiseTopPerformers(1, 2);
+
+        $queries = $this->mockDb->getPreparedQueries();
+        self::assertCount($before + 1, $queries);
+        $query = $queries[array_key_last($queries)];
+        self::assertStringNotContainsString('unique_games', $query);
+        self::assertStringContainsString($this->memoBlock(), $query);
+        self::assertSame('siiisssiiiss', $this->mockDb->getLastBoundTypes());
+        self::assertSame(
+            ['2001-02-03', 1, 1, 2, '1', '2', '2002-03-04', 2, 2, 1, '2', '1'],
+            $this->mockDb->getLastBoundParams(),
+        );
+    }
+
+    public function testTopPerformersSkipQueryForEmptyMemoizedPairGames(): void
+    {
+        $this->stubTenures('A Gm', 'B Gm');
+        $this->repo->getGmPairGames('A Gm', 'B Gm');
+        $before = count($this->mockDb->getPreparedQueries());
+
+        self::assertSame(['totals' => [], 'highs' => []], $this->repo->getGmTopPerformers('A Gm', 'B Gm'));
+        self::assertCount($before, $this->mockDb->getPreparedQueries());
+    }
+
+    public function testTopPerformersWithoutMemoUseFullChain(): void
+    {
+        $this->repo->getFranchiseTopPerformers(1, 2);
+        self::assertStringContainsString('unique_games', $this->lastQuery());
+
+        // Memo keys follow argument order, so the reversed pair is a miss.
+        $this->mockDb->onQuery('FROM games', $this->stubGameRows('1', '2'));
+        $this->repo->getFranchisePairGames(1, 2);
+        $this->repo->getFranchiseTopPerformers(2, 1);
+        self::assertStringContainsString('unique_games', $this->lastQuery());
+    }
+
+    public function testNullGameOfDaySkipsMemo(): void
+    {
+        $rows = $this->stubGameRows('1', '2');
+        $rows[0]['game_of_that_day'] = null;
+        $this->mockDb->onQuery('FROM games', $rows);
+        $this->repo->getFranchisePairGames(1, 2);
+
+        $this->repo->getFranchiseTopPerformers(1, 2);
+
+        self::assertStringContainsString('unique_games', $this->lastQuery());
+    }
+
+    private function lastQuery(): string
+    {
+        $queries = $this->mockDb->getPreparedQueries();
+
+        return $queries[array_key_last($queries)];
+    }
+
+    private function memoBlock(): string
+    {
+        $select = 'SELECT CAST(? AS DATE) AS game_date, ? AS game_of_that_day, ? AS visitor_teamid, ? AS home_teamid, ? AS v_gm, ? AS h_gm';
+
+        return "WITH pair_games AS (\n    " . $select . "\n    UNION ALL " . $select . "\n)";
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function stubGameRows(string $visitorSide, string $homeSide): array
+    {
+        $base = [
+            'season_year' => 2001, 'game_type' => 2, 'visitor_label' => 'Away', 'home_label' => 'Home',
+            'visitor_points' => 90, 'home_points' => 80,
+        ];
+
+        return [
+            $base + ['game_date' => '2001-02-03', 'game_of_that_day' => 1, 'visitor_teamid' => 1, 'home_teamid' => 2,
+                'visitor_side' => $visitorSide, 'home_side' => $homeSide],
+            $base + ['game_date' => '2002-03-04', 'game_of_that_day' => 2, 'visitor_teamid' => 2, 'home_teamid' => 1,
+                'visitor_side' => $homeSide, 'home_side' => $visitorSide],
+        ];
+    }
+
     private function stubTenures(string $a, string $b): void
     {
         $this->mockDb->onQuery('gm_display_name IN', [

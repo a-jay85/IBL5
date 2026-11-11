@@ -281,6 +281,8 @@ try {
     // IBL-only: Head-to-Head Records, All-Star games, record holders, and related steps don't apply to Olympics
     if (!$isOlympics) {
         $updaterService->addStep(new Updater\Steps\RefreshHeadToHeadRecordsStep($mysqli_db));
+        // Delete, then rewarm, the Records "This Season" Season Highs keys; skips the warm (keys stay deleted) once 240 s of the shared budget is gone.
+        $updaterService->addStep(Updater\Steps\RefreshSeasonHighsCacheStep::fromDb($mysqli_db, $season, $leagueContext, $updaterClock, $updaterStartedAt));
         $updaterService->addStep(new Updater\Steps\ProcessAllStarGamesStep(
             $boxscoreProcessor, $allStarTeamRepo, $boxscoreView, $sourceResolver,
         ));

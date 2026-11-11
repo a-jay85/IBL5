@@ -277,7 +277,7 @@ final class CachedSeasonHighsRepositoryTest extends TestCase
             $repository->warmKeys(static function (): void {
                 throw new \RuntimeException('boom');
             });
-            $this->fail('warmKeys should propagate the callable exception');
+            self::fail('warmKeys should propagate the callable exception');
         } catch (\RuntimeException $e) {
             $this->assertSame('boom', $e->getMessage());
         }

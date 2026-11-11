@@ -1,0 +1,54 @@
+[
+  {
+    "module": "team",
+    "viewport": "desktop",
+    "title": "team",
+    "index": 1,
+    "count": 1,
+    "kind": "spot",
+    "region": "middle, y 932-1108 px",
+    "beforeFile": "changed/team.1.before.png",
+    "afterFile": "changed/team.1.after.png",
+    "sideFile": "changed/team.1.side.png",
+    "stackFile": "changed/team.1.stack.png"
+  },
+  {
+    "module": "team-contracts",
+    "viewport": "desktop",
+    "title": "team-contracts",
+    "index": 1,
+    "count": 1,
+    "kind": "spot",
+    "region": "middle, y 1045-1221 px",
+    "beforeFile": "changed/team-contracts.1.before.png",
+    "afterFile": "changed/team-contracts.1.after.png",
+    "sideFile": "changed/team-contracts.1.side.png",
+    "stackFile": "changed/team-contracts.1.stack.png"
+  },
+  {
+    "module": "team-contracts",
+    "viewport": "mobile",
+    "title": "team-contracts-mobile",
+    "index": 1,
+    "count": 1,
+    "kind": "spot",
+    "region": "bottom, y 1716-1892 px",
+    "beforeFile": "changed/team-contracts-mobile.1.before.png",
+    "afterFile": "changed/team-contracts-mobile.1.after.png",
+    "sideFile": "changed/team-contracts-mobile.1.side.png",
+    "stackFile": "changed/team-contracts-mobile.1.stack.png"
+  },
+  {
+    "module": "team",
+    "viewport": "mobile",
+    "title": "team-mobile",
+    "index": 1,
+    "count": 1,
+    "kind": "spot",
+    "region": "bottom, y 1589-1765 px",
+    "beforeFile": "changed/team-mobile.1.before.png",
+    "afterFile": "changed/team-mobile.1.after.png",
+    "sideFile": "changed/team-mobile.1.side.png",
+    "stackFile": "changed/team-mobile.1.stack.png"
+  }
+]

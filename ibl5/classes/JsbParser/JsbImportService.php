@@ -84,7 +84,7 @@ class JsbImportService implements JsbImportServiceInterface
     /** @see JsbImportServiceInterface::processAswData() */
     public function processAswData(string $data, int $seasonYear): JsbImportResult
     {
-        return $this->asw->import($data, $seasonYear);
+        return $this->asw->import($data, $seasonYear, rejectStaleRosters: true);
     }
 
     /** @see JsbImportServiceInterface::processAswFile() */

@@ -1,6 +1,6 @@
 ---
 description: REST API architectural overview — auth, rate limiting, ETag caching, controller inventory, route table, and full per-endpoint reference.
-last_verified: 2026-10-26
+last_verified: 2026-11-09
 ---
 
 # API Guide
@@ -458,7 +458,7 @@ X-API-Key: <key>
 
 ### POST /trades/{offerId}/accept
 Accepts a pending trade offer on behalf of the receiving GM.
-**Auth:** API key required.
+**Auth:** API key required. The key must be service-tier (any `rate_limit_tier` except `standard`), which in practice means the IBLbot key.
 **Path parameters:** `offerId` (integer) — numeric offer ID.
 **Request body:**
 - `discord_user_id` (string, **required**) — Discord user ID of the caller; must match the receiving team's GM.
@@ -475,10 +475,11 @@ Content-Type: application/json
 **Response `200`:** standard envelope; `data` fields: `accepted` (bool, always `true`), `story` (string — trade story text).
 **Conditional requests:** not supported.
 **Errors:** `400 bad_request` — missing or invalid `offerId`, or missing `discord_user_id`. `403 forbidden` — caller's Discord ID does not match the receiving team's GM. `404 not_found` — offer not found or already processed. `500 processing_error` — trade processing failed.
+**Service key.** A missing or standard-tier key gets `403 forbidden` with the message `Only the IBLbot service key can accept trades.` This check runs before the offer ID or body is read.
 
 ### POST /trades/{offerId}/decline
 Declines a pending trade offer on behalf of the receiving GM and notifies the offering team.
-**Auth:** API key required.
+**Auth:** API key required. The key must be service-tier (any `rate_limit_tier` except `standard`), which in practice means the IBLbot key.
 **Path parameters:** `offerId` (integer) — numeric offer ID.
 **Request body:**
 - `discord_user_id` (string, **required**) — Discord user ID of the caller; must match the receiving team's GM.
@@ -495,6 +496,7 @@ Content-Type: application/json
 **Response `200`:** standard envelope; `data` fields: `declined` (bool, always `true`), `offering_team` (string — team name of the offering side), `offering_gm_discord_id` (string — Discord ID of the offering GM).
 **Conditional requests:** not supported.
 **Errors:** `400 bad_request` — missing or invalid `offerId`, or missing `discord_user_id`. `403 forbidden` — caller's Discord ID does not match the receiving team's GM. `404 not_found` — offer not found or already processed.
+**Service key.** A missing or standard-tier key gets `403 forbidden` with the message `Only the IBLbot service key can decline trades.` This check runs before the offer ID or body is read.
 
 ### POST /bug-pipeline/enqueue
 Enqueues a Discord message as a bug report candidate; advances the channel watermark unconditionally.

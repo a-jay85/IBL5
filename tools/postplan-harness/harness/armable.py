@@ -17,9 +17,11 @@ merge; a false ARM ships unreviewed code).
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 import subprocess
+import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -163,6 +165,53 @@ def dep_numbers(body: str) -> list[int]:
 
 
 UI_CLASSIFIER = Path(__file__).resolve().parents[3] / "bin" / "lib" / "ui-change-classifier.sh"
+HS_CLASSIFIER = Path(__file__).resolve().parents[3] / "bin" / "lib" / "human-signoff-classifier.sh"
+OWNER_APPROVAL_STATES = frozenset({"match", "no-label", "no-record", "mismatch", "error"})
+C7_APPROVAL_REASONS = {
+    "no-label": "no human-approved label",
+    "no-record": "human-approved has no current approval record",
+    "mismatch": "human-approved was given for an older diff",
+    "error": "the owner approval could not be verified",
+}
+
+
+def owner_approval_state(labels, comments, base_ref, head_ref, cwd) -> str:
+    """Owner-approval half of condition (7): the hs_approval_state token. Fail closed."""
+    if "human-approved" not in labels:
+        return "no-label"
+    if not isinstance(comments, list):
+        return "error"
+    path = None
+    try:
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as fh:
+            path = fh.name
+            json.dump(comments, fh)
+        proc = subprocess.run(
+            ["bash", "-c", 'source "$1" && hs_approval_state "$2" "$3" "$4" "$5"', "_",
+             str(HS_CLASSIFIER), base_ref, head_ref, path, ",".join(labels)],
+            cwd=cwd, capture_output=True, text=True, timeout=30, check=False)
+    except (OSError, subprocess.SubprocessError, TypeError, ValueError):
+        return "error"
+    finally:
+        if path:
+            Path(path).unlink(missing_ok=True)
+    state = proc.stdout.strip()
+    return state if state in OWNER_APPROVAL_STATES else "error"
+
+
+def resolve_owner_approval(gh, git, pr, labels, cwd, plan_false: bool) -> str:
+    """Runner entry for (7): 'unchecked' unless the plan says auto_merge: false."""
+    if not plan_false:
+        return "unchecked"
+    if "human-approved" not in labels:
+        return "no-label"
+    try:
+        base_ref = f"origin/{gh.pr_base_ref()}"
+        git.fetch_base(base_ref)
+        comments = gh.pr_comments_json(pr)
+    except Exception:  # any read failure keeps (7) held
+        return "error"
+    return owner_approval_state(labels, comments, base_ref, "HEAD", cwd)
 
 
 def ui_hold(files: list[str], labels: list[str]) -> str:
@@ -307,6 +356,7 @@ class ArmInputs:
     merge_danger_state: str = "MISSING"   # runner._arm_merge_danger_state: classify_body re-checked against the diff floor; only "TWO-WAY" arms (fail-closed default)
     removed_guards_holds: Optional[list[str]] = None   # removed_guards.classify_body(body, flagged keys); None = never computed -> BLOCKS
     plan_auto_merge_value: Optional[str] = None   # raw line-1 `auto_merge:` value; None = absent
+    owner_approval: str = "unchecked"   # (7) token from resolve_owner_approval
     plan_hold_triggers: tuple = ()                # line-1 `hold_trigger:` tokens; () keeps condition (7) with the owner
     fidelity_gate_edit_only: bool = False         # every blocking fidelity finding is [GATE-EDIT]
     second_review_verdict: Optional[str] = None   # "CLEAN"/"REJECT"; None = the seat gave no verdict
@@ -528,11 +578,18 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     #   absent / "true"     -> no hold
     #   "false"             -> hold (unchanged meaning; the bool stays authoritative
     #                          so callers that only set it keep their meaning)
+    #                          "false" clears only when owner_approval == "match"
     #   DOCS_REFRESH_TOKEN  -> hold iff any docs-refresh clause fails on the REALIZED PR
     #   anything else       -> hold (unknown value, fail-closed; it armed silently before)
     val = inp.plan_auto_merge_value
     if inp.plan_auto_merge_false or val == "false":
-        c7_blocked, c7_reason = True, "plan declares auto_merge: false"
+        if inp.owner_approval == "match":
+            c7_blocked, c7_reason = False, ""
+        elif inp.owner_approval == "unchecked":
+            c7_blocked, c7_reason = True, "plan declares auto_merge: false"
+        else:
+            c7_blocked, c7_reason = True, ("plan declares auto_merge: false; "
+                + C7_APPROVAL_REASONS.get(inp.owner_approval, C7_APPROVAL_REASONS["error"]))
     elif val is None or val == "true":
         c7_blocked, c7_reason = False, ""
     elif val == DOCS_REFRESH_TOKEN:

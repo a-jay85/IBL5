@@ -191,13 +191,13 @@ jobs:
           esac
 
           # Every failure below leaves FP or COMMENTS empty/absent, and
-          # hs_eval_approval turns that into a red gate for a UI PR holding
-          # the label. A not-ui PR never reads either value.
-          # Only a UI PR holding the label reads FP or COMMENTS. Every other
-          # PR skips the deep fetch, the diff, and the comment read.
+          # hs_eval_approval turns that into a drop for a PR holding the label
+          # (red for a UI PR, green for a non-UI PR).
+          # Any PR holding human-approved reads FP and COMMENTS. An unlabeled
+          # non-UI PR skips the deep fetch, the diff, and the comment read.
           FP=""
           COMMENTS="$RUNNER_TEMP/hs-comments.json"
-          if [ "$UI_VERDICT" != not-ui ] && hs_pr_cleared "$UI_VERDICT" "$LABELS"; then
+          if hs_pr_cleared "$UI_VERDICT" "$LABELS" && { [ "$UI_VERDICT" != not-ui ] || hs_has_approval_label "$LABELS"; }; then
             if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
               git fetch --no-tags --quiet --unshallow origin || echo "::warning::could not deepen history"
             fi
@@ -263,6 +263,7 @@ jobs:
           delim="HS_BODY_$(openssl rand -hex 12)"
           {
             echo "verdict=$HS_VERDICT"
+            echo "gate_red=${HS_GATE_RED:-}"
             echo "reason=$HS_DROP_REASON"
             echo "fingerprint=$FP"
             echo "approved_at=$APPROVED_AT"
@@ -276,10 +277,19 @@ jobs:
       - name: Require human sign-off for UI PRs
         env:
           VERDICT: ${{ steps.eval.outputs.verdict }}
+          GATE_RED: ${{ steps.eval.outputs.gate_red }}
         run: |
           set -euo pipefail
+          # A drop on a non-UI PR stays green: the write job still removes the
+          # label and posts the revoke, so post-plan condition (7) holds again.
           case "$VERDICT" in
             pass|keep|record) echo "Human sign-off gate: $VERDICT" ;;
+            drop)
+              if [ "${GATE_RED:-}" = 0 ]; then
+                echo "Human sign-off gate: drop on a non-UI PR (green; approval removed)"
+                exit 0
+              fi
+              echo "Human sign-off gate: drop (red)"; exit 1 ;;
             *) echo "Human sign-off gate: ${VERDICT:-unset} (red)"; exit 1 ;;
           esac
 

@@ -295,10 +295,12 @@ Owner decision on PR #N (branch <branch>), <date>: "<owner's words>". <What it c
 6. Do NOT run post-plan or /pr-ready. This session is headless and bin/post-plan-now refuses
    to start here. The parent session re-fires post-plan after you finish.
 7. <One of:>
-   - Ship: add human-approved (feat only), tick the manual boxes the owner confirmed, and
-     comment "Owner approved <date>: <words>." Do NOT arm gh pr merge. Post-plan arms it
-     after the verdict on the new head has no blocking finding and CI is green. A plan
-     with auto_merge: false is the exception; the follow-up thread arms that one.
+   - Ship: add `human-approved` to every approved PR, tick the manual boxes the owner
+     confirmed, and comment "Owner approved <date>: <words>." Do NOT arm gh pr merge.
+     Post-plan arms it after the verdict on the new head has no blocking finding and CI is
+     green. The label also clears post-plan condition (7) for a PR whose plan says
+     auto_merge: false, while the recorded fingerprint matches the diff. After labeling,
+     re-fire post-plan for that PR so it arms.
    - Come back: save before/after screenshots at 1280 and 390 to $D/jobs/pN-*.png,
      and do NOT sign off or arm.
    If anything blocks, do not merge. Comment on the PR saying what blocks.
@@ -367,11 +369,10 @@ A PR whose post-plan run is already live and has no owner hold gets nothing. Pos
 DM is its completion signal. That DM exists only once post-plan starts. A refused pre-fire
 check exits before then, so whoever fires `post-plan-now` reports a non-zero exit itself.
 
-Post-plan holds condition 7 on every run when the plan says `auto_merge: false`, so it
-never arms that PR, even after the owner approves. The follow-up thread arms it with
-`gh pr merge N -R a-jay85/IBL5 --squash --auto`. It does so only when the verdict on the
-new head is current with no blocking finding, CI has no real failures, and condition 7 is
-the only hold. Its PR comment quotes the owner's words and the date.
+Post-plan holds condition 7 when the plan says `auto_merge: false`. The hold lasts until
+`human-approved` is on the PR and the `human-signoff` workflow has recorded the diff
+fingerprint. The next post-plan run then arms the PR. A push that changes the PR's changed
+lines drops the label, and the hold comes back.
 
 ## Step 7: Wrap up
 

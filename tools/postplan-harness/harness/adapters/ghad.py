@@ -280,6 +280,14 @@ class RecordingGh:
     def pr_comments_text(self, pr: int) -> str:
         return "\n".join(self.fixture.get("pr_comments") or [])
 
+    def pr_comments_json(self, pr: int) -> list[dict]:
+        if self.fixture.get("pr_comments_json_error"):
+            raise HarnessError("gh", "replay: comment read failed")
+        return list(self.fixture.get("pr_comments_json") or [])
+
+    def pr_base_ref(self) -> str:
+        return str(self.fixture.get("base_ref_name") or "master")
+
     def pr_label_remove(self, pr: int, label: str) -> bool:
         self.record("label_remove", pr=pr, label=label)
         return True
@@ -777,6 +785,20 @@ class LiveGh(RecordingGh):
     def pr_comments_text(self, pr: int) -> str:
         return self._gh("api", "--paginate", f"repos/{{owner}}/{{repo}}/issues/{pr}/comments",
                         "--jq", ".[].body")
+
+    def pr_comments_json(self, pr: int) -> list[dict]:
+        pages = json.loads(self._gh("api", "--paginate", "--slurp",
+                                    f"repos/{{owner}}/{{repo}}/issues/{pr}/comments"))
+        if not isinstance(pages, list) or not all(isinstance(p, list) for p in pages):
+            raise HarnessError("gh", "issue comments payload is not a list of pages")
+        return [c for page in pages for c in page]
+
+    def pr_base_ref(self) -> str:
+        out = self._gh("pr", "view", str(self.pr_number()), "--json", "baseRefName",
+                       "--jq", ".baseRefName").strip()
+        if not out:
+            raise HarnessError("gh", "empty baseRefName")
+        return out
 
     def pr_label_remove(self, pr: int, label: str) -> bool:
         try:

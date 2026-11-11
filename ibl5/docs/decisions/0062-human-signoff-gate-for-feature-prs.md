@@ -1,6 +1,6 @@
 ---
 description: Feature PRs (conventional-commit `feat:`) cannot merge until a human applies the `human-approved` label — a required CI check, not a convention, blocks auto-merge.
-last_verified: 2026-11-08
+last_verified: 2026-11-10
 ---
 
 # ADR-0062: Human sign-off gate for feature PRs
@@ -75,3 +75,19 @@ Relates to (does not supersede) ADR-0017 (`0017-dependabot-full-ci-and-auto-merg
 - `.claude/skills/post-plan/SKILL.md` — Phase 6.5 arms `gh pr merge --auto` (the behaviour this gate constrains).
 - `.claude/rules/automouse-workflow.md` — automouse pipeline overview.
 - `bin/lib/human-signoff-classifier.sh`: the classifier and the diff-pinned approval functions, sourced by the workflow and by `bin/test-human-signoff-classifier`.
+
+## Update 2026-11-10: owner approval clears post-plan condition (7)
+
+The diff fingerprint now covers changed lines only (`git diff -U0`). A clean rebase that
+moves only the lines around a change keeps the fingerprint, so the label stays. Records
+taken with the old `-U3` form no longer match. Each such PR drops its label once and needs
+the owner to approve it again.
+
+The workflow records and drops fingerprints for any PR that carries `human-approved`, UI or
+not. A drop on a non-UI PR removes the label and posts the revoke marker, but the check
+stays green, because a non-UI PR needs no sign-off to merge.
+
+Post-plan condition (7) holds a PR whose plan says `auto_merge: false`. It now clears only
+when `hs_approval_state` in `bin/lib/human-signoff-classifier.sh` returns `match`: the label
+is on the PR and the latest github-actions[bot] record equals the current fingerprint.
+The harness, `bin/lib/pr-armable.sh` and `bin/pr-triage` all call that one function.

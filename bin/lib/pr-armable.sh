@@ -10,6 +10,7 @@
 #   (5) golden-snapshot touch      -> pr_golden_hold <files_json>
 #   (6) Depends-on merge-order     -> pr_dep_holds <body>
 #   (8) UI floor                   -> pr_ui_hold <rest_files_json> <labels_json>  (REST pulls/N/files, not gh pr view)
+#   (7, approval) owner approval  -> pr_owner_approval_hold / pr_owner_approval_live_hold
 #   (10) pipeline-authored floor   -> pr_pipeline_authored_hold <labels_json> [head_ref]
 #   (11) unresolved review thread  -> pr_unresolved_findings_hold <pr_number>
 #   (15) already-red CI checks     -> pr_red_check_hold <pr_number>
@@ -24,6 +25,8 @@
 # file, the realized diff) and cannot be evaluated for an arbitrary PR. Callers
 # fail CLOSED on them — a PR is only ARMABLE with a POSITIVE clearance signal
 # (pr_manual_testing_clearance == CLEARED), never the mere absence of holds.
+# The frontmatter read of (7) stays run-local; the owner-approval half of (7),
+# a human-approved label bound to the current diff, lives here.
 # (11) is NOT a duplicate of (2): (2) scores findings produced by the current
 # post-plan run; (11) reads live GitHub thread state, catching findings left
 # unresolved by an earlier run or by a standalone /pr-review or /security-audit.
@@ -147,6 +150,56 @@ pr_golden_hold() {
             >/dev/null 2>&1; then
         echo "golden-changed"
     fi
+}
+
+# pr_owner_approval_hold <base_ref> <head_ref> <comments_json_file> <labels_json>
+#   The owner-approval half of condition (7). Echoes nothing when
+#   hs_approval_state says match, `approval-<state>` otherwise, and
+#   `approval-error` when the classifier lib cannot load (fail closed).
+pr_owner_approval_hold() {
+    local labels_csv state
+    if ! declare -F hs_approval_state >/dev/null; then
+        # shellcheck source=bin/lib/human-signoff-classifier.sh
+        source "$(dirname "${BASH_SOURCE[0]}")/human-signoff-classifier.sh" 2>/dev/null || true
+    fi
+    if ! declare -F hs_approval_state >/dev/null; then
+        echo approval-error
+        return
+    fi
+    labels_csv=$(printf '%s' "$4" | jq -r '[.[]?.name // empty] | join(",")' 2>/dev/null) || labels_csv=""
+    state=$(hs_approval_state "$1" "$2" "$3" "$labels_csv" 2>/dev/null) || true
+    case "$state" in
+        match) return ;;
+        no-label|no-record|mismatch|error) echo "approval-$state" ;;
+        *) echo approval-error ;;
+    esac
+}
+
+# pr_owner_approval_live_hold <pr_number> <head_oid> <base_ref_name> <labels_json>
+#   Cross-PR form for bin/pr-triage. Fetches the base branch and
+#   refs/pull/N/head, requires FETCH_HEAD to equal <head_oid>, reads REST issue
+#   comments through GH_CMD, then calls pr_owner_approval_hold. Any fetch or
+#   read failure echoes approval-error. An unlabeled PR returns
+#   approval-no-label before any fetch or GH_CMD call.
+pr_owner_approval_live_hold() {
+    local num="$1" oid="$2" base="$3" labels_json="$4" tmp out
+    if ! printf '%s' "$labels_json" | jq -e 'any(.[]?; .name == "human-approved")' >/dev/null 2>&1; then
+        echo approval-no-label
+        return
+    fi
+    tmp=$(mktemp -d) || { echo approval-error; return; }
+    if ! { git fetch --no-tags --quiet origin "+refs/heads/$base:refs/remotes/origin/$base" \
+            && git fetch --no-tags --quiet origin "refs/pull/$num/head" \
+            && [ "$(git rev-parse FETCH_HEAD)" = "$oid" ] \
+            && "${GH_CMD:-gh}" api --paginate --slurp "repos/${REPO_SLUG:-a-jay85/IBL5}/issues/$num/comments" > "$tmp/pages.json" \
+            && jq 'add // []' "$tmp/pages.json" > "$tmp/comments.json"; } 2>/dev/null; then
+        rm -rf "$tmp"
+        echo approval-error
+        return
+    fi
+    out=$(pr_owner_approval_hold "origin/$base" "$oid" "$tmp/comments.json" "$labels_json")
+    rm -rf "$tmp"
+    [ -z "$out" ] || printf '%s\n' "$out"
 }
 
 # pr_ui_hold <files_json> <labels_json>

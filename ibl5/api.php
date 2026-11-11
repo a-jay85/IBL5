@@ -87,7 +87,8 @@ $app->getContainer()->set('api.controllerFactory', static function (): \Closure 
             return new \Api\Controller\TradeAcceptController(
                 $commonRepo,
                 new \Trading\TradeOfferRepository($db, ''),
-                new \Trading\TradeProcessor($db, $commonRepo)
+                new \Trading\TradeProcessor($db, $commonRepo),
+                new \Api\Repository\ApiKeyRepository($db)
             );
         }
 
@@ -96,7 +97,8 @@ $app->getContainer()->set('api.controllerFactory', static function (): \Closure 
             $commonRepo = new \Repositories\TeamIdentityRepository($db);
             return new \Api\Controller\TradeDeclineController(
                 $commonRepo,
-                new \Trading\TradeOfferRepository($db, '')
+                new \Trading\TradeOfferRepository($db, ''),
+                new \Api\Repository\ApiKeyRepository($db)
             );
         }
 

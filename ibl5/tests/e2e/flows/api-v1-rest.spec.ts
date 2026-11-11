@@ -286,6 +286,30 @@ test.describe('api/v1 REST contract', () => {
     expect(body.error.code).toBe('not_found');
   });
 
+  test('POST api/v1/trades/{unknown}/accept returns 403 with a standard-tier key', async ({
+    request,
+  }) => {
+    const response = await request.post('api/v1/trades/999999/accept', {
+      headers: { 'X-API-Key': STANDARD_KEY },
+      data: { discord_user_id: 'test' },
+    });
+    expectJsonEnvelope(response, 403);
+    const body = await response.json();
+    expect(body.error.code).toBe('forbidden');
+  });
+
+  test('POST api/v1/trades/{unknown}/decline returns 403 with a standard-tier key', async ({
+    request,
+  }) => {
+    const response = await request.post('api/v1/trades/999999/decline', {
+      headers: { 'X-API-Key': STANDARD_KEY },
+      data: { discord_user_id: 'test' },
+    });
+    expectJsonEnvelope(response, 403);
+    const body = await response.json();
+    expect(body.error.code).toBe('forbidden');
+  });
+
   test.describe('POST trades — offer lifecycle', () => {
     test.describe.configure({ mode: 'serial' });
 

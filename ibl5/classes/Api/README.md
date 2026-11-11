@@ -9,7 +9,7 @@ Houses the full REST API layer for the application, entered via `ibl5/api.php`. 
 
 | Component | Purpose |
 |-----------|---------|
-| `Controller/` | 26 controllers including `PlayerDetailController`, `StandingsController`, `TeamDetailController`, `TradeAcceptController` |
+| `Controller/` | 27 controllers including `PlayerDetailController`, `StandingsController`, `TeamDetailController`, `TradeAcceptController`. The trade accept/decline, reaction, and wake controllers call `Middleware/ServiceKeyGuard` first, so a standard-tier key gets 403 |
 | `Middleware/` | `ApiKeyAuthenticator` and `RateLimiter` |
 | `Transformer/` | Shapes domain objects into API response payloads |
 | `Pagination/` | Cursor/offset pagination support |

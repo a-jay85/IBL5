@@ -1,6 +1,6 @@
 ---
 description: The eager-rebase workflow returns as manual workflow_dispatch only; the push-to-master auto-trigger that caused rebase storms is never restored.
-last_verified: 2026-09-10
+last_verified: 2026-11-10
 ---
 
 # ADR-0125: Manual-Dispatch Rebase for Open PRs

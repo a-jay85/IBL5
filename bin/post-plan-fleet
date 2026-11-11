@@ -577,7 +577,9 @@ while read -r pr; do
     # its own --foreground runner takes the lock as first holder. A listed path that is not
     # a directory has no git dir to lock; an existing directory whose git dir cannot be
     # resolved counts as held (fail closed).
-    _wt="$(wt_path_for_branch "$branch")"; _lkh=""
+    # `|| _wt=""`: grep exits 1 when the branch has no worktree, and pipefail + set -e
+    # would otherwise kill the whole fleet run on the first such PR.
+    _wt="$(wt_path_for_branch "$branch")" || _wt=""; _lkh=""
     if [[ -n "$_wt" && -d "$_wt" ]]; then
         _lk="$(wtlock_path "$_wt")" || _lk=""
         if [[ -z "$_lk" ]]; then _lkh=unknown; else _lkh="$(wtlock_live "$_lk")" || _lkh=""; fi

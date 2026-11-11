@@ -6,8 +6,7 @@ import subprocess
 import pytest
 
 from harness import armable
-from harness.armable import (C7_APPROVAL_REASONS, evaluate, owner_approval_state,
-                             resolve_owner_approval)
+from harness.armable import evaluate, owner_approval_state, resolve_owner_approval
 from harness.state import HarnessError
 
 from tests.test_armable import inputs
@@ -85,10 +84,11 @@ def test_c7_false_holds_on_mismatch_with_label():
 
 
 @pytest.mark.parametrize("token,expected", [
-    ("no-label", C7_APPROVAL_REASONS["no-label"]),
-    ("no-record", C7_APPROVAL_REASONS["no-record"]),
-    ("error", C7_APPROVAL_REASONS["error"]),
-    ("bogus", C7_APPROVAL_REASONS["error"]),
+    ("no-label", "no human-approved label"),
+    ("no-record", "human-approved has no current approval record"),
+    ("mismatch", "human-approved was given for an older diff"),
+    ("error", "the owner approval could not be verified"),
+    ("bogus", "the owner approval could not be verified"),
 ])
 def test_c7_false_hold_reasons_name_missing_piece(token, expected):
     c7 = _c7(evaluate(inputs(plan_auto_merge_value="false", owner_approval=token)))

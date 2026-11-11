@@ -17,7 +17,7 @@ use League\LeagueContext;
  * injected via db/db.php; it composes no credential of its own.
  *
  * @phpstan-type PlayerLine array{pid:int,name:string,min:int,pts:int,reb:int,ast:int,stl:int,blk:int,fgm:int,fga:int,tpm:int,tpa:int}
- * @phpstan-type GameInjury array{pid:int,name:string,injuryDescription:string,injuryGamesMissed:int}
+ * @phpstan-type GameInjury array{pid:int,name:string,injuryDescription:string,injuryGamesMissed:int,returnDate:string}
  * @phpstan-type GameRow array{id:int,season_year:int,box_id:int,game_date:string,visitor_teamid:int,visitor_score:int,home_teamid:int,home_score:int,visitor_name:string|null,home_name:string|null,visitor_city:string|null,home_city:string|null,game_of_that_day:int|null}
  * @phpstan-type BoxLine array{game_date:string,visitor_teamid:int,home_teamid:int,teamid:int,pid:int,name:string,min:int,pts:int,reb:int,ast:int,stl:int,blk:int,fgm:int,fga:int,tpm:int,tpa:int}
  * @phpstan-type GameFact array{key:string,season_year:int,game_date:string,box_id:int|null,game_of_that_day:int|null,visitor_teamid:int,home_teamid:int,visitor_name:string|null,home_name:string|null,visitor_city:string|null,home_city:string|null,visitor_score:int,home_score:int,visitor_top:list<PlayerLine>,home_top:list<PlayerLine>,injuries:list<GameInjury>}
@@ -404,6 +404,23 @@ final class SimRecapContextRepository extends \Database\BaseMysqliRepository
     }
 
     /**
+     * ibl_jsb_transactions.injury_games_missed is a count of calendar days, not
+     * games. The player is back on injury date + that many days. This matches
+     * PlayerInjuryCalculator::getInjuryReturnDate(), which the team pages use:
+     * it adds (ibl_plr.injured + 1) days to the sim end date, and ibl_plr.injured
+     * at sim end is (days - days since injury - 1).
+     */
+    private static function injuryReturnDate(string $injuryDate, int $days): string
+    {
+        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $injuryDate);
+        if ($date === false) {
+            return '';
+        }
+
+        return $date->modify('+' . $days . ' days')->format('Y-m-d');
+    }
+
+    /**
      * Attaches top performers (per side) and game-date injuries to each game and
      * assigns the script-owned key "g<N>" in final order.
      *
@@ -458,6 +475,7 @@ final class SimRecapContextRepository extends \Database\BaseMysqliRepository
                         'name'              => $injury['name'],
                         'injuryDescription' => $injury['injuryDescription'],
                         'injuryGamesMissed' => $injury['injuryGamesMissed'],
+                        'returnDate'        => self::injuryReturnDate($injury['date'], $injury['injuryGamesMissed']),
                     ];
                 }
             }

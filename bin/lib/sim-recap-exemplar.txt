@@ -9,7 +9,7 @@ Format per game: score header, then GM Discord mentions (away · home).
 **Houston Rockets 103 @ Washington Bullets 139**
 <@667455847189970964> · <@511987457798045706>
 
-Washington won by 36 and it wasn't that close. James Harden went for 31 and Ramon Fernandez matched him with 31 of his own while adding SEVEN steals, which means half of Houston's possessions ended with the ball going the other way. Nick Richards added 18 and 13 with four blocks. The Bullets are 37-16 and playing like a team that believes it. The one dark cloud: Washington lost Jean-Paul Beugnot to a bone bruise on his right knee, three games out. When you win by 36 and still leave with a guy in a boot, the basketball gods are just showing off their sense of humor.
+Washington won by 36 and it wasn't that close. James Harden went for 31 and Ramon Fernandez matched him with 31 of his own while adding SEVEN steals, which means half of Houston's possessions ended with the ball going the other way. Nick Richards added 18 and 13 with four blocks. The Bullets are 37-16 and playing like a team that believes it. The one dark cloud: Washington lost Jean-Paul Beugnot to a bone bruise on his right knee, out three days. When you win by 36 and still leave with a guy in a boot, the basketball gods are just showing off their sense of humor.
 
 **Phoenix Suns 135 @ Minnesota Timberwolves 133**
 <@669635704862539786> · <@667176455599554570>
@@ -30,7 +30,7 @@ The Lakers had five guys in double figures and handled Vegas 127-109, which is w
 **Chicago Bulls 99 @ New Orleans Pelicans 152**
 <@336682769583177730> · <@669349908989345802>
 
-New Orleans 152, Chicago 99. That's not a final score, that's a math error someone should investigate. The Pelicans won by 53 behind 32 and 14 from Mel Daniels, a 30-12-six-blocks night from Artis Gilmore, and a 22-11-seven-steals gem from Tyrese Haliburton. Even Prince, yes the artist formerly known as scoring 22, got in on it. The 13-43 Bulls got outscored by roughly a touchdown-and-two-field-goals and never had a pulse. One sour note for New Orleans: they lost Jason Williams to a sprained thumb, six games out. A 53-point win with a casualty. Only in this league.
+New Orleans 152, Chicago 99. That's not a final score, that's a math error someone should investigate. The Pelicans won by 53 behind 32 and 14 from Mel Daniels, a 30-12-six-blocks night from Artis Gilmore, and a 22-11-seven-steals gem from Tyrese Haliburton. Even Prince, yes the artist formerly known as scoring 22, got in on it. The 13-43 Bulls got outscored by roughly a touchdown-and-two-field-goals and never had a pulse. One sour note for New Orleans: they lost Jason Williams to a sprained thumb, out six days. A 53-point win with a casualty. Only in this league.
 
 **Orlando Magic 133 @ Charlotte Sting 114**
 <@830100995676569600> · <@710928347403780156>

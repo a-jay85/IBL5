@@ -130,6 +130,7 @@ pcw_inflight() {
     done <<< "$snap"
     ljob_postplan_now_live "$(ljob_safe_slug "$branch")" "$snap" >/dev/null && return 0
     _wt=$(wtlock_wt_for_branch "$branch" ${repo:+"$repo"}) || return 1
+    [[ -d "$_wt" ]] || return 1
     _lk=$(wtlock_path "$_wt") || return 0
     wtlock_live "$_lk" >/dev/null
 }

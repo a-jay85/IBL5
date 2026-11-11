@@ -74,8 +74,13 @@ Archive walk `TestRealArchive_FTADecomp` (`engine/internal/calibrate/fta_decomp_
 | BEFORE / AFTER engine pace | 102.420 / 103.100 per game |
 | BEFORE / AFTER foul trips that ended in FTs | 107,758 / 70,549 |
 | BEFORE / AFTER possessions | 1,358,801 / 1,362,917 |
+| BEFORE / AFTER engine home/away FTA ratio | 1.040 / 1.267 |
+| sco home/away FTA ratio | 1.101 |
+| BEFORE / AFTER walk dYield | +0.6178 / -0.0492 (band 0.05) |
 
-The gap widened, as predicted. The port moves FTA per foul from 1.7569 to 1.0325, which sits 4.9% under sco's 1.0859. Before the port every engine foul shot FTs, so each foul carried too many FTs and hid part of the foul-volume deficit. Now the FTA gap is almost all foul volume: the engine commits 8.317 fouls per team-game against sco's 17.116. PR #2650 already attributed the J27 FTA undershoot to that foul-volume deficit, and the walk's own branch verdict still reads VOLUME.
+The gap widened, as predicted. The port moves FTA per foul from 1.7569 to 1.0325, which sits 4.9% under sco's 1.0859. Before the port every engine foul shot FTs, so each foul carried too many FTs and hid part of the foul-volume deficit. Now the FTA gap is almost all foul volume: the engine commits 8.317 fouls per team-game against sco's 17.116. PR #2650 already attributed the J27 FTA undershoot to that foul-volume deficit, and the walk's own branch verdict still reads VOLUME. The walk's FTA yield delta (dYield) moved from +0.6178 to -0.0492, inside its 0.05 band, so FTA per foul now matches sco and only the foul count is off.
+
+The home/away FTA ratio rose from 1.040 to 1.267. The guard treats both teams the same. I ran the golden fixture over 2000 seeds on both trees: the guard kept 51.7% of the away team's 2-shot foul trips and 51.2% of the home team's. And-ones always shoot, and in the engine they go mostly to the home team (4,551 home against 137 away in that run). The port halves the 2-shot trips on both sides and leaves the and-ones alone, so the home team's share of FTA grows.
 
 ## Close criterion verdict
 

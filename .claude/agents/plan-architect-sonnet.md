@@ -1,6 +1,6 @@
 ---
 name: plan-architect-sonnet
-description: Sonnet planner for /plan, for a task that already carries a recipe and a named pattern to copy. Use only as the planning agent selected by /plan Step 3.
+description: Sonnet planner for /plan, for a task that already carries a recipe and a named pattern to copy. The tier is an Opus judgment that bin/plan-tier-hint makes. Use only as the planning agent selected by /plan Step 3.
 model: claude-sonnet-5-5
 effort: high
 disallowedTools: Agent, ExitPlanMode, Edit, Write, NotebookEdit

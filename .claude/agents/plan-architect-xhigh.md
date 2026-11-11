@@ -1,6 +1,6 @@
 ---
 name: plan-architect-xhigh
-description: Fable planner for /plan, for a high-stakes plan that Opus would likely get wrong. Use only as the planning agent selected by /plan Step 3.
+description: Fable planner for /plan, for a high-stakes plan that Opus would likely get wrong. The tier is an Opus judgment that bin/plan-tier-hint makes. Use only as the planning agent selected by /plan Step 3.
 model: fable
 effort: high
 disallowedTools: ExitPlanMode, Edit, Write, NotebookEdit

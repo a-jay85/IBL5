@@ -9,11 +9,17 @@
 //   --mode=select --pages-dir=PATH [--pr=N | --all] [--stale-days=N] [--max-prs=N]
 //       stdout: one JSON line {"count":N,"matrix":[...],"skipped":[...]}
 //       stderr: the markdown decision table
+//       stdout JSON also carries "tidy" (stale-screenshot actions) and, when a
+//       single dispatch skipped the named PR, "error"
 //   --mode=keep
 //       stdout: one 40-hex gallery SHA per line (every SHA any open PR links,
 //       plus every open PR head SHA)
+//   --mode=tidy [--pr=N] [--dry-run]
+//       removes stale screenshots: cleans stacked PRs, banners galleries shot
+//       against an older master. --dry-run lists the edits and writes nothing.
 //
-// Exit codes: 0 success, 1 runtime or fail-closed failure, 2 usage error.
+// Exit codes: 0 success, 1 runtime or fail-closed failure, 2 usage error,
+// 3 single dispatch skipped the named PR.
 // Fail closed: any gh/git error, JSON parse failure, or a PR list that may be
 // truncated at --limit 500 exits 1 with EMPTY stdout. Stdout is buffered and
 // written only after every call succeeded, so a consumer that checks the exit
@@ -21,7 +27,9 @@
 //
 // Run it after oven-sh/setup-bun. Under an empty PATH, `#!/usr/bin/env bun`
 // cannot resolve bun and the shell reports exit 127.
-import { resolve, dirname } from 'path';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { resolve, dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dir = dirname(fileURLToPath(import.meta.url));
@@ -32,9 +40,18 @@ const {
   selectRefreshTargets,
   renderSelectionTable,
   linkedGalleryDir,
+  classifyTidy,
+  masterAdvancedInVrPaths,
+  parseBaseSha,
+  refreshGalleryDir,
+  renderTidyTable,
+  singleDispatchError,
+  VISUAL_REVIEW_MARKER,
 } = await import(modulePath);
 
 type OpenPr = import('../ibl5/tests/e2e/vr-refresh').OpenPr;
+type TidyPlan = import('../ibl5/tests/e2e/vr-refresh').TidyPlan;
+type GhComment = { id: number; body: string };
 
 const PR_LIST_LIMIT = 500;
 
@@ -75,10 +92,54 @@ function listOpenPrs(): RawPr[] {
   return raw;
 }
 
-function fetchComments(prNumber: number): string[] {
+function fetchComments(prNumber: number): GhComment[] {
   const out = run(['gh', 'api', '--paginate', '--slurp', `repos/{owner}/{repo}/issues/${prNumber}/comments`]);
-  const pages = JSON.parse(out) as { body: string | null }[][];
-  return pages.flat().map((c) => c.body ?? '');
+  const pages = JSON.parse(out) as { id: number; body: string | null }[][];
+  return pages.flat().map((c) => ({ id: c.id, body: c.body ?? '' }));
+}
+
+function gatherPrs(raws: RawPr[], only: number | null): OpenPr[] {
+  return raws
+    .filter((r) => only === null || r.number === only)
+    .map((r) => toOpenPr(r, r.isCrossRepository ? [] : fetchComments(r.number).map((c) => c.body)));
+}
+
+function fetchMasterSha(): string {
+  const sha = run(['gh', 'api', 'repos/{owner}/{repo}/commits/master', '--jq', '.sha']).trim().toLowerCase();
+  if (!/^[0-9a-f]{40}$/.test(sha)) throw new Error(`master SHA lookup returned '${sha}'`);
+  return sha;
+}
+
+// For each distinct base-sha marker on a master-based gallery comment: did master change a
+// VR-relevant path since? A failed compare (unknown or garbage-collected SHA) counts as yes.
+function fetchAdvanced(prs: OpenPr[], masterSha: string): Record<string, boolean> {
+  const out: Record<string, boolean> = {};
+  for (const pr of prs) {
+    if (pr.isCrossRepository || pr.baseRefName !== 'master') continue;
+    const visual = pr.comments.filter((c) => c.includes(VISUAL_REVIEW_MARKER));
+    const sha = parseBaseSha(visual[visual.length - 1] ?? '');
+    if (sha === null || sha === masterSha || sha in out) continue;
+    try {
+      const cmp = JSON.parse(
+        run(['gh', 'api', `repos/{owner}/{repo}/compare/${sha}...${masterSha}`, '--jq', '{n: (.files | length), f: [.files[].filename]}'])
+      ) as { n: number; f: string[] };
+      out[sha] = masterAdvancedInVrPaths(cmp.f, cmp.n);
+    } catch {
+      out[sha] = true;
+    }
+  }
+  return out;
+}
+
+function applyTidyEdit(prNumber: number, e: { op: string; id?: number; body?: string }, dir: string): void {
+  if (e.op === 'delete-comment') {
+    run(['gh', 'api', '-X', 'DELETE', `repos/{owner}/{repo}/issues/comments/${e.id}`]);
+    return;
+  }
+  const file = join(dir, `${prNumber}-${e.op}-${e.id ?? 'body'}.md`);
+  writeFileSync(file, e.body ?? '');
+  const path = e.op === 'patch-comment' ? `issues/comments/${e.id}` : `pulls/${prNumber}`;
+  run(['gh', 'api', '-X', 'PATCH', `repos/{owner}/{repo}/${path}`, '-F', `body=@${file}`]);
 }
 
 function fetchBehindBy(headRefOid: string): number | null {
@@ -116,20 +177,43 @@ if (opts.mode === 'help') {
 
 let stdoutBuf = '';
 let stderrBuf = '';
+let exitCode = 0;
 try {
   const raws = listOpenPrs();
 
   if (opts.mode === 'keep') {
-    const prs = raws.map((r) => toOpenPr(r, fetchComments(r.number)));
+    const prs = raws.map((r) => toOpenPr(r, fetchComments(r.number).map((c) => c.body)));
     stdoutBuf = computeKeepList(prs).map((s: string) => `${s}\n`).join('');
+  } else if (opts.mode === 'tidy') {
+    const { planTidyEdits } = await import(resolve(__dir, '..', 'ibl5', 'tests', 'e2e', 'vr-review-comment.ts'));
+    const prs = gatherPrs(raws, opts.pr);
+    if (opts.pr !== null && prs.length === 0) throw new Error(`PR #${opts.pr} is not open`);
+    const masterSha = fetchMasterSha();
+    const plan: TidyPlan = classifyTidy(prs, masterSha, fetchAdvanced(prs, masterSha));
+    const dir = mkdtempSync(join(tmpdir(), 'vr-tidy-'));
+    let failures = 0;
+    for (const action of plan.actions) {
+      const pr = prs.find((p) => p.number === action.pr) as OpenPr;
+      try {
+        const edits = planTidyEdits(action, fetchComments(action.pr), pr.body);
+        stdoutBuf += `${opts.dryRun ? 'would ' : ''}${action.kind} PR #${action.pr}: ${edits.map((e: { op: string }) => e.op).join(', ') || 'no edits'}\n`;
+        if (opts.dryRun) continue;
+        for (const e of edits) applyTidyEdit(action.pr, e, dir);
+      } catch (err) {
+        failures++;
+        stderrBuf += `tidy PR #${action.pr} failed: ${err instanceof Error ? err.message : String(err)}\n`;
+      }
+    }
+    for (const n of plan.noops) stdoutBuf += `${n.kind} PR #${n.pr}: already applied\n`;
+    if (failures > 0) exitCode = 1;
   } else {
-    const prs = raws.map((r) => toOpenPr(r, r.baseRefName === 'master' ? fetchComments(r.number) : []));
+    const prs = gatherPrs(raws, null);
     for (const pr of prs) {
       const eligible =
         pr.baseRefName === 'master' &&
         !pr.isCrossRepository &&
         !pr.labels.includes('update-baselines') &&
-        linkedGalleryDir(pr) !== null;
+        refreshGalleryDir(pr) !== null;
       if (eligible) pr.behindBy = fetchBehindBy(pr.headRefOid);
     }
 
@@ -144,8 +228,18 @@ try {
 
     const nowSec = Math.floor(Date.now() / 1000);
     const sel = selectRefreshTargets(prs, ages, nowSec, opts.select, opts.maxPrs);
-    stdoutBuf = `${JSON.stringify({ count: sel.targets.length, matrix: sel.targets, skipped: sel.skipped })}\n`;
-    stderrBuf = `${renderSelectionTable(sel)}\n`;
+    const masterSha = fetchMasterSha();
+    const tidy: TidyPlan = classifyTidy(prs, masterSha, fetchAdvanced(prs, masterSha));
+    const dispatchError: string | null = singleDispatchError(opts.select, sel, tidy);
+    if (dispatchError !== null) exitCode = 3;
+    stdoutBuf = `${JSON.stringify({
+      count: sel.targets.length,
+      matrix: sel.targets,
+      skipped: sel.skipped,
+      tidy: tidy.actions,
+      ...(dispatchError === null ? {} : { error: dispatchError }),
+    })}\n`;
+    stderrBuf = `${renderSelectionTable(sel)}\n\n${renderTidyTable(tidy)}\n`;
   }
 } catch (e) {
   process.stderr.write(`vr-refresh-targets: ${e instanceof Error ? e.message : String(e)}\n`);
@@ -154,3 +248,4 @@ try {
 
 if (stderrBuf !== '') process.stderr.write(stderrBuf);
 process.stdout.write(stdoutBuf);
+if (exitCode !== 0) process.exit(exitCode);

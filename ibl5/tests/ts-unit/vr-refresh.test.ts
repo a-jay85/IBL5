@@ -2,6 +2,16 @@ import { readFileSync } from 'fs';
 import { describe, it, expect } from 'vitest';
 import {
   VISUAL_REVIEW_MARKER,
+  MANUAL_ROW_MARKER,
+  VR_BODY_BEGIN_MARKERS,
+  VR_RELEVANT_PATHS,
+  baseShaMarker,
+  parseBaseSha,
+  staleBannerLine,
+  stackedNoteBody,
+  isVrRelevantPath,
+  classifyTidy,
+  singleDispatchError,
   extractGalleryShas,
   extractGalleryDirs,
   linkedGalleryDir,
@@ -11,6 +21,7 @@ import {
   parseRefreshArgs,
   type OpenPr,
 } from '../e2e/vr-refresh';
+import { AGENT_SHOTS_BEGIN, PR_BODY_MARKER_BEGIN } from '../e2e/vr-pr-body';
 
 const DAY = 86400;
 const NOW = 1_800_000_000;
@@ -317,5 +328,166 @@ describe('parseRefreshArgs', () => {
     expect(parseRefreshArgs(['--mode=select', '--pages-dir=/x', '--all'])).toMatchObject({ select: { kind: 'all' } });
     expect(parseRefreshArgs(['--mode=keep'])).toEqual({ mode: 'keep' });
     expect(parseRefreshArgs(['--help'])).toEqual({ mode: 'help' });
+  });
+});
+
+describe('classifyTidy', () => {
+  it('tidy cleans a stacked PR that still shows a gallery', () => {
+    const p = pr({ number: 5, baseRefName: 'feat-x' });
+    expect(classifyTidy([p], SHA_E, {})).toEqual({
+      actions: [{ pr: 5, kind: 'cleanup', base: 'feat-x', staleSha: null }],
+      noops: [],
+    });
+  });
+
+  it('tidy leaves a stacked PR already showing the note', () => {
+    const p = pr({ baseRefName: 'feat-x', comments: [stackedNoteBody('feat-x')] });
+    expect(classifyTidy([p], SHA_E, {})).toEqual({ actions: [], noops: [{ pr: 1, kind: 'cleanup' }] });
+  });
+
+  it('tidy never touches a fork PR', () => {
+    const p = pr({ isCrossRepository: true, baseRefName: 'feat-x' });
+    expect(classifyTidy([p], SHA_E, {})).toEqual({ actions: [], noops: [] });
+  });
+
+  it('tidy cleans a stacked PR with only a manual-row comment', () => {
+    const p = pr({ number: 3, baseRefName: 'feat-x', comments: [`rows\n${MANUAL_ROW_MARKER}`] });
+    const plan = classifyTidy([p], SHA_E, {});
+    expect(plan.actions).toHaveLength(1);
+    expect(plan.actions[0]).toMatchObject({ pr: 3, kind: 'cleanup', base: 'feat-x' });
+  });
+
+  it('tidy banners a gallery shot before a VR-relevant master change', () => {
+    const p = pr({ comments: [`${baseShaMarker(SHA_A)}\n${galleryComment(SHA_B)}`] });
+    const plan = classifyTidy([p], SHA_E, { [SHA_A]: true });
+    expect(plan.actions).toEqual([{ pr: 1, kind: 'banner', base: 'master', staleSha: SHA_A }]);
+    expect(plan.noops).toEqual([]);
+  });
+
+  it('tidy skips a gallery shot against the current master', () => {
+    const p = pr({ comments: [`${baseShaMarker(SHA_E)}\n${galleryComment(SHA_B)}`] });
+    expect(classifyTidy([p], SHA_E, {})).toEqual({ actions: [], noops: [] });
+  });
+
+  it('tidy skips a gallery when master changed only non-VR paths', () => {
+    const p = pr({ comments: [`${baseShaMarker(SHA_A)}\n${galleryComment(SHA_B)}`] });
+    expect(classifyTidy([p], SHA_E, { [SHA_A]: false })).toEqual({ actions: [], noops: [] });
+  });
+
+  it('tidy banners a legacy gallery without a base marker', () => {
+    const plan = classifyTidy([pr()], SHA_E, {});
+    expect(plan.actions).toEqual([{ pr: 1, kind: 'banner', base: 'master', staleSha: null }]);
+    expect(plan.noops).toEqual([]);
+  });
+
+  it('tidy leaves an already-bannered gallery alone', () => {
+    const p = pr({
+      body: '',
+      comments: [`${staleBannerLine()}\n\n${baseShaMarker(SHA_A)}\n${galleryComment(SHA_B)}`],
+    });
+    expect(classifyTidy([p], SHA_E, { [SHA_A]: true })).toEqual({
+      actions: [],
+      noops: [{ pr: 1, kind: 'banner' }],
+    });
+  });
+});
+
+describe('VR path filter', () => {
+  it('isVrRelevantPath matches the e2e push filter and rejects near misses', () => {
+    for (const p of [
+      'ibl5/classes/Foo.php',
+      'docker-compose.ci.yml',
+      'ibl5/migrations/sub/001_x.sql',
+      'ibl5/design/a/b.png',
+      'ibl5/tests/e2e/foo.ts',
+    ]) {
+      expect(isVrRelevantPath(p), p).toBe(true);
+    }
+    for (const p of [
+      'ibl5/docs/x.md',
+      'bin/vr-refresh-targets',
+      'docker-compose/x.yml',
+      'ibl5/migrations/README.md',
+      'Dockerfile.bak',
+      'ibl5/tests/e2e-old/x.md',
+    ]) {
+      expect(isVrRelevantPath(p), p).toBe(false);
+    }
+  });
+
+  it('VR_RELEVANT_PATHS equals the e2e-tests push paths', () => {
+    const lines = readFileSync(new URL('../../../.github/workflows/e2e-tests.yml', import.meta.url), 'utf-8').split('\n');
+    const start = lines.findIndex((l) => l === '  push:');
+    expect(start).toBeGreaterThanOrEqual(0);
+    const globs: string[] = [];
+    for (const line of lines.slice(start + 1)) {
+      if (/^ {0,2}\S/.test(line)) break;
+      const m = /^\s*-\s+(.+?)\s*$/.exec(line);
+      if (m !== null) globs.push((m[1] as string).replace(/^(['"])(.*)\1$/, '$2'));
+    }
+    expect(globs.length).toBeGreaterThan(0);
+    expect(globs).toEqual([...VR_RELEVANT_PATHS]);
+  });
+});
+
+describe('parseBaseSha', () => {
+  it('parseBaseSha rejects short and uppercase markers', () => {
+    expect(parseBaseSha(`<!-- vr-base-sha: ${'a'.repeat(39)} -->`)).toBeNull();
+    expect(parseBaseSha(`<!-- vr-base-sha: ${'A'.repeat(40)} -->`)).toBeNull();
+    expect(parseBaseSha(`<!-- vr-base-sha: ${SHA_A} -->`)).toBe(SHA_A);
+  });
+});
+
+describe('stacked note refresh', () => {
+  it('a master PR showing the stacked note is a refresh target', () => {
+    const sel = selectRefreshTargets(
+      [pr({ number: 9, comments: [stackedNoteBody('feat-x')] })],
+      {},
+      NOW,
+      { kind: 'stale', staleDays: 7 },
+      10
+    );
+    expect(sel.targets[0]).toMatchObject({ pr: 9, gallery_dir: 'pr/9/visual-review', age_days: null });
+  });
+});
+
+describe('singleDispatchError', () => {
+  const skippedSel = { targets: [], skipped: [{ pr: 7, reason: 'not-master-base' as const }] };
+
+  it('single dispatch error names the skip reason', () => {
+    const err = singleDispatchError({ kind: 'single', pr: 7 }, skippedSel, { actions: [], noops: [] });
+    expect(typeof err).toBe('string');
+    expect(err).toContain('not-master-base');
+    expect(err).toContain('PR #7');
+  });
+
+  it('single dispatch with a tidy action is not an error', () => {
+    const tidy = { actions: [{ pr: 7, kind: 'cleanup' as const, base: 'feat-x', staleSha: null }], noops: [] };
+    expect(singleDispatchError({ kind: 'single', pr: 7 }, skippedSel, tidy)).toBeNull();
+  });
+
+  it('non-single modes never raise a dispatch error', () => {
+    const tidy = { actions: [], noops: [] };
+    expect(singleDispatchError({ kind: 'stale', staleDays: 7 }, skippedSel, tidy)).toBeNull();
+    expect(singleDispatchError({ kind: 'all' }, skippedSel, tidy)).toBeNull();
+  });
+});
+
+describe('parseRefreshArgs tidy', () => {
+  it('parseRefreshArgs accepts tidy with pr and dry-run', () => {
+    expect(parseRefreshArgs(['--mode=tidy', '--pr=5', '--dry-run'])).toEqual({ mode: 'tidy', pr: 5, dryRun: true });
+    expect(parseRefreshArgs(['--mode=tidy'])).toEqual({ mode: 'tidy', pr: null, dryRun: false });
+  });
+
+  it('parseRefreshArgs rejects dry-run outside tidy', () => {
+    expect(parseRefreshArgs(['--mode=select', '--pages-dir=/x', '--dry-run'])).toHaveProperty('error');
+    expect(parseRefreshArgs(['--mode=keep', '--dry-run'])).toHaveProperty('error');
+    expect(parseRefreshArgs(['--mode=tidy', '--all', '--dry-run'])).toHaveProperty('error');
+  });
+});
+
+describe('vr-pr-body marker drift', () => {
+  it('VR_BODY_BEGIN_MARKERS match vr-pr-body markers', () => {
+    expect([...VR_BODY_BEGIN_MARKERS]).toEqual([PR_BODY_MARKER_BEGIN, AGENT_SHOTS_BEGIN]);
   });
 });

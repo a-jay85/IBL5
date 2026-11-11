@@ -41,6 +41,7 @@ const PR_LIST_LIMIT = 500;
 const USAGE =
   'Usage: bin/vr-refresh-targets --mode=select --pages-dir=PATH [--pr=N | --all] [--stale-days=N] [--max-prs=N]\n' +
   '   or: bin/vr-refresh-targets --mode=keep\n' +
+  '   or: bin/vr-refresh-targets --mode=tidy [--pr=N] [--dry-run]\n' +
   'Flags take the --flag=VALUE form only.';
 
 function run(cmd: string[], cwd?: string): string {

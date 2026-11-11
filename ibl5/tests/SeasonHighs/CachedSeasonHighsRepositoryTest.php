@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\SeasonHighs;
 
-use Cache\Contracts\DatabaseCacheInterface;
 use PHPUnit\Framework\TestCase;
 use SeasonHighs\CachedSeasonHighsRepository;
 use SeasonHighs\Contracts\SeasonHighsRepositoryInterface;
@@ -171,6 +170,145 @@ final class CachedSeasonHighsRepositoryTest extends TestCase
         $this->assertSame(0, $this->cache->setCount);
     }
 
+    public function testLazyMissWritesWithNineHundredSecondTtl(): void
+    {
+        $inner = new CountingSeasonHighsInner($this->createFixture());
+        $repository = new CachedSeasonHighsRepository($inner, $this->cache, 'ibl');
+
+        $repository->getSeasonHighsBatch(self::STATS, '', '2026-01-01', '2026-06-30');
+
+        $keys = $this->cache->keysOf('set');
+        $this->assertCount(1, $keys);
+        $this->assertSame(900, $this->cache->ttlOf($keys[0]));
+    }
+
+    public function testCacheHitReturnsCachedValueWithoutCallingInner(): void
+    {
+        $fixture = $this->createFixture();
+        $inner = new CountingSeasonHighsInner($fixture);
+        $repository = new CachedSeasonHighsRepository($inner, $this->cache, 'ibl');
+
+        $repository->getSeasonHighsBatch(self::STATS, '', '2026-01-01', '2026-06-30');
+        $second = $repository->getSeasonHighsBatch(self::STATS, '', '2026-01-01', '2026-06-30');
+
+        $this->assertSame($fixture, $second);
+        $this->assertSame(1, $inner->calls);
+    }
+
+    public function testCachedValueWithMismatchedStatKeysFallsThroughToInner(): void
+    {
+        $fixture = $this->createFixture();
+        $inner = new CountingSeasonHighsInner($fixture);
+        $repository = new CachedSeasonHighsRepository($inner, $this->cache, 'ibl');
+
+        $repository->getSeasonHighsBatch(self::STATS, '', '2026-01-01', '2026-06-30');
+        $key = $this->cache->keysOf('set')[0];
+        $this->cache->seed($key, ['Points' => $fixture['Points']]);
+
+        $result = $repository->getSeasonHighsBatch(self::STATS, '', '2026-01-01', '2026-06-30');
+
+        $this->assertSame($fixture, $result);
+        $this->assertSame(2, $inner->calls);
+    }
+
+    public function testPlanKeysRecordsKeysWithoutTouchingInnerOrCache(): void
+    {
+        $inner = new CountingSeasonHighsInner($this->createFixture());
+        $repository = new CachedSeasonHighsRepository($inner, $this->cache, 'ibl');
+
+        $planned = null;
+        $keys = $repository->planKeys(function () use ($repository, &$planned): void {
+            $planned = $repository->getSeasonHighsBatch(self::STATS, '', '2026-01-01', '2026-06-30');
+            $repository->getSeasonHighsBatch(self::STATS, '_teams', '2026-01-01', '2026-06-30');
+        });
+
+        $this->assertSame(['Points' => [], 'Rebounds' => []], $planned);
+        $this->assertCount(2, $keys);
+        $this->assertNotSame($keys[0], $keys[1]);
+        $this->assertSame(0, $inner->calls);
+        $this->assertSame([], $this->cache->log);
+    }
+
+    public function testWarmKeysOverwritesExistingEntry(): void
+    {
+        $valueA = $this->createFixture(50);
+        $valueB = $this->createFixture(60);
+        $inner = new CountingSeasonHighsInner($valueA);
+        $repository = new CachedSeasonHighsRepository($inner, $this->cache, 'ibl');
+        $call = static function () use ($repository): void {
+            $repository->getSeasonHighsBatch(self::STATS, '', '2026-01-01', '2026-06-30');
+        };
+
+        $call();
+        $key = $this->cache->keysOf('set')[0];
+        $inner->result = $valueB;
+
+        $warmed = $repository->warmKeys($call);
+
+        $this->assertSame([$key], $warmed);
+        $this->assertSame($valueB, $this->cache->get($key));
+        $this->assertSame(CachedSeasonHighsRepository::WARM_TTL_SECONDS, $this->cache->ttlOf($key));
+    }
+
+    public function testWarmedValueIsServedWithoutCallingInner(): void
+    {
+        $fixture = $this->createFixture();
+        $inner = new CountingSeasonHighsInner($fixture);
+        $repository = new CachedSeasonHighsRepository($inner, $this->cache, 'ibl');
+
+        $returned = null;
+        $repository->warmKeys(static function () use ($repository, &$returned): void {
+            $returned = $repository->getSeasonHighsBatch(self::STATS, '', '2026-01-01', '2026-06-30');
+        });
+        $this->assertSame($fixture, $returned);
+        $this->assertSame([], $this->cache->keysOf('get'), 'warm mode must not read the cache');
+        $this->assertSame(1, $inner->calls);
+
+        $served = $repository->getSeasonHighsBatch(self::STATS, '', '2026-01-01', '2026-06-30');
+
+        $this->assertSame($fixture, $served);
+        $this->assertSame(1, $inner->calls);
+    }
+
+    public function testModeResetsToReadAfterCallableThrows(): void
+    {
+        $fixture = $this->createFixture();
+        $inner = new CountingSeasonHighsInner($fixture);
+        $repository = new CachedSeasonHighsRepository($inner, $this->cache, 'ibl');
+        $repository->getSeasonHighsBatch(self::STATS, '', '2026-01-01', '2026-06-30');
+        $this->assertSame(1, $inner->calls);
+
+        try {
+            $repository->warmKeys(static function (): void {
+                throw new \RuntimeException('boom');
+            });
+            self::fail('warmKeys should propagate the callable exception');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('boom', $e->getMessage());
+        }
+
+        $repository->getSeasonHighsBatch(self::STATS, '', '2026-01-01', '2026-06-30');
+        $this->assertSame(1, $inner->calls);
+    }
+
+    public function testDeleteKeysDeletesEachKeyAndReturnsCount(): void
+    {
+        $inner = new CountingSeasonHighsInner($this->createFixture());
+        $repository = new CachedSeasonHighsRepository($inner, $this->cache, 'ibl');
+        $repository->getSeasonHighsBatch(self::STATS, '', '2026-01-01', '2026-06-30');
+        $repository->getSeasonHighsBatch(self::STATS, '_teams', '2026-01-01', '2026-06-30');
+        $keys = $this->cache->keysOf('set');
+        $this->cache->clearLog();
+
+        $deleted = $repository->deleteKeys($keys);
+
+        $this->assertSame(2, $deleted);
+        $this->assertSame($keys, $this->cache->keysOf('delete'));
+        $this->assertCount(2, $this->cache->log);
+        $this->assertNull($this->cache->get($keys[0]));
+        $this->assertNull($this->cache->get($keys[1]));
+    }
+
     /**
      * @return array<string, list<SeasonHighEntry>>
      */
@@ -200,65 +338,5 @@ final class CachedSeasonHighsRepositoryTest extends TestCase
             ],
             'Rebounds' => [],
         ];
-    }
-}
-
-/**
- * Cache double that JSON-encodes on set and decodes on get, matching what
- * Cache\DatabaseCache does against the `cache` table.
- */
-final class JsonRoundTripCache implements DatabaseCacheInterface
-{
-    /** @var array<string, string> */
-    private array $store = [];
-
-    public string $lastKey = '';
-    public int $lastTtl = 0;
-    public int $setCount = 0;
-
-    /**
-     * @return array<mixed>|null
-     */
-    public function get(string $key): ?array
-    {
-        if (!isset($this->store[$key])) {
-            return null;
-        }
-
-        $decoded = json_decode($this->store[$key], true, 512, JSON_THROW_ON_ERROR);
-
-        return is_array($decoded) ? $decoded : null;
-    }
-
-    /**
-     * @param array<mixed> $data
-     */
-    public function set(string $key, array $data, int $ttlSeconds): void
-    {
-        $this->store[$key] = json_encode($data, JSON_THROW_ON_ERROR);
-        $this->lastKey = $key;
-        $this->lastTtl = $ttlSeconds;
-        $this->setCount++;
-    }
-
-    public function delete(string $key): void
-    {
-        unset($this->store[$key]);
-    }
-
-    /**
-     * @return array<mixed>|null
-     */
-    public function getStale(string $key): ?array
-    {
-        return $this->get($key);
-    }
-
-    /**
-     * @param array<mixed> $data
-     */
-    public function seed(string $key, array $data): void
-    {
-        $this->store[$key] = json_encode($data, JSON_THROW_ON_ERROR);
     }
 }

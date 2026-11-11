@@ -48,5 +48,7 @@ ibl5/tests/WideUnit/Scripts/RootHtaccessLegacyModulesRedirectGuardTest.php
 ibl5/tests/WideUnit/Scripts/UpdateAllTheThingsRolloverWiringTest.php
 # updateAllTheThings.php registers RefreshRecordHoldersStep after ProcessBoxscoresStep and the derived-table refreshes, inside the non-Olympics block; the script requires mainfile.php at top level, so there is no seam (behavior: RefreshRecordHoldersStepTest)
 ibl5/tests/WideUnit/Scripts/UpdateAllTheThingsRecordHoldersWiringTest.php
+# updateAllTheThings.php registers RefreshSeasonHighsCacheStep after ProcessBoxscoresStep and RefreshHeadToHeadRecordsStep, inside the non-Olympics block, before RefreshRecordHoldersStep, sharing the updater clock; the script requires mainfile.php at top level, so there is no seam (behavior: RefreshSeasonHighsCacheStepTest)
+ibl5/tests/WideUnit/Scripts/UpdateAllTheThingsSeasonHighsWiringTest.php
 # IBL/Olympics primary color constants must equal the --color-*-primary @theme tokens in design/input.css; a CSS token has no PHP execution seam
 ibl5/tests/League/LeagueContextTest.php

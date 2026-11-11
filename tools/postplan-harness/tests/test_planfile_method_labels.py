@@ -181,3 +181,8 @@ def test_item_marked_removed_is_skipped_and_later_items_kept():
     got = _methods("- `ibl5/tests/FooEntryPointTest.php`: `testPinned` (Phase 1, removed in Phase 4 after porting), "
                    "`testStubEmitsNoBody` (Phase 4)")
     assert got == ["testStubEmitsNoBody"]
+
+
+def test_note_that_only_mentions_a_deleted_thing_keeps_the_method():
+    got = _methods("- `ibl5/tests/FooTest.php`: `testChecksDeletedRow` (asserts the deleted row is gone)")
+    assert got == ["testChecksDeletedRow"]

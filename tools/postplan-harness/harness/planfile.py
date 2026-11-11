@@ -861,7 +861,8 @@ _LABELLED_LIST_RE = re.compile(
     rf"^({_LIST_ITEM}{_ITEM_NOTE}(?:\s*,\s*{_LIST_ITEM}{_ITEM_NOTE})*)"
     r"(?:\s*[.;]?\s*$|[.;]\s+\S.*$)")
 _ITEM_WITH_NOTE_RE = re.compile(_LIST_ITEM + _ITEM_NOTE)
-_REMOVED_NOTE_RE = re.compile(r"\b(?:removed|deleted|dropped)\b", re.I)
+_REMOVED_NOTE_RE = re.compile(
+    r"(?:^|[,;]\s*)(?:removed|deleted|dropped)\b(?:\s+(?:in|by|at|after|during|before)\b)?", re.I)
 _PATH_LABEL_RE = re.compile(r"^`[^`]*/[^`]*`\s+(`.*)$")
 _BULLET_RE = re.compile(r"^[*\-]\s+")
 

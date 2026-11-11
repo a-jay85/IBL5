@@ -174,6 +174,7 @@ _ARMING_PATHS = (
     "tools/postplan-harness/harness/armable.py",
     "bin/lib/pr-armable.sh",
     "tools/postplan-harness/harness/second_review.py",
+    "tools/postplan-harness/harness/owner_intent.py",
     ".claude/agents/pr-second-reviewer.md",
     "tools/postplan-harness/harness/fidelity.py",
     "tools/postplan-harness/harness/planfile.py",

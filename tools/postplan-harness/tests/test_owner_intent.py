@@ -182,3 +182,13 @@ def test_runner_wires_owner_section():
              if '_owner = "" if plan.found else owner_intent.pr_section(res.slug)' in ln]
     assert len(gates) == 2
     assert gates[0] == upsert_create - 1 and gates[1] == upsert_phase6 - 1
+
+
+def test_owner_intent_is_arming_path():
+    from harness.gate_backtest import detect_gate_changes
+    owner = "tools/postplan-harness/harness/owner_intent.py"
+    seat = "tools/postplan-harness/harness/second_review.py"
+    changes = detect_gate_changes([("A", owner), ("M", seat)], lambda p: None, {})
+    got = {c.path: (c.kind, c.state) for c in changes}
+    assert got == {owner: ("arming-harness", "not-replayable"),
+                   seat: ("arming-harness", "not-replayable")}

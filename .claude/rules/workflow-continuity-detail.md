@@ -1,6 +1,6 @@
 ---
 description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made. Lazy companion to workflow-continuity.md; loads only when a post-plan surface is in play.
-last_verified: 2026-11-10
+last_verified: 2026-11-11
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
@@ -142,25 +142,29 @@ A plan seeded by `bin/docfix-run` carries `auto_merge: docs-only-ready` instead;
 
 ## Ad-hoc branches
 
-An ad-hoc branch with no plan file makes post-plan run **plan-blind**. That is expected,
-not an error. The merge-arming decision still happens at `/post-plan` Phase 6.5, so
+An ad-hoc branch with no plan file makes post-plan run **plan-blind**, as expected. The
+merge-arming decision still happens at `/post-plan` Phase 6.5, so
 auto-opening the PR never auto-merges a UI-touching / `auto_merge: false` / visual PR without
 human signoff.
 
 The per-branch arming marker is `$(git rev-parse --absolute-git-dir)/postplan-ready`. Only
-`~/.claude/hooks/auto-commit-reminder.sh` reads it, using it to decide which nudge to show
-at turn-end: unarmed tells the model to commit and, if the work verified clean, end its reply with the `cd <worktree> && bin/post-plan-now` paste line; the model must not run `bin/post-plan-now` or /post-plan, as the branch is unarmed (unless the creator-session marker below matches); armed shows `bin/post-plan-now --auto`. Nothing else
-watches the marker or fires post-plan when it appears. The arming requirement was added after
-PR [#2340](https://github.com/a-jay85/IBL5/pull/2340) (2026-09-22), where a post-plan nudge
-caused a model to ship half-done ad-hoc work.
+`~/.claude/hooks/auto-commit-reminder.sh` reads it, to pick the turn-end nudge. Unarmed, the
+nudge says to commit and, if verified clean, end the reply with the
+`cd <worktree> && bin/post-plan-now` paste line and not run post-plan itself (unless the
+creator-session marker below matches). Armed, it shows `bin/post-plan-now --auto`. Nothing
+else fires post-plan off the marker. PR [#2340](https://github.com/a-jay85/IBL5/pull/2340)
+(2026-09-22) added it after a nudge made a model ship half-done ad-hoc work.
 
 The creator-session marker is `$(git rev-parse --absolute-git-dir)/wt-new-session`. `bin/wt-new`
 writes `$CLAUDE_CODE_SESSION_ID` into it when it creates a new branch. It writes nothing for a
-human run or for `--existing`, whose branch can carry earlier work. The same hook reads it: when
-the marker matches the Stop payload's `session_id`, the nudge says ship with
-`bin/post-plan-now --auto` once the whole task verified clean. Any other session gets the hold
-text. The marker is session-scoped by content, so a later session in the same worktree never
-inherits the ship default the way it would inherit `postplan-ready`. Added 2026-09-25.
+human run or for `--existing`, whose branch can carry earlier work. When it matches the Stop
+payload's `session_id`, the same hook's nudge says ship with `bin/post-plan-now --auto` once the
+whole task verified clean. Other sessions get the hold text, so a later session in the same
+worktree never inherits the ship default. Added 2026-09-25.
+
+The ad-hoc session runs `bin/capture-intent`, as post-plan cannot see the chat. It writes `~/claude-plans/_intent/<branch>.md`, outside the repo. Post-plan quotes it as
+`## Owner request`, and the second reviewer reads it as scope evidence. A missing or altered
+file changes nothing (ADR-0240).
 
 ## No deadlock
 

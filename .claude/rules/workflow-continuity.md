@@ -1,6 +1,6 @@
 ---
 description: All work happens in a worktree; where plans live (outside the repo); worktree setup; post-plan handoff triggers.
-last_verified: 2026-11-10
+last_verified: 2026-11-11
 ---
 
 # Workflow Continuity Rule
@@ -45,7 +45,7 @@ Never run `/post-plan` **inline**. That costs several times a fresh run. Run it 
 
 **Plan-driven work** (session has a `/plan`): when verified clean, fire `bin/post-plan-now --auto` with no confirmation prompt. Shipping is durably pre-authorized. A session not rooted in the worktree fires `(cd <abs wt> && bin/post-plan-now --auto)`.
 
-**Ad-hoc work** (no plan): if this session created the worktree, shipping is pre-authorized. If it already existed, hold: when verified clean, commit with `/commit-commands:commit`, don't fire post-plan, and end with `cd <abs worktree path> && bin/post-plan-now` to paste. It ships only when the user arms the branch (never arm it or suggest arming) or says ship. A skill ending in shipping is the instruction. To ship, fire `bin/post-plan-now --auto`.
+**Ad-hoc work** (no plan): if this session created the worktree, shipping is pre-authorized. Before the hold commit or fire, run `bin/capture-intent --list`, then `bin/capture-intent <indices>` on the owner's request turns. If it already existed, hold: when verified clean, commit with `/commit-commands:commit`, don't fire post-plan, and end with `cd <abs worktree path> && bin/post-plan-now` to paste. It ships only when the user arms the branch (never arm it or suggest arming) or says ship. A skill ending in shipping is the instruction. To ship, fire `bin/post-plan-now --auto`.
 
 - **Do NOT commit first** when shipping plan-driven work or a fresh ad-hoc branch. Leave it **dirty**. `/post-plan` commits the uncommitted tree in Phase 2 and opens the PR.
 - **A held branch ships with its hold commit.** `bin/post-plan-now` runs with commits ahead of `origin/master`. Never reset or squash the hold commit to get a dirty tree back.

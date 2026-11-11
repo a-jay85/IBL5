@@ -104,7 +104,8 @@ def test_agent_def_pins_opus_and_has_no_fixer_framing():
     assert "model: claude-opus-5-5" in head
     denied = re.search(r"^disallowedTools: (.*)$", head, re.M).group(1).split(", ")
     assert {"Agent", "Edit", "Write", "NotebookEdit", "Skill"} <= set(denied)
-    assert not second_review.FIXER_FRAMING_RE.search(body)
+    # The body names the blocking-findings block, so it is held to the history-only pattern.
+    assert not second_review._HISTORY_RE.search(body)
     assert not second_review.FIXER_FRAMING_RE.search(head)
 
 

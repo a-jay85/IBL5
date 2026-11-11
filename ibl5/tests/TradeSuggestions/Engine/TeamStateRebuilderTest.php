@@ -142,6 +142,69 @@ final class TeamStateRebuilderTest extends TestCase
         self::assertLessThan($s->payrollByOffset[1][1], $without->payroll);
     }
 
+    public function testRotationChangeWithoutMovedPlayerIsRanked(): void
+    {
+        $s = self::league();
+        $checked = 0;
+        foreach (self::seededSwaps($s, 20) as $c) {
+            $moved = array_merge($c->userPids, $c->partnerPids);
+            foreach (array_keys($s->slotRanks) as $offset) {
+                [$state, $table, $changed] = self::postDealRanks($s, $c, $offset);
+                foreach ($changed as $lineup) {
+                    foreach (SlotMapper::SLOTS as $slot) {
+                        foreach ($lineup->rotation[$slot] ?? [] as $pid) {
+                            if (in_array($pid, $moved, true)) {
+                                continue;
+                            }
+                            $checked++;
+                            self::assertNotNull($state->poolRank($slot, $pid), "pid {$pid} {$slot} offset {$offset}");
+                            self::assertSame($table->poolRank($slot, $pid), $state->poolRank($slot, $pid), "pool {$pid} {$slot} offset {$offset}");
+                        }
+                    }
+                }
+            }
+        }
+
+        self::assertGreaterThan(0, $checked);
+    }
+
+    public function testUntouchedTeamBestBenchFlipIsUpdated(): void
+    {
+        $s = self::league();
+        $checked = 0;
+        foreach (self::seededSwaps($s, 20) as $c) {
+            foreach (array_keys($s->slotRanks) as $offset) {
+                [$state, $table] = self::postDealRanks($s, $c, $offset);
+                foreach ($s->teamIds as $tid) {
+                    if ($tid === $c->userTid || $tid === $c->partnerTid) {
+                        continue;
+                    }
+                    foreach (SlotMapper::SLOTS as $slot) {
+                        $checked++;
+                        self::assertSame($table->bestBenchRank($slot, $tid), $state->bestBenchRank($slot, $tid), "bench {$offset} {$slot} {$tid}");
+                        self::assertSame($table->starterRank($slot, $tid), $state->starterRank($slot, $tid), "starter {$offset} {$slot} {$tid}");
+                    }
+                }
+            }
+        }
+
+        self::assertGreaterThan(0, $checked);
+    }
+
+    /**
+     * @return array{0: \TradeSuggestions\Engine\SlotRankState, 1: SlotRankTable, 2: array<int, \TradeSuggestions\Profile\SeasonLineup>}
+     */
+    private static function postDealRanks(LeagueSnapshot $s, TradeCandidate $c, int $offset): array
+    {
+        $after = TeamStateRebuilder::after($s, $c, $offset, new PairRecordMemo());
+        $changed = [$c->userTid => $after['user']->lineup, $c->partnerTid => $after['partner']->lineup];
+        $ratings = SnapshotCodec::ratingsAt($s->projections, $offset);
+        $state = $s->slotRanks[$offset]->withLineups($changed, $ratings, new PairRecordMemo());
+        $table = SlotRankTable::build(array_replace($s->lineups[$offset], $changed), $ratings);
+
+        return [$state, $table, $changed];
+    }
+
     /**
      * Seeded one-for-one swaps between real teams, both players on the books
      * now.

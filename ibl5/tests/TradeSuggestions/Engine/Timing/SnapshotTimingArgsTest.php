@@ -29,6 +29,23 @@ final class SnapshotTimingArgsTest extends TestCase
         SnapshotTimingArgs::parse(['--bogus=1']);
     }
 
+    public function testBogusFlagReturnsTwoAndPrintsUsage(): void
+    {
+        $script = dirname(__DIR__, 4) . '/scripts/trade-suggestions-timing.php';
+        $process = proc_open([PHP_BINARY, $script, '--bogus=1'], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+        self::assertIsResource($process);
+
+        $stdout = (string) stream_get_contents($pipes[1]);
+        $stderr = (string) stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $code = proc_close($process);
+
+        self::assertSame(2, $code, $stdout . $stderr);
+        self::assertStringContainsString('Unknown or malformed flag: --bogus=1', $stderr);
+        self::assertStringContainsString(SnapshotTimingArgs::USAGE, $stderr);
+    }
+
     public function testNonPositiveTidRejected(): void
     {
         $this->expectException(\InvalidArgumentException::class);

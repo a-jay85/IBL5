@@ -74,6 +74,27 @@ final class ResignScenarioTest extends TestCase
         );
     }
 
+    public function testReceivedWalkerLikelihoodUsesReceivingTeam(): void
+    {
+        $s = self::league();
+        // Team 3 sends the walker, so team 1 is the partner who receives it.
+        $c = new TradeCandidate(3, 1, [self::WALKER], [], [], []);
+        $f = self::factor($s);
+        $memo = new PairRecordMemo();
+        $before = TeamStateRebuilder::before($s, 1, 1);
+        $with = SideGain::fromStates($before, TeamStateRebuilder::after($s, $c, 1, $memo)['partner'], $s, $c, 1);
+        $without = SideGain::fromStates($before, TeamStateRebuilder::after($s, $c, 1, $memo, [self::WALKER])['partner'], $s, $c, 1);
+        self::assertNotSame($with['starter_slots'], $without['starter_slots']);
+
+        $deal = DealScorer::score($s, $c, 'dump');
+
+        self::assertEqualsWithDelta(
+            $f * $with['starter_slots'] + (1 - $f) * $without['starter_slots'],
+            $deal->partner->components()[1]['starter_slots'],
+            1e-9,
+        );
+    }
+
     public function testUnmovedWalkersAreNotMixed(): void
     {
         $s = self::league();

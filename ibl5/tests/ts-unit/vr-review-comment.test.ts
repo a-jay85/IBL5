@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { VrRow } from '../e2e/vr-manifest';
 import {
   applyStaleBanner,
+  planTidyEdits,
   buildComment,
   classifyCells,
   titleToModule,
@@ -287,5 +288,38 @@ describe('base-sha marker and stale banner', () => {
     expect(once).toContain('<!-- vr-stale-banner -->');
     expect(applyStaleBanner(once)).toBe(once);
     expect(once).toContain('<!-- Sticky Pull Request Commentvisual-review -->');
+  });
+});
+
+describe('planTidyEdits', () => {
+  const VISUAL = '<!-- Sticky Pull Request Commentvisual-review -->';
+  const MANUAL = '<!-- Sticky Pull Request Commentmanual-row-screenshots -->';
+  const NOTE = `Screenshots removed while this PR is stacked on \`feat-x\`. They come back when it targets master.\n${VISUAL}`;
+  const cleanup = { pr: 5, kind: 'cleanup' as const, base: 'feat-x', staleSha: null };
+
+  it('planTidyEdits cleanup deletes the manual-row comment', () => {
+    const edits = planTidyEdits(cleanup, [{ id: 2, body: `rows\n${MANUAL}` }], '');
+    expect(edits).toEqual([{ op: 'delete-comment', id: 2 }]);
+  });
+
+  it('planTidyEdits cleanup rewrites the gallery comment to the note', () => {
+    const edits = planTidyEdits(cleanup, [{ id: 1, body: `## gallery\n${VISUAL}` }], '');
+    expect(edits).toEqual([{ op: 'patch-comment', id: 1, body: NOTE }]);
+  });
+
+  it('planTidyEdits cleanup on a clean PR plans nothing', () => {
+    expect(planTidyEdits(cleanup, [{ id: 1, body: `${NOTE}\r\n` }], 'plain body')).toEqual([]);
+  });
+
+  it('planTidyEdits banner skips a comment republished since classification', () => {
+    const fresh = 'b'.repeat(40);
+    const stale = 'a'.repeat(40);
+    const banner = { pr: 5, kind: 'banner' as const, base: 'master', staleSha: stale };
+    const body = `<!-- vr-base-sha: ${fresh} -->\n## gallery\n${VISUAL}`;
+    expect(planTidyEdits(banner, [{ id: 1, body }], '')).toEqual([]);
+    const old = `<!-- vr-base-sha: ${stale} -->\n## gallery\n${VISUAL}`;
+    const edits = planTidyEdits(banner, [{ id: 1, body: old }], '');
+    expect(edits).toHaveLength(1);
+    expect(edits[0]).toMatchObject({ op: 'patch-comment', id: 1 });
   });
 });

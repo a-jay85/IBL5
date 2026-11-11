@@ -5,7 +5,18 @@
 //
 // Follows the "script writes a .md consumed by marocchino" sticky-comment pattern.
 import type { VrRow, Viewport } from './vr-manifest';
-import { baseShaMarker, STALE_BANNER_MARKER, staleBannerLine } from './vr-refresh';
+import {
+  baseShaMarker,
+  MANUAL_ROW_MARKER,
+  normalizeComment,
+  parseBaseSha,
+  STALE_BANNER_MARKER,
+  staleBannerLine,
+  stackedNoteBody,
+  VISUAL_REVIEW_MARKER,
+  type TidyAction,
+} from './vr-refresh';
+import { applyBodyStaleBanner, stripVrBlocks } from './vr-pr-body';
 
 export const COMMENT_HEADER = '🖼️ Visual review';
 
@@ -216,4 +227,40 @@ export function buildComment(input: BuildCommentInput): string {
 export function applyStaleBanner(body: string): string {
   if (body.includes(STALE_BANNER_MARKER)) return body;
   return `${staleBannerLine()}\n\n${body}`;
+}
+
+export interface PrComment {
+  id: number;
+  body: string;
+}
+export type TidyEdit =
+  | { op: 'patch-comment'; id: number; body: string }
+  | { op: 'delete-comment'; id: number }
+  | { op: 'patch-pr-body'; body: string };
+
+// Pure: the GitHub edits that bring one PR to its tidy target. An empty list = no-op.
+export function planTidyEdits(action: TidyAction, comments: PrComment[], prBody: string): TidyEdit[] {
+  const edits: TidyEdit[] = [];
+  if (action.kind === 'cleanup') {
+    const note = stackedNoteBody(action.base);
+    for (const c of comments) {
+      if (c.body.includes(VISUAL_REVIEW_MARKER)) {
+        if (normalizeComment(c.body) !== note) edits.push({ op: 'patch-comment', id: c.id, body: note });
+      } else if (c.body.includes(MANUAL_ROW_MARKER)) {
+        edits.push({ op: 'delete-comment', id: c.id });
+      }
+    }
+    const stripped = stripVrBlocks(prBody);
+    if (stripped !== prBody) edits.push({ op: 'patch-pr-body', body: stripped });
+    return edits;
+  }
+  const visual = comments.filter((c) => c.body.includes(VISUAL_REVIEW_MARKER));
+  const last = visual[visual.length - 1];
+  // An E2E run republished the comment since classification: leave the fresh one alone.
+  if (last === undefined || parseBaseSha(last.body) !== action.staleSha) return edits;
+  const bannered = applyStaleBanner(last.body);
+  if (bannered !== last.body) edits.push({ op: 'patch-comment', id: last.id, body: bannered });
+  const bodyBannered = applyBodyStaleBanner(prBody);
+  if (bodyBannered !== prBody) edits.push({ op: 'patch-pr-body', body: bodyBannered });
+  return edits;
 }

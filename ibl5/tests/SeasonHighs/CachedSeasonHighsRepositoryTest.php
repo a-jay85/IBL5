@@ -216,11 +216,13 @@ final class CachedSeasonHighsRepositoryTest extends TestCase
         $inner = new CountingSeasonHighsInner($this->createFixture());
         $repository = new CachedSeasonHighsRepository($inner, $this->cache, 'ibl');
 
-        $keys = $repository->planKeys(function () use ($repository): void {
-            $repository->getSeasonHighsBatch(self::STATS, '', '2026-01-01', '2026-06-30');
+        $planned = null;
+        $keys = $repository->planKeys(function () use ($repository, &$planned): void {
+            $planned = $repository->getSeasonHighsBatch(self::STATS, '', '2026-01-01', '2026-06-30');
             $repository->getSeasonHighsBatch(self::STATS, '_teams', '2026-01-01', '2026-06-30');
         });
 
+        $this->assertSame(['Points' => [], 'Rebounds' => []], $planned);
         $this->assertCount(2, $keys);
         $this->assertNotSame($keys[0], $keys[1]);
         $this->assertSame(0, $inner->calls);
@@ -254,9 +256,12 @@ final class CachedSeasonHighsRepositoryTest extends TestCase
         $inner = new CountingSeasonHighsInner($fixture);
         $repository = new CachedSeasonHighsRepository($inner, $this->cache, 'ibl');
 
-        $repository->warmKeys(static function () use ($repository): void {
-            $repository->getSeasonHighsBatch(self::STATS, '', '2026-01-01', '2026-06-30');
+        $returned = null;
+        $repository->warmKeys(static function () use ($repository, &$returned): void {
+            $returned = $repository->getSeasonHighsBatch(self::STATS, '', '2026-01-01', '2026-06-30');
         });
+        $this->assertSame($fixture, $returned);
+        $this->assertSame([], $this->cache->keysOf('get'), 'warm mode must not read the cache');
         $this->assertSame(1, $inner->calls);
 
         $served = $repository->getSeasonHighsBatch(self::STATS, '', '2026-01-01', '2026-06-30');

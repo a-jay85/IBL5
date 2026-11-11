@@ -121,7 +121,7 @@ final class RefreshSeasonHighsCacheStepTest extends TestCase
 
         $this->assertFalse($result->success);
         $this->assertFalse($result->skipped);
-        $this->assertStringContainsString('inner failed on call 3', $result->errorMessage);
+        $this->assertSame('Season Highs cache warm failed: inner failed on call 3', $result->errorMessage);
         $this->assertSame(2, $cache->setCount, 'two keys should be written before the inner throws');
         foreach ($expected as $key) {
             $this->assertNull($cache->get($key), 'key survived the failure: ' . $key);
@@ -137,7 +137,7 @@ final class RefreshSeasonHighsCacheStepTest extends TestCase
         $result = $this->buildStep($warmer, 10.0)->execute();
 
         $this->assertFalse($result->success);
-        $this->assertStringContainsString('cache delete failed', $result->errorMessage);
+        $this->assertSame('Season Highs cache invalidation failed: cache delete failed', $result->errorMessage);
         $this->assertSame(0, $inner->calls);
         $this->assertSame(1, $cache->deleteAttempts, 'no cleanup or warm should follow a failed first invalidate');
     }

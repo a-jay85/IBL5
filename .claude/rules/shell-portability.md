@@ -1,6 +1,6 @@
 ---
-description: Shell portability gotchas for bin/ scripts and skill inline bash — BSD vs GNU date and stat, SSH single-line commands, heredoc JSON, isolated bash blocks in skills.
-last_verified: 2026-11-08
+description: Shell portability gotchas for bin/ scripts and skill inline bash — BSD vs GNU date and stat, SSH single-line commands, heredoc JSON, isolated bash blocks in skills, shellcheck only the scripts you changed.
+last_verified: 2026-11-11
 paths:
   - "bin/**"
   - ".claude/skills/**/*.md"
@@ -64,3 +64,16 @@ In `.claude/skills/**/*.md` skill files, every fenced `bash` block runs in a sep
 - Persist state to a temp file between blocks.
 
 **JSON output from skill bash:** use `printf` not `echo -e` for JSON strings — `echo -e` interprets escape sequences inconsistently across shells (`\n` in dash vs. bash). `printf '%s\n' "$json"` is safe everywhere.
+
+## Shellcheck only the scripts you changed
+
+Never run the full-repo shellcheck on the Mac (`bin/lib/shell-scripts.sh --full` piped into `xargs -P`). It starts one shellcheck per core and uses about 2.5 GB in total. Several sessions doing it at once stall the machine. CI's `ShellCheck (bash 3.2 compat)` job already runs it on every push. That job never failed in the 1000 test runs from 2026-10-30 to 2026-11-11.
+
+Lint only the scripts you touched:
+
+```bash
+shellcheck --severity=warning --shell=bash \
+  --exclude=SC2034,SC1090,SC2207 bin/foo bin/lib/bar.sh
+```
+
+`bin/pre-commit-hook` runs the same check on staged shell files at commit time.

@@ -103,6 +103,7 @@ final class RivalriesRepositoryTest extends TestCase
         $queries = $this->mockDb->getPreparedQueries();
         $query = $queries[array_key_last($queries)];
         self::assertStringNotContainsString('LIMIT 1', $query);
+        self::assertStringContainsString('FROM `ibl_box_scores_teams` b FORCE INDEX (`idx_visitor_team`)', $query);
         // The non-pair GM C still gets a CASE branch, so a side C ran resolves to C and not to the pair GM.
         $filter = "AND ((b.visitor_teamid = ? AND b.home_teamid = ?) OR (b.visitor_teamid = ? AND b.home_teamid = ?))\n"
             . "      AND ((b.visitor_teamid = ? AND b.season_year BETWEEN ? AND ?) OR (b.visitor_teamid = ? AND b.season_year BETWEEN ? AND ?))\n"

@@ -302,18 +302,19 @@ pair_games AS (
      * H2H `unique_games` + `games` CTEs, phase `all` (HEAT counts), plus dates and era labels.
      *
      * @param string $extraWhere Extra `AND ...` filter on `ibl_box_scores_teams b`, applied before the dedupe.
+     * @param string $indexHint Optional index hint for the dedupe scan, e.g. ` FORCE INDEX (`idx_visitor_team`)`.
      */
-    private function gamesCte(string $extraWhere = ''): string
+    private function gamesCte(string $extraWhere = '', string $indexHint = ''): string
     {
         $maxTid = League::MAX_REAL_TEAMID;
 
         return sprintf(
             'WITH unique_games AS (
     SELECT MIN(id) AS id
-    FROM `ibl_box_scores_teams` b
+    FROM `ibl_box_scores_teams` b%3$s
     WHERE b.game_type IN (1, 2, 3)
-      AND b.visitor_teamid BETWEEN 1 AND %d
-      AND b.home_teamid   BETWEEN 1 AND %d%s
+      AND b.visitor_teamid BETWEEN 1 AND %1$d
+      AND b.home_teamid   BETWEEN 1 AND %1$d%2$s
     GROUP BY b.game_date, b.visitor_teamid, b.home_teamid, b.game_of_that_day
 ),
 games AS (
@@ -334,8 +335,8 @@ games AS (
     LEFT JOIN `ibl_team_info` hti ON hti.teamid = b.home_teamid
 )',
             $maxTid,
-            $maxTid,
             $extraWhere,
+            $indexHint,
         );
     }
 
@@ -447,7 +448,9 @@ ORDER BY t.start_season_year ASC, t.id ASC',
      */
     private function gmPairCte(array $resolution): string
     {
-        return $this->gamesCte($resolution['filter']) . ',
+        // Up to a dozen-plus franchise tuples make the planner pick a full scan of the 53K-row
+        // date index; the team index narrows the dedupe to the pair's franchises (33 ms -> 8 ms).
+        return $this->gamesCte($resolution['filter'], ' FORCE INDEX (`idx_visitor_team`)') . ',
 gm_games AS (
     SELECT g.*,
         ' . $resolution['vCase'] . ' AS v_gm,

@@ -216,12 +216,12 @@ final class TeamSingleGameBatchCharacterizationTest extends DatabaseTestCase
     }
 
     /**
-     * @param list<array{value: int}> $rows
+     * @param list<array<string, int|string>> $rows
      * @return list<int>
      */
     private function values(array $rows): array
     {
-        return array_map(static fn (array $row): int => $row['value'], $rows);
+        return array_map(static fn (array $row): int => (int) $row['value'], $rows);
     }
 
     private function insertTeamBoxRow(string $date, int $visitorTid, int $homeTid, string $name, int $ast): void

@@ -170,7 +170,9 @@ class SettingsRenameTriggerTest extends DatabaseTestCase
         $teamid = (int) $team['teamid'];
 
         $gm = 'ZZTenureProbe';
-        $stmt = $this->db->prepare('UPDATE ibl_team_info SET gm_username = ? WHERE teamid = ?');
+        // The trigger opens the tenure under owner_name and falls back to gm_username only when
+        // owner_name is empty. Seed team rows carry an owner_name, so clear it to exercise the fallback.
+        $stmt = $this->db->prepare("UPDATE ibl_team_info SET gm_username = ?, owner_name = '' WHERE teamid = ?");
         self::assertNotFalse($stmt);
         $stmt->bind_param('si', $gm, $teamid);
         $stmt->execute();

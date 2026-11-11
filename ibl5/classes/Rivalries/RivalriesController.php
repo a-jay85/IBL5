@@ -102,13 +102,9 @@ final class RivalriesController
                 }
                 $teamRivals = $this->service->getTopFranchiseRivals($id, self::TOP_LIMIT);
                 $owner = $this->teams->getOwnerName($id);
-                $gm = $owner !== null && $owner !== '' ? $this->repo->findGmName($owner) : null;
-                // The GM-change trigger stores the site username, so a tenure row can hold
-                // "SpecBob" while owner_name reads "Spec-Bob".
-                if ($gm === null) {
-                    $username = $this->teams->getUsernameFromTeamname($name);
-                    $gm = $username !== null && $username !== '' ? $this->repo->findGmName($username) : null;
-                }
+                // Migration 207's trigger names a tenure after gm_username when owner_name is empty.
+                $tenureName = $owner !== null && $owner !== '' ? $owner : $this->teams->getUsernameFromTeamname($name);
+                $gm = $tenureName !== null && $tenureName !== '' ? $this->repo->findGmName($tenureName) : null;
                 $gmRivals = $gm === null ? [] : $this->service->getTopGmRivals($gm, self::TOP_LIMIT);
                 $team = $this->teams->getTeamByName($name);
                 $teamLabel = $team !== null && $team['team_city'] !== '' ? $team['team_city'] . ' ' . $name : $name;

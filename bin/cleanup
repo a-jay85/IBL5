@@ -7,6 +7,12 @@
 # Exit codes: 0 = done (named target cleaned, or --all finished, skips included)
 #             1 = usage error, unknown option, or worktree not found
 #             3 = the named target was SKIPPED (reason printed on stderr)
+#
+# Leaked-orphan kill (merged worktrees only, see kill_leaked_orphans in
+# bin/lib/wt-guards.sh):
+#   WT_GC_KILL_ORPHANS     "0" = never kill; unset or empty = on
+#   WT_GC_ORPHAN_MIN_AGE   seconds an orphan must have run first (86400)
+#   WTG_ORPHAN_PARENT_PID  test seam: parent pid that marks an orphan (1)
 
 set -euo pipefail
 
@@ -276,6 +282,13 @@ check_worktree() {
     # there's nothing on disk to protect.
     if [ -d "$wt_path" ]; then
         kill_infra_processes "$wt_path"
+
+        # Merged path only: is_merged was proven above, so a leaked orphan
+        # (ppid 1, not claude, older than WT_GC_ORPHAN_MIN_AGE) may be killed.
+        # The existing in-use check below re-runs and still decides the reap.
+        if is_worktree_in_use "$wt_path"; then
+            kill_leaked_orphans "$wt_path" "$DRY_RUN" || true
+        fi
 
         if is_worktree_in_use "$wt_path"; then
             skip_note "$wt_name" "worktree is in active use (processes detected)"

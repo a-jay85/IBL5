@@ -1586,7 +1586,7 @@ def _escape_quoted(line: str) -> str:
 
 
 # --- Shadow-mode arming record (procedure 6f). Logged beside conditions (3) and (18) in
-# result.json; nothing on the arming, remediation or verdict path reads it.
+# result.json. Arming reads it only through reviewer_arming_holds, which can add condition (21) and never clears a hold.
 
 SHADOW_KEY = "shadow"
 
@@ -1647,6 +1647,53 @@ def carried_shadow(cached, run_id) -> dict:
     rec["carried_from"] = run_id
     rec["states"] = schemas.shadow_condition_states(rec)
     return rec
+
+
+REVIEWER_HOLD_CAP = 300
+
+
+def _one_line(value) -> str:
+    return " ".join(str(value).split())
+
+
+def _landed_later(item, changed_files, diff_text: str) -> bool:
+    """True when the final diff realises a reviewer-missing item (a later commit landed it)."""
+    tok = _one_line(item.get("token", "")).strip("`")
+    if not tok:
+        return False
+    kind = item.get("kind")
+    if kind in ("file", "test"):
+        return any(p == tok or p.endswith("/" + tok) for p in changed_files)
+    if kind == "method":
+        return re.search(rf"^\+.*\b{re.escape(tok)}\b", diff_text, re.M) is not None
+    return False
+
+
+def reviewer_arming_holds(shadow, changed_files, diff_text: str, log) -> list[str]:
+    """Condition (21) parts from the SHADOW-ARMING record. Add-only: it never clears a hold.
+
+    Anything but a well-formed present or carried record is neutral: [] plus one log line.
+    """
+    status = shadow.get("status") if isinstance(shadow, dict) else None
+    if status not in ("present", "carried"):
+        log(f"phase6.5: reviewer arming hold neutral (status={status})")
+        return []  # neutral: no well-formed block
+    try:
+        fields = shadow["fields"]
+        parts = []
+        pl = fields["planned_landed"]
+        if pl["hold"] is True and not shadow.get("plan_blind"):
+            items = [i for i in pl["missing"] if not _landed_later(i, changed_files, diff_text)]
+            if items:
+                parts.append("planned-landed: " + ", ".join(
+                    f"{_one_line(i.get('kind'))}:{_one_line(i.get('token'))}" for i in items))
+        md = fields["merge_danger"]
+        if md["hold"] is True:
+            parts.append(f"merge-danger: door={_one_line(md.get('door'))}: {_one_line(md.get('why'))}")
+    except (KeyError, TypeError, AttributeError) as e:
+        log(f"phase6.5: reviewer arming hold neutral (malformed {e.__class__.__name__})")
+        return []  # neutral: malformed block
+    return [p[:REVIEWER_HOLD_CAP] for p in parts]
 
 
 def _strip_shadow_section(lines: list[str]) -> list[str]:

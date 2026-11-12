@@ -25,14 +25,18 @@ UI_PATH_RE+='|^ibl5/(index|modules|block|demo-login)\.php$|^ibl5/favicon\.ico$'
 UI_PATH_RE+='|-snapshots/'
 # The gallery producers run from the PR's own code on pull_request, so a PR
 # that edits one could write a clean gallery. Every PR-head file the VR job
-# runs before the vr-gallery-json upload always holds: the workflow and its
-# local actions, the bin/ scripts it calls, the specs the VR and manual-row
-# configs match (their testMatch is unanchored, so any directory), the
-# fixtures, helpers and auth setup inside the Playwright process, the package
-# and lock files that `bun install` and `composer install` run, and the
-# Docker files that start the containers. The app under test (PHP, SQL, CSS)
-# is what the gallery measures, so it is out of scope here.
-UI_PATH_RE+='|^\.github/workflows/e2e-tests\.yml$|^\.github/actions/|^bin/vr-build-gallery$'
+# runs before the vr-gallery-json upload always holds: the workflow, the one
+# local action the e2e job runs (setup-docker-e2e), the bin/ scripts they
+# call, the specs the VR and manual-row configs match (their testMatch is
+# unanchored, so any directory), the fixtures, helpers and auth setup inside
+# the Playwright process, the package and lock files that `bun install` and
+# `composer install` run, and the Docker files that start the containers.
+# The other local actions (setup-php-env, notify-discord, setup-ssh,
+# lighthouse-setup) never run in the VR job, so they stay off this list. A PR
+# that wires another action into the VR job must edit e2e-tests.yml or
+# setup-docker-e2e, and both hold. The app under test (PHP, SQL, CSS) is
+# what the gallery measures, so it is out of scope here.
+UI_PATH_RE+='|^\.github/workflows/e2e-tests\.yml$|^\.github/actions/setup-docker-e2e/|^bin/vr-build-gallery$'
 UI_PATH_RE+='|^bin/vr-review-comment$|^bin/vr-changed-coverage$|^bin/playwright-image-tag$'
 UI_PATH_RE+='|^ibl5/bin/run-migrations-ci$'
 UI_PATH_RE+='|^ibl5/tests/e2e/vr-[^/]*\.ts$|^ibl5/playwright[^/]*\.config\.ts$'

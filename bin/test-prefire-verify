@@ -41,6 +41,11 @@ want_cnt() { # <counter> <n>
 cnt() {
     if [ -f "$CNT/$1" ]; then wc -l < "$CNT/$1" | tr -d ' '; else echo 0; fi
 }
+want_args() { # <exact last argv line the phpunit stub recorded>
+    local got; got=$(tail -n 1 "$CNT/phpunit_args" 2>/dev/null)
+    [ "$got" = "$1" ] || note "phpunit args expected '$1', got '$got'"
+}
+run_gate_nobase() { OUT=$(cd "$R" && "$GATE" "$@" 2>&1); RC=$?; }
 
 # ---------------------------------------------------------------------------
 # Fixture: a fresh temp git repo plus stubs. Sets D (case dir), R (repo),
@@ -57,6 +62,7 @@ new_case() {
     cat > "$R/ibl5/vendor/bin/phpunit" <<'EOF'
 #!/usr/bin/env bash
 echo run >> "$CNT/phpunit"
+printf '%s:%s\n' "$#" "$*" >> "$CNT/phpunit_args"
 exit "${STUB_PHPUNIT_RC:-0}"
 EOF
     printf '#!/usr/bin/env bash\necho run >> "$CNT/mutation"\nexit 0\n' > "$D/stubs/mutation"
@@ -73,6 +79,7 @@ EOF
         git commit -q -m init
     ) || { echo "HARNESS-SETUP: fixture repo failed" >&2; exit 2; }
     export PREFIRE_PHPUNIT_CMD="vendor/bin/phpunit"
+    export PREFIRE_PHPUNIT_FULL=1   # existing cases pin full-suite behavior; subset_case unsets it
     export PREFIRE_DB_PROBE_CMD="$D/stubs/probe"
     # Removed seams. Kept exported so a stray read shows up in $CNT.
     export PREFIRE_MUTATION_CMD="$D/stubs/mutation"
@@ -903,6 +910,27 @@ test_prompt_impl_runs_three_stages() {
 # ---------------------------------------------------------------------------
 # Runner
 # ---------------------------------------------------------------------------
+# PHPUnit stage characterization (plan prefire-phpunit-changed-files rows 1-3)
+# ---------------------------------------------------------------------------
+test_phpunit_full_run_passes_no_args() {
+    new_case
+    run_gate --stage phpunit
+    want_rc 0
+    want_args "0:"
+    local logs n=0 f
+    logs=$(state_dir)
+    for f in "$logs"/*.phpunit.log; do [ -e "$f" ] && n=$((n + 1)); done
+    [ "$n" -eq 1 ] || note "expected exactly 1 phpunit log, found $n"
+}
+
+test_base_without_value_exits_2() {
+    new_case
+    OUT=$(cd "$R" && "$GATE" --stage phpunit --base 2>&1); RC=$?
+    want_rc 2
+    want_out "--base needs a ref"
+}
+
+# ---------------------------------------------------------------------------
 ALL_CASES="
 test_matrix_row_failure_refuses_and_names_row
 test_unrun_row_refuses_without_gate_record
@@ -958,6 +986,8 @@ test_xm_fire_point_undecided_still_fails
 test_post_plan_now_passes_fire_point
 test_help_lists_exec_mutations
 test_prompt_impl_runs_three_stages
+test_phpunit_full_run_passes_no_args
+test_base_without_value_exits_2
 "
 
 if [ $# -gt 0 ]; then CASES="$*"; else CASES="$ALL_CASES"; fi

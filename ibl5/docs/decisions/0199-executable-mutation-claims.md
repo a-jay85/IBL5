@@ -1,6 +1,6 @@
 ---
 description: Verification Matrix mutation claims become executable through a keyed ## Executable Mutations section; one bin/lib script owns the grammar, Phase 5.0 applies each edit, requires the check to fail, reverts, and arming condition (19) holds on any claim that did not trip.
-last_verified: 2026-11-02
+last_verified: 2026-11-12
 ---
 
 # ADR-0199: Executable mutation claims
@@ -59,3 +59,23 @@ ceiling) and `--budget` (total wall clock; later rows print UNDECIDED). The harn
 seconds are memoized per check command. A timeout still never counts as TRIPPED.
 The `_architect-contract.md` size cap moved from 31232 B to 31744 B for the sentence that
 tells architects to narrow each check to one test file or a `-k` filter.
+
+## Amendment (2026-11-12): post-plan reuses pre-fire's recorded pass
+
+Pre-fire (`bin/lib/prefire-verify`) already runs this check at the fire point. When every
+row trips, it now also writes a reuse record into its state directory under the worktree's
+git dir. The file is `exec-mutations.rows-<id>.reuse`, where `<id>` is the git blob id of
+the `plan-exec-mutations parse` output. It holds pre-fire's working-tree hash and the
+per-row result lines.
+
+Post-plan's exec-mutations step reads that record before it runs anything. It skips its
+own run only when all of these hold: the record matches the current rows; every row's
+mutation target and every repo path its check command names is tracked and unchanged
+between pre-fire's tree and the current tree; and the executor journal is empty. The
+PR-body block and arming condition 19 then judge the recorded per-row results, so a
+recorded non-TRIPPED row still holds. In every other case post-plan runs the check as
+before. The audit log names which path ran. The fix round's proof run always runs fresh.
+
+The dependency set is the paths the command names. A rebase that changes a file the
+check reaches only indirectly, such as a class the named test imports, does not force a
+fresh run. CI still runs the test suites on every push.

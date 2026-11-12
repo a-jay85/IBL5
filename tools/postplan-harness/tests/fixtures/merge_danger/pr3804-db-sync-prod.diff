@@ -1,0 +1,26 @@
+diff --git a/bin/db-sync-prod b/bin/db-sync-prod
+index 5c4710f1b0..87a287421f 100755
+--- a/bin/db-sync-prod
++++ b/bin/db-sync-prod
+@@ -363,10 +363,10 @@ done
+ 
+ REGULAR_TABLES=""
+ for name in $ALL_TABLES; do
+-    if [ -n "$GEN_RE" ] && echo "$name" | grep -qE "^($GEN_RE)$"; then
++    if [ -n "$GEN_RE" ] && grep -qE "^($GEN_RE)$" <<< "$name"; then
+         continue
+     fi
+-    if [ -n "$PRESERVE_RE" ] && echo "$name" | grep -qE "^($PRESERVE_RE)$"; then
++    if [ -n "$PRESERVE_RE" ] && grep -qE "^($PRESERVE_RE)$" <<< "$name"; then
+         continue
+     fi
+     REGULAR_TABLES="$REGULAR_TABLES $name"
+@@ -378,7 +378,7 @@ done
+ if [ -n "$PRESERVE_RE" ]; then
+     _kept_gen=""
+     for name in $GENERATED_TABLES; do
+-        if echo "$name" | grep -qE "^($PRESERVE_RE)$"; then
++        if grep -qE "^($PRESERVE_RE)$" <<< "$name"; then
+             continue
+         fi
+         _kept_gen="$_kept_gen $name"

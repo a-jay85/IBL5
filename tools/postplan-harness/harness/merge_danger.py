@@ -25,6 +25,7 @@ from pathlib import Path
 from harness.armable import DESTRUCTIVE_SQL
 from harness.sql_comments import strip_added_sql_comments
 from harness.workflow_scope import workflow_send_change
+from harness.external_scope import external_send_change
 from harness.gate_backtest import GateChange, changes_from_unified_diff, detect_gate_changes
 # Private name imported on purpose: the arming paths are the bootstrap-hazard set, and a public
 # alias would mean another edit to a file several open PRs touch.
@@ -41,6 +42,9 @@ FIELD_RE = re.compile(
 _LINE_RE = re.compile(r"^\*\*Merge danger:\*\*")
 _EXTERNAL_PATHS = ("bin/db-sync-prod", ".github/workflows/promote-to-production.yml", "bin/discord-dm")
 _EXTERNAL_PREFIXES = (".github/actions/notify-discord/", "ibl5/classes/Mail/")
+# Narrowed external paths: their own changed hunks decide (harness/external_scope.py). Every other
+# _EXTERNAL_PATHS member, today .github/workflows/promote-to-production.yml, fires on any touch.
+_NARROWED_EXTERNAL_PATHS = ("bin/db-sync-prod", "bin/discord-dm")
 _NOTIFY_TEXT_RE = re.compile(r"notify-discord|DISCORD_")
 _SITE_WIDE_PATHS = ("ibl5/.htaccess", "ibl5/router.php", "ibl5/composer.json")
 _MIGRATION_RE = re.compile(r"^ibl5/migrations/.*\.sql$")
@@ -117,6 +121,18 @@ def _moved_in_from_outside(section: str | None) -> bool:
     return bool(m) and not fnmatch.fnmatchcase(m.group(1).strip(), _WORKFLOW_GLOB)
 
 
+def _external_path_fires(status: str, parts: list[str], diff_text: str) -> bool:
+    """True when an external path's diff can change what is synced, promoted or sent. A delete,
+    a rename to or from the path, a path outside the narrowed set, or a section the parser
+    cannot read fires (fail closed)."""
+    if not status.startswith(("M", "A")) or len(parts) > 1:
+        return True
+    path = parts[0]
+    if path not in _NARROWED_EXTERNAL_PATHS and not path.startswith(_EXTERNAL_PREFIXES):
+        return True
+    return external_send_change(path, _section_for(diff_text, path)) is not None
+
+
 def _module_root(path: str) -> str:
     parts = path.split("/")
     if len(parts) >= 3 and parts[0] == "ibl5" and parts[1] in ("classes", "modules"):
@@ -185,8 +201,10 @@ def derive_merge_danger(
         if status.startswith("R") and len(parts) == 1 and wf in renamed_from:
             parts = [renamed_from[wf], wf]
         if any(q in _EXTERNAL_PATHS or q.startswith(_EXTERNAL_PREFIXES) for q in parts):
-            add(f"external-path:{p}")
-            external = True
+            # The path's own changed hunks decide; an unreadable diff fires (fail closed).
+            if _external_path_fires(status, parts, diff_text or ""):
+                add(f"external-path:{p}")
+                external = True
         elif fnmatch.fnmatchcase(wf, _WORKFLOW_GLOB) and not status.startswith("D"):
             text = read_candidate(wf)
             # Notify text in the file is only the precondition; the workflow's own changed

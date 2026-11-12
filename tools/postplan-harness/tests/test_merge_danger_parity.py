@@ -9,6 +9,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -167,3 +169,21 @@ def test_shell_docs_refresh_self_governing():
          "_", str(REPO), "docs-stale-refresh-20261015", '[{"path": "ibl5/docs/guide.md"}]', state, "READY"],
         capture_output=True, text=True, check=True).stdout.strip().splitlines()
     assert out == ["docs-refresh:merge-danger:SELF-GOVERNING"]
+
+
+_SG_FIX = Path(__file__).parent / "fixtures" / "merge_danger"
+_SG_LINES = ("pr3829-merge-danger-line.txt", "pr3832-merge-danger-line.txt")
+
+
+def _sg_line(name):
+    return (_SG_FIX / name).read_text(encoding="utf-8").rstrip("\n")
+
+
+@pytest.mark.parametrize("name", _SG_LINES)
+def test_pin_sg_lines_python(name):
+    assert merge_danger.classify_body(_sg_line(name)) == "SELF-GOVERNING"
+
+
+@pytest.mark.parametrize("name", _SG_LINES)
+def test_pin_sg_lines_shell(name):
+    assert "SELF-GOVERNING" in _shell_token(_sg_line(name))

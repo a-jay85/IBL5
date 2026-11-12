@@ -8,6 +8,7 @@ import subprocess
 import pytest
 
 from harness import fidelity, hold_text
+from harness import merge_danger as md
 from harness.armable import ArmInputs, evaluate
 from harness.state import Classification, ConditionResult, Finding
 
@@ -186,3 +187,12 @@ def test_shell_reader_still_parses_the_plain_block():
         capture_output=True, text=True, check=True).stdout.split()
     assert out == [f"verdict-hold:{c.number}" for c in decision.holds]
     assert len(out) == 20
+
+
+def test_self_governing_hold_text_is_not_unreadable():
+    fix = pathlib.Path(__file__).parent / "fixtures" / "merge_danger"
+    for name in ("pr3829-merge-danger-line.txt", "pr3832-merge-danger-line.txt"):
+        state = md.classify_body((fix / name).read_text(encoding="utf-8").rstrip("\n"))
+        words = hold_text.plain_hold(ConditionResult(18, "merge-danger", True, f"state={state}"))
+        assert "auto-merge machinery itself" in words
+        assert "could not be read" not in words

@@ -54,21 +54,44 @@ LOCK_DIR="$LOG_DIR/css-rebuild-$slug.lock"
 LOCK_WAIT_SECS="${CSS_REBUILD_LOCK_WAIT_SECS:-120}"
 case "$LOCK_WAIT_SECS" in *[!0-9]*) LOCK_WAIT_SECS=120 ;; esac
 
-# Remove the lock only if its holder is still $1. A second mkdir guard lets one
+# Create file $1 only if it does not exist yet. noclobber makes bash open it
+# with O_EXCL, so exactly one racing caller wins. mkdir cannot be trusted for
+# this: uutils mkdir (Ubuntu 26.04) reports success to both callers when two
+# create the same dir at once. The file gets $2's stdout; with no $2 it is empty.
+claim_file() {
+    local f="$1" rc
+    shift
+    set -C
+    if [ "$#" -gt 0 ]; then "$@" 2>/dev/null > "$f"; else : 2>/dev/null > "$f"; fi
+    rc=$?
+    set +C
+    return "$rc"
+}
+
+# Remove the lock only if its holder is still $1. A second guard file lets one
 # waiter at a time re-check and delete, so a waiter that lost the race never
 # deletes a lock another waiter just took.
 reap_lock() {
     local expected="$1"
-    mkdir "$LOCK_DIR.reap" 2>/dev/null || return 1
+    claim_file "$LOCK_DIR.reap" || return 1
     if [ "$(cat "$LOCK_DIR/pid" 2>/dev/null || true)" = "$expected" ]; then
         rm -rf "$LOCK_DIR"
     fi
-    rmdir "$LOCK_DIR.reap" 2>/dev/null || true
+    rm -f "$LOCK_DIR.reap"
+}
+
+# The lock is held by whoever creates $LOCK_DIR/pid. The mkdir only makes room
+# for it. $$ is the hook process, which exits at once. sh's parent is this
+# subshell, so the pid file names the process that actually holds the lock
+# (bash 3.2 has no BASHPID).
+lock_try() {
+    mkdir -p "$LOCK_DIR" 2>/dev/null || return 1
+    claim_file "$LOCK_DIR/pid" sh -c 'echo "$PPID"'
 }
 
 lock_acquire() {
     local waited=0 logged=0 holder
-    while ! mkdir "$LOCK_DIR" 2>/dev/null; do
+    while ! lock_try; do
         holder="$(cat "$LOCK_DIR/pid" 2>/dev/null || true)"
         if [ -n "$holder" ] && ! kill -0 "$holder" 2>/dev/null; then
             if reap_lock "$holder"; then
@@ -84,7 +107,7 @@ lock_acquire() {
         fi
         if [ "$waited" -ge "$LOCK_WAIT_SECS" ]; then
             echo "$(date): css lock wait timed out after ${LOCK_WAIT_SECS}s, taking it over ($slug)" >> "$LOG"
-            rmdir "$LOCK_DIR.reap" 2>/dev/null || true   # a reaper that died mid-reap
+            rm -f "$LOCK_DIR.reap"   # a reaper that died mid-reap
             reap_lock "$holder" || true
             waited=0
             logged=0
@@ -93,9 +116,6 @@ lock_acquire() {
         sleep 1
         waited=$((waited + 1))
     done
-    # $$ is the hook process, which exits at once. sh's parent is this subshell,
-    # so this records the PID that actually holds the lock (bash 3.2 has no BASHPID).
-    sh -c 'echo "$PPID"' > "$LOCK_DIR/pid"
     LOCK_PID="$(cat "$LOCK_DIR/pid")"
 }
 

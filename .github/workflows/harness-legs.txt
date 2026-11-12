@@ -144,3 +144,4 @@
 1 bin/test-check-xml-class-refs
 1 bin/test-bug-pipeline-cron-setup
 1 ibl5/bin/test-flake-ledger
+0 bin/test-post-plan-now-worktree-lock

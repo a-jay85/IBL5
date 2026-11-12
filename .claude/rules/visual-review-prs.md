@@ -18,7 +18,7 @@ paths:
   - "ibl5/tests/e2e/vr-manual-rows.ts"
   - "ibl5/tests/e2e/manual-rows.spec.ts"
   - "ibl5/playwright.manual-rows.config.ts"
-last_verified: 2026-11-07
+last_verified: 2026-11-11
 ---
 
 # Visual-review PRs
@@ -59,10 +59,10 @@ Under that label the publish steps still run (ADR-0181): gallery build, crop, de
    over-suppresses one push instead of silently no-opping. The debounce never fires on an
    `in_progress` run (it may have checked out `gh-pages` first) and fails **open**: an API error
    dispatches. A not-started run older than an hour counts as stuck. The step cancels it and leaves it
-   out of the count, so one stuck run cannot block every later deploy. A push fan-out collapses to about **two** deploys (one in-flight, one pending). Every open PR's VR job pushes to the same `gh-pages` ref, so concurrent runs
+   out of the count, so it cannot block later deploys. A push fan-out collapses to about **two** deploys (one in-flight, one pending). Every open PR's VR job pushes to the same `gh-pages` ref, so concurrent runs
    collide on the ref lock. The deploy runs **one attempt plus two retries** (each re-clones
    `gh-pages`, so a retry sees the ref that beat it). An **assert step** fails the job if all three
-   fail. The retries absorb contention and never soften the gate. The per-cell before/after/diff PNGs
+   fail. The retries never soften the gate. The per-cell before/after/diff PNGs
    are published once each to the shared `_vr-blobs/` store at the `gh-pages` root by
    `bin/vr-dedupe-gallery`, and the gallery's `index.html` refers to them there (ADR-0211).
 4. **Build comment** — `bin/vr-review-comment` consumes the pre-classified `gallery.json` and renders
@@ -74,7 +74,7 @@ per-SHA gallery dirs whose newest commit is older than 7 days. The same job remo
 no surviving gallery references once they are older than 7 days, migrates any legacy-form gallery into
 the store, and runs `bin/check-vr-gallery-refs` before it pushes. Its `gh-pages` push carries the same
 rebase-and-retry loop for the same ref contention. A prune reaches the served site when
-`pages-deploy.yml` next re-publishes the tree (the cleanup job dispatches `pages-deploy.yml` itself once its push lands).
+the cleanup job dispatches `pages-deploy.yml` after its push lands.
 It keeps every dir an open PR still links to. See [Refreshing stale galleries](#refreshing-stale-galleries).
 
 ## Refreshing stale galleries
@@ -82,35 +82,19 @@ It keeps every dir an open PR still links to. See [Refreshing stale galleries](#
 `.github/workflows/vr-refresh.yml` republishes the gallery, both sticky comments, and the PR-body block for open visual PRs whose screenshots went stale. It calls the `Visual Regression` job of `e2e-tests.yml` through its `workflow_call` inputs.
 
 - **Daily schedule.** Refreshes each open visual PR whose linked gallery dir is older than 7 days. At most 10 PRs per sweep, 2 at a time.
-- **Manual dispatch.** `gh workflow run vr-refresh.yml -f pr=<N>` refreshes one PR. A blank `pr` refreshes every open visual PR, with the same cap. Add `-f dry_run=true` to list what would refresh and what cleanup would keep.
-- **Visual PR.** A PR whose `visual-review` sticky comment links a gallery, as `<sha>/visual-review` or `pr/<N>/visual-review`. The first link wins. The banner-only comment links none and is never refreshed.
+- **Manual dispatch.** `gh workflow run vr-refresh.yml -f pr=<N>` refreshes one PR. If that PR is skipped for a reason other than fresh, the select job exits 3 and the run goes red with the reason. A stacked PR that the tidy job cleans is the one other exception and ends green. A blank `pr` sweeps every open visual PR, with the same cap. `-f dry_run=true` lists what would refresh, what the tidy would edit, and what cleanup would keep.
+- **Visual PR.** A PR whose `visual-review` sticky comment links a gallery, as `<sha>/visual-review` or `pr/<N>/visual-review`. The first link wins. The banner-only comment is never refreshed.
 - **Age.** The `gh-pages` commit time of the dir that comment links to (`<sha>` or `pr/<N>/visual-review`). Every publish writes `refreshed-at.txt` into the dir, so a refresh always moves the age forward.
-- **Skipped PRs.** Forks, PRs labeled `update-baselines`, drafts (unless named by `pr`), PRs whose base is not `master`, and PRs behind `master`. A push republishes a behind PR anyway (ADR-0182 gives the reason).
+- **Skipped PRs.** Forks, PRs labeled `update-baselines`, drafts (unless named by `pr`), and PRs behind `master`. The refresh skips a PR whose base is not `master`, and the tidy job removes that PR's stale screenshots (see Stale banner). A master-based PR that still shows the stacked note (the parent merged and GitHub retargeted it) is refreshed. A push republishes a behind PR anyway (ADR-0182).
 - **Publish key.** A refresh publishes under the PR head SHA and rewrites the links to it. A push to the PR still publishes under the test-merge SHA.
-- **Never a gate.** Every write runs on a master-ref event, so a refresh adds no check run to a PR head and a failed refresh leaves required checks alone. One sweep dispatches `pages-deploy.yml` once.
-- **Retention.** `vr-pages-cleanup` keeps every per-SHA dir that any open PR's comments or body link to, plus each open PR's head SHA, through both the 7-day age pass and the 150-dir cap. When the keep-list cannot be computed, that run prunes nothing. The keep-list holds 40-hex SHAs only, since `bin/prune-vr-galleries` never prunes `pr/<N>/` dirs.
+- **Never a gate.** Every write runs on a master-ref event, so a refresh adds no check run to a PR head and a failed refresh leaves required checks alone. One sweep dispatches `pages-deploy.yml` once. The `tidy` job runs only on the master ref and holds `pull-requests: write`. The select job keeps `pull-requests: read`, and `ibl5/tests/ts-unit/vr-workflow-guard.test.ts` pins both.
+- **Stale banner.** A master-based PR's gallery counts as stale when it was shot against an older master (the `<!-- vr-base-sha: <40hex> -->` marker in the sticky comment) and master changed a VR-relevant path since, or when the marker is missing. `VR_RELEVANT_PATHS` is a copy of the `e2e-tests.yml` push `paths:` list, pinned by a drift test. The tidy job then prepends a `<!-- vr-stale-banner -->` banner to the comment and to the PR-body block. A failed compare counts as advanced. A stacked PR (base not `master`) gets its gallery comment replaced by the stacked note, and its manual-row comment and PR-body blocks are removed. A fresh publish drops the banner.
+- **Retention.** `vr-pages-cleanup` keeps every per-SHA dir that any open PR's comments or body link to, plus each open PR's head SHA, through both the 7-day age pass and the 150-dir cap. When the keep-list cannot be computed, that run prunes nothing. The keep-list holds 40-hex SHAs only; `bin/prune-vr-galleries` never prunes `pr/<N>/`.
 - **Pull-request dry-run.** A PR that edits the refresh workflow, `bin/vr-refresh-targets`, `ibl5/tests/e2e/vr-refresh.ts`, `bin/prune-vr-galleries`, `bin/vr-dedupe-gallery`, or `bin/check-vr-gallery-refs` runs the read-only `VR refresh select` job, which prints both lists and rehearses the migration.
 
 ## Reading the comment
 
-- The comment makes **no claim about the check's red/green color.** In the regen-into-branch steady
-  state the VR gate can be **green** while the gallery still shows **changed** cells (the in-branch
-  baseline was refreshed, but the render still differs from master's committed baseline). The prose
-  is true in both states and never says the check "stays red until then."
-- Diffing views are grouped per module in `<details>` blocks; each link points into the static
-  side-by-side gallery (the `<title>` anchor) where the master-vs-PR before/after shows desktop +
-  mobile. The Playwright report (traces) is preserved under `…/playwright-report/`.
-- A **"🆕 New views (no prior baseline — review the render)"** section lists cells whose baseline was
-  never committed (a brand-new VR row). These have no before — the link shows the first render;
-  sanity-check it, then `update-baselines` commits it as the baseline. NEW cells are excluded from the
-  "changed view(s)" count so a first-render never reads as a regression. The NEW-vs-CHANGED split
-  (ADR-0069) is computed in `bin/vr-build-gallery` from master's committed baseline set, not from
-  disk.
-- The per-SHA Pages URL shape is `https://a-jay85.github.io/IBL5/<sha>/visual-review/`.
-- A **"⚠️ Changed but NOT covered by the VR manifest"** section lists changed website paths
-  that match no manifest row — review those by hand or add a `vr-manifest.ts` row. A
-  **global-change banner** appears as a standalone coverage heads-up whenever a shared
-  CSS/theme/class file changed, independent of whether any row diffed.
+See `.claude/rules/visual-review-prs-detail.md` § Reading the comment.
 
 ## Approving (sign-off)
 
@@ -167,7 +151,10 @@ Gallery cell selection lives in `bin/vr-build-gallery` and `ibl5/tests/e2e/vr-ga
 `ibl5/tests/e2e/vr-coverage-map.ts` (`classifyChangedFiles`, `deriveModuleGlob`, `rowGlobs`); the
 comment markup lives in `ibl5/tests/e2e/vr-review-comment.ts` (`buildComment`). The pure modules are
 unit-tested (`ibl5/tests/ts-unit/vr-gallery.test.ts`, `ibl5/tests/ts-unit/vr-coverage-map.test.ts`,
-`ibl5/tests/ts-unit/vr-review-comment.test.ts`, run via `bun run test:unit` from `ibl5/`). Per-row
+`ibl5/tests/ts-unit/vr-review-comment.test.ts`, run via `bun run test:unit` from `ibl5/`). The refresh
+tidy logic is pure too: `classifyTidy`, `singleDispatchError`, and `VR_RELEVANT_PATHS` live in
+`ibl5/tests/e2e/vr-refresh.ts`, and `planTidyEdits` and `applyStaleBanner` live in
+`ibl5/tests/e2e/vr-review-comment.ts`. Per-row
 source overrides use the optional `sourceGlobs` field on `VrRow`. **Changing this selection logic is
 a mechanical-enforcement surface and requires an ADR** (current: ADR-0074, amended by ADR-0180 for the review-only strict pass). The PR-body new-screens
 publishing surface (`--copy-new-screens`/`--update-pr-body` on `bin/vr-review-comment`,
@@ -178,38 +165,7 @@ mechanical-enforcement surface, covered by **ADR-0076**. The crop modules (`ibl5
 
 ## Manual-row screenshots
 
-A **Truly-manual** Verification-Matrix row about look and feel carries a `vr:` cell in its location
-column (`bin/check-plan` gate `[Q]`; ADR-0126), so CI can screenshot the thing the human is being
-asked to judge:
-
-```
-vr: label=team-page-header; role=anon; url=modules.php?name=Team&op=view&teamID=1; anchor=.ibl-title; setup=DELETE test-state.php?action=clear-throttle
-```
-
-`label=` is a kebab slug, `role=` is `anon|regular|admin`, `url=` is relative to the app root, and
-`anchor=` is the selector waited on before the shot. Zero or more `setup=<GET|POST|DELETE> <path>`
-clauses drive `ibl5/test-state.php` into the state the shot needs. An unknown `action=` there
-answers **400**, so a typo surfaces in the PR comment as a failed row instead of a wrong
-screenshot. Clauses are `;`-separated because `|` would break the matrix table. A row that
-cannot be shot (print CSS, an email render) uses `no-vr: <reason ≥ 15 chars>` instead.
-
-The pipeline is a **review aid**. Every step below is `continue-on-error: true` and
-runs in its own config so a bad `vr:` cell can never turn the baseline-diff step red:
-
-| Stage | Where |
-|---|---|
-| Parse the PR body's `## Manual Testing` bullets | `bin/vr-review-comment --manual-rows-from-pr=N --out-json=ibl5/vr-manual-rows.json` |
-| Capture one PNG per row | `ibl5/playwright.manual-rows.config.ts` + `ibl5/tests/e2e/manual-rows.spec.ts` → `ibl5/vr-manual-shots/<label>.png` |
-| Publish | copied into the gallery deploy tree, served at `<pages-url>manual-rows/<label>.png` |
-| Post | `bin/vr-review-comment --manual-gallery=…` under sticky header `manual-row-screenshots` |
-
-Capture runs **after** the baseline diff has shot its actuals, so a `setup=` mutation cannot
-invalidate a baseline; the pure grammar/markup helpers live in `ibl5/tests/e2e/vr-manual-rows.ts`
-(unit-tested in `ibl5/tests/ts-unit/vr-manual-rows.test.ts`). Both output paths are gitignored.
-
-A base-SHA pass (ADR-0181) serves the base from a second PHP container, runs with
-`VR_MANUAL_SIDE=before`, writes `<label>.before.png` and sets `beforeStatus`. With `ok`, the row shows
-the `<picture>` composite (`--compose-manual`); otherwise it stays after-only.
+See `.claude/rules/visual-review-prs-detail.md` § Manual-row screenshots (ADR-0126, ADR-0181).
 
 ## One-time deployment prerequisite
 

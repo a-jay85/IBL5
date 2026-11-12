@@ -18,7 +18,8 @@
 # run     baseline, apply, check, revert, verify each entry in order.
 #         exit 0 = every entry TRIPPED (or none); 1 = any HELD,
 #         BASELINE-FAILED, NOT-APPLIED, UNDECIDED (or a parse violation,
-#         or NO-TIMEOUT); 3 = REVERT-FAILED (journal retained).
+#         or NO-TIMEOUT); 3 = REVERT-FAILED (journal retained);
+#         4 = EXEC-LOCKED (another live run holds $GITDIR/exec-mutations/run.lock; nothing planted).
 #         --timeout SEC      floor for the mutated run's bound (default 30).
 #         --max-timeout SEC  bound for the baseline run and ceiling for the
 #                            mutated run (default = --timeout, so a run with
@@ -33,6 +34,7 @@
 #         of guidance; harness/mutations.py skips it (not a verdict token).
 # recover restore every journalled entry; exit 0 when the journal is empty
 #         afterwards, 3 otherwise.
+#         recover exit 4 = EXEC-LOCKED (a live run owns the journal; nothing restored)
 # pending exit 0 when any journal entry exists, 1 otherwise.
 # ---
 # The journal lives at $(git rev-parse --absolute-git-dir)/exec-mutations/:
@@ -42,6 +44,8 @@ set -u
 export LC_ALL=C
 
 SELF="${BASH_SOURCE[0]}"
+# Resolved before any cd: a relative $0 breaks once --root changes the cwd.
+SELF_LIBDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
 usage() {
     echo "Usage: bin/lib/plan-exec-mutations parse [--root DIR] <plan>" >&2
@@ -296,6 +300,16 @@ esac
 cd "$ROOT" || usage
 GITDIR=$(git rev-parse --absolute-git-dir 2>/dev/null) || usage
 JDIR="$GITDIR/exec-mutations"
+XLOCK="$JDIR/run.lock"
+. "$SELF_LIBDIR/worktree-lock.sh"
+# take_exec_lock <mode>: one plant/revert owner per worktree (backlog#1827). A live
+# holder owns the journal, so neither run nor recover may touch it. Exit 4 = EXEC-LOCKED.
+take_exec_lock() {
+    local _xh
+    _xh=$(wtlock_acquire "$XLOCK" "$$") && { trap 'wtlock_release "$XLOCK" "$$"' EXIT; return 0; }
+    echo "EXEC-LOCKED — another plan-exec-mutations run (pid ${_xh:-unknown}) holds $XLOCK; $1 refused, nothing planted or reverted"
+    exit 4
+}
 
 sha256() {
     python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$1" 2>/dev/null
@@ -412,12 +426,14 @@ if [ "$MODE" = pending ]; then
 fi
 
 if [ "$MODE" = recover ]; then
+    take_exec_lock recover
     do_recover
     exit $?
 fi
 
 # --- run --------------------------------------------------------------------
 
+take_exec_lock run
 do_recover || exit 3
 
 RECS=$(mktemp "${TMPDIR:-/tmp}/pem-recs.XXXXXX") || exit 2
@@ -458,6 +474,7 @@ revert_pending() {
     do_recover >/dev/null || FINAL=3
     journal_empty && rm -f "$JDIR/status.pre"
     rm -f "$RECS"; rm -rf "$BCACHE"
+    wtlock_release "$XLOCK" "$$"
 }
 on_signal() { revert_pending; [ "$FINAL" -ne 3 ] || exit 3; exit "$1"; }
 trap 'revert_pending; exit $FINAL' EXIT

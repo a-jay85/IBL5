@@ -114,6 +114,7 @@ ROOT="$(main_checkout_root "$SCRIPT_DIR")" || ROOT=""
 # --- session-id helpers ------------------------------------------------------------------
 . "$SCRIPT_DIR/lib/session-id.sh"
 . "$SCRIPT_DIR/lib/launchd-job.sh"
+. "$SCRIPT_DIR/lib/worktree-lock.sh"
 # shellcheck source=bin/lib/dm.sh
 . "$SCRIPT_DIR/lib/dm.sh"
 # Usage-gate markers (ADR-0143): a post-plan session paused by the gate is resumed by the
@@ -570,6 +571,21 @@ while read -r pr; do
     # before a slot, runner and log are spent on a run post-plan-now would refuse (exit 6).
     if ljob_postplan_now_live "$(ljob_safe_slug "$branch")" "$LAUNCHCTL_LIST" >/dev/null; then
         SKIP_LINES+=("$pr|$branch|-|post-plan-now in flight; skipped"); continue
+    fi
+    # A --foreground post-plan-now (automouse, a human, a fleet runner) loads no label; the
+    # per-worktree lock is its only footprint. The fleet only probes and never acquires, so
+    # its own --foreground runner takes the lock as first holder. A listed path that is not
+    # a directory has no git dir to lock; an existing directory whose git dir cannot be
+    # resolved counts as held (fail closed).
+    # `|| _wt=""`: grep exits 1 when the branch has no worktree, and pipefail + set -e
+    # would otherwise kill the whole fleet run on the first such PR.
+    _wt="$(wt_path_for_branch "$branch")" || _wt=""; _lkh=""
+    if [[ -n "$_wt" && -d "$_wt" ]]; then
+        _lk="$(wtlock_path "$_wt")" || _lk=""
+        if [[ -z "$_lk" ]]; then _lkh=unknown; else _lkh="$(wtlock_live "$_lk")" || _lkh=""; fi
+    fi
+    if [[ -n "$_lkh" ]]; then
+        SKIP_LINES+=("$pr|$branch|-|post-plan-now holds the worktree lock (pid $_lkh); skipped"); continue
     fi
     # Pre-flight: worktree + plan check.
     # grep -F is required: without it, [$branch] is treated as a character class.

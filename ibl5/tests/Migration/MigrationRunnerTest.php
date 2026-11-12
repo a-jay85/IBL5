@@ -390,6 +390,44 @@ final class MigrationRunnerTest extends TestCase
         $runner->runPending();
     }
 
+    public function testRunPendingStoresDownSqlForUpperCaseSqlExtension(): void
+    {
+        $upBody = 'UPDATE t SET a = 1;';
+        file_put_contents($this->tempDir . '/001_x.SQL', $upBody);
+        file_put_contents($this->tempDir . '/001_x.down.sql', 'DELETE FROM t;');
+
+        $fakeResolver = self::createStub(MigrationFileResolver::class);
+        $fakeResolver->method('getAvailableMigrations')->willReturn(['001_x.SQL']);
+        $fakeResolver->method('getDownFilename')->willReturn('001_x.down.sql');
+        $fakeResolver->method('getFullPath')
+            ->willReturnCallback(fn(string $f): string => $this->tempDir . '/' . $f);
+
+        $runner = new MigrationRunner($this->stubRepository, $fakeResolver);
+        $runner->runPending();
+
+        $this->assertSame(
+            [['001_x.SQL', 1, 'DELETE FROM t;', hash('sha256', $upBody)]],
+            $this->recordedDowns,
+        );
+    }
+
+    public function testRunPendingRefusesWhitespaceOnlyDownFile(): void
+    {
+        file_put_contents($this->tempDir . '/001_x.sql', 'UPDATE a SET b = 1;');
+        file_put_contents($this->tempDir . '/001_x.down.sql', "  \n\t\n");
+
+        $runner = new MigrationRunner($this->stubRepository, $this->fileResolver);
+
+        try {
+            $runner->runPending();
+            self::fail('Expected RuntimeException');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('Down file is empty or unreadable: 001_x.down.sql', $e->getMessage());
+            $this->assertSame([], $this->executedSql);
+            $this->assertSame([], $this->recordedDowns);
+        }
+    }
+
     public function testRunPendingRefusesNonDmlDownFile(): void
     {
         file_put_contents($this->tempDir . '/001_x.sql', 'UPDATE a SET b = 1;');
@@ -429,6 +467,14 @@ final class MigrationRunnerTest extends TestCase
             'keyword prefix near miss' => ['INSERTS INTO a VALUES (1);', 'INSERTS INTO a VALUES (1)'],
             'comment only' => ['-- only a comment', '(no statements)'],
             'semicolon in literal' => ["INSERT INTO a VALUES ('x; y');", "y')"],
+            'dml keyword mid statement' => [
+                'CREATE TRIGGER t AFTER INSERT ON a FOR EACH ROW SET @x = 1;',
+                'CREATE TRIGGER t AFTER INSERT ON a FOR EACH ROW SET @x = 1',
+            ],
+            'long fragment cut at 60 chars' => [
+                'ALTER TABLE ibl_plr ADD COLUMN some_long_column_name INT NOT NULL DEFAULT 0;',
+                'ALTER TABLE ibl_plr ADD COLUMN some_long_column_name INT NOT',
+            ],
         ];
     }
 
@@ -536,6 +582,43 @@ final class MigrationRunnerTest extends TestCase
         );
 
         $runner->getVanishedUndoPlan();
+    }
+
+    public function testUndoPlanRefusesByteIdenticalRenameAmongSeveralFiles(): void
+    {
+        $body = 'UPDATE t SET a = 1;';
+        file_put_contents($this->tempDir . '/08_other.sql', 'UPDATE t SET a = 2;');
+        file_put_contents($this->tempDir . '/09_renamed.sql', $body);
+        $this->appliedRows = [
+            ['id' => 1, 'migration' => '01_gone.sql', 'hasDown' => true, 'upSha256' => hash('sha256', $body)],
+        ];
+
+        $runner = new MigrationRunner($this->stubRepository, $this->fileResolver);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageIsOrContains(
+            'Cannot auto-revert: 01_gone.sql has the same contents as 09_renamed.sql. Restore the old file name.',
+        );
+
+        $runner->getVanishedUndoPlan();
+    }
+
+    public function testUndoVanishedRefusesWhitespaceOnlyStoredDown(): void
+    {
+        $this->appliedRows = [
+            ['id' => 3, 'migration' => '02_b.sql', 'hasDown' => true, 'upSha256' => hash('sha256', 'b')],
+        ];
+        $this->storedDowns = [3 => "  \n\t"];
+
+        $runner = new MigrationRunner($this->stubRepository, $this->fileResolver);
+
+        try {
+            $runner->undoVanished();
+            self::fail('Expected RuntimeException');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('No stored down SQL for 02_b.sql.', $e->getMessage());
+            $this->assertSame([], $this->undoCalls);
+        }
     }
 
     public function testUndoPlanRefusesMissingChecksum(): void

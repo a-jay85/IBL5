@@ -62,6 +62,15 @@ final class MigrationFileResolverTest extends TestCase
         $this->assertSame(['01_a.sql'], $resolver->getAvailableMigrations());
     }
 
+    public function testUpperCaseDownSqlFilesAreNotMigrations(): void
+    {
+        touch($this->tempDir . '/01_a.sql');
+        touch($this->tempDir . '/02_B.DOWN.SQL');
+
+        $resolver = new MigrationFileResolver($this->tempDir);
+        $this->assertSame(['01_a.sql'], $resolver->getAvailableMigrations());
+    }
+
     public function testGetDownFilenameFindsPartner(): void
     {
         touch($this->tempDir . '/01_a.sql');

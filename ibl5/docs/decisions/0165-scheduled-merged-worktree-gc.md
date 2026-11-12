@@ -101,3 +101,5 @@ The tick stops a worktree's Docker stack when nobody has used it for a while. Th
 | Running worktree stack, no live work | WT_GC_STOP_IDLE_STACKS | WT_GC_STACK_IDLE_HOURS (24, hours since the php container started) | none (stop deletes nothing) |
 
 The step reads `.wt-slug` files under the worktrees parent, so it never sees the main stack. It keeps any worktree where `_gc_live_work` finds work or fails. It stops through `bin/wt-down --stop`. Automouse calls the same command when it moves a plan to skipped/. `bin/wt-up` still gives a fresh DB. To resume a stopped stack with its DB, start its containers with `docker start`.
+
+A stopped stack's containers are exited containers. The stopped-container step removes them after `WT_GC_CONTAINER_DAYS` (14), archiving their inspect JSON first. The volumes stay. After that, `docker start` has nothing to start, and `bin/wt-up` recreates the containers with a fresh DB. `--stop` leaves browser-sync running, so a stopped stack can leave a host browser-sync process behind.

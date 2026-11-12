@@ -98,8 +98,17 @@ teardown_worktree() {
     local project
     project=$(wt_project_name "$slug")
 
-    # Stop browser-sync if running (also on --stop: it proxies to the
-    # containers being stopped and deletes no data).
+    if [ "$STOP" = true ]; then
+        # Stop-only: containers, images, volumes and .wt-slug all stay.
+        # Runs before the browser-sync block: stop mode never kills host processes.
+        wt_compose_export "$slug" "$wt_path"
+        echo "Stopping (keeping volumes): $slug (worktree: $wt_name, project: $project)..."
+        wt_compose "$project" stop
+        echo "  Done."
+        return
+    fi
+
+    # Stop browser-sync if running
     local bs_pid_file="$wt_path/.bs-sync.pid"
     if [ -f "$bs_pid_file" ]; then
         local bs_pid
@@ -107,15 +116,6 @@ teardown_worktree() {
         kill -9 "$bs_pid" 2>/dev/null || true
         rm -f "$bs_pid_file" "$wt_path/.bs-sync.log"
         echo "  Stopped browser-sync (PID $bs_pid)"
-    fi
-
-    if [ "$STOP" = true ]; then
-        # Stop-only: containers, images, volumes and .wt-slug all stay.
-        wt_compose_export "$slug" "$wt_path"
-        echo "Stopping (keeping volumes): $slug (worktree: $wt_name, project: $project)..."
-        wt_compose "$project" stop
-        echo "  Done."
-        return
     fi
 
     # Export vars so Docker Compose can interpolate the static compose file

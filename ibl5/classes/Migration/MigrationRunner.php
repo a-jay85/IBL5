@@ -135,6 +135,14 @@ class MigrationRunner implements MigrationRunnerInterface
             );
         }
 
+        $nonDml = self::findNonDmlStatement($downSql);
+
+        if ($nonDml !== null) {
+            throw new \RuntimeException(
+                "Down file must hold only INSERT, UPDATE or DELETE: {$downName} ({$nonDml})",
+            );
+        }
+
         $sha = @hash_file('sha256', $this->fileResolver->getFullPath($filename));
 
         if ($sha === false) {
@@ -147,6 +155,172 @@ class MigrationRunner implements MigrationRunnerInterface
     }
 
     /**
+     * Find the first statement in a down-SQL text that is not INSERT, UPDATE or DELETE.
+     *
+     * Whole-line `--` comments are removed, then the text is split on every `;`.
+     * A `;` inside a string literal causes a false refusal, so down files keep
+     * `;` out of literals.
+     *
+     * @return string|null Null when every statement is DML, else the first 60
+     *         characters of the offending fragment ('(no statements)' when empty)
+     */
+    public static function findNonDmlStatement(string $sql): ?string
+    {
+        $stripped = preg_replace('/^\s*--.*$/m', '', $sql);
+        $text = $stripped ?? $sql;
+
+        $fragments = [];
+        foreach (explode(';', $text) as $fragment) {
+            $fragment = trim($fragment);
+            if ($fragment !== '') {
+                $fragments[] = $fragment;
+            }
+        }
+
+        if ($fragments === []) {
+            return '(no statements)';
+        }
+
+        foreach ($fragments as $fragment) {
+            if (preg_match('/^(insert|update|delete)\b/i', $fragment) !== 1) {
+                return substr($fragment, 0, 60);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @see MigrationRunnerInterface::getVanishedUndoPlan()
+     */
+    public function getVanishedUndoPlan(): array
+    {
+        if (!$this->repository->supportsDownSql()) {
+            return [];
+        }
+
+        $rows = $this->repository->getAppliedDownStates();
+
+        $first = null;
+        foreach ($rows as $index => $row) {
+            if ($row['hasDown'] && $this->isVanished($row['migration'])) {
+                $first = $index;
+                break;
+            }
+        }
+
+        if ($first === null) {
+            return [];
+        }
+
+        $hashes = $this->currentUpHashes();
+        $plan = [];
+
+        foreach (array_slice($rows, $first) as $row) {
+            $name = $row['migration'];
+
+            if (!$this->isVanished($name)) {
+                throw new \RuntimeException(
+                    "Cannot auto-revert: {$name} was applied after a reverted migration and its file still exists.",
+                );
+            }
+
+            if (!$row['hasDown']) {
+                throw new \RuntimeException(
+                    "Cannot auto-revert: {$name} is missing from the checkout and has no stored down SQL.",
+                );
+            }
+
+            $sha = $row['upSha256'];
+
+            if ($sha === null || $sha === '') {
+                throw new \RuntimeException(
+                    "Cannot auto-revert: {$name} has no stored checksum.",
+                );
+            }
+
+            if (isset($hashes[$sha])) {
+                throw new \RuntimeException(
+                    "Cannot auto-revert: {$name} has the same contents as {$hashes[$sha]}. Restore the old file name.",
+                );
+            }
+
+            $plan[] = ['id' => $row['id'], 'migration' => $name];
+        }
+
+        return array_reverse($plan);
+    }
+
+    /**
+     * @see MigrationRunnerInterface::undoVanished()
+     */
+    public function undoVanished(): array
+    {
+        $plan = $this->getVanishedUndoPlan();
+
+        $texts = [];
+        foreach ($plan as $row) {
+            $name = $row['migration'];
+            $downSql = $this->repository->getStoredDownSql($row['id']);
+
+            if ($downSql === null || trim($downSql) === '') {
+                throw new \RuntimeException("No stored down SQL for {$name}.");
+            }
+
+            $nonDml = self::findNonDmlStatement($downSql);
+
+            if ($nonDml !== null) {
+                throw new \RuntimeException(
+                    "Stored down SQL for {$name} is not DML-only ({$nonDml}).",
+                );
+            }
+
+            $texts[] = $downSql;
+        }
+
+        $undone = [];
+        foreach ($plan as $index => $row) {
+            $this->repository->undoMigration($row['id'], $texts[$index]);
+            $undone[] = $row['migration'];
+        }
+
+        return $undone;
+    }
+
+    /**
+     * Whether a migration's file is gone from the migrations directory.
+     */
+    private function isVanished(string $name): bool
+    {
+        return !file_exists($this->fileResolver->getFullPath($name));
+    }
+
+    /**
+     * Map the SHA-256 of every current migration file to its file name.
+     *
+     * @return array<string, string> Hex digest => file name
+     * @throws \RuntimeException When a file cannot be hashed
+     */
+    private function currentUpHashes(): array
+    {
+        $hashes = [];
+
+        foreach ($this->fileResolver->getAvailableMigrations() as $name) {
+            $hash = @hash_file('sha256', $this->fileResolver->getFullPath($name));
+
+            if ($hash === false) {
+                throw new \RuntimeException(
+                    "Failed to checksum migration file: {$name}",
+                );
+            }
+
+            $hashes[$hash] = $name;
+        }
+
+        return $hashes;
+    }
+
+    /**
      * Execute a single migration file.
      *
      * @throws \RuntimeException On execution failure
@@ -155,7 +329,7 @@ class MigrationRunner implements MigrationRunnerInterface
     {
         $fullPath = $this->fileResolver->getFullPath($filename);
 
-        if (!file_exists($fullPath)) {
+        if ($this->isVanished($filename)) {
             throw new \RuntimeException(
                 "Migration file not found: {$filename}",
             );

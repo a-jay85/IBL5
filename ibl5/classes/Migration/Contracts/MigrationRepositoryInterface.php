@@ -45,6 +45,34 @@ interface MigrationRepositoryInterface
     public function recordMigrationWithDown(string $filename, int $batch, string $downSql, string $upSha256): void;
 
     /**
+     * Get the down-SQL state of every applied migration, oldest first.
+     *
+     * The down SQL text itself is not read, only whether it is stored.
+     *
+     * @return list<array{id: int, migration: string, hasDown: bool, upSha256: ?string}>
+     */
+    public function getAppliedDownStates(): array;
+
+    /**
+     * Get the down SQL stored for one applied migration row.
+     *
+     * @param int $id The migrations row id
+     * @return string|null The stored text, or null when the row or the value is missing
+     */
+    public function getStoredDownSql(int $id): ?string;
+
+    /**
+     * Run a migration's stored down SQL and delete its migrations row, in one transaction.
+     *
+     * The down SQL must be DML-only because DDL commits implicitly and could not roll back.
+     *
+     * @param int $id The migrations row id
+     * @param string $downSql The stored down SQL to run
+     * @throws \RuntimeException When the down SQL fails or the row cannot be removed
+     */
+    public function undoMigration(int $id, string $downSql): void;
+
+    /**
      * Get the next batch number (max existing batch + 1).
      *
      * @return int The next batch number to use

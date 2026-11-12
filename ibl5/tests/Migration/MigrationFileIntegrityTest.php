@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Migration;
 
 use Migration\MigrationFileResolver;
+use Migration\MigrationRunner;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -102,6 +103,22 @@ final class MigrationFileIntegrityTest extends TestCase
                 '/^-- restores: [a-z0-9_]+(, [a-z0-9_]+)*$/m',
                 $contents,
                 sprintf('Down file "%s" must declare "-- restores: table_a, table_b"', basename($downFile))
+            );
+        }
+    }
+
+    public function testEveryDownFileIsDmlOnly(): void
+    {
+        $downFiles = glob($this->migrationsDir . '/*.down.sql');
+        self::assertNotFalse($downFiles);
+
+        foreach ($downFiles as $downFile) {
+            $contents = file_get_contents($downFile);
+            self::assertIsString($contents);
+
+            self::assertNull(
+                MigrationRunner::findNonDmlStatement($contents),
+                sprintf('Down file "%s" must hold only INSERT, UPDATE or DELETE', basename($downFile))
             );
         }
     }

@@ -55,7 +55,9 @@ class MigrationRepository extends \Database\BaseMysqliRepository implements Migr
             return false;
         }
 
-        return (int) $row['cnt'] === 2;
+        $count = $row['cnt'];
+
+        return is_int($count) && $count === 2;
     }
 
     /**
@@ -71,6 +73,70 @@ class MigrationRepository extends \Database\BaseMysqliRepository implements Migr
             $downSql,
             $upSha256,
         );
+    }
+
+    /**
+     * @see MigrationRepositoryInterface::getAppliedDownStates()
+     */
+    public function getAppliedDownStates(): array
+    {
+        $rows = $this->fetchAll(
+            'SELECT id, migration, (down_sql IS NOT NULL) AS has_down, up_sha256 FROM migrations ORDER BY id',
+        );
+
+        $states = [];
+        foreach ($rows as $row) {
+            $id = $row['id'];
+            $migration = $row['migration'];
+            $upSha256 = $row['up_sha256'];
+
+            $states[] = [
+                'id' => is_int($id) ? $id : 0,
+                'migration' => is_string($migration) ? $migration : '',
+                'hasDown' => $row['has_down'] === 1,
+                'upSha256' => is_string($upSha256) ? $upSha256 : null,
+            ];
+        }
+
+        return $states;
+    }
+
+    /**
+     * @see MigrationRepositoryInterface::getStoredDownSql()
+     */
+    public function getStoredDownSql(int $id): ?string
+    {
+        $row = $this->fetchOne(
+            'SELECT down_sql FROM migrations WHERE id = ?',
+            'i',
+            $id,
+        );
+
+        if ($row === null) {
+            return null;
+        }
+
+        $downSql = $row['down_sql'];
+
+        return is_string($downSql) ? $downSql : null;
+    }
+
+    /**
+     * @see MigrationRepositoryInterface::undoMigration()
+     */
+    public function undoMigration(int $id, string $downSql): void
+    {
+        $this->transactional(function () use ($id, $downSql): void {
+            $this->executeRawSql($downSql);
+
+            $deleted = $this->execute('DELETE FROM migrations WHERE id = ?', 'i', $id);
+
+            if ($deleted !== 1) {
+                throw new \RuntimeException(
+                    "Could not remove migrations row {$id} after its down SQL ran.",
+                );
+            }
+        });
     }
 
     /**

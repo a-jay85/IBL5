@@ -29,6 +29,15 @@ final class MigrationRunnerTest extends TestCase
 
     private bool $supportsDown = true;
 
+    /** @var list<array{id: int, migration: string, hasDown: bool, upSha256: ?string}> Simulates applied migrations rows */
+    private array $appliedRows = [];
+
+    /** @var array<int, string> Stored down SQL keyed by migrations row id */
+    private array $storedDowns = [];
+
+    /** @var list<array{int, string}> Tracks undoMigration calls */
+    private array $undoCalls = [];
+
     private int $nextBatch = 1;
 
     protected function setUp(): void
@@ -41,6 +50,9 @@ final class MigrationRunnerTest extends TestCase
         $this->executedSql = [];
         $this->recordedDowns = [];
         $this->supportsDown = true;
+        $this->appliedRows = [];
+        $this->storedDowns = [];
+        $this->undoCalls = [];
         $this->nextBatch = 1;
 
         $this->stubRepository = $this->createStubRepository();
@@ -378,6 +390,256 @@ final class MigrationRunnerTest extends TestCase
         $runner->runPending();
     }
 
+    public function testRunPendingRefusesNonDmlDownFile(): void
+    {
+        file_put_contents($this->tempDir . '/001_x.sql', 'UPDATE a SET b = 1;');
+        file_put_contents($this->tempDir . '/001_x.down.sql', 'TRUNCATE TABLE a;');
+
+        $runner = new MigrationRunner($this->stubRepository, $this->fileResolver);
+
+        try {
+            $runner->runPending();
+            self::fail('Expected RuntimeException');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString(
+                'Down file must hold only INSERT, UPDATE or DELETE: 001_x.down.sql (TRUNCATE TABLE a)',
+                $e->getMessage(),
+            );
+            $this->assertSame([], $this->executedSql);
+            $this->assertSame([], $this->recordedMigrations);
+            $this->assertSame([], $this->recordedDowns);
+        }
+    }
+
+    public function testFindNonDmlStatementAcceptsDmlOnly(): void
+    {
+        $sql = "insert ignore into a select * from b;\n-- note\nUPDATE a SET b = 1 WHERE c = 2;\nDELETE FROM a WHERE b = 1;";
+
+        $this->assertNull(MigrationRunner::findNonDmlStatement($sql));
+    }
+
+    /**
+     * @return array<string, array{string, string}>
+     */
+    public static function nonDmlStatementProvider(): array
+    {
+        return [
+            'ddl' => ['DROP TABLE a;', 'DROP TABLE a'],
+            'replace' => ['REPLACE INTO a SELECT * FROM b;', 'REPLACE INTO a SELECT * FROM b'],
+            'keyword prefix near miss' => ['INSERTS INTO a VALUES (1);', 'INSERTS INTO a VALUES (1)'],
+            'comment only' => ['-- only a comment', '(no statements)'],
+            'semicolon in literal' => ["INSERT INTO a VALUES ('x; y');", "y')"],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('nonDmlStatementProvider')]
+    public function testFindNonDmlStatementRejectsDdlAndNearMisses(string $sql, string $expectedFragment): void
+    {
+        $this->assertSame($expectedFragment, MigrationRunner::findNonDmlStatement($sql));
+    }
+
+    public function testUndoPlanIsEmptyWhenNoRowHasStoredDownSql(): void
+    {
+        file_put_contents($this->tempDir . '/03_present.sql', 'SELECT 3;');
+        $this->appliedRows = [
+            ['id' => 1, 'migration' => '01_gone.sql', 'hasDown' => false, 'upSha256' => null],
+            ['id' => 2, 'migration' => '02_gone.sql', 'hasDown' => false, 'upSha256' => null],
+            ['id' => 3, 'migration' => '03_present.sql', 'hasDown' => false, 'upSha256' => null],
+        ];
+
+        $runner = new MigrationRunner($this->stubRepository, $this->fileResolver);
+
+        $this->assertSame([], $runner->getVanishedUndoPlan());
+    }
+
+    public function testUndoPlanIsEmptyWhenColumnsMissing(): void
+    {
+        $this->supportsDown = false;
+        $this->appliedRows = [
+            ['id' => 1, 'migration' => '01_gone.sql', 'hasDown' => true, 'upSha256' => hash('sha256', 'gone')],
+        ];
+
+        $runner = new MigrationRunner($this->stubRepository, $this->fileResolver);
+
+        $this->assertSame([], $runner->getVanishedUndoPlan());
+    }
+
+    public function testUndoPlanListsNewestRunNewestFirst(): void
+    {
+        file_put_contents($this->tempDir . '/01_a.sql', 'SELECT 1;');
+        $this->appliedRows = [
+            ['id' => 1, 'migration' => '01_a.sql', 'hasDown' => false, 'upSha256' => null],
+            ['id' => 2, 'migration' => 'legacy.sql', 'hasDown' => false, 'upSha256' => null],
+            ['id' => 3, 'migration' => '02_b.sql', 'hasDown' => true, 'upSha256' => hash('sha256', 'b')],
+            ['id' => 4, 'migration' => '03_c.sql', 'hasDown' => true, 'upSha256' => hash('sha256', 'c')],
+        ];
+
+        $runner = new MigrationRunner($this->stubRepository, $this->fileResolver);
+
+        $this->assertSame(
+            [
+                ['id' => 4, 'migration' => '03_c.sql'],
+                ['id' => 3, 'migration' => '02_b.sql'],
+            ],
+            $runner->getVanishedUndoPlan(),
+        );
+    }
+
+    public function testUndoPlanRefusesWhenLaterMigrationStillExists(): void
+    {
+        file_put_contents($this->tempDir . '/02_later.sql', 'SELECT 2;');
+        $this->appliedRows = [
+            ['id' => 1, 'migration' => '01_gone.sql', 'hasDown' => true, 'upSha256' => hash('sha256', 'gone')],
+            ['id' => 2, 'migration' => '02_later.sql', 'hasDown' => false, 'upSha256' => null],
+        ];
+
+        $runner = new MigrationRunner($this->stubRepository, $this->fileResolver);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageIsOrContains(
+            'Cannot auto-revert: 02_later.sql was applied after a reverted migration and its file still exists.',
+        );
+
+        $runner->getVanishedUndoPlan();
+    }
+
+    public function testUndoPlanRefusesVanishedRowWithoutDownAfterCandidate(): void
+    {
+        $this->appliedRows = [
+            ['id' => 1, 'migration' => '01_gone.sql', 'hasDown' => true, 'upSha256' => hash('sha256', 'gone')],
+            ['id' => 2, 'migration' => '02_legacy.sql', 'hasDown' => false, 'upSha256' => null],
+        ];
+
+        $runner = new MigrationRunner($this->stubRepository, $this->fileResolver);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageIsOrContains(
+            'Cannot auto-revert: 02_legacy.sql is missing from the checkout and has no stored down SQL.',
+        );
+
+        $runner->getVanishedUndoPlan();
+    }
+
+    public function testUndoPlanRefusesByteIdenticalRename(): void
+    {
+        $body = 'UPDATE t SET a = 1;';
+        file_put_contents($this->tempDir . '/09_renamed.sql', $body);
+        $this->appliedRows = [
+            ['id' => 1, 'migration' => '01_gone.sql', 'hasDown' => true, 'upSha256' => hash('sha256', $body)],
+        ];
+
+        $runner = new MigrationRunner($this->stubRepository, $this->fileResolver);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageIsOrContains(
+            'Cannot auto-revert: 01_gone.sql has the same contents as 09_renamed.sql. Restore the old file name.',
+        );
+
+        $runner->getVanishedUndoPlan();
+    }
+
+    public function testUndoPlanRefusesMissingChecksum(): void
+    {
+        $this->appliedRows = [
+            ['id' => 1, 'migration' => '01_gone.sql', 'hasDown' => true, 'upSha256' => null],
+        ];
+
+        $runner = new MigrationRunner($this->stubRepository, $this->fileResolver);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageIsOrContains('Cannot auto-revert: 01_gone.sql has no stored checksum.');
+
+        $runner->getVanishedUndoPlan();
+    }
+
+    public function testUndoVanishedRunsStoredDownNewestFirst(): void
+    {
+        $this->appliedRows = [
+            ['id' => 3, 'migration' => '02_b.sql', 'hasDown' => true, 'upSha256' => hash('sha256', 'b')],
+            ['id' => 4, 'migration' => '03_c.sql', 'hasDown' => true, 'upSha256' => hash('sha256', 'c')],
+        ];
+        $this->storedDowns = [
+            3 => 'DELETE FROM b;',
+            4 => 'DELETE FROM c;',
+        ];
+
+        $runner = new MigrationRunner($this->stubRepository, $this->fileResolver);
+        $undone = $runner->undoVanished();
+
+        $this->assertSame(['03_c.sql', '02_b.sql'], $undone);
+        $this->assertSame(
+            [[4, 'DELETE FROM c;'], [3, 'DELETE FROM b;']],
+            $this->undoCalls,
+        );
+    }
+
+    public function testUndoVanishedChangesNothingWhenGuardRefuses(): void
+    {
+        file_put_contents($this->tempDir . '/02_later.sql', 'SELECT 2;');
+        $this->appliedRows = [
+            ['id' => 1, 'migration' => '01_gone.sql', 'hasDown' => true, 'upSha256' => hash('sha256', 'gone')],
+            ['id' => 2, 'migration' => '02_later.sql', 'hasDown' => false, 'upSha256' => null],
+        ];
+        $this->storedDowns = [1 => 'DELETE FROM a;'];
+
+        $runner = new MigrationRunner($this->stubRepository, $this->fileResolver);
+
+        try {
+            $runner->undoVanished();
+            self::fail('Expected RuntimeException');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('Cannot auto-revert: 02_later.sql', $e->getMessage());
+            $this->assertSame([], $this->undoCalls);
+        }
+    }
+
+    public function testUndoVanishedRefusesStoredDdlBeforeRunningAnything(): void
+    {
+        $this->appliedRows = [
+            ['id' => 3, 'migration' => '02_b.sql', 'hasDown' => true, 'upSha256' => hash('sha256', 'b')],
+            ['id' => 4, 'migration' => '03_c.sql', 'hasDown' => true, 'upSha256' => hash('sha256', 'c')],
+        ];
+        $this->storedDowns = [
+            3 => 'DROP TABLE x;',
+            4 => 'DELETE FROM c;',
+        ];
+
+        $runner = new MigrationRunner($this->stubRepository, $this->fileResolver);
+
+        try {
+            $runner->undoVanished();
+            self::fail('Expected RuntimeException');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString(
+                'Stored down SQL for 02_b.sql is not DML-only (DROP TABLE x)',
+                $e->getMessage(),
+            );
+            $this->assertSame([], $this->undoCalls);
+        }
+    }
+
+    public function testMigrateUndoesVanishedBeforeNothingToMigrateExit(): void
+    {
+        // phpunit-hygiene-allow: bin/migrate is a script with no callable seam
+        $script = file_get_contents(dirname(__DIR__, 2) . '/bin/migrate');
+        $this->assertIsString($script);
+
+        $marker = '// Default: run all pending migrations';
+        $markerPos = strpos($script, $marker);
+        $this->assertIsInt($markerPos);
+        $tail = substr($script, $markerPos);
+
+        $guardPos = strpos($tail, '$repository->hasSeededMigrations()');
+        $undoPos = strpos($tail, '$runner->undoVanished()');
+        $exitPos = strpos($tail, 'Nothing to migrate.');
+
+        $this->assertIsInt($guardPos);
+        $this->assertIsInt($undoPos);
+        $this->assertIsInt($exitPos);
+        $this->assertLessThan($undoPos, $guardPos);
+        $this->assertLessThan($exitPos, $undoPos);
+    }
+
     public function testFormatPhpOutputPrefixesEveryLine(): void
     {
         $this->assertSame(
@@ -418,6 +680,17 @@ final class MigrationRunnerTest extends TestCase
         $stub->method('recordMigrationWithDown')
             ->willReturnCallback(function (string $filename, int $batch, string $downSql, string $upSha256): void {
                 $this->recordedDowns[] = [$filename, $batch, $downSql, $upSha256];
+            });
+
+        $stub->method('getAppliedDownStates')
+            ->willReturnCallback(fn(): array => $this->appliedRows);
+
+        $stub->method('getStoredDownSql')
+            ->willReturnCallback(fn(int $id): ?string => $this->storedDowns[$id] ?? null);
+
+        $stub->method('undoMigration')
+            ->willReturnCallback(function (int $id, string $downSql): void {
+                $this->undoCalls[] = [$id, $downSql];
             });
 
         $stub->method('executeRawSql')

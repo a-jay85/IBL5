@@ -1,0 +1,25 @@
+{
+ "run": "live-prefire-matrix-cwd-and-fleet-env-20261106-184249-14612",
+ "bucket": "posted-no-thread",
+ "targets": [
+  2,
+  11
+ ],
+ "findings": [
+  {
+   "path": "bin/check-plan",
+   "line": 2134,
+   "score": 100,
+   "source": "code-review",
+   "agent": "A",
+   "title": "`[[ \"$_cw_seg\" =~ $_cw_subcd_re ]] && break` runs after the prefix-stripping loo",
+   "detail": "`[[ \"$_cw_seg\" =~ $_cw_subcd_re ]] && break` runs after the prefix-stripping loop, so the assignment branch has already removed the `$(cd` it needs to detect."
+  }
+ ],
+ "posted": [
+  0
+ ],
+ "open_threads": [],
+ "thread_fetch_failed": false,
+ "expect_unthreaded_items": 1
+}

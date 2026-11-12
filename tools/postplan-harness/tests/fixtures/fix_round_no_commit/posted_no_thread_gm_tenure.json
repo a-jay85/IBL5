@@ -1,0 +1,25 @@
+{
+ "run": "live-gm-tenure-trigger-display-name-20261110-123026-7881",
+ "bucket": "posted-no-thread",
+ "targets": [
+  2,
+  11
+ ],
+ "findings": [
+  {
+   "path": "ibl5/migrations/207_gm_tenure_trigger_display_name.sql",
+   "line": 0,
+   "score": 87,
+   "source": "code-review",
+   "agent": "A",
+   "title": "The backfill only renames each franchise's open tenure to owner_name.",
+   "detail": "The backfill only renames each franchise's open tenure to owner_name."
+  }
+ ],
+ "posted": [
+  0
+ ],
+ "open_threads": [],
+ "thread_fetch_failed": false,
+ "expect_unthreaded_items": 1
+}

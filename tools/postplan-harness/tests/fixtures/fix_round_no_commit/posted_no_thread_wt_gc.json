@@ -1,0 +1,25 @@
+{
+ "run": "live-wt-gc-stop-idle-stacks-20261111-233639-85434",
+ "bucket": "posted-no-thread",
+ "targets": [
+  2,
+  11
+ ],
+ "findings": [
+  {
+   "path": "bin/lib/wt-gc-reap.sh",
+   "line": 1290,
+   "score": 100,
+   "source": "code-review",
+   "agent": "A",
+   "title": "`if _gc_do \"$WT_GC_REPO_ROOT/bin/wt-down\" --stop \"$name\"; then` leaves the stack",
+   "detail": "`if _gc_do \"$WT_GC_REPO_ROOT/bin/wt-down\" --stop \"$name\"; then` leaves the stack's containers in the stopped state."
+  }
+ ],
+ "posted": [
+  0
+ ],
+ "open_threads": [],
+ "thread_fetch_failed": false,
+ "expect_unthreaded_items": 1
+}

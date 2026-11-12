@@ -1,0 +1,32 @@
+{
+ "run": "live-postplan-conflict-summary-sticky-20261106-110128-7280",
+ "bucket": "reply-only",
+ "targets": [
+  2,
+  11
+ ],
+ "findings": [
+  {
+   "path": "tools/postplan-harness/harness/conflict_report.py",
+   "line": 463,
+   "score": 100,
+   "source": "code-review",
+   "agent": "A",
+   "title": "false-dropped-claim-after-rewrite",
+   "detail": "`return _block(HEADING, DROPPED_LINE)` says \"None of it remains on this branch\" based only on SHA ancestry."
+  }
+ ],
+ "posted": [
+  0
+ ],
+ "open_threads": [
+  {
+   "commentId": 4496517286,
+   "finding": 0,
+   "gate_held": false,
+   "outdated": true
+  }
+ ],
+ "thread_fetch_failed": false,
+ "expect_unthreaded_items": 0
+}

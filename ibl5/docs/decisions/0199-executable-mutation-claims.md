@@ -79,3 +79,5 @@ before. The audit log names which path ran. The fix round's proof run always run
 The dependency set is the paths the command names. A rebase that changes a file the
 check reaches only indirectly, such as a class the named test imports, does not force a
 fresh run. CI still runs the test suites on every push.
+
+**Superseded in part by:** ADR-0244. CI's required Plan checks job now runs the non-DB matrix rows and the executable mutations; the local gate keeps only the DB rows.

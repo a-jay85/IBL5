@@ -167,7 +167,7 @@ def test_send_mail_transport_line_is_one_way():
 
 def test_send_mail_php_attribute_is_one_way():
     body = [
-        "+    #[\\Override]",
+        r"+    #[\Override]",
         "     public function send(string $to, string $subject, string $body, string $fromEmail, string $fromName = ''): bool",
         "     {",
     ]

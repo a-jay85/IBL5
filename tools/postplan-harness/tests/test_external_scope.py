@@ -153,7 +153,7 @@ def test_shell_comment_is_quiet():
 
 def test_php_attribute_fires():
     body = [
-        "+    #[\\Override]",
+        r"+    #[\Override]",
         "     public function send(string $to, string $subject, string $body, string $fromEmail, string $fromName = ''): bool",
     ]
     assert external_send_change(MAIL, _section(MAIL, 30, body)) == "send-change"

@@ -251,6 +251,21 @@ prefire_phpunit_map_source() { # <repo-relative source path> <list-file>
     [ "$rc" -le 1 ]
 }
 
+# Succeeds when the changed class is one that other classes build on: it declares
+# an abstract class, trait or interface, or another class extends it. Tests of
+# the subclasses and users need not name it, so name-matching would skip them.
+prefire_phpunit_is_shared_base() { # <repo-relative source path>
+    local src="$1" name
+    name="${src##*/}"; name="${name%.php}"
+    if [ -f "$src" ] && command grep -qE '^[[:space:]]*((abstract|final|readonly)[[:space:]]+)*(abstract[[:space:]]+class|trait|interface)[[:space:]]' "$src"; then
+        return 0
+    fi
+    if [ -d ibl5/classes ] && command grep -rqE --include='*.php' "(extends|implements)[^{]*[[:space:],\\\\]${name}([[:space:],{]|\$)" ibl5/classes; then
+        return 0
+    fi
+    return 1
+}
+
 # A path outside ibl5/ adds every test that names it by its repo-relative path.
 prefire_phpunit_map_path_ref() { # <repo-relative path> <list-file>
     local rc
@@ -295,6 +310,9 @@ prefire_phpunit_select() { # <list-file>
             ibl5/classes/*.php|ibl5/phpstan-rules/*.php)
                 php_changed=1
                 if [ "$status" = D ]; then phpunit_full "source file deleted: $path"; break; fi
+                if prefire_phpunit_is_shared_base "$path"; then
+                    phpunit_full "shared base (abstract class, trait, interface, or extended class): $path"; break
+                fi
                 before=$(wc -l < "$out" | tr -d ' ')
                 prefire_phpunit_map_source "$path" "$out" || { phpunit_full "cannot search ibl5/tests for $path"; break; }
                 after=$(wc -l < "$out" | tr -d ' ')

@@ -86,6 +86,30 @@ EOF
     export PREFIRE_EXCLUDES_CMD="$D/stubs/excludes"
 }
 
+# subset_case: new_case plus a committed class/test tree on master, then branch feat.
+# Auto mode: PREFIRE_PHPUNIT_FULL unset.
+subset_case() {
+    new_case
+    unset PREFIRE_PHPUNIT_FULL
+    (
+        cd "$R" || exit 1
+        mkdir -p ibl5/classes/Foo ibl5/tests/Foo ibl5/tests/Other ibl5/tests/WideUnit
+        printf '<?php\nclass Bar {}\n' > ibl5/classes/Foo/Bar.php
+        printf '<?php\nclass Lonely {}\n' > ibl5/classes/Foo/Lonely.php
+        printf '<?php\nclass Team {}\n' > ibl5/classes/Team.php
+        printf '<?php\nclass BarTest { function t() { new Bar(); } }\n' > ibl5/tests/Foo/BarTest.php
+        printf '<?php\nclass OldTest {}\n' > ibl5/tests/Foo/OldTest.php
+        printf '<?php\nclass UsesBarTest { function t() { Bar::x(); } }\n' > ibl5/tests/Other/UsesBarTest.php
+        printf '<?php\nclass UnrelatedTest {}\n' > ibl5/tests/Other/UnrelatedTest.php
+        printf '<?php\n// root-class test\n' > ibl5/tests/TeamTest.php
+        printf '<?php\nabstract class WideUnitTestCase {}\n' > ibl5/tests/WideUnit/WideUnitTestCase.php
+        printf '<?php\n' > ibl5/tests/bootstrap.php
+        printf '<phpunit/>\n' > ibl5/phpunit.xml
+        printf '{}\n' > ibl5/composer.lock
+        git add -A && git commit -q -m tree && git checkout -q -b feat
+    ) || { echo "HARNESS-SETUP: subset fixture failed" >&2; exit 2; }
+}
+
 # write_plan <row-line>...  — each argument is a full table row.
 write_plan() {
     {
@@ -931,6 +955,260 @@ test_base_without_value_exits_2() {
 }
 
 # ---------------------------------------------------------------------------
+# PHPUnit test selection (plan prefire-phpunit-changed-files rows 5-28)
+# ---------------------------------------------------------------------------
+touch_file() { # <repo-relative path>: append a line, creating the file if needed
+    mkdir -p "$(dirname "$R/$1")"
+    printf '// edit\n' >> "$R/$1"
+}
+commit_all() { (cd "$R" && git add -A && git commit -q -m "$1"); }
+
+test_phpunit_subset_runs_mapped_class_tests() {
+    subset_case
+    touch_file ibl5/classes/Foo/Bar.php
+    run_gate --stage phpunit
+    want_rc 0
+    want_out "phpunit mode: subset (2 test files)"
+    want_args "2:tests/Foo/BarTest.php tests/Other/UsesBarTest.php"
+}
+
+test_phpunit_root_class_maps_top_level_test() {
+    subset_case
+    touch_file ibl5/classes/Team.php
+    run_gate --stage phpunit
+    want_rc 0
+    want_args "1:tests/TeamTest.php"
+}
+
+test_phpunit_subset_runs_changed_test_file() {
+    subset_case
+    touch_file ibl5/tests/Other/UnrelatedTest.php
+    commit_all "edit unrelated test"
+    run_gate --stage phpunit
+    want_rc 0
+    want_args "1:tests/Other/UnrelatedTest.php"
+}
+
+test_phpunit_untracked_test_included() {
+    subset_case
+    printf '<?php\nclass NewTest {}\n' > "$R/ibl5/tests/Other/NewTest.php"
+    run_gate --stage phpunit
+    want_rc 0
+    want_args "1:tests/Other/NewTest.php"
+}
+
+test_phpunit_deleted_test_not_passed() {
+    subset_case
+    (cd "$R" && git rm -q ibl5/tests/Foo/OldTest.php)
+    touch_file ibl5/tests/Foo/BarTest.php
+    run_gate --stage phpunit
+    want_rc 0
+    want_args "1:tests/Foo/BarTest.php"
+    refute_out "OldTest"
+}
+
+test_phpunit_bootstrap_change_runs_full() {
+    subset_case
+    touch_file ibl5/tests/bootstrap.php
+    run_gate --stage phpunit
+    want_rc 0
+    want_out "phpunit mode: full (shared PHPUnit input changed: ibl5/tests/bootstrap.php)"
+    want_args "0:"
+}
+
+test_phpunit_phpunit_xml_change_runs_full() {
+    subset_case
+    touch_file ibl5/phpunit.xml
+    run_gate --stage phpunit
+    want_rc 0
+    want_out "phpunit mode: full (shared PHPUnit input changed: ibl5/phpunit.xml)"
+    want_args "0:"
+}
+
+test_phpunit_composer_lock_change_runs_full() {
+    subset_case
+    touch_file ibl5/composer.lock
+    run_gate --stage phpunit
+    want_rc 0
+    want_out "phpunit mode: full (shared PHPUnit input changed: ibl5/composer.lock)"
+    want_args "0:"
+}
+
+test_phpunit_shared_helper_change_runs_full() {
+    subset_case
+    touch_file ibl5/tests/WideUnit/WideUnitTestCase.php
+    run_gate --stage phpunit
+    want_rc 0
+    want_out "phpunit mode: full (shared test helper or fixture changed: ibl5/tests/WideUnit/WideUnitTestCase.php)"
+    want_args "0:"
+}
+
+test_phpunit_no_php_change_skips() {
+    subset_case
+    touch_file bin/foo
+    touch_file README.md
+    touch_file ibl5/tests/e2e/x.spec.ts
+    commit_all "non-phpunit changes"
+    run_gate --stage phpunit
+    want_rc 0
+    want_out "phpunit mode: skipped (no PHPUnit-relevant file changed against master)"
+    want_cnt phpunit 0
+}
+
+test_phpunit_empty_range_skips() {
+    subset_case
+    run_gate --stage phpunit
+    want_rc 0
+    want_out "phpunit mode: skipped"
+    want_cnt phpunit 0
+}
+
+test_phpunit_bad_base_runs_full() {
+    subset_case
+    touch_file ibl5/classes/Foo/Bar.php
+    run_gate_nobase --base no-such-ref --stage phpunit
+    want_rc 0
+    want_out "phpunit mode: full (cannot resolve base 'no-such-ref')"
+    want_args "0:"
+}
+
+test_phpunit_empty_map_with_php_change_runs_full() {
+    subset_case
+    touch_file ibl5/classes/Foo/Lonely.php
+    run_gate --stage phpunit
+    want_rc 0
+    want_out "phpunit mode: full (no test file maps to the changed PHP)"
+    want_args "0:"
+}
+
+test_phpunit_deleted_source_runs_full() {
+    subset_case
+    (cd "$R" && git rm -q ibl5/classes/Foo/Bar.php)
+    run_gate --stage phpunit
+    want_rc 0
+    want_out "phpunit mode: full (source file deleted: ibl5/classes/Foo/Bar.php)"
+    want_args "0:"
+}
+
+test_phpunit_subset_red_exits_1() {
+    subset_case
+    touch_file ibl5/classes/Foo/Bar.php
+    export STUB_PHPUNIT_RC=1
+    run_gate --stage phpunit
+    unset STUB_PHPUNIT_RC
+    want_rc 1
+    want_out "FAIL phpunit: subset of 2 test files red"
+    [ -z "$(pass_files '\.phpunit.*\.pass$')" ] || note "a phpunit pass record was written for a red subset"
+}
+
+test_phpunit_missing_binary_exits_3() {
+    subset_case
+    touch_file ibl5/classes/Foo/Bar.php
+    unset PREFIRE_PHPUNIT_CMD
+    rm "$R/ibl5/vendor/bin/phpunit"
+    run_gate --stage phpunit
+    want_rc 3
+    want_out "prerequisite missing"
+}
+
+test_phpunit_subset_cache_hit() {
+    subset_case
+    touch_file ibl5/classes/Foo/Bar.php
+    run_gate --stage phpunit
+    want_rc 0
+    run_gate --stage phpunit
+    want_rc 0
+    want_out "phpunit mode: subset"
+    want_out "phpunit pass cached"
+    want_cnt phpunit 1
+}
+
+test_phpunit_force_full_env() {
+    subset_case
+    touch_file ibl5/classes/Foo/Bar.php
+    export PREFIRE_PHPUNIT_FULL=1
+    run_gate --stage phpunit
+    want_rc 0
+    want_out "phpunit mode: full (PREFIRE_PHPUNIT_FULL=1)"
+    want_args "0:"
+}
+
+test_phpunit_force_full_env_unset_is_auto() {
+    subset_case
+    touch_file ibl5/classes/Foo/Bar.php
+    unset PREFIRE_PHPUNIT_FULL
+    run_gate --stage phpunit
+    want_rc 0
+    want_out "phpunit mode: subset"
+}
+
+test_phpunit_force_full_env_empty_is_auto() {
+    subset_case
+    touch_file ibl5/classes/Foo/Bar.php
+    export PREFIRE_PHPUNIT_FULL=
+    run_gate --stage phpunit
+    want_rc 0
+    want_out "phpunit mode: subset"
+}
+
+test_phpunit_force_full_env_invalid_exits_2() {
+    subset_case
+    export PREFIRE_PHPUNIT_FULL=yes
+    run_gate --stage phpunit
+    want_rc 2
+    want_out "PREFIRE_PHPUNIT_FULL must be 1, 0, or unset"
+    want_cnt phpunit 0
+}
+
+# parent edits UnrelatedTest.php, child (stacked on parent) edits BarTest.php.
+stacked_tree() {
+    (
+        cd "$R" || exit 1
+        git checkout -q -b parent
+        printf '// parent edit\n' >> ibl5/tests/Other/UnrelatedTest.php
+        git add -A && git commit -q -m parent
+        git checkout -q -b child
+        printf '// child edit\n' >> ibl5/tests/Foo/BarTest.php
+        git add -A && git commit -q -m child
+        git config branch.child.iblBase parent
+    ) || { echo "HARNESS-SETUP: stacked fixture failed" >&2; exit 2; }
+}
+
+test_phpunit_stacked_iblbase_scopes_diff() {
+    subset_case
+    stacked_tree
+    run_gate_nobase --stage phpunit
+    want_rc 0
+    want_args "1:tests/Foo/BarTest.php"
+}
+
+test_phpunit_base_flag_overrides_iblbase() {
+    subset_case
+    stacked_tree
+    run_gate --stage phpunit
+    want_rc 0
+    want_args "2:tests/Foo/BarTest.php tests/Other/UnrelatedTest.php"
+}
+
+test_phpunit_subset_leaves_worktree_clean() {
+    subset_case
+    touch_file ibl5/classes/Foo/Bar.php
+    local before after logs n=0 f first=""
+    before=$(git -C "$R" status --porcelain)
+    run_gate --stage phpunit
+    after=$(git -C "$R" status --porcelain)
+    want_rc 0
+    [ "$before" = "$after" ] || note "git status changed: before='$before' after='$after'"
+    logs=$(state_dir)
+    for f in "$logs"/*.phpunit.log; do
+        [ -e "$f" ] || continue
+        n=$((n + 1)); first=$(head -n 1 "$f")
+    done
+    [ "$n" -eq 1 ] || note "expected exactly 1 phpunit log, found $n"
+    [ "$first" = "prefire-verify phpunit mode: subset" ] || note "log first line is '$first'"
+}
+
+# ---------------------------------------------------------------------------
 ALL_CASES="
 test_matrix_row_failure_refuses_and_names_row
 test_unrun_row_refuses_without_gate_record
@@ -988,6 +1266,30 @@ test_help_lists_exec_mutations
 test_prompt_impl_runs_three_stages
 test_phpunit_full_run_passes_no_args
 test_base_without_value_exits_2
+test_phpunit_subset_runs_mapped_class_tests
+test_phpunit_root_class_maps_top_level_test
+test_phpunit_subset_runs_changed_test_file
+test_phpunit_untracked_test_included
+test_phpunit_deleted_test_not_passed
+test_phpunit_bootstrap_change_runs_full
+test_phpunit_phpunit_xml_change_runs_full
+test_phpunit_composer_lock_change_runs_full
+test_phpunit_shared_helper_change_runs_full
+test_phpunit_no_php_change_skips
+test_phpunit_empty_range_skips
+test_phpunit_bad_base_runs_full
+test_phpunit_empty_map_with_php_change_runs_full
+test_phpunit_deleted_source_runs_full
+test_phpunit_subset_red_exits_1
+test_phpunit_missing_binary_exits_3
+test_phpunit_subset_cache_hit
+test_phpunit_force_full_env
+test_phpunit_force_full_env_unset_is_auto
+test_phpunit_force_full_env_empty_is_auto
+test_phpunit_force_full_env_invalid_exits_2
+test_phpunit_stacked_iblbase_scopes_diff
+test_phpunit_base_flag_overrides_iblbase
+test_phpunit_subset_leaves_worktree_clean
 "
 
 if [ $# -gt 0 ]; then CASES="$*"; else CASES="$ALL_CASES"; fi

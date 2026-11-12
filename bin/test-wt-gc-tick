@@ -356,6 +356,8 @@ run_tick() {
         WT_GC_REAP_DETACHED=0
         WT_GC_REAP_CLOSED=0
         WT_GC_REAP_LANDED=0
+        WT_GC_REAP_UNBORN=0
+        WT_GC_REAP_POOL_BRANCHES=0
         WT_GC_DROP_STASHES=0
         WT_GC_REF_FALLBACK=0
         WT_GC_REAP_REFS=0
@@ -1626,6 +1628,150 @@ has_branch br/landed || note_err "branch deleted"
 finish_case
 fi
 
+# ── Unborn-HEAD worktree reap and orphan wt-pool branch delete ────────────────
+UB_ON=(WT_GC_REAP_UNBORN=1)
+PB_ON=(WT_GC_REAP_POOL_BRANCHES=1)
+# mk_unborn <name> <branch> <age_days> — a worktree whose HEAD names a branch
+# with no commit: notes/a.md untracked, b.txt staged, dir mtime backdated.
+mk_unborn() {
+    local wt
+    wt="$(wt_dir "$1")"
+    git -C "$ENV_MAIN" worktree add -q --orphan -b "$2" "$wt" >/dev/null 2>&1
+    mkdir -p "$wt/notes"
+    printf 'note\n' > "$wt/notes/a.md"
+    printf 'b\n' > "$wt/b.txt"
+    git -C "$wt" add b.txt
+    touch -t "$(epoch_to_touch "$(epoch_ago "$3")")" "$wt"
+}
+# rt_seen [rt args...] — rt, but pool-orphans.txt (the pool-branches step's
+# previous-sweep sighting file) survives the per-run state wipe.
+rt_seen() {
+    local keep="$CD/pool-orphans.keep"
+    if [ -f "$CD/state/pool-orphans.txt" ]; then cp "$CD/state/pool-orphans.txt" "$keep"; fi
+    rm -f "$CD/docker-argv" "$CD/wt-remove-argv" "$CD/gh-argv"
+    fresh
+    mkdir -p "$CD/state"
+    if [ -f "$keep" ]; then cp "$keep" "$CD/state/pool-orphans.txt"; fi
+    run_tick WT_GC_REPO_ROOT="$ENV_MAIN" WT_GC_WT_STATUS="$STUBBIN/wt-status-rows" \
+        STUB_WT_STATUS_ROWS="$CD/rows" WT_GC_WT_REMOVE="$ENV_MAIN/bin/wt-remove" "$@"
+}
+
+# UB1 — an old unborn worktree is archived as a parentless commit, then removed.
+if should_run UB1-unborn-reaped; then
+fx UB1-unborn-reaped
+mk_unborn ub-old br/ub-old 5
+rt "${UB_ON[@]}" -- --force
+chk_rc UB1 0
+log_has 'step unborn threshold=3d' || note_err "no step line"
+log_has 'unborn reaped ub-old branch=br/ub-old age=5d archive=[0-9a-f]{40}' || note_err "no reaped line"
+SNAP="$(sed -n 's/.*unborn reaped ub-old .*archive=\([0-9a-f]\{40\}\).*/\1/p' "$(LOG)")"
+[ -n "$SNAP" ] || note_err "no archive sha in the log"
+KEEP="$(git -C "$ENV_MAIN" for-each-ref --format='%(refname) %(objectname)' refs/wt-gc-archive/)"
+grep -qE "^refs/wt-gc-archive/[0-9]+/heads/br/ub-old $SNAP\$" <<< "$KEEP" || note_err "no keep-ref at the snapshot"
+PARENTS="$(git -C "$ENV_MAIN" rev-list --parents -n1 "$SNAP" 2>/dev/null)"
+[ "$(wc -w <<< "$PARENTS" | tr -d ' ')" = 1 ] || note_err "snapshot has a parent: $PARENTS"
+FILES="$(git -C "$ENV_MAIN" ls-tree -r --name-only "$SNAP" 2>/dev/null)"
+grep -qxF 'notes/a.md' <<< "$FILES" || note_err "notes/a.md not in the snapshot"
+grep -qxF 'b.txt' <<< "$FILES" || note_err "b.txt not in the snapshot"
+tips_has "$SNAP refs/heads/br/ub-old" || note_err "tips lacks the snapshot"
+[ "$(cat "$CD/wt-remove-argv" 2>/dev/null)" = "$(printf 'ub-old\n--volumes')" ] || note_err "wt-remove argv not exactly ub-old --volumes"
+[ -d "$(wt_dir ub-old)" ] && note_err "worktree still present"
+log_has 'reap done steps_failed=0' || note_err "a step failed"
+finish_case
+fi
+
+# UB2 — every reason to keep an unborn worktree: young, pool slot, live work.
+# A normal committed worktree is no candidate.
+if should_run UB2-unborn-kept; then
+fx UB2-unborn-kept
+mk_unborn ub-young br/ub-young 2
+mk_unborn _pool-9 wt-pool/9 5
+mk_unborn ub-live br/ub-live 5
+mk_registry "$CD/registry.json" br/ub-live
+mk_wt ub-norm br/ub-norm ahead=1 age_days=5
+rt "${UB_ON[@]}" -- --force
+chk_rc UB2 0
+log_has 'unborn keep ub-young: age=2d' || note_err "young not kept"
+log_has 'unborn keep _pool-9: pool worktree' || note_err "pool slot not kept"
+log_has 'unborn keep ub-live: live work' || note_err "live work not kept"
+log_has 'unborn (keep|reaped) ub-norm' && note_err "a committed worktree was considered"
+[ -f "$CD/wt-remove-argv" ] && note_err "wt-remove ran for a kept worktree"
+for n in ub-young _pool-9 ub-live; do
+    [ -f "$(wt_dir "$n")/notes/a.md" ] || note_err "$n lost an untracked file"
+    [ -f "$(wt_dir "$n")/b.txt" ] || note_err "$n lost a staged file"
+done
+[ -d "$(wt_dir ub-norm)" ] || note_err "committed worktree removed"
+finish_case
+fi
+
+# UB3 — an orphan wt-pool/<N> ref is kept on the first sweep and deleted on the
+# second, after its sha lands in the tips file and a keep-ref.
+if should_run UB3-pool-branch-deleted; then
+fx UB3-pool-branch-deleted
+git -C "$ENV_MAIN" update-ref refs/heads/wt-pool/31 origin/master
+SHA="$(git -C "$ENV_MAIN" rev-parse refs/heads/wt-pool/31)"
+rt_seen "${PB_ON[@]}" -- --force
+chk_rc "UB3 first" 0
+log_has 'step pool-branches' || note_err "no step line"
+log_has 'pool-branches keep refs/heads/wt-pool/31: first sighting' || note_err "no first-sighting line"
+has_branch wt-pool/31 || note_err "deleted on first sighting"
+rt_seen "${PB_ON[@]}" -- --force
+chk_rc "UB3 second" 0
+log_has 'pool-branches deleted refs/heads/wt-pool/31' || note_err "no deleted line"
+has_branch wt-pool/31 && note_err "ref still present"
+tips_has "$SHA refs/heads/wt-pool/31" || note_err "tips lacks the sha"
+KEEP="$(git -C "$ENV_MAIN" for-each-ref --format='%(refname) %(objectname)' refs/wt-gc-archive/)"
+grep -qE "^refs/wt-gc-archive/[0-9]+/heads/wt-pool/31 $SHA\$" <<< "$KEEP" || note_err "no keep-ref"
+finish_case
+fi
+
+# UB4 — every reason to keep a pool ref, across two sweeps.
+if should_run UB4-pool-branch-kept; then
+fx UB4-pool-branch-kept
+mk_wt _pool-32 wt-pool/32 age_days=1
+mkdir -p "$(wt_dir _pool-33)"
+git -C "$ENV_MAIN" update-ref refs/heads/wt-pool/33 origin/master
+AHEAD="$(git -C "$ENV_MAIN" commit-tree -p origin/master -m ahead 'origin/master^{tree}')"
+git -C "$ENV_MAIN" update-ref refs/heads/wt-pool/34 "$AHEAD"
+git -C "$ENV_MAIN" update-ref refs/heads/wt-pool/feature origin/master
+git -C "$ENV_MAIN" update-ref refs/heads/wt-pool/35 origin/master
+rt_seen "${PB_ON[@]}" -- --force
+chk_rc "UB4 first" 0
+log_has 'pool-branches keep refs/heads/wt-pool/35: first sighting' || note_err "run 1: no first sighting for 35"
+land_on_master
+git -C "$ENV_MAIN" update-ref refs/heads/wt-pool/35 origin/master
+rt_seen "${PB_ON[@]}" -- --force
+chk_rc "UB4 second" 0
+log_has 'pool-branches keep refs/heads/wt-pool/35: first sighting' || note_err "run 2: a moved sha was not a first sighting"
+log_has 'pool-branches keep refs/heads/wt-pool/33: slot dir exists' || note_err "slot dir not kept"
+log_has 'pool-branches keep refs/heads/wt-pool/34: ahead=1' || note_err "ahead ref not kept"
+log_has 'pool-branches keep refs/heads/wt-pool/feature: not a slot name' || note_err "non-slot name not kept"
+log_has 'pool-branches .*wt-pool/32' && note_err "a checked-out pool ref was considered"
+log_has 'pool-branches deleted' && note_err "something was deleted"
+for b in wt-pool/32 wt-pool/33 wt-pool/34 wt-pool/feature wt-pool/35; do
+    has_branch "$b" || note_err "$b deleted"
+done
+finish_case
+fi
+
+# UB5 — both switches at 0: neither step runs across two sweeps.
+if should_run UB5-switches-off; then
+fx UB5-switches-off
+mk_unborn ub-old br/ub-old 5
+git -C "$ENV_MAIN" update-ref refs/heads/wt-pool/31 origin/master
+rt_seen WT_GC_REAP_UNBORN=0 WT_GC_REAP_POOL_BRANCHES=0 -- --force
+rt_seen WT_GC_REAP_UNBORN=0 WT_GC_REAP_POOL_BRANCHES=0 -- --force
+chk_rc UB5 0
+log_has 'step unborn threshold' && note_err "unborn step ran with the switch at 0"
+log_has 'step pool-branches$' && note_err "pool-branches step ran with the switch at 0"
+log_has 'step unborn disabled \(WT_GC_REAP_UNBORN=0\)' || note_err "no unborn disabled line"
+log_has 'step pool-branches disabled \(WT_GC_REAP_POOL_BRANCHES=0\)' || note_err "no pool-branches disabled line"
+[ -d "$(wt_dir ub-old)" ] || note_err "worktree removed"
+[ -f "$(wt_dir ub-old)/notes/a.md" ] || note_err "untracked file lost"
+has_branch wt-pool/31 || note_err "pool ref deleted"
+finish_case
+fi
+
 # ── Merged-but-dirty worktree reap ────────────────────────────────────────────
 D_ON=(WT_GC_REAP_DIRTY_MERGED=1)
 # d_wt <name> <dirt> [oid] — MERGED row, cleanup dirty-skip line, gh fixture.
@@ -1756,6 +1902,20 @@ arch_has 1700000000/wt/da1 || note_err "no wt archive ref"
 arch_has 1700000000/heads/da1 || note_err "no heads archive ref"
 [ "$(git -C "$ENV_MAIN" rev-parse refs/wt-gc-archive/1700000000/wt/da1^ 2>/dev/null)" = "$DA_TIP" ] || note_err "snapshot parent is not the tip"
 [ "$(git -C "$ENV_MAIN" show refs/wt-gc-archive/1700000000/wt/da1:README.md 2>/dev/null)" = different ] || note_err "dirt bytes not in archive"
+finish_case
+fi
+
+# UB6 — a snapshot taken with a tip still has exactly one parent (the tip);
+# only an empty tip (unborn HEAD) drops the parent.
+if should_run UB6-snapshot-with-tip-unchanged; then
+fx UB6-snapshot-with-tip-unchanged
+d_wt ub6 diff
+epoch_ago 5 > "$CD/gh/7.json"
+rt "${DA_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
+chk_rc UB6 0
+log_has 'dirty archived-reaped ub6 paths=1' || note_err "not archived-reaped"
+PARENTS="$(git -C "$ENV_MAIN" rev-list --parents -n1 refs/wt-gc-archive/1700000000/wt/ub6 2>/dev/null)"
+[ "$(wc -w <<< "$PARENTS" | tr -d ' ')" = 2 ] || note_err "snapshot does not have exactly one parent: $PARENTS"
 finish_case
 fi
 

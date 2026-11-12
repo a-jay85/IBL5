@@ -4,7 +4,7 @@
 #
 # Applies 000_baseline_schema.sql first (creates all tables), then numbered
 # migrations (001_*, 002_*, 033b_*, etc.) which alter them.
-# Skips .php data migrations (need production data) and .md files.
+# Skips .php data migrations (need production data), .md files and .down.sql partners.
 set -euo pipefail
 trap 'echo "ERROR: Failed applying migration: $(basename "${f:-unknown}")"; exit 1' ERR
 
@@ -14,7 +14,7 @@ MIGRATIONS_DIR="$(cd "${RUN_MIGRATIONS_CI_DIR:-$(dirname "$0")/../migrations}" &
 numbered=()
 for f in "$MIGRATIONS_DIR"/*.sql; do
     base=$(basename "$f")
-    if [[ "$base" =~ ^[0-9]{1,3}[a-z]?_ ]]; then
+    if [[ "$base" =~ ^[0-9]{1,3}[a-z]?_ && "$base" != *.down.sql ]]; then
         numbered+=("$f")
     fi
 done

@@ -58,6 +58,31 @@ final class MigrationRepositoryTest extends TestCase
         $this->assertStringContainsString('003_new.sql', $lastQuery);
     }
 
+    public function testRecordMigrationWithDownBindsFourParameters(): void
+    {
+        $downSql = "-- restores: t\nDELETE FROM t WHERE id = 7;";
+
+        $this->repository->recordMigrationWithDown('003_new.sql', 5, $downSql, str_repeat('a', 64));
+
+        $prepared = $this->db->getPreparedQueries();
+        $this->assertNotSame([], $prepared);
+
+        $lastPrepared = end($prepared);
+        $this->assertStringContainsString('VALUES (?, ?, ?, ?)', $lastPrepared);
+        $this->assertStringNotContainsString($downSql, $lastPrepared);
+        $this->assertSame('siss', $this->db->getLastBoundTypes());
+        $this->assertSame(['003_new.sql', 5, $downSql, str_repeat('a', 64)], $this->db->getLastBoundParams());
+    }
+
+    public function testSupportsDownSqlRequiresBothColumns(): void
+    {
+        $this->db->setMockData([['cnt' => 2]]);
+        $this->assertTrue($this->repository->supportsDownSql());
+
+        $this->db->setMockData([['cnt' => 1]]);
+        $this->assertFalse($this->repository->supportsDownSql());
+    }
+
     public function testGetNextBatchNumberReturnsOneWhenEmpty(): void
     {
         $this->db->setMockData([['next_batch' => 1]]);

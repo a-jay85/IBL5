@@ -126,6 +126,7 @@ $MYSQL $MYSQL_ARGS -e "DROP DATABASE IF EXISTS $DB_NAME; CREATE DATABASE $DB_NAM
 
 echo "==> Applying migrations (000 = baseline schema, then alterations)..."
 for f in "$IBL5_DIR"/migrations/*.sql; do
+    case "$f" in *.down.sql) continue ;; esac
     base=$(basename "$f")
     [[ "$base" =~ ^[0-9]{1,3}[a-z]?_ ]] || continue
     echo "  -> $base"

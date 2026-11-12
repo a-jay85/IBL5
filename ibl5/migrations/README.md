@@ -8,7 +8,7 @@ These migrations improve the IBL5 database schema in a phased approach to minimi
 
 ## Auto-Rollback Compatibility (New Migrations)
 
-The production deploy workflow automatically reverts the last commit if post-deploy smoke tests fail. Because the migration runner is forward-only (no down migrations), a reverted commit deploys old PHP code against the new schema. For this to work safely, **new migrations must be backward-compatible** with the previous PHP version:
+The production deploy workflow automatically reverts the last commit if post-deploy smoke tests fail. The runner never rolls back schema, so a reverted commit deploys old PHP code against the new schema. A reverted data-changing migration that shipped a down file is undone on that deploy (see Down files and automatic undo). For this to work safely, **new migrations must be backward-compatible** with the previous PHP version:
 
 1. **Additive only**: Add columns with `DEFAULT` values or `NULL`; never remove or rename columns in the same deploy as PHP code that reads the new name
 2. **No irreversible data transforms**: Data migrations that destroy the old format cannot be auto-rolled back; use a two-step deploy (schema first, data transform after confirming stability)
@@ -57,6 +57,8 @@ The `migration-safety.yml` workflow includes a **destructive migration scan** (`
 | `delete-no-where` | `DELETE ... FROM` with no `WHERE` anywhere in the statement |
 | `update-no-where` | `UPDATE ... SET` with no `WHERE` anywhere in the statement (`UPDATE ... JOIN` counts; `INSERT ... ON DUPLICATE KEY UPDATE` does not) |
 | `rewrite-no-backup` | `UPDATE ... SET ... WHERE` or `DELETE ... WHERE` on an added line with no earlier backup fill in the same file or no undo script (see Reversible Data-Rewrite Migrations). Diff modes only. |
+| `down-file-missing` | A data-rewrite statement in a `.sql` migration with no `<stem>.down.sql` beside it (see Down files and automatic undo). Diff modes only. |
+| `down-not-dml` | A statement in a `.down.sql` file that is not `INSERT`, `UPDATE` or `DELETE`. Diff modes only. |
 | `narrow-type` | `MODIFY` / `CHANGE` to a narrower type. The old type comes from `ibl5/docs/schema/current-schema.sql`, then a same-file definition; a column the dump does not know fires as unresolved |
 | `drop-recreate-existing` | `DROP TABLE IF EXISTS` + `CREATE TABLE` of a table that already exists in the schema dump, the baseline, or an earlier-numbered migration |
 
@@ -76,7 +78,7 @@ When a destructive operation is intentional and reviewed, add a bypass marker th
 <!-- destructive-migration[update-no-where]: <reason at least 20 characters> -->
 ```
 
-Known tags: `drop-column`, `drop-table`, `truncate`, `rename-column`, `add-not-null-no-default`, `tighten-not-null`, `drop-index`, `rename-table`, `delete-no-where`, `update-no-where`, `narrow-type`, `drop-recreate-existing`, `rewrite-no-backup`. An unknown tag is an error. The reason must be at least 20 characters. Short reasons are rejected.
+Known tags: `drop-column`, `drop-table`, `truncate`, `rename-column`, `add-not-null-no-default`, `tighten-not-null`, `drop-index`, `rename-table`, `delete-no-where`, `update-no-where`, `narrow-type`, `drop-recreate-existing`, `rewrite-no-backup`, `down-file-missing`, `down-not-dml`. An unknown tag is an error. The reason must be at least 20 characters. Short reasons are rejected.
 
 An untagged marker (`-- destructive-migration: <reason>`) is rejected in `--staged` and `--since` modes. `bin/check-destructive-migrations --full-scan` audits every tracked migration and still honours untagged markers, so historical files scan the same as before.
 
@@ -86,7 +88,7 @@ DDL run through a prepared statement is scanned too. For `PREPARE n FROM @v` the
 
 A migration that replaces existing values or deletes rows must keep the old data and ship a way to put it back. Reverting the merge does not undo an applied `UPDATE`. Migration 205 rewrote `ibl_gm_tenures.gm_display_name` with no copy, so its old values are gone.
 
-The destructive scan enforces this with the `rewrite-no-backup` trigger. It runs on added lines (`--staged`, `--since`). `--full-scan` skips it, so applied migrations are not re-judged.
+The destructive scan enforces this with the `rewrite-no-backup` trigger. It runs on added lines (`--staged`, `--since`). `--full-scan` skips it, so applied migrations are not re-judged. The `down-file-missing` and `down-not-dml` triggers run in the same two modes, and `--full-scan` skips them too.
 
 ### What the trigger flags
 
@@ -101,13 +103,14 @@ A `SET` passes as a backfill when its `WHERE` is a plain `AND` chain that holds 
 
 The rewriting file needs both of these for each table it rewrites. In a multi-table `UPDATE` that is each table a `SET` column belongs to. In a multi-table `DELETE` it is each table in the delete list.
 
-1. A backup fill earlier in the same file. This is an `INSERT INTO <name> ... SELECT ... FROM <table>` placed before the rewrite, where `<name>` contains `backup`. Create the table with `CREATE TABLE IF NOT EXISTS ... LIKE`, as migrations 167 and 183 do. The `CREATE` may live in an earlier migration. The fill must live in the rewriting file.
+1. A backup fill earlier in the same file. This is an `INSERT IGNORE INTO <name> ... SELECT ... FROM <table>` placed before the rewrite, where `<name>` contains `backup`. Create the table with `CREATE TABLE IF NOT EXISTS ... LIKE`, as migrations 167 and 183 do. The `CREATE` may live in an earlier migration. The fill must live in the rewriting file.
 2. An undo script in an `undo/` folder beside the migration, named after the migration's stem, for example `ibl5/migrations/undo/NNN_slug.sql` (example).
+3. A down file beside the migration, named `<stem>.down.sql`. New data-rewrite migrations need it (trigger `down-file-missing`). The `undo/` script stays valid for `rewrite-no-backup`, and a down file also meets that trigger's undo-script half.
 
 ```sql
 -- ibl5/migrations/NNN_slug.sql
 CREATE TABLE IF NOT EXISTS my_table_backup_NNN LIKE my_table;
-INSERT INTO my_table_backup_NNN
+INSERT IGNORE INTO my_table_backup_NNN
   SELECT * FROM my_table WHERE status = 'old';
 UPDATE my_table SET status = 'new' WHERE status = 'old';
 ```
@@ -120,6 +123,19 @@ UPDATE my_table, my_table_backup_NNN b
 -- for a DELETE, restore the rows instead:
 -- INSERT IGNORE INTO my_table SELECT * FROM my_table_backup_NNN;
 ```
+
+### Down files and automatic undo
+
+- The file is `NNN_slug.down.sql` beside `NNN_slug.sql`. Every runner skips it as an up migration. `.php` migrations cannot have one.
+- `php ibl5/bin/migrate` stores the down text and the up file's SHA-256 in `migrations.down_sql` and `migrations.up_sha256` when it applies the up. A `git revert` deletes both files, so the stored copy is the only one the undo uses.
+- On each deploy the runner looks for applied rows with stored down SQL whose file is gone. It runs their down SQL newest first, each in one transaction with the delete of its `migrations` row, then applies pending migrations.
+- It stops the deploy with a non-zero exit and changes nothing when a migration applied after a reverted one still exists, when a vanished row inside that run has no stored down SQL, or when a vanished row's checksum matches a current file (a rename). Vanished rows with no stored down SQL that are older than the run are ignored, as before.
+- A down file holds only `INSERT`, `UPDATE` and `DELETE`, with no `;` inside a string literal, and restores only InnoDB tables. Its first line is `-- restores: table_a, table_b`.
+- Backup-table pattern: the up creates the table with `CREATE TABLE IF NOT EXISTS ... LIKE`, fills it with `INSERT IGNORE INTO <backup> SELECT * FROM <table> WHERE ...`, then rewrites. The down restores deleted rows with `INSERT IGNORE INTO <table> SELECT * FROM <backup>` and overwritten values with a joined `UPDATE ... WHERE`. Rows come back with the same primary key (`table_id`). A script that re-inserts typed-in values gives them new ids.
+- A later migration drops the backup table. Until then the pair can be reverted. After it, the guard stops a revert of the older migration because the dropping migration still exists.
+- Never rename, renumber or squash an applied migration that has a down file. The runner stops on a byte-identical rename. It cannot tell an edited rename or a squash from a revert.
+- `bin/predeploy-db-snapshot` dumps the database before any deploy that adds or deletes a migration file. That dump is the backstop.
+- The hand-run undo scripts in `ibl5/scripts/undo/` stay where they are.
 
 ### Undo script rules
 

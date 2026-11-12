@@ -1668,7 +1668,16 @@ done
 
 # Near misses: files the VR job never runs stay off the producer list.
 ui_paths_rc ui_paths_producer_near_misses 1 ibl5/tests/e2e/flows/trade.spec.ts \
-    ibl5/IBLbot/package.json bin/vr-refresh-targets docker-compose.yml ibl5/package-lock.json
+    ibl5/IBLbot/package.json bin/vr-refresh-targets docker-compose.yml ibl5/package-lock.json \
+    .github/actions/setup-php-env/action.yml .github/actions/notify-discord/action.yml
+# The e2e job runs only setup-docker-e2e from .github/actions. Each other local
+# action gets its own case so a regression names the path that broke.
+ui_paths_rc ui_paths_non_vr_action_setup_php_env 1 .github/actions/setup-php-env/action.yml
+ui_paths_rc ui_paths_non_vr_action_notify_discord 1 .github/actions/notify-discord/send.sh
+# Boundaries of the narrowed prefix: a sibling directory whose name starts with
+# setup-docker-e2e stays off the list, and any file inside setup-docker-e2e holds.
+ui_paths_rc ui_paths_actions_sibling_near_miss 1 .github/actions/setup-docker-e2e-v2/action.yml
+ui_paths_rc ui_paths_vr_action_nested_file_holds 0 .github/actions/setup-docker-e2e/scripts/start.sh
 
 # ---- gallery trust: ui_fetch_gallery_gh against a fake gh ----
 # The gallery counts only when the run API shows this PR's own E2E Tests run

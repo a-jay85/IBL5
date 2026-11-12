@@ -81,7 +81,7 @@ harness/
     llm.py                claude -p adapter (single-turn, --tools "", usage-recording)
     ghad.py               RecordingGh — mutations become out/actions.jsonl intents
     gitad.py              LiveGit (push disabled by default) / ReplayGit (fixtures)
-    verify.py             LiveVerify (phpunit/phpstan/go) / ReplayVerify (recorded outputs)
+    verify.py             LiveVerify (phpstan/go; phpunit and shellcheck report ci because CI runs them) / ReplayVerify (recorded outputs)
 tests/                    27 tests (pure logic + live-git tempdir + full replay runs)
 fixtures/scenarios/<slug>/fixture.json   point-in-time inputs from 8 historical runs
 fixtures/reviewer-eval/corpus.json       confirmed bug cases + clean cases scored by bin/reviewer-eval

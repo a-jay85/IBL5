@@ -607,6 +607,29 @@ test_stdin_reading_row_does_not_swallow_later_rows() {
     [ -z "$(pass_files '\.matrix\..*\.pass$')" ] || note "a matrix pass record exists"
 }
 
+test_matrix_repeated_command_runs_once() {
+    new_case
+    write_plan "$(row 1 "echo x >> $CNT/rowA")" \
+               "$(row 2 "echo x >> $CNT/rowB")" \
+               "$(row 3 "echo x >> $CNT/rowA")" \
+               "$(row 4 "echo x >> $CNT/rowA")"
+    run_gate --plan "$PLAN" --stage matrix
+    want_rc 0
+    want_cnt rowA 1
+    want_cnt rowB 1
+    want_out "matrix row 3: same command as an earlier row, already passed"
+}
+
+test_matrix_repeated_failing_command_still_refuses() {
+    new_case
+    write_plan "$(row 1 true)" "$(row 2 "echo x >> $CNT/rowF; exit 7")" \
+               "$(row 3 "echo x >> $CNT/rowF; exit 7")"
+    run_gate --plan "$PLAN" --stage matrix
+    want_rc 1
+    want_out "FAIL matrix row 2 exited 7"
+    want_cnt rowF 1
+}
+
 test_db_probe_does_not_read_callers_stdin() {
     new_case
     write_plan "$(row 1 "echo x >> $CNT/row1; bin/db-query 'SELECT 1'")"
@@ -1288,6 +1311,8 @@ test_post_plan_now_passes_fire_point
 test_help_lists_exec_mutations
 test_prompt_impl_runs_three_stages
 test_phpunit_full_run_passes_no_args
+test_matrix_repeated_command_runs_once
+test_matrix_repeated_failing_command_still_refuses
 test_base_without_value_exits_2
 test_phpunit_subset_runs_mapped_class_tests
 test_phpunit_root_class_maps_top_level_test

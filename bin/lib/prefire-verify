@@ -260,7 +260,7 @@ prefire_phpunit_map_path_ref() { # <repo-relative path> <list-file>
 }
 
 prefire_phpunit_select() { # <list-file>
-    local out="$1" base mb changed status path php_changed=0
+    local out="$1" base mb changed status path php_changed=0 before after
     PHPUNIT_MODE=""; PHPUNIT_REASON=""
     if [ "${PREFIRE_PHPUNIT_FULL:-}" = "1" ]; then phpunit_full "PREFIRE_PHPUNIT_FULL=1"; return 0; fi
     base=$(prefire_phpunit_base)
@@ -295,7 +295,10 @@ prefire_phpunit_select() { # <list-file>
             ibl5/classes/*.php|ibl5/phpstan-rules/*.php)
                 php_changed=1
                 if [ "$status" = D ]; then phpunit_full "source file deleted: $path"; break; fi
+                before=$(wc -l < "$out" | tr -d ' ')
                 prefire_phpunit_map_source "$path" "$out" || { phpunit_full "cannot search ibl5/tests for $path"; break; }
+                after=$(wc -l < "$out" | tr -d ' ')
+                if [ "$after" -le "$before" ]; then phpunit_full "no test file maps to the changed PHP: $path"; break; fi
                 continue ;;
             ibl5/*)
                 phpunit_full "file under ibl5/ with no test mapping: $path"; break ;;

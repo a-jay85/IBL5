@@ -824,9 +824,11 @@ if [ "$W6_GROUP" = 1 ] && grep -qF 'type: boolean' <<< "$W6_INPUT" \
 else
     failcase "W6-hotfix-dispatch-path — group=$W6_GROUP input=[$W6_INPUT] coalesce=[$W6_COALESCE] botwait=[$W6_BOTWAIT] attempts=$W6_ATTEMPTS"
 fi
-# W7: hotfix-dispatch.yml is a pull_request_target workflow with a write token. Pin the
-# defence: no checkout or uses:, actions: write is the only permission, no ${{ }} in run:,
-# label and armed state compared in if:, and the only command is the dispatch.
+# W7: hotfix-dispatch.yml runs on pull_request with an actions: write token. Pin the
+# defence: the trigger is pull_request and never pull_request_target (GitHub blocks
+# that trigger by default for public repos), no checkout or uses:, actions: write is
+# the only permission, no ${{ }} in run:, label and armed state compared in if:, and
+# the only command is the dispatch.
 DISPATCH_WF="${DISPATCH_WF:-$REPO_ROOT/.github/workflows/hotfix-dispatch.yml}"
 W7_USES=$(grep -cE '^[[:space:]]*(-[[:space:]]*)?uses:' "$DISPATCH_WF" || true)
 W7_PERMKEYS=$(grep -cE '^[[:space:]]*permissions:' "$DISPATCH_WF" || true)
@@ -836,32 +838,34 @@ W7_RUNEXPR=$(grep -cE '^[[:space:]]+run:.*(\$\{\{|[|>][[:space:]]*$)' "$DISPATCH
 W7_CMD=$(count_lines 'run: gh workflow run update-behind-prs.yml --ref master -f hotfix=true' "$DISPATCH_WF")
 W7_TRIGGER=$(count_lines 'types: [labeled, auto_merge_enabled]' "$DISPATCH_WF")
 W7_PLAINPR=$(grep -cE '^[[:space:]]+pull_request:' "$DISPATCH_WF" || true)
+W7_PRT=$(grep -cE '^[[:space:]]+pull_request_target:' "$DISPATCH_WF" || true)
 W7_LABEL=$(count_lines "github.event.label.name == 'hotfix'" "$DISPATCH_WF")
 W7_ARMED=$(count_lines 'github.event.pull_request.auto_merge != null' "$DISPATCH_WF")
 W7_ARMEVT=$(count_lines "contains(github.event.pull_request.labels.*.name, 'hotfix')" "$DISPATCH_WF")
 W7_HEAD=$(grep -cE 'head\.(sha|ref|repo)|github\.head_ref' "$DISPATCH_WF" || true)
 if [ "$W7_USES" = 0 ] && [ "$W7_PERMKEYS" = 1 ] && [ "$W7_PERMS" = "  actions: write" ] \
     && [ "$W7_RUNS" = 1 ] && [ "$W7_RUNEXPR" = 0 ] && [ "$W7_CMD" = 1 ] \
-    && [ "$W7_TRIGGER" = 1 ] && [ "$W7_PLAINPR" = 0 ] && [ "$W7_LABEL" = 1 ] \
+    && [ "$W7_TRIGGER" = 1 ] && [ "$W7_PLAINPR" = 1 ] && [ "$W7_PRT" = 0 ] \
+    && [ "$W7_LABEL" = 1 ] \
     && [ "$W7_ARMED" = 1 ] && [ "$W7_ARMEVT" = 1 ] && [ "$W7_HEAD" = 0 ]; then
     pass "W7-hotfix-dispatcher-defence"
 else
-    failcase "W7-hotfix-dispatcher-defence — uses=$W7_USES permkeys=$W7_PERMKEYS perms=[$W7_PERMS] runs=$W7_RUNS runexpr=$W7_RUNEXPR cmd=$W7_CMD trigger=$W7_TRIGGER plainpr=$W7_PLAINPR label=$W7_LABEL armed=$W7_ARMED armevt=$W7_ARMEVT head=$W7_HEAD"
+    failcase "W7-hotfix-dispatcher-defence — uses=$W7_USES permkeys=$W7_PERMKEYS perms=[$W7_PERMS] runs=$W7_RUNS runexpr=$W7_RUNEXPR cmd=$W7_CMD trigger=$W7_TRIGGER plainpr=$W7_PLAINPR prt=$W7_PRT label=$W7_LABEL armed=$W7_ARMED armevt=$W7_ARMEVT head=$W7_HEAD"
 fi
 
-# W7b: the run-interpolation gate's pull_request_target strict mode covers the dispatcher.
-# The real file passes; a copy whose run line interpolates the PR title (the PR #3652
-# row-29 mutation) fails. W7B_MUTLINES guards the sed anchor so a no-op copy cannot pass.
+# W7b: the run-interpolation gate denies a pull_request_target trigger. The real
+# dispatcher passes; a copy whose trigger is reverted to pull_request_target fails.
+# W7B_MUTLINES guards the sed anchor so a no-op copy cannot pass.
 W7B_CHECK="$SCRIPT_DIR/check-workflow-run-interpolation"
-W7B_MUT="$TMP/hotfix-dispatch-row29.yml"
-sed 's#run: gh workflow run update-behind-prs.yml --ref master -f hotfix=true#run: echo ${{ github.event.pull_request.title }}#' "$DISPATCH_WF" > "$W7B_MUT"
-W7B_MUTLINES=$(grep -cF 'run: echo ${{ github.event.pull_request.title }}' "$W7B_MUT" || true)
+W7B_MUT="$TMP/hotfix-dispatch-revert.yml"
+sed 's#^  pull_request:$#  pull_request_target:#' "$DISPATCH_WF" > "$W7B_MUT"
+W7B_MUTLINES=$(grep -cE '^  pull_request_target:$' "$W7B_MUT" || true)
 "$W7B_CHECK" "$DISPATCH_WF" >/dev/null 2>&1; W7B_REAL=$?
 "$W7B_CHECK" "$W7B_MUT" >/dev/null 2>&1; W7B_MUTRC=$?
 if [ "$W7B_MUTLINES" = 1 ] && [ "$W7B_REAL" = 0 ] && [ "$W7B_MUTRC" = 1 ]; then
-    pass "W7b-dispatcher-strict-interpolation-gate"
+    pass "W7b-dispatcher-trigger-deny"
 else
-    failcase "W7b-dispatcher-strict-interpolation-gate — mutlines=$W7B_MUTLINES real=$W7B_REAL mut=$W7B_MUTRC"
+    failcase "W7b-dispatcher-trigger-deny —mutlines=$W7B_MUTLINES real=$W7B_REAL mut=$W7B_MUTRC"
 fi
 
 # W8: a hotfix (or any unrelated) label event never cancels an in-flight labeled run.

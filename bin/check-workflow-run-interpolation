@@ -13,6 +13,10 @@
 # with a write token on PR-author-controlled event data, so there ANY ${{ }} inside
 # a run: body fails, github.*, steps.* and needs.* included (ADR-0188 addendum).
 #
+# Trigger deny: a workflow whose top-level on: block names pull_request_target fails
+# outright, with a report on stderr. GitHub blocks that trigger by default for public
+# repos (ADR-0223 addendum of 2026-11-09). Strict mode stays as defence in depth.
+#
 # Usage: bin/check-workflow-run-interpolation [file ...]
 #   default: .github/workflows/*.yml and .github/actions/*/action.yml
 set -eu
@@ -25,6 +29,7 @@ CI gate: no ${{ env.* }} or string-typed ${{ inputs.* }} expression inside a run
 Pass the value through env: and use a quoted "$NAME" in the shell.
 Strict mode: in a workflow whose on: block names pull_request_target, any ${{ }}
 expression inside a run: body fails.
+Trigger deny: a workflow whose on: block names pull_request_target fails outright.
 
 Arguments:
   [file ...]   workflow or action files to check
@@ -103,7 +108,10 @@ pass == 1 {
     inon = (line ~ /^["']?on["']?:/)
     sub(/^["']?on["']?:/, "", line)
   }
-  if (inon && (" " line " ") ~ /[^A-Za-z0-9_]pull_request_target[^A-Za-z0-9_]/) strict = 1
+  if (inon && (" " line " ") ~ /[^A-Za-z0-9_]pull_request_target[^A-Za-z0-9_]/) {
+    strict = 1
+    if (!trigline) trigline = FNR
+  }
   if ($0 ~ /^[[:space:]]+[A-Za-z0-9_-]+:[[:space:]]*$/) {
     lastkey = $0
     gsub(/[[:space:]:]/, "", lastkey)
@@ -130,7 +138,14 @@ pass == 2 {
   }
 }
 
-END { exit (fail ? 1 : 0) }
+END {
+  # Trigger deny: GitHub blocks pull_request_target by default for public repos.
+  if (strict && trigline) {
+    printf "%s:%d: on: names pull_request_target, which GitHub blocks by default for public repos; use pull_request with an explicit permissions: block (ADR-0223 addendum)\n", FILENAME, trigline > "/dev/stderr"
+    fail = 1
+  }
+  exit (fail ? 1 : 0)
+}
 AWK_EOF
 
 rc=0

@@ -115,6 +115,36 @@ defect3_shape() {
     git -C "$main" push -q origin master >/dev/null 2>&1
 }
 
+# expired_forkpoint_shape <main> <name> <dirty> — worktree on a branch with one
+# own commit whose `merge-base --fork-point origin/master` fails because the
+# origin/master reflog entry it forked from has expired. <dirty>=dirty adds an
+# untracked file. <dirty>=nocommit makes a zero-own-commit branch instead.
+expired_forkpoint_shape() {
+    local main="$1" name="$2" dirty="${3:-clean}"
+    mkdir -p "$main/worktrees"
+    git -C "$main" worktree add -q -b "$name" "$main/worktrees/$name" master >/dev/null 2>&1
+    if [ "$dirty" != nocommit ]; then
+        printf 'own\n' > "$main/worktrees/$name/own-$name.txt"
+        git -C "$main/worktrees/$name" add "own-$name.txt" >/dev/null 2>&1
+        git -C "$main/worktrees/$name" commit -qm "own-$name" >/dev/null 2>&1
+    fi
+    local i
+    for i in 1 2; do
+        printf 'advance%s\n' "$i" > "$main/adv-$name-$i.txt"
+        git -C "$main" add "adv-$name-$i.txt" >/dev/null 2>&1
+        git -C "$main" commit -qm "advance-$i-for-$name" >/dev/null 2>&1
+        git -C "$main" push -q origin master >/dev/null 2>&1
+        git -C "$main" fetch -q origin >/dev/null 2>&1
+    done
+    git -C "$main" reflog expire --expire=now --all >/dev/null 2>&1
+    if git -C "$main" merge-base --fork-point origin/master "$name" >/dev/null 2>&1; then
+        failcase "fixture: fork-point still resolves ($name)"
+    fi
+    if [ "$dirty" = dirty ]; then
+        printf 'wip\n' > "$main/worktrees/$name/untracked-wip.md"
+    fi
+}
+
 # run_status <main> <stub_pr_state> [extra-flags...]
 # Runs wt-status from inside <main> with the stub gh in PATH.
 run_status() {
@@ -296,6 +326,24 @@ defect3_shape "$e" "visible-branch"
 out_default="$(run_status "$e" "")"
 assert_match "default-output-shows-non-protected" 'visible-branch' "$out_default"
 assert_absent "default-output-no-protected-row" 'PROTECTED' "$out_default"
+
+# ----------------------------------------------------------------------------
+# Row 10: fork-point fallback — expired upstream reflog
+# ----------------------------------------------------------------------------
+e="$(new_env)"
+expired_forkpoint_shape "$e" "fp-clean" clean
+out="$(run_status "$e" "")"
+assert_match "fork-point-fallback-clean-unpushed" 'UNPUSHED +fp-clean +\(committed work, no PR, fork-point fallback\)' "$out"
+
+e="$(new_env)"
+expired_forkpoint_shape "$e" "fp-dirty" dirty
+out="$(run_status "$e" "")"
+assert_match "fork-point-fallback-dirty-stays-stalled" 'STALLED +fp-dirty +\(uncommitted/untracked work, never committed\)' "$out"
+
+e="$(new_env)"
+expired_forkpoint_shape "$e" "fp-empty" nocommit
+out="$(run_status "$e" "")"
+assert_match "fork-point-fallback-zero-commits-stays-empty" 'EMPTY +fp-empty +\(no own commits, clean tree\)' "$out"
 
 # ----------------------------------------------------------------------------
 # Final result

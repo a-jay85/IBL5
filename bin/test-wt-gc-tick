@@ -39,7 +39,8 @@ while [ $# -gt 0 ]; do
         --case)
             [ $# -ge 2 ] && [ -n "$2" ] || { echo "usage: $0 [--case NAME]..." >&2; exit 2; }
             ONLY_CASES+=("$2"); shift 2 ;;
-        *) echo "usage: $0 [--case NAME]... (unknown argument: $1)" >&2; exit 2 ;;
+        -*) echo "usage: $0 [--case NAME]... (unknown argument: $1)" >&2; exit 2 ;;
+        *) ONLY_CASES+=("$1"); shift ;;   # bare case name, same as --case NAME
     esac
 done
 RAN_CASES=$'\n'
@@ -354,6 +355,9 @@ run_tick() {
         WT_GC_REAP_DIRTY_ARCHIVE=0
         WT_GC_REAP_DETACHED=0
         WT_GC_REAP_CLOSED=0
+        WT_GC_REAP_LANDED=0
+        WT_GC_REAP_UNBORN=0
+        WT_GC_REAP_POOL_BRANCHES=0
         WT_GC_DROP_STASHES=0
         WT_GC_REF_FALLBACK=0
         WT_GC_REAP_REFS=0
@@ -1364,7 +1368,7 @@ mk_registry "$CD/registry.json" t3/live
 rt "${T_ON[@]}" -- --force
 chk_rc T2 0
 log_has 't3 keep t3-young001: age=0d' || note_err "young not kept by age"
-log_has 't3 keep t3-ahead001: ahead=1' || note_err "ahead not kept"
+log_has 't3 keep t3-ahead001: no merged PR' || note_err "ahead not kept"
 log_has 't3 keep t3-dirty001: dirty' || note_err "dirty not kept"
 log_has 'live-work t3-live0001: live Claude session' || note_err "live session not seen"
 log_has 't3 keep t3-live0001: live work' || note_err "live not kept"
@@ -1388,7 +1392,7 @@ mkdir -p "$CD/t3root/nested"
 git -C "$ENV_MAIN" worktree add -q -b t3/nested "$CD/t3root/nested/t3-deep0001" origin/master >/dev/null 2>&1
 touch -t "$(epoch_to_touch "$(epoch_ago 5)")" "$CD/t3root/nested/t3-deep0001"
 B_WT="$(wt_snapshot)"; B_REFS="$(refs_snapshot)"
-rt "${T_ON[@]}" -- --force
+rt "${T_ON[@]}" WT_GC_REAP_T3_MERGED=0 -- --force
 chk_rc T3 0
 [ "$(wt_snapshot)" = "$B_WT" ] || note_err "worktrees changed"
 [ "$(refs_snapshot)" = "$B_REFS" ] || note_err "refs changed"
@@ -1411,6 +1415,360 @@ rt "${T_ON[@]}" WT_GC_T3_ROOT="$CD/no-such-root" -- --force
 chk_rc "T4 absent root" 0
 log_has 'reap done steps_failed=0' || note_err "absent root failed the step"
 [ -d "$(t3_dir t3-bbbb2222)" ] || note_err "absent-root run removed a worktree"
+finish_case
+fi
+
+# T2b — with the merged proof switched off, a t3-* worktree with own commits
+# is kept on the old ahead check, as before the proof existed.
+if should_run T2b-t3-ahead-switch-off; then
+fx T2b-t3-ahead-switch-off
+mk_t3 t3-ahead001 t3/ahead ahead=1 age_days=5
+rt "${T_ON[@]}" WT_GC_REAP_T3_MERGED=0 -- --force
+chk_rc T2b 0
+log_has 't3 keep t3-ahead001: ahead=1' || note_err "ahead not kept by the old check"
+[ -d "$(t3_dir t3-ahead001)" ] || note_err "removed"
+finish_case
+fi
+
+# gh_head <branch> <value> — the answer the gh stub gives `pr list --head <branch>`
+# after the reaper's --jq filter: open, none, or the merged PR's head oid.
+gh_head() {
+    mkdir -p "$(dirname "$CD/gh/by-head/$1.json")"
+    printf '%s\n' "$2" > "$CD/gh/by-head/$1.json"
+}
+
+# TM1 — a T3-root worktree with own commits is reaped when its branch has one
+# MERGED PR and the proof accepts the tip. Any name qualifies, not only t3-*.
+if should_run TM1-t3-merged-reaped; then
+fx TM1-t3-merged-reaped
+mk_t3 t3-bbbb2222 t3/merged ahead=2 age_days=5
+mk_t3 dependabot-npm dependabot/npm/foo ahead=1 age_days=5
+SHA1="$(git -C "$ENV_MAIN" rev-parse refs/heads/t3/merged)"
+SHA2="$(git -C "$ENV_MAIN" rev-parse refs/heads/dependabot/npm/foo)"
+gh_head t3/merged "$SHA1"
+gh_head dependabot/npm/foo "$SHA2"
+rt "${T_ON[@]}" -- --force
+chk_rc TM1 0
+log_has "t3 reaped-merged t3-bbbb2222 branch=t3/merged age=5d pr_head=$SHA1" || note_err "no merged reaped line (t3 name)"
+log_has "t3 reaped-merged dependabot-npm branch=dependabot/npm/foo age=5d pr_head=$SHA2" || note_err "no merged reaped line (dependabot name)"
+[ -d "$(t3_dir t3-bbbb2222)" ] && note_err "t3 worktree still present"
+[ -d "$(t3_dir dependabot-npm)" ] && note_err "dependabot worktree still present"
+has_branch t3/merged && note_err "t3 branch still present"
+has_branch dependabot/npm/foo && note_err "dependabot branch still present"
+tips_has "$SHA1 refs/heads/t3/merged" || note_err "tips lacks t3 sha"
+tips_has "$SHA2 refs/heads/dependabot/npm/foo" || note_err "tips lacks dependabot sha"
+KEEP="$(git -C "$ENV_MAIN" for-each-ref --format='%(refname) %(objectname)' refs/wt-gc-archive/)"
+grep -qE "^refs/wt-gc-archive/[0-9]+/heads/t3/merged $SHA1\$" <<< "$KEEP" || note_err "no keep-ref (t3)"
+grep -qE "^refs/wt-gc-archive/[0-9]+/heads/dependabot/npm/foo $SHA2\$" <<< "$KEEP" || note_err "no keep-ref (dependabot)"
+[ -f "$CD/wt-remove-argv" ] && note_err "wt-remove ran for a T3 worktree"
+finish_case
+fi
+
+# TM2 — every way the merged proof can say no keeps the worktree, its branch
+# and its files.
+if should_run TM2-t3-merged-kept; then
+fx TM2-t3-merged-kept
+mk_t3 tm-open tm/open ahead=1 age_days=5;       gh_head tm/open open
+mk_t3 tm-none tm/none ahead=1 age_days=5
+mk_t3 tm-unproven tm/unproven ahead=1 age_days=5
+gh_head tm/unproven "$(git -C "$ENV_MAIN" rev-parse origin/master)"
+mk_t3 tm-ghfail tm/ghfail ahead=1 age_days=5
+mk_t3 tm-dirty tm/dirty ahead=1 age_days=5
+printf 'scratch\n' > "$(t3_dir tm-dirty)/notes.md"
+touch -t "$(epoch_to_touch "$(epoch_ago 5)")" "$(t3_dir tm-dirty)"
+gh_head tm/dirty "$(git -C "$ENV_MAIN" rev-parse refs/heads/tm/dirty)"
+mkdir -p "$CD/t3root/sub"
+git -C "$ENV_MAIN" worktree add -q -b tm/nested "$CD/t3root/sub/tm-nested" origin/master >/dev/null 2>&1
+touch -t "$(epoch_to_touch "$(epoch_ago 5)")" "$CD/t3root/sub/tm-nested"
+gh_head tm/nested "$(git -C "$ENV_MAIN" rev-parse refs/heads/tm/nested)"
+rt "${T_ON[@]}" -- --force
+chk_rc TM2 0
+log_has 't3 keep tm-open: open PR' || note_err "open PR not kept"
+log_has 't3 keep tm-none: no merged PR' || note_err "no-PR not kept"
+log_has 't3 keep tm-unproven: merge not proven' || note_err "unproven merge not kept"
+log_has 't3 keep tm-dirty: dirty' || note_err "dirty not kept"
+grep -q 'tm/dirty' "$CD/gh-argv" 2>/dev/null && note_err "dirty worktree cost a gh call"
+log_has 't3 (keep|reaped|reaped-merged) tm-nested' && note_err "nested worktree considered"
+rt "${T_ON[@]}" STUB_GH_FAIL=1 -- --force
+chk_rc "TM2 gh failure" 0
+log_has 't3 keep tm-ghfail: gh error' || note_err "gh failure not kept"
+for n in tm-open tm-none tm-unproven tm-ghfail tm-dirty; do
+    [ -d "$(t3_dir "$n")" ] || note_err "$n removed"
+done
+[ -d "$CD/t3root/sub/tm-nested" ] || note_err "nested removed"
+[ -f "$(t3_dir tm-dirty)/notes.md" ] || note_err "untracked file lost"
+for b in tm/open tm/none tm/unproven tm/ghfail tm/dirty tm/nested; do has_branch "$b" || note_err "$b deleted"; done
+log_has 'reap done steps_failed=0' || note_err "a step failed"
+finish_case
+fi
+
+# TM3 — WT_GC_REAP_T3_MERGED=0 restores the old behavior: own commits keep a
+# t3-* worktree, and a non-t3 name is never looked at.
+if should_run TM3-t3-merged-switch-off; then
+fx TM3-t3-merged-switch-off
+mk_t3 t3-bbbb2222 t3/merged ahead=2 age_days=5
+mk_t3 dependabot-npm dependabot/npm/foo ahead=1 age_days=5
+gh_head t3/merged "$(git -C "$ENV_MAIN" rev-parse refs/heads/t3/merged)"
+gh_head dependabot/npm/foo "$(git -C "$ENV_MAIN" rev-parse refs/heads/dependabot/npm/foo)"
+rt "${T_ON[@]}" WT_GC_REAP_T3_MERGED=0 -- --force
+chk_rc TM3 0
+log_has 't3 keep t3-bbbb2222: ahead=2' || note_err "t3 name not kept by ahead"
+log_has 'dependabot-npm' && note_err "non-t3 name was looked at"
+[ -d "$(t3_dir t3-bbbb2222)" ] || note_err "t3 worktree removed"
+[ -d "$(t3_dir dependabot-npm)" ] || note_err "dependabot worktree removed"
+has_branch t3/merged || note_err "t3 branch deleted"
+has_branch dependabot/npm/foo || note_err "dependabot branch deleted"
+finish_case
+fi
+
+# ── Content-landed worktree reap ──────────────────────────────────────────────
+CLD_ON=(WT_GC_REAP_LANDED=1)
+# land_on_master — origin/master gains own-1.txt (the file mk_wt ahead=1 commits)
+# and a README.md edit, so a branch that added the same own-1.txt adds nothing.
+land_on_master() {
+    printf '1\n' > "$ENV_MAIN/own-1.txt"
+    printf 'master-side\n' > "$ENV_MAIN/README.md"
+    git -C "$ENV_MAIN" add own-1.txt README.md
+    git -C "$ENV_MAIN" commit -qm "land own-1 under another sha"
+    git -C "$ENV_MAIN" push -q origin master
+    git -C "$ENV_MAIN" fetch -q origin
+}
+# landed_wt <name> <branch> [mk_wt args...] — a landed-shape worktree (the gh
+# stub reports no open PR for it) and its UNPUSHED status row.
+landed_wt() {
+    local name="$1" br="$2"
+    shift 2
+    mk_wt "$name" "$br" ahead=1 "$@"
+    gh_head "$br" 0
+    row UNPUSHED "$name"
+}
+
+# CL1 — a clean landed branch is reaped (tips line, keep-ref, wt-remove, branch
+# delete) and drops out of the stale list; a kept UNPUSHED row stays listed.
+if should_run CL1-landed-reaped; then
+fx CL1-landed-reaped
+landed_wt cl-landed br/landed age_days=5
+mk_wt cl-extra br/extra ahead=2 age_days=5; gh_head br/extra 0; row UNPUSHED cl-extra
+land_on_master
+SHA="$(git -C "$ENV_MAIN" rev-parse refs/heads/br/landed)"
+rt "${CLD_ON[@]}" WT_GC_STALE_LIST=1 WT_GC_STALE_DAYS=0 -- --force
+chk_rc CL1 0
+log_has 'step landed threshold=3d' || note_err "no step line"
+log_has 'landed reaped cl-landed branch=br/landed age=5d' || note_err "no reaped line"
+[ -d "$(wt_dir cl-landed)" ] && note_err "worktree still present"
+has_branch br/landed && note_err "branch still present"
+tips_has "$SHA refs/heads/br/landed" || note_err "tips lacks sha"
+KEEP="$(git -C "$ENV_MAIN" for-each-ref --format='%(refname) %(objectname)' refs/wt-gc-archive/)"
+grep -qE "^refs/wt-gc-archive/[0-9]+/heads/br/landed $SHA\$" <<< "$KEEP" || note_err "no keep-ref"
+[ "$(cat "$CD/wt-remove-argv" 2>/dev/null)" = "$(printf 'cl-landed\n--volumes')" ] || note_err "wt-remove argv not exactly cl-landed --volumes"
+log_has 'landed keep cl-extra: adds content' || note_err "extra-content branch not kept"
+grep -q 'cl-landed' "$CD/stale.tsv" 2>/dev/null && note_err "reaped worktree is in the stale list"
+grep -q 'cl-extra' "$CD/stale.tsv" 2>/dev/null || note_err "kept row missing from the stale list"
+finish_case
+fi
+
+# CL2 — every reason to keep: extra content, dirty, conflict, open PR, gh
+# failure, young, pool slot; plus EMPTY and OPEN-PR rows the filter must skip.
+# Each landed-shaped fixture has exactly one reason to be kept.
+if should_run CL2-landed-kept; then
+fx CL2-landed-kept
+mk_wt cl-extra br/extra ahead=2 age_days=5; gh_head br/extra 0; row UNPUSHED cl-extra
+landed_wt cl-dirty br/dirty age_days=5
+landed_wt cl-openpr br/openpr age_days=5
+gh_head br/openpr 1
+landed_wt cl-ghfail br/ghfail age_days=5
+rm -f "$CD/gh/by-head/br/ghfail.json"   # second run: stub answers 'none', not an open count, so it is kept
+landed_wt cl-young br/young age_days=0
+landed_wt _pool-7 br/pool7 age_days=5
+mk_wt cl-conflict br/conflict age_days=5; gh_head br/conflict 0; row UNPUSHED cl-conflict
+mk_wt cl-empty br/empty ahead=1 age_days=5; gh_head br/empty 0; row EMPTY cl-empty
+mk_wt cl-open br/open ahead=1 age_days=5; gh_head br/open 0; row OPEN-PR cl-open
+printf 'wip\n' > "$(wt_dir cl-dirty)/notes.md"
+touch -t "$(epoch_to_touch "$(epoch_ago 5)")" "$(wt_dir cl-dirty)"
+printf 'branch-side\n' > "$(wt_dir cl-conflict)/README.md"
+git -C "$(wt_dir cl-conflict)" add README.md
+bd_commit "$(wt_dir cl-conflict)" "$(epoch_ago 5)" "branch edits readme"
+touch -t "$(epoch_to_touch "$(epoch_ago 5)")" "$(wt_dir cl-conflict)"
+land_on_master
+rt "${CLD_ON[@]}" STUB_GH_FAIL=1 -- --force
+chk_rc "CL2 gh failure" 0
+log_has 'landed keep cl-ghfail: gh error' || note_err "gh failure not kept"
+rt "${CLD_ON[@]}" -- --force
+chk_rc CL2 0
+log_has 'landed keep cl-extra: adds content' || note_err "extra content not kept"
+log_has 'landed keep cl-dirty: dirty' || note_err "dirty not kept"
+log_has 'landed keep cl-conflict: merge conflict' || note_err "conflict not kept"
+log_has 'landed keep cl-openpr: open PR' || note_err "open PR not kept"
+log_has 'landed keep cl-young: age=0d' || note_err "young not kept"
+log_has 'landed keep _pool-7: pool worktree' || note_err "pool slot not kept"
+log_has 'landed (keep|reaped) (cl-empty|cl-open)\b' && note_err "EMPTY or OPEN-PR row was considered"
+for n in cl-extra cl-dirty cl-openpr cl-ghfail cl-young _pool-7 cl-conflict cl-empty cl-open; do
+    [ -d "$(wt_dir "$n")" ] || note_err "$n removed"
+done
+[ -f "$(wt_dir cl-dirty)/notes.md" ] || note_err "untracked file lost"
+for b in br/extra br/dirty br/openpr br/ghfail br/young br/pool7 br/conflict br/empty br/open; do
+    has_branch "$b" || note_err "$b deleted"
+done
+[ -f "$CD/wt-remove-argv" ] && note_err "wt-remove ran for a kept worktree"
+log_has 'reap done steps_failed=0' || note_err "a step failed"
+finish_case
+fi
+
+# CL3 — WT_GC_REAP_LANDED=0 leaves CL1's landed branch alone.
+if should_run CL3-landed-switch-off; then
+fx CL3-landed-switch-off
+landed_wt cl-landed br/landed age_days=5
+land_on_master
+rt WT_GC_REAP_LANDED=0 -- --force
+chk_rc CL3 0
+log_has 'step landed threshold' && note_err "landed step ran with the switch at 0"
+log_has 'step landed disabled \(WT_GC_REAP_LANDED=0\)' || note_err "no disabled line"
+[ -d "$(wt_dir cl-landed)" ] || note_err "worktree removed"
+has_branch br/landed || note_err "branch deleted"
+finish_case
+fi
+
+# ── Unborn-HEAD worktree reap and orphan wt-pool branch delete ────────────────
+UB_ON=(WT_GC_REAP_UNBORN=1)
+PB_ON=(WT_GC_REAP_POOL_BRANCHES=1)
+# mk_unborn <name> <branch> <age_days> — a worktree whose HEAD names a branch
+# with no commit: notes/a.md untracked, b.txt staged, dir mtime backdated.
+mk_unborn() {
+    local wt
+    wt="$(wt_dir "$1")"
+    git -C "$ENV_MAIN" worktree add -q --orphan -b "$2" "$wt" >/dev/null 2>&1
+    mkdir -p "$wt/notes"
+    printf 'note\n' > "$wt/notes/a.md"
+    printf 'b\n' > "$wt/b.txt"
+    git -C "$wt" add b.txt
+    touch -t "$(epoch_to_touch "$(epoch_ago "$3")")" "$wt"
+}
+# rt_seen [rt args...] — rt, but pool-orphans.txt (the pool-branches step's
+# previous-sweep sighting file) survives the per-run state wipe.
+rt_seen() {
+    local keep="$CD/pool-orphans.keep"
+    if [ -f "$CD/state/pool-orphans.txt" ]; then cp "$CD/state/pool-orphans.txt" "$keep"; fi
+    rm -f "$CD/docker-argv" "$CD/wt-remove-argv" "$CD/gh-argv"
+    fresh
+    mkdir -p "$CD/state"
+    if [ -f "$keep" ]; then cp "$keep" "$CD/state/pool-orphans.txt"; fi
+    run_tick WT_GC_REPO_ROOT="$ENV_MAIN" WT_GC_WT_STATUS="$STUBBIN/wt-status-rows" \
+        STUB_WT_STATUS_ROWS="$CD/rows" WT_GC_WT_REMOVE="$ENV_MAIN/bin/wt-remove" "$@"
+}
+
+# UB1 — an old unborn worktree is archived as a parentless commit, then removed.
+if should_run UB1-unborn-reaped; then
+fx UB1-unborn-reaped
+mk_unborn ub-old br/ub-old 5
+rt "${UB_ON[@]}" -- --force
+chk_rc UB1 0
+log_has 'step unborn threshold=3d' || note_err "no step line"
+log_has 'unborn reaped ub-old branch=br/ub-old age=5d archive=[0-9a-f]{40}' || note_err "no reaped line"
+SNAP="$(sed -n 's/.*unborn reaped ub-old .*archive=\([0-9a-f]\{40\}\).*/\1/p' "$(LOG)")"
+[ -n "$SNAP" ] || note_err "no archive sha in the log"
+KEEP="$(git -C "$ENV_MAIN" for-each-ref --format='%(refname) %(objectname)' refs/wt-gc-archive/)"
+grep -qE "^refs/wt-gc-archive/[0-9]+/heads/br/ub-old $SNAP\$" <<< "$KEEP" || note_err "no keep-ref at the snapshot"
+PARENTS="$(git -C "$ENV_MAIN" rev-list --parents -n1 "$SNAP" 2>/dev/null)"
+[ "$(wc -w <<< "$PARENTS" | tr -d ' ')" = 1 ] || note_err "snapshot has a parent: $PARENTS"
+FILES="$(git -C "$ENV_MAIN" ls-tree -r --name-only "$SNAP" 2>/dev/null)"
+grep -qxF 'notes/a.md' <<< "$FILES" || note_err "notes/a.md not in the snapshot"
+grep -qxF 'b.txt' <<< "$FILES" || note_err "b.txt not in the snapshot"
+tips_has "$SNAP refs/heads/br/ub-old" || note_err "tips lacks the snapshot"
+[ "$(cat "$CD/wt-remove-argv" 2>/dev/null)" = "$(printf 'ub-old\n--volumes')" ] || note_err "wt-remove argv not exactly ub-old --volumes"
+[ -d "$(wt_dir ub-old)" ] && note_err "worktree still present"
+log_has 'reap done steps_failed=0' || note_err "a step failed"
+finish_case
+fi
+
+# UB2 — every reason to keep an unborn worktree: young, pool slot, live work.
+# A normal committed worktree is no candidate.
+if should_run UB2-unborn-kept; then
+fx UB2-unborn-kept
+mk_unborn ub-young br/ub-young 2
+mk_unborn _pool-9 wt-pool/9 5
+mk_unborn ub-live br/ub-live 5
+mk_registry "$CD/registry.json" br/ub-live
+mk_wt ub-norm br/ub-norm ahead=1 age_days=5
+rt "${UB_ON[@]}" -- --force
+chk_rc UB2 0
+log_has 'unborn keep ub-young: age=2d' || note_err "young not kept"
+log_has 'unborn keep _pool-9: pool worktree' || note_err "pool slot not kept"
+log_has 'unborn keep ub-live: live work' || note_err "live work not kept"
+log_has 'unborn (keep|reaped) ub-norm' && note_err "a committed worktree was considered"
+[ -f "$CD/wt-remove-argv" ] && note_err "wt-remove ran for a kept worktree"
+for n in ub-young _pool-9 ub-live; do
+    [ -f "$(wt_dir "$n")/notes/a.md" ] || note_err "$n lost an untracked file"
+    [ -f "$(wt_dir "$n")/b.txt" ] || note_err "$n lost a staged file"
+done
+[ -d "$(wt_dir ub-norm)" ] || note_err "committed worktree removed"
+finish_case
+fi
+
+# UB3 — an orphan wt-pool/<N> ref is kept on the first sweep and deleted on the
+# second, after its sha lands in the tips file and a keep-ref.
+if should_run UB3-pool-branch-deleted; then
+fx UB3-pool-branch-deleted
+git -C "$ENV_MAIN" update-ref refs/heads/wt-pool/31 origin/master
+SHA="$(git -C "$ENV_MAIN" rev-parse refs/heads/wt-pool/31)"
+rt_seen "${PB_ON[@]}" -- --force
+chk_rc "UB3 first" 0
+log_has 'step pool-branches' || note_err "no step line"
+log_has 'pool-branches keep refs/heads/wt-pool/31: first sighting' || note_err "no first-sighting line"
+has_branch wt-pool/31 || note_err "deleted on first sighting"
+rt_seen "${PB_ON[@]}" -- --force
+chk_rc "UB3 second" 0
+log_has 'pool-branches deleted refs/heads/wt-pool/31' || note_err "no deleted line"
+has_branch wt-pool/31 && note_err "ref still present"
+tips_has "$SHA refs/heads/wt-pool/31" || note_err "tips lacks the sha"
+KEEP="$(git -C "$ENV_MAIN" for-each-ref --format='%(refname) %(objectname)' refs/wt-gc-archive/)"
+grep -qE "^refs/wt-gc-archive/[0-9]+/heads/wt-pool/31 $SHA\$" <<< "$KEEP" || note_err "no keep-ref"
+finish_case
+fi
+
+# UB4 — every reason to keep a pool ref, across two sweeps.
+if should_run UB4-pool-branch-kept; then
+fx UB4-pool-branch-kept
+mk_wt _pool-32 wt-pool/32 age_days=1
+mkdir -p "$(wt_dir _pool-33)"
+git -C "$ENV_MAIN" update-ref refs/heads/wt-pool/33 origin/master
+AHEAD="$(git -C "$ENV_MAIN" commit-tree -p origin/master -m ahead 'origin/master^{tree}')"
+git -C "$ENV_MAIN" update-ref refs/heads/wt-pool/34 "$AHEAD"
+git -C "$ENV_MAIN" update-ref refs/heads/wt-pool/feature origin/master
+git -C "$ENV_MAIN" update-ref refs/heads/wt-pool/35 origin/master
+rt_seen "${PB_ON[@]}" -- --force
+chk_rc "UB4 first" 0
+log_has 'pool-branches keep refs/heads/wt-pool/35: first sighting' || note_err "run 1: no first sighting for 35"
+land_on_master
+git -C "$ENV_MAIN" update-ref refs/heads/wt-pool/35 origin/master
+rt_seen "${PB_ON[@]}" -- --force
+chk_rc "UB4 second" 0
+log_has 'pool-branches keep refs/heads/wt-pool/35: first sighting' || note_err "run 2: a moved sha was not a first sighting"
+log_has 'pool-branches keep refs/heads/wt-pool/33: slot dir exists' || note_err "slot dir not kept"
+log_has 'pool-branches keep refs/heads/wt-pool/34: ahead=1' || note_err "ahead ref not kept"
+log_has 'pool-branches keep refs/heads/wt-pool/feature: not a slot name' || note_err "non-slot name not kept"
+log_has 'pool-branches .*wt-pool/32' && note_err "a checked-out pool ref was considered"
+log_has 'pool-branches deleted' && note_err "something was deleted"
+for b in wt-pool/32 wt-pool/33 wt-pool/34 wt-pool/feature wt-pool/35; do
+    has_branch "$b" || note_err "$b deleted"
+done
+finish_case
+fi
+
+# UB5 — both switches at 0: neither step runs across two sweeps.
+if should_run UB5-switches-off; then
+fx UB5-switches-off
+mk_unborn ub-old br/ub-old 5
+git -C "$ENV_MAIN" update-ref refs/heads/wt-pool/31 origin/master
+rt_seen WT_GC_REAP_UNBORN=0 WT_GC_REAP_POOL_BRANCHES=0 -- --force
+rt_seen WT_GC_REAP_UNBORN=0 WT_GC_REAP_POOL_BRANCHES=0 -- --force
+chk_rc UB5 0
+log_has 'step unborn threshold' && note_err "unborn step ran with the switch at 0"
+log_has 'step pool-branches$' && note_err "pool-branches step ran with the switch at 0"
+log_has 'step unborn disabled \(WT_GC_REAP_UNBORN=0\)' || note_err "no unborn disabled line"
+log_has 'step pool-branches disabled \(WT_GC_REAP_POOL_BRANCHES=0\)' || note_err "no pool-branches disabled line"
+[ -d "$(wt_dir ub-old)" ] || note_err "worktree removed"
+[ -f "$(wt_dir ub-old)/notes/a.md" ] || note_err "untracked file lost"
+has_branch wt-pool/31 || note_err "pool ref deleted"
 finish_case
 fi
 
@@ -1544,6 +1902,20 @@ arch_has 1700000000/wt/da1 || note_err "no wt archive ref"
 arch_has 1700000000/heads/da1 || note_err "no heads archive ref"
 [ "$(git -C "$ENV_MAIN" rev-parse refs/wt-gc-archive/1700000000/wt/da1^ 2>/dev/null)" = "$DA_TIP" ] || note_err "snapshot parent is not the tip"
 [ "$(git -C "$ENV_MAIN" show refs/wt-gc-archive/1700000000/wt/da1:README.md 2>/dev/null)" = different ] || note_err "dirt bytes not in archive"
+finish_case
+fi
+
+# UB6 — a snapshot taken with a tip still has exactly one parent (the tip);
+# only an empty tip (unborn HEAD) drops the parent.
+if should_run UB6-snapshot-with-tip-unchanged; then
+fx UB6-snapshot-with-tip-unchanged
+d_wt ub6 diff
+epoch_ago 5 > "$CD/gh/7.json"
+rt "${DA_ON[@]}" STUB_SKIP_LINES="$CD/skips" -- --force
+chk_rc UB6 0
+log_has 'dirty archived-reaped ub6 paths=1' || note_err "not archived-reaped"
+PARENTS="$(git -C "$ENV_MAIN" rev-list --parents -n1 refs/wt-gc-archive/1700000000/wt/ub6 2>/dev/null)"
+[ "$(wc -w <<< "$PARENTS" | tr -d ' ')" = 2 ] || note_err "snapshot does not have exactly one parent: $PARENTS"
 finish_case
 fi
 
@@ -2879,10 +3251,13 @@ fi
 # A token "-VAR" in rt's env list leaves VAR truly unset (run_tick drops it).
 EC_SWITCHES=(WT_GC_ARCHIVE_PRUNE WT_GC_REAP_DIRTY_ARCHIVE WT_GC_REAP_DETACHED
     WT_GC_REAP_CLOSED WT_GC_DROP_STASHES WT_GC_REF_FALLBACK WT_GC_DOCKER_CONTAINERS
-    WT_GC_REAP_T3)
+    WT_GC_REAP_T3 WT_GC_REAP_T3_MERGED WT_GC_REAP_LANDED WT_GC_REAP_UNBORN
+    WT_GC_REAP_POOL_BRANCHES)
 # The switches that own a run_step, as "VAR:step".
 EC_STEPS=(WT_GC_ARCHIVE_PRUNE:archive-prune WT_GC_REAP_DETACHED:detached
-    WT_GC_REAP_CLOSED:closed WT_GC_DROP_STASHES:stashes WT_GC_REAP_T3:t3)
+    WT_GC_REAP_CLOSED:closed WT_GC_DROP_STASHES:stashes WT_GC_REAP_T3:t3
+    WT_GC_REAP_LANDED:landed WT_GC_REAP_UNBORN:unborn
+    WT_GC_REAP_POOL_BRANCHES:pool-branches)
 
 for ec_var in "${EC_SWITCHES[@]}"; do
     if should_run "EC-switch-$ec_var"; then
@@ -2913,6 +3288,8 @@ EC_AGES=(
     'WT_GC_BACKUP_FALLBACK_DAYS|14|WT_GC_REAP_REFS=1 WT_GC_REF_FALLBACK=1'
     'WT_GC_CONTAINER_DAYS|14|WT_GC_DOCKER_PRUNE=1 WT_GC_DOCKER_CONTAINERS=1'
     'WT_GC_T3_DAYS|1|WT_GC_REAP_T3=1'
+    'WT_GC_LANDED_DAYS|3|WT_GC_REAP_LANDED=1'
+    'WT_GC_UNBORN_DAYS|3|WT_GC_REAP_UNBORN=1'
 )
 for ec_row in "${EC_AGES[@]}"; do
     ec_var="${ec_row%%|*}"
@@ -2954,12 +3331,46 @@ done
 finish_case
 fi
 
+# NV1 — the new vars, empty. Unset is the default path every earlier case runs.
+# An empty day count fails its step closed (nothing reaped); an empty switch
+# turns the step on. Mutations this case catches:
+#   ${WT_GC_UNBORN_DAYS-3} -> ${WT_GC_UNBORN_DAYS:-3}   (empty day count would default)
+#   ${WT_GC_REAP_UNBORN:-1} -> ${WT_GC_REAP_UNBORN:-0}  (empty switch would disable)
+if should_run NV1-new-vars-empty; then
+fx NV1-new-vars-empty
+landed_wt nv-landed br/nv-landed age_days=5
+land_on_master
+mk_unborn nv-unborn br/nv-unborn 5
+for nv_row in 'WT_GC_LANDED_DAYS=|landed|WT_GC_REAP_LANDED=1' 'WT_GC_UNBORN_DAYS=|unborn|WT_GC_REAP_UNBORN=1' \
+    'WT_GC_UNBORN_DAYS=abc|unborn|WT_GC_REAP_UNBORN=1'; do
+    nv_env="${nv_row%%|*}"
+    nv_rest="${nv_row#*|}"
+    nv_step="${nv_rest%%|*}"
+    nv_on="${nv_rest#*|}"
+    rt "$nv_on" "$nv_env" -- --force
+    chk_rc "NV1 $nv_env" 1
+    log_has "step $nv_step failed \(rc=1\)" || note_err "$nv_env: step $nv_step did not fail closed"
+    log_has "invalid ${nv_env%%=*} '${nv_env#*=}'" || note_err "$nv_env: no invalid-value log"
+    [ -d "$(wt_dir nv-landed)" ] || note_err "$nv_env: landed worktree removed"
+    [ -d "$(wt_dir nv-unborn)" ] || note_err "$nv_env: unborn worktree removed"
+done
+[ -z "$(git -C "$ENV_MAIN" for-each-ref refs/wt-gc-archive/)" ] || note_err "a failed step wrote an archive"
+rt WT_GC_REAP_LANDED= WT_GC_REAP_UNBORN= WT_GC_REAP_POOL_BRANCHES= WT_GC_REAP_T3_MERGED= -- --force
+chk_rc "NV1 empty switches" 0
+log_has 'step landed threshold=3d' || note_err "empty WT_GC_REAP_LANDED did not run the step"
+log_has 'step unborn threshold=3d' || note_err "empty WT_GC_REAP_UNBORN did not run the step"
+log_has 'step pool-branches$' || note_err "empty WT_GC_REAP_POOL_BRANCHES did not run the step"
+log_has 'config .*WT_GC_REAP_T3_MERGED=1( |$)' || note_err "empty WT_GC_REAP_T3_MERGED did not default to 1"
+finish_case
+fi
+
 if should_run H2-help-lists-new-vars; then
 fx H2-help-lists-new-vars
 env -i PATH=/usr/bin:/bin bash -euo pipefail "$TICK" --help > "$CD/help.out" 2>&1
 chk_rc H2-help 0
 for ec_var in "${EC_SWITCHES[@]}" WT_GC_ARCHIVE_DAYS WT_GC_DIRTY_ARCHIVE_DAYS WT_GC_DETACHED_DAYS \
-    WT_GC_CLOSED_DAYS WT_GC_STASH_DAYS WT_GC_BACKUP_FALLBACK_DAYS WT_GC_CONTAINER_DAYS WT_GC_ARCHIVE_STAMP; do
+    WT_GC_CLOSED_DAYS WT_GC_STASH_DAYS WT_GC_BACKUP_FALLBACK_DAYS WT_GC_CONTAINER_DAYS WT_GC_ARCHIVE_STAMP \
+    WT_GC_LANDED_DAYS WT_GC_UNBORN_DAYS; do
     grep -qF -- "$ec_var" "$CD/help.out" || note_err "--help does not list $ec_var"
 done
 grep -qF 'Usage: bin/wt-gc-tick [--dry-run] [--force] [--help]' "$CD/help.out" || note_err "--help lost the Usage line"

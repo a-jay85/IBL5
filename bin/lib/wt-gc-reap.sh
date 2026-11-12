@@ -164,17 +164,19 @@ _gc_archive_batch() {
 
 # _gc_snapshot_dirt <wt> <tip> <label> — prints a commit sha whose tree is the
 # worktree's full content (tracked edits + untracked, non-ignored files) and
-# whose parent is <tip>. Dry-run prints <tip> and writes no object.
+# whose parent is <tip> (no parent when <tip> is empty: an unborn HEAD). Dry-run prints <tip> (or "dry-run") and writes no object.
 _gc_snapshot_dirt() {
     local wt="$1" tip="$2" label="$3" idx tree snap
-    if [ "${DRY_RUN:-0}" = 1 ]; then printf '%s\n' "$tip"; return 0; fi
+    if [ "${DRY_RUN:-0}" = 1 ]; then printf '%s\n' "${tip:-dry-run}"; return 0; fi
     idx="$(mktemp "${TMPDIR:-/tmp}/wt-gc-idx.XXXXXX")" || return 1
     rm -f "$idx"
-    if ! GIT_INDEX_FILE="$idx" git -C "$wt" read-tree "$tip" 2>/dev/null; then rm -f "$idx"; return 1; fi
+    if [ -n "$tip" ]; then
+        if ! GIT_INDEX_FILE="$idx" git -C "$wt" read-tree "$tip" 2>/dev/null; then rm -f "$idx"; return 1; fi
+    fi
     if ! GIT_INDEX_FILE="$idx" git -C "$wt" add -A -- . >/dev/null 2>&1; then rm -f "$idx"; return 1; fi
     if ! tree="$(GIT_INDEX_FILE="$idx" git -C "$wt" write-tree 2>/dev/null)"; then rm -f "$idx"; return 1; fi
     if ! snap="$(git -C "$wt" -c user.name=wt-gc -c user.email=wt-gc@localhost \
-            commit-tree "$tree" -p "$tip" -m "wt-gc archive: $label" 2>/dev/null)"; then
+            commit-tree "$tree" ${tip:+-p "$tip"} -m "wt-gc archive: $label" 2>/dev/null)"; then
         rm -f "$idx"; return 1
     fi
     rm -f "$idx"
@@ -182,7 +184,7 @@ _gc_snapshot_dirt() {
     printf '%s\n' "$snap"
 }
 
-# _gc_protected_name <refname> — 0 (deny) for refs no step may ever delete.
+# _gc_protected_name <refname> — 0 (deny) for refs the generic refs step may never delete. Only reap_orphan_pool_branches deletes wt-pool/<N>, under its own guards.
 _gc_protected_name() {
     case "$1" in
         refs/t3/*|refs/remotes/origin/*|refs/heads/wt-pool/*) return 0 ;;
@@ -429,13 +431,37 @@ reap_t3_worktrees() {
     paths="$(sed -n 's/^worktree //p' <<< "$listing")"
     while IFS= read -r wt <&3; do
         [ -n "$wt" ] || continue
-        case "${wt##*/}" in t3-*) ;; *) continue ;; esac
+        case "${wt##*/}" in
+            t3-*) ;;
+            *) [ "${WT_GC_REAP_T3_MERGED:-1}" != 0 ] || continue ;;
+        esac
         [ -d "$wt" ] || continue
         real="$(cd "$wt" && pwd -P)" || continue
         [ "${real%/*}" = "$root" ] || continue
         _gc_reap_t3_one "${wt##*/}" "$wt" || rc=1
     done 3<<< "$paths"
     return "$rc"
+}
+
+# _gc_t3_merged_check <name> <branch> <sha> — 0 when the branch has exactly
+# one MERGED PR, no OPEN PR, and _gc_merge_proven accepts <sha> against that
+# PR's head. Logs the keep reason and returns 1 otherwise (gh error included).
+_gc_t3_merged_check() {
+    local name="$1" branch="$2" sha="$3" oid prc=0
+    if ! oid="$("$WT_GC_GH" pr list --repo a-jay85/IBL5 --head "$branch" --state all --limit 5 \
+            --json state,headRefOid \
+            --jq 'if any(.[]; .state=="OPEN") then "open" else ([.[] | select(.state=="MERGED")] | if length==1 then .[0].headRefOid else "none" end) end' \
+            2>/dev/null)"; then
+        log "t3 keep $name: gh error"; return 1
+    fi
+    if [ "$oid" = open ]; then log "t3 keep $name: open PR"; return 1; fi
+    if [[ ! "$oid" =~ ^[0-9a-f]{40}$ ]]; then log "t3 keep $name: no merged PR"; return 1; fi
+    _gc_merge_proven "$sha" "$oid" || prc=$?
+    case "$prc" in
+        0) GC_T3_PR_OID="$oid"; return 0 ;;
+        1) log "t3 keep $name: merge not proven ($GC_PROOF_REASON)"; return 1 ;;
+        *) log "t3 keep $name: proof error"; return 1 ;;
+    esac
 }
 
 _gc_reap_t3_one() {
@@ -446,7 +472,12 @@ _gc_reap_t3_one() {
     if [ -z "$age" ]; then log "t3 keep $name: age unknown"; return 0; fi
     if [ "$age" -lt "$WT_GC_T3_DAYS" ]; then log "t3 keep $name: age=${age}d"; return 0; fi
     ahead="$(git -C "$wt" rev-list --count origin/master..HEAD 2>/dev/null)" || ahead=""
-    if [ "$ahead" != 0 ]; then log "t3 keep $name: ahead=${ahead:-?}"; return 0; fi
+    case "$ahead" in ''|*[!0-9]*) log "t3 keep $name: ahead=?"; return 0 ;; esac
+    local need_proof=0
+    case "$name" in t3-*) [ "$ahead" = 0 ] || need_proof=1 ;; *) need_proof=1 ;; esac
+    if [ "$need_proof" = 1 ] && [ "${WT_GC_REAP_T3_MERGED:-1}" = 0 ]; then
+        log "t3 keep $name: ahead=$ahead"; return 0
+    fi
     if ! dirt="$(git -C "$wt" status --porcelain --untracked-files=all 2>/dev/null)"; then
         log "t3 keep $name: status error"; return 0
     fi
@@ -454,9 +485,161 @@ _gc_reap_t3_one() {
     if ! sha="$(git -C "$WT_GC_REPO_ROOT" rev-parse --verify -q "refs/heads/$branch")"; then
         log "t3 keep $name: branch unresolved"; return 0
     fi
+    if [ "$need_proof" = 1 ]; then
+        _gc_t3_merged_check "$name" "$branch" "$sha" || return 0
+    fi
     _gc_remove_wt_and_branch t3 "$name" "$branch" "$sha" "$wt" || return 1
     [ "$GC_REMOVED" = 1 ] || return 0
-    log "t3 reaped $name branch=$branch age=${age}d"
+    if [ "$need_proof" = 1 ]; then
+        log "t3 reaped-merged $name branch=$branch age=${age}d pr_head=$GC_T3_PR_OID"
+    else
+        log "t3 reaped $name branch=$branch age=${age}d"
+    fi
+}
+
+# ── Step: content-landed worktrees ────────────────────────────────────────────
+# Candidates: UNPUSHED rows. A clean branch whose merge into origin/master
+# yields origin/master's own tree adds nothing: its commits landed under other
+# SHAs. merge-tree exit 1 (conflict) or any other non-zero code is a keep.
+reap_landed_worktrees() {
+    _gc_valid_days WT_GC_LANDED_DAYS || return 1
+    log "step landed threshold=${WT_GC_LANDED_DAYS}d"
+    local names parent name master_tree rc=0
+    names="$(awk '$1=="UNPUSHED" {print $2}' "$TMP_STATUS")"
+    [ -n "$names" ] || return 0
+    parent="$(_gc_wt_parent)" || return 1
+    if ! master_tree="$(git -C "$WT_GC_REPO_ROOT" rev-parse --verify -q 'origin/master^{tree}')"; then
+        log "landed master tree unresolved"; return 1
+    fi
+    while IFS= read -r name <&3; do
+        [ -n "$name" ] || continue
+        _gc_reap_landed_one "$name" "$parent/$name" "$master_tree" || rc=1
+    done 3<<< "$names"
+    return "$rc"
+}
+
+_gc_reap_landed_one() {
+    local name="$1" wt="$2" master_tree="$3" branch age dirt sha out n mrc=0
+    if [ ! -d "$wt" ]; then log "landed keep $name: no such worktree"; return 0; fi
+    _gc_wt_guard landed "$name" "$wt" || return 0
+    branch="$GC_BRANCH"
+    age="$(_gc_wt_age_days "$wt" "$branch")" || age=""
+    if [ -z "$age" ]; then log "landed keep $name: age unknown"; return 0; fi
+    if [ "$age" -lt "$WT_GC_LANDED_DAYS" ]; then log "landed keep $name: age=${age}d"; return 0; fi
+    if ! dirt="$(git -C "$wt" status --porcelain --untracked-files=all 2>/dev/null)"; then
+        log "landed keep $name: status error"; return 0
+    fi
+    if [ -n "$dirt" ]; then log "landed keep $name: dirty"; return 0; fi
+    if ! sha="$(git -C "$WT_GC_REPO_ROOT" rev-parse --verify -q "refs/heads/$branch")"; then
+        log "landed keep $name: branch unresolved"; return 0
+    fi
+    if ! n="$("$WT_GC_GH" pr list --repo a-jay85/IBL5 --head "$branch" --state open \
+            --json number --jq length 2>/dev/null)"; then
+        log "landed keep $name: gh error"; return 0
+    fi
+    if [ "$n" != 0 ]; then log "landed keep $name: open PR"; return 0; fi
+    out="$(git -C "$WT_GC_REPO_ROOT" merge-tree --write-tree origin/master "$sha" 2>/dev/null)" || mrc=$?
+    case "$mrc" in
+        0) ;;
+        1) log "landed keep $name: merge conflict"; return 0 ;;
+        *) log "landed keep $name: merge-tree error rc=$mrc"; return 0 ;;
+    esac
+    if [ "${out%%$'\n'*}" != "$master_tree" ]; then log "landed keep $name: adds content"; return 0; fi
+    _gc_remove_wt_and_branch landed "$name" "$branch" "$sha" || return 1
+    [ "$GC_REMOVED" = 1 ] || return 0
+    log "landed reaped $name branch=$branch age=${age}d"
+}
+
+# ── Step: unborn-HEAD worktrees ───────────────────────────────────────────────
+# A worktree directly under IBL5-worktrees whose HEAD names a branch with no
+# commit. Older than WT_GC_UNBORN_DAYS by dir mtime: archive the full tree as a
+# parentless commit under refs/wt-gc-archive/, then wt-remove.
+reap_unborn_worktrees() {
+    _gc_valid_days WT_GC_UNBORN_DAYS || return 1
+    log "step unborn threshold=${WT_GC_UNBORN_DAYS}d"
+    local parent root listing paths wt real rc=0
+    parent="$(_gc_wt_parent)" || return 1
+    [ -d "$parent" ] || return 0
+    root="$(cd "$parent" && pwd -P)" || return 1
+    if ! listing="$(git -C "$WT_GC_REPO_ROOT" worktree list --porcelain 2>/dev/null)"; then
+        log "unborn worktree list failed"; return 1
+    fi
+    paths="$(sed -n 's/^worktree //p' <<< "$listing")"
+    while IFS= read -r wt <&3; do
+        [ -n "$wt" ] && [ -d "$wt" ] || continue
+        real="$(cd "$wt" && pwd -P)" || continue
+        [ "${real%/*}" = "$root" ] || continue
+        git -C "$wt" rev-parse --verify -q HEAD >/dev/null 2>&1 && continue
+        _gc_reap_unborn_one "${wt##*/}" "$wt" || rc=1
+    done 3<<< "$paths"
+    return "$rc"
+}
+
+_gc_reap_unborn_one() {
+    local name="$1" wt="$2" branch mt age snap
+    _gc_wt_guard unborn "$name" "$wt" || return 0
+    branch="$GC_BRANCH"
+    if git -C "$WT_GC_REPO_ROOT" rev-parse --verify -q "refs/heads/$branch" >/dev/null 2>&1; then
+        log "unborn keep $name: branch $branch exists"; return 0
+    fi
+    mt="$(_gc_mtime "$wt")" || mt=""
+    case "$mt" in ''|*[!0-9]*) log "unborn keep $name: age unknown"; return 0 ;; esac
+    age=$(( ($(date +%s) - mt) / 86400 ))
+    if [ "$age" -lt "$WT_GC_UNBORN_DAYS" ]; then log "unborn keep $name: age=${age}d"; return 0; fi
+    if ! snap="$(_gc_snapshot_dirt "$wt" "" "unborn $name")"; then
+        log "unborn keep $name: snapshot failed"; return 0
+    fi
+    if ! _gc_tips_record "$snap" "refs/heads/$branch"; then
+        log "unborn keep $name: tips write failed"; return 0
+    fi
+    if ! _gc_do "$WT_GC_WT_REMOVE" "$name" --volumes; then
+        log "unborn keep $name: wt-remove refused"; return 0
+    fi
+    [ "${DRY_RUN:-0}" = 1 ] || log "unborn reaped $name branch=$branch age=${age}d archive=$snap"
+}
+
+# ── Step: orphan wt-pool/<N> branches ─────────────────────────────────────────
+# _gc_protected_name keeps refs/heads/wt-pool/* away from the generic refs
+# step. This step alone may delete one, and only when no worktree has it
+# checked out, no _pool-<N> slot dir exists, it is 0 ahead of origin/master,
+# and the previous sweep saw the same "<sha> <ref>" as an orphan too.
+reap_orphan_pool_branches() {
+    log "step pool-branches"
+    local checked parent listing ref sha n ahead seen prev="" doomed="" rc=0 now=""
+    checked="$(_gc_checked_out)" || { log "pool-branches worktree list failed"; return 1; }
+    parent="$(_gc_wt_parent)" || return 1
+    listing="$(git -C "$WT_GC_REPO_ROOT" for-each-ref --format='%(objectname) %(refname)' refs/heads/wt-pool/)" || return 1
+    seen="$WT_GC_LOCK_DIR/pool-orphans.txt"
+    if [ -f "$seen" ]; then prev="$(cat "$seen" 2>/dev/null)"; fi
+    while IFS=' ' read -r sha ref <&3; do
+        [ -n "$ref" ] || continue
+        if [[ ! "$ref" =~ ^refs/heads/wt-pool/([0-9]+)$ ]]; then log "pool-branches keep $ref: not a slot name"; continue; fi
+        n="${BASH_REMATCH[1]}"
+        if grep -qxF -- "$ref" <<< "$checked"; then continue; fi
+        if [ -e "$parent/_pool-$n" ]; then log "pool-branches keep $ref: slot dir exists"; continue; fi
+        ahead="$(git -C "$WT_GC_REPO_ROOT" rev-list --count "origin/master..$sha" 2>/dev/null)" || ahead=""
+        if [ "$ahead" != 0 ]; then log "pool-branches keep $ref: ahead=${ahead:-?}"; continue; fi
+        now="${now}$sha $ref"$'\n'
+        if grep -qxF -- "$sha $ref" <<< "$prev"; then
+            doomed="${doomed}$sha $ref"$'\n'
+        else
+            log "pool-branches keep $ref: first sighting"
+        fi
+    done 3<<< "$listing"
+    if [ "${DRY_RUN:-0}" != 1 ]; then
+        printf '%s' "$now" > "$seen" 2>/dev/null || { log "pool-branches seen-file write failed"; return 1; }
+    fi
+    [ -n "$doomed" ] || return 0
+    _gc_archive_batch "$doomed" || return 1
+    while IFS=' ' read -r sha ref <&3; do
+        [ -n "$ref" ] || continue
+        if _gc_do git -C "$WT_GC_REPO_ROOT" update-ref -d "$ref" "$sha"; then
+            [ "${DRY_RUN:-0}" = 1 ] || log "pool-branches deleted $ref"
+        else
+            log "pool-branches delete failed $ref"; rc=1
+        fi
+    done 3<<< "$doomed"
+    return "$rc"
 }
 
 # ── Step: merged-but-dirty worktrees ──────────────────────────────────────────
@@ -1298,6 +1481,7 @@ write_stale_list() {
     while read -r cls name <&3; do
         [ -n "$name" ] || continue
         wt="$parent/$name"
+        [ -d "$wt" ] || continue
         age=""
         if branch="$(git -C "$wt" symbolic-ref --short -q HEAD 2>/dev/null)" && [ -n "$branch" ]; then
             age="$(_gc_wt_age_days "$wt" "$branch")" || age=""

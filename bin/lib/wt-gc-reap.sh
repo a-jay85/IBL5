@@ -429,13 +429,37 @@ reap_t3_worktrees() {
     paths="$(sed -n 's/^worktree //p' <<< "$listing")"
     while IFS= read -r wt <&3; do
         [ -n "$wt" ] || continue
-        case "${wt##*/}" in t3-*) ;; *) continue ;; esac
+        case "${wt##*/}" in
+            t3-*) ;;
+            *) [ "${WT_GC_REAP_T3_MERGED:-1}" != 0 ] || continue ;;
+        esac
         [ -d "$wt" ] || continue
         real="$(cd "$wt" && pwd -P)" || continue
         [ "${real%/*}" = "$root" ] || continue
         _gc_reap_t3_one "${wt##*/}" "$wt" || rc=1
     done 3<<< "$paths"
     return "$rc"
+}
+
+# _gc_t3_merged_check <name> <branch> <sha> — 0 when the branch has exactly
+# one MERGED PR, no OPEN PR, and _gc_merge_proven accepts <sha> against that
+# PR's head. Logs the keep reason and returns 1 otherwise (gh error included).
+_gc_t3_merged_check() {
+    local name="$1" branch="$2" sha="$3" oid prc=0
+    if ! oid="$("$WT_GC_GH" pr list --repo a-jay85/IBL5 --head "$branch" --state all --limit 5 \
+            --json state,headRefOid \
+            --jq 'if any(.[]; .state=="OPEN") then "open" else ([.[] | select(.state=="MERGED")] | if length==1 then .[0].headRefOid else "none" end) end' \
+            2>/dev/null)"; then
+        log "t3 keep $name: gh error"; return 1
+    fi
+    if [ "$oid" = open ]; then log "t3 keep $name: open PR"; return 1; fi
+    if [[ ! "$oid" =~ ^[0-9a-f]{40}$ ]]; then log "t3 keep $name: no merged PR"; return 1; fi
+    _gc_merge_proven "$sha" "$oid" || prc=$?
+    case "$prc" in
+        0) GC_T3_PR_OID="$oid"; return 0 ;;
+        1) log "t3 keep $name: merge not proven ($GC_PROOF_REASON)"; return 1 ;;
+        *) log "t3 keep $name: proof error"; return 1 ;;
+    esac
 }
 
 _gc_reap_t3_one() {
@@ -446,7 +470,12 @@ _gc_reap_t3_one() {
     if [ -z "$age" ]; then log "t3 keep $name: age unknown"; return 0; fi
     if [ "$age" -lt "$WT_GC_T3_DAYS" ]; then log "t3 keep $name: age=${age}d"; return 0; fi
     ahead="$(git -C "$wt" rev-list --count origin/master..HEAD 2>/dev/null)" || ahead=""
-    if [ "$ahead" != 0 ]; then log "t3 keep $name: ahead=${ahead:-?}"; return 0; fi
+    case "$ahead" in ''|*[!0-9]*) log "t3 keep $name: ahead=?"; return 0 ;; esac
+    local need_proof=0
+    case "$name" in t3-*) [ "$ahead" = 0 ] || need_proof=1 ;; *) need_proof=1 ;; esac
+    if [ "$need_proof" = 1 ] && [ "${WT_GC_REAP_T3_MERGED:-1}" = 0 ]; then
+        log "t3 keep $name: ahead=$ahead"; return 0
+    fi
     if ! dirt="$(git -C "$wt" status --porcelain --untracked-files=all 2>/dev/null)"; then
         log "t3 keep $name: status error"; return 0
     fi
@@ -454,9 +483,16 @@ _gc_reap_t3_one() {
     if ! sha="$(git -C "$WT_GC_REPO_ROOT" rev-parse --verify -q "refs/heads/$branch")"; then
         log "t3 keep $name: branch unresolved"; return 0
     fi
+    if [ "$need_proof" = 1 ]; then
+        _gc_t3_merged_check "$name" "$branch" "$sha" || return 0
+    fi
     _gc_remove_wt_and_branch t3 "$name" "$branch" "$sha" "$wt" || return 1
     [ "$GC_REMOVED" = 1 ] || return 0
-    log "t3 reaped $name branch=$branch age=${age}d"
+    if [ "$need_proof" = 1 ]; then
+        log "t3 reaped-merged $name branch=$branch age=${age}d pr_head=$GC_T3_PR_OID"
+    else
+        log "t3 reaped $name branch=$branch age=${age}d"
+    fi
 }
 
 # ── Step: merged-but-dirty worktrees ──────────────────────────────────────────

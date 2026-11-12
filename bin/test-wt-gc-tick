@@ -39,7 +39,8 @@ while [ $# -gt 0 ]; do
         --case)
             [ $# -ge 2 ] && [ -n "$2" ] || { echo "usage: $0 [--case NAME]..." >&2; exit 2; }
             ONLY_CASES+=("$2"); shift 2 ;;
-        *) echo "usage: $0 [--case NAME]... (unknown argument: $1)" >&2; exit 2 ;;
+        -*) echo "usage: $0 [--case NAME]... (unknown argument: $1)" >&2; exit 2 ;;
+        *) ONLY_CASES+=("$1"); shift ;;   # bare case name, same as --case NAME
     esac
 done
 RAN_CASES=$'\n'
@@ -1364,7 +1365,7 @@ mk_registry "$CD/registry.json" t3/live
 rt "${T_ON[@]}" -- --force
 chk_rc T2 0
 log_has 't3 keep t3-young001: age=0d' || note_err "young not kept by age"
-log_has 't3 keep t3-ahead001: ahead=1' || note_err "ahead not kept"
+log_has 't3 keep t3-ahead001: no merged PR' || note_err "ahead not kept"
 log_has 't3 keep t3-dirty001: dirty' || note_err "dirty not kept"
 log_has 'live-work t3-live0001: live Claude session' || note_err "live session not seen"
 log_has 't3 keep t3-live0001: live work' || note_err "live not kept"
@@ -1388,7 +1389,7 @@ mkdir -p "$CD/t3root/nested"
 git -C "$ENV_MAIN" worktree add -q -b t3/nested "$CD/t3root/nested/t3-deep0001" origin/master >/dev/null 2>&1
 touch -t "$(epoch_to_touch "$(epoch_ago 5)")" "$CD/t3root/nested/t3-deep0001"
 B_WT="$(wt_snapshot)"; B_REFS="$(refs_snapshot)"
-rt "${T_ON[@]}" -- --force
+rt "${T_ON[@]}" WT_GC_REAP_T3_MERGED=0 -- --force
 chk_rc T3 0
 [ "$(wt_snapshot)" = "$B_WT" ] || note_err "worktrees changed"
 [ "$(refs_snapshot)" = "$B_REFS" ] || note_err "refs changed"
@@ -1411,6 +1412,109 @@ rt "${T_ON[@]}" WT_GC_T3_ROOT="$CD/no-such-root" -- --force
 chk_rc "T4 absent root" 0
 log_has 'reap done steps_failed=0' || note_err "absent root failed the step"
 [ -d "$(t3_dir t3-bbbb2222)" ] || note_err "absent-root run removed a worktree"
+finish_case
+fi
+
+# T2b — with the merged proof switched off, a t3-* worktree with own commits
+# is kept on the old ahead check, as before the proof existed.
+if should_run T2b-t3-ahead-switch-off; then
+fx T2b-t3-ahead-switch-off
+mk_t3 t3-ahead001 t3/ahead ahead=1 age_days=5
+rt "${T_ON[@]}" WT_GC_REAP_T3_MERGED=0 -- --force
+chk_rc T2b 0
+log_has 't3 keep t3-ahead001: ahead=1' || note_err "ahead not kept by the old check"
+[ -d "$(t3_dir t3-ahead001)" ] || note_err "removed"
+finish_case
+fi
+
+# gh_head <branch> <value> — the answer the gh stub gives `pr list --head <branch>`
+# after the reaper's --jq filter: open, none, or the merged PR's head oid.
+gh_head() {
+    mkdir -p "$(dirname "$CD/gh/by-head/$1.json")"
+    printf '%s\n' "$2" > "$CD/gh/by-head/$1.json"
+}
+
+# TM1 — a T3-root worktree with own commits is reaped when its branch has one
+# MERGED PR and the proof accepts the tip. Any name qualifies, not only t3-*.
+if should_run TM1-t3-merged-reaped; then
+fx TM1-t3-merged-reaped
+mk_t3 t3-bbbb2222 t3/merged ahead=2 age_days=5
+mk_t3 dependabot-npm dependabot/npm/foo ahead=1 age_days=5
+SHA1="$(git -C "$ENV_MAIN" rev-parse refs/heads/t3/merged)"
+SHA2="$(git -C "$ENV_MAIN" rev-parse refs/heads/dependabot/npm/foo)"
+gh_head t3/merged "$SHA1"
+gh_head dependabot/npm/foo "$SHA2"
+rt "${T_ON[@]}" -- --force
+chk_rc TM1 0
+log_has "t3 reaped-merged t3-bbbb2222 branch=t3/merged age=5d pr_head=$SHA1" || note_err "no merged reaped line (t3 name)"
+log_has "t3 reaped-merged dependabot-npm branch=dependabot/npm/foo age=5d pr_head=$SHA2" || note_err "no merged reaped line (dependabot name)"
+[ -d "$(t3_dir t3-bbbb2222)" ] && note_err "t3 worktree still present"
+[ -d "$(t3_dir dependabot-npm)" ] && note_err "dependabot worktree still present"
+has_branch t3/merged && note_err "t3 branch still present"
+has_branch dependabot/npm/foo && note_err "dependabot branch still present"
+tips_has "$SHA1 refs/heads/t3/merged" || note_err "tips lacks t3 sha"
+tips_has "$SHA2 refs/heads/dependabot/npm/foo" || note_err "tips lacks dependabot sha"
+KEEP="$(git -C "$ENV_MAIN" for-each-ref --format='%(refname) %(objectname)' refs/wt-gc-archive/)"
+grep -qE "^refs/wt-gc-archive/[0-9]+/heads/t3/merged $SHA1\$" <<< "$KEEP" || note_err "no keep-ref (t3)"
+grep -qE "^refs/wt-gc-archive/[0-9]+/heads/dependabot/npm/foo $SHA2\$" <<< "$KEEP" || note_err "no keep-ref (dependabot)"
+[ -f "$CD/wt-remove-argv" ] && note_err "wt-remove ran for a T3 worktree"
+finish_case
+fi
+
+# TM2 — every way the merged proof can say no keeps the worktree, its branch
+# and its files.
+if should_run TM2-t3-merged-kept; then
+fx TM2-t3-merged-kept
+mk_t3 tm-open tm/open ahead=1 age_days=5;       gh_head tm/open open
+mk_t3 tm-none tm/none ahead=1 age_days=5
+mk_t3 tm-unproven tm/unproven ahead=1 age_days=5
+gh_head tm/unproven "$(git -C "$ENV_MAIN" rev-parse origin/master)"
+mk_t3 tm-ghfail tm/ghfail ahead=1 age_days=5
+mk_t3 tm-dirty tm/dirty ahead=1 age_days=5
+printf 'scratch\n' > "$(t3_dir tm-dirty)/notes.md"
+touch -t "$(epoch_to_touch "$(epoch_ago 5)")" "$(t3_dir tm-dirty)"
+gh_head tm/dirty "$(git -C "$ENV_MAIN" rev-parse refs/heads/tm/dirty)"
+mkdir -p "$CD/t3root/sub"
+git -C "$ENV_MAIN" worktree add -q -b tm/nested "$CD/t3root/sub/tm-nested" origin/master >/dev/null 2>&1
+touch -t "$(epoch_to_touch "$(epoch_ago 5)")" "$CD/t3root/sub/tm-nested"
+gh_head tm/nested "$(git -C "$ENV_MAIN" rev-parse refs/heads/tm/nested)"
+rt "${T_ON[@]}" -- --force
+chk_rc TM2 0
+log_has 't3 keep tm-open: open PR' || note_err "open PR not kept"
+log_has 't3 keep tm-none: no merged PR' || note_err "no-PR not kept"
+log_has 't3 keep tm-unproven: merge not proven' || note_err "unproven merge not kept"
+log_has 't3 keep tm-dirty: dirty' || note_err "dirty not kept"
+grep -q 'tm/dirty' "$CD/gh-argv" 2>/dev/null && note_err "dirty worktree cost a gh call"
+log_has 't3 (keep|reaped|reaped-merged) tm-nested' && note_err "nested worktree considered"
+rt "${T_ON[@]}" STUB_GH_FAIL=1 -- --force
+chk_rc "TM2 gh failure" 0
+log_has 't3 keep tm-ghfail: gh error' || note_err "gh failure not kept"
+for n in tm-open tm-none tm-unproven tm-ghfail tm-dirty; do
+    [ -d "$(t3_dir "$n")" ] || note_err "$n removed"
+done
+[ -d "$CD/t3root/sub/tm-nested" ] || note_err "nested removed"
+[ -f "$(t3_dir tm-dirty)/notes.md" ] || note_err "untracked file lost"
+for b in tm/open tm/none tm/unproven tm/ghfail tm/dirty tm/nested; do has_branch "$b" || note_err "$b deleted"; done
+log_has 'reap done steps_failed=0' || note_err "a step failed"
+finish_case
+fi
+
+# TM3 — WT_GC_REAP_T3_MERGED=0 restores the old behavior: own commits keep a
+# t3-* worktree, and a non-t3 name is never looked at.
+if should_run TM3-t3-merged-switch-off; then
+fx TM3-t3-merged-switch-off
+mk_t3 t3-bbbb2222 t3/merged ahead=2 age_days=5
+mk_t3 dependabot-npm dependabot/npm/foo ahead=1 age_days=5
+gh_head t3/merged "$(git -C "$ENV_MAIN" rev-parse refs/heads/t3/merged)"
+gh_head dependabot/npm/foo "$(git -C "$ENV_MAIN" rev-parse refs/heads/dependabot/npm/foo)"
+rt "${T_ON[@]}" WT_GC_REAP_T3_MERGED=0 -- --force
+chk_rc TM3 0
+log_has 't3 keep t3-bbbb2222: ahead=2' || note_err "t3 name not kept by ahead"
+log_has 'dependabot-npm' && note_err "non-t3 name was looked at"
+[ -d "$(t3_dir t3-bbbb2222)" ] || note_err "t3 worktree removed"
+[ -d "$(t3_dir dependabot-npm)" ] || note_err "dependabot worktree removed"
+has_branch t3/merged || note_err "t3 branch deleted"
+has_branch dependabot/npm/foo || note_err "dependabot branch deleted"
 finish_case
 fi
 

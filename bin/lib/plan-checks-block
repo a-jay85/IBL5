@@ -252,7 +252,9 @@ do_ci() {
         fi
     done < "$out/rows.tsv"
     if [ -s "$out/records.nul" ]; then
-        nmut=$(grep -c '' "$out/records.nul")
+        # Count newline-terminated records. GNU grep treats the NUL field
+        # separators as line ends and overcounts, so use wc -l.
+        nmut=$(( $(wc -l < "$out/records.nul") ))
         bin/lib/plan-exec-mutations recover; rc=$?
         if [ "$rc" -ne 0 ]; then
             echo "FAIL plan-checks mutation recover exited $rc"

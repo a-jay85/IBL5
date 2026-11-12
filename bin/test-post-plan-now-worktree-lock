@@ -1,0 +1,377 @@
+#!/usr/bin/env bash
+# Tests the per-worktree lock (backlog#1827): bin/lib/worktree-lock.sh, bin/post-plan-now's
+# acquire/release, and pcw_inflight's probe.
+#
+# Usage: bin/test-post-plan-now-worktree-lock [--case NAME]...
+# Exit 0 iff every selected case passes.
+set -euo pipefail
+
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+
+pass() { h_pass "$1"; }
+fail() { h_fail "$@"; }
+
+ONLY_CASES=()
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --case)
+            [[ $# -ge 2 && -n "$2" ]] || { echo "usage: $0 [--case NAME]..." >&2; exit 2; }
+            ONLY_CASES+=("$2"); shift 2 ;;
+        *) echo "usage: $0 [--case NAME]... (unknown argument: $1)" >&2; exit 2 ;;
+    esac
+done
+RAN_CASES=$'\n'
+should_run() {  # $1 = case name; true when no --case was given or $1 was named
+    [[ ${#ONLY_CASES[@]} -eq 0 ]] && return 0
+    local c
+    for c in "${ONLY_CASES[@]}"; do
+        if [[ "$c" == "$1" ]]; then RAN_CASES+="$1"$'\n'; return 0; fi
+    done
+    return 1
+}
+check_only_cases() {  # fail every --case name that matched no case
+    local c
+    for c in ${ONLY_CASES[@]+"${ONLY_CASES[@]}"}; do
+        [[ "$RAN_CASES" == *$'\n'"$c"$'\n'* ]] || fail "unknown --case name: $c (no case ran)"
+    done
+}
+
+h_tmp TMP
+
+sleep 300 & LIVE=$!; disown "$LIVE"
+OTHER=""
+cleanup() {
+    kill "$LIVE" 2>/dev/null || true
+    if [ -n "$OTHER" ]; then kill "$OTHER" 2>/dev/null || true; fi
+    h_cleanup
+}
+trap cleanup EXIT
+
+sleep 0 & DEAD=$!
+wait "$DEAD" || true
+
+# Scratch repo with two linked worktrees whose branch names share a prefix.
+git init -q -b master "$TMP/r" >/dev/null 2>&1
+git -C "$TMP/r" config user.email "test@example.com"
+git -C "$TMP/r" config user.name "Test"
+git -C "$TMP/r" commit -q --allow-empty -m init
+git -C "$TMP/r" worktree add -q -b feat-a "$TMP/wt-a"
+git -C "$TMP/r" worktree add -q -b feat-ab "$TMP/wt-ab"
+
+# shellcheck source=bin/lib/worktree-lock.sh
+. "$REPO/bin/lib/worktree-lock.sh"
+
+L="$(wtlock_path "$TMP/wt-a")"
+reset_lock() { chmod -R u+rwx "$L" 2>/dev/null || true; rm -rf "$L"; }
+plant() {  # $1 = pid text
+    reset_lock
+    mkdir "$L"
+    printf '%s\n' "$1" > "$L/pid"
+}
+
+if should_run lib-held; then
+    plant "$LIVE"
+    RC=0; OUT=$(wtlock_live "$L") || RC=$?
+    h_eq "lib-held: live holder reads held (rc 0)" "0" "$RC"
+    h_eq "lib-held: live prints the holder pid" "$LIVE" "$OUT"
+    RC=0; OUT=$(wtlock_acquire "$L" 99999) || RC=$?
+    h_eq "lib-held: second acquire refuses (rc 1)" "1" "$RC"
+    h_eq "lib-held: refusal prints the holder pid" "$LIVE" "$OUT"
+    h_eq "lib-held: pid file unchanged" "$LIVE" "$(cat "$L/pid")"
+    reset_lock
+fi
+
+if should_run lib-stale; then
+    plant "$DEAD"
+    RC=0; wtlock_live "$L" >/dev/null || RC=$?
+    h_eq "lib-stale: dead pid reads free (rc 1)" "1" "$RC"
+    RC=0; wtlock_acquire "$L" "$LIVE" >/dev/null || RC=$?
+    h_eq "lib-stale: acquire reclaims (rc 0)" "0" "$RC"
+    h_eq "lib-stale: pid is now the new holder" "$LIVE" "$(cat "$L/pid")"
+    reset_lock
+fi
+
+if should_run lib-unreadable; then
+    # shellcheck disable=SC2043
+    for sub in nopid garbage mode000; do
+        reset_lock
+        mkdir "$L"
+        case "$sub" in
+            nopid) : ;;
+            garbage) printf 'abc\n' > "$L/pid" ;;
+            mode000)
+                if [ "$(id -u)" = 0 ]; then
+                    echo "SKIP: lib-unreadable mode000 (running as root)"
+                    continue
+                fi
+                printf '%s\n' "$DEAD" > "$L/pid"; chmod 000 "$L/pid" ;;
+        esac
+        RC=0; OUT=$(wtlock_live "$L") || RC=$?
+        h_eq "lib-unreadable[$sub]: reads held (rc 0)" "0" "$RC"
+        h_eq "lib-unreadable[$sub]: prints unknown" "unknown" "$OUT"
+        RC=0; wtlock_acquire "$L" "$LIVE" >/dev/null || RC=$?
+        h_eq "lib-unreadable[$sub]: acquire refuses (rc 1)" "1" "$RC"
+    done
+    reset_lock
+fi
+
+if should_run lib-release-owner; then
+    plant "$LIVE"
+    RC=0; wtlock_release "$L" 12345 || RC=$?
+    h_eq "lib-release-owner: non-owner release rc 0" "0" "$RC"
+    h_exists "lib-release-owner: non-owner release leaves the lock" "$L"
+    RC=0; wtlock_release "$L" "$LIVE" || RC=$?
+    h_eq "lib-release-owner: owner release rc 0" "0" "$RC"
+    h_absent "lib-release-owner: owner release removes the lock" "$L"
+    RC=0; wtlock_release "$L" "$LIVE" || RC=$?
+    h_eq "lib-release-owner: release of an absent lock rc 0" "0" "$RC"
+fi
+
+if should_run lib-adopt; then
+    plant "$DEAD"
+    RC=0; wtlock_adopt "$L" "$DEAD" "$LIVE" || RC=$?
+    h_eq "lib-adopt: hand-off rc 0" "0" "$RC"
+    h_eq "lib-adopt: pid rewritten to the run's pid" "$LIVE" "$(cat "$L/pid")"
+    sleep 300 & OTHER=$!; disown "$OTHER"
+    printf '%s\n' "$OTHER" > "$L/pid"
+    RC=0; OUT=$(wtlock_adopt "$L" "$DEAD" "$LIVE") || RC=$?
+    h_eq "lib-adopt: another live holder refuses (rc 1)" "1" "$RC"
+    h_eq "lib-adopt: refusal prints the other holder" "$OTHER" "$OUT"
+    h_eq "lib-adopt: other holder's pid left alone" "$OTHER" "$(cat "$L/pid")"
+    reset_lock
+    RC=0; wtlock_adopt "$L" "$DEAD" "$LIVE" || RC=$?
+    h_eq "lib-adopt: absent lock is created (rc 0)" "0" "$RC"
+    h_eq "lib-adopt: created lock holds the new pid" "$LIVE" "$(cat "$L/pid")"
+    reset_lock
+fi
+
+if should_run lib-path-ignored; then
+    GD="$(git -C "$TMP/wt-a" rev-parse --absolute-git-dir)"
+    h_eq "lib-path-ignored: lock sits in the git admin dir" "$GD/post-plan-now.lock" "$L"
+    h_contains "lib-path-ignored: path is under /worktrees/wt-a/" "$L" "/worktrees/wt-a/"
+    reset_lock
+    wtlock_acquire "$L" "$LIVE" >/dev/null
+    h_eq "lib-path-ignored: git status stays empty" "" "$(git -C "$TMP/wt-a" status --porcelain)"
+    reset_lock
+fi
+
+# Thread orphaned-pidless-lock: a failed pid write must not leave a pid-less lock dir, and
+# a pid-less dir older than the grace is reclaimable.
+if should_run lib-pidless; then
+    reset_lock
+    RC=0; OUT=$( wtlock_write_pid() { return 1; }; wtlock_acquire "$L" "$LIVE" ) || RC=$?
+    h_eq "lib-pidless: failed pid write refuses (rc 1)" "1" "$RC"
+    h_absent "lib-pidless: failed pid write leaves no lock dir" "$L"
+    reset_lock
+    mkdir "$L"; touch -t 200001010000 "$L"
+    RC=0; wtlock_live "$L" >/dev/null || RC=$?
+    h_eq "lib-pidless: old pid-less dir reads free (rc 1)" "1" "$RC"
+    RC=0; wtlock_acquire "$L" "$LIVE" >/dev/null || RC=$?
+    h_eq "lib-pidless: old pid-less dir is reclaimed (rc 0)" "0" "$RC"
+    h_eq "lib-pidless: reclaimed lock holds the new pid" "$LIVE" "$(cat "$L/pid")"
+    reset_lock
+    mkdir "$L"
+    RC=0; OUT=$(wtlock_acquire "$L" "$LIVE") || RC=$?
+    h_eq "lib-pidless: young pid-less dir still refuses (rc 1)" "1" "$RC"
+    h_absent "lib-pidless: young pid-less dir gets no pid" "$L/pid"
+    reset_lock
+fi
+
+# Thread lock-reclaim-race: two runs reclaiming one dead lock. A run that finds another's
+# reclaim in progress refuses and leaves the lock alone; a reclaim mutex left by a killed
+# run is cleared once it is older than the grace.
+if should_run lib-reclaim-race; then
+    plant "$DEAD"
+    rm -rf "$L.reclaim"; mkdir "$L.reclaim"
+    RC=0; wtlock_acquire "$L" "$LIVE" >/dev/null || RC=$?
+    h_eq "lib-reclaim-race: reclaim in progress refuses (rc 1)" "1" "$RC"
+    h_eq "lib-reclaim-race: the other run's lock is left alone" "$DEAD" "$(cat "$L/pid")"
+    touch -t 200001010000 "$L.reclaim"
+    RC=0; wtlock_acquire "$L" "$LIVE" >/dev/null || RC=$?
+    h_eq "lib-reclaim-race: old mutex is cleared and the lock reclaimed (rc 0)" "0" "$RC"
+    h_eq "lib-reclaim-race: reclaimed lock holds the new pid" "$LIVE" "$(cat "$L/pid")"
+    h_absent "lib-reclaim-race: mutex released after reclaim" "$L.reclaim"
+    reset_lock
+fi
+
+if should_run lib-branch-nearmiss; then
+    h_eq "lib-branch-nearmiss: feat-a maps to wt-a only" \
+        "$(cd "$TMP/wt-a" && pwd -P)" "$(cd "$(wtlock_wt_for_branch feat-a "$TMP/r")" && pwd -P)"
+    RC=0; OUT=$(wtlock_wt_for_branch feat "$TMP/r") || RC=$?
+    h_eq "lib-branch-nearmiss: prefix feat returns rc 1" "1" "$RC"
+    h_eq "lib-branch-nearmiss: prefix feat prints nothing" "" "$OUT"
+    RC=0; OUT=$(wtlock_wt_for_branch 'feat-[a]' "$TMP/r") || RC=$?
+    h_eq "lib-branch-nearmiss: glob returns rc 1" "1" "$RC"
+    h_eq "lib-branch-nearmiss: glob prints nothing" "" "$OUT"
+fi
+
+# ---------------------------------------------------------------------------
+# bin/post-plan-now integration cases (rows 11-18). Scaffold copied from
+# bin/test-post-plan-now-untracked-only, built once and only when a case needs it.
+# ---------------------------------------------------------------------------
+PPN_READY=0
+setup_ppn() {
+    [ "$PPN_READY" -eq 0 ] || return 0
+    PPN_READY=1
+    PPN="$TMP/ppn"; mkdir -p "$PPN/runlog" "$PPN/shims" "$PPN/Library/LaunchAgents" "$PPN/gate" "$PPN/.local/bin"
+    printf '#!/usr/bin/env bash\nexit 0\n' > "$PPN/prefire-pass"; chmod +x "$PPN/prefire-pass"
+    export PREFIRE_VERIFY_SCRIPT="$PPN/prefire-pass"
+    export POSTPLAN_LOG_DIR="$PPN/runlog" PLAN_NOW_LOG_DIR="$PPN/runlog"
+    export PATH="$PPN/shims:$PATH"
+    export IBL5_USAGE_GATE_STATE_DIR="$PPN/gate"
+    printf '#!/bin/sh\nexit 1\n' > "$PPN/shims/security"
+    printf '#!/bin/sh\nexit 0\n' > "$PPN/shims/launchctl"
+    # claude shim sits in $HOME/.local/bin, which $CMD's own PATH export keeps.
+    printf '#!/bin/sh\n[ -z "${FAKE_CLAUDE_MARK:-}" ] || : > "$FAKE_CLAUDE_MARK"\nsleep "${FAKE_CLAUDE_SLEEP:-0}"\nexit 0\n' > "$PPN/.local/bin/claude"
+    # caffeinate is macOS-only; Linux CI has none (exit 127). Drop its flags, run the rest.
+    printf '#!/usr/bin/env bash\nwhile [ $# -gt 0 ]; do case "$1" in -*) shift ;; *) break ;; esac; done\nexec "$@"\n' > "$PPN/.local/bin/caffeinate"
+    chmod +x "$PPN/shims/security" "$PPN/shims/launchctl" "$PPN/.local/bin/claude" "$PPN/.local/bin/caffeinate"
+    unset CLAUDE_HEADLESS
+    export POST_PLAN_SKILL=1  # skill engine: the fake claude shim runs, never the real harness
+    PORIGIN="$PPN/origin.git"; PMAIN="$PPN/IBL5"; PWT="$PPN/IBL5-worktrees/feat-lock"
+    git init -q --bare -b master "$PORIGIN" >/dev/null 2>&1
+    mkdir -p "$PMAIN/bin/lib"
+    git -C "$PMAIN" init -q -b master >/dev/null 2>&1
+    git -C "$PMAIN" config user.email "test@example.com"
+    git -C "$PMAIN" config user.name "Test"
+    git -C "$PMAIN" remote add origin "file://$PORIGIN"
+    cp "$REPO/bin/lib/git-helpers.sh" "$PMAIN/bin/lib/git-helpers.sh"
+    printf 'ignored.log\n' > "$PMAIN/.gitignore"
+    git -C "$PMAIN" add .
+    git -C "$PMAIN" commit -q -m init
+    git -C "$PMAIN" push -q origin master
+    git -C "$PMAIN" fetch -q origin
+    git -C "$PMAIN" worktree add -q -b feat-lock "$PWT" master
+    PL="$(wtlock_path "$PWT")"
+    PRC=0; POUT=""; PERR=""
+}
+dirty_wt() { printf 'change\n' > "$PWT/NewFile.txt"; }
+run_ppn() {  # args: post-plan-now flags. Sets PRC, POUT, PERR.
+    PRC=0
+    set +e
+    POUT="$(cd "$PWT" && POST_PLAN_MAIN_ROOT="$PMAIN" POST_PLAN_SELF_BIN="$PMAIN/bin" HOME="$PPN" \
+            "$REPO/bin/post-plan-now" "$@" 2>"$PPN/err")"
+    PRC=$?
+    set -e
+    PERR="$(cat "$PPN/err")"; [ -z "${PPN_DEBUG:-}" ] || { echo "--- rc=$PRC"; echo "$POUT"; echo "$PERR"; }
+}
+plant_ppn() { reset_ppn; mkdir "$PL"; printf '%s\n' "$1" > "$PL/pid"; }
+reset_ppn() { rm -rf "$PL"; }
+
+if should_run held-live; then
+    setup_ppn; dirty_wt; plant_ppn "$LIVE"
+    run_ppn --foreground
+    h_eq "held-live: exit 6" "6" "$PRC"
+    h_contains "held-live: stdout names the lock" "$POUT" "holds the worktree lock"
+    # Only the submitter's own refusal says this; the far-side adopt refusal does not.
+    h_contains "held-live: submitter refuses before the far side" "$POUT" "refusing to start a second one"
+    h_eq "held-live: holder pid untouched" "$LIVE" "$(cat "$PL/pid")"
+    reset_ppn
+fi
+
+if should_run dead-reclaim; then
+    setup_ppn; dirty_wt; plant_ppn "$DEAD"
+    run_ppn --foreground
+    h_eq "dead-reclaim: exit 0" "0" "$PRC"
+    h_absent "dead-reclaim: no lock left behind" "$PL"
+fi
+
+if should_run force-steal; then
+    setup_ppn; dirty_wt; plant_ppn "$LIVE"
+    run_ppn --foreground --force
+    if [ "$PRC" = 6 ]; then fail "force-steal: --force still refused (exit 6)"; else pass "force-steal: exit is not 6 (got $PRC)"; fi
+    h_not_contains "force-steal: no lock refusal text" "$POUT" "holds the worktree lock"
+    reset_ppn
+fi
+
+if should_run release-exit; then
+    setup_ppn; dirty_wt; reset_ppn
+    run_ppn --foreground
+    h_eq "release-exit: exit 0" "0" "$PRC"
+    h_absent "release-exit: lock released on exit" "$PL"
+fi
+
+if should_run release-term; then
+    setup_ppn; dirty_wt; reset_ppn
+    rm -f "$PPN/claude-started"
+    (cd "$PWT" && FAKE_CLAUDE_SLEEP=3 FAKE_CLAUDE_MARK="$PPN/claude-started" POST_PLAN_MAIN_ROOT="$PMAIN" POST_PLAN_SELF_BIN="$PMAIN/bin" HOME="$PPN" \
+        exec "$REPO/bin/post-plan-now" --foreground >/dev/null 2>&1) &
+    pp=$!
+    # Wait for the fake claude to start: the TERM must land on the far side of the
+    # exec, where PP_UNLOCK_TRAP releases the lock. Before that, the submitter's own
+    # EXIT trap would release it and hide a missing far-side release.
+    for _ in $(seq 1 100); do
+        if [ -e "$PPN/claude-started" ]; then break; fi
+        sleep 0.2
+    done
+    h_exists "release-term: run reached the far side (claude started)" "$PPN/claude-started"
+    h_eq "release-term: lock holds the run's pid" "$pp" "$(cat "$PL/pid" 2>/dev/null || true)"
+    kill -TERM "$pp" 2>/dev/null || true
+    wait "$pp" 2>/dev/null || true
+    h_absent "release-term: lock released after TERM" "$PL"
+fi
+
+if should_run early-exit-release; then
+    setup_ppn; reset_ppn
+    rm -f "$PWT/NewFile.txt"
+    run_ppn --foreground
+    if [ "$PRC" != 0 ]; then pass "early-exit-release: refused with nonzero exit ($PRC)"; else fail "early-exit-release: expected a nonzero exit"; fi
+    h_absent "early-exit-release: lock released on the early exit" "$PL"
+fi
+
+if should_run detached-handoff; then
+    setup_ppn; dirty_wt; reset_ppn
+    printf '#!/bin/sh\necho "$*" >> "%s/lc.log"\nexit 0\n' "$PPN" > "$PPN/shims/launchctl"
+    chmod +x "$PPN/shims/launchctl"
+    PRC=0
+    (cd "$PWT" && POST_PLAN_MAIN_ROOT="$PMAIN" POST_PLAN_SELF_BIN="$PMAIN/bin" HOME="$PPN" \
+        exec "$REPO/bin/post-plan-now" >/dev/null 2>&1) &
+    pp=$!
+    wait "$pp" || PRC=$?
+    h_eq "detached-handoff: exit 0" "0" "$PRC"
+    h_exists "detached-handoff: lock still held for the far side" "$PL"
+    h_eq "detached-handoff: pid is the submitter's" "$pp" "$(cat "$PL/pid" 2>/dev/null || true)"
+    reset_ppn
+fi
+
+if should_run submit-fail-release; then
+    setup_ppn; dirty_wt; reset_ppn
+    printf '#!/bin/sh\n[ "$1" = list ] && exit 0\nexit 1\n' > "$PPN/shims/launchctl"
+    chmod +x "$PPN/shims/launchctl"
+    run_ppn
+    h_eq "submit-fail-release: exit 1" "1" "$PRC"
+    h_contains "submit-fail-release: stderr names the failure" "$PERR" "launchctl submit failed"
+    h_absent "submit-fail-release: lock released" "$PL"
+fi
+
+if should_run pcw-inflight; then
+    # pcw_inflight (bin/lib/pr-cycle-watch.sh) probes the branch's worktree lock.
+    pcw_probe() {  # $1 = branch; prints the pcw_inflight return code
+        (
+            # shellcheck source=bin/lib/launchd-job.sh
+            . "$REPO/bin/lib/launchd-job.sh"
+            # shellcheck source=bin/lib/pr-cycle-watch.sh
+            . "$REPO/bin/lib/pr-cycle-watch.sh"
+            RC=0; pcw_inflight 7 "$1" "" "$TMP/r" || RC=$?
+            printf '%s' "$RC"
+        )
+    }
+    plant "$LIVE"
+    h_eq "pcw-inflight: live lock reads as in flight" "0" "$(pcw_probe feat-a)"
+    plant "$DEAD"
+    h_eq "pcw-inflight: dead lock reads as not in flight" "1" "$(pcw_probe feat-a)"
+    reset_lock
+    h_eq "pcw-inflight: no lock reads as not in flight" "1" "$(pcw_probe feat-a)"
+    plant "$LIVE"
+    h_eq "pcw-inflight: a lock on feat-a does not hold feat-ab" "1" "$(pcw_probe feat-ab)"
+    h_eq "pcw-inflight: a branch with no worktree is not in flight" "1" "$(pcw_probe no-such-branch)"
+    reset_lock
+fi
+
+# --- later phases add their cases above this line ---
+
+check_only_cases
+h_done

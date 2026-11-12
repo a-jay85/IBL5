@@ -28,6 +28,7 @@ _SYNC_TOKEN_RE = re.compile(
 )
 _ECHO_GREP_RE = re.compile(r'echo ("\$\{?\w+\}?") \| (grep(?: -[A-Za-z]+)*) ("[^"]*")')
 _HERESTRING_RE = re.compile(r"<<<\s*")
+_DQUOTE_RE = re.compile(r'(?<!\\)"')
 _SHELL_COMMENT_RE = re.compile(r"#(?!!)")
 _PHP_COMMENT_RE = re.compile(r"(?://|#(?!\[)|/\*|\*/|\*(?:\s|$))")
 _YAML_COMMENT_RE = re.compile(r"#")
@@ -134,7 +135,34 @@ def _sync_reason(body: list[str], idx: int, start: int) -> str | None:
     joined = " ".join(body[side[k]][1:] for k in range(lo, hi + 1))
     if _SYNC_TOKEN_RE.search(joined):
         return _R_SYNC
-    return None
+    return _string_reason(body, idx)
+
+
+def _string_reason(body: list[str], idx: int) -> str | None:
+    """A multi-line double-quoted string, such as a `remote_query "...")` table-list query, hides
+    its command head from the backslash join. Walk the changed line's side of the hunk, toggling
+    on each line with an odd count of unescaped quotes. When the first such line is a closer (it
+    opens with `"` and does not end with one), the hunk starts inside a string whose head is
+    unseen, so a changed line there fires. A changed line inside a string whose opening line is in
+    view is joined from that line and searched for a sync token."""
+    tag = body[idx][:1]
+    side = [k for k, ln in enumerate(body) if ln[:1] in (" ", tag)]
+    odd = [pos for pos, k in enumerate(side) if len(_DQUOTE_RE.findall(body[k][1:])) % 2]
+    first = body[side[odd[0]]][1:].strip() if odd else ""
+    opener: int | None = None
+    inside = first.startswith('"') and not first.endswith('"')
+    for pos, k in enumerate(side):
+        if k == idx:
+            break
+        if pos in odd:
+            inside = not inside
+            opener = pos if inside else None
+    if not inside:
+        return None
+    if opener is None:
+        return _R_CONTINUATION
+    through = " ".join(body[side[j]][1:] for j in range(opener, side.index(idx) + 1))
+    return _R_SYNC if _SYNC_TOKEN_RE.search(through) else None
 
 
 def external_send_change(path: str, section: str | None) -> str | None:

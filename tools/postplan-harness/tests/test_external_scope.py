@@ -174,3 +174,34 @@ def test_markdown_under_prefix_is_quiet():
 def test_unknown_extension_line_fires():
     path = "ibl5/classes/Mail/config.json"
     assert external_send_change(path, _section(path, 1, ['-{"a": 1}', '+{"a": 2}'])) == "send-change"
+
+
+# Multi-line quoted strings.
+
+def test_string_cut_by_hunk_top_fails_closed():
+    from test_merge_danger_external_replay import ALL_TABLES_CUT_BODY
+    assert external_send_change(SYNC, _section(SYNC, 314, ALL_TABLES_CUT_BODY)) == "truncated-continuation"
+
+
+def test_line_inside_string_joins_its_opener():
+    body = [
+        '     ALL_TABLES=$(remote_query "',
+        "         SELECT table_name",
+        "-        FROM information_schema.tables",
+        "+        FROM information_schema.views",
+        "         WHERE table_schema='$REMOTE_DATABASE'",
+        "           AND engine IS NOT NULL",
+        "         ORDER BY table_name;",
+        '     ")',
+    ]
+    assert external_send_change(SYNC, _section(SYNC, 313, body)) == "sync-change"
+
+
+def test_line_inside_local_string_is_quiet():
+    body = [
+        ' db_cmd "$DB_CONTAINER" mariadb "$DB_DEFAULT_NAME" -e "',
+        "-    SELECT migration FROM migrations WHERE migration LIKE '%.sql';",
+        "+    SELECT migration FROM migrations WHERE migration LIKE '%.sql' ORDER BY migration;",
+        ' " 2> >(db_strip_warnings >&2) || true',
+    ]
+    assert external_send_change(SYNC, _section(SYNC, 523, body)) is None

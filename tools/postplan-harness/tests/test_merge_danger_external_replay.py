@@ -284,3 +284,20 @@ def test_quiet_test_only_edit_is_two_way():
     path = "tools/postplan-harness/tests/test_discord_dm_stub.py"
     body = [" def test_stub():", '-    send_one("a")', '+    send_one("b")', " "]
     _assert_two_way_quiet(_replay_text(_section(path, 1, body)))
+
+
+# A SQL line inside the multi-line `remote_query "..."` string (bin/db-sync-prod lines 313-320).
+ALL_TABLES_CUT_BODY = [
+    "         SELECT table_name",
+    "         FROM information_schema.tables",
+    "         WHERE table_schema='$REMOTE_DATABASE'",
+    "-          AND engine IS NOT NULL",
+    "+          AND engine IS NOT NULL AND table_name NOT LIKE 'ibl_tmp%'",
+    "         ORDER BY table_name;",
+    '     ")',
+    " fi",
+]
+
+
+def test_sync_query_line_inside_remote_query_string_is_one_way():
+    _assert_one_way(_replay_text(_section(SYNC, 314, ALL_TABLES_CUT_BODY)), f"external-path:{SYNC}")

@@ -6,7 +6,9 @@ namespace Tests\TradeSuggestions\Engine;
 
 use PHPUnit\Framework\TestCase;
 use Tests\TradeSuggestions\Engine\Fixtures\SnapshotFactory;
+use Tests\TradeSuggestions\Fixtures\ProjectionFactory;
 use TradeSuggestions\Engine\LeagueSnapshot;
+use TradeSuggestions\Engine\LeagueSnapshotBuilder;
 use TradeSuggestions\Engine\SnapshotCodec;
 use TradeSuggestions\SlotMapper;
 use TradeSuggestions\Valuation\ContractValue;
@@ -149,5 +151,21 @@ final class LeagueSnapshotTest extends TestCase
             }
         }
         self::assertGreaterThan(100, $checked);
+    }
+
+    public function testPlayerWithoutProductionRoundTripsAsNull(): void
+    {
+        $roster = [];
+        foreach (['PG', 'SG', 'SF', 'PF', 'C', 'PG', 'SG', 'SF'] as $i => $pos) {
+            $roster[] = ProjectionFactory::player(pid: 101 + $i, tid: 1, pos: $pos, dcMinutes: $i < 5 ? 30 : 10, noProduction: $i === 2);
+        }
+        $s = LeagueSnapshotBuilder::build(SnapshotFactory::inputs(2, 8, [1 => $roster]));
+        self::assertNull($s->players[103]->production);
+
+        $json = json_encode(SnapshotCodec::encode($s), JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION);
+        $decoded = SnapshotCodec::decode(json_decode($json, true, 512, JSON_THROW_ON_ERROR));
+
+        self::assertNull($decoded->players[103]->production);
+        self::assertNotNull($decoded->players[101]->production);
     }
 }

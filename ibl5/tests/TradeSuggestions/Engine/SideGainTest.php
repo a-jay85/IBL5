@@ -10,7 +10,9 @@ use TradeSuggestions\Engine\LeagueSnapshot;
 use TradeSuggestions\Engine\MoneyPlaces;
 use TradeSuggestions\Engine\PairRecordMemo;
 use TradeSuggestions\Engine\SideGain;
+use TradeSuggestions\Engine\TeamState;
 use TradeSuggestions\Engine\TeamStateRebuilder;
+use TradeSuggestions\Valuation\PickWorth;
 use TradeSuggestions\Profile\RankUtility;
 use TradeSuggestions\Projection\ProjectionPlayer;
 use TradeSuggestions\TeamMode;
@@ -147,6 +149,61 @@ final class SideGainTest extends TestCase
     {
         self::assertFalse(RookieControl::isRookieScale(1, 8));
         self::assertSame(0.0, SideGain::rookieAt(1, 8, 0, [0 => 300, 1 => 300, 2 => 300, 3 => 300]));
+    }
+
+    public function testRookieAtTreatsAnOffsetMissingFromSurplusAsNoSurplus(): void
+    {
+        self::assertTrue(RookieControl::isRookieScale(1, 1));
+
+        self::assertSame(0.0, SideGain::rookieAt(1, 1, 0, [1 => 300, 2 => 300, 3 => 300]));
+    }
+
+    public function testReceivedPicksAreOrdinalledInOrderAndSummed(): void
+    {
+        $s = self::league();
+        $state = self::withRosterCount(TeamStateRebuilder::before($s, 1, 0), 14);
+        $c = new TradeCandidate(1, 2, [], [], [], [21, 22]);
+
+        $picks = SideGain::fromStates($state, $state, $s, $c, 1)['picks'];
+
+        // One open spot: the first pick fits, the second is a glut.
+        self::assertEqualsWithDelta(self::worth($s, 21, 1, 1) + self::worth($s, 22, 1, 2), $picks, 1e-12);
+        self::assertNotEqualsWithDelta(self::worth($s, 21, 1, 1) + self::worth($s, 22, 1, 1), $picks, 1e-9);
+    }
+
+    public function testSentPickIsWorthItsFirstOrdinalAgainstOpenSpots(): void
+    {
+        $s = self::league();
+        $c = new TradeCandidate(1, 2, [], [11], [], []);
+        $oneOpen = self::withRosterCount(TeamStateRebuilder::before($s, 1, 0), 14);
+        $full = self::withRosterCount(TeamStateRebuilder::before($s, 1, 0), 15);
+
+        self::assertEqualsWithDelta(-self::worth($s, 11, 1, 1), SideGain::fromStates($oneOpen, $oneOpen, $s, $c, 1)['picks'], 1e-12);
+        self::assertEqualsWithDelta(-self::worth($s, 11, 0, 1), SideGain::fromStates($full, $full, $s, $c, 1)['picks'], 1e-12);
+        self::assertNotEqualsWithDelta(self::worth($s, 11, 1, 1), self::worth($s, 11, 0, 1), 1e-9);
+    }
+
+    private static function worth(LeagueSnapshot $s, int $pickId, int $open, int $ordinal): float
+    {
+        $pick = $s->picks[$pickId];
+
+        return PickWorth::worth($pick->round, $pick->yearsAway, $pick->originalTid, $s->draftIndex, $s->mode(1), $open, $ordinal);
+    }
+
+    private static function withRosterCount(TeamState $base, int $count): TeamState
+    {
+        return new TeamState(
+            $base->tid,
+            $base->offset,
+            $base->lineup,
+            $base->starterRank,
+            $base->bestBenchRank,
+            $base->profile,
+            $base->positionStrength,
+            $base->payroll,
+            $base->payrollRank,
+            $count,
+        );
     }
 
     public function testComponentsExposesEveryKeyPerSeason(): void

@@ -74,6 +74,39 @@ final class LeagueSnapshotLoaderTest extends TestCase
         self::assertSame(10, $s->standings[1]['losses']);
     }
 
+    public function testNullAwayGamesCountsAsZero(): void
+    {
+        $row = self::standingsRow(1);
+        $row['homeGames'] = 40;
+        $row['awayGames'] = null;
+
+        $s = $this->loader(standingsRows: [$row])->snapshot();
+
+        self::assertSame(10, $s->standings[1]['losses']);
+    }
+
+    public function testTeamWithoutStandingsRowGetsTheFullZeroRow(): void
+    {
+        $s = $this->loader()->snapshot();
+
+        self::assertSame(
+            ['wins' => 0, 'losses' => 0, 'pct' => 0.0, 'games_unplayed' => League::REGULAR_SEASON_GAMES, 'conference' => ''],
+            $s->standings[2],
+        );
+    }
+
+    public function testStreaksAreReKeyedByTeamWithLastWinAndLastLossOnly(): void
+    {
+        $streaks = [
+            1 => self::streakRow(3, 2),
+            2 => self::streakRow(7, 1),
+        ];
+
+        $s = $this->loader(streakRows: $streaks)->snapshot();
+
+        self::assertSame([1 => ['last_win' => 3, 'last_loss' => 2], 2 => ['last_win' => 7, 'last_loss' => 1]], $s->streaks);
+    }
+
     public function testLoaderLastKeyIsNull(): void
     {
         $loader = $this->loader();
@@ -86,12 +119,14 @@ final class LeagueSnapshotLoaderTest extends TestCase
     /**
      * @param array<int, TeamModeSetting> $stored
      * @param list<array<string, mixed>>|null $standingsRows
+     * @param array<int, array<string, mixed>> $streakRows
      */
     private function loader(
         ?ProjectionPlayerRepositoryInterface $players = null,
         array $stored = [],
         string $phase = 'Regular Season',
         ?array $standingsRows = null,
+        array $streakRows = [],
     ): LeagueSnapshotLoader {
         if ($players === null) {
             $players = self::createStub(ProjectionPlayerRepositoryInterface::class);
@@ -105,7 +140,7 @@ final class LeagueSnapshotLoaderTest extends TestCase
 
         $standings = self::createStub(StandingsRepositoryInterface::class);
         $standings->method('getAllStandings')->willReturn($standingsRows ?? [self::standingsRow(1)]);
-        $standings->method('getAllStreakData')->willReturn([]);
+        $standings->method('getAllStreakData')->willReturn($streakRows);
 
         $draftOrder = self::createStub(ProjectedDraftOrderServiceInterface::class);
         $draftOrder->method('calculateDraftOrder')->willReturn(['round1' => [self::slot(1), self::slot(2)], 'round2' => []]);
@@ -154,6 +189,17 @@ final class LeagueSnapshotLoaderTest extends TestCase
         }
 
         return $out;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function streakRow(int $lastWin, int $lastLoss): array
+    {
+        return [
+            'last_win' => $lastWin, 'last_loss' => $lastLoss, 'streak_type' => 'W', 'streak' => 1, 'ranking' => 1,
+            'sos' => 0.5, 'remaining_sos' => 0.5, 'sos_rank' => 1, 'remaining_sos_rank' => 1,
+        ];
     }
 
     /**

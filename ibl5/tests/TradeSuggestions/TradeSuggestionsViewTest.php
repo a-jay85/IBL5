@@ -150,6 +150,19 @@ class TradeSuggestionsViewTest extends TestCase
         self::assertStringNotContainsString('value="middle"', $html);
     }
 
+    public function testMiddleOverrideRendersWithAutoSelectedSinceNoMiddleOptionExists(): void
+    {
+        $html = $this->render(new TradeSuggestionsPanelData(
+            new ResolvedTeamMode(TeamMode::Middle, TeamMode::WinNow, true),
+            [],
+        ));
+
+        self::assertStringContainsString('Mode: Middle', $html);
+        self::assertStringContainsString('(your choice, we guessed Win now)', $html);
+        self::assertStringContainsString('<option value="auto" selected>', $html);
+        self::assertSame(1, substr_count($html, ' selected>'));
+    }
+
     public function testRendersFixedModeErrorNotice(): void
     {
         $data = new TradeSuggestionsPanelData($this->autoMode(), []);

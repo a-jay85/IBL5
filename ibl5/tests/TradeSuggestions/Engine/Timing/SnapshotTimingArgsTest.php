@@ -51,4 +51,28 @@ final class SnapshotTimingArgsTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         SnapshotTimingArgs::parse(['--tid=0']);
     }
+
+    public function testFlagMustStartAtTheBeginningOfTheArgument(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        SnapshotTimingArgs::parse(['x--tid=4']);
+    }
+
+    public function testFlagValueMustEndTheArgument(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        SnapshotTimingArgs::parse(["--tid=4\nzzz"]);
+    }
+
+    public function testNumericValueWithTrailingJunkRejected(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        SnapshotTimingArgs::parse(['--tid=5x']);
+    }
+
+    public function testNumericValueWithLeadingJunkRejected(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        SnapshotTimingArgs::parse(['--repeat=x5']);
+    }
 }

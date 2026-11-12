@@ -65,4 +65,12 @@ final class SnapshotCacheKeyTest extends TestCase
         self::assertStringStartsWith(SnapshotCacheKey::PREFIX, self::key());
         self::assertSame(strlen(SnapshotCacheKey::PREFIX) + 40, strlen(self::key()));
     }
+
+    public function testKeyIsShaOfPipeJoinedComponentsWithTidEqualsModePairs(): void
+    {
+        $expected = SnapshotCacheKey::PREFIX
+            . sha1('Regular Season:4|Regular Season|abc|2026-11-01 10:00:00|1=WinNow,5=WinNow,9=Rebuild');
+
+        self::assertSame($expected, self::key());
+    }
 }

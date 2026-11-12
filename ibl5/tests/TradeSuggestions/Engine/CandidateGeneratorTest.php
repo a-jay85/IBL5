@@ -168,6 +168,118 @@ final class CandidateGeneratorTest extends TestCase
         self::assertSame(['OWNERSHIP' => 1], $result->rejectedByReason);
     }
 
+    public function testPartnersAreEveryEligiblePartnerWithANeedPair(): void
+    {
+        $s = self::league();
+        $expected = [];
+        foreach (ExposureFilter::eligiblePartners(self::SIM_KEY, 1, $s->teamIds) as $tid) {
+            if (SurplusDeficitMatcher::needPairs($s, 1, $tid) !== []) {
+                $expected[] = $tid;
+            }
+        }
+        $generator = new CandidateGenerator([self::fake('A', static fn (): array => [])]);
+
+        $result = $generator->generate($s, 1, self::SIM_KEY);
+
+        self::assertGreaterThan(1, count($expected));
+        self::assertSame($expected, $result->partners);
+    }
+
+    public function testAssetPoolsTakeTheGiversPairsInNeedPairOrderAsAList(): void
+    {
+        $s = self::league();
+        $pools = [];
+        $generator = new CandidateGenerator([self::fake('A', static function (TradeCandidate $c, AssetPool $pool) use (&$pools): array {
+            $pools[$c->partnerTid] = $pool;
+
+            return [];
+        })]);
+
+        $generator->generate($s, 1, self::SIM_KEY);
+
+        self::assertNotSame([], $pools);
+        foreach ($pools as $partnerTid => $pool) {
+            $pairs = SurplusDeficitMatcher::needPairs($s, 1, $partnerTid);
+            self::assertSame(self::expectedPool($s, 1, $pairs), $pool->userPids, "user pool vs {$partnerTid}");
+            self::assertSame(self::expectedPool($s, $partnerTid, $pairs), $pool->partnerPids, "partner pool vs {$partnerTid}");
+        }
+    }
+
+    public function testDuplicateDoesNotStopTheShapesRemainingCandidates(): void
+    {
+        $first = self::pickSwapFactory();
+        $second = static function (TradeCandidate $c) use ($first): array {
+            $swap = $first($c);
+            if ($swap === []) {
+                return [];
+            }
+
+            return [
+                $swap[0],
+                new TradeCandidate($c->userTid, $c->partnerTid, [], [$c->userTid * 10 + 2], [], [$c->partnerTid * 10 + 2]),
+            ];
+        };
+        $generator = new CandidateGenerator([self::fake('A', $first), self::fake('B', $second)]);
+
+        $result = $generator->generate(self::league(), 1, self::SIM_KEY);
+
+        self::assertSame(2, $result->rawCount);
+        self::assertCount(2, $result->candidates);
+    }
+
+    public function testOversizedCandidateDoesNotStopTheShapesRemainingCandidates(): void
+    {
+        $swap = self::pickSwapFactory();
+        $generator = new CandidateGenerator([self::fake('A', static function (TradeCandidate $c) use ($swap): array {
+            return [new TradeCandidate($c->userTid, $c->partnerTid, [101, 102, 103], [], [], []), ...$swap($c)];
+        })]);
+
+        $result = $generator->generate(self::league(), 1, self::SIM_KEY);
+
+        self::assertSame(1, $result->rawCount);
+        self::assertCount(1, $result->candidates);
+    }
+
+    public function testPartnerSideAssetCountBoundary(): void
+    {
+        $partner = self::firstPartner();
+        $generator = new CandidateGenerator([self::fake('A', static function (TradeCandidate $c) use ($partner): array {
+            if ($c->partnerTid !== $partner) {
+                return [];
+            }
+            $p = $c->partnerTid * 10;
+
+            return [
+                new TradeCandidate($c->userTid, $c->partnerTid, [], [], [$p + 5], [$p + 1, $p + 2]),
+                new TradeCandidate($c->userTid, $c->partnerTid, [], [], [], [$p + 1, $p + 2]),
+            ];
+        })]);
+
+        $result = $generator->generate(self::league(), 1, self::SIM_KEY);
+
+        self::assertSame(1, $result->rawCount);
+    }
+
+    public function testRejectionsOfOneReasonAreTallied(): void
+    {
+        $partner = self::firstPartner();
+        $generator = new CandidateGenerator([self::fake('A', static function (TradeCandidate $c) use ($partner): array {
+            if ($c->partnerTid !== $partner) {
+                return [];
+            }
+
+            return [
+                new TradeCandidate($c->userTid, $c->partnerTid, [], [$c->partnerTid * 10 + 1], [], []),
+                new TradeCandidate($c->userTid, $c->partnerTid, [], [$c->partnerTid * 10 + 2], [], []),
+            ];
+        })]);
+
+        $result = $generator->generate(self::league(), 1, self::SIM_KEY);
+
+        self::assertSame(['OWNERSHIP' => 2], $result->rejectedByReason);
+        self::assertSame(2, $result->prefilterRejected);
+    }
+
     public function testCandidateKeyIgnoresPidOrder(): void
     {
         self::assertSame(
@@ -273,6 +385,32 @@ final class CandidateGeneratorTest extends TestCase
 
             return [new TradeCandidate($c->userTid, $c->partnerTid, [], [$c->userTid * 10 + 1], [], [$c->partnerTid * 10 + 1])];
         };
+    }
+
+    /**
+     * The side's players: up to six distinct, taking only the pairs it gives, in pair order.
+     *
+     * @param list<\TradeSuggestions\Engine\NeedPair> $pairs
+     * @return list<int>
+     */
+    private static function expectedPool(LeagueSnapshot $s, int $tid, array $pairs): array
+    {
+        $pool = [];
+        foreach ($pairs as $pair) {
+            if ($pair->giverTid !== $tid) {
+                continue;
+            }
+            foreach (SurplusDeficitMatcher::assetsFor($s, $tid, $pair, CandidateBudget::PLAYERS_PER_PARTNER) as $pid) {
+                if (!in_array($pid, $pool, true)) {
+                    $pool[] = $pid;
+                }
+                if (count($pool) === CandidateBudget::PLAYERS_PER_PARTNER) {
+                    return $pool;
+                }
+            }
+        }
+
+        return $pool;
     }
 
     private static function firstPartner(): int

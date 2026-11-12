@@ -120,6 +120,18 @@ final class LeagueSnapshotBuilderTest extends TestCase
         self::assertSame(1, $s->picks[32]->yearsAway);
     }
 
+    public function testPastPickAheadOfLivePicksDoesNotDropThem(): void
+    {
+        $base = SnapshotFactory::inputs();
+        $rows = $base->pickRows;
+        array_unshift($rows[3], ['pickid' => 999, 'owner_teamid' => 3, 'teampick_teamid' => 3, 'year' => SnapshotFactory::SEASON_YEAR - 1, 'round' => 1]);
+        $s = LeagueSnapshotBuilder::build(self::with($base, pickRows: $rows));
+
+        self::assertArrayNotHasKey(999, $s->picks);
+        self::assertArrayHasKey(31, $s->picks);
+        self::assertArrayHasKey(32, $s->picks);
+    }
+
     public function testNonFranchiseTidsExcludedFromTeamIds(): void
     {
         $s = self::league();

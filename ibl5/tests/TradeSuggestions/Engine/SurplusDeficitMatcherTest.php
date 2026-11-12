@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\TradeSuggestions\Engine;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Tests\TradeSuggestions\Engine\Fixtures\SnapshotFactory;
 use Tests\TradeSuggestions\Fixtures\ProjectionFactory;
@@ -12,8 +13,10 @@ use TradeSuggestions\Engine\LeagueSnapshotBuilder;
 use TradeSuggestions\Engine\NeedPair;
 use TradeSuggestions\Engine\SurplusDeficitMatcher;
 use TradeSuggestions\Profile\ProfileDimension;
+use TradeSuggestions\Profile\RankUtility;
 use TradeSuggestions\Profile\SlotStrength;
 use TradeSuggestions\Profile\TeamProfile;
+use TradeSuggestions\Projection\ProjectedSeason;
 use TradeSuggestions\Projection\ProjectionPlayer;
 use TradeSuggestions\Projection\Rating;
 use TradeSuggestions\SlotMapper;
@@ -152,6 +155,189 @@ final class SurplusDeficitMatcherTest extends TestCase
         $s = self::withRoster($roster);
 
         self::assertCount(2, SurplusDeficitMatcher::assetsFor($s, self::USER, self::dimensionPair('r_3gp'), 2));
+    }
+
+    public function testNeedPairsSkipOffsetsMissingEitherTeam(): void
+    {
+        foreach ([self::USER, self::PARTNER] as $present) {
+            $s = self::withProfiles(
+                [0 => [$present => ['r_3gp' => 3]]],
+                [0 => [$present => ['C' => 3]]],
+            );
+
+            self::assertSame([], SurplusDeficitMatcher::needPairs($s, self::USER, self::PARTNER));
+        }
+    }
+
+    public function testOverlapWeightIsTheGainOfOneReceiverPlace(): void
+    {
+        $s = self::withProfiles(
+            [0 => [self::USER => ['r_3gp' => 3], self::PARTNER => ['r_3gp' => 24]]],
+            [0 => [self::USER => ['C' => 3], self::PARTNER => ['C' => 25]]],
+        );
+
+        $pairs = SurplusDeficitMatcher::needPairs($s, self::USER, self::PARTNER);
+
+        $byKind = [];
+        foreach ($pairs as $pair) {
+            $byKind[$pair->kind] = $pair;
+        }
+        self::assertSame(RankUtility::gain(24, 23), $byKind[NeedPair::KIND_DIMENSION]->overlapWeight);
+        self::assertSame(RankUtility::gain(25, 24), $byKind[NeedPair::KIND_SLOT]->overlapWeight);
+    }
+
+    public function testAssetsForSlotPairListsStarterThenRestByPoolRank(): void
+    {
+        $s = self::withRoster(self::slotRoster());
+        $pair = new NeedPair(0, NeedPair::KIND_SLOT, 'PG', self::USER, self::PARTNER, 3, 25, 1.0);
+
+        // 9104 starts. The rest follow by pool rank, not by minutes (9101, 9102, 9103, 9105).
+        self::assertSame(self::EXPECTED_SLOT_ORDER, SurplusDeficitMatcher::assetsFor($s, self::USER, $pair, 10));
+        self::assertSame(array_slice(self::EXPECTED_SLOT_ORDER, 0, 3), SurplusDeficitMatcher::assetsFor($s, self::USER, $pair, 3));
+        self::assertSame([9104], SurplusDeficitMatcher::assetsFor($s, self::USER, $pair, 1));
+    }
+
+    /**
+     * @return array<string, array{string, array<string, int>, array<string, int>}>
+     */
+    public static function rateProvider(): array
+    {
+        return [
+            'fg_pct' => ['fg_pct', ['stats_fgm' => 90, 'stats_fga' => 100, 'stats_3gm' => 2, 'stats_3ga' => 5], ['stats_fgm' => 0, 'stats_fga' => 0]],
+            'ft_pct' => ['ft_pct', ['stats_ftm' => 90, 'stats_fta' => 100, 'stats_3gm' => 2, 'stats_3ga' => 5], ['stats_ftm' => 0, 'stats_fta' => 0]],
+            'tpa_rate' => ['tpa_rate', ['stats_3ga' => 90, 'stats_fga' => 100], ['stats_3ga' => 0, 'stats_fga' => 0]],
+        ];
+    }
+
+    /**
+     * @param array<string, int> $high
+     * @param array<string, int> $zero
+     */
+    #[DataProvider('rateProvider')]
+    public function testAssetsForRateDimensionsRankByRatioAndZeroDenominatorIsZero(string $key, array $high, array $zero): void
+    {
+        $a = self::rotationPlayer(9101, production: ProjectionFactory::productionLine($high));
+        $b = self::rotationPlayer(9102, production: ProjectionFactory::productionLine());
+        $c = self::rotationPlayer(9103, production: ProjectionFactory::productionLine($zero));
+        $none = self::rotationPlayer(9100, noProduction: true);
+        $s = self::withRoster([$none, $c, $b, $a]);
+
+        self::assertSame([9101, 9102, 9103, 9100], SurplusDeficitMatcher::assetsFor($s, self::USER, self::dimensionPair($key), 5));
+    }
+
+    public function testAssetsForRankingByRatioNotByProduct(): void
+    {
+        $small = self::rotationPlayer(9101, production: ProjectionFactory::productionLine(['stats_fgm' => 90, 'stats_fga' => 100]));
+        $big = self::rotationPlayer(9102, production: ProjectionFactory::productionLine(['stats_fgm' => 200, 'stats_fga' => 420]));
+        $s = self::withRoster([$big, $small]);
+
+        self::assertSame([9101, 9102], SurplusDeficitMatcher::assetsFor($s, self::USER, self::dimensionPair('fg_pct'), 5));
+    }
+
+    public function testAssetsForPutsMissingProductionAfterAZeroRate(): void
+    {
+        $none = self::rotationPlayer(9100, noProduction: true);
+        $zero = self::rotationPlayer(9101, production: ProjectionFactory::productionLine(['stats_fgm' => 0, 'stats_fga' => 100]));
+        $s = self::withRoster([$none, $zero]);
+
+        self::assertSame([9101, 9100], SurplusDeficitMatcher::assetsFor($s, self::USER, self::dimensionPair('fg_pct'), 5));
+    }
+
+    public function testAssetsForBreaksTiesByAscendingPid(): void
+    {
+        $s = self::withRoster([self::rated(9103, 'r_3gp', 70, 50), self::rated(9101, 'r_3gp', 70, 50), self::rated(9102, 'r_3gp', 70, 50)]);
+
+        self::assertSame([9101, 9102, 9103], SurplusDeficitMatcher::assetsFor($s, self::USER, self::dimensionPair('r_3gp'), 5));
+    }
+
+    public function testAssetsForStatDimensionReadsProjectedPer36(): void
+    {
+        $roster = [];
+        foreach ([9101, 9102, 9103, 9104] as $pid) {
+            $roster[] = self::rotationPlayer($pid);
+        }
+        $s = self::withRoster($roster);
+        $s = self::withSeason($s, 9101, 0, per36: ['pts' => 20.0]);
+        $s = self::withSeason($s, 9102, 0, per36: ['pts' => 0.5]);
+        $s = self::withSeason($s, 9103, 0, per36: []);
+        $s = self::withSeason($s, 9104, 0, absent: true);
+
+        self::assertSame([9101, 9102, 9103, 9104], SurplusDeficitMatcher::assetsFor($s, self::USER, self::dimensionPair('pts'), 5));
+        // Lower is better for turnovers, so a missing line (0.0) leads.
+        $s = self::withSeason($s, 9101, 0, per36: ['tov' => 3.0]);
+        $s = self::withSeason($s, 9102, 0, per36: ['tov' => 1.0]);
+        self::assertSame([9103, 9104, 9102, 9101], SurplusDeficitMatcher::assetsFor($s, self::USER, self::dimensionPair('tov'), 5));
+    }
+
+    public function testAssetsForRatingDimensionReadsProjectedRatingsWhenPresent(): void
+    {
+        $s = self::withRoster([
+            self::rated(9101, 'r_3gp', 90, 50),
+            self::rated(9102, 'r_3gp', 20, 50),
+            self::rated(9103, 'r_3gp', 50, 50),
+        ]);
+        $s = self::withSeason($s, 9101, 0, ratings: ProjectionFactory::ratingSet(['r_3gp' => 20]));
+        $s = self::withSeason($s, 9102, 0, ratings: ProjectionFactory::ratingSet(['r_3gp' => 80]));
+        $s = self::withSeason($s, 9103, 0, absent: true);
+
+        self::assertSame([9102, 9103, 9101], SurplusDeficitMatcher::assetsFor($s, self::USER, self::dimensionPair('r_3gp'), 5));
+    }
+
+    private const array EXPECTED_SLOT_ORDER = [9104, 9102, 9105, 9103, 9101];
+
+    /**
+     * Five point guards. Minutes run 9101 down to 9105; 9104 is the depth-chart
+     * starter although he is fourth by minutes.
+     *
+     * @return list<ProjectionPlayer>
+     */
+    private static function slotRoster(): array
+    {
+        $roster = [];
+        foreach ([9101 => [30, 40, 0], 9102 => [28, 80, 0], 9103 => [26, 60, 0], 9104 => [24, 50, 1], 9105 => [22, 70, 0]] as $pid => [$minutes, $base, $starter]) {
+            $ratings = [];
+            foreach (Rating::ALL as $k) {
+                $ratings[$k] = $base;
+            }
+            $roster[] = ProjectionFactory::player(
+                pid: $pid,
+                tid: self::USER,
+                pos: 'PG',
+                ratings: ProjectionFactory::ratingSet($ratings),
+                dcDepth: $starter === 1 ? ['PG' => 1] : [],
+                dcMinutes: $minutes,
+            );
+        }
+
+        // A reliable depth chart needs a starter at every slot.
+        foreach (['SG', 'SF', 'PF', 'C'] as $i => $slot) {
+            $roster[] = ProjectionFactory::player(pid: 9200 + $i, tid: self::USER, pos: $slot, dcDepth: [$slot => 1], dcMinutes: 0);
+        }
+
+        return $roster;
+    }
+
+    /**
+     * @param array<string, float>|null $per36
+     */
+    private static function withSeason(LeagueSnapshot $s, int $pid, int $offset, ?array $per36 = null, ?\TradeSuggestions\Projection\RatingSet $ratings = null, bool $absent = false): LeagueSnapshot
+    {
+        $projections = $s->projections;
+        $old = $projections[$pid][$offset];
+        if ($absent) {
+            unset($projections[$pid][$offset]);
+        } else {
+            $projections[$pid][$offset] = new ProjectedSeason(
+                $old->offset,
+                $old->age,
+                $old->salary,
+                $old->onRoster,
+                $ratings ?? $old->ratings,
+                $per36 ?? $old->per36,
+            );
+        }
+
+        return new LeagueSnapshot(...[...get_object_vars($s), 'projections' => $projections]);
     }
 
     private static function dimensionPair(string $key): NeedPair

@@ -16,6 +16,8 @@ use TradeSuggestions\Engine\Contracts\LeagueSnapshotProviderInterface;
 use TradeSuggestions\Engine\Contracts\SnapshotKeyRepositoryInterface;
 use TradeSuggestions\Engine\LeagueSnapshot;
 use TradeSuggestions\Engine\ModeResolver;
+use TradeSuggestions\Engine\SnapshotCacheKey;
+use TradeSuggestions\Engine\SnapshotCodec;
 use TradeSuggestions\SuggestionPlayer;
 use TradeSuggestions\TeamModeGuesser;
 use TradeSuggestions\TeamModeService;
@@ -70,6 +72,52 @@ final class CachedLeagueSnapshotProviderTest extends TestCase
         self::assertSame(1, $inner->calls);
         self::assertSame($key, $cache->sets[0]['key'] ?? null);
         self::assertNotSame(['v' => 0], $cache->get($key));
+    }
+
+    public function testPayloadThatFailsATypedConstructorIsAMiss(): void
+    {
+        $cache = new InMemorySnapshotCache();
+        $inner = new CountingSnapshotProvider(self::league());
+        $provider = $this->provider($inner, $cache);
+        $key = $provider->currentKey();
+        $payload = SnapshotCodec::encode(self::league());
+        $payload['draftOrder']['round1'] = [['teamId' => []]];
+        $cache->store[$key] = $payload;
+
+        $snapshot = $provider->snapshot();
+
+        self::assertSame(1, $inner->calls);
+        self::assertSame($key, $cache->sets[0]['key'] ?? null);
+        self::assertSame(self::league(), $snapshot);
+    }
+
+    public function testKeyIsBuiltFromPhaseSimNumberDigestTradeMarkerAndModes(): void
+    {
+        $modeRepo = self::createStub(TeamModeRepositoryInterface::class);
+        $modeRepo->method('getAllStoredSettings')->willReturn([]);
+        $season = new \Tests\WideUnit\Mocks\Season(self::createStub(\mysqli::class));
+        $season->endingYear = 2027;
+        $season->lastSimNumber = 4;
+        $keys = self::createStub(SnapshotKeyRepositoryInterface::class);
+        $keys->method('rosterDigest')->willReturn('digest');
+        $keys->method('tradeMarker')->willReturn('2026-11-01 10:00:00');
+        $provider = new CachedLeagueSnapshotProvider(
+            new CountingSnapshotProvider(self::league()),
+            new InMemorySnapshotCache(),
+            $keys,
+            $this->modeResolver($modeRepo, $season),
+            $season,
+        );
+
+        $expected = SnapshotCacheKey::build(
+            'Regular Season:4',
+            'Regular Season',
+            'digest',
+            '2026-11-01 10:00:00',
+            $this->modeResolver($modeRepo, $season)->resolveAll(),
+        );
+
+        self::assertSame($expected, $provider->currentKey());
     }
 
     public function testModeChangeMissesTheCache(): void

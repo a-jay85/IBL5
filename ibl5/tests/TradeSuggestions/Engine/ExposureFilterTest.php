@@ -67,6 +67,22 @@ final class ExposureFilterTest extends TestCase
         self::assertSame([], ExposureFilter::eligiblePartners('key', 99, self::league()));
     }
 
+    public function testEligiblePartnersAreEveryPartnerThatMayTargetUserAscendingWhateverTheInputOrder(): void
+    {
+        $tids = array_reverse(self::league());
+        $expected = [];
+        foreach (self::league() as $partner) {
+            if (ExposureFilter::mayTarget('key', $partner, 3, $tids)) {
+                $expected[] = $partner;
+            }
+        }
+
+        $partners = ExposureFilter::eligiblePartners('key', 3, $tids);
+
+        self::assertGreaterThan(1, count($partners));
+        self::assertSame($expected, $partners);
+    }
+
     public function testPartnerNeverTargetsItself(): void
     {
         self::assertFalse(ExposureFilter::mayTarget('key', 5, 5, self::league()));

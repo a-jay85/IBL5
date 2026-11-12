@@ -1,0 +1,5 @@
+# Module<TAB>SettingKey<TAB>ClosedValue for bin/check-plan gate [Q] (backlog#1818).
+# A module counts as closed while EVERY row for it holds ClosedValue for the
+# 'ibl' league in ibl5/tests/e2e/fixtures/ci-seed.sql. List a row only after
+# the module controller is confirmed to render its closed view on that value.
+Waivers	Allow Waiver Moves	No

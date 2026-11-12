@@ -447,6 +447,35 @@ MC_NUM=""; MC_TYPE=""; MC_TIME=""; MC_LOC=""; MC_PIPES=0
 # row is screenshot-reviewable on the open PR (ADR-0126), so [Q] demands a vr:
 # cell and [PM] refuses the post-merge: marker.
 _LOOKFEEL_LEX='(look|feel|visual|appearance|layout|spacing|alignment|legible|readable|styl|design|renders?|\bui\b|\bux\b)'
+# Gate [Q] seed-state check (backlog#1818). A vr: cell whose url= module the CI
+# seed keeps closed never renders its anchor, so the CI capture times out.
+# bin/lib/vr-closed-modules.tsv maps Module<TAB>SettingKey<TAB>ClosedValue; the
+# live value is read from the seed, so a seed flip retires the hit with no edit.
+# CHECK_PLAN_VR_SEED overrides the seed path (test seam); empty means unset.
+_Q_CLOSED_MAP="$SCRIPT_DIR/lib/vr-closed-modules.tsv"
+_Q_SEED_DEFAULT="$REPO_ROOT/ibl5/tests/e2e/fixtures/ci-seed.sql"
+_Q_SEED="${CHECK_PLAN_VR_SEED:-$_Q_SEED_DEFAULT}"
+# _q_seed_value <setting key>: the 'ibl'-league value in the seed, or empty.
+_q_seed_value() {
+    sed -nE "s/^[[:space:]]*\('$1',[[:space:]]*'([^']*)',[[:space:]]*'ibl'\).*/\1/p" "$_Q_SEED" | head -n 1
+}
+# _q_closed_by <module>: prints "Key=Value[, Key=Value]" when EVERY map row for
+# the module holds its closed value in the seed; prints nothing otherwise.
+_q_closed_by() {
+    local _m="$1" _mod _key _closed _val _out="" _rows=0 _hit=0
+    { [ -r "$_Q_CLOSED_MAP" ] && [ -r "$_Q_SEED" ]; } || return 0
+    while IFS=$'\t' read -r _mod _key _closed; do
+        case "$_mod" in ''|'#'*) continue ;; esac
+        [ "$_mod" = "$_m" ] || continue
+        _rows=$((_rows + 1))
+        _val="$(_q_seed_value "$_key")"
+        [ "$_val" = "$_closed" ] || continue
+        _hit=$((_hit + 1))
+        _out="${_out:+$_out, }$_key=$_val"
+    done < "$_Q_CLOSED_MAP"
+    if [ "$_rows" -gt 0 ] && [ "$_hit" -eq "$_rows" ]; then printf '%s' "$_out"; fi
+    return 0
+}
 
 
 # gatev_nonrunnable <cell> — gate V's predicate chain. Prints why the cell is
@@ -585,6 +614,16 @@ while IFS= read -r row; do
                     if [ "${#_novr_reason}" -lt 15 ]; then
                         viol "[Q] no-vr: needs a reason of at least 15 characters: ${row}"
                     fi
+                    # Advisory (backlog#1818): a no-vr: reason can be false. When the
+                    # What cell names an .ibl-* class an E2E spec asserts visible, the
+                    # row is probably shootable. Heuristic, so warn() and never viol().
+                    for _novr_cls in $(grep -oE '\.ibl-[a-z0-9_-]+' <<< "$MC_WHAT" | sort -u); do
+                        _novr_hits="$(grep -rhF --include='*.ts' -- "$_novr_cls" "$REPO_ROOT/ibl5/tests/e2e" 2>/dev/null || true)"
+                        if grep -qF 'toBeVisible' <<< "$_novr_hits"; then
+                            warn "[Q-advisory] no-vr: row names ${_novr_cls}, which an ibl5/tests/e2e spec asserts with toBeVisible; a vr: cell may render: ${row}"
+                            break
+                        fi
+                    done
                 elif grep -qE '(^|[^-])vr:' <<< "$MC_LOC"; then
                     _vr="${MC_LOC#*vr:}"
                     _vrbad=""
@@ -599,6 +638,19 @@ while IFS= read -r row; do
                             || _vrbad="setup= method must be GET, POST or DELETE"
                     fi
                     [ -z "$_vrbad" ] || viol "[Q] malformed vr: cell — ${_vrbad}: ${row}"
+                    # Seed-state check (backlog#1818): no setup= clause can set an
+                    # ibl_settings row today, so a closed module never renders,
+                    # with or without setup=. Check every well-formed cell.
+                    if [ -z "$_vrbad" ]; then
+                        if [ -n "${CHECK_PLAN_VR_SEED:-}" ] && [ ! -r "$CHECK_PLAN_VR_SEED" ]; then
+                            viol "[Q] CHECK_PLAN_VR_SEED names an unreadable file: ${CHECK_PLAN_VR_SEED}"
+                        fi
+                        _vrmod="$(sed -nE 's/.*url=[^;]*[?&]name=([A-Za-z0-9_]+).*/\1/p' <<< "$_vr" | head -n 1)"
+                        if [ -n "$_vrmod" ]; then
+                            _vrclosed="$(_q_closed_by "$_vrmod")"
+                            [ -z "$_vrclosed" ] || viol "[Q] vr: url= module ${_vrmod} cannot render under the CI seed (${_vrclosed} in ibl5/tests/e2e/fixtures/ci-seed.sql); pick a url= an E2E spec already visits and asserts, or write \`no-vr: <true reason>\`: ${row}"
+                        fi
+                    fi
                 else
                     viol "[Q] look-and-feel truly-manual row needs a \`vr:\` cell (or \`no-vr: <reason>\`): ${row}"
                 fi

@@ -1,6 +1,6 @@
 ---
-description: Lazy detail companion to visual-review-prs.md. Covers self-stability (flake) triage and the strict review-only pass, cropped before/after changed-screen pairs in the PR body, publishing agent shots, how an `update-baselines` label run treats an in-flight E2E run, and the one-time Pages source setting.
-last_verified: 2026-11-02
+description: Lazy detail companion to visual-review-prs.md. Covers reading the VR comment, self-stability (flake) triage and the strict review-only pass, cropped before/after changed-screen pairs in the PR body, publishing agent shots, how an `update-baselines` label run treats an in-flight E2E run, and the one-time Pages source setting.
+last_verified: 2026-11-11
 paths:
   - ".github/workflows/e2e-tests.yml"
   - ".github/workflows/update-baselines.yml"
@@ -24,6 +24,27 @@ paths:
 # Visual Review PRs Detail
 
 Companion to `.claude/rules/visual-review-prs.md`, which points here.
+
+## Reading the comment
+
+- The comment makes **no claim about the check's red/green color.** In the regen-into-branch steady
+  state the VR gate can be **green** while the gallery still shows **changed** cells (the in-branch
+  baseline was refreshed, but the render still differs from master's committed baseline). The prose
+  is true in both states and never says the check "stays red until then."
+- Diffing views are grouped per module in `<details>` blocks; each link points into the static
+  side-by-side gallery (the `<title>` anchor) where the master-vs-PR before/after shows desktop +
+  mobile. The Playwright report (traces) is preserved under `…/playwright-report/`.
+- A **"🆕 New views (no prior baseline — review the render)"** section lists cells whose baseline was
+  never committed (a brand-new VR row). These have no before — the link shows the first render; <!-- slop-ok -->
+  sanity-check it, then `update-baselines` commits it as the baseline. NEW cells are excluded from the
+  "changed view(s)" count so a first-render never reads as a regression. The NEW-vs-CHANGED split
+  (ADR-0069) is computed in `bin/vr-build-gallery` from master's committed baseline set, not from <!-- slop-ok -->
+  disk.
+- The per-SHA Pages URL shape is `https://a-jay85.github.io/IBL5/<sha>/visual-review/`.
+- A **"⚠️ Changed but NOT covered by the VR manifest"** section lists changed website paths
+  that match no manifest row — review those by hand or add a `vr-manifest.ts` row. A <!-- slop-ok -->
+  **global-change banner** appears as a standalone coverage heads-up whenever a shared
+  CSS/theme/class file changed, independent of whether any row diffed.
 
 ## Self-stability (flake) vs real change
 

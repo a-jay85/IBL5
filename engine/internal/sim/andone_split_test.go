@@ -66,4 +66,39 @@ func TestAndOneHomeAwaySplit(t *testing.T) {
 	if home+away == 0 {
 		t.Fatal("no and-one free-throw trips found; the split check would pass vacuously")
 	}
+	if misCredited != 0 {
+		t.Errorf("%d and-one FT trips credited to a team other than the one that made the basket", misCredited)
+	}
+	// Q3 verdict UNFAITHFUL-ORDER (FUN_004e1ba0 97158-97168): the plan pins the
+	// home/away and-one ratio inside 0.5 to 2.0 once the floor moves after the
+	// HCA term.
+	if 2*away < home || 2*home < away {
+		t.Errorf("and-one home/away ratio outside 0.5-2.0: home=%d away=%d", home, away)
+	}
+}
+
+// TestAndOneWeightOrder pins the JSB order of the half-court and-one weight:
+// the HCA addend joins the raw weight first and the floor applies to the sum
+// (FUN_004e1ba0 97158-97168).
+func TestAndOneWeightOrder(t *testing.T) {
+	var p onCourt
+	p.FGP = 50
+	raw := andOneBucketRaw(0, p)
+	away := -hcaMagnitude * hcaSite2BasisScale
+	if raw+away >= andOneBucketFloor {
+		t.Fatalf("fixture: raw %v plus away HCA %v must fall below the floor", raw, away)
+	}
+	if got := max(andOneBucketRaw(0, p)+away, andOneBucketFloor); got != andOneBucketFloor {
+		t.Errorf("below the floor: got %v, want exactly %v", got, andOneBucketFloor)
+	}
+	home := hcaMagnitude * hcaSite2BasisScale
+	if got, want := max(andOneBucketRaw(0, p)+home, andOneBucketFloor), raw+home; got != want {
+		t.Errorf("above the floor: got %v, want raw plus HCA %v", got, want)
+	}
+	if got := andOneBucketWeight(0, p); got != raw {
+		t.Errorf("andOneBucketWeight above the floor: got %v, want raw %v", got, raw)
+	}
+	if got := andOneBucketWeight(-1, p); got != andOneBucketFloor {
+		t.Errorf("andOneBucketWeight below the floor: got %v, want %v", got, andOneBucketFloor)
+	}
 }

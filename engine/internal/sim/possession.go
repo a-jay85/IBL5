@@ -131,6 +131,8 @@ const doForcedMakeMax = 10
 // Mechanism 2B (leading-by-1-3): Q4+, clock < 25, scoreDiff ∈ [1,3],
 //
 //	bh.DriveOff < rand_int(doForcedMakeMax) → forcedMake. Low-DO players fire more.
+//	forcedFoulFires (foulvolume.go) holds the period, clock and margin gate. The
+//	caller turns forcedMake into a non-shooting foul (JSB 93458, J27).
 //
 // scoreDiff = offense.score − defense.score (positive = offense leading).
 // Only the half-court possession path calls this; transition.go is unchanged.
@@ -145,7 +147,7 @@ func (gs *gameState) lateGameForcing(scoreDiff int, bh onCourt) (forcedMake, sho
 		switch {
 		case scoreDiff == -3:
 			shotClock = true
-		case scoreDiff >= 1 && scoreDiff <= 3:
+		case forcedFoulFires(gs.period, gs.clock, scoreDiff):
 			// 5.60: local_15e=1 when bh.DriveOff < rand_int(max)
 			if bh.DriveOff < gs.rng.IntN(doForcedMakeMax)+1 {
 				forcedMake = true
@@ -290,7 +292,7 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 		in := outcomeInputs{
 			twoPtWeight:      twoPtW,
 			threePtWeight:    threePtW,
-			andOneWeight:     andOneBucketWeight(mq, bh) + hcaScaled, // leg D: e90 inherits e88's +hca
+			andOneWeight:     max(andOneBucketRaw(mq, bh)+hcaScaled, andOneBucketFloor), // leg D: e90 inherits e88's +hca, floored after (FUN_004e1ba0 97165-97168)
 			foulOnlyWeight:   foulW,
 			turnoverDefValue: energyCeiling(bh),
 		}
@@ -303,7 +305,20 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 		}
 
 		fm, sc := gs.lateGameForcing(scoreDiff, bh)
-		switch selectOutcome(in, fm, sc, false, gs.freeze.SuppressW4Rescale, gs.rng) {
+		path := selectOutcome(in, fm, sc, false, gs.freeze.SuppressW4Rescale, gs.rng)
+		if fm {
+			// JSB 93458: local_15e == 1 jumps to the foul handler (LAB_004d9d4d)
+			// whatever outcome FUN_004e1ba0 drew, and 93478 clears the shooting
+			// flag. The trailing defense fouls on purpose: a non-shooting foul
+			// that shoots 2 FTs only in the bonus (foulvolume.go).
+			if !gs.resolveFoul(offense, defense, bh, def, 2, false, true, periodIdx) {
+				retainedFoul = true
+				trip--   // a retained foul does not spend the offensive-rebound budget
+				continue // below the bonus: offense keeps the ball (half-court)
+			}
+			return possNormal
+		}
+		switch path {
 		case outcome2pt:
 			if made, _ := gs.shotAttempt(offense, defense, bh, sv2, result.ShotTwoPoint, origin, periodIdx); !made {
 				gs.creditBlock(offense, defense, bh, def)

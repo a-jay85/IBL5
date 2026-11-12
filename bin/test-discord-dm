@@ -861,15 +861,15 @@ grep -qF -- "main.yml::build-and-deploy" <<< "$G5_GOT" \
     && ok "G5: the flagged job is main.yml::build-and-deploy" \
     || fail "G5: expected main.yml::build-and-deploy, got: $(tr '\n' ' ' <<< "$G5_GOT")"
 
-# G6: --ping (the @-mention), directly or through dm_ping, is allowed only in the six PING host callers and bin/lib/dm.sh. Tests, fixture data under bin/fixtures/, the
+# G6: --ping (the @-mention), directly or through dm_ping, is allowed only in the seven PING host callers and bin/lib/dm.sh. Tests, fixture data under bin/fixtures/, the
 # README and discord-dm itself mention it and are excluded; any other bin/ caller is QUIET.
 # `--ping-out` (bin/digest-dm-build's ping-decision file) is a different flag and does not match.
 G6_GOT=$(grep -rlE -- '--ping($|[^-[:alnum:]_])|dm_ping' "$ROOT/bin" 2>/dev/null \
     | grep -v -e '/bin/discord-dm$' -e '/bin/test-' -e '/bin/README.md$' -e '/bin/lib/README.md$' -e '/bin/fixtures/' \
     | sed "s|^$ROOT/||" | sort || true)
-G6_WANT=$(printf '%s\n' bin/db-backups-pull bin/launchd-health-check bin/lib/dm.sh bin/main-checkout-guard bin/post-plan-fail-dm bin/pr-cycle bin/pr-cycle-tick)
+G6_WANT=$(printf '%s\n' bin/automouse/morning-digest bin/db-backups-pull bin/launchd-health-check bin/lib/dm.sh bin/main-checkout-guard bin/post-plan-fail-dm bin/pr-cycle bin/pr-cycle-tick)
 [ "$G6_GOT" = "$G6_WANT" ] \
-    && ok "G6: only the seven PING-allowed paths contain --ping" \
+    && ok "G6: only the eight PING-allowed paths contain --ping" \
     || fail "G6: --ping callers differ from the PING set; got: $(tr '\n' ' ' <<< "$G6_GOT")"
 
 # G7: bin/lib/dm.sh (dm_bin / dm_ping). Each snippet runs under a bare strict bash.

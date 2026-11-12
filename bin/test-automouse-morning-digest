@@ -567,4 +567,19 @@ shown=$(printf '%s\n' "$body" | grep -c '^• n' || true)
 assert_contains "row36: header counts every row" "Stale worktrees (80, as of 2026-10-22 08:26)" "$body"
 assert_contains "row36: hidden count"            "…and $((80 - shown)) more" "$body"
 h_pass "row36 — byte budget and hidden count"
+# --- row37: a skipped plan @mentions the owner; a night with none stays quiet ---
+setup
+pin "$NDIR/skipped/plan-s.md"
+rm -f "$TMP/dm-calls.log"
+run_digest >/dev/null 2>&1
+calls=$(cat "$TMP/dm-calls.log" 2>/dev/null || true)
+assert_contains "row37: skip pings" "--ping" "$calls"
+setup
+pin "$NDIR/done/plan-a.md"
+rm -f "$TMP/dm-calls.log"
+run_digest >/dev/null 2>&1
+calls=$(cat "$TMP/dm-calls.log" 2>/dev/null || true)
+assert_contains     "row37: quiet night still sends" "CALLED" "$calls"
+assert_not_contains "row37: quiet night no ping"     "--ping" "$calls"
+h_pass "row37 — ping only when a plan was skipped"
 h_done

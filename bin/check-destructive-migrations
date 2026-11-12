@@ -60,6 +60,12 @@ Detected patterns (v2, statement-level):
                           A SET whose WHERE pins every assigned column IS NULL
                           in a plain AND chain is a backfill and passes. Diff
                           modes only; --full-scan skips it.
+  down-file-missing       A data-rewrite statement (rewrite-no-backup family, or
+                          UPDATE/DELETE with no WHERE) in a .sql migration with no
+                          NNN_name.down.sql beside it. Diff modes only.
+  down-not-dml            A statement in a .down.sql file that is not INSERT,
+                          UPDATE or DELETE. DDL commits implicitly, so the runner
+                          could not roll it back. Diff modes only.
   delete-no-where         DELETE ... FROM with no WHERE anywhere in the statement
   update-no-where         UPDATE ... SET with no WHERE anywhere in the statement;
                           UPDATE ... JOIN without WHERE counts, INSERT ... ON

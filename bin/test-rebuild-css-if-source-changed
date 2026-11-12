@@ -66,7 +66,15 @@ if [ "${STUB_BUNX_WRITE:-0}" = 1 ]; then
 fi
 exit "${STUB_BUNX_RC:-0}"
 STUB
-chmod +x "$STUB_DOCKER/docker" "$STUB_BUNX/bunx"
+# uutils mkdir (Ubuntu 26.04) tells both callers "success" when two create one
+# dir at once. This stub tells every caller "success", which is that race at worst.
+STUB_MKDIR="$TMP/stub-mkdir"; mkdir -p "$STUB_MKDIR"
+cat > "$STUB_MKDIR/mkdir" <<'STUB'
+#!/bin/sh
+/bin/mkdir -p "$@" 2>/dev/null
+exit 0
+STUB
+chmod +x "$STUB_DOCKER/docker" "$STUB_BUNX/bunx" "$STUB_MKDIR/mkdir"
 
 # --- fixture: main checkout "mainrepo" + linked worktree "feat-x"
 MAIN="$TMP/mainrepo"; WT="$TMP/feat-x"
@@ -100,12 +108,14 @@ prep_case() {
 # STUB_BUNX_SLEEP, STUB_BUNX_TOUCH, STUB_BUNX_WRITE. CSS_REBUILD_LOCK_WAIT_SECS
 # is forwarded only when set (empty counts as set). COPIES=<n> runs n hooks at
 # once; DETACH=1 does not capture output, so the call returns when the hook
-# process exits and not when its backgrounded subshell finishes.
+# process exits and not when its backgrounded subshell finishes. LYING_MKDIR=1
+# puts a mkdir first on PATH that always reports success.
 # Sets globals RC and OUT.
 exec_case() {
     local dir="$1" bunx="$2" copies="${COPIES:-1}"
     local path="$STUB_DOCKER:/usr/bin:/bin"
     [ "$bunx" = yes ] && path="$STUB_DOCKER:$STUB_BUNX:/usr/bin:/bin"
+    [ "${LYING_MKDIR:-0}" = 1 ] && path="$STUB_MKDIR:$path"
     local envv
     envv=(env -i HOME="$CASE_DIR/home" XDG_CACHE_HOME="$CASE_DIR/cache"
         PATH="$path" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
@@ -248,6 +258,15 @@ wantn "c9 pair: the waiter skips once" "$LOG" "css fresh, skip" 1
 wantn "c9 pair: exactly one run waited" "$LOG" "waiting up to" 1
 wantnx "c9 pair: exactly one watcher restart" "$CALLS" "restart ibl5-tailwind" 1
 if [ ! -d "$(lockdir_for 9 "$MAIN")" ]; then pass "c9 lock released"; else fail "c9 lock released (dir left behind)"; fi
+
+# Case 9b: same pair, but mkdir never reports a lost race -> still one rebuild
+prep_case 9b "$MAIN" yes ibl5-tailwind
+LYING_MKDIR=1 COPIES=2 STUB_BUNX_SLEEP=1 STUB_BUNX_WRITE=1 exec_case "$MAIN" yes
+rc0   "c9b lying mkdir: exit 0"
+wantn "c9b lying mkdir: exactly one host rebuild" "$LOG" "css rebuilt on host" 1
+wantn "c9b lying mkdir: the waiter skips once" "$LOG" "css fresh, skip" 1
+wantnx "c9b lying mkdir: exactly one watcher restart" "$CALLS" "restart ibl5-tailwind" 1
+if [ ! -d "$(lockdir_for 9b "$MAIN")" ]; then pass "c9b lock released"; else fail "c9b lock released (dir left behind)"; fi
 
 # Case 10: lock left by a dead pid -> removed at once, rebuild runs, no timeout
 sh -c 'exit 0' & dead=$!; wait "$dead"

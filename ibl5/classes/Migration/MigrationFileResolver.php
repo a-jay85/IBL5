@@ -70,11 +70,32 @@ class MigrationFileResolver
     }
 
     /**
+     * Get the paired down filename for a migration, when that file exists.
+     *
+     * A down file pairs by stem: `NNN_x.sql` pairs with `NNN_x.down.sql`.
+     *
+     * @return string|null The down filename (without path), or null when no partner exists
+     */
+    public function getDownFilename(string $filename): ?string
+    {
+        $downName = pathinfo($filename, PATHINFO_FILENAME) . '.down.sql';
+
+        return file_exists($this->getFullPath($downName)) ? $downName : null;
+    }
+
+    /**
      * Check if a file is a migration file (.sql or .php).
+     *
+     * A `.down.sql` file is the revert partner of an up migration, never a
+     * migration itself, so it is not listed.
      */
     private function isMigrationFile(string $filename): bool
     {
         if ($filename === '.' || $filename === '..') {
+            return false;
+        }
+
+        if (str_ends_with(strtolower($filename), '.down.sql')) {
             return false;
         }
 

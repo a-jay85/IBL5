@@ -14,32 +14,6 @@
   },
   {
     "module": "depth-chart-entry",
-    "viewport": "desktop",
-    "title": "depth-chart-entry",
-    "index": 1,
-    "count": 2,
-    "kind": "spot",
-    "region": "top, y 671-946 px",
-    "beforeFile": "changed/depth-chart-entry.1.before.png",
-    "afterFile": "changed/depth-chart-entry.1.after.png",
-    "sideFile": "changed/depth-chart-entry.1.side.png",
-    "stackFile": "changed/depth-chart-entry.1.stack.png"
-  },
-  {
-    "module": "depth-chart-entry",
-    "viewport": "desktop",
-    "title": "depth-chart-entry",
-    "index": 2,
-    "count": 2,
-    "kind": "spot",
-    "region": "middle, y 1028-1389 px",
-    "beforeFile": "changed/depth-chart-entry.2.before.png",
-    "afterFile": "changed/depth-chart-entry.2.after.png",
-    "sideFile": "changed/depth-chart-entry.2.side.png",
-    "stackFile": "changed/depth-chart-entry.2.stack.png"
-  },
-  {
-    "module": "depth-chart-entry",
     "viewport": "mobile",
     "title": "depth-chart-entry-mobile",
     "index": 1,

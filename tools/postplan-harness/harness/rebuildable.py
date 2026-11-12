@@ -22,6 +22,7 @@ REBUILDABLE_TABLES: dict[str, str] = {
 CACHE_ONLY_REFRESH_STEPS: tuple[str, ...] = (
     "RefreshHeadToHeadRecordsStep",
     "RefreshRecordHoldersStep",
+    "RefreshSeasonHighsCacheStep",
 )
 STEPS_GLOB = "ibl5/classes/Updater/Steps/Refresh*Step.php"
 

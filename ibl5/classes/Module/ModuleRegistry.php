@@ -34,6 +34,7 @@ final class ModuleRegistry
         'Leaderboards',
         'LeagueControlPanel',
         'LeagueStarters',
+        'League_Starters',
         'News',
         'NextSim',
         'OneOnOneGame',

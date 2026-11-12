@@ -380,7 +380,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: gh workflow run x.yml --ref master')"
-run_case "strict: env: expression outside run passes" 0 "$f"
+run_case "strict: env: expression outside run is not a run-body report" 1 "$f"
+if [ -n "$out" ]; then
+  h_fail "strict: env: expression outside run is not a run-body report" "stdout should be empty (only the stderr trigger deny fires): $out"
+fi
 
 f="$(write_wf 'name: t
 on: pull_request_target
@@ -395,6 +398,53 @@ run_case "strict: one report per line" 1 "$f"
 lines="$(printf '%s\n' "$out" | grep -c .)"
 if [ "$lines" -ne 1 ]; then
   h_fail "strict: one report per line" "expected 1 output line, got $lines"
+fi
+
+# --- trigger deny: pull_request_target under on: fails outright -----------------
+f="$(write_wf 'name: t
+on:
+  pull_request_target:
+    types: [labeled]
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi')"
+run_case "deny: block-form pull_request_target trigger fails" 1 "$f"
+"$CHECK" "$f" >/dev/null 2>"$TMP/deny-err"
+if ! grep -qF -- ":3: on: names pull_request_target" "$TMP/deny-err"; then
+  h_fail "deny: block-form report names line 3" "stderr lacks ':3: on: names pull_request_target': $(cat "$TMP/deny-err")"
+fi
+if [ -n "$out" ]; then
+  h_fail "deny: block-form report stays off stdout" "stdout not empty: $out"
+fi
+
+f="$(write_wf 'name: t
+on: [push, pull_request_target]
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi')"
+run_case "deny: flow-form pull_request_target trigger fails" 1 "$f"
+"$CHECK" "$f" >/dev/null 2>"$TMP/deny-err"
+if ! grep -qF -- ":2: on: names pull_request_target" "$TMP/deny-err"; then
+  h_fail "deny: flow-form report names line 2" "stderr lacks ':2: on: names pull_request_target': $(cat "$TMP/deny-err")"
+fi
+
+f="$(write_wf 'name: t
+on:
+  pull_request:
+    types: [labeled, auto_merge_enabled]
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ${{ github.repository }}')"
+run_case "deny: plain pull_request trigger passes" 0 "$f"
+"$CHECK" "$f" >/dev/null 2>"$TMP/deny-err"
+if grep -qF -- "on: names pull_request_target" "$TMP/deny-err"; then
+  h_fail "deny: plain pull_request has no deny report" "unexpected deny: $(cat "$TMP/deny-err")"
 fi
 
 # --- trigger parser near-misses: these files stay on the default rule ------------

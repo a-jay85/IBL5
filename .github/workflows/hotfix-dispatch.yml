@@ -4,16 +4,21 @@ name: Hotfix dispatch
 # merge (ADR-0081 addendum "hotfix lane"). Order only: no check, sign-off, or title floor
 # is skipped, and nothing here arms auto-merge.
 #
-# Security: pull_request_target runs master's copy of this file with a write token, so a
-# PR cannot change what runs. The job never checks out the repository and never runs PR
-# code. No PR-controlled string reaches run:. The label name is compared in if: only, and
-# only collaborators can add a label. bin/test-merge-line-select W7 pins this shape.
+# Security: the pull_request event runs the PR head's copy of this file. A same-repo PR
+# gets a token limited to actions: write by the permissions block below. The repo default
+# token is write, so that block is the only limit. A fork PR gets a read-only token and
+# cannot dispatch. A same-repo branch can already edit any workflow it triggers, so
+# running the head's copy adds no exposure. The job never checks out the repository and
+# never runs PR code. No PR-controlled string reaches run:. The label name is compared in
+# if: only, and only collaborators can add a label. GitHub blocks pull_request_target by
+# default for public repos (ADR-0223 addendum of 2026-11-09). bin/test-merge-line-select
+# W7 pins this shape and bin/check-workflow-run-interpolation denies that trigger.
 #
 # An unarmed PR is not in the merge line, so labeling one dispatches nothing. Arming a
 # PR that already carries the label fires auto_merge_enabled instead.
 
 on:
-  pull_request_target:
+  pull_request:
     types: [labeled, auto_merge_enabled]
 
 permissions:

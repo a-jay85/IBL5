@@ -645,7 +645,7 @@ if [ -n "$RESUME_SID" ]; then
     echo "post-plan-now: resume discard: ${_resume_discard:-unavailable}"
 fi
 
-# Pre-fire verification gate: full PHPUnit, the plan's post-impl CLI-executable
+# Pre-fire verification gate: PHPUnit on the changed files' tests, the plan's post-impl CLI-executable
 # matrix rows, and the plan's mutation rows. CI's required Infection check gates
 # mutation score (ADR-0237). Fail closed: no
 # pass for this exact tree means no fire. A --rebase-only run pushes no new

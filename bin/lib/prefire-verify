@@ -3,7 +3,8 @@
 #
 # Re-runs three checks on the current working tree before /post-plan fires:
 #   1. every post-impl CLI-executable row of the plan's Verification Matrix
-#   2. the full default PHPUnit suite
+#   2. PHPUnit on the tests mapped to the branch's changed files (full suite when a
+#      shared test input changed or mapping failed; skipped when no PHPUnit-relevant file changed)
 #   3. every Executable Mutations row of the plan (bin/lib/plan-exec-mutations run)
 # Mutation score is gated by CI's required check "Infection PHP (per-PR diff)" (ADR-0237).
 # It trusts no implementer-written ledger. Only this script writes pass records,
@@ -14,7 +15,8 @@
 #   --fire-point  exec-mutations only: use the larger limits (300 s per check run, 1800 s
 #                 total, the post-plan gate's) instead of the implementer's 120 s / 300 s.
 #                 bin/post-plan-now passes it; a pass under either limit is the same record.
-#   --base        accepted for existing callers; no stage reads it since ADR-0237.
+#   --base        base ref for the phpunit stage's diff (default: git config
+#                 branch.<name>.iblBase, else origin/master)
 # Exit codes:
 #   0  every requested stage passed (fresh run, or a valid pass record for this tree)
 #   1  a check failed (the message names the matrix row or the stage)
@@ -24,9 +26,12 @@
 #   4  the checks changed the working tree, so no pass record was written
 #
 # Test seams (used only by bin/test-prefire-verify):
-#   PREFIRE_PHPUNIT_CMD    default vendor/bin/phpunit, run from ibl5/
+#   PREFIRE_PHPUNIT_CMD    default vendor/bin/phpunit, run from ibl5/; subset mode appends test paths as arguments
 #   PREFIRE_DB_PROBE_CMD   default bin/db-query "SELECT 1", run from the repo root
 #   PREFIRE_EXEC_MUTATIONS_LIB  default bin/lib/plan-exec-mutations
+#
+# Environment:
+#   PREFIRE_PHPUNIT_FULL=1  run the full suite; 0, empty or unset maps files to tests
 
 set -uo pipefail
 

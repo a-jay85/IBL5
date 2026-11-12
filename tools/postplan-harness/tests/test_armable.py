@@ -20,7 +20,7 @@ BODY_HELD = "## Summary\nx\n\n## Manual Testing\n\n- [ ] eyeball the layout\n"
 
 def inputs(**kw):
     base = dict(pr_body=BODY_CLEARED, pr_title="chore: x", pr_labels=[],
-                classification=Classification(files=["ibl5/classes/Trade/TradeService.php"]), findings=[], unresolved_conformance=[], exec_mutations_holding=(), exec_mutations_tree_suspect=False,
+                classification=Classification(files=["ibl5/classes/Trade/TradeService.php"]), findings=[], unresolved_conformance=[], exec_mutations_holding=(), exec_mutations_tree_suspect=False, plan_checks_holding=(),
                 phase5_status="pass", plan_auto_merge_false=False, headless=True,
                 dep_state_lookup=lambda n: "MERGED", fidelity_verdict="READY",
                 unresolved_findings=[], conflict_resolved=False, merge_danger_state="TWO-WAY",
@@ -712,6 +712,23 @@ def test_condition_19_holds_on_tree_suspect():
     c = _c19(evaluate(inputs(exec_mutations_holding=(), exec_mutations_tree_suspect=True)))
     assert c.blocked is True
     assert "tree not verified clean" in c.reason
+
+
+def test_condition_19_holds_on_plan_checks_ci_failure():
+    c = _c19(evaluate(inputs(plan_checks_holding=("Plan checks CI job concluded FAILURE",))))
+    assert c.blocked is True
+    assert "Plan checks CI job concluded FAILURE" in c.reason
+
+
+def test_condition_19_holds_when_plan_checks_step_did_not_run():
+    d = evaluate(inputs(plan_checks_holding=None))
+    c = _c19(d)
+    assert c.blocked is True and "plan-checks step did not run" in c.reason
+    assert d.armed is False
+
+
+def test_condition_19_passes_with_empty_plan_checks_holding():
+    assert _c19(evaluate(inputs(plan_checks_holding=()))).blocked is False
 
 
 def test_condition_19_never_releases_other_holds():

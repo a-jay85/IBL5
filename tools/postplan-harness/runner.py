@@ -67,11 +67,10 @@ from harness.classify import (BACKLOG_REPO, render_merge_digest,
                               render_scope_notes,
                               restore_manual_testing_section, strip_change_blocks,
                               strip_manual_testing_section,
-                              upsert_exec_mutations, upsert_gate_fix,
+                              upsert_plan_checks, extract_plan_checks, upsert_gate_fix,
                               upsert_hold_notice, upsert_residual_phases,
                               upsert_scope_notes)
 from harness.gate_backtest import upsert_gate_backtest
-from harness.mutations import MutationReport, reuse_prefire_pass, run_executable_mutations
 from harness import merge_danger
 from harness import removed_guards
 from harness import second_review
@@ -228,11 +227,6 @@ def _record_failure_context(res: RunResult, e: HarnessError) -> None:
 
 
 
-def _fix_round_mutation_check(path, worktree, remaining) -> MutationReport:
-    """The fix round's proof run. Module-level so tests stub the executor."""
-    return run_executable_mutations(Path(path), Path(worktree or "."), outer_timeout=remaining)
-
-
 def _fix_round_conflict_rereview(llm, git):
     """Re-ask a conflict review that gave no verdict. None for any other stored verdict."""
     if not isinstance(git, LiveGit) or conflict_verdict_for(git.branch()) != conflict.VERDICT_ABSENT:
@@ -241,49 +235,61 @@ def _fix_round_conflict_rereview(llm, git):
                                     key=git.branch().translate(str.maketrans("/:", "--")))
 
 
-def _exec_mutations_step(plan, worktree, live, log, fixture=None) -> MutationReport | None:
-    """Executable mutation claims (ADR-0199), run after verify and before arming.
+# A "Plan checks" check in one of these states fails condition (19). Pending, queued,
+# running, success and a missing entry add nothing: the required context and the
+# All checks settled job keep GitHub from merging until the job passes.
+_PLAN_CHECKS_FAILED_STATES = frozenset({"FAILURE", "CANCELLED", "TIMED_OUT", "ERROR",
+                                        "STARTUP_FAILURE", "ACTION_REQUIRED"})
 
-    Replay reads the report from the fixture (default: an empty, passing report). A run
-    with no plan has no `## Executable Mutations` section, so it gets the same empty
-    report. A live run with a plan but no worktree returns None, which condition (19)
-    holds on. A crash never aborts the run: it becomes a holding report with
-    tree_suspect=True, because the journal may hold an unreverted edit.
+
+def _plan_checks_step(gh, plan, worktree, pr, live, log, fixture=None,
+                      encoder="bin/lib/plan-checks-block") -> tuple[str, ...] | None:
+    """Plan checks (ADR-0244): write the plan-checks block and label, read the CI result.
+
+    Returns condition (19)'s hold reasons; () means nothing holds and None means the step
+    did not run. Replay reads `plan_checks_holding` from the fixture. A run with no plan
+    has nothing for CI to run. A live run with no PR returns None, so (19) holds. Each
+    live fault adds a reason and the step goes on, so the hold text lists every fault.
+    A raised error fails closed with one reason.
     """
     if not live:
-        fx = fixture or {}
-        return MutationReport(ran=True, results=(),
-                              holding=tuple(fx.get("exec_mutations_holding") or ()),
-                              tree_suspect=bool(fx.get("exec_mutations_tree_suspect", False)))
+        return tuple((fixture or {}).get("plan_checks_holding") or ())
     if plan is None or not getattr(plan, "found", False) or not getattr(plan, "path", None):
-        log("exec-mutations: no plan — nothing to run")
-        return MutationReport(ran=True, results=(), holding=(), tree_suspect=False)
-    if not (worktree and os.path.isdir(worktree)):
-        log("exec-mutations: skipped (no worktree) — condition (19) holds")
+        log("plan-checks: no plan — nothing to write")
+        return ()
+    if not pr:
+        log("plan-checks: no PR — condition (19) holds")
         return None
+    reasons: list[str] = []
     try:
-        reused, why = reuse_prefire_pass(Path(plan.path), Path(worktree))
-    except Exception as e:  # noqa: BLE001 - doubt means run fresh
-        reused, why = None, f"reuse check crashed: {e}"
-    if reused is not None:
-        log(f"exec-mutations: reused pre-fire pass ({why})")
-        report = reused
-    else:
-        log(f"exec-mutations: running ({why})")
-        try:
-            report = run_executable_mutations(Path(plan.path), Path(worktree))
-        except Exception as e:  # noqa: BLE001 - the step must hold, never fail the run
-            report = MutationReport(ran=False, results=(),
-                                    holding=(f"executor-crashed: {e}",), tree_suspect=True)
-    for r in report.results:
-        log(f"exec-mutations: {r.kind} row {r.row} — {r.detail}")
-    for h in report.holding:
-        log(f"exec-mutations HOLD: {h}")
-    if report.tree_suspect:
-        log("exec-mutations: tree suspect — journal may hold an unreverted edit")
-    if not report.results and not report.holding:
-        log("exec-mutations: no executable mutations in plan")
-    return report
+        proc = subprocess.run([encoder, "encode", plan.path], cwd=worktree,
+                              capture_output=True, text=True, timeout=120)
+        if proc.returncode != 0:
+            reasons.append(f"plan-checks block could not be built (exit {proc.returncode})")
+        else:
+            block = proc.stdout
+            cur = gh.pr_body_fresh() or ""
+            if not cur:
+                reasons.append("PR body read empty, so the plan-checks block was not written")
+            else:
+                new = upsert_plan_checks(cur, block)
+                if new != cur:
+                    gh.pr_edit_body(pr, new)
+            if extract_plan_checks(gh.pr_body_fresh() or "") != block.strip():
+                reasons.append("plan-checks block missing or stale in the PR body")
+            # After the block, so a CI run that sees the label finds the block beside it.
+            if not gh.pr_label_add_checked(pr, "plan-checks"):
+                reasons.append("could not add the plan-checks label")
+            for c in gh.pr_checks_json(pr) or []:
+                state = str(c.get("state") or "").upper()
+                if c.get("name") == "Plan checks" and state in _PLAN_CHECKS_FAILED_STATES:
+                    reasons.append(f"Plan checks CI job concluded {state}")
+    except (HarnessError, OSError, subprocess.SubprocessError) as e:
+        log(f"plan-checks: step failed ({e.__class__.__name__}: {e})")
+        return (f"plan-checks step failed ({e.__class__.__name__})",)
+    for r in reasons:
+        log(f"plan-checks HOLD: {r}")
+    return tuple(reasons)
 
 
 def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
@@ -866,21 +872,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             _mc_status = meta_checks_clearance(_mc_flag, _mc_post_rc)
             _gb = gate_backtest_result(worktree or ".", git.diff_vs_base(), pr=pr, live=live,
                                        fixture=fixture, log=log)
-            mutation_report = _exec_mutations_step(plan, worktree, live, log, fixture)
-            if live and pr and mutation_report is not None:
-                # A second body edit: the Phase 6 body write above runs before this step.
-                # Log-and-continue like the merge-digest write: a failed or empty read must never
-                # blank the body, and a failed edit must never abort the run.
-                try:
-                    _xm_cur = gh.pr_body_fresh() or ""
-                    if not _xm_cur:
-                        log("phase6.5: exec-mutations body write skipped (PR body read empty)")
-                    else:
-                        _xm_new = upsert_exec_mutations(_xm_cur, mutation_report)
-                        if _xm_new != _xm_cur:
-                            gh.pr_edit_body(pr, _xm_new)
-                except (HarnessError, OSError, subprocess.SubprocessError) as e:
-                    log(f"phase6.5: exec-mutations body write failed ({e.__class__.__name__}: {e})")
+            plan_checks_holding = _plan_checks_step(gh, plan, worktree, pr, live, log, fixture)
             _arm_body = gh.pr_body() or body
             if live and pr:
                 _arm_body = _retry_merge_danger(gh, pr, _arm_body, phase2_merge_danger, worktree,
@@ -897,10 +889,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 pr_labels=gh.pr_labels(), classification=cls, findings=res.findings,
                 ui_paths=git.conformance_files(),
                 unresolved_conformance=unresolved, phase5_status=phase5,
-                exec_mutations_holding=(mutation_report.holding
-                                        if mutation_report is not None else None),
-                exec_mutations_tree_suspect=(mutation_report.tree_suspect
-                                             if mutation_report is not None else True),
+                exec_mutations_holding=(),
+                exec_mutations_tree_suspect=False,
+                plan_checks_holding=plan_checks_holding,
                 conformance_fix_note=conformance_fix.hold_note(res.conformance_fix),
                 plan_auto_merge_false=plan.auto_merge_false, headless=headless,
                 plan_auto_merge_value=getattr(plan, "auto_merge_value", None),
@@ -1081,7 +1072,6 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 plan=plan, pr=pr, out_dir=out_dir, log=log,
                 commit=_fr_commit,
                 recheck=_fr_recheck, already_tried=_fr_tried, inputs=inputs,
-                mutation_check=lambda p, rem: _fix_round_mutation_check(p, worktree, rem),
                 fidelity_fix=_fr_fidelity_fix if pr else None,
                 conflict_rereview=_fr_conflict_rereview if pr else None,
                 security_bar=_reviewer_bar_verdict)

@@ -127,6 +127,7 @@
 1 bin/test-wt-remove
 1 bin/test-prune-eligibility
 1 bin/test-wt-compose
+1 bin/test-wt-stack
 1 bin/test-architect-contract-split
 1 bin/test-merge-last-verified
 1 bin/test-scrub-log-credentials

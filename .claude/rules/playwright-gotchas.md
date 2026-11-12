@@ -1,7 +1,7 @@
 ---
 description: Playwright E2E gotchas: CSRF/session isolation, hx-boost waits, PRG races, hidden-element fill, axe a11y, URL-flip blast radius, global-table ownership, seed/test-state traps, CI shard load.
 paths: ibl5/tests/e2e/**/*.ts
-last_verified: 2026-10-23
+last_verified: 2026-11-12
 ---
 
 # Playwright E2E Gotchas
@@ -34,13 +34,13 @@ Hard-won pitfalls, each one broke a real PR. Core rules and templates: `playwrig
 
 - **FA quick offers: MLE/LLE bypass the soft cap, a max contract does not.** `FreeAgencyCapCalculator` counts pending FA offers as committed salary. `test-state.php?action=reset-fa-offers` seeds pids 10/11/12 all on Metros, leaving ~278 of soft space, so a max offer (needs ~1275) is rejected with no `offer_success` redirect and the test times out. Seed only the pid under test: `reset-fa-offers&pid=N`.
 - **`reset-trade-offers` only UPDATEs the IDOR-reserved rows.** If offers 7/8 were deleted mid-run the UPDATE is a no-op, `getTradesByOfferId(7)` is empty, and `counterTradeOffer()` redirects `result=already_processed` before the IDOR check. If an IDOR test in `flows/trading-submission.spec.ts` sees `already_processed` instead of `error=`, re-seed first: `bin/wt-down <slug> && bin/wt-up <slug> --seed`.
-- **Local seed ≠ CI seed.** `bin/wt-up --seed` and `bin/db-test-up` load a local seed that differs from `fixtures/ci-seed.sql` in schedule rows and power rankings. Some tests only pass in CI (Team Schedule playoff labels, home/visitor).
+- **Local seed ≠ CI seed.** `bin/wt-up --seed` and `bin/db-test-up` load a local seed that differs from `fixtures/ci-seed.sql` in schedule rows and power rankings. Some tests only pass in CI (Team Schedule playoff labels, home/visitor). <!-- wt-up-ok: describes which seed the script loads -->
 
 ## CI & environment
 
 - **Same-shard slow URLs need coordinated timeouts.** Two specs in one shard hitting `modules.php?name=Schedule` double the concurrent load, so adding tests to one makes the other time out. `grep -r "modules.php?name=<Module>" ibl5/tests/e2e/` for siblings, set the same `test.setTimeout(60000)` in each with a comment naming the other file, and use `gotoWithRetry` plus a container `toBeVisible()` before axe or assertions.
 - **"New regression or pre-existing?"** Before investigating, run the failing spec from the main checkout's `ibl5/` directory with `BASE_URL` pointed at the master Docker stack's hostname (`bun run test:e2e -- --project=chromium tests/e2e/flows/<spec>.spec.ts`). If it fails there too, it is not your regression.
-- **Sub-agents cannot run E2E.** A spawned agent gets its own worktree without the task worktree's Docker stack or `.env.test`, so auth setup fails on missing `IBL_TEST_USER`/`IBL_TEST_PASS`. Run `bin/wt-up --seed` and `bin/e2e-wt` as direct Bash calls from the parent session.
+- **Sub-agents cannot run E2E.** A spawned agent gets its own worktree without the task worktree's Docker stack or `.env.test`, so auth setup fails on missing `IBL_TEST_USER`/`IBL_TEST_PASS`. Run `bin/wt-stack start <slug> --seed` and `bin/e2e-wt` as direct Bash calls from the parent session, and stop the stack per `.claude/rules/workflow-continuity.md` § Worktree Setup.
 
 ## Forms — hidden elements & fill()
 

@@ -1,6 +1,6 @@
 ---
 description: All work happens in a worktree; where plans live (outside the repo); worktree setup; post-plan handoff triggers.
-last_verified: 2026-11-11
+last_verified: 2026-11-12
 ---
 
 # Workflow Continuity Rule
@@ -21,8 +21,6 @@ Use `/plan <task description>` for implementation planning.
 ls ~/claude-plans/"$(git rev-parse --abbrev-ref HEAD)".md
 ```
 
-`~/claude-plans/` is the single source of truth.
-
 **Never `Read` a plan whole** (58-320 KB = 15-80K tokens). Index it, then read by range: `bin/plan-index <path>` prints each `## ` section's start/end line; `sed -n 'START,ENDp'` the ones you need.
 
 ## Worktree Setup
@@ -36,6 +34,8 @@ bin/wt-new <slug>   # slug = kebab-case branch name derived from the plan
 When a task builds on an open, unmerged PR, stack on it (`--base <that-branch>`) and start now. Don't wait for it to land on master. Work in `IBL5-worktrees/<slug>/ibl5/` (ADR-0046). Skip creation only when this task's worktree already exists (or the plan names one). "This edit is small enough for master" is never a reason to skip.
 
 Its Docker hostname is `<slug>.localhost` (slug = `basename "$(git rev-parse --show-toplevel)"`), never `main.localhost`; navigate `/ibl5/` paths only. Detail: `.claude/rules/worktree-hostname.md`.
+
+Worktree Docker stacks start on demand; only the main stack runs all the time. An agent that needs one runs `bin/wt-stack start <slug> [wt-up flags]` and runs `bin/wt-stack stop <slug>` when its step ends. `stop` acts only on a stack that `start` brought up, so a stack the user started with `bin/wt-up` keeps running. An implementation session leaves its stack up through `bin/post-plan-now`, because the pre-fire DB probe needs it; post-plan Phase 5 stops it.
 
 `master` is squash/rebase-merge only, so a merged SHA absent from it is normal; confirm by content. Before rebasing a stacked branch whose parent merged: `.claude/rules/linear-history-squash-merge.md`.
 

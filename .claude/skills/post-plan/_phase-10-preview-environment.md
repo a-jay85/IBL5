@@ -1,6 +1,6 @@
 ---
 description: /post-plan Phase 10 preview environment reference: the Path A main-stack rebuild after merge and the Path B worktree preview procedure.
-last_verified: 2026-11-10
+last_verified: 2026-11-12
 ---
 
 # Phase 10 — Preview Environment (post-plan reference)
@@ -78,12 +78,10 @@ The PR has been merged (either auto-merge fired during CI watch, or it was alrea
 
 ### Path B: Worktree preview (when `$PR_STATE` != `MERGED`)
 
-**Skip if** worktree was pre-existing or earlier phases left uncommitted fixes.
+Run this path for every unmerged PR. It starts no container, so a pre-existing worktree or uncommitted fixes need no skip.
 
-1. Tear down and restart with production data:
-   ```bash
-   bin/wt-down <worktree-name>
-   bin/wt-up <worktree-name> --prod
-   ```
-2. Print preview URL: `http://<slug>.localhost/ibl5/`
+1. Run `bin/wt-stack stop <slug>`. It stops the worktree stack only when an agent in this run started it with `bin/wt-stack start`. A stack the user started keeps running.
+2. Print these two lines for the user, with the slug filled in:
+   - `bin/wt-up <slug> --prod` <!-- wt-up-ok: printed for the user to run -->
+   - `http://<slug>.localhost/ibl5/`
 3. Do NOT run `wt-remove` or `git branch -D`

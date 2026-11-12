@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-11-05
+last_verified: 2026-11-12
 ---
 
 # Post-Plan Fallback
@@ -158,12 +158,14 @@ The harness runs PHPUnit, PHPStan and the Go track (`tools/postplan-harness/harn
 **E2E agent (Haiku):**
 
 Steps:
-1. Run `bin/wt-down <worktree-name>` then `bin/wt-up <worktree-name> --seed`
+1. Run `bin/wt-stack start <worktree-name> --seed`. It prints `STACK: started` when it brought up a fresh seeded stack. It prints `STACK: already-up user-owned (left as is)` when the user is previewing this worktree; run E2E anyway on the data that is there and say so in the report.
 2. Run `bin/e2e-for-pr <worktree-name>` and capture both stdout and exit code
 3. Branch on the result:
-   - **Exit 0, empty stdout** → print "No E2E tests map to changed files — skipping E2E" and stop
+   - **Exit 0, empty stdout** → print "No E2E tests map to changed files — skipping E2E", run `bin/wt-stack stop <worktree-name>`, and stop
    - **Exit 2** → run full suite: `bin/e2e-wt <worktree-name>`
    - **Exit 0, test file list on stdout** → run targeted: `bin/e2e-wt <worktree-name> <test-files-from-stdout>`
+
+Run whichever `bin/e2e-wt` command applies with the stop in the same call: `bin/e2e-wt <worktree-name> [<test-files-from-stdout>]; rc=$?; bin/wt-stack stop <worktree-name>; exit $rc`. Make it ONE foreground Bash call with `timeout: 600000`, so the stop runs after `bin/e2e-wt` exits, on pass or fail. The stop acts only on a stack that step 1 started, so a user's preview keeps running. Report the `STACK:` line it prints.
 
 Prompt MUST include: "Run these commands and report the summary output. Do NOT investigate, re-run, or diagnose individual test failures — just report the pass/fail counts and any error output." <!-- slop-ok -->
 
@@ -187,7 +189,7 @@ ENGINE_ONLY=$(gh pr diff <PR_NUMBER> --name-only 2>/dev/null \
 echo "PR_STATE=$PR_STATE ENGINE_ONLY=$ENGINE_ONLY"
 ```
 
-**Branch on `$PR_STATE`:** if `MERGED` → **Path A** (sync local, then rebuild the main Docker stack with fresh prod data. Skip Path A entirely if `ENGINE_ONLY=true`, since an engine-only change touches no `ibl5/` PHP. It requires `REMOTE_*` prod credentials in `.env`). Otherwise → **Path B** (worktree preview via `bin/wt-down`/`bin/wt-up --prod`; skip if the worktree pre-existed or earlier phases left uncommitted fixes). **Read `.claude/skills/post-plan/_phase-10-preview-environment.md`** for the full step-by-step of whichever path applies before running it. Do NOT run `wt-remove` or `git branch -D`.
+**Branch on `$PR_STATE`:** if `MERGED` → **Path A** (sync local, then rebuild the main Docker stack with fresh prod data. Skip Path A entirely if `ENGINE_ONLY=true`, since an engine-only change touches no `ibl5/` PHP. It requires `REMOTE_*` prod credentials in `.env`). Otherwise → **Path B** (stop the stack only if this run started it (`bin/wt-stack stop <slug>`), then print `bin/wt-up <slug> --prod` and `http://<slug>.localhost/ibl5/` for the user; never run `wt-remove` or `git branch -D`). **Read `.claude/skills/post-plan/_phase-10-preview-environment.md`** for the full step-by-step of whichever path applies before running it. Do NOT run `wt-remove` or `git branch -D`.
 
 ---
 

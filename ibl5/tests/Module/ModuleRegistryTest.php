@@ -23,6 +23,14 @@ final class ModuleRegistryTest extends TestCase
         self::assertTrue(ModuleRegistry::isValid('ContractList'));
     }
 
+    public function testLeagueStartersLegacyAliasIsRegistered(): void
+    {
+        self::assertTrue(ModuleRegistry::isValid('League_Starters'));
+        self::assertContains('League_Starters', ModuleRegistry::getAllModules());
+        self::assertFalse(ModuleRegistry::isValid('league_starters'));
+        self::assertTrue(ModuleRegistry::isValid('LeagueStarters'));
+    }
+
     public function testLeagueControlPanelIsRegistered(): void
     {
         self::assertTrue(ModuleRegistry::isValid('LeagueControlPanel'));

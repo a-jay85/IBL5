@@ -12,6 +12,10 @@ from typing import Callable, Optional
 
 from harness.adapters import probe as probe_mod
 
+# Main-checkout helper, called by absolute path like wt-bring-up.sh calls wt-up. A copy
+# loaded from a master blob would lose its sibling wt-up/wt-down, so it is never loaded.
+WT_STACK_PATH = Path("/Users/ajaynicolas/GitHub/IBL5/bin/wt-stack")
+STACK_STOP_TIMEOUT_S = 180
 BRINGUP_SCRIPT_PATHS = (
     ".claude/review-shared/scripts/wt-bring-up.sh",
 )
@@ -176,6 +180,22 @@ def bring_up(script_path: Path, pr: int, slug: str, worktree: str) -> str:
     if BRINGUP_SENTINEL not in stdout:
         return "incomplete"
     return bringup_state
+
+
+def stop_stack(slug: str, worktree: str) -> str:
+    """Run bin/wt-stack stop and return its STACK: verdict. Never raises.
+
+    bin/wt-stack stops the stack only when its ownership marker matches the live
+    container, so a stack the user started is always left running.
+    """
+    if not WT_STACK_PATH.is_file():
+        return "skipped-missing"
+    rc, stdout, _stderr = _run_script(WT_STACK_PATH, ["stop", slug], STACK_STOP_TIMEOUT_S, worktree)
+    for line in stdout.splitlines():
+        line = line.strip()
+        if line.startswith("STACK: "):
+            return line[len("STACK: "):]
+    return f"no-verdict rc={rc}"
 
 
 def run_http_rows(
@@ -449,57 +469,62 @@ def run(
         # Step 7: capture tree before bring-up
         result.probed_tree = head_tree()
 
-        # Step 8: bring up
-        bringup_state = bring_up(bringup_script, pr, slug, worktree)
-        result.bringup = bringup_state
-        log(f"phase6.7: bringup={bringup_state}")
-        if bringup_state not in ("UP", "ALREADY-UP"):
-            result.errors.append(f"bringup-stopped:{bringup_state}")
-            return result
-
-        # Step 9: HTTP rows
-        http_rows, http_err = run_http_rows(rows_script, pr, slug, worktree, len(pending))
-        result.rows.extend(http_rows)
-        if http_err:
-            result.errors.append(http_err)
-            return result
-
-        # Step 10: CLI rows
-        http_verdicts = {r["id"]: r["verdict"] for r in http_rows}
-        cli_rows = run_cli_rows(probe, pending, http_verdicts)
-
-        # Step 11: append CLI passes to tick input file and union rows
-        cli_err = append_cli_passes(pr, cli_rows)
-        if cli_err:
-            result.errors.append(cli_err)
-        result.rows.extend(cli_rows)
-
-        # Step 12: tick
-        pass_ids = [r["id"] for r in result.rows if r["verdict"] == "PASS"]
-
-        if not tick_enabled:
-            log(
-                f"phase6.7: rows={len(result.rows)} ticked={len(result.ticked)}"
-                f" all_ticked={result.all_ticked}"
-            )
-        else:
-            # Tree gate before ticking
-            current_tree = head_tree()
-            if current_tree and result.probed_tree and current_tree != result.probed_tree:
-                result.errors.append("tree-moved-mid-pass")
+        try:
+            # Step 8: bring up
+            bringup_state = bring_up(bringup_script, pr, slug, worktree)
+            result.bringup = bringup_state
+            log(f"phase6.7: bringup={bringup_state}")
+            if bringup_state not in ("UP", "ALREADY-UP"):
+                result.errors.append(f"bringup-stopped:{bringup_state}")
                 return result
 
-            _count, _ticked_ids = tick(tick_script, pr, slug, worktree, pass_ids)
-            confirmed, all_ticked_val = confirm(gh, pass_ids, result.errors)
-            result.ticked = confirmed
-            result.all_ticked = all_ticked_val
-            if all_ticked_val:
-                result.sentinel = write_ticked_sentinel(
-                    gh, pr, head_tree, result.probed_tree, result.errors)
-            log(
-                f"phase6.7: rows={len(result.rows)} ticked={len(result.ticked)}"
-                f" all_ticked={result.all_ticked} sentinel={result.sentinel}"
-            )
+            # Step 9: HTTP rows
+            http_rows, http_err = run_http_rows(rows_script, pr, slug, worktree, len(pending))
+            result.rows.extend(http_rows)
+            if http_err:
+                result.errors.append(http_err)
+                return result
+
+            # Step 10: CLI rows
+            http_verdicts = {r["id"]: r["verdict"] for r in http_rows}
+            cli_rows = run_cli_rows(probe, pending, http_verdicts)
+
+            # Step 11: append CLI passes to tick input file and union rows
+            cli_err = append_cli_passes(pr, cli_rows)
+            if cli_err:
+                result.errors.append(cli_err)
+            result.rows.extend(cli_rows)
+
+            # Step 12: tick
+            pass_ids = [r["id"] for r in result.rows if r["verdict"] == "PASS"]
+
+            if not tick_enabled:
+                log(
+                    f"phase6.7: rows={len(result.rows)} ticked={len(result.ticked)}"
+                    f" all_ticked={result.all_ticked}"
+                )
+            else:
+                # Tree gate before ticking
+                current_tree = head_tree()
+                if current_tree and result.probed_tree and current_tree != result.probed_tree:
+                    result.errors.append("tree-moved-mid-pass")
+                    return result
+
+                _count, _ticked_ids = tick(tick_script, pr, slug, worktree, pass_ids)
+                confirmed, all_ticked_val = confirm(gh, pass_ids, result.errors)
+                result.ticked = confirmed
+                result.all_ticked = all_ticked_val
+                if all_ticked_val:
+                    result.sentinel = write_ticked_sentinel(
+                        gh, pr, head_tree, result.probed_tree, result.errors)
+                log(
+                    f"phase6.7: rows={len(result.rows)} ticked={len(result.ticked)}"
+                    f" all_ticked={result.all_ticked} sentinel={result.sentinel}"
+                )
+        finally:
+            # Step 13: stop the stack only if bin/wt-stack started it. Runs on every
+            # return after bring-up, NOT-READY and FAILED included (partial containers).
+            log(f"phase6.7: stack-stop={stop_stack(slug, worktree)}")
 
     except Exception as exc:  # noqa: BLE001
         result.errors.append(f"manual-testing-error:{exc}")

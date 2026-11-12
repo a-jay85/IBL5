@@ -1,7 +1,7 @@
 ---
 name: pr-burndown
 description: "Burn down the open PRs that wait on the owner. Background headless jobs do the prep that needs no owner call (rebase, regenerate snapshots, write promised tests, fix review findings, re-fire post-plan). The owner sees only the decisions that are theirs: a status card per PR (CI on the current head, review threads, post-plan verdict, door and blast radius, conflicts, hold reasons, visual links) with a recommended option, answered in a batch."
-last_verified: 2026-11-11
+last_verified: 2026-11-12
 ---
 
 # /pr-burndown
@@ -288,7 +288,7 @@ settle, the job stops and comments, and the PR moves to Decide now.
 
 When the decision needs eyes:
 
-- **Live page:** bring up the PR worktree stack with `bin/wt-up <slug> --seed`. Drop
+- **Live page:** bring up the PR worktree stack with `bin/wt-stack start <slug> --seed`, take the screenshot, then run `bin/wt-stack stop <slug>` before the next step. Drop
   `--seed` for prod data only when `.env` has the `REMOTE_*` credentials. Open
   `http://<slug>.localhost/ibl5/...` with the `preview_*` tools and embed the screenshot.
   For before and after, swap the old CSS value in with `preview_evaluate` and shoot again.
@@ -326,7 +326,7 @@ Owner decision on PR #N (branch <branch>), <date>: "<owner's words>". <What it c
    bin/lib/prefire-verify --plan <plan path> --stage matrix, then --stage phpunit, then
    --stage exec-mutations. Drop --plan when the PR has no plan
    (ls ~/claude-plans/<branch>.md). Exit 3 means Docker or the DB is down: run
-   bin/wt-up <slug> and retry. Also run composer run analyse in the worktree's Docker when
+   `bin/wt-stack start <slug>`, retry, then run `bin/wt-stack stop <slug>` once the query returns. Also run composer run analyse in the worktree's Docker when
    PHP changed, and <any extra tests this change needs>. Fix what broke.
    Do not push until every stage exits 0. A pass is cached by tree hash, so the parent's
    re-fire reuses it. If a failure is outside this PR's diff and also fails on master,

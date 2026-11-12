@@ -1,6 +1,6 @@
 ---
 description: Worktree Docker hostnames, URL paths, and slug-derivation rules — path-scoped, loads only for E2E tests and worktree Docker scripts.
-last_verified: 2026-09-30
+last_verified: 2026-11-12
 paths:
   - "ibl5/tests/e2e/**"
   - "ibl5/playwright*.config.ts"
@@ -27,7 +27,7 @@ Derive the slug at runtime from anywhere inside a worktree:
 basename "$(git rev-parse --show-toplevel)"
 ```
 
-This returns the worktree directory name, matching the Traefik route `bin/wt-up` configures.
+This returns the worktree directory name, matching the Traefik route `bin/wt-up` configures. <!-- wt-up-ok: describes the Traefik route -->
 
 ## URL paths
 

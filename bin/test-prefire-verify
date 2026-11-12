@@ -1094,6 +1094,16 @@ test_phpunit_empty_map_with_php_change_runs_full() {
     want_args "0:"
 }
 
+test_phpunit_mixed_mapped_and_unmapped_class_runs_full() {
+    subset_case
+    touch_file ibl5/classes/Foo/Bar.php
+    touch_file ibl5/classes/Foo/Lonely.php
+    run_gate --stage phpunit
+    want_rc 0
+    want_out "phpunit mode: full (no test file maps to the changed PHP: ibl5/classes/Foo/Lonely.php)"
+    want_args "0:"
+}
+
 test_phpunit_deleted_source_runs_full() {
     subset_case
     (cd "$R" && git rm -q ibl5/classes/Foo/Bar.php)
@@ -1293,6 +1303,7 @@ test_phpunit_bin_script_maps_cli_test
 test_phpunit_empty_range_skips
 test_phpunit_bad_base_runs_full
 test_phpunit_empty_map_with_php_change_runs_full
+test_phpunit_mixed_mapped_and_unmapped_class_runs_full
 test_phpunit_deleted_source_runs_full
 test_phpunit_subset_red_exits_1
 test_phpunit_missing_binary_exits_3

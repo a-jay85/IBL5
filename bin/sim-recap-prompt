@@ -173,12 +173,19 @@ echo "== FACT SHEET (complete and authoritative) =="
 echo ""
 echo "Each game carries a key (g1, g2, ...). Your prose.json games object is keyed by these."
 echo ""
+# Prod's simRecapContext.php adds the "double" field. Until prod runs that
+# version, an untagged sheet must not get the tag-only rule, or the writer
+# would stop calling any line a double-double.
+if jq -e '[.games[] | (.visitor_top + .home_top)[] | has("double")] | any' "$roster_path" >/dev/null 2>&1; then
+    echo "Each side lists its top 3 scorers plus every other player with a double-double or better. A tag like [TRIPLE-DOUBLE] at the end of a line is computed from the box score and is authoritative. Call a line a double-double, triple-double, or better only when its tag says so, and use the tag's word. Never say a tagged player \"nearly\" or \"almost\" got it. A player missing from this list did not get one."
+    echo ""
+fi
 echo "Team cities below are the IBL's and can differ from real life. The IBL Grizzlies play in Vancouver, not Memphis. Use the city shown here. Never assume a team's city, arena, or local color from its real-life namesake."
 echo ""
 jq -r '
   def tn($nm; $id; $n): $n // $nm[$id | tostring] // ("team " + ($id | tostring));
   def fn($city; $name): if ($city // "") == "" then $name else "\($city) \($name)" end;
-  def pl($s): "  \($s) \(.name) \(.min)m \(.pts)p \(.reb)r \(.ast)a \(.stl)s \(.blk)b \(.fgm)-\(.fga) \(.tpm)-\(.tpa)";
+  def pl($s): "  \($s) \(.name) \(.min)m \(.pts)p \(.reb)r \(.ast)a \(.stl)s \(.blk)b \(.fgm)-\(.fga) \(.tpm)-\(.tpa)\(if (.double // null) == null then "" else " [" + (.double | ascii_upcase) + "]" end)";
   (reduce .standings[] as $s ({}; .[$s.teamid | tostring] = $s.name)) as $nm
   | "Sim \(.sim): \(.start_date) to \(.end_date)",
     "",

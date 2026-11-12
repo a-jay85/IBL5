@@ -10,7 +10,6 @@ on:
 permissions:
   contents: read
   packages: read
-  pull-requests: write
 
 concurrency:
   # A labeled event for any label other than mutation-test gets its own group, so it never

@@ -1,0 +1,224 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-plan-checks-block — tests for bin/lib/plan-checks-block, the PR-body
+# codec the Plan checks CI job reads. Prints one `PASS <case>` or
+# `FAIL <case> — <why>` line per case. Exits 1 when any case fails.
+#
+# Usage: bin/test-plan-checks-block
+
+set -u
+export LC_ALL=C
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+LIB="$REPO_ROOT/bin/lib/plan-checks-block"
+XM="$REPO_ROOT/bin/lib/plan-exec-mutations"
+TMP="$(mktemp -d "${TMPDIR:-/tmp}/test-plan-checks-block.XXXXXX")"
+trap 'rm -rf "$TMP"' EXIT
+FAILS=0
+F='```'
+
+CASE=""; CASE_ERR=""
+start_case() { CASE="$1"; CASE_ERR=""; }
+chk() {
+    _d="$1"; shift
+    if ! "$@"; then
+        [ -n "$CASE_ERR" ] || CASE_ERR="$_d"
+    fi
+}
+end_case() {
+    if [ -z "$CASE_ERR" ]; then
+        echo "PASS $CASE"
+    else
+        echo "FAIL $CASE — $CASE_ERR"
+        FAILS=$((FAILS + 1))
+    fi
+}
+eq() { [ "$1" = "$2" ]; }
+has() { grep -qF -- "$2" <<< "$1"; }
+lacks() { ! grep -qF -- "$2" <<< "$1"; }
+
+# Fixture repo: bin/lib links to the real library, so `ci` finds
+# bin/lib/plan-exec-mutations at the repo root exactly as it does in CI.
+R="$TMP/repo"
+mkdir -p "$R/bin"
+git -C "$R" init -q
+ln -s "$REPO_ROOT/bin/lib" "$R/bin/lib"
+printf 'ALPHA\n' > "$R/target.txt"
+printf 'other\n' > "$R/other.txt"
+printf '#!/usr/bin/env bash\ngrep -q ALPHA target.txt\n' > "$R/bin/test-alpha-fixture"
+printf '#!/usr/bin/env bash\nexit 1\n' > "$R/bin/test-false-fixture"
+chmod +x "$R/bin/test-alpha-fixture" "$R/bin/test-false-fixture"
+git -C "$R" add -A
+git -C "$R" -c user.email=t@t -c user.name=t commit -qm fixture
+
+# mkplan <path> <matrix rows...> -- <mutation section body>
+mkplan() {
+    local out="$1"; shift
+    {
+        printf '# Fixture plan\n\n## Verification Matrix\n\n'
+        printf '| # | What to verify | Test type | Timing | Test file / location |\n'
+        printf '|---|---------------|-----------|--------|---------------------|\n'
+        while [ $# -gt 0 ] && [ "$1" != -- ]; do printf '%s\n' "$1"; shift; done
+        [ $# -gt 0 ] && shift
+        printf '\n'
+        if [ $# -gt 0 ] && [ -n "$1" ]; then printf '## Executable Mutations\n\n%s\n' "$1"; fi
+    } > "$out"
+}
+row() { printf '| %s | check %s | CLI-executable | post-impl | `%s` |' "$1" "$1" "$2"; }
+mblock() { # <row> <file> <match> <replace>
+    printf '%smutation\nrow: %s\nfile: %s\nmatch: %s\nreplace: %s\n%s\n' "$F" "$1" "$2" "$3" "$4" "$F"
+}
+
+PLAN="$TMP/plan.md"
+mkplan "$PLAN" "$(row 1 'bin/test-alpha-fixture')" "$(row 2 'bin/db-query "SELECT 1"')" -- \
+    "$(mblock 1 target.txt ALPHA BETA)"
+: > "$TMP/nolabels"
+printf 'plan-checks\n' > "$TMP/labels"
+
+enc() { (cd "$R" && "$LIB" encode "$1"); }
+dec() { rm -rf "$2"; mkdir -p "$2"; (cd "$R" && "$LIB" decode "$1" "$2"); }
+ci() { (cd "$R" && "$LIB" ci --body-file "$1" --labels-file "$2" 2>&1); }
+
+start_case case_round_trip_records_identical
+enc "$PLAN" > "$TMP/body"; RC=$?
+chk "encode exits 0 (got $RC)" eq "$RC" 0
+dec "$TMP/body" "$TMP/out"; RC=$?
+chk "decode exits 0 (got $RC)" eq "$RC" 0
+(cd "$R" && "$XM" parse "$PLAN") > "$TMP/parse.nul"
+chk "records.nul is byte-identical to parse" cmp -s "$TMP/out/records.nul" "$TMP/parse.nul"
+chk "records.nul is non-empty" test -s "$TMP/out/records.nul"
+chk "rows.tsv holds only the CI row" eq "$(cat "$TMP/out/rows.tsv")" "$(printf '1\tbin/test-alpha-fixture')"
+chk "header counts" has "$(cat "$TMP/body")" "rows=1 mutations=1"
+end_case
+
+start_case case_db_row_excluded
+chk "rows.tsv lacks the db-query row" lacks "$(cat "$TMP/out/rows.tsv")" "bin/db-query"
+end_case
+
+start_case case_ci_passes_on_tripped_plan
+OUT=$(ci "$TMP/body" "$TMP/labels"); RC=$?
+chk "ci exits 0 (got $RC)" eq "$RC" 0
+chk "PASS line" has "$OUT" "PASS plan-checks: 1 rows, 1 mutation rows TRIPPED"
+chk "fixture tree clean" eq "$(git -C "$R" status --porcelain)" ""
+end_case
+
+start_case case_empty_plan_block
+EP="$TMP/empty.md"
+mkplan "$EP" "$(row 1 'bin/db-query "SELECT 1"')" -- ""
+enc "$EP" > "$TMP/empty-body"; RC=$?
+chk "encode exits 0 (got $RC)" eq "$RC" 0
+chk "rows=0 mutations=0" has "$(cat "$TMP/empty-body")" "rows=0 mutations=0"
+OUT=$(ci "$TMP/empty-body" "$TMP/labels"); RC=$?
+chk "ci exits 0 (got $RC)" eq "$RC" 0
+chk "PASS 0 rows" has "$OUT" "PASS plan-checks: 0 rows"
+end_case
+
+start_case case_absent_block_adhoc_passes
+printf 'hello\n' > "$TMP/hello"
+OUT=$(ci "$TMP/hello" "$TMP/nolabels"); RC=$?
+chk "ci exits 0 (got $RC)" eq "$RC" 0
+chk "ad-hoc PR line" has "$OUT" "ad-hoc PR"
+end_case
+
+start_case case_absent_block_labelled_fails
+OUT=$(ci "$TMP/hello" "$TMP/labels"); RC=$?
+chk "ci exits 1 (got $RC)" eq "$RC" 1
+chk "FAIL line names the lost block" has "$OUT" "has no plan-checks block"
+end_case
+
+start_case case_corrupt_sha_fails
+# Variant 1: one flipped base64 character in the payload.
+python3 -I - "$TMP/body" "$TMP/flip" <<'PY'
+import sys
+lines = open(sys.argv[1]).read().split("\n")
+i = next(n for n, l in enumerate(lines) if l.startswith("plan-checks v1")) + 1
+l = lines[i]
+c = "A" if l[10] != "A" else "B"
+lines[i] = l[:10] + c + l[11:]
+open(sys.argv[2], "w").write("\n".join(lines))
+PY
+OUT=$(ci "$TMP/flip" "$TMP/nolabels"); RC=$?
+chk "flipped char: ci exits 1 (got $RC)" eq "$RC" 1
+chk "flipped char: corrupt" has "$OUT" "corrupt"
+# Variant 2: a well-formed payload whose JSON changed under the old header SHA.
+# zlib would catch variant 1 alone, so this variant is what pins the SHA test.
+python3 -I - "$TMP/body" "$TMP/resha" <<'PY'
+import base64, json, sys, zlib
+lines = open(sys.argv[1]).read().split("\n")
+i = next(n for n, l in enumerate(lines) if l.startswith("plan-checks v1"))
+j = lines.index("```", i)
+obj = json.loads(zlib.decompress(base64.b64decode("".join(lines[i + 1:j]))))
+obj["rows"][0]["cmd"] = "bin/test-false-fixture"
+raw = json.dumps(obj, sort_keys=True, separators=(",", ":")).encode()
+b64 = base64.b64encode(zlib.compress(raw)).decode()
+lines[i + 1:j] = [b64[k:k + 76] for k in range(0, len(b64), 76)]
+open(sys.argv[2], "w").write("\n".join(lines))
+PY
+OUT=$(ci "$TMP/resha" "$TMP/nolabels"); RC=$?
+chk "stale sha: ci exits 1 (got $RC)" eq "$RC" 1
+chk "stale sha: corrupt" has "$OUT" "corrupt"
+chk "stale sha: no row ran" lacks "$OUT" "matrix row"
+end_case
+
+start_case case_duplicate_marker_fails
+cat "$TMP/body" "$TMP/body" > "$TMP/dup"
+dec "$TMP/dup" "$TMP/out-dup" >/dev/null; RC=$?
+chk "doubled block: decode exits 3 (got $RC)" eq "$RC" 3
+end_case
+
+start_case case_header_near_miss_fails
+sed 's/^plan-checks v1 /plan-checks v2 /' "$TMP/body" > "$TMP/v2"
+dec "$TMP/v2" "$TMP/out-v2" >/dev/null; RC=$?
+chk "v2 header: decode exits 3 (got $RC)" eq "$RC" 3
+sed -E 's/^(plan-checks v1 sha256=)[0-9a-f]/\1/' "$TMP/body" > "$TMP/sha63"
+chk "63-digit fixture really has 63 digits" eval 'grep -qE "^plan-checks v1 sha256=[0-9a-f]{63} " "$TMP/sha63"'
+dec "$TMP/sha63" "$TMP/out-63" >/dev/null; RC=$?
+chk "63-digit sha: decode exits 3 (got $RC)" eq "$RC" 3
+end_case
+
+start_case case_failing_row_fails
+FP="$TMP/failrow.md"
+mkplan "$FP" "$(row 1 'bin/test-false-fixture')" -- ""
+enc "$FP" > "$TMP/fail-body"
+OUT=$(ci "$TMP/fail-body" "$TMP/labels"); RC=$?
+chk "ci exits 1 (got $RC)" eq "$RC" 1
+chk "FAIL matrix row" has "$OUT" "FAIL matrix row 1"
+end_case
+
+start_case case_held_mutation_fails
+HP="$TMP/held.md"
+mkplan "$HP" "$(row 1 'bin/test-alpha-fixture')" -- "$(mblock 1 other.txt other changed)"
+enc "$HP" > "$TMP/held-body"
+OUT=$(ci "$TMP/held-body" "$TMP/labels"); RC=$?
+chk "ci exits 1 (got $RC)" eq "$RC" 1
+chk "HELD verdict" has "$OUT" "HELD row 1"
+chk "FAIL plan-checks mutation run" has "$OUT" "FAIL plan-checks mutation run"
+chk "fixture tree clean" eq "$(git -C "$R" status --porcelain)" ""
+end_case
+
+start_case case_oversize_block_exits_5
+OP="$TMP/over.md"
+python3 -I - "$OP" <<'PY'
+import os, sys
+rows = ["| %d | big | CLI-executable | post-impl | `bin/test-x %s` |" % (i, os.urandom(100).hex()) for i in range(1, 401)]
+head = "# Fixture plan\n\n## Verification Matrix\n\n| # | What to verify | Test type | Timing | Test file / location |\n|---|---|---|---|---|\n"
+open(sys.argv[1], "w").write(head + "\n".join(rows) + "\n")
+PY
+OUT=$(enc "$OP" 2>&1); RC=$?
+chk "encode exits 5 (got $RC)" eq "$RC" 5
+chk "names the cap" has "$OUT" "over the 32768 cap"
+end_case
+
+start_case case_ci_rejects_unknown_flag
+"$LIB" ci --bogus /dev/null >/dev/null 2>&1; RC=$?
+chk "unknown flag exits 2 (got $RC)" eq "$RC" 2
+"$LIB" encode >/dev/null 2>&1; RC=$?
+chk "encode without a plan exits 2 (got $RC)" eq "$RC" 2
+end_case
+
+if [ "$FAILS" -gt 0 ]; then
+    echo "test-plan-checks-block: $FAILS case(s) failed"
+    exit 1
+fi
+echo "test-plan-checks-block: all cases passed"

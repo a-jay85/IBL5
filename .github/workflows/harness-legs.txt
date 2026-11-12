@@ -13,6 +13,7 @@
 0 bin/test-usage-gate
 0 bin/test-postplan-fix
 0 bin/test-check-composite-contracts
+0 bin/test-plan-checks-block
 0 bin/test-pr-triage
 0 bin/test-finding-class-scan
 0 bin/test-plan-exec-mutations

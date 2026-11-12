@@ -1,0 +1,289 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/lib/plan-checks-block — the PR-body codec for the Plan checks CI job.
+# Post-plan encodes a plan's CI-runnable matrix rows and its mutation records
+# into a base64 block in the PR body; the Plan checks job decodes and runs them.
+# One script owns both sides, so the encoder and the decoder cannot drift.
+#
+# Usage: bin/lib/plan-checks-block encode <plan>
+#        bin/lib/plan-checks-block decode <body-file> <outdir>
+#        bin/lib/plan-checks-block ci --body-file F --labels-file L
+# ---
+# encode  print the block on stdout. Rows: the plan's matrix rows that
+#         row_runs_in_ci (bin/lib/plan-matrix-rows.sh) sends to CI, deduped.
+#         Records: bin/lib/plan-exec-mutations parse output. Exit 3 when the
+#         plan has no Verification Matrix or parse fails; exit 5 when the
+#         block is over 32768 bytes.
+# decode  write <outdir>/rows.tsv (num TAB cmd) and <outdir>/records.nul (the
+#         exact parse byte format). Exit 0 ok; 4 no begin marker; 3 corrupt.
+# ci      the CI driver. The PR is plan-driven when the labels file has a line
+#         exactly `plan-checks`. Exit 0 pass; 1 fail.
+# All three exit 2 on a usage error.
+
+set -uo pipefail
+
+SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CAP=32768
+
+usage() {
+    echo "Usage: bin/lib/plan-checks-block encode <plan>" >&2
+    echo "       bin/lib/plan-checks-block decode <body-file> <outdir>" >&2
+    echo "       bin/lib/plan-checks-block ci --body-file F --labels-file L" >&2
+    exit 2
+}
+
+# The codec. argv: encode <rows.tsv> <records.nul> <cap> | decode <body> <outdir>
+codec() {
+    python3 -I -c '
+import base64, hashlib, json, re, sys, zlib
+
+BEGIN = "<!-- plan-checks:begin -->"
+END = "<!-- plan-checks:end -->"
+HEADER_RE = re.compile(r"^plan-checks v1 sha256=([0-9a-f]{64}) rows=([0-9]+) mutations=([0-9]+)$")
+REC_KEYS = ("row", "file", "check", "match", "replace")
+
+
+def encode(rows_path, recs_path, cap):
+    rows = []
+    with open(rows_path, encoding="utf-8") as f:
+        for line in f.read().splitlines():
+            if not line:
+                continue
+            num, _, cmd = line.partition("\t")
+            rows.append({"num": num, "cmd": cmd})
+    mutations = []
+    with open(recs_path, "rb") as f:
+        raw = f.read()
+    for line in raw.split(b"\n"):
+        if not line:
+            continue
+        parts = line.decode("utf-8").split("\0")
+        if len(parts) != len(REC_KEYS):
+            sys.stderr.write("FAIL parse record has %d fields, wanted 5\n" % len(parts))
+            return 3
+        mutations.append(dict(zip(REC_KEYS, parts)))
+    payload = json.dumps({"v": 1, "rows": rows, "mutations": mutations},
+                         sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("ascii")
+    sha = hashlib.sha256(payload).hexdigest()
+    b64 = base64.b64encode(zlib.compress(payload, 9)).decode("ascii")
+    lines = [b64[i:i + 76] for i in range(0, len(b64), 76)]
+    block = "\n".join([
+        BEGIN,
+        "<details><summary>Plan checks for CI (read by the Plan checks job)</summary>",
+        "",
+        "```text",
+        "plan-checks v1 sha256=%s rows=%d mutations=%d" % (sha, len(rows), len(mutations)),
+    ] + lines + [
+        "```",
+        "",
+        "</details>",
+        END,
+    ]) + "\n"
+    size = len(block.encode("ascii"))
+    if size > cap:
+        sys.stderr.write("FAIL plan-checks block is %d bytes, over the %d cap\n" % (size, cap))
+        return 5
+    sys.stdout.write(block)
+    return 0
+
+
+def corrupt(reason):
+    sys.stdout.write(reason + "\n")
+    return 3
+
+
+def decode(body_path, outdir):
+    with open(body_path, encoding="utf-8", errors="replace") as f:
+        body = f.read().replace("\r\n", "\n")
+    n = body.count(BEGIN)
+    if n == 0:
+        return 4
+    if n != 1:
+        return corrupt("begin marker appears %d times" % n)
+    b = body.index(BEGIN)
+    e = body.find(END)
+    if e == -1:
+        return corrupt("end marker missing")
+    if e < b:
+        return corrupt("end marker comes before the begin marker")
+    lines = body[b + len(BEGIN):e].split("\n")
+    hi = next((i for i, l in enumerate(lines) if l.startswith("plan-checks ")), None)
+    if hi is None:
+        return corrupt("no plan-checks header line")
+    m = HEADER_RE.match(lines[hi].strip())
+    if not m:
+        return corrupt("header line does not match plan-checks v1 sha256=<64 hex> rows=<n> mutations=<m>")
+    data = []
+    for l in lines[hi + 1:]:
+        if l.strip() == "```":
+            break
+        data.append(l.strip())
+    else:
+        return corrupt("payload fence not closed")
+    try:
+        payload = zlib.decompress(base64.b64decode("".join(data), validate=True))
+    except Exception as exc:
+        return corrupt("base64 or zlib decoding failed: %s" % exc)
+    if hashlib.sha256(payload).hexdigest() != m.group(1):
+        return corrupt("sha256 of the payload differs from the header")
+    try:
+        obj = json.loads(payload.decode("ascii"))
+    except Exception as exc:
+        return corrupt("payload is not JSON: %s" % exc)
+    if not isinstance(obj, dict) or set(obj) != {"v", "rows", "mutations"} or obj["v"] != 1:
+        return corrupt("payload is not an object with exactly v=1, rows, mutations")
+    if not isinstance(obj["rows"], list) or not isinstance(obj["mutations"], list):
+        return corrupt("rows or mutations is not a list")
+
+    def clean(rec, keys, num_key):
+        if not isinstance(rec, dict) or set(rec) != set(keys):
+            return "an entry has the wrong keys"
+        for k in keys:
+            v = rec[k]
+            if not isinstance(v, str):
+                return "field %s is not a string" % k
+            if "\0" in v or "\n" in v:
+                return "field %s holds a NUL or LF" % k
+        if not re.fullmatch(r"[0-9]+", rec[num_key]):
+            return "field %s is not all digits" % num_key
+        return None
+
+    for r in obj["rows"]:
+        why = clean(r, ("num", "cmd"), "num")
+        if why:
+            return corrupt("row: " + why)
+    for r in obj["mutations"]:
+        why = clean(r, REC_KEYS, "row")
+        if why:
+            return corrupt("mutation: " + why)
+    if len(obj["rows"]) != int(m.group(2)) or len(obj["mutations"]) != int(m.group(3)):
+        return corrupt("a count differs from its header value")
+    with open(outdir + "/rows.tsv", "w", encoding="utf-8") as f:
+        for r in obj["rows"]:
+            f.write("%s\t%s\n" % (r["num"], r["cmd"]))
+    with open(outdir + "/records.nul", "wb") as f:
+        for r in obj["mutations"]:
+            f.write("\0".join(r[k] for k in REC_KEYS).encode("utf-8") + b"\n")
+    return 0
+
+
+if sys.argv[1] == "encode":
+    sys.exit(encode(sys.argv[2], sys.argv[3], int(sys.argv[4])))
+sys.exit(decode(sys.argv[2], sys.argv[3]))
+' "$@"
+}
+
+do_encode() {
+    local plan="$1" rows rows_rc num cmd tmp recs_rc prev dup
+    # shellcheck source=bin/lib/plan-matrix-rows.sh
+    source "$SELF_DIR/plan-matrix-rows.sh"
+    rows=$(plan_matrix_rows "$plan"); rows_rc=$?
+    if [ "$rows_rc" -eq 2 ]; then
+        echo "FAIL plan has no Verification Matrix" >&2
+        return 3
+    fi
+    tmp=$(mktemp -d "${TMPDIR:-/tmp}/plan-checks.XXXXXX") || return 3
+    : > "$tmp/rows.tsv"
+    local seen=()
+    while IFS=$'\t' read -r num cmd; do
+        [ -n "$num" ] || continue
+        row_runs_in_ci "$cmd" || continue
+        dup=0
+        for prev in ${seen[@]+"${seen[@]}"}; do
+            if [ "$prev" = "$cmd" ]; then dup=1; break; fi
+        done
+        [ "$dup" -eq 0 ] || continue
+        seen+=("$cmd")
+        printf '%s\t%s\n' "$num" "$cmd" >> "$tmp/rows.tsv"
+    done <<< "$rows"
+    "$SELF_DIR/plan-exec-mutations" parse "$plan" > "$tmp/records.nul"; recs_rc=$?
+    if [ "$recs_rc" -ne 0 ]; then
+        echo "FAIL plan-exec-mutations parse exited $recs_rc: $(head -1 "$tmp/records.nul" | tr '\0' ' ')" >&2
+        rm -rf "$tmp"
+        return 3
+    fi
+    codec encode "$tmp/rows.tsv" "$tmp/records.nul" "$CAP"; rc=$?
+    rm -rf "$tmp"
+    return "$rc"
+}
+
+do_ci() {
+    local body="$1" labels="$2" out drc reason labelled=0 nrows=0 nmut=0 num cmd log rc root
+    grep -qxF 'plan-checks' "$labels" && labelled=1
+    out=$(mktemp -d "${TMPDIR:-/tmp}/plan-checks.XXXXXX") || return 1
+    reason=$(codec decode "$body" "$out"); drc=$?
+    if [ "$drc" -eq 4 ]; then
+        rm -rf "$out"
+        if [ "$labelled" -eq 1 ]; then
+            echo "FAIL plan-driven PR (label plan-checks) has no plan-checks block in its body"
+            return 1
+        fi
+        echo "PASS no plan-checks block and no plan-checks label: ad-hoc PR, nothing to run"
+        return 0
+    fi
+    if [ "$drc" -ne 0 ]; then
+        rm -rf "$out"
+        echo "FAIL plan-checks block is corrupt: ${reason:-decode exited $drc}"
+        return 1
+    fi
+    root=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "FAIL plan-checks ci must run inside the repo"; rm -rf "$out"; return 1; }
+    cd "$root" || { rm -rf "$out"; return 1; }
+    log="$out/row.log"
+    while IFS=$'\t' read -r num cmd; do
+        [ -n "$num" ] || continue
+        nrows=$((nrows + 1))
+        echo "plan-checks: matrix row $num: $cmd"
+        timeout 900 bash -c "$cmd" </dev/null > "$log" 2>&1; rc=$?
+        if [ "$rc" -ne 0 ]; then
+            echo "FAIL matrix row $num exited $rc: $cmd"
+            tail -n 30 "$log"
+            rm -rf "$out"
+            return 1
+        fi
+    done < "$out/rows.tsv"
+    if [ -s "$out/records.nul" ]; then
+        nmut=$(grep -c '' "$out/records.nul")
+        bin/lib/plan-exec-mutations recover; rc=$?
+        if [ "$rc" -ne 0 ]; then
+            echo "FAIL plan-checks mutation recover exited $rc"
+            rm -rf "$out"
+            return 1
+        fi
+        bin/lib/plan-exec-mutations run --records "$out/records.nul" --timeout 30 --max-timeout 300 --scale 2 --budget 1800; rc=$?
+        if [ "$rc" -ne 0 ]; then
+            echo "FAIL plan-checks mutation run exited $rc"
+            rm -rf "$out"
+            return 1
+        fi
+    fi
+    rm -rf "$out"
+    echo "PASS plan-checks: $nrows rows, $nmut mutation rows TRIPPED"
+    return 0
+}
+
+MODE="${1:-}"
+[ $# -gt 0 ] && shift
+case "$MODE" in
+    encode)
+        [ $# -eq 1 ] && [ -r "$1" ] || usage
+        do_encode "$1"; exit $?
+        ;;
+    decode)
+        [ $# -eq 2 ] && [ -r "$1" ] && [ -d "$2" ] || usage
+        codec decode "$1" "$2"; exit $?
+        ;;
+    ci)
+        BODY="" LABELS=""
+        while [ $# -gt 0 ]; do
+            case "$1" in
+                --body-file) [ $# -ge 2 ] || usage; BODY="$2"; shift 2 ;;
+                --labels-file) [ $# -ge 2 ] || usage; LABELS="$2"; shift 2 ;;
+                *) echo "plan-checks-block: unknown argument '$1'" >&2; usage ;;
+            esac
+        done
+        [ -n "$BODY" ] && [ -r "$BODY" ] && [ -n "$LABELS" ] && [ -r "$LABELS" ] || usage
+        do_ci "$BODY" "$LABELS"; exit $?
+        ;;
+    *) usage ;;
+esac

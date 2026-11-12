@@ -296,6 +296,47 @@ jobs:
           echo "$OUT"
           echo "$OUT" | grep -q "Nothing to migrate." || { echo "::error::pending migrations remain after rehearsal"; exit 1; }
 
+      - name: Fake revert (apply a paired migration, delete its files, migrate again)
+        run: |
+          set -euo pipefail
+          q() { mysql -h 127.0.0.1 -u root -proot iblhoops_ibl5 -N -B -e "$1"; }
+          want() { [ "$2" = "$3" ] || { echo "::error::$1: expected '$3', got '$2'"; exit 1; }; }
+          D=ibl5/migrations; P=98_rehearsal_revert_probe
+          trap 'rm -f "$D/$P.sql" "$D/$P.down.sql" "$D/99_rehearsal_later.sql"' EXIT
+          rows() { q "SELECT COALESCE(GROUP_CONCAT(CONCAT(id, ':', v) ORDER BY id), '') FROM rehearsal_revert_probe"; }
+          tracked() { q "SELECT COUNT(*) FROM migrations WHERE migration = '$P.sql'"; }
+          write_pair() {
+            printf '%s\n' "INSERT IGNORE INTO rehearsal_revert_probe_backup SELECT * FROM rehearsal_revert_probe WHERE v = 'old';" \
+              "DELETE FROM rehearsal_revert_probe WHERE v = 'old';" > "$D/$P.sql"
+            printf '%s\n' '-- restores: rehearsal_revert_probe' \
+              'INSERT IGNORE INTO rehearsal_revert_probe SELECT * FROM rehearsal_revert_probe_backup;' > "$D/$P.down.sql"
+          }
+          want "down columns exist" "$(q "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'migrations' AND COLUMN_NAME IN ('down_sql', 'up_sha256')")" 2
+          q "CREATE TABLE rehearsal_revert_probe (id INT PRIMARY KEY, v VARCHAR(20) NOT NULL) ENGINE=InnoDB;
+             CREATE TABLE rehearsal_revert_probe_backup LIKE rehearsal_revert_probe;
+             INSERT INTO rehearsal_revert_probe VALUES (1, 'keep'), (2, 'old');"
+
+          # Case 1: a pure revert deploy (no pending files) undoes the data change.
+          write_pair; php ibl5/bin/migrate
+          want "up deleted the row" "$(rows)" "1:keep"
+          want "down SQL stored" "$(q "SELECT COUNT(*) FROM migrations WHERE migration = '$P.sql' AND down_sql IS NOT NULL AND CHAR_LENGTH(up_sha256) = 64")" 1
+          rm "$D/$P.sql" "$D/$P.down.sql"
+          OUT="$(php ibl5/bin/migrate)"; echo "$OUT"
+          grep -qF "Reverted $P.sql" <<< "$OUT" || { echo "::error::revert line missing"; exit 1; }
+          grep -qF "Nothing to migrate." <<< "$OUT" || { echo "::error::revert deploy did not reach the no-pending path"; exit 1; }
+          want "row restored with its id" "$(rows)" "1:keep,2:old"
+          want "tracking row removed" "$(tracked)" 0
+
+          # Case 2: a later migration still exists, so the deploy stops and changes nothing.
+          write_pair; echo 'SELECT 1;' > "$D/99_rehearsal_later.sql"; php ibl5/bin/migrate
+          rm "$D/$P.sql" "$D/$P.down.sql"
+          if OUT="$(php ibl5/bin/migrate)"; then echo "$OUT"; echo "::error::guard did not stop the deploy"; exit 1; fi
+          echo "$OUT"
+          grep -qF "Cannot auto-revert" <<< "$OUT" || { echo "::error::guard message missing"; exit 1; }
+          want "data untouched after refusal" "$(rows)" "1:keep"
+          want "tracking row kept after refusal" "$(tracked)" 1
+          q "DROP TABLE rehearsal_revert_probe, rehearsal_revert_probe_backup; DELETE FROM migrations WHERE migration IN ('$P.sql', '99_rehearsal_later.sql');"
+
       # Mirror main.yml "Validate database schema" exactly — this is the gate
       - name: php bin/validate-schema (mirrors main.yml; pre-flight gate)
         run: php ibl5/bin/validate-schema

@@ -629,6 +629,132 @@ final class CheckDestructiveMigrationsCliTest extends TestCase
         self::assertStringNotContainsString('[delete-no-where]', $result['output']);
     }
 
+    private const REWRITE_UP_BODY = "CREATE TABLE IF NOT EXISTS t_backup_300 LIKE t;\n"
+        . "INSERT IGNORE INTO t_backup_300 SELECT * FROM t WHERE status = 'old';\n"
+        . "UPDATE t SET status = 'new' WHERE status = 'old';\n";
+
+    private const GOOD_DOWN_BODY = "-- restores: t\n"
+        . "UPDATE t, t_backup_300 b SET t.status = b.status WHERE t.id = b.id;\n";
+
+    public function testRewriteWithUndoScriptButNoDownFileIsFlagged(): void
+    {
+        $this->writeMigration('00_r.sql', self::REWRITE_UP_BODY);
+        mkdir($this->tmpDir . '/ibl5/migrations/undo', 0755, true);
+        $this->writeMigration('undo/00_r.sql', "-- restore\nUPDATE t SET status = 'old' WHERE status = 'new';\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('[down-file-missing]', $result['output']);
+        self::assertStringNotContainsString('[rewrite-no-backup]', $result['output']);
+    }
+
+    public function testRewriteWithDmlDownFileIsClean(): void
+    {
+        $this->writeMigration('00_r.sql', self::REWRITE_UP_BODY);
+        $this->writeMigration('00_r.down.sql', self::GOOD_DOWN_BODY);
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+    }
+
+    public function testDownFileWithDdlIsFlagged(): void
+    {
+        $this->writeMigration('00_r.sql', self::REWRITE_UP_BODY);
+        $this->writeMigration('00_r.down.sql', self::GOOD_DOWN_BODY . "DROP TABLE t_backup_300;\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('[down-not-dml]', $result['output']);
+    }
+
+    public function testDownFileRejectsReplaceAndAcceptsInsertIgnore(): void
+    {
+        $this->writeMigration('00_r.sql', self::REWRITE_UP_BODY);
+        $this->writeMigration('00_r.down.sql', "-- restores: t\nREPLACE INTO t SELECT * FROM t_backup_300;\n");
+        $this->runInDir('git add -A');
+
+        $replace = $this->runScript();
+
+        self::assertSame(1, $replace['exit'], "Output: {$replace['output']}");
+        self::assertStringContainsString('[down-not-dml]', $replace['output']);
+
+        $this->writeMigration('00_r.down.sql', "-- restores: t\nINSERT IGNORE INTO t SELECT * FROM t_backup_300;\n");
+        $this->runInDir('git add -A');
+
+        $insert = $this->runScript();
+
+        self::assertStringNotContainsString('[down-not-dml]', $insert['output']);
+    }
+
+    public function testNoWhereUpdateNeedsDownFile(): void
+    {
+        $this->writeMigration('00_r.sql', "UPDATE t SET a = 1;\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(1, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('[update-no-where]', $result['output']);
+        self::assertStringContainsString('[down-file-missing]', $result['output']);
+    }
+
+    public function testNullBackfillNeedsNoDownFile(): void
+    {
+        $this->writeMigration('00_r.sql', "UPDATE t SET a = 1 WHERE a IS NULL;\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+        self::assertStringNotContainsString('[down-file-missing]', $result['output']);
+    }
+
+    public function testDdlOnlyMigrationNeedsNoDownFile(): void
+    {
+        $this->writeMigration('00_r.sql', "ALTER TABLE t ADD COLUMN IF NOT EXISTS c INT NULL;\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertStringNotContainsString('[down-file-missing]', $result['output']);
+    }
+
+    public function testDownFileMissingMarkerWaives(): void
+    {
+        $this->writeMigration(
+            '00_r.sql',
+            self::REWRITE_UP_BODY
+            . "-- destructive-migration[down-file-missing]: the importer rebuilds this column on every run\n"
+            . "UPDATE t SET status = 'newer' WHERE status = 'new';\n",
+        );
+        mkdir($this->tmpDir . '/ibl5/migrations/undo', 0755, true);
+        $this->writeMigration('undo/00_r.sql', "-- restore\nUPDATE t SET status = 'old' WHERE status = 'new';\n");
+        $this->runInDir('git add -A');
+
+        $result = $this->runScript();
+
+        self::assertSame(0, $result['exit'], "Output: {$result['output']}");
+        self::assertStringContainsString('No destructive migration patterns detected', $result['output']);
+    }
+
+    public function testFullScanDoesNotRequireDownFiles(): void
+    {
+        $this->writeMigration('00_r.sql', self::REWRITE_UP_BODY);
+        $this->runInDir('git add -A');
+        $this->runInDir('git commit -m "rewrite without partner"');
+
+        $result = $this->runScript(['--full-scan']);
+
+        self::assertStringNotContainsString('[down-file-missing]', $result['output']);
+        self::assertStringNotContainsString('[down-not-dml]', $result['output']);
+    }
+
     public function testDeleteWhereOnlyInCommentStillFlagged(): void
     {
         $this->writeMigration('212_delete_comment.sql', "DELETE FROM t; -- where id = 1\n");

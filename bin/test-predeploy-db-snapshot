@@ -40,18 +40,25 @@ chmod +x "$GOOD_DUMP" "$BAD_DUMP"
 
 GIT_ENV=(-c user.name=t -c user.email=t@example.com -c commit.gpgsign=false)
 
-# new_repo [with-migration]: HEAD is the "old" prod commit; origin/production
-# is one commit ahead, optionally adding a migration file.
+# new_repo [with-migration|deleted-migration]: HEAD is the "old" prod commit;
+# origin/production is one commit ahead, optionally adding a migration file or
+# deleting a migration pair (00_x.sql + 00_x.down.sql, present in the base).
 new_repo() {
     REPO="$(mktemp -d "$BASE_TMP/repo.XXXXXX")"
     SNAP="$REPO.snap"
     git -C "$REPO" init -q -b master
     mkdir -p "$REPO/ibl5/migrations"
     echo "-- 001" > "$REPO/ibl5/migrations/001_a.sql"
+    if [ "${1:-}" = "deleted-migration" ]; then
+        echo "-- 00x" > "$REPO/ibl5/migrations/00_x.sql"
+        echo "-- 00x down" > "$REPO/ibl5/migrations/00_x.down.sql"
+    fi
     git -C "$REPO" add -A
     git -C "$REPO" "${GIT_ENV[@]}" commit -q -m base
     if [ "${1:-}" = "with-migration" ]; then
         echo "-- 002" > "$REPO/ibl5/migrations/002_b.sql"
+    elif [ "${1:-}" = "deleted-migration" ]; then
+        rm "$REPO/ibl5/migrations/00_x.sql" "$REPO/ibl5/migrations/00_x.down.sql"
     else
         echo "x" > "$REPO/other.txt"
     fi
@@ -72,7 +79,7 @@ new_repo
 run PREDEPLOY_DUMP_BIN="$GOOD_DUMP" REMOTE_DATABASE=testdb; rc=$?
 check "a: exits 0" test "$rc" -eq 0
 check "a: no file created" test "$(count_snaps)" = "0"
-check "a: skip message printed" grep -q "no new migrations; skipping pre-deploy snapshot" "$OUT"
+check "a: skip message printed" grep -q "no added or deleted migrations; skipping pre-deploy snapshot" "$OUT"
 
 # (b) migration added
 new_repo with-migration
@@ -113,6 +120,18 @@ run PREDEPLOY_DUMP_BIN="$GOOD_DUMP" REMOTE_DATABASE=; rc=$?
 check "e: unset REMOTE_DATABASE exits non-zero" test "$rc" -ne 0
 check "e: message names REMOTE_DATABASE" grep -q "REMOTE_DATABASE" "$OUT"
 check "e: no file created" test "$(count_snaps)" = "0"
+
+# (f) migration deleted (revert deploy)
+new_repo deleted-migration
+run PREDEPLOY_DUMP_BIN="$GOOD_DUMP" REMOTE_DATABASE=testdb; rc=$?
+check "f: deleted migration takes a snapshot: exits 0" test "$rc" -eq 0
+check "f: deleted migration takes a snapshot: exactly one file created" test "$(count_snaps)" = "1"
+
+# (g) migration deleted, REMOTE_DATABASE unset
+new_repo deleted-migration
+run PREDEPLOY_DUMP_BIN="$GOOD_DUMP" REMOTE_DATABASE=; rc=$?
+check "g: deleted migration with REMOTE_DATABASE unset exits non-zero" test "$rc" -ne 0
+check "g: deleted migration with REMOTE_DATABASE unset: no file created" test "$(count_snaps)" = "0"
 
 # --help
 "$SCRIPT" --help > "$OUT" 2>&1

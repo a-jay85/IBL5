@@ -1,0 +1,338 @@
+#!/usr/bin/env bash
+# bin/test-text-hold-recheck: cases for bin/lib/text-hold-recheck.sh, bin/text-hold-recheck
+# and .github/workflows/text-hold-recheck.yml. Prints PASS/FAIL per case; exit 1 on any FAIL.
+set -uo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=bin/lib/text-hold-recheck.sh
+. "$ROOT/bin/lib/text-hold-recheck.sh"
+
+FAILS=0
+TMP=$(mktemp -d "${TMPDIR:-/tmp}/thr-test.XXXXXX")
+trap 'rm -rf "$TMP"' EXIT
+
+pass() { echo "PASS $1"; }
+fail() { echo "FAIL $1: $2"; FAILS=$((FAILS + 1)); }
+# expect <case> <got> <want>
+expect() { if [ "$2" = "$3" ]; then pass "$1"; else fail "$1" "got [$2] want [$3]"; fi; }
+
+D=$(printf 'a%.0s' $(seq 1 40))
+D2=$(printf 'b%.0s' $(seq 1 40))
+KEY='try@ibl5/classes/Season/Season.php#1a2b3c4d'
+MD_TWO='**Merge danger:** Door: two-way · Blast radius: localized · Why: the change only edits one season helper and its unit test'
+MD_ONE='**Merge danger:** Door: one-way · Blast radius: localized · Why: the change only edits one season helper and its unit test'
+RG_OK=$(cat <<EOF
+<!-- removed-guards:begin -->
+- \`$KEY\` — Reason: the try block moved into SeasonValidator, which now owns the error path
+<!-- removed-guards:end -->
+EOF
+)
+RG_BAD=$(cat <<EOF
+<!-- removed-guards:begin -->
+- \`$KEY\` — Reason: tbd
+<!-- removed-guards:end -->
+EOF
+)
+BODY_FIXED=$(printf '## Summary\nx\n\n%s\n\n%s\n' "$MD_TWO" "$RG_OK")
+BODY_UNFIXED=$(printf '## Summary\nx\n\n%s\n\n%s\n' "$MD_TWO" "$RG_BAD")
+BODY_ONE_WAY=$(printf '## Summary\nx\n\n%s\n\n%s\n' "$MD_ONE" "$RG_OK")
+
+# --- decision library (matrix rows 5-19) -------------------------------------------
+
+expect only20_fixed_arms \
+    "$(thr_decide edited "$D 20" "$D" "$BODY_FIXED" "$KEY" "")" "ARM cleared=20"
+
+expect only20_unfixed_holds \
+    "$(thr_decide edited "$D 20" "$D" "$BODY_UNFIXED" "$KEY" "")" "NOARM removed-guards-still-held"
+
+expect 20_and_11_holds \
+    "$(thr_decide edited "$D 20,11" "$D" "$BODY_FIXED" "$KEY" "")" "NOARM non-text-hold:11"
+
+for tok in 18:ONE-WAY 18:SELF-GOVERNING 18 18:UNKNOWN; do
+    expect "18_judged_states_hold[$tok]" \
+        "$(thr_decide edited "$D $tok" "$D" "$BODY_FIXED" "$KEY" "")" "NOARM non-text-hold:$tok"
+done
+
+for n in $(seq 1 21); do
+    [ "$n" = 20 ] && continue
+    expect "every_other_number_holds[$n]" \
+        "$(thr_decide edited "$D $n" "$D" "$BODY_FIXED" "$KEY" "")" "NOARM non-text-hold:$n"
+done
+
+expect 18_missing_fixed_arms \
+    "$(thr_decide edited "$D 18:MISSING" "$D" "$BODY_FIXED" "$KEY" "")" "ARM cleared=18:MISSING"
+expect 18_malformed_fixed_arms \
+    "$(thr_decide edited "$D 18:MALFORMED,20" "$D" "$BODY_FIXED" "$KEY" "")" "ARM cleared=18:MALFORMED,20"
+
+expect 20_fixed_but_one_way_holds \
+    "$(thr_decide edited "$D 20" "$D" "$BODY_ONE_WAY" "$KEY" "")" "NOARM merge-danger-still-held"
+
+rec_line() { printf '<!-- pr-ready-holds: v1 diff=%s held=%s -->' "$1" "$2"; }
+printf 'Banner\n%s\n%s\n<!-- pr-ready-verdict -->\n' "$(rec_line "$D" 20)" "$(rec_line "$D" 20)" > "$TMP/dup.md"
+if thr_parse_record "$TMP/dup.md" >/dev/null; then
+    fail duplicate_record_unreadable "two record lines parsed"
+else
+    pass duplicate_record_unreadable
+fi
+
+printf 'Banner\n%s\n<!-- pr-ready-verdict -->\n' "$(rec_line "$D" 18:MISSING,20)" > "$TMP/good.md"
+expect record_parses "$(thr_parse_record "$TMP/good.md")" "$D 18:MISSING,20"
+
+# The 39-hex line kills a THR_RECORD_RE diff group loosened to diff=([0-9a-f]{39,40}).
+D39=${D:0:39}
+i=0
+for line in \
+    "<!-- pr-ready-holds: v2 diff=$D held=20 -->" \
+    "$(rec_line "$D39" 20)" \
+    "$(rec_line "$D" 20,)" \
+    "$(rec_line "$D" "")" \
+    "$(rec_line "$D" 18:missing)"; do
+    i=$((i + 1))
+    printf 'Banner\n%s\n<!-- pr-ready-verdict -->\n' "$line" > "$TMP/near-$i.md"
+    if thr_parse_record "$TMP/near-$i.md" >/dev/null; then
+        fail "record_near_misses_unreadable[$i]" "parsed: $line"
+    else
+        pass "record_near_misses_unreadable[$i]"
+    fi
+done
+
+expect diff_moved_holds \
+    "$(thr_decide edited "$D 20" "$D2" "$BODY_FIXED" "$KEY" "")" "NOARM diff-moved"
+expect "diff_moved_holds[empty]" \
+    "$(thr_decide edited "$D 20" "" "$BODY_FIXED" "$KEY" "")" "NOARM no-current-diff"
+expect "no_record_holds" \
+    "$(thr_decide edited "" "$D" "$BODY_FIXED" "$KEY" "")" "NOARM no-record"
+
+for ev in synchronize opened reopened; do
+    expect "non_edited_event_holds[$ev]" \
+        "$(thr_decide "$ev" "$D 20" "$D" "$BODY_FIXED" "$KEY" "")" "NOARM event-not-edited"
+done
+
+expect ui_hold_holds \
+    "$(thr_decide edited "$D 20" "$D" "$BODY_FIXED" "$KEY" "ui-floor:held")" "NOARM ui-hold"
+
+CASES="$ROOT/bin/fixtures/removed-guards/cases.json"
+ncases=$(jq 'length' "$CASES")
+replay_bad=0
+for ((c = 0; c < ncases; c++)); do
+    name=$(jq -r ".[$c].name" "$CASES")
+    cbody=$(jq -r ".[$c].body" "$CASES")
+    ckeys=$(jq -r ".[$c].flagged_keys | join(\"\n\")" "$CASES")
+    nexp=$(jq ".[$c].expected | length" "$CASES")
+    got=$(thr_decide edited "$D 20" "$D" "$(printf '%s\n\n%s\n' "$cbody" "$MD_TWO")" "$ckeys" "")
+    if [ "$nexp" = 0 ]; then want="ARM cleared=20"; else want="NOARM removed-guards-still-held"; fi
+    if [ "$got" != "$want" ]; then
+        fail "cases_json_replay[$name]" "got [$got] want [$want]"
+        replay_bad=1
+    fi
+done
+[ "$ncases" -gt 0 ] && [ "$replay_bad" = 0 ] && pass "cases_json_replay ($ncases cases)"
+[ "$ncases" -gt 0 ] || fail cases_json_replay "no cases read from $CASES"
+
+# The mallory comment kills an owner filter widened to select(true).
+STICKY_BODY=$(printf 'Banner\n%s\n<!-- pr-ready-verdict -->\n' "$(rec_line "$D" 20)")
+jq -n --arg b "$STICKY_BODY" --arg nm "$(printf 'Banner\n%s\n<!-- pr-ready-verdict -->\ntrailer\n' "$(rec_line "$D" 20)")" \
+    '[{user:{login:"mallory"}, body:$b}, {user:{login:"a-jay85"}, body:$nm}]' > "$TMP/forged.json"
+expect forged_sticky_ignored "$(thr_pick_trusted_sticky "$TMP/forged.json" a-jay85)" ""
+jq -n --arg b "$STICKY_BODY" \
+    '[{user:{login:"a-jay85"}, body:"old"}, {user:{login:"a-jay85"}, body:$b}, {user:{login:"mallory"}, body:$b}]' \
+    > "$TMP/owner.json"
+expect owner_sticky_picked "$(thr_pick_trusted_sticky "$TMP/owner.json" a-jay85)" "$STICKY_BODY"
+
+cleared=$(thr_cleared_comment 20)
+case "$cleared" in
+    *'<!--'*) fail cleared_comment_has_no_marker "comment carries <!--" ;;
+    'Text-hold re-check:'*'20'*) pass cleared_comment_has_no_marker ;;
+    *) fail cleared_comment_has_no_marker "unexpected text: $cleared" ;;
+esac
+
+# --- driver cases (matrix rows 20-25) -----------------------------------------------
+# Each case runs bin/text-hold-recheck with a stub gh first on PATH. The stub serves
+# fixture JSON and appends every `pr merge` / `pr comment` call to $FAKE_GH_LOG.
+
+DRIVER="$ROOT/bin/text-hold-recheck"
+STUB="$TMP/stub"
+mkdir -p "$STUB"
+cat > "$STUB/gh" <<'EOF'
+#!/usr/bin/env bash
+case "$1 $2" in
+    "pr view") cat "$FAKE_PR_JSON" ;;
+    "pr merge"|"pr comment") echo "$*" >> "$FAKE_GH_LOG" ;;
+    api\ *)
+        case "$*" in
+            *"/comments"*) cat "$FAKE_COMMENTS" ;;
+            *"/files"*) cat "$FAKE_FILES" ;;
+            *) exit 1 ;;
+        esac ;;
+    *) exit 1 ;;
+esac
+EOF
+printf '#!/bin/sh\necho %s\n' "$D" > "$STUB/patch-id"
+printf '#!/bin/sh\ncat "$FAKE_DIFF"\n' > "$STUB/diff"
+chmod +x "$STUB/gh" "$STUB/patch-id" "$STUB/diff"
+
+printf 'diff --git a/x.md b/x.md\n--- a/x.md\n+++ b/x.md\n@@ -1 +1,2 @@\n line\n+added\n' > "$TMP/ok.diff"
+printf 'not a diff at all\n' > "$TMP/bad.diff"
+printf '[{"filename":"bin/foo","status":"modified"}]' > "$TMP/files.json"
+jq -n --arg b "$STICKY_BODY" '[{user:{login:"a-jay85"}, body:$b}]' > "$TMP/sticky-comments.json"
+
+# write_pr_json <autoMergeRequest-json>
+write_pr_json() {
+    jq -n --arg b "$BODY_FIXED" --argjson amr "$1" \
+        '{state:"OPEN", isDraft:false, autoMergeRequest:$amr, body:$b, baseRefName:"master", labels:[]}' \
+        > "$TMP/pr.json"
+}
+
+# run_driver <diff fixture> <args...>: sets D_OUT, D_ERR, D_RC; truncates the gh log first.
+run_driver() {
+    local diff="$1"; shift
+    : > "$TMP/gh.log"
+    D_RC=0
+    D_OUT=$(PATH="$STUB:$PATH" GITHUB_REPOSITORY=a-jay85/IBL5 GITHUB_STEP_SUMMARY='' \
+        FAKE_PR_JSON="$TMP/pr.json" FAKE_COMMENTS="$TMP/sticky-comments.json" \
+        FAKE_FILES="$TMP/files.json" FAKE_GH_LOG="$TMP/gh.log" FAKE_DIFF="$diff" \
+        PR_CYCLE_PATCH_ID_CMD="$STUB/patch-id" THR_DIFF_CMD="${THR_DIFF_CMD_OVERRIDE-$STUB/diff}" \
+        "$DRIVER" "$@" 2>"$TMP/driver.err") || D_RC=$?
+    D_ERR=$(cat "$TMP/driver.err")
+}
+
+write_pr_json null
+run_driver "$TMP/ok.diff" --pr 4242 --event edited
+log=$(cat "$TMP/gh.log")
+nmerge=$(grep -c '^pr merge 4242 --auto --squash$' "$TMP/gh.log" || true)
+ncomment=$(grep -c '^pr comment 4242 ' "$TMP/gh.log" || true)
+first=$(sed -n '1p' "$TMP/gh.log")
+if [ "$D_RC" = 0 ] && [ "$nmerge" = 1 ] && [ "$ncomment" = 1 ] \
+    && [ "$first" = "pr merge 4242 --auto --squash" ] && [ "$(wc -l < "$TMP/gh.log" | tr -d ' ')" = 2 ] \
+    && [ "$D_OUT" = "ARM cleared=20" ]; then
+    pass driver_arms_and_comments
+else
+    fail driver_arms_and_comments "rc=$D_RC out=[$D_OUT] log=[$log] err=[$D_ERR]"
+fi
+case "$D_ERR" in
+    *"current-diff=$D sticky-reviewed-diff=none"*) pass driver_logs_diff_ids ;;
+    *) fail driver_logs_diff_ids "stderr=[$D_ERR]" ;;
+esac
+
+run_driver "$TMP/ok.diff" --pr 4242 --event edited --dry-run
+if [ "$D_RC" = 0 ] && [ "$D_OUT" = "DRY-RUN ARM cleared=20" ] && [ ! -s "$TMP/gh.log" ]; then
+    pass driver_dry_run_never_arms
+else
+    fail driver_dry_run_never_arms "rc=$D_RC out=[$D_OUT] log=[$(cat "$TMP/gh.log")]"
+fi
+
+run_driver "$TMP/ok.diff" --pr 4242 --event synchronize
+if [ "$D_RC" = 0 ] && [ "$D_OUT" = "NOARM event-not-edited" ] && [ ! -s "$TMP/gh.log" ]; then
+    pass driver_non_edited_noop
+else
+    fail driver_non_edited_noop "rc=$D_RC out=[$D_OUT] log=[$(cat "$TMP/gh.log")]"
+fi
+
+write_pr_json '{"enabledAt":"2026-11-12T00:00:00Z","mergeMethod":"SQUASH"}'
+run_driver "$TMP/ok.diff" --pr 4242 --event edited
+if [ "$D_RC" = 0 ] && [ "$D_OUT" = "NOARM already-armed" ] && [ ! -s "$TMP/gh.log" ]; then
+    pass driver_already_armed_noop
+else
+    fail driver_already_armed_noop "rc=$D_RC out=[$D_OUT] log=[$(cat "$TMP/gh.log")]"
+fi
+write_pr_json null
+
+# A re-arm comment newer than the sticky means the record is spent: a later manual disarm stands.
+jq -n --arg b "$STICKY_BODY" '[{user:{login:"a-jay85"}, body:$b, created_at:"2026-11-12T00:00:00Z"},
+    {user:{login:"github-actions[bot]"}, body:"Text-hold re-check: armed again.", created_at:"2026-11-12T01:00:00Z"}]' > "$TMP/rearmed-comments.json"
+cp "$TMP/sticky-comments.json" "$TMP/sticky-comments.orig"
+cp "$TMP/rearmed-comments.json" "$TMP/sticky-comments.json"
+run_driver "$TMP/ok.diff" --pr 4242 --event edited
+if [ "$D_RC" = 0 ] && [ "$D_OUT" = "NOARM already-rearmed" ] && [ ! -s "$TMP/gh.log" ]; then
+    pass driver_already_rearmed_noop
+else
+    fail driver_already_rearmed_noop "rc=$D_RC out=[$D_OUT] log=[$(cat "$TMP/gh.log")]"
+fi
+cp "$TMP/sticky-comments.orig" "$TMP/sticky-comments.json"
+
+run_driver "$TMP/bad.diff" --pr 4242 --event edited
+if [ "$D_RC" = 0 ] && [ "$D_OUT" = "NOARM detector-error" ] && [ ! -s "$TMP/gh.log" ]; then
+    pass driver_detector_error_holds
+else
+    fail driver_detector_error_holds "rc=$D_RC out=[$D_OUT] log=[$(cat "$TMP/gh.log")] err=[$D_ERR]"
+fi
+
+for bad in --bogus --pr=4242; do
+    run_driver "$TMP/ok.diff" "$bad"
+    case "$D_RC:$D_ERR" in
+        2:*"unknown argument"*) pass "driver_rejects_bad_flags[$bad]" ;;
+        *) fail "driver_rejects_bad_flags[$bad]" "rc=$D_RC err=[$D_ERR]" ;;
+    esac
+done
+
+# The default diff path runs git fetch against $ROOT; a fetch of PR 4242 fails here (no such
+# ref offline, or not a PR in this clone), which is NOARM diff-error. The case checks only
+# that both unset and set-but-empty THR_DIFF_CMD take the default path. The empty mode kills
+# a driver test changed to ${THR_DIFF_CMD+set}, which treats set-but-empty as a command.
+for mode in unset empty; do
+    if [ "$mode" = unset ]; then
+        D_OUT=""; : > "$TMP/gh.log"; D_RC=0
+        D_OUT=$(env -u THR_DIFF_CMD PATH="$STUB:$PATH" GITHUB_REPOSITORY=a-jay85/IBL5 \
+            FAKE_PR_JSON="$TMP/pr.json" FAKE_COMMENTS="$TMP/sticky-comments.json" \
+            FAKE_FILES="$TMP/files.json" FAKE_GH_LOG="$TMP/gh.log" \
+            PR_CYCLE_PATCH_ID_CMD="$STUB/patch-id" GIT_TERMINAL_PROMPT=0 \
+            "$DRIVER" --pr 999999999 --event edited --dry-run 2>"$TMP/driver.err") || D_RC=$?
+        D_ERR=$(cat "$TMP/driver.err")
+    else
+        THR_DIFF_CMD_OVERRIDE="" GIT_TERMINAL_PROMPT=0 run_driver "$TMP/ok.diff" --pr 999999999 --event edited --dry-run
+    fi
+    case "$D_ERR" in
+        *"diff-source=default"*) pass "driver_empty_diff_cmd_uses_default[$mode]" ;;
+        *) fail "driver_empty_diff_cmd_uses_default[$mode]" "rc=$D_RC out=[$D_OUT] err=[$D_ERR]" ;;
+    esac
+    [ ! -s "$TMP/gh.log" ] || fail "driver_empty_diff_cmd_uses_default[$mode]" "gh log not empty"
+done
+
+# --- workflow cases (Phase 4) -------------------------------------------------------
+
+# on_events FILE: the event keys under the top-level `on:` block, one per line.
+on_events() {
+    awk '/^on:/ {f=1; next} f && /^[^ #]/ {f=0} f && /^  [A-Za-z_]+:/ {sub(/^  /, ""); sub(/:.*/, ""); print}' "$1"
+}
+has_line() { grep -qxF -- "$2" "$1"; }
+has_text() { grep -qF -- "$2" "$1"; }
+
+WF_EDIT="$ROOT/.github/workflows/text-hold-recheck.yml"
+WF_RUN="$ROOT/.github/workflows/text-hold-recheck-run.yml"
+
+if [ ! -f "$WF_EDIT" ] || [ ! -f "$WF_RUN" ]; then
+    fail workflow_shape_pinned "workflow file missing"
+else
+    expect "workflow_shape_pinned[edit-events]" "$(on_events "$WF_EDIT" | tr '\n' ' ')" "pull_request "
+    if has_line "$WF_EDIT" '    types: [edited]'; then pass "workflow_shape_pinned[edit-types]"
+    else fail "workflow_shape_pinned[edit-types]" "types line is not exactly [edited]"; fi
+    for needle in 'head.repo.full_name == github.repository' '*"HTTP 404"*) '; do
+        if has_text "$WF_EDIT" "$needle"; then pass "workflow_shape_pinned[edit-has:$needle]"
+        else fail "workflow_shape_pinned[edit-has:$needle]" "missing"; fi
+    done
+    if has_line "$WF_EDIT" '          gh workflow run text-hold-recheck-run.yml --ref master -f pr="$PR_NUMBER"'; then
+        pass "workflow_shape_pinned[edit-dispatch-line]"
+    else fail "workflow_shape_pinned[edit-dispatch-line]" "exact dispatch line missing"; fi
+    for needle in 'secrets.' 'actions/checkout' 'github.event.pull_request.body' \
+        'github.event.pull_request.title' 'github.event.pull_request.head.ref' \
+        'github.event.pull_request.head.sha'; do
+        if has_text "$WF_EDIT" "$needle"; then fail "workflow_shape_pinned[edit-lacks:$needle]" "present"
+        else pass "workflow_shape_pinned[edit-lacks:$needle]"; fi
+    done
+
+    expect "workflow_shape_pinned[run-events]" "$(on_events "$WF_RUN" | tr '\n' ' ')" "workflow_dispatch "
+    if has_text "$WF_RUN" 'secrets.CI_PAT'; then pass "workflow_shape_pinned[run-has-ci-pat]"
+    else fail "workflow_shape_pinned[run-has-ci-pat]" "missing"; fi
+    if has_line "$WF_RUN" "    if: github.ref == 'refs/heads/master'"; then pass "workflow_shape_pinned[run-master-only]"
+    else fail "workflow_shape_pinned[run-master-only]" "master-only if: missing"; fi
+    run_lines=$(grep -E '^[[:space:]]*(- )?run:' "$WF_RUN" || true)
+    expect "workflow_shape_pinned[run-line]" "$run_lines" '        run: bin/text-hold-recheck --pr "$INPUT_PR" --event edited'
+    if has_text "$WF_RUN" 'github.event.pull_request'; then fail "workflow_shape_pinned[run-lacks-pr-event]" "present"
+    else pass "workflow_shape_pinned[run-lacks-pr-event]"; fi
+fi
+
+if [ "$FAILS" -gt 0 ]; then
+    echo "RESULT: $FAILS failure(s)"
+    exit 1
+fi
+echo "RESULT: all passed"

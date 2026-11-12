@@ -521,6 +521,7 @@ if [ "$STAGE" = "pre-push" ]; then
     queue_step "test-check-reviewer-eval"     hard "$BIN/test-check-reviewer-eval"
     queue_step "reviewer-eval-validate"        hard "$BIN/reviewer-eval" validate
     run_group_end
+    run_step "test-text-hold-recheck"        hard "$BIN/test-text-hold-recheck"
 
     # Row 7: pre-push form of manual-testing check
     if [ -n "$BODY_FILE" ]; then

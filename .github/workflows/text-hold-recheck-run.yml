@@ -1,0 +1,30 @@
+name: Text hold re-check run
+# Dispatched by text-hold-recheck.yml on a PR body edit. Runs master's bin/text-hold-recheck
+# with CI_PAT. workflow_dispatch runs the copy on the dispatched ref, so the job refuses any
+# ref but master. Manual re-check: gh workflow run text-hold-recheck-run.yml --ref master -f pr=N
+on:
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: PR number to re-check
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: text-hold-recheck-${{ inputs.pr }}
+  cancel-in-progress: true
+jobs:
+  recheck:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Re-check text holds
+        env:
+          GH_TOKEN: ${{ secrets.CI_PAT }}
+          INPUT_PR: ${{ inputs.pr }}
+        run: bin/text-hold-recheck --pr "$INPUT_PR" --event edited

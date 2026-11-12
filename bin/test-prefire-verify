@@ -630,6 +630,84 @@ test_matrix_repeated_failing_command_still_refuses() {
     want_cnt rowF 1
 }
 
+mk_suite_stubs() { # counting stubs for the commands a whole-suite row would run
+    local f
+    mkdir -p "$R/vendor/bin" "$R/ibl5/vendor/bin" "$R/bin" "$D/stubbin"
+    for f in "$R/vendor/bin/phpunit" "$R/ibl5/vendor/bin/phpunit" "$D/stubbin/composer"; do
+        printf '#!/usr/bin/env bash\necho x >> "%s/suite"\n' "$CNT" > "$f"; chmod +x "$f"
+    done
+    printf '#!/usr/bin/env bash\necho x >> "%s/foo"\n' "$CNT" > "$R/bin/foo"; chmod +x "$R/bin/foo"
+}
+
+test_matrix_whole_suite_rows_skipped() {
+    new_case
+    mk_suite_stubs
+    write_plan "$(row 1 'vendor/bin/phpunit')" \
+               "$(row 2 'vendor/bin/phpunit --no-progress')" \
+               "$(row 3 'composer run analyse')" \
+               "$(row 4 'composer run analyse:tests')" \
+               "$(row 5 'composer run test')" \
+               "$(row 6 'composer test')" \
+               "$(row 7 "echo x >> $CNT/rowRun")"
+    local saved_path="$PATH"
+    export PATH="$D/stubbin:$PATH"
+    run_gate --plan "$PLAN" --stage matrix
+    export PATH="$saved_path"
+    want_rc 0
+    want_cnt suite 0
+    want_cnt rowRun 1
+    want_out "matrix row 1: skipped, CI covers full-suite runs: vendor/bin/phpunit"
+    want_out "matrix row 2: skipped, CI covers full-suite runs: vendor/bin/phpunit --no-progress"
+    want_out "matrix row 3: skipped, CI covers full-suite runs: composer run analyse"
+    want_out "matrix row 4: skipped, CI covers full-suite runs: composer run analyse:tests"
+    want_out "matrix row 5: skipped, CI covers full-suite runs: composer run test"
+    want_out "matrix row 6: skipped, CI covers full-suite runs: composer test"
+    want_out "matrix passed"
+}
+
+test_matrix_cd_ibl5_whole_suite_rows_skipped() {
+    new_case
+    mk_suite_stubs
+    write_plan "$(row 1 'cd ibl5 && vendor/bin/phpunit')" \
+               "$(row 2 'cd ibl5  &&  composer run analyse')"
+    local saved_path="$PATH"
+    export PATH="$D/stubbin:$PATH"
+    run_gate --plan "$PLAN" --stage matrix
+    export PATH="$saved_path"
+    want_rc 0
+    want_cnt suite 0
+    want_out "matrix row 1: skipped, CI covers full-suite runs: cd ibl5 && vendor/bin/phpunit"
+    want_out "matrix row 2: skipped, CI covers full-suite runs"
+}
+
+test_matrix_filtered_phpunit_rows_still_run() {
+    new_case
+    mk_suite_stubs
+    write_plan "$(row 1 'vendor/bin/phpunit --filter Foo')" \
+               "$(row 2 'vendor/bin/phpunit tests/TradeSuggestions')"
+    local saved_path="$PATH"
+    export PATH="$D/stubbin:$PATH"
+    run_gate --plan "$PLAN" --stage matrix
+    export PATH="$saved_path"
+    want_rc 0
+    want_cnt suite 2
+    refute_out "CI covers full-suite runs"
+}
+
+test_matrix_chained_whole_suite_row_still_runs() {
+    new_case
+    mk_suite_stubs
+    write_plan "$(row 1 'composer run analyse && bin/foo')"
+    local saved_path="$PATH"
+    export PATH="$D/stubbin:$PATH"
+    run_gate --plan "$PLAN" --stage matrix
+    export PATH="$saved_path"
+    want_rc 0
+    want_cnt suite 1
+    want_cnt foo 1
+    refute_out "CI covers full-suite runs"
+}
+
 test_db_probe_does_not_read_callers_stdin() {
     new_case
     write_plan "$(row 1 "echo x >> $CNT/row1; bin/db-query 'SELECT 1'")"
@@ -1313,6 +1391,10 @@ test_prompt_impl_runs_three_stages
 test_phpunit_full_run_passes_no_args
 test_matrix_repeated_command_runs_once
 test_matrix_repeated_failing_command_still_refuses
+test_matrix_whole_suite_rows_skipped
+test_matrix_cd_ibl5_whole_suite_rows_skipped
+test_matrix_filtered_phpunit_rows_still_run
+test_matrix_chained_whole_suite_row_still_runs
 test_base_without_value_exits_2
 test_phpunit_subset_runs_mapped_class_tests
 test_phpunit_root_class_maps_top_level_test

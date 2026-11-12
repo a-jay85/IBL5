@@ -3,6 +3,7 @@
 #
 # Re-runs three checks on the current working tree before /post-plan fires:
 #   1. every post-impl CLI-executable row of the plan's Verification Matrix
+#      (a row whose whole command is one of six whole-suite runs CI covers is skipped; see is_whole_suite_cmd)
 #   2. PHPUnit on the tests mapped to the branch's changed files (full suite when a
 #      shared test input changed or mapping failed; skipped when no PHPUnit-relevant file changed)
 #   3. every Executable Mutations row of the plan (bin/lib/plan-exec-mutations run)
@@ -165,6 +166,22 @@ write_record() { # <stage> <key>
 }
 
 # --- matrix stage -----------------------------------------------------------
+# Exit 0 when a matrix row's whole command, after trimming whitespace and an
+# optional `cd ibl5 &&` prefix, is exactly a whole-suite run that CI's required
+# checks already cover. Exact match only: any filter, path, --group, pipe or
+# `&&` chain to another command still runs.
+CD_IBL5_RE='^cd[[:space:]]+ibl5[[:space:]]*&&[[:space:]]*(.*)$'
+is_whole_suite_cmd() {
+    local c="$1"
+    c="${c#"${c%%[![:space:]]*}"}"
+    c="${c%"${c##*[![:space:]]}"}"
+    if [[ "$c" =~ $CD_IBL5_RE ]]; then c="${BASH_REMATCH[1]}"; fi
+    case "$c" in
+        'vendor/bin/phpunit'|'vendor/bin/phpunit --no-progress'|'composer run analyse'|'composer run analyse:tests'|'composer run test'|'composer test') return 0 ;;
+    esac
+    return 1
+}
+
 stage_matrix() {
     local plan_sha rows rc num cmd log rows_rc
     if [ -z "$PLAN" ]; then
@@ -206,6 +223,11 @@ stage_matrix() {
     local ran_cmds=() prev dup
     while IFS=$'\t' read -r num cmd; do
         [ -n "$num" ] || continue
+        if is_whole_suite_cmd "$cmd"; then
+            say "matrix row $num: skipped, CI covers full-suite runs: $cmd"
+            printf '### row %s: skipped, CI covers full-suite runs\n' "$num" >> "$log"
+            continue
+        fi
         dup=0
         for prev in ${ran_cmds[@]+"${ran_cmds[@]}"}; do
             if [ "$prev" = "$cmd" ]; then dup=1; break; fi

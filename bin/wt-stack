@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+# bin/wt-stack: start a worktree Docker stack on demand and stop only a stack this helper started.
+#
+#   bin/wt-stack start <slug> [bin/wt-up args...]
+#   bin/wt-stack stop <slug>
+#
+# Ownership marker: $HOME/.cache/ibl5-wt-stack/<slug>. It holds the ibl5-php-<slug>
+# container ID seen right after this helper ran bin/wt-up. The path is outside every
+# checkout, so a later session and the launchd harness read the same file.
+# A stack with no marker, or whose live container ID differs from the marker because the
+# user re-ran bin/wt-up, belongs to the user. stop leaves it running and drops the marker.
+# Main-stack names are refused. stop runs plain bin/wt-down <slug> --force.
+#
+# Verdicts on stdout: STACK: started | STACK: start-failed rc=N |
+#   STACK: already-up user-owned (left as is) | STACK: stopped | STACK: stop-failed rc=N |
+#   STACK: not-owned (left running) | STACK: stale-marker-dropped (left as is) |
+#   STACK: refused <reason>
+# Exit: 0 ok; 2 usage error or refused slug; otherwise the wt-up or wt-down exit code.
+# Test: bin/test-wt-stack.
+set -uo pipefail
+
+BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
+MARKER_DIR="${HOME:?HOME must be set}/.cache/ibl5-wt-stack"
+
+usage() {
+  echo "usage: bin/wt-stack start <slug> [wt-up args...]" >&2
+  echo "       bin/wt-stack stop <slug>" >&2
+  exit 2
+}
+
+validate_slug() {
+  local s="$1"
+  if [ -z "$s" ]; then
+    echo "STACK: refused empty slug"
+    exit 2
+  fi
+  case "$s" in
+    main|mariadb|ibl5|traefik|adminer|mailpit|tailwind|php|db)
+      echo "STACK: refused main-stack name '$s'"
+      exit 2 ;;
+  esac
+  if ! [[ "$s" =~ ^[A-Za-z0-9][A-Za-z0-9_-]*$ ]]; then
+    echo "STACK: refused invalid slug '$s'"
+    exit 2
+  fi
+}
+
+php_id() {
+  local out
+  out=$(docker inspect -f '{{.Id}}' "ibl5-php-$1" 2>/dev/null) || out=""
+  printf '%s\n' "$out" | head -n 1
+}
+
+# Same shape as stack_running() in .claude/review-shared/scripts/wt-bring-up.sh.
+stack_running() {
+  local out count
+  out=$(docker inspect -f '{{.State.Running}}' "ibl5-php-$1" "ibl5-db-$1" 2>/dev/null) || return 1
+  count=$(printf '%s\n' "$out" | grep -c '^true$') || true
+  [ "$count" -eq 2 ]
+}
+
+cmd_start() {
+  local slug="$1"; shift
+  local marker="$MARKER_DIR/$slug" recorded="" live rc
+  [ -f "$marker" ] && recorded=$(head -n 1 "$marker")
+  if stack_running "$slug"; then
+    live=$(php_id "$slug")
+    if [ -z "$recorded" ] || [ "$recorded" != "$live" ]; then
+      rm -f "$marker"
+      echo "STACK: already-up user-owned (left as is)"
+      return 0
+    fi
+  fi
+  rm -f "$marker"
+  "$BIN_DIR/wt-up" "$slug" "$@"
+  rc=$?
+  live=$(php_id "$slug")
+  if [ -n "$live" ]; then
+    mkdir -p "$MARKER_DIR"
+    printf '%s\n' "$live" > "$marker"
+  fi
+  if [ "$rc" -eq 0 ]; then
+    echo "STACK: started"
+  else
+    echo "STACK: start-failed rc=$rc"
+  fi
+  return "$rc"
+}
+
+cmd_stop() {
+  local slug="$1" marker="$MARKER_DIR/$1" recorded live rc
+  if [ ! -f "$marker" ]; then
+    echo "STACK: not-owned (left running)"
+    return 0
+  fi
+  recorded=$(head -n 1 "$marker")
+  live=$(php_id "$slug")
+  if [ -z "$live" ] || [ "$recorded" != "$live" ]; then
+    rm -f "$marker"
+    echo "STACK: stale-marker-dropped (left as is)"
+    return 0
+  fi
+  "$BIN_DIR/wt-down" "$slug" --force
+  rc=$?
+  if [ "$rc" -eq 0 ]; then
+    rm -f "$marker"
+    echo "STACK: stopped"
+  else
+    echo "STACK: stop-failed rc=$rc"
+  fi
+  return "$rc"
+}
+
+[ "$#" -ge 1 ] || usage
+sub="$1"; shift
+case "$sub" in
+  start)
+    [ "$#" -ge 1 ] || usage
+    slug="$1"; shift
+    validate_slug "$slug"
+    cmd_start "$slug" "$@"
+    exit $? ;;
+  stop)
+    [ "$#" -eq 1 ] || usage
+    validate_slug "$1"
+    cmd_stop "$1"
+    exit $? ;;
+  *)
+    usage ;;
+esac

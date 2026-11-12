@@ -1,6 +1,6 @@
 ---
 description: Which tier to pick for each sub-agent, plus the Sonnet 5.5 def-pins and the effort setting per surface.
-last_verified: 2026-11-10
+last_verified: 2026-11-12
 ---
 
 # Agent Tiering
@@ -40,4 +40,4 @@ Sonnet surfaces are pinned to 5.5 via an agent def or skill frontmatter. The def
 
 Tier Explore per prompt: Haiku for grep-and-list, omit `model` for multi-hop traces. Table: `agent-tiering-detail.md` § Explore Agent Tiering.
 
-Plan-authoring tiering: `.claude/skills/plan/_architect-contract.md` — Read by the **`plan-architect`** at `/plan` Step 3, not by you. Never Read it on the main thread; that bulk must never enter the orchestrator's context (`.claude/skills/plan/SKILL.md` Step 3).
+Plan-authoring tiering lives in `.claude/skills/plan/_architect-contract.md`. Only the **`plan-architect`** Reads it, at `/plan` Step 3. Never Read it on the main thread (`.claude/skills/plan/SKILL.md` Step 3).

@@ -71,10 +71,17 @@ class MigrationFileResolver
 
     /**
      * Check if a file is a migration file (.sql or .php).
+     *
+     * A `.down.sql` file is the revert partner of an up migration, never a
+     * migration itself, so it is not listed.
      */
     private function isMigrationFile(string $filename): bool
     {
         if ($filename === '.' || $filename === '..') {
+            return false;
+        }
+
+        if (str_ends_with(strtolower($filename), '.down.sql')) {
             return false;
         }
 

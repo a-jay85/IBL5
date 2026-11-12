@@ -33,6 +33,12 @@ final class MigrationFileIntegrityTest extends TestCase
     public function testNoDuplicateNumberPrefixes(): void
     {
         $files = glob($this->migrationsDir . '/*.sql');
+        if ($files !== false) {
+            $files = array_values(array_filter(
+                $files,
+                static fn (string $file): bool => !str_ends_with($file, '.down.sql')
+            ));
+        }
         self::assertNotFalse($files);
         self::assertNotSame([], $files, 'No .sql migration files found');
 
@@ -66,6 +72,38 @@ final class MigrationFileIntegrityTest extends TestCase
 
         // Ensure we actually found numbered migrations
         self::assertNotSame([], $prefixes, 'No numbered migration files found');
+    }
+
+    public function testEveryDownFileHasASqlUpPartner(): void
+    {
+        $downFiles = glob($this->migrationsDir . '/*.down.sql');
+        self::assertNotFalse($downFiles);
+
+        foreach ($downFiles as $downFile) {
+            $upFile = substr($downFile, 0, -strlen('.down.sql')) . '.sql';
+
+            self::assertFileExists(
+                $upFile,
+                sprintf('Down file "%s" has no up partner "%s"', basename($downFile), basename($upFile))
+            );
+        }
+    }
+
+    public function testEveryDownFileDeclaresRestoredTables(): void
+    {
+        $downFiles = glob($this->migrationsDir . '/*.down.sql');
+        self::assertNotFalse($downFiles);
+
+        foreach ($downFiles as $downFile) {
+            $contents = file_get_contents($downFile);
+            self::assertIsString($contents);
+
+            self::assertMatchesRegularExpression(
+                '/^-- restores: [a-z0-9_]+(, [a-z0-9_]+)*$/m',
+                $contents,
+                sprintf('Down file "%s" must declare "-- restores: table_a, table_b"', basename($downFile))
+            );
+        }
     }
 
     public function testAllMigrationFilesAreNonEmpty(): void
@@ -139,6 +177,10 @@ final class MigrationFileIntegrityTest extends TestCase
 
         $sqlFiles = glob($this->migrationsDir . '/*.sql');
         $files = $sqlFiles ? $sqlFiles : [];
+        $files = array_values(array_filter(
+            $files,
+            static fn (string $file): bool => !str_ends_with($file, '.down.sql')
+        ));
         sort($files);
 
         // First pass: build a rename chain map keyed by "table.old_column" →

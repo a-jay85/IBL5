@@ -86,12 +86,64 @@ class MigrationRunner implements MigrationRunnerInterface
         $executed = [];
 
         foreach ($pending as $filename) {
+            $down = $this->readDownPartner($filename);
             $this->executeMigration($filename);
-            $this->repository->recordMigration($filename, $batch);
+            if ($down === null) {
+                $this->repository->recordMigration($filename, $batch);
+            } else {
+                $this->repository->recordMigrationWithDown($filename, $batch, $down['sql'], $down['sha']);
+            }
             $executed[] = $filename;
         }
 
         return $executed;
+    }
+
+    /**
+     * Read the paired .down.sql file and the up file's checksum, before the up runs.
+     *
+     * Every refusal throws before the migration changes any data.
+     *
+     * @return array{sql: string, sha: string}|null Null when the migration has no down file
+     * @throws \RuntimeException When the pair cannot be stored safely
+     */
+    private function readDownPartner(string $filename): ?array
+    {
+        $downName = $this->fileResolver->getDownFilename($filename);
+
+        if ($downName === null) {
+            return null;
+        }
+
+        if (strtolower(pathinfo($filename, PATHINFO_EXTENSION)) !== 'sql') {
+            throw new \RuntimeException(
+                "Down files pair with .sql migrations only: {$downName}",
+            );
+        }
+
+        if (!$this->repository->supportsDownSql()) {
+            throw new \RuntimeException(
+                "Cannot store down SQL for {$filename}: the migrations table has no down_sql column.",
+            );
+        }
+
+        $downSql = @file_get_contents($this->fileResolver->getFullPath($downName));
+
+        if ($downSql === false || trim($downSql) === '') {
+            throw new \RuntimeException(
+                "Down file is empty or unreadable: {$downName}",
+            );
+        }
+
+        $sha = @hash_file('sha256', $this->fileResolver->getFullPath($filename));
+
+        if ($sha === false) {
+            throw new \RuntimeException(
+                "Failed to checksum migration file: {$filename}",
+            );
+        }
+
+        return ['sql' => $downSql, 'sha' => $sha];
     }
 
     /**

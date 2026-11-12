@@ -173,6 +173,18 @@ seed ibl5/migrations/400_b.sql
 gadd ibl5/migrations/400_b.sql; gcommit branch-sql
 run_gate --since=refs/remotes/origin/master; expect "cross-extension-collision" 1 $?
 
+# 5b. A down file shares its migration's number: no collision.
+new_repo; origin_master
+seed ibl5/migrations/00_x.sql ibl5/migrations/00_x.down.sql
+gadd ibl5/migrations/00_x.sql ibl5/migrations/00_x.down.sql; gcommit branch-down
+run_gate --since=refs/remotes/origin/master; expect "down partner shares its number" 0 $?
+
+# 5c. A down partner does not excuse a second stem on the same number.
+new_repo; origin_master
+seed ibl5/migrations/00_x.sql ibl5/migrations/00_x.down.sql ibl5/migrations/00_y.sql
+gadd ibl5/migrations/00_x.sql ibl5/migrations/00_x.down.sql ibl5/migrations/00_y.sql; gcommit branch-two-stems
+run_gate --since=refs/remotes/origin/master; expect "two stems on one number still collide" 1 $?
+
 # 6. The happy path: one genuinely new number.
 new_repo
 seed ibl5/docs/decisions/0400-alpha.md

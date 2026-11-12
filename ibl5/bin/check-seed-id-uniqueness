@@ -147,6 +147,7 @@ foreach ($seedChecks as $file => $tables) {
 $byNumber = [];
 $migrationFiles = glob('migrations/*.sql');
 foreach ($migrationFiles !== false ? $migrationFiles : [] as $path) {
+    if (str_ends_with(basename($path), '.down.sql')) { continue; }
     if (preg_match('/^(\d+)_/', basename($path), $m) === 1) {
         $byNumber[$m[1]][] = basename($path);
     }

@@ -59,6 +59,7 @@ FAILED=0
 for migration in "$MIGRATIONS_DIR"/*.sql; do
     [ -f "$migration" ] || continue
     BASENAME=$(basename "$migration")
+    case "$BASENAME" in *.down.sql) continue ;; esac
     ALREADY=$(db_exec "$DB_CONTAINER" $DB_CMD -N \
         -e "SELECT COUNT(*) FROM schema_migrations WHERE version='$BASENAME';")
     if [ "$ALREADY" = "0" ]; then

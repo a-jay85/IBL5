@@ -53,6 +53,15 @@ final class MigrationFileResolverTest extends TestCase
         $this->assertSame([], $resolver->getAvailableMigrations());
     }
 
+    public function testDownSqlFilesAreNotMigrations(): void
+    {
+        touch($this->tempDir . '/01_a.sql');
+        touch($this->tempDir . '/01_a.down.sql');
+
+        $resolver = new MigrationFileResolver($this->tempDir);
+        $this->assertSame(['01_a.sql'], $resolver->getAvailableMigrations());
+    }
+
     public function testIncludesSqlAndPhpFiles(): void
     {
         touch($this->tempDir . '/001_create_table.sql');

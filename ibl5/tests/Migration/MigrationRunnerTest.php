@@ -24,6 +24,11 @@ final class MigrationRunnerTest extends TestCase
     /** @var list<string> Tracks executeRawSql calls */
     private array $executedSql = [];
 
+    /** @var list<array{string, int, string, string}> Tracks recordMigrationWithDown calls */
+    private array $recordedDowns = [];
+
+    private bool $supportsDown = true;
+
     private int $nextBatch = 1;
 
     protected function setUp(): void
@@ -34,6 +39,8 @@ final class MigrationRunnerTest extends TestCase
         $this->ranMigrations = [];
         $this->recordedMigrations = [];
         $this->executedSql = [];
+        $this->recordedDowns = [];
+        $this->supportsDown = true;
         $this->nextBatch = 1;
 
         $this->stubRepository = $this->createStubRepository();
@@ -305,6 +312,72 @@ final class MigrationRunnerTest extends TestCase
         $this->assertSame([['001_a.php', 'first', 0], ['002_b.php', 'second', 1]], $calls);
     }
 
+    public function testRunPendingStoresDownSqlAndChecksum(): void
+    {
+        $upBody = 'UPDATE t SET a = 1;';
+        file_put_contents($this->tempDir . '/001_x.sql', $upBody);
+        file_put_contents($this->tempDir . '/001_x.down.sql', "-- restores: t\nDELETE FROM t;");
+
+        $runner = new MigrationRunner($this->stubRepository, $this->fileResolver);
+        $executed = $runner->runPending();
+
+        $this->assertSame(['001_x.sql'], $executed);
+        $this->assertSame(
+            [['001_x.sql', 1, "-- restores: t\nDELETE FROM t;", hash('sha256', $upBody)]],
+            $this->recordedDowns,
+        );
+        $this->assertSame([], $this->recordedMigrations);
+    }
+
+    public function testRunPendingWithoutDownFileRecordsExactlyAsBefore(): void
+    {
+        file_put_contents($this->tempDir . '/001_x.sql', 'SELECT 1;');
+
+        $runner = new MigrationRunner($this->stubRepository, $this->fileResolver);
+        $runner->runPending();
+
+        $this->assertSame([['001_x.sql', 1]], $this->recordedMigrations);
+        $this->assertSame([], $this->recordedDowns);
+    }
+
+    public function testRunPendingRefusesDownFileWhenColumnsMissing(): void
+    {
+        $this->supportsDown = false;
+        file_put_contents($this->tempDir . '/001_x.sql', 'UPDATE t SET a = 1;');
+        file_put_contents($this->tempDir . '/001_x.down.sql', 'DELETE FROM t;');
+
+        $runner = new MigrationRunner($this->stubRepository, $this->fileResolver);
+
+        try {
+            $runner->runPending();
+            self::fail('Expected RuntimeException');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('the migrations table has no down_sql column', $e->getMessage());
+            $this->assertSame([], $this->executedSql);
+            $this->assertSame([], $this->recordedMigrations);
+            $this->assertSame([], $this->recordedDowns);
+        }
+    }
+
+    public function testRunPendingRefusesDownFileForPhpMigration(): void
+    {
+        file_put_contents($this->tempDir . '/001_x.php', '<?php');
+        file_put_contents($this->tempDir . '/001_x.down.sql', 'DELETE FROM t;');
+
+        $fakeResolver = self::createStub(MigrationFileResolver::class);
+        $fakeResolver->method('getAvailableMigrations')->willReturn(['001_x.php']);
+        $fakeResolver->method('getDownFilename')->willReturn('001_x.down.sql');
+        $fakeResolver->method('getFullPath')
+            ->willReturnCallback(fn(string $f): string => $this->tempDir . '/' . $f);
+
+        $runner = new MigrationRunner($this->stubRepository, $fakeResolver);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageIsOrContains('Down files pair with .sql migrations only');
+
+        $runner->runPending();
+    }
+
     public function testFormatPhpOutputPrefixesEveryLine(): void
     {
         $this->assertSame(
@@ -337,6 +410,14 @@ final class MigrationRunnerTest extends TestCase
         $stub->method('recordMigration')
             ->willReturnCallback(function (string $filename, int $batch): void {
                 $this->recordedMigrations[] = [$filename, $batch];
+            });
+
+        $stub->method('supportsDownSql')
+            ->willReturnCallback(fn(): bool => $this->supportsDown);
+
+        $stub->method('recordMigrationWithDown')
+            ->willReturnCallback(function (string $filename, int $batch, string $downSql, string $upSha256): void {
+                $this->recordedDowns[] = [$filename, $batch, $downSql, $upSha256];
             });
 
         $stub->method('executeRawSql')

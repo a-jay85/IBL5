@@ -43,6 +43,37 @@ class MigrationRepository extends \Database\BaseMysqliRepository implements Migr
     }
 
     /**
+     * @see MigrationRepositoryInterface::supportsDownSql()
+     */
+    public function supportsDownSql(): bool
+    {
+        $row = $this->fetchOne(
+            "SELECT COUNT(*) AS cnt FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'migrations' AND COLUMN_NAME IN ('down_sql', 'up_sha256')",
+        );
+
+        if ($row === null) {
+            return false;
+        }
+
+        return (int) $row['cnt'] === 2;
+    }
+
+    /**
+     * @see MigrationRepositoryInterface::recordMigrationWithDown()
+     */
+    public function recordMigrationWithDown(string $filename, int $batch, string $downSql, string $upSha256): void
+    {
+        $this->execute(
+            'INSERT INTO migrations (migration, batch, down_sql, up_sha256) VALUES (?, ?, ?, ?)',
+            'siss',
+            $filename,
+            $batch,
+            $downSql,
+            $upSha256,
+        );
+    }
+
+    /**
      * @see MigrationRepositoryInterface::getNextBatchNumber()
      */
     public function getNextBatchNumber(): int

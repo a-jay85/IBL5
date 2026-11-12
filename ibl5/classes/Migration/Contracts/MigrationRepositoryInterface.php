@@ -27,6 +27,24 @@ interface MigrationRepositoryInterface
     public function recordMigration(string $filename, int $batch): void;
 
     /**
+     * Whether the migrations table has both the down_sql and up_sha256 columns.
+     *
+     * Queried on every call and never cached: the answer changes inside the
+     * run that applies the migration that adds the columns.
+     */
+    public function supportsDownSql(): bool;
+
+    /**
+     * Record a migration together with its stored down SQL and up-file checksum.
+     *
+     * @param string $filename The migration filename
+     * @param int $batch The batch number for this run
+     * @param string $downSql Contents of the paired .down.sql file
+     * @param string $upSha256 Hex SHA-256 of the up migration file
+     */
+    public function recordMigrationWithDown(string $filename, int $batch, string $downSql, string $upSha256): void;
+
+    /**
      * Get the next batch number (max existing batch + 1).
      *
      * @return int The next batch number to use

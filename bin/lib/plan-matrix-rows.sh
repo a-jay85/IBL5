@@ -63,3 +63,43 @@ plan_matrix_rows() {
     [ "$found" -eq 1 ] || return 2
     return 0
 }
+
+# --- row helpers shared with prefire-verify and plan-checks-block ----------
+# (moved from prefire-verify)
+CD_IBL5_RE='^cd[[:space:]]+ibl5[[:space:]]*&&[[:space:]]*(.*)$'
+is_whole_suite_cmd() {
+    local c="$1"
+    c="${c#"${c%%[![:space:]]*}"}"
+    c="${c%"${c##*[![:space:]]}"}"
+    if [[ "$c" =~ $CD_IBL5_RE ]]; then c="${BASH_REMATCH[1]}"; fi
+    case "$c" in
+        'vendor/bin/phpunit'|'vendor/bin/phpunit --no-progress'|'composer run analyse'|'composer run analyse:tests'|'composer run test'|'composer test') return 0 ;;
+    esac
+    return 1
+}
+
+# DB-touching rows: prefire-verify probes the DB before the first one, and the
+# CI sorter keeps them local.
+PLAN_ROW_DB_RE='db-query|docker|--group[= ]database|DatabaseIntegration|db-test-up|run-migrations|mariadb'
+
+# A row runs in CI only when it matches no local marker AND its first word
+# is on the allowlist. Anything else stays local (fail toward local).
+PLAN_ROW_LOCAL_RE="$PLAN_ROW_DB_RE"'|localhost|127\.0\.0\.1|curl|wget|playwright|npx|npm|(^|[^[:alnum:]_/-])gh[[:space:]]|bin/wt-|bin/automouse|bin/post-plan|bin/plan-now|bin/check-plan|launchctl|osascript|ssh|scp|rsync|~/|\$HOME|/Users/|/tmp/|claude-plans|PLAN|\.\./'
+row_runs_in_ci() {
+    local c="$1" first second
+    grep -Eq -- "$PLAN_ROW_LOCAL_RE" <<< "$c" && return 1
+    is_whole_suite_cmd "$c" && return 1
+    c="${c#"${c%%[![:space:]]*}"}"
+    while [[ "$c" =~ ^cd[[:space:]]+([A-Za-z0-9_./-]+)[[:space:]]*\&\&[[:space:]]*(.*)$ ]]; do
+        c="${BASH_REMATCH[2]}"
+    done
+    c="${c#!}"; c="${c#"${c%%[![:space:]]*}"}"
+    first="${c%%[[:space:]]*}"; second="${c#"$first"}"; second="${second#"${second%%[![:space:]]*}"}"; second="${second%%[[:space:]]*}"
+    case "$first" in
+        bin/test-*|bin/check-*|bin/lib/*|vendor/bin/phpunit|python3|shellcheck|grep|rg|jq) return 0 ;;
+        command) [ "$second" = grep ] && return 0 ;;
+        git) case "$second" in grep|ls-files|check-ignore) return 0 ;; esac ;;
+        bash) [ "$second" = -n ] && return 0 ;;
+    esac
+    return 1
+}

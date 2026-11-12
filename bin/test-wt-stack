@@ -1,0 +1,224 @@
+#!/usr/bin/env bash
+# bin/test-wt-stack: behavior cases for bin/wt-stack with docker, wt-up and wt-down stubbed.
+# Runs on any host; touches no real container and no real $HOME.
+set -euo pipefail
+
+REPO=$(cd "$(dirname "$0")/.." && pwd)
+T=$(mktemp -d)
+trap 'rm -rf "$T"' EXIT
+
+FAILS=0
+CASES=0
+OUT=""
+ERR=""
+RC=0
+
+fail() {
+  echo "FAIL: $1: $2"
+  FAILS=$((FAILS + 1))
+}
+
+write_stubs() {
+  mkdir -p "$T/bin" "$T/stub"
+  cat > "$T/stub/docker" <<'STUB'
+#!/usr/bin/env bash
+[ "$1" = inspect ] || exit 1
+fmt="$3"; shift 3; rc=0
+for n in "$@"; do
+  s=${n#ibl5-php-}; s=${s#ibl5-db-}
+  if [ -f "$STATE/id-$s" ]; then
+    case "$fmt" in *Id*) cat "$STATE/id-$s" ;; *) echo true ;; esac
+  else
+    rc=1
+  fi
+done
+exit "$rc"
+STUB
+  cat > "$T/bin/wt-up" <<'STUB'
+#!/usr/bin/env bash
+n=$(( $(cat "$STATE/counter" 2>/dev/null || echo 0) + 1 ))
+echo "$n" > "$STATE/counter"
+echo "wt-up $*" >> "$STATE/calls"
+[ "${STUB_WT_UP_NO_CONTAINER:-}" = 1 ] || echo "cid$n" > "$STATE/id-$1"
+exit "${STUB_WT_UP_RC:-0}"
+STUB
+  cat > "$T/bin/wt-down" <<'STUB'
+#!/usr/bin/env bash
+echo "wt-down $*" >> "$STATE/calls"
+[ "${STUB_WT_DOWN_RC:-0}" = 0 ] && rm -f "$STATE/id-$1"
+exit "${STUB_WT_DOWN_RC:-0}"
+STUB
+  chmod +x "$T/stub/docker" "$T/bin/wt-up" "$T/bin/wt-down"
+}
+
+reset_case() {
+  CASES=$((CASES + 1))
+  rm -rf "${T:?}/state" "${T:?}/home"
+  mkdir -p "$T/state" "$T/home"
+  unset STUB_WT_UP_RC STUB_WT_UP_NO_CONTAINER STUB_WT_DOWN_RC
+  write_stubs
+  cp "$REPO/bin/wt-stack" "$T/bin/wt-stack"
+  chmod +x "$T/bin/wt-stack"
+}
+
+MARKER_DIR() { echo "$T/home/.cache/ibl5-wt-stack"; }
+
+# run_ws <args...>: sets OUT (stdout), ERR (stderr), RC (exit code).
+run_ws() {
+  RC=0
+  OUT=$(env HOME="$T/home" STATE="$T/state" PATH="$T/stub:$PATH" \
+    "$T/bin/wt-stack" "$@" 2>"$T/err") || RC=$?
+  ERR=$(cat "$T/err")
+}
+
+set_running() { echo "$2" > "$T/state/id-$1"; }
+set_marker() { mkdir -p "$(MARKER_DIR)"; echo "$2" > "$(MARKER_DIR)/$1"; }
+marker_of() { cat "$(MARKER_DIR)/$1" 2>/dev/null || echo ABSENT; }
+calls() { cat "$T/state/calls" 2>/dev/null || echo NONE; }
+
+expect_eq() { # case label actual expected
+  [ "$3" = "$4" ] || fail "$1" "$2: got '$3', want '$4'"
+}
+
+case_started_then_stopped() {
+  reset_case
+  run_ws start s1 --seed
+  expect_eq started-then-stopped "start exit" "$RC" 0
+  expect_eq started-then-stopped "start stdout" "$OUT" "STACK: started"
+  expect_eq started-then-stopped "marker after start" "$(marker_of s1)" cid1
+  run_ws stop s1
+  expect_eq started-then-stopped "stop exit" "$RC" 0
+  expect_eq started-then-stopped "stop stdout" "$OUT" "STACK: stopped"
+  expect_eq started-then-stopped "marker after stop" "$(marker_of s1)" ABSENT
+  expect_eq started-then-stopped "calls" "$(calls)" "$(printf 'wt-up s1 --seed\nwt-down s1 --force')"
+}
+
+case_preexisting_left_running() {
+  reset_case
+  set_running s2 user1
+  run_ws start s2 --seed
+  expect_eq preexisting-left-running "start stdout" "$OUT" "STACK: already-up user-owned (left as is)"
+  run_ws stop s2
+  expect_eq preexisting-left-running "stop stdout" "$OUT" "STACK: not-owned (left running)"
+  expect_eq preexisting-left-running "calls" "$(calls)" NONE
+  [ -f "$T/state/id-s2" ] || fail preexisting-left-running "id-s2 was removed"
+}
+
+case_main_names_refused() {
+  reset_case
+  local n
+  for n in main mariadb '' ibl5 traefik adminer mailpit tailwind php db '../x' 'a/b'; do
+    run_ws start "$n"
+    expect_eq main-names-refused "start '$n' exit" "$RC" 2
+    case "$OUT" in "STACK: refused"*) ;; *) fail main-names-refused "start '$n' stdout: $OUT" ;; esac
+    run_ws stop "$n"
+    expect_eq main-names-refused "stop '$n' exit" "$RC" 2
+    case "$OUT" in "STACK: refused"*) ;; *) fail main-names-refused "stop '$n' stdout: $OUT" ;; esac
+  done
+  expect_eq main-names-refused "calls" "$(calls)" NONE
+  [ ! -d "$(MARKER_DIR)" ] || fail main-names-refused "marker dir was created"
+}
+
+case_marker_owned_stopped() {
+  reset_case
+  set_running s3 cid9
+  set_marker s3 cid9
+  run_ws stop s3
+  expect_eq marker-owned-stopped "calls" "$(calls)" "wt-down s3 --force"
+  expect_eq marker-owned-stopped "marker" "$(marker_of s3)" ABSENT
+  expect_eq marker-owned-stopped "stdout" "$OUT" "STACK: stopped"
+}
+
+case_stale_marker_dropped() {
+  reset_case
+  set_marker s4 cid5
+  run_ws stop s4
+  expect_eq stale-marker-dropped "calls" "$(calls)" NONE
+  expect_eq stale-marker-dropped "marker" "$(marker_of s4)" ABSENT
+  expect_eq stale-marker-dropped "stdout" "$OUT" "STACK: stale-marker-dropped (left as is)"
+}
+
+case_takeover_left_running() {
+  reset_case
+  set_marker s5 cidOLD
+  set_running s5 cidNEW
+  run_ws stop s5
+  expect_eq takeover-left-running "calls" "$(calls)" NONE
+  expect_eq takeover-left-running "marker" "$(marker_of s5)" ABSENT
+  [ -f "$T/state/id-s5" ] || fail takeover-left-running "id-s5 was removed"
+}
+
+case_owned_restart() {
+  reset_case
+  set_running s6 cid7
+  set_marker s6 cid7
+  run_ws start s6 --seed
+  expect_eq owned-restart "calls" "$(calls)" "wt-up s6 --seed"
+  expect_eq owned-restart "marker" "$(marker_of s6)" cid1
+}
+
+case_start_failure_keeps_marker() {
+  reset_case
+  export STUB_WT_UP_RC=1
+  run_ws start s7
+  expect_eq start-failure-keeps-marker "exit" "$RC" 1
+  expect_eq start-failure-keeps-marker "stdout" "$OUT" "STACK: start-failed rc=1"
+  expect_eq start-failure-keeps-marker "marker" "$(marker_of s7)" cid1
+}
+
+case_start_failure_no_container() {
+  reset_case
+  export STUB_WT_UP_RC=1 STUB_WT_UP_NO_CONTAINER=1
+  run_ws start s8
+  expect_eq start-failure-no-container "exit" "$RC" 1
+  expect_eq start-failure-no-container "marker" "$(marker_of s8)" ABSENT
+}
+
+case_stop_failure_keeps_marker() {
+  reset_case
+  set_running s9 cid3
+  set_marker s9 cid3
+  export STUB_WT_DOWN_RC=4
+  run_ws stop s9
+  expect_eq stop-failure-keeps-marker "exit" "$RC" 4
+  expect_eq stop-failure-keeps-marker "stdout" "$OUT" "STACK: stop-failed rc=4"
+  expect_eq stop-failure-keeps-marker "marker" "$(marker_of s9)" cid3
+}
+
+case_rejected_forms() {
+  reset_case
+  local label
+  run_ws
+  expect_eq rejected-forms "no args exit" "$RC" 2
+  case "$ERR" in *"usage:"*) ;; *) fail rejected-forms "no args stderr: $ERR" ;; esac
+  run_ws bogus s1
+  expect_eq rejected-forms "bogus exit" "$RC" 2
+  case "$ERR" in *"usage:"*) ;; *) fail rejected-forms "bogus stderr: $ERR" ;; esac
+  run_ws stop a b
+  expect_eq rejected-forms "stop a b exit" "$RC" 2
+  case "$ERR" in *"usage:"*) ;; *) fail rejected-forms "stop a b stderr: $ERR" ;; esac
+  run_ws start
+  expect_eq rejected-forms "start exit" "$RC" 2
+  case "$ERR" in *"usage:"*) ;; *) fail rejected-forms "start stderr: $ERR" ;; esac
+  label=$(calls)
+  expect_eq rejected-forms "calls" "$label" NONE
+}
+
+case_started_then_stopped
+case_preexisting_left_running
+case_main_names_refused
+case_marker_owned_stopped
+case_stale_marker_dropped
+case_takeover_left_running
+case_owned_restart
+case_start_failure_keeps_marker
+case_start_failure_no_container
+case_stop_failure_keeps_marker
+case_rejected_forms
+
+if [ "$FAILS" -eq 0 ]; then
+  echo "PASS: test-wt-stack ($CASES cases)"
+  exit 0
+fi
+echo "FAIL: test-wt-stack ($FAILS failures in $CASES cases)"
+exit 1

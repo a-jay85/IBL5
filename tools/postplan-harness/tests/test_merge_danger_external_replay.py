@@ -237,3 +237,50 @@ def test_llm_one_way_survives_two_way_floor():
     floor = _replay_text(_section("tools/postplan-harness/README.md", 1, [" a", "-b", "+c"]))
     assert floor.door == "two-way"
     assert md.classify_with_floor(body, floor) == "ONE-WAY"
+    floor = _replay_text(_load("pr3804-db-sync-prod.diff"))
+    assert floor.door == "two-way"
+    assert md.classify_with_floor(body, floor) == "ONE-WAY"
+
+
+# Real PRs the old floor held one-way on a path touch alone.
+
+def test_replay_pr3804_herestring_rewrite_is_two_way():
+    _assert_two_way_quiet(_replay_text(_load("pr3804-db-sync-prod.diff")))
+
+
+def test_replay_pr3804_blast_radius_is_not_external():
+    assert _replay_text(_load("pr3804-db-sync-prod.diff")).blast != "external"
+
+
+def test_replay_pr3830_local_container_lines_are_two_way():
+    _assert_two_way_quiet(_replay_text(_load("pr3830-db-sync-prod.diff")))
+
+
+# Quiet edits to narrowed paths.
+
+def test_quiet_discord_dm_comment_only_is_two_way():
+    _assert_two_way_quiet(_replay_text(_DM_COMMENT_SECTION))
+
+
+def test_quiet_discord_dm_reindent_is_two_way():
+    line = r"""say() { [ "$QUIET" = 1 ] || printf 'discord-dm: %s\n' "$1" >&2; }"""
+    body = [" set -euo pipefail", "-" + line, "+    " + line, " "]
+    _assert_two_way_quiet(_replay_text(_section(DM, 20, body)))
+
+
+def test_quiet_mail_docblock_only_is_two_way():
+    _assert_two_way_quiet(_replay_text(_section(MAIL, 20, MAIL_DOCBLOCK_BODY)))
+
+
+def test_quiet_mail_readme_is_two_way():
+    _assert_two_way_quiet(_replay_text(_section(MAIL_README, 1, MAIL_README_BODY)))
+
+
+def test_quiet_notify_action_yaml_comment_is_two_way():
+    _assert_two_way_quiet(_replay_text(_section(ACTION_YML, 1, ACTION_YML_BODY)))
+
+
+def test_quiet_test_only_edit_is_two_way():
+    path = "tools/postplan-harness/tests/test_discord_dm_stub.py"
+    body = [" def test_stub():", '-    send_one("a")', '+    send_one("b")', " "]
+    _assert_two_way_quiet(_replay_text(_section(path, 1, body)))

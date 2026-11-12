@@ -1,0 +1,15 @@
+[
+  {
+    "module": "last-sim-recap",
+    "viewport": "desktop",
+    "title": "last-sim-recap",
+    "index": 1,
+    "count": 1,
+    "kind": "spot",
+    "region": "top, y 106-258 px",
+    "beforeFile": "changed/last-sim-recap.1.before.png",
+    "afterFile": "changed/last-sim-recap.1.after.png",
+    "sideFile": "changed/last-sim-recap.1.side.png",
+    "stackFile": "changed/last-sim-recap.1.stack.png"
+  }
+]

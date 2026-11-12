@@ -73,6 +73,7 @@ from harness.classify import (BACKLOG_REPO, render_merge_digest,
 from harness.gate_backtest import upsert_gate_backtest
 from harness import merge_danger
 from harness import removed_guards
+from harness import removed_guard_fix
 from harness import second_review
 from harness import unplanned_scope
 from harness.gate_backtest_replay import gate_backtest_result
@@ -959,6 +960,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                                                       for c in decision.holds)) + log_suffix)
             return {"inputs": inputs, "decision": decision, "mc_flag": _mc_flag}
 
+        _run_removed_guard_fix(gh, llm, git, worktree, plan, pr, body, log)
         _arm = _evaluate_arm()
         inputs, decision, _mc_flag = _arm["inputs"], _arm["decision"], _arm["mc_flag"]
         # ---- Phase 6.5-fix: one in-run fix round for holds on conditions {2, 3, 11, 12, 14, 19} ----
@@ -2851,6 +2853,38 @@ def _detector_root(worktree) -> str:
     Tests stub the detector by monkeypatching this function.
     """
     return conformance._HARNESS_REPO_ROOT
+
+
+def _run_removed_guard_fix(gh, llm, git, worktree, plan, pr, body, log) -> None:
+    """Condition (20) pre-evaluate step: fill placeholder, filler or too-short Removed guards
+    reasons that a Sonnet writer drafts and an Opus checker approves, then edit the PR body.
+
+    Body only: it never commits. `_evaluate_arm` re-reads the live body, so the first evaluation
+    sees the filled reasons, and the arm evaluate stays the only thing that clears (20). Any
+    error leaves the body as it was, so the hold stays.
+    """
+    if not pr:
+        return
+    if not removed_guard_fix.enabled(os.environ):
+        return
+    try:
+        live = gh.pr_body_fresh() or body
+        if not any(h.startswith(removed_guard_fix.FILLABLE_PREFIXES)
+                   for h in removed_guards.classify_body(live, [])):
+            return
+        diff = git.diff_vs_base()
+        ok, rows = removed_guards.run_detector(
+            _detector_root(worktree), diff,
+            plan.path if (plan and getattr(plan, "found", False)) else None)
+        if not ok:
+            log("removed-guard-fix: detector not ok; skipped (condition 20 holds on DETECTOR-ERROR)")
+            return
+        res = removed_guard_fix.run(body=live, rows=rows, diff=diff, llm=llm, log=log)
+        if res["status"] == "changed":
+            gh.pr_edit_body(pr, res["body"])
+            log(f"removed-guard-fix: filled {len(res['filled'])} reason(s), kept {len(res['kept'])}")
+    except Exception as exc:  # removed-guard-fix fails closed
+        log(f"removed-guard-fix: error, body left as it was: {exc}")
 
 
 def _removed_guards_holds(worktree, diff_body: str, plan, arm_body: str) -> list[str]:

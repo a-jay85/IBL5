@@ -22,9 +22,13 @@ set -uo pipefail
 BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
 MARKER_DIR="${HOME:?HOME must be set}/.cache/ibl5-wt-stack"
 
+print_usage() {
+  echo "usage: bin/wt-stack start <slug> [wt-up args...]"
+  echo "       bin/wt-stack stop <slug>"
+}
+
 usage() {
-  echo "usage: bin/wt-stack start <slug> [wt-up args...]" >&2
-  echo "       bin/wt-stack stop <slug>" >&2
+  print_usage >&2
   exit 2
 }
 
@@ -114,6 +118,9 @@ cmd_stop() {
 [ "$#" -ge 1 ] || usage
 sub="$1"; shift
 case "$sub" in
+  -h|--help)
+    print_usage
+    exit 0 ;;
   start)
     [ "$#" -ge 1 ] || usage
     slug="$1"; shift

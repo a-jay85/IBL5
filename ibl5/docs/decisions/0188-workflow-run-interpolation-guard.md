@@ -1,6 +1,6 @@
 ---
 description: ADR-0188. Ban env.* and string-typed inputs.* expressions inside workflow run bodies, and every expression in a pull_request_target workflow's run bodies, enforced by bin/check-workflow-run-interpolation in Static guards.
-last_verified: 2026-11-08
+last_verified: 2026-11-12
 ---
 
 # ADR-0188: Ban env and string-input expressions inside workflow run: bodies
@@ -45,3 +45,7 @@ The Consequences above leave `github.*`, `steps.*`, `needs.*`, and `matrix.*` ou
 The checker now has a strict mode. When a workflow's top-level `on:` block names `pull_request_target`, any `${{ }}` expression inside a `run:` body fails, whatever its context. The trigger is read only from the `on:` block before `jobs:`, in scalar, flow-list, and block form. Comments are stripped first, so a file that mentions `pull_request_target` only in a comment stays on the default rule. Values reach the shell through `env:` and a quoted `"$NAME"`, as before.
 
 A deny-list of untrusted event fields was considered and left for a later change. It would still pass `steps.*.outputs.*` and `needs.*.outputs.*`, which can carry attacker data forward from an earlier step. Every other workflow keeps the original env and string-input rule unchanged. `bin/test-check-workflow-run-interpolation` covers the trigger forms and the comment cases, and case W7b in `bin/test-merge-line-select` runs the checker on the real dispatcher and on a copy carrying the row-29 mutation.
+
+## Addendum: strict mode unreachable on the real tree (2026-11-09)
+
+The dispatcher moved to `pull_request` (ADR-0223 addendum of 2026-11-09). The checker now fails any workflow whose `on:` block names `pull_request_target`, so no file in the tree can reach strict mode. Strict mode stays as defence in depth, and its fixtures in `bin/test-check-workflow-run-interpolation` still run. Case W7b in `bin/test-merge-line-select` no longer runs the row-29 mutation. It now proves the trigger deny on a copy of the dispatcher with its trigger reverted. Case W7 still pins that no run line carries an expression.

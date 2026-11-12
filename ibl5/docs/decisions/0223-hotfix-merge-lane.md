@@ -1,6 +1,6 @@
 ---
 description: A PR labeled hotfix sorts ahead of every other armed PR in the merge line, and a new pull_request_target workflow, hotfix-dispatch.yml, starts an update-behind-prs pass the moment an armed PR carries the label. Gates, the armed filter, and the feat floor are unchanged.
-last_verified: 2026-11-08
+last_verified: 2026-11-12
 owner: ajaynicolas
 ---
 
@@ -51,3 +51,15 @@ The label was created with `gh label create hotfix --force --color D73A4A --desc
 ## Addendum: coalesce sleep removed (2026-11-08)
 
 The Decision says the hotfix pass skips the 300-second coalesce sleep. That sleep no longer runs on any path. Push passes dropped it on 2026-11-08, as recorded in the ADR-0081 addendum of that date. The hotfix pass and the push pass now start the same way, at the bot-commit wait. The hotfix lane keeps its own `-hotfix` concurrency group, so a hotfix dispatch still never cancels a push pass in its bot-commit wait. Its head start over a push pass now comes from the sort order and the dispatch at label time.
+
+## Addendum: hotfix dispatch moves to pull_request (2026-11-09)
+
+The Decision describes `hotfix-dispatch.yml` as a `pull_request_target` workflow. GitHub now blocks that trigger by default in public repos with no explicit Actions event policy. A scheduled brownout on 2026-11-09 failed both armed fires at startup (runs 42669819936 and 42669862074), and enforcement starts on 2026-12-02. The repo keeps the default policy.
+
+The trigger is now `pull_request` with the same activity types, `labeled` and `auto_merge_enabled`. The job `if:` and the single dispatch command are unchanged. The `permissions:` block still grants only `actions: write`, and it is the only limit because the repo default token is write.
+
+The security model changes. The PR head's copy of the file runs, where before master's copy ran. A same-repo branch can already edit any workflow it triggers, so this adds no exposure. A fork PR gets a read-only token, so its dispatch step fails with a red job. This repo has no fork PRs in its merge line, and that job is not a required check. The other defences stay: no checkout, no PR-controlled string in `run:`, and the label compared in `if:` only.
+
+One side effect reaches `all-checks-settled.yml`. Its job keeps only `workflow_run` events whose event is `pull_request`. Hotfix dispatch completions used to carry `pull_request_target`, so they were ignored. They now carry `pull_request`, so each one, skipped runs included, starts an idempotent settle run for that PR.
+
+`bin/check-workflow-run-interpolation` now fails any workflow whose top-level `on:` block names `pull_request_target`. Case W7 in `bin/test-merge-line-select` pins the new trigger, and case W7b proves the deny fires on a copy with the trigger reverted.

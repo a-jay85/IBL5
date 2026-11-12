@@ -1,6 +1,6 @@
 ---
 description: Scheduled launchd sweep that reaps merged worktrees via bin/cleanup --all and only surfaces stalled, unpushed and empty ones. The EMPTY rejection is superseded in part by ADR-0212. Safe-class reaping with archive-first restore added 2026-11-01.
-last_verified: 2026-11-01
+last_verified: 2026-11-11
 ---
 
 # ADR-0165: Scheduled merged-worktree GC
@@ -91,3 +91,13 @@ Restore:
 - Container: `bin/wt-up` recreates it. The JSON file records its config and mounts.
 
 Never removed: open-PR worktrees, nightly autostashes, protected names, and anything a live-work probe reports in use. A probe error is a keep. The stopped-container step and the image prune never touch docker volumes. The dirty, detached and closed-PR worktree reaps call `wt-remove <name> --volumes`, so they do drop that worktree's own docker volumes. The closed-PR reap skips only OPEN-PR rows. An UNPUSHED or STALLED worktree whose PR was closed is archived and removed once it passes the closed-PR checks. Other UNPUSHED and STALLED worktrees stay. Every switch accepts `0` to disable its class without touching the others.
+
+## Addendum 2026-11-11: idle worktree stacks are stopped
+
+The tick stops a worktree's Docker stack when nobody has used it for a while. The stop keeps the DB volume, the images, the containers and `.wt-slug`.
+
+| Class | Switch | Threshold | Archive |
+|-------|--------|-----------|---------|
+| Running worktree stack, no live work | WT_GC_STOP_IDLE_STACKS | WT_GC_STACK_IDLE_HOURS (24, hours since the php container started) | none (stop deletes nothing) |
+
+The step reads `.wt-slug` files under the worktrees parent, so it never sees the main stack. It keeps any worktree where `_gc_live_work` finds work or fails. It stops through `bin/wt-down --stop`. Automouse calls the same command when it moves a plan to skipped/. `bin/wt-up` still gives a fresh DB. To resume a stopped stack with its DB, start its containers with `docker start`.

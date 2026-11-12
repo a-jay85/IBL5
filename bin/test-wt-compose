@@ -320,6 +320,71 @@ chk_log_line "ARGV image inspect ibl5-ghost-php"
 chk_log_line "ARGV image inspect ibl5-ghost-browsersync"
 case_end
 
+# run_stop <args...> — wt-down with the given args (no implicit --force); sets OUT and RC.
+run_stop() {
+    OUT="$(cd "$ROOT" && "$ROOT/bin/wt-down" "$@" 2>&1)" && RC=$? || RC=$?
+}
+
+new_fx
+mk_wt alpha; echo alpha > "$BASE/IBL5-worktrees/alpha/.wt-slug"
+run_stop alpha --stop
+case_begin "stop: compose stop only, slug kept"
+chk_eq "exit code" 0 "$RC"
+chk_log_line "ARGV compose -f $ROOT/$COMPOSE_FILE_REL -p ibl5-alpha stop"
+chk_log_absent 'down'
+chk_log_absent ' -v'
+chk_log_absent '--rmi'
+chk_log_absent 'volume'
+[ -f "$BASE/IBL5-worktrees/alpha/.wt-slug" ] || note_fail ".wt-slug deleted"
+case_end
+
+new_fx
+mk_wt alpha; echo alpha > "$BASE/IBL5-worktrees/alpha/.wt-slug"
+run_stop alpha --stop -v
+case_begin "stop: --stop with -v rejected"
+chk_eq "exit code" 1 "$RC"
+chk_match "names the conflict" '--stop keeps volumes' "$OUT"
+chk_log_absent 'compose'
+case_end
+
+new_fx
+mk_wt alpha; echo alpha > "$BASE/IBL5-worktrees/alpha/.wt-slug"
+run_stop alpha --stopp
+case_begin "stop: unknown flag rejected"
+chk_eq "exit code" 1 "$RC"
+chk_match "names the flag" 'Unknown option: --stopp' "$OUT"
+chk_log_absent 'compose'
+case_end
+
+new_fx
+run_stop ghost --stop
+case_begin "stop: missing worktree touches nothing"
+chk_eq "exit code" 0 "$RC"
+chk_match "says nothing to stop" 'nothing to stop' "$OUT"
+chk_log_absent 'inspect'
+chk_log_absent 'volume'
+chk_log_absent 'network'
+chk_log_absent ' rm'
+chk_log_absent 'stop'
+case_end
+
+new_fx
+mk_wt beta; echo beta > "$BASE/IBL5-worktrees/beta/.wt-slug"
+git_q init -q "$BASE/IBL5-worktrees/beta" >/dev/null 2>&1
+echo one > "$BASE/IBL5-worktrees/beta/tracked.txt"
+git_q -C "$BASE/IBL5-worktrees/beta" add tracked.txt >/dev/null 2>&1
+git_q -C "$BASE/IBL5-worktrees/beta" commit -qm init >/dev/null 2>&1
+echo two > "$BASE/IBL5-worktrees/beta/tracked.txt"
+run_stop beta
+control_rc="$RC"
+: > "$DOCKER_LOG"
+run_stop beta --stop
+case_begin "stop: dirty worktree still stopped"
+chk_eq "control (no --stop) exit code" 1 "$control_rc"
+chk_eq "exit code" 0 "$RC"
+chk_log_line "ARGV compose -f $ROOT/$COMPOSE_FILE_REL -p ibl5-beta stop"
+case_end
+
 # ---------------------------------------------------------------------------
 # (b) wt-up
 # ---------------------------------------------------------------------------

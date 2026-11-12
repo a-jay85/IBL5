@@ -364,6 +364,7 @@ run_tick() {
         WT_GC_REAP_TMP_PACK=0
         WT_GC_DOCKER_PRUNE=0
         WT_GC_DOCKER_CONTAINERS=0
+        WT_GC_STOP_IDLE_STACKS=0
         STUB_DOCKER_PS="$CD/ps"
         STUB_DOCKER_INSPECT_DIR="$CD/insp"
         WT_GC_STALE_LIST=0
@@ -426,7 +427,15 @@ done
 exec git -C "$root" worktree remove --force "$(dirname "$root")/IBL5-worktrees/$name"
 SH
     chmod +x "$envdir/main/bin/wt-remove"
-    git -C "$envdir/main" add README.md bin/wt-remove
+    # Stub bin/wt-down: records argv, never calls docker.
+    cat > "$envdir/main/bin/wt-down" <<'SH'
+#!/usr/bin/env bash
+# Harness stub of bin/wt-down: record argv to wt-down-argv; exit STUB_WT_DOWN_RC.
+if [ -n "${STUB_CASE_DIR:-}" ]; then printf '%s\n' "$*" >> "$STUB_CASE_DIR/wt-down-argv"; fi
+exit "${STUB_WT_DOWN_RC:-0}"
+SH
+    chmod +x "$envdir/main/bin/wt-down"
+    git -C "$envdir/main" add README.md bin/wt-remove bin/wt-down
     # Backdated 30d so a worktree with no own commits takes its age from the
     # directory mtime (mk_wt age_days=N).
     GIT_AUTHOR_DATE="@$(( $(date +%s) - 30 * 86400 ))" \
@@ -446,6 +455,21 @@ import sys, time
 t = time.time() - int(sys.argv[1]) * 86400 - 3600
 print(time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(t)) + ".123456789Z")
 ' "$1"
+}
+# iso_secs_ago <secs> — a Docker-style StartedAt that many seconds back.
+iso_secs_ago() {
+    python3 -I -c '
+import sys, time
+t = time.time() - int(sys.argv[1])
+print(time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(t)) + ".123456789Z")
+' "$1"
+}
+# dk_stack <wt-name> <slug> <running> <started-iso> — the worktree's .wt-slug
+# plus the inspect --format fixture for its ibl5-php-<slug> container.
+dk_stack() {
+    mkdir -p "$CD/insp"
+    printf '%s' "$2" > "$(wt_dir "$1")/.wt-slug"
+    printf '%s\t%s\n' "$3" "$4" > "$CD/insp/ibl5-php-$2.fmt"
 }
 # dk_container <id> <name> <state> <finished> — one ps row plus its inspect files.
 dk_container() {
@@ -1022,7 +1046,7 @@ row() { printf "%-12s %-30s %s\n" "$1" "$2" "(fixture)" >> "$CD/rows"; }
 # rt [VAR=val ...] -- [args] — run_tick against the fixture env.
 rt() {
     fresh
-    rm -f "$CD/docker-argv" "$CD/wt-remove-argv" "$CD/gh-argv"
+    rm -f "$CD/docker-argv" "$CD/wt-remove-argv" "$CD/wt-down-argv" "$CD/gh-argv"
     run_tick WT_GC_REPO_ROOT="$ENV_MAIN" WT_GC_WT_STATUS="$STUBBIN/wt-status-rows" \
         STUB_WT_STATUS_ROWS="$CD/rows" WT_GC_WT_REMOVE="$ENV_MAIN/bin/wt-remove" "$@"
 }
@@ -3630,6 +3654,210 @@ git -C "$ENV_MAIN" update-ref -d refs/remotes/origin/pra-br
 rt -- --force
 log_has 'PR-ALERT skip pra-br \(no origin ref\)' || note_err "leg 2: no 'no origin ref' line"
 [ "$(dm_calls)" = 0 ] || note_err "leg 2: a DM was sent with no origin ref"
+finish_case
+fi
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ST — idle-stack stop step (stop_idle_stacks, bin/lib/wt-gc-reap.sh)
+# ══════════════════════════════════════════════════════════════════════════════
+ST_ON=(WT_GC_STOP_IDLE_STACKS=1 WT_GC_STACK_IDLE_HOURS=24)
+# st_nodestruct — no docker call may remove or tear anything down.
+st_nodestruct() {
+    if grep -qE '^(volume|compose|down|stop|rm) ' "$CD/docker-argv" 2>/dev/null; then
+        note_err "a destructive docker call was made"
+    fi
+}
+# st_stopped <name> — wt-down ran exactly once, as --stop <name>, and logged it.
+st_stopped() {
+    [ "$(cat "$CD/wt-down-argv" 2>/dev/null)" = "--stop $1" ] \
+        || note_err "wt-down argv != '--stop $1' (got '$(cat "$CD/wt-down-argv" 2>/dev/null)')"
+    log_has "stack stopped $1" || note_err "no 'stack stopped $1' line"
+}
+st_kept() { [ ! -e "$CD/wt-down-argv" ] || note_err "wt-down was called"; }
+
+if should_run ST1-idle-stopped; then
+fx ST1-idle-stopped
+mk_wt s1 s1-br; dk_stack s1 s1 true "$(iso_secs_ago $((25 * 3600)))"
+rt "${ST_ON[@]}" -- --force
+st_stopped s1; st_nodestruct
+finish_case
+fi
+
+if should_run ST2-young-kept; then
+fx ST2-young-kept
+mk_wt s2 s2-br; dk_stack s2 s2 true "$(iso_secs_ago $((2 * 3600)))"
+rt "${ST_ON[@]}" -- --force
+st_kept; st_nodestruct
+finish_case
+fi
+
+if should_run ST3-just-under-kept; then
+fx ST3-just-under-kept
+mk_wt s3 s3-br; dk_stack s3 s3 true "$(iso_secs_ago 3540)"
+rt WT_GC_STOP_IDLE_STACKS=1 WT_GC_STACK_IDLE_HOURS=1 -- --force
+st_kept; st_nodestruct
+finish_case
+fi
+
+if should_run ST4-just-over-stopped; then
+fx ST4-just-over-stopped
+mk_wt s4 s4-br; dk_stack s4 s4 true "$(iso_secs_ago 3660)"
+rt WT_GC_STOP_IDLE_STACKS=1 WT_GC_STACK_IDLE_HOURS=1 -- --force
+st_stopped s4; st_nodestruct
+finish_case
+fi
+
+if should_run ST5-lsof-busy-kept; then
+fx ST5-lsof-busy-kept
+mk_wt s5 s5-br; dk_stack s5 s5 true "$(iso_secs_ago $((25 * 3600)))"
+printf 'p123\nn%s/sub\n' "$(wt_dir s5)" > "$CD/lsof-out"
+rt "${ST_ON[@]}" STUB_LSOF_RC=0 STUB_LSOF_OUT="$CD/lsof-out" -- --force
+st_kept; st_nodestruct
+log_has 'stack kept s5: live work' || note_err "no live-work keep line"
+finish_case
+fi
+
+if should_run ST6-queue-busy-kept; then
+fx ST6-queue-busy-kept
+mk_wt s6 s6-br; dk_stack s6 s6 true "$(iso_secs_ago $((25 * 3600)))"
+mk_queue "$CD/queue" s6.md
+rt "${ST_ON[@]}" -- --force
+st_kept; st_nodestruct
+log_has 'stack kept s6: live work' || note_err "no live-work keep line"
+finish_case
+fi
+
+if should_run ST7-registry-busy-kept; then
+fx ST7-registry-busy-kept
+mk_wt s7 s7-br; dk_stack s7 s7 true "$(iso_secs_ago $((25 * 3600)))"
+mk_registry "$CD/registry.json" s7-br
+rt "${ST_ON[@]}" -- --force
+st_kept; st_nodestruct
+log_has 'stack kept s7: live work' || note_err "no live-work keep line"
+finish_case
+fi
+
+if should_run ST8-main-never; then
+fx ST8-main-never
+mk_wt s8 s8-br; dk_stack s8 s8 true "$(iso_secs_ago $((25 * 3600)))"
+printf 'main' > "$ENV_MAIN/.wt-slug"
+printf 'true\t%s\n' "$(iso_secs_ago $((30 * 86400)))" > "$CD/insp/ibl5-php.fmt"
+printf 'true\t%s\n' "$(iso_secs_ago $((30 * 86400)))" > "$CD/insp/ibl5-php-main.fmt"
+printf 'cid1\tibl5-php\n' > "$CD/ps"
+rt "${ST_ON[@]}" -- --force
+st_stopped s8; st_nodestruct
+if grep -qE '^inspect .*(ibl5-php-main| ibl5-php)$' "$CD/docker-argv" 2>/dev/null; then
+    note_err "main stack was inspected"
+fi
+finish_case
+fi
+
+if should_run ST9-bad-slug-refused; then
+fx ST9-bad-slug-refused
+mk_wt s9 s9-br; dk_stack s9 s9 true "$(iso_secs_ago $((25 * 3600)))"
+printf 'bad slug' > "$(wt_dir s9)/.wt-slug"
+rt "${ST_ON[@]}" -- --force
+st_kept; st_nodestruct
+log_has 'stack refused s9' || note_err "no refused line"
+if grep -qE '^inspect ' "$CD/docker-argv" 2>/dev/null; then note_err "inspected a refused slug"; fi
+finish_case
+fi
+
+if should_run ST10-pool-slot-kept; then
+fx ST10-pool-slot-kept
+mk_wt _pool-1 wt-pool/1; dk_stack _pool-1 pool1 true "$(iso_secs_ago $((25 * 3600)))"
+rt "${ST_ON[@]}" -- --force
+st_kept; st_nodestruct
+log_has 'pool slot' || note_err "no pool-slot line"
+finish_case
+fi
+
+if should_run ST11-not-running-skipped; then
+fx ST11-not-running-skipped
+mk_wt s11 s11-br; dk_stack s11 s11 false "$(iso_secs_ago $((30 * 86400)))"
+rt "${ST_ON[@]}" -- --force
+st_kept; st_nodestruct
+finish_case
+fi
+
+if should_run ST12-inspect-fails-kept; then
+fx ST12-inspect-fails-kept
+mk_wt s12 s12-br
+printf 's12' > "$(wt_dir s12)/.wt-slug"
+rt "${ST_ON[@]}" -- --force
+st_kept; st_nodestruct
+log_has 'inspect ibl5-php-s12 failed' || note_err "no inspect-failed line"
+finish_case
+fi
+
+if should_run ST13-unknown-start-kept; then
+fx ST13-unknown-start-kept
+mk_wt s13 s13-br; dk_stack s13 s13 true garbage
+rt "${ST_ON[@]}" -- --force
+st_kept; st_nodestruct
+log_has 'unknown start time' || note_err "no unknown-start-time line"
+finish_case
+fi
+
+if should_run ST14-switch-off; then
+fx ST14-switch-off
+mk_wt s14 s14-br; dk_stack s14 s14 true "$(iso_secs_ago $((25 * 3600)))"
+rt WT_GC_STOP_IDLE_STACKS=0 WT_GC_STACK_IDLE_HOURS=24 -- --force
+st_kept; st_nodestruct
+if grep -qF '.State.Running' "$CD/docker-argv" 2>/dev/null; then note_err "docker inspected with the switch off"; fi
+finish_case
+fi
+
+if should_run ST15-switch-empty-on; then
+fx ST15-switch-empty-on
+mk_wt s15 s15-br; dk_stack s15 s15 true "$(iso_secs_ago $((25 * 3600)))"
+rt WT_GC_STOP_IDLE_STACKS= WT_GC_STACK_IDLE_HOURS=24 -- --force
+st_stopped s15; st_nodestruct
+finish_case
+fi
+
+if should_run ST16-threshold-invalid; then
+fx ST16-threshold-invalid
+mk_wt s16 s16-br; dk_stack s16 s16 true "$(iso_secs_ago $((25 * 3600)))"
+rt WT_GC_STOP_IDLE_STACKS=1 WT_GC_STACK_IDLE_HOURS=abc -- --force
+st_kept; st_nodestruct
+log_has 'invalid WT_GC_STACK_IDLE_HOURS' || note_err "no invalid-threshold line"
+finish_case
+fi
+
+if should_run ST17-threshold-empty; then
+fx ST17-threshold-empty
+mk_wt s17 s17-br; dk_stack s17 s17 true "$(iso_secs_ago $((25 * 3600)))"
+rt WT_GC_STOP_IDLE_STACKS=1 WT_GC_STACK_IDLE_HOURS= -- --force
+st_kept; st_nodestruct
+log_has 'invalid WT_GC_STACK_IDLE_HOURS' || note_err "no invalid-threshold line"
+finish_case
+fi
+
+if should_run ST18-threshold-unset-default; then
+fx ST18-threshold-unset-default
+mk_wt s18a s18a-br; dk_stack s18a s18a true "$(iso_secs_ago $((25 * 3600)))"
+mk_wt s18b s18b-br; dk_stack s18b s18b true "$(iso_secs_ago $((23 * 3600)))"
+rt WT_GC_STOP_IDLE_STACKS=1 -- --force
+st_stopped s18a; st_nodestruct
+finish_case
+fi
+
+if should_run ST19-threshold-zero-rejected; then
+fx ST19-threshold-zero-rejected
+mk_wt s19 s19-br; dk_stack s19 s19 true "$(iso_secs_ago $((25 * 3600)))"
+rt WT_GC_STOP_IDLE_STACKS=1 WT_GC_STACK_IDLE_HOURS=0 -- --force
+st_kept; st_nodestruct
+log_has "invalid WT_GC_STACK_IDLE_HOURS '0'" || note_err "no zero-rejected line"
+finish_case
+fi
+
+if should_run ST20-dry-run; then
+fx ST20-dry-run
+mk_wt s20 s20-br; dk_stack s20 s20 true "$(iso_secs_ago $((25 * 3600)))"
+rt "${ST_ON[@]}" -- --dry-run --force
+st_kept; st_nodestruct
+log_has 'DRY-RUN would: .*/bin/wt-down --stop s20' || note_err "no dry-run would line"
 finish_case
 fi
 

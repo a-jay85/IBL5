@@ -36,6 +36,8 @@
 #                                          WT_GC_TMP_PACK_DAYS (1), not open
 #   docker        WT_GC_DOCKER_PRUNE       image + builder prune, filter
 #                                          until=WT_GC_DOCKER_UNTIL (168h)
+#   stop-stacks   WT_GC_STOP_IDLE_STACKS   stop idle worktree stacks (wt-down --stop, keeps
+#                                          volumes) up >= WT_GC_STACK_IDLE_HOURS (24)
 #   stale-list    WT_GC_STALE_LIST         STALLED/UNPUSHED older than
 #                                          WT_GC_STALE_DAYS (7) to
 #                                          WT_GC_STALE_FILE for the digest
@@ -115,6 +117,7 @@ WT_GC_REF_FALLBACK="${WT_GC_REF_FALLBACK:-1}"   # sub-switch: 0 = backups need a
 WT_GC_REAP_TMP_PACK="${WT_GC_REAP_TMP_PACK:-1}"
 WT_GC_DOCKER_PRUNE="${WT_GC_DOCKER_PRUNE:-1}"
 WT_GC_DOCKER_CONTAINERS="${WT_GC_DOCKER_CONTAINERS:-1}"
+WT_GC_STOP_IDLE_STACKS="${WT_GC_STOP_IDLE_STACKS:-1}"
 WT_GC_STALE_LIST="${WT_GC_STALE_LIST:-1}"
 WT_GC_ARCHIVE_PRUNE="${WT_GC_ARCHIVE_PRUNE:-1}"
 # Ages (days) / Docker until-filter. Non-numeric or empty = that step skipped, rc=1.
@@ -133,6 +136,7 @@ WT_GC_TMP_PACK_DAYS="${WT_GC_TMP_PACK_DAYS-1}"
 WT_GC_STALE_DAYS="${WT_GC_STALE_DAYS-7}"
 WT_GC_DOCKER_UNTIL="${WT_GC_DOCKER_UNTIL-168h}"
 WT_GC_CONTAINER_DAYS="${WT_GC_CONTAINER_DAYS-14}"
+WT_GC_STACK_IDLE_HOURS="${WT_GC_STACK_IDLE_HOURS-24}"
 WT_GC_ARCHIVE_DAYS="${WT_GC_ARCHIVE_DAYS-90}"
 WT_GC_ARCHIVE_STAMP="${WT_GC_ARCHIVE_STAMP:-}"   # test seam: pins keep-ref names; empty = now
 # Paths / binaries.
@@ -489,6 +493,7 @@ log "config WT_GC_ARCHIVE_PRUNE=$WT_GC_ARCHIVE_PRUNE WT_GC_ARCHIVE_DAYS=$WT_GC_A
     "WT_GC_DROP_STASHES=$WT_GC_DROP_STASHES WT_GC_STASH_DAYS=$WT_GC_STASH_DAYS" \
     "WT_GC_REF_FALLBACK=$WT_GC_REF_FALLBACK WT_GC_BACKUP_FALLBACK_DAYS=$WT_GC_BACKUP_FALLBACK_DAYS" \
     "WT_GC_DOCKER_CONTAINERS=$WT_GC_DOCKER_CONTAINERS WT_GC_CONTAINER_DAYS=$WT_GC_CONTAINER_DAYS" \
+    "WT_GC_STOP_IDLE_STACKS=$WT_GC_STOP_IDLE_STACKS WT_GC_STACK_IDLE_HOURS=$WT_GC_STACK_IDLE_HOURS" \
     "WT_GC_REAP_T3=$WT_GC_REAP_T3 WT_GC_REAP_T3_MERGED=$WT_GC_REAP_T3_MERGED WT_GC_T3_DAYS=$WT_GC_T3_DAYS" \
     "WT_GC_ARCHIVE_STAMP=$WT_GC_ARCHIVE_STAMP"
 run_step empty        "$WT_GC_REAP_EMPTY"       WT_GC_REAP_EMPTY        reap_empty_worktrees
@@ -503,6 +508,7 @@ run_step stashes      "$WT_GC_DROP_STASHES"      WT_GC_DROP_STASHES      drop_or
 run_step refs         "$WT_GC_REAP_REFS"         WT_GC_REAP_REFS         reap_stale_refs
 run_step tmp-pack     "$WT_GC_REAP_TMP_PACK"     WT_GC_REAP_TMP_PACK     reap_tmp_packs
 run_step docker       "$WT_GC_DOCKER_PRUNE"      WT_GC_DOCKER_PRUNE      docker_prune
+run_step stop-stacks  "$WT_GC_STOP_IDLE_STACKS"  WT_GC_STOP_IDLE_STACKS  stop_idle_stacks
 run_step stale-list   "$WT_GC_STALE_LIST"        WT_GC_STALE_LIST        write_stale_list
 run_step archive-prune "$WT_GC_ARCHIVE_PRUNE"    WT_GC_ARCHIVE_PRUNE     prune_archives
 log "reap done steps_failed=$STEPS_FAILED"

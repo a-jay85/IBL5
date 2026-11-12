@@ -64,6 +64,9 @@
 #   WT_GC_CONTAINER_DAYS (14)        WT_GC_LANDED_DAYS (3)
 #   WT_GC_UNBORN_DAYS (3)
 #   WT_GC_ARCHIVE_STAMP      test seam: epoch seconds that name the archives
+# bin/cleanup also reads these from this script's environment:
+#   WT_GC_KILL_ORPHANS        "0" = never kill leaked orphans on merged worktrees
+#   WT_GC_ORPHAN_MIN_AGE      seconds an orphan must have run first (86400)
 # ---
 # Every deleted branch/ref is first written as "<sha> <ref>" to a dated file
 # under WT_GC_TIPS_DIR. Every probe that gates a delete keeps on error. A step

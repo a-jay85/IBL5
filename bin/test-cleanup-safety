@@ -1286,4 +1286,362 @@ else
     failcase "wt-down-orphan-gh-missing (log: $(cat "$wtd_log"))"
 fi
 
+# ----------------------------------------------------------------------------
+# Leaked-orphan kill on the merged path (kill_leaked_orphans in wt-guards.sh).
+# Test processes are children of this harness, so WTG_ORPHAN_PARENT_PID=$$
+# stands in for ppid 1 (Linux runners may reparent to a subreaper). The one
+# real ppid-1 case SKIPs when the platform does not reparent to pid 1.
+# ----------------------------------------------------------------------------
+ORF_PIDS=""
+_orf_kill_all() { local p; for p in $ORF_PIDS; do kill -9 "$p" 2>/dev/null || true; done; }
+trap '_reap_kill_procs; _orf_kill_all; chmod -R u+w "$TMP" 2>/dev/null; rm -rf "$TMP" 2>/dev/null; h_cleanup' EXIT
+# orf_spawn <cwd> [exe] — start "<exe> 600" (default sleep) with cwd <cwd>; sets ORF_PID.
+orf_spawn() {
+    local exe="${2:-sleep}"
+    (cd "$1" && exec "$exe" 600) >/dev/null 2>&1 &
+    ORF_PID=$!
+    ORF_PIDS="$ORF_PIDS $ORF_PID"
+}
+# orf_gone <pid> — 0 when the pid is gone or a zombie (a SIGTERMed child of
+# this harness stays a zombie until reaped, and kill -0 still succeeds on it).
+orf_gone() {
+    local st
+    st="$(ps -o stat= -p "$1" 2>/dev/null || true)"
+    st="${st//[[:space:]]/}"
+    case "$st" in ''|Z*) return 0 ;; esac
+    return 1
+}
+# orf_env — a scratch repo at its PHYSICAL path: lsof reports resolved cwds
+# (/private/var/... on macOS), and is_worktree_in_use compares literally.
+orf_env() { local e; e="$(new_env)"; (cd "$e" && pwd -P); }
+
+if ! command -v lsof >/dev/null 2>&1; then
+    echo "SKIP: orphan-* cases (no lsof)"
+else
+    e="$(orf_env)"
+    add_merged_wt "$e" orfoff "$e/worktrees/orfoff"
+    orf_spawn "$e/worktrees/orfoff"; p=$ORF_PID
+    sleep 2
+    export WTG_ORPHAN_PARENT_PID=$$ WT_GC_ORPHAN_MIN_AGE=1 WT_GC_KILL_ORPHANS=0
+    run_cleanup_split "$e" orfoff
+    unset WTG_ORPHAN_PARENT_PID WT_GC_ORPHAN_MIN_AGE WT_GC_KILL_ORPHANS
+    assert_rc "orphan-switch-off-restores-skip" 3 "$SPLIT_RC"
+    assert_match "orphan-switch-off-restores-skip-reason" \
+        "^bin/cleanup: 'orfoff' skipped: worktree is in active use \(processes detected\)$" \
+        "$(cat "$SPLIT_ERR")"
+    if orf_gone "$p"; then failcase "orphan-switch-off-restores-skip-alive"; else pass "orphan-switch-off-restores-skip-alive"; fi
+
+    # ---- kill_leaked_orphans cases ----------------------------------------
+    # orf_ud — fresh physical scratch dir in $ud.
+    orf_ud() { ud="$(cd "$(mktemp -d "$TMP/orfu.XXXXXX")" && pwd -P)"; }
+    orf_unset() { unset WTG_ORPHAN_PARENT_PID WT_GC_ORPHAN_MIN_AGE WT_GC_KILL_ORPHANS; }
+    # orf_alive_case <name> <pid> / orf_gone_case <name> <pid>
+    orf_alive_case() {
+        if orf_gone "$2"; then failcase "$1 (process was killed)"; else pass "$1"; fi
+    }
+    orf_gone_case() {
+        if orf_gone "$2"; then pass "$1"; else failcase "$1 (process still alive)"; fi
+    }
+
+    # One merged run: the old orphan is killed, the worktree reaped, the kill logged.
+    e="$(orf_env)"
+    add_merged_wt "$e" orfkill "$e/worktrees/orfkill"
+    orf_spawn "$e/worktrees/orfkill"; p=$ORF_PID
+    sleep 2
+    if is_worktree_in_use "$e/worktrees/orfkill"; then
+        export WTG_ORPHAN_PARENT_PID=$$ WT_GC_ORPHAN_MIN_AGE=1
+        run_cleanup_split "$e" orfkill
+        orf_unset
+        orf_gone_case "orphan-old-merged-killed" "$p"
+        # The scratch repo has no bin/wt-remove, so the dir itself stays; the
+        # reap decision is the "Cleaning:" line (cleanup_worktree reached).
+        if [ "$SPLIT_RC" = 0 ] && grep -qF 'Cleaning: orfkill' "$SPLIT_OUT"; then
+            pass "orphan-old-merged-reaped"
+        else
+            failcase "orphan-old-merged-reaped (rc=$SPLIT_RC, stderr: $(cat "$SPLIT_ERR"))"
+        fi
+        line="$(grep -F "orphan-kill: SIGTERM pid=$p" "$SPLIT_OUT" || true)"
+        case "$line" in
+            *started=*) pass "orphan-old-merged-logged" ;;
+            *) failcase "orphan-old-merged-logged (line: '$line')" ;;
+        esac
+    else
+        failcase "orphan-old-merged-precondition"
+    fi
+    kill -9 "$p" 2>/dev/null || true
+
+    # Unmerged branch: nothing is killed, the skip reason is the merge check.
+    e="$(orf_env)"
+    add_open_wt "$e" orfopen
+    orf_spawn "$e/worktrees/orfopen"; p=$ORF_PID
+    sleep 2
+    export WTG_ORPHAN_PARENT_PID=$$ WT_GC_ORPHAN_MIN_AGE=1
+    run_cleanup_split "$e" orfopen
+    orf_unset
+    if [ "$SPLIT_RC" = 3 ] && grep -qF 'not merged to master' "$SPLIT_ERR" && ! orf_gone "$p"; then
+        pass "orphan-unmerged-untouched"
+    else
+        failcase "orphan-unmerged-untouched (rc=$SPLIT_RC, stderr: $(cat "$SPLIT_ERR"))"
+    fi
+    kill -9 "$p" 2>/dev/null || true
+
+    # Young process (24h default age): spared, the worktree stays in use.
+    e="$(orf_env)"
+    add_merged_wt "$e" orfyoung "$e/worktrees/orfyoung"
+    orf_spawn "$e/worktrees/orfyoung"; p=$ORF_PID
+    sleep 2
+    export WTG_ORPHAN_PARENT_PID=$$
+    run_cleanup_split "$e" orfyoung
+    orf_unset
+    if [ "$SPLIT_RC" = 3 ] && grep -qF 'worktree is in active use' "$SPLIT_ERR" && ! orf_gone "$p"; then
+        pass "orphan-young-untouched"
+    else
+        failcase "orphan-young-untouched (rc=$SPLIT_RC, stderr: $(cat "$SPLIT_ERR"))"
+    fi
+    kill -9 "$p" 2>/dev/null || true
+
+    # Empty age falls back to the 24h default: the process survives, no complaint.
+    orf_ud
+    orf_spawn "$ud"; p=$ORF_PID
+    sleep 2
+    export WTG_ORPHAN_PARENT_PID=$$ WT_GC_ORPHAN_MIN_AGE=
+    out="$(kill_leaked_orphans "$ud" false)"
+    orf_unset
+    case "$out" in
+        *"not a whole number"*) failcase "orphan-age-empty-uses-default (complained: $out)" ;;
+        *) orf_alive_case "orphan-age-empty-uses-default" "$p" ;;
+    esac
+    kill -9 "$p" 2>/dev/null || true
+
+    # Non-numeric age kills nothing and says so. Mutation: rename the
+    # non-numeric case arm in kill_leaked_orphans to __never__ and this case fails.
+    orf_ud
+    orf_spawn "$ud"; p=$ORF_PID
+    sleep 2
+    export WTG_ORPHAN_PARENT_PID=$$ WT_GC_ORPHAN_MIN_AGE=abc
+    out="$(kill_leaked_orphans "$ud" false)"
+    orf_unset
+    case "$out" in
+        *"not a whole number"*) orf_alive_case "orphan-age-nonnumeric-kills-nothing" "$p" ;;
+        *) failcase "orphan-age-nonnumeric-kills-nothing (out: '$out')" ;;
+    esac
+    kill -9 "$p" 2>/dev/null || true
+
+    # Empty switch means on.
+    orf_ud
+    orf_spawn "$ud"; p=$ORF_PID
+    sleep 2
+    export WTG_ORPHAN_PARENT_PID=$$ WT_GC_ORPHAN_MIN_AGE=1 WT_GC_KILL_ORPHANS=
+    out="$(kill_leaked_orphans "$ud" false)"
+    orf_unset
+    sleep 1
+    orf_gone_case "orphan-switch-empty-is-on" "$p"
+    kill -9 "$p" 2>/dev/null || true
+
+    # Switch "0" kills nothing and prints nothing.
+    orf_ud
+    orf_spawn "$ud"; p=$ORF_PID
+    sleep 2
+    export WTG_ORPHAN_PARENT_PID=$$ WT_GC_ORPHAN_MIN_AGE=1 WT_GC_KILL_ORPHANS=0
+    out="$(kill_leaked_orphans "$ud" false)"
+    orf_unset
+    if [ -z "$out" ] && ! orf_gone "$p"; then
+        pass "orphan-switch-off-kills-nothing"
+    else
+        failcase "orphan-switch-off-kills-nothing (out: '$out')"
+    fi
+    kill -9 "$p" 2>/dev/null || true
+
+    # claude and tmux are never killed. orf_named_case <case> <process name>.
+    orf_named_case() {
+        local cname="$1" pname="$2" c fb
+        orf_ud
+        mkdir -p "$TMP/orfbin"
+        cp "$(command -v sleep)" "$TMP/orfbin/$pname"
+        # macOS kills a copied system binary (invalid signature); re-sign ad hoc.
+        if command -v codesign >/dev/null 2>&1; then codesign -s - --force "$TMP/orfbin/$pname" >/dev/null 2>&1 || true; fi
+        orf_spawn "$ud" "$TMP/orfbin/$pname"; p=$ORF_PID
+        sleep 2
+        c="$(ps -o comm= -p "$p" 2>/dev/null || true)"
+        if [ "${c##*/}" != "$pname" ]; then
+            kill -9 "$p" 2>/dev/null || true
+            (cd "$ud" && printf '%s' "$pname" > /proc/self/comm 2>/dev/null && while :; do sleep 1; done) >/dev/null 2>&1 &
+            fb=$!
+            ORF_PIDS="$ORF_PIDS $fb"
+            p=$fb
+            sleep 2
+            c="$(ps -o comm= -p "$p" 2>/dev/null || true)"
+        fi
+        if [ "${c##*/}" != "$pname" ]; then
+            kill -9 "$p" 2>/dev/null || true
+            echo "SKIP: $cname (cannot name a process $pname)"
+            return 0
+        fi
+        export WTG_ORPHAN_PARENT_PID=$$ WT_GC_ORPHAN_MIN_AGE=1
+        out="$(kill_leaked_orphans "$ud" false)"
+        orf_unset
+        sleep 1
+        orf_alive_case "$cname" "$p"
+        kill -9 "$p" 2>/dev/null || true
+    }
+    # Mutations: rename the claude case arm to __no_such_comm__ and the first
+    # case fails; rename the multiplexer case arm to __no_such_mux__ and the
+    # second fails.
+    orf_named_case "orphan-claude-never-killed" claude
+    orf_named_case "orphan-tmux-spared" tmux
+
+    # Dry run: reports, kills nothing.
+    e="$(orf_env)"
+    add_merged_wt "$e" orfdry "$e/worktrees/orfdry"
+    orf_spawn "$e/worktrees/orfdry"; p=$ORF_PID
+    sleep 2
+    export WTG_ORPHAN_PARENT_PID=$$ WT_GC_ORPHAN_MIN_AGE=1
+    run_cleanup_split "$e" orfdry --dry-run
+    orf_unset
+    if [ "$SPLIT_RC" = 3 ] && ! orf_gone "$p" \
+        && grep -qF "orphan-kill: would SIGTERM pid=$p" "$SPLIT_OUT"; then
+        pass "orphan-dry-run-never-kills"
+    else
+        failcase "orphan-dry-run-never-kills (rc=$SPLIT_RC, out: $(cat "$SPLIT_OUT"))"
+    fi
+    kill -9 "$p" 2>/dev/null || true
+
+    # A failing ps or lsof probe kills nothing and prints nothing.
+    for tool in ps lsof; do
+        case "$tool" in
+            ps) cname="orphan-ps-fail-kills-nothing"; sd="$TMP/psfail" ;;
+            *) cname="orphan-lsof-fail-kills-nothing"; sd="$TMP/lsoffail" ;;
+        esac
+        mkdir -p "$sd"
+        printf '#!/bin/sh\nexit 1\n' > "$sd/$tool"
+        chmod +x "$sd/$tool"
+        orf_ud
+        orf_spawn "$ud"; p=$ORF_PID
+        sleep 2
+        export WTG_ORPHAN_PARENT_PID=$$ WT_GC_ORPHAN_MIN_AGE=1
+        out="$(PATH="$sd:$PATH" kill_leaked_orphans "$ud" false)"
+        orf_unset
+        if [ -z "$out" ] && ! orf_gone "$p"; then
+            pass "$cname"
+        else
+            failcase "$cname (out: '$out')"
+        fi
+        kill -9 "$p" 2>/dev/null || true
+    done
+
+    # Parent seam empty or unset means ppid 1; the harness-parented process has ppid $$.
+    orf_ud
+    orf_spawn "$ud"; p=$ORF_PID
+    sleep 2
+    export WT_GC_ORPHAN_MIN_AGE=1 WTG_ORPHAN_PARENT_PID=
+    out="$(kill_leaked_orphans "$ud" false)"
+    orf_unset
+    sleep 1
+    orf_alive_case "orphan-parent-seam-empty-means-ppid1" "$p"
+    export WT_GC_ORPHAN_MIN_AGE=1
+    out="$(kill_leaked_orphans "$ud" false)"
+    orf_unset
+    sleep 1
+    orf_alive_case "orphan-parent-seam-unset-means-ppid1" "$p"
+    kill -9 "$p" 2>/dev/null || true
+
+    # Real ppid 1: double-fork so the process is reparented.
+    orf_ud
+    pf="$TMP/orf.pid"
+    ( (cd "$ud" && exec sleep 600) >/dev/null 2>&1 & echo $! > "$pf" )
+    p="$(cat "$pf")"
+    ORF_PIDS="$ORF_PIDS $p"
+    sleep 2
+    pp="$(ps -o ppid= -p "$p" 2>/dev/null || true)"
+    pp="${pp//[[:space:]]/}"
+    if [ "$pp" != 1 ]; then
+        echo "SKIP: orphan-real-ppid1-killed (platform reparents to a subreaper)"
+    else
+        export WT_GC_ORPHAN_MIN_AGE=1
+        out="$(kill_leaked_orphans "$ud" false)"
+        orf_unset
+        sleep 1
+        orf_gone_case "orphan-real-ppid1-killed" "$p"
+    fi
+    kill -9 "$p" 2>/dev/null || true
+
+    # A sibling dir sharing the name prefix is not the worktree.
+    orf_ud
+    mkdir -p "$ud-bar"
+    orf_spawn "$ud-bar"; p=$ORF_PID
+    sleep 2
+    export WTG_ORPHAN_PARENT_PID=$$ WT_GC_ORPHAN_MIN_AGE=1
+    out="$(kill_leaked_orphans "$ud" false)"
+    orf_unset
+    sleep 1
+    orf_alive_case "orphan-sibling-prefix-untouched" "$p"
+    kill -9 "$p" 2>/dev/null || true
+
+    # A worktree nobody uses: no output, other processes untouched.
+    orf_ud
+    orf_spawn "$ud"; p=$ORF_PID
+    orf_ud
+    sleep 2
+    export WTG_ORPHAN_PARENT_PID=$$ WT_GC_ORPHAN_MIN_AGE=1
+    out="$(kill_leaked_orphans "$ud" false)"
+    orf_unset
+    if [ -z "$out" ] && ! orf_gone "$p"; then
+        pass "orphan-free-worktree-no-output"
+    else
+        failcase "orphan-free-worktree-no-output (out: '$out')"
+    fi
+    kill -9 "$p" 2>/dev/null || true
+
+    # etime parsing.
+    ok=1
+    [ "$(wtg_etime_secs 05:07)" = 307 ] || ok=0
+    [ "$(wtg_etime_secs 01:02:03)" = 3723 ] || ok=0
+    [ "$(wtg_etime_secs 2-03:04:05)" = 183845 ] || ok=0
+    [ "$(wtg_etime_secs '  00:09')" = 9 ] || ok=0
+    if [ "$ok" = 1 ]; then pass "etime-parse-valid"; else failcase "etime-parse-valid"; fi
+    ok=1
+    for bad in abc '' 12 1:2:3:4 -05:07; do
+        r=""
+        if r="$(wtg_etime_secs "$bad")"; then ok=0; fi
+        [ -z "$r" ] || ok=0
+    done
+    if [ "$ok" = 1 ]; then pass "etime-parse-near-miss"; else failcase "etime-parse-near-miss"; fi
+
+    # A process that ignores SIGTERM is SIGKILLed.
+    orf_ud
+    (cd "$ud" && trap '' TERM && exec sleep 600) >/dev/null 2>&1 &
+    p=$!
+    ORF_PIDS="$ORF_PIDS $p"
+    sleep 2
+    export WTG_ORPHAN_PARENT_PID=$$ WT_GC_ORPHAN_MIN_AGE=1
+    out="$(kill_leaked_orphans "$ud" false)"
+    orf_unset
+    sleep 1
+    case "$out" in
+        *"orphan-kill: SIGKILL survivor pid=$p"*)
+            if orf_gone "$p"; then
+                pass "orphan-term-ignoring-sigkilled"
+            else
+                failcase "orphan-term-ignoring-sigkilled (still alive)"
+            fi ;;
+        *) failcase "orphan-term-ignoring-sigkilled (out: '$out')" ;;
+    esac
+    kill -9 "$p" 2>/dev/null || true
+
+    # A live post-plan run on the worktree: touch nothing.
+    orf_ud
+    orf_spawn "$ud"; p=$ORF_PID
+    sleep 2
+    printf '#!/usr/bin/env bash\nprintf '"'"'456\\t-\\tcom.ibl5.postplan-now-%s-20260101-120000-4242\\n'"'"'\n' \
+        "$(basename "$ud")" > "$TMP/launchctl-orf"
+    chmod +x "$TMP/launchctl-orf"
+    export LAUNCHCTL_CMD="$TMP/launchctl-orf" WTG_ORPHAN_PARENT_PID=$$ WT_GC_ORPHAN_MIN_AGE=1
+    out="$(kill_leaked_orphans "$ud" false)"
+    unset LAUNCHCTL_CMD
+    orf_unset
+    sleep 1
+    orf_alive_case "orphan-live-postplan-spared" "$p"
+    kill -9 "$p" 2>/dev/null || true
+fi
+
 h_done

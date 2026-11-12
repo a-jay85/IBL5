@@ -162,6 +162,7 @@ def test_live_shell_diff_never_runs_shellcheck(tmp_path, monkeypatch):
 def test_aggregate_ignores_ci_status():
     assert aggregate([TrackResult("phpunit", "ci"), TrackResult("phpstan", "pass")]) == "pass"
     assert aggregate([TrackResult("phpunit", "ci"), TrackResult("phpstan", "fail")]) == "fail"
+    # [shellcheck=ci] alone launches nothing, so the aggregate is skipped.
     assert aggregate([TrackResult("shellcheck", "ci")]) == "skipped"
 
 

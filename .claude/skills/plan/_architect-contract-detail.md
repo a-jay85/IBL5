@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for _architect-contract.md — incident callbacks, counter-examples, procedure elaboration, and taxonomy rationale moved from the rules spine. The plan-architect never reads it; load only when editing the contract.
-last_verified: 2026-11-10
+last_verified: 2026-11-12
 ---
 
 Read-on-demand companion to `_architect-contract.md` (the plan-architect's output contract). This file holds the incident callbacks, counter-examples, procedure elaboration, and extended rationale for each operative rule in the spine. The plan-architect never reads it — the spine's pointer lines name the specific section to open when editing the contract.
@@ -281,7 +281,7 @@ Use the `**No diff:** <reason>` line for a phase whose deliverable is not a chan
 
 post-plan's Phase 6.5 condition (3) skips a marked phase and logs `NO-DIFF-PHASE` in the audit log. The marker is read only from a `## Phase N:` / `## Step N:` body, exact case, at line start (an optional `- ` bullet is fine). A fenced example, a code-span mention, or a reason under 15 characters is ignored, and the phase is checked as unmarked. `bin/check-plan` gate `[ND]` rejects those shapes at plan time.
 
-A phase that cites only non-repo tokens (`/proc/...`, `~/...`, `origin/master`, an `owner/repo` slug, a URL route fragment) needs no marker: condition (3) treats it as uncheckable and logs `UNCHECKABLE-PHASE`. Any citation that could name a tracked file or directory, by exact path, suffix, or basename, keeps the phase checkable. So a phase that reads `bin/wt-up` without changing it still needs the marker.
+A phase that cites only non-repo tokens (`/proc/...`, `~/...`, `origin/master`, an `owner/repo` slug, a URL route fragment) needs no marker: condition (3) treats it as uncheckable and logs `UNCHECKABLE-PHASE`. Any citation that could name a tracked file or directory, by exact path, suffix, or basename, keeps the phase checkable. So a phase that reads `bin/wt-up` without changing it still needs the marker. <!-- wt-up-ok: example token, not an instruction -->
 
 ## Context bounds rationale
 

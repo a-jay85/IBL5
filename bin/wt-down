@@ -1,14 +1,15 @@
 #!/bin/bash
 # Stop a worktree Docker environment and remove its volumes.
-# Usage: bin/wt-down <worktree-name> [--force]
-#        bin/wt-down --all [--force]
+# With --stop: stop the containers only (volumes, images, containers and .wt-slug stay).
+# Usage: bin/wt-down <worktree-name> [--force] [--stop]
+#        bin/wt-down --all [--force] [--stop]
 
 set -euo pipefail
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     cat <<'EOF'
-Usage: bin/wt-down <worktree-name> [--force]
-       bin/wt-down --all [--force]
+Usage: bin/wt-down <worktree-name> [--force] [--stop]
+       bin/wt-down --all [--force] [--stop]
 
 Stop a worktree Docker environment and remove its volumes.
 
@@ -18,6 +19,10 @@ Arguments:
 Options:
   --all     Tear down all known worktree environments.
   --force   Tear down even if the worktree has uncommitted changes.
+  --stop    Stop the containers only. Keeps volumes, images, containers and .wt-slug.
+            Skips the uncommitted-changes check. Cannot be combined with --volumes/-v.
+            Resume a stopped stack (same DB): docker start $(docker ps -aq --filter label=com.docker.compose.project=<project>)
+            bin/wt-up gives a fresh DB instead (it always purges the db-data volume).
 EOF
     exit 0
 fi
@@ -32,17 +37,25 @@ WT_PARENT="$(worktrees_parent_dir "$REPO_ROOT")"
 WORKTREE_NAME=""
 ALL=false
 FORCE=false
+STOP=false
+VOLUMES=false
 
 # Parse arguments
 for arg in "$@"; do
     case "$arg" in
         --all) ALL=true ;;
         --force) FORCE=true ;;
-        --volumes|-v) : ;;   # volumes always removed via `down -v` (line 91); accept for wt-remove/cleanup compat
+        --stop) STOP=true ;;
+        --volumes|-v) VOLUMES=true ;;   # default path always runs `down -v`; accepted for wt-remove/cleanup compat
         -*) echo "Unknown option: $arg" >&2; exit 1 ;;
         *) WORKTREE_NAME="$arg" ;;
     esac
 done
+
+if [ "$STOP" = true ] && [ "$VOLUMES" = true ]; then
+    echo "ERROR: --stop keeps volumes; it cannot be combined with --volumes/-v" >&2
+    exit 1
+fi
 
 check_uncommitted() {
     local wt_path="$1"
@@ -84,6 +97,16 @@ teardown_worktree() {
     # Detect the actual project name from the running container (may differ from convention)
     local project
     project=$(wt_project_name "$slug")
+
+    if [ "$STOP" = true ]; then
+        # Stop-only: containers, images, volumes and .wt-slug all stay.
+        # Runs before the browser-sync block: stop mode never kills host processes.
+        wt_compose_export "$slug" "$wt_path"
+        echo "Stopping (keeping volumes): $slug (worktree: $wt_name, project: $project)..."
+        wt_compose "$project" stop
+        echo "  Done."
+        return
+    fi
 
     # Stop browser-sync if running
     local bs_pid_file="$wt_path/.bs-sync.pid"
@@ -140,8 +163,9 @@ if [ -z "$WORKTREE_NAME" ]; then
     echo "Options:" >&2
     echo "  --all      Tear down all worktree environments" >&2
     echo "  --force    Tear down even if worktree has uncommitted changes" >&2
+    echo "  --stop     Stop containers only; keep volumes and .wt-slug" >&2
     echo "" >&2
-    echo "The DB volume is always removed." >&2
+    echo "The DB volume is always removed (use --stop to keep it)." >&2
     exit 1
 fi
 
@@ -150,6 +174,12 @@ WORKTREE_PATH=$(get_worktree_path "$WORKTREE_NAME")
 # Fall back to the conventional location if git doesn't know the branch.
 if [ -z "$WORKTREE_PATH" ]; then
     WORKTREE_PATH="$WT_PARENT/$WORKTREE_NAME"
+fi
+
+# --stop never enters the orphan branch below: that branch runs docker volume rm.
+if [ "$STOP" = true ] && [ ! -d "$WORKTREE_PATH" ]; then
+    echo "Worktree directory not found at $WORKTREE_PATH; nothing to stop."
+    exit 0
 fi
 
 # If the worktree directory is gone (already removed), try to find and stop
@@ -217,7 +247,7 @@ if [ ! -f "$WORKTREE_PATH/.wt-slug" ]; then
     exit 0
 fi
 
-if ! check_uncommitted "$WORKTREE_PATH"; then
+if [ "$STOP" != true ] && ! check_uncommitted "$WORKTREE_PATH"; then
     exit 1
 fi
 

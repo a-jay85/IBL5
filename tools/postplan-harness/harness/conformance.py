@@ -13,6 +13,7 @@ from pathlib import PurePosixPath
 from typing import Callable
 
 from .planfile import NO_DIFF_MIN_REASON
+from .classify import is_shell_path
 from .state import PhaseInfo, PlanInfo
 
 _MATRIX_ASSERTIONS_SCRIPT = str(
@@ -56,6 +57,19 @@ _MIGRATION_PLACEHOLDER_TOKEN = re.compile(r"^ibl5/migrations/N{3,4}_(?P<suffix>.
 _ADR_PLACEHOLDER_TOKEN = re.compile(r"^ibl5/docs/decisions/NNNN-(?P<suffix>.+)$")
 
 
+def _tests_green_met(phase5_status: str | None, changed_files: list[str]) -> bool:
+    """True when a `stop_condition: tests-green` plan's Phase 5 evidence counts as green.
+
+    "pass" always counts. "skipped" counts only for a diff that carries a shell
+    file: Phase 5 reports shellcheck as "ci" (CI runs it, condition (15) holds on
+    red), so a shell-only diff that scored "pass" before keeps a met contract.
+    A docs-only "skipped", "fail" and None stay unmet.
+    """
+    if phase5_status == "pass":
+        return True
+    return phase5_status == "skipped" and any(is_shell_path(f) for f in changed_files)
+
+
 def _contract_items(plan: PlanInfo, changed_files: list[str],
                     phase5_status: str | None) -> list[str]:
     """Returns unresolved `UNMET-CONTRACT:` items for a plan's autonomy contract.
@@ -71,10 +85,10 @@ def _contract_items(plan: PlanInfo, changed_files: list[str],
         return [f"UNMET-CONTRACT: malformed autonomy contract — {plan.contract_error} "
                 "(plan was hand-edited after bin/check-plan cleared it)"]
     items: list[str] = []
-    # `!= "pass"` on purpose: unmet on "fail", on "skipped" AND on None. armable.py
-    # condition (4) blocks only on "fail", so the other two arm today — narrowing
-    # this to `== "fail"` removes the feature while leaving it looking present.
-    if plan.stop_condition == "tests-green" and phase5_status != "pass":
+    # Unmet on "fail", on None and on a "skipped" with no shell file. armable.py
+    # condition (4) clears "skipped", so narrowing this to `== "fail"` removes the
+    # feature while leaving it looking present. See _tests_green_met.
+    if plan.stop_condition == "tests-green" and not _tests_green_met(phase5_status, changed_files):
         items.append("UNMET-CONTRACT: stop_condition tests-green declared but "
                      f"PHASE5_VERIFY_STATUS={phase5_status or 'none'}")
     # Exact match, not the substring test the Critical-Files loop below uses: an

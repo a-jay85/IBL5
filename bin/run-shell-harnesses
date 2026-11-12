@@ -143,6 +143,11 @@ done
 [ -z "$union_spec" ] || { shard_union "$union_spec" "$@"; exit $?; }
 if [ -n "$cov_file" ]; then
     { [ $# -eq 0 ] && [ -z "$list_file$leg" ]; } || { echo "Usage: --check-coverage takes no scripts, --list or --leg" >&2; exit 2; }
+    # Without --leg-count, the count is the highest leg number in the list file plus one.
+    # CI always passes the matrix size, which is what catches a leg the workflow lacks.
+    if [ -z "$leg_count" ] && [ -f "$cov_file" ]; then
+        leg_count=$(awk 'BEGIN { m = -1 } $1 ~ /^(0|[1-9][0-9]*)$/ && $1 + 0 > m { m = $1 + 0 } END { if (m >= 0) print m + 1 }' "$cov_file")
+    fi
     case "$leg_count" in '' | 0 | *[!0-9]*) echo "Usage: --check-coverage needs --leg-count N (N >= 1)" >&2; exit 2 ;; esac
     check_coverage "$cov_file" "$leg_count"; exit $?
 fi

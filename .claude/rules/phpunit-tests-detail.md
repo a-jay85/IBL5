@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand only (no auto-attach trigger). Golden snapshot rules (GoldenSnapshotTrait, UPDATE_SNAPSHOTS=1, the five golden helpers that skip the trait) plus the long-form sections moved from phpunit-tests.md: WideUnit + MockDatabase, module entry point tests, PHPStan test-neon suppressions, and the Season class alias.
-last_verified: 2026-11-11
+last_verified: 2026-11-12
 paths: "~/.claude/hooks/plan-gate-edit.sh"
 ---
 
@@ -35,7 +35,7 @@ Five other golden helpers do not use the trait. Each already fails on a missing 
 
 Thresholds: **100% MSI / 100% Covered MSI** (`ibl5/infection.json5`, `.github/workflows/mutation-pr.yml`). Config: `phpunit-mutation.xml`; per-file deferrals live in `infection.json5`.
 
-**Local run.** `bin/mutation-diff <base-ref>`; details in `.claude/rules/phpstan-invocation.md`.
+**Local run.** Only after CI's Infection check fails on the PR. Use `bin/mutation-diff <base-ref>`. Details are in `.claude/rules/phpstan-invocation.md` § Running Infection locally.
 
 ## WideUnit + MockDatabase
 

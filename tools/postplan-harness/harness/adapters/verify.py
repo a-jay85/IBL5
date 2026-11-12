@@ -1,7 +1,8 @@
 """Phase 5 verification tracks. LiveVerify shells out to the real commands in a
 worktree; ReplayVerify parses recorded track outputs from the historical trace.
 
-Track results are TrackResult(status in {pass, fail, skipped, unavailable}).
+Track results are TrackResult(status in {pass, fail, skipped, unavailable, ci}).
+`ci` marks a track CI covers instead (phpunit, shellcheck); aggregation ignores it.
 `unavailable` (replay fixture lacked the recorded output for a track that should
 have run) degrades the scenario's phase-5 fidelity and is disclosed — it is
 treated as `skipped` for aggregation but flagged in the result.
@@ -18,10 +19,16 @@ from dataclasses import dataclass
 from ..state import Classification
 
 
+# Phase 5 no longer runs the full PHPUnit suite or full-repo shellcheck. CI's
+# required checks run both on every push, and arming condition (15) holds a PR
+# on any red check. Those tracks report "ci", which aggregate() ignores.
+CI_COVERED_EVIDENCE = "covered by CI: CI's required checks run the full suite; condition (15) holds on red"
+
+
 @dataclass
 class TrackResult:
     name: str
-    status: str            # pass | fail | skipped | unavailable
+    status: str            # pass | fail | skipped | unavailable | ci
     evidence: str = ""
     seconds: float | None = None
 
@@ -102,20 +109,14 @@ class LiveVerify:
             return TrackResult("go", "pass" if rc1 == 0 and rc2 == 0 else "fail", o1 + o2)
 
         jobs: dict[str, Callable[[], TrackResult]] = {}
+        ci_covered: dict[str, TrackResult] = {}
         if cls.has_php:
-            jobs["phpunit"] = _simple("phpunit", "vendor/bin/phpunit --no-progress 2>&1", ibl5)
+            ci_covered["phpunit"] = TrackResult("phpunit", "ci", CI_COVERED_EVIDENCE)
             jobs["phpstan"] = _simple("phpstan", "composer run analyse -- --no-progress 2>&1", ibl5)
         if cls.has_go:
             jobs["go"] = _go
         if cls.has_shell:
-            jobs["shellcheck"] = _simple(
-                "shellcheck",
-                "bin/lib/shell-scripts.sh --full"
-                ' | xargs -P "$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)" -n 20'
-                " shellcheck --severity=warning --shell=bash"
-                " --exclude=SC2034,SC1090,SC2207 2>&1",
-                self.worktree,
-            )
+            ci_covered["shellcheck"] = TrackResult("shellcheck", "ci", CI_COVERED_EVIDENCE)
 
         results: dict[str, TrackResult] = {}
         self.last_wall_seconds = None
@@ -128,7 +129,7 @@ class LiveVerify:
                     results[name] = fut.result()
             self.last_wall_seconds = time.monotonic() - t0
 
-        tracks = [results.get(name) or TrackResult(name, "skipped")
+        tracks = [results.get(name) or ci_covered.get(name) or TrackResult(name, "skipped")
                   for name in ("phpunit", "phpstan", "go", "shellcheck")]
         # E2E track intentionally NOT run in the isolated prototype (needs the
         # project Docker stack); labeled unavailable so aggregation stays honest.

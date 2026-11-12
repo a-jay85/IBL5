@@ -1416,6 +1416,69 @@ docker_prune() {
     return "$rc"
 }
 
+# ── Step: stop idle worktree Docker stacks (never removes anything) ───────────
+# Stop worktree Docker stacks left running with nobody using them. Enumerates
+# <worktrees parent>/*/.wt-slug, so the main checkout (never under that parent)
+# is structurally excluded. Stop-only via bin/wt-down --stop: containers,
+# images, volumes and .wt-slug all stay. _gc_live_work 0 (live) and 2 (probe
+# error) both keep the stack.
+stop_idle_stacks() {
+    _gc_valid_days WT_GC_STACK_IDLE_HOURS || return 1
+    if [ "$WT_GC_STACK_IDLE_HOURS" -eq 0 ]; then
+        log "invalid WT_GC_STACK_IDLE_HOURS '0' — step skipped (fail-closed)"
+        return 1
+    fi
+    log "step stop-stacks threshold=${WT_GC_STACK_IDLE_HOURS}h"
+    if ! _gc_have "$WT_GC_DOCKER"; then
+        log "docker not found ('$WT_GC_DOCKER') — no stacks stopped"
+        return 1
+    fi
+    if ! "$WT_GC_DOCKER" info >/dev/null 2>&1; then
+        log "docker daemon unreachable — skipped"
+        return 0
+    fi
+    local parent slug_file wt name slug fmt running started up_epoch now age branch lw rc=0
+    parent="$(_gc_wt_parent)"
+    [ -d "$parent" ] || return 0
+    now="$(date +%s)"
+    for slug_file in "$parent"/*/.wt-slug; do
+        [ -f "$slug_file" ] || continue
+        wt="${slug_file%/.wt-slug}"
+        name="${wt##*/}"
+        case "$name" in _pool-*) log "stack kept $name: pool slot"; continue ;; esac
+        slug="$(cat "$slug_file" 2>/dev/null)" || slug=""
+        if [[ ! "$slug" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+            log "stack refused $name: slug '$slug' does not name ibl5-php-<slug> / ibl5-<slug>"
+            continue
+        fi
+        if ! fmt="$("$WT_GC_DOCKER" inspect --format '{{.State.Running}}{{"\t"}}{{.State.StartedAt}}' "ibl5-php-$slug" 2>/dev/null)"; then
+            log "stack kept $name: inspect ibl5-php-$slug failed"
+            continue
+        fi
+        IFS=$'\t' read -r running started <<< "$fmt"
+        if [ "$running" != true ]; then continue; fi
+        if ! up_epoch="$(_gc_iso_epoch "$started")" || [[ ! "$up_epoch" =~ ^[0-9]+$ ]]; then
+            log "stack kept $name: unknown start time '$started'"
+            continue
+        fi
+        age=$(( now - up_epoch ))
+        if [ "$age" -lt $(( WT_GC_STACK_IDLE_HOURS * 3600 )) ]; then continue; fi
+        branch="$(git -C "$wt" symbolic-ref --short -q HEAD 2>/dev/null)" || branch=""
+        lw=0
+        _gc_live_work "$name" "$branch" "$wt" || lw=$?
+        if [ "$lw" -ne 1 ]; then
+            log "stack kept $name: live work (probe rc=$lw)"
+            continue
+        fi
+        if _gc_do "$WT_GC_REPO_ROOT/bin/wt-down" --stop "$name"; then
+            log "stack stopped $name up=$(( age / 3600 ))h"
+        else
+            log "stack stop failed $name"; rc=1
+        fi
+    done
+    return "$rc"
+}
+
 # ── Step: archive retention ───────────────────────────────────────────────────
 # Keep-refs under refs/wt-gc-archive/<stamp>/ older than WT_GC_ARCHIVE_DAYS go.
 # The stamp in the refname is the only clock; a malformed stamp keeps.

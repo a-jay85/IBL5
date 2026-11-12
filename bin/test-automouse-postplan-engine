@@ -879,4 +879,27 @@ rm -rf "$SB"
 unset RC8_DUR
 unset PR_STUB
 
+# --- Row 20: the real reap_empty_worktree stops the stack, then reaps ---
+REAP_FN=$(awk '/^reap_empty_worktree\(\) \{/,/^\}/' "$RUN_FILE")
+assert_eq "$(grep -c '^reap_empty_worktree() {' "$RUN_FILE")" "1" "row 20a: reap helper anchor is unique"
+assert_eq "$(grep -cF 'bin/wt-down" --stop "$1"' <<< "$REAP_FN")" "1" "row 20b: extracted span holds the stop call"
+RB=$(mktemp -d); mkdir -p "$RB/repo/bin"
+for s in wt-down wt-remove; do
+    printf '#!/bin/bash\nprintf "%%s %%s\\n" "%s" "$*" >> "%s/order"\nexit "${STUB_%s_RC:-0}"\n' \
+        "$s" "$RB" "$(tr 'a-z-' 'A-Z_' <<< "$s")" > "$RB/repo/bin/$s"
+    chmod +x "$RB/repo/bin/$s"
+done
+( set -e; REPO="$RB/repo"; LOG="$RB/log"; eval "$REAP_FN"; reap_empty_worktree demo-slug; echo ok > "$RB/rc" )
+assert_eq "$(cat "$RB/order")" "$(printf 'wt-down --stop demo-slug\nwt-remove demo-slug --if-empty')" "row 20c: stop runs first, then the empty-worktree reap"
+# --- Row 21: a failing stop never fails the run and the reap still runs ---
+: > "$RB/order"; rm -f "$RB/rc"
+( set -e; export STUB_WT_DOWN_RC=1; REPO="$RB/repo"; LOG="$RB/log"; eval "$REAP_FN"; reap_empty_worktree demo-slug; echo ok > "$RB/rc" )
+assert_eq "$(cat "$RB/rc" 2>/dev/null)" "ok" "row 21a: wt-down failure is swallowed"
+assert_eq "$(tail -n 1 "$RB/order")" "wt-remove demo-slug --if-empty" "row 21b: wt-remove still runs"
+# --- Row 22: the 3-failed-attempts skip reaches the helper ---
+assert_eq "$(grep -c 'Plan \$PLAN_NAME failed \$ATTEMPTS times' "$RUN_FILE")" "1" "row 22a: attempt-cap anchor is unique"
+CAP_SPAN=$(awk '/Plan \$PLAN_NAME failed \$ATTEMPTS times/,/note_failure "Plan \$SLUG failed/' "$RUN_FILE")
+assert_eq "$(grep -cF 'reap_empty_worktree "${PLAN_NAME%.md}"' <<< "$CAP_SPAN")" "1" "row 22b: attempt-cap skip calls reap_empty_worktree"
+rm -rf "$RB"
+
 h_done

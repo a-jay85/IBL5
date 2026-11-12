@@ -479,4 +479,7 @@ if [ $DRY_RUN -eq 1 ]; then
   exit 0
 fi
 
-printf '%s\n' "$BODY" | "${DISCORD_DM_BIN:-$REPO_ROOT/bin/discord-dm}" --chunk -
+# A skipped plan needs the owner to act, so @mention them; a quiet digest stays silent.
+PING_ARGS=()
+if [ "$n_skipped" -gt 0 ]; then PING_ARGS=(--ping); fi
+printf '%s\n' "$BODY" | "${DISCORD_DM_BIN:-$REPO_ROOT/bin/discord-dm}" --chunk ${PING_ARGS[@]+"${PING_ARGS[@]}"} -

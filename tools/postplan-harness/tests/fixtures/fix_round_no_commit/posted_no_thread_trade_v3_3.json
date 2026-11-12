@@ -1,0 +1,25 @@
+{
+ "run": "live-trade-suggestions-engine-v3-3-candidates-scoring-20261111-140545-5673",
+ "bucket": "posted-no-thread",
+ "targets": [
+  2,
+  11
+ ],
+ "findings": [
+  {
+   "path": "ibl5/tests/e2e/flows/trade-suggestions.spec.ts",
+   "line": 0,
+   "score": 100,
+   "source": "code-review",
+   "agent": "D",
+   "title": "Pattern 2 (generic-fallback assertion), in 'suggestion links target offer screen",
+   "detail": "Pattern 2 (generic-fallback assertion), in 'suggestion links target offer screen only'."
+  }
+ ],
+ "posted": [
+  0
+ ],
+ "open_threads": [],
+ "thread_fetch_failed": false,
+ "expect_unthreaded_items": 1
+}

@@ -1,0 +1,32 @@
+{
+ "run": "live-check-docs-backup-refspec-1580-20261109-031202-22637",
+ "bucket": "gate-path",
+ "targets": [
+  2,
+  11
+ ],
+ "findings": [
+  {
+   "path": "bin/check-docs",
+   "line": 128,
+   "score": 93,
+   "source": "code-review",
+   "agent": "A",
+   "title": "The new push/fetch branch in `'pattern' => '~(?:git (?:branch...|git (?:push|fet",
+   "detail": "The new push/fetch branch in `'pattern' => '~(?:git (?:branch...|git (?:push|fetch)(?: \\S+)*?"
+  }
+ ],
+ "posted": [
+  0
+ ],
+ "open_threads": [
+  {
+   "commentId": 4512096087,
+   "finding": 0,
+   "gate_held": true,
+   "outdated": false
+  }
+ ],
+ "thread_fetch_failed": false,
+ "expect_unthreaded_items": 0
+}

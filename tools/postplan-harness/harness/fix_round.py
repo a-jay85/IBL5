@@ -75,6 +75,8 @@ def collect_items(gh, pr, res, actions, record: dict | None = None, *,
     sec_flags: list[bool] = []
     excluded = 0
     verdict: list = []
+    skips = {"gate_held": 0, "open_thread": 0, "posted_no_fetch": 0}
+    thread_keys: set | None = None
 
     def _security_allowed() -> bool:
         if not verdict:
@@ -92,9 +94,13 @@ def collect_items(gh, pr, res, actions, record: dict | None = None, *,
     if rows is None:
         record["thread_fetch"] = "failed"
     else:
+        # Every open trusted thread's key, taken before the outdated cap: a finding whose
+        # thread is gate-held or deferred by the cap must not enter the round unthreaded.
+        thread_keys = {same_run_threads._key(t.get("path"), t.get("body")) for t in rows}
         rows, _deferred = thread_ingestion.cap_outdated(rows)
         for t in rows:
             if thread_ingestion._is_gate_held(t):
+                skips["gate_held"] += 1
                 continue
             if t.get("agent") == SECURITY_AGENT and not _security_allowed():
                 excluded += 1
@@ -107,7 +113,11 @@ def collect_items(gh, pr, res, actions, record: dict | None = None, *,
             excluded += 1
             continue
         body = render_body(f, same_run_threads.POSTED_BODY_LIMIT)
-        if same_run_threads._key(f.path, body) in posted:
+        key = same_run_threads._key(f.path, body)
+        # Skip a finding an open thread already carries. A posted finding can lack a thread
+        # (line 0, or a line outside the diff). Without a thread list, skip what this run posted.
+        if key in (posted if thread_keys is None else thread_keys):
+            skips["posted_no_fetch" if thread_keys is None else "open_thread"] += 1
             continue
         items.append({"commentId": None, "path": f.path, "line": f.line, "body": body,
                       "authorLogin": "review-agent", "authorType": "Bot", "outdated": False,
@@ -127,6 +137,8 @@ def collect_items(gh, pr, res, actions, record: dict | None = None, *,
         record["security_items"] = sum(sec_flags)
     if excluded:
         record["security_excluded"] = excluded
+    if any(skips.values()):
+        record["collect_skips"] = {k: v for k, v in skips.items() if v}
     return items
 
 

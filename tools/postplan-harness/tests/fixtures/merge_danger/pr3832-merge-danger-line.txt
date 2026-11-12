@@ -1,0 +1,1 @@
+**Merge danger:** Door: two-way · Blast radius: site-wide · Self-governing: yes · Why: mechanical: arming-path:tools/postplan-harness/harness/fidelity.py. Changes only a log message in the postplan harness; no behaviour, data or GM-facing code changes.

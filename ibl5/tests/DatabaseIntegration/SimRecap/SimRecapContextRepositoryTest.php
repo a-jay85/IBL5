@@ -406,6 +406,41 @@ final class SimRecapContextRepositoryTest extends DatabaseTestCase
     }
 
     /**
+     * A player outside the top 3 scorers still makes the fact sheet when he has
+     * a double-double or better, and every line carries its tag. This mirrors a
+     * 16-11-15 game where the 4th scorer's triple-double was cut from the sheet.
+     */
+    public function testLowerScorerWithTripleDoubleIsListedAndTagged(): void
+    {
+        $date = '2031-05-10';
+        $this->seedTeam(999151, 'Ayes City', 'Ayes');
+        $this->seedTeam(999152, 'Bees City', 'Bees');
+        $this->seedSim(999151, '2031-05-08', '2031-05-14');
+        $this->insertScheduleRow(2031, $date, 999151, 125, 999152, 114);
+        $this->insertTeamBoxscoreRow($date, 'Ayes', 1, 999151, 999152);
+        // Rebounds = 2 orb + drb. Points = 2 * p2m.
+        $this->seedBoxLine($date, 200000311, 'Big Scorer', 999151, 999152, 999151, 36, 13, drb: 14);
+        $this->seedBoxLine($date, 200000312, 'Second Scorer', 999151, 999152, 999151, 30, 11);
+        $this->seedBoxLine($date, 200000313, 'Third Scorer', 999151, 999152, 999151, 30, 10);
+        $this->seedBoxLine($date, 200000314, 'Point God', 999151, 999152, 999151, 34, 8, drb: 9, ast: 15);
+        $this->seedBoxLine($date, 200000315, 'Role Player', 999151, 999152, 999151, 20, 3);
+
+        $game = $this->repo->buildContext(999151)['games'][0];
+
+        self::assertSame(
+            [200000311, 200000312, 200000313, 200000314],
+            array_column($game['visitor_top'], 'pid')
+        );
+        self::assertSame(
+            ['double-double', null, null, 'triple-double'],
+            array_column($game['visitor_top'], 'double')
+        );
+        self::assertSame(16, $game['visitor_top'][3]['pts']);
+        self::assertSame(11, $game['visitor_top'][3]['reb']);
+        self::assertSame(15, $game['visitor_top'][3]['ast']);
+    }
+
+    /**
      * An injury dated on game A's date for a player who played in A attaches to A
      * only; game B (another date) carries no injuries even though the player played.
      */
@@ -577,6 +612,8 @@ final class SimRecapContextRepositoryTest extends DatabaseTestCase
         int $teamId,
         int $minutes,
         int $twoPointMade,
+        int $drb = 6,
+        int $ast = 5,
     ): void {
         if (!isset($this->seededPids[$pid])) {
             $this->insertTestPlayer($pid, $name, ['teamid' => $teamId]);
@@ -597,6 +634,8 @@ final class SimRecapContextRepositoryTest extends DatabaseTestCase
             fta: 0,
             points3m: 0,
             points3a: 0,
+            drb: $drb,
+            ast: $ast,
         );
     }
 }

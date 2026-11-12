@@ -28,6 +28,12 @@
 #                   starts (no filters, no `labeled`), M2 exact context shared with
 #                   the ADR and unique, M3 never job-skipped (no job-level `if:` or
 #                   `continue-on-error`), M4 the --min-msi=100 threshold intact.
+#   plan-checks:    five invariants (P1-P5) that keep the required check `Plan checks`
+#                   reporting on every PR: P1 always starts (types opened, synchronize,
+#                   reopened, edited; no filters, no `labeled`), P2 exact context shared
+#                   with the ADR, unique and not ignored, P3 never job-skipped, P4 read-only
+#                   permissions with no secrets or services, P5 no PR or issue text in a
+#                   run: script.
 #   e2e-label:      two invariants (L1-L2) that keep label events off the required
 #                   E2E Tests check: L1 e2e-tests.yml on: lists no labeled or
 #                   unlabeled type; L2 update-baselines.yml names no job or workflow
@@ -86,6 +92,10 @@ set -eu
 # machine-checked copy of this literal; M2 compares the workflow and the ADR to it,
 # and --protection-readback compares branch protection to it.
 MUT_CONTEXT='Infection PHP (per-PR diff)'
+
+# Required status-check context emitted by plan-checks.yml. P2 compares the job name,
+# the ADR and all-checks-settled.yml's --ignore= list to it.
+PLAN_CONTEXT='Plan checks'
 
 # Required aggregator commit status posted by all-checks-settled.yml (ADR-0149 addendum). The same
 # literal lives in bin/lib/pr-armable.sh (PR_ARMABLE_AGGREGATOR_CONTEXT) and
@@ -641,6 +651,162 @@ else
   fi
 
 fi  # end mp_file present
+
+# ---------------------------------------------------------------------------
+# plan-checks (P1-P5): keep the required check `Plan checks` reporting on every PR
+# and keep PR free text out of run: scripts.
+# ---------------------------------------------------------------------------
+pc_file="$WORKFLOWS/plan-checks.yml"
+if [ ! -f "$pc_file" ]; then
+  echo "composite-contracts: plan-checks absent — skipped"
+else
+
+  pc_on_blk="$(awk '
+    { sub(/\r$/, "") }
+    /^on:/ { inblk=1; print; next }
+    inblk && /^[A-Za-z]/ { exit }
+    inblk { print }
+  ' "$pc_file")"
+  pc_job_blk="$(awk '
+    { sub(/\r$/, "") }
+    /^  plan-checks:[[:space:]]*$/ { inblk=1; print; next }
+    inblk && /^  [A-Za-z0-9_-]+:[[:space:]]*$/ { exit }
+    inblk { print }
+  ' "$pc_file")"
+
+  # P1: always starts. The types list is exactly opened, synchronize, reopened,
+  # edited; no path/branch filter; no labeled.
+  _p1_bad=""
+  _p1_types="$(sed -n -E 's/^[[:space:]]+types:[[:space:]]*\[(.*)\][[:space:]]*(#.*)?$/\1/p' <<< "$pc_on_blk" | tr -d ' \r' | tr ',' '\n' | LC_ALL=C sort | paste -sd, -)"
+  if ! grep -q 'pull_request' <<< "$pc_on_blk"; then
+    _p1_bad="on: has no pull_request trigger"
+  elif grep -qE '^[[:space:]]+(paths|paths-ignore|branches|branches-ignore):' <<< "$pc_on_blk"; then
+    _p1_bad="on: carries a paths/branches filter"
+  elif grep -Eq '(^|[^a-z_])labeled([^a-z_]|$)' <<< "$pc_on_blk"; then
+    _p1_bad="on: lists the labeled type"
+  elif [ "$_p1_types" != "edited,opened,reopened,synchronize" ]; then
+    _p1_bad="types: is '${_p1_types:-<unset>}', expected exactly opened, synchronize, reopened, edited"
+  fi
+  if [ -n "$_p1_bad" ]; then
+    echo "composite-contracts: plan-checks (P1) — $_p1_bad; the required check would not start on every PR event, leaving the PR pending forever ($pc_file)" >&2
+    fail=1
+  else
+    echo "composite-contracts: plan-checks starts on opened, synchronize, reopened and edited, no filters, no labeled (P1)"
+  fi
+
+  # P2: the job name equals the required context and is unique; exactly one ADR
+  # carries the literal; all-checks-settled.yml must not ignore it.
+  _p2_bad=""
+  if [ -z "$pc_job_blk" ]; then
+    _p2_bad="job plan-checks is missing or renamed"
+  else
+    pc_job_name="$(sed -n 's/^    name:[[:space:]]*//p' <<< "$pc_job_blk" | head -1 | sed "s/[[:space:]]*\$//; s/^[\"']//; s/[\"']\$//")"
+    if [ "$pc_job_name" != "$PLAN_CONTEXT" ]; then
+      _p2_bad="job name is '${pc_job_name:-<unset>}', expected '$PLAN_CONTEXT'"
+    fi
+  fi
+  if [ -z "$_p2_bad" ]; then
+    _pc_adrs=()
+    for _f in "$DECISIONS"/*-plan-checks-ci-from-pr-body.md; do
+      [ -f "$_f" ] && _pc_adrs+=("$_f")
+    done
+    if [ "${#_pc_adrs[@]}" -ne 1 ]; then
+      _p2_bad="expected exactly one ADR $DECISIONS/*-plan-checks-ci-from-pr-body.md, found ${#_pc_adrs[@]}"
+    elif ! grep -qF -- "$PLAN_CONTEXT" "${_pc_adrs[0]}"; then
+      _p2_bad="ADR ${_pc_adrs[0]} does not carry the literal '$PLAN_CONTEXT'"
+    fi
+  fi
+  if [ -z "$_p2_bad" ]; then
+    for _wf in "$WORKFLOWS"/*.yml; do
+      [ -f "$_wf" ] || continue
+      [ "$_wf" = "$pc_file" ] && continue
+      if awk -v ctx="$PLAN_CONTEXT" '
+        { sub(/\r$/, "") }
+        /^[[:space:]]*(- )?name:/ {
+          v=$0; sub(/^[^:]*:[[:space:]]*/, "", v); gsub(/["'"'"']/, "", v); sub(/[[:space:]]+$/, "", v)
+          if (v == ctx) found=1
+        }
+        END { exit !found }
+      ' "$_wf"; then
+        _p2_bad="$_wf also names a job '$PLAN_CONTEXT'; two check runs would share one required context"
+        break
+      fi
+    done
+  fi
+  if [ -z "$_p2_bad" ] && [ -f "$WORKFLOWS/all-checks-settled.yml" ]; then
+    if grep -F -- '--ignore=' "$WORKFLOWS/all-checks-settled.yml" | grep -qF -- "$PLAN_CONTEXT"; then
+      _p2_bad="all-checks-settled.yml ignores '$PLAN_CONTEXT'; a failed run would not fail the aggregator"
+    fi
+  fi
+  if [ -n "$_p2_bad" ]; then
+    echo "composite-contracts: plan-checks (P2) — $_p2_bad; the required context would not resolve to a single check run ($pc_file)" >&2
+    fail=1
+  else
+    echo "composite-contracts: plan-checks job name matches the ADR, is unique and is not ignored (P2)"
+  fi
+
+  # P3: never skipped. No job-level if: or continue-on-error:.
+  if grep -qE '^    (if|continue-on-error):' <<< "$pc_job_blk"; then
+    echo "composite-contracts: plan-checks (P3) — job-level 'if:' or 'continue-on-error:' present; the job could be skipped or fail green, so the required check would not gate ($pc_file)" >&2
+    fail=1
+  else
+    echo "composite-contracts: plan-checks has no job-level if/continue-on-error (P3)"
+  fi
+
+  # P4: least privilege. No secrets., no services:, no ': write', and the
+  # top-level permissions: block is exactly contents: read + pull-requests: read.
+  _p4_bad=""
+  _p4_code="$(tr -d '\r' < "$pc_file" | grep -vE '^[[:space:]]*#' || true)"
+  _p4_perms="$(awk '
+    { sub(/\r$/, "") }
+    /^permissions:/ { inblk=1; next }
+    inblk && /^[^[:space:]#]/ { exit }
+    inblk && /^[[:space:]]*(#.*)?$/ { next }
+    inblk { sub(/[[:space:]]+#.*$/, ""); sub(/^[[:space:]]+/, ""); print }
+  ' "$pc_file" | LC_ALL=C sort | paste -sd, -)"
+  if grep -qF 'secrets.' <<< "$_p4_code"; then
+    _p4_bad="the file references a secrets. token"
+  elif grep -qE '^[[:space:]]*services:' <<< "$_p4_code"; then
+    _p4_bad="the file declares a services: key"
+  elif grep -qF ': write' <<< "$_p4_code"; then
+    _p4_bad="the file grants a write permission"
+  elif [ "$_p4_perms" != "contents: read,pull-requests: read" ]; then
+    _p4_bad="top-level permissions: is '${_p4_perms:-<unset>}', expected exactly contents: read and pull-requests: read"
+  fi
+  if [ -n "$_p4_bad" ]; then
+    echo "composite-contracts: plan-checks (P4) — $_p4_bad; PR code would run with more than a read-only token ($pc_file)" >&2
+    fail=1
+  else
+    echo "composite-contracts: plan-checks holds only contents: read and pull-requests: read, no secrets and no services (P4)"
+  fi
+
+fi  # end pc_file present
+
+# P5: no attacker-controlled event text pasted into a run: script.
+_p5_re='\$\{\{[^}]*github\.event\.(pull_request\.(body|title)|issue\.(body|title)|comment\.body|review\.body)'
+_p5_hits=$(for _f in "$WORKFLOWS"/*.yml $(find "$ACTIONS" -name action.yml 2>/dev/null); do
+  [ -f "$_f" ] || continue
+  # The regex travels in the environment: awk -v would expand its backslash escapes
+  # (\$ and \{ lose their escape) and the pattern would stop matching.
+  P5_RE="$_p5_re" awk -v f="$_f" '
+    BEGIN { re = ENVIRON["P5_RE"] }
+    function ind(s) { match(s, /^ */); return RLENGTH }
+    inrun && ind($0) <= runind && $0 !~ /^[[:space:]]*$/ { inrun = 0 }
+    /^[[:space:]]*(- )?run:/ {
+      runind = ind($0); line = $0; sub(/^[[:space:]]*(- )?run:[[:space:]]*/, "", line)
+      if (line ~ /^[|>]/) { inrun = 1; next }
+      if (line ~ re) print f ":" NR
+      next
+    }
+    inrun && $0 ~ re { print f ":" NR }
+  ' "$_f"
+done)
+if [ -n "$_p5_hits" ]; then
+  echo "composite-contracts: event text in a run: script (P5) at $_p5_hits; move it to an env: value and read the variable" >&2
+  fail=1
+else
+  echo "composite-contracts: no PR or issue text interpolated into run: scripts (P5)"
+fi
 
 # ---------------------------------------------------------------------------
 # all-checks-settled invariants (A1-A6, ADR-0149 addendum 2026-10-21). The

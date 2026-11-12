@@ -6,7 +6,7 @@
 # skip/active behavior. Verifies the logic even while the live composites are absent
 # on master (the check is dormant there, but its logic must already be correct so it
 # is sound the moment the composites land). Also covers the mutation-pr.yml
-# invariants (M1-M4) and the all-checks-settled.yml invariants (A1-A7) against
+# invariants (M1-M4), the plan-checks.yml invariants (P1-P4), the P5 run: script lint and the all-checks-settled.yml invariants (A1-A7) against
 # mutated copies of the real workflows tree, the promote P9 branches filter, the P10 aggregate-ignore knobs, the
 # step-scoped DB env invariant (D1) with a throwaway setup-php-env composite,
 # with throwaway workflow + ADR fixtures, and the read-only --protection-readback
@@ -1191,6 +1191,113 @@ if should_run u1-workflows-absent-skips; then
   expect "u1-workflows-absent-skips" 0 "$rc"
   h_contains "u1-workflows-absent-skips-output" "$out" "U1 skipped"
 fi
+
+# plan-checks (P1-P4) and the run: script lint (P5). Each case builds a throwaway
+# workflows dir holding a copy of the real plan-checks.yml (or a probe) plus an ADR
+# fixture; the actions dir is empty. The --case runs need their own paths because
+# REPO_ROOT is set inside the unfiltered wrapper.
+PC_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PC_REAL="$PC_ROOT/.github/workflows/plan-checks.yml"
+PC_LITERAL='Plan checks'
+
+put_pc_adr() { # dir literal
+  mkdir -p "$1"
+  printf '# ADR-0999\n\nRequired context: %s\n' "$2" > "$1/0999-plan-checks-ci-from-pr-body.md"
+}
+
+# pc_case <name> <want-exit> <tag> <sed-expr|-> [adr-literal|-none-]
+# Copies the real workflow, applies one sed edit, runs the checker, asserts the exit
+# code and (on failure) that stderr carries the (P<n>) tag.
+pc_case() {
+  should_run "$1" || return 0
+  local wf act dec out rc
+  act="$(fresh_actions)"; wf="$(fresh_workflows)"; dec="$(fresh_decisions)"
+  cp "$PC_REAL" "$wf/plan-checks.yml"
+  if [ "$4" != "-" ]; then sed -i.bak -E "$4" "$wf/plan-checks.yml"; rm -f "$wf/plan-checks.yml.bak"; fi
+  if [ "${5:-$PC_LITERAL}" != "-none-" ]; then put_pc_adr "$dec" "${5:-$PC_LITERAL}"; fi
+  out="$("$CHECK" "$act" "$wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" "$dec" 2>&1)"; rc=$?
+  expect "$1" "$2" "$rc"
+  if [ "$2" -ne 0 ]; then h_contains "$1-tag" "$out" "plan-checks ($3)"; fi
+}
+
+pc_case case_pc_good_passes 0 - -
+pc_case case_p1_paths_fails 1 P1 $'s/^  pull_request:$/  pull_request:\\\n    paths: [x]/'
+pc_case case_p1_labeled_fails 1 P1 's/reopened, edited\]/reopened, edited, labeled]/'
+pc_case case_p1_edited_dropped_fails 1 P1 's/reopened, edited\]/reopened]/'
+pc_case case_p2_renamed_fails 1 P2 's/^    name: Plan checks$/    name: Plan check/'
+pc_case case_p2_adr_missing_fails 1 P2 - -none-
+pc_case case_p3_job_if_fails 1 P3 $'s/^    runs-on: .*$/&\\\n    if: true/'
+pc_case case_p4_write_fails 1 P4 's/^  pull-requests: read$/  pull-requests: write/'
+pc_case case_p4_secret_fails 1 P4 $'s/^    timeout-minutes: 50$/&\\\n    env:\\\n      X: ${{ secrets.FOO }}/'
+
+# P5 probes: one workflow in an otherwise empty workflows dir.
+# p5_case <name> <want-exit> <file-body>
+p5_case() {
+  should_run "$1" || return 0
+  local wf act dec out rc
+  act="$(fresh_actions)"; wf="$(fresh_workflows)"; dec="$(fresh_decisions)"
+  put_mut_adr "$dec" "$U1_ADR_LITERAL"
+  printf '%s\n' "$3" > "$wf/p5-probe.yml"
+  out="$("$CHECK" "$act" "$wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" "$dec" 2>&1)"; rc=$?
+  expect "$1" "$2" "$rc"
+  if [ "$2" -ne 0 ]; then h_contains "$1-tag" "$out" "(P5) at"; fi
+}
+
+p5_case case_p5_block_scalar_hit 1 'name: P5 probe
+on:
+  push:
+jobs:
+  probe:
+    runs-on: ubuntu-26.04
+    steps:
+      - name: Echo body
+        run: |
+          echo "${{ github.event.pull_request.body }}"'
+
+p5_case case_p5_inline_hit 1 'name: P5 probe
+on:
+  push:
+jobs:
+  probe:
+    runs-on: ubuntu-26.04
+    steps:
+      - run: echo ${{ github.event.pull_request.title }}'
+
+p5_case case_p5_env_value_passes 0 'name: P5 probe
+on:
+  push:
+jobs:
+  probe:
+    runs-on: ubuntu-26.04
+    steps:
+      - name: Read body
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          echo "$PR_BODY"'
+
+p5_case case_p5_block_ends_at_dedent 0 'name: P5 probe
+on:
+  push:
+jobs:
+  probe:
+    runs-on: ubuntu-26.04
+    steps:
+      - name: Read body
+        run: |
+          echo "$PR_BODY"
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}'
+
+p5_case case_p5_number_passes 0 'name: P5 probe
+on:
+  push:
+jobs:
+  probe:
+    runs-on: ubuntu-26.04
+    steps:
+      - run: echo ${{ github.event.pull_request.number }}'
+
 
 check_only_cases
 h_done

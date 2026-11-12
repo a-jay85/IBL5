@@ -106,6 +106,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0239](0239-reviewer-arming-holds-add-only.md) | Reviewer shadow verdicts add holds and never clear | Accepted | Arming condition 21 holds on a reviewer `hold: true` for planned files or merge danger; `conformance.py` and `merge_danger.py` stay the only clearers of conditions 3 and 18; a bad block is neutral. |
 | [0241](0241-prefire-phpunit-changed-files.md) | Run only the PHPUnit tests tied to the branch's changed files in prefire-verify | Accepted | The prefire phpunit stage runs the tests mapped to the changed files, runs the full suite on a shared test input or a mapping error, and skips when no PHPUnit-relevant file changed; `PREFIRE_PHPUNIT_FULL=1` forces the full suite. Partially supersedes ADR-0227. |
 | [0242](0242-on-demand-worktree-stacks.md) | Agents start worktree stacks through bin/wt-stack and stop only the ones they started | Accepted | `bin/wt-stack start` records the PHP container ID in `~/.cache/ibl5-wt-stack/<slug>`; `bin/wt-stack stop` runs `bin/wt-down --force` only when that marker matches the live container. |
+| [0243](0243-migration-auto-revert.md) | Undo a reverted data-changing migration from stored down SQL on the next deploy | Accepted | The runner stores a migration's down SQL and up-file checksum when it applies the up, and on the next deploy undoes vanished migrations from the stored copy, failing closed when the run is not contiguous or a checksum matches a current file. |
 
 ## When an ADR is Required
 

@@ -42,6 +42,8 @@ KNOWN_TRIGGERS = [
     "narrow-type",
     "drop-recreate-existing",
     "rewrite-no-backup",
+    "down-file-missing",
+    "down-not-dml",
 ]
 
 NAME = r"([a-z0-9_$]+(?:\.[a-z0-9_$]+)?)"
@@ -1078,6 +1080,19 @@ def _is_undo_script(path):
     return "undo" in os.path.normpath(path).split(os.sep)[:-1]
 
 
+def down_file_path(path):
+    """Convention: the DML-only down partner sits beside the migration as NNN_name.down.sql."""
+    return os.path.splitext(path)[0] + ".down.sql"
+
+
+def _is_down_file(path):
+    return path.endswith(".down.sql")
+
+
+DOWN_DML_RE = re.compile(r"^(insert|update|delete)\b")
+DOWN_TRIGGERS = ("down-file-missing", "down-not-dml")
+
+
 def _set_columns(low):
     m = re.search(r"\bset\b(.*?)\bwhere\b(.*)$", low)
     if not m:
@@ -1191,7 +1206,7 @@ def _backup_filled_before(ctx, table):
 
 
 def rule_rewrite_no_backup(ctx, path, undo_present):
-    if _is_undo_script(path):
+    if _is_undo_script(path) or _is_down_file(path):
         return []
     low = ctx.st.lower
     if not re.search(r"\bwhere\b", low):
@@ -1213,12 +1228,41 @@ def rule_rewrite_no_backup(ctx, path, undo_present):
     for table in tables:
         if not _backup_filled_before(ctx, table):
             missing.append("no backup fill of %s before this statement" % table)
-    present = os.path.isfile(undo_script_path(path)) if undo_present is None else undo_present
+    # A down partner is the newer undo path: the runner stores it and replays it on revert.
+    present = (
+        os.path.isfile(undo_script_path(path)) or os.path.isfile(down_file_path(path))
+        if undo_present is None
+        else undo_present
+    )
     if not present:
         missing.append("no undo script at %s" % undo_script_path(path))
     if missing:
         return [("rewrite-no-backup", "(" + "; ".join(missing) + ")")]
     return []
+
+
+def rules_down_file(ctx, path, found):
+    """Down-file triggers, for diff modes only (the caller passes path only then).
+
+    down-file-missing: a data-rewrite statement in a .sql migration that has no
+    NNN_name.down.sql partner. A rewrite is anything rewrite-no-backup would judge
+    (even with its backup and undo script in place) or a WHERE-less UPDATE/DELETE.
+    down-not-dml: a statement in a down file that is not INSERT, UPDATE or DELETE,
+    because DDL commits implicitly and the runner's one transaction could not undo it.
+    """
+    hits = []
+    if _is_down_file(path):
+        if DOWN_DML_RE.match(ctx.st.lower) is None:
+            hits.append(("down-not-dml", "(a down file may hold only INSERT, UPDATE or DELETE)"))
+        return hits
+    if not path.endswith(".sql") or _is_undo_script(path):
+        return hits
+    is_rewrite = bool(rule_rewrite_no_backup(ctx, path, False)) or any(
+        tag in ("update-no-where", "delete-no-where") for tag, _ in found
+    )
+    if is_rewrite and not os.path.isfile(down_file_path(path)):
+        hits.append(("down-file-missing", "(no down file at %s)" % down_file_path(path)))
+    return hits
 
 
 def evaluate(statements, selected, lookups, rewrite_path=None, undo_present=None):
@@ -1233,6 +1277,7 @@ def evaluate(statements, selected, lookups, rewrite_path=None, undo_present=None
             found.extend(rule(ctx))
         if rewrite_path is not None:
             found.extend(rule_rewrite_no_backup(ctx, rewrite_path, undo_present))
+            found.extend(rules_down_file(ctx, rewrite_path, found))
         table, clauses = alter_clauses(st)
         for masked_clause, clean_clause in clauses:
             for rule in ALTER_CLAUSE_RULES:
@@ -1588,7 +1633,7 @@ REWRITE_SCAN_CASES = [
     # (name, sql, ranges, pr_body, expected_exit) through run_scan("x.sql", ...)
     ("rw diff mode fires", "UPDATE t SET name = 'x' WHERE id = 1;\n", [(1, 1)], None, 1),
     ("rw all-lines silent", "UPDATE t SET name = 'x' WHERE id = 1;\n", None, None, 0),
-    ("rw marker suppresses", "-- destructive-migration[rewrite-no-backup]: importer rebuilds this column on every run\nUPDATE t SET name = 'x' WHERE id = 1;\n", [(1, 2)], None, 0),
+    ("rw marker suppresses", "-- destructive-migration[rewrite-no-backup,down-file-missing]: importer rebuilds this column on every run\nUPDATE t SET name = 'x' WHERE id = 1;\n", [(1, 2)], None, 0),
     ("rw marker other tag", "-- destructive-migration[update-no-where]: importer rebuilds this column on every run\nUPDATE t SET name = 'x' WHERE id = 1;\n", [(1, 2)], None, 1),
     ("rw marker typo tag", "-- destructive-migration[rewrite-no-backups]: importer rebuilds this column on every run\nSELECT 1;\n", [(1, 2)], None, 1),
 ]
@@ -1638,7 +1683,9 @@ def self_test():
             rewrite_path=path if rewrite_on else None,
             undo_present=undo_present,
         )
-        got = sorted(set(h[0] for h in hits))
+        # These cases pin the rewrite-no-backup family; the down-file triggers are
+        # covered by CheckDestructiveMigrationsCliTest.
+        got = sorted(set(h[0] for h in hits if h[0] not in DOWN_TRIGGERS))
         if got != sorted(expected):
             failures += 1
             print("FAIL %s: expected %s, got %s" % (name, sorted(expected), got))
@@ -1657,6 +1704,10 @@ def self_test():
                 os.mkdir(os.path.join(tmp, "undo"))
                 with open(os.path.join(tmp, "undo", "x.sql"), "w") as fh:
                     fh.write("-- restore\n")
+                # The case pins the undo-script check; the down partner keeps
+                # down-file-missing out of the exit code.
+                with open(os.path.join(tmp, "x.down.sql"), "w") as fh:
+                    fh.write("-- restores: t\n")
             code, _ = run_scan(mig, REWRITE_BACKED_SQL, [(1, 999)], "strict", None, Lookups(None, None, mig))
         finally:
             shutil.rmtree(tmp)

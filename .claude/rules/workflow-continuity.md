@@ -1,6 +1,6 @@
 ---
 description: All work happens in a worktree; where plans live (outside the repo); worktree setup; post-plan handoff triggers.
-last_verified: 2026-11-11
+last_verified: 2026-11-12
 ---
 
 # Workflow Continuity Rule
@@ -20,8 +20,6 @@ Use `/plan <task description>` for implementation planning.
 ```bash
 ls ~/claude-plans/"$(git rev-parse --abbrev-ref HEAD)".md
 ```
-
-`~/claude-plans/` is the single source of truth.
 
 **Never `Read` a plan whole** (58-320 KB = 15-80K tokens). Index it, then read by range: `bin/plan-index <path>` prints each `## ` section's start/end line; `sed -n 'START,ENDp'` the ones you need.
 

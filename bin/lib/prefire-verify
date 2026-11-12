@@ -3,7 +3,8 @@
 #
 # Re-runs three checks on the current working tree before /post-plan fires:
 #   1. every post-impl CLI-executable row of the plan's Verification Matrix
-#   2. the full default PHPUnit suite
+#   2. PHPUnit on the tests mapped to the branch's changed files (full suite when a
+#      shared test input changed or mapping failed; skipped when no PHPUnit-relevant file changed)
 #   3. every Executable Mutations row of the plan (bin/lib/plan-exec-mutations run)
 # Mutation score is gated by CI's required check "Infection PHP (per-PR diff)" (ADR-0237).
 # It trusts no implementer-written ledger. Only this script writes pass records,
@@ -14,7 +15,8 @@
 #   --fire-point  exec-mutations only: use the larger limits (300 s per check run, 1800 s
 #                 total, the post-plan gate's) instead of the implementer's 120 s / 300 s.
 #                 bin/post-plan-now passes it; a pass under either limit is the same record.
-#   --base        accepted for existing callers; no stage reads it since ADR-0237.
+#   --base        base ref for the phpunit stage's diff (default: git config
+#                 branch.<name>.iblBase, else origin/master)
 # Exit codes:
 #   0  every requested stage passed (fresh run, or a valid pass record for this tree)
 #   1  a check failed (the message names the matrix row or the stage)
@@ -24,9 +26,12 @@
 #   4  the checks changed the working tree, so no pass record was written
 #
 # Test seams (used only by bin/test-prefire-verify):
-#   PREFIRE_PHPUNIT_CMD    default vendor/bin/phpunit, run from ibl5/
+#   PREFIRE_PHPUNIT_CMD    default vendor/bin/phpunit, run from ibl5/; subset mode appends test paths as arguments
 #   PREFIRE_DB_PROBE_CMD   default bin/db-query "SELECT 1", run from the repo root
 #   PREFIRE_EXEC_MUTATIONS_LIB  default bin/lib/plan-exec-mutations
+#
+# Environment:
+#   PREFIRE_PHPUNIT_FULL=1  run the full suite; 0, empty or unset maps files to tests
 
 set -uo pipefail
 
@@ -57,12 +62,15 @@ while [ $# -gt 0 ]; do
         *) die 2 "unknown argument '$1'" ;;
     esac
 done
-: "$BASE_OPT"   # --base is still parsed for existing callers; no stage reads it
 
 case "$STAGE" in
     matrix|phpunit|exec-mutations|all) : ;;
     infection) die 2 "--stage infection was removed; CI's required check \"Infection PHP (per-PR diff)\" covers mutation testing, so skip this call" ;;
     *) die 2 "--stage must be matrix, phpunit, exec-mutations, or all (got '$STAGE')" ;;
+esac
+case "${PREFIRE_PHPUNIT_FULL:-}" in
+    ''|0|1) : ;;
+    *) die 2 "PREFIRE_PHPUNIT_FULL must be 1, 0, or unset (got '${PREFIRE_PHPUNIT_FULL}')" ;;
 esac
 if [ "$BYPASS_SET" -eq 1 ] && [ -z "$BYPASS_REASON" ]; then
     die 2 "--bypass needs a non-empty reason"
@@ -209,22 +217,175 @@ stage_matrix() {
     return 0
 }
 
+# --- phpunit test selection -------------------------------------------------
+# prefire_phpunit_select <list-file> sets PHPUNIT_MODE (subset|full|skip) and
+# PHPUNIT_REASON. In subset mode it writes test paths, relative to ibl5/, to
+# <list-file>. Every error path calls phpunit_full, so errors run the full suite.
+PHPUNIT_MODE=""
+PHPUNIT_REASON=""
+phpunit_full() { PHPUNIT_MODE=full; PHPUNIT_REASON="$1"; }
+
+# Base for the diff: --base, else git config branch.<name>.iblBase, else origin/master.
+prefire_phpunit_base() {
+    local br cfg
+    if [ -n "$BASE_OPT" ]; then printf '%s\n' "$BASE_OPT"; return 0; fi
+    br=$(git rev-parse --abbrev-ref HEAD 2>/dev/null) || br=""
+    cfg=$(git config "branch.$br.iblBase" 2>/dev/null) || cfg=""
+    if [ -n "$cfg" ]; then printf '%s\n' "$cfg"; return 0; fi
+    printf 'origin/master\n'
+}
+
+prefire_phpunit_map_source() { # <repo-relative source path> <list-file>
+    local src="$1" out="$2" rel name cand rc
+    case "$src" in
+        ibl5/classes/*) rel="${src#ibl5/classes/}" ;;
+        *) rel="PHPStanRules/${src#ibl5/phpstan-rules/}" ;;
+    esac
+    rel="${rel%.php}"
+    name="${rel##*/}"
+    for cand in "tests/${rel}Test.php" "tests/DatabaseIntegration/${rel}Test.php"; do
+        if [ -f "ibl5/$cand" ]; then printf '%s\n' "$cand" >> "$out"; fi
+    done
+    (cd ibl5 && git grep -l --untracked -w -F -e "$name" -- 'tests/*Test.php' ':(exclude)tests/PHPStanRules/Fixtures') >> "$out"
+    rc=$?
+    [ "$rc" -le 1 ]
+}
+
+# Succeeds when the changed class is one that other classes build on: it declares
+# an abstract class, trait or interface, or another class extends it. Tests of
+# the subclasses and users need not name it, so name-matching would skip them.
+prefire_phpunit_is_shared_base() { # <repo-relative source path>
+    local src="$1" name
+    name="${src##*/}"; name="${name%.php}"
+    if [ -f "$src" ] && command grep -qE '^[[:space:]]*((abstract|final|readonly)[[:space:]]+)*(abstract[[:space:]]+class|trait|interface)[[:space:]]' "$src"; then
+        return 0
+    fi
+    if [ -d ibl5/classes ] && command grep -rqE --include='*.php' "(extends|implements)[^{]*[[:space:],\\\\]${name}([[:space:],{]|\$)" ibl5/classes; then
+        return 0
+    fi
+    return 1
+}
+
+# A path outside ibl5/ adds every test that names it by its repo-relative path.
+prefire_phpunit_map_path_ref() { # <repo-relative path> <list-file>
+    local rc
+    (cd ibl5 && git grep -l --untracked -F -e "$1" -- 'tests/*Test.php' ':(exclude)tests/PHPStanRules/Fixtures') >> "$2"
+    rc=$?
+    [ "$rc" -le 1 ]
+}
+
+prefire_phpunit_select() { # <list-file>
+    local out="$1" base mb changed status path php_changed=0 before after
+    PHPUNIT_MODE=""; PHPUNIT_REASON=""
+    if [ "${PREFIRE_PHPUNIT_FULL:-}" = "1" ]; then phpunit_full "PREFIRE_PHPUNIT_FULL=1"; return 0; fi
+    base=$(prefire_phpunit_base)
+    if ! git rev-parse --verify -q "$base^{commit}" >/dev/null 2>&1; then
+        if git rev-parse --verify -q "origin/$base^{commit}" >/dev/null 2>&1; then base="origin/$base"
+        else phpunit_full "cannot resolve base '$base'"; return 0; fi
+    fi
+    mb=$(git merge-base "$base" HEAD 2>/dev/null) || { phpunit_full "no merge-base between $base and HEAD"; return 0; }
+    changed=$(mktemp "${TMPDIR:-/tmp}/prefire-changed.XXXXXX") || { phpunit_full "cannot create a temp file"; return 0; }
+    if ! git -c core.quotePath=false diff --name-status --no-renames "$mb" -- > "$changed" 2>/dev/null; then
+        rm -f "$changed"; phpunit_full "cannot diff the tree against $base"; return 0
+    fi
+    if ! git -c core.quotePath=false ls-files --others --exclude-standard > "$changed.u" 2>/dev/null; then
+        rm -f "$changed" "$changed.u"; phpunit_full "cannot list untracked files"; return 0
+    fi
+    while IFS= read -r path; do printf 'A\t%s\n' "$path"; done < "$changed.u" >> "$changed"
+    rm -f "$changed.u"
+    while IFS=$'\t' read -r status path; do
+        [ -n "$path" ] || continue
+        case "$path" in
+            ibl5/phpunit.xml|ibl5/phpunit.xml.dist|ibl5/tests/bootstrap.php|ibl5/composer.json|ibl5/composer.lock)
+                phpunit_full "shared PHPUnit input changed: $path"; break ;;
+            ibl5/tests/e2e/*|*.md) continue ;;
+            ibl5/tests/PHPStanRules/Fixtures/*)
+                phpunit_full "PHPStan rule fixture changed: $path"; break ;;
+            ibl5/tests/*Test.php)
+                php_changed=1
+                if [ -f "$path" ]; then printf '%s\n' "${path#ibl5/}" >> "$out"; fi
+                continue ;;
+            ibl5/tests/*)
+                phpunit_full "shared test helper or fixture changed: $path"; break ;;
+            ibl5/classes/*.php|ibl5/phpstan-rules/*.php)
+                php_changed=1
+                if [ "$status" = D ]; then phpunit_full "source file deleted: $path"; break; fi
+                if prefire_phpunit_is_shared_base "$path"; then
+                    phpunit_full "shared base (abstract class, trait, interface, or extended class): $path"; break
+                fi
+                before=$(wc -l < "$out" | tr -d ' ')
+                prefire_phpunit_map_source "$path" "$out" || { phpunit_full "cannot search ibl5/tests for $path"; break; }
+                after=$(wc -l < "$out" | tr -d ' ')
+                if [ "$after" -le "$before" ]; then phpunit_full "no test file maps to the changed PHP: $path"; break; fi
+                continue ;;
+            ibl5/*)
+                phpunit_full "file under ibl5/ with no test mapping: $path"; break ;;
+            *)
+                # Outside ibl5/: Cli tests run scripts such as bin/adr-check by path.
+                prefire_phpunit_map_path_ref "$path" "$out" || { phpunit_full "cannot search ibl5/tests for $path"; break; }
+                continue ;;
+        esac
+    done < "$changed"
+    rm -f "$changed"
+    [ "$PHPUNIT_MODE" = full ] && return 0
+    if [ ! -s "$out" ]; then
+        if [ "$php_changed" -eq 1 ]; then phpunit_full "no test file maps to the changed PHP"; return 0; fi
+        PHPUNIT_MODE=skip; PHPUNIT_REASON="no PHPUnit-relevant file changed against $base"
+        return 0
+    fi
+    sort -u "$out" -o "$out" || { phpunit_full "cannot sort the test list"; return 0; }
+    PHPUNIT_MODE=subset
+}
+
 # --- phpunit stage ----------------------------------------------------------
 stage_phpunit() {
-    local log rc cmd="${PREFIRE_PHPUNIT_CMD:-vendor/bin/phpunit}"
+    local log rc key list t cmd="${PREFIRE_PHPUNIT_CMD:-vendor/bin/phpunit}"
+    local -a targets
+    targets=()
+    key=""
+    if list=$(mktemp "${TMPDIR:-/tmp}/prefire-phpunit.XXXXXX"); then
+        prefire_phpunit_select "$list"
+    else
+        list=""; phpunit_full "cannot create the test-list file"
+    fi
+    case "$PHPUNIT_MODE" in
+        skip)
+            rm -f "$list"
+            say "phpunit mode: skipped ($PHPUNIT_REASON)"
+            return 0 ;;
+        subset)
+            while IFS= read -r t; do targets[${#targets[@]}]="$t"; done < "$list"
+            key="subset-$(git hash-object "$list" | cut -c1-12)"
+            say "phpunit mode: subset (${#targets[@]} test files)" ;;
+        *)
+            PHPUNIT_MODE=full
+            say "phpunit mode: full ($PHPUNIT_REASON)" ;;
+    esac
+    [ -n "$list" ] && rm -f "$list"
     cache_hit phpunit "" && return 0
+    if [ -n "$key" ]; then cache_hit phpunit "$key" && return 0; fi
     if [ -z "${PREFIRE_PHPUNIT_CMD:-}" ] && [ ! -x ibl5/vendor/bin/phpunit ]; then
         say "FAIL phpunit prerequisite missing: ibl5/vendor/bin/phpunit; run composer install in ibl5/" >&2
         return 3
     fi
     log="$STATE_DIR/$TREE.phpunit.log"
-    (cd ibl5 && bash -c "$cmd") > "$log" 2>&1; rc=$?
-    if [ "$rc" -ne 0 ]; then
-        say "FAIL phpunit: full default suite red (exit $rc); log: $log" >&2
+    if [ "$PHPUNIT_MODE" = subset ]; then
+        { printf 'prefire-verify phpunit mode: subset\n'; printf '  %s\n' "${targets[@]}"; } > "$log"
+        (cd ibl5 && bash -c "$cmd \"\$@\"" prefire-phpunit "${targets[@]}") >> "$log" 2>&1; rc=$?
+    else
+        printf 'prefire-verify phpunit mode: full (%s)\n' "$PHPUNIT_REASON" > "$log"
+        (cd ibl5 && bash -c "$cmd") >> "$log" 2>&1; rc=$?
+    fi
+    if [ "$rc" -ne 0 ]; then # phpunit-red
+        if [ "$PHPUNIT_MODE" = subset ]; then
+            say "FAIL phpunit: subset of ${#targets[@]} test files red (exit $rc); log: $log" >&2
+        else
+            say "FAIL phpunit: full default suite red (exit $rc); log: $log" >&2
+        fi
         tail -n 40 "$log" >&2
         return 1
     fi
-    write_record phpunit ""
+    write_record phpunit "$key"
     say "phpunit passed"
     return 0
 }

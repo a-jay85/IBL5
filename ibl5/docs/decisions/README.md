@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-11-10
+last_verified: 2026-11-11
 ---
 
 # IBL5 Architecture Decision Records
@@ -96,7 +96,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0224](0224-rehearsal-clone-fallback-cache.md) | Rehearsal clone fallback to an encrypted cached dump | Accepted | When the remote dump fails with MySQL 1203, 1040, 2002, 2003, or 2013, `bin/rehearsal-clone-fallback` routes the rehearsal to the newest encrypted cached dump up to 7 days old; every downstream gate still runs on it. |
 | [0225](0225-update-baselines-caller-workflow.md) | Update-baselines regen runs from a caller workflow | Accepted | `.github/workflows/update-baselines.yml` calls `e2e-tests.yml`, which no longer triggers on `labeled`, so a label event cannot re-post the required `E2E Tests` check; `bin/check-composite-contracts` L1 and L2 pin it. |
 | [0226](0226-plan-tier-hint-open-judgment.md) | Open Opus judgment for the /plan architect tier | Accepted | `bin/plan-tier-hint` asks one open Opus 5.5 question with no trigger list, prints `default` on any failure, and logs every verdict; it supersedes ADR-0222. |
-| [0227](0227-prefire-verify-gate.md) | Pre-fire verification gate in post-plan-now | Accepted; Infection stage superseded by ADR-0237 | `bin/post-plan-now` runs `bin/lib/prefire-verify` (full PHPUnit, the plan's matrix rows, changed-file Infection at MSI 100) and exits 9 until all pass on the current tree; automouse `prompt-impl` Step 6.9 runs it stage by stage first. |
+| [0227](0227-prefire-verify-gate.md) | Pre-fire verification gate in post-plan-now | Accepted; Infection stage superseded by ADR-0237; full-suite phpunit scope superseded by ADR-0241 | `bin/post-plan-now` runs `bin/lib/prefire-verify` (full PHPUnit, the plan's matrix rows, changed-file Infection at MSI 100) and exits 9 until all pass on the current tree; automouse `prompt-impl` Step 6.9 runs it stage by stage first. |
 | [0228](0228-postplan-sync-rebases-onto-target.md) | Post-plan sync rebases onto the target | Accepted | The harness Phase 2 sync replays the branch's own commits with `git rebase --onto`, pushes with `--force-with-lease=refs/heads/<b>:<sha>`, and fails closed. Supersedes ADR-0064's fix advice in part. |
 | [0230](0230-postplan-conflict-report.md) | Show model-resolved conflicts in the post-plan sticky | Accepted | The sticky gains a display-only conflict section built from a record beside the condition-(14) marker; no arming condition changes. |
 | [0231](0231-second-reviewer-clears-holds.md) | A second reviewer clears the non-UI owner holds | Accepted | A blind Opus seat may clear arming conditions 7, 10, 12 and 17 when every blocked condition is one of them; the verdict binds to the reviewed tree. |
@@ -104,6 +104,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0237](0237-prefire-drop-local-infection.md) | Drop the local Infection stage from prefire-verify | Accepted | `bin/lib/prefire-verify` runs matrix, phpunit and exec-mutations; `--stage infection` exits 2 and names CI's required check `Infection PHP (per-PR diff)`, which is the mutation gate. Partially supersedes ADR-0227. |
 | [0236](0236-two-engine-model-jsb-port.md) | Two engines: resume the faithful JSB port in engine/ | Accepted | Gate A is gone; bin/check-engine-freeze allows decompile tokens only under engine/ and jsb-native/. |
 | [0239](0239-reviewer-arming-holds-add-only.md) | Reviewer shadow verdicts add holds and never clear | Accepted | Arming condition 21 holds on a reviewer `hold: true` for planned files or merge danger; `conformance.py` and `merge_danger.py` stay the only clearers of conditions 3 and 18; a bad block is neutral. |
+| [0241](0241-prefire-phpunit-changed-files.md) | Run only the PHPUnit tests tied to the branch's changed files in prefire-verify | Accepted | The prefire phpunit stage runs the tests mapped to the changed files, runs the full suite on a shared test input or a mapping error, and skips when no PHPUnit-relevant file changed; `PREFIRE_PHPUNIT_FULL=1` forces the full suite. Partially supersedes ADR-0227. |
 
 ## When an ADR is Required
 

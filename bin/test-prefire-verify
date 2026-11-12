@@ -1055,6 +1055,19 @@ test_phpunit_no_php_change_skips() {
     want_cnt phpunit 0
 }
 
+test_phpunit_bin_script_maps_cli_test() {
+    subset_case
+    mkdir -p "$R/ibl5/tests/Cli" "$R/bin"
+    printf '<?php\nclass ToolCliTest { const S = "/../../../bin/tool"; }\n' > "$R/ibl5/tests/Cli/ToolCliTest.php"
+    printf '#!/bin/sh\n' > "$R/bin/tool"
+    commit_all "cli test and script"
+    touch_file bin/tool
+    run_gate_nobase --base feat --stage phpunit
+    want_rc 0
+    want_out "phpunit mode: subset (1 test files)"
+    want_args "1:tests/Cli/ToolCliTest.php"
+}
+
 test_phpunit_empty_range_skips() {
     subset_case
     run_gate --stage phpunit
@@ -1276,6 +1289,7 @@ test_phpunit_phpunit_xml_change_runs_full
 test_phpunit_composer_lock_change_runs_full
 test_phpunit_shared_helper_change_runs_full
 test_phpunit_no_php_change_skips
+test_phpunit_bin_script_maps_cli_test
 test_phpunit_empty_range_skips
 test_phpunit_bad_base_runs_full
 test_phpunit_empty_map_with_php_change_runs_full

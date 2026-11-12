@@ -23,9 +23,10 @@ ADR-0227 made the prefire phpunit stage run the full default suite before every 
 - `ibl5/classes/<Rel>.php` maps to `tests/<Rel>Test.php` and `tests/DatabaseIntegration/<Rel>Test.php` when they exist. `ibl5/phpstan-rules/<Rel>.php` maps the same way under `tests/PHPStanRules/`.
 - A word-match `git grep` for the class's short name over `ibl5/tests/**/*Test.php` adds every test that names the class. It excludes `tests/PHPStanRules/Fixtures`.
 - A changed `ibl5/tests/**/*Test.php` runs itself when it still exists. A deleted test is never passed to PHPUnit.
+- A changed path outside `ibl5/` that is not markdown adds every test that names it by its repo-relative path. Cli tests such as `ibl5/tests/Cli/AdrCheckCliTest.php` run `bin/adr-check` that way.
 - These shared inputs run the full suite: `ibl5/phpunit.xml`, `ibl5/phpunit.xml.dist` (example), `ibl5/tests/bootstrap.php`, `ibl5/composer.json`, `ibl5/composer.lock`, any PHPStan rule fixture, and any other file under `ibl5/tests/` that is not a `*Test.php` file (base classes such as `WideUnitTestCase.php`, helpers, fixtures, golden snapshots).
 - A deleted source class, a PHP change that maps to no test, any other path under `ibl5/` (modules, migrations, CSS), and every error building the diff run the full suite.
-- The stage skips with exit 0 only when every changed path is outside `ibl5/`, is markdown, or is an e2e spec under `ibl5/tests/e2e/`.
+- The stage skips with exit 0 only when every changed path is outside `ibl5/`, is markdown, or is an e2e spec under `ibl5/tests/e2e/`, and no test names a changed path outside `ibl5/`.
 - `PREFIRE_PHPUNIT_FULL=1` forces the full suite. `0`, empty and unset select automatically. Any other value exits 2.
 - A full-suite pass record keeps its old filename and satisfies a later subset run on the same tree. A subset record is keyed by a hash of its test list and never satisfies a full run. A skip writes no record.
 

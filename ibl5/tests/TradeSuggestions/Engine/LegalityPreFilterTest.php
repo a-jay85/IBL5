@@ -114,6 +114,23 @@ final class LegalityPreFilterTest extends TestCase
         self::assertSame(LegalityPreFilter::CAP, LegalityPreFilter::reason($s, $c));
     }
 
+    public function testReceivingWithNothingSentLandsExactlyOnTheCapAndPasses(): void
+    {
+        $s = self::league(array_fill(0, 13, 500), [500, ...array_fill(0, 9, 100)]);
+        self::assertSame(6500, $s->payrollByOffset[0][1]);
+        $c = new TradeCandidate(1, 2, [], [], [201], []);
+
+        self::assertNull(LegalityPreFilter::reason($s, $c));
+    }
+
+    public function testTeamAbsentFromPayrollTablesReceivingExactlyTheCapPasses(): void
+    {
+        $s = self::league(array_fill(0, 10, 100), [7000, 100]);
+        $c = new TradeCandidate(99, 2, [], [], [201], []);
+
+        self::assertNull(LegalityPreFilter::reason($s, $c));
+    }
+
     /**
      * Two teams with the given current-season salaries, one player each.
      *

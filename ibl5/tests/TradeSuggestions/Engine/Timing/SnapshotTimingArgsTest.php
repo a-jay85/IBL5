@@ -75,4 +75,10 @@ final class SnapshotTimingArgsTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         SnapshotTimingArgs::parse(['--repeat=x5']);
     }
+
+    public function testValueWithADigitSuffixAfterJunkRejected(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        SnapshotTimingArgs::parse(['--tid=1x5']);
+    }
 }

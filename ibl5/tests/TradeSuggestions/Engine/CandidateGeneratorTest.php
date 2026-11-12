@@ -75,6 +75,40 @@ final class CandidateGeneratorTest extends TestCase
         self::assertSame(0, $calls);
     }
 
+    public function testPartnerWithNoNeedPairDoesNotStopLaterPartners(): void
+    {
+        $positions = ['PG', 'SG', 'SF', 'PF', 'C', 'PG', 'SG', 'SF', 'PF', 'C'];
+        $rosters = [];
+        foreach ([1, 2] as $tid) {
+            foreach ($positions as $i => $pos) {
+                $rosters[$tid][] = ProjectionFactory::player(pid: $tid * 100 + $i + 1, tid: $tid, pos: $pos, dcMinutes: $i < 5 ? 30 : 10);
+            }
+        }
+        foreach ($positions as $i => $pos) {
+            $rosters[3][] = ProjectionFactory::player(pid: 301 + $i, tid: 3, pos: 'C', talent: 90, age: 22, dcMinutes: $i < 5 ? 30 : 10);
+        }
+        $s = LeagueSnapshotBuilder::build(SnapshotFactory::inputs(3, 13, $rosters));
+        self::assertSame([2, 3], ExposureFilter::eligiblePartners(self::SIM_KEY, 1, $s->teamIds));
+        self::assertSame([], SurplusDeficitMatcher::needPairs($s, 1, 2));
+        self::assertNotSame([], SurplusDeficitMatcher::needPairs($s, 1, 3));
+        $pools = [];
+        $generator = new CandidateGenerator([self::fake('A', static function (TradeCandidate $c, AssetPool $pool) use (&$pools): array {
+            $pools[] = $pool;
+
+            return [];
+        })]);
+
+        $result = $generator->generate($s, 1, self::SIM_KEY);
+
+        self::assertSame([3], $result->partners);
+        self::assertCount(1, $pools);
+        foreach ([$pools[0]->userPids, $pools[0]->partnerPids] as $pids) {
+            self::assertLessThan(CandidateBudget::PLAYERS_PER_PARTNER, count($pids));
+            self::assertTrue(array_is_list($pids));
+        }
+        self::assertNotSame([], array_merge($pools[0]->userPids, $pools[0]->partnerPids));
+    }
+
     public function testAssetPoolHoldsAtMostSixPlayersPerSide(): void
     {
         $sizes = [];

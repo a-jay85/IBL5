@@ -169,6 +169,102 @@ final class SurplusDeficitMatcherTest extends TestCase
         }
     }
 
+    /**
+     * @return array<string, array{int, int, ?int}> user rank, partner rank, expected giver tid
+     */
+    public static function rankCombinationProvider(): array
+    {
+        $out = [];
+        foreach ([3 => 'strong', 14 => 'middle', 25 => 'weak'] as $u => $uName) {
+            foreach ([3 => 'strong', 14 => 'middle', 25 => 'weak'] as $p => $pName) {
+                $giver = match (true) {
+                    $u === 3 && $p === 25 => self::USER,
+                    $u === 25 && $p === 3 => self::PARTNER,
+                    default => null,
+                };
+                $out["user $uName, partner $pName"] = [$u, $p, $giver];
+            }
+        }
+
+        return $out;
+    }
+
+    #[DataProvider('rankCombinationProvider')]
+    public function testDimensionPairNeedsOneSurplusAndTheOtherSidesDeficit(int $userRank, int $partnerRank, ?int $giver): void
+    {
+        $s = self::withProfiles([0 => [self::USER => ['r_3gp' => $userRank], self::PARTNER => ['r_3gp' => $partnerRank]]]);
+
+        $pairs = SurplusDeficitMatcher::needPairs($s, self::USER, self::PARTNER);
+
+        self::assertSame($giver === null ? [] : [$giver], array_map(static fn (NeedPair $p): int => $p->giverTid, $pairs));
+    }
+
+    #[DataProvider('rankCombinationProvider')]
+    public function testSlotPairNeedsOneStrongSlotAndTheOtherSidesWeakSlot(int $userRank, int $partnerRank, ?int $giver): void
+    {
+        $s = self::withProfiles([], [0 => [self::USER => ['C' => $userRank], self::PARTNER => ['C' => $partnerRank]]]);
+
+        $pairs = SurplusDeficitMatcher::needPairs($s, self::USER, self::PARTNER);
+
+        self::assertSame($giver === null ? [] : [$giver], array_map(static fn (NeedPair $p): int => $p->giverTid, $pairs));
+    }
+
+    public function testNeedPairsKeepScanningAfterAnOffsetMissingATeam(): void
+    {
+        $s = self::withProfiles(
+            [
+                0 => [self::USER => ['r_3gp' => 3]],
+                1 => [self::USER => ['r_3gp' => 3], self::PARTNER => ['r_3gp' => 24]],
+            ],
+            [
+                0 => [self::USER => ['C' => 3]],
+                1 => [self::USER => ['C' => 3], self::PARTNER => ['C' => 25]],
+            ],
+        );
+
+        $pairs = SurplusDeficitMatcher::needPairs($s, self::USER, self::PARTNER);
+
+        self::assertSame([[1, NeedPair::KIND_SLOT, 'C'], [1, NeedPair::KIND_DIMENSION, 'r_3gp']], array_map(
+            static fn (NeedPair $p): array => [$p->offset, $p->kind, $p->key],
+            $pairs,
+        ));
+    }
+
+    public function testAssetsForGiverWithoutALineupIsEmpty(): void
+    {
+        $s = self::withRoster([self::rotationPlayer(9101), self::rotationPlayer(9102)]);
+
+        self::assertSame([], SurplusDeficitMatcher::assetsFor(
+            $s,
+            99,
+            new NeedPair(0, NeedPair::KIND_SLOT, 'PG', 99, self::PARTNER, 3, 25, 1.0),
+            5,
+        ));
+        self::assertSame([], SurplusDeficitMatcher::assetsFor($s, 99, self::dimensionPair('r_3gp'), 5));
+    }
+
+    public function testAssetsForSlotPairWithoutSlotRanksFallsBackToPidOrder(): void
+    {
+        $s = self::withRoster(self::slotRoster());
+        $s = new LeagueSnapshot(...[...get_object_vars($s), 'slotRanks' => []]);
+        $pair = new NeedPair(0, NeedPair::KIND_SLOT, 'PG', self::USER, self::PARTNER, 3, 25, 1.0);
+
+        self::assertSame([9104, 9101, 9102, 9103, 9105], SurplusDeficitMatcher::assetsFor($s, self::USER, $pair, 10));
+    }
+
+    public function testAssetsForOrdersSeveralMissingProductionLinesLastByAscendingPid(): void
+    {
+        $s = self::withRoster([
+            self::rotationPlayer(9103, noProduction: true),
+            self::rotationPlayer(9101, production: ProjectionFactory::productionLine(['stats_fgm' => 50, 'stats_fga' => 100])),
+            self::rotationPlayer(9102, noProduction: true),
+            self::rotationPlayer(9105, production: ProjectionFactory::productionLine(['stats_fgm' => 90, 'stats_fga' => 100])),
+            self::rotationPlayer(9100, noProduction: true),
+        ]);
+
+        self::assertSame([9105, 9101, 9100, 9102, 9103], SurplusDeficitMatcher::assetsFor($s, self::USER, self::dimensionPair('fg_pct'), 5));
+    }
+
     public function testOverlapWeightIsTheGainOfOneReceiverPlace(): void
     {
         $s = self::withProfiles(

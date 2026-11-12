@@ -293,6 +293,70 @@ final class DealScorerTest extends TestCase
         self::assertEqualsWithDelta($plain, $deal->user->components()[1], 1e-9);
     }
 
+    public function testReceivedWalkerAfterAPlayerWithNoOffsetZeroSalaryStillMixes(): void
+    {
+        $in = SnapshotFactory::inputs(4, 13);
+        $byTid = $in->playersByTid;
+        $byTid[2][] = ProjectionFactory::player(pid: 250, tid: 2, pos: 'PG', salaryByYear: [1 => 0, 2 => 500, 3 => 500, 4 => 0, 5 => 0, 6 => 0]);
+        $s = LeagueSnapshotBuilder::build(new LeagueSnapshotInputs(...[...get_object_vars($in), 'playersByTid' => $byTid]));
+        $odds = ResignOdds::forTeam($s->players[207], 1, $s->lineups[0], $s->slotRanks[0], $s->teamFactors);
+        self::assertTrue($odds['walks']);
+        self::assertFalse($s->players[250]->onRosterAt(0));
+        $c = new TradeCandidate(1, 2, [], [], [250, 207], []);
+        $offset = 1;
+        $factor = ResignLikelihood::futureValueFactor($offset, true, true, $odds['likelihood']);
+
+        $deal = DealScorer::score($s, $c, 'one_for_one');
+
+        $user = self::mixOutcomes($s, $c, 1, $offset, [207 => $factor], [207], [], true);
+        self::assertMixedComponents($user['base'], $user['mixed'], $deal->user->components()[$offset]);
+    }
+
+    public function testSentWalkerMissingFromTheSnapshotWalkMapIsNotMixed(): void
+    {
+        $s = self::smallLeague();
+        $likelihood = $s->resignLikelihood;
+        $likelihood[202] = 0.2;
+        $walk = $s->likelyToWalk;
+        unset($walk[202]);
+        $s = new LeagueSnapshot(...[...get_object_vars($s), 'resignLikelihood' => $likelihood, 'likelyToWalk' => $walk]);
+        self::assertTrue($s->players[202]->onRosterAt(1));
+        $c = new TradeCandidate(1, 2, [], [], [202], []);
+
+        $deal = DealScorer::score($s, $c, 'one_for_one');
+
+        foreach ([1, 2, 3] as $offset) {
+            $after = TeamStateRebuilder::after($s, $c, $offset, new PairRecordMemo());
+            $plain = SideGain::fromStates(TeamStateRebuilder::before($s, 2, $offset), $after['partner'], $s, $c, 2);
+            self::assertEqualsWithDelta($plain, $deal->partner->components()[$offset], 1e-9, "offset $offset");
+        }
+    }
+
+    public function testSentWalkerWhoCannotLeaveDoesNotStopTheOtherWalkersOutcomes(): void
+    {
+        // 202 has no recorded likelihood, so his factor is 1.0 and "he left" has zero weight.
+        // 207 still has to mix both of his outcomes.
+        $s = self::smallLeague();
+        $likelihood = $s->resignLikelihood;
+        unset($likelihood[202]);
+        $walk = $s->likelyToWalk;
+        $walk[202] = true;
+        $s = new LeagueSnapshot(...[...get_object_vars($s), 'resignLikelihood' => $likelihood, 'likelyToWalk' => $walk]);
+        self::assertTrue($s->players[202]->onRosterAt(1));
+        self::assertTrue($s->likelyToWalk[207]);
+        $c = new TradeCandidate(1, 2, [], [], [202, 207], []);
+        $offset = 1;
+        $sent = [
+            202 => 1.0,
+            207 => ResignLikelihood::futureValueFactor($offset, true, true, $s->resignLikelihood[207]),
+        ];
+
+        $deal = DealScorer::score($s, $c, 'one_for_one');
+
+        $partner = self::mixOutcomes($s, $c, 2, $offset, [], [202, 207], $sent, false);
+        self::assertMixedComponents($partner['base'], $partner['mixed'], $deal->partner->components()[$offset]);
+    }
+
     /**
      * Expected mixed components for one side at one offset. Walker `$i` is gone
      * in bit `$i` of the outcome. Received walkers drop out of the after roster,

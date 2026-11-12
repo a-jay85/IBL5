@@ -10,6 +10,7 @@ use TradeSuggestions\Engine\ProfileDelta;
 use TradeSuggestions\Engine\TeamState;
 use TradeSuggestions\Engine\TeamStateRebuilder;
 use TradeSuggestions\Profile\ProfileDimension;
+use TradeSuggestions\Profile\TeamProfile;
 
 final class ProfileDeltaTest extends TestCase
 {
@@ -50,17 +51,49 @@ final class ProfileDeltaTest extends TestCase
         self::assertSame([$b, $d, $a, $c], $delta->movedDimensions());
     }
 
-    private static function state(int $payroll, int $payrollRank): TeamState
+    public function testFromStatesRecordsDimensionAndStarterRanksOfBothStates(): void
     {
-        $base = TeamStateRebuilder::before(SnapshotFactory::league(), 1, 0);
+        $keys = ProfileDimension::KEYS;
+        $beforeRanks = [];
+        $afterRanks = [];
+        foreach ($keys as $i => $key) {
+            $beforeRanks[$key] = $i % 28 + 1;
+            $afterRanks[$key] = ($i + 5) % 28 + 1;
+        }
+        // A dimension ranked on one side only is left out.
+        unset($afterRanks[$keys[0]]);
+        $before = self::state(payroll: 1000, payrollRank: 7, profileRanks: $beforeRanks, starterRank: ['PG' => 3, 'SG' => 8]);
+        $after = self::state(payroll: 1500, payrollRank: 12, profileRanks: $afterRanks, starterRank: ['PG' => 5, 'C' => 9]);
+
+        $delta = ProfileDelta::fromStates($before, $after);
+
+        $expected = [];
+        foreach (array_slice($keys, 1) as $key) {
+            $expected[$key] = ['before' => $beforeRanks[$key], 'after' => $afterRanks[$key]];
+        }
+        self::assertSame($expected, $delta->dimensionRanks);
+        self::assertSame(
+            ['PG' => ['before' => 3, 'after' => 5], 'SG' => ['before' => 8, 'after' => null], 'SF' => ['before' => null, 'after' => null], 'PF' => ['before' => null, 'after' => null], 'C' => ['before' => null, 'after' => 9]],
+            $delta->starterRanks,
+        );
+    }
+
+    /**
+     * @param array<string, int>|null $profileRanks
+     * @param array<string, int>|null $starterRank
+     */
+    private static function state(int $payroll, int $payrollRank, ?array $profileRanks = null, ?array $starterRank = null): TeamState
+    {
+        $base = TeamStateRebuilder::before(SnapshotFactory::league(4, 8), 1, 0);
+        $profile = $profileRanks === null ? $base->profile : new TeamProfile($base->tid, $base->offset, [], $profileRanks);
 
         return new TeamState(
             $base->tid,
             $base->offset,
             $base->lineup,
-            $base->starterRank,
+            $starterRank ?? $base->starterRank,
             $base->bestBenchRank,
-            $base->profile,
+            $profile,
             $base->positionStrength,
             $payroll,
             $payrollRank,

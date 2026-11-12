@@ -8,6 +8,7 @@
 // base-URL normalization + encodeURIComponent pattern (reportLink) and its
 // module-grouping / localeCompare / title-sort pattern (renderModuleSection).
 import type { Viewport } from './vr-manifest';
+import { STALE_BANNER_MARKER, staleBannerLine } from './vr-refresh';
 
 export type LeanCell = { module: string; viewport: Viewport; title: string };
 
@@ -302,6 +303,38 @@ function newScreensLines(newCells: LeanCell[], pagesUrl: string): string[] {
 export function buildNewScreensSection(newCells: LeanCell[], pagesUrl: string): string {
   if (newCells.length === 0) return '';
   return [PR_BODY_MARKER_BEGIN, '', ...newScreensLines(newCells, pagesUrl), PR_BODY_MARKER_END].join('\n');
+}
+
+// Removes every VR-managed block (new-screens and agent-shots) plus the one line
+// break that follows each. Every other byte of the body is kept. A begin marker
+// without its end marker leaves the whole body unchanged (fail safe).
+export function stripVrBlocks(body: string): string {
+  let out = body;
+  for (const [begin, end] of [
+    [PR_BODY_MARKER_BEGIN, PR_BODY_MARKER_END],
+    [AGENT_SHOTS_BEGIN, AGENT_SHOTS_END],
+  ] as const) {
+    for (;;) {
+      const start = out.indexOf(begin);
+      if (start === -1) break;
+      const close = out.indexOf(end, start + begin.length);
+      if (close === -1) return body;
+      let stop = close + end.length;
+      if (out.startsWith('\r\n', stop)) stop += 2;
+      else if (out[stop] === '\n') stop += 1;
+      out = out.slice(0, start) + out.slice(stop);
+    }
+  }
+  return out;
+}
+
+// Inserts the stale banner as the first line inside the new-screens block, once.
+// spliceBody replaces the block's inside on the next publish, which drops it.
+export function applyBodyStaleBanner(body: string): string {
+  const at = body.indexOf(PR_BODY_MARKER_BEGIN);
+  if (at === -1 || body.includes(STALE_BANNER_MARKER)) return body;
+  const insert = at + PR_BODY_MARKER_BEGIN.length;
+  return `${body.slice(0, insert)}\n${staleBannerLine()}${body.slice(insert)}`;
 }
 
 // "null"/nullish -> ""; strip trailing newlines.

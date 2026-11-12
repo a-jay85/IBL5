@@ -102,8 +102,10 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       # Read-only preview of the stale-screenshot tidy: lists the edits, writes nothing.
+      # continue-on-error: a transient gh api failure here must not skip the rehearsals below.
       - name: Dry-run stale-screenshot tidy
         if: github.event_name == 'pull_request' || inputs.dry_run
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -115,8 +117,10 @@ jobs:
           {
             echo "### Stale-screenshot tidy dry-run"
             echo '```'
-            bin/vr-refresh-targets "${args[@]}"
+            rc=0
+            bin/vr-refresh-targets "${args[@]}" || rc=$?
             echo '```'
+            exit "$rc"
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
       # Lists which per-SHA dirs vr-pages-cleanup would keep or prune right now, with the
@@ -218,7 +222,7 @@ jobs:
   tidy:
     name: VR stale-screenshot tidy
     needs: [select, refresh]
-    if: always() && github.event_name != 'pull_request' && github.ref == 'refs/heads/master' && !inputs.dry_run && needs.select.result == 'success' && fromJSON(needs.select.outputs.tidy_count || '0') > 0
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && github.ref == 'refs/heads/master' && !inputs.dry_run && needs.select.result == 'success' && fromJSON(needs.select.outputs.tidy_count || '0') > 0 }}
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     permissions:

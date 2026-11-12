@@ -370,6 +370,25 @@ describe('vr-refresh.yml write guard', () => {
     expect(tidy).not.toContain('contents: write');
   });
 
+  it('vr-refresh tidy job skips a cancelled run', () => {
+    const tidy = jobBlock(REFRESH, 'tidy');
+    const cond = tidy.split('\n').find((l) => /^\s*if:/.test(l)) ?? '';
+    expect(cond).toContain('!cancelled()');
+    expect(cond).not.toContain('always()');
+  });
+
+  it('vr-refresh dry-run tidy step cannot skip the rehearsals or leave the fence open', () => {
+    const select = jobBlock(REFRESH, 'select');
+    const start = select.indexOf('- name: Dry-run stale-screenshot tidy');
+    expect(start).toBeGreaterThan(-1);
+    const next = select.indexOf('\n      - name: ', start + 1);
+    const step = select.slice(start, next === -1 ? undefined : next);
+    expect(step).toMatch(/^ {8}continue-on-error: true$/m);
+    expect(step).toContain('bin/vr-refresh-targets "${args[@]}" || rc=$?');
+    expect(step.indexOf('|| rc=$?')).toBeLessThan(step.lastIndexOf("echo '```'"));
+    expect(step).toContain('exit "$rc"');
+  });
+
   it('vr-refresh select job keeps pull-requests read', () => {
     const select = jobBlock(REFRESH, 'select');
     expect(select).toContain('pull-requests: read');

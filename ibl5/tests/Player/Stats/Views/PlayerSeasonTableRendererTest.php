@@ -350,4 +350,49 @@ class PlayerSeasonTableRendererTest extends TestCase
         $this->assertStringContainsString('<td>300</td>', $html);
         $this->assertStringNotContainsString('<td>190</td>', $html);
     }
+
+    /**
+     * @return array<string, array{PlayerSeasonTableMode}>
+     */
+    public static function linkedModeProvider(): array
+    {
+        return [
+            'totals' => [PlayerSeasonTableMode::TOTALS],
+            'detailed averages' => [PlayerSeasonTableMode::DETAILED_AVERAGES],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('linkedModeProvider')]
+    public function testTeamLinkFallsBackToTeamIdZeroWhenRowHasNoTeamId(PlayerSeasonTableMode $mode): void
+    {
+        $config = new PlayerSeasonTableConfig(
+            mode: $mode,
+            title: 'Test',
+            careerLabel: 'Career',
+            linkTeamToSeason: true,
+        );
+        $row = $this->makeSeasonRow();
+        unset($row['teamid']);
+
+        $html = $this->renderer->render($config, [$row]);
+
+        $this->assertStringContainsString('teamid=0&yr=2001">Bulls</a>', $html);
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('linkedModeProvider')]
+    public function testTeamLinkAndYearCellNormalizeNumericStringsToIntegers(PlayerSeasonTableMode $mode): void
+    {
+        $config = new PlayerSeasonTableConfig(
+            mode: $mode,
+            title: 'Test',
+            careerLabel: 'Career',
+            linkTeamToSeason: true,
+        );
+
+        $html = $this->renderer->render($config, [$this->makeSeasonRow(['teamid' => '007', 'year' => '02001', 'games' => '010'])]);
+
+        $this->assertStringContainsString('teamid=7&yr=2001">Bulls</a>', $html);
+        $this->assertStringContainsString('<td>2001</td>', $html);
+        $this->assertStringContainsString('<td>10</td>', $html);
+    }
 }

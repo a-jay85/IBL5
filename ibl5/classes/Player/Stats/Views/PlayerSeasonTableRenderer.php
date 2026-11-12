@@ -159,24 +159,24 @@ class PlayerSeasonTableRenderer implements PlayerSeasonTableRendererInterface
         <td><?= (int)$row['year'] ?></td>
         <td><?php if ($config->linkTeamToSeason): ?><a href="modules.php?name=Team&op=team&teamid=<?= (int)($row['teamid'] ?? 0) ?>&yr=<?= (int)$row['year'] ?>"><?= HtmlSanitizer::e($row['team']) ?></a><?php else: ?><?= HtmlSanitizer::e($row['team']) ?><?php endif; ?></td>
         <td><?= (int)$gm ?></td>
-        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['minutes'], $gm) : '0.0' ?></td>
-        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['fgm'], $gm) : '0.0' ?></td>
-        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['fga'], $gm) : '0.0' ?></td>
+        <td><?= StatsFormatter::formatPerGameAverage((float)$row['minutes'], $gm) ?></td>
+        <td><?= StatsFormatter::formatPerGameAverage((float)$row['fgm'], $gm) ?></td>
+        <td><?= StatsFormatter::formatPerGameAverage((float)$row['fga'], $gm) ?></td>
         <td><?= $gm > 0 ? StatsFormatter::formatPercentageWithDecimals($row['fgm'], $row['fga']) : '0.0' ?></td>
-        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['ftm'], $gm) : '0.0' ?></td>
-        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['fta'], $gm) : '0.0' ?></td>
+        <td><?= StatsFormatter::formatPerGameAverage((float)$row['ftm'], $gm) ?></td>
+        <td><?= StatsFormatter::formatPerGameAverage((float)$row['fta'], $gm) ?></td>
         <td><?= $gm > 0 ? StatsFormatter::formatPercentageWithDecimals($row['ftm'], $row['fta']) : '0.0' ?></td>
-        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['tgm'], $gm) : '0.0' ?></td>
-        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['tga'], $gm) : '0.0' ?></td>
+        <td><?= StatsFormatter::formatPerGameAverage((float)$row['tgm'], $gm) ?></td>
+        <td><?= StatsFormatter::formatPerGameAverage((float)$row['tga'], $gm) ?></td>
         <td><?= $gm > 0 ? StatsFormatter::formatPercentageWithDecimals($row['tgm'], $row['tga']) : '0.0' ?></td>
-        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['orb'], $gm) : '0.0' ?></td>
-        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['reb'], $gm) : '0.0' ?></td>
-        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['ast'], $gm) : '0.0' ?></td>
-        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['stl'], $gm) : '0.0' ?></td>
-        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['tvr'], $gm) : '0.0' ?></td>
-        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['blk'], $gm) : '0.0' ?></td>
-        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['pf'], $gm) : '0.0' ?></td>
-        <td><?= $gm > 0 ? StatsFormatter::formatPerGameAverage((float)$row['pts'], $gm) : '0.0' ?></td>
+        <td><?= StatsFormatter::formatPerGameAverage((float)$row['orb'], $gm) ?></td>
+        <td><?= StatsFormatter::formatPerGameAverage((float)$row['reb'], $gm) ?></td>
+        <td><?= StatsFormatter::formatPerGameAverage((float)$row['ast'], $gm) ?></td>
+        <td><?= StatsFormatter::formatPerGameAverage((float)$row['stl'], $gm) ?></td>
+        <td><?= StatsFormatter::formatPerGameAverage((float)$row['tvr'], $gm) ?></td>
+        <td><?= StatsFormatter::formatPerGameAverage((float)$row['blk'], $gm) ?></td>
+        <td><?= StatsFormatter::formatPerGameAverage((float)$row['pf'], $gm) ?></td>
+        <td><?= StatsFormatter::formatPerGameAverage((float)$row['pts'], $gm) ?></td>
     </tr>
             <?php
         }
@@ -191,7 +191,7 @@ class PlayerSeasonTableRenderer implements PlayerSeasonTableRendererInterface
 <tfoot>
     <tr class="career-row">
         <td colspan=2><?= HtmlSanitizer::e($config->careerLabel) ?></td>
-        <td><?= (int)$careerAverages['games'] ?></td>
+        <td><?= $careerAverages['games'] ?></td>
         <td><?= StatsFormatter::formatWithDecimals((float)$careerAverages['minutes'], 1) ?></td>
         <td><?= StatsFormatter::formatWithDecimals((float)$careerAverages['fgm'], 1) ?></td>
         <td><?= StatsFormatter::formatWithDecimals((float)$careerAverages['fga'], 1) ?></td>

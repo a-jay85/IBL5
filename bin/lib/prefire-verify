@@ -490,6 +490,9 @@ stage_exec_mutations() {
     fi
     xm_rows=$(git hash-object "$recs")
     rm -f "$recs"
+    # Drop the old reuse record for these rows. A run that fails below never
+    # overwrites it, and post-plan would reuse the stale all-TRIPPED pass.
+    rm -f "$STATE_DIR/exec-mutations.rows-$xm_rows.reuse"
     if ! command -v gtimeout >/dev/null 2>&1 && ! command -v timeout >/dev/null 2>&1; then
         say "FAIL exec-mutations prerequisite missing: gtimeout or timeout (brew install coreutils)" >&2
         return 3

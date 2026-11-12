@@ -232,6 +232,21 @@ classify_worktree() {
         return
     fi
 
+    # UNPUSHED (fork-point fallback). --fork-point needs the origin/master
+    # reflog entry the branch forked from; once it expires has_own_commits
+    # stays false and a committed branch would land here. Retry with a plain
+    # merge-base. Only this terminal branch changes: MERGED Check 3 and
+    # STALLED still see the fork-point result.
+    if [ -z "$fork_point" ] && [ "$is_ancestor" = false ]; then
+        local plain_base=""
+        plain_base="$(git -C "$REPO_ROOT" merge-base origin/master "$branch" 2>/dev/null || true)"
+        if [ -n "$plain_base" ] \
+           && git -C "$REPO_ROOT" rev-list "$plain_base..$branch" 2>/dev/null | grep -q .; then
+            echo "UNPUSHED $wt_name (committed work, no PR, fork-point fallback)"
+            return
+        fi
+    fi
+
     # EMPTY — zero own-commits, clean tree, no PR (terminal catch-all)
     echo "EMPTY $wt_name (no own commits, clean tree)"
 }

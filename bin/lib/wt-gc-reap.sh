@@ -495,6 +495,59 @@ _gc_reap_t3_one() {
     fi
 }
 
+# ── Step: content-landed worktrees ────────────────────────────────────────────
+# Candidates: UNPUSHED rows. A clean branch whose merge into origin/master
+# yields origin/master's own tree adds nothing: its commits landed under other
+# SHAs. merge-tree exit 1 (conflict) or any other non-zero code is a keep.
+reap_landed_worktrees() {
+    _gc_valid_days WT_GC_LANDED_DAYS || return 1
+    log "step landed threshold=${WT_GC_LANDED_DAYS}d"
+    local names parent name master_tree rc=0
+    names="$(awk '$1=="UNPUSHED" {print $2}' "$TMP_STATUS")"
+    [ -n "$names" ] || return 0
+    parent="$(_gc_wt_parent)" || return 1
+    if ! master_tree="$(git -C "$WT_GC_REPO_ROOT" rev-parse --verify -q 'origin/master^{tree}')"; then
+        log "landed master tree unresolved"; return 1
+    fi
+    while IFS= read -r name <&3; do
+        [ -n "$name" ] || continue
+        _gc_reap_landed_one "$name" "$parent/$name" "$master_tree" || rc=1
+    done 3<<< "$names"
+    return "$rc"
+}
+
+_gc_reap_landed_one() {
+    local name="$1" wt="$2" master_tree="$3" branch age dirt sha out n mrc=0
+    if [ ! -d "$wt" ]; then log "landed keep $name: no such worktree"; return 0; fi
+    _gc_wt_guard landed "$name" "$wt" || return 0
+    branch="$GC_BRANCH"
+    age="$(_gc_wt_age_days "$wt" "$branch")" || age=""
+    if [ -z "$age" ]; then log "landed keep $name: age unknown"; return 0; fi
+    if [ "$age" -lt "$WT_GC_LANDED_DAYS" ]; then log "landed keep $name: age=${age}d"; return 0; fi
+    if ! dirt="$(git -C "$wt" status --porcelain --untracked-files=all 2>/dev/null)"; then
+        log "landed keep $name: status error"; return 0
+    fi
+    if [ -n "$dirt" ]; then log "landed keep $name: dirty"; return 0; fi
+    if ! sha="$(git -C "$WT_GC_REPO_ROOT" rev-parse --verify -q "refs/heads/$branch")"; then
+        log "landed keep $name: branch unresolved"; return 0
+    fi
+    if ! n="$("$WT_GC_GH" pr list --repo a-jay85/IBL5 --head "$branch" --state open \
+            --json number --jq length 2>/dev/null)"; then
+        log "landed keep $name: gh error"; return 0
+    fi
+    if [ "$n" != 0 ]; then log "landed keep $name: open PR"; return 0; fi
+    out="$(git -C "$WT_GC_REPO_ROOT" merge-tree --write-tree origin/master "$sha" 2>/dev/null)" || mrc=$?
+    case "$mrc" in
+        0) ;;
+        1) log "landed keep $name: merge conflict"; return 0 ;;
+        *) log "landed keep $name: merge-tree error rc=$mrc"; return 0 ;;
+    esac
+    if [ "${out%%$'\n'*}" != "$master_tree" ]; then log "landed keep $name: adds content"; return 0; fi
+    _gc_remove_wt_and_branch landed "$name" "$branch" "$sha" || return 1
+    [ "$GC_REMOVED" = 1 ] || return 0
+    log "landed reaped $name branch=$branch age=${age}d"
+}
+
 # ── Step: merged-but-dirty worktrees ──────────────────────────────────────────
 # Candidates: MERGED rows that bin/cleanup skipped as dirty this sweep.
 reap_dirty_merged_worktrees() {
@@ -1334,6 +1387,7 @@ write_stale_list() {
     while read -r cls name <&3; do
         [ -n "$name" ] || continue
         wt="$parent/$name"
+        [ -d "$wt" ] || continue
         age=""
         if branch="$(git -C "$wt" symbolic-ref --short -q HEAD 2>/dev/null)" && [ -n "$branch" ]; then
             age="$(_gc_wt_age_days "$wt" "$branch")" || age=""

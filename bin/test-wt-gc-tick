@@ -355,6 +355,7 @@ run_tick() {
         WT_GC_REAP_DIRTY_ARCHIVE=0
         WT_GC_REAP_DETACHED=0
         WT_GC_REAP_CLOSED=0
+        WT_GC_REAP_LANDED=0
         WT_GC_DROP_STASHES=0
         WT_GC_REF_FALLBACK=0
         WT_GC_REAP_REFS=0
@@ -1515,6 +1516,113 @@ log_has 'dependabot-npm' && note_err "non-t3 name was looked at"
 [ -d "$(t3_dir dependabot-npm)" ] || note_err "dependabot worktree removed"
 has_branch t3/merged || note_err "t3 branch deleted"
 has_branch dependabot/npm/foo || note_err "dependabot branch deleted"
+finish_case
+fi
+
+# ── Content-landed worktree reap ──────────────────────────────────────────────
+CLD_ON=(WT_GC_REAP_LANDED=1)
+# land_on_master — origin/master gains own-1.txt (the file mk_wt ahead=1 commits)
+# and a README.md edit, so a branch that added the same own-1.txt adds nothing.
+land_on_master() {
+    printf '1\n' > "$ENV_MAIN/own-1.txt"
+    printf 'master-side\n' > "$ENV_MAIN/README.md"
+    git -C "$ENV_MAIN" add own-1.txt README.md
+    git -C "$ENV_MAIN" commit -qm "land own-1 under another sha"
+    git -C "$ENV_MAIN" push -q origin master
+    git -C "$ENV_MAIN" fetch -q origin
+}
+# landed_wt <name> <branch> [mk_wt args...] — a landed-shape worktree (the gh
+# stub reports no open PR for it) and its UNPUSHED status row.
+landed_wt() {
+    local name="$1" br="$2"
+    shift 2
+    mk_wt "$name" "$br" ahead=1 "$@"
+    gh_head "$br" 0
+    row UNPUSHED "$name"
+}
+
+# CL1 — a clean landed branch is reaped (tips line, keep-ref, wt-remove, branch
+# delete) and drops out of the stale list; a kept UNPUSHED row stays listed.
+if should_run CL1-landed-reaped; then
+fx CL1-landed-reaped
+landed_wt cl-landed br/landed age_days=5
+mk_wt cl-extra br/extra ahead=2 age_days=5; gh_head br/extra 0; row UNPUSHED cl-extra
+land_on_master
+SHA="$(git -C "$ENV_MAIN" rev-parse refs/heads/br/landed)"
+rt "${CLD_ON[@]}" WT_GC_STALE_LIST=1 WT_GC_STALE_DAYS=0 -- --force
+chk_rc CL1 0
+log_has 'step landed threshold=3d' || note_err "no step line"
+log_has 'landed reaped cl-landed branch=br/landed age=5d' || note_err "no reaped line"
+[ -d "$(wt_dir cl-landed)" ] && note_err "worktree still present"
+has_branch br/landed && note_err "branch still present"
+tips_has "$SHA refs/heads/br/landed" || note_err "tips lacks sha"
+KEEP="$(git -C "$ENV_MAIN" for-each-ref --format='%(refname) %(objectname)' refs/wt-gc-archive/)"
+grep -qE "^refs/wt-gc-archive/[0-9]+/heads/br/landed $SHA\$" <<< "$KEEP" || note_err "no keep-ref"
+[ "$(cat "$CD/wt-remove-argv" 2>/dev/null)" = "$(printf 'cl-landed\n--volumes')" ] || note_err "wt-remove argv not exactly cl-landed --volumes"
+log_has 'landed keep cl-extra: adds content' || note_err "extra-content branch not kept"
+grep -q 'cl-landed' "$CD/stale.tsv" 2>/dev/null && note_err "reaped worktree is in the stale list"
+grep -q 'cl-extra' "$CD/stale.tsv" 2>/dev/null || note_err "kept row missing from the stale list"
+finish_case
+fi
+
+# CL2 — every reason to keep: extra content, dirty, conflict, open PR, gh
+# failure, young, pool slot; plus EMPTY and OPEN-PR rows the filter must skip.
+# Each landed-shaped fixture has exactly one reason to be kept.
+if should_run CL2-landed-kept; then
+fx CL2-landed-kept
+mk_wt cl-extra br/extra ahead=2 age_days=5; gh_head br/extra 0; row UNPUSHED cl-extra
+landed_wt cl-dirty br/dirty age_days=5
+landed_wt cl-openpr br/openpr age_days=5
+gh_head br/openpr 1
+landed_wt cl-ghfail br/ghfail age_days=5
+rm -f "$CD/gh/by-head/br/ghfail.json"   # second run: stub answers 'none', not an open count, so it is kept
+landed_wt cl-young br/young age_days=0
+landed_wt _pool-7 br/pool7 age_days=5
+mk_wt cl-conflict br/conflict age_days=5; gh_head br/conflict 0; row UNPUSHED cl-conflict
+mk_wt cl-empty br/empty ahead=1 age_days=5; gh_head br/empty 0; row EMPTY cl-empty
+mk_wt cl-open br/open ahead=1 age_days=5; gh_head br/open 0; row OPEN-PR cl-open
+printf 'wip\n' > "$(wt_dir cl-dirty)/notes.md"
+touch -t "$(epoch_to_touch "$(epoch_ago 5)")" "$(wt_dir cl-dirty)"
+printf 'branch-side\n' > "$(wt_dir cl-conflict)/README.md"
+git -C "$(wt_dir cl-conflict)" add README.md
+bd_commit "$(wt_dir cl-conflict)" "$(epoch_ago 5)" "branch edits readme"
+touch -t "$(epoch_to_touch "$(epoch_ago 5)")" "$(wt_dir cl-conflict)"
+land_on_master
+rt "${CLD_ON[@]}" STUB_GH_FAIL=1 -- --force
+chk_rc "CL2 gh failure" 0
+log_has 'landed keep cl-ghfail: gh error' || note_err "gh failure not kept"
+rt "${CLD_ON[@]}" -- --force
+chk_rc CL2 0
+log_has 'landed keep cl-extra: adds content' || note_err "extra content not kept"
+log_has 'landed keep cl-dirty: dirty' || note_err "dirty not kept"
+log_has 'landed keep cl-conflict: merge conflict' || note_err "conflict not kept"
+log_has 'landed keep cl-openpr: open PR' || note_err "open PR not kept"
+log_has 'landed keep cl-young: age=0d' || note_err "young not kept"
+log_has 'landed keep _pool-7: pool worktree' || note_err "pool slot not kept"
+log_has 'landed (keep|reaped) (cl-empty|cl-open)\b' && note_err "EMPTY or OPEN-PR row was considered"
+for n in cl-extra cl-dirty cl-openpr cl-ghfail cl-young _pool-7 cl-conflict cl-empty cl-open; do
+    [ -d "$(wt_dir "$n")" ] || note_err "$n removed"
+done
+[ -f "$(wt_dir cl-dirty)/notes.md" ] || note_err "untracked file lost"
+for b in br/extra br/dirty br/openpr br/ghfail br/young br/pool7 br/conflict br/empty br/open; do
+    has_branch "$b" || note_err "$b deleted"
+done
+[ -f "$CD/wt-remove-argv" ] && note_err "wt-remove ran for a kept worktree"
+log_has 'reap done steps_failed=0' || note_err "a step failed"
+finish_case
+fi
+
+# CL3 — WT_GC_REAP_LANDED=0 leaves CL1's landed branch alone.
+if should_run CL3-landed-switch-off; then
+fx CL3-landed-switch-off
+landed_wt cl-landed br/landed age_days=5
+land_on_master
+rt WT_GC_REAP_LANDED=0 -- --force
+chk_rc CL3 0
+log_has 'step landed threshold' && note_err "landed step ran with the switch at 0"
+log_has 'step landed disabled \(WT_GC_REAP_LANDED=0\)' || note_err "no disabled line"
+[ -d "$(wt_dir cl-landed)" ] || note_err "worktree removed"
+has_branch br/landed || note_err "branch deleted"
 finish_case
 fi
 

@@ -36,7 +36,7 @@ def test_classify_body_matches_shared_case_table(case):
 def test_render_placeholder_when_reason_missing_holds():
     block = rg.render_block([ROW_A], {})
     assert rg.PLACEHOLDER in block
-    assert rg.classify_body(block, [KEY_A]) == [f"removed-guards:UNJUSTIFIED:{KEY_A}"]
+    assert rg.classify_body(block, [KEY_A]) == [f"removed-guards:UNFILLED:{KEY_A}"]
 
 
 def test_render_then_classify_with_reasons_arms():
@@ -131,3 +131,96 @@ def test_run_detector_replay_pr3371():
 ])
 def test_is_substantive_boundaries(reason, ok):
     assert rg.is_substantive(reason) is ok
+
+
+def _one_bullet(reason: str) -> str:
+    return rg.upsert_block("## Summary\nx\n", "\n".join([
+        rg.BEGIN, "## Removed guards", rg.INTRO,
+        f"- `{KEY_A}` — Reason: {reason}", "  removed: `try {`", rg.END]))
+
+
+@pytest.mark.parametrize("reason", ["<one-line reason required>", "n/a", "none", "TBD", ""])
+def test_unfilled_reasons_classify_as_unfilled(reason):
+    assert rg.classify_body(_one_bullet(reason), [KEY_A]) == [f"removed-guards:UNFILLED:{KEY_A}"]
+
+
+def test_short_real_14_reason_stays_unjustified():
+    reason = "Moved to b.php"
+    assert len(reason) == 14
+    assert rg.reason_verdict(reason) == "short"
+    assert rg.classify_body(_one_bullet(reason), [KEY_A]) == [f"removed-guards:UNJUSTIFIED:{KEY_A}"]
+
+
+def test_near_miss_angle_prefix_is_substantive():
+    reason = "<FooGuard> moved into the caller"
+    assert rg.reason_verdict(reason) == "ok"
+    assert rg.classify_body(_one_bullet(reason), [KEY_A]) == []
+
+
+def test_marked_substantive_reason_has_no_hold():
+    reason = rg.HARNESS_MARKER + "guard moved into ValidatorX::check"
+    assert rg.reason_verdict(reason) == "ok"
+    assert rg.classify_body(_one_bullet(reason), [KEY_A]) == []
+
+
+@pytest.mark.parametrize("reason", [rg.HARNESS_MARKER + "n/a", rg.HARNESS_MARKER,
+                                    rg.HARNESS_MARKER.strip()],
+                         ids=["marked_filler", "marker_only_spaced", "marker_only"])
+def test_marked_filler_and_marker_only_are_unfilled(reason):
+    assert rg.reason_verdict(reason) == "unfilled"
+    assert rg.classify_body(_one_bullet(reason), [KEY_A]) == [f"removed-guards:UNFILLED:{KEY_A}"]
+
+
+def _two_bullets(reason_a: str, reason_b: str) -> str:
+    return rg.upsert_block("## Summary\nx\n", rg.render_block([ROW_A, ROW_B],
+                                                               {KEY_A: reason_a, KEY_B: reason_b}))
+
+
+def test_set_reason_fills_placeholder_bullet():
+    real = "Moved into SeasonFactory::build, same catch."
+    body = _two_bullets("", real)
+    new_reason = rg.mark_reason("guard moved into ValidatorX::check")
+    out = rg.set_reason(body, KEY_A, new_reason)
+    assert out != body
+    before, after = body.split("\n"), out.split("\n")
+    assert len(before) == len(after)
+    changed = [i for i, (a, b) in enumerate(zip(before, after)) if a != b]
+    assert len(changed) == 1
+    assert after[changed[0]] == f"- `{KEY_A}` — Reason: {new_reason}"
+    assert after[changed[0] + 1] == "  removed: `try {`"
+    assert f"- `{KEY_B}` — Reason: {real}" in after
+    assert rg.classify_body(out, [KEY_A, KEY_B]) == []
+
+
+def test_set_reason_refuses_substantive_reason():
+    real = "Moved into SeasonFactory::build, same catch."
+    body = _two_bullets(real, real)
+    out = rg.set_reason(body, KEY_A, rg.mark_reason("guard moved into ValidatorX::check"))
+    assert out == body
+
+
+def test_set_reason_missing_key_is_noop():
+    body = _two_bullets("", "")
+    out = rg.set_reason(body, "lock@bin/foo.sh#0badc0de", rg.mark_reason("guard moved elsewhere ok"))
+    assert out == body
+    assert rg.set_reason("## Summary\nno block\n", KEY_A, "a reason long enough") == \
+        "## Summary\nno block\n"
+
+
+def test_set_reason_keeps_crlf_lines():
+    body = _two_bullets("", "").replace("\n", "\r\n")
+    out = rg.set_reason(body, KEY_A, rg.mark_reason("guard moved into ValidatorX::check"))
+    assert out != body
+    assert out.count("\r\n") == body.count("\r\n")
+
+
+@pytest.mark.parametrize("text", ["n/a", "<x>", "a reason that is\nlong enough", "moved into `Foo::bar` caller"],
+                         ids=["filler", "placeholder", "newline", "backtick"])
+def test_mark_reason_rejects_non_substantive(text):
+    with pytest.raises(ValueError):
+        rg.mark_reason(text)
+
+
+def test_mark_reason_prefixes_marker():
+    assert rg.mark_reason("  guard moved into ValidatorX::check ") == \
+        rg.HARNESS_MARKER + "guard moved into ValidatorX::check"

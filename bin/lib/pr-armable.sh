@@ -302,8 +302,11 @@ pr_merge_danger_hold() {
 #   1. Counts the whole-line '<!-- removed-guards:begin -->' / '<!-- removed-guards:end -->' markers.
 #   2. No begin and no end marker: prints nothing without keys; with keys, 'removed-guards:UNLISTED:<key>' per key.
 #   3. Begin or end count != 1, end before begin, no '- ' bullet, or a bad bullet -> 'removed-guards:MALFORMED' (fail-closed).
-#   4. Each bullet whose trimmed reason is <15 chars, a none/n/a/tbd/todo word, or '<...>' -> 'removed-guards:UNJUSTIFIED:<key>'.
-#   5. Each flagged key with no bullet -> 'removed-guards:UNLISTED:<key>', after every UNJUSTIFIED line.
+#   4. Each bullet whose trimmed reason is empty, a none/n/a/tbd/todo word, or '<...>' -> 'removed-guards:UNFILLED:<key>';
+#      any other trimmed reason under 15 chars -> 'removed-guards:UNJUSTIFIED:<key>'.
+#      A leading '(harness-written, checker-approved) ' marker is stripped first (HARNESS_MARKER in
+#      removed_guards.py), so a marked reason is judged on its own words.
+#   5. Each flagged key with no bullet -> 'removed-guards:UNLISTED:<key>', after every UNFILLED or UNJUSTIFIED line.
 pr_removed_guards_hold() {
     local body="$1" flagged="${2:-}" line k reason lc nl='
 '
@@ -324,9 +327,14 @@ pr_removed_guards_hold() {
                 if [[ "$line" =~ $bullet_re ]]; then
                     k="${BASH_REMATCH[1]}"; reason="${BASH_REMATCH[2]}"
                     reason="${reason#"${reason%%[![:space:]]*}"}"; reason="${reason%"${reason##*[![:space:]]}"}"
+                    reason="${reason#'(harness-written, checker-approved) '}"
+                    reason="${reason#"${reason%%[![:space:]]*}"}"
+                    if [ "$reason" = '(harness-written, checker-approved)' ]; then reason=""; fi
                     keys="$keys$nl$k"
                     lc=$(printf '%s' "$reason" | tr '[:upper:]' '[:lower:]')
-                    if [ "${#reason}" -lt 15 ] || [[ "$lc" =~ $filler_re ]] || [[ "$reason" =~ $placeholder_re ]]; then
+                    if [ -z "$reason" ] || [[ "$lc" =~ $filler_re ]] || [[ "$reason" =~ $placeholder_re ]]; then
+                        out="$out${nl}removed-guards:UNFILLED:$k"
+                    elif [ "${#reason}" -lt 15 ]; then
                         out="$out${nl}removed-guards:UNJUSTIFIED:$k"
                     fi
                 else

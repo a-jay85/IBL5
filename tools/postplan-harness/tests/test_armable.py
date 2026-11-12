@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from harness.adapters.gitad import LiveGit
 from harness.armable import (ArmInputs, SENTINEL_RE, dep_numbers, evaluate, ui_hold,
                              manual_testing_clearance, all_rows_ticked)
+from harness import removed_guards
 from harness.classify import _neutralize_checkboxes
 from harness.manual_rows import ManualRow, _assert_no_sentinel, render_rows
 from harness.state import Classification, Finding, HarnessError
@@ -223,6 +224,18 @@ def test_condition_removed_guards_hold_lines_block():
     c20 = [c for c in d.conditions if c.number == 20][0]
     assert c20.blocked and c20.name == "removed-guards"
     assert c20.reason == "; ".join(holds)
+
+
+def test_condition_20_blocks_on_unfilled():
+    """A lone UNFILLED line (a placeholder or filler reason) holds (20) on its own."""
+    holds = removed_guards.classify_body(
+        removed_guards.render_block([("try@a.php#1a2b3c4d", "a.php", "try", "try {")], {}),
+        ["try@a.php#1a2b3c4d"])
+    assert holds == ["removed-guards:UNFILLED:try@a.php#1a2b3c4d"]
+    d = evaluate(inputs(removed_guards_holds=holds))
+    assert not d.armed
+    c20 = [c for c in d.conditions if c.number == 20][0]
+    assert c20.blocked and c20.reason == holds[0]
 
 
 def test_condition_removed_guards_empty_arms():

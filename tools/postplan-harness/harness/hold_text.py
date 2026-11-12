@@ -253,16 +253,20 @@ def _removed_guards(reason: str) -> str:
         return "The harness could not check whether this PR removes a safety check."
     if "removed-guards:MALFORMED" in r:
         return "The PR body's list of removed safety checks could not be read."
-    found = re.findall(r"removed-guards:(UNLISTED|UNJUSTIFIED):([^@;\s]+)@([^#;\s]+)", r)
+    found = re.findall(r"removed-guards:(UNLISTED|UNJUSTIFIED|UNFILLED):([^@;\s]+)@([^#;\s]+)", r)
+    unfilled = _unique(f"{_GUARD_WORDS.get(k, k)} in {p}" for t, k, p in found
+                       if t == "UNFILLED")
     unlisted = _unique(f"{_GUARD_WORDS.get(k, k)} in {p}" for t, k, p in found
                        if t == "UNLISTED")
     thin = _unique(f"{_GUARD_WORDS.get(k, k)} in {p}" for t, k, p in found
                    if t == "UNJUSTIFIED")
     parts = []
-    if unlisted:
-        parts.append("the PR body does not explain " + ", ".join(unlisted))
+    if unfilled:
+        parts.append("the PR body has no reason filled in for these: " + ", ".join(unfilled))
     if thin:
         parts.append("the PR body explains these too briefly: " + ", ".join(thin))
+    if unlisted:
+        parts.append("the PR body does not explain " + ", ".join(unlisted))
     if not parts:
         parts = [r]
     return "This PR removes safety checks, and " + "; and ".join(parts) + "."

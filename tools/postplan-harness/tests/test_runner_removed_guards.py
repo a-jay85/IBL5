@@ -38,7 +38,7 @@ def test_runner_injects_block_for_flagged_removal():
     assert removed_guards.PLACEHOLDER in body
     assert any(ln.startswith("phase2 removed-guard: try@") for ln in logs)
     # The rendered placeholder holds until a human writes a reason.
-    assert any(h.startswith("removed-guards:UNJUSTIFIED:")
+    assert any(h.startswith("removed-guards:UNFILLED:")
                for h in removed_guards.classify_body(body, []))
 
 

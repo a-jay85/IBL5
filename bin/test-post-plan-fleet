@@ -686,6 +686,60 @@ clear_live_labels
 end_case postplan-now-inflight-skip
 fi
 
+# --- cases 10c/10d: per-worktree lock probe (backlog#1827) --------------------------------
+# A --foreground post-plan-now loads no launchd label; its lock under the worktree's git
+# admin dir is the only footprint. The fleet probes it and never acquires it.
+WLK_REPO="$SCRATCH/wlk-repo"; WLK_WT="$SCRATCH/wlk-wt-one"
+wlk_setup() {
+    [[ -d "$WLK_WT" ]] && return 0
+    git init -q -b master "$WLK_REPO" >/dev/null 2>&1
+    git -C "$WLK_REPO" config user.email "test@example.com"
+    git -C "$WLK_REPO" config user.name "Test"
+    git -C "$WLK_REPO" commit -q --allow-empty -m init
+    git -C "$WLK_REPO" worktree add -q -b branch-one "$WLK_WT"
+    WLK_LOCK="$(git -C "$WLK_WT" rev-parse --absolute-git-dir)/post-plan-now.lock"
+    WLK_WTL="$SCRATCH/wlk-wtl.txt"
+    cat > "$WLK_WTL" <<WTL_EOF
+$WLK_REPO  1111111 [master]
+$WLK_WT  2222222 [branch-one]
+/Users/x/GitHub/IBL5-worktrees/second-slug/ibl5  3333333 [branch-two]
+WTL_EOF
+}
+if should_run "worktree-lock-skip"; then
+begin_case
+clean_slots; wlk_setup
+sleep 300 & wlk_live=$!; disown "$wlk_live"
+rm -rf "$WLK_LOCK"; mkdir "$WLK_LOCK"; printf '%s\n' "$wlk_live" > "$WLK_LOCK/pid"
+out="$(POST_PLAN_FLEET_WTL="$WLK_WTL" POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" run_driver 2>&1)"; rc=$?
+kill "$wlk_live" 2>/dev/null || true
+[[ $rc -eq 0 ]] || fail "worktree-lock-skip run exited $rc, want 0 (out: $out)"
+grep -qF "post-plan-now holds the worktree lock (pid $wlk_live); skipped" <<< "$out" \
+    || fail "PR 1901 was not skipped for the live worktree lock (out: $out)"
+grep -qE '1901 +branch-one +WT.*WOULD FIRE' <<< "$out" \
+    && fail "PR 1901 would fire despite a live worktree lock (out: $out)"
+[[ "$(plist_count)" -eq 0 ]] || fail "a runner was spawned for the locked PR"
+rm -rf "$WLK_LOCK"
+end_case worktree-lock-skip
+fi
+
+if should_run "worktree-lock-free"; then
+begin_case
+clean_slots; wlk_setup
+sleep 0 & wlk_dead=$!; wait "$wlk_dead" 2>/dev/null
+rm -rf "$WLK_LOCK"; mkdir "$WLK_LOCK"; printf '%s\n' "$wlk_dead" > "$WLK_LOCK/pid"
+out="$(POST_PLAN_FLEET_WTL="$WLK_WTL" POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" run_driver 2>&1)"; rc=$?
+[[ $rc -eq 0 ]] || fail "worktree-lock-free run exited $rc, want 0 (out: $out)"
+grep -qF "holds the worktree lock" <<< "$out" \
+    && fail "a dead-pid lock wrongly skipped the PR (out: $out)"
+[[ "$(cat "$WLK_LOCK/pid" 2>/dev/null)" == "$wlk_dead" ]] \
+    || fail "the fleet rewrote the planted lock pid (it must only probe)"
+rm -rf "$WLK_LOCK"
+clean_slots
+out="$(POST_PLAN_FLEET_WTL="$WLK_WTL" POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" run_driver 2>&1)"
+[[ ! -e "$WLK_LOCK" ]] || fail "the fleet left a post-plan-now.lock behind (it must never acquire)"
+end_case worktree-lock-free
+fi
+
 # --- Phase 8 fixture setup ---------------------------------------------------------------
 # Shared fixtures for preflight/report cases.
 
@@ -856,9 +910,9 @@ fi
 
 # --- case 20: wait-drains ----------------------------------------------------------------
 # Sub-case A (fast): empty label list → ljob_count_live=0 → break without printing "waiting for".
-# Sub-case B (~4s at WAIT_POLL=1): a LIVE label for a PR that is NOT a selection candidate →
-# "waiting for 1 session(s)…" printed → a background job clears the label list → the next
-# poll counts 0 → exit 0.
+# Sub-case B (a few s at WAIT_POLL=1): a LIVE label for a PR that is NOT a selection candidate →
+# "waiting for 1 session(s)…" printed → a background job sees that line and clears the label
+# list → the next poll counts 0 → exit 0.
 #
 # Sub-case B needs the wait block to be REACHED, and line 635 exits 0 before it whenever
 # FIRE_PRS is empty. So the candidate PRs must actually fire — which is safe here because
@@ -867,6 +921,17 @@ fi
 # 1901/1902 would suppress them as already-running and empty FIRE_PRS again.
 if should_run "wait-drains"; then
 begin_case
+# The fleet can take 2-4s under load to reach its first wait poll, so a fixed sleep before
+# changing the fake list races it. Change the list only after the driver prints the
+# "waiting for N" line for the current N, then hold it 2.5s so the loop polls each N at
+# least twice and a lost once-per-N dedup prints a second line. Bounded at 120s.
+wd_await() {
+    local i=0
+    until grep -qF "$1" "$SCRATCH/wait-out.txt" 2>/dev/null; do
+        i=$((i + 1)); [ "$i" -ge 1200 ] && return 1
+        sleep 0.1
+    done
+}
 # Sub-case A — zero live slots at entry breaks immediately, without printing.
 clean_slots
 clear_live_labels
@@ -878,11 +943,13 @@ grep -q 'waiting for' <<< "$out_a" && fail "wait-drains/A: printed 'waiting for'
 # Sub-case B — the block must actually wait, then drain to zero.
 clean_slots
 set_live_labels "40477	0	com.ibl5.post-plan-fleet-9999"
-( sleep 3; : > "$SCRATCH/launchctl-list.txt" ) &
+: > "$SCRATCH/wait-out.txt"
+( wd_await 'waiting for 1 session'; sleep 2.5; : > "$SCRATCH/launchctl-list.txt" ) &
 _wd_bg=$!
-out_b="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" POST_PLAN_FLEET_WAIT_POLL=1 \
-         run_driver --go --wait 2>&1)"; rc_b=$?
+POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" POST_PLAN_FLEET_WAIT_POLL=1 \
+    run_driver --go --wait > "$SCRATCH/wait-out.txt" 2>&1; rc_b=$?
 wait "$_wd_bg" 2>/dev/null
+out_b="$(cat "$SCRATCH/wait-out.txt")"
 [[ $rc_b -eq 0 ]] || fail "wait-drains/B: exit $rc_b (out: $out_b)"
 grep -qE 'waiting for [0-9]+ session' <<< "$out_b" \
     || fail "wait-drains/B: never printed a 'waiting for N session(s)' line — the wait block did not wait (out: $out_b)"
@@ -893,12 +960,15 @@ clean_slots
 
 # Sub-case C — N changes 2 -> 1 -> 0; one timestamped line per distinct N.
 set_live_labels "40476	0	com.ibl5.post-plan-fleet-9998" "40477	0	com.ibl5.post-plan-fleet-9999"
-( sleep 2; printf '40477\t0\tcom.ibl5.post-plan-fleet-9999\n' > "$SCRATCH/launchctl-list.txt"
-  sleep 3; : > "$SCRATCH/launchctl-list.txt" ) &
+: > "$SCRATCH/wait-out.txt"
+( wd_await 'waiting for 2 session'; sleep 2.5
+  printf '40477\t0\tcom.ibl5.post-plan-fleet-9999\n' > "$SCRATCH/launchctl-list.txt"
+  wd_await 'waiting for 1 session'; sleep 2.5; : > "$SCRATCH/launchctl-list.txt" ) &
 _wd_bg=$!
-out_c="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" POST_PLAN_FLEET_WAIT_POLL=1 \
-         run_driver --go --wait 2>&1)"; rc_c=$?
+POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" POST_PLAN_FLEET_WAIT_POLL=1 \
+    run_driver --go --wait > "$SCRATCH/wait-out.txt" 2>&1; rc_c=$?
 wait "$_wd_bg" 2>/dev/null
+out_c="$(cat "$SCRATCH/wait-out.txt")"
 [[ $rc_c -eq 0 ]] || fail "wait-drains/C: exit $rc_c (out: $out_c)"
 _ts_re='^\[[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\] waiting for [0-9]+ session\(s\) to finish'
 [[ "$(grep -c 'waiting for 2 session' <<< "$out_c")" == 1 ]] || fail "wait-drains/C: want one N=2 line (out: $out_c)"

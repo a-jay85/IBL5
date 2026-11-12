@@ -1090,7 +1090,7 @@ test_phpunit_empty_map_with_php_change_runs_full() {
     touch_file ibl5/classes/Foo/Lonely.php
     run_gate --stage phpunit
     want_rc 0
-    want_out "phpunit mode: full (no test file maps to the changed PHP)"
+    want_out "phpunit mode: full (no test file maps to the changed PHP: ibl5/classes/Foo/Lonely.php)"
     want_args "0:"
 }
 

@@ -46,9 +46,10 @@ def _comment_re(path: str) -> re.Pattern[str] | None:
     return None
 
 
-def _norm(line: str) -> str:
-    """Indentation-free form. The here-string rewrite of `echo "$v" | grep` maps to one form."""
-    line = line.strip()
+def _norm(line: str, keep_indent: bool = False) -> str:
+    """Indentation-free form. The here-string rewrite of `echo "$v" | grep` maps to one form.
+    YAML keeps its leading whitespace, because indentation is structure there."""
+    line = line.rstrip() if keep_indent else line.strip()
     line = _HERESTRING_RE.sub("<<< ", line)
     line = _ECHO_GREP_RE.sub(r"\2 \3 <<< \1", line)
     return line
@@ -90,7 +91,7 @@ def _hunks(section: str) -> list[tuple[int, int, list[str]]] | str:
     return hunks
 
 
-def _live_changes(body: list[str]) -> list[int]:
+def _live_changes(body: list[str], keep_indent: bool = False) -> list[int]:
     """Changed-line indexes left after aligned cancellation. In a run of removed lines followed by
     a run of added lines of the same length, the i-th pair cancels when both normalize equal.
     A reorder or a length change cancels nothing."""
@@ -110,7 +111,7 @@ def _live_changes(body: list[str]) -> list[int]:
             i += 1
         if len(minus) == len(plus):
             for a, b in zip(minus, plus):
-                if _norm(body[a][1:]) != _norm(body[b][1:]):
+                if _norm(body[a][1:], keep_indent) != _norm(body[b][1:], keep_indent):
                     live += [a, b]
         else:
             live += minus + plus
@@ -175,8 +176,9 @@ def external_send_change(path: str, section: str | None) -> str | None:
     if isinstance(hunks, str):
         return hunks
     comment_re = _comment_re(path)
+    keep_indent = comment_re is _YAML_COMMENT_RE
     for old_start, new_start, body in hunks:
-        for idx in _live_changes(body):
+        for idx in _live_changes(body, keep_indent):
             text = body[idx][1:].strip()
             if not text or (comment_re is not None and comment_re.match(text)):
                 continue

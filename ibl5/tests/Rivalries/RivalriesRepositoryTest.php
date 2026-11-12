@@ -196,9 +196,19 @@ final class RivalriesRepositoryTest extends TestCase
         $this->mockDb->onQuery('FROM games', $this->stubGameRows('1', '2'));
         $this->repo->getFranchisePairGames(1, 2);
         $before = count($this->mockDb->getPreparedQueries());
+        $this->mockDb->onQuery('FROM per_game', [
+            ['pid' => 7, 'name' => 'Pat', 'side' => '1', 'points' => 20, 'game_date' => '2001-02-03', 'game_of_that_day' => 1],
+        ]);
 
-        $this->repo->getFranchiseTopPerformers(1, 2);
+        $result = $this->repo->getFranchiseTopPerformers(1, 2);
 
+        self::assertSame(
+            [
+                'totals' => [['pid' => 7, 'name' => 'Pat', 'side' => '1', 'games' => 1, 'total_points' => 20]],
+                'highs' => [['pid' => 7, 'name' => 'Pat', 'side' => '1', 'points' => 20, 'game_date' => '2001-02-03', 'game_of_that_day' => 1]],
+            ],
+            $result,
+        );
         $queries = $this->mockDb->getPreparedQueries();
         self::assertCount($before + 1, $queries);
         $query = $queries[array_key_last($queries)];

@@ -415,8 +415,8 @@ ORDER BY t.start_season_year ASC, t.id ASC',
 
         $tuples = [];
         $tupleParams = [];
-        foreach (array_keys($franchises) as $one) {
-            foreach (array_keys($franchises) as $two) {
+        foreach ($franchises as $one) {
+            foreach ($franchises as $two) {
                 if ($one !== $two) {
                     $tuples[] = '(b.visitor_teamid = ? AND b.home_teamid = ?)';
                     array_push($tupleParams, $one, $two);

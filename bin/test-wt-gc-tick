@@ -3333,7 +3333,9 @@ fi
 
 # NV1 — the new vars, empty. Unset is the default path every earlier case runs.
 # An empty day count fails its step closed (nothing reaped); an empty switch
-# turns the step on.
+# turns the step on. Mutations this case catches:
+#   ${WT_GC_UNBORN_DAYS-3} -> ${WT_GC_UNBORN_DAYS:-3}   (empty day count would default)
+#   ${WT_GC_REAP_UNBORN:-1} -> ${WT_GC_REAP_UNBORN:-0}  (empty switch would disable)
 if should_run NV1-new-vars-empty; then
 fx NV1-new-vars-empty
 landed_wt nv-landed br/nv-landed age_days=5

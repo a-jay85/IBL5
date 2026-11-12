@@ -1,7 +1,7 @@
 ---
 description: Playwright E2E testing rules, Docker requirements, and actionability pitfalls.
 paths: ibl5/tests/e2e/**/*.ts
-last_verified: 2026-10-09
+last_verified: 2026-11-12
 ---
 
 # Playwright E2E Testing Rules
@@ -185,7 +185,7 @@ E2E runs in `.github/workflows/e2e-tests.yml`:
 
 ## Worktree & Environment Gotchas
 
-- **`bin/test e2e`** is the front door. Inside a worktree it runs `bin/e2e-wt <slug>` with the slug derived for you; on the main checkout it runs `ibl5/bin/e2e-local`. Run `bin/wt-up <slug> --seed` first in a worktree.
+- **`bin/test e2e`** is the front door. Inside a worktree it runs `bin/e2e-wt <slug>` with the slug derived for you; on the main checkout it runs `ibl5/bin/e2e-local`. Run `bin/wt-stack start <slug> --seed` first in a worktree, and stop it per `.claude/rules/workflow-continuity.md` § Worktree Setup.
 - **`bin/e2e-wt <name>`** runs Playwright from the worktree's `ibl5/`. Test files and `BASE_URL` both resolve to the worktree, so TS changes are picked up with no extra steps. Call it directly for agent and background runs: `bash-guard` allows `run_in_background` only for a command matching `e2e-wt`.
 - **Login/registration tests can trip auth throttling** (`auth_users_throttling` accumulates failures). If `auth.setup.ts` fails with "Too many login attempts": `DELETE FROM auth_users_throttling WHERE 1=1;`. CI is unaffected (fresh DB per run).
 
@@ -208,7 +208,7 @@ E2E runs in `.github/workflows/e2e-tests.yml`:
 
 **Add a module:** one `VrRow` in `VR_MANIFEST` (set `viewports`/`states`/`htmxTabs`), then run with `--update-snapshots` to generate the baseline PNG.
 
-**Running VR locally needs its own config.** `playwright.config.ts` excludes the spec (`testIgnore: [… /visual-regression/ …]`), so a plain `bunx playwright test` never runs it. Use `cd ibl5 && bunx playwright test --config=playwright.visual.config.ts`, against a `bin/wt-up <name> --seed` stack — baselines built from dev data mismatch CI wholesale.
+**Running VR locally needs its own config.** `playwright.config.ts` excludes the spec (`testIgnore: [… /visual-regression/ …]`), so a plain `bunx playwright test` never runs it. Use `cd ibl5 && bunx playwright test --config=playwright.visual.config.ts`, against a stack from `bin/wt-stack start <name> --seed` (stop it per `.claude/rules/workflow-continuity.md` § Worktree Setup). Baselines built from dev data mismatch CI wholesale.
 
 **Coverage:** CI runs `bin/vr-changed-coverage` (`e2e-tests.yml`) to report VR rows missing for changed files.
 

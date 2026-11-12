@@ -25,6 +25,11 @@ def _isolated_rows_file(monkeypatch, tmp_path):
     monkeypatch.setattr(mt, "ROWS_TMPFILE", str(tmp_path / "pr-ready-manual-rows-{pr}.txt"))
 
 
+@pytest.fixture(autouse=True)
+def _no_real_wt_stack(monkeypatch, tmp_path):
+    monkeypatch.setattr(mt, "WT_STACK_PATH", tmp_path / "absent" / "wt-stack")
+
+
 class FakeGh:
     def __init__(self, bodies):
         self.bodies = list(bodies)
@@ -382,6 +387,76 @@ def test_bringup_failure_stops_pass(monkeypatch):
     assert "bringup-stopped:FAILED" in result.errors
     # No confirm re-fetch: a stopped pass must not reach any gh call.
     assert gh.calls == 0
+
+
+def _recording_fake(bringup_line):
+    calls = []
+
+    def fake_run(path, args, timeout_s, cwd=None):
+        calls.append((str(path), list(args)))
+        name = str(path)
+        if "bring-up" in name or "wt-bring" in name:
+            return 0, f"{bringup_line}\nBRINGUP-COMPLETE\n", ""
+        if name.endswith("wt-stack"):
+            return 0, "STACK: not-owned (left running)\n", ""
+        return 0, "", ""
+
+    return calls, fake_run
+
+
+def _make_helper(monkeypatch, tmp_path):
+    helper = tmp_path / "wt-stack"
+    helper.write_text("#!/bin/bash\n")
+    monkeypatch.setattr(mt, "WT_STACK_PATH", helper)
+    return helper
+
+
+def test_stack_stop_runs_after_bringup_failure(monkeypatch, tmp_path):
+    _make_helper(monkeypatch, tmp_path)
+    calls, fake_run = _recording_fake("BRINGUP: FAILED")
+    monkeypatch.setattr(mt, "_run_script", fake_run)
+    kwargs = _base_run_kwargs(monkeypatch, extra_body=BODY_ONE_ROW)
+    gh = kwargs["gh"]
+    result = mt.run(**kwargs)
+    stops = [c for c in calls if c[0].endswith("wt-stack")]
+    assert len(stops) == 1
+    assert stops[0][1] == ["stop", "harness-manual-rows-execute"]
+    assert "bringup-stopped:FAILED" in result.errors
+    assert gh.calls == 0
+
+
+def test_stack_stop_runs_after_rows_return(monkeypatch, tmp_path):
+    _make_helper(monkeypatch, tmp_path)
+    calls, fake_run = _recording_fake("BRINGUP: UP http://x.localhost/ibl5/")
+    monkeypatch.setattr(mt, "_run_script", fake_run)
+    mt.run(**_base_run_kwargs(monkeypatch, extra_body=BODY_ONE_ROW))
+    assert calls[-1][0].endswith("wt-stack")
+    assert calls[-1][1] == ["stop", "harness-manual-rows-execute"]
+
+
+def test_stack_stop_skipped_when_helper_missing(monkeypatch):
+    calls, fake_run = _recording_fake("BRINGUP: FAILED")
+    monkeypatch.setattr(mt, "_run_script", fake_run)
+    mt.run(**_base_run_kwargs(monkeypatch, extra_body=BODY_ONE_ROW))
+    assert not [c for c in calls if c[0].endswith("wt-stack")]
+    assert mt.stop_stack("s", "/w") == "skipped-missing"
+
+
+def test_stack_stop_not_called_without_slug(monkeypatch, tmp_path):
+    _make_helper(monkeypatch, tmp_path)
+    calls, fake_run = _recording_fake("BRINGUP: UP http://x.localhost/ibl5/")
+    monkeypatch.setattr(mt, "_run_script", fake_run)
+    kwargs = _base_run_kwargs(monkeypatch, extra_body=BODY_ONE_ROW)
+    monkeypatch.setattr(mt, "resolve_slug", lambda w: ("", "no-worktree"))
+    mt.run(**kwargs)
+    assert not [c for c in calls if c[0].endswith("wt-stack")]
+
+
+def test_stop_stack_parses_verdict(monkeypatch, tmp_path):
+    _make_helper(monkeypatch, tmp_path)
+    _calls, fake_run = _recording_fake("BRINGUP: FAILED")
+    monkeypatch.setattr(mt, "_run_script", fake_run)
+    assert mt.stop_stack("s", "/w") == "not-owned (left running)"
 
 
 # ---------------------------------------------------------------------------

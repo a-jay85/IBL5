@@ -941,6 +941,14 @@ case_coverage_modes() {
     { cat "$d/legs.txt"; printf '# 0 bin/test-x\n'; } >"$d/legs-comment.txt"
     run_runner "$d" --check-coverage legs-comment.txt --leg-count 2
     chk "coverage-parse-near-miss (comment ignored)" 0 'coverage: OK (3 entries, 2 legs)'
+
+    run_runner "$d" --check-coverage legs.txt
+    chk "coverage-default-leg-count (derived from the file)" 0 'coverage: OK (3 entries, 2 legs)'
+    run_runner "$d" --check-coverage legs-nob.txt
+    chk "coverage-default-leg-count (unlisted harness still fails)" 1 'unlisted harness bin/test-b'
+    printf '# nothing but a comment\n' >"$d/legs-empty.txt"
+    run_runner "$d" --check-coverage legs-empty.txt
+    chk "coverage-default-leg-count (no legs refused)" 2 'needs --leg-count'
 }
 
 if [ -z "$THL_ONLY" ] || [ "$THL_ONLY" = shard ]; then

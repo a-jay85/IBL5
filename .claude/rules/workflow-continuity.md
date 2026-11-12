@@ -35,6 +35,8 @@ When a task builds on an open, unmerged PR, stack on it (`--base <that-branch>`)
 
 Its Docker hostname is `<slug>.localhost` (slug = `basename "$(git rev-parse --show-toplevel)"`), never `main.localhost`; navigate `/ibl5/` paths only. Detail: `.claude/rules/worktree-hostname.md`.
 
+Worktree Docker stacks start on demand; only the main stack runs all the time. An agent that needs one runs `bin/wt-stack start <slug> [wt-up flags]` and runs `bin/wt-stack stop <slug>` when its step ends. `stop` acts only on a stack that `start` brought up, so a stack the user started with `bin/wt-up` keeps running. An implementation session leaves its stack up through `bin/post-plan-now`, because the pre-fire DB probe needs it; post-plan Phase 5 stops it.
+
 `master` is squash/rebase-merge only, so a merged SHA absent from it is normal; confirm by content. Before rebasing a stacked branch whose parent merged: `.claude/rules/linear-history-squash-merge.md`.
 
 ## Post-Plan

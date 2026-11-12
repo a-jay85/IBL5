@@ -2813,6 +2813,19 @@ grep -qF 'BRINGUP: NOT-READY' "$PRD/scripts/wt-bring-up.sh" \
 end_case pr-ready-bringup-already-up
 fi
 
+# --- case pr-ready-bringup-owned-start ---------------------------------------------------
+# Pins that wt-bring-up.sh starts the stack through bin/wt-stack, after the already-up guard.
+if should_run "pr-ready-bringup-owned-start"; then
+begin_case
+grep -qF '"$WT_STACK" start "$SLUG" --seed' "$PRD/scripts/wt-bring-up.sh" \
+  || fail "pr-ready-bringup-owned-start: wt-stack start call absent from wt-bring-up.sh"
+_alup_ln=$(grep -n 'BRINGUP: ALREADY-UP' "$PRD/scripts/wt-bring-up.sh" | head -1 | cut -d: -f1)
+_stack_ln=$(grep -n '"$WT_STACK" start' "$PRD/scripts/wt-bring-up.sh" | head -1 | cut -d: -f1)
+[[ -n "$_alup_ln" && -n "$_stack_ln" && "$_alup_ln" -lt "$_stack_ln" ]] \
+  || fail "pr-ready-bringup-owned-start: ALREADY-UP (line ${_alup_ln}) is not before the wt-stack start (line ${_stack_ln})"
+end_case pr-ready-bringup-owned-start
+fi
+
 # --- case pr-ready-rows-classifier-precedence (row 14) -----------------------------------
 # Pins all outcome tokens and the SKIP-DONE < SKIP-HUMAN < SKIP-NOURL ordering.
 if should_run "pr-ready-rows-classifier-precedence"; then

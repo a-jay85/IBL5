@@ -33,8 +33,15 @@ if stack_running; then
   exit 0
 fi
 
-# Step 3: bring the stack up (--seed loads fixtures)
-/Users/ajaynicolas/GitHub/IBL5/bin/wt-up "$SLUG" --seed || true
+# Step 3: bring the stack up (--seed loads fixtures). bin/wt-stack records the ownership
+# marker so harness Phase 6.7 can stop this stack when its rows finish. A main checkout
+# that predates bin/wt-stack falls back to plain wt-up, which leaves no marker.
+WT_STACK=/Users/ajaynicolas/GitHub/IBL5/bin/wt-stack
+if [ -x "$WT_STACK" ]; then
+  "$WT_STACK" start "$SLUG" --seed || true
+else
+  /Users/ajaynicolas/GitHub/IBL5/bin/wt-up "$SLUG" --seed || true
+fi
 
 # Step 4: re-probe regardless of wt-up exit code — the exit code is not definitive
 if stack_running; then

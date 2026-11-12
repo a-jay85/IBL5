@@ -203,7 +203,16 @@ do_encode() {
         rm -rf "$tmp"
         return 3
     fi
-    codec encode "$tmp/rows.tsv" "$tmp/records.nul" "$CAP"; rc=$?
+    # Keep only records whose check command runs in CI (same filter as the rows).
+    : > "$tmp/records.ci"
+    local rrow rfile rcheck rmatch rrepl
+    while IFS= read -r -d '' rrow <&3 \
+        && IFS= read -r -d '' rfile <&3 && IFS= read -r -d '' rcheck <&3 \
+        && IFS= read -r -d '' rmatch <&3 && IFS= read -r rrepl <&3; do
+        row_runs_in_ci "$rcheck" || continue
+        printf '%s\0%s\0%s\0%s\0%s\n' "$rrow" "$rfile" "$rcheck" "$rmatch" "$rrepl" >> "$tmp/records.ci"
+    done 3< "$tmp/records.nul"
+    codec encode "$tmp/rows.tsv" "$tmp/records.ci" "$CAP"; rc=$?
     rm -rf "$tmp"
     return "$rc"
 }

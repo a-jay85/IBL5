@@ -534,6 +534,10 @@ export CLAUDE_HEADLESS=1
 # degradation and 2x-cost edge — and to accept that it no longer tracks the
 # interactive setting.
 
+# First stop the plan's Docker stack with bin/wt-down --stop (keeps volumes,
+# images and .wt-slug), so a kept worktree's stack does not sit up for days.
+# A plan with no worktree prints "nothing to stop". wt-remove --if-empty then
+# tears an empty worktree's stopped stack down in full via bin/wt-down.
 # Hand a parked plan's worktree to bin/wt-remove --if-empty, which removes it
 # (and its never-pushed branch) only when it holds no work: 0 commits ahead of
 # origin/master, clean tree, no untracked non-ignored file. A worktree with any
@@ -543,6 +547,7 @@ export CLAUDE_HEADLESS=1
 # including a plan the impl agent moved to skipped/ itself. The unusable-impl_model
 # skip runs before any attempt and is marked reap-exempt instead.
 reap_empty_worktree() {
+    (cd "$REPO" && "$REPO/bin/wt-down" --stop "$1") >> "$LOG" 2>&1 || true
     (cd "$REPO" && "$REPO/bin/wt-remove" "$1" --if-empty) >> "$LOG" 2>&1 || true
 }
 REPO="/Users/ajaynicolas/GitHub/IBL5"

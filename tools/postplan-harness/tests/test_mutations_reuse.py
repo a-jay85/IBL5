@@ -347,3 +347,83 @@ def test_missing_prefire_tree_runs(tmp_path):
     lib = _reuse_stub(tmp_path)
     _seed(tmp_path, repo, [TRIPPED], tree="0" * 40)
     assert reuse_prefire_pass(plan, repo, lib=lib) == (None, "pre-fire tree missing")
+
+
+# --- Phase 3: the runner reuses the record and logs the start line -------------
+
+from types import SimpleNamespace  # noqa: E402
+
+import runner  # noqa: E402
+
+
+def _plan_ns(tmp_path):
+    return SimpleNamespace(found=True, path=str(tmp_path / "plan.md"))
+
+
+def test_step_reuses_and_skips_run(tmp_path, monkeypatch):
+    rep = MutationReport(True, (MutationResult(1, "TRIPPED", "x"),), (), False)
+    monkeypatch.setattr(runner, "reuse_prefire_pass", lambda *a, **k: (rep, "rows abc"))
+
+    def boom(*a, **k):
+        raise AssertionError("executor must not run")
+    monkeypatch.setattr(runner, "run_executable_mutations", boom)
+    lines = []
+    got = runner._exec_mutations_step(_plan_ns(tmp_path), str(tmp_path), True, lines.append)
+    assert got is rep
+    assert "exec-mutations: reused pre-fire pass (rows abc)" in lines
+    assert "exec-mutations: TRIPPED row 1 — x" in lines
+
+
+def test_step_logs_running_before_run(tmp_path, monkeypatch):
+    monkeypatch.setattr(runner, "reuse_prefire_pass",
+                        lambda *a, **k: (None, "no pre-fire record for these rows"))
+    lines, seen = [], []
+
+    def fake_run(*a, **k):
+        seen.append(list(lines))
+        return MutationReport(True, (), (), False)
+    monkeypatch.setattr(runner, "run_executable_mutations", fake_run)
+    runner._exec_mutations_step(_plan_ns(tmp_path), str(tmp_path), True, lines.append)
+    assert len(seen) == 1
+    assert "exec-mutations: running (no pre-fire record for these rows)" in seen[0]
+
+
+def test_step_reuse_crash_runs_fresh(tmp_path, monkeypatch):
+    def crash(*a, **k):
+        raise RuntimeError("boom")
+    monkeypatch.setattr(runner, "reuse_prefire_pass", crash)
+    calls = []
+
+    def fake_run(*a, **k):
+        calls.append(a)
+        return MutationReport(True, (), (), False)
+    monkeypatch.setattr(runner, "run_executable_mutations", fake_run)
+    lines = []
+    runner._exec_mutations_step(_plan_ns(tmp_path), str(tmp_path), True, lines.append)
+    assert len(calls) == 1
+    assert "exec-mutations: running (reuse check crashed: boom)" in lines
+
+
+def test_fix_round_check_never_reuses(tmp_path, monkeypatch):
+    reuse_calls = []
+    reused = MutationReport(True, (MutationResult(1, "TRIPPED", "x"),), (), False)
+
+    def fake_reuse(*a, **k):
+        reuse_calls.append(a)
+        return reused, "rows abc"
+    sentinel = MutationReport(True, (), ("sentinel",), False)
+    monkeypatch.setattr(runner, "reuse_prefire_pass", fake_reuse)
+    monkeypatch.setattr(runner, "run_executable_mutations", lambda *a, **k: sentinel)
+    got = runner._fix_round_mutation_check(str(tmp_path / "plan.md"), str(tmp_path), 100)
+    assert got is sentinel
+    assert reuse_calls == []
+
+
+def test_replay_branch_never_consults_record(tmp_path, monkeypatch):
+    def boom(*a, **k):
+        raise AssertionError("replay must not consult the record")
+    monkeypatch.setattr(runner, "reuse_prefire_pass", boom)
+    lines = []
+    report = runner._exec_mutations_step(_plan_ns(tmp_path), str(tmp_path), False, lines.append,
+                                         fixture={"exec_mutations_holding": ["h"]})
+    assert report.holding == ("h",)

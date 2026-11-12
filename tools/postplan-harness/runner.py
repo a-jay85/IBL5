@@ -71,7 +71,7 @@ from harness.classify import (BACKLOG_REPO, render_merge_digest,
                               upsert_hold_notice, upsert_residual_phases,
                               upsert_scope_notes)
 from harness.gate_backtest import upsert_gate_backtest
-from harness.mutations import MutationReport, run_executable_mutations
+from harness.mutations import MutationReport, reuse_prefire_pass, run_executable_mutations
 from harness import merge_danger
 from harness import removed_guards
 from harness import second_review
@@ -262,10 +262,19 @@ def _exec_mutations_step(plan, worktree, live, log, fixture=None) -> MutationRep
         log("exec-mutations: skipped (no worktree) — condition (19) holds")
         return None
     try:
-        report = run_executable_mutations(Path(plan.path), Path(worktree))
-    except Exception as e:  # noqa: BLE001 - the step must hold, never fail the run
-        report = MutationReport(ran=False, results=(),
-                                holding=(f"executor-crashed: {e}",), tree_suspect=True)
+        reused, why = reuse_prefire_pass(Path(plan.path), Path(worktree))
+    except Exception as e:  # noqa: BLE001 - doubt means run fresh
+        reused, why = None, f"reuse check crashed: {e}"
+    if reused is not None:
+        log(f"exec-mutations: reused pre-fire pass ({why})")
+        report = reused
+    else:
+        log(f"exec-mutations: running ({why})")
+        try:
+            report = run_executable_mutations(Path(plan.path), Path(worktree))
+        except Exception as e:  # noqa: BLE001 - the step must hold, never fail the run
+            report = MutationReport(ran=False, results=(),
+                                    holding=(f"executor-crashed: {e}",), tree_suspect=True)
     for r in report.results:
         log(f"exec-mutations: {r.kind} row {r.row} — {r.detail}")
     for h in report.holding:

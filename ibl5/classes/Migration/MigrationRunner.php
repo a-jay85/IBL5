@@ -157,7 +157,7 @@ class MigrationRunner implements MigrationRunnerInterface
     /**
      * Find the first statement in a down-SQL text that is not INSERT, UPDATE or DELETE.
      *
-     * Whole-line `--` comments are removed, then the text is split on every `;`.
+     * Whole-line `--` comments (`--` followed by whitespace or end of line, as MySQL requires) are removed, then the text is split on every `;`.
      * A `;` inside a string literal causes a false refusal, so down files keep
      * `;` out of literals.
      *
@@ -166,7 +166,7 @@ class MigrationRunner implements MigrationRunnerInterface
      */
     public static function findNonDmlStatement(string $sql): ?string
     {
-        $stripped = preg_replace('/^\s*--.*$/m', '', $sql);
+        $stripped = preg_replace('/^[ \t]*--(?:[ \t\r].*)?$/m', '', $sql);
         $text = $stripped ?? $sql;
 
         $fragments = [];

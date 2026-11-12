@@ -3251,10 +3251,13 @@ fi
 # A token "-VAR" in rt's env list leaves VAR truly unset (run_tick drops it).
 EC_SWITCHES=(WT_GC_ARCHIVE_PRUNE WT_GC_REAP_DIRTY_ARCHIVE WT_GC_REAP_DETACHED
     WT_GC_REAP_CLOSED WT_GC_DROP_STASHES WT_GC_REF_FALLBACK WT_GC_DOCKER_CONTAINERS
-    WT_GC_REAP_T3)
+    WT_GC_REAP_T3 WT_GC_REAP_T3_MERGED WT_GC_REAP_LANDED WT_GC_REAP_UNBORN
+    WT_GC_REAP_POOL_BRANCHES)
 # The switches that own a run_step, as "VAR:step".
 EC_STEPS=(WT_GC_ARCHIVE_PRUNE:archive-prune WT_GC_REAP_DETACHED:detached
-    WT_GC_REAP_CLOSED:closed WT_GC_DROP_STASHES:stashes WT_GC_REAP_T3:t3)
+    WT_GC_REAP_CLOSED:closed WT_GC_DROP_STASHES:stashes WT_GC_REAP_T3:t3
+    WT_GC_REAP_LANDED:landed WT_GC_REAP_UNBORN:unborn
+    WT_GC_REAP_POOL_BRANCHES:pool-branches)
 
 for ec_var in "${EC_SWITCHES[@]}"; do
     if should_run "EC-switch-$ec_var"; then
@@ -3285,6 +3288,8 @@ EC_AGES=(
     'WT_GC_BACKUP_FALLBACK_DAYS|14|WT_GC_REAP_REFS=1 WT_GC_REF_FALLBACK=1'
     'WT_GC_CONTAINER_DAYS|14|WT_GC_DOCKER_PRUNE=1 WT_GC_DOCKER_CONTAINERS=1'
     'WT_GC_T3_DAYS|1|WT_GC_REAP_T3=1'
+    'WT_GC_LANDED_DAYS|3|WT_GC_REAP_LANDED=1'
+    'WT_GC_UNBORN_DAYS|3|WT_GC_REAP_UNBORN=1'
 )
 for ec_row in "${EC_AGES[@]}"; do
     ec_var="${ec_row%%|*}"
@@ -3326,12 +3331,44 @@ done
 finish_case
 fi
 
+# NV1 — the new vars, empty. Unset is the default path every earlier case runs.
+# An empty day count fails its step closed (nothing reaped); an empty switch
+# turns the step on.
+if should_run NV1-new-vars-empty; then
+fx NV1-new-vars-empty
+landed_wt nv-landed br/nv-landed age_days=5
+land_on_master
+mk_unborn nv-unborn br/nv-unborn 5
+for nv_row in 'WT_GC_LANDED_DAYS=|landed|WT_GC_REAP_LANDED=1' 'WT_GC_UNBORN_DAYS=|unborn|WT_GC_REAP_UNBORN=1' \
+    'WT_GC_UNBORN_DAYS=abc|unborn|WT_GC_REAP_UNBORN=1'; do
+    nv_env="${nv_row%%|*}"
+    nv_rest="${nv_row#*|}"
+    nv_step="${nv_rest%%|*}"
+    nv_on="${nv_rest#*|}"
+    rt "$nv_on" "$nv_env" -- --force
+    chk_rc "NV1 $nv_env" 1
+    log_has "step $nv_step failed \(rc=1\)" || note_err "$nv_env: step $nv_step did not fail closed"
+    log_has "invalid ${nv_env%%=*} '${nv_env#*=}'" || note_err "$nv_env: no invalid-value log"
+    [ -d "$(wt_dir nv-landed)" ] || note_err "$nv_env: landed worktree removed"
+    [ -d "$(wt_dir nv-unborn)" ] || note_err "$nv_env: unborn worktree removed"
+done
+[ -z "$(git -C "$ENV_MAIN" for-each-ref refs/wt-gc-archive/)" ] || note_err "a failed step wrote an archive"
+rt WT_GC_REAP_LANDED= WT_GC_REAP_UNBORN= WT_GC_REAP_POOL_BRANCHES= WT_GC_REAP_T3_MERGED= -- --force
+chk_rc "NV1 empty switches" 0
+log_has 'step landed threshold=3d' || note_err "empty WT_GC_REAP_LANDED did not run the step"
+log_has 'step unborn threshold=3d' || note_err "empty WT_GC_REAP_UNBORN did not run the step"
+log_has 'step pool-branches$' || note_err "empty WT_GC_REAP_POOL_BRANCHES did not run the step"
+log_has 'config .*WT_GC_REAP_T3_MERGED=1( |$)' || note_err "empty WT_GC_REAP_T3_MERGED did not default to 1"
+finish_case
+fi
+
 if should_run H2-help-lists-new-vars; then
 fx H2-help-lists-new-vars
 env -i PATH=/usr/bin:/bin bash -euo pipefail "$TICK" --help > "$CD/help.out" 2>&1
 chk_rc H2-help 0
 for ec_var in "${EC_SWITCHES[@]}" WT_GC_ARCHIVE_DAYS WT_GC_DIRTY_ARCHIVE_DAYS WT_GC_DETACHED_DAYS \
-    WT_GC_CLOSED_DAYS WT_GC_STASH_DAYS WT_GC_BACKUP_FALLBACK_DAYS WT_GC_CONTAINER_DAYS WT_GC_ARCHIVE_STAMP; do
+    WT_GC_CLOSED_DAYS WT_GC_STASH_DAYS WT_GC_BACKUP_FALLBACK_DAYS WT_GC_CONTAINER_DAYS WT_GC_ARCHIVE_STAMP \
+    WT_GC_LANDED_DAYS WT_GC_UNBORN_DAYS; do
     grep -qF -- "$ec_var" "$CD/help.out" || note_err "--help does not list $ec_var"
 done
 grep -qF 'Usage: bin/wt-gc-tick [--dry-run] [--force] [--help]' "$CD/help.out" || note_err "--help lost the Usage line"

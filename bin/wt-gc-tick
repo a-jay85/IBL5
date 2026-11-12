@@ -47,15 +47,23 @@
 #   WT_GC_REAP_DIRTY_ARCHIVE  merged worktrees with dirt that is not identical
 #   WT_GC_REAP_DETACHED       detached worktrees at a commit already in master
 #   WT_GC_REAP_CLOSED         worktrees of closed PRs whose remote branch is gone
-#   WT_GC_DROP_STASHES        stashes on gone branches or already in master
+#   WT_GC_REAP_LANDED         clean UNPUSHED worktrees whose content already
+#                             landed on master under other SHAs
+#   WT_GC_REAP_UNBORN         worktrees whose HEAD has no commit, dir older than
+#                             WT_GC_UNBORN_DAYS; tree kept as a parentless commit
+#   WT_GC_REAP_POOL_BRANCHES  orphan wt-pool/<N> refs (no worktree, no slot dir,
+#                             0 ahead); deleted on the second sighting
+#   WT_GC_REAP_T3_MERGED      t3 sub-switch: 0 = only t3-* with no own commits
+#   WT_GC_DROP_STASHES       stashes on gone branches or already in master
 #   WT_GC_REF_FALLBACK        backup branches with no PR, by commit age
 #   WT_GC_DOCKER_CONTAINERS   exited ibl5-* containers (docker rm, no volumes)
 # Ages in days; empty or non-numeric = invalid, that step is skipped:
 #   WT_GC_ARCHIVE_DAYS (90)          WT_GC_DIRTY_ARCHIVE_DAYS (3)
 #   WT_GC_DETACHED_DAYS (3)          WT_GC_CLOSED_DAYS (7)
 #   WT_GC_STASH_DAYS (7)             WT_GC_BACKUP_FALLBACK_DAYS (14)
-#   WT_GC_CONTAINER_DAYS (14)
-#   WT_GC_ARCHIVE_STAMP       test seam: epoch seconds that name the archives
+#   WT_GC_CONTAINER_DAYS (14)        WT_GC_LANDED_DAYS (3)
+#   WT_GC_UNBORN_DAYS (3)
+#   WT_GC_ARCHIVE_STAMP      test seam: epoch seconds that name the archives
 # ---
 # Every deleted branch/ref is first written as "<sha> <ref>" to a dated file
 # under WT_GC_TIPS_DIR. Every probe that gates a delete keeps on error. A step

@@ -1,6 +1,6 @@
 ---
 description: Docker MariaDB connection details, query patterns, schema verification, and migration authoring rules. Long-form sections live in database-access-detail.md (Read on demand).
-last_verified: 2026-11-11
+last_verified: 2026-11-12
 paths:
   - "**/*Repository.php"
   - "**/migrations/000_baseline_schema.sql"
@@ -57,7 +57,7 @@ Moved to `.claude/rules/database-access-detail.md` § Claude Code Database Queri
 bin/db-migrate <db-container> <migrations-dir> [db-name]
 ```
 
-Runs pending SQL migrations against a Docker MariaDB container. Tracks applied migrations in `schema_migrations(version VARCHAR PRIMARY KEY)`. Idempotent — skips already-applied migrations. Optional third arg overrides the target database (defaults to `iblhoops_ibl5`). Used internally by `bin/wt-up` and `bin/db-test-up`.
+Runs pending SQL migrations against a Docker MariaDB container. Tracks applied migrations in `schema_migrations(version VARCHAR PRIMARY KEY)`. Idempotent: it skips already-applied migrations. Optional third arg overrides the target database (defaults to `iblhoops_ibl5`). Used internally by `bin/wt-up` and `bin/db-test-up`. <!-- wt-up-ok: names a caller of the script -->
 
 ## Local Database Integration Tests
 

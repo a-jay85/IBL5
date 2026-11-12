@@ -204,6 +204,63 @@ case_rejected_forms() {
   expect_eq rejected-forms "calls" "$label" NONE
 }
 
+# Lint: a line naming bin/wt-up must also name bin/wt-stack or bin/wt-down, or carry
+# a wt-up-ok marker. Frontmatter (the paths: globs) is skipped.
+lint_root() {
+  local root="$1"
+  (cd "$root" && find .claude/rules .claude/skills .claude/review-shared \
+      -name '*.md' -type f 2>/dev/null | sort | while read -r f; do
+    awk -v F="$f" '
+      NR == 1 && $0 == "---" { fm = 1; next }
+      fm && $0 == "---"      { fm = 0; next }
+      fm                     { next }
+      index($0, "bin/wt-up") && !index($0, "wt-up-ok") \
+        && !index($0, "bin/wt-stack") && !index($0, "bin/wt-down") { print F ":" NR ": " $0 }
+    ' "$f"
+  done)
+}
+
+case_surface_lint() {
+  reset_case
+  local hits
+  hits=$(lint_root "$REPO")
+  [ -z "$hits" ] || fail surface-lint "unmarked bin/wt-up lines:
+$hits"
+}
+
+case_surface_lint_fixtures() {
+  reset_case
+  local hits want
+  mkdir -p "$T/lint/.claude/rules" "$T/lint/.claude/skills" "$T/lint/.claude/review-shared"
+  cat > "$T/lint/.claude/rules/x.md" <<'FIX'
+---
+paths:
+  - "bin/wt-up"
+---
+Run `bin/wt-up s --seed` first.
+Run `bin/wt-up s --prod` <!-- wt-up-ok: user -->
+Start with `bin/wt-stack start s`; `bin/wt-up` is the raw tool.
+The bin/wt-upkeep note.
+FIX
+  hits=$(lint_root "$T/lint")
+  want=$(printf '%s\n%s' \
+    '.claude/rules/x.md:5: Run `bin/wt-up s --seed` first.' \
+    '.claude/rules/x.md:8: The bin/wt-upkeep note.')
+  expect_eq surface-lint-fixtures "hits" "$hits" "$want"
+}
+
+case_post_plan_wiring() {
+  reset_case
+  local p10="$REPO/.claude/skills/post-plan/_phase-10-preview-environment.md"
+  local sk="$REPO/.claude/skills/post-plan/SKILL.md"
+  grep -qF 'bin/wt-stack stop <slug>' "$p10" || fail post-plan-wiring "phase 10 lacks wt-stack stop"
+  grep -qF 'bin/wt-up <slug> --prod' "$p10" || fail post-plan-wiring "phase 10 lacks printed wt-up --prod"
+  grep -qF 'http://<slug>.localhost/ibl5/' "$p10" || fail post-plan-wiring "phase 10 lacks preview URL"
+  ! grep -qF 'bin/wt-down <slug>' "$p10" || fail post-plan-wiring "phase 10 runs bin/wt-down <slug> again"
+  grep -qF 'bin/wt-stack start <worktree-name> --seed' "$sk" || fail post-plan-wiring "SKILL.md lacks wt-stack start"
+  grep -qF 'rc=$?; bin/wt-stack stop <worktree-name>; exit $rc' "$sk" || fail post-plan-wiring "SKILL.md lacks same-call stop"
+}
+
 case_started_then_stopped
 case_preexisting_left_running
 case_main_names_refused
@@ -215,6 +272,9 @@ case_start_failure_keeps_marker
 case_start_failure_no_container
 case_stop_failure_keeps_marker
 case_rejected_forms
+case_surface_lint
+case_surface_lint_fixtures
+case_post_plan_wiring
 
 if [ "$FAILS" -eq 0 ]; then
   echo "PASS: test-wt-stack ($CASES cases)"

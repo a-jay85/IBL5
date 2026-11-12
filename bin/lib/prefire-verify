@@ -32,7 +32,7 @@
 #   PREFIRE_EXEC_MUTATIONS_LIB  default bin/lib/plan-exec-mutations
 #
 # Environment:
-#   PREFIRE_PHPUNIT_FULL=1  run the full suite; 0, empty or unset maps files to tests
+#   PREFIRE_PHPUNIT_FULL=1  run the full suite; 0, empty or unset maps files to tests and defers unmapped files to CI
 
 set -uo pipefail
 
@@ -256,9 +256,22 @@ stage_matrix() {
 # prefire_phpunit_select <list-file> sets PHPUNIT_MODE (subset|full|skip) and
 # PHPUNIT_REASON. In subset mode it writes test paths, relative to ibl5/, to
 # <list-file>. Every error path calls phpunit_full, so errors run the full suite.
+# A changed file with no mapped test, or a shared test input, calls phpunit_defer
+# instead: it runs nothing locally, because CI runs the full suite on every push.
+# stage_phpunit prints each deferred file on a "phpunit deferred to CI:" line.
 PHPUNIT_MODE=""
 PHPUNIT_REASON=""
+PHPUNIT_DEFERRED=""
+PHPUNIT_DEFERRED_N=0
 phpunit_full() { PHPUNIT_MODE=full; PHPUNIT_REASON="$1"; }
+phpunit_defer() { PHPUNIT_DEFERRED="${PHPUNIT_DEFERRED}$1"$'\n'; PHPUNIT_DEFERRED_N=$((PHPUNIT_DEFERRED_N + 1)); }
+phpunit_say_deferred() {
+    local d
+    while IFS= read -r d; do
+        [ -n "$d" ] || continue
+        say "phpunit deferred to CI: $d"
+    done <<< "$PHPUNIT_DEFERRED"
+}
 
 # Base for the diff: --base, else git config branch.<name>.iblBase, else origin/master.
 prefire_phpunit_base() {
@@ -310,8 +323,8 @@ prefire_phpunit_map_path_ref() { # <repo-relative path> <list-file>
 }
 
 prefire_phpunit_select() { # <list-file>
-    local out="$1" base mb changed status path php_changed=0 before after
-    PHPUNIT_MODE=""; PHPUNIT_REASON=""
+    local out="$1" base mb changed status path before after
+    PHPUNIT_MODE=""; PHPUNIT_REASON=""; PHPUNIT_DEFERRED=""; PHPUNIT_DEFERRED_N=0
     if [ "${PREFIRE_PHPUNIT_FULL:-}" = "1" ]; then phpunit_full "PREFIRE_PHPUNIT_FULL=1"; return 0; fi
     base=$(prefire_phpunit_base)
     if ! git rev-parse --verify -q "$base^{commit}" >/dev/null 2>&1; then
@@ -332,29 +345,28 @@ prefire_phpunit_select() { # <list-file>
         [ -n "$path" ] || continue
         case "$path" in
             ibl5/phpunit.xml|ibl5/phpunit.xml.dist|ibl5/tests/bootstrap.php|ibl5/composer.json|ibl5/composer.lock)
-                phpunit_full "shared PHPUnit input changed: $path"; break ;;
+                phpunit_defer "shared PHPUnit input changed: $path"; continue ;;
             ibl5/tests/e2e/*|*.md) continue ;;
             ibl5/tests/PHPStanRules/Fixtures/*)
-                phpunit_full "PHPStan rule fixture changed: $path"; break ;;
+                phpunit_defer "PHPStan rule fixture changed: $path"; continue ;;
             ibl5/tests/*Test.php)
-                php_changed=1
-                if [ -f "$path" ]; then printf '%s\n' "${path#ibl5/}" >> "$out"; fi
+                if [ -f "$path" ]; then printf '%s\n' "${path#ibl5/}" >> "$out"
+                else phpunit_defer "test file deleted: $path"; fi
                 continue ;;
             ibl5/tests/*)
-                phpunit_full "shared test helper or fixture changed: $path"; break ;;
+                phpunit_defer "shared test helper or fixture changed: $path"; continue ;;
             ibl5/classes/*.php|ibl5/phpstan-rules/*.php)
-                php_changed=1
-                if [ "$status" = D ]; then phpunit_full "source file deleted: $path"; break; fi
+                if [ "$status" = D ]; then phpunit_defer "source file deleted: $path"; continue; fi
                 if prefire_phpunit_is_shared_base "$path"; then
-                    phpunit_full "shared base (abstract class, trait, interface, or extended class): $path"; break
+                    phpunit_defer "shared base (abstract class, trait, interface, or extended class): $path"; continue
                 fi
                 before=$(wc -l < "$out" | tr -d ' ')
                 prefire_phpunit_map_source "$path" "$out" || { phpunit_full "cannot search ibl5/tests for $path"; break; }
                 after=$(wc -l < "$out" | tr -d ' ')
-                if [ "$after" -le "$before" ]; then phpunit_full "no test file maps to the changed PHP: $path"; break; fi
+                if [ "$after" -le "$before" ]; then phpunit_defer "no test file maps to the changed PHP: $path"; fi
                 continue ;;
             ibl5/*)
-                phpunit_full "file under ibl5/ with no test mapping: $path"; break ;;
+                phpunit_defer "file under ibl5/ with no test mapping: $path"; continue ;;
             *)
                 # Outside ibl5/: Cli tests run scripts such as bin/adr-check by path.
                 prefire_phpunit_map_path_ref "$path" "$out" || { phpunit_full "cannot search ibl5/tests for $path"; break; }
@@ -364,8 +376,12 @@ prefire_phpunit_select() { # <list-file>
     rm -f "$changed"
     [ "$PHPUNIT_MODE" = full ] && return 0
     if [ ! -s "$out" ]; then
-        if [ "$php_changed" -eq 1 ]; then phpunit_full "no test file maps to the changed PHP"; return 0; fi
-        PHPUNIT_MODE=skip; PHPUNIT_REASON="no PHPUnit-relevant file changed against $base"
+        PHPUNIT_MODE=skip
+        if [ "$PHPUNIT_DEFERRED_N" -gt 0 ]; then
+            PHPUNIT_REASON="deferred to CI, which runs the full suite; changed files with no local test: $PHPUNIT_DEFERRED_N"
+        else
+            PHPUNIT_REASON="no PHPUnit-relevant file changed against $base"
+        fi
         return 0
     fi
     sort -u "$out" -o "$out" || { phpunit_full "cannot sort the test list"; return 0; }
@@ -386,12 +402,17 @@ stage_phpunit() {
     case "$PHPUNIT_MODE" in
         skip)
             rm -f "$list"
+            phpunit_say_deferred
             say "phpunit mode: skipped ($PHPUNIT_REASON)"
             return 0 ;;
         subset)
             while IFS= read -r t; do targets[${#targets[@]}]="$t"; done < "$list"
             key="subset-$(git hash-object "$list" | cut -c1-12)"
-            say "phpunit mode: subset (${#targets[@]} test files)" ;;
+            say "phpunit mode: subset (${#targets[@]} test files)"
+            if [ "$PHPUNIT_DEFERRED_N" -gt 0 ]; then
+                say "phpunit subset covers mapped files only; CI runs the full suite (deferred files: $PHPUNIT_DEFERRED_N)"
+                phpunit_say_deferred
+            fi ;;
         *)
             PHPUNIT_MODE=full
             say "phpunit mode: full ($PHPUNIT_REASON)" ;;

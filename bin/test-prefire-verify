@@ -1063,6 +1063,14 @@ touch_file() { # <repo-relative path>: append a line, creating the file if neede
     printf '// edit\n' >> "$R/$1"
 }
 commit_all() { (cd "$R" && git add -A && git commit -q -m "$1"); }
+want_deferred_skip() { # <deferred reason> <deferred count>: CI-deferred skip, nothing run, no record
+    want_rc 0
+    want_out "phpunit deferred to CI: $1"
+    want_out "phpunit mode: skipped (deferred to CI, which runs the full suite; changed files with no local test: $2)"
+    refute_out "phpunit mode: full"
+    want_cnt phpunit 0
+    [ -z "$(pass_files '\.phpunit.*\.pass$')" ] || note "a phpunit pass record was written for a skipped run"
+}
 
 test_phpunit_subset_runs_mapped_class_tests() {
     subset_case
@@ -1105,43 +1113,35 @@ test_phpunit_deleted_test_not_passed() {
     run_gate --stage phpunit
     want_rc 0
     want_args "1:tests/Foo/BarTest.php"
-    refute_out "OldTest"
+    want_out "phpunit deferred to CI: test file deleted: ibl5/tests/Foo/OldTest.php"
 }
 
-test_phpunit_bootstrap_change_runs_full() {
+test_phpunit_bootstrap_change_defers_to_ci() {
     subset_case
     touch_file ibl5/tests/bootstrap.php
     run_gate --stage phpunit
-    want_rc 0
-    want_out "phpunit mode: full (shared PHPUnit input changed: ibl5/tests/bootstrap.php)"
-    want_args "0:"
+    want_deferred_skip "shared PHPUnit input changed: ibl5/tests/bootstrap.php" 1
 }
 
-test_phpunit_phpunit_xml_change_runs_full() {
+test_phpunit_phpunit_xml_change_defers_to_ci() {
     subset_case
     touch_file ibl5/phpunit.xml
     run_gate --stage phpunit
-    want_rc 0
-    want_out "phpunit mode: full (shared PHPUnit input changed: ibl5/phpunit.xml)"
-    want_args "0:"
+    want_deferred_skip "shared PHPUnit input changed: ibl5/phpunit.xml" 1
 }
 
-test_phpunit_composer_lock_change_runs_full() {
+test_phpunit_composer_lock_change_defers_to_ci() {
     subset_case
     touch_file ibl5/composer.lock
     run_gate --stage phpunit
-    want_rc 0
-    want_out "phpunit mode: full (shared PHPUnit input changed: ibl5/composer.lock)"
-    want_args "0:"
+    want_deferred_skip "shared PHPUnit input changed: ibl5/composer.lock" 1
 }
 
-test_phpunit_shared_helper_change_runs_full() {
+test_phpunit_shared_helper_change_defers_to_ci() {
     subset_case
     touch_file ibl5/tests/WideUnit/WideUnitTestCase.php
     run_gate --stage phpunit
-    want_rc 0
-    want_out "phpunit mode: full (shared test helper or fixture changed: ibl5/tests/WideUnit/WideUnitTestCase.php)"
-    want_args "0:"
+    want_deferred_skip "shared test helper or fixture changed: ibl5/tests/WideUnit/WideUnitTestCase.php" 1
 }
 
 test_phpunit_no_php_change_skips() {
@@ -1186,32 +1186,145 @@ test_phpunit_bad_base_runs_full() {
     want_args "0:"
 }
 
-test_phpunit_empty_map_with_php_change_runs_full() {
+test_phpunit_unmapped_class_only_skips() {
     subset_case
     touch_file ibl5/classes/Foo/Lonely.php
     run_gate --stage phpunit
-    want_rc 0
-    want_out "phpunit mode: full (no test file maps to the changed PHP: ibl5/classes/Foo/Lonely.php)"
-    want_args "0:"
+    want_deferred_skip "no test file maps to the changed PHP: ibl5/classes/Foo/Lonely.php" 1
 }
 
-test_phpunit_mixed_mapped_and_unmapped_class_runs_full() {
+test_phpunit_mixed_mapped_and_unmapped_class_runs_subset() {
     subset_case
     touch_file ibl5/classes/Foo/Bar.php
     touch_file ibl5/classes/Foo/Lonely.php
     run_gate --stage phpunit
     want_rc 0
-    want_out "phpunit mode: full (no test file maps to the changed PHP: ibl5/classes/Foo/Lonely.php)"
-    want_args "0:"
+    want_out "phpunit mode: subset (2 test files)"
+    want_out "phpunit subset covers mapped files only; CI runs the full suite (deferred files: 1)"
+    want_out "phpunit deferred to CI: no test file maps to the changed PHP: ibl5/classes/Foo/Lonely.php"
+    refute_out "phpunit mode: full"
+    want_args "2:tests/Foo/BarTest.php tests/Other/UsesBarTest.php"
 }
 
-test_phpunit_deleted_source_runs_full() {
+test_phpunit_deleted_source_defers_to_ci() {
     subset_case
     (cd "$R" && git rm -q ibl5/classes/Foo/Bar.php)
     run_gate --stage phpunit
+    want_deferred_skip "source file deleted: ibl5/classes/Foo/Bar.php" 1
+}
+
+test_phpunit_migration_only_skips() {
+    subset_case
+    touch_file ibl5/migrations/999_example.sql
+    run_gate --stage phpunit
+    want_deferred_skip "file under ibl5/ with no test mapping: ibl5/migrations/999_example.sql" 1
+}
+
+test_phpunit_skip_writes_no_pass_record() {
+    subset_case
+    touch_file ibl5/migrations/999_example.sql
+    run_gate --stage phpunit
     want_rc 0
-    want_out "phpunit mode: full (source file deleted: ibl5/classes/Foo/Bar.php)"
+    run_gate --stage phpunit
+    want_rc 0
+    want_out "phpunit mode: skipped (deferred to CI"
+    refute_out "phpunit pass cached"
+    want_cnt phpunit 0
+    [ -z "$(pass_files '\.phpunit.*\.pass$')" ] || note "a phpunit pass record was written for a skipped run"
+}
+
+test_phpunit_ibl5_bin_script_only_skips() {
+    subset_case
+    touch_file ibl5/bin/check-example
+    run_gate --stage phpunit
+    want_deferred_skip "file under ibl5/ with no test mapping: ibl5/bin/check-example" 1
+}
+
+test_phpunit_other_unmapped_ibl5_file_skips() {
+    subset_case
+    touch_file ibl5/tracked.txt
+    run_gate --stage phpunit
+    want_deferred_skip "file under ibl5/ with no test mapping: ibl5/tracked.txt" 1
+}
+
+test_phpunit_phpstan_fixture_change_defers_to_ci() {
+    subset_case
+    touch_file ibl5/tests/PHPStanRules/Fixtures/ExampleFixture.php
+    run_gate --stage phpunit
+    want_deferred_skip "PHPStan rule fixture changed: ibl5/tests/PHPStanRules/Fixtures/ExampleFixture.php" 1
+}
+
+test_phpunit_shared_base_change_defers_to_ci() {
+    subset_case
+    printf '<?php\nabstract class Base {}\n' > "$R/ibl5/classes/Foo/Base.php"
+    commit_all "abstract base"
+    touch_file ibl5/classes/Foo/Base.php
+    run_gate --stage phpunit
+    want_deferred_skip "shared base (abstract class, trait, interface, or extended class): ibl5/classes/Foo/Base.php" 1
+}
+
+test_phpunit_shared_input_plus_mapped_class_runs_subset() {
+    subset_case
+    touch_file ibl5/tests/bootstrap.php
+    touch_file ibl5/classes/Foo/Bar.php
+    run_gate --stage phpunit
+    want_rc 0
+    want_out "phpunit mode: subset (2 test files)"
+    want_out "phpunit subset covers mapped files only; CI runs the full suite (deferred files: 1)"
+    want_out "phpunit deferred to CI: shared PHPUnit input changed: ibl5/tests/bootstrap.php"
+    refute_out "phpunit mode: full"
+    want_args "2:tests/Foo/BarTest.php tests/Other/UsesBarTest.php"
+}
+
+test_phpunit_deleted_test_only_skips() {
+    subset_case
+    (cd "$R" && git rm -q ibl5/tests/Foo/OldTest.php)
+    run_gate --stage phpunit
+    want_deferred_skip "test file deleted: ibl5/tests/Foo/OldTest.php" 1
+}
+
+test_phpunit_bad_base_with_unmapped_file_runs_full() {
+    subset_case
+    touch_file ibl5/classes/Foo/Lonely.php
+    touch_file ibl5/migrations/999_example.sql
+    run_gate_nobase --base no-such-ref --stage phpunit
+    want_rc 0
+    want_out "phpunit mode: full (cannot resolve base 'no-such-ref')"
+    refute_out "phpunit deferred to CI"
     want_args "0:"
+}
+
+test_phpunit_force_full_env_with_unmapped_file_runs_full() {
+    subset_case
+    touch_file ibl5/classes/Foo/Lonely.php
+    export PREFIRE_PHPUNIT_FULL=1
+    run_gate --stage phpunit
+    unset PREFIRE_PHPUNIT_FULL
+    want_rc 0
+    want_out "phpunit mode: full (PREFIRE_PHPUNIT_FULL=1)"
+    refute_out "phpunit deferred to CI"
+    want_args "0:"
+}
+
+test_phpunit_subset_key_changes_with_selected_set() {
+    subset_case
+    touch_file ibl5/classes/Foo/Bar.php
+    commit_all "bar"
+    (cd "$R" && git branch mid)
+    touch_file ibl5/classes/Team.php
+    commit_all "team"
+    run_gate --stage phpunit
+    want_rc 0
+    want_out "phpunit mode: subset (3 test files)"
+    run_gate_nobase --base mid --stage phpunit
+    want_rc 0
+    want_out "phpunit mode: subset (1 test files)"
+    want_args "1:tests/TeamTest.php"
+    want_cnt phpunit 2
+    run_gate --stage phpunit
+    want_rc 0
+    want_out "phpunit pass cached"
+    want_cnt phpunit 2
 }
 
 test_phpunit_subset_red_exits_1() {
@@ -1401,17 +1514,17 @@ test_phpunit_root_class_maps_top_level_test
 test_phpunit_subset_runs_changed_test_file
 test_phpunit_untracked_test_included
 test_phpunit_deleted_test_not_passed
-test_phpunit_bootstrap_change_runs_full
-test_phpunit_phpunit_xml_change_runs_full
-test_phpunit_composer_lock_change_runs_full
-test_phpunit_shared_helper_change_runs_full
+test_phpunit_bootstrap_change_defers_to_ci
+test_phpunit_phpunit_xml_change_defers_to_ci
+test_phpunit_composer_lock_change_defers_to_ci
+test_phpunit_shared_helper_change_defers_to_ci
 test_phpunit_no_php_change_skips
 test_phpunit_bin_script_maps_cli_test
 test_phpunit_empty_range_skips
 test_phpunit_bad_base_runs_full
-test_phpunit_empty_map_with_php_change_runs_full
-test_phpunit_mixed_mapped_and_unmapped_class_runs_full
-test_phpunit_deleted_source_runs_full
+test_phpunit_unmapped_class_only_skips
+test_phpunit_mixed_mapped_and_unmapped_class_runs_subset
+test_phpunit_deleted_source_defers_to_ci
 test_phpunit_subset_red_exits_1
 test_phpunit_missing_binary_exits_3
 test_phpunit_subset_cache_hit
@@ -1422,6 +1535,17 @@ test_phpunit_force_full_env_invalid_exits_2
 test_phpunit_stacked_iblbase_scopes_diff
 test_phpunit_base_flag_overrides_iblbase
 test_phpunit_subset_leaves_worktree_clean
+test_phpunit_migration_only_skips
+test_phpunit_skip_writes_no_pass_record
+test_phpunit_ibl5_bin_script_only_skips
+test_phpunit_other_unmapped_ibl5_file_skips
+test_phpunit_phpstan_fixture_change_defers_to_ci
+test_phpunit_shared_base_change_defers_to_ci
+test_phpunit_shared_input_plus_mapped_class_runs_subset
+test_phpunit_deleted_test_only_skips
+test_phpunit_bad_base_with_unmapped_file_runs_full
+test_phpunit_force_full_env_with_unmapped_file_runs_full
+test_phpunit_subset_key_changes_with_selected_set
 "
 
 if [ $# -gt 0 ]; then CASES="$*"; else CASES="$ALL_CASES"; fi

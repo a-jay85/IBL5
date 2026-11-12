@@ -239,7 +239,8 @@
     border: 1px solid color-mix(in srgb, var(--card-border) 30%, transparent);
     border-radius: var(--pc-radius-md);
     padding: var(--pc-pad-sm) var(--pc-pad-md);
-    font-family: 'Monaco', 'Menlo', monospace;
+    font-family: var(--font-numeric);
+    font-variant-numeric: tabular-nums;
     display: inline-block;
     text-align: center;
 }
@@ -328,7 +329,8 @@
     font-size: var(--pc-text-lg);
     font-weight: var(--font-weight-bold);
     color: var(--card-text);
-    font-family: 'Monaco', 'Menlo', monospace;
+    font-family: var(--font-numeric);
+    font-variant-numeric: tabular-nums;
 }
 
 .trading-card .contract-bar {
@@ -416,7 +418,8 @@
 .trading-card-back .highs-table .stat-value {
     color: var(--card-text);
     font-weight: var(--font-weight-bold);
-    font-family: 'Monaco', 'Menlo', monospace;
+    font-family: var(--font-numeric);
+    font-variant-numeric: tabular-nums;
 }
 
 .trading-card-back .highs-table .season-col {
@@ -552,7 +555,8 @@
 
 .player-stats-card > .stats-table-header,
 .player-stats-card > .player-view-table__title {
-    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+    font-family: var(--font-numeric);
+    font-variant-numeric: tabular-nums;
     line-height: 1.5;
     white-space: nowrap;
 }
@@ -590,7 +594,8 @@
     border: none;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     color: var(--card-text-muted);
-    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+    font-family: var(--font-numeric);
+    font-variant-numeric: tabular-nums;
     font-size: var(--pc-text-md);
     white-space: nowrap;
     background: transparent;

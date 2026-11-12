@@ -4,113 +4,24 @@ declare(strict_types=1);
 
 namespace Tests\JsbParser\Importers;
 
-use JsbParser\AswFileParser;
 use JsbParser\Contracts\JsbImportRepositoryInterface;
 use JsbParser\Importers\AswImporter;
 use PHPUnit\Framework\TestCase;
+
+require_once __DIR__ . '/BuildsAswFixtures.php';
 
 /**
  * @covers \JsbParser\Importers\AswImporter
  */
 final class AswImporterTest extends TestCase
 {
+    use BuildsAswFixtures;
+
     /** @var list<array<string, mixed>> */
     private array $captured = [];
 
     /** @var list<array<string, mixed>> */
     private array $capturedScores = [];
-
-    /**
-     * Build a synthetic .asw file with known roster and score data.
-     *
-     * The .asw format has 112 data lines. Sections:
-     * - Lines 0-15: All-Star Team 1 roster (PIDs)
-     * - Lines 16-30: All-Star Team 2 roster
-     * - Lines 31-45: Rookie Team 1 roster
-     * - Lines 46-60: Rookie Team 2 roster
-     * - Lines 61-70: 3-Point Shootout participants
-     * - Lines 71-80: Dunk Contest participants
-     * - Lines 81-96: Dunk scores (81=header, 82-89=round1, 90-92=finals)
-     * - Lines 97-111: 3-pt scores (97-104=round1, 105-108=semis, 109-110=finals)
-     *
-     * @param list<int> $allstar1 PIDs for All-Star Team 1 (up to 16)
-     * @param list<int> $allstar2 PIDs for All-Star Team 2 (up to 15)
-     * @param list<int> $threePointPids 3-pt contest participant PIDs
-     * @param list<int> $dunkPids Dunk contest participant PIDs
-     * @param list<int> $dunkRound1Scores Dunk round 1 scores (stored as score*10)
-     * @param list<int> $dunkFinalsScores Dunk finals scores
-     * @param list<int> $threePtRound1Scores 3-pt round 1 scores (raw count)
-     * @param list<int> $threePtSemisScores 3-pt semis scores
-     * @param list<int> $threePtFinalsScores 3-pt finals scores
-     */
-    private function buildAswFile(
-        array $allstar1 = [],
-        array $allstar2 = [],
-        array $threePointPids = [],
-        array $dunkPids = [],
-        array $dunkRound1Scores = [],
-        array $dunkFinalsScores = [],
-        array $threePtRound1Scores = [],
-        array $threePtSemisScores = [],
-        array $threePtFinalsScores = [],
-    ): string {
-        // Initialize 112 lines with "0". array_map with a string-typed callback yields
-        // list<string> (not list<'0'>), matching fillLines()'s by-ref param type.
-        $lines = array_map(
-            static fn (int $i): string => '0',
-            range(0, AswFileParser::TOTAL_DATA_LINES - 1)
-        );
-
-        // Fill roster sections
-        $this->fillLines($lines, AswFileParser::ALLSTAR_1_START, $allstar1);
-        $this->fillLines($lines, AswFileParser::ALLSTAR_2_START, $allstar2);
-        // Rookie rosters left as 0
-        $this->fillLines($lines, AswFileParser::THREE_POINT_START, $threePointPids);
-        $this->fillLines($lines, AswFileParser::DUNK_CONTEST_START, $dunkPids);
-
-        // Fill dunk scores: 82-89 = round1, 90-92 = finals
-        $this->fillLines($lines, 82, $dunkRound1Scores);
-        $this->fillLines($lines, 90, $dunkFinalsScores);
-
-        // Fill 3-pt scores: 97-104 = round1, 105-108 = semis, 109-110 = finals
-        $this->fillLines($lines, 97, $threePtRound1Scores);
-        $this->fillLines($lines, 105, $threePtSemisScores);
-        $this->fillLines($lines, 109, $threePtFinalsScores);
-
-        $content = implode("\r\n", $lines) . "\r\n";
-
-        // Pad to exactly 10,000 bytes
-        if (strlen($content) < AswFileParser::FILE_SIZE) {
-            $content = str_pad($content, AswFileParser::FILE_SIZE);
-        }
-
-        return $content;
-    }
-
-    /**
-     * Fill lines array starting at offset with values.
-     *
-     * @param array<int, string> $lines Lines array (modified in place)
-     * @param int $startLine Starting line index
-     * @param list<int> $values Values to fill
-     */
-    private function fillLines(array &$lines, int $startLine, array $values): void
-    {
-        foreach ($values as $i => $value) {
-            $lines[$startLine + $i] = (string) $value;
-        }
-    }
-
-    private function buildFixture(): string
-    {
-        return $this->buildAswFile(
-            allstar1: [101, 102],
-            threePointPids: [301, 302],
-            dunkPids: [401, 402],
-            dunkRound1Scores: [455, 480, 470],
-            threePtRound1Scores: [18, 21],
-        );
-    }
 
     private function repositoryCapturing(string $method): JsbImportRepositoryInterface&\PHPUnit\Framework\MockObject\Stub
     {
@@ -293,6 +204,197 @@ final class AswImporterTest extends TestCase
         $this->assertSame(5, $result->inserted);
         $this->assertStringContainsString('All-Star roster upsert failed: db down', implode("\n", $result->messages));
         $this->assertCount(5, $this->capturedScores);
+    }
+
+    private function buildAwardFixture(): string
+    {
+        return $this->buildAswFile(
+            allstar1: [101],
+            allstar2: [102],
+            threePointPids: [301],
+            dunkPids: [401],
+            rookie1: [201],
+            rookie2: [202],
+        );
+    }
+
+    /**
+     * @return JsbImportRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject
+     */
+    private function strictRepositoryWithWrites(): JsbImportRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject
+    {
+        $repo = self::createMock(JsbImportRepositoryInterface::class);
+        $repo->method('getPlayerName')->willReturnCallback(static fn (int $pid): string => 'P' . $pid);
+        $repo->method('findAllStarConference')->willReturn('Western');
+        $repo->method('upsertAllStarRoster')->willReturn(1);
+        $repo->method('upsertAllStarScore')->willReturn(1);
+        return $repo;
+    }
+
+    public function testStaleRostersRejectedWritesNothing(): void
+    {
+        $repo = self::createMock(JsbImportRepositoryInterface::class);
+        $repo->expects(self::once())->method('findOtherSeasonWithIdenticalRosters')->willReturn(2007);
+        $repo->expects(self::never())->method('upsertAllStarRoster');
+        $repo->expects(self::never())->method('upsertAllStarScore');
+        $repo->expects(self::never())->method('insertAwardUnlessFamilyExists');
+        $repo->expects(self::never())->method('getPlayerName');
+
+        $result = (new AswImporter($repo))->import($this->buildFixture(), 2009, true);
+
+        $this->assertSame(0, $result->inserted);
+        $this->assertSame(0, $result->errors);
+        $this->assertStringContainsString('season 2007', implode("\n", $result->messages));
+        $this->assertStringContainsString('nothing written for season 2009', implode("\n", $result->messages));
+    }
+
+    public function testStaleCheckSkippedWhenFlagOff(): void
+    {
+        $repo = $this->strictRepositoryWithWrites();
+        $repo->expects(self::never())->method('findOtherSeasonWithIdenticalRosters');
+        $repo->expects(self::atLeastOnce())->method('insertAwardUnlessFamilyExists')->willReturn(1);
+
+        $result = (new AswImporter($repo))->import($this->buildFixture(), 2009);
+
+        $this->assertSame(0, $result->errors);
+        $this->assertGreaterThan(0, $result->inserted);
+        $this->assertStringNotContainsString('stale', implode("\n", $result->messages));
+    }
+
+    public function testStaleCheckFailureWritesNothing(): void
+    {
+        $repo = self::createMock(JsbImportRepositoryInterface::class);
+        $repo->expects(self::once())->method('findOtherSeasonWithIdenticalRosters')
+            ->willThrowException(new \RuntimeException('db down'));
+        $repo->expects(self::never())->method('upsertAllStarRoster');
+        $repo->expects(self::never())->method('upsertAllStarScore');
+        $repo->expects(self::never())->method('insertAwardUnlessFamilyExists');
+
+        $result = (new AswImporter($repo))->import($this->buildFixture(), 2009, true);
+
+        $this->assertSame(1, $result->errors);
+        $this->assertSame(0, $result->inserted);
+        $this->assertStringContainsString('ASW stale check failed; nothing written: db down', implode("\n", $result->messages));
+    }
+
+    public function testAcceptedImportWritesParticipantAwards(): void
+    {
+        /** @var list<array{int, string, string, string}> $calls */
+        $calls = [];
+        $repo = $this->strictRepositoryWithWrites();
+        $repo->expects(self::once())->method('findOtherSeasonWithIdenticalRosters')->willReturn(null);
+        $repo->expects(self::exactly(6))->method('insertAwardUnlessFamilyExists')->willReturnCallback(
+            static function (int $year, string $award, string $name, string $sibling) use (&$calls): int {
+                $calls[] = [$year, $award, $name, $sibling];
+                return 1;
+            }
+        );
+
+        $result = (new AswImporter($repo))->import($this->buildAwardFixture(), 2009, true);
+
+        $this->assertSame(0, $result->errors);
+        $this->assertSame([
+            [2009, 'Western Conference All-Star', 'P101', 'Eastern Conference All-Star'],
+            [2009, 'Western Conference All-Star', 'P102', 'Eastern Conference All-Star'],
+            [2009, 'Rookie-Sophomore Challenge', 'P201', 'Rookie-Sophomore Challenge - MVP'],
+            [2009, 'Rookie-Sophomore Challenge', 'P202', 'Rookie-Sophomore Challenge - MVP'],
+            [2009, 'Three-Point Contest', 'P301', 'Three-Point Contest - Winner'],
+            [2009, 'Slam Dunk Competition', 'P401', 'Slam Dunk Competition - Winner'],
+        ], $calls);
+        foreach ($calls as [, $award]) {
+            $this->assertStringEndsNotWith('- Winner', $award);
+            $this->assertStringEndsNotWith('- MVP', $award);
+        }
+    }
+
+    public function testAllStarWithoutConferenceIsSkippedAndReported(): void
+    {
+        $repo = self::createMock(JsbImportRepositoryInterface::class);
+        $repo->method('getPlayerName')->willReturnCallback(static fn (int $pid): string => 'P' . $pid);
+        $repo->method('findAllStarConference')->willReturn(null);
+        $repo->method('upsertAllStarRoster')->willReturn(1);
+        $repo->method('upsertAllStarScore')->willReturn(1);
+        /** @var list<string> $awards */
+        $awards = [];
+        $repo->expects(self::exactly(4))->method('insertAwardUnlessFamilyExists')->willReturnCallback(
+            static function (int $year, string $award) use (&$awards): int {
+                $awards[] = $award;
+                return 1;
+            }
+        );
+
+        $result = (new AswImporter($repo))->import($this->buildAwardFixture(), 2009);
+
+        $this->assertSame(0, $result->errors);
+        $this->assertSame([
+            'Rookie-Sophomore Challenge',
+            'Rookie-Sophomore Challenge',
+            'Three-Point Contest',
+            'Slam Dunk Competition',
+        ], $awards);
+        $messages = implode("\n", $result->messages);
+        $this->assertStringContainsString('no conference for P101 (pid 101) in 2009', $messages);
+        $this->assertStringContainsString('no conference for P102 (pid 102) in 2009', $messages);
+    }
+
+    public function testAwardSkippedWhenPlayerNameUnknown(): void
+    {
+        $repo = self::createMock(JsbImportRepositoryInterface::class);
+        $repo->method('getPlayerName')->willReturn(null);
+        $repo->method('upsertAllStarRoster')->willReturn(1);
+        $repo->method('upsertAllStarScore')->willReturn(1);
+        $repo->expects(self::never())->method('findAllStarConference');
+        $repo->expects(self::never())->method('insertAwardUnlessFamilyExists');
+
+        $result = (new AswImporter($repo))->import($this->buildAwardFixture(), 2009);
+
+        $this->assertSame(0, $result->errors);
+        $this->assertStringContainsString('ASW awards: 6 roster slots skipped (unknown player name)', implode("\n", $result->messages));
+    }
+
+    public function testUnnamedSlotDoesNotStopLaterSlotsInSameEvent(): void
+    {
+        $repo = self::createMock(JsbImportRepositoryInterface::class);
+        $repo->method('getPlayerName')->willReturnMap([[101, null], [102, 'P102']]);
+        $repo->method('findAllStarConference')->willReturn('Eastern');
+        $repo->method('upsertAllStarRoster')->willReturn(1);
+        $repo->method('upsertAllStarScore')->willReturn(1);
+        $repo->expects(self::once())->method('insertAwardUnlessFamilyExists')
+            ->with(2009, 'Eastern Conference All-Star', 'P102', 'Western Conference All-Star')
+            ->willReturn(1);
+
+        $result = (new AswImporter($repo))->import($this->buildAswFile(allstar1: [101, 102]), 2009);
+
+        $this->assertSame(0, $result->errors);
+        $this->assertStringContainsString('ASW awards: 1 roster slots skipped (unknown player name)', implode("\n", $result->messages));
+    }
+
+    public function testMissingConferenceDoesNotStopLaterSlotsInSameEvent(): void
+    {
+        $repo = self::createMock(JsbImportRepositoryInterface::class);
+        $repo->method('getPlayerName')->willReturnCallback(static fn (int $pid): string => 'P' . $pid);
+        $repo->method('findAllStarConference')->willReturnMap([[101, 2009, null], [102, 2009, 'Eastern']]);
+        $repo->method('upsertAllStarRoster')->willReturn(1);
+        $repo->method('upsertAllStarScore')->willReturn(1);
+        $repo->expects(self::once())->method('insertAwardUnlessFamilyExists')
+            ->with(2009, 'Eastern Conference All-Star', 'P102', 'Western Conference All-Star')
+            ->willReturn(1);
+
+        $result = (new AswImporter($repo))->import($this->buildAswFile(allstar1: [101, 102]), 2009);
+
+        $this->assertSame(0, $result->errors);
+        $this->assertStringContainsString('no conference for P101 (pid 101) in 2009', implode("\n", $result->messages));
+    }
+
+    public function testAllNamedSlotsReportNoSkippedSlots(): void
+    {
+        $repo = $this->strictRepositoryWithWrites();
+        $repo->expects(self::exactly(6))->method('insertAwardUnlessFamilyExists')->willReturn(1);
+
+        $result = (new AswImporter($repo))->import($this->buildAwardFixture(), 2009);
+
+        $this->assertSame(0, $result->errors);
+        $this->assertStringNotContainsString('roster slots skipped', implode("\n", $result->messages));
     }
 
     public function testImportFileReportsMissingFile(): void

@@ -44,6 +44,26 @@ final class TeamRecordRepository extends \Database\BaseMysqliRepository
      */
     private array $teamNameCache = [];
 
+    /**
+     * (game_type, stat) index per RecordStatDefinitions::STATS expression on
+     * ibl_box_scores_teams. Hinted only when the date filter is a DATE_FILTERS
+     * value (a game_type equality), so the index prefix matches the filter.
+     */
+    private const STAT_INDEXES = [
+        'bs.calc_points' => 'idx_gt_points',
+        'bs.calc_rebounds' => 'idx_gt_rebounds',
+        'bs.game_ast' => 'idx_gt_ast',
+        'bs.game_stl' => 'idx_gt_stl',
+        'bs.game_blk' => 'idx_gt_blk',
+        'bs.game_tov' => 'idx_gt_tov',
+        'bs.calc_fg_made' => 'idx_gt_fg_made',
+        'bs.game_ftm' => 'idx_gt_ftm',
+        'bs.game_3gm' => 'idx_gt_3gm',
+    ];
+
+    /** Rows per single-game record list; the cut is the value at this rank. */
+    private const SINGLE_GAME_LIMIT = 5;
+
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db, $leagueContext);
@@ -189,17 +209,18 @@ final class TeamRecordRepository extends \Database\BaseMysqliRepository
         $safeOrder = $order === 'ASC' ? 'ASC' : 'DESC';
 
         $query = "SELECT
-                twl.currentname AS team_name,
-                twl.year,
-                twl.wins,
-                twl.losses
-            FROM `ibl_team_win_loss` twl
-            JOIN `ibl_team_info` ti ON ti.team_name = twl.currentname
-            WHERE ti.teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-                AND (twl.wins + twl.losses) > 0"
-            // @phpstan-ignore ibl.orderByMissingTiebreaker ($safeOrder is a validated ASC/DESC constant; the full ORDER BY ends with (year, teamid), unique per ibl_team_win_loss row)
-            . " ORDER BY (twl.wins / (twl.wins + twl.losses)) " . $safeOrder . ",
-                twl.wins " . $safeOrder . ", twl.year ASC, ti.teamid ASC
+                r.currentname AS team_name,
+                r.year,
+                r.wins,
+                r.losses
+            FROM `ibl_team_season_records` r
+            JOIN `ibl_team_info` ti ON ti.teamid = r.team_id
+            WHERE r.game_type = 1
+                AND ti.teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
+                AND (r.wins + r.losses) > 0"
+            // @phpstan-ignore ibl.orderByMissingTiebreaker ($safeOrder is a validated ASC/DESC constant; the full ORDER BY ends with (year, teamid), unique per ibl_team_season_records row at game_type = 1 because the PK is (team_id, year, game_type))
+            . " ORDER BY (r.wins / (r.wins + r.losses)) " . $safeOrder . ",
+                r.wins " . $safeOrder . ", r.year ASC, ti.teamid ASC
             LIMIT 5";
 
         $rows = $this->fetchAll($query);
@@ -231,37 +252,17 @@ final class TeamRecordRepository extends \Database\BaseMysqliRepository
             return [];
         }
 
+        $thresholds = $this->fetchSingleGameThresholds($statExpressions, $dateFilter);
         $unions = [];
+        $params = [];
         foreach ($statExpressions as $label => $config) {
-            $safeLabel = str_replace("'", "''", $label);
-            $safeOrder = $config['order'] === 'ASC' ? 'ASC' : 'DESC';
-            $unions[] = "(SELECT
-                    '" . $safeLabel . "' AS stat_type,
-                    t.teamid AS teamid,
-                    t.team_name,
-                    bs.game_date AS `date`,
-                    COALESCE(sch.box_id, 0) AS box_id,
-                    COALESCE(bs.game_of_that_day, 0) AS game_of_that_day,
-                    CASE WHEN t.teamid = bs.visitor_teamid THEN bs.home_teamid ELSE bs.visitor_teamid END AS oppTid,
-                    opp.team_name AS opp_team_name,
-                    " . $config['expression'] . " AS value
-                FROM `ibl_box_scores_teams` bs
-                JOIN `ibl_team_info` t ON t.team_name = bs.name
-                LEFT JOIN `ibl_schedule` sch ON sch.game_date = bs.game_date
-                    AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
-                LEFT JOIN `ibl_team_info` opp ON opp.teamid = CASE
-                    WHEN t.teamid = bs.visitor_teamid THEN bs.home_teamid
-                    ELSE bs.visitor_teamid END
-                WHERE " . $dateFilter . "
-                    AND bs.visitor_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-                    AND bs.home_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID
-                // @phpstan-ignore ibl.orderByMissingTiebreaker ($safeOrder is a validated ASC/DESC constant; the full ORDER BY ends with the bs.id PK)
-                . " ORDER BY value " . $safeOrder . ", bs.game_date ASC, bs.id ASC
-                LIMIT 5)";
+            $branch = self::buildSingleGameBranch($label, $config, $dateFilter, $thresholds[$label] ?? null);
+            $unions[] = $branch['sql'];
+            array_push($params, ...$branch['params']);
         }
 
         $query = implode("\nUNION ALL\n", $unions);
-        $rows = $this->fetchAll($query);
+        $rows = $this->fetchAll($query, str_repeat('i', count($params)), ...$params);
 
         /** @var array<string, list<TeamSingleGameRecord>> $results */
         $results = [];
@@ -290,6 +291,123 @@ final class TeamRecordRepository extends \Database\BaseMysqliRepository
         }
 
         return $results;
+    }
+
+    /**
+     * Value at rank SINGLE_GAME_LIMIT of each stat's own order, one round trip
+     * for the batch. Null when fewer rows match or that row's value is NULL;
+     * the branch then skips the cut and runs the uncut query. The JOIN and
+     * team-id filters match the record branch, because rows they drop would
+     * otherwise raise the cut above a real record. The branch's LEFT JOINs can
+     * only add rows, which never lowers the true rank-5 value below this one.
+     *
+     * @param array<string, array{expression: string, order: string}> $statExpressions
+     * @return array<string, int|null>
+     */
+    private function fetchSingleGameThresholds(array $statExpressions, string $dateFilter): array
+    {
+        $branches = [];
+        foreach ($statExpressions as $label => $config) {
+            $safeLabel = str_replace("'", "''", $label);
+            $safeOrder = $config['order'] === 'ASC' ? 'ASC' : 'DESC';
+            $expression = $config['expression'];
+            $branches[] = "(SELECT '" . $safeLabel . "' AS stat_type, (
+                    SELECT " . $expression . "
+                    " . self::singleGameSource(self::statIndex($expression, $dateFilter)) . "
+                    " . self::singleGameWhere($dateFilter) . "
+                    ORDER BY " . $expression . " " . $safeOrder . "
+                    LIMIT 1 OFFSET " . (self::SINGLE_GAME_LIMIT - 1) . "
+                ) AS threshold)";
+        }
+
+        $thresholds = [];
+        foreach ($this->fetchAll(implode("\nUNION ALL\n", $branches)) as $row) {
+            /** @var array{stat_type: string, threshold?: int|string|null} $row */
+            $value = $row['threshold'] ?? null;
+            $thresholds[$row['stat_type']] = $value === null ? null : (int) $value;
+        }
+
+        return $thresholds;
+    }
+
+    /**
+     * One UNION ALL branch. A non-null threshold adds the cut; `>=` / `<=`
+     * keep every row tied at the cut, so the ORDER BY tiebreak sees the same
+     * leading rows as the uncut query. ASC also keeps NULL values, which
+     * MariaDB sorts first in ASC order.
+     *
+     * @param array{expression: string, order: string} $config
+     * @return array{sql: string, params: list<int>}
+     */
+    private static function buildSingleGameBranch(string $label, array $config, string $dateFilter, ?int $threshold): array
+    {
+        $safeLabel = str_replace("'", "''", $label);
+        $safeOrder = $config['order'] === 'ASC' ? 'ASC' : 'DESC';
+        $expression = $config['expression'];
+
+        $cut = '';
+        $params = [];
+        if ($threshold !== null) {
+            $cut = $safeOrder === 'ASC'
+                ? "\n                    AND (" . $expression . ' <= ? OR ' . $expression . ' IS NULL)'
+                : "\n                    AND " . $expression . ' >= ?';
+            $params[] = $threshold;
+        }
+        $source = self::singleGameSource($threshold === null ? null : self::statIndex($expression, $dateFilter));
+
+        // $expression and $dateFilter come from RecordStatDefinitions constants, never user input.
+        // The chain starts with a variable so the SQL-concatenation rule sees a fragment, not a statement.
+        $select = "(SELECT
+                    '";
+        $sql = $select . $safeLabel . "' AS stat_type,
+                    t.teamid AS teamid,
+                    t.team_name,
+                    bs.game_date AS `date`,
+                    COALESCE(sch.box_id, 0) AS box_id,
+                    COALESCE(bs.game_of_that_day, 0) AS game_of_that_day,
+                    CASE WHEN t.teamid = bs.visitor_teamid THEN bs.home_teamid ELSE bs.visitor_teamid END AS oppTid,
+                    opp.team_name AS opp_team_name,
+                    " . $expression . " AS value
+                " . $source . "
+                LEFT JOIN `ibl_schedule` sch ON sch.game_date = bs.game_date
+                    AND sch.visitor_teamid = bs.visitor_teamid AND sch.home_teamid = bs.home_teamid
+                LEFT JOIN `ibl_team_info` opp ON opp.teamid = CASE
+                    WHEN t.teamid = bs.visitor_teamid THEN bs.home_teamid
+                    ELSE bs.visitor_teamid END
+                " . self::singleGameWhere($dateFilter) . $cut
+                // @phpstan-ignore ibl.orderByMissingTiebreaker ($safeOrder is a validated ASC/DESC constant; the full ORDER BY ends with the bs.id PK)
+                . " ORDER BY value " . $safeOrder . ", bs.game_date ASC, bs.id ASC
+                LIMIT " . self::SINGLE_GAME_LIMIT . ")";
+
+        return ['sql' => $sql, 'params' => $params];
+    }
+
+    private static function statIndex(string $expression, string $dateFilter): ?string
+    {
+        if (!in_array($dateFilter, RecordStatDefinitions::DATE_FILTERS, true)) {
+            return null;
+        }
+
+        return self::STAT_INDEXES[$expression] ?? null;
+    }
+
+    private static function singleGameSource(?string $index): string
+    {
+        if ($index === null) {
+            return "FROM `ibl_box_scores_teams` bs
+                JOIN `ibl_team_info` t ON t.team_name = bs.name";
+        }
+
+        return "FROM `ibl_box_scores_teams` bs FORCE INDEX (`" . $index . "`)
+                STRAIGHT_JOIN `ibl_team_info` t ON t.team_name = bs.name";
+    }
+
+    private static function singleGameWhere(string $dateFilter): string
+    {
+        // @phpstan-ignore ibl.sqlStringConcatenation ($dateFilter is a RecordStatDefinitions::DATE_FILTERS constant or a caller-built date range, never user input)
+        return "WHERE " . $dateFilter . "
+                    AND bs.visitor_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
+                    AND bs.home_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID;
     }
 
     /**

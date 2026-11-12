@@ -413,7 +413,7 @@ jobs:
           docker run -d --name php-base --network ibl5-e2e --network-alias php-base \
             -e DB_HOST=mariadb -e E2E_TESTING=1 \
             -v "$BASE/ibl5:/var/www/html/ibl5" ghcr.io/a-jay85/ibl5/php-apache:latest
-          for i in $(seq 1 30); do docker exec php-base curl -sf http://localhost/ibl5/ >/dev/null && break; sleep 2; done
+          for _ in $(seq 1 30); do docker exec php-base curl -sf http://localhost/ibl5/ >/dev/null && break; sleep 2; done
           if ! docker run --rm \
             --network ibl5-e2e \
             --user "$(id -u):$(id -g)" \
@@ -682,6 +682,7 @@ jobs:
             --gallery=ibl5/vr-gallery.json \
             --coverage=coverage.json \
             --pages-url="https://a-jay85.github.io/IBL5/$VRCTX_KEY/visual-review/" \
+            --base-sha="$VRCTX_BASE_SHA" \
             --out=vr-review-comment.md
           cat vr-review-comment.md
 

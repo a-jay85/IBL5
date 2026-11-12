@@ -135,6 +135,8 @@ blocked_ship_block() {
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib/launchd-job.sh"
 # shellcheck source=lib/usage-gate.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib/usage-gate.sh"
+WTLOCK_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib/worktree-lock.sh"
+. "$WTLOCK_LIB"
 
 # LEGACY: the old sticky "post-plan is running" comment marker. Only used to delete stale
 # sticky comments; master's harness still posts them until this change merges.
@@ -605,6 +607,23 @@ if [ "${FORCE:-0}" -eq 0 ]; then
   fi
 fi
 
+# Per-worktree lock (backlog#1827). A --foreground run creates no launchd label, so the
+# label checks above cannot see it. The lock under the worktree's git admin dir covers
+# every caller. --force steals a held lock instead of refusing. The far side of $CMD
+# adopts it with its own pid (LOCK_SEG).
+PP_WTLOCK=$(wtlock_path "$ROOT") || PP_WTLOCK=""
+if [ -z "$PP_WTLOCK" ]; then
+    echo "post-plan-now: cannot resolve the git dir of '$ROOT' for the worktree lock; refusing." >&2
+    exit 6
+fi
+if [ "${FORCE:-0}" -eq 1 ]; then PP_LOCK_MODE=--steal; else PP_LOCK_MODE=""; fi
+if ! PP_LOCK_HOLDER=$(wtlock_acquire "$PP_WTLOCK" "$$" ${PP_LOCK_MODE:+"$PP_LOCK_MODE"}); then
+    echo "post-plan-now: another post-plan run holds the worktree lock for '$SLUG' (pid ${PP_LOCK_HOLDER:-unknown})."
+    echo "post-plan-now: refusing to start a second one. Wait for it, or re-run with --force."
+    exit 6
+fi
+trap 'wtlock_release "$PP_WTLOCK" "$$"' EXIT
+
 # Nothing to ship? Clean tree AND no untracked files AND no commits ahead of origin/master.
 # `git diff` ignores untracked files, so a tree whose only change is a new file needs its
 # own check.
@@ -939,6 +958,12 @@ FAILDM_SEG="if [ \"\$pp_rc\" != 0 ] && [ \"\$pp_rc\" != 3 ] && [ \"\$pp_rc\" != 
 # postplan_postrun_pause checks kill evidence first, so a killed run is never a pause.
 PAUSE_SEG="if postplan_postrun_pause $(shq "$SESSION_ID") $(shq "$ROOT/bin/post-plan-now") \"\$pp_rc\" \"\${_sigterm_received:-0}\" $(shq "$LOG"); then pp_rc=75; fi; "
 RELEASE_SEG="usage_token_release $(shq "$SESSION_ID") 2>/dev/null || true; "
+# The far side of $CMD takes over the worktree lock with its own long-lived pid (\$\$),
+# the same hand-off ACQUIRE_SEG does for the drain token. Foreground: exec keeps the pid,
+# so the adopt rewrites the same value. Detached: the submitting shell exits after
+# ljob_submit, and the loaded launchd label covers the gap until the adopt runs.
+LOCK_SEG="PP_WTLOCK=$(shq "$PP_WTLOCK"); . $(shq "$WTLOCK_LIB"); wtlock_adopt \"\$PP_WTLOCK\" $(shq "$$") \$\$ || { echo 'post-plan-now: another post-plan run holds the worktree lock; refusing.'; exit 6; }; "
+PP_UNLOCK_TRAP="; wtlock_release \"\$PP_WTLOCK\" \$\$"
 # Re-acquire the drain token with this launchd job's pid (\$\$ expands on the far side)
 # so usage_token_reclaim_dead keeps it alive while the run is in flight. No-op when the
 # session does not hold the token (normal-zone runs never acquire it).
@@ -952,7 +977,7 @@ else
     SKILL_SESSION_ARG="--session-id $(shq "$SESSION_ID")"
 fi
 
-CMD="export PATH=\"/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH\"; ${PLAN_SLUG_SEG}export POSTPLAN_LABEL=$(shq "$LABEL") POSTPLAN_STARTED=$(shq "$STARTED") POSTPLAN_BADGE_MARKER=$(shq "$POSTPLAN_BADGE_MARKER") POSTPLAN_RUNNING_LABEL=$(shq "$POSTPLAN_RUNNING_LABEL") POSTPLAN_FAILURE_MARKER=$(shq "$POSTPLAN_FAILURE_MARKER") POSTPLAN_LOG_FILE=$(shq "$LOG") POSTPLAN_STATUS_LABEL=$(shq "$POSTPLAN_RUNNING_LABEL"); ${BADGE_FN}_sigterm_received=0; trap 'conclude_status_badge \"\${pp_rc:-1}\"' EXIT INT HUP; trap '_sigterm_received=1; conclude_status_badge \"\${pp_rc:-1}\"' TERM; cd \"$ROOT\" && { . \"$ROOT/bin/lib/usage-gate.sh\"; postplan_sweep_stale_badge \"\$(postplan_badge_pr_number)\"; ${ACQUIRE_SEG}${FALLBACK_FN}${HARNESS_SEG}${POST_HARNESS_SEG}${GATE_OPEN}${GATE_ENV}POSTPLAN_HARNESS_RC=\"\${rc:-}\" CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 caffeinate -s claude -p ${SKILL_PROMPT_ARG} --dangerously-skip-permissions --model claude-sonnet-5-5 ${SKILL_SESSION_ARG} --effort high --name \"$LABEL\"${GATE_CLOSE}; }; pp_rc=\$?; if [ \"\${_sigterm_received:-0}\" -eq 1 ]; then pp_rc=143; fi; if [ \"\${rc:-0}\" = 3 ]; then pp_rc=3; elif [ \"\${rc:-0}\" = 76 ]; then pp_rc=76; elif [ \"\$pp_rc\" = 0 ] && [ -n \"\${rc:-}\" ] && [ \"\$rc\" != 0 ] && [ \"\$rc\" != 7 ]; then pp_rc=\$rc; fi; ${PAUSE_SEG}${FAILDM_SEG}${RELEASE_SEG}${CMD_TAIL}"
+CMD="export PATH=\"/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH\"; ${PLAN_SLUG_SEG}${LOCK_SEG}export POSTPLAN_LABEL=$(shq "$LABEL") POSTPLAN_STARTED=$(shq "$STARTED") POSTPLAN_BADGE_MARKER=$(shq "$POSTPLAN_BADGE_MARKER") POSTPLAN_RUNNING_LABEL=$(shq "$POSTPLAN_RUNNING_LABEL") POSTPLAN_FAILURE_MARKER=$(shq "$POSTPLAN_FAILURE_MARKER") POSTPLAN_LOG_FILE=$(shq "$LOG") POSTPLAN_STATUS_LABEL=$(shq "$POSTPLAN_RUNNING_LABEL"); ${BADGE_FN}_sigterm_received=0; trap 'conclude_status_badge \"\${pp_rc:-1}\"${PP_UNLOCK_TRAP}' EXIT INT HUP; trap '_sigterm_received=1; conclude_status_badge \"\${pp_rc:-1}\"' TERM; cd \"$ROOT\" && { . \"$ROOT/bin/lib/usage-gate.sh\"; postplan_sweep_stale_badge \"\$(postplan_badge_pr_number)\"; ${ACQUIRE_SEG}${FALLBACK_FN}${HARNESS_SEG}${POST_HARNESS_SEG}${GATE_OPEN}${GATE_ENV}POSTPLAN_HARNESS_RC=\"\${rc:-}\" CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 caffeinate -s claude -p ${SKILL_PROMPT_ARG} --dangerously-skip-permissions --model claude-sonnet-5-5 ${SKILL_SESSION_ARG} --effort high --name \"$LABEL\"${GATE_CLOSE}; }; pp_rc=\$?; if [ \"\${_sigterm_received:-0}\" -eq 1 ]; then pp_rc=143; fi; if [ \"\${rc:-0}\" = 3 ]; then pp_rc=3; elif [ \"\${rc:-0}\" = 76 ]; then pp_rc=76; elif [ \"\$pp_rc\" = 0 ] && [ -n \"\${rc:-}\" ] && [ \"\$rc\" != 0 ] && [ \"\$rc\" != 7 ]; then pp_rc=\$rc; fi; ${PAUSE_SEG}${FAILDM_SEG}${RELEASE_SEG}${CMD_TAIL}"
 
 if [ "$FOREGROUND" -eq 1 ]; then
     echo "post-plan-now: foreground mode on branch '$SLUG' — engine: $ENGINE"
@@ -973,6 +998,8 @@ if ! ljob_submit "$LABEL" "$LOG" "$SCRIPT"; then
     echo "post-plan-now: launchctl submit failed for $LABEL; nothing launched. Log: $LOG" >&2
     exit 1
 fi
+
+trap - EXIT  # lock handed to the launchd job (wtlock_adopt in LOCK_SEG)
 
 echo "post-plan-now: fired a detached post-plan on branch '$SLUG'."
 echo "  engine: $ENGINE"

@@ -1,6 +1,6 @@
 ---
 description: Displays season-high statistical performances for players and teams.
-last_verified: 2026-10-03
+last_verified: 2026-11-11
 ---
 
 # SeasonHighs
@@ -12,9 +12,13 @@ Tracks and displays the best single-game statistical performances of the current
 | `SeasonHighsRepository` | Queries for peak single-game performances |
 | `SeasonHighsService` | Assembles season-high data for display |
 | `SeasonHighsView` | Renders the season highs page |
+| `CachedSeasonHighsRepository` | Caches batch results; also plans and warms keys for the warmer |
+| `SeasonHighsCacheWarmer` | Lists, deletes, and rebuilds the Records "This Season" keys |
 
 ## Caching
 
 `ibl5/modules/SeasonHighs/index.php` wraps `SeasonHighsRepository` in `CachedSeasonHighsRepository`. The decorator caches each `getSeasonHighsBatch` result for 15 minutes under the `season_highs:v1:` key prefix, keyed by league, date range, limit, location filter, and a hash of the stat map. `getSeasonHighs` and `getRcbSeasonHighs` pass through uncached.
+
+Lazy page-miss writes keep a 900 s TTL. After each IBL sim, `RefreshSeasonHighsCacheStep` deletes every Records "This Season" key, for all four date ranges (Regular Season, Playoffs, Preseason, HEAT). It then rewarms them with a 30-day safety-net TTL through `SeasonHighsCacheWarmer`. When the warm is skipped for time or fails, the keys stay deleted and the page cold-computes.
 
 Build every new `SeasonHighsRepository` inside a `CachedSeasonHighsRepository`. `ibl5/tests/SeasonHighs/SeasonHighsRepositoryConstructionSitesTest.php` fails on any bare construction under `ibl5/classes` or `ibl5/modules`.

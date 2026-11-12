@@ -1,6 +1,6 @@
 ---
 name: pr-second-reviewer
-description: Pinned Opus 5.5 blind reviewer that decides whether a held pull request is safe to merge without the owner. Spawned by the post-plan harness at arming time. It sees only a diff, the stated reason for it and the hold list. Never edits, never spawns a delegate.
+description: Opus 5.5 blind reviewer that decides whether a held PR may merge without the owner. Spawned by name by the post-plan harness at arming time. It never edits.
 model: claude-opus-5-5
 effort: high
 last_verified: 2026-11-06

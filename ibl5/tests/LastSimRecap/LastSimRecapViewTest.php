@@ -189,8 +189,8 @@ class LastSimRecapViewTest extends TestCase
             games: [$this->makeGame()],
         ));
 
-        self::assertStringContainsString('Best:</span>&nbsp;<span class="last-sim-recap__meta-value">+11 vs CLE', $html);
-        self::assertStringContainsString('Worst:</span>&nbsp;<span class="last-sim-recap__meta-value">−13 @ MIA', $html);
+        self::assertStringContainsString('<span class="last-sim-recap__meta-bw-label">Best:</span><span class="last-sim-recap__meta-value">+11 vs CLE', $html);
+        self::assertStringContainsString('<span class="last-sim-recap__meta-bw-label">Worst:</span><span class="last-sim-recap__meta-value">−13 @ MIA', $html);
     }
 
     private function makeInjury(

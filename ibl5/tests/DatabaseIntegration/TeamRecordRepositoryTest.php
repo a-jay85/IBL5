@@ -6,6 +6,7 @@ namespace Tests\DatabaseIntegration;
 
 use PHPUnit\Framework\Attributes\Group;
 use RecordHolders\TeamRecordRepository;
+use Updater\Steps\RefreshTeamSeasonRecordsStep;
 
 /**
  * Direct tests for TeamRecordRepository against the real schema.
@@ -321,6 +322,7 @@ final class TeamRecordRepositoryTest extends DatabaseTestCase
         }
         $this->seedGame('2098-01-17', 3, 1, $this->quarters(80), $this->quarters(100));
         $this->seedGame('2098-01-18', 2, 3, $this->quarters(80), $this->quarters(100));
+        (new RefreshTeamSeasonRecordsStep($this->db))->rebuildWithinCurrentTransaction();
     }
 
     /**

@@ -1622,10 +1622,43 @@ CREATE TABLE `ibl_jsb_allstar_rosters` (
   KEY `idx_pid` (`pid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `ibl_jsb_allstar_rosters_backup_210`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ibl_jsb_allstar_rosters_backup_210` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `season_year` smallint(5) unsigned NOT NULL,
+  `event_type` enum('allstar_1','allstar_2','rookie_1','rookie_2','three_point','dunk_contest') NOT NULL,
+  `roster_slot` tinyint(3) unsigned NOT NULL,
+  `pid` int(11) DEFAULT NULL COMMENT 'FK to ibl_plr.pid',
+  `player_name` varchar(32) DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_season_event_slot` (`season_year`,`event_type`,`roster_slot`),
+  KEY `idx_pid` (`pid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ibl_jsb_allstar_scores`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `ibl_jsb_allstar_scores` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `season_year` smallint(5) unsigned NOT NULL,
+  `contest_type` enum('three_point','dunk_contest') NOT NULL,
+  `round` tinyint(3) unsigned NOT NULL COMMENT '1=round1, 2=semifinals, 3=finals',
+  `participant_slot` tinyint(3) unsigned NOT NULL,
+  `pid` int(11) DEFAULT NULL,
+  `score` int(11) NOT NULL COMMENT '3pt: raw count. Dunk: score*10 (932=93.2)',
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_season_contest_round_slot` (`season_year`,`contest_type`,`round`,`participant_slot`),
+  KEY `idx_pid` (`pid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `ibl_jsb_allstar_scores_backup_210`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ibl_jsb_allstar_scores_backup_210` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `season_year` smallint(5) unsigned NOT NULL,
   `contest_type` enum('three_point','dunk_contest') NOT NULL,

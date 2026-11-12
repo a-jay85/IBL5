@@ -10,6 +10,8 @@ import {
   normalizeBody,
   spliceBody,
   findManagedBlocks,
+  stripVrBlocks,
+  applyBodyStaleBanner,
   AGENT_SHOTS_BEGIN,
   AGENT_SHOTS_END,
   buildPrBodyBlock,
@@ -566,5 +568,31 @@ describe('pairPicture', () => {
       '<a href="S.png"><picture><source media="(min-width: 768px)" srcset="S.png"><img src="T.png" alt="x"></picture></a>'
     );
     expect(PAIR_MEDIA).toBe('(min-width: 768px)');
+  });
+});
+
+describe('stripVrBlocks / applyBodyStaleBanner', () => {
+  it('stripVrBlocks leaves the rest of the body byte-identical', () => {
+    const input =
+      'intro\n' +
+      `${PR_BODY_MARKER_BEGIN}\nnew screens\n${PR_BODY_MARKER_END}\r\n` +
+      'middle\n' +
+      `${AGENT_SHOTS_BEGIN}\nshots\n${AGENT_SHOTS_END}\n` +
+      'tail';
+    expect(stripVrBlocks(input)).toBe('intro\nmiddle\ntail');
+  });
+
+  it('stripVrBlocks keeps a body with an unterminated block', () => {
+    const input = `${PR_BODY_MARKER_BEGIN}\nx\n${PR_BODY_MARKER_END}\nprose\n${AGENT_SHOTS_BEGIN}\nno end`;
+    expect(stripVrBlocks(input)).toBe(input);
+  });
+
+  it('applyBodyStaleBanner inserts the banner once', () => {
+    const body = `${PR_BODY_MARKER_BEGIN}\nscreens\n${PR_BODY_MARKER_END}\nrest`;
+    const once = applyBodyStaleBanner(body);
+    expect(once).toContain('<!-- vr-stale-banner -->');
+    expect(once.startsWith(`${PR_BODY_MARKER_BEGIN}\n> `)).toBe(true);
+    expect(applyBodyStaleBanner(once)).toBe(once);
+    expect(applyBodyStaleBanner('no block here')).toBe('no block here');
   });
 });

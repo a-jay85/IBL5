@@ -60,24 +60,24 @@ def test_live_all_tracks_pass_in_fixed_order():
     fake = FakeRunner()
     tracks = LiveVerify("/wt", run_cmd=fake).run(_all_flags())
     assert [t.name for t in tracks] == NAMES
-    assert [t.status for t in tracks] == ["pass", "pass", "pass", "pass", "unavailable"]
+    assert [t.status for t in tracks] == ["ci", "pass", "pass", "ci", "unavailable"]
     cwd_by_prefix = {}
     for cmd, cwd in fake.calls:
         for prefix in (PHPUNIT, PHPSTAN, GO_FMT, GO_COVER, SHELLCHECK):
             if cmd.startswith(prefix):
                 cwd_by_prefix[prefix] = cwd
-    assert cwd_by_prefix[PHPUNIT] == "/wt/ibl5"
+    assert PHPUNIT not in cwd_by_prefix
+    assert SHELLCHECK not in cwd_by_prefix
     assert cwd_by_prefix[PHPSTAN] == "/wt/ibl5"
     assert cwd_by_prefix[GO_FMT] == "/wt"
     assert cwd_by_prefix[GO_COVER] == "/wt"
-    assert cwd_by_prefix[SHELLCHECK] == "/wt"
 
 
 def test_live_nonzero_rc_fails_only_that_track():
     fake = FakeRunner({PHPSTAN: (2, "boom")})
     tracks = LiveVerify("/wt", run_cmd=fake).run(_all_flags())
-    assert _status(tracks) == {"phpunit": "pass", "phpstan": "fail", "go": "pass",
-                               "shellcheck": "pass", "e2e": "unavailable"}
+    assert _status(tracks) == {"phpunit": "ci", "phpstan": "fail", "go": "pass",
+                               "shellcheck": "ci", "e2e": "unavailable"}
 
 
 @pytest.mark.parametrize("failing", [GO_FMT, GO_COVER])
@@ -85,7 +85,7 @@ def test_live_go_fails_when_either_make_step_fails(failing):
     fake = FakeRunner({failing: (1, "bad")})
     tracks = LiveVerify("/wt", run_cmd=fake).run(_all_flags())
     assert _status(tracks)["go"] == "fail"
-    assert _status(tracks)["phpunit"] == "pass"
+    assert _status(tracks)["phpunit"] == "ci"
 
 
 def test_tracks_log_line_byte_identical():
@@ -128,34 +128,64 @@ def _by_name(tracks):
     return {t.name: t for t in tracks}
 
 
-def test_live_real_shell_failing_phpunit_reports_fail(tmp_path, monkeypatch):
-    wt = _stub_tree(tmp_path, monkeypatch, phpunit='echo FAILURES! >&2\nexit 1')
-    tracks = _by_name(LiveVerify(wt).run(Classification(has_php=True)))
-    assert tracks["phpunit"].status == "fail"
+def test_live_php_diff_never_runs_phpunit(tmp_path, monkeypatch):
+    wt = _stub_tree(tmp_path, monkeypatch, phpunit='touch "$0.ran"\nexit 1')
+    raw = LiveVerify(wt).run(Classification(has_php=True))
+    tracks = _by_name(raw)
+    assert tracks["phpunit"].status == "ci"
+    assert "covered by CI" in tracks["phpunit"].evidence
+    assert not (tmp_path / "ibl5" / "vendor" / "bin" / "phpunit.ran").exists()
     assert tracks["phpstan"].status == "pass"
-    assert "FAILURES!" in tracks["phpunit"].evidence
+    assert aggregate(list(raw)) == "pass"
 
 
-def test_live_real_shell_failing_shellcheck_reports_fail(tmp_path, monkeypatch):
-    wt = _stub_tree(tmp_path, monkeypatch, shellcheck='echo "In a.sh line 1:"\nexit 1')
-    tracks = _by_name(LiveVerify(wt).run(Classification(has_shell=True)))
-    assert tracks["shellcheck"].status == "fail"
-    assert "In a.sh line 1:" in tracks["shellcheck"].evidence
+def test_live_php_diff_status_follows_phpstan(tmp_path, monkeypatch):
+    wt = _stub_tree(tmp_path, monkeypatch, composer='echo "PHPStan error" >&2\nexit 1')
+    raw = LiveVerify(wt).run(Classification(has_php=True))
+    tracks = _by_name(raw)
+    assert tracks["phpstan"].status == "fail"
+    assert "PHPStan error" in tracks["phpstan"].evidence
+    assert aggregate(list(raw)) == "fail"
+
+
+def test_live_shell_diff_never_runs_shellcheck(tmp_path, monkeypatch):
+    wt = _stub_tree(tmp_path, monkeypatch, shellcheck='touch "$0.ran"\nexit 1')
+    raw = LiveVerify(wt).run(Classification(has_shell=True))
+    tracks = _by_name(raw)
+    assert tracks["shellcheck"].status == "ci"
+    assert "covered by CI" in tracks["shellcheck"].evidence
+    assert not (tmp_path / "stubs" / "shellcheck.ran").exists()
+    assert [tracks[n].status for n in ("phpunit", "phpstan", "go")] == ["skipped"] * 3
+    assert aggregate(list(raw)) == "skipped"
+
+
+def test_aggregate_ignores_ci_status():
+    assert aggregate([TrackResult("phpunit", "ci"), TrackResult("phpstan", "pass")]) == "pass"
+    assert aggregate([TrackResult("phpunit", "ci"), TrackResult("phpstan", "fail")]) == "fail"
+    assert aggregate([TrackResult("shellcheck", "ci")]) == "skipped"
+
+
+def test_live_ci_status_only_for_classified_tracks():
+    fake = FakeRunner()
+    by = _by_name(LiveVerify("/wt", run_cmd=fake).run(Classification(has_go=True)))
+    assert by["phpunit"].status == "skipped"
+    assert by["shellcheck"].status == "skipped"
+    assert by["go"].status == "pass"
 
 
 def test_live_real_shell_passing_stubs_report_pass(tmp_path, monkeypatch):
     wt = _stub_tree(tmp_path, monkeypatch)
     tracks = _by_name(LiveVerify(wt).run(Classification(has_php=True, has_shell=True)))
-    assert tracks["phpunit"].status == "pass"
+    assert tracks["phpunit"].status == "ci"
     assert tracks["phpstan"].status == "pass"
-    assert tracks["shellcheck"].status == "pass"
+    assert tracks["shellcheck"].status == "ci"
 
 
 def test_live_evidence_keeps_last_3000_chars(tmp_path, monkeypatch):
     wt = _stub_tree(tmp_path, monkeypatch,
-                    phpunit='printf "%0.sx" $(seq 1 5000)\necho TAILMARK')
+                    composer='printf "%0.sx" $(seq 1 5000)\necho TAILMARK')
     tracks = _by_name(LiveVerify(wt).run(Classification(has_php=True)))
-    evidence = tracks["phpunit"].evidence
+    evidence = tracks["phpstan"].evidence
     # Guards the `[-3000:]` slice in `_sh`: a head slice (`[:3000]`) loses TAILMARK.
     assert len(evidence) <= 3000
     assert evidence.rstrip().endswith("TAILMARK")
@@ -185,16 +215,17 @@ def test_fail_log_lines_empty_when_nothing_failed():
 # ---- Phase 3: concurrency ----
 
 def test_live_tracks_overlap_in_time():
-    barrier = threading.Barrier(3, timeout=5)
+    # phpstan and go are the tracks that still run; each blocks until the other arrives.
+    barrier = threading.Barrier(2, timeout=5)
 
     def runner(cmd, cwd):
-        if cmd.startswith((PHPUNIT, PHPSTAN, SHELLCHECK)):
+        if cmd.startswith((PHPSTAN, GO_FMT)):
             barrier.wait()
         return 0, ""
 
     tracks = LiveVerify("/wt", run_cmd=runner).run(_all_flags())
-    assert _status(tracks) == {"phpunit": "pass", "phpstan": "pass", "go": "pass",
-                               "shellcheck": "pass", "e2e": "unavailable"}
+    assert _status(tracks) == {"phpunit": "ci", "phpstan": "pass", "go": "pass",
+                               "shellcheck": "ci", "e2e": "unavailable"}
 
 
 def test_live_concurrent_preserves_submission_order():
@@ -214,34 +245,36 @@ def test_live_concurrent_preserves_submission_order():
 
 def test_live_timeout_in_one_track_does_not_swallow_others():
     def runner(cmd, cwd):
-        if cmd.startswith(PHPUNIT):
+        if cmd.startswith(PHPSTAN):
             raise subprocess.TimeoutExpired("x", 1800)
         return 0, ""
 
     tracks = LiveVerify("/wt", run_cmd=runner).run(_all_flags())
     by = _by_name(tracks)
-    assert by["phpunit"].status == "fail"
-    assert "timed out" in by["phpunit"].evidence
-    assert [by[n].status for n in ("phpstan", "go", "shellcheck")] == ["pass"] * 3
+    assert by["phpstan"].status == "fail"
+    assert "timed out" in by["phpstan"].evidence
+    assert by["go"].status == "pass"
+    assert [by[n].status for n in ("phpunit", "shellcheck")] == ["ci"] * 2
     assert aggregate(tracks) == "fail"
 
 
 def test_live_exception_in_one_track_does_not_swallow_others():
     def runner(cmd, cwd):
-        if cmd.startswith(SHELLCHECK):
+        if cmd.startswith(GO_FMT):
             raise OSError("boom")
         return 0, ""
 
     by = _by_name(LiveVerify("/wt", run_cmd=runner).run(_all_flags()))
-    assert by["shellcheck"].status == "fail"
-    assert by["shellcheck"].evidence.startswith("OSError")
-    assert [by[n].status for n in ("phpunit", "phpstan", "go")] == ["pass"] * 3
+    assert by["go"].status == "fail"
+    assert by["go"].evidence.startswith("OSError")
+    assert by["phpstan"].status == "pass"
+    assert [by[n].status for n in ("phpunit", "shellcheck")] == ["ci"] * 2
 
 
 def test_live_records_seconds_for_run_tracks_only():
     verify = LiveVerify("/wt", run_cmd=FakeRunner())
     by = _by_name(verify.run(Classification(has_php=True)))
-    assert by["phpunit"].seconds is not None
+    assert by["phpunit"].seconds is None
     assert by["phpstan"].seconds is not None
     assert by["go"].seconds is None
     assert by["shellcheck"].seconds is None
@@ -260,35 +293,13 @@ def test_timing_log_line_only_when_a_track_ran():
     assert timing_log_line(ran, 12.5) == "phase5 timing: phpunit=12.3s wall=12.5s"
 
 
-# ---- Phase 4: shellcheck fan-out ----
+# ---- Shell-only diffs: shellcheck is CI's job; Phase 5 runs nothing ----
 
-def test_live_shellcheck_command_fans_out():
+def test_live_shell_only_diff_runs_no_command():
     fake = FakeRunner()
-    LiveVerify("/wt", run_cmd=fake).run(Classification(has_shell=True))
-    (cmd,) = [c for c, _ in fake.calls if c.startswith(SHELLCHECK)]
-    assert "xargs -P" in cmd
-    assert "-n 20" in cmd
-    assert "--severity=warning --shell=bash" in cmd
-    assert "--exclude=SC2034,SC1090,SC2207" in cmd
-
-
-def _many_scripts_tree(tmp_path, monkeypatch, shellcheck):
-    wt = _stub_tree(tmp_path, monkeypatch, shellcheck=shellcheck)
-    names = [f"f{i}.sh" for i in range(59)] + ["bad.sh"]
-    _script(tmp_path / "bin" / "lib" / "shell-scripts.sh",
-            "printf '%s\\n' " + " ".join(names) + "\n")
-    return wt
-
-
-def test_live_real_shell_one_failing_batch_fails_track(tmp_path, monkeypatch):
-    wt = _many_scripts_tree(
-        tmp_path, monkeypatch,
-        'for a in "$@"; do [ "$a" = bad.sh ] && { echo "In bad.sh line 1:"; exit 1; }; done\nexit 0')
-    by = _by_name(LiveVerify(wt).run(Classification(has_shell=True)))
-    assert by["shellcheck"].status == "fail"
-
-
-def test_live_real_shell_all_batches_clean_passes(tmp_path, monkeypatch):
-    wt = _many_scripts_tree(tmp_path, monkeypatch, "exit 0")
-    by = _by_name(LiveVerify(wt).run(Classification(has_shell=True)))
-    assert by["shellcheck"].status == "pass"
+    verify = LiveVerify("/wt", run_cmd=fake)
+    by = _by_name(verify.run(Classification(has_shell=True)))
+    assert fake.calls == []
+    assert by["shellcheck"].status == "ci"
+    # An empty job set skips the executor (max_workers=0 would raise).
+    assert verify.last_wall_seconds is None

@@ -27,6 +27,8 @@ GATE_FIX_BEGIN = "<!-- gate-fix:begin -->"
 GATE_FIX_END = "<!-- gate-fix:end -->"
 EXEC_MUTATIONS_BEGIN = "<!-- exec-mutations:begin -->"
 EXEC_MUTATIONS_END = "<!-- exec-mutations:end -->"
+PLAN_CHECKS_BEGIN = "<!-- plan-checks:begin -->"
+PLAN_CHECKS_END = "<!-- plan-checks:end -->"
 
 _RUNNER_BLOCKS = (
     (FILES_CHANGED_BEGIN, FILES_CHANGED_END),  # runner-owned
@@ -583,6 +585,37 @@ def upsert_exec_mutations(body: str, report) -> str:
     if not body.strip():
         return block
     return body.rstrip() + "\n\n" + block + "\n"
+
+
+def extract_plan_checks(body: str) -> str | None:
+    """Return the plan-checks block (markers inclusive), or None when absent or malformed."""
+    body = body or ""
+    if body.count(PLAN_CHECKS_BEGIN) != 1:
+        return None
+    begin_idx = body.find(PLAN_CHECKS_BEGIN)
+    end_idx = body.find(PLAN_CHECKS_END)
+    if end_idx == -1 or end_idx < begin_idx:
+        return None
+    return body[begin_idx:end_idx + len(PLAN_CHECKS_END)]
+
+
+def upsert_plan_checks(body: str, block: str) -> str:
+    """Replace or append the plan-checks block; a malformed body is repaired to one valid block."""
+    body = body or ""
+    block = block.strip()
+    existing = extract_plan_checks(body)
+    if existing is not None:
+        begin_idx = body.find(PLAN_CHECKS_BEGIN)
+        return body[:begin_idx] + block + body[begin_idx + len(existing):]
+    if PLAN_CHECKS_BEGIN not in body and PLAN_CHECKS_END not in body:
+        return body.rstrip() + "\n\n" + block + "\n" if body.strip() else block + "\n"
+    # Malformed: cut every begin-to-end span, then any stray marker line.
+    span = re.compile(re.escape(PLAN_CHECKS_BEGIN) + r".*?" + re.escape(PLAN_CHECKS_END), re.S)
+    cleaned = span.sub("", body)
+    cleaned = "\n".join(ln for ln in cleaned.split("\n")
+                        if PLAN_CHECKS_BEGIN not in ln and PLAN_CHECKS_END not in ln)
+    cleaned = cleaned.rstrip()
+    return cleaned + "\n\n" + block + "\n" if cleaned else block + "\n"
 
 
 def _neutralize_headings(text: str) -> list[str]:

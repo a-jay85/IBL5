@@ -217,6 +217,29 @@ chk "unknown flag exits 2 (got $RC)" eq "$RC" 2
 chk "encode without a plan exits 2 (got $RC)" eq "$RC" 2
 end_case
 
+start_case case_python_upsert_round_trip
+enc "$PLAN" > "$TMP/up-block"
+upsert() {
+    python3 -I -c '
+import sys
+sys.path.insert(0, sys.argv[1])
+from harness.classify import upsert_plan_checks
+sys.stdout.write(upsert_plan_checks(open(sys.argv[2]).read(), open(sys.argv[3]).read()))
+' "$REPO_ROOT/tools/postplan-harness" "$1" "$2"
+}
+printf 'Intro text.' > "$TMP/up-intro"
+upsert "$TMP/up-intro" "$TMP/up-block" > "$TMP/up-body1"; RC=$?
+chk "upsert exits 0 (got $RC)" eq "$RC" 0
+chk "body keeps intro" has "$(cat "$TMP/up-body1")" "Intro text."
+dec "$TMP/up-body1" "$TMP/out-up" >/dev/null; RC=$?
+chk "decode exits 0 (got $RC)" eq "$RC" 0
+(cd "$R" && "$XM" parse "$PLAN") > "$TMP/up-parse.nul"
+chk "records.nul matches parse" cmp -s "$TMP/out-up/records.nul" "$TMP/up-parse.nul"
+chk "records.nul is non-empty" test -s "$TMP/out-up/records.nul"
+upsert "$TMP/up-body1" "$TMP/up-block" > "$TMP/up-body2"
+chk "second upsert leaves body unchanged" cmp -s "$TMP/up-body1" "$TMP/up-body2"
+end_case
+
 if [ "$FAILS" -gt 0 ]; then
     echo "test-plan-checks-block: $FAILS case(s) failed"
     exit 1

@@ -24,6 +24,8 @@ from harness.classify import (_manual_testing_span, classify, files_from_diff, f
                                restore_manual_testing_section, strip_change_blocks, strip_manual_testing_section,
                                TESTS_CHANGED_BEGIN, TESTS_CHANGED_END,
                                upsert_reviewer_verification,
+                               PLAN_CHECKS_BEGIN, PLAN_CHECKS_END, extract_plan_checks,
+                               upsert_plan_checks,
                                MERGE_DIGEST_BEGIN, MERGE_DIGEST_END,
                                SCOPE_NOTES_BEGIN, SCOPE_NOTES_END, strip_runner_blocks)
 from harness.planfile import parse_hold_justification, split_hold_justification
@@ -1275,3 +1277,37 @@ def test_strip_runner_blocks_leaves_unbalanced_pair_intact(body):
 
 def test_strip_runner_blocks_treats_none_as_empty():
     assert strip_runner_blocks(None) == ""
+
+
+def _pc_block(text="rows=1"):
+    return f"{PLAN_CHECKS_BEGIN}\n{text}\n{PLAN_CHECKS_END}"
+
+
+def test_upsert_plan_checks_appends_when_absent():
+    out = upsert_plan_checks("Intro text.", _pc_block())
+    assert out == "Intro text.\n\n" + _pc_block() + "\n"
+    assert extract_plan_checks(out) == _pc_block()
+
+
+def test_upsert_plan_checks_replaces_existing_block():
+    body = "Head text.\n\n" + _pc_block("OLD-TEXT") + "\n\nTail text.\n"
+    out = upsert_plan_checks(body, _pc_block("NEW-TEXT"))
+    assert "OLD-TEXT" not in out
+    assert out == "Head text.\n\n" + _pc_block("NEW-TEXT") + "\n\nTail text.\n"
+
+
+def test_upsert_plan_checks_repairs_duplicate_markers():
+    body = "Intro.\n" + _pc_block("A") + "\nmid\n" + _pc_block("B") + "\n"
+    out = upsert_plan_checks(body, _pc_block("NEW"))
+    assert out.count(PLAN_CHECKS_BEGIN) == 1
+    assert out.count(PLAN_CHECKS_END) == 1
+    assert extract_plan_checks(out) == _pc_block("NEW")
+    assert "Intro." in out
+
+
+def test_extract_plan_checks_returns_none_on_missing_end_marker():
+    assert extract_plan_checks(f"x\n{PLAN_CHECKS_BEGIN}\nrows\n") is None
+
+
+def test_extract_plan_checks_returns_none_when_end_precedes_begin():
+    assert extract_plan_checks(f"{PLAN_CHECKS_END}\nrows\n{PLAN_CHECKS_BEGIN}\n") is None

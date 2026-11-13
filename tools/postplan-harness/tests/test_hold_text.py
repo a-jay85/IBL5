@@ -151,6 +151,15 @@ def test_variant_reasons(cond, want):
     assert hold_text.plain_hold(cond) == want
 
 
+def test_condition_19_plan_checks_wording():
+    cond = ConditionResult(19, "exec-mutations", True,
+                           "Plan checks CI job concluded FAILURE; "
+                           "could not add the plan-checks label")
+    assert hold_text.plain_hold(cond) == (
+        "The Plan checks CI job has not passed, or post-plan could not confirm its block: "
+        "Plan checks CI job concluded FAILURE; could not add the plan-checks label.")
+
+
 def test_self_governing_merge_danger_has_its_own_words():
     c = ConditionResult(18, "merge-danger", True, "state=SELF-GOVERNING")
     assert hold_text.plain_hold(c) == (

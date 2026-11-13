@@ -198,8 +198,22 @@ _XM_WORDS = {
 }
 
 
+_PLAN_CHECKS_MARKS = ("plan-checks", "Plan checks")
+
+
 def _exec_mutations(reason: str) -> str:
     r = reason or ""
+    segs = [s.strip() for s in r.split("; ") if s.strip()]
+    pc = [s for s in segs if any(m in s for m in _PLAN_CHECKS_MARKS)]
+    if not pc:
+        return _local_mutations(r)
+    pc_text = ("The Plan checks CI job has not passed, or post-plan could not confirm its "
+               "block: " + "; ".join(pc) + ".")
+    rest = "; ".join(s for s in segs if s not in pc)
+    return (_local_mutations(rest) + " " + pc_text) if rest else pc_text
+
+
+def _local_mutations(r: str) -> str:
     if r.startswith("executable-mutation step did not run"):
         return ("The step that plants bugs on purpose, to prove the tests catch them, "
                 "did not run.")

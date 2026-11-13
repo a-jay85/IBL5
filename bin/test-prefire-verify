@@ -260,7 +260,7 @@ test_all_green_passes_and_records() {
     local n
     n=$(pass_files '\.pass$' | wc -l | tr -d ' ')
     [ "$n" -eq 2 ] || note "expected 2 .pass files, got $n"
-    want_out "SKIP exec-mutations: the plan has no Executable Mutations rows"
+    refute_out "exec-mutations"
 }
 
 test_cache_hit_skips_rerun() {
@@ -302,7 +302,7 @@ test_adhoc_no_plan_runs_phpunit_only() {
     run_gate
     want_rc 0
     want_out "SKIP matrix: no plan"
-    want_out "SKIP exec-mutations: no plan"
+    refute_out "exec-mutations"
     want_cnt phpunit 1
     want_cnt mutation 0
     want_cnt excludes 0
@@ -340,7 +340,7 @@ test_all_never_invokes_infection() {
     chmod +x "$R/bin/mutation-diff" "$R/ibl5/bin/check-infection-excludes"
     run_gate --plan "$PLAN"
     want_rc 0
-    want_out "all requested stages passed (matrix phpunit exec-mutations)"
+    want_out "all requested stages passed (matrix phpunit)"
     want_cnt mutation 0
     want_cnt excludes 0
     [ ! -e "$D/mutation-diff-called" ] || note "bin/mutation-diff ran under --stage all"
@@ -690,8 +690,10 @@ test_matrix_filtered_phpunit_rows_still_run() {
     run_gate --plan "$PLAN" --stage matrix
     export PATH="$saved_path"
     want_rc 0
-    want_cnt suite 2
+    want_cnt suite 0
     refute_out "CI covers full-suite runs"
+    want_out "matrix row 1: runs in CI (Plan checks), skipped locally: vendor/bin/phpunit --filter Foo"
+    want_out "matrix row 2: runs in CI (Plan checks), skipped locally: vendor/bin/phpunit tests/TradeSuggestions"
 }
 
 test_matrix_chained_whole_suite_row_still_runs() {
@@ -717,6 +719,88 @@ test_db_probe_does_not_read_callers_stdin() {
     run_gate --plan "$PLAN" <<< "caller stdin"
     refute_out "DB unreachable"
     export PREFIRE_DB_PROBE_CMD="$saved"
+}
+
+# ---------------------------------------------------------------------------
+# Row sorter: local rows vs rows the Plan checks CI job runs
+# ---------------------------------------------------------------------------
+matrix_log() { cat "$(state_dir)"/*.matrix.log 2>/dev/null; }
+
+case_db_row_runs_locally() {
+    new_case
+    mkdir -p "$R/bin"
+    printf '#!/usr/bin/env bash\necho run >> "$CNT/dbq"\nexit 0\n' > "$R/bin/db-query"
+    chmod +x "$R/bin/db-query"
+    write_plan "$(row 1 'bin/db-query "SELECT 1"')"
+    run_gate --plan "$PLAN" --stage matrix
+    want_rc 0
+    want_cnt dbq 1
+    grep -qF '### row 1: bin/db-query' <<< "$(matrix_log)" || note "matrix log lacks '### row 1: bin/db-query'"
+}
+
+case_ci_row_skipped_locally() {
+    new_case
+    mkdir -p "$R/bin"
+    printf '#!/usr/bin/env bash\necho run >> "$CNT/prose"\nexit 0\n' > "$R/bin/check-prose"
+    chmod +x "$R/bin/check-prose"
+    write_plan "$(row 1 'bin/check-prose')"
+    run_gate --plan "$PLAN" --stage matrix
+    want_rc 0
+    want_cnt prose 0
+    want_out "matrix row 1: runs in CI (Plan checks), skipped locally: bin/check-prose"
+    grep -qF '### row 1: runs in CI (Plan checks)' <<< "$(matrix_log)" || note "matrix log lacks '### row 1: runs in CI (Plan checks)'"
+}
+
+case_unclear_row_runs_locally() {
+    new_case
+    write_plan "$(row 1 'echo unclear-row-marker')"
+    run_gate --plan "$PLAN" --stage matrix
+    want_rc 0
+    grep -qF '### row 1: echo unclear-row-marker' <<< "$(matrix_log)" || note "matrix log lacks '### row 1: echo unclear-row-marker'"
+    refute_out "runs in CI (Plan checks)"
+}
+
+case_fire_point_skips_exec_mutations() {
+    new_case
+    xm_plan 'grep -qx a ibl5/tracked.txt'
+    # The pre-hash leftover repair calls `pending`; only `run` means the stage ran.
+    printf '#!/usr/bin/env bash\ncase "$1" in\n    run) touch "%s/xmlib-called"; exit 0 ;;\n    pending) exit 1 ;;\n    *) exit 0 ;;\nesac\n' "$D" > "$D/stubs/xmlib-sentinel"
+    chmod +x "$D/stubs/xmlib-sentinel"
+    OUT=$(cd "$R" && PREFIRE_EXEC_MUTATIONS_LIB="$D/stubs/xmlib-sentinel" "$GATE" --base master --plan "$PLAN" --fire-point 2>&1); RC=$?
+    want_rc 0
+    refute_out "exec-mutations passed"
+    want_out "all requested stages passed (matrix phpunit)"
+    [ ! -e "$D/xmlib-called" ] || note "plan-exec-mutations ran at the fire point"
+}
+
+case_row_sorter_near_misses() {
+    local verdicts
+    verdicts=$(
+        # shellcheck source=/dev/null
+        source "$REPO/bin/lib/plan-matrix-rows.sh"
+        v() { if row_runs_in_ci "$1"; then printf 'CI\t%s\n' "$1"; else printf 'LOCAL\t%s\n' "$1"; fi; }
+        v 'bin/testing-thing'
+        v 'cd ibl5 && vendor/bin/phpunit --group database'
+        v 'grep -n localhost file.txt'
+        v 'cd tools/postplan-harness && python3 -m pytest tests/test_x.py'
+        v '! git grep -n foo'
+        v 'git log -1'
+        v 'cd ../other && bin/test-x'
+        v 'composer run analyse'
+    )
+    local want
+    for want in \
+        'LOCAL	bin/testing-thing' \
+        'LOCAL	cd ibl5 && vendor/bin/phpunit --group database' \
+        'LOCAL	grep -n localhost file.txt' \
+        'CI	cd tools/postplan-harness && python3 -m pytest tests/test_x.py' \
+        'CI	! git grep -n foo' \
+        'LOCAL	git log -1' \
+        'LOCAL	cd ../other && bin/test-x' \
+        'LOCAL	composer run analyse'; do
+        grep -qxF -- "$want" <<< "$verdicts" || note "sorter verdict missing: $want"
+    done
+    OUT="$verdicts"
 }
 
 # ---------------------------------------------------------------------------
@@ -1508,6 +1592,11 @@ test_matrix_whole_suite_rows_skipped
 test_matrix_cd_ibl5_whole_suite_rows_skipped
 test_matrix_filtered_phpunit_rows_still_run
 test_matrix_chained_whole_suite_row_still_runs
+case_db_row_runs_locally
+case_ci_row_skipped_locally
+case_unclear_row_runs_locally
+case_fire_point_skips_exec_mutations
+case_row_sorter_near_misses
 test_base_without_value_exits_2
 test_phpunit_subset_runs_mapped_class_tests
 test_phpunit_root_class_maps_top_level_test

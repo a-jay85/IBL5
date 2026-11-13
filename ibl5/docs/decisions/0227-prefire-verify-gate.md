@@ -1,6 +1,6 @@
 ---
 description: bin/post-plan-now runs bin/lib/prefire-verify (full PHPUnit, the plan's matrix rows, changed-file Infection at MSI 100) and exits 9 until all three pass on the current tree; the automouse impl prompt runs it stage by stage first. The Infection stage was removed by ADR-0237.
-last_verified: 2026-11-09
+last_verified: 2026-11-12
 ---
 
 # ADR-0227: Pre-fire verification gate in post-plan-now
@@ -62,3 +62,5 @@ A clean-code run that times out (exit 124) now reports UNDECIDED instead of the 
 ## Addendum — Infection stage removed (2026-11-09) <!-- slop-ok -->
 
 The gate ran four stages, including changed-file Infection through `bin/mutation-diff`. Since ADR-0237 it runs three: matrix, phpunit and exec-mutations. CI's required check `Infection PHP (per-PR diff)` is the mutation gate. The Context, Decision and Alternatives above are unchanged and record what was decided on 2026-11-03.
+
+**Superseded in part by:** ADR-0244. CI's required Plan checks job now runs the non-DB matrix rows and the executable mutations; the local gate keeps only the DB rows.

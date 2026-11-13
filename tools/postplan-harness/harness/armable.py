@@ -337,6 +337,9 @@ class ArmInputs:
     # a dataclass cannot default a field ahead of the required ones above. None = the step did not run (holds).
     exec_mutations_holding: Optional[tuple[str, ...]] = None
     exec_mutations_tree_suspect: bool = True
+    # Condition (19), ADR-0244: hold reasons from the Plan checks step. None (the
+    # default) means the step did not run and holds, so a forgotten field fails closed.
+    plan_checks_holding: Optional[tuple[str, ...]] = None
     ui_paths: Optional[list[str]] = None  # git.conformance_files(): lists a rename's source too; None = classification.files
     llm_safety_holds: list[str] = field(default_factory=list)  # bounded-LLM ADDed holds
     fidelity_verdict: Optional[str] = None    # Phase 5.5 verdict word; None = never ran (blocks)
@@ -735,16 +738,20 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     cs.append(ConditionResult(18, "merge-danger", md_blocked,
                               f"state={md}{md_retried}" if md_blocked else ""))
 
-    # condition (19) — executable mutations: every claimed mutation tripped its check and
-    # the tree was verified byte-identical afterwards. Run-local, fail-closed, additive.
+    # condition (19) — executable mutations and Plan checks (ADR-0244): the Plan checks CI
+    # job has not failed and post-plan confirmed its block and label. The local mutation
+    # fields stay for a caller that still fills them. Fail-closed, additive.
     xm = inp.exec_mutations_holding
-    xm_blocked = xm is None or bool(xm) or inp.exec_mutations_tree_suspect
+    pc = inp.plan_checks_holding
+    xm_blocked = (xm is None or bool(xm) or inp.exec_mutations_tree_suspect
+                  or pc is None or bool(pc))
     if xm is None:
-        xm_reason = "executable-mutation step did not run"
+        parts = ["executable-mutation step did not run"]
     else:
         parts = (["tree not verified clean after mutation"] if inp.exec_mutations_tree_suspect
                  else []) + list(xm)
-        xm_reason = "; ".join(parts)[:300]
+    parts += ["plan-checks step did not run"] if pc is None else list(pc)
+    xm_reason = "; ".join(parts)[:300]
     cs.append(ConditionResult(19, "exec-mutations", xm_blocked, xm_reason if xm_blocked else ""))
 
     # Condition (20): removed guards. Every flagged removal needs a substantive body Reason.

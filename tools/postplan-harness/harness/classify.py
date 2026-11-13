@@ -25,8 +25,8 @@ REVIEWER_VERIFICATION_BEGIN = "<!-- reviewer-verification:begin -->"
 REVIEWER_VERIFICATION_END = "<!-- reviewer-verification:end -->"
 GATE_FIX_BEGIN = "<!-- gate-fix:begin -->"
 GATE_FIX_END = "<!-- gate-fix:end -->"
-EXEC_MUTATIONS_BEGIN = "<!-- exec-mutations:begin -->"
-EXEC_MUTATIONS_END = "<!-- exec-mutations:end -->"
+PLAN_CHECKS_BEGIN = "<!-- plan-checks:begin -->"
+PLAN_CHECKS_END = "<!-- plan-checks:end -->"
 
 _RUNNER_BLOCKS = (
     (FILES_CHANGED_BEGIN, FILES_CHANGED_END),  # runner-owned
@@ -495,94 +495,35 @@ def upsert_gate_fix(body: str, block: str) -> str:
     return body.rstrip() + "\n\n" + block + "\n"
 
 
-def render_exec_mutations(report) -> str:
-    """Marker-delimited executable-mutations block (ADR-0199), or "" for an empty report.
-
-    `report` is a harness.mutations.MutationReport. Every `detail` echoes the plan's
-    `check` text, so it goes through _neutralize_headings like other plan prose.
-    """
-    if report is None:
-        return ""
-    problems: list[str] = []
-    caught: list[str] = []
-    if not report.ran:
-        problems.append("- The bug-planting check did not run, so arming is held.")
-    for r in report.results:
-        line = f"**Row {r.row}**{_xm_check_suffix(r.detail)}"
-        if r.kind == "TRIPPED":
-            caught.append(f"- {line}")
-            continue
-        words = _XM_PROBLEM_WORDS.get(r.kind, r.kind)
-        if r.kind == "UNDECIDED" and r.detail.endswith("before mutation"):
-            words = _XM_UNDECIDED_CLEAN_RUN_WORDS
-        problems.append(f"- ❌ {line}: {words}")
-        if not _XM_DETAIL_RE.match(r.detail):
-            problems.extend(_neutralize_headings(r.detail))
-    for h in report.holding:
-        if not any(h.startswith(f"row {r.row} {r.kind} ") for r in report.results):
-            problems.append("- ❌ The bug-planting tool hit an error:")
-            problems.extend(_neutralize_headings(h))
-    if report.tree_suspect:
-        problems.append("- ❌ After planting bugs, the tool could not confirm the code was "
-                        "put back. Check the worktree before merging.")
-    if not problems and not caught:
-        return ""
-    out = [EXEC_MUTATIONS_BEGIN, "### Bug-planting check on the tests", "",
-           "For each row of the plan's Verification Matrix, a tool planted a small bug "
-           "in the code and re-ran that row's test. A good test fails when the bug is there.",
-           ""]
-    if problems:
-        n = sum(1 for r in report.results if r.kind != "TRIPPED")
-        head = (f"**⚠️ {n} of {len(report.results)} rows need attention:**" if n
-                else "**⚠️ The check had a problem:**")
-        out += [head, "", *problems, ""]
-    else:
-        out += [f"**✅ All {len(caught)} rows caught the planted bug.**", ""]
-    if caught:
-        out += [f"<details><summary>✅ {len(caught)} rows caught the planted bug</summary>",
-                "", *caught, "", "</details>"]
-    return "\n".join([*out, EXEC_MUTATIONS_END])
-
-
-# Plain words for each non-TRIPPED kind bin/lib/plan-exec-mutations prints.
-_XM_PROBLEM_WORDS = {
-    "HELD": "the test still passed with the bug planted, so nothing guards this rule",
-    "UNDECIDED": "the test could not run with the bug planted, so we can't tell",
-    "BASELINE-FAILED": "the test already failed before any bug was planted",
-}
-_XM_UNDECIDED_CLEAN_RUN_WORDS = "the test timed out before any bug was planted, so we can't tell"
-# "<check> [still ]exited N ..." — the lib's fixed detail shapes; group 1 is the check.
-_XM_DETAIL_RE = re.compile(r"^(.+?) (?:still )?exited -?\d+\b")
-
-
-def _xm_check_suffix(detail: str) -> str:
-    """` (`check`)` when the detail has the lib's shape, else "". One line, no backticks,
-    so it never starts a line (ARMING-GATE DEFENSE, see _neutralize_headings)."""
-    m = _XM_DETAIL_RE.match(detail or "")
-    if not m:
-        return ""
-    check = " ".join(m.group(1).split()).replace("`", "'")
-    return f" (`{check}`)"
-
-
-def upsert_exec_mutations(body: str, report) -> str:
-    """Insert, replace, or remove the exec-mutations block; same contract as upsert_gate_fix."""
-    block = render_exec_mutations(report)
+def extract_plan_checks(body: str) -> str | None:
+    """Return the plan-checks block (markers inclusive), or None when absent or malformed."""
     body = body or ""
-    begin_idx = body.find(EXEC_MUTATIONS_BEGIN)
-    end_idx = body.find(EXEC_MUTATIONS_END)
-    if begin_idx != -1 and end_idx != -1 and begin_idx < end_idx:
-        after_end = end_idx + len(EXEC_MUTATIONS_END)
-        if not block:
-            head = body[:begin_idx].rstrip("\n")
-            tail = body[after_end:].lstrip("\n")
-            return head + ("\n\n" + tail if tail else "\n") if head else tail
-        return body[:begin_idx] + block + body[after_end:]
-    if not block:
-        return body
-    if not body.strip():
-        return block
-    return body.rstrip() + "\n\n" + block + "\n"
+    if body.count(PLAN_CHECKS_BEGIN) != 1:
+        return None
+    begin_idx = body.find(PLAN_CHECKS_BEGIN)
+    end_idx = body.find(PLAN_CHECKS_END)
+    if end_idx == -1 or end_idx < begin_idx:
+        return None
+    return body[begin_idx:end_idx + len(PLAN_CHECKS_END)]
+
+
+def upsert_plan_checks(body: str, block: str) -> str:
+    """Replace or append the plan-checks block; a malformed body is repaired to one valid block."""
+    body = body or ""
+    block = block.strip()
+    existing = extract_plan_checks(body)
+    if existing is not None:
+        begin_idx = body.find(PLAN_CHECKS_BEGIN)
+        return body[:begin_idx] + block + body[begin_idx + len(existing):]
+    if PLAN_CHECKS_BEGIN not in body and PLAN_CHECKS_END not in body:
+        return body.rstrip() + "\n\n" + block + "\n" if body.strip() else block + "\n"
+    # Malformed: cut every begin-to-end span, then any stray marker line.
+    span = re.compile(re.escape(PLAN_CHECKS_BEGIN) + r".*?" + re.escape(PLAN_CHECKS_END), re.S)
+    cleaned = span.sub("", body)
+    cleaned = "\n".join(ln for ln in cleaned.split("\n")
+                        if PLAN_CHECKS_BEGIN not in ln and PLAN_CHECKS_END not in ln)
+    cleaned = cleaned.rstrip()
+    return cleaned + "\n\n" + block + "\n" if cleaned else block + "\n"
 
 
 def _neutralize_headings(text: str) -> list[str]:

@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # bin/lib/prefire-verify — pre-fire verification gate.
 #
-# Re-runs three checks on the current working tree before /post-plan fires:
+# Re-runs two checks on the current working tree before /post-plan fires (ADR-0244):
 #   1. every post-impl CLI-executable row of the plan's Verification Matrix
-#      (a row whose whole command is one of six whole-suite runs CI covers is skipped; see is_whole_suite_cmd)
+#      (a row whose whole command is one of six whole-suite runs CI covers is skipped; see is_whole_suite_cmd;
+#      a row that row_runs_in_ci sends to the Plan checks CI job is skipped too)
 #   2. PHPUnit on the tests mapped to the branch's changed files (full suite when a
 #      shared test input changed or mapping failed; skipped when no PHPUnit-relevant file changed)
-#   3. every Executable Mutations row of the plan (bin/lib/plan-exec-mutations run)
+# The Executable Mutations rows (bin/lib/plan-exec-mutations run) run in the Plan checks CI job.
+# The exec-mutations stage stays for an implementer who asks for it by name; "all" leaves it out.
 # Mutation score is gated by CI's required check "Infection PHP (per-PR diff)" (ADR-0237).
 # It trusts no implementer-written ledger. Only this script writes pass records,
 # keyed by tree hash, in the per-worktree git dir. It fails closed.
@@ -14,7 +16,8 @@
 # Usage: bin/lib/prefire-verify [--plan <path>] [--stage matrix|phpunit|exec-mutations|all]
 #                               [--base <ref>] [--bypass <reason>] [--fire-point]
 #   --fire-point  exec-mutations only: use the larger limits (300 s per check run, 1800 s
-#                 total, the post-plan gate's) instead of the implementer's 120 s / 300 s.
+#                 total) instead of the implementer's 120 s / 300 s. The fire point's "all" run
+#                 skips that stage, so the flag matters only for a named exec-mutations run.
 #                 bin/post-plan-now passes it; a pass under either limit is the same record.
 #   --base        base ref for the phpunit stage's diff (default: git config
 #                 branch.<name>.iblBase, else origin/master)
@@ -170,18 +173,6 @@ write_record() { # <stage> <key>
 # optional `cd ibl5 &&` prefix, is exactly a whole-suite run that CI's required
 # checks already cover. Exact match only: any filter, path, --group, pipe or
 # `&&` chain to another command still runs.
-CD_IBL5_RE='^cd[[:space:]]+ibl5[[:space:]]*&&[[:space:]]*(.*)$'
-is_whole_suite_cmd() {
-    local c="$1"
-    c="${c#"${c%%[![:space:]]*}"}"
-    c="${c%"${c##*[![:space:]]}"}"
-    if [[ "$c" =~ $CD_IBL5_RE ]]; then c="${BASH_REMATCH[1]}"; fi
-    case "$c" in
-        'vendor/bin/phpunit'|'vendor/bin/phpunit --no-progress'|'composer run analyse'|'composer run analyse:tests'|'composer run test'|'composer test') return 0 ;;
-    esac
-    return 1
-}
-
 stage_matrix() {
     local plan_sha rows rc num cmd log rows_rc
     if [ -z "$PLAN" ]; then
@@ -198,7 +189,7 @@ stage_matrix() {
     fi
 
     # DB probe, once, before the first DB-touching row.
-    local db_re='db-query|docker|--group[= ]database|DatabaseIntegration|db-test-up|run-migrations|mariadb'
+    local db_re="$PLAN_ROW_DB_RE"
     local first_db_num="" first_db_cmd=""
     while IFS=$'\t' read -r num cmd; do
         [ -n "$num" ] || continue
@@ -226,6 +217,11 @@ stage_matrix() {
         if is_whole_suite_cmd "$cmd"; then
             say "matrix row $num: skipped, CI covers full-suite runs: $cmd"
             printf '### row %s: skipped, CI covers full-suite runs\n' "$num" >> "$log"
+            continue
+        fi
+        if row_runs_in_ci "$cmd"; then
+            say "matrix row $num: runs in CI (Plan checks), skipped locally: $cmd"
+            printf '### row %s: runs in CI (Plan checks)\n' "$num" >> "$log"
             continue
         fi
         dup=0
@@ -449,8 +445,8 @@ stage_phpunit() {
 # --- exec-mutations stage ---------------------------------------------------
 # The short limits fit one 600 s foreground implementer Bash call (prompt-impl Step 6.9):
 # a row starts only inside the 300 s budget and can then take at most 120 s baseline + 120 s
-# mutated. The fire point has no such cap, so --fire-point uses the real post-plan gate's
-# limits (DEFAULT_MAX_TIMEOUT and DEFAULT_BUDGET in tools/postplan-harness/harness/mutations.py).
+# mutated. --fire-point uses the larger limits in DEFAULT_MAX_TIMEOUT and DEFAULT_BUDGET in
+# tools/postplan-harness/harness/mutations.py. The Plan checks CI job runs the rows (ADR-0244).
 XM_TIMEOUT=30
 XM_MAX_TIMEOUT=120
 XM_BUDGET=300
@@ -567,7 +563,7 @@ stage_exec_mutations() {
 
 # --- run --------------------------------------------------------------------
 case "$STAGE" in
-    all) STAGES="matrix phpunit exec-mutations" ;;
+    all) STAGES="matrix phpunit" ;;
     *)   STAGES="$STAGE" ;;
 esac
 

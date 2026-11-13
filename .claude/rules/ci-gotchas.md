@@ -1,6 +1,6 @@
 ---
 description: GitHub Actions gotchas learned in production — cascade cancels, payload freezing, required check wiring, mutation gate, Dependabot, ssh-keyscan, VR update-baselines label flow, conversation resolution, runner image pin.
-last_verified: 2026-11-04
+last_verified: 2026-11-12
 paths: ".github/workflows/**"
 ---
 
@@ -41,6 +41,8 @@ Branch protection on master names job-level contexts. `Tests and Analysis` is th
 A new protection context is a separate decision (ADR-0120, ADR-0145). The workflow that emits it must report on every PR: no `paths` or `branches` filter, and no job-level `if:` except a payload-provable skip (ADR-0210): the skipped events cannot change the verdict, a title that could fail never skips, and the predicate is duplicated into a per-run `concurrency.group` so a skipped run never cancels a real one. `human-signoff` carries one; `Meta checks` deliberately does not. A context with no matching check run leaves the PR pending forever. Add it with the append-only `POST .../required_status_checks/contexts` and check it with `bin/check-composite-contracts --protection-readback`. Never use the protection `PUT`, which replaces the whole object. Live list: `gh api repos/a-jay85/IBL5/branches/master/protection --jq '.required_status_checks.contexts'`.
 
 `All checks settled` (`.github/workflows/all-checks-settled.yml`, ADR-0149 addendum) is the required cross-workflow aggregator. It is a commit status on the PR head, posted from master each time a PR workflow completes, and it never waits. A red check anywhere on the head turns it `failure`, and a pending one keeps it `pending` until the last check finishes. A re-run of one flaky job re-settles it when that job completes. If the status is stuck, settle it by hand: `gh workflow run all-checks-settled.yml -f pr_number=N`. The excluded names live in that workflow's `--ignore=`. To make a new job advisory, add its name there. A new workflow with a `pull_request` trigger must also join its `workflow_run.workflows:` list, or its completion never settles the status (`bin/check-composite-contracts` A6). Never delete a check to get a merge through. On a PR whose base is not master or develop (a stacked PR), the status goes `failure` with `FAIL: stacked on <base>`, because the master-only workflows never report there. After the parent merges and GitHub retargets the PR, push (merge or rebase onto `origin/master`) to start CI. The polling `All checks green` waiter is retired (ADR-0149 addendum).
+
+`Plan checks` (`.github/workflows/plan-checks.yml`, ADR-0244) runs a plan's matrix rows and mutation rows in CI. It reads the PR body and the `plan-checks` label. Post-plan writes a base64 block into the body and adds the label. The job decodes the block with `bin/lib/plan-checks-block ci`. It fails when the PR carries the label and the block is gone, when the block is corrupt, when a CI row fails, or when a mutation row comes back HELD. A PR with no label and no block passes. The job re-runs on `edited`, so a body edit that damages the block turns it red. The live list of required contexts: `gh api repos/a-jay85/IBL5/branches/master/protection --jq '.required_status_checks.contexts'`.
 
 ### Conversation resolution
 

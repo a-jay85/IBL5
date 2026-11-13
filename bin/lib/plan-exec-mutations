@@ -8,6 +8,7 @@
 #
 # Usage: bin/lib/plan-exec-mutations parse [--root DIR] <plan>
 #        bin/lib/plan-exec-mutations run [--root DIR] [--timeout SEC] [--max-timeout SEC] [--scale K] [--budget SEC] <plan>
+#        bin/lib/plan-exec-mutations run [--root DIR] [...] --records FILE
 #        bin/lib/plan-exec-mutations recover [--root DIR]
 #        bin/lib/plan-exec-mutations pending [--root DIR]
 # ---
@@ -28,6 +29,10 @@
 #                            --timeout, --max-timeout); integer K >= 1 (default 1).
 #         --budget SEC       total wall clock across rows; a row that starts
 #                            after it is spent prints UNDECIDED (0 = unlimited).
+#         --records FILE     read the records from FILE (the exact `parse`
+#                            output) instead of parsing a plan; the Plan checks
+#                            CI job has the records and no plan. Passing both
+#                            --records and a plan is a usage error (exit 2).
 #         Baseline rc + seconds are memoized per distinct check command, so
 #         rows sharing one command run their baseline once.
 #         Each non-TRIPPED verdict line is followed by one NEXT-STEP row <id> line
@@ -50,6 +55,7 @@ SELF_LIBDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 usage() {
     echo "Usage: bin/lib/plan-exec-mutations parse [--root DIR] <plan>" >&2
     echo "       bin/lib/plan-exec-mutations run [--root DIR] [--timeout SEC] [--max-timeout SEC] [--scale K] [--budget SEC] <plan>" >&2
+    echo "       bin/lib/plan-exec-mutations run [--root DIR] [...] --records FILE" >&2
     echo "       bin/lib/plan-exec-mutations recover [--root DIR]" >&2
     echo "       bin/lib/plan-exec-mutations pending [--root DIR]" >&2
     exit 2
@@ -65,11 +71,13 @@ ROOT=""
 SEC=30
 MAXSEC=""
 SCALE=1
+RECORDS=""
 BUDGET=0
 PLAN=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --root) [ $# -ge 2 ] || usage; ROOT="$2"; shift 2 ;;
+        --records) [ $# -ge 2 ] || usage; RECORDS="$2"; shift 2 ;;
         --timeout)
             [ $# -ge 2 ] || usage
             case "$2" in ''|*[!0-9]*) usage ;; esac
@@ -92,7 +100,8 @@ while [ $# -gt 0 ]; do
 done
 
 case "$MODE" in
-    parse|run) [ -n "$PLAN" ] && [ -r "$PLAN" ] || usage ;;
+    parse) [ -n "$PLAN" ] && [ -r "$PLAN" ] || usage ;;
+    run) if [ -n "$RECORDS" ]; then [ -r "$RECORDS" ] && [ -z "$PLAN" ] || usage; else [ -n "$PLAN" ] && [ -r "$PLAN" ] || usage; fi ;;
     *) [ -z "$PLAN" ] || usage ;;
 esac
 [ -n "$MAXSEC" ] || MAXSEC="$SEC"
@@ -293,6 +302,12 @@ if [ -n "$PLAN" ]; then
         *) PLAN="$(cd "$(dirname "$PLAN")" && pwd)/$(basename "$PLAN")" ;;
     esac
 fi
+if [ -n "$RECORDS" ]; then
+    case "$RECORDS" in
+        /*) : ;;
+        *) RECORDS="$(cd "$(dirname "$RECORDS")" && pwd)/$(basename "$RECORDS")" ;;
+    esac
+fi
 case "$ROOT" in
     /*) : ;;
     *) ROOT="$(cd "$ROOT" 2>/dev/null && pwd)" || usage ;;
@@ -437,7 +452,7 @@ take_exec_lock run
 do_recover || exit 3
 
 RECS=$(mktemp "${TMPDIR:-/tmp}/pem-recs.XXXXXX") || exit 2
-do_parse "$PLAN" "$ROOT" > "$RECS"
+if [ -n "$RECORDS" ]; then cp "$RECORDS" "$RECS"; else do_parse "$PLAN" "$ROOT" > "$RECS"; fi
 PRC=$?
 if [ "$PRC" -ne 0 ]; then
     echo "PARSE-FAILED — $(head -1 "$RECS")"

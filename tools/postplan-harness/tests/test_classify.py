@@ -24,6 +24,8 @@ from harness.classify import (_manual_testing_span, classify, files_from_diff, f
                                restore_manual_testing_section, strip_change_blocks, strip_manual_testing_section,
                                TESTS_CHANGED_BEGIN, TESTS_CHANGED_END,
                                upsert_reviewer_verification,
+                               PLAN_CHECKS_BEGIN, PLAN_CHECKS_END, extract_plan_checks,
+                               upsert_plan_checks,
                                MERGE_DIGEST_BEGIN, MERGE_DIGEST_END,
                                SCOPE_NOTES_BEGIN, SCOPE_NOTES_END, strip_runner_blocks)
 from harness.planfile import parse_hold_justification, split_hold_justification
@@ -1177,79 +1179,6 @@ def test_numstat_text_does_not_count_file_headers():
     assert numstat_text(diff) == "1\t1\ta"
 
 
-# --- exec-mutations PR-body block (ADR-0199) ------------------------------------------
-
-def _xm_report(**kw):
-    from harness.mutations import MutationReport, MutationResult
-    base = dict(ran=True, results=(MutationResult(1, "TRIPPED", "bash check.sh exited 1 under mutation"),),
-                holding=(), tree_suspect=False)
-    base.update(kw)
-    return MutationReport(**base)
-
-
-def test_upsert_exec_mutations_insert_replace_remove():
-    from harness.classify import EXEC_MUTATIONS_BEGIN, EXEC_MUTATIONS_END, upsert_exec_mutations
-    from harness.mutations import MutationReport, MutationResult
-    body = "## Summary\nx\n"
-    once = upsert_exec_mutations(body, _xm_report())
-    assert once.count(EXEC_MUTATIONS_BEGIN) == 1 and EXEC_MUTATIONS_END in once
-    assert "- **Row 1** (`bash check.sh`)" in once
-    assert "✅ All 1 rows caught the planted bug." in once and "⚠️" not in once
-    assert "exited" not in once
-    held = _xm_report(results=(MutationResult(20, "HELD", "x still exited 0 under mutation"),),
-                      holding=("row 20 HELD — x still exited 0 under mutation",),
-                      tree_suspect=True)
-    twice = upsert_exec_mutations(once, held)
-    assert twice.count(EXEC_MUTATIONS_BEGIN) == 1
-    assert "- ❌ **Row 20** (`x`): the test still passed with the bug planted" in twice
-    assert "Row 1**" not in twice and "<details>" not in twice
-    assert "could not confirm the code was put back" in twice
-    gone = upsert_exec_mutations(twice, MutationReport(True, (), (), False))
-    assert EXEC_MUTATIONS_BEGIN not in gone and gone.startswith("## Summary")
-    notrun = upsert_exec_mutations(body, MutationReport(False, (), ("executor-crashed: x",), True))
-    assert "- The bug-planting check did not run, so arming is held." in notrun
-    assert "> executor-crashed: x" in notrun
-
-
-def test_exec_mutations_failures_outside_details_passes_inside():
-    from harness.classify import render_exec_mutations
-    from harness.mutations import MutationResult
-    out = render_exec_mutations(_xm_report(results=(
-        MutationResult(4, "TRIPPED", "t exited 1 under mutation"),
-        MutationResult(5, "HELD", "t still exited 0 under mutation"),
-        MutationResult(6, "UNDECIDED", "t exited 124 (check could not run) under mutation"),
-        MutationResult(7, "TRIPPED", "t exited 1 under mutation"),
-    )))
-    head, details = out.split("<details>")
-    assert "**⚠️ 2 of 4 rows need attention:**" in head
-    assert "❌ **Row 5**" in head and "❌ **Row 6** (`t`): the test could not run" in head
-    assert "Row 4" not in head and "Row 7" not in head
-    assert "✅ 2 rows caught the planted bug</summary>" in details
-    assert "- **Row 4** (`t`)" in details and "- **Row 7** (`t`)" in details
-    assert "</details>" in details and "Row 5" not in details
-
-
-def test_exec_mutations_clean_run_timeout_has_its_own_words():
-    from harness.classify import render_exec_mutations
-    from harness.mutations import MutationResult
-    out = render_exec_mutations(_xm_report(results=(
-        MutationResult(5, "UNDECIDED", "t timed out (124) before mutation"),
-        MutationResult(6, "UNDECIDED", "t timed out (124) under mutation"),
-    )))
-    assert "**Row 5**: the test timed out before any bug was planted" in out
-    assert "**Row 6**: the test could not run with the bug planted" in out
-
-
-def test_exec_mutations_neutralizes_headings():
-    from harness.classify import upsert_exec_mutations
-    from harness.mutations import MutationResult
-    out = upsert_exec_mutations("", _xm_report(
-        results=(MutationResult(2, "HELD", "## Manual Testing"),),
-        holding=("row 2 HELD — ## Manual Testing",)))
-    assert "> ## Manual Testing" in out
-    assert not any(l.startswith("## ") for l in out.splitlines())
-
-
 def test_strip_runner_blocks_removes_merge_digest():
     body = f"A\n{MERGE_DIGEST_BEGIN}\nstale quote\n{MERGE_DIGEST_END}\nB\n"
     assert strip_runner_blocks(body) == "A\n\nB\n"
@@ -1275,3 +1204,37 @@ def test_strip_runner_blocks_leaves_unbalanced_pair_intact(body):
 
 def test_strip_runner_blocks_treats_none_as_empty():
     assert strip_runner_blocks(None) == ""
+
+
+def _pc_block(text="rows=1"):
+    return f"{PLAN_CHECKS_BEGIN}\n{text}\n{PLAN_CHECKS_END}"
+
+
+def test_upsert_plan_checks_appends_when_absent():
+    out = upsert_plan_checks("Intro text.", _pc_block())
+    assert out == "Intro text.\n\n" + _pc_block() + "\n"
+    assert extract_plan_checks(out) == _pc_block()
+
+
+def test_upsert_plan_checks_replaces_existing_block():
+    body = "Head text.\n\n" + _pc_block("OLD-TEXT") + "\n\nTail text.\n"
+    out = upsert_plan_checks(body, _pc_block("NEW-TEXT"))
+    assert "OLD-TEXT" not in out
+    assert out == "Head text.\n\n" + _pc_block("NEW-TEXT") + "\n\nTail text.\n"
+
+
+def test_upsert_plan_checks_repairs_duplicate_markers():
+    body = "Intro.\n" + _pc_block("A") + "\nmid\n" + _pc_block("B") + "\n"
+    out = upsert_plan_checks(body, _pc_block("NEW"))
+    assert out.count(PLAN_CHECKS_BEGIN) == 1
+    assert out.count(PLAN_CHECKS_END) == 1
+    assert extract_plan_checks(out) == _pc_block("NEW")
+    assert "Intro." in out
+
+
+def test_extract_plan_checks_returns_none_on_missing_end_marker():
+    assert extract_plan_checks(f"x\n{PLAN_CHECKS_BEGIN}\nrows\n") is None
+
+
+def test_extract_plan_checks_returns_none_when_end_precedes_begin():
+    assert extract_plan_checks(f"{PLAN_CHECKS_END}\nrows\n{PLAN_CHECKS_BEGIN}\n") is None

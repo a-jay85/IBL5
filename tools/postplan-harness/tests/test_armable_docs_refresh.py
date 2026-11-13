@@ -164,7 +164,7 @@ def test_docs_refresh_shell_parity(name, head, files, md, verdict, expected):
 def _inputs(**overrides):
     """Fully-arming baseline (conditions 1-18 pass), copied from tests/test_armable.py."""
     base = dict(pr_body=BODY_CLEARED, pr_title="chore: x", pr_labels=[],
-                classification=Classification(files=["ibl5/classes/Trade/TradeService.php"]), findings=[], unresolved_conformance=[], exec_mutations_holding=(), exec_mutations_tree_suspect=False,
+                classification=Classification(files=["ibl5/classes/Trade/TradeService.php"]), findings=[], unresolved_conformance=[], exec_mutations_holding=(), exec_mutations_tree_suspect=False, plan_checks_holding=(),
                 phase5_status="pass", plan_auto_merge_false=False, headless=True,
                 dep_state_lookup=lambda n: "MERGED", fidelity_verdict="READY",
                 unresolved_findings=[], conflict_resolved=False, merge_danger_state="TWO-WAY",

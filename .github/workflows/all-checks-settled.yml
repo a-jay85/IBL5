@@ -13,6 +13,7 @@ on:
     # Every PR-triggered workflow name; bin/check-composite-contracts A6 pins this list
     # to the set of workflows with a pull_request/pull_request_target trigger.
     workflows:
+      - "Plan checks"
       - Auto-mergeable Label
       - bun audit — tracking issue
       - Dependabot Auto-Merge

@@ -189,15 +189,3 @@ def test_commit_all_refuses_with_pending_journal(tmp_path):
     out = subprocess.run(["git", "-C", str(repo), "status", "--porcelain"],
                          capture_output=True, text=True).stdout
     assert "?? new.txt" in out  # nothing was staged
-
-
-def test_mutation_step_runs_after_verify_before_arm():
-    src = (Path(__file__).resolve().parents[1] / "runner.py").read_text()
-    verify = src.index("tracks = verifier.run(cls)")
-    step = src.index("mutation_report = _exec_mutations_step(")
-    arm = src.index("inputs = ArmInputs(")
-    first_eval = src.index("= evaluate(inputs)")
-    assert verify < step < arm < first_eval
-    # no stage/commit between the step and arming
-    between = src[step:first_eval]
-    assert not re.search(r"\.(stage_all|commit_all)\(", between)

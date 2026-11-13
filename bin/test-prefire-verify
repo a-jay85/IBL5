@@ -1582,6 +1582,8 @@ test_pytest_changed_test_file_runs_itself() {
 }
 
 test_pytest_module_maps_importing_tests() {
+    # test_combo.py holds the from-import form. Narrowing the selector regex to
+    # import[[:space:]]${leaf}${b} drops it and fails the args assertion below.
     pytest_case
     touch_file tools/postplan-harness/harness/armable.py
     run_gate --stage pytest

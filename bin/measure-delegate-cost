@@ -6,6 +6,7 @@ import glob
 import importlib.util
 import json
 import os
+import re
 import statistics
 import sys
 from importlib.machinery import SourceFileLoader
@@ -27,6 +28,15 @@ for _k in RATE_KEY.values():
 
 MIN_N = 20
 NEUTRAL_BAND = 0.05
+
+
+ATTEMPT_ARMS = ("low-first", "control")
+ATTEMPT_EFFORTS = ("low", "high", "inherited")
+ATTEMPT_RESULTS = ("pass", "fail", "unrunnable")
+ATTEMPT_SUBDIRS = ("logs", "logs.archive")
+PLAN_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+MIN_PLANS_PER_ARM = 30
+MIN_PACKETS_PER_ARM = 100
 
 
 def reprice(row, tier):
@@ -224,6 +234,41 @@ def build_report(s_stats, o_stats, gap, verd, skipped_null,
     return "\n".join(lines)
 
 
+def record_attempt(args):
+    """Append one delegate-attempt row to <nightly>/logs/<plan>.delegate-attempts.jsonl."""
+    errors = []
+    if not args.plan or not PLAN_NAME_RE.match(args.plan):
+        errors.append("--plan must be a bare plan file name (no slash, no leading dot)")
+    if args.phase is None or args.phase < 1:
+        errors.append("--phase must be an integer >= 1")
+    for flag, val in (("--arm", args.arm), ("--attempt", args.attempt),
+                      ("--effort", args.effort), ("--check-result", args.check_result)):
+        if val is None:
+            errors.append(f"{flag} is required with --record-attempt")
+    if args.check_result == "pass" and args.check_exit != 0:
+        errors.append("--check-result pass needs --check-exit 0")
+    if args.check_result == "fail" and (args.check_exit is None or args.check_exit == 0):
+        errors.append("--check-result fail needs a non-zero --check-exit")
+    if errors:
+        for msg in errors:
+            print(f"record-attempt: {msg}", file=sys.stderr)
+        sys.exit(2)
+
+    row = {
+        "plan": args.plan, "phase": args.phase, "arm": args.arm,
+        "attempt": args.attempt, "effort": args.effort,
+        "check_exit": None if args.check_result == "unrunnable" else args.check_exit,
+        "check_result": args.check_result,
+        "ts": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+    }
+    stem = args.plan[:-3] if args.plan.endswith(".md") else args.plan
+    logs_dir = os.path.join(args.nightly_dir, "logs")
+    os.makedirs(logs_dir, exist_ok=True)
+    path = os.path.join(logs_dir, f"{stem}.delegate-attempts.jsonl")
+    with open(path, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps(row, sort_keys=True) + "\n")
+
+
 def main():
     default_dir = os.path.expanduser(
         "~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse"
@@ -244,7 +289,25 @@ def main():
         "--json", action="store_true",
         help="Print JSON to stdout instead of Markdown"
     )
+    parser.add_argument(
+        "--record-attempt", action="store_true",
+        help="Append one delegate-attempt row to the attempts log, then exit"
+    )
+    parser.add_argument("--plan", default=None, help="With --record-attempt: bare plan file name")
+    parser.add_argument("--phase", type=int, default=None, help="With --record-attempt: phase number")
+    parser.add_argument("--arm", choices=ATTEMPT_ARMS, default=None, help="With --record-attempt: trial arm")
+    parser.add_argument("--attempt", type=int, choices=(1, 2), default=None,
+                        help="With --record-attempt: attempt number")
+    parser.add_argument("--effort", choices=ATTEMPT_EFFORTS, default=None,
+                        help="With --record-attempt: effort the delegate ran at")
+    parser.add_argument("--check-result", choices=ATTEMPT_RESULTS, default=None,
+                        help="With --record-attempt: outcome of the packet's check")
+    parser.add_argument("--check-exit", type=int, default=None,
+                        help="With --record-attempt: exit code of the packet's check")
     args = parser.parse_args()
+    if args.record_attempt:
+        record_attempt(args)
+        return
 
     nightly_dir = args.nightly_dir
     generated = datetime.date.today().isoformat()

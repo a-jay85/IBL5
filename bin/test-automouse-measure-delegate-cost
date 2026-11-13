@@ -297,6 +297,62 @@ grep -qi 'no ledger files' <<< "$MISS_ERR" \
     && h_pass 'missing-dir stderr contains "no ledger files"' \
     || h_fail 'missing-dir stderr missing "no ledger files"' "$MISS_ERR"
 
+printf '\n=== case_record_attempt ===\n'
+# Every call runs from an empty mktemp cwd so a stray relative write shows up.
+RA_CWD=$(mktemp -d "$TMPROOT/ra-cwd.XXXXXX")
+RA_DIR="$TMPROOT/R"
+RA_ATTEMPTS="$RA_DIR/logs/rt.delegate-attempts.jsonl"
+ra_call() { (cd "$RA_CWD" && "$SCRIPT" --record-attempt --nightly-dir "$1" "${@:2}"); }
+
+ra_call "$RA_DIR" --plan rt.md --phase 3 --arm low-first --attempt 1 \
+    --effort low --check-result pass --check-exit 0
+RA_KEYS=$(python3 -c 'import json,sys
+print(" ".join(sorted(json.loads(open(sys.argv[1]).readline()))))' "$RA_ATTEMPTS" 2>/dev/null || true)
+assert_eq "$RA_KEYS" "arm attempt check_exit check_result effort phase plan ts" \
+    "record-attempt-writes-row: eight keys in <nightly>/logs/<stem>.delegate-attempts.jsonl"
+assert_eq "$(find "$RA_CWD" -type f | wc -l | tr -d ' ')" "0" \
+    "record-attempt-writes-row: cwd stays empty"
+
+ra_call "$RA_DIR" --plan rt.md --phase 4 --arm low-first --attempt 1 \
+    --effort low --check-result unrunnable --check-exit 127
+RA_NULL=$(python3 -c 'import json,sys
+rows=[json.loads(l) for l in open(sys.argv[1])]
+print(json.dumps(rows[-1]["check_exit"]))' "$RA_ATTEMPTS" 2>/dev/null || true)
+assert_eq "$RA_NULL" "null" "record-attempt-unrunnable-null-exit: check_exit stored as null"
+
+RA_RC=0
+ra_call "$TMPROOT/R1" --plan rt.md --phase 1 --arm control --attempt 1 \
+    --effort high --check-result pass --check-exit 1 2>/dev/null || RA_RC=$?
+assert_eq "$RA_RC" "2" "record-attempt-rejects-pass-nonzero: exit 2"
+assert_eq "$(find "$TMPROOT/R1" -type f 2>/dev/null | wc -l | tr -d ' ')" "0" \
+    "record-attempt-rejects-pass-nonzero: no file written"
+
+for ra_bad in '../evil.md' 'a/b.md' '.hidden.md'; do
+    RA_RC=0
+    ra_call "$TMPROOT/R2" --plan "$ra_bad" --phase 1 --arm control --attempt 1 \
+        --effort high --check-result pass --check-exit 0 2>/dev/null || RA_RC=$?
+    assert_eq "$RA_RC" "2" "record-attempt-rejects-bad-plan-name: $ra_bad exits 2"
+done
+assert_eq "$(find "$TMPROOT/R2" -type f 2>/dev/null | wc -l | tr -d ' ')" "0" \
+    "record-attempt-rejects-bad-plan-name: no file written"
+RA_RC=0
+ra_call "$TMPROOT/R2" --plan x.md --phase 1 --arm control --attempt 1 \
+    --effort high --check-result pass --check-exit 0 2>/dev/null || RA_RC=$?
+assert_eq "$RA_RC" "0" "record-attempt-rejects-bad-plan-name: near-miss x.md exits 0"
+
+RA_RC=0
+RA_ERR=$(ra_call "$TMPROOT/R3" --plan rt.md --arm control --attempt 1 \
+    --effort high --check-result pass --check-exit 0 2>&1) || RA_RC=$?
+assert_eq "$RA_RC" "2" "record-attempt-missing-arg-exit2: exit 2"
+grep -qF -- '--phase' <<< "$RA_ERR" \
+    && h_pass "record-attempt-missing-arg-exit2: stderr names --phase" \
+    || h_fail "record-attempt-missing-arg-exit2: stderr names --phase" "$RA_ERR"
+
+RA_RC=0
+ra_call "$TMPROOT/R4" --plan rt.md --phase 1 --arm ab --attempt 1 \
+    --effort high --check-result pass --check-exit 0 2>/dev/null || RA_RC=$?
+assert_eq "$RA_RC" "2" "record-attempt-rejects-arm-ab: exit 2"
+
 printf '\n'
 if [ "$H_FAIL" -eq 0 ]; then
     printf 'PASS: bin/test-automouse-measure-delegate-cost\n'

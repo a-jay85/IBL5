@@ -240,7 +240,7 @@ def record_attempt(args):
     if not args.plan or not PLAN_NAME_RE.match(args.plan):
         errors.append("--plan must be a bare plan file name (no slash, no leading dot)")
     if args.phase is None or args.phase < 1:
-        errors.append("--phase must be an integer >= 1")
+        errors.append("--packet (alias --phase) must be an integer >= 1")
     for flag, val in (("--arm", args.arm), ("--attempt", args.attempt),
                       ("--effort", args.effort), ("--check-result", args.check_result)):
         if val is None:
@@ -299,7 +299,7 @@ def ingest_attempts(nightly_dir):
                 if row["arm"] not in ATTEMPT_ARMS:
                     malformed += 1
                     continue
-                # "phase" holds the Delegate packet number (one per packet, see --phase).
+                # "phase" holds the Delegate packet number (one per packet, see --packet).
                 key = (row["plan"], row["phase"], row["attempt"])
                 prev = latest.get(key)
                 if prev is None or str(row["ts"]) >= str(prev["ts"]):
@@ -473,7 +473,7 @@ def main():
         help="Append one delegate-attempt row to the attempts log, then exit"
     )
     parser.add_argument("--plan", default=None, help="With --record-attempt: bare plan file name")
-    parser.add_argument("--phase", type=int, default=None, help="With --record-attempt: Delegate packet number (1 = the plan's first ### Delegate packet; each packet gets its own number, even two in one plan phase)")
+    parser.add_argument("--packet", "--phase", dest="phase", type=int, default=None, help="With --record-attempt: Delegate packet number (1 = the plan's first ### Delegate packet; each packet gets its own number, even two in one plan phase)")
     parser.add_argument("--arm", choices=ATTEMPT_ARMS, default=None, help="With --record-attempt: trial arm")
     parser.add_argument("--attempt", type=int, choices=(1, 2), default=None,
                         help="With --record-attempt: attempt number")

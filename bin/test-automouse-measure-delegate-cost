@@ -320,6 +320,14 @@ rows=[json.loads(l) for l in open(sys.argv[1])]
 print(json.dumps(rows[-1]["check_exit"]))' "$RA_ATTEMPTS" 2>/dev/null || true)
 assert_eq "$RA_NULL" "null" "record-attempt-unrunnable-null-exit: check_exit stored as null"
 
+# --packet is the primary flag name; --phase stays an alias. Both fill "phase".
+ra_call "$RA_DIR" --plan rt.md --packet 5 --arm low-first --attempt 1 \
+    --effort low --check-result pass --check-exit 0
+RA_PKT=$(python3 -c 'import json,sys
+rows=[json.loads(l) for l in open(sys.argv[1])]
+print(rows[-1]["phase"])' "$RA_ATTEMPTS" 2>/dev/null || true)
+assert_eq "$RA_PKT" "5" "record-attempt-packet-flag: --packet 5 stored as phase 5"
+
 RA_RC=0
 ra_call "$TMPROOT/R1" --plan rt.md --phase 1 --arm control --attempt 1 \
     --effort high --check-result pass --check-exit 1 2>/dev/null || RA_RC=$?

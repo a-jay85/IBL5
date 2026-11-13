@@ -262,12 +262,15 @@ _oa_finish_record() { # sets rec_mode and rec_head from this login's newest appr
     fi
 }
 _oa_prefire() {
-    local wt_head rc
+    local wt_head rc plan_file
+    local -a pf_args=()
     [ -n "$OA_WT" ] || _oa_refuse 4 "no worktree is checked out on $branch, so prefire-verify cannot run on the fixed head."
     wt_head=$(git -C "$OA_WT" rev-parse HEAD 2>/dev/null)
     [ "$wt_head" = "$head" ] || _oa_refuse 4 "worktree $OA_WT is at ${wt_head:-an unreadable HEAD}, but the PR head is $head."
     [ -z "$(git -C "$OA_WT" status --porcelain 2>/dev/null)" ] || _oa_refuse 4 "worktree $OA_WT has uncommitted changes, so prefire-verify would not test the pushed head."
-    (cd "$OA_WT" && bin/lib/prefire-verify) >&2; rc=$?
+    plan_file="$HOME/claude-plans/$branch.md"
+    [ -f "$plan_file" ] && pf_args=(--plan "$plan_file")
+    (cd "$OA_WT" && bin/lib/prefire-verify ${pf_args[@]+"${pf_args[@]}"}) >&2; rc=$?
     [ "$rc" -eq 0 ] || _oa_refuse 4 "bin/lib/prefire-verify exited $rc in $OA_WT (1 a check failed, 3 a prerequisite is missing, 4 the tree changed)."
 }
 

@@ -270,7 +270,7 @@ _OWNER_CHANNEL_RE = re.compile(
 _KEEP_ONE_WAY_RE = re.compile(
     r"\bdrop(s|ped|ping)?\s+(table|column|index)\b|\balter(s|ed|ing)?\b|\brenam\w*|\bschema\b"
     r"|\bcolumns?\b|discord-dm|\bDMs?\b|direct message|\bGMs?\b|e-?mail|classes/Mail"
-    r"|db-sync-prod|promote-to-production|\bprod(uction)?[- ]?(sync|data|db|database)\b",
+    r"|\bfiles?\b|\bphotos?\b|\bartifacts?\b|db-sync-prod|promote-to-production|\bprod(uction)?[- ]?(sync|data|db|database)\b",
     re.IGNORECASE)
 # Any table-like token: an `ibl_`/`nuke_` name, the shared `cache` table, or a backticked
 # snake_case name. An unregistered one keeps the raise.

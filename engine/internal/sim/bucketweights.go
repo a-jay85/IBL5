@@ -279,11 +279,15 @@ func threePtBucketWeight(p onCourt) float64 {
 // default ratings) contributes negligible negative weight; the made-rate term
 // carries the bucket above the floor. Unchanged from the faithful #952 basis.
 func andOneBucketWeight(mq float64, p onCourt) float64 {
-	w := mq*0.25 + float64(floor1(p.FGP))*andOneMadeRateScale
-	if w < andOneBucketFloor {
-		return andOneBucketFloor
-	}
-	return w
+	return max(andOneBucketRaw(mq, p), andOneBucketFloor)
+}
+
+// andOneBucketRaw is the unfloored and-one stand-in. The half-court caller adds
+// the HCA term to it before applying andOneBucketFloor, the JSB order
+// (FUN_004e1ba0 97158-97168: local_e88 takes the HCA addend, local_e90 inherits
+// it, and only then is local_e90 floored).
+func andOneBucketRaw(mq float64, p onCourt) float64 {
+	return mq*0.25 + float64(floor1(p.FGP))*andOneMadeRateScale
 }
 
 // foulBucketWeight is the faithful JSB 5.60 foul bucket: a symmetric two-arm BASE

@@ -160,3 +160,55 @@ func TestGoldenFoulTally_ChargeFoulFeedsSubstitution(t *testing.T) {
 		t.Errorf("teamFouls = %d, want %d", defense.teamFouls, teamFoulBonusThreshold+1)
 	}
 }
+
+// TestResolveFoulShotThreePtShootsBelowBonus pins JSB's local_110 (94148):
+// a fouled 3 shoots 3 FTs below the bonus even on a draw at or under the
+// shooting cut, and the same draw without the 3pt flag shoots nothing.
+func TestResolveFoulShotThreePtShootsBelowBonus(t *testing.T) {
+	seed := uint64(0)
+	for s := uint64(1); s <= 200; s++ {
+		ref := rng.New(s)
+		if ref.Float64() <= shootingFoulDrawCut {
+			seed = s
+			break
+		}
+	}
+	if seed == 0 {
+		t.Fatal("no seed in 1..200 gives a first draw at or under the shooting cut")
+	}
+	for _, c := range []struct {
+		threePt bool
+		wantFTs bool
+	}{{true, true}, {false, false}} {
+		b := richBundle()
+		offense := newTeamState(b.Players, 7, false)
+		defense := newTeamState(b.Players, 3, true)
+		shooter, defender := offense.players[0], defense.players[0]
+		gs := &gameState{rng: rng.New(seed), period: 1, clock: 600}
+		defense.teamFouls = 0
+		got := gs.resolveFoulShot(offense, defense, shooter, defender, 3, false, c.threePt, false, 0)
+		if got != c.wantFTs {
+			t.Errorf("threePt=%v: resolveFoulShot = %v, want %v", c.threePt, got, c.wantFTs)
+		}
+		fts := 0
+		for _, e := range gs.events {
+			if e.Kind != result.EventFreeThrow {
+				continue
+			}
+			fts++
+			if e.FTAttempts != 3 {
+				t.Errorf("threePt=%v: FT trip with %d attempts, want 3", c.threePt, e.FTAttempts)
+			}
+		}
+		wantTrips := 0
+		if c.wantFTs {
+			wantTrips = 1
+		}
+		if fts != wantTrips {
+			t.Errorf("threePt=%v: %d FT events, want %d", c.threePt, fts, wantTrips)
+		}
+		if got := defense.fouls[defender.PID]; got != 1 {
+			t.Errorf("threePt=%v: defender fouls = %d, want 1", c.threePt, got)
+		}
+	}
+}

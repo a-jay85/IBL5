@@ -320,7 +320,11 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 		}
 		switch path {
 		case outcome2pt:
-			if made, _ := gs.shotAttempt(offense, defense, bh, sv2, result.ShotTwoPoint, origin, periodIdx); !made {
+			made, _ := gs.shotAttempt(offense, defense, bh, sv2, result.ShotTwoPoint, origin, periodIdx)
+			if made && andOneMadeTwoFires(gs.rng.Float64()) { // JSB made-2pt roll: and-one
+				gs.resolveFoul(offense, defense, bh, def, 1, true, false, periodIdx)
+			}
+			if !made {
 				gs.creditBlock(offense, defense, bh, def)
 				if cont, next := gs.rebound(offense, defense, periodIdx); cont {
 					bh = next
@@ -335,7 +339,11 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 			// captures the roll's actual make verdict and fatigue (it issues no rng draw,
 			// so post-roll ordering keeps the GameResult byte-identical).
 			sv := shotValue3pt(net, bh.D80, gs.shotBaselineOrFallback(), gs.leagueBlk48, defBlkSum)
-			made, _ := gs.shotAttempt(offense, defense, bh, sv, result.ShotThree, origin, periodIdx)
+			res := gs.threePtShot(offense, defense, bh, def, sv, origin, periodIdx)
+			if res == threePtFouled {
+				return possNormal // JSB 94102-94150: fouled missed 3, FTs already shot
+			}
+			made := res == threePtMade
 			if gs.threePtDiag != nil {
 				b3 := gs.shotBaselineOrFallback() * 1.5
 				netTerm := net * netToShotValue / b3
@@ -343,7 +351,6 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 				gs.threePtDiag.Add(float64(bh.D80), netTerm, blockTerm, made, fatigueFactor(bh.Stamina), sv)
 			}
 			if !made {
-				gs.creditBlock(offense, defense, bh, def)
 				if cont, next := gs.rebound(offense, defense, periodIdx); cont {
 					bh = next
 					continue

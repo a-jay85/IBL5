@@ -29,17 +29,23 @@ func foulAwardsFreeThrows(shooting bool, teamFouls int, andOne, threePt bool) bo
 	return shooting || teamFouls > teamFoulBonusThreshold || andOne || threePt
 }
 
-// resolveFoul charges one defensive foul under the team-foul bonus. It returns
-// true when free throws were shot (possession then changes as before) and
-// false for a below-bonus non-shooting foul: PF charged, no FTs, and the
-// caller keeps the ball with the offense. threePt is always false here: no
-// engine outcome is a fouled 3-point attempt (outcome3pt resolves through
-// shotAttempt with no foul; outcomeFoulOnly carries no shot type).
+// resolveFoul charges one defensive foul on a trip with no fouled 3-point
+// attempt. Every existing caller keeps this signature; see resolveFoulShot.
 func (gs *gameState) resolveFoul(offense, defense *teamState, shooter, defender onCourt, n int, andOne, forced bool, periodIdx int) bool {
+	return gs.resolveFoulShot(offense, defense, shooter, defender, n, andOne, false, forced, periodIdx)
+}
+
+// resolveFoulShot charges one defensive foul under the team-foul bonus. It
+// returns true when free throws were shot (possession then changes as before)
+// and false for a below-bonus non-shooting foul: PF charged, no FTs, and the
+// caller keeps the ball with the offense. threePt is JSB's local_110 (set at
+// 94148 for a fouled missed 3): it forces shooting at 93469-93480 and clears
+// the 93647 guard, so a fouled 3 always shoots.
+func (gs *gameState) resolveFoulShot(offense, defense *teamState, shooter, defender onCourt, n int, andOne, threePt, forced bool, periodIdx int) bool {
 	draw := gs.rng.Float64() // consumed on every foul, forced or not
-	shooting := isShootingFoul(draw, andOne, false, forced)
+	shooting := isShootingFoul(draw, andOne, threePt, forced)
 	defense.teamFouls++
-	if foulAwardsFreeThrows(shooting, defense.teamFouls, andOne, false) {
+	if foulAwardsFreeThrows(shooting, defense.teamFouls, andOne, threePt) {
 		gs.freeThrows(offense, defense, shooter, defender, n, periodIdx)
 		return true
 	}

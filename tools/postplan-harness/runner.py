@@ -45,6 +45,7 @@ from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, confor
 from harness import fidelity_delta
 from harness import conflict, conflict_report, fidelity_filefix
 from harness import armable as _armable_mod
+from harness import sql_equivalence
 from harness.armable import (AGGREGATOR_CONTEXT, ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
                              manual_testing_clearance, meta_checks_clearance, meta_checks_flag_path,
                              resolve_owner_approval, select_fidelity_verdict)
@@ -904,6 +905,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 plan_auto_merge_value=getattr(plan, "auto_merge_value", None),
                 owner_approval=_owner_approval,
                 plan_hold_triggers=getattr(plan, "hold_triggers", ()),
+                sql_equivalence_evidence=sql_equivalence.arm_input_value(
+                    getattr(plan, "hold_triggers", ()), worktree, git.branch(), cls.files),
                 fidelity_gate_edit_only=second_review.selected_gate_edit_only(
                     res.fidelity or {}, pr, git.head_tree()),
                 branch=git.branch(),

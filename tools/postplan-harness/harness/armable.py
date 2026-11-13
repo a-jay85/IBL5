@@ -235,7 +235,10 @@ def ui_hold(files: list[str], labels: list[str]) -> str:
 # blocked condition is one of them and each passes its own check below. Anything else
 # stays with the owner. The UI floor is deliberately broad: a false positive keeps a hold.
 SECOND_REVIEW_CLEARABLE = frozenset({7, 10, 12, 17})
-CLEARABLE_PLAN_TRIGGERS = frozenset({"security-surface", "gate-weakening", "golden-snapshot"})
+CLEARABLE_PLAN_TRIGGERS = frozenset({"security-surface", "gate-weakening", "golden-snapshot", "sql-equivalent"})
+# Tokens the seat may rule on only after a harness-checked evidence verdict is "ok".
+# A missing, failed or stale verdict keeps the owner hold (fail closed).
+EVIDENCE_GATED_PLAN_TRIGGERS = frozenset({"sql-equivalent"})
 # The owner-held tokens. Arming holds these the same way it holds an unknown token. They are
 # listed so the vocabulary is explicit and a test can pin that the two sets never overlap.
 # bootstrap-hazard, security-irreducible and golden-new are the must-ask shapes of gate 14(e),
@@ -257,6 +260,16 @@ def _ui_paths(inp) -> list[str]:
     return inp.ui_paths if inp.ui_paths is not None else inp.classification.files
 
 
+def plan_triggers_clearable(triggers, sql_equivalence_evidence: str) -> bool:
+    """True when condition (7)'s plan tokens may go to the seat. Fails closed."""
+    tokens = set(triggers or ())
+    if not tokens or not tokens <= CLEARABLE_PLAN_TRIGGERS:
+        return False
+    if tokens & EVIDENCE_GATED_PLAN_TRIGGERS and sql_equivalence_evidence != "ok":
+        return False
+    return True
+
+
 def second_review_candidates(inp, cs) -> dict[int, str]:
     """{condition number: hold reason} the seat may rule on; {} keeps every hold."""
     blocked = {c.number: c for c in cs if c.blocked}
@@ -269,9 +282,7 @@ def second_review_candidates(inp, cs) -> dict[int, str]:
     if 7 in blocked_nums:
         if inp.plan_auto_merge_value != "false" and not inp.plan_auto_merge_false:
             return {}
-        if not inp.plan_hold_triggers:
-            return {}
-        if not set(inp.plan_hold_triggers) <= CLEARABLE_PLAN_TRIGGERS:
+        if not plan_triggers_clearable(inp.plan_hold_triggers, inp.sql_equivalence_evidence):
             return {}
     if 12 in blocked_nums:
         selected, _ = select_fidelity_verdict(inp.fidelity_verdict, inp.fidelity_verdict_2,
@@ -361,6 +372,7 @@ class ArmInputs:
     plan_auto_merge_value: Optional[str] = None   # raw line-1 `auto_merge:` value; None = absent
     owner_approval: str = "unchecked"   # (7) token from resolve_owner_approval
     plan_hold_triggers: tuple = ()                # line-1 `hold_trigger:` tokens; () keeps condition (7) with the owner
+    sql_equivalence_evidence: str = "unchecked"   # sql_equivalence.arm_input_value(); only "ok" lets `sql-equivalent` reach the seat
     fidelity_gate_edit_only: bool = False         # every blocking fidelity finding is [GATE-EDIT]
     second_review_verdict: Optional[str] = None   # "CLEAN"/"REJECT"; None = the seat gave no verdict
     second_review_tree: Optional[str] = None      # tree the seat reviewed; must equal current_tree

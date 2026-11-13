@@ -59,7 +59,7 @@ final class DumpPaidWithPick implements DealShapeInterface
 
         foreach ($pool->userPids as $userPid) {
             $surplus = $s->surplusBySeason($userPid);
-            if ((($surplus[1] ?? 0) + ($surplus[2] ?? 0) + ($surplus[3] ?? 0)) >= 0) {
+            if ($surplus[1] + $surplus[2] + $surplus[3] >= 0) {
                 continue;
             }
             foreach ($partnerSides as $partnerSide) {

@@ -93,11 +93,11 @@ final class SlotRankState implements SlotRankReaderInterface
                 $starter = $lineup->starterPid($slot);
                 if ($starter !== null && isset($ratingsByPid[$starter])) {
                     $starterMembers[] = $starter;
-                    $poolMembers[$starter] = true;
+                    $poolMembers[$starter] = $starter;
                 }
                 foreach ($lineup->rotation[$slot] ?? [] as $pid) {
                     if (isset($ratingsByPid[$pid])) {
-                        $poolMembers[$pid] = true;
+                        $poolMembers[$pid] = $pid;
                     }
                 }
             }

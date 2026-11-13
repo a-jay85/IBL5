@@ -27,9 +27,9 @@ final class NeedPairGate
         $partnerGives = [];
         foreach ($pool->needPairs as $pair) {
             if ($pair->giverTid === $userTid && $pair->receiverTid === $partnerTid) {
-                $userGives[$pair->offset] = true;
+                $userGives[$pair->offset] = $pair->offset;
             } elseif ($pair->giverTid === $partnerTid && $pair->receiverTid === $userTid) {
-                $partnerGives[$pair->offset] = true;
+                $partnerGives[$pair->offset] = $pair->offset;
             }
         }
 

@@ -119,7 +119,7 @@ final class SurplusDeficitMatcher
         $pids = [];
         foreach ($lineup->rotation as $slotPids) {
             foreach ($slotPids as $pid) {
-                $pids[$pid] = true;
+                $pids[$pid] = $pid;
             }
         }
         $values = [];
@@ -150,7 +150,7 @@ final class SurplusDeficitMatcher
     {
         $season = $s->projections[$pid][$offset] ?? null;
         if (in_array($key, ProfileDimension::STATS, true)) {
-            return $season?->per36[$key] ?? 0.0;
+            return $season->per36[$key] ?? 0.0;
         }
         if (in_array($key, ProfileDimension::RATES, true)) {
             $production = $s->players[$pid]->production ?? null;

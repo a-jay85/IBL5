@@ -33,10 +33,6 @@ final class ChangeOfScenery implements DealShapeInterface
                 $userBuried[$pid] = $slot;
             }
         }
-        if ($userBuried === []) {
-            return;
-        }
-
         $partnerBuried = self::buriedInPool($partnerStrength, $pool->partnerPids);
 
         $weakestBench = null;
@@ -59,11 +55,11 @@ final class ChangeOfScenery implements DealShapeInterface
             $targets = [];
             foreach ($partnerBuried as $partnerPid => $partnerSlot) {
                 if ($partnerSlot !== $userSlot) {
-                    $targets[$partnerPid] = true;
+                    $targets[$partnerPid] = $partnerPid;
                 }
             }
             if ($weakestBench !== null) {
-                $targets[$weakestBench] = true;
+                $targets[$weakestBench] = $weakestBench;
             }
             foreach (array_keys($targets) as $partnerPid) {
                 yield new TradeCandidate($userTid, $partnerTid, [$userPid], [], [$partnerPid], []);

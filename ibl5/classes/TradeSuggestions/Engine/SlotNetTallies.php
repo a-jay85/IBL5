@@ -47,11 +47,11 @@ final class SlotNetTallies
                 $starter = $lineup->starterPid($slot);
                 if ($starter !== null && isset($ratingsByPid[$starter])) {
                     $starterPids[] = $starter;
-                    $poolPids[$starter] = true;
+                    $poolPids[$starter] = $starter;
                 }
                 foreach ($lineup->rotation[$slot] ?? [] as $pid) {
                     if (isset($ratingsByPid[$pid])) {
-                        $poolPids[$pid] = true;
+                        $poolPids[$pid] = $pid;
                     }
                 }
             }

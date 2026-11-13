@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# Harness for bin/lib/claim-file.sh (exclusive file claims for directory locks).
+set -uo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=lib/claim-file.sh
+. "$ROOT/bin/lib/claim-file.sh"
+
+T=$(mktemp -d)
+trap 'rm -rf "$T"' EXIT
+
+FAILED=0
+ok() { printf 'ok %s\n' "$1"; }
+fail() { printf 'FAIL %s %s\n' "$1" "${2:-}"; FAILED=1; }
+
+# claim_first_wins
+if claim_file "$T/a" printf '%s\n' 123 && [ "$(cat "$T/a")" = "123" ]; then
+    ok claim_first_wins
+else
+    fail claim_first_wins "rc/content wrong"
+fi
+
+# claim_second_loses
+if claim_file "$T/a" printf '%s\n' 456; then
+    fail claim_second_loses "second claim won"
+elif [ "$(cat "$T/a")" = "123" ]; then
+    ok claim_second_loses
+else
+    fail claim_second_loses "content clobbered: $(cat "$T/a")"
+fi
+
+# claim_restores_noclobber
+nc_ok=1
+set +C
+claim_file "$T/nc1" >/dev/null 2>&1
+case $- in *C*) nc_ok=0 ;; esac
+claim_file "$T/nc1" >/dev/null 2>&1
+case $- in *C*) nc_ok=0 ;; esac
+set -C
+claim_file "$T/nc2" >/dev/null 2>&1
+case $- in *C*) ;; *) nc_ok=0 ;; esac
+claim_file "$T/nc2" >/dev/null 2>&1
+case $- in *C*) ;; *) nc_ok=0 ;; esac
+set +C
+if [ "$nc_ok" = 1 ]; then ok claim_restores_noclobber; else fail claim_restores_noclobber "noclobber state leaked"; fi
+
+# claim_dir_counts_held
+mkdir "$T/d"
+if claim_file "$T/d"; then
+    fail claim_dir_counts_held "claimed over a directory"
+else
+    ok claim_dir_counts_held
+fi
+
+# claim_missing_parent_fails_closed
+cm_ok=1
+if claim_file "$T/nope/x"; then cm_ok=0; fi
+(
+    set -e
+    if claim_file "$T/nope/x"; then :; fi
+    exit 0
+) || cm_ok=0
+if [ "$cm_ok" = 1 ]; then ok claim_missing_parent_fails_closed; else fail claim_missing_parent_fails_closed "claimed or tripped set -e"; fi
+
+# stub_mkdir_lies
+claim_file_lying_mkdir_stub "$T/stub"
+if PATH="$T/stub:$PATH" mkdir "$T/m" && PATH="$T/stub:$PATH" mkdir "$T/m"; then
+    ok stub_mkdir_lies
+else
+    fail stub_mkdir_lies "stub mkdir exited non-zero"
+fi
+
+# claim_race_one_winner
+COPIES=8
+: > "$T/winners"
+i=0
+while [ "$i" -lt "$COPIES" ]; do
+    (
+        PATH="$T/stub:$PATH"
+        mkdir "$T/r"
+        claim_file "$T/r/pid" printf '%s\n' "$i" && echo "$i" >> "$T/winners"
+    ) &
+    i=$((i + 1))
+done
+wait
+n=$(wc -l < "$T/winners" | tr -d ' ')
+if [ "$n" = 1 ]; then ok claim_race_one_winner; else fail claim_race_one_winner "winners=$n"; fi
+
+exit "$FAILED"

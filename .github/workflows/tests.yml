@@ -964,6 +964,9 @@ jobs:
       - name: bin/test-wt-pool
         run: env -i PATH=/usr/bin:/bin bash -c 'set -euo pipefail; bin/test-wt-pool'
 
+      - name: bin/test-claim-file
+        run: env -i PATH=/usr/bin:/bin bash -c 'set -euo pipefail; bin/test-claim-file'
+
       # The batch list runs bin/test-architect-contract-split with no flag, so
       # this step covers the --self-test (h_rewind rewind-canary) path.
       - name: bin/test-architect-contract-split --self-test

@@ -25,7 +25,7 @@ def repo(tmp_path):
     root = tmp_path / "repo"
     root.mkdir()
     subprocess.run(["git", "init", "-q"], cwd=root, check=True)
-    for rel, body in ((SOURCE, "<?php // new query\n"), (BIND_FILE, "<?php // bind test\n")):
+    for rel, body in ((SOURCE, "<?php // new query\n"), (BIND_FILE, "<?php function testPairQueryBindsEveryUserValue() {}\n")):
         (root / rel).parent.mkdir(parents=True, exist_ok=True)
         (root / rel).write_text(body)
     return root
@@ -195,7 +195,15 @@ def test_evaluate_rejects_path_escape(repo, tmp_path, bad):
 def test_evaluate_bind_test_missing(repo, tmp_path):
     _record(repo, tmp_path)
     (repo / BIND_FILE).unlink()
-    assert se.evaluate_evidence(repo, BRANCH, CHANGED) == f"bind test missing: {BIND_FILE}"
+    assert se.evaluate_evidence(repo, BRANCH, CHANGED) == f"bind test missing: {BIND_TEST}"
+
+
+@pytest.mark.parametrize("entry", [f"{BIND_FILE}::testNoSuchMethod", BIND_FILE,
+                                   f"{SOURCE}::testPairQueryBindsEveryUserValue"])
+def test_evaluate_bind_test_method_or_location_wrong(repo, tmp_path, entry):
+    _record(repo, tmp_path)
+    _rewrite(repo, bind_tests=[entry])
+    assert se.evaluate_evidence(repo, BRANCH, CHANGED) == f"bind test missing: {entry}"
 
 
 def test_evaluate_crash_fails_closed(repo, tmp_path, monkeypatch):

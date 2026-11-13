@@ -86,6 +86,16 @@ def _is_bad_path(path) -> bool:
             or ".." in Path(path).parts)
 
 
+def _has_method(root, rel_path, method) -> bool:
+    """True when the file exists and declares `function <method>(`."""
+    if not re.fullmatch(r"\w+", method or ""):
+        return False
+    file = Path(root) / rel_path
+    if not file.is_file():
+        return False
+    return re.search(rf"\bfunction\s+{method}\s*\(", file.read_text()) is not None
+
+
 def _load(path):
     """The parsed evidence object, or None when it is not a schema-1 JSON object."""
     try:
@@ -130,9 +140,10 @@ def evaluate_evidence(root, branch, changed_files) -> str:
                 return f"source not in diff: {path}"
             if not (Path(root) / path).is_file() or _blob_sha(root, path) != blob:
                 return f"stale: {path}"
-        for test_path in bind_paths:
-            if not (Path(root) / test_path).is_file():
-                return f"bind test missing: {test_path}"
+        for entry in bind_tests:
+            test_path, _, method = entry.partition("::")
+            if not test_path.startswith("ibl5/tests/") or not _has_method(root, test_path, method):
+                return f"bind test missing: {entry}"
         return "ok"
     except Exception:
         return "error"

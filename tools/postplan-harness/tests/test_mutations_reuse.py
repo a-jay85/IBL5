@@ -124,7 +124,6 @@ def test_prefire_tree_change_drops_sidecar(tmp_path):
 # --- Phase 2: post-plan loads and validates the sidecar -------------------------
 
 from harness.armable import ArmInputs, evaluate  # noqa: E402
-from harness.classify import render_exec_mutations  # noqa: E402
 from harness.mutations import (DEFAULT_LIB, MutationReport, MutationResult,  # noqa: E402
                                _rows_identity, reuse_prefire_pass)
 from harness.state import Classification  # noqa: E402
@@ -162,6 +161,7 @@ def _cond19_blocked(report):
                     findings=[], unresolved_conformance=[],
                     exec_mutations_holding=report.holding,
                     exec_mutations_tree_suspect=report.tree_suspect,
+                    plan_checks_holding=(),
                     phase5_status="pass", plan_auto_merge_false=False, headless=True,
                     dep_state_lookup=lambda n: "MERGED", fidelity_verdict="READY",
                     unresolved_findings=[], conflict_resolved=False, current_tree="a" * 40,
@@ -202,8 +202,7 @@ def test_reuse_when_deps_unchanged(tmp_path):
     assert report.tree_suspect is False
     assert why.startswith("rows ")
     fresh = MutationReport(True, (MutationResult(1, "TRIPPED", "x"),), (), False)
-    assert render_exec_mutations(report) == render_exec_mutations(fresh)
-    assert render_exec_mutations(report) != ""
+    assert report.results == fresh.results
     assert _cond19_blocked(report) is False
     _assert_not_run(tmp_path)
 

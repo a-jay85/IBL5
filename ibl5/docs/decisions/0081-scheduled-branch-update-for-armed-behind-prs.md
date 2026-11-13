@@ -1,6 +1,6 @@
 ---
 description: A GitHub Actions workflow that finds open PRs stuck BEHIND master and refreshes them via the update-branch API using CI_PAT. Triggered on push to master (auto-merge-armed PRs only, coalesced) and on a best-effort schedule (all open non-draft PRs, debounced on an hour of master quiet), guarded by concurrency-cancel, so PRs stay current without manual intervention and without a CI storm per merge. Amended 2026-09-29: only the head of the merge line is kept current. Amended 2026-10-04: post-plan's BEHIND cap now leaves armed PRs to this workflow. Amended 2026-10-10: bin/pr-triage --arm updates only the head of the line. Amended 2026-10-11: the merge line skips PRs labeled post-plan-running, and post-plan absorbs a stack of clean update-branch merges. Amended 2026-10-26: armed PRs labeled hotfix sort first, and a label-triggered dispatcher starts the pass at once. Amended 2026-11-03: a settled verdict on the PR the line holds on dispatches one head-of-line pass. Amended 2026-11-08: push passes no longer sleep 300 seconds before the bot-commit wait.
-last_verified: 2026-11-08
+last_verified: 2026-11-13
 ---
 
 # ADR-0081: Scheduled branch-update for armed PRs stuck BEHIND master
@@ -153,7 +153,7 @@ Measured 2026-09-28. There were 31 open non-draft PRs. After GitHub settled merg
 The workflow now keeps only the head of the merge line current. The merge line is every PR that has native auto-merge armed, is not a draft, and is based on master. It is ordered by arm time (`autoMergeRequest.enabledAt`), oldest first, with PR number as the tie-break.
 
 - Each pass picks the first line member that is not skipped. If it is BEHIND, the workflow calls update-branch on it and stops. Native auto-merge lands it once CI is green, and that merge push starts the next pass.
-- A member is skipped when it has a merge conflict with master, or when one of the four required checks (`Tests and Analysis`, `E2E Tests`, `human-signoff`, `Meta checks`) is failing on its current head. Pending, in-progress, and cancelled runs do not count as failing. A failing optional check does not count.
+- A member is skipped when it has a merge conflict with master, or when one of master's required checks (`Tests and Analysis`, `E2E Tests`, `human-signoff`, `Meta checks`, `Infection PHP (per-PR diff)`, `All checks settled`) is failing on its current head. The list in `bin/merge-line-select` must match master's branch protection. On 2026-11-13 it still had only the first four, so a red run of the last two would hold the line. A past run on PR #3927 was reported to show this; that run was not checked. Pending, in-progress, and cancelled runs do not count as failing. A failing optional check does not count.
 - A skipped PR stays armed. It gets a sticky comment marked `<!-- merge-line-skip -->` that names the reason. The comment is removed once the PR is eligible again.
 - A head that is not BEHIND, or whose mergeability GitHub has not settled, holds the line. The pass does nothing further and never updates a younger PR ahead of it.
 - Selection lives in `bin/merge-line-select`. `bin/test-merge-line-select` tests it against synthetic snapshots and one captured live snapshot.

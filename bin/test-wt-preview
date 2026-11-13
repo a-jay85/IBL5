@@ -1,0 +1,289 @@
+#!/usr/bin/env bash
+# bin/test-wt-preview: behavior cases for bin/wt-preview with docker, launchctl,
+# wt-up and wt-down stubbed. Runs on any host; touches no real container and no real $HOME.
+set -euo pipefail
+
+REPO=$(cd "$(dirname "$0")/.." && pwd)
+T=$(mktemp -d)
+trap 'rm -rf "$T"' EXIT
+
+FAILS=0
+CASES=0
+OUT=""
+ERR=""
+RC=0
+
+fail() {
+  echo "FAIL: $1: $2"
+  FAILS=$((FAILS + 1))
+}
+
+# Stub state: $STATE/st-<slug> holds "running" or "stopped" for the php+db pair.
+write_stubs() {
+  mkdir -p "$T/bin" "$T/stub"
+  cat > "$T/stub/docker" <<'STUB'
+#!/usr/bin/env bash
+slug_of() { local s=${1#ibl5-php-}; s=${s#ibl5-db-}; echo "$s"; }
+case "$1" in
+  inspect)
+    shift; fmt=""
+    if [ "$1" = -f ]; then fmt="$2"; shift 2; fi
+    s=$(slug_of "$1")
+    [ -f "$STATE/st-$s" ] || exit 1
+    case "$fmt" in
+      *Running*) [ "$(cat "$STATE/st-$s")" = running ] && echo true || echo false ;;
+      *Id*) echo "cid-$s" ;;
+      *Labels*) echo "ibl5-$s" ;;
+    esac
+    exit 0 ;;
+  ps)
+    last="${!#}"; p=${last##*project=}; s=${p#ibl5-}
+    [ -f "$STATE/st-$s" ] && printf 'ibl5-php-%s\nibl5-db-%s\n' "$s" "$s"
+    exit 0 ;;
+  start)
+    shift; echo "docker start $*" >> "$STATE/calls"
+    [ "${STUB_START_RC:-0}" = 0 ] || exit "$STUB_START_RC"
+    s=$(slug_of "$1"); echo running > "$STATE/st-$s"
+    exit 0 ;;
+esac
+exit 1
+STUB
+  cat > "$T/stub/launchctl" <<'STUB'
+#!/usr/bin/env bash
+cat "$STATE/launchctl" 2>/dev/null
+exit 0
+STUB
+  cat > "$T/bin/wt-up" <<'STUB'
+#!/usr/bin/env bash
+echo "wt-up $*" >> "$STATE/calls"
+s=$(head -n 1 "$WT_PREVIEW_PARENT/$1/.wt-slug" 2>/dev/null || echo "$1")
+echo running > "$STATE/st-$s"
+exit "${STUB_WT_UP_RC:-0}"
+STUB
+  cat > "$T/bin/wt-down" <<'STUB'
+#!/usr/bin/env bash
+echo "wt-down $*" >> "$STATE/calls"
+s=$(head -n 1 "$WT_PREVIEW_PARENT/$1/.wt-slug")
+echo stopped > "$STATE/st-$s"
+exit 0
+STUB
+  cat > "$T/stub/gh" <<'STUB'
+#!/usr/bin/env bash
+# gh pr view <N> ...: prints $STATE/pr-<N>, or fails when absent.
+[ -f "$STATE/pr-$3" ] || exit 1
+cat "$STATE/pr-$3"
+STUB
+  cat > "$T/stub/git" <<'STUB'
+#!/usr/bin/env bash
+cat "$STATE/worktrees" 2>/dev/null
+exit 0
+STUB
+  chmod +x "$T/stub/docker" "$T/stub/launchctl" "$T/stub/gh" "$T/stub/git" \
+    "$T/bin/wt-up" "$T/bin/wt-down"
+}
+
+reset_case() {
+  CASES=$((CASES + 1))
+  rm -rf "${T:?}/state" "${T:?}/home" "${T:?}/wts"
+  mkdir -p "$T/state" "$T/home/queue" "$T/wts"
+  unset STUB_START_RC STUB_WT_UP_RC
+  write_stubs
+  cp "$REPO/bin/wt-preview" "$T/bin/wt-preview"
+  chmod +x "$T/bin/wt-preview"
+}
+
+# add_wt <name> [slug] [state]: a worktree dir; with a state, its stack exists.
+add_wt() {
+  mkdir -p "$T/wts/$1"
+  local s="${2:-$1}"
+  if [ -n "${3:-}" ]; then
+    echo "$s" > "$T/wts/$1/.wt-slug"
+    echo "$3" > "$T/state/st-$s"
+  fi
+}
+
+run_wp() {
+  RC=0
+  OUT=$(env HOME="$T/home" STATE="$T/state" PATH="$T/stub:$PATH" \
+    WT_PREVIEW_PARENT="$T/wts" WT_PREVIEW_QUEUE_DIR="$T/home/queue" \
+    WT_PREVIEW_LAUNCHCTL="$T/stub/launchctl" \
+    WT_PREVIEW_GH="$T/stub/gh" WT_PREVIEW_GIT="$T/stub/git" \
+    "$T/bin/wt-preview" "$@" 2>"$T/err") || RC=$?
+  ERR=$(cat "$T/err")
+}
+
+calls() { cat "$T/state/calls" 2>/dev/null || echo NONE; }
+state_of() { cat "$T/state/st-$1" 2>/dev/null || echo ABSENT; }
+
+expect_eq() { # case label actual expected
+  [ "$3" = "$4" ] || fail "$1" "$2: got '$3', want '$4'"
+}
+want() { # case label haystack needle
+  grep -qF -- "$4" <<< "$3" || fail "$1" "$2: '$4' not in '$3'"
+}
+
+case_switch_resumes_target() {
+  reset_case
+  add_wt a a running
+  add_wt b b stopped
+  run_wp b
+  expect_eq switch "exit" "$RC" 0
+  want switch "a stopped" "$OUT" "stopped a (data kept)"
+  want switch "b resumed" "$OUT" "resumed b (same DB): http://b.localhost/ibl5/"
+  want switch "wt-down call" "$(calls)" "wt-down a --stop"
+  want switch "docker start call" "$(calls)" "docker start ibl5-php-b"
+  expect_eq switch "a state" "$(state_of a)" stopped
+  expect_eq switch "b state" "$(state_of b)" running
+}
+
+case_agent_marker_kept() {
+  reset_case
+  add_wt a a running
+  add_wt b b running
+  mkdir -p "$T/home/.cache/ibl5-wt-stack"
+  echo cid-a > "$T/home/.cache/ibl5-wt-stack/a"
+  run_wp b
+  expect_eq agent-marker "exit" "$RC" 0
+  want agent-marker "kept line" "$OUT" "kept    a: started by an agent (bin/wt-stack)"
+  want agent-marker "target already up" "$OUT" "already up: http://b.localhost/ibl5/"
+  expect_eq agent-marker "a state" "$(state_of a)" running
+  expect_eq agent-marker "no calls" "$(calls)" NONE
+}
+
+case_stale_marker_stopped() {
+  reset_case
+  add_wt a a running
+  add_wt b b running
+  mkdir -p "$T/home/.cache/ibl5-wt-stack"
+  echo cid-old > "$T/home/.cache/ibl5-wt-stack/a"
+  run_wp b
+  want stale-marker "a stopped" "$OUT" "stopped a (data kept)"
+  expect_eq stale-marker "a state" "$(state_of a)" stopped
+}
+
+case_queue_and_launchd_kept() {
+  reset_case
+  add_wt a a running
+  add_wt c pr-7 running
+  add_wt b b running
+  touch "$T/home/queue/a.md"
+  add_wt d pr-4 running
+  { printf '%s\t%s\t%s\n' 123 0 com.ibl5.post-plan-pr-7
+    printf '%s\t%s\t%s\n' 124 0 com.ibl5.post-plan-pr-42; } > "$T/state/launchctl"
+  run_wp b
+  expect_eq queue-launchd "pr-4 state" "$(state_of pr-4)" stopped
+  want queue-launchd "queue kept" "$OUT" "kept    a: automouse queue entry a.md"
+  want queue-launchd "launchd kept" "$OUT" "kept    c: launchd job com.ibl5.post-plan-pr-7"
+  expect_eq queue-launchd "a state" "$(state_of a)" running
+  expect_eq queue-launchd "pr-7 state" "$(state_of pr-7)" running
+}
+
+case_never_built_runs_wt_up() {
+  reset_case
+  add_wt b
+  run_wp b
+  expect_eq never-built "exit" "$RC" 0
+  expect_eq never-built "calls" "$(calls)" "wt-up b"
+  want never-built "started line" "$OUT" "started b (fresh DB): http://b.localhost/ibl5/"
+}
+
+case_fresh_and_args_run_wt_up() {
+  reset_case
+  add_wt b b stopped
+  run_wp b --fresh
+  expect_eq fresh "calls" "$(calls)" "wt-up b"
+  reset_case
+  add_wt b b stopped
+  run_wp b --seed
+  expect_eq wt-up-args "calls" "$(calls)" "wt-up b --seed"
+}
+
+case_pr_slug_and_pool() {
+  reset_case
+  add_wt b pr-42 stopped
+  add_wt _pool-1 _pool-1 running
+  run_wp b
+  want pr-slug "resumed with slug url" "$OUT" "resumed b (same DB): http://pr-42.localhost/ibl5/"
+  expect_eq pr-slug "pool untouched" "$(state_of _pool-1)" running
+}
+
+case_docker_start_fails() {
+  reset_case
+  add_wt b b stopped
+  STUB_START_RC=3 run_wp b
+  expect_eq start-fails "exit" "$RC" 3
+  want start-fails "error names --fresh" "$ERR" "try bin/wt-preview b --fresh"
+}
+
+case_wt_up_fails() {
+  reset_case
+  add_wt b
+  STUB_WT_UP_RC=4 run_wp b
+  expect_eq wt-up-fails "exit" "$RC" 4
+  ! grep -qF started <<< "$OUT" || fail wt-up-fails "printed started on failure"
+}
+
+case_usage_errors() {
+  reset_case
+  run_wp
+  expect_eq usage "no args exit" "$RC" 2
+  run_wp --help
+  expect_eq usage "help exit" "$RC" 0
+  want usage "help on stdout" "$OUT" "usage: bin/wt-preview"
+  run_wp nope
+  expect_eq usage "missing worktree exit" "$RC" 2
+  want usage "missing worktree msg" "$ERR" "no worktree at"
+}
+
+# add_porcelain <path> <branch>: one git worktree list --porcelain entry.
+add_porcelain() {
+  printf 'worktree %s\nHEAD abc\nbranch refs/heads/%s\n\n' "$1" "$2" >> "$T/state/worktrees"
+}
+
+case_pr_number_resolves() {
+  reset_case
+  add_wt my-feat my-feat stopped
+  echo my-feat > "$T/state/pr-3890"
+  add_porcelain /Users/x/GitHub/IBL5 master
+  add_porcelain "$T/wts/my-feat" my-feat
+  run_wp 3890
+  expect_eq pr-number "exit" "$RC" 0
+  want pr-number "names the worktree" "$OUT" "PR #3890 is worktree my-feat"
+  want pr-number "resumed" "$OUT" "resumed my-feat (same DB)"
+  run_wp '#3890'
+  expect_eq pr-number "hash form exit" "$RC" 0
+  want pr-number "hash form names the worktree" "$OUT" "PR #3890 is worktree my-feat"
+}
+
+case_pr_number_no_worktree() {
+  reset_case
+  echo other-branch > "$T/state/pr-12"
+  add_porcelain /Users/x/GitHub/IBL5 other-branch
+  run_wp 12
+  expect_eq pr-no-wt "exit (branch only on main checkout)" "$RC" 2
+  want pr-no-wt "points at pr-wt" "$ERR" "has no worktree; make one with /pr-wt 12"
+  run_wp 999
+  expect_eq pr-no-wt "unknown PR exit" "$RC" 2
+  want pr-no-wt "lookup error" "$ERR" "could not look up PR #999"
+  expect_eq pr-no-wt "no calls" "$(calls)" NONE
+}
+
+case_switch_resumes_target
+case_pr_number_resolves
+case_pr_number_no_worktree
+case_agent_marker_kept
+case_stale_marker_stopped
+case_queue_and_launchd_kept
+case_never_built_runs_wt_up
+case_fresh_and_args_run_wt_up
+case_pr_slug_and_pool
+case_docker_start_fails
+case_wt_up_fails
+case_usage_errors
+
+if [ "$FAILS" -eq 0 ]; then
+  echo "PASS: test-wt-preview ($CASES cases)"
+  exit 0
+fi
+echo "FAIL: test-wt-preview ($FAILS failures in $CASES cases)"
+exit 1

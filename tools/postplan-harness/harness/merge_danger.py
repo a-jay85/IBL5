@@ -272,7 +272,9 @@ _KEEP_ONE_WAY_RE = re.compile(
     r"|\bcolumns?\b|discord-dm|\bDMs?\b|direct message|\bGMs?\b|e-?mail|classes/Mail"
     r"|db-sync-prod|promote-to-production|\bprod(uction)?[- ]?(sync|data|db|database)\b",
     re.IGNORECASE)
-_TABLE_TOKEN_RE = re.compile(r"\bibl_\w+\b")
+# Any table-like token: an `ibl_`/`nuke_` name, the shared `cache` table, or a backticked
+# snake_case name. An unregistered one keeps the raise.
+_TABLE_TOKEN_RE = re.compile(r"\b(?:ibl|nuke)_\w+\b|\bcache\b|(?<=`)\w+_\w+(?=`)")
 
 
 def _bar_exempt(core: str) -> bool:

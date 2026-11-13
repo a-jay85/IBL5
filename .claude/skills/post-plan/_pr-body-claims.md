@@ -183,7 +183,7 @@ A backup table plus an undo script does not make a change two-way when reverting
 
 Either of these triggers adds the Self-governing segment and leaves the Door alone:
 
-- Self-governing merge machinery. A diff touching a path in `_ARMING_PATHS` in `harness/gate_backtest.py`: `harness/armable.py`, `bin/lib/pr-armable.sh`, or `_phase-6.5-arm-auto-merge.md` (retired; kept so a recreated file trips the hazard check). This is the bootstrap hazard.
+- Self-governing merge machinery. A diff touching a path in `_ARMING_PATHS` in `harness/gate_backtest.py`: `harness/armable.py`, `bin/lib/pr-armable.sh`, or `_phase-6.5-arm-auto-merge.md` (retired; kept so a recreated file trips the hazard check). This is the bootstrap hazard. When every arming-path trigger is a Python file under `harness/`, the arming replay (ADR-0246) drops the segment if no corpus decision loosens, and the Why leads with `replay cleared arming-path (…)`, `replay kept arming-path (…)`, or `replay not run (…)`.
 - Gate removal. Any `detect_gate_changes` result whose state is `removed`: a deleted `bin/check-*`, lib gate, CI workflow, or arming path.
 
 An LLM cannot add the segment in Phase 2. A human may add it in a later phase, and nobody may remove a mechanical one.

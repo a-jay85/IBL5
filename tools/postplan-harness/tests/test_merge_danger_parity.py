@@ -190,3 +190,57 @@ def test_pin_sg_lines_python(name):
 @pytest.mark.parametrize("name", _SG_LINES)
 def test_pin_sg_lines_shell(name):
     assert "SELF-GOVERNING" in _shell_token(_sg_line(name))
+
+
+# --- arming replay: the shell twin reads only the body the Python side writes ---------------
+
+from harness.arming_replay import ReplayVerdict  # noqa: E402
+
+_PY_ARM = "tools/postplan-harness/harness/armable.py"
+
+
+def _body(d):
+    seg = " · Self-governing: yes" if d.self_governing else ""
+    return ("## Summary\nx\n\n**Merge danger:** "
+            f"Door: {d.door} · Blast radius: {d.blast}{seg} · Why: {d.why}")
+
+
+def _replayed(changed, replay):
+    return merge_danger.derive_merge_danger(changed, "", [], lambda _p: None, replay=replay)
+
+
+def _clear(_paths):
+    return ReplayVerdict(True, "replay cleared arming-path (48 inputs: 0 loosened "
+                         "(0 held->armed), 0 tightened (0 armed->held))", "clean")
+
+
+def _loosened(_paths):
+    return ReplayVerdict(False, "replay kept arming-path (48 inputs: 1 loosened "
+                         "(1 held->armed), 0 tightened (0 armed->held))", "loosened")
+
+
+def _raising(_paths):
+    raise RuntimeError("fixture replay crash")
+
+
+def test_replay_cleared_body_arms_in_shell_and_python():
+    d = _replayed([("M", _PY_ARM)], _clear)
+    body = _body(d)
+    assert "merge-danger:SELF-GOVERNING" not in _shell_token(body)
+    assert _shell_state(body) == "TWO-WAY"
+    assert not _python_held(merge_danger.classify_with_floor(body, d))
+
+
+@pytest.mark.parametrize("fake", [_loosened, _raising])
+def test_replay_kept_body_holds_in_shell_and_python(fake):
+    d = _replayed([("M", _PY_ARM)], fake)
+    body = _body(d)
+    assert "merge-danger:SELF-GOVERNING" in _shell_token(body)
+    assert _python_held(merge_danger.classify_with_floor(body, d))
+
+
+def test_shell_path_with_replay_supplied_holds_in_both():
+    d = _replayed([("M", "bin/lib/pr-armable.sh")], _clear)
+    body = _body(d)
+    assert "merge-danger:SELF-GOVERNING" in _shell_token(body)
+    assert _python_held(merge_danger.classify_with_floor(body, d))

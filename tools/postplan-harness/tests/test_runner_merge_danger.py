@@ -109,6 +109,14 @@ def test_derive_from_worktree_workflow_send_edit_is_two_way(tmp_path):
     assert not any(t.startswith("notify-workflow") for t in d.triggers)
 
 
+def test_worktree_armable_edit_holds_when_tree_has_no_harness(tmp_path):
+    wt = _worktree(tmp_path, {})
+    path = "tools/postplan-harness/harness/armable.py"
+    diff = (f"diff --git a/{path} b/{path}\n--- a/{path}\n+++ b/{path}\n@@ -1,1 +1,1 @@\n"
+            "-x = 1\n+x = 2\n")
+    assert merge_danger.derive_from_worktree(wt, diff).self_governing is True
+
+
 def test_validator_returns_no_findings_after_injection(tmp_path):
     wt = _worktree(tmp_path, {"docs/a.md": "x\n"})
     copy = {"summary_md": "## Summary\n- docs"}

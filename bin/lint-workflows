@@ -18,6 +18,9 @@
 #   SC2034 — unused variables
 #   SC1090 — non-const source
 #   SC2207 — array splitting suggestion (fix uses bash 4 mapfile)
+# The flag string lives in bin/lib/shell-lint-opts.sh. bin/lib/prefire-verify
+# reads the same file and sets SHELLCHECK_OPTS to it for plan matrix rows that
+# run actionlint or shellcheck, so a pre-fire row fails on what CI fails on.
 #
 # SC2170 has no such exclude and is handled per-site: actionlint replaces each
 # ${{ ... }} with a placeholder literal before invoking shellcheck, so the
@@ -43,6 +46,10 @@ EOF
 fi
 
 cd "$(git rev-parse --show-toplevel)"
+
+# The flag string is shared with bin/lib/prefire-verify; see bin/lib/shell-lint-opts.sh.
+# shellcheck source=bin/lib/shell-lint-opts.sh
+. bin/lib/shell-lint-opts.sh
 
 # CI installs actionlint with `go install`, which lands it in GOPATH/bin — not
 # necessarily on PATH. Fall back there before giving up.
@@ -71,5 +78,5 @@ if ! command -v shellcheck >/dev/null 2>&1; then
 fi
 
 exec "$actionlint_bin" \
-  -shellcheck 'shellcheck --severity=warning --exclude=SC2034,SC1090,SC2207' \
+  -shellcheck "shellcheck $IBL5_SC_OPTS" \
   "$@"

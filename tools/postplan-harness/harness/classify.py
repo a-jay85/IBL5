@@ -391,25 +391,149 @@ def upsert_residual_phases(body: str, block: str) -> str:
     return body.rstrip() + "\n\n" + block + "\n"
 
 
-def render_scope_notes(notes: list[str]) -> str:
+SCOPE_RULE = ("The plan did not name these changed paths. A path counts as named when a "
+              "plan Critical File, a Verification Matrix test path or a `## Declared scope` "
+              "bullet covers it. Auto-merge is not held on them. Riskiest first.")
+SCOPE_GAP_RULE = "The plan names these files, but the diff does not change them:"
+SCOPE_REASON_PLACEHOLDER = "(no reason given)"
+SCOPE_REASONS_HEADING = "## Unplanned change reasons"
+SCOPE_REASON_MAX_CHARS = 200
+_SCOPE_REASON_BULLET = re.compile(r"^\s*[-*]\s+`(?P<path>[^`\s]+)`\s*(?::|—|-)\s*(?P<reason>\S.*)$")
+SMALL_EDIT_MAX_LINES = 4
+LARGE_NEW_CODE_MIN_ADDED = 100
+MISMATCH_MIN_UNPLANNED = 5
+_SCOPE_TEST_PATH = re.compile(r"^(ibl5/tests/|tools/[^/]+/tests/|bin/test-[^/]+$)")
+_SCOPE_NOTE = re.compile(r"^(unplanned|gap) (\S+)(.*)$")
+
+
+def numstat_counts(diff_text: str) -> dict[str, tuple[int | None, int | None]]:
+    """{path: (added, deleted)} from numstat_text; a binary path maps to (None, None)."""
+    out: dict[str, tuple[int | None, int | None]] = {}
+    for row in numstat_text(diff_text).splitlines():
+        parts = row.split("\t")
+        if len(parts) != 3:
+            continue
+        a, d, path = parts
+        out[path] = (int(a), int(d)) if a.isdigit() and d.isdigit() else (None, None)
+    return out
+
+
+def _scope_risk(path: str, counts) -> tuple[int, int, str]:
+    """Sort key: .claude/ paths, then test files with net deletions, then large new code, then the rest."""
+    added, deleted = counts if counts else (None, None)
+    total = (added or 0) + (deleted or 0)
+    is_test = bool(_SCOPE_TEST_PATH.match(path))
+    if path.startswith(".claude/"):
+        tier = 0
+    elif is_test and deleted is not None and deleted > (added or 0):
+        tier = 1
+    elif not is_test and (added or 0) >= LARGE_NEW_CODE_MIN_ADDED:
+        tier = 2
+    else:
+        tier = 3
+    return (tier, -total, path)
+
+
+def _is_small_edit(path: str, counts) -> bool:
+    if path.startswith(".claude/") or not counts or counts[0] is None:
+        return False
+    return counts[0] + counts[1] <= SMALL_EDIT_MAX_LINES
+
+
+def _count_label(counts) -> str:
+    if not counts:
+        return "+?/-?"
+    if counts[0] is None:
+        return "binary"
+    return f"+{counts[0]}/-{counts[1]}"
+
+
+def render_scope_notes(notes: list[str], numstat: dict | None = None,
+                       reasons: dict[str, str] | None = None, changed_count: int = 0) -> str:
     """The `## Unplanned changes` block for a PR body, or "" when there are no notes.
 
-    `notes` are `unplanned <path> (...)` / `gap <path> (...)` texts from
-    scope_conformance.scope_notes. The block is advisory: it never holds auto-merge.
+    `notes` come from scope_conformance.scope_notes. The rule is stated once in the
+    header; each unplanned bullet carries `+added/-deleted` from `numstat` and its reason
+    from `reasons` (SCOPE_REASON_PLACEHOLDER when absent). Unplanned paths sort riskiest
+    first; edits of SMALL_EDIT_MAX_LINES or fewer fold into a <details> box; gap notes
+    and unmatched notes stay visible. When unplanned paths number at least
+    MISMATCH_MIN_UNPLANNED and are strictly more than half of `changed_count`, the list
+    collapses behind a matches-only lead line; `changed_count` 0 means unknown and never
+    collapses. The block is advisory: it never holds auto-merge.
     """
     if not notes:
         return ""
-    parts = [SCOPE_NOTES_BEGIN, "## Unplanned changes",
-             "The plan did not name these changes, or the diff lacks a planned file. "
-             "Auto-merge is not held on them. Check each one."]
+    numstat = numstat or {}
+    reasons = reasons or {}
+    unplanned: list[str] = []
+    gaps: list[str] = []
+    other: list[str] = []
     for n in notes:
-        m = re.match(r"^(unplanned|gap) (\S+)(.*)$", n)
-        if m:
-            parts.append(f"- {m.group(1)} `{m.group(2)}`{m.group(3)}")
+        m = _SCOPE_NOTE.match(n)
+        if m and m.group(1) == "unplanned":
+            unplanned.append(m.group(2))
+        elif m:
+            gaps.append(f"- gap `{m.group(2)}`{m.group(3)}")
         else:
-            parts.append(f"- {n.strip()}")
+            other.append(f"- {n.strip()}")
+    unplanned.sort(key=lambda p: _scope_risk(p, numstat.get(p)))
+
+    def bullet(p: str) -> str:
+        return (f"- `{p}` {_count_label(numstat.get(p))}: "
+                f"{reasons.get(p) or SCOPE_REASON_PLACEHOLDER}")
+
+    parts = [SCOPE_NOTES_BEGIN, "## Unplanned changes"]
+    if unplanned:
+        parts.append(SCOPE_RULE)
+        mismatch = (len(unplanned) >= MISMATCH_MIN_UNPLANNED
+                    and 2 * len(unplanned) > changed_count > 0)
+        if mismatch:
+            matched = max(changed_count - len(unplanned), 0)
+            parts.append(f"The plan's file list matches only {matched} of {changed_count} "
+                         "changed files. Check the plan.")
+            parts += ["", f"<details><summary>All {len(unplanned)} unplanned paths</summary>", ""]
+            parts += [bullet(p) for p in unplanned] + ["", "</details>"]
+        else:
+            big = [p for p in unplanned if not _is_small_edit(p, numstat.get(p))]
+            small = [p for p in unplanned if _is_small_edit(p, numstat.get(p))]
+            parts += [bullet(p) for p in big]
+            if small:
+                parts += ["", f"<details><summary>{len(small)} small edits "
+                          f"({SMALL_EDIT_MAX_LINES} lines or fewer)</summary>", ""]
+                parts += [bullet(p) for p in small] + ["", "</details>"]
+    if gaps:
+        parts += ["", SCOPE_GAP_RULE] + gaps
+    parts += other
     parts.append(SCOPE_NOTES_END)
     return "\n".join(parts)
+
+
+def extract_scope_reasons(body: str) -> tuple[dict[str, str], str]:
+    """({path: reason}, body without the section) from a `## Unplanned change reasons` section.
+
+    The section runs from a line that is exactly SCOPE_REASONS_HEADING to the next `## `
+    heading. Only a bullet with a backticked path counts; the first reason for a path wins.
+    Comment markers are removed from each reason so it can never close the scope-notes
+    marker pair. A body with no such section comes back unchanged with {}. The reasons are
+    display text only: bin/lib/plan-scope-conformance reads `## Declared scope`, so this
+    section never clears a note.
+    """
+    body = body or ""
+    lines = body.split("\n")
+    start = next((i for i, ln in enumerate(lines) if ln.strip() == SCOPE_REASONS_HEADING), None)
+    if start is None:
+        return {}, body
+    end = next((j for j in range(start + 1, len(lines)) if lines[j].startswith("## ")), len(lines))
+    reasons: dict[str, str] = {}
+    for ln in lines[start + 1:end]:
+        m = _SCOPE_REASON_BULLET.match(ln)
+        if m and m.group("path") not in reasons:
+            reason = m.group("reason").replace("<!--", "").replace("-->", "").strip()
+            reasons[m.group("path")] = reason[:SCOPE_REASON_MAX_CHARS]
+    head = "\n".join(lines[:start]).rstrip("\n")
+    tail = "\n".join(lines[end:]).lstrip("\n")
+    rest = head + ("\n\n" + tail if tail else "\n") if head else tail
+    return reasons, rest
 
 
 def upsert_scope_notes(body: str, block: str) -> str:

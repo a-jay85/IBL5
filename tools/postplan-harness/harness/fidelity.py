@@ -1562,6 +1562,26 @@ EXCERPT_LIMIT = 30000
 # `REVIEWED_TREE=<sha>` line and is unchanged by this PR.
 _RE_REVIEW_TERMINAL_RE = re.compile(r"^(?:NOT READY|READY WITH NOTES|READY) \(re-review\)")
 STICKY_REVIEWED_DIFF_RE = re.compile(r"^\*\*Reviewed diff:\*\* ([0-9a-f]{40})$", re.M)
+
+# Machine-read hold record (bin/lib/text-hold-recheck.sh parses it; keep the two in step).
+# One line in the audit trail, never among the `- (N)` bullets. (18) carries its state so
+# the CI re-check can tell a missing/malformed line (text) from a one-way verdict (judged).
+HOLD_RECORD_PREFIX = "<!-- pr-ready-holds: v1"
+
+
+def machine_hold_record(holds, diff_id: str) -> str:
+    """`<!-- pr-ready-holds: v1 diff=<40hex> held=<n>[:<STATE>],... -->`, or "" (no record)."""
+    if not holds or not re.fullmatch(r"[0-9a-f]{40}", diff_id or ""):
+        return ""
+    toks = []
+    for c in holds:
+        if c.number == 18:
+            m = re.search(r"state=([A-Z][A-Z-]*)", c.reason or "")
+            toks.append(f"18:{m.group(1)}" if m else "18:UNKNOWN")
+        else:
+            toks.append(str(c.number))
+    return f"{HOLD_RECORD_PREFIX} diff={diff_id} held={','.join(toks)} -->"
+
 STICKY_PLAN_HASH_RE = re.compile(r"^\*\*Plan hash:\*\* ([0-9a-f]{64})$", re.M)
 STICKY_OWN_CHANGE_RE = re.compile(r"^\*\*Own change:\*\* ([0-9a-f]{40})$", re.M)
 STICKY_REVIEW_KIND_DELTA_RE = re.compile(r"^\*\*Review kind:\*\* delta\b", re.M)
@@ -2287,6 +2307,9 @@ def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
         out.append(f"**Reviewed diff:** {diff_id}")
         if own_id and re.fullmatch(r"[0-9a-f]{40}", own_id):
             out.append(f"**Own change:** {own_id}")
+        record = machine_hold_record(holds, diff_id)
+        if record:
+            out.append(record)
     if plan_hash:
         out.append(f"**Plan hash:** {plan_hash}")
     for c in holds:

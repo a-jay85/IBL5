@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+# bin/text-hold-recheck: re-arm a held PR whose only recorded holds were body-text conditions.
+# Run by .github/workflows/text-hold-recheck-run.yml, which text-hold-recheck.yml dispatches on a PR body edit.
+# Env seams: PR_CYCLE_PATCH_ID_CMD (see bin/lib/pr-cycle-watch.sh), THR_DIFF_CMD (`<cmd> N`
+# prints the PR's unified diff; unset or empty = fetch pull/N/head and diff it against base).
+#
+# Usage: bin/text-hold-recheck --pr N --event NAME [--dry-run]
+#   Prints one verdict line: `ARM cleared=<held>`, `DRY-RUN ARM cleared=<held>` or
+#   `NOARM <reason>`. Exits 0 on every NOARM, 1 when the arm call fails, 2 on a usage error.
+#   Decision logic: bin/lib/text-hold-recheck.sh (thr_decide). ADR-0245.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+. "$ROOT/bin/lib/text-hold-recheck.sh"
+. "$ROOT/bin/lib/pr-cycle-watch.sh"
+PR="" EVENT="" DRY_RUN=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --pr) PR="${2:-}"; shift 2 ;;
+        --event) EVENT="${2:-}"; shift 2 ;;
+        --dry-run) DRY_RUN=1; shift ;;
+        -h|--help) sed -n '7,10s/^# \{0,1\}//p' "$0"; exit 0 ;;
+        *) echo "text-hold-recheck: unknown argument: $1" >&2; exit 2 ;;
+    esac
+done
+[[ "$PR" =~ ^[0-9]+$ ]] || { echo "text-hold-recheck: --pr N is required" >&2; exit 2; }
+
+REPO=${GITHUB_REPOSITORY:-a-jay85/IBL5}
+OWNER=${REPO%%/*}
+work=$(mktemp -d "${TMPDIR:-/tmp}/thr.XXXXXX")
+trap 'rm -rf "$work"' EXIT
+
+# summary <line>: echo the verdict and append it to the Actions job summary when one exists.
+summary() {
+    echo "$1"
+    if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+        printf 'text-hold-recheck PR #%s (%s): %s\n' "$PR" "$EVENT" "$1" >> "$GITHUB_STEP_SUMMARY"
+    fi
+}
+
+gh pr view "$PR" --json state,isDraft,autoMergeRequest,body,baseRefName,labels \
+    > "$work/pr.json" || { summary "NOARM pr-view-error"; exit 0; }
+[ "$(jq -r '.state' "$work/pr.json")" = OPEN ] || { summary "NOARM not-open"; exit 0; }
+[ "$(jq -r '.isDraft' "$work/pr.json")" = false ] || { summary "NOARM draft"; exit 0; }
+[ "$(jq -r '.autoMergeRequest == null' "$work/pr.json")" = true ] || { echo "NOARM already-armed"; exit 0; }
+
+jq -r '.body // ""' "$work/pr.json" | tr -d '\r' > "$work/body.md"
+
+gh api --paginate "repos/$REPO/issues/$PR/comments" | jq -s 'add // []' \
+    > "$work/comments.json" || { summary "NOARM comments-error"; exit 0; }
+thr_pick_trusted_sticky "$work/comments.json" "$OWNER" | tr -d '\r' > "$work/sticky.md" \
+    || { summary "NOARM sticky-error"; exit 0; }
+record=$(thr_parse_record "$work/sticky.md" || true)
+
+# One re-arm per sticky record: a re-arm comment posted after the sticky was last written means
+# this job already used the record, so a later manual disarm must stand.
+rearmed=$(jq -r --arg o "$OWNER" --arg m "$THR_STICKY_MARKER" --arg p "Text-hold re-check:" '
+    ([.[] | select(.user.login == $o) | select((.body // "") | rtrimstr("\n") | endswith($m))] | last
+        | (.updated_at // .created_at // "")) as $s
+    | [.[] | select((.body // "") | startswith($p)) | select(.created_at > $s)] | length' \
+    "$work/comments.json" 2>/dev/null) || rearmed=error
+[ "$rearmed" = 0 ] || { summary "NOARM already-rearmed"; exit 0; }
+
+cur_diff=$(pcw_patch_id "$ROOT" "$PR" || true)
+sticky_diff=$(sed -n 's/^\*\*Reviewed diff:\*\* \([0-9a-f]\{40\}\)$/\1/p' "$work/sticky.md" | tail -n 1)
+echo "current-diff=${cur_diff:-none} sticky-reviewed-diff=${sticky_diff:-none}" >&2
+
+diff_rc=0
+if [ -n "${THR_DIFF_CMD:-}" ]; then
+    $THR_DIFF_CMD "$PR" > "$work/pr.diff" || diff_rc=$?
+else
+    echo "diff-source=default" >&2
+    base=$(jq -r .baseRefName "$work/pr.json")
+    { git -C "$ROOT" fetch -q origin "$base" "pull/$PR/head:refs/thr/$PR" \
+        && git -C "$ROOT" diff "origin/$base...refs/thr/$PR"; } > "$work/pr.diff" || diff_rc=$?
+fi
+[ "$diff_rc" = 0 ] && [ -s "$work/pr.diff" ] || { echo "NOARM diff-error"; exit 0; }
+dg_rc=0
+"$ROOT/bin/lib/deleted-guards" --diff "$work/pr.diff" > "$work/dg.out" || dg_rc=$?
+[ "$dg_rc" -le 1 ] || { echo "NOARM detector-error"; exit 0; }
+flagged=$(awk -F'\t' '$1=="REMOVED-GUARD"{print $2}' "$work/dg.out")
+
+files=$(gh api --paginate "repos/$REPO/pulls/$PR/files?per_page=100" | jq -cs 'add // []') \
+    || files="not-json"
+labels=$(jq -c '.labels // []' "$work/pr.json")
+ui_hold=$(pr_ui_hold "$files" "$labels") || ui_hold="ui-check-error"
+
+verdict=$(thr_decide "$EVENT" "$record" "$cur_diff" "$(cat "$work/body.md")" "$flagged" "$ui_hold")
+
+case "$verdict" in
+    ARM*)
+    [ "$DRY_RUN" = 1 ] && { echo "DRY-RUN $verdict"; exit 0; }
+    gh pr merge "$PR" --auto --squash || { echo "text-hold-recheck: arm failed" >&2; exit 1; }
+    gh pr comment "$PR" --body "$(thr_cleared_comment "${verdict#ARM cleared=}")"
+    summary "$verdict"
+    ;;
+    *) summary "$verdict"; exit 0 ;;
+esac

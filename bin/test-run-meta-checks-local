@@ -129,7 +129,7 @@ make_repo() {
                  check-registry-trigger-rows check-numbering check-e2e-hygiene \
                  check-e2e-fa-offers-owner check-e2e-mutator-isolation \
                  check-hot-files check-orphan-css adr-check refactor-flag \
-                 check-pr-collisions check-model-pins test-check-model-pins \
+                 check-pr-collisions check-model-pins test-check-model-pins test-text-hold-recheck \
                  check-engine-freeze test-check-engine-freeze \
                  check-pipefail-grep-q test-check-pipefail-grep-q \
                  check-shell-portability test-check-shell-portability \
@@ -545,6 +545,7 @@ PASS  test-check-shell-portability
 PASS  check-shell-portability
 PASS  test-check-reviewer-eval
 PASS  reviewer-eval-validate
+PASS  test-text-hold-recheck
 SKIP  check-pr-manual-testing (no --body-file)
 SKIP  check-post-merge-recipe (no --body-file)
 SKIP  check-reviewer-eval (no --body-file)
@@ -558,12 +559,12 @@ DEFER adr-check (deferred to post-pr for PR bypass check)
 DEFER refactor-flag (deferred to post-pr for PR bypass check)
 META-CHECK-DEFERRED: adr-check
 META-CHECK-DEFERRED: refactor-flag
-META-CHECKS: OK stage=pre-push hard=20 failed=0 warn=0 skip=3 defer=2'
+META-CHECKS: OK stage=pre-push hard=21 failed=0 warn=0 skip=3 defer=2'
 CONTRACT_FAIL_GOLDEN='FAIL  test-check-engine-freeze
 META-CHECK-FAILED: test-check-engine-freeze
 META-CHECK-DEFERRED: adr-check
 META-CHECK-DEFERRED: refactor-flag
-META-CHECKS: FAILED stage=pre-push hard=20 failed=1 warn=0 skip=3 defer=2'
+META-CHECKS: FAILED stage=pre-push hard=21 failed=1 warn=0 skip=3 defer=2'
 
 # contract_run <env-assignments...>: all-rc-0 stubs unless overridden; sets
 # _LAST_OUT and _LAST_RC from the pre-push stage on a throwaway fixture.

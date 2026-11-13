@@ -137,6 +137,12 @@ MIN_PATH="$T/min:/usr/bin:/bin:/usr/sbin:/sbin"
 # Test framework
 # ---------------------------------------------------------------------------
 pass() { h_pass "$1"; }
+# pass_row: same counter as pass, printed as `ok <name>` so a matrix row can grep the exact line.
+pass_row() { H_PASS=$((H_PASS + 1)); printf 'ok %s\n' "$1"; }
+# shellcheck source=bin/lib/claim-file.sh
+. "$SCRIPT_DIR/lib/claim-file.sh"
+LIE_BIN="$T/lie"
+claim_file_lying_mkdir_stub "$LIE_BIN"
 fail() { h_fail "$1: $2"; }
 
 # reset_ctl — clear per-test control state
@@ -747,7 +753,7 @@ reset_ctl
 ) >/dev/null 2>&1
 SA_LINE="$(cat "$T/ctl/launchctl_calls" 2>/dev/null || true)"
 SA_GOLD="$(cat <<'GOLD_EOF'
-launchctl submit -l com.ibl5.t-1 -o @T@/sub/L.log -e @T@/sub/L.log -- /usr/bin/env HOME=/test-home PATH=/usr/local/bin:/opt/homebrew/bin:/test-home/.bun/bin:/test-home/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin /bin/bash -lc if ! mkdir '@T@/sub/S.sh.once' 2>/dev/null; then trap '' TERM; '@T@/shim/launchctl' remove 'com.ibl5.t-1' && rmdir '@T@/sub/S.sh.once'; exit 0; fi; '@T@/sub/S.sh'; rc=$?; trap '' TERM; '@T@/shim/launchctl' remove 'com.ibl5.t-1' && rmdir '@T@/sub/S.sh.once'; exit $rc
+launchctl submit -l com.ibl5.t-1 -o @T@/sub/L.log -e @T@/sub/L.log -- /usr/bin/env HOME=/test-home PATH=/usr/local/bin:/opt/homebrew/bin:/test-home/.bun/bin:/test-home/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin /bin/bash -lc if ! (set -C; : > '@T@/sub/S.sh.once') 2>/dev/null; then trap '' TERM; '@T@/shim/launchctl' remove 'com.ibl5.t-1' && rm -rf '@T@/sub/S.sh.once'; exit 0; fi; '@T@/sub/S.sh'; rc=$?; trap '' TERM; '@T@/shim/launchctl' remove 'com.ibl5.t-1' && rm -rf '@T@/sub/S.sh.once'; exit $rc
 GOLD_EOF
 )"
 SA_GOLD="${SA_GOLD//@T@/$T}"
@@ -934,6 +940,74 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Case: W_racing_wrappers_run_once
+# Two wrappers race for one marker with the lying mkdir first on PATH. The marker is
+# an O_EXCL file, so exactly one runs the body (it sleeps 1s so both overlap).
+# ---------------------------------------------------------------------------
+reset_ctl
+WRR_SCRIPT="$SUB_DIR/wrr.sh"
+WRR_COUNT="$SUB_DIR/wrr.count"
+rm -rf "${WRR_SCRIPT}.once" "$WRR_COUNT"
+cat > "$WRR_SCRIPT" <<WRR_EOF
+#!/bin/bash
+echo x >> "$WRR_COUNT"
+sleep 1
+exit 0
+WRR_EOF
+chmod +x "$WRR_SCRIPT"
+WRR_TEXT="$(LAUNCHCTL_CMD="$T/shim/launchctl" HOME="$T/home" bash -c ". '$LIB'; ljob_submit_wrapper_text com.ibl5.test-w '$WRR_SCRIPT'")"
+for _i in 1 2; do
+    ( PATH="$LIE_BIN:$PATH"; bash -c "$WRR_TEXT" ) >/dev/null 2>&1 &
+done
+wait
+WRR_N=0; [[ -f "$WRR_COUNT" ]] && WRR_N="$(wc -l < "$WRR_COUNT" | tr -d ' ')"
+if [[ "$WRR_N" == "1" && ! -e "${WRR_SCRIPT}.once" ]]; then
+    pass_row "W_racing_wrappers_run_once"
+else
+    fail "W_racing_wrappers_run_once" "count=$WRR_N marker=$([ -e "${WRR_SCRIPT}.once" ] && echo present || echo gone)"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: W_legacy_once_dir_held_and_removed
+# A .once DIRECTORY left by an older wrapper reads as held: the body never runs,
+# exit 0, and the marker is removed.
+# ---------------------------------------------------------------------------
+reset_ctl
+WLD_SCRIPT="$SUB_DIR/wld.sh"
+WLD_COUNT="$SUB_DIR/wld.count"
+rm -rf "${WLD_SCRIPT}.once" "$WLD_COUNT"
+cat > "$WLD_SCRIPT" <<WLD_EOF
+#!/bin/bash
+echo x >> "$WLD_COUNT"
+exit 7
+WLD_EOF
+chmod +x "$WLD_SCRIPT"
+mkdir "${WLD_SCRIPT}.once"
+WLD_TEXT="$(LAUNCHCTL_CMD="$T/shim/launchctl" HOME="$T/home" bash -c ". '$LIB'; ljob_submit_wrapper_text com.ibl5.test-w '$WLD_SCRIPT'")"
+WLD_RC=0
+bash -c "$WLD_TEXT" >/dev/null 2>&1 || WLD_RC=$?
+WLD_N=0; [[ -f "$WLD_COUNT" ]] && WLD_N="$(wc -l < "$WLD_COUNT" | tr -d ' ')"
+if [[ $WLD_RC -eq 0 && "$WLD_N" == "0" && ! -e "${WLD_SCRIPT}.once" ]]; then
+    pass_row "W_legacy_once_dir_held_and_removed"
+else
+    fail "W_legacy_once_dir_held_and_removed" "rc=$WLD_RC count=$WLD_N marker=$([ -e "${WLD_SCRIPT}.once" ] && echo present || echo gone)"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: RO_file_marker_reaped
+# The reaper removes a FILE .once marker (rmdir would leave it in place).
+# ---------------------------------------------------------------------------
+reset_ctl
+ro_fixture old
+rm -rf "$RO_SCRIPT.once"; : > "$RO_SCRIPT.once"
+ro_run "$RO_OTHER" >/dev/null 2>&1
+if [[ ! -e "$RO_SCRIPT" && ! -e "$RO_SCRIPT.once" ]]; then
+    pass_row "RO_file_marker_reaped"
+else
+    fail "RO_file_marker_reaped" "script=$([ -e "$RO_SCRIPT" ] && echo present || echo gone) marker=$([ -e "$RO_SCRIPT.once" ] && echo present || echo gone)"
+fi
+
+# ---------------------------------------------------------------------------
 # Live-label slot cases L1-L6. A dedicated launchctl stub, reached only through
 # LAUNCHCTL_CMD, and a sandbox HOME. Real sleep, because L5 and L6 need real time.
 # ---------------------------------------------------------------------------
@@ -1057,7 +1131,7 @@ L5_CAP="$(grep -c "cap reached under FAKE_DRY" "$SLOT/err" || true)"
 if [[ "$L5_SUBMITS" == "1" && "$L5_CAP" == "1" ]]; then
     pass "L5_concurrent_launchers_cap_1"
 else
-    fail "L5_concurrent_launchers_cap_1" "submits=$L5_SUBMITS cap_reached=$L5_CAP"
+    fail "L5_concurrent_launchers_cap_1" "submits=$L5_SUBMITS cap_reached=$L5_CAP err=$(tr '\n' ' ' < "$SLOT/err" 2>/dev/null)"
 fi
 
 # L6: a dead holder's lock breaks; a live holder's lock holds; an empty
@@ -1108,6 +1182,52 @@ if [[ $L6_DEAD_RC -eq 0 && $L6_DEAD_LOCK -eq 0 && "$L6_DEAD_SUBMITS" == "1" \
 else
     fail "L6_stale_lock_broken_live_lock_respected" \
         "dead rc=$L6_DEAD_RC lock=$L6_DEAD_LOCK submits=$L6_DEAD_SUBMITS; live rc=$L6_LIVE_RC submits=$L6_LIVE_SUBMITS msg=$L6_LIVE_MSG; empty rc=$L6_EMPTY_RC submits=$L6_EMPTY_SUBMITS"
+fi
+
+# L5b: L5 again with the lying mkdir first on PATH; the pid file is the claim.
+reset_slot
+for i in 1 2; do
+    (
+        HOME="$SLOT/home"; LAUNCHCTL_CMD="$SLOT_STUB"; STUB_SUBMIT_DELAY=1; FAKE_DRY=1
+        PATH="$LIE_BIN:$PATH"
+        export STUB_SUBMIT_DELAY
+        . "$LIB"
+        ljob_claim_slot "com.ibl5.test-a-" 1 60 FAKE_DRY "com.ibl5.test-a-$i" -- "$SLOT_STUB" submit -l "com.ibl5.test-a-$i" -- /bin/true
+    ) >/dev/null 2>>"$SLOT/err" &
+done
+wait
+L5B_SUBMITS="$(slot_lines "$SLOT/submits")"
+L5B_CAP="$(grep -c "cap reached under FAKE_DRY" "$SLOT/err" || true)"
+if [[ "$L5B_SUBMITS" == "1" && "$L5B_CAP" == "1" ]]; then
+    pass_row "L5b_lying_mkdir_cap_1"
+else
+    fail "L5b_lying_mkdir_cap_1" "submits=$L5B_SUBMITS cap_reached=$L5B_CAP err=$(tr '\n' ' ' < "$SLOT/err" 2>/dev/null)"
+fi
+
+# L6 (lying mkdir): a live holder's lock holds while mkdir always succeeds. The loser
+# must wait and give up (rc 1), not spin. A watchdog kills it after 10s.
+reset_slot
+L6L_LOCK="$SLOT/home/Library/Caches/com.ibl5.ljob-locks/com.ibl5.test-b-lock.d"
+mkdir -p "$L6L_LOCK"
+sleep 60 & L6L_HOLDER=$!
+printf '%s\n' "$L6L_HOLDER" > "$L6L_LOCK/pid"
+(
+    HOME="$SLOT/home"; PATH="$LIE_BIN:$PATH"; LJOB_LOCK_TRIES=2
+    . "$LIB"
+    ljob_slot_lock "com.ibl5.test-b-"
+) >/dev/null 2>"$SLOT/l6l.err" &
+L6L_PID=$!
+L6L_W=0
+while kill -0 "$L6L_PID" 2>/dev/null && [[ $L6L_W -lt 10 ]]; do sleep 1; L6L_W=$((L6L_W + 1)); done
+kill "$L6L_PID" 2>/dev/null
+L6L_RC=0; wait "$L6L_PID" 2>/dev/null || L6L_RC=$?
+kill "$L6L_HOLDER" 2>/dev/null
+wait "$L6L_HOLDER" 2>/dev/null
+L6L_MSG=0; grep -qF "ERROR: slot lock busy" "$SLOT/l6l.err" && L6L_MSG=1
+if [[ $L6L_RC -eq 1 && $L6L_MSG -eq 1 ]]; then
+    pass_row "L6_lying_mkdir_lost_claim_bounded"
+else
+    fail "L6_lying_mkdir_lost_claim_bounded" "rc=$L6L_RC msg=$L6L_MSG waited=${L6L_W}s"
 fi
 
 # ---------------------------------------------------------------------------

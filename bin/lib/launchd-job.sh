@@ -157,9 +157,11 @@ ljob_count_live() {
 
 # ljob_lock_dir: HOME-derived so a terminal launcher and a launchd-spawned one
 # (whose TMPDIR may differ or be unset) share one lock. Empty means unset.
+# shellcheck source=bin/lib/claim-file.sh
+. "$(dirname "${BASH_SOURCE[0]}")/claim-file.sh"
 ljob_lock_dir() { printf '%s\n' "${LJOB_LOCK_DIR:-$HOME/Library/Caches/com.ibl5.ljob-locks}"; }
 
-# ljob_slot_lock <label_prefix>: per-prefix mkdir lock holding the launcher's PID.
+# ljob_slot_lock <label_prefix>: per-prefix lock dir whose O_EXCL pid file is the claim.
 # A lock whose holder is dead is broken, after re-reading the pid file so a lock
 # taken over in between survives. A pid file still empty after 5 tries means the
 # holder died between its mkdir and its write. The pid write is exclusive, so a
@@ -171,14 +173,11 @@ ljob_slot_lock() {
     lock="$dir/${prefix}lock.d"
     mkdir -p "$dir" || { echo "ERROR: cannot create lock dir $dir" >&2; return 1; }
     while :; do
-        if mkdir "$lock" 2>/dev/null; then
-            # noclobber makes the pid write exclusive. A launcher that stalls
-            # here past the empty-pid break finds the pid file already written
-            # (or the lock gone) and loses, so two launchers never both own it.
-            if (set -C; printf '%s\n' "$$" > "$lock/pid") 2>/dev/null; then
-                return 0
-            fi
-            continue
+        # The pid file is the claim (O_EXCL via claim_file); mkdir only makes room.
+        # A lost claim falls through to the held path below, which reads the holder,
+        # counts the try and sleeps, so a lying mkdir can never spin this loop.
+        if mkdir "$lock" 2>/dev/null && claim_file "$lock/pid" printf '%s\n' "$$"; then
+            return 0
         fi
         holder="$(cat "$lock/pid" 2>/dev/null || true)"
         if [[ -z "$holder" ]]; then
@@ -310,7 +309,7 @@ ljob_bootstrap() {
 # Per-run detached jobs with NO file in ~/Library/LaunchAgents.
 # Every per-run launcher goes through ljob_submit, so swapping the mechanism
 # later edits only this block. launchd restarts a submitted job after it exits
-# until the label is removed. The wrapper's once-guard (atomic mkdir of
+# until the label is removed. The wrapper's once-guard (an O_EXCL noclobber create of
 # "<script>.once") turns any respawn into "remove the label, exit 0" so the
 # script body runs at most once. The normal tail ignores TERM, removes the
 # label, then removes the marker only if the remove worked (else the marker stays
@@ -323,7 +322,7 @@ ljob_submit_wrapper_text() {
     local label="$1" script="$2" ctl l s m c
     ctl="$(command -v "${LAUNCHCTL_CMD:-launchctl}" 2>/dev/null || printf '%s' "${LAUNCHCTL_CMD:-launchctl}")"
     l="$(shq "$label")"; s="$(shq "$script")"; m="$(shq "${script}.once")"; c="$(shq "$ctl")"
-    printf '%s' "if ! mkdir $m 2>/dev/null; then trap '' TERM; $c remove $l && rmdir $m; exit 0; fi; $s; rc=\$?; trap '' TERM; $c remove $l && rmdir $m; exit \$rc"
+    printf '%s' "if ! (set -C; : > $m) 2>/dev/null; then trap '' TERM; $c remove $l && rm -rf $m; exit 0; fi; $s; rc=\$?; trap '' TERM; $c remove $l && rm -rf $m; exit \$rc"
 }
 
 # Builds LJOB_SUBMIT_ARGV. Returns 2 (nothing built) on a usage error.
@@ -412,7 +411,7 @@ ljob_reap_orphan_scripts() {
         label="${lpre}${stem#"$fpre"}"
         awk -F'\t' -v l="$label" '$3 == l {f=1} END {exit !f}' <<< "$snap" && continue   # still loaded
         if [[ -n "${LJOB_REAP_DRY:-}" ]]; then echo "would reap $f"; continue; fi
-        rm -f "$f"; rmdir "$f.once" 2>/dev/null || true
+        rm -f "$f"; rm -rf "$f.once"
         echo "reaped orphan script $f"
     done
     return 0

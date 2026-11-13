@@ -275,11 +275,15 @@ extract_fn() {
 }
 
 BIP_SRC="$(extract_fn build_impl_prompt)"
-if [ -z "$SFFR_SRC" ] || [ -z "$BIP_SRC" ]; then
-    h_fail "could not extract should_feed_failure_report/build_impl_prompt from $RUNNER"
+RTA_SRC="$(extract_fn resolve_delegate_trial_arm)"
+ITA_SRC="$(extract_fn impl_trial_addendum)"
+if [ -z "$SFFR_SRC" ] || [ -z "$BIP_SRC" ] || [ -z "$RTA_SRC" ] || [ -z "$ITA_SRC" ]; then
+    h_fail "could not extract build_impl_prompt and its helpers from $RUNNER"
 else
     eval "$SFFR_SRC"
     eval "$BIP_SRC"
+    eval "$RTA_SRC"
+    eval "$ITA_SRC"
     BIP_TMP="$(mktemp -d)"
     printf 'line one\nbudget={{IMPL_BUDGET_MINUTES}} min\nlast {{IMPL_BUDGET_MINUTES}}\n\n' > "$BIP_TMP/fixture-prompt-impl"
 
@@ -311,6 +315,103 @@ else
         "$SCRIPT_DIR/automouse/prompt-impl" > "$BIP_TMP/expect-real"
     build_impl_prompt "$SCRIPT_DIR/automouse/prompt-impl" p.md 42 s s /nonexistent > "$BIP_TMP/got-real"
     assert_bytes "impl-prompt-unset-matches-master-render" "$BIP_TMP/expect-real" "$BIP_TMP/got-real"
+
+    # --- resolve_delegate_trial_arm: the opt-in knob -------------------------
+    # wiring: the loop reads the var with a `:-` default, so unset is legal.
+    if grep -qF 'resolve_delegate_trial_arm "${AUTOMOUSE_DELEGATE_EFFORT_TRIAL:-}" "$PLAN_NAME"' "$RUNNER"; then
+        got=$(unset AUTOMOUSE_DELEGATE_EFFORT_TRIAL; set -u
+              resolve_delegate_trial_arm "${AUTOMOUSE_DELEGATE_EFFORT_TRIAL:-}" "p.md" 2>/dev/null; echo "rc=$?")
+        if [ "$got" = "rc=0" ]; then
+            h_pass "wiring-trial-arm-unset-safe"
+        else
+            h_fail "wiring-trial-arm-unset-safe" "unset var gave '$got', expected 'rc=0'"
+        fi
+    else
+        h_fail "wiring-trial-arm-unset-safe" "loop does not read the var with a :- default"
+    fi
+
+    got=$(resolve_delegate_trial_arm "" p.md 2>&1; echo "rc=$?")
+    if [ "$got" = "rc=0" ]; then
+        h_pass "trial-arm-empty-off"
+    else
+        h_fail "trial-arm-empty-off" "empty value gave '$got', expected 'rc=0'"
+    fi
+
+    typo_bad=""
+    for typo in "lowfirst" "LOW-FIRST" "low-first " "ab-test"; do
+        out=$(resolve_delegate_trial_arm "$typo" p.md 2>/dev/null); rc=$?
+        if [ "$rc" -ne 2 ] || [ -n "$out" ]; then
+            typo_bad="$typo_bad [$typo: rc=$rc out='$out']"
+        fi
+    done
+    if [ -z "$typo_bad" ]; then
+        h_pass "trial-arm-typo-rejected"
+    else
+        h_fail "trial-arm-typo-rejected" "$typo_bad"
+    fi
+
+    warn=$(resolve_delegate_trial_arm "lowfirst" p.md 2>&1 >/dev/null)
+    if grep -qF "AUTOMOUSE_DELEGATE_EFFORT_TRIAL='lowfirst'" <<< "$warn" \
+        && grep -qF "ignored, trial off" <<< "$warn"; then
+        h_pass "trial-typo-logged-loudly"
+    else
+        h_fail "trial-typo-logged-loudly" "stderr was '$warn'"
+    fi
+
+    got_lf=$(resolve_delegate_trial_arm "low-first" p.md)
+    got_ct=$(resolve_delegate_trial_arm "control" p.md)
+    if [ "$got_lf" = "low-first" ] && [ "$got_ct" = "control" ]; then
+        h_pass "trial-arm-passthrough"
+    else
+        h_fail "trial-arm-passthrough" "low-first -> '$got_lf', control -> '$got_ct'"
+    fi
+
+    # cksum CRCs (printf '%s' <name> | cksum): plan-a.md = 7719664 (even),
+    # plan-b.md = 3680658023 (odd).
+    got_even=$(resolve_delegate_trial_arm "ab" plan-a.md)
+    got_odd=$(resolve_delegate_trial_arm "ab" plan-b.md)
+    if [ "$got_even" = "low-first" ] && [ "$got_odd" = "control" ]; then
+        h_pass "trial-arm-ab-parity"
+    else
+        h_fail "trial-arm-ab-parity" "even -> '$got_even', odd -> '$got_odd'"
+    fi
+
+    # --- build_impl_prompt with a trial arm ----------------------------------
+    build_impl_prompt "$SCRIPT_DIR/automouse/prompt-impl" p.md 42 s s /nonexistent "" > "$BIP_TMP/got-empty-arm"
+    assert_bytes "impl-prompt-empty-arm-identical" "$BIP_TMP/got-real" "$BIP_TMP/got-empty-arm"
+
+    build_impl_prompt "$SCRIPT_DIR/automouse/prompt-impl" p.md 42 s s /nonexistent low-first > "$BIP_TMP/got-trial"
+    {
+        cat "$BIP_TMP/expect-real"
+        printf '\n\n'
+        printf '%s' "$(impl_trial_addendum)"
+        printf '\nDELEGATE_EFFORT_TRIAL=low-first'
+    } > "$BIP_TMP/expect-trial"
+    assert_bytes "impl-prompt-trial-adds-addendum" "$BIP_TMP/expect-trial" "$BIP_TMP/got-trial"
+    if [ "$(tail -n 1 "$BIP_TMP/got-trial")" = "DELEGATE_EFFORT_TRIAL=low-first" ]; then
+        h_pass "impl-prompt-trial-last-line"
+    else
+        h_fail "impl-prompt-trial-last-line" "last line is '$(tail -n 1 "$BIP_TMP/got-trial")'"
+    fi
+
+    # assert_trial_line <name> <literal>: the low-first render carries the line.
+    assert_trial_line() {
+        if grep -qF -- "$2" "$BIP_TMP/got-trial"; then
+            h_pass "$1"
+        else
+            h_fail "$1" "render lacks: $2"
+        fi
+    }
+    assert_trial_line "impl-prompt-addendum-fail-closed" "Unrunnable counts as failed."
+    assert_trial_line "impl-prompt-addendum-batch-wait" "Wait until every delegate launched in the same batch has reported."
+    assert_trial_line "impl-prompt-addendum-control-high" 'Arm control: spawn every first attempt with effort: "high".'
+    assert_trial_line "impl-prompt-addendum-single-retry" "Never spawn a third attempt"
+
+    if grep -qF '"$IMPL_MODEL" "$FAILURE_FILE" "$TRIAL_ARM")' "$RUNNER"; then
+        h_pass "wiring-trial-arm-into-build"
+    else
+        h_fail "wiring-trial-arm-into-build" "plan loop does not pass \"\$TRIAL_ARM\" to build_impl_prompt"
+    fi
 
     rm -rf "$BIP_TMP"
 fi

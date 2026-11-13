@@ -97,6 +97,7 @@ _ADDED_ARMING_PATHS = (
     "tools/postplan-harness/harness/external_scope.py",
     "tools/postplan-harness/harness/sql_comments.py",
     "tools/postplan-harness/harness/rebuildable.py",
+    "tools/postplan-harness/harness/arming_replay.py",
     "tools/postplan-harness/harness/gate_backtest.py",
     "bin/text-hold-recheck",
     "bin/lib/text-hold-recheck.sh",

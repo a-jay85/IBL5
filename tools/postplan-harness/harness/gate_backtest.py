@@ -191,6 +191,9 @@ _ARMING_PATHS = (
     "tools/postplan-harness/harness/sql_comments.py",
     # merge_danger.py reads REBUILDABLE_TABLES here to decide whether a loss of rows is one-way.
     "tools/postplan-harness/harness/rebuildable.py",
+    # merge_danger.py imports this. It runs the self-governing replay that decides whether the
+    # segment clears.
+    "tools/postplan-harness/harness/arming_replay.py",
     "tools/postplan-harness/harness/gate_backtest.py",
     # The re-arm path. It turns auto-merge back on with CI_PAT after a body edit clears a
     # text hold.

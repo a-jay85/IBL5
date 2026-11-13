@@ -3,12 +3,13 @@
 #
 # bin/reviewer-eval — score the post-plan PR reviewer against a corpus of known bugs.
 #
-# Usage: bin/reviewer-eval <run|validate|smoke|compare|mine> [flags]
+# Usage: bin/reviewer-eval <run|validate|smoke|compare|mine|second> [flags]
 #   run       review each corpus case offline and print the one-line score
 #   validate  check the corpus schema and its history claims offline
 #   smoke     one live review-agent call proving the claude -p boundary
 #   compare   score the base tree and this tree on one corpus and print a before/after block
 #   mine      print bug or clean corpus candidates from history (writes no file)
+#   second    score the second-reviewer seat: second <mine|validate|run|compare|smoke>
 #   exit 0 ok, 1 finding or failure, 2 usage, 3 incomplete (a degraded review agent)
 #
 # The logic lives in tools/postplan-harness/harness/reviewer_eval.py. This wrapper resolves
@@ -30,6 +31,12 @@ case "$1" in
         exit 0
         ;;
 esac
+
+if [ "$1" = "second" ]; then
+    shift
+    export PYTHONPATH="$ROOT/tools/postplan-harness${PYTHONPATH:+:$PYTHONPATH}"
+    exec python3 -m harness.second_review_eval "$@"
+fi
 
 EXTRA=()
 if [ "$1" = "compare" ]; then

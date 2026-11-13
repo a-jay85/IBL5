@@ -1,6 +1,6 @@
 ---
 description: How the reviewer eval corpus scores the post-plan code reviewer, how /fix-and-prevent grows the corpus, the before/after rule for review-surface PRs, and the reviewer bar that gates security fixes.
-last_verified: 2026-11-07
+last_verified: 2026-11-12
 ---
 
 # Reviewer eval
@@ -158,3 +158,55 @@ A hand check of the raw findings puts the true recall at 2 of 6. The scored 3/6 
 - `depth-chart-log-after-commit` is a real miss. The live post-plan run on PR #3288 also got no finding from agents A, B and security.
 
 The first baseline, on surface `v=16345a91e105` with the Haiku scorer, read a recall of 0 of 6 with no surviving finding on any case. The matching rule did not cause that zero, because no finding reached it. The scorer dropped the agents' findings, including the two line-312 findings that the verifier now keeps.
+
+## Second-reviewer eval
+
+The second-reviewer eval replays the `pr-second-reviewer` seat on past held PRs whose owner outcome is known. It reports how often the seat cleared a PR the owner held and how often it held a PR the owner merged as it was. Decision record: `ibl5/docs/decisions/0247-second-reviewer-eval-corpus.md`. The code lives in `tools/postplan-harness/harness/second_review_eval.py`.
+
+### Subcommands
+
+Each one runs as `bin/reviewer-eval second <name>`.
+
+| Name | What it does | Exit codes |
+|------|--------------|------------|
+| `mine` | Reads merged PRs since `--since` (default 2026-10-13) through read-only `gh` calls and git, and writes one row per PR to `tools/postplan-harness/out/second-review-eval/candidates.jsonl`. | 0 written, 1 on a `gh` failure |
+| `validate` | Checks the corpus schema and prints `ok cases=<n> confirmed=<k> c=<digest>`. | 0 valid, 1 schema errors, 2 unreadable corpus |
+| `run` | Runs the seat on each confirmed case, or only the `--case` ids given, and prints the score line. `--score-out` also writes the line to a file. | 0 scored, 2 no confirmed case, 3 a case was degraded |
+| `compare` | Compares two score files given with `--before` and `--after`. | 0 no worse, 1 worse, 2 the corpus digest or a denominator differs |
+| `smoke` | Runs the real seat path with a fake model on a synthetic case. It spends no tokens. | 0 pass, 1 fail |
+
+The miner only reads. A guard in the live `gh` adapter raises on any argv outside `pr list`, `pr view`, a plain `api repos/a-jay85/IBL5/...` read, or a `graphql` query. The candidates file and the verdict cache sit under the gitignored `tools/postplan-harness/out/`.
+
+### Corpus
+
+`tools/postplan-harness/fixtures/second-review-eval/corpus.json` holds `{"version": 1, "cases": [...]}`. Each case carries `id`, `pr`, `status`, `expected`, `label_basis`, `base_sha`, `replay_sha`, `holds`, `reason`, `reason_source`, and `evidence`. The `holds` map uses only the clearable conditions 7, 10, 12 and 17. An id starts with a letter, so it can never equal a bare PR number.
+
+The miner picks a case's holds from the `Auto-merge held:` block of the post-plan sticky comment. It reads every saved version of the comment and takes the newest one whose holds are all clearable. The replay commit is the PR commit whose tree matches that version's `**Reviewed tree:**` line. A PR whose sticky also held a non-clearable condition, whose reviewed tree left the branch history, or whose diff is over the inline cap gets `seat_eligible: false` and stays out of the corpus.
+
+A person copies each eligible row into the corpus and sets `status`. A case is `confirmed` when its `evidence` names the label or the blamed fix. A `changed-after-hold` case also needs a commit after the replay commit that touches a file in the diff, named in `evidence`. Every other case is `unconfirmed`, and only confirmed cases enter the score and the corpus digest.
+
+### Labels
+
+The miner labels each PR from what the owner did. The first matching rule wins.
+
+1. A fix within 14 days whose removed lines blame the PR's merge commit gives `hold` with basis `reverted`.
+2. A `needs-a-human` label gives `hold` with basis `needs-a-human`.
+3. A `human-approved` label with a changes-requested review, or with a patch id that changed after the hold, gives `hold` with basis `changed-after-hold`.
+4. A `human-approved` label with an unchanged patch id gives `clear` with basis `approved-as-is`. Patch ids ignore a rebase-only push.
+5. Any other kept PR was cleared by the seat and auto-merged, and gives `clear` with basis `seat-cleared-clean`.
+
+No merged sticky carries a `Second reviewer cleared` digest line yet, so the miner finds no rule-5 case today.
+
+### Score
+
+`run` prints one line:
+
+```
+second-review-eval v=<surface> c=<corpus> missed_holds=a/b extra_holds=c/d degraded=n
+```
+
+`v=` hashes the seat code, the agent definition, and the `REMEDIATION_DIFF_INLINE_CAP` line of `fidelity.py`. `c=` hashes the confirmed cases. `missed_holds=a/b` counts `hold` cases the seat cleared. `extra_holds=c/d` counts `clear` cases the seat held. The two counts are never summed, because a missed hold lets a bad PR merge and an extra hold only costs the owner a look. A `CLEAN` verdict that clears only some of a case's holds counts as held, since arming would still wait. A degraded case (a seat error or no verdict) drops out of both denominators and adds 1 to `degraded=`.
+
+The seat writes each verdict under the key `eval-<id>`, at `/tmp/postplan-second-review-eval-<id>.md`, so a run never touches the verdict file arming reads for a real PR. The run deletes that file afterward. Verdicts are cached in `tools/postplan-harness/out/second-review-eval/cache/`, keyed on the case and the surface hash, so a rerun on an unchanged surface makes no seat call.
+
+Nothing gates on this score. It is a measurement for PRs that change the seat. The first run, on 2026-11-12 over cases `pr3899-hold7` and `pr3820-clear7`, printed `second-review-eval v=7e835ad672d7 c=bb8984c77d24 missed_holds=0/1 extra_holds=1/1 degraded=0`.

@@ -81,3 +81,7 @@ check reaches only indirectly, such as a class the named test imports, does not 
 fresh run. CI still runs the test suites on every push.
 
 **Superseded in part by:** ADR-0244. CI's required Plan checks job now runs the non-DB matrix rows and the executable mutations; the local gate keeps only the DB rows.
+
+## Addendum: reuse record removed (2026-11-12)
+
+The 2026-11-12 amendment above added a reuse record. Pre-fire wrote it, and post-plan read it through `reuse_prefire_pass` in `tools/postplan-harness/harness/mutations.py`. After ADR-0244, post-plan no longer runs the mutation rows, so nothing called `reuse_prefire_pass`. This change deletes that function and its helpers. It also deletes `write_xm_sidecar` from `bin/lib/prefire-verify`, so pre-fire no longer writes `exec-mutations.rows-<id>.reuse` files.

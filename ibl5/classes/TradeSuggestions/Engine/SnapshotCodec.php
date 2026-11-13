@@ -678,6 +678,6 @@ final class SnapshotCodec
 
     private static function num(mixed $v): float
     {
-        return is_int($v) || is_float($v) ? (float) $v : throw new \UnexpectedValueException('Expected a number');
+        return is_int($v) || is_float($v) ? $v : throw new \UnexpectedValueException('Expected a number');
     }
 }

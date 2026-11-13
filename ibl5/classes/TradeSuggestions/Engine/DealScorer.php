@@ -47,8 +47,8 @@ final class DealScorer
 
     private static function scoreWith(LeagueSnapshot $s, TradeCandidate $c, string $shapeId, PairRecordMemo $memo): ScoredDeal
     {
-        $components = [$c->userTid => [], $c->partnerTid => []];
-        $deltas = [$c->userTid => [], $c->partnerTid => []];
+        $components = [];
+        $deltas = [];
 
         foreach (Horizon::OFFSETS as $offset) {
             $after = TeamStateRebuilder::after($s, $c, $offset, $memo);
@@ -62,7 +62,10 @@ final class DealScorer
                 $walkFactor = self::receivedFactors($s, $offset, $odds);
                 $base = SideGain::fromStates($before, $afterState, $s, $c, $tid, $walkFactor);
                 if ($offset >= 1) {
-                    $base = self::mixWalkers($s, $c, $tid, $offset, $memo, $base, $received, $sent, $odds, $walkFactor);
+                    $walkers = self::walkers($s, $offset, $received, $sent, $odds, $walkFactor);
+                    if ($walkers !== []) {
+                        $base = self::mixWalkers($s, $c, $tid, $offset, $memo, $base, $walkers, $walkFactor);
+                    }
                 }
                 $components[$tid][$offset] = $base;
                 $deltas[$tid][$offset] = ProfileDelta::fromStates($before, $afterState);
@@ -129,21 +132,16 @@ final class DealScorer
     }
 
     /**
-     * Mixes the slot, bench, profile and balance components over every
-     * outcome of the moved walkers on this side. A received walker who leaves
-     * drops out of the after roster; a sent walker who would have left drops
-     * out of the before roster. Each outcome is weighted by the product of
-     * the walkers' factors. With no moved walker the base components return
-     * unchanged.
+     * The moved walkers on this side at `$offset`, each as pid, whether this
+     * side received him, and his factor.
      *
-     * @param array<string, float> $base
      * @param list<int> $received
      * @param list<int> $sent
      * @param array<int, array{likelihood: float, walks: bool}> $odds received pid => odds against the receiving team
      * @param array<int, float> $walkFactor received pid => factor at this offset
-     * @return array<string, float>
+     * @return list<array{int, bool, float}>
      */
-    private static function mixWalkers(LeagueSnapshot $s, TradeCandidate $c, int $tid, int $offset, PairRecordMemo $memo, array $base, array $received, array $sent, array $odds, array $walkFactor): array
+    private static function walkers(LeagueSnapshot $s, int $offset, array $received, array $sent, array $odds, array $walkFactor): array
     {
         $walkers = [];
         foreach ($received as $pid) {
@@ -156,10 +154,25 @@ final class DealScorer
                 $walkers[] = [$pid, false, ResignLikelihood::futureValueFactor($offset, true, true, $s->resignLikelihood[$pid] ?? 1.0)];
             }
         }
-        if ($walkers === []) {
-            return $base;
-        }
 
+        return $walkers;
+    }
+
+    /**
+     * Mixes the slot, bench, profile and balance components over every
+     * outcome of the moved walkers on this side. A received walker who leaves
+     * drops out of the after roster; a sent walker who would have left drops
+     * out of the before roster. Each outcome is weighted by the product of
+     * the walkers' factors. The caller skips this when no walker moved, so
+     * the base components stand unchanged.
+     *
+     * @param array<string, float> $base
+     * @param list<array{int, bool, float}> $walkers
+     * @param array<int, float> $walkFactor received pid => factor at this offset
+     * @return array<string, float>
+     */
+    private static function mixWalkers(LeagueSnapshot $s, TradeCandidate $c, int $tid, int $offset, PairRecordMemo $memo, array $base, array $walkers, array $walkFactor): array
+    {
         $mixed = array_fill_keys(self::MIXED_KEYS, 0.0);
         $count = count($walkers);
         for ($mask = 0; $mask < (1 << $count); $mask++) {

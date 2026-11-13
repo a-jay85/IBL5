@@ -27,10 +27,7 @@ final class ExposureFilter
      */
     public static function mayTarget(string $simKey, int $partnerTid, int $userTid, array $allTids, int $k = GainWeights::EXPOSURE_K): bool
     {
-        if ($partnerTid === $userTid) {
-            return false;
-        }
-        $others = array_values(array_filter($allTids, static fn (int $tid): bool => $tid !== $partnerTid));
+        $others = array_filter($allTids, static fn (int $tid): bool => $tid !== $partnerTid);
         usort($others, static fn (int $a, int $b): int
             => strcmp(self::rankOf($simKey, $partnerTid, $a), self::rankOf($simKey, $partnerTid, $b)));
         $index = array_search($userTid, $others, true);
@@ -47,9 +44,6 @@ final class ExposureFilter
      */
     public static function eligiblePartners(string $simKey, int $userTid, array $allTids, int $k = GainWeights::EXPOSURE_K): array
     {
-        if (!in_array($userTid, $allTids, true)) {
-            return [];
-        }
         $partners = [];
         foreach ($allTids as $partnerTid) {
             if (self::mayTarget($simKey, $partnerTid, $userTid, $allTids, $k)) {

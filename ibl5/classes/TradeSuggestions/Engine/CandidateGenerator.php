@@ -59,7 +59,7 @@ final class CandidateGenerator
                     if (isset($seen[$key])) {
                         continue;
                     }
-                    $seen[$key] = true;
+                    $seen[$key] = $key;
                     if (self::tooManyAssets($candidate)) {
                         continue;
                     }
@@ -95,7 +95,7 @@ final class CandidateGenerator
                 continue;
             }
             foreach (SurplusDeficitMatcher::assetsFor($s, $tid, $pair, CandidateBudget::PLAYERS_PER_PARTNER) as $pid) {
-                $pool[$pid] = true;
+                $pool[$pid] = $pid;
                 if (count($pool) === CandidateBudget::PLAYERS_PER_PARTNER) {
                     return array_keys($pool);
                 }

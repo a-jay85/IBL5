@@ -15,8 +15,8 @@ final class CandidateKey
     public static function of(TradeCandidate $c): string
     {
         return implode(';', [
-            (string) $c->userTid,
-            (string) $c->partnerTid,
+            $c->userTid,
+            $c->partnerTid,
             self::join($c->userPids),
             self::join($c->userPickIds),
             self::join($c->partnerPids),

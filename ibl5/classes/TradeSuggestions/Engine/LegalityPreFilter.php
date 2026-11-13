@@ -85,11 +85,6 @@ final class LegalityPreFilter
      */
     private static function salaryNow(LeagueSnapshot $s, array $pids): int
     {
-        $total = 0;
-        foreach ($pids as $pid) {
-            $total += $s->players[$pid]->salaryAt(0);
-        }
-
-        return $total;
+        return array_sum(array_map(static fn (int $pid): int => $s->players[$pid]->salaryAt(0), $pids));
     }
 }

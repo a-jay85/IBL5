@@ -199,9 +199,6 @@ final readonly class SideGain
      */
     public static function rookieAt(int $draftRound, int $exp, int $offset, array $surplusBySeason): float
     {
-        if (!RookieControl::isRookieScale($draftRound, $exp)) {
-            return 0.0;
-        }
         $mask = [];
         foreach (Horizon::OFFSETS as $k) {
             $mask[$k] = $k === $offset ? ($surplusBySeason[$k] ?? 0) : 0;
@@ -222,7 +219,7 @@ final readonly class SideGain
         foreach ([[$receivedPids, 1], [$sentPids, -1]] as [$pids, $sign]) {
             foreach ($pids as $pid) {
                 $surplus = $s->surplusBySeason($pid);
-                $money += $sign * ($surplus[$offset] ?? 0) * ($factors[$pid] ?? 1.0);
+                $money += $sign * $surplus[$offset] * $factors[$pid];
                 $p = $s->players[$pid];
                 $rookie += $sign * self::rookieAt($p->draftRound, $p->exp, $offset, $surplus);
             }
@@ -267,6 +264,6 @@ final readonly class SideGain
 
     private static function clampRank(int $rank): int
     {
-        return max(1, min(RankUtility::MAX_RANK, $rank));
+        return min(RankUtility::MAX_RANK, $rank);
     }
 }

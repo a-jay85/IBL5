@@ -48,10 +48,11 @@ final class SnapshotTimingArgs
 
     private static function positive(string $flag, string $raw): int
     {
-        if (preg_match('/^[0-9]+$/', $raw) !== 1 || (int) $raw < 1) {
+        $n = (int) $raw;
+        if (preg_match('/^[0-9]+$/', $raw) !== 1 || $n < 1) {
             throw new \InvalidArgumentException("--{$flag} must be a positive integer, got '{$raw}'");
         }
 
-        return (int) $raw;
+        return $n;
     }
 }

@@ -126,6 +126,7 @@ class TradeSuggestionsView implements TradeSuggestionsViewInterface
         return match ($mode) {
             TeamMode::WinNow => 'Win now',
             TeamMode::Rebuild => 'Rebuild',
+            TeamMode::Middle => 'Middle',
         };
     }
 
@@ -142,6 +143,8 @@ class TradeSuggestionsView implements TradeSuggestionsViewInterface
         return match ($mode->mode) {
             TeamMode::WinNow => TeamModeSetting::WinNow,
             TeamMode::Rebuild => TeamModeSetting::Rebuild,
+            // Unreachable until unit 4 adds the Middle setting case: an override is never Middle today.
+            TeamMode::Middle => TeamModeSetting::Auto,
         };
     }
 }

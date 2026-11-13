@@ -11,9 +11,8 @@ use TradeSuggestions\TeamMode;
  * The F8 weights. Data only: it holds no `$db`, takes no player, and never
  * returns a per-player number. Gain is measured in weighted rank places.
  *
- * `TeamMode` has no backing strings and no Middle case, so the table keys come
- * from `modeKey()`. The `middle` row stays because F8 froze all three rows; no
- * enum case reaches it today.
+ * `TeamMode` has no backing strings, so the table keys come from `modeKey()`.
+ * `TeamMode::Middle` reads the `middle` row F8 froze alongside the other two.
  */
 final class GainWeights
 {
@@ -44,6 +43,7 @@ final class GainWeights
         return match ($mode) {
             TeamMode::WinNow => 'win_now',
             TeamMode::Rebuild => 'rebuild',
+            TeamMode::Middle => 'middle',
         };
     }
 

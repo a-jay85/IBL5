@@ -8,7 +8,8 @@ namespace TradeSuggestions;
  * Pure win-now/rebuild guess. No I/O.
  *
  * score = 0.70 * record + 0.15 * rotation age + 0.15 * contract horizon, each
- * term scaled to -1..1. score >= 0 is Win now.
+ * term scaled to -1..1. score >= 0 is Win now. When the caller allows it, a
+ * score strictly inside -MIDDLE_BAND..MIDDLE_BAND is Middle instead.
  *
  * - record: this season's win% blended with last season's, which counts as
  *   PRIOR_GAMES games, so a 3-1 start does not outweigh an 82-game season.
@@ -30,6 +31,13 @@ final class TeamModeGuesser
     public const float W_CONTRACTS = 0.15;
 
     /**
+     * Equal to W_AGE and W_CONTRACTS: a team is Middle when the record term alone
+     * cannot outvote one full roster term. With neutral roster terms that is a
+     * record within about .043 of .500.
+     */
+    public const float MIDDLE_BAND = 0.15;
+
+    /**
      * This season's win% blended with last season's (PRIOR_GAMES games of it).
      */
     public static function recordPct(ModeInputs $in): float
@@ -40,7 +48,7 @@ final class TeamModeGuesser
         return ($in->wins + self::PRIOR_GAMES * $priorPct) / ($in->wins + $in->losses + self::PRIOR_GAMES);
     }
 
-    public function guess(ModeInputs $in): ModeGuess
+    public function guess(ModeInputs $in, bool $allowMiddle = false): ModeGuess
     {
         $recordPct = self::recordPct($in);
 
@@ -48,7 +56,13 @@ final class TeamModeGuesser
             + self::W_AGE * self::clamp(($in->rotationAge - self::AGE_PIVOT) / self::AGE_SPAN)
             + self::W_CONTRACTS * ($in->lockedShare - 0.5) * 2;
 
-        return new ModeGuess($score >= 0 ? TeamMode::WinNow : TeamMode::Rebuild, $score, $recordPct, $in);
+        if ($allowMiddle && abs($score) < self::MIDDLE_BAND) {
+            $mode = TeamMode::Middle;
+        } else {
+            $mode = $score >= 0 ? TeamMode::WinNow : TeamMode::Rebuild;
+        }
+
+        return new ModeGuess($mode, $score, $recordPct, $in);
     }
 
     /**

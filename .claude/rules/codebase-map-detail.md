@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand only (no auto-attach trigger). Auto-generated cross-module dependency list for ibl5/classes/, the companion to codebase-map.md.
-last_verified: 2026-11-11
+last_verified: 2026-11-13
 paths: "~/.claude/hooks/plan-gate-edit.sh"
 ---
 
@@ -89,6 +89,7 @@ Team -> Auth BasketballStats Discord Extension Http League Player Repositories R
 TeamOffDefStats -> BasketballStats League Season Security UI
 TeamSchedule -> BasketballStats League LeagueSchedule Season Security Team
 Topics -> Database Search Security
+TradeSuggestions -> Auth BasketballStats Cache League ProjectedDraftOrder Repositories Season Security Settings Standings Team Trading
 Trading -> Auth BasketballStats Database Discord EventLog League Player Repositories Season Security Team UI Validation
 TrainingCampRatingsDiff -> Database Player Repositories Security UI
 TransactionHistory -> Security

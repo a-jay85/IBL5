@@ -62,6 +62,30 @@ class TeamModeServiceTest extends TestCase
         self::assertSame([['tid' => 7, 'setting' => TeamModeSetting::Rebuild]], $repo->saves);
     }
 
+    /**
+     * The Middle flag reaches the Auto arm only. A WinNow override near .500
+     * keeps the two-way guess (WinNow), so its guessed mode is never Middle.
+     */
+    public function testAutoResolvesMiddleOnlyWhenAllowed(): void
+    {
+        $nearFiveHundred = new ModeInputs(41, 41, 41, 41, 26.5, 0.5);
+
+        $autoWithout = $this->service()->resolveFromInputs(TeamModeSetting::Auto, $nearFiveHundred);
+        $autoWith = $this->service()->resolveFromInputs(TeamModeSetting::Auto, $nearFiveHundred, true);
+        $override = $this->service()->resolveFromInputs(TeamModeSetting::WinNow, $nearFiveHundred, true);
+        $rebuild = $this->service()->resolveFromInputs(TeamModeSetting::Rebuild, $nearFiveHundred, true);
+
+        self::assertSame(TeamMode::WinNow, $autoWithout->mode);
+        self::assertSame(TeamMode::Middle, $autoWith->mode);
+        self::assertSame(TeamMode::Middle, $autoWith->guessed);
+        self::assertFalse($autoWith->isOverride);
+        self::assertSame(TeamMode::WinNow, $override->mode);
+        self::assertSame(TeamMode::WinNow, $override->guessed);
+        self::assertTrue($override->isOverride);
+        self::assertSame(TeamMode::Rebuild, $rebuild->mode);
+        self::assertSame(TeamMode::WinNow, $rebuild->guessed);
+    }
+
     private function service(): TeamModeService
     {
         return new TeamModeService(self::createStub(TeamModeRepositoryInterface::class), new TeamModeGuesser());

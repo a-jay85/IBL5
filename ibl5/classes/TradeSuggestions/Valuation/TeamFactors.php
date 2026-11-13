@@ -22,7 +22,7 @@ final readonly class TeamFactors
      * The league-average rival: tid 0, each field the rounded mean. An empty
      * list gives all zeros.
      *
-     * @param list<TeamFactors> $teams
+     * @param array<TeamFactors> $teams
      */
     public static function average(array $teams): self
     {
@@ -40,7 +40,7 @@ final readonly class TeamFactors
     }
 
     /**
-     * @param non-empty-list<TeamFactors> $teams
+     * @param non-empty-array<TeamFactors> $teams
      * @param \Closure(TeamFactors): int $field
      */
     private static function mean(array $teams, \Closure $field): int

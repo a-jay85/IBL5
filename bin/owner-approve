@@ -219,9 +219,16 @@ _oa_verdict() {
     head_tree_armed=$head_tree
 }
 _oa_arm() {
+    local had_label=0
+    case "$labels" in
+        *,human-approved,*) had_label=1 ;;
+    esac
     gh pr edit "$OA_PR" -R "$OA_REPO" --add-label human-approved >/dev/null 2>&1 \
         || _oa_refuse 4 "adding the human-approved label failed, so auto-merge was not armed."
     if ! gh pr merge "$OA_PR" -R "$OA_REPO" --squash --auto --match-head-commit "$head" >/dev/null 2>&1; then
+        if [ "$had_label" -eq 1 ]; then
+            _oa_refuse 4 "gh pr merge --auto failed on head $head. The human-approved label was already on the PR, so it was left in place."
+        fi
         gh pr edit "$OA_PR" -R "$OA_REPO" --remove-label human-approved >/dev/null 2>&1 || printf 'owner-approve: removing human-approved failed; remove it by hand\n' >&2
         _oa_refuse 4 "gh pr merge --auto failed on head $head, so the human-approved label was removed again."
     fi

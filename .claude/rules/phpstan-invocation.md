@@ -1,6 +1,6 @@
 ---
 description: PHPStan/Infection tooling — always use composer scripts; baseline management; infection exclude staleness; local Infection via bin/mutation-diff; constant() false positives.
-last_verified: 2026-11-12
+last_verified: 2026-11-13
 paths:
   - "**/*.php"
   - "ibl5/composer.json"
@@ -51,4 +51,4 @@ This also fails `Tests and Analysis` and `Infection PHP (per-PR diff)`. **Fix:**
 
 Don't run Infection locally by default. CI's required check `Infection PHP (per-PR diff)` scores every PR, so push and let CI run it. A local run takes 4 threads plus a full coverage run and slows the owner's machine for many minutes. Run it locally only when CI's Infection check has failed on this PR and you are fixing the mutants it reported. Then run it once to confirm the fix before you push again. No prep job, burndown job, review, or plan phase runs it unless that condition holds.
 
-When you do run it, run `bin/mutation-diff <base-ref>` from the worktree root. The base defaults to `origin/master`. It runs on the host, resets `ibl5_test` on the main-stack DB through `bin/db-test-up --no-run`, writes coverage, then runs Infection with the flags `.github/workflows/mutation-pr.yml` uses. A raw `vendor/bin/infection --git-diff-*` call skips the coverage run and fails with "Project tests must be in a passing state". Exit 3 names the missing prerequisite (pcov, the `ibl5-mariadb` container, or `bin/db-test-up`). Exit 4 means another run holds the lock.
+`~/.claude/hooks/bash-guard.sh` Check 24 blocks every other way to run Infection, including a direct call, `composer run mutation`, and a script that wraps either. The only way left is `bin/mutation-diff <base-ref>`, run from the worktree root. The base defaults to `origin/master`. It runs on the host, resets `ibl5_test` on the main-stack DB through `bin/db-test-up --no-run`, writes coverage, then runs Infection with the flags `.github/workflows/mutation-pr.yml` uses and the repo config's 4 threads. Exit 3 names the missing prerequisite (pcov, the `ibl5-mariadb` container, or `bin/db-test-up`). Exit 4 means another run holds the lock.

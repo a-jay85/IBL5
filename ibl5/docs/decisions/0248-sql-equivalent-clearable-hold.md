@@ -33,6 +33,7 @@ The equivalence run is local, because only the local DB holds live-shaped data. 
 - Positive: the verdict is an exact string with the default `"unchecked"`, so a typo, crash or missing wiring holds.
 - Negative: one small JSON file per rewrite PR accumulates under `ibl5/tests/sql-equivalence/` (example).
 - Negative: an edit to a file outside the recorded sources does not stale the evidence. The seat's fresh-tree rule and its read of the diff cover that.
+- Negative: the fixed row shape must sit in `_architect-contract.md`, because the architect never reads the detail file. The contract's size cap in `bin/test-architect-contract-split` moved from 31744 B to 32768 B to hold it.
 
 ## References
 

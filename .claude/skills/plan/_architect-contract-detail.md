@@ -210,6 +210,8 @@ The **reflection assertion** shape: in the `*Test.php` file, `$r = new \Reflecti
 
 A named-but-unasserted invariant, a "stateless by inspection" note, or a reviewer's word discharges nothing; there is no prose-only path.
 
+A **SQL-equivalent rewrite** runs its before/after corpus diff on the local DB only, because CI's seed is not live data. Its bind-list `PHPUnit` row runs in CI.
+
 A discharge never replaces a defense — the **Security** bullet (SQL prepared statements, `CsrfGuard`, etc.) is required regardless.
 
 ## Mid-design exploration

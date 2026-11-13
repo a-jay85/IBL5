@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "pr3899-hold7",
+      "pr": 3899,
+      "expected": "hold",
+      "label_basis": "changed-after-hold",
+      "base_sha": "1eadc3d966abd2065eaa8f57478ba39dcdc98ed4",
+      "replay_sha": "75a1a9c8f4af40b16bbe2614ce9a7d58d78a2a6b",
+      "holds": {
+        "7": "The plan says a person must review and merge this PR."
+      },
+      "reason": "chore(postplan): skip repeat mutation run when pre-fire already passed\n\ncontext-budget: about half the lines are fenced recipe code and mutation blocks; the plan has 4 phases.\n\nPre-fire keeps running the stage and, on an all-TRIPPED pass, writes one more file: a reuse sidecar. Post-plan reads the sidecar and rebuilds its `MutationReport` from it when every validation passes; otherwise it runs `plan-exec-mutations` as today. The main alternative rejected was extending the one-line `.pass` record (see trade-offs). Each must-resolve point:\n\n1. **Sidecar keyed on rows identity.** The key is `git hash-object` of the `plan-exec-mutations parse` stdout (the `recs` temp file pre-fire already writes), so post-plan can rebuild the file name from the plan alone without knowing pre-fire's tree. Pre-fire's own cache key `xm_key` (whole plan file) stays as it is. The sidecar is written through `mktemp` in the same directory plus `mv -f`, so a reader never sees half a file. Post-plan computes the same id in Python (`_rows_identity`, git's blob-hash formula) and row 10 pins it equal to `git hash-object`. A changed mutation block changes the id, finds no file, and runs (case e).\n2. **Per-row lines copied at pass time.** `write_xm_sidecar` copies the closed-vocabulary result lines from this run's own `$log` immediately after `write_record`, before any later run can overwrite the shared `$STATE_DIR/$TREE.exec-mutations.log`. Post-plan never reads that shared log.\n3. **Value check and fallback.** Of the 454 explicit `check:` lines in the `## Executable Mutations` blocks of the 60 most recently modified `~/claude-plans/*.md`, all 454 name at least one slash-bearing path and 344 name a test file (`*Test.php`, `test_*.py`, `bin/test-*`, `*.spec.ts`). A row's dependency set is its mutation target, every repo path token in its check, and the executor `bin/lib/plan-exec-mutations`. Tokens resolve against the repo root, and against each `cd` argument in the check (the `cd` argument itself is a base and adds no dependency). Gitignored paths such as `vendor/bin/phpunit` add none. The fallback is to run: a check with no tracked path (the `--filter`-only phpunit shape), a token that resolves nowhere, a glob, a `$`, a `~`, or an unsplittable string all return None. The set is never target-only.\n4. **Tree diff.** `prefire_tree_hash` writes a real tree object. The sidecar records it; post-plan checks it exists (`git cat-file -e <tree>^{tree}`), computes the current tree the same way (temp index copy, `git add -A`, `git write-tree`, so uncommitted edits count), and runs `git diff --quiet <pre> <post> -- :(literal)<path>...` over the dependency set only. A path present in one tree but not the other counts as changed. A rebase onto a newer master that moved any dependency path therefore runs fresh (case b).\n5. **Holding reconstruction.** Every sidecar body line must match `RESULT_RE`, and the body's row ids, in order, must equal the current `parse` row ids. `_collect` then builds `results` and `holding` with the same code the fresh path uses, so a recorded non-TRIPPED row lands in `holding` and condition 19 holds (case d). Because pre-fire writes only all-TRIPPED passes, case d is tested with a hand-written sidecar.\n6. **tree_suspect.** Reuse sets `tree_suspect=False` only after `plan-exec-mutations pending --root <root>` exits 0 with empty stdout; any other answer runs fresh, and the fresh path then judges the journal as today. Row 19 pins that predicate against the real lib.\n7. **Worktree paths.** Post-plan resolves `root` with `git -C <worktree> rev-parse --show-toplevel`, then `git -C <root> rev-parse --git-path prefire-verify`, and joins a relative answer onto `root`. It never resolves against the harness repo or its own cwd (row 24).\n8. **Fail toward running.** `reuse_prefire_pass` returns `(None, reason)` on every validation miss and on any `OSError`, `SubprocessError` or `ValueError`; the runner additionally catches any exception from it and runs fresh.\n9. **Logging.** The runner logs `exec-mutations: reused pre-fire pass (<rows, tree, row count, path count>)` or `exec-mutations: running (<reason>)`, and the running line is logged before `run_executable_mutations` starts, so the audit log shows when the slow step began.\n10. **Callers left alone.** `_fix_round_mutation_check` keeps running fresh (row 29). The replay branch of `_exec_mutations_step` is untouched (row 30).\n\n**Security surface:** none. The change adds no SQL, POST/form endpoint, auth-gated route or user-facing output; it is dev tooling a league GM never sees.\n\n**ADR check:** the plan adds no trigger-pattern file (no new `bin/` script, rule, workflow, composer dependency, migration or PHPStan rule), so `bin/adr-check` needs no action. Phase 4 amends ADR-0199 anyway because the gate's semantics change: post-plan may now skip a local verification run.\n\n**Forced integration triggers:** no CLI flag and no new environment variable (the tests use the existing `PREFIRE_EXEC_MUTATIONS_LIB`; `GIT_INDEX_FILE` is only set for a child `git`). The one new file write lands inside the git dir, outside the working tree (row 6). The diff compares two explicit tree objects rather than a base derived from repo state, so the stacked-PR scenario does not apply.",
+      "reason_source": "plan",
+      "evidence": "label ['human-approved']; basis changed-after-hold; commit 36b9cbdf4 fix(review): address thread 4556904805 touches bin/lib/prefire-verify after the hold",
+      "status": "confirmed"
+    },
+    {
+      "id": "pr3820-clear7",
+      "pr": 3820,
+      "expected": "clear",
+      "label_basis": "approved-as-is",
+      "base_sha": "20e9ea4d22d18f8a3247ec4ac0b50644499a0947",
+      "replay_sha": "f60a514fe03c3a98e9ae700f9792f373e74ec2f8",
+      "holds": {
+        "7": "The plan says a person must review and merge this PR."
+      },
+      "reason": "fix(api): only the IBLbot service key can accept or decline trades\n\nCopy the merged `ReactionController` guard (PR [#3707](https://github.com/a-jay85/IBL5/pull/3707)) into both trade controllers. Each takes a required `ApiKeyRepository`, wraps it in `ServiceKeyGuard`, and calls `callerIsServiceKey()` as the first statement of `handle()`. The existing body `discord_user_id` GM-match check stays as a second layer: the bot key proves the request came through the Discord button, and the Discord id says which GM pressed it. The rejected alternative was to authenticate the GM from the API key's owner (map key to team). That would need a key-to-team column that does not exist and a migration, and the issue's stated fix is the service-key gate. The plan is recipe-backed with a named pattern to copy and a test for every claim, so `impl_model` is `sonnet`.\n\nEach route gets its own 403 message (`Only the IBLbot service key can accept trades.` / `... can decline trades.`), matching the per-route GM-mismatch messages already in these files. Tests pin each string, and a swap between routes fails (matrix rows 4 and 10).\n\nNo ADR trigger files are added (no PHPStan rule, rule doc, workflow, migration, new `bin/` script, or dependency), so `bin/adr-check` needs no action. Neither controller is near the 500-LOC hot-file line.",
+      "reason_source": "plan",
+      "evidence": "label ['human-approved']; basis approved-as-is",
+      "status": "confirmed"
+    },
+    {
+      "id": "pr3825-clear7",
+      "pr": 3825,
+      "expected": "clear",
+      "label_basis": "approved-as-is",
+      "base_sha": "c216f97c573bbff28a6ad1844f8da08df9b5da2f",
+      "replay_sha": "89e0eca555671dfcb90cd59d56d57a2358f6a958",
+      "holds": {
+        "7": "The plan says a person must review and merge this PR."
+      },
+      "reason": "fix(free-agency): reject malformed offer type and year input\n\nF1 is enforced in `FreeAgencyOfferValidator::validateOffer()` as a new first check that rejects any offerType outside 0..8. F2 is enforced in `FreeAgencyProcessor::parseOfferData()` through a new `toOfferType()` helper that maps decimal and exponent strings to an out-of-range sentinel, which the F1 guard then rejects. F3 and F4 are detected in `parseOfferData()` (a rewritten `toOfferAmount()` returns null for letters or arrays) and reported by the validator through an optional `nonNumericYear` key, with a message naming the year. Both new validator checks sit before the zero-first-year check, so for any offerType 0..8 with numeric or blank years the existing checks run in the same order with the same messages, and the form's `'0'`..`'8'` strings cast to the same ints. The main alternative was widening the soft-cap condition to \"not MLE, not LLE, not vet-min\"; it was rejected because an unknown type would still be saved to `ibl_fa_offers.offer_type` and later read by code that assumes 0..8.\n\n**Headless fork (recorded).** `.claude/rules/league-rules.md` says to leave code that already breaks a written rule until the owner decides. This run fixes F1 anyway: `ibl5/docs/LEAGUE_RULES.md:74` is unambiguous, and the fix only enforces it. The rule text does not change. The PR body carries `League rule conflict:` (Phase 4), the plan keeps `auto_merge: false`, and `## Automouse Hold Justification` names the fork.",
+      "reason_source": "plan",
+      "evidence": "label ['human-approved']; basis approved-as-is",
+      "status": "confirmed"
+    },
+    {
+      "id": "pr3870-clear7",
+      "pr": 3870,
+      "expected": "clear",
+      "label_basis": "approved-as-is",
+      "base_sha": "3161b722155672294c9782a62fef8bd88c3cbc6f",
+      "replay_sha": "b03e8227dcc75b47d333ca5289d92332d8afb0d9",
+      "holds": {
+        "7": "The plan says a person must review and merge this PR."
+      },
+      "reason": "perf(records): speed up team single-game record lists with a value cut\n\n`getTopTeamSingleGameBatch()` gains a two-step value cut copied from commit 1c8b8e2f78 (`PlayerRecordRepository`). Step one runs a single UNION ALL of scalar subqueries that reads, for every stat in the batch, the value at rank 5 in that stat's own order. Step two adds `AND <expr> >= ?` (DESC) or `AND (<expr> <= ? OR <expr> IS NULL)` (ASC) to each branch, bound as an int parameter. A NULL threshold skips the cut, so that branch runs exactly today's SQL. When the cut applies, the expression has a `(game_type, stat)` index, and the date filter is a `RecordStatDefinitions::DATE_FILTERS` value, the branch reads `bs` through `FORCE INDEX` and `STRAIGHT_JOIN`. The rejected alternative is the inline `>= (SELECT ... LIMIT 4,1)` subquery: it yields NULL when fewer than 5 rows match, `>= NULL` drops every row, and MariaDB would not use range with it.",
+      "reason_source": "plan",
+      "evidence": "label ['human-approved']; basis approved-as-is",
+      "status": "confirmed"
+    },
+    {
+      "id": "pr3874-clear12",
+      "pr": 3874,
+      "expected": "clear",
+      "label_basis": "approved-as-is",
+      "base_sha": "315d4b985961acf5bc55e097d57368ce93deabef",
+      "replay_sha": "e512dbd8727419a15a5fddab1171549d4be74baa",
+      "holds": {
+        "12": "The check that compares the PR to its plan did not pass (it said NOT READY)."
+      },
+      "reason": "docs(pr-burndown): stop wasted rebases of PRs the merge line updates\n\n- Updates `.claude/skills/pr-burndown/SKILL.md` so the skill rebases only `DIRTY` PRs. A `BEHIND` PR with no conflict gets no rebase from this skill.\n- Adds a section, \"Rebase only what the merge line can't fix\", that explains why. Master takes a PR only when it is up to date, so rebasing several approved PRs at once makes all but one fall behind again.\n- Points to the merge line that already handles `BEHIND` PRs: `.github/workflows/update-behind-prs.yml`, `bin/merge-line-watch` and `bin/merge-line-select`, which update the oldest armed PR with no conflict and no red required check (ADR-0081).\n- Adds ordering rules. When two approved PRs clash with each other, rebase and ship the higher-ranked one first and hold the other's rebase until it merges. Post-plan is re-fired in Step 2 rank order so PRs arm, and merge, in that order.\n- Rewords the ranking text and the status card text so a `BEHIND` branch is not described as getting a rebase in Step 6. The Conflicts line now says when a PR rebases after another PR merges.\n- Changes the job prompt template so step 2 rebases only when the PR is `DIRTY`. A `BEHIND`-only PR is told not to rebase or merge master.\n- Bumps `last_verified` to 2026-11-11.\n- No code, workflow or script changes. Only skill prose changed.\n\n**Merge danger:** Door: two-way \u00b7 Blast radius: localized \u00b7 Why: Edits one skill prose file that guides the burndown agent. No code, data or workflow runs differently until the skill is used.\n**How to revert:** `git revert <merge-sha>`. No migration, prod sync or config is touched.",
+      "reason_source": "pr-body",
+      "evidence": "label ['human-approved']; basis approved-as-is",
+      "status": "confirmed"
+    },
+    {
+      "id": "pr3888-clear7",
+      "pr": 3888,
+      "expected": "clear",
+      "label_basis": "approved-as-is",
+      "base_sha": "b382459d216102deaa1305bdbf6ef915c458208e",
+      "replay_sha": "3a28071edfed9b918822f8f4e21707e4697054b4",
+      "holds": {
+        "7": "The plan says a person must review and merge this PR."
+      },
+      "reason": "docs(rules): trim resident rule text to cut per-session byte cost\n\nThe request assumed 67 rule files and 363,506 bytes load into every session. Both counts are right, but only 4 files with 14,574 bytes are always loaded (`workflow-continuity.md` 4385, `work-triage.md` 4298, `agent-tiering.md` 4169, `auto-commit.md` 1722). Every other rule carries `paths:` and attaches only when a matching file is touched. `bin/check-rules-byte-budget` caps a resident file at 5200 bytes, a lazy file at 16000, and the resident aggregate at 16000, and its Check 4 needs every path-scoped rule named by some always-on file. Prior art is partial: [#3878](https://github.com/a-jay85/IBL5/pull/3878) merged on 2026-11-11 and already trimmed `workflow-continuity.md` and `work-triage.md` plus four lazy files, after earlier trims in #3549, #2594, #1278 and #1224. This plan audits the remainder. It measures first (Phase 1), buckets every hook and rule (Phase 2), writes the ranked report (Phase 3), ships only low-risk rule trims (Phase 4), and reviews the diff for lost decision steps (Phase 5). Hook changes stay proposals in the report. The design fork is the tiny-trims case: after #3878 the low-risk resident trims may total a few hundred bytes or nothing. The resolution is to ship whatever passes every checker, report the real before and after byte counts in the PR body, and stop with no PR when no trim qualifies. The rejected alternative was to set a byte target and trim toward it, which would push cuts into decision procedures.",
+      "reason_source": "plan",
+      "evidence": "label ['human-approved']; basis approved-as-is",
+      "status": "confirmed"
+    },
+    {
+      "id": "pr3900-clear7-17",
+      "pr": 3900,
+      "expected": "clear",
+      "label_basis": "approved-as-is",
+      "base_sha": "1eadc3d966abd2065eaa8f57478ba39dcdc98ed4",
+      "replay_sha": "89d88bd7370efcf54d2f38b78dc3806cf3207da1",
+      "holds": {
+        "17": "This PR changes a safety check, and testing it against past PRs did not come out clean: `bin/check-plan` replay failed (timeout: 60s)",
+        "7": "The plan says a person must review and merge this PR."
+      },
+      "reason": "chore(prefire): trust CI for PHPUnit on files with no mapped test\n\nPre-fire's PHPUnit selector (`prefire_phpunit_select` in `bin/lib/prefire-verify`) stops escalating to the full suite when it meets a changed file it cannot map to a test. A new helper `phpunit_defer <reason>` records the file and the reason in an accumulator (`PHPUNIT_DEFERRED`, one reason per line, plus the count `PHPUNIT_DEFERRED_N`), and the loop continues with the next file. Mapped files keep building the subset list. After the loop, an empty list with deferred files gives `PHPUNIT_MODE=skip` with a reason naming CI, an empty list with nothing deferred keeps today's skip reason, and a non-empty list gives `subset` (mapped tests only, never escalated). `stage_phpunit` prints each deferred file on its own `phpunit deferred to CI: <reason>` line in skip and subset mode, so the log says which files ran nothing locally and why.\n\n**Shared-input decision: every shared-input trigger defers to CI.** That covers PHPUnit config and composer files (`ibl5/phpunit.xml`, `ibl5/phpunit.xml.dist`, `ibl5/tests/bootstrap.php`, `ibl5/composer.json`, `ibl5/composer.lock`), PHPStan rule fixtures, shared test helpers and fixtures, a deleted source file, a deleted test file, and a shared base class (abstract class, trait, interface, or extended class). The reason: CI runs the full PHPUnit suite on every push as a required check, and the measured local full runs took 3 to 18 minutes each (4 of 6 runs on 2026-11-12). Running the full suite locally duplicates CI's check at the slowest point of the fire. A shared-input change plus a mapped class runs the mapped class's subset only and logs the shared input as deferred. A shared base defers without name-mapping its tests, because name-matching misses the subclasses' tests (the reason `prefire_phpunit_is_shared_base` exists), so a partial local run would give false confidence. `PREFIRE_PHPUNIT_FULL=1` stays the manual opt-in for a full local run.\n\n**Error paths keep running the full suite.** Each of these means the selector could not see the diff, so it fails toward the strongest check: `PREFIRE_PHPUNIT_FULL=1`, `cannot resolve base`, `no merge-base`, `cannot create a temp file`, `cannot diff the tree`, `cannot list untracked files`, `cannot search ibl5/tests for <path>` (map helper rc above 1), `cannot sort the test list`, and `cannot create the test-list file` in `stage_phpunit`. In full mode `stage_phpunit` prints no deferred lines.\n\n**The all-deferred outcome reuses the existing `skip` branch of `stage_phpunit`.** That branch writes no pass record and returns 0, and that is the wanted behavior: a skipped run has nothing to cache, the next fire on the same tree re-runs the selector (cheap) and skips again, and a later commit that adds a mapped file gets its subset run with no stale record standing in. The `php_changed` bookkeeping goes away: its only job was to force full when PHP changed and nothing mapped, and every such file now calls `phpunit_defer` (a deleted `*Test.php` included), so a non-zero `PHPUNIT_DEFERRED_N` carries the same signal. Paths outside `ibl5/` with no mapped test stay silent and undeferred, as today, so a diff of only `bin/` scripts and docs keeps the reason `no PHPUnit-relevant file changed against <base>`.\n\n**Backstop.** CI's required checks (the full PHPUnit suite, PHPStan and full-repo shellcheck) plus arming condition (15) `red-ci-check` are the backstop for everything this PR stops running locally, which is the full-suite fallback for changed files with no mapped test and for shared test inputs. Condition (4) stays fail-closed on `fail` and `None`; condition (15) is untouched. The PR body states this backstop (Phase 4).\n\n**Rejected alternative:** keep the shared-input triggers on the full suite and defer only unmapped files. A bootstrap or `composer.lock` change can break every test, so a local full run there catches real failures; it also costs the same 3 to 18 minutes, and CI's required full-suite check catches the same failures before arming. The user's decision already accepts CI as the only full-suite run for unmapped files, and the shared inputs carry no extra risk that CI does not see.\n\n**ADR resolution.** The PR modifies an existing `.claude/rules/*.md` file and adds no `bin/` script, workflow, PHPStan rule, migration, or dependency, so `bin/adr-check` has no added trigger file. The PR body still carries `<!-- no-adr: narrows the full-suite fallback of the pre-fire PHPUnit selection decided in ADR-0241; CI's required full suite covers the deferred files as in PR 3894 -->` so a reviewer sees which decision this extends. No new ADR.\n\n**Residual unknowns (named, not blocking).** (a) My confirmation grep found no reader of the old `no test file maps to the changed PHP` string outside `bin/lib/prefire-verify` and `bin/test-prefire-verify`; any other parser of `phpunit mode:` output keys on the unchanged prefixes `phpunit mode: skipped (`, `phpunit mode: subset (` and `phpunit mode: full (`. (b) Row 29 assumes the pass-record tree id `$TREE` does not include the diff base. If its Executable Mutations entry fails to trip, the implementer reports that in the PR body and keeps the case, because the case still proves that a different selected set re-runs PHPUnit.",
+      "reason_source": "plan",
+      "evidence": "label ['human-approved']; basis approved-as-is",
+      "status": "confirmed"
+    },
+    {
+      "id": "pr3904-clear7",
+      "pr": 3904,
+      "expected": "clear",
+      "label_basis": "approved-as-is",
+      "base_sha": "96c4a7ff995b2c8fc811c2ebc92ba3bd20f24fdc",
+      "replay_sha": "9e10c23364616594b3461ae286b556b36989eab1",
+      "holds": {
+        "7": "The plan says a person must review and merge this PR."
+      },
+      "reason": "chore(postplan-harness): repair stale mutation rows one by one\n\n\nBlocking question answers:\n\n- **(a) Diff range.** Use `git.diff_vs_base()` (`gitad.py:458`): merge-base of `origin/master` and `HEAD`, diffed to the working tree, called the same way `fix_round.py:426` calls it. The harness has no ref for \"the last exec-mutations pass\", and the review-fix commit that broke rows 7, 8 and 40 is inside this range. `_run` (`gitad.py:293-309`) raises `HarnessError` on any non-zero git exit, and `_repair_stale_rows` catches it and passes `diff=None`, which fails closed. On a stacked branch the range starts at the `origin/master` merge-base, so it also holds the parent branch's commits. That widens the set of candidate `-`/`+` pairs only to real rewrites made on the branch line. Each one still has to pass every other per-row check and trip its test in the mutation proof. A rewrite that already landed on master is outside the range, and the row is refused exactly as it is today. No base is derived from `branch.<name>.iblBase`, so the forced stacked-PR matrix row does not apply.\n- **(b) Multi-line match.** Single-line pairing only. Each match must be a substring of one removed line and one added line, and a match with a newline can never be. A multi-line row therefore stays `match-dissimilar` (row 12).\n- **(c) Partial repair and `proof_ok`.** `wanted` becomes `held_committed` plus the accepted row ids only. `before_holding` (computed at `fix_round.py:274` from the NOT-APPLIED lines before the round) still names the refused row. `proof_ok` (`mutation_repair.py:215`) allows `report.holding` rows inside `before_holding - wanted`, so the refused row may keep holding while the two accepted rows must trip. Row 16 pins this.\n\nThe forced LLM-output-validator row does not apply. `parse_new_match` and the repair prompt are unchanged, and the new parser reads `git diff` output, never model output.\n\n\n**impl_model reason.** Explicit `opus` under gate 13 reason (2): the diff edits executable ship-pipeline gate code of the gate-14(e) class.",
+      "reason_source": "plan",
+      "evidence": "label ['human-approved']; basis approved-as-is",
+      "status": "confirmed"
+    }
+  ]
+}

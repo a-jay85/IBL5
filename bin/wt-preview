@@ -1,0 +1,184 @@
+#!/usr/bin/env bash
+# bin/wt-preview: switch the one running worktree preview to <worktree-name>.
+#
+#   bin/wt-preview <worktree-name | PR number> [--fresh] [bin/wt-up args...]
+#
+# A PR number (3890 or #3890) means the worktree checked out on that PR's branch.
+#
+# 1. Stops every other running worktree stack with bin/wt-down --stop (data kept).
+#    The main stack is never touched: only <worktrees parent>/*/.wt-slug stacks are
+#    looked at, the same list bin/wt-gc-tick's stop-stacks step walks.
+#    A stack stays up when an agent may be using it:
+#      - bin/wt-stack started it (its marker in $HOME/.cache/ibl5-wt-stack matches), or
+#      - an automouse queue entry names the worktree or its slug, or
+#      - a com.ibl5.* launchd label ends in -<name> or .<name> (name or slug),
+#        or is com.ibl5.postplan-now-<name>-<number>. A short name can match an
+#        unrelated label; that only keeps a stack up.
+#    _pool-* slots are left alone.
+# 2. Brings <worktree-name> up:
+#      - already running: left as is;
+#      - stopped containers exist: docker start them (same DB as before);
+#      - otherwise, or with --fresh or any wt-up args: bin/wt-up (fresh DB).
+#
+# Exit: 0 ok or --help; 2 usage error; otherwise the docker start or wt-up exit code.
+# A failed stop of another stack is reported and does not block the switch.
+# Test: bin/test-wt-preview.
+set -uo pipefail
+
+BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
+MARKER_DIR="${HOME:?HOME must be set}/.cache/ibl5-wt-stack"
+QUEUE_DIR="${WT_PREVIEW_QUEUE_DIR:-$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/queue}"
+LAUNCHCTL="${WT_PREVIEW_LAUNCHCTL:-/bin/launchctl}"
+GH="${WT_PREVIEW_GH:-gh}"
+GIT="${WT_PREVIEW_GIT:-git}"
+
+print_usage() {
+  echo "usage: bin/wt-preview <worktree-name | PR number> [--fresh] [bin/wt-up args...]"
+  echo "  Stops the other worktree previews (data kept) and brings this one up."
+  echo "  --fresh  rebuild with bin/wt-up (fresh DB) instead of restarting stopped containers"
+}
+usage() { print_usage >&2; exit 2; }
+
+case "${1:-}" in -h|--help) print_usage; exit 0 ;; esac
+
+if [ -n "${WT_PREVIEW_PARENT:-}" ]; then
+  WT_PARENT="$WT_PREVIEW_PARENT"
+else
+  # shellcheck source=bin/lib/git-helpers.sh
+  source "$BIN_DIR/lib/git-helpers.sh"
+  WT_PARENT="$(worktrees_parent_dir "$BIN_DIR/..")"
+fi
+
+[ "$#" -ge 1 ] || usage
+case "$1" in -*) usage ;; esac
+TARGET="${1%/}"; shift
+FRESH=false
+UP_ARGS=()
+for a in "$@"; do
+  if [ "$a" = --fresh ]; then FRESH=true; else UP_ARGS+=("$a"); fi
+done
+
+# A PR number (3890 or #3890) resolves to the worktree checked out on its branch.
+if [ ! -d "$WT_PARENT/$TARGET" ] && [[ "$TARGET" =~ ^#?([0-9]+)$ ]]; then
+  pr="${BASH_REMATCH[1]}"
+  if ! branch=$("$GH" pr view "$pr" -R a-jay85/IBL5 --json headRefName --jq .headRefName 2>/dev/null) \
+      || [ -z "$branch" ]; then
+    echo "ERROR: could not look up PR #$pr on GitHub" >&2
+    exit 2
+  fi
+  if ! listing=$("$GIT" -C "$BIN_DIR/.." worktree list --porcelain); then
+    echo "ERROR: git worktree list failed" >&2
+    exit 2
+  fi
+  wt_path=$(awk -v want="branch refs/heads/$branch" \
+    '/^worktree /{p=substr($0,10)} $0==want && !f {print p; f=1}' <<< "$listing")
+  if [ -z "$wt_path" ] || [ ! -d "$WT_PARENT/$(basename "$wt_path")" ]; then
+    echo "ERROR: PR #$pr (branch $branch) has no worktree; make one with /pr-wt $pr" >&2
+    exit 2
+  fi
+  TARGET=$(basename "$wt_path")
+  echo "PR #$pr is worktree $TARGET"
+fi
+
+TARGET_WT="$WT_PARENT/$TARGET"
+if [ ! -d "$TARGET_WT" ]; then
+  echo "ERROR: no worktree at $TARGET_WT" >&2
+  exit 2
+fi
+
+slug_of() { # <worktree dir>
+  local s=""
+  [ -f "$1/.wt-slug" ] && s=$(head -n 1 "$1/.wt-slug")
+  [ -n "$s" ] || s=$(basename "$1" | tr '/' '-')
+  printf '%s\n' "$s"
+}
+
+php_running() {
+  [ "$(docker inspect -f '{{.State.Running}}' "ibl5-php-$1" 2>/dev/null)" = true ]
+}
+
+stack_running() {
+  php_running "$1" && [ "$(docker inspect -f '{{.State.Running}}' "ibl5-db-$1" 2>/dev/null)" = true ]
+}
+
+# in_use <name> <slug>: prints why an agent may be using the stack; returns 1 when idle.
+in_use() {
+  local name="$1" slug="$2" recorded live entry label
+  if [ -f "$MARKER_DIR/$slug" ]; then
+    recorded=$(head -n 1 "$MARKER_DIR/$slug")
+    live=$(docker inspect -f '{{.Id}}' "ibl5-php-$slug" 2>/dev/null | head -n 1)
+    if [ -n "$live" ] && [ "$recorded" = "$live" ]; then
+      echo "started by an agent (bin/wt-stack)"; return 0
+    fi
+  fi
+  if [ -d "$QUEUE_DIR" ]; then
+    for entry in "$QUEUE_DIR"/"$name".md* "$QUEUE_DIR"/"$slug".md*; do
+      [ -e "$entry" ] && { echo "automouse queue entry $(basename "$entry")"; return 0; }
+    done
+  fi
+  while IFS= read -r entry; do
+    label="${entry##*[[:space:]]}"
+    case "$label" in
+      com.ibl5.*[.-]"$name"|com.ibl5.*[.-]"$slug"|com.ibl5.postplan-now-"$name"-[0-9]*|com.ibl5.postplan-now-"$slug"-[0-9]*) echo "launchd job $label"; return 0 ;;
+    esac
+  done < <("$LAUNCHCTL" list 2>/dev/null)
+  return 1
+}
+
+# ── 1. Stop the other previews ────────────────────────────────────────────────
+for slug_file in "$WT_PARENT"/*/.wt-slug; do
+  [ -f "$slug_file" ] || continue
+  wt="${slug_file%/.wt-slug}"
+  name="${wt##*/}"
+  [ "$name" = "$TARGET" ] && continue
+  case "$name" in _pool-*) continue ;; esac
+  slug=$(slug_of "$wt")
+  [[ "$slug" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || continue
+  php_running "$slug" || continue
+  if why=$(in_use "$name" "$slug"); then
+    echo "kept    $name: $why"
+    continue
+  fi
+  if "$BIN_DIR/wt-down" "$name" --stop >/dev/null 2>&1; then
+    echo "stopped $name (data kept)"
+  else
+    echo "WARNING: could not stop $name; run bin/wt-down $name --stop" >&2
+  fi
+done
+
+# ── 2. Bring the target up ────────────────────────────────────────────────────
+slug=$(slug_of "$TARGET_WT")
+url="http://$slug.localhost/ibl5/"
+
+if [ "$FRESH" = false ] && [ "${#UP_ARGS[@]}" -eq 0 ]; then
+  if stack_running "$slug"; then
+    echo "already up: $url"
+    exit 0
+  fi
+  if docker inspect "ibl5-php-$slug" >/dev/null 2>&1; then
+    project=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' "ibl5-php-$slug" 2>/dev/null)
+    [ -n "$project" ] || project="ibl5-$slug"
+    ids=$(docker ps -aq --filter "label=com.docker.compose.project=$project")
+    if [ -n "$ids" ]; then
+      # shellcheck disable=SC2086 # ids is a whitespace-separated list of container IDs
+      rc=0
+      docker start $ids >/dev/null || rc=$?
+      if [ "$rc" -eq 0 ]; then
+        echo "resumed $TARGET (same DB): $url (Apache takes ~10s to answer)"
+        exit 0
+      fi
+      echo "ERROR: docker start failed (rc=$rc); try bin/wt-preview $TARGET --fresh" >&2
+      exit "$rc"
+    fi
+  fi
+fi
+
+"$BIN_DIR/wt-up" "$TARGET" ${UP_ARGS[@]+"${UP_ARGS[@]}"}
+rc=$?
+if [ "$rc" -eq 0 ]; then
+  # wt-up may have written or changed .wt-slug (first build, --pr), so re-read it.
+  slug=$(slug_of "$TARGET_WT")
+  url="http://$slug.localhost/ibl5/"
+  echo "started $TARGET (fresh DB): $url"
+fi
+exit "$rc"

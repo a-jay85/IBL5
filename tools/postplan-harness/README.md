@@ -96,7 +96,8 @@ out/                      per-run result.json, audit.log, actions.jsonl
 ## Run it
 
 ```bash
-./run test                          # offline test suite (no LLM calls)
+./run test                          # whole offline suite (no LLM calls); CI runs it, so agents run single files
+                                    # instead (.claude/rules/postplan-harness-tests.md)
 ./run demo                          # offline demo: bundled fixture + canned LLM, $0
 ./run replay fixtures/scenarios/request-event-logging/fixture.json
                                     # historical replay with LIVE bounded LLM calls (~$0.10-0.25)

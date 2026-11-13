@@ -85,33 +85,56 @@ def test_scope_notes_unavailable_on_usage_exit(tmp_path):
     assert notes[0].startswith("scope check unavailable (exit 2")
 
 
-def test_scope_notes_timeout_fails_closed_and_reaps(tmp_path, monkeypatch):
+# Same group as the target test, which keeps the literal decorator so the plan mutation
+# for row 12 matches exactly once.
+_REAL_TIMEOUT = pytest.mark.xdist_group("real_timeout")
+
+
+def _hang_script(tmp_path, startup_delay=0):
+    script = tmp_path / "hang"
+    delay = f"sleep {startup_delay}\n" if startup_delay else ""
+    pid = f"{tmp_path}/grandchild.pid"
+    script.write_text(f"#!/bin/bash\nsleep 300 &\n{delay}echo $! > {pid}.tmp && mv {pid}.tmp {pid}\nsleep 300\n")
+    os.chmod(script, 0o755)
+    return script
+
+
+def _scope_hang_attempt(plan, script, monkeypatch):
+    def attempt(timeout):
+        monkeypatch.setattr(scope_conformance, "SCOPE_CHECK_TIMEOUT", timeout)
+        with pytest.raises(HarnessError) as ei:
+            scope_notes(plan, ["ibl5/a.php"], "", "", script=str(script))
+        assert ei.value.kind == "subprocess-timeout"
+        assert "scope-check" in ei.value.detail
+    return attempt
+
+
+@pytest.mark.xdist_group("real_timeout")
+def test_scope_notes_timeout_fails_closed_and_reaps(tmp_path, monkeypatch, pid_reap_witness):
     """A hung scope helper is an anomaly: it raises subprocess-timeout (not the advisory
     note) and the process group, grandchild included, is reaped.
 
     Mutation caught: bare subprocess.run blocks 300s (elapsed assertion); folding the
     timeout into the "scope check unavailable" note makes pytest.raises fail.
+    The timeout escalates only while grandchild.pid is missing, and a pid that never
+    appears fails the test (backlog#1801).
     """
     plan = _plan(tmp_path, ["ibl5/a.php"])
-    script = tmp_path / "hang"
-    script.write_text(f"#!/bin/bash\nsleep 300 &\necho $! > {tmp_path}/grandchild.pid\nsleep 300\n")
-    os.chmod(script, 0o755)
-    monkeypatch.setattr(scope_conformance, "SCOPE_CHECK_TIMEOUT", 1)
-    start = time.monotonic()
-    with pytest.raises(HarnessError) as ei:
-        scope_notes(plan, ["ibl5/a.php"], "", "", script=str(script))
-    assert time.monotonic() - start < 15
-    assert ei.value.kind == "subprocess-timeout"
-    assert "scope-check" in ei.value.detail
-    grandchild = int((tmp_path / "grandchild.pid").read_text().strip())
-    deadline = time.monotonic() + 5
-    while time.monotonic() < deadline:
-        try:
-            os.kill(grandchild, 0)
-        except ProcessLookupError:
-            return
-        time.sleep(0.1)
-    pytest.fail("grandchild survived the process-group reap")
+    script = _hang_script(tmp_path)
+    pid_reap_witness(_scope_hang_attempt(plan, script, monkeypatch),
+                     tmp_path / "grandchild.pid", "grandchild")
+
+
+@_REAL_TIMEOUT
+def test_scope_notes_timeout_witnesses_reap_when_grandchild_pid_is_late(
+        tmp_path, monkeypatch, pid_reap_witness):
+    """The grandchild pid lands 1.5s late, so the 1s attempt cannot see it and the witness
+    must escalate to 2s or 4s (backlog#1801)."""
+    plan = _plan(tmp_path, ["ibl5/a.php"])
+    script = _hang_script(tmp_path, startup_delay=1.5)
+    witnessed = pid_reap_witness(_scope_hang_attempt(plan, script, monkeypatch),
+                                 tmp_path / "grandchild.pid", "grandchild")
+    assert witnessed in (2, 4)
 
 
 def test_scope_notes_unavailable_on_missing_script(tmp_path):

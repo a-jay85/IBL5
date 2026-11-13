@@ -3,13 +3,14 @@
 Opt in per module with `pytestmark = pytest.mark.usefixtures("stub_ambient_git_show")`.
 `stub_ambient_git_show` is not autouse: `test_fidelity.py` and `test_fidelity_remediation.py`
 exercise the real `_git_show` through a `git` shim on PATH, and a repo-wide patch would
-defeat them. `standard_review_depth` is opt-in the same way. Autouse fixtures: `no_real_pr_review_now`, `stub_prefire_gate`, `_reset_netretry_latch`,
+defeat them. `standard_review_depth` and `pid_reap_witness` are opt-in the same way. Autouse fixtures: `no_real_pr_review_now`, `stub_prefire_gate`, `_reset_netretry_latch`,
 `isolate_live_reviewcache`, `_private_verdict_files`, `_private_log_dir`, and `no_ambient_usage_gate`.
 """
 from __future__ import annotations
 
 import os
 import sys
+import time
 
 import pytest
 
@@ -165,3 +166,53 @@ def _verdict_cache_off(monkeypatch):
     """Run every test on the unchanged verifier spawn path and keep it from writing into a real
     repository's git dir. test_verifier_verdict_cache.py turns the cache back on per test."""
     monkeypatch.setenv("POSTPLAN_VERDICT_CACHE", "0")
+
+
+# Real-timeout reap witness (backlog#1801). A timeout test passes attempt(timeout); the
+# witness escalates the timeout only when the child had not written its pid file yet.
+PID_WITNESS_TIMEOUTS = (1, 2, 4)  # seconds, tried in order
+REAP_DEADLINE = 10.0              # seconds for a SIGKILLed pid to disappear
+
+
+def _read_witness_pid(pidfile) -> int | None:
+    try:
+        text = pidfile.read_text().strip()
+    except FileNotFoundError:
+        return None
+    return int(text) if text else None
+
+
+def _assert_reaped(pid: int, what: str, deadline_s: float) -> None:
+    deadline = time.monotonic() + deadline_s
+    while time.monotonic() < deadline:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return
+        time.sleep(0.1)
+    pytest.fail(f"{what} survived the process-group reap")
+
+
+def run_pid_witnessed(attempt, pidfile, what, *, reap_deadline=REAP_DEADLINE) -> int:
+    """Run attempt(timeout) until the child writes pidfile, then assert the pid is reaped.
+
+    Returns the timeout that produced the pid. Fails when no timeout in
+    PID_WITNESS_TIMEOUTS produced one, because then no reap was witnessed.
+    """
+    for timeout in PID_WITNESS_TIMEOUTS:
+        pidfile.unlink(missing_ok=True)
+        start = time.monotonic()
+        attempt(timeout)
+        elapsed = time.monotonic() - start
+        assert elapsed < timeout + 14, f"timeout={timeout}s attempt took {elapsed:.1f}s"
+        pid = _read_witness_pid(pidfile)
+        if pid is not None:
+            _assert_reaped(pid, what, reap_deadline)
+            return timeout
+    pytest.fail(f"{what} never wrote {pidfile.name} within {PID_WITNESS_TIMEOUTS[-1]}s; reap not witnessed")
+
+
+@pytest.fixture
+def pid_reap_witness():
+    """The run_pid_witnessed callable, for tests that time a real subprocess hang."""
+    return run_pid_witnessed

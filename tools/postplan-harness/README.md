@@ -376,7 +376,7 @@ These runs stay serial:
 - Any explicit `-n`. The caller's value wins, and `-n 0` forces serial.
 - `-p no:xdist`, or an interpreter without pytest-xdist. Every test still runs and nothing errors.
 
-Tests that time a real subprocess hang carry `xdist_group("real_timeout")`, so they share one worker.
+Tests that time a real subprocess hang carry `xdist_group("real_timeout")`, so they share one worker. The group does not shield them from load on the other workers. Each one checks its reap through the `pid_reap_witness` fixture in `tests/conftest.py`. The fixture retries with a longer timeout (1, 2, then 4 seconds) while the child has not written its pid file, and fails when it never does.
 
 A worker crash stops the run with a non-zero exit, the same way a crash stops a serial run. The plugin sets `--max-worker-restart 0` because xdist 3.8.0 requeues a crashed test under `loadgroup`, which can hang the run. An explicit `--max-worker-restart` still wins.
 

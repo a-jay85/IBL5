@@ -619,9 +619,11 @@ def test_prove_lostwork_conjunctive_gate(repo, script, expected_ok):
         assert "lostwork.sh not found" in evidence
 
 
-def _install_slow_clean_filter(repo, tmp_path):
+def _install_slow_clean_filter(repo, tmp_path, startup_delay=0):
     script = tmp_path / "slow-clean.sh"
-    script.write_text(f"#!/bin/bash\necho $$ > {tmp_path}/filter.pid\nsleep 30\ncat\n")
+    delay = f"sleep {startup_delay}\n" if startup_delay else ""
+    pid = f"{tmp_path}/filter.pid"
+    script.write_text(f"#!/bin/bash\n{delay}echo $$ > {pid}.tmp && mv {pid}.tmp {pid}\nsleep 30\ncat\n")
     script.chmod(0o755)
     with open(os.path.join(repo, ".gitattributes"), "w") as fh:
         fh.write("*.slow filter=slow\n")
@@ -629,44 +631,58 @@ def _install_slow_clean_filter(repo, tmp_path):
                    check=True, capture_output=True)
 
 
-def _assert_pid_gone(pidfile):
-    pid = int(pidfile.read_text().strip())
-    deadline = time.monotonic() + 5
-    while time.monotonic() < deadline:
-        try:
-            os.kill(pid, 0)
-            time.sleep(0.1)
-        except ProcessLookupError:
-            return
-    pytest.fail("filter process survived the process-group reap")
+def _prepare_git_add_hang(repo, tmp_path, startup_delay=0) -> str:
+    _install_slow_clean_filter(repo, tmp_path, startup_delay)
+    subprocess.run(["git", "-C", repo, "add", ".gitattributes"], check=True, capture_output=True)
+    subprocess.run(["git", "-C", repo, "commit", "-m", "attrs"], check=True, capture_output=True)
+    with open(os.path.join(repo, "x.slow"), "w") as fh:
+        fh.write("slow\n")
+    return subprocess.run(["git", "-C", repo, "rev-parse", "HEAD"], check=True,
+                          capture_output=True, text=True).stdout.strip()
 
 
-def test_git_add_hang_raises_subprocess_timeout_naming_step(repo, tmp_path, monkeypatch):
+def _git_add_hang_attempt(repo, monkeypatch):
+    def attempt(timeout):
+        monkeypatch.setattr(gitad, "GIT_OP_TIMEOUT", timeout)
+        with pytest.raises(HarnessError) as ei:
+            LiveGit(repo).commit_all("m")
+        assert ei.value.kind == "subprocess-timeout", f"kind was {ei.value.kind!r}"
+        assert ei.value.kind != "precommit-hang"
+        assert "step 'git add'" in ei.value.detail
+    return attempt
+
+
+def _head(repo) -> str:
+    return subprocess.run(["git", "-C", repo, "rev-parse", "HEAD"], check=True,
+                          capture_output=True, text=True).stdout.strip()
+
+
+def test_git_add_hang_raises_subprocess_timeout_naming_step(repo, tmp_path, monkeypatch,
+                                                            pid_reap_witness):
     """A hang in commit_all's `git add -A` leg is bounded and named, and it stays
     subprocess-timeout: only the commit leg (the hook) is precommit-hang.
 
     Mutation caught: revert _run to a bare subprocess.run and git add finishes after
     30s, the commit lands, so the raise and HEAD assertions fail.
+    The timeout escalates only while filter.pid is missing, and a pid that never
+    appears fails the test (backlog#1801).
     """
-    _install_slow_clean_filter(repo, tmp_path)
-    subprocess.run(["git", "-C", repo, "add", ".gitattributes"], check=True, capture_output=True)
-    subprocess.run(["git", "-C", repo, "commit", "-m", "attrs"], check=True, capture_output=True)
-    with open(os.path.join(repo, "x.slow"), "w") as fh:
-        fh.write("slow\n")
-    pre = subprocess.run(["git", "-C", repo, "rev-parse", "HEAD"], check=True,
-                         capture_output=True, text=True).stdout.strip()
-    monkeypatch.setattr(gitad, "GIT_OP_TIMEOUT", 1)
-    start = time.monotonic()
-    with pytest.raises(HarnessError) as ei:
-        LiveGit(repo).commit_all("m")
-    assert time.monotonic() - start < 15
-    assert ei.value.kind == "subprocess-timeout", f"kind was {ei.value.kind!r}"
-    assert ei.value.kind != "precommit-hang"
-    assert "step 'git add'" in ei.value.detail
-    post = subprocess.run(["git", "-C", repo, "rev-parse", "HEAD"], check=True,
-                          capture_output=True, text=True).stdout.strip()
-    assert post == pre
-    _assert_pid_gone(tmp_path / "filter.pid")
+    pre = _prepare_git_add_hang(repo, tmp_path)
+    pid_reap_witness(_git_add_hang_attempt(repo, monkeypatch), tmp_path / "filter.pid",
+                     "filter process")
+    assert _head(repo) == pre
+    assert not os.path.exists(os.path.join(repo, ".git", "index.lock"))
+
+
+def test_git_add_hang_witnesses_reap_when_filter_starts_late(repo, tmp_path, monkeypatch,
+                                                             pid_reap_witness):
+    """The filter writes its pid 1.5s after start, so the 1s attempt cannot see it and the
+    witness must escalate to 2s or 4s (backlog#1801)."""
+    pre = _prepare_git_add_hang(repo, tmp_path, startup_delay=1.5)
+    witnessed = pid_reap_witness(_git_add_hang_attempt(repo, monkeypatch),
+                                 tmp_path / "filter.pid", "filter process")
+    assert witnessed in (2, 4)
+    assert _head(repo) == pre
     assert not os.path.exists(os.path.join(repo, ".git", "index.lock"))
 
 

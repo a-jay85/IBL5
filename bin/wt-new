@@ -264,7 +264,7 @@ else
 fi
 echo "  cd $WT_IBL5"
 echo ""
-echo "  Need browser preview? Run: bin/wt-up $NAME"
+echo "  Need browser preview? Run: bin/wt-preview $NAME"
 echo ""
 
 # Keep one warm spare for the next run (out of band; never fails this run).

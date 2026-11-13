@@ -1,6 +1,6 @@
 ---
 description: Docker Compose setup for local PHP-Apache + MariaDB stack.
-last_verified: 2026-10-05
+last_verified: 2026-11-13
 ---
 
 # Docker Development Setup
@@ -131,6 +131,27 @@ bin/wt-up my-feature --no-data
 bin/wt-up my-feature --pr         # → http://pr-42.localhost/ibl5/
 
 ```
+
+### Switching the preview you look at
+
+You can only look at one worktree preview at a time, so run one at a time:
+
+```bash
+bin/wt-preview my-feature          # stop the other previews, bring this one up
+bin/wt-preview my-feature --fresh  # rebuild it with bin/wt-up (fresh DB)
+bin/wt-preview my-feature --seed   # any bin/wt-up flag also means a rebuild
+bin/wt-preview 3890                # a PR number means the worktree on that PR's branch
+```
+
+`bin/wt-preview` stops every other running worktree stack with
+`bin/wt-down --stop`, which keeps its data. It never touches the main stack. It
+leaves a stack up when an agent may be using it: `bin/wt-stack` started it, an
+automouse queue entry names the worktree, or a `com.ibl5.` launchd label ends in
+`-<name>` or `.<name>`. A `com.ibl5.postplan-now-<name>-<number>` label also
+counts. A short worktree name can match an unrelated label, which only keeps a
+stack up. Then it restarts the
+target's stopped containers with the same DB. If the target has no containers,
+it runs `bin/wt-up`.
 
 > **Vendor updates:** If `composer.lock` changes, run `cd ibl5 && composer install` on the host.
 > Docker picks up updated packages automatically via bind mount.

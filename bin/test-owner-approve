@@ -531,7 +531,7 @@ finish_after_plain() {
     printf -- '-\t0\tcom.ibl5.post-plan-fleet-%s\n' "$PR" > "$FX/launchctl.out"
     echo 99 > "$FX/launchctl.left"
     seed_ready
-    run_oa "$PR" "go" --poll=0 --timeout=0
+    run_oa "$PR" "go" --poll=1 --timeout=0
     want_rc 5
     : > "$FX/launchctl.out"
     run_oa "$PR" --finish

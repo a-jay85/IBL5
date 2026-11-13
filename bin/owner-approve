@@ -268,6 +268,7 @@ _oa_prefire() {
 
 pr_ok=1
 _oa_read_pr || pr_ok=0
+if [ "$OA_FINISH" -eq 0 ]; then rec_head=$head; fi
 if [ "$OA_FINISH" -eq 0 ]; then
     _oa_post "$(_oa_approval_body)" || { printf 'owner-approve: posting the approval comment failed. Nothing else was done.\n' >&2; printf 'RESULT: refused\n'; exit 4; }
     printf 'owner-approve: approval comment posted on PR %s\n' "$OA_PR" >&2
@@ -282,6 +283,9 @@ fi
 if [ "$OA_FINISH" -eq 1 ]; then _oa_finish_record; fi
 OA_WT=$(_oa_find_wt)
 _oa_wait
+if [ "$rec_mode" = "approve" ] && [ "$head" != "$rec_head" ]; then
+    _oa_refuse 4 "the head is now $head, but the owner approved $rec_head. Ask the owner to approve the new head."
+fi
 if [ "$rec_mode" = "fix-first" ]; then _oa_prefire; fi
 _oa_verdict
 _oa_arm

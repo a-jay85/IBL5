@@ -119,12 +119,15 @@ def test_path_corpus_one_way_flip_set():
     # so 3058 (workflow send lines only) left the held set. 3050 stays one-way: it edits
     # .github/actions/notify-discord/ itself, an external path. Old one-way set {3050, 3058};
     # new one-way set {3050}.
+    # 3046 and 3058 joined the self-governing set when gate_backtest.py became an arming path:
+    # it holds _ARMING_PATHS and the gate detection the merge-danger floor reads. Both PRs
+    # edited it, so 3058 is back in the held set through that path.
     got = {n for n, (md, _) in _DERIVED.items() if held(md)}
-    want = set(_PATHS["expected_one_way"]) - {3058}
+    want = set(_PATHS["expected_one_way"]) | {3046}
     assert got == want, f"measured held set {sorted(got)} != expected {sorted(want)}"
     assert {n for n, (md, _) in _DERIVED.items() if md.door == "one-way"} == {3050}
     assert {n for n, (md, _) in _DERIVED.items() if held(md) and md.self_governing} == {
-        3043, 3112, 3114}
+        3043, 3046, 3058, 3112, 3114}
     runner_prs = {e["number"] for e in _PATHS["prs"] if _RUNNER in e["files"]}
     assert runner_prs, "corpus has no runner.py PR; the fail-closed count below proves nothing"
     assert {n for n, (md, _) in _DERIVED.items() if _RUNNER_TRIGGER in md.triggers} == runner_prs

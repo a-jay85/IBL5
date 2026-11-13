@@ -13,7 +13,7 @@ from harness.armable import ArmInputs, evaluate
 from harness.state import Classification
 
 from harness import merge_danger as md
-from harness.gate_backtest import _ARMING_PATHS
+from harness.gate_backtest import _ARMING_PATHS, detect_gate_changes
 from tests.test_armable import BODY_CLEARED, _CHARACTERIZATION_FIXTURES, inputs
 from tests.test_merge_danger import _derive
 
@@ -88,3 +88,48 @@ def test_arming_paths_include_ui_classifier():
     assert not decision.armed
     assert _cond(decision, 18).blocked
     assert _cond(decision, 18).reason == "state=SELF-GOVERNING"
+
+
+_ADDED_ARMING_PATHS = (
+    "tools/postplan-harness/harness/labels.py",
+    "tools/postplan-harness/harness/merge_danger.py",
+    "tools/postplan-harness/harness/workflow_scope.py",
+    "tools/postplan-harness/harness/external_scope.py",
+    "tools/postplan-harness/harness/sql_comments.py",
+    "tools/postplan-harness/harness/rebuildable.py",
+    "tools/postplan-harness/harness/gate_backtest.py",
+    "bin/text-hold-recheck",
+    "bin/lib/text-hold-recheck.sh",
+    ".github/workflows/text-hold-recheck.yml",
+    ".github/workflows/text-hold-recheck-run.yml",
+)
+
+
+@pytest.mark.parametrize("path", _ADDED_ARMING_PATHS)
+def test_added_arming_paths_set_self_governing(path):
+    assert path in _ARMING_PATHS
+    d = _derive([("M", path)])
+    assert d.self_governing is True
+    assert f"arming-path:{path}" in d.triggers
+
+
+@pytest.mark.parametrize("path", [
+    "tools/postplan-harness/harness/state.py",
+    "tools/postplan-harness/harness/manual_rows.py",
+    "bin/text-hold-recheck-extra",
+])
+def test_unlisted_harness_module_is_not_self_governing(path):
+    # Exact-path match: a helper on the allowlist and a lookalike name stay out.
+    d = _derive([("M", path)])
+    assert d.self_governing is False
+    assert not any(t.startswith("arming-path:") for t in d.triggers)
+
+
+def test_rearm_bin_path_is_arming_harness_not_replayable():
+    [g] = detect_gate_changes([("M", "bin/text-hold-recheck")], lambda p: None, {})
+    assert (g.kind, g.state) == ("arming-harness", "not-replayable")
+
+
+def test_rearm_workflow_path_stays_ci_workflow():
+    [g] = detect_gate_changes([("M", ".github/workflows/text-hold-recheck.yml")], lambda p: None, {})
+    assert g.kind == "ci-workflow"

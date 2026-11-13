@@ -1,0 +1,250 @@
+#!/usr/bin/env bash
+# owner-approve: record an owner's chat approval of a PR, then add human-approved
+# and arm auto-merge only when the post-plan verdict covers the PR's current head.
+#
+# Usage:
+#   bin/owner-approve N "<owner's words>" [--option=<picked>] [--fix-first=<condition>]
+#       [--timeout=<seconds>] [--poll=<seconds>]
+#   bin/owner-approve N --finish [--timeout=<seconds>] [--poll=<seconds>]
+#
+# Order: post the approval comment; wait up to --timeout seconds (default 3600,
+# polled every --poll, default 20) for any live post-plan run on N (a launchd label,
+# the post-plan-running label, or a post-plan process naming the PR's worktree);
+# require a READY or READY WITH NOTES sticky verdict, posted by this gh login, whose
+# reviewed tree equals the head commit's tree; then add human-approved and run
+# gh pr merge --squash --auto --match-head-commit <head>. --fix-first records a
+# condition and stops. --finish later requires a new pushed head, the PR's worktree
+# clean at that head, and a bin/lib/prefire-verify pass there, then waits, checks
+# the verdict, and arms. --finish after a plain approval resumes at the wait.
+#
+# Run it from a Claude session through the Bash tool with run_in_background: true.
+# The last stdout line is RESULT: armed|refused|timeout|fix-first-recorded|headless|usage.
+# Exit: 0 armed; 2 usage error, nothing posted; 3 CLAUDE_HEADLESS set, nothing
+# posted; 4 not armed, a reason comment posted whenever gh can post one; 5 a
+# post-plan run was still live at --timeout, reason comment posted; 6 fix-first
+# condition recorded, run --finish after the fix is pushed.
+set -uo pipefail
+
+if [ -n "${CLAUDE_HEADLESS:-}" ]; then
+    printf 'owner-approve: CLAUDE_HEADLESS is set. An owner approval needs an interactive session. Nothing posted.\n' >&2
+    printf 'RESULT: headless\n'
+    exit 3
+fi
+
+OA_REPO=a-jay85/IBL5
+OA_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=bin/lib/held-prs.sh
+. "$OA_ROOT/bin/lib/held-prs.sh"
+
+OA_PR="" OA_WORDS="" OA_OPTION="" OA_FIX="" OA_FINISH=0 OA_TIMEOUT=3600 OA_POLL=20 OA_WT=""
+head_tree_armed="" head="" branch="" state="" labels=",," rec_mode=approve rec_head="" me="" comments="" verdict_word=""
+_oa_usage() { printf 'owner-approve: %s\n' "$1" >&2; printf 'RESULT: usage\n'; exit 2; }
+pos=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --option=|--fix-first=|--timeout=|--poll=) _oa_usage "$1 needs a value" ;;
+        --option=*) OA_OPTION="${1#--option=}" ;;
+        --fix-first=*) OA_FIX="${1#--fix-first=}" ;;
+        --timeout=*) OA_TIMEOUT="${1#--timeout=}" ;;
+        --poll=*) OA_POLL="${1#--poll=}" ;;
+        --finish) OA_FINISH=1 ;;
+        --option|--fix-first|--timeout|--poll) _oa_usage "$1 needs =<value>" ;;
+        --*) _oa_usage "unknown flag: $1" ;;
+        *)
+            pos=$((pos + 1))
+            case "$pos" in
+                1) OA_PR="$1" ;;
+                2) OA_WORDS="$1" ;;
+                *) _oa_usage "too many arguments" ;;
+            esac ;;
+    esac
+    shift
+done
+case "$OA_PR" in ''|0*|*[!0-9]*) _oa_usage "the first argument must be a PR number" ;; esac
+case "$OA_TIMEOUT$OA_POLL" in *[!0-9]*) _oa_usage "--timeout and --poll take whole seconds" ;; esac
+if [ "$OA_FINISH" -eq 1 ]; then
+    if [ -n "$OA_WORDS$OA_OPTION$OA_FIX" ]; then _oa_usage "--finish takes only the PR number"; fi
+elif [ -z "$OA_WORDS" ]; then
+    _oa_usage "pass the owner's words as the second argument"
+fi
+for tool in gh jq git; do
+    command -v "$tool" >/dev/null 2>&1 || { printf 'owner-approve: %s not found. Nothing posted.\n' "$tool" >&2; printf 'RESULT: refused\n'; exit 4; }
+done
+tmpd=$(mktemp -d "${TMPDIR:-/tmp}/owner-approve.XXXXXX") || { printf 'owner-approve: mktemp failed. Nothing posted.\n' >&2; printf 'RESULT: refused\n'; exit 4; }
+trap 'rm -rf "$tmpd"' EXIT
+
+_oa_post() { # <body>: posts one PR comment through --body-file
+    printf '%s\n' "$1" > "$tmpd/body.md"
+    gh pr comment "$OA_PR" -R "$OA_REPO" --body-file "$tmpd/body.md" >/dev/null
+}
+_oa_refuse() { # <exit code> <reason>: posts the reason comment, then exits
+    _oa_post "$(printf 'Not armed by bin/owner-approve: %s\n\n<!-- owner-approve:refused -->' "$2")" \
+        || printf 'owner-approve: posting the reason comment failed too\n' >&2
+    printf 'owner-approve: %s\n' "$2" >&2
+    if [ "$1" -eq 5 ]; then printf 'RESULT: timeout\n'; else printf 'RESULT: refused\n'; fi
+    exit "$1"
+}
+_oa_read_pr() { # sets head, branch, state, labels; returns 1 on any read error
+    gh pr view "$OA_PR" -R "$OA_REPO" --json state,headRefOid,headRefName,labels > "$tmpd/pr.json" 2>/dev/null || return 1
+    head=$(jq -r '.headRefOid // empty' "$tmpd/pr.json") || return 1
+    branch=$(jq -r '.headRefName // empty' "$tmpd/pr.json") || return 1
+    state=$(jq -r '.state // empty' "$tmpd/pr.json") || return 1
+    labels=",$(jq -r '[.labels[].name] | join(",")' "$tmpd/pr.json")," || return 1
+    [ -n "$head" ] && [ -n "$branch" ]
+}
+_oa_approval_body() {
+    local today t3 sess opt_part="" mode=approve
+    today=$(date +%F)
+    t3="${T3CODE_THREAD_ID:-unknown}"
+    sess="${CLAUDE_CODE_SESSION_ID:-unknown}"
+    if [ -n "$OA_OPTION" ]; then opt_part=" ($OA_OPTION)"; fi
+    printf 'Owner approved %s: "%s"%s. Head %s. Conversation: T3 thread %s, session %s.\n' \
+        "$today" "$OA_WORDS" "$opt_part" "${head:-unread}" "$t3" "$sess"
+    if [ -n "$OA_FIX" ]; then
+        mode=fix-first
+        printf '\nCondition: %s\nThe label and the arm wait until the fix is pushed and `bin/owner-approve %s --finish` passes.\n' "$OA_FIX" "$OA_PR"
+    fi
+    printf '\n<!-- owner-approve mode=%s head=%s -->' "$mode" "${head:-unread}"
+}
+_oa_safe() { printf '%s' "$1" | tr -cs 'A-Za-z0-9._-' '-'; }
+_oa_find_wt() { # prints the worktree checked out on $branch, or nothing
+    local line wt=""
+    while IFS= read -r line; do
+        case "$line" in
+            "worktree "*) wt="${line#worktree }" ;;
+            "branch refs/heads/$branch") printf '%s\n' "$wt"; return 0 ;;
+        esac
+    done < <(git -C "$OA_ROOT" worktree list --porcelain 2>/dev/null)
+    return 0
+}
+_oa_live() { # prints the first live signal; 0 live, 1 none, 2 cannot tell
+    local list label s rest pid cwd slugs cols
+    list=$(launchctl list 2>/dev/null) || { printf 'launchctl list failed'; return 2; }
+    slugs="$(_oa_safe "$branch")"
+    if [ -n "$OA_WT" ]; then slugs="$slugs $(_oa_safe "$(basename "$OA_WT")")"; fi
+    for s in $slugs; do
+        while IFS=$'\t' read -r _ _ label; do
+            case "$label" in
+                "com.ibl5.postplan-now-$s-"*)
+                    rest="${label#"com.ibl5.postplan-now-$s-"}"
+                    if grep -Eq '^[0-9]{8}-[0-9]{6}-[0-9]+$' <<< "$rest"; then printf 'launchd label %s' "$label"; return 0; fi ;;
+            esac
+        done <<< "$list"
+    done
+    cols=$(cut -f3 <<< "$list")
+    if grep -qxF "com.ibl5.post-plan-fleet-$OA_PR" <<< "$cols"; then printf 'launchd label com.ibl5.post-plan-fleet-%s' "$OA_PR"; return 0; fi
+    case "$labels" in
+        *,post-plan-running,*) printf 'post-plan-running label\n'; return 0 ;;
+    esac
+    if [ -n "$OA_WT" ]; then
+        if pgrep -lf -- "$OA_WT" 2>/dev/null | grep -v "^$$ " | grep -Eq 'post-plan|postplan'; then
+            printf 'a post-plan process names %s' "$OA_WT"; return 0
+        fi
+        for pid in $(pgrep -f 'post-plan|postplan' 2>/dev/null); do
+            [ "$pid" = "$$" ] && continue
+            cwd=$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p')
+            case "$cwd" in
+                "$OA_WT"|"$OA_WT"/*) printf 'post-plan process %s runs in %s' "$pid" "$OA_WT"; return 0 ;;
+            esac
+        done
+    fi
+    return 1
+}
+_oa_pause() { sleep "$1"; }
+_oa_wait() {
+    local start=$SECONDS why rc
+    while :; do
+        why=$(_oa_live); rc=$?
+        if [ "$rc" -eq 1 ]; then return 0; fi
+        if [ "$rc" -ne 0 ]; then _oa_refuse 4 "could not check for a live post-plan run ($why)."; fi
+        if [ $((SECONDS - start)) -ge "$OA_TIMEOUT" ]; then
+            _oa_refuse 5 "a post-plan run on this PR was still live after ${OA_TIMEOUT}s ($why). Run bin/owner-approve $OA_PR --finish once it ends."
+        fi
+        printf 'owner-approve: waiting %ss: %s\n' "$OA_POLL" "$why" >&2
+        _oa_pause "$OA_POLL"
+        _oa_read_pr || _oa_refuse 4 "could not re-read PR $OA_PR while waiting for the post-plan run."
+    done
+}
+
+_oa_comments() { # sets me and comments; refuses on a read error
+    me=$(gh api user --jq .login 2>/dev/null) && [ -n "$me" ] || _oa_refuse 4 "could not read the gh login."
+    comments=$(gh api --paginate "repos/$OA_REPO/issues/$OA_PR/comments" 2>/dev/null) || _oa_refuse 4 "could not read the comments on PR $OA_PR."
+}
+_oa_verdict() {
+    local sticky banner word tree_line bound head_tree
+    _oa_comments
+    sticky=$(printf '%s' "$comments" | jq -r -s --arg m "$HP_STICKY_MARKER" '[add // [] | .[] | select((.body // "") | contains($m) and (contains("<!-- owner-approve") | not))] | last | if . == null then "" else (.user.login + "\n" + .body) end') \
+        || _oa_refuse 4 "could not parse the comments on PR $OA_PR."
+    [ -n "$sticky" ] || _oa_refuse 4 "PR $OA_PR has no post-plan verdict comment."
+    [ "${sticky%%$'\n'*}" = "$me" ] || _oa_refuse 4 "the newest verdict comment was posted by ${sticky%%$'\n'*}, not by $me."
+    sticky=${sticky#*$'\n'}
+    banner=$(hp_verdict_banner "$sticky")
+    word=$(printf '%s' "$banner" | tr -d '*' | sed -E 's/^[[:space:]]*(LATEST VERDICT: )?//')
+    case "$word" in
+        "NOT READY "*) _oa_refuse 4 "the verdict is NOT READY." ;;
+        "READY WITH NOTES "*) verdict_word="READY WITH NOTES" ;;
+        "READY "*) verdict_word=READY ;;
+        *) _oa_refuse 4 "the verdict banner is missing or unreadable." ;;
+    esac
+    tree_line=$(printf '%s\n' "$sticky" | grep -E '^[[:space:]]*(-[[:space:]]+)?\*\*Re-reviewed tree:\*\*' | tail -n 1)
+    [ -n "$tree_line" ] || tree_line=$(printf '%s\n' "$sticky" | grep -E '^[[:space:]]*(-[[:space:]]+)?\*\*Reviewed tree:\*\*' | tail -n 1)
+    bound=$(printf '%s' "$tree_line" | sed -nE 's/^.*tree:\*\*[[:space:]]*([0-9a-f]{40})[[:space:]]*$/\1/p')
+    [ -n "$bound" ] || _oa_refuse 4 "the verdict names no reviewed tree (${tree_line:-no tree line}), so it cannot be bound to the head."
+    head_tree=$(gh api "repos/$OA_REPO/git/commits/$head" --jq .tree.sha 2>/dev/null) || _oa_refuse 4 "could not read the tree of head $head."
+    [ "$bound" = "$head_tree" ] || _oa_refuse 4 "the $verdict_word verdict covers tree $bound, but head $head has tree $head_tree. Wait for post-plan to review the new head."
+    head_tree_armed=$head_tree
+}
+_oa_arm() {
+    gh pr edit "$OA_PR" -R "$OA_REPO" --add-label human-approved >/dev/null 2>&1 \
+        || _oa_refuse 4 "adding the human-approved label failed, so auto-merge was not armed."
+    if ! gh pr merge "$OA_PR" -R "$OA_REPO" --squash --auto --match-head-commit "$head" >/dev/null 2>&1; then
+        gh pr edit "$OA_PR" -R "$OA_REPO" --remove-label human-approved >/dev/null 2>&1 || printf 'owner-approve: removing human-approved failed; remove it by hand\n' >&2
+        _oa_refuse 4 "gh pr merge --auto failed on head $head, so the human-approved label was removed again."
+    fi
+    _oa_post "$(printf 'Armed by bin/owner-approve: %s verdict on tree %s, head %s. Added human-approved and ran gh pr merge --squash --auto.\n\n<!-- owner-approve:armed -->' "$verdict_word" "$head_tree_armed" "$head")" \
+        || printf 'owner-approve: armed, but the confirmation comment failed\n' >&2
+    printf 'RESULT: armed\n'
+    exit 0
+}
+
+_oa_finish_record() { # sets rec_mode and rec_head from this login's newest approval comment
+    local rec
+    _oa_comments
+    rec=$(printf '%s' "$comments" | jq -r -s --arg me "$me" '[add // [] | .[] | select(.user.login == $me) | .body // ""] | .[]' \
+        | sed -nE 's/^<!-- owner-approve mode=(approve|fix-first) head=([0-9a-f]{40}) -->$/\1 \2/p' | tail -n 1)
+    [ -n "$rec" ] || _oa_refuse 4 "no owner approval comment from $me on PR $OA_PR. Run bin/owner-approve $OA_PR \"<words>\" first."
+    rec_mode=${rec%% *}
+    rec_head=${rec#* }
+    if [ "$rec_mode" = fix-first ] && [ "$head" = "$rec_head" ]; then
+        _oa_refuse 4 "the head is still $head, the commit the fix-first condition was recorded on. Push the fix, then run --finish again."
+    fi
+}
+_oa_prefire() {
+    local wt_head rc
+    [ -n "$OA_WT" ] || _oa_refuse 4 "no worktree is checked out on $branch, so prefire-verify cannot run on the fixed head."
+    wt_head=$(git -C "$OA_WT" rev-parse HEAD 2>/dev/null)
+    [ "$wt_head" = "$head" ] || _oa_refuse 4 "worktree $OA_WT is at ${wt_head:-an unreadable HEAD}, but the PR head is $head."
+    [ -z "$(git -C "$OA_WT" status --porcelain 2>/dev/null)" ] || _oa_refuse 4 "worktree $OA_WT has uncommitted changes, so prefire-verify would not test the pushed head."
+    (cd "$OA_WT" && bin/lib/prefire-verify) >&2; rc=$?
+    [ "$rc" -eq 0 ] || _oa_refuse 4 "bin/lib/prefire-verify exited $rc in $OA_WT (1 a check failed, 3 a prerequisite is missing, 4 the tree changed)."
+}
+
+pr_ok=1
+_oa_read_pr || pr_ok=0
+if [ "$OA_FINISH" -eq 0 ]; then
+    _oa_post "$(_oa_approval_body)" || { printf 'owner-approve: posting the approval comment failed. Nothing else was done.\n' >&2; printf 'RESULT: refused\n'; exit 4; }
+    printf 'owner-approve: approval comment posted on PR %s\n' "$OA_PR" >&2
+fi
+[ "$pr_ok" -eq 1 ] || _oa_refuse 4 "could not read PR $OA_PR with gh pr view, so its head and state are unknown."
+[ "$state" = "OPEN" ] || _oa_refuse 4 "PR $OA_PR is $state, so there is nothing to arm."
+if [ "$OA_FINISH" -eq 0 ] && [ -n "$OA_FIX" ]; then
+    printf 'owner-approve: fix-first condition recorded. Run bin/owner-approve %s --finish after the fix is pushed.\n' "$OA_PR" >&2
+    printf 'RESULT: fix-first-recorded\n'
+    exit 6
+fi
+if [ "$OA_FINISH" -eq 1 ]; then _oa_finish_record; fi
+OA_WT=$(_oa_find_wt)
+_oa_wait
+if [ "$rec_mode" = "fix-first" ]; then _oa_prefire; fi
+_oa_verdict
+_oa_arm

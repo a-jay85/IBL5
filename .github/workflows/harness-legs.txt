@@ -105,6 +105,7 @@
 1 bin/test-wt-pool
 1 bin/test-watch-run
 1 bin/test-prefire-verify
+1 bin/test-owner-approve
 1 bin/test-rebuild-css-if-source-changed
 1 bin/test-docfix-poll
 1 bin/test-pr-attack

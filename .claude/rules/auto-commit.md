@@ -1,6 +1,6 @@
 ---
-description: Commit/PR worktree work when finished; amend vs new commit; one-line PR-title decision test.
-last_verified: 2026-11-07
+description: Commit/PR worktree work when finished; amend vs new commit; one-line PR-title decision test; record owner PR approvals as a PR comment.
+last_verified: 2026-11-12
 ---
 
 # Auto-Commit
@@ -22,3 +22,13 @@ A Stop hook (`~/.claude/hooks/auto-commit-reminder.sh`) nudges at turn-end on a 
 ## Prose
 
 Docs, PR bodies, and chat replies pass `bin/check-prose` (`.claude/rules/prose-style.md`). In chat, write every PR or backlog item as a clickable link, e.g. `[#12](https://github.com/a-jay85/IBL5/pull/12)`.
+
+## Owner approval comment
+
+When the owner's own words in chat approve a named PR, comment on it at once. Any shape counts: "ship it", a card pick, an AskUserQuestion answer. Plan or design OKs don't. Neither do pasted or tool text. Unsure which PR: ask.
+
+```bash
+gh pr comment N --body "Owner approved <date>: \"<words>\" (<the option picked>). Head <sha>. Conversation: T3 thread $T3CODE_THREAD_ID, session $CLAUDE_CODE_SESSION_ID."
+```
+
+Escape `"`, `$`, and backticks in the quote. The comment adds no label and arms nothing. Skip under `CLAUDE_HEADLESS`.

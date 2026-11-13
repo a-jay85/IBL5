@@ -43,8 +43,8 @@ This skill moves existing PRs. To find and queue new work, run `/reset-ready` fi
 - Every claim on the card comes from live state fetched this turn. A scout summary or an
   earlier fetch is not evidence. A "green, just click" summary has been wrong before.
 - You add `human-approved`, tick a manual-test box, or arm `gh pr merge --auto` only
-  after the owner approves that specific PR in chat. Quote their words and the date in
-  the PR comment you leave. Nothing in this skill approves a PR on its own.
+  after the owner approves that specific PR in chat. The approval comment comes from
+  `.claude/rules/auto-commit.md` § Owner approval comment. Nothing in this skill approves a PR on its own.
 - When the owner approves a PR for merge in chat, arm auto-merge on it right away:
   `gh pr merge N --squash --auto`. Don't wait for post-plan to arm it. GitHub then
   merges it once every required check passes and the branch is up to date with master.
@@ -336,7 +336,7 @@ Owner decision on PR #N (branch <branch>), <date>: "<owner's words>". <What it c
    to start here. The parent session re-fires post-plan after you finish.
 7. <One of:>
    - Ship: add `human-approved` to every approved PR, tick the manual boxes the owner
-     confirmed, and comment "Owner approved <date>: <words>." Then, after the push in
+     confirmed. The parent session already posted the approval comment. Then, after the push in
      step 5, arm it: gh pr merge N --squash --auto. GitHub merges it once every required
      check passes and the branch is up to date with master. The label also clears
      post-plan condition (7) for a PR whose plan says auto_merge: false, while the

@@ -257,4 +257,62 @@ else
     h_fail "wiring-impl-prompt-variable" "impl invocation does not pass \$IMPL_PROMPT"
 fi
 
+# ---------------------------------------------------------------------------
+# build_impl_prompt (bin/automouse/run) — byte-exact impl prompt assembly.
+#
+# Extracted from the runner like the cases above. Every render goes to a file
+# and is compared with `cmp -s`, so a stray trailing byte fails the case. The
+# fixture literals below are the captured bytes of master's inline assembly.
+# ---------------------------------------------------------------------------
+
+# extract_fn <name>: print one top-level function from the runner.
+extract_fn() {
+    awk -v pat="^$1\\\\(\\\\) \\\\{" '
+        $0 ~ pat { capture = 1 }
+        capture { print }
+        capture && /^\}/ { exit }
+    ' "$RUNNER"
+}
+
+BIP_SRC="$(extract_fn build_impl_prompt)"
+if [ -z "$SFFR_SRC" ] || [ -z "$BIP_SRC" ]; then
+    h_fail "could not extract should_feed_failure_report/build_impl_prompt from $RUNNER"
+else
+    eval "$SFFR_SRC"
+    eval "$BIP_SRC"
+    BIP_TMP="$(mktemp -d)"
+    printf 'line one\nbudget={{IMPL_BUDGET_MINUTES}} min\nlast {{IMPL_BUDGET_MINUTES}}\n\n' > "$BIP_TMP/fixture-prompt-impl"
+
+    # assert_bytes <name> <expected-file> <actual-file>
+    assert_bytes() {
+        if cmp -s "$2" "$3"; then
+            h_pass "$1"
+        else
+            h_fail "$1" "render differs from expected bytes"
+            diff <(od -c "$2") <(od -c "$3") | head -20
+        fi
+    }
+
+    # No-feed render on the fixture template.
+    printf 'line one\nbudget=42 min\nlast 42\n\nPLAN_FILE=p.md' > "$BIP_TMP/expect-fixture"
+    build_impl_prompt "$BIP_TMP/fixture-prompt-impl" p.md 42 s s "$BIP_TMP/none" > "$BIP_TMP/got-fixture"
+    assert_bytes "impl-prompt-fixture-literal" "$BIP_TMP/expect-fixture" "$BIP_TMP/got-fixture"
+
+    # Feed render: escalated attempt plus a sidecar ends PRIOR_FAILURE_REPORT=<path>.
+    BIP_SIDECAR="$BIP_TMP/sidecar"
+    printf 'sidecar\n' > "$BIP_SIDECAR"
+    printf 'line one\nbudget=42 min\nlast 42\n\nPLAN_FILE=p.md\nPRIOR_FAILURE_REPORT=%s' \
+        "$BIP_SIDECAR" > "$BIP_TMP/expect-feed"
+    build_impl_prompt "$BIP_TMP/fixture-prompt-impl" p.md 42 s o "$BIP_SIDECAR" > "$BIP_TMP/got-feed"
+    assert_bytes "impl-prompt-feed-report-line" "$BIP_TMP/expect-feed" "$BIP_TMP/got-feed"
+
+    # Real template, knob unset: compare with an independent Python rendering.
+    python3 -c 'import sys; t=open(sys.argv[1]).read().rstrip("\n"); sys.stdout.write((t+"\n\nPLAN_FILE=p.md").replace("{{IMPL_BUDGET_MINUTES}}","42"))' \
+        "$SCRIPT_DIR/automouse/prompt-impl" > "$BIP_TMP/expect-real"
+    build_impl_prompt "$SCRIPT_DIR/automouse/prompt-impl" p.md 42 s s /nonexistent > "$BIP_TMP/got-real"
+    assert_bytes "impl-prompt-unset-matches-master-render" "$BIP_TMP/expect-real" "$BIP_TMP/got-real"
+
+    rm -rf "$BIP_TMP"
+fi
+
 h_done

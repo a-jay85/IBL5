@@ -376,15 +376,41 @@ def run_fix_round(*, decision, res, gh, llm, git, worktree, plan, pr, out_dir, l
         if new_rows is None:
             reasons = ["reparse-failed"]
         else:
+            try:
+                repair_diff = git.diff_vs_base()
+            except HarnessError:
+                repair_diff = None
             reasons = mutation_repair.validate_repair(old_rows, new_rows, set(proposals),
-                                                      read_file=git.read_worktree_file)
+                                                      read_file=git.read_worktree_file,
+                                                      diff=repair_diff)
             new_by_id = {r.row: r for r in new_rows}
             reasons += [f"proposal-mismatch row {row_id}" for row_id, match in proposals.items()
                         if row_id not in new_by_id or new_by_id[row_id].match != match]
+        def _copy_holds(accepted: dict) -> bool:
+            """Rewrite the copy from the original plan with only `accepted`. True when every
+            row re-parses to its intended match: new for accepted rows, old for the rest."""
+            partial = raw.decode("utf-8", "surrogateescape")
+            for row_id, match in accepted.items():
+                partial = mutation_repair.rewrite_match(partial, row_id, match)
+                if partial is None:
+                    return False
+            with open(copy_path, "wb") as fh:
+                fh.write(partial.encode("utf-8", "surrogateescape"))
+            rows = mutation_repair.parse_rows(copy_path, worktree)
+            return rows is not None and ([(r.row, r.match) for r in rows]
+                                         == [(o.row, accepted.get(o.row, o.match)) for o in old_rows])
+
         if reasons:
-            _remove_quietly(copy_path)
             record["mutation"]["refused"] = reasons
-            return
+            batch, refused_ids = mutation_repair.split_reasons(reasons)
+            accepted = {} if batch else {r: m for r, m in proposals.items() if r not in refused_ids}
+            if accepted and not _copy_holds(accepted):
+                record["mutation"]["refused"] = reasons + ["reparse-failed"]
+                accepted = {}
+            if not accepted:
+                _remove_quietly(copy_path)
+                return
+            proposals = accepted
         record["row_repairs"] = [{"row": row_id, "file": by_id[row_id].file,
                                   "old_match": by_id[row_id].match, "new_match": match}
                                  for row_id, match in proposals.items()]

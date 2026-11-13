@@ -1,4 +1,5 @@
 """The deterministic gate on Executable Mutations repairs, over the real grammar owner."""
+import difflib
 import os
 import sys
 from types import SimpleNamespace
@@ -277,3 +278,129 @@ def test_is_test_path():
     for path in ("tools/postplan-harness/harness/x.py", "ibl5/classes/Foo.php",
                  "bin/check-thing", "x/contest.py", "<unreadable-delta>"):
         assert not is_test_path(path)
+
+
+# --- Per-row verdicts and diff provenance -------------------------------------------------
+
+def test_split_reasons_separates_batch_and_row_reasons():
+    split = mutation_repair.split_reasons
+    assert split(["match-dissimilar row 40", "not-stale row 7", "row-order-changed"]) == (
+        ["row-order-changed"], {"40", "7"})
+    assert split(["match-dissimilar row 40"]) == ([], {"40"})
+
+
+def test_split_reasons_treats_proposal_mismatch_as_batch():
+    split = mutation_repair.split_reasons
+    assert split(["proposal-mismatch row 8", "match-dissimilar row 40"]) == (
+        ["proposal-mismatch row 8"], {"40"})
+    # Near-miss: free text with numbers is not `<reason> row <id>`, so it voids the batch.
+    assert split(["checks 3 and 4"]) == (["checks 3 and 4"], set())
+
+
+R40_FILE = "tools/postplan-harness/harness/external_scope.py"
+R40_OLD = "line = line.strip()"
+R40_NEW = "line = line.rstrip() if keep_indent else line.strip()"
+R40_REPLACE = "line = line"
+R40_TEXT = ("def _norm(line, keep_indent=False):\n"
+            "    line = line.rstrip() if keep_indent else line.strip()\n"
+            "    return line\n")
+R40_HEAD = (f"diff --git a/{R40_FILE} b/{R40_FILE}\n"
+            "index 1111111..2222222 100644\n"
+            f"--- a/{R40_FILE}\n"
+            f"+++ b/{R40_FILE}\n")
+R40_DIFF = (R40_HEAD
+            + "@@ -1,3 +1,3 @@\n"
+            " def _norm(line, keep_indent=False):\n"
+            "-    line = line.strip()\n"
+            "+    line = line.rstrip() if keep_indent else line.strip()\n"
+            "     return line\n")
+
+
+def _r40_rows(tmp_path, text=R40_TEXT, new_match=R40_NEW):
+    src = tmp_path / R40_FILE
+    src.parent.mkdir(parents=True, exist_ok=True)
+    src.write_text(text)
+    rows = []
+    for name, match in (("old.md", R40_OLD), ("new.md", new_match)):
+        plan = tmp_path / name
+        plan.write_text(_plan_text(_row_block(40, match=match, replace=R40_REPLACE, file=R40_FILE),
+                                   rows=(40,)))
+        parsed = parse_rows(plan, tmp_path)
+        assert parsed is not None
+        rows.append(parsed)
+    return rows[0], rows[1], {R40_FILE: text}.get
+
+
+def test_provenance_accepts_row40_rewrite(tmp_path):
+    ratio = difflib.SequenceMatcher(None, R40_OLD, R40_NEW).ratio()
+    assert ratio < mutation_repair.MATCH_SIMILARITY_MIN
+    old, new, stub = _r40_rows(tmp_path)
+    assert validate_repair(old, new, {"40"}, read_file=stub, diff=R40_DIFF) == []
+
+
+def test_similar_match_accepted_without_diff(tmp_path):
+    ratio = difflib.SequenceMatcher(None, OLD_MATCH, NEW_MATCH).ratio()
+    assert ratio >= mutation_repair.MATCH_SIMILARITY_MIN
+    (tmp_path / "calc.py").write_text(SOURCE)
+    old = _parsed(tmp_path, "old.md", _row_block(1))
+    new = _parsed(tmp_path, "new.md", _row_block(1, match=NEW_MATCH))
+    assert validate_repair(old, new, {"1"}, read_file={"calc.py": SOURCE}.get, diff=None) == []
+
+
+def test_provenance_refuses_new_match_only_in_context(tmp_path):
+    diff = (R40_HEAD + "@@ -1,3 +1,3 @@\n"
+            " def _norm(line, keep_indent=False):\n"
+            "-    line = line.strip()\n"
+            "+    pass\n"
+            "     line = line.rstrip() if keep_indent else line.strip()\n")
+    old, new, stub = _r40_rows(tmp_path)
+    assert validate_repair(old, new, {"40"}, read_file=stub, diff=diff) == ["match-dissimilar row 40"]
+
+
+def test_provenance_refuses_pair_split_across_hunks(tmp_path):
+    diff = (R40_HEAD
+            + "@@ -1,1 +1,1 @@\n"
+            "-    line = line.strip()\n"
+            "@@ -9,1 +9,1 @@\n"
+            "+    line = line.rstrip() if keep_indent else line.strip()\n")
+    old, new, stub = _r40_rows(tmp_path)
+    assert validate_repair(old, new, {"40"}, read_file=stub, diff=diff) == ["match-dissimilar row 40"]
+
+
+def test_provenance_refuses_pair_in_different_file(tmp_path):
+    diff = R40_DIFF.replace(R40_FILE, "tools/postplan-harness/harness/other.py")
+    assert R40_FILE not in diff
+    old, new, stub = _r40_rows(tmp_path)
+    assert validate_repair(old, new, {"40"}, read_file=stub, diff=diff) == ["match-dissimilar row 40"]
+
+
+def test_provenance_refuses_when_diff_unreadable(tmp_path):
+    old, new, stub = _r40_rows(tmp_path)
+    assert validate_repair(old, new, {"40"}, read_file=stub, diff=None) == ["match-dissimilar row 40"]
+
+
+def test_provenance_refuses_unparseable_hunk_line(tmp_path):
+    diff = R40_DIFF.replace("-    line = line.strip()\n", "-    line = line.strip()\ngarbage\n")
+    assert "\ngarbage\n" in diff
+    assert mutation_repair.rewritten_in_diff(diff, R40_FILE, R40_OLD, R40_NEW) is False
+    old, new, stub = _r40_rows(tmp_path)
+    assert validate_repair(old, new, {"40"}, read_file=stub, diff=diff) == ["match-dissimilar row 40"]
+
+
+def test_provenance_header_like_body_lines_stay_in_hunk():
+    diff = ("diff --git a/q.py b/q.py\n--- a/q.py\n+++ b/q.py\n@@ -1 +1 @@\n"
+            "--- x = 1\n+++ x = 2\n")
+    assert mutation_repair.rewritten_in_diff(diff, "q.py", "-- x = 1", "++ x = 2") is True
+
+
+def test_provenance_refuses_multiline_match():
+    diff = ("diff --git a/m.py b/m.py\n--- a/m.py\n+++ b/m.py\n@@ -1,2 +1,2 @@\n"
+            "-a = 1\n-b = 2\n+a = 10\n+b = 20\n")
+    assert mutation_repair.rewritten_in_diff(diff, "m.py", "a = 1\nb = 2", "a = 10\nb = 20") is False
+
+
+def test_provenance_keeps_match_count_check(tmp_path):
+    twice = R40_TEXT + "    line = line.rstrip() if keep_indent else line.strip()\n"
+    old, new, stub = _r40_rows(tmp_path, text=twice)
+    reasons = validate_repair(old, new, {"40"}, read_file=stub, diff=R40_DIFF)
+    assert "match-count row 40" in reasons

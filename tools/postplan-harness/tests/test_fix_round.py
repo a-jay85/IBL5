@@ -9,13 +9,14 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from harness import fix_round
+from harness import fix_round, mutation_repair
 from harness.armable import holding_findings
 from harness.labels import LABEL_IMPORTANT, render_body
 from harness.state import ArmDecision, ConditionResult, Finding, HarnessError, RunResult
 from harness.thread_ingestion import declined_body, fixed_body
 from harness.usage_pause import UsagePause
-from test_mutation_repair import (HELD_LINE, NEW_MATCH, OLD_MATCH, STALE_LINE, _plan_text,
+from test_mutation_repair import (HELD_LINE, NEW_MATCH, OLD_MATCH, R40_DIFF, R40_FILE, R40_NEW,
+                                  R40_OLD, R40_REPLACE, R40_TEXT, STALE_LINE, _plan_text,
                                   _row_block)
 
 PR = 77
@@ -455,6 +456,9 @@ NEW_MATCH_REPLY = f"NEW-MATCH: {NEW_MATCH}"
 NO_RECHECK_FINDINGS = {"new_holding": [], "conformance_added": [], "degraded": False}
 
 
+_DIFF_UNREADABLE = object()
+
+
 def _section(path, added):
     return (f"diff --git a/{path} b/{path}\nindex 1111111..2222222 100644\n--- a/{path}\n"
             f"+++ b/{path}\n@@ -1 +1,2 @@\n x\n+{added}\n")
@@ -463,13 +467,18 @@ def _section(path, added):
 class _MutGit(_Git):
     """`diff_vs_base` gives real-shaped sections, so the real patch-id delta runs on them."""
 
-    def __init__(self, root, touches=(TEST_PATH,), *, diff_after=None):
+    def __init__(self, root, touches=(TEST_PATH,), *, diff_after=None, repair_diff=None):
         super().__init__()
         self.root = root
         self.touches = touches
         self.diff_after = diff_after
+        self.repair_diff = repair_diff
 
     def diff_vs_base(self, base=None):
+        if self.repair_diff is _DIFF_UNREADABLE:
+            raise HarnessError("git", "diff failed")
+        if self.repair_diff is not None:
+            return self.repair_diff
         base_diff = _section("calc.py", "base")
         if self.sha == "head0":
             return base_diff
@@ -635,6 +644,125 @@ def test_repair_with_no_prover_is_discarded(tmp_path):
                            llm=_Llm(git, [NEW_MATCH_REPLY]), inputs=_holding(STALE_LINE))
     assert (rec["status"], rec["reason"]) == ("rejected", "mutation-unproven")
     assert rec["row_repairs"] == []
+
+
+# ---- Per-row stale repair: accept the rows that pass, keep the rest stale ----
+
+TRIO_SRC = ("def f(total_cap, used):\n    return total_cap - used\n\n"
+            "def h(total_lim, spent):\n    return total_lim * spent\n\n"
+            "def k(x):\n    y = compute(x)\n    return y\n")
+# (row, old match, new match, replace). Rows 1 and 2 are similar renames; row 3 is not.
+TRIO = (("1", "return cap - used", "return total_cap - used", "return total_cap + used"),
+        ("2", "return lim * spent", "return total_lim * spent", "return total_lim / spent"),
+        ("3", "y = x", "y = compute(x)", "y = None"))
+TRIO_REFUSED = "3"
+
+
+def _stale_line(row, path):
+    return f"row {row} NOT-APPLIED — match occurs 0 times in {path} (need exactly 1)"
+
+
+def _trio_plan(tmp_path):
+    (tmp_path / "trio.py").write_text(TRIO_SRC)
+    plan = tmp_path / "plan.md"
+    plan.write_text(_plan_text(*(_row_block(r, match=o, replace=rep, check="true", file="trio.py")
+                                 for r, o, _, rep in TRIO), rows=(1, 2, 3)))
+    return SimpleNamespace(path=str(plan))
+
+
+def _run_trio(tmp_path, *, mutation_check=None, git=None):
+    plan = _trio_plan(tmp_path)
+    git = git or _MutGit(tmp_path, repair_diff="")
+    replies = [f"NEW-MATCH: {n}" for _, _, n, _ in TRIO]
+    holding = _holding(*(_stale_line(r, "trio.py") for r, *_ in TRIO))
+    check = mutation_check or (lambda p, r: _proof(
+        "1", "2", holding=[_stale_line(TRIO_REFUSED, "trio.py")]))
+    rec, *_ = _run(tmp_path, decision=_decision(19), git=git, plan=plan,
+                   llm=_Llm(git, replies), inputs=holding, mutation_check=check)
+    return rec, plan
+
+
+def test_partial_repair_applies_accepted_rows_and_records_refused(tmp_path):
+    rec, _ = _run_trio(tmp_path)
+    assert len(rec["row_repairs"]) == 2
+    assert [r["row"] for r in rec["row_repairs"]] == ["1", "2"]
+    assert rec["mutation"]["refused"] == [f"match-dissimilar row {TRIO_REFUSED}"]
+    assert rec["repaired_plan"]
+    assert rec["reevaluate"] is True
+
+
+def test_partial_repair_copy_keeps_refused_row_old_match(tmp_path):
+    rec, plan = _run_trio(tmp_path)
+    before = open(plan.path).read()
+    rows = mutation_repair.parse_rows(rec["repaired_plan"], tmp_path)
+    assert rows is not None
+    assert {r.row: r.match for r in rows} == {"1": TRIO[0][2], "2": TRIO[1][2], "3": TRIO[2][1]}
+    assert open(plan.path).read() == before
+    assert f"match: {TRIO[2][2]}" not in open(rec["repaired_plan"]).read()
+
+
+def test_partial_repair_proof_excuses_refused_row(tmp_path):
+    seen = []
+
+    def check(path, remaining):
+        seen.append(path)
+        return _proof("1", "2", holding=[_stale_line(TRIO_REFUSED, "trio.py")])
+
+    rec, _ = _run_trio(tmp_path, mutation_check=check)
+    assert rec["reason"] != "mutation-unproven"
+    assert rec["status"] != "rejected"
+    assert seen == [rec["repaired_plan"]]
+    assert [r["row"] for r in rec["row_repairs"]] == ["1", "2"]
+
+
+def test_batch_level_refusal_discards_every_proposal(tmp_path, monkeypatch):
+    # The stub refuses the batch as a whole, so even rows that would pass on their own drop.
+    monkeypatch.setattr(mutation_repair, "validate_repair",
+                        lambda *a, **kw: ["row-order-changed"])
+    calls = []
+    rec, _ = _run_trio(tmp_path, mutation_check=lambda p, r: calls.append(p))
+    assert rec["row_repairs"] == []
+    assert rec["mutation"]["refused"] == ["row-order-changed"]
+    assert "repaired_plan" not in rec
+    assert not os.path.exists(os.path.join(str(tmp_path), fix_round.REPAIRED_PLAN_BASENAME))
+    assert calls == []
+
+
+def _r40_plan(tmp_path, *extra_blocks, rows=(40,)):
+    src = tmp_path / R40_FILE
+    src.parent.mkdir(parents=True, exist_ok=True)
+    src.write_text(R40_TEXT)
+    plan = tmp_path / "plan.md"
+    plan.write_text(_plan_text(_row_block(40, match=R40_OLD, replace=R40_REPLACE, check="true",
+                                          file=R40_FILE), *extra_blocks, rows=rows))
+    return SimpleNamespace(path=str(plan))
+
+
+def test_row40_provenance_repair_recorded(tmp_path):
+    plan = _r40_plan(tmp_path)
+    git = _MutGit(tmp_path, repair_diff=R40_DIFF)
+    rec, *_ = _run(tmp_path, decision=_decision(19), git=git, plan=plan,
+                   llm=_Llm(git, [f"NEW-MATCH: {R40_NEW}"]),
+                   inputs=_holding(_stale_line("40", R40_FILE)),
+                   mutation_check=lambda p, r: _proof("40"))
+    assert rec["row_repairs"] == [{"row": "40", "file": R40_FILE, "old_match": R40_OLD,
+                                   "new_match": "line = line.rstrip() if keep_indent else line.strip()"}]
+    assert "refused" not in rec["mutation"]
+
+
+def test_repair_diff_unreadable_refuses_dissimilar_row(tmp_path):
+    (tmp_path / "calc.py").write_text(CALC)
+    plan = _r40_plan(tmp_path, STALE_BLOCK, rows=(7, 40))
+    git = _MutGit(tmp_path, repair_diff=_DIFF_UNREADABLE)
+    with pytest.raises(HarnessError):
+        git.diff_vs_base()
+    rec, *_ = _run(tmp_path, decision=_decision(19), git=git, plan=plan,
+                   llm=_Llm(git, [NEW_MATCH_REPLY, f"NEW-MATCH: {R40_NEW}"]),
+                   inputs=_holding(STALE_LINE, _stale_line("40", R40_FILE)),
+                   mutation_check=lambda p, r: _proof("7", holding=[_stale_line("40", R40_FILE)]))
+    assert rec["status"] != "aborted"
+    assert "match-dissimilar row 40" in rec["mutation"]["refused"]
+    assert [r["row"] for r in rec["row_repairs"]] == ["7"]
 
 
 def test_unparsable_plan_skips_the_rows(tmp_path):

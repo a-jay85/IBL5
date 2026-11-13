@@ -185,9 +185,60 @@ def test_owner_held_must_ask_token_holds_on_clean(token):
 
 
 def test_owner_held_and_clearable_tokens_never_overlap():
-    from harness.armable import CLEARABLE_PLAN_TRIGGERS, OWNER_HELD_PLAN_TRIGGERS
+    from harness.armable import (CLEARABLE_PLAN_TRIGGERS, EVIDENCE_GATED_PLAN_TRIGGERS,
+                                 OWNER_HELD_PLAN_TRIGGERS)
     assert not CLEARABLE_PLAN_TRIGGERS & OWNER_HELD_PLAN_TRIGGERS
     assert {"bootstrap-hazard", "security-irreducible", "golden-new"} <= OWNER_HELD_PLAN_TRIGGERS
+    assert "sql-equivalent" in CLEARABLE_PLAN_TRIGGERS
+    assert "sql-equivalent" not in OWNER_HELD_PLAN_TRIGGERS
+    assert EVIDENCE_GATED_PLAN_TRIGGERS <= CLEARABLE_PLAN_TRIGGERS
+    assert "security-irreducible" in OWNER_HELD_PLAN_TRIGGERS and "merge-rule" in OWNER_HELD_PLAN_TRIGGERS
+
+
+# A pure SQL rewrite (`sql-equivalent`) reaches the seat only with harness-checked "ok" evidence.
+_SQL_EQ = {**_PLAN_HOLD, "plan_hold_triggers": ("sql-equivalent",)}
+
+
+def test_sql_equivalent_clears_on_clean_with_ok_evidence():
+    decision = evaluate(inputs(**_SQL_EQ, sql_equivalence_evidence="ok", **_seat([7])))
+    assert decision.armed
+    assert not decision.holds
+
+
+@pytest.mark.parametrize("evidence", [
+    "unchecked", "absent", "failed", "no cases", "stale: ibl5/classes/X.php", "", "OK",
+])
+def test_sql_equivalent_holds_without_ok_evidence(evidence):
+    _assert_held_with_clean([7], **_SQL_EQ, sql_equivalence_evidence=evidence)
+
+
+def test_sql_equivalent_with_security_surface_needs_evidence():
+    mixed = {**_PLAN_HOLD, "plan_hold_triggers": ("security-surface", "sql-equivalent")}
+    _assert_held_with_clean([7], **mixed, sql_equivalence_evidence="absent")
+    decision = evaluate(inputs(**mixed, sql_equivalence_evidence="ok", **_seat([7])))
+    assert decision.armed
+    assert not decision.holds
+
+
+@pytest.mark.parametrize("owner_token", ["security-irreducible", "merge-rule"])
+def test_sql_equivalent_with_owner_held_token_holds(owner_token):
+    _assert_held_with_clean([7], **_PLAN_HOLD, plan_hold_triggers=("sql-equivalent", owner_token),
+                            sql_equivalence_evidence="ok")
+
+
+def test_sql_equivalent_holds_on_stale_seat_tree():
+    decision = evaluate(inputs(**_SQL_EQ, sql_equivalence_evidence="ok",
+                               **_seat([7], tree=OTHER_TREE)))
+    assert not decision.armed
+    assert _holds(decision) == {7}
+    assert decision.second_review_cleared == []
+
+
+def test_evidence_value_ignored_for_other_tokens():
+    decision = evaluate(inputs(**_PLAN_HOLD, plan_hold_triggers=("gate-weakening",),
+                               sql_equivalence_evidence="unchecked", **_seat([7])))
+    assert decision.armed
+    assert not decision.holds
 
 
 def test_ui_floor_holds_on_rename_source_in_ui_paths():

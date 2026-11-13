@@ -83,10 +83,11 @@ class Repo:
     def record(self, merge_sha=None):
         return premerge.record(self.d, self.branch, self.pre_sha, ("f.txt",))
 
-    def advance_master(self, text):
+    def advance_master(self, text, name="f.txt"):
         _git(self.d, "checkout", "master")
-        _write(self.d, "f.txt", text)
-        _git(self.d, "commit", "-am", "master: newer")
+        _write(self.d, name, text)
+        _git(self.d, "add", name)
+        _git(self.d, "commit", "-m", "master: newer")
         _git(self.d, "push", "origin", "master")
         _git(self.d, "checkout", self.branch)
 
@@ -101,6 +102,9 @@ def make_repo(tmp_path):
         d = str(tmp_path / f"work-{branch}")
         subprocess.run(["git", "init", "-q", "--bare", "-b", "master", origin], check=True)
         subprocess.run(["git", "init", "-q", "-b", "master", d], check=True)
+        # LiveGit's own rebase runs without _ENV; a CI runner has no global identity.
+        _git(d, "config", "user.email", "t@t")
+        _git(d, "config", "user.name", "t")
         _git(d, "remote", "add", "origin", origin)
         _write(d, "f.txt", "line1\nline2\nline3\n")
         if with_lostwork:
@@ -146,6 +150,7 @@ def make_repo(tmp_path):
 
 CLEAN = f"line1\nMASTER_LINE\n{BRANCH_LINE}\nline3\n"
 DROPPED = "line1\nMASTER_LINE\nline3\n"
+UNRELATED = "master-only file\n"
 
 
 def test_premerged_dropped_branch_line_fails_proof(make_repo):
@@ -218,9 +223,108 @@ def test_premerged_conflict_with_newer_master_fails_closed(make_repo):
     with pytest.raises(HarnessError) as ei:
         LiveGit(r.d, llm=llm).rebase_onto("origin/master")
     assert ei.value.kind == "rebase-conflict"
-    assert "premerged head is stale: origin/master moved after the fix" in ei.value.detail
+    assert "premerged head is stale: replaying it onto origin/master conflicted" \
+        in ei.value.detail
+    assert not os.path.exists(os.path.join(r.d, ".git", "rebase-merge"))
+    assert premerge.load(r.key).sha == merge_sha
     assert _rev(r.d, "HEAD") == merge_sha
     assert not os.path.exists(os.path.join(r.d, ".git", "MERGE_HEAD"))
+    assert llm.calls == []
+
+
+def test_premerged_clean_replay_onto_newer_master(make_repo):
+    r = make_repo()
+    merge_sha = r.rebase_by_hand(CLEAN)
+    r.record()
+    r.advance_master(UNRELATED, name="m.txt")
+    new_master = _rev(r.d, "origin/master")
+    LiveGit(r.d, llm=None).rebase_onto("origin/master")
+    head = _rev(r.d, "HEAD")
+    assert head != merge_sha
+    assert _git(r.d, "merge-base", "--is-ancestor", new_master, "HEAD",
+                check=False).returncode == 0
+    assert _git(r.d, "rev-list", "--count", f"{new_master}..HEAD").stdout.strip() == "1"
+    assert _git(r.d, "show", "HEAD:f.txt").stdout == CLEAN
+    assert _git(r.d, "show", "HEAD:own.txt").stdout == "branch-only file\n"
+    assert _git(r.d, "show", "HEAD:m.txt").stdout == UNRELATED
+
+
+def test_premerged_replay_rebinds_manifest(make_repo):
+    r = make_repo()
+    r.rebase_by_hand(CLEAN)
+    r.record()
+    r.advance_master(UNRELATED, name="m.txt")
+    LiveGit(r.d, llm=None).rebase_onto("origin/master")
+    manifest = premerge.load(r.key)
+    assert manifest is not None
+    assert manifest.sha == _rev(r.d, "HEAD")
+    assert manifest.pre_sha == r.pre_sha
+
+
+def test_premerged_replay_reviews_new_head(make_repo):
+    r = make_repo()
+    r.rebase_by_hand(CLEAN)
+    r.record()
+    r.advance_master(UNRELATED, name="m.txt")
+    llm = FakeLlm()
+    LiveGit(r.d, llm=llm).rebase_onto("origin/master")
+    head = _rev(r.d, "HEAD")
+    assert llm.calls == ["conflict-review"]
+    verdict = open(verdict_ok_path(r.key, head)).read()
+    assert verdict.splitlines()[0] == "CONFLICT-REVIEW=CLEAN"
+    assert head in open(conflict_flag_path(r.branch)).read()
+
+
+def test_premerged_replay_failed_proof_restores_head(make_repo):
+    r = make_repo()
+    merge_sha = r.rebase_by_hand(DROPPED)
+    r.record()
+    r.advance_master(UNRELATED, name="m.txt")
+    llm = FakeLlm()
+    with pytest.raises(HarnessError) as ei:
+        LiveGit(r.d, llm=llm).rebase_onto("origin/master")
+    assert ei.value.kind == "rebase-conflict"
+    assert "tree proof failed:" in ei.value.detail
+    assert "LOST:" in ei.value.detail
+    assert _rev(r.d, "HEAD") == merge_sha
+    assert _git(r.d, "status", "--porcelain", "--untracked-files=no").stdout == ""
+    assert premerge.load(r.key).sha == merge_sha
+    assert llm.calls == []
+
+
+def test_premerged_replay_rebind_refused_restores_head(make_repo, monkeypatch):
+    """A stacked base leaves the replayed parent outside origin/master, so the rebind
+    refuses. The run must restore the pre-merged head and fail closed."""
+    r = make_repo()
+    merge_sha = r.rebase_by_hand(CLEAN)
+    r.record()
+    r.advance_master(UNRELATED, name="m.txt")
+
+    def refuse(*args, **kwargs):
+        raise premerge.PremergeError("rebased parent is not in origin/master")
+
+    monkeypatch.setattr(premerge, "record", refuse)
+    llm = FakeLlm()
+    with pytest.raises(HarnessError) as ei:
+        LiveGit(r.d, llm=llm).rebase_onto("origin/master")
+    assert ei.value.kind == "rebase-conflict"
+    assert "premerged replay could not rebind the manifest" in ei.value.detail
+    assert _rev(r.d, "HEAD") == merge_sha
+    assert premerge.load(r.key).sha == merge_sha
+    assert llm.calls == []
+
+
+def test_premerged_stale_head_with_merge_commit_fails_closed(make_repo):
+    r = make_repo()
+    merge_sha = r.merge_by_hand(CLEAN)
+    r.record()
+    r.advance_master(UNRELATED, name="m.txt")
+    llm = FakeLlm()
+    with pytest.raises(HarnessError) as ei:
+        LiveGit(r.d, llm=llm).rebase_onto("origin/master")
+    assert ei.value.kind == "rebase-conflict"
+    assert "premerged head carries a merge commit" in ei.value.detail
+    assert _rev(r.d, "HEAD") == merge_sha
     assert llm.calls == []
 
 

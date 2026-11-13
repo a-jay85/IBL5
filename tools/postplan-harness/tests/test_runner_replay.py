@@ -206,6 +206,17 @@ def test_clean_rerun_copy_carries_the_live_pr_title():
     assert degraded is False      # a skip is not a degradation; it must not hold arming
 
 
+def test_replay_run_without_outcomes_writes_one_cycle_marker():
+    from harness import outcome_log as ol
+    out = tempfile.mkdtemp()
+    runner.run(_fixture(), out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
+    events = ol.read_events(os.path.join(out, "state", ol.LOG_BASENAME))
+    markers = [e for e in events if ol.is_cycle_marker(e)]
+    assert len(markers) == 1
+    assert markers[0]["pr"] == 9999
+    assert [e for e in events if e.get("source") == "phase4.5" and not ol.is_cycle_marker(e)] == []
+
+
 def test_dirty_rerun_with_open_pr_still_calls_pr_copy():
     out = tempfile.mkdtemp()
     res = runner.run(_fixture(), out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
@@ -1195,7 +1206,8 @@ def _run_live_shaped(monkeypatch, out, canned_extra=None, fixture=None):
         canned.update(canned_extra)
     llm = FixtureLlm(UsageLedger(), canned)
     return runner.run(fx, out, llm, mode="replay", headless=True,
-                      live=True, probe=FixtureProbe(fx))
+                      live=True, probe=FixtureProbe(fx),
+                      state_dir=os.path.join(out, "state"))
 
 
 def _ci_files(out):
@@ -1760,7 +1772,7 @@ def _run_live_shaped_ticking(monkeypatch, tmp_path, *, llm, github_ticks=True):
     monkeypatch.setattr(ciwatch, "reap_background_watch", lambda *a, **k: None)
     out = str(tmp_path / "out")
     res = runner.run(fx, out, llm, mode="replay", headless=True, live=True,
-                     probe=FixtureProbe(fx))
+                     probe=FixtureProbe(fx), state_dir=str(tmp_path / "state"))
     return res, out
 
 
@@ -1858,7 +1870,8 @@ def _run_live_shaped_with(monkeypatch, out, *, git_cls, fixture, canned_extra=No
         llm = FixtureLlm(UsageLedger(), canned)
     fx = fixture if fixture is not None else _INLINE_FIXTURE
     res = runner.run(fx, out, llm, mode="replay", headless=True,
-                     live=True, probe=FixtureProbe(fx))
+                     live=True, probe=FixtureProbe(fx),
+                     state_dir=os.path.join(out, "state"))
     return res, llm
 
 

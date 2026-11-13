@@ -213,3 +213,90 @@ def test_run_sweep_unreadable_log_never_raises(tmp_path):
     seen = []
     assert ol.run_sweep([_th(1, isOutdated=True)], 9, str(tmp_path), seen.append, pipeline="harness") == 0
     assert any("outcome-log: sweep failed" in m for m in seen)
+
+
+# ---------------------------------------------------------------------------
+# Zero-finding cycle marker
+# ---------------------------------------------------------------------------
+
+def _marker_now():
+    import datetime
+    return datetime.datetime(2026, 10, 1, 12, 0, 0, tzinfo=datetime.timezone.utc)
+
+
+def test_build_cycle_marker_shape():
+    now = _marker_now()
+    assert ol.build_cycle_marker(pr=7, pipeline="harness", now=now) == {
+        "v": 1, "ts": ol.now_stamp(now), "pr": 7, "findingId": 0, "agent": "none", "score": None,
+        "outcome": "cycle-marker", "source": "phase4.5", "basis": "zero-findings",
+        "pipeline": "harness", "reason": "", "sha": None, "origin": None}
+
+
+def test_seen_finding_ids_excludes_cycle_marker(tmp_path):
+    path = str(tmp_path / "o.jsonl")
+    ol.append_events(path, [ol.build_cycle_marker(pr=7, pipeline="harness"), _ev(pr=7, finding_id=555)],
+                     lambda m: None)
+    assert ol.seen_finding_ids(path, 7) == {555}
+
+
+def test_sweep_not_blocked_by_cycle_marker_id(tmp_path):
+    path = str(tmp_path / "o.jsonl")
+    ol.append_events(path, [ol.build_cycle_marker(pr=7, pipeline="harness")], lambda m: None)
+    assert ol.run_sweep([_th(0, isOutdated=True)], 7, path, lambda m: None, pipeline="harness") == 1
+    sweeps = [e for e in ol.read_events(path) if e["source"] == "sweep"]
+    assert len(sweeps) == 1 and sweeps[0]["findingId"] == 0
+
+
+def test_record_cycle_marker_writes_on_zero_finding_run(tmp_path):
+    path = tmp_path / "o.jsonl"
+    path.write_text("")
+    assert ol.record_cycle_marker(str(path), 7, "2026-10-01T12:00:00Z", lambda m: None,
+                                  pipeline="harness") == 1
+    events = ol.read_events(str(path))
+    assert len(events) == 1 and events[0]["outcome"] == "cycle-marker" and events[0]["pr"] == 7
+
+
+def test_record_cycle_marker_writes_on_missing_log(tmp_path):
+    path = tmp_path / "new" / "log.jsonl"
+    assert ol.record_cycle_marker(str(path), 7, "2026-10-01T12:00:00Z", lambda m: None,
+                                  pipeline="harness") == 1
+    assert len(ol.read_events(str(path))) == 1
+
+
+def test_record_cycle_marker_skips_when_run_logged_outcome(tmp_path):
+    path = tmp_path / "o.jsonl"
+    ol.append_events(str(path), [{**_ev(pr=7), "ts": "2026-10-01T12:01:00Z"}], lambda m: None)
+    before = path.read_bytes()
+    assert ol.record_cycle_marker(str(path), 7, "2026-10-01T12:00:00Z", lambda m: None,
+                                  pipeline="harness") == 0
+    assert path.read_bytes() == before
+
+
+def test_record_cycle_marker_same_second_event_suppresses(tmp_path):
+    path = tmp_path / "o.jsonl"
+    ol.append_events(str(path), [{**_ev(pr=7), "ts": "2026-10-01T12:00:00Z"}], lambda m: None)
+    assert ol.record_cycle_marker(str(path), 7, "2026-10-01T12:00:00Z", lambda m: None,
+                                  pipeline="harness") == 0
+
+
+def test_record_cycle_marker_ignores_prior_run_event(tmp_path):
+    path = tmp_path / "o.jsonl"
+    ol.append_events(str(path), [{**_ev(pr=7), "ts": "2026-10-01T11:00:00Z"}], lambda m: None)
+    assert ol.record_cycle_marker(str(path), 7, "2026-10-01T12:00:00Z", lambda m: None,
+                                  pipeline="harness") == 1
+
+
+def test_record_cycle_marker_ignores_sweep_events(tmp_path):
+    path = tmp_path / "o.jsonl"
+    ol.append_events(str(path), [{**_ev(pr=7, source="sweep", basis="outdated"),
+                                  "ts": "2026-10-01T12:05:00Z"}], lambda m: None)
+    assert ol.record_cycle_marker(str(path), 7, "2026-10-01T12:00:00Z", lambda m: None,
+                                  pipeline="harness") == 1
+
+
+def test_record_cycle_marker_never_raises_on_bad_since(tmp_path):
+    path = tmp_path / "o.jsonl"
+    ol.append_events(str(path), [_ev(pr=7)], lambda m: None)
+    seen = []
+    assert ol.record_cycle_marker(str(path), 7, None, seen.append, pipeline="harness") == 0
+    assert any("outcome-log: cycle marker failed" in m for m in seen)

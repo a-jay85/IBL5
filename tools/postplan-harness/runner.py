@@ -530,6 +530,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         # Phase 4.5 snapshot: thread ids that exist BEFORE this run posts anything.
         # Taken before the review worker is submitted, so nothing this run posts can
         # enter it. Empty on any failure = Phase 4.5 acts on nothing.
+        cycle_since = outcome_log.now_stamp()  # outcome events at or after this belong to this run
         t_snap = time.monotonic()
         pre_posting_ids = gh.pr_thread_ids(pr)
         log(f"phase4.5 snapshot: {len(pre_posting_ids)} pre-existing thread(s) "
@@ -802,6 +803,10 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             review_delta=_delta_review)
         if sr.get("found") or sr.get("error"):
             res.thread_ingestion["same_run"] = sr
+        # Cycle marker: a run that logged no phase4.5 outcome still counts as one review cycle.
+        outcome_log.record_cycle_marker(
+            os.path.join(_state_dir(out_dir, live, state_dir), outcome_log.LOG_BASENAME),
+            pr, cycle_since, log, pipeline="harness")
         res.findings, res.scored_findings = same_run_threads.prune_findings(
             res.findings, res.scored_findings, same_run_threads.dispositioned_keys(sr))
         res.degraded_agents = list(res.degraded_agents) + [

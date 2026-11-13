@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-11-12
+last_verified: 2026-11-13
 ---
 
 # IBL5 Architecture Decision Records
@@ -110,6 +110,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0243](0243-migration-auto-revert.md) | Undo a reverted data-changing migration from stored down SQL on the next deploy | Accepted | The runner stores a migration's down SQL and up-file checksum when it applies the up, and on the next deploy undoes vanished migrations from the stored copy, failing closed when the run is not contiguous or a checksum matches a current file. |
 | [0245](0245-ci-text-hold-rearm.md) | CI re-arms auto-merge after a body edit clears a text-only hold | Accepted | A pull_request edited job dispatches a master-only run that re-arms auto-merge with CI_PAT only when the owner's post-plan sticky records holds on (20) or (18 MISSING/MALFORMED) alone, the patch-id is unchanged, the UI floor passes, and both body checks now pass. |
 | [0248](0248-sql-equivalent-clearable-hold.md) | A pure SQL rewrite gets a seat-clearable hold backed by committed evidence | Accepted | Token `sql-equivalent` reaches the second-review seat only when the harness re-checks a committed evidence file and returns exactly "ok"; any other evidence state keeps the owner hold. |
+| [0249](0249-prefire-pytest-stage.md) | Run only the harness tests tied to the branch's changed files in prefire-verify, and defer the rest to CI | Accepted | The prefire pytest stage runs the post-plan harness test files mapped to the changed files, serially, and defers every shared input, mapping error and selection over 25 files to CI instead of running the whole suite. |
 | [0247](0247-second-reviewer-eval-corpus.md) | Score the second-reviewer seat on a corpus of past held PRs | Accepted | `bin/reviewer-eval second` replays the seat on hand-confirmed cases whose holds come from the sticky and whose labels come from the owner's outcome, writes verdicts under an `eval-<id>` key, and prints a score that gates nothing. |
 
 ## When an ADR is Required

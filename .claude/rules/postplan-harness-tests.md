@@ -1,6 +1,6 @@
 ---
 description: Run only the post-plan harness test files you changed; CI runs the whole suite on every PR that touches the harness.
-last_verified: 2026-11-12
+last_verified: 2026-11-13
 paths:
   - "tools/postplan-harness/**"
   - "bin/post-plan-now"
@@ -28,6 +28,8 @@ Run only the test files you added or changed, from `tools/postplan-harness`:
 ```bash
 python3 -m pytest -q tests/test_armable.py tests/test_runner_review_depth.py
 ```
+
+`bin/lib/prefire-verify` runs the same targeted selection at the fire point through its `pytest` stage, so `bin/post-plan-now` exits 9 when a mapped harness test fails. Run the stage by hand with `bin/lib/prefire-verify --stage pytest`.
 
 A file or nodeid argument keeps the run serial, so it starts no worker pool. When you change a shell script with no matching test file, find its tests with `grep -l <script-name> tests/*.py` and run those. When a change touches shared code such as `conftest.py` or `harness/state.py`, push and let CI run the whole suite.
 

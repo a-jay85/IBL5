@@ -157,6 +157,18 @@ class PlayerActionControllerTest extends WideUnitTestCase
         $this->assertStringContainsString('is not on your team.', $output);
     }
 
+    public function testRenderRookieOptionUnknownPlayerReturnsNotFoundError(): void
+    {
+        $this->mockDb->setMockData([]);
+        $controller = $this->buildController($this->ownerRepo('Heat'), 'Free Agency');
+
+        $output = $controller->renderRookieOption(0, 'testgm', null, null, null);
+
+        $this->assertStringContainsString('role="alert"', $output);
+        $this->assertStringContainsString('Player not found.', $output);
+        $this->assertStringContainsString('Go Back', $output);
+    }
+
     public function testRenderRookieOptionTeamlessReturnsNoTeamError(): void
     {
         $this->seedPlayer();

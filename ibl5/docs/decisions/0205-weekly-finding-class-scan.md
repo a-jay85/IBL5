@@ -1,6 +1,6 @@
 ---
 description: Weekly scheduled scan that clusters recurring PR review findings and files one backlog issue per class proposing a static check.
-last_verified: 2026-11-01
+last_verified: 2026-11-13
 ---
 
 # ADR-0205: Weekly scan of recurring PR review finding classes
@@ -49,3 +49,7 @@ Class identity lives in a key marker on the backlog issue, read from open and cl
 - `bin/code-slice-review`
 - `ibl5/docs/decisions/0200-weekly-code-slice-review.md`
 - `ibl5/docs/decisions/0178-retire-retro-mine.md`
+
+## Addendum 2026-11-13: hotspot kind
+
+A `none` class whose threads cluster on one file now files as a bug issue, per `ibl5/docs/decisions/0252-finding-class-scan-hotspot-kind.md`. The rest of this ADR stands.

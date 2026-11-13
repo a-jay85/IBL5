@@ -199,7 +199,10 @@ use_backlog() { # copy the canned open/closed lists into the gh stub
 
 # seed_class <key> <check_kind> <pr> <id...>: registry entry plus assignment rows.
 seed_class() {
-    local key="$1" kind="$2" pr="$3" id i=0 path="null" reg="$STATE/registry.json"
+    local key="$1" kind="$2" pr="$3" id i=0 tp path="null" reg="$STATE/registry.json"
+    # SEED_PATHS: optional space-separated per-thread paths; "-" seeds a null path.
+    # shellcheck disable=SC2206  # word-split on purpose
+    local -a tpaths=(${SEED_PATHS:-})
     shift 3
     case "$kind" in
         phpstan) path='"ibl5/phpstan-rules/BanSeedRule.php"' ;;
@@ -211,9 +214,10 @@ seed_class() {
                      proposed_check: "Seed proposed check.", artifact_path: $p}}' "$reg" > "$reg.tmp" && mv "$reg.tmp" "$reg"
     for id in "$@"; do
         i=$((i + 1))
-        jq -nc --arg t "$id" --arg k "$key" --argjson pr "$pr" \
+        tp="${tpaths[$((i - 1))]:-ibl5/classes/Seed.php}"
+        jq -nc --arg t "$id" --arg k "$key" --argjson pr "$pr" --arg tp "$tp" \
             --arg u "https://github.com/a-jay85/IBL5/pull/$pr#discussion_r$((pr * 100 + i))" \
-            '{thread_id: $t, class_key: $k, pr: $pr, url: $u, path: "ibl5/classes/Seed.php", line: 7, resolved: false}' \
+            '{thread_id: $t, class_key: $k, pr: $pr, url: $u, path: (if $tp == "-" then null else $tp end), line: 7, resolved: false}' \
             >> "$STATE/assignments.jsonl"
     done
 }
@@ -512,7 +516,7 @@ seed_counting_fixture() {
     set_payload "$EMPTY_PAYLOAD"
     seed_class one-thread phpstan 50 o-1
     seed_class two-threads-one-pr phpstan 50 p-1 p-2
-    seed_class kind-none none 51 n-1 n-2 n-3
+    SEED_PATHS="ibl5/classes/SeedA.php ibl5/classes/SeedB.php ibl5/classes/SeedC.php" seed_class kind-none none 51 n-1 n-2 n-3
     local c
     for c in a b c d e; do seed_class "extra-class-$c" bin-check 52 "x-$c-1" "x-$c-2"; done
     grep '"thread_id":"p-1"' "$STATE/assignments.jsonl" >> "$STATE/assignments.jsonl"
@@ -538,6 +542,75 @@ case_counting() {
     expect_eq "row 27: six issue create calls on a real run" 6 "$(count_lines gh.calls 'issue create')"
     expect_has "row 26: DM counts the none class" "$(cat "$STUB_DIR/dm.txt")" "NO CHECK POSSIBLE: 1 classes, 0 grew this run"
     expect_lacks "row 26: an old none class that did not grow is not listed" "$(cat "$STUB_DIR/dm.txt")" "Title for kind-none"
+}
+
+# ── Cases: hotspot kind ───────────────────────────────────────────────────────
+seed_hotspot_fixture() {
+    new_fixture
+    set_payload "$EMPTY_PAYLOAD"
+    local hp="ibl5/classes"
+    SEED_PATHS="$hp/Hot.php $hp/Hot.php $hp/Hot.php $hp/Hot.php" \
+        seed_class hot-all none 60 h-1 h-2 h-3 h-4
+    SEED_PATHS="$hp/Edge.php $hp/Edge.php $hp/Edge.php $hp/Edge.php $hp/Other.php" \
+        seed_class hot-exact none 61 e-1 e-2 e-3 e-4 e-5
+    SEED_PATHS="$hp/Three.php $hp/Three.php $hp/Three.php $hp/Four.php" \
+        seed_class spread-75 none 62 s-1 s-2 s-3 s-4
+    SEED_PATHS="$hp/Two.php $hp/Two.php" \
+        seed_class hot-two none 63 t-1 t-2
+    SEED_PATHS="$hp/X.php $hp/X.php $hp/X.php $hp/F1.php $hp/F2.php $hp/F3.php $hp/F4.php $hp/F5.php $hp/F6.php $hp/F7.php" \
+        seed_class cross-file none 64 c-1 c-2 c-3 c-4 c-5 c-6 c-7 c-8 c-9 c-10
+    SEED_PATHS="- - -" seed_class null-path none 65 z-1 z-2 z-3
+}
+
+case_hotspot_derivation() {
+    seed_hotspot_fixture
+    fcs --dry-run
+    expect_eq "hotspot: run exits 0" 0 "$RC"
+    expect_has "hotspot: a 4-of-4 none class files under bug" "$OUT" "--- would file [bug] class-scan: Title for hot-all"
+    expect_has "hotspot: a 4-of-5 none class at exactly 80% files" "$OUT" "--- would file [bug] class-scan: Title for hot-exact"
+    expect_has "hotspot: a 75% class stays skipped-none" "$ALL" "skipped-none: spread-75 (4 threads)"
+    expect_has "hotspot: a 2-thread single-file class stays skipped-none" "$ALL" "skipped-none: hot-two (2 threads)"
+    expect_has "hotspot: a cross-file class stays skipped-none" "$ALL" "skipped-none: cross-file (10 threads)"
+    expect_has "hotspot: a class with no thread paths stays skipped-none" "$ALL" "skipped-none: null-path (3 threads)"
+    expect_lacks "hotspot: a filed hotspot leaves the skipped-none list" "$ALL" "skipped-none: hot-all"
+    expect_eq "hotspot: exactly two classes file" 2 "$(grep -c '^--- would file' <<< "$OUT")"
+}
+
+case_hotspot_issue_body() {
+    seed_hotspot_fixture
+    fcs
+    local body
+    body="$(cat "$STUB_DIR/gh.body.1")"
+    expect_eq "hotspot: label is bug" "bug" "$(cat "$STUB_DIR/gh.label.1")"
+    expect_has "hotspot: body names the hotspot file" "$body" 'ibl5/classes/Hot.php'
+    # The occurrences table also prints the path, so pin the recipe line hpath fills.
+    expect_has "hotspot: recipe names the hotspot file" "$body" '3. Fix `ibl5/classes/Hot.php` until every new case passes.'
+    expect_has "hotspot: body carries the fix recipe" "$body" '## Fix recipe'
+    expect_has "hotspot: recipe asks for a regression test" "$body" 'Add a regression test'
+    if "$REPO_ROOT/bin/check-prose" --stdin < "$STUB_DIR/gh.body.1" >/dev/null 2>&1; then ok "hotspot: body passes check-prose"
+    else fail "hotspot: body fails check-prose"; fi
+    expect_has "hotspot: body carries the evidence marker" "$body" 'finding-class-scan:threads=h-1,h-2,h-3,h-4'
+    expect_eq "hotspot: two issue create calls" 2 "$(count_lines gh.calls 'issue create')"
+}
+
+case_hotspot_kind_from_registry_not_filed() {
+    new_fixture
+    set_payload "$EMPTY_PAYLOAD"
+    SEED_PATHS="ibl5/classes/Reg.php ibl5/classes/Reg.php ibl5/classes/Reg.php" \
+        seed_class reg-hotspot hotspot 66 r-1 r-2 r-3
+    fcs --dry-run
+    expect_lacks "hotspot: a registry-only hotspot kind is not filed" "$OUT" "Title for reg-hotspot"
+    expect_has "hotspot: the registry-only kind logs the skip" "$ALL" "class reg-hotspot has no check metadata; skipped"
+}
+
+case_classifier_hotspot_kind_rejected() {
+    new_fixture
+    set_payload '{"assignments":[{"thread_id":"T1","class_key":"classifier-hotspot"},{"thread_id":"T2","class_key":"classifier-hotspot"}],
+        "classes":[{"key":"classifier-hotspot","title":"Classifier invented a kind","description":"A class with an invented kind.",
+                    "check_kind":"hotspot","proposed_check":"None.","artifact_path":null}]}'
+    fcs
+    expect_eq "hotspot: a classifier-emitted hotspot kind files nothing" 0 "$(count_lines gh.calls 'issue create')"
+    expect_lacks "hotspot: the invented kind title never reaches gh" "$ALL" "Classifier invented a kind"
 }
 
 # ── Cases: backlog dedupe (Phase 5) ───────────────────────────────────────────
@@ -699,7 +772,10 @@ case_filing_failure_and_success() {
     new_fixture
     set_payload "$EMPTY_PAYLOAD"
     local i
-    for i in $(seq 1 200); do seed_class "skipped-class-$i" none 80 "k$i-1" "k$i-2" "k$i-3"; done
+    for i in $(seq 1 200); do
+        SEED_PATHS="ibl5/classes/SeedA.php ibl5/classes/SeedB.php ibl5/classes/SeedC.php" \
+            seed_class "skipped-class-$i" none 80 "k$i-1" "k$i-2" "k$i-3"
+    done
     fcs
     local size
     size="$(wc -c < "$STUB_DIR/dm.txt" | tr -d ' ')"

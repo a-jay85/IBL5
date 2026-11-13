@@ -59,6 +59,11 @@ FCS_CLAUDE_BIN="${FCS_CLAUDE_BIN:-claude}"
 FCS_DM_BIN="${FCS_DM_BIN:-$SCRIPT_DIR/discord-dm}"
 FCS_LAUNCHCTL_BIN="${FCS_LAUNCHCTL_BIN:-launchctl}"
 FCS_MIN_OCCURRENCES="${FCS_MIN_OCCURRENCES:-2}"
+# Hotspot derivation: a check_kind "none" class files as a bug issue when at
+# least HOTSPOT_MIN_THREADS of its threads, and at least HOTSPOT_MIN_SHARE_PCT
+# percent of them, sit on one file. Tuned on the 2026-11-10 review corpus.
+HOTSPOT_MIN_THREADS=3
+HOTSPOT_MIN_SHARE_PCT=80
 FCS_MAX_BUDGET_USD="${FCS_MAX_BUDGET_USD:-3.00}"
 FCS_CLASSIFY_TIMEOUT="${FCS_CLASSIFY_TIMEOUT:-1500}"
 FCS_VERIFY_TIMEOUT="${FCS_VERIFY_TIMEOUT:-1800}"
@@ -726,7 +731,7 @@ count_classes() {
     jq -n --slurpfile k "$WORK/known-classes.json" --slurpfile r "$reg" --slurpfile n "$WORK/run-classes.json" '
         ($k[0] | map({key: .key, value: {title: .title, check_kind: .check_kind}}) | from_entries) as $kn
         | $kn * $r[0] * $n[0]' > "$WORK/meta.json"
-    jq -sc --argjson min "$MIN_OCCURRENCES" --slurpfile meta "$WORK/meta.json" '
+    jq -sc --argjson min "$MIN_OCCURRENCES" --argjson hmin "$HOTSPOT_MIN_THREADS" --argjson hpct "$HOTSPOT_MIN_SHARE_PCT" --slurpfile meta "$WORK/meta.json" '
         map(select(.class_key != null))
         | group_by(.class_key)
         | map(. as $g | ($g | unique_by(.thread_id)) as $u | $g[0].class_key as $key
@@ -738,6 +743,13 @@ count_classes() {
                threads: ($u | sort_by([.pr, .thread_id])
                           | map({thread_id, url, pr, path, line, resolved}))})
         | map(select(.thread_count >= $min))
+        | map(if .check_kind == "none" then
+              ((.threads | map(.path | select(type == "string" and . != "")) | group_by(.)
+                | map({p: .[0], n: length}) | sort_by([-.n, .p]) | .[0]) // null) as $top
+              | if $top != null and $top.n >= $hmin and ($top.n * 100) >= ($hpct * .thread_count)
+                then . + {check_kind: "hotspot", hotspot_path: $top.p, hotspot_count: $top.n}
+                else . end
+            else . end)
         | sort_by(.key)' "$rows" > "$WORK/classes-counted.json"
     jq -c '.[] | select(.check_kind == "none") | {key, title, thread_count}' "$WORK/classes-counted.json" > "$WORK/skipped-none.jsonl"
     jq -c '.[] | select(.check_kind != "none")' "$WORK/classes-counted.json" > "$WORK/candidates.jsonl"
@@ -756,7 +768,7 @@ plan_actions() {
         key="$(jq -r .key <<< "$cand")"
         known="$(jq -c --arg k "$key" 'map(select(.key == $k and .number != null)) | .[0] // empty' "$WORK/known-classes.json")"
         if [ -z "$known" ]; then
-            if [ "$(jq -r '.check_kind' <<< "$cand")" != "phpstan" ] && [ "$(jq -r '.check_kind' <<< "$cand")" != "bin-check" ]; then
+            if ! jq -e '.check_kind == "phpstan" or .check_kind == "bin-check" or (.check_kind == "hotspot" and (.hotspot_path | type == "string") and .hotspot_path != "")' <<< "$cand" >/dev/null; then
                 log "class $key has no check metadata; skipped"
                 SKIPPED_NONE=$((SKIPPED_NONE + 1))
                 continue
@@ -828,11 +840,43 @@ threads_table() {
 
 thread_ids_csv() { jq -r '[.[] | .thread_id | select(test("^[A-Za-z0-9_-]+$"))] | join(",")' <<< "$1"; }
 
+# render_hotspot_body <action-json> <body-file>: a none class clustered on one
+# file. It files as a bug with a fix-plus-regression-test recipe.
+render_hotspot_body() {
+    local a="$1" hpath
+    hpath="$(clean_inline "$(jq -r '.hotspot_path // ""' <<< "$a")" 120)"
+    {
+        printf '**Class.** A recurring review finding that keeps landing in one file. It was flagged in %s review threads across %s PRs, and %s of them point at `%s`.\n\n' \
+            "$(jq -r .thread_count <<< "$a")" "$(jq -r .pr_count <<< "$a")" "$(jq -r .hotspot_count <<< "$a")" "$hpath"
+        printf '**Proposed fix.** Fix the defect in `%s` and add a regression test for every listed occurrence. No static check can encode this judgment, so the fix belongs in the file itself.\n\n' "$hpath"
+        printf '~~~text\n%s\n~~~\n\n' "$(defang "$(jq -r .description <<< "$a")")"
+        printf '## Occurrences\n\n'
+        threads_table "$(jq -c .threads <<< "$a")"
+        printf '\n## Fix recipe\n\nSteps run in order.\n\n'
+        printf -- '1. Read each listed thread and note the input it reports.\n'
+        printf -- '2. Add a regression test that reproduces each listed occurrence as a failing case.\n'
+        printf -- '3. Fix `%s` until every new case passes.\n' "$hpath"
+        printf -- '4. Run the existing tests for `%s`.\n\n' "$hpath"
+        printf '## Acceptance criteria\n\n'
+        printf -- '- [ ] A regression test reproduces every listed occurrence.\n'
+        printf -- '- [ ] The fix in `%s` makes each new case pass.\n' "$hpath"
+        printf -- '- [ ] The existing tests for `%s` still pass.\n' "$hpath"
+        printf '\n(discovered %s during the weekly finding-class scan)\n\n' "$(date +%F)"
+        printf '<!-- finding-class-scan:threads=%s -->\n' "$(thread_ids_csv "$(jq -c .threads <<< "$a")")"
+        printf '<!-- finding-class-scan:key=%s -->\n' "$(jq -r .key <<< "$a")"
+    } > "$2"
+}
+
 # render_issue <action-json> <body-file>: prints the issue title.
 render_issue() {
     local a="$1" bodyfile="$2" kind key apath target reg rung title
     kind="$(jq -r .check_kind <<< "$a")"; key="$(jq -r .key <<< "$a")"
     apath="$(clean_inline "$(jq -r '.artifact_path // ""' <<< "$a")" 120)"
+    if [ "$kind" = "hotspot" ]; then
+        render_hotspot_body "$a" "$bodyfile"
+        printf 'class-scan: %s' "$(clean_inline "$(jq -r .title <<< "$a")" 90)"
+        return 0
+    fi
     if [ "$kind" = "phpstan" ]; then
         target="PHPStan rule"; reg='`ibl5/phpstan.neon`'; rung=3
     else
@@ -928,7 +972,7 @@ apply_actions() {
             file)
                 title="$(render_issue "$a" "$bodyfile")"
                 kind="$(jq -r .check_kind <<< "$a")"
-                label="maintenance"; [ "$kind" = "bin-check" ] && label="dev-efficiency"
+                label="maintenance"; [ "$kind" = "bin-check" ] && label="dev-efficiency"; [ "$kind" = "hotspot" ] && label="bug"
                 if ! prose_ok "$bodyfile"; then
                     log "prose gate rejected the body for $key"
                     PROSE_FAILS="${PROSE_FAILS}${PROSE_FAILS:+, }prose:$key"

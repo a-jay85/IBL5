@@ -57,7 +57,7 @@ The forced flag is wired for the half-court arm only, the same scope `lateGameFo
 
 - The offensive foul on turnovers (Q1 above).
 - JSB's and-one floor test is `local_e90 <= _DAT_00669f00` (0.0), and its replacement is `FUN_005c6100(0.03)`, a uniform draw in [0, 0.03). The engine keeps the constant 0.03 floor at the 0.03 threshold. Porting the draw adds an RNG call on every floored trip.
-- The and-one basis. JSB's `local_e90` carries the whole `local_e88` made-shot weight, while the engine's and-one stand-in is about 0.04 against an HCA term of 0.57 (`hcaSite2BasisScale` 2.85 times 0.2). Under the faithful order the home/away and-one ratio is still about 11.5 to 1 (1186 home, 103 away over 500 fixture seeds). The plan expected a ratio between 0.5 and 2.0.
+- The and-one basis. JSB's `local_e90` carries the whole `local_e88` made-shot weight, while the engine's and-one stand-in is about 0.04 against an HCA term of 0.57 (`hcaSite2BasisScale` 2.85 times 0.2). Under the faithful order the home/away and-one ratio is still about 11.5 to 1 (1186 home, 103 away over 500 fixture seeds). A ratio band would need the `local_e88` basis, which is retuning (ADR-0158). So `TestAndOneHomeAwaySplit` checks that the away count rises above the BEFORE count of 34, and `TestAndOneWeightOrder` checks that the floor applies after the HCA term.
 - Unlocated foul volume: about 8.8 PF per team-game.
 - Still open from the 2026-11-08 handoff: the putback undo at 98430-98435 and the first-game initial counter. The late-game margin sign is now pinned by the J17 objdump.
 

@@ -85,6 +85,11 @@ def test_scope_notes_unavailable_on_usage_exit(tmp_path):
     assert notes[0].startswith("scope check unavailable (exit 2")
 
 
+# Same group as the target test, which keeps the literal decorator so the plan mutation
+# for row 12 matches exactly once.
+_REAL_TIMEOUT = pytest.mark.xdist_group("real_timeout")
+
+
 def _hang_script(tmp_path, startup_delay=0):
     script = tmp_path / "hang"
     delay = f"sleep {startup_delay}\n" if startup_delay else ""
@@ -120,7 +125,7 @@ def test_scope_notes_timeout_fails_closed_and_reaps(tmp_path, monkeypatch, pid_r
                      tmp_path / "grandchild.pid", "grandchild")
 
 
-@pytest.mark.xdist_group("real_timeout")
+@_REAL_TIMEOUT
 def test_scope_notes_timeout_witnesses_reap_when_grandchild_pid_is_late(
         tmp_path, monkeypatch, pid_reap_witness):
     """The grandchild pid lands 1.5s late, so the 1s attempt cannot see it and the witness

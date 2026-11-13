@@ -32,10 +32,9 @@ final class TwoForOne implements DealShapeInterface
             return;
         }
         $userPids = array_slice($pool->userPids, 0, CandidateBudget::PLAYERS_PER_PARTNER);
-        $count = count($userPids);
-        for ($i = 0; $i < $count; $i++) {
-            for ($j = $i + 1; $j < $count; $j++) {
-                $pair = [$userPids[$i], $userPids[$j]];
+        foreach ($userPids as $i => $first) {
+            foreach (array_slice($userPids, $i + 1) as $second) {
+                $pair = [$first, $second];
                 sort($pair);
                 foreach (array_slice($pool->partnerPids, 0, self::PARTNER_SINGLES) as $partnerPid) {
                     yield new TradeCandidate($userTid, $partnerTid, $pair, [], [$partnerPid], []);

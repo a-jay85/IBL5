@@ -61,7 +61,7 @@ final class ChangeOfScenery implements DealShapeInterface
             if ($weakestBench !== null) {
                 $targets[$weakestBench] = $weakestBench;
             }
-            foreach (array_keys($targets) as $partnerPid) {
+            foreach ($targets as $partnerPid) {
                 yield new TradeCandidate($userTid, $partnerTid, [$userPid], [], [$partnerPid], []);
             }
         }

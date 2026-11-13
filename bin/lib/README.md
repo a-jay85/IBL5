@@ -1,6 +1,6 @@
 ---
 description: Index of shared library files sourced by bin/ scripts.
-last_verified: 2026-11-12
+last_verified: 2026-11-13
 ---
 
 # bin/lib — Shared Library Files
@@ -27,6 +27,7 @@ Sourced (not executed directly) by scripts in `bin/` and `bin/automouse/`. Each 
 | `git-helpers.sh` | Shared git-layout helpers: canonical repo root resolution, `main_checkout_root`, and `register_last_verified_merge_driver` (idempotent `merge.lastverified.driver` registration, called by `bin/install-git-hooks` and `bin/wt-new`) |
 | `merge-last-verified` | Git merge driver (git executes it; nothing sources it) for markdown whose only conflict is the frontmatter `last_verified` date; keeps the newer date, else leaves standard markers and exits 1; exercised by `bin/test-merge-last-verified` |
 | `numbering.sh` | Shared ADR and migration numbering grammar: allocator name regexes, gate collision keys, and `numbering_next`. Sourced by `bin/next-number` and `bin/check-numbering`; source-safe (no `set`, no `exit`) |
+| `claim-file.sh` | `claim_file <path> [cmd...]` exclusive O_EXCL file claim for directory locks, plus `claim_file_lying_mkdir_stub` for harnesses; see `.claude/rules/shell-portability.md`; exercised by `bin/test-claim-file` |
 | `human-signoff-classifier.sh` | Single source of truth for the human sign-off verdict helpers (ADR-0062, ADR-0233), sourced by both the workflow and its regression harness |
 | `ui-change-classifier.sh` | Decides whether a PR is UI-touching from its changed paths and the VR gallery JSON (ADR-0233). Sourced by `human-signoff.yml`; `--paths` mode is called by `bin/lib/pr-armable.sh` `pr_ui_hold` and `tools/postplan-harness/harness/armable.py` `ui_hold` |
 | `dm.sh` | Discord-DM sender helpers. `dm_bin` resolves the `discord-dm` binary from a caller's seam variables, so an empty seam falls back to the default. `dm_ping` sends with `--ping` and puts the message last. Sourced by `bin/pr-cycle`, `bin/pr-cycle-tick`, `bin/post-plan-fail-dm`, `bin/plan-now`, `bin/post-plan-fleet`, `bin/pr-review-now` and `bin/db-backups-pull`; tested by `bin/test-discord-dm` |

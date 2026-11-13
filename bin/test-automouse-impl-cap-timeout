@@ -284,7 +284,10 @@ else
     h_fail "s1-placeholder-present" "{{IMPL_BUDGET_MINUTES}} missing from $PROMPT"
 fi
 
-if grep -qF 'IMPL_BUDGET_MINUTES' "$RUNNER"; then
+# The runner's comments also name the token, so match the substitution
+# expression itself. A bare name grep passes after the code line is respelled.
+# shellcheck disable=SC2016  # intentional: searching source code for a literal $-string
+if grep -qF '${IMPL_PROMPT//\{\{IMPL_BUDGET_MINUTES\}\}/$IMPL_BUDGET_MIN}' "$RUNNER"; then
     h_pass "s2-substitution-present"
 else
     h_fail "s2-substitution-present" "no IMPL_BUDGET_MINUTES substitution in $RUNNER"

@@ -258,7 +258,7 @@ def test_render_scope_notes_empty_and_nonempty():
     assert out.endswith(SCOPE_NOTES_END)
     assert "## Unplanned changes" in out
     assert "Auto-merge is not held on them." in out
-    assert "- unplanned `ibl5/a.php` (changed path)" in out
+    assert "- `ibl5/a.php` +?/-?: (no reason given)" in out
     assert "- gap `ibl5/b.php` (absent)" in out
 
 
@@ -276,3 +276,52 @@ def test_upsert_scope_notes_insert_replace_remove():
     removed = upsert_scope_notes(replaced, "")
     assert removed.strip() == body.strip()
     assert upsert_scope_notes(body, "") == body
+
+
+_ADR_NEW = "ibl5/docs/decisions/0999-x.md"
+_ADR_README = "ibl5/docs/decisions/README.md"
+
+
+def _flagged(notes):
+    return {n.split(" ")[1] for n in _unplanned(notes)}
+
+
+def test_scope_notes_new_adr_and_index_are_expected(tmp_path):
+    plan = _plan(tmp_path, ["ibl5/a.php"])
+    diff = _diff(modified=[_ADR_README, "ibl5/a.php"], added=[_ADR_NEW])
+    notes = scope_notes(plan, [_ADR_NEW, _ADR_README, "ibl5/a.php"], diff, "")
+    assert _unplanned(notes) == []
+
+
+def test_scope_notes_adr_index_alone_still_flagged(tmp_path):
+    plan = _plan(tmp_path, ["ibl5/a.php"])
+    diff = _diff(modified=[_ADR_README, "ibl5/a.php"], added=[])
+    notes = scope_notes(plan, [_ADR_README, "ibl5/a.php"], diff, "")
+    assert _flagged(notes) == {_ADR_README}
+
+
+def test_scope_notes_adr_near_miss_paths_still_flagged(tmp_path):
+    plan = _plan(tmp_path, ["ibl5/a.php"])
+    txt = "ibl5/docs/decisions/0999-x.txt"
+    arch = "ibl5/docs/decisions/archive/0999-x.md"
+    diff = _diff(modified=[_ADR_README, "ibl5/a.php"], added=[txt, arch])
+    notes = scope_notes(plan, [txt, arch, _ADR_README, "ibl5/a.php"], diff, "")
+    assert {txt, arch, _ADR_README} <= _flagged(notes)
+
+
+def test_scope_notes_modified_adr_still_flagged(tmp_path):
+    plan = _plan(tmp_path, ["ibl5/a.php"])
+    adr = "ibl5/docs/decisions/0244-plan-checks-ci-from-pr-body.md"
+    diff = _diff(modified=[adr, "ibl5/a.php"], added=[])
+    notes = scope_notes(plan, [adr, "ibl5/a.php"], diff, "")
+    assert _flagged(notes) == {adr}
+
+
+def test_scope_notes_adr_carve_out_keeps_test_and_claude_flags(tmp_path):
+    plan = _plan(tmp_path, ["ibl5/a.php"])
+    test_p, claude_p = "ibl5/tests/FooTest.php", ".claude/rules/x.md"
+    diff = _diff(modified=[test_p, claude_p, _ADR_README, "ibl5/a.php"], added=[_ADR_NEW])
+    notes = scope_notes(plan, [_ADR_NEW, test_p, claude_p, _ADR_README, "ibl5/a.php"], diff, "")
+    flagged = _flagged(notes)
+    assert {test_p, claude_p} <= flagged
+    assert _ADR_NEW not in flagged and _ADR_README not in flagged

@@ -22,6 +22,14 @@ SCOPE_CHECK_TIMEOUT = 120   # seconds; a hang fails closed (subprocess-timeout, 
 _DIFF_HEADER = re.compile(r"^diff --git a/.+ b/(?P<path>.+)$")
 _NOTE_PREFIX = "SCOPE-NOTE: "
 _UNPLANNED_PREFIX = "UNPLANNED-FILE: "
+_ADR_FILE = re.compile(r"^ibl5/docs/decisions/[0-9]{4}-[^/]+\.md$")
+_ADR_INDEX = "ibl5/docs/decisions/README.md"
+
+
+def _adr_companions(added: list[str]) -> set[str]:
+    """Paths a new ADR makes expected: each ADDED ADR file, plus the index when one exists."""
+    new_adrs = {p for p in added if _ADR_FILE.match(p)}
+    return (new_adrs | {_ADR_INDEX}) if new_adrs else set()
 
 
 def _added_paths(diff_body: str) -> list[str]:
@@ -59,10 +67,14 @@ def scope_notes(plan: PlanInfo, changed_files: list[str], diff_body: str, pr_bod
     Added paths come from `diff_body`, never from git in the process cwd, because the
     pinned main-checkout harness runs outside the target worktree. An empty diff body
     yields no added paths, so nothing is exempt.
+
+    A newly added `ibl5/docs/decisions/NNNN-*.md` ADR, and the decisions README edit
+    when such an ADR is added, are dropped as expected; a gap note is never dropped.
     """
     if not plan.path:
         return []
     script = script or _SCOPE_SCRIPT
+    added = _added_paths(diff_body)
     with tempfile.TemporaryDirectory(prefix="scope-conf-") as td:
         changed_path = os.path.join(td, "changed.txt")
         added_path = os.path.join(td, "added.txt")
@@ -70,7 +82,7 @@ def scope_notes(plan: PlanInfo, changed_files: list[str], diff_body: str, pr_bod
         with open(changed_path, "w") as fh:
             fh.write("".join(f"{p}\n" for p in changed_files))
         with open(added_path, "w") as fh:
-            fh.write("".join(f"{p}\n" for p in _added_paths(diff_body)))
+            fh.write("".join(f"{p}\n" for p in added))
         with open(body_path, "w") as fh:
             fh.write(pr_body or "")
         try:
@@ -89,4 +101,6 @@ def scope_notes(plan: PlanInfo, changed_files: list[str], diff_body: str, pr_bod
             notes.append(text[len(_NOTE_PREFIX):])
         elif text.startswith(_UNPLANNED_PREFIX):
             notes.append("unplanned " + text[len(_UNPLANNED_PREFIX):])
-    return notes
+    expected = _adr_companions(added)
+    return [n for n in notes
+            if not (n.startswith("unplanned ") and n.split(" ", 2)[1] in expected)]

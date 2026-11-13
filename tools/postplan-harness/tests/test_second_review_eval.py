@@ -250,6 +250,20 @@ def test_graphql_mutation_argv_raises():
 CLEAN_REPLY = "CLEARS 7: the hold is safe to clear for this diff\nVERDICT: CLEAN"
 
 
+@pytest.fixture(autouse=True)
+def _private_verdict_dir(tmp_path, monkeypatch):
+    """Point verdict files at this test's tmp_path.
+
+    The run tests share one case id, so the real verdict_path gives them one
+    /tmp file. Under xdist, one test's cleanup deletes the file another test
+    just wrote, and that test reads no verdict.
+    """
+    vdir = tmp_path / "verdicts"
+    vdir.mkdir()
+    monkeypatch.setattr(second_review, "verdict_path",
+                        lambda pr: str(vdir / f"postplan-second-review-{pr}.md"))
+
+
 def _git(repo, *argv):
     return subprocess.run(["git", "-C", str(repo), *argv], capture_output=True, text=True,
                           check=True).stdout.strip()

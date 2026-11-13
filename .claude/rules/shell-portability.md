@@ -1,6 +1,6 @@
 ---
 description: Shell portability gotchas for bin/ scripts and skill inline bash — BSD vs GNU date and stat, SSH single-line commands, heredoc JSON, isolated bash blocks in skills, shellcheck only the scripts you changed.
-last_verified: 2026-11-11
+last_verified: 2026-11-13
 paths:
   - "bin/**"
   - ".claude/skills/**/*.md"
@@ -35,6 +35,17 @@ mtime=$(stat -c %Y "$f" 2>/dev/null || stat -f %m "$f" 2>/dev/null || echo 0)
 ```
 
 `bin/check-shell-portability` enforces this on every shell file under `bin/`, and CI runs it on each pull request. It flags a `stat -f` call with a format operand when no `stat -c` call comes earlier in the same statement. Backslash-continued lines count as one statement. When a site is correct for another reason, such as output validated before use or a GNU branch chosen by a probe, end the line with `# portability-ok: <reason>`. The reason must be non-empty.
+
+## Directory locks: own the lock by an O_EXCL file
+
+uutils mkdir, the default on Ubuntu 26.04, can report success to both of two racing `mkdir` calls on one path. A lock that counts `mkdir` success as ownership then has two owners. Every directory lock under `bin/` takes ownership by creating a file inside the lock dir with `claim_file` from `bin/lib/claim-file.sh`. The helper creates the file under noclobber, which bash opens with O_EXCL, and restores the caller's noclobber setting. `mkdir` only makes room for that file. A failed claim means the lock is held, and the script takes the same wait, reap, or refuse path that a failed `mkdir` takes.
+
+- Take a lock with `mkdir "$d" 2>/dev/null && claim_file "$d/pid" printf '%s\n' "$$"`.
+- Remove a lock dir with `rm -rf`. `rmdir` fails once the dir holds a claim file.
+- A launchd job string cannot source a repo file, so `ljob_submit_wrapper_text` claims its marker inline with `(set -C; : > "$marker")`.
+- Test a lock with `claim_file_lying_mkdir_stub`, which writes a `mkdir` that always exits 0. Put its dir first on PATH.
+
+No gate checks this. A text lint cannot tell a lock `mkdir` from a plain directory create, so review and each lock's harness case carry it.
 
 ## SSH commands must be single-line strings
 

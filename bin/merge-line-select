@@ -129,7 +129,7 @@ fi
 # The decision program. Semantics are binding (plan: merge-line-head-of-line).
 # shellcheck disable=SC2016  # jq program: $-variables are jq's, not the shell's
 SELECT_JQ='
-def required: ["Tests and Analysis","E2E Tests","human-signoff","Meta checks"];
+def required: ["Tests and Analysis","E2E Tests","human-signoff","Meta checks","Infection PHP (per-PR diff)","All checks settled"];
 def ctx_name: (.name // .context // "");
 def ctx_red:
   if .__typename == "CheckRun" then

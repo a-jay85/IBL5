@@ -35,7 +35,7 @@ Five other golden helpers do not use the trait. Each already fails on a missing 
 
 Thresholds: **100% MSI / 100% Covered MSI** (`ibl5/infection.json5`, `.github/workflows/mutation-pr.yml`). Config: `phpunit-mutation.xml`; per-file deferrals live in `infection.json5`.
 
-**Local run.** Only after CI's Infection check fails on the PR. A hook allows only `bin/mutation-diff <base-ref>`. Details are in `.claude/rules/phpstan-invocation.md` § Running Infection locally.
+**Local run.** Only after CI's Infection check fails on the PR. Details are in `.claude/rules/phpstan-invocation.md` § Running Infection locally.
 
 ## WideUnit + MockDatabase
 

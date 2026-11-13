@@ -164,7 +164,7 @@ def _git(args, cwd=None) -> str:
 def _changed_files(root) -> list[str]:
     """Files this branch changes vs origin/master, plus uncommitted ones."""
     files = set(_git(["diff", "--name-only", "origin/master...HEAD"], cwd=root).splitlines())
-    for line in _git(["status", "--porcelain"], cwd=root).splitlines():
+    for line in _git(["status", "--porcelain", "--untracked-files=all"], cwd=root).splitlines():
         entry = line[3:]
         files.add(entry.split(" -> ", 1)[-1].strip('"'))
     return sorted(f for f in files if f)

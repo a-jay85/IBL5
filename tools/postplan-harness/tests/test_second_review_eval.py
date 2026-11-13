@@ -311,6 +311,22 @@ def test_run_never_touches_real_pr_verdict(repo):
             Path(real).write_bytes(prior)
 
 
+def test_replay_checkout_uses_current_agent_def(repo):
+    root = repo[0]
+    agent = root / sre.SURFACE_PATHS[1]
+    agent.parent.mkdir(parents=True)
+    agent.write_text("current agent def\n")
+    seen = []
+
+    def factory(wt):
+        seen.append((Path(wt) / sre.SURFACE_PATHS[1]).read_text())
+        return _factory()(wt)
+
+    word, _ = sre.run_case(root, _run_case(repo), spawn_factory=factory)
+    assert word == "CLEAN"
+    assert seen == ["current agent def\n"]
+
+
 def test_checkout_removed_after_spawn_error(repo):
     word, clears = sre.run_case(repo[0], _run_case(repo), spawn_factory=_factory(raises=True))
     assert (word, clears) == (None, {})

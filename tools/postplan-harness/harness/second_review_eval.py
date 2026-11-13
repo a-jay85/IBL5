@@ -569,6 +569,19 @@ def _remove_worktree(root: Path, wt: str) -> None:
     _gitt(root, "worktree", "prune")
 
 
+def _install_current_agent(root: Path, wt: Path) -> None:
+    """Copy the agent def under test into the replay checkout.
+
+    The seat resolves `--agent pr-second-reviewer` from its cwd, which is the old replay
+    commit. Without this copy a run would score the old definition while `v=` hashes the new one.
+    """
+    agent = Path(root) / SURFACE_PATHS[1]
+    if agent.is_file():
+        dest = wt / SURFACE_PATHS[1]
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(agent, dest)
+
+
 def _has_commit(root: Path, sha: str) -> bool:
     return _gitt(root, "cat-file", "-e", f"{sha}^{{commit}}").returncode == 0
 
@@ -590,6 +603,7 @@ def run_case(root: Path, case: dict, *, spawn_factory) -> tuple[Optional[str], d
     try:
         if _gitt(root, "worktree", "add", "-q", "--detach", wt, replay).returncode != 0:
             return None, {}
+        _install_current_agent(root, Path(wt))
         replay_tree = _gitt(root, "rev-parse", f"{replay}^{{tree}}").stdout.strip()
         word, tree, clears = second_review.run_seat(
             key,

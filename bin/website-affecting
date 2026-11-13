@@ -62,6 +62,7 @@
 #       .github/workflows/smoke-prod.yml             (post-deploy prod smoke over SSH)
 #       .github/workflows/cache-dependencies.yml     (builds php-apache:latest; E2E pulls prebaked)
 #       .github/workflows/deploy-rehearsal.yml       (self-contained migration smoke; no VR/E2E/LH)
+#       .github/workflows/harness-legs.txt           (shell-harness leg list for tests.yml; data, not a workflow)
 #
 # Anchoring is load-bearing:
 #   ^bin/      so ibl5/bin/* (app bin, website-side) is NOT denied
@@ -142,6 +143,7 @@ is_ci_meta_exempt() {
         .github/workflows/smoke-prod.yml)            return 0 ;;  # workflow_run after "Build and Deploy" — SSH prod smoke; no PR-E2E impact (like pages-deploy)
         .github/workflows/cache-dependencies.yml)    return 0 ;;  # builds php-apache:latest on push:master; E2E pulls the prebaked image (a PR edit doesn't rebuild it)
         .github/workflows/deploy-rehearsal.yml)      return 0 ;;  # boots PHP for a self-contained migration smoke — drives no VR/E2E/Lighthouse/preview render
+        .github/workflows/harness-legs.txt)          return 0 ;;  # leg list read only by bin/run-shell-harnesses for the tests.yml shell-harness job — drives no VR/E2E/Lighthouse/preview render
     esac
     return 1
 }
@@ -192,6 +194,7 @@ affect a VR/E2E/Lighthouse/preview render; staleness over-runs, never silent-ski
   .github/workflows/smoke-prod.yml
   .github/workflows/cache-dependencies.yml
   .github/workflows/deploy-rehearsal.yml
+  .github/workflows/harness-legs.txt
 
 Naturally website-side (not denied, not exempt):
   ibl5/**  .github/** (incl. e2e-tests.yml, lighthouse*.yml)  docker/**

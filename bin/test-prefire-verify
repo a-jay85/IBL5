@@ -58,7 +58,7 @@ new_case() {
     PLAN="$D/plan.md"
     mkdir -p "$R/ibl5/vendor/bin" "$CNT" "$D/stubs"
     export CNT
-    unset STUB_PHPUNIT_RC STUB_MUT_MODE
+    unset STUB_PHPUNIT_RC STUB_MUT_MODE STUB_PYTEST_RC STUB_PYTEST_PREREQ_RC
     cat > "$R/ibl5/vendor/bin/phpunit" <<'EOF'
 #!/usr/bin/env bash
 echo run >> "$CNT/phpunit"
@@ -68,6 +68,14 @@ EOF
     printf '#!/usr/bin/env bash\necho run >> "$CNT/mutation"\nexit 0\n' > "$D/stubs/mutation"
     printf '#!/usr/bin/env bash\necho run >> "$CNT/probe"\nexit "${STUB_PROBE_RC:-0}"\n' > "$D/stubs/probe"
     printf '#!/usr/bin/env bash\necho run >> "$CNT/excludes"\nexit 0\n' > "$D/stubs/excludes"
+    cat > "$D/stubs/pytest" <<'EOF'
+#!/usr/bin/env bash
+if [ "${1:-}" = --version ]; then exit "${STUB_PYTEST_PREREQ_RC:-0}"; fi
+echo run >> "$CNT/pytest"
+printf '%s:%s\n' "$#" "$*" >> "$CNT/pytest_args"
+exit "${STUB_PYTEST_RC:-0}"
+EOF
+    chmod +x "$D/stubs/pytest"
     chmod +x "$R/ibl5/vendor/bin/phpunit" "$D/stubs/mutation" "$D/stubs/probe" "$D/stubs/excludes"
     (
         cd "$R" || exit 1
@@ -81,6 +89,7 @@ EOF
     export PREFIRE_PHPUNIT_CMD="vendor/bin/phpunit"
     export PREFIRE_PHPUNIT_FULL=1   # existing cases pin full-suite behavior; subset_case unsets it
     export PREFIRE_DB_PROBE_CMD="$D/stubs/probe"
+    export PREFIRE_PYTEST_CMD="$D/stubs/pytest"
     # Removed seams. Kept exported so a stray read shows up in $CNT.
     export PREFIRE_MUTATION_CMD="$D/stubs/mutation"
     export PREFIRE_EXCLUDES_CMD="$D/stubs/excludes"
@@ -108,6 +117,35 @@ subset_case() {
         printf '{}\n' > ibl5/composer.lock
         git add -A && git commit -q -m tree && git checkout -q -b feat
     ) || { echo "HARNESS-SETUP: subset fixture failed" >&2; exit 2; }
+}
+
+# pytest_case: new_case plus a committed tools/postplan-harness tree on master, then branch feat.
+pytest_case() {
+    new_case
+    (
+        cd "$R" || exit 1
+        H=tools/postplan-harness
+        mkdir -p "$H/harness" "$H/tests" bin/lib
+        printf '' > "$H/harness/__init__.py"
+        printf 'def evaluate(): pass\n' > "$H/harness/armable.py"
+        printf 'x = 1\n' > "$H/harness/armable_extra.py"
+        printf 'S = 1\n' > "$H/harness/state.py"
+        printf 'L = 1\n' > "$H/harness/lonely.py"
+        printf 'import pytest\n' > "$H/tests/conftest.py"
+        printf 'from harness.armable import evaluate\n' > "$H/tests/test_armable.py"
+        printf 'from harness import fidelity, armable\n' > "$H/tests/test_combo.py"
+        printf 'from harness.armable_extra import x\n' > "$H/tests/test_extra.py"
+        printf 'from harness.state import S\n' > "$H/tests/test_state_user.py"
+        printf 'def test_u(): pass\n' > "$H/tests/test_unrelated.py"
+        printf 'SCRIPT = "bin/lib/pr-armable.sh"\n' > "$H/tests/test_script.py"
+        printf 'SCRIPT = "bin/lib/pr-armable.shim"\n' > "$H/tests/test_script_nearmiss.py"
+        printf '#!/bin/sh\n' > bin/lib/pr-armable.sh
+        git add -A && git commit -q -m harness && git checkout -q -b feat
+    ) || { echo "HARNESS-SETUP: pytest fixture failed" >&2; exit 2; }
+}
+want_pytest_args() { # <exact last argv line the pytest stub recorded>
+    local got; got=$(tail -n 1 "$CNT/pytest_args" 2>/dev/null)
+    [ "$got" = "$1" ] || note "pytest args expected '$1', got '$got'"
 }
 
 # write_plan <row-line>...  — each argument is a full table row.
@@ -340,7 +378,7 @@ test_all_never_invokes_infection() {
     chmod +x "$R/bin/mutation-diff" "$R/ibl5/bin/check-infection-excludes"
     run_gate --plan "$PLAN"
     want_rc 0
-    want_out "all requested stages passed (matrix phpunit)"
+    want_out "all requested stages passed (matrix phpunit pytest)"
     want_cnt mutation 0
     want_cnt excludes 0
     [ ! -e "$D/mutation-diff-called" ] || note "bin/mutation-diff ran under --stage all"
@@ -769,7 +807,7 @@ case_fire_point_skips_exec_mutations() {
     OUT=$(cd "$R" && PREFIRE_EXEC_MUTATIONS_LIB="$D/stubs/xmlib-sentinel" "$GATE" --base master --plan "$PLAN" --fire-point 2>&1); RC=$?
     want_rc 0
     refute_out "exec-mutations passed"
-    want_out "all requested stages passed (matrix phpunit)"
+    want_out "all requested stages passed (matrix phpunit pytest)"
     [ ! -e "$D/xmlib-called" ] || note "plan-exec-mutations ran at the fire point"
 }
 
@@ -1093,7 +1131,7 @@ test_xm_bad_stage_rejected() {
     new_case
     run_gate --stage exec_mutations
     want_rc 2
-    want_out "--stage must be matrix, phpunit, exec-mutations, or all"
+    want_out "--stage must be matrix, phpunit, pytest, exec-mutations, or all"
 }
 
 test_help_lists_exec_mutations() {
@@ -1530,6 +1568,162 @@ test_phpunit_subset_leaves_worktree_clean() {
 }
 
 # ---------------------------------------------------------------------------
+# pytest stage (plan prefire-verify-pytest-stage rows 2-17)
+# ---------------------------------------------------------------------------
+PYF="-q -p no:xdist -p no:cacheprovider"
+
+test_pytest_changed_test_file_runs_itself() {
+    pytest_case
+    touch_file tools/postplan-harness/tests/test_unrelated.py
+    run_gate --stage pytest
+    want_rc 0
+    want_out "pytest mode: subset (1 test files)"
+    want_pytest_args "6:$PYF tests/test_unrelated.py"
+}
+
+test_pytest_module_maps_importing_tests() {
+    pytest_case
+    touch_file tools/postplan-harness/harness/armable.py
+    run_gate --stage pytest
+    want_rc 0
+    want_pytest_args "7:$PYF tests/test_armable.py tests/test_combo.py"
+}
+
+test_pytest_module_prefix_near_miss_excluded() {
+    pytest_case
+    touch_file tools/postplan-harness/harness/armable.py
+    run_gate --stage pytest
+    want_rc 0
+    if grep -qF test_extra.py "$CNT/pytest_args"; then note "armable_extra importer selected"; fi
+}
+
+test_pytest_script_maps_by_basename() {
+    pytest_case
+    touch_file bin/lib/pr-armable.sh
+    run_gate --stage pytest
+    want_rc 0
+    want_pytest_args "6:$PYF tests/test_script.py"
+}
+
+test_pytest_conftest_defers_to_ci() {
+    pytest_case
+    touch_file tools/postplan-harness/tests/conftest.py
+    run_gate --stage pytest
+    want_rc 0
+    want_out "pytest deferred to CI: shared test helper or fixture changed: tools/postplan-harness/tests/conftest.py"
+    want_out "pytest mode: skipped"
+    want_cnt pytest 0
+}
+
+test_pytest_state_module_defers_to_ci() {
+    pytest_case
+    touch_file tools/postplan-harness/harness/state.py
+    run_gate --stage pytest
+    want_rc 0
+    want_out "pytest deferred to CI: shared harness module imported by most tests: tools/postplan-harness/harness/state.py"
+    want_cnt pytest 0
+}
+
+test_pytest_unmapped_module_defers_to_ci() {
+    pytest_case
+    touch_file tools/postplan-harness/harness/lonely.py
+    run_gate --stage pytest
+    want_rc 0
+    want_out "pytest deferred to CI: no harness test imports the changed module: tools/postplan-harness/harness/lonely.py"
+    want_cnt pytest 0
+}
+
+test_pytest_no_trigger_path_skips() {
+    pytest_case
+    touch_file ibl5/tracked.txt
+    run_gate --stage pytest
+    want_rc 0
+    want_out "pytest mode: skipped (no harness trigger path changed against master)"
+    want_cnt pytest 0
+}
+
+test_pytest_deleted_test_file_runs_nothing() {
+    pytest_case
+    (cd "$R" && git rm -q tools/postplan-harness/tests/test_unrelated.py)
+    run_gate --stage pytest
+    want_rc 0
+    want_out "pytest deferred to CI: test file deleted: tools/postplan-harness/tests/test_unrelated.py"
+    want_cnt pytest 0
+}
+
+test_pytest_over_cap_defers_to_ci() {
+    pytest_case
+    local i=1
+    while [ "$i" -le 26 ]; do
+        touch_file "tools/postplan-harness/tests/test_cap_$i.py"
+        i=$((i + 1))
+    done
+    run_gate --stage pytest
+    want_rc 0
+    want_out "pytest deferred to CI: 26 test files selected, over the local cap of 25"
+    want_cnt pytest 0
+}
+
+test_pytest_bad_base_defers_not_full() {
+    pytest_case
+    touch_file tools/postplan-harness/tests/test_unrelated.py
+    run_gate_nobase --base no-such-ref --stage pytest
+    want_rc 0
+    want_out "pytest deferred to CI: cannot resolve base 'no-such-ref'"
+    want_cnt pytest 0
+}
+
+test_pytest_missing_prereq_exits_3() {
+    pytest_case
+    export STUB_PYTEST_PREREQ_RC=1
+    touch_file tools/postplan-harness/tests/test_unrelated.py
+    run_gate --stage pytest
+    unset STUB_PYTEST_PREREQ_RC
+    want_rc 3
+    want_out "FAIL pytest prerequisite missing"
+    want_cnt pytest 0
+}
+
+test_pytest_failing_test_exits_1() {
+    pytest_case
+    export STUB_PYTEST_RC=1
+    touch_file tools/postplan-harness/tests/test_unrelated.py
+    run_gate --stage pytest
+    unset STUB_PYTEST_RC
+    want_rc 1
+    want_out "FAIL pytest: subset of 1 test files red (exit 1)"
+    [ -z "$(pass_files '\.pytest.*\.pass$')" ] || note "red run wrote a pass record"
+}
+
+test_pytest_subset_pass_is_cached() {
+    pytest_case
+    touch_file tools/postplan-harness/tests/test_unrelated.py
+    run_gate --stage pytest
+    want_rc 0
+    run_gate --stage pytest
+    want_rc 0
+    want_out "pytest pass cached for tree"
+    want_cnt pytest 1
+}
+
+test_stage_rejects_unknown_name_lists_pytest() {
+    new_case
+    run_gate --stage pytests
+    want_rc 2
+    want_out "--stage must be matrix, phpunit, pytest, exec-mutations, or all (got 'pytests')"
+}
+
+test_pytest_all_includes_pytest_stage() {
+    pytest_case
+    green_plan
+    touch_file tools/postplan-harness/tests/test_unrelated.py
+    run_gate --plan "$PLAN"
+    want_rc 0
+    want_out "all requested stages passed (matrix phpunit pytest)"
+    want_cnt pytest 1
+}
+
+# ---------------------------------------------------------------------------
 # SHELLCHECK_OPTS for actionlint / shellcheck rows (backlog#1803)
 # ---------------------------------------------------------------------------
 # A fake linter that models shellcheck's severity filter. It records the
@@ -1718,6 +1912,22 @@ test_sc_row_info_finding_passes_under_shared_opts
 test_sc_row_warning_finding_still_fails
 test_non_sc_row_gets_no_opts
 test_sc_opts_single_source
+test_pytest_changed_test_file_runs_itself
+test_pytest_module_maps_importing_tests
+test_pytest_module_prefix_near_miss_excluded
+test_pytest_script_maps_by_basename
+test_pytest_conftest_defers_to_ci
+test_pytest_state_module_defers_to_ci
+test_pytest_unmapped_module_defers_to_ci
+test_pytest_no_trigger_path_skips
+test_pytest_deleted_test_file_runs_nothing
+test_pytest_over_cap_defers_to_ci
+test_pytest_bad_base_defers_not_full
+test_pytest_missing_prereq_exits_3
+test_pytest_failing_test_exits_1
+test_pytest_subset_pass_is_cached
+test_stage_rejects_unknown_name_lists_pytest
+test_pytest_all_includes_pytest_stage
 "
 
 if [ $# -gt 0 ]; then CASES="$*"; else CASES="$ALL_CASES"; fi

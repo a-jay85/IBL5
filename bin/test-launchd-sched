@@ -254,7 +254,8 @@ expect_eq "lib-main-wt-non-git-fallback" "0:$NOGIT" "$rc:$got"
 T="$TMP/nogit-wt-gc"
 mkdir -p "$T/bin/lib"
 cp "$REPO_ROOT/bin/wt-gc-cron-setup" "$T/bin/"
-cp "$REPO_ROOT/bin/lib/launchd-sched.sh" "$REPO_ROOT/bin/lib/launchd-job.sh" "$T/bin/lib/"
+cp "$REPO_ROOT/bin/lib/launchd-sched.sh" "$REPO_ROOT/bin/lib/launchd-job.sh" \
+   "$REPO_ROOT/bin/lib/claim-file.sh" "$T/bin/lib/"
 rc=0
 got="$(env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" HOME="$GOLDEN_HOME" PATH=/usr/bin:/bin bash "$T/bin/wt-gc-cron-setup" --print-schedule 2>&1)" || rc=$?
 if [ "$rc" = "0" ] && grep -qF "$T/bin/wt-gc-tick" <<< "$got"; then

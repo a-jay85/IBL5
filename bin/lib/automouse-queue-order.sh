@@ -32,6 +32,19 @@
 # append that ran mid-renumber would reuse a prefix the renumber is about to give out.
 #   lstat_mtime <path>             epoch mtime of the path itself (cutover only)
 
+# bin/automouse/lib-queue-order is a symlink to this file, and test fixtures copy it, so
+# the sibling claim-file.sh is found through the symlink target; a bare copy has none and
+# falls back to a one-argument noclobber claim.
+_qo_self="${BASH_SOURCE[0]}"
+if [ -L "$_qo_self" ]; then _qo_self="$(dirname "$_qo_self")/$(readlink "$_qo_self")"; fi
+if [ -f "$(dirname "$_qo_self")/claim-file.sh" ]; then
+    # shellcheck source=bin/lib/claim-file.sh
+    . "$(dirname "$_qo_self")/claim-file.sh"
+elif ! declare -F claim_file >/dev/null 2>&1; then
+    claim_file() { (set -C; : > "$1") 2>/dev/null; }
+fi
+unset _qo_self
+
 if stat -c '%Y' / >/dev/null 2>&1; then
     _LIB_STAT_FMT=gnu
 else
@@ -136,7 +149,7 @@ next_prefix() {
 # rival stole first and re-took the lock, so put it back instead of deleting it.
 _queue_lock_take() {
     mkdir "$1" 2>/dev/null || return 1
-    (set -C; : > "$1/owner") 2>/dev/null
+    claim_file "$1/owner"
 }
 
 _queue_lock_remove() {

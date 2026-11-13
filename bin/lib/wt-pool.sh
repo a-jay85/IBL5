@@ -13,6 +13,9 @@
 # sourcing script; POOL_CSS_STALE is read back by it.
 # shellcheck disable=SC2153,SC2034
 
+# shellcheck source=bin/lib/claim-file.sh
+. "$(dirname "${BASH_SOURCE[0]}")/claim-file.sh"
+
 POOL_LABEL="com.ibl5.wt-pool-refill"
 
 # Canonical form of an existing path (macOS mktemp sits under a /var symlink).
@@ -106,7 +109,7 @@ _pool_lock_dir() {
     printf '%s/wt-pool.lock\n' "$gcd"
 }
 
-_pool_lock_write_owner() { printf '%s\n%s\n' "$$" "$(date +%s)" > "$1/owner"; }
+_pool_lock_write_owner() { claim_file "$1/owner" printf '%s\n%s\n' "$$" "$(date +%s)"; }
 
 # 0 when the lock at <dir> is stale: dead owner pid, owner epoch over 600s old,
 # or no owner file in a dir over 10 minutes old.
@@ -135,15 +138,13 @@ _pool_lock_live() {
 pool_lock_acquire() {
     local lock
     lock="$(_pool_lock_dir "$1")" || return 1
-    if mkdir "$lock" 2>/dev/null; then
-        _pool_lock_write_owner "$lock"
+    if mkdir "$lock" 2>/dev/null && _pool_lock_write_owner "$lock"; then
         return 0
     fi
     if _pool_lock_is_stale "$lock"; then
         rm -rf "$lock"
         echo "wt-pool: recovered stale lock" >&2
-        if mkdir "$lock" 2>/dev/null; then
-            _pool_lock_write_owner "$lock"
+        if mkdir "$lock" 2>/dev/null && _pool_lock_write_owner "$lock"; then
             return 0
         fi
     fi

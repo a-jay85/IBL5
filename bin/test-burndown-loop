@@ -223,7 +223,8 @@ make_tree() {
     TT="$T/tree"
     mkdir -p "$TT/bin/lib"
     cp "$REPO_ROOT/bin/burndown-loop" "$TT/bin/burndown-loop"
-    cp "$REPO_ROOT/bin/lib/usage-gate.sh" "$REPO_ROOT/bin/lib/usage-fetch.sh" "$TT/bin/lib/"
+    cp "$REPO_ROOT/bin/lib/usage-gate.sh" "$REPO_ROOT/bin/lib/usage-fetch.sh" \
+       "$REPO_ROOT/bin/lib/claim-file.sh" "$TT/bin/lib/"
     chmod +x "$TT/bin/burndown-loop"
 }
 

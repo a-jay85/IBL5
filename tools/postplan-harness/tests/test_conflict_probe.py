@@ -337,7 +337,7 @@ def _run_live(tmp_path, wt, monkeypatch, body_pass, *, calls=None, resolver=True
                 self.llm = None
         monkeypatch.setattr(runner, "LiveGit", _NullLlmGit)
 
-    def fake_pr_copy(llm, git, gh, fixture, slug, cls, plan, log):
+    def fake_pr_copy(llm, git, gh, fixture, slug, cls, plan, log, files=None, diff_body=""):
         calls["pr_copy"] += 1
         return dict(_COPY), False
 

@@ -18,24 +18,25 @@
 # a row fails on the findings CI fails on and passes on the info notes CI ignores.
 # A row that sets SHELLCHECK_OPTS inline overrides it.
 #
-# Usage: bin/lib/prefire-verify [--plan <path>] [--stage matrix|phpunit|exec-mutations|all]
+# Usage: bin/lib/prefire-verify [--plan <path>] [--stage matrix|phpunit|pytest|exec-mutations|all]
 #                               [--base <ref>] [--bypass <reason>] [--fire-point]
 #   --fire-point  exec-mutations only: use the larger limits (300 s per check run, 1800 s
 #                 total) instead of the implementer's 120 s / 300 s. The fire point's "all" run
 #                 skips that stage, so the flag matters only for a named exec-mutations run.
 #                 bin/post-plan-now passes it; a pass under either limit is the same record.
-#   --base        base ref for the phpunit stage's diff (default: git config
+#   --base        base ref for the phpunit and pytest stages' diff (default: git config
 #                 branch.<name>.iblBase, else origin/master)
 # Exit codes:
 #   0  every requested stage passed (fresh run, or a valid pass record for this tree)
 #   1  a check failed (the message names the matrix row or the stage)
 #      (an exec-mutations row that did not trip, or a mutation revert that failed)
 #   2  usage error, including --plan with an empty value (omit the flag when there is no plan)
-#   3  prerequisite missing: vendor/bin/phpunit, docker, the DB container, gtimeout/timeout
+#   3  prerequisite missing: vendor/bin/phpunit, python3 -m pytest, docker, the DB container, gtimeout/timeout
 #   4  the checks changed the working tree, so no pass record was written
 #
 # Test seams (used only by bin/test-prefire-verify):
 #   PREFIRE_PHPUNIT_CMD    default vendor/bin/phpunit, run from ibl5/; subset mode appends test paths as arguments
+#   PREFIRE_PYTEST_CMD     default python3 -m pytest; "<cmd> --version" is the prerequisite probe; a run goes from tools/postplan-harness/ with -q -p no:xdist -p no:cacheprovider and the test paths
 #   PREFIRE_DB_PROBE_CMD   default bin/db-query "SELECT 1", run from the repo root
 #   PREFIRE_EXEC_MUTATIONS_LIB  default bin/lib/plan-exec-mutations
 #
@@ -81,9 +82,9 @@ while [ $# -gt 0 ]; do
 done
 
 case "$STAGE" in
-    matrix|phpunit|exec-mutations|all) : ;;
+    matrix|phpunit|pytest|exec-mutations|all) : ;;
     infection) die 2 "--stage infection was removed; CI's required check \"Infection PHP (per-PR diff)\" covers mutation testing, so skip this call" ;;
-    *) die 2 "--stage must be matrix, phpunit, exec-mutations, or all (got '$STAGE')" ;;
+    *) die 2 "--stage must be matrix, phpunit, pytest, exec-mutations, or all (got '$STAGE')" ;;
 esac
 case "${PREFIRE_PHPUNIT_FULL:-}" in
     ''|0|1) : ;;
@@ -398,6 +399,125 @@ prefire_phpunit_select() { # <list-file>
     PHPUNIT_MODE=subset
 }
 
+# --- pytest test selection --------------------------------------------------
+# prefire_pytest_select <list-file> sets PYTEST_MODE (subset|skip) and PYTEST_REASON.
+# In subset mode it writes test paths, relative to tools/postplan-harness/, to <list-file>.
+# There is no full mode. An error, a shared input, an unmapped file, or a selection
+# over PYTEST_CAP defers to CI, whose python-tests.yml runs the whole harness suite.
+PYTEST_HOME="tools/postplan-harness"
+PYTEST_CAP=25
+PYTEST_MODE=""
+PYTEST_REASON=""
+PYTEST_DEFERRED=""
+PYTEST_DEFERRED_N=0
+PYTEST_TRIGGERED=0
+pytest_defer() { PYTEST_DEFERRED="${PYTEST_DEFERRED}$1"$'\n'; PYTEST_DEFERRED_N=$((PYTEST_DEFERRED_N + 1)); }
+pytest_abort() { pytest_defer "$1"; PYTEST_MODE=skip; PYTEST_REASON="deferred to CI: $1"; }
+pytest_say_deferred() {
+    local d
+    while IFS= read -r d; do
+        [ -n "$d" ] || continue
+        say "pytest deferred to CI: $d"
+    done <<< "$PYTEST_DEFERRED"
+}
+
+pytest_grep_tests() { # <extended regex> <list-file>; appends top-level tests/test_*.py that match
+    local rc
+    (cd "$PYTEST_HOME" && git grep -l --untracked -E -e "$1" -- 'tests/test_*.py' ':(exclude)tests/*/*') >> "$2"
+    rc=$?
+    [ "$rc" -le 1 ]
+}
+
+pytest_map_module() { # <path relative to tools/postplan-harness/, ending .py> <list-file>
+    local rel="${1%.py}" dotted leaf parent b='([^A-Za-z0-9_]|$)'
+    leaf="${rel##*/}"
+    case "$rel" in
+        */*)
+            dotted=$(printf '%s' "$rel" | sed 's/\//\\./g')
+            parent=$(printf '%s' "${rel%/*}" | sed 's/\//\\./g')
+            pytest_grep_tests "(^|[^A-Za-z0-9_.])${dotted}${b}" "$2" || return 1
+            pytest_grep_tests "^[[:space:]]*from[[:space:]]+${parent}[[:space:]]+import(.*[^A-Za-z0-9_])?${leaf}${b}" "$2" ;;
+        *)
+            pytest_grep_tests "^[[:space:]]*(import|from)[[:space:]]+${leaf}${b}" "$2" ;;
+    esac
+}
+
+pytest_map_script() { # <repo-relative script path> <list-file>
+    local esc
+    esc=$(printf '%s' "${1##*/}" | sed 's/[.]/\\./g')
+    pytest_grep_tests "(^|[^A-Za-z0-9_.-])${esc}([^A-Za-z0-9_-]|$)" "$2"
+}
+
+prefire_pytest_select() { # <list-file>
+    local out="$1" base mb changed status path rel n before after
+    PYTEST_MODE=""; PYTEST_REASON=""; PYTEST_DEFERRED=""; PYTEST_DEFERRED_N=0; PYTEST_TRIGGERED=0
+    base=$(prefire_phpunit_base)
+    if ! git rev-parse --verify -q "$base^{commit}" >/dev/null 2>&1; then
+        if git rev-parse --verify -q "origin/$base^{commit}" >/dev/null 2>&1; then base="origin/$base"
+        else pytest_abort "cannot resolve base '$base'"; return 0; fi
+    fi
+    mb=$(git merge-base "$base" HEAD 2>/dev/null) || { pytest_abort "no merge-base between $base and HEAD"; return 0; }
+    changed=$(mktemp "${TMPDIR:-/tmp}/prefire-pychanged.XXXXXX") || { pytest_abort "cannot create a temp file"; return 0; }
+    if ! git -c core.quotePath=false diff --name-status --no-renames "$mb" -- > "$changed" 2>/dev/null; then
+        rm -f "$changed"; pytest_abort "cannot diff the tree against $base"; return 0
+    fi
+    if ! git -c core.quotePath=false ls-files --others --exclude-standard > "$changed.u" 2>/dev/null; then
+        rm -f "$changed" "$changed.u"; pytest_abort "cannot list untracked files"; return 0
+    fi
+    while IFS= read -r path; do printf 'A\t%s\n' "$path"; done < "$changed.u" >> "$changed"
+    rm -f "$changed.u"
+    while IFS=$'\t' read -r status path; do
+        [ -n "$path" ] || continue
+        case "$path" in
+            *.md) continue ;;
+            "$PYTEST_HOME"/tests/test_*.py)
+                PYTEST_TRIGGERED=1
+                rel="${path#"$PYTEST_HOME"/}"
+                case "${rel#tests/}" in */*) pytest_defer "nested test file, CI runs it: $path"; continue ;; esac
+                if [ -f "$path" ]; then printf '%s\n' "$rel" >> "$out"
+                else pytest_defer "test file deleted: $path"; fi
+                continue ;;
+            "$PYTEST_HOME"/tests/*)
+                PYTEST_TRIGGERED=1; pytest_defer "shared test helper or fixture changed: $path"; continue ;;
+            "$PYTEST_HOME"/harness/state.py|"$PYTEST_HOME"/*__init__.py)
+                PYTEST_TRIGGERED=1; pytest_defer "shared harness module imported by most tests: $path"; continue ;;
+            "$PYTEST_HOME"/harness/*.py|"$PYTEST_HOME"/runner.py)
+                PYTEST_TRIGGERED=1
+                before=$(wc -l < "$out" | tr -d ' ')
+                pytest_map_module "${path#"$PYTEST_HOME"/}" "$out" || { pytest_abort "cannot search $PYTEST_HOME/tests for $path"; break; }
+                after=$(wc -l < "$out" | tr -d ' ')
+                if [ "$after" -le "$before" ]; then pytest_defer "no harness test imports the changed module: $path"; fi
+                continue ;;
+            "$PYTEST_HOME"/*)
+                PYTEST_TRIGGERED=1; pytest_defer "harness file with no test mapping: $path"; continue ;;
+            .github/workflows/python-tests.yml)
+                PYTEST_TRIGGERED=1; pytest_defer "harness CI workflow changed: $path"; continue ;;
+            bin/lib/pr-armable.sh|bin/lib/post-review-findings.sh|bin/post-plan-now|bin/lib/branch-base.sh|bin/lib/usage-gate.sh|bin/normalize-manual-testing|bin/lib/pr-sticky.sh|bin/lib/current-models|bin/check-*|bin/gate-backtest|.claude/review-shared/scripts/lostwork.sh)
+                PYTEST_TRIGGERED=1
+                before=$(wc -l < "$out" | tr -d ' ')
+                pytest_map_script "$path" "$out" || { pytest_abort "cannot search $PYTEST_HOME/tests for $path"; break; }
+                after=$(wc -l < "$out" | tr -d ' ')
+                if [ "$after" -le "$before" ]; then pytest_defer "no harness test names the changed script: $path"; fi
+                continue ;;
+            *) continue ;;
+        esac
+    done < "$changed"
+    rm -f "$changed"
+    if [ "$PYTEST_MODE" = skip ]; then return 0; fi
+    if [ "$PYTEST_TRIGGERED" -eq 0 ]; then
+        PYTEST_MODE=skip; PYTEST_REASON="no harness trigger path changed against $base"; return 0
+    fi
+    if [ ! -s "$out" ]; then
+        PYTEST_MODE=skip
+        PYTEST_REASON="deferred to CI, which runs the whole harness suite; changed files with no local test: $PYTEST_DEFERRED_N"
+        return 0
+    fi
+    sort -u "$out" -o "$out" || { pytest_abort "cannot sort the test list"; return 0; }
+    n=$(wc -l < "$out" | tr -d ' ')
+    if [ "$n" -gt "$PYTEST_CAP" ]; then pytest_abort "$n test files selected, over the local cap of $PYTEST_CAP"; return 0; fi
+    PYTEST_MODE=subset
+}
+
 # --- phpunit stage ----------------------------------------------------------
 stage_phpunit() {
     local log rc key list t cmd="${PREFIRE_PHPUNIT_CMD:-vendor/bin/phpunit}"
@@ -453,6 +573,49 @@ stage_phpunit() {
     fi
     write_record phpunit "$key"
     say "phpunit passed"
+    return 0
+}
+
+# --- pytest stage -----------------------------------------------------------
+stage_pytest() {
+    local log rc key list t cmd="${PREFIRE_PYTEST_CMD:-python3 -m pytest}"
+    local -a targets
+    targets=()
+    if list=$(mktemp "${TMPDIR:-/tmp}/prefire-pytest.XXXXXX"); then
+        prefire_pytest_select "$list"
+    else
+        list=""; pytest_abort "cannot create the test-list file"
+    fi
+    if [ "$PYTEST_MODE" = subset ]; then
+        while IFS= read -r t; do targets[${#targets[@]}]="$t"; done < "$list"
+        key="subset-$(git hash-object "$list" | cut -c1-12)"
+    fi
+    [ -n "$list" ] && rm -f "$list"
+    if [ "$PYTEST_MODE" != subset ] || [ "${#targets[@]}" -eq 0 ]; then
+        pytest_say_deferred
+        say "pytest mode: skipped ($PYTEST_REASON)"
+        return 0
+    fi
+    say "pytest mode: subset (${#targets[@]} test files)"
+    if [ "$PYTEST_DEFERRED_N" -gt 0 ]; then
+        say "pytest subset covers mapped files only; CI runs the whole harness suite (deferred files: $PYTEST_DEFERRED_N)"
+        pytest_say_deferred
+    fi
+    cache_hit pytest "$key" && return 0
+    if ! bash -c "$cmd --version" >/dev/null 2>&1; then
+        say "FAIL pytest prerequisite missing: '$cmd --version' failed; install pytest for python3" >&2
+        return 3
+    fi
+    log="$STATE_DIR/$TREE.pytest.log"
+    { printf 'prefire-verify pytest mode: subset\n'; printf '  %s\n' "${targets[@]}"; } > "$log"
+    (cd "$PYTEST_HOME" && PYTHONDONTWRITEBYTECODE=1 bash -c "$cmd -q -p no:xdist -p no:cacheprovider \"\$@\"" prefire-pytest "${targets[@]}") >> "$log" 2>&1; rc=$?
+    if [ "$rc" -ne 0 ]; then # pytest-red
+        say "FAIL pytest: subset of ${#targets[@]} test files red (exit $rc); log: $log" >&2
+        tail -n 40 "$log" >&2
+        return 1
+    fi
+    write_record pytest "$key"
+    say "pytest passed"
     return 0
 }
 
@@ -555,7 +718,7 @@ stage_exec_mutations() {
 
 # --- run --------------------------------------------------------------------
 case "$STAGE" in
-    all) STAGES="matrix phpunit" ;;
+    all) STAGES="matrix phpunit pytest" ;;
     *)   STAGES="$STAGE" ;;
 esac
 

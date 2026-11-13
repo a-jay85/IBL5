@@ -100,10 +100,14 @@ left=0
 [ "$left" -gt 0 ] || exit 1
 out=""
 case "${1:-}" in
-    -lf)
-        if [ "${2:-}" = "--" ]; then pat=${3:-}; else pat=${2:-}; fi
-        out=$(grep -F -- "$pat" "$FX/pgrep.lf" 2>/dev/null) ;;
-    -f) out=$(cat "$FX/pgrep.f" 2>/dev/null) ;;
+    -f)
+        # `pgrep -f -- <worktree>` matches pgrep.lf lines ("<pid> <command>");
+        # a bare `pgrep -f <pattern>` returns the pids in pgrep.f.
+        if [ "${2:-}" = "--" ]; then
+            out=$(grep -F -- "${3:-}" "$FX/pgrep.lf" 2>/dev/null | cut -d' ' -f1)
+        else
+            out=$(cat "$FX/pgrep.f" 2>/dev/null)
+        fi ;;
 esac
 [ -n "$out" ] || exit 1
 echo $((left - 1)) > "$FX/pgrep.left"
@@ -116,7 +120,17 @@ case " $* " in
 esac
 exit 0
 SHIM
-chmod +x "$TMP/shims/gh" "$TMP/shims/launchctl" "$TMP/shims/pgrep" "$TMP/shims/lsof"
+# ps: `ps -o command= -p <pid>` for a pid in pgrep.lf prints that line's command.
+# Every other call (the ppid walks in _oa_mine) goes to the real /bin/ps.
+cat > "$TMP/shims/ps" <<'SHIM'
+#!/usr/bin/env bash
+if [ "${1:-}" = "-o" ] && [ "${2:-}" = "command=" ] && [ "${3:-}" = "-p" ] && [ -f "$FX/pgrep.lf" ]; then
+    line=$(grep -E "^${4:-x} " "$FX/pgrep.lf" 2>/dev/null)
+    if [ -n "$line" ]; then printf '%s\n' "${line#* }"; exit 0; fi
+fi
+exec /bin/ps "$@"
+SHIM
+chmod +x "$TMP/shims/gh" "$TMP/shims/launchctl" "$TMP/shims/pgrep" "$TMP/shims/lsof" "$TMP/shims/ps"
 
 # ---------------------------------------------------------------------------
 # Fixture repo: the script under test, bin/lib, and a prefire-verify stub.

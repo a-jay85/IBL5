@@ -1,7 +1,7 @@
 ---
 description: PHPUnit testing rules: output parsing, behavior-focused patterns, PHPStan test-neon suppressions, integration test seeding. Long-form sections live in phpunit-tests-detail.md (Read on demand).
 paths: ibl5/tests/**/*.php
-last_verified: 2026-11-11
+last_verified: 2026-11-12
 ---
 
 # PHPUnit Testing Rules
@@ -133,13 +133,13 @@ Mutation testing (Infection): see `phpunit-tests-detail.md`.
 
 Before considering ANY PHP task complete:
 
-1. **Run the FULL suite**: `composer test` (from `ibl5/`) — never `--testsuite`/`--filter` as final verification; changes in one module frequently break others (shared mocks/interfaces/base classes).
-2. **DB-touching code** → `composer test:all` instead (needs Docker MariaDB + `DB_HOST`/`DB_USER`/`DB_PASS`/`DB_NAME`).
+1. **Run the tests mapped to your changed files.** `bin/lib/prefire-verify --stage phpunit` picks them, and `bin/post-plan-now` runs the same stage before it ships (ADR-0241). Do not run the full suite locally. It takes about 3 minutes, and CI's `PHPUnit Tests` job runs it on every PR. A change to a shared base class, helper or PHPUnit config has no mapped tests, so it defers to CI. Set `PREFIRE_PHPUNIT_FULL=1` only when you need the full result before you push.
+2. **DB-touching code.** `phpunit.xml` excludes the `database` group, so the stage above skips integration tests. Run the ones you touched with `vendor/bin/phpunit --group database <test file>` (needs Docker MariaDB and `DB_HOST`/`DB_USER`/`DB_PASS`/`DB_NAME`). CI's `Database Integration Tests` job runs the whole group.
 3. Final line must read `OK (X tests, Y assertions)`, with zero warnings, failures, errors, or skips. One skip is expected on the macOS host, so `OK, but some tests were skipped!` with `Skipped: 1` passes there. That test is `ShadowProcessLauncherTest::launchReturnsImmediatelyWhileChildRunsDetached`.
    It needs Linux `setsid`, which macOS lacks. It runs for real in CI and in the php container, and it fails in CI if `setsid` is missing. Don't investigate it. A second skip, or a skip anywhere in CI, is real and needs fixing.
 4. If `OK, but there were issues!`, run `--display-all-issues` and FIX root causes (don't suppress).
 
-Use `--testsuite`/`--filter` only for fast feedback while debugging a specific failure — re-run the full suite once it passes.
+Use `--testsuite`/`--filter` for fast feedback while debugging a specific failure. Re-run the mapped tests once it passes.
 
 ## PHPStan test-neon suppressions
 

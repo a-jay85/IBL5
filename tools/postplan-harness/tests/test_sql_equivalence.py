@@ -174,6 +174,12 @@ def test_evaluate_source_not_in_diff(repo, tmp_path):
     assert se.evaluate_evidence(repo, BRANCH, [EVIDENCE, BIND_FILE]) == f"source not in diff: {SOURCE}"
 
 
+def test_evaluate_changed_class_file_missing_from_sources(repo, tmp_path):
+    _record(repo, tmp_path)
+    other = "ibl5/classes/Bar/BarRepository.php"
+    assert se.evaluate_evidence(repo, BRANCH, [*CHANGED, other]) == f"changed source not covered: {other}"
+
+
 def test_evaluate_stale_source_blob(repo, tmp_path):
     _record(repo, tmp_path)
     (repo / SOURCE).write_text("<?php // edited after the recording\n")

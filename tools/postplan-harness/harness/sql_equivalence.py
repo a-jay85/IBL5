@@ -140,6 +140,10 @@ def evaluate_evidence(root, branch, changed_files) -> str:
                 return f"source not in diff: {path}"
             if not (Path(root) / path).is_file() or _blob_sha(root, path) != blob:
                 return f"stale: {path}"
+        for changed_path in sorted(changed):
+            if (changed_path.startswith("ibl5/classes/") and changed_path.endswith(".php")
+                    and changed_path not in sources):
+                return f"changed source not covered: {changed_path}"
         for entry in bind_tests:
             test_path, _, method = entry.partition("::")
             if not test_path.startswith("ibl5/tests/") or not _has_method(root, test_path, method):

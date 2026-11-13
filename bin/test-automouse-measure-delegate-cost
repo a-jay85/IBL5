@@ -353,6 +353,168 @@ ra_call "$TMPROOT/R4" --plan rt.md --phase 1 --arm ab --attempt 1 \
     --effort high --check-result pass --check-exit 0 2>/dev/null || RA_RC=$?
 assert_eq "$RA_RC" "2" "record-attempt-rejects-arm-ab: exit 2"
 
+printf '\n=== case_trial ===\n'
+python3 - "$TMPROOT" <<'PY'
+import json, os, sys
+
+ROOT = sys.argv[1]
+TS = "2026-11-01T00:00:00+00:00"
+
+def row(phase, model, tier, plan, session_id, cost, inp=0, out=0, cr=0, w5=0, w1=0, date="2026-09-20"):
+    return json.dumps({
+        "date": date, "plan": plan, "phase": phase, "model": model, "tier": tier,
+        "session_id": session_id, "cost": cost,
+        "inp": inp, "out": out, "cr": cr, "w5": w5, "w1": w1,
+    })
+
+def att(plan, phase, arm, attempt, effort, result):
+    return json.dumps({
+        "plan": plan, "phase": phase, "arm": arm, "attempt": attempt,
+        "effort": effort,
+        "check_exit": 0 if result == "pass" else 1,
+        "check_result": result, "ts": TS,
+    }, sort_keys=True)
+
+def write_attempts(d, plan, rows):
+    stem = plan[:-3]
+    with open(f"{d}/logs/{stem}.delegate-attempts.jsonl", "w") as f:
+        for r in rows:
+            f.write(r + "\n")
+
+def build(name, lf_layout, ctl_layout, lf_out=100000, ctl_out=200000,
+          drop=False, inherited=False):
+    d = f"{ROOT}/{name}"
+    os.makedirs(f"{d}/logs", exist_ok=True)
+    ledger = []
+    def ledger_rows(plan, out, tag):
+        ledger.append(row("impl", "claude-sonnet-4-6", "Sonnet", plan, f"{tag}-impl", 0, out=out))
+        ledger.append(row("postplan", "claude-sonnet-4-6", "Sonnet", plan, f"{tag}-pp", 1.0))
+    idx = 0
+    for i, n in enumerate(lf_layout):
+        plan = f"lf-{i}.md"
+        ledger_rows(plan, lf_out, f"{name}-lf{i}")
+        rows = []
+        for ph in range(1, n + 1):
+            if idx < 10:
+                rows.append(att(plan, ph, "low-first", 1, "low", "fail"))
+                rows.append(att(plan, ph, "low-first", 2, "high",
+                                "fail" if (drop and idx == 0) else "pass"))
+            else:
+                rows.append(att(plan, ph, "low-first", 1, "low", "pass"))
+            idx += 1
+        write_attempts(d, plan, rows)
+    for i, n in enumerate(ctl_layout):
+        plan = f"ctl-{i}.md"
+        ledger_rows(plan, ctl_out, f"{name}-ctl{i}")
+        write_attempts(d, plan, [att(plan, ph, "control", 1, "high", "pass")
+                                 for ph in range(1, n + 1)])
+    if inherited:
+        plan = "lf-inh.md"
+        ledger_rows(plan, 100000, f"{name}-inh")
+        write_attempts(d, plan, [att(plan, 1, "low-first", 1, "inherited", "fail")])
+    with open(f"{d}/logs/2026-11-01.costs.jsonl", "w") as f:
+        for r in ledger:
+            f.write(r + "\n")
+
+FULL = [4] * 10 + [3] * 20
+build("T_keep", FULL, FULL)
+build("T_drop", FULL, FULL, drop=True)
+build("T_cost", FULL, FULL, lf_out=200000)
+build("T_few", [4] * 13 + [3] * 16, [4] * 13 + [3] * 16)
+build("T_pk", [4] * 9 + [3] * 21, [4] * 9 + [3] * 21)
+build("T_inh", FULL, FULL, inherited=True)
+
+os.makedirs(f"{ROOT}/T_none/logs", exist_ok=True)
+with open(f"{ROOT}/T_none/logs/2026-11-01.costs.jsonl", "w") as f:
+    f.write(row("impl", "claude-sonnet-4-6", "Sonnet", "n-1.md", "N-impl", 0, out=1000) + "\n")
+    f.write(row("postplan", "claude-sonnet-4-6", "Sonnet", "n-1.md", "N-pp", 1.0) + "\n")
+
+os.makedirs(f"{ROOT}/T_rt/logs", exist_ok=True)
+with open(f"{ROOT}/T_rt/logs/2026-11-01.costs.jsonl", "w") as f:
+    f.write(row("impl", "claude-sonnet-4-6", "Sonnet", "rt.md", "RT-impl", 0, out=1000) + "\n")
+    f.write(row("postplan", "claude-sonnet-4-6", "Sonnet", "rt.md", "RT-pp", 1.0) + "\n")
+PY
+
+for t_name in T_keep T_drop T_cost T_few T_pk T_inh; do
+    "$SCRIPT" --trial --nightly-dir "$TMPROOT/$t_name" --out "$TMPROOT/$t_name/trial.md" --json \
+        > "$TMPROOT/$t_name/trial.json" 2>/dev/null
+done
+
+assert_eq "$(jget "$TMPROOT/T_keep/trial.json" verdict)" "KEEP" \
+    "trial-keep-verdict: equal pass rate and lower low-first cost"
+assert_eq "$(jget "$TMPROOT/T_drop/trial.json" verdict)" "REVERT" \
+    "trial-revert-pass-rate-drop: one failed retry lowers the final pass rate"
+assert_eq "$(jget "$TMPROOT/T_cost/trial.json" verdict)" "REVERT" \
+    "trial-revert-cost-not-lower: equal median cost is not lower"
+assert_eq "$(jget "$TMPROOT/T_few/trial.json" verdict)" "INSUFFICIENT" \
+    "trial-insufficient-below-floor: 29 plans per arm"
+assert_eq "$(jget "$TMPROOT/T_pk/trial.json" verdict)" "INSUFFICIENT" \
+    "trial-insufficient-packets-floor: 99 packets per arm"
+assert_eq "$(jget "$TMPROOT/T_inh/trial.json" verdict)" "KEEP" \
+    "trial-inherited-excluded: verdict unchanged by the inherited plan"
+assert_eq "$(jget "$TMPROOT/T_inh/trial.json" arms.low-first.excluded)" "1" \
+    "trial-inherited-excluded: low-first excluded=1"
+assert_eq "$(jget "$TMPROOT/T_inh/trial.json" arms.low-first.plans)" "30" \
+    "trial-inherited-excluded: low-first plans=30"
+assert_close "$(jget "$TMPROOT/T_keep/trial.json" arms.low-first.final_pass_rate)" "1.0" \
+    "trial-final-result-uses-retry: low-first final_pass_rate=1.0"
+assert_close "$(jget "$TMPROOT/T_keep/trial.json" arms.low-first.first_pass_rate)" "0.9" \
+    "trial-final-result-uses-retry: low-first first_pass_rate=0.9"
+grep -qx 'Verdict: KEEP' "$TMPROOT/T_keep/trial.md" \
+    && h_pass "trial-keep-verdict: report has bare Verdict line" \
+    || h_fail "trial-keep-verdict: report has bare Verdict line"
+
+TN_RC=0
+TN_ERR=$("$SCRIPT" --trial --nightly-dir "$TMPROOT/T_none" --out /dev/null 2>&1) || TN_RC=$?
+assert_eq "$TN_RC" "2" "trial-no-attempt-files-exit2: exit 2"
+grep -qF -- 'no delegate-attempts files' <<< "$TN_ERR" \
+    && h_pass "trial-no-attempt-files-exit2: stderr names no delegate-attempts files" \
+    || h_fail "trial-no-attempt-files-exit2: stderr names no delegate-attempts files" "$TN_ERR"
+
+"$SCRIPT" --record-attempt --nightly-dir "$TMPROOT/T_rt" --plan rt.md --phase 1 --arm low-first \
+    --attempt 1 --effort low --check-result fail --check-exit 1
+"$SCRIPT" --record-attempt --nightly-dir "$TMPROOT/T_rt" --plan rt.md --phase 1 --arm low-first \
+    --attempt 2 --effort high --check-result pass --check-exit 0
+"$SCRIPT" --record-attempt --nightly-dir "$TMPROOT/T_rt" --plan rt.md --phase 2 --arm low-first \
+    --attempt 1 --effort low --check-result pass --check-exit 0
+"$SCRIPT" --trial --nightly-dir "$TMPROOT/T_rt" --out "$TMPROOT/T_rt/trial.md" --json \
+    > "$TMPROOT/T_rt/trial.json" 2>/dev/null
+assert_eq "$(jget "$TMPROOT/T_rt/trial.json" arms.low-first.packets)" "2" \
+    "trial-roundtrip-record-then-read: low-first packets=2"
+
+printf '\n=== case_archive_rotation ===\n'
+# archive_stale is extracted from the runner, not copied, so this cannot drift.
+RUNNER="$REPO_ROOT/bin/automouse/run"
+AS_SRC=$(awk '
+    /^archive_stale\(\) \{/ { capture = 1 }
+    capture { print }
+    capture && /^\}/ { exit }
+' "$RUNNER")
+if [ -z "$AS_SRC" ]; then
+    h_fail "case_archive_rotation: could not extract archive_stale from $RUNNER"
+else
+    (
+        eval "$AS_SRC"
+        NIGHTLY_DIR="$TMPROOT/ROT"; ARCHIVE_AGE_DAYS=1; LOG="$TMPROOT/rot.log"
+        mkdir -p "$NIGHTLY_DIR/logs"
+        cp "$TMPROOT"/T_keep/logs/* "$NIGHTLY_DIR/logs/"
+        touch -t 202601010000 "$NIGHTLY_DIR"/logs/*.delegate-attempts.jsonl
+        archive_stale logs
+    )
+    ROT_LEFT=$(find "$TMPROOT/ROT/logs" -name '*.delegate-attempts.jsonl' | wc -l | tr -d ' ')
+    ROT_MOVED=$(find "$TMPROOT/ROT/logs.archive" -name '*.delegate-attempts.jsonl' 2>/dev/null | wc -l | tr -d ' ')
+    ROT_TOTAL=$(find "$TMPROOT/T_keep/logs" -name '*.delegate-attempts.jsonl' | wc -l | tr -d ' ')
+    if [ "$ROT_LEFT" = "0" ] && [ "$ROT_MOVED" = "$ROT_TOTAL" ] && [ "$ROT_MOVED" != "0" ]; then
+        h_pass "trial-archive-rotation-moves-attempts: $ROT_MOVED files in logs.archive/, 0 left in logs/"
+    else
+        h_fail "trial-archive-rotation-moves-attempts" "left=$ROT_LEFT moved=$ROT_MOVED total=$ROT_TOTAL"
+    fi
+    "$SCRIPT" --trial --json --nightly-dir "$TMPROOT/ROT" --out "$TMPROOT/ROT/trial.md" \
+        > "$TMPROOT/ROT/trial.json" 2>/dev/null
+    assert_eq "$(jget "$TMPROOT/ROT/trial.json" arms.low-first.packets)" "100" \
+        "trial-reads-archived-attempts: low-first packets=100 from logs.archive/"
+fi
+
 printf '\n'
 if [ "$H_FAIL" -eq 0 ]; then
     printf 'PASS: bin/test-automouse-measure-delegate-cost\n'

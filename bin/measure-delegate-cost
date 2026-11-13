@@ -269,6 +269,184 @@ def record_attempt(args):
         fh.write(json.dumps(row, sort_keys=True) + "\n")
 
 
+def ingest_attempts(nightly_dir):
+    attempt_paths = []
+    for sub in ATTEMPT_SUBDIRS:
+        pattern = os.path.join(nightly_dir, sub, "*.delegate-attempts.jsonl")
+        attempt_paths += sorted(glob.glob(pattern))
+
+    if not attempt_paths:
+        print(f"no delegate-attempts files under {nightly_dir}", file=sys.stderr)
+        sys.exit(2)
+
+    required = ("plan", "phase", "arm", "attempt", "effort", "check_result", "ts")
+    latest = {}
+    malformed = 0
+    for path in attempt_paths:
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except json.JSONDecodeError:
+                    malformed += 1
+                    continue
+                if not isinstance(row, dict) or any(k not in row for k in required):
+                    malformed += 1
+                    continue
+                if row["arm"] not in ATTEMPT_ARMS:
+                    malformed += 1
+                    continue
+                key = (row["plan"], row["phase"], row["attempt"])
+                prev = latest.get(key)
+                if prev is None or str(row["ts"]) >= str(prev["ts"]):
+                    latest[key] = row
+    return list(latest.values()), malformed
+
+
+def plan_costs(nightly_dir):
+    files = []
+    for sub in ATTEMPT_SUBDIRS:
+        files += sorted(glob.glob(os.path.join(nightly_dir, sub, "*.costs.jsonl")))
+
+    seen = set()
+    costs = {}
+    malformed = 0
+    for path in files:
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except json.JSONDecodeError:
+                    malformed += 1
+                    continue
+                if not isinstance(row, dict):
+                    malformed += 1
+                    continue
+                key = json.dumps(row, sort_keys=True)
+                if key in seen:
+                    continue
+                seen.add(key)
+                try:
+                    cost = reprice(row, row.get("tier"))
+                except (KeyError, TypeError, ValueError):
+                    continue
+                plan = row.get("plan")
+                costs[plan] = costs.get(plan, 0.0) + cost
+    return costs, malformed
+
+
+def trial_stats(attempt_rows, costs, completed):
+    by_plan = {}
+    for r in attempt_rows:
+        by_plan.setdefault(r["plan"], []).append(r)
+
+    arms = {a: {"plans": [], "packets": [], "excluded": 0} for a in ATTEMPT_ARMS}
+    for plan, plan_rows in by_plan.items():
+        plan_arms = {r["arm"] for r in plan_rows}
+        if len(plan_arms) != 1:
+            continue
+        arm = plan_arms.pop()
+        if any(r["effort"] == "inherited" for r in plan_rows):
+            arms[arm]["excluded"] += 1
+            continue
+        arms[arm]["plans"].append(plan)
+        packets = {}
+        for r in plan_rows:
+            packets.setdefault(r["phase"], {})[r["attempt"]] = r
+        for phase, by_attempt in packets.items():
+            final = by_attempt.get(2) or by_attempt.get(1)
+            first = by_attempt.get(1)
+            arms[arm]["packets"].append({
+                "retried": 2 in by_attempt,
+                "first_pass": first is not None and first["check_result"] == "pass",
+                "final_pass": final["check_result"] == "pass",
+            })
+
+    out = {}
+    for arm, data in arms.items():
+        pk = data["packets"]
+        n = len(pk)
+        done = [p for p in data["plans"] if p in completed and p in costs]
+        out[arm] = {
+            "plans": len(data["plans"]),
+            "packets": n,
+            "excluded": data["excluded"],
+            "retried": sum(1 for x in pk if x["retried"]),
+            "first_pass_rate": round(sum(1 for x in pk if x["first_pass"]) / n, 4) if n else None,
+            "final_pass_rate": round(sum(1 for x in pk if x["final_pass"]) / n, 4) if n else None,
+            "completed_plans": len(done),
+            "median_cost_per_completed_plan":
+                round(statistics.median(costs[p] for p in done), 4) if done else None,
+        }
+    return out
+
+
+def trial_verdict(lf, ctl):
+    for s in (lf, ctl):
+        if s["plans"] < MIN_PLANS_PER_ARM or s["packets"] < MIN_PACKETS_PER_ARM:
+            return "INSUFFICIENT"
+    if lf["median_cost_per_completed_plan"] is None or ctl["median_cost_per_completed_plan"] is None:
+        return "INSUFFICIENT"
+    keep = (lf["final_pass_rate"] >= ctl["final_pass_rate"]
+            and lf["median_cost_per_completed_plan"] < ctl["median_cost_per_completed_plan"])
+    return "KEEP" if keep else "REVERT"
+
+
+def trial_main(args, nightly_dir, generated):
+    completed = ingest(nightly_dir)[1]
+    attempt_rows, malformed = ingest_attempts(nightly_dir)
+    costs, cost_malformed = plan_costs(nightly_dir)
+    malformed += cost_malformed
+    arms = trial_stats(attempt_rows, costs, completed)
+    verdict = trial_verdict(arms["low-first"], arms["control"])
+
+    cols = ("plans", "packets", "excluded", "retried", "first_pass_rate",
+            "final_pass_rate", "completed_plans", "median_cost_per_completed_plan")
+    lines = [
+        "# Delegate trial: low-first vs control",
+        "",
+        f"Generated: {generated}",
+        "",
+        "| Arm | " + " | ".join(cols) + " |",
+        "| --- | " + " | ".join("---" for _ in cols) + " |",
+    ]
+    for arm in ATTEMPT_ARMS:
+        lines.append(f"| {arm} | " + " | ".join(str(arms[arm][c]) for c in cols) + " |")
+    lines += [
+        "",
+        f"Verdict: {verdict}",
+        "",
+        f"Floor: {MIN_PLANS_PER_ARM} plans and {MIN_PACKETS_PER_ARM} packets per arm.",
+        "Criterion: KEEP when the low-first final pass rate is at least the control's and its"
+        " median cost per completed plan is lower; REVERT otherwise; INSUFFICIENT below the floor.",
+        "",
+        f"malformed: {malformed}",
+    ]
+    report_md = "\n".join(lines)
+
+    out_path = args.out
+    if out_path is None:
+        out_path = os.path.join(nightly_dir, "reports", f"{generated}-delegate-trial.md")
+    os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
+    with open(out_path, "w", encoding="utf-8") as fh:
+        fh.write(report_md + "\n")
+
+    if args.json:
+        print(json.dumps({
+            "arms": arms, "verdict": verdict,
+            "min_plans": MIN_PLANS_PER_ARM, "min_packets": MIN_PACKETS_PER_ARM,
+            "malformed": malformed, "generated": generated,
+        }))
+    else:
+        print(report_md)
+
+
 def main():
     default_dir = os.path.expanduser(
         "~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse"
@@ -304,6 +482,10 @@ def main():
                         help="With --record-attempt: outcome of the packet's check")
     parser.add_argument("--check-exit", type=int, default=None,
                         help="With --record-attempt: exit code of the packet's check")
+    parser.add_argument(
+        "--trial", action="store_true",
+        help="Print the low-first vs control trial report instead of the cost report"
+    )
     args = parser.parse_args()
     if args.record_attempt:
         record_attempt(args)
@@ -311,6 +493,9 @@ def main():
 
     nightly_dir = args.nightly_dir
     generated = datetime.date.today().isoformat()
+    if args.trial:
+        trial_main(args, nightly_dir, generated)
+        return
 
     out_path = args.out
     if out_path is None:

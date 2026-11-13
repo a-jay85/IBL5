@@ -320,9 +320,10 @@ SB="$SB1"
   || bad "(2) hold plan seeding"
 # Case 2b: the seeded plan must carry rows bin/lib/prefire-verify can run, parsed by the
 # real parser. No matrix means post-plan-now exits 9 and the unattended run wedges.
+# Row 1 is pinned as a whole line (grep -qxF), so a bare or extended row 1 fails.
 PLAN_ROWS="$(. "$(dirname "$REAL_DOCFIX")/lib/plan-matrix-rows.sh"; plan_matrix_rows "$PLAN")"; PLAN_ROWS_RC=$?
 { [ "$PLAN_ROWS_RC" = 0 ] \
-    && grep -qF "$(printf '1\tbin/check-docs')" <<< "$PLAN_ROWS" \
+    && grep -qxF "$(printf '1\tbin/check-docs --no-staleness')" <<< "$PLAN_ROWS" \
     && grep -qF "$(printf "2\tbin/check-docs --staleness-report | jq -e 'length == 0'")" <<< "$PLAN_ROWS"; } \
   && ok "(2b) [docfix_plan_has_runnable_matrix] seeded plan yields both post-impl matrix rows" \
   || bad "(2b) [docfix_plan_has_runnable_matrix] rc=$PLAN_ROWS_RC rows: $PLAN_ROWS"

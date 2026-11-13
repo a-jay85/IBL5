@@ -125,7 +125,7 @@ Held for human merge unless Phase 6.5 finds it docs-only, two-way and READY.
 
 | # | What | Type | Timing | Location |
 |---|------|------|--------|----------|
-| 1 | Every in-scope doc passes the freshness policy | CLI-executable | post-impl | bin/check-docs |
+| 1 | Every in-scope doc passes the freshness policy | CLI-executable | post-impl | bin/check-docs --no-staleness |
 | 2 | No stale doc or dead glob remains | CLI-executable | post-impl | bin/check-docs --staleness-report \| jq -e 'length == 0' |
 
 ## Automouse Hold Justification

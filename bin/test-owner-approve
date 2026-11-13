@@ -380,6 +380,19 @@ verdict_rereview_wins() {
     want_rc 0
     want_out "RESULT: armed"
 }
+verdict_rereview_suffix() {
+    fresh verdict_rereview_suffix
+    seed_sticky owner READY "**Reviewed tree:** $B40" "**Re-reviewed tree:** $A40 (READY)"
+    run_oa "$PR" "ok"
+    want_rc 0
+    want_out "RESULT: armed"
+    rm -f "$FX"/posted.*.md "$FX/gh.log"
+    : > "$FX/comments.ndjson"
+    seed_sticky owner READY "**Reviewed tree:** $B40" "**Re-reviewed tree:** $A40 (NOT READY)"
+    run_oa "$PR" "ok"
+    want_rc 4
+    want_posted "not READY"
+}
 verdict_banner_near_miss() {
     fresh verdict_banner_near_miss
     seed_sticky owner "READY-ish" "**Reviewed tree:** $A40"
@@ -566,7 +579,7 @@ body_literal body_option ids_unset ids_empty headless_refuses headless_empty_pro
 usage_unknown_flag usage_space_form no_repo_writes
 live_launchd_now live_launchd_fleet live_label live_pgrep_args live_pgrep_cwd live_near_miss live_timeout
 verdict_ready_arms verdict_notes_arms verdict_stale_tree verdict_none verdict_not_ready
-verdict_unrecorded verdict_no_tree_line verdict_rereview_wins verdict_banner_near_miss
+verdict_unrecorded verdict_no_tree_line verdict_rereview_wins verdict_rereview_suffix verdict_banner_near_miss
 verdict_foreign_author verdict_ignores_approval_text verdict_gh_error
 arm_label_fail arm_merge_fail_rollback pr_closed
 fixfirst_records finish_no_record finish_head_unmoved finish_wt_mismatch finish_wt_dirty

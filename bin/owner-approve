@@ -201,7 +201,7 @@ _oa_comments() { # sets me and comments; refuses on a read error
     comments=$(gh api --paginate "repos/$OA_REPO/issues/$OA_PR/comments" 2>/dev/null) || _oa_refuse 4 "could not read the comments on PR $OA_PR."
 }
 _oa_verdict() {
-    local sticky banner word tree_line bound head_tree
+    local sticky banner word tree_line tree_word bound head_tree
     _oa_comments
     sticky=$(printf '%s' "$comments" | jq -r -s --arg m "$HP_STICKY_MARKER" '[add // [] | .[] | select((.body // "") | contains($m) and (contains("<!-- owner-approve") | not))] | last | if . == null then "" else (.user.login + "\n" + .body) end') \
         || _oa_refuse 4 "could not parse the comments on PR $OA_PR."
@@ -218,7 +218,12 @@ _oa_verdict() {
     esac
     tree_line=$(printf '%s\n' "$sticky" | grep -E '^[[:space:]]*(-[[:space:]]+)?\*\*Re-reviewed tree:\*\*' | tail -n 1)
     [ -n "$tree_line" ] || tree_line=$(printf '%s\n' "$sticky" | grep -E '^[[:space:]]*(-[[:space:]]+)?\*\*Reviewed tree:\*\*' | tail -n 1)
-    bound=$(printf '%s' "$tree_line" | sed -nE 's/^.*tree:\*\*[[:space:]]*([0-9a-f]{40})[[:space:]]*$/\1/p')
+    bound=$(printf '%s' "$tree_line" | sed -nE 's/^.*tree:\*\*[[:space:]]*([0-9a-f]{40})([[:space:]]+\([A-Za-z ]+\))?[[:space:]]*$/\1/p')
+    tree_word=$(printf '%s' "$tree_line" | sed -nE 's/^.*tree:\*\*[[:space:]]*[0-9a-f]{40}[[:space:]]+\(([A-Za-z ]+)\)[[:space:]]*$/\1/p')
+    case "$tree_word" in
+        "" | "READY" | "READY WITH NOTES") ;;
+        *) _oa_refuse 4 "the re-review of tree $bound says $tree_word, not READY." ;;
+    esac
     [ -n "$bound" ] || _oa_refuse 4 "the verdict names no reviewed tree (${tree_line:-no tree line}), so it cannot be bound to the head."
     head_tree=$(gh api "repos/$OA_REPO/git/commits/$head" --jq .tree.sha 2>/dev/null) || _oa_refuse 4 "could not read the tree of head $head."
     [ "$bound" = "$head_tree" ] || _oa_refuse 4 "the $verdict_word verdict covers tree $bound, but head $head has tree $head_tree. Wait for post-plan to review the new head."

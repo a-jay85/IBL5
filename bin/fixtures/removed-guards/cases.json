@@ -50,7 +50,7 @@
       "try@ibl5/classes/Season/Season.php#1a2b3c4d"
     ],
     "expected": [
-      "removed-guards:UNJUSTIFIED:try@ibl5/classes/Season/Season.php#1a2b3c4d"
+      "removed-guards:UNFILLED:try@ibl5/classes/Season/Season.php#1a2b3c4d"
     ]
   },
   {
@@ -60,7 +60,7 @@
       "try@ibl5/classes/Season/Season.php#1a2b3c4d"
     ],
     "expected": [
-      "removed-guards:UNJUSTIFIED:try@ibl5/classes/Season/Season.php#1a2b3c4d"
+      "removed-guards:UNFILLED:try@ibl5/classes/Season/Season.php#1a2b3c4d"
     ]
   },
   {
@@ -70,7 +70,7 @@
       "try@ibl5/classes/Season/Season.php#1a2b3c4d"
     ],
     "expected": [
-      "removed-guards:UNJUSTIFIED:try@ibl5/classes/Season/Season.php#1a2b3c4d"
+      "removed-guards:UNFILLED:try@ibl5/classes/Season/Season.php#1a2b3c4d"
     ]
   },
   {
@@ -80,7 +80,7 @@
       "try@ibl5/classes/Season/Season.php#1a2b3c4d"
     ],
     "expected": [
-      "removed-guards:UNJUSTIFIED:try@ibl5/classes/Season/Season.php#1a2b3c4d"
+      "removed-guards:UNFILLED:try@ibl5/classes/Season/Season.php#1a2b3c4d"
     ]
   },
   {
@@ -161,7 +161,7 @@
     "expected": []
   },
   {
-    "name": "order-unjustified-then-unlisted",
+    "name": "order-unfilled-then-unlisted",
     "body": "## Summary\nSome change.\n\n<!-- removed-guards:begin -->\n## Removed guards\nThe deleted-guard check flagged these removals. Each needs a one-line reason, or auto-merge holds.\n- `catch@ibl5/classes/Season/Season.php#5e6f7a8b` — Reason: tbd\n- `try@ibl5/classes/Season/Season.php#1a2b3c4d` — Reason: todo\n<!-- removed-guards:end -->\n",
     "flagged_keys": [
       "lock@bin/foo.sh#0badc0de",
@@ -169,8 +169,8 @@
       "catch@ibl5/classes/Season/Season.php#5e6f7a8b"
     ],
     "expected": [
-      "removed-guards:UNJUSTIFIED:catch@ibl5/classes/Season/Season.php#5e6f7a8b",
-      "removed-guards:UNJUSTIFIED:try@ibl5/classes/Season/Season.php#1a2b3c4d",
+      "removed-guards:UNFILLED:catch@ibl5/classes/Season/Season.php#5e6f7a8b",
+      "removed-guards:UNFILLED:try@ibl5/classes/Season/Season.php#1a2b3c4d",
       "removed-guards:UNLISTED:lock@bin/foo.sh#0badc0de"
     ]
   },
@@ -190,6 +190,82 @@
     ],
     "expected": [
       "removed-guards:MALFORMED"
+    ]
+  },
+  {
+    "name": "unfilled_placeholder",
+    "body": "## Summary\nSome change.\n\n<!-- removed-guards:begin -->\n## Removed guards\nThe deleted-guard check flagged these removals. Each needs a one-line reason, or auto-merge holds.\n- `try@ibl5/classes/Season/Season.php#1a2b3c4d` — Reason: <one-line reason required>\n  removed: `try {`\n<!-- removed-guards:end -->\n",
+    "flagged_keys": [
+      "try@ibl5/classes/Season/Season.php#1a2b3c4d"
+    ],
+    "expected": [
+      "removed-guards:UNFILLED:try@ibl5/classes/Season/Season.php#1a2b3c4d"
+    ]
+  },
+  {
+    "name": "unfilled_filler_na",
+    "body": "## Summary\nSome change.\n\n<!-- removed-guards:begin -->\n## Removed guards\nThe deleted-guard check flagged these removals. Each needs a one-line reason, or auto-merge holds.\n- `try@ibl5/classes/Season/Season.php#1a2b3c4d` — Reason: n/a\n  removed: `try {`\n<!-- removed-guards:end -->\n",
+    "flagged_keys": [
+      "try@ibl5/classes/Season/Season.php#1a2b3c4d"
+    ],
+    "expected": [
+      "removed-guards:UNFILLED:try@ibl5/classes/Season/Season.php#1a2b3c4d"
+    ]
+  },
+  {
+    "name": "unfilled_empty",
+    "body": "## Summary\nSome change.\n\n<!-- removed-guards:begin -->\n## Removed guards\nThe deleted-guard check flagged these removals. Each needs a one-line reason, or auto-merge holds.\n- `try@ibl5/classes/Season/Season.php#1a2b3c4d` — Reason: \n  removed: `try {`\n<!-- removed-guards:end -->\n",
+    "flagged_keys": [
+      "try@ibl5/classes/Season/Season.php#1a2b3c4d"
+    ],
+    "expected": [
+      "removed-guards:UNFILLED:try@ibl5/classes/Season/Season.php#1a2b3c4d"
+    ]
+  },
+  {
+    "name": "short_real_14",
+    "body": "## Summary\nSome change.\n\n<!-- removed-guards:begin -->\n## Removed guards\nThe deleted-guard check flagged these removals. Each needs a one-line reason, or auto-merge holds.\n- `try@ibl5/classes/Season/Season.php#1a2b3c4d` — Reason: Moved to b.php\n  removed: `try {`\n<!-- removed-guards:end -->\n",
+    "flagged_keys": [
+      "try@ibl5/classes/Season/Season.php#1a2b3c4d"
+    ],
+    "expected": [
+      "removed-guards:UNJUSTIFIED:try@ibl5/classes/Season/Season.php#1a2b3c4d"
+    ]
+  },
+  {
+    "name": "near_miss_angle_prefix",
+    "body": "## Summary\nSome change.\n\n<!-- removed-guards:begin -->\n## Removed guards\nThe deleted-guard check flagged these removals. Each needs a one-line reason, or auto-merge holds.\n- `try@ibl5/classes/Season/Season.php#1a2b3c4d` — Reason: <FooGuard> moved into the caller\n  removed: `try {`\n<!-- removed-guards:end -->\n",
+    "flagged_keys": [
+      "try@ibl5/classes/Season/Season.php#1a2b3c4d"
+    ],
+    "expected": []
+  },
+  {
+    "name": "marked_substantive",
+    "body": "## Summary\nSome change.\n\n<!-- removed-guards:begin -->\n## Removed guards\nThe deleted-guard check flagged these removals. Each needs a one-line reason, or auto-merge holds.\n- `try@ibl5/classes/Season/Season.php#1a2b3c4d` — Reason: (harness-written, checker-approved) guard moved into ValidatorX::check\n  removed: `try {`\n<!-- removed-guards:end -->\n",
+    "flagged_keys": [
+      "try@ibl5/classes/Season/Season.php#1a2b3c4d"
+    ],
+    "expected": []
+  },
+  {
+    "name": "marked_filler",
+    "body": "## Summary\nSome change.\n\n<!-- removed-guards:begin -->\n## Removed guards\nThe deleted-guard check flagged these removals. Each needs a one-line reason, or auto-merge holds.\n- `try@ibl5/classes/Season/Season.php#1a2b3c4d` — Reason: (harness-written, checker-approved) n/a\n  removed: `try {`\n<!-- removed-guards:end -->\n",
+    "flagged_keys": [
+      "try@ibl5/classes/Season/Season.php#1a2b3c4d"
+    ],
+    "expected": [
+      "removed-guards:UNFILLED:try@ibl5/classes/Season/Season.php#1a2b3c4d"
+    ]
+  },
+  {
+    "name": "marker_only",
+    "body": "## Summary\nSome change.\n\n<!-- removed-guards:begin -->\n## Removed guards\nThe deleted-guard check flagged these removals. Each needs a one-line reason, or auto-merge holds.\n- `try@ibl5/classes/Season/Season.php#1a2b3c4d` — Reason: (harness-written, checker-approved)\n  removed: `try {`\n<!-- removed-guards:end -->\n",
+    "flagged_keys": [
+      "try@ibl5/classes/Season/Season.php#1a2b3c4d"
+    ],
+    "expected": [
+      "removed-guards:UNFILLED:try@ibl5/classes/Season/Season.php#1a2b3c4d"
     ]
   }
 ]

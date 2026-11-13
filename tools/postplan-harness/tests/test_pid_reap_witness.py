@@ -33,7 +33,19 @@ def test_pid_reap_witness_returns_first_timeout_when_pid_is_gone(tmp_path, pid_r
                             "child") == 1
 
 
+def _has_real_timeout_group(fn) -> bool:
+    return any(m.name == "xdist_group" and m.args == ("real_timeout",)
+               for m in getattr(fn, "pytestmark", []))
+
+
 def test_scope_timeout_test_carries_real_timeout_group():
-    marks = getattr(test_scope_conformance.test_scope_notes_timeout_fails_closed_and_reaps,
-                    "pytestmark", [])
-    assert any(m.name == "xdist_group" and m.args == ("real_timeout",) for m in marks)
+    assert _has_real_timeout_group(
+        test_scope_conformance.test_scope_notes_timeout_fails_closed_and_reaps)
+
+
+def test_real_timeout_group_check_rejects_a_renamed_group():
+    @pytest.mark.xdist_group("real_timeout_mutant")
+    def mutant():
+        pass
+
+    assert not _has_real_timeout_group(mutant)

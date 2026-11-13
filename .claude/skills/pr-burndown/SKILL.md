@@ -324,7 +324,7 @@ Owner decision on PR #N (branch <branch>), <date>: "<owner's words>". <What it c
 6. Do NOT run post-plan or /pr-ready. This session is headless and bin/post-plan-now refuses
    to start here. The parent session re-fires post-plan after you finish.
 7. <One of:>
-   - Ship: tick the manual boxes the owner confirmed. After the last push in step 5, the parent session runs `bin/owner-approve N --finish` with `run_in_background: true`. The script checks the pushed head, runs `bin/lib/prefire-verify` in the worktree, and arms only on a READY verdict for that head's tree.
+   - Ship: tick the manual boxes the owner confirmed. After the last push in step 5, the parent session runs `bin/owner-approve N --finish` with `run_in_background: true`. After a plain approval the script waits out any live post-plan run, then arms only on a READY verdict for the pushed head's tree. After a `--fix-first` approval it first checks the pushed head and runs `bin/lib/prefire-verify` in the worktree.
      Master refuses any merge while a review thread is open (ci-gotchas.md § Conversation
      resolution). Before you report the PR as shipping, list its open threads. File each
      finding the owner deferred to the backlog, reply "Deferred to

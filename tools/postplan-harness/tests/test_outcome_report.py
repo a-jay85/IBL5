@@ -173,6 +173,20 @@ def test_report_no_unknown_note_when_all_attributed(tmp_path, capsys):
     assert not any(ln.startswith("unknown") for ln in captured.out.splitlines())
 
 
+def test_report_json_ignores_cycle_marker_in_agent_table(tmp_path, capsys):
+    log = tmp_path / "outcomes.jsonl"
+    assert ol.append_events(str(log), [ol.build_cycle_marker(pr=9, pipeline="harness")],
+                            lambda msg: None) == 1
+    rc = ol.main(["report", f"--log={log}", "--json"])
+    captured = capsys.readouterr()
+    assert rc == 0
+    report = json.loads(captured.out)
+    assert report["agents"] == {}
+    assert report["total"]["total"] == 0
+    assert report["cycles"]["prs"] == 1
+    assert "unknown" not in captured.err
+
+
 def test_report_wrapper_runs_under_empty_env():
     proc = subprocess.run(
         ["env", "-i", str(REPO / "bin" / "review-outcomes"), "report", f"--log={FIXTURE}", "--json"],

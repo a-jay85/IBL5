@@ -2300,7 +2300,7 @@ DELEGATE_EFFORT_TRIAL (the last line of this prompt) puts this run in an opt-in 
 5. Exit 0 is pass. Any other exit is fail. A packet with no Self-verify command, or a command that cannot start in either directory (exit 126 or 127, or no such file), is unrunnable.
    Unrunnable counts as failed.
 6. Record every attempt with one foreground call:
-   bin/measure-delegate-cost --record-attempt --plan <PLAN_FILE value> --phase <phase number> --arm <arm> --attempt <1|2> --effort <low|high|inherited> --check-result <pass|fail|unrunnable> --check-exit <exit code>
+   bin/measure-delegate-cost --record-attempt --plan <PLAN_FILE value> --phase <packet number: 1 for the plan's first ### Delegate packet, 2 for the second, and so on; two packets in one plan phase get two numbers> --arm <arm> --attempt <1|2> --effort <low|high|inherited> --check-result <pass|fail|unrunnable> --check-exit <exit code>
    Leave out --check-exit for an unrunnable check. If the record call exits non-zero, note it in your handoff and carry on. The log never blocks the plan.
 7. Arm low-first only: for each packet whose first check was fail or unrunnable, spawn ONE fresh Agent with effort: "high" at the same tier. Never use SendMessage for a retry. Its prompt is the packet verbatim followed by this block:
    RETRY (attempt 2 of 2, effort high). An earlier attempt at this packet left edits in the tree and its check failed.

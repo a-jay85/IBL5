@@ -117,8 +117,28 @@ _oa_find_wt() { # prints the worktree checked out on $branch, or nothing
     done < <(git -C "$OA_ROOT" worktree list --porcelain 2>/dev/null)
     return 0
 }
+_oa_mine() { # 0 when $1 is this script, a subshell or child of it, or an ancestor of it
+    local p="$1" up n=0 anc
+    [ -n "$p" ] || return 1
+    anc="$$ $BASHPID"
+    up=$$
+    while [ "$n" -lt 20 ]; do
+        up=$(ps -o ppid= -p "$up" 2>/dev/null | tr -d ' ')
+        [ -n "$up" ] && [ "$up" -gt 1 ] 2>/dev/null || break
+        anc="$anc $up"; n=$((n + 1))
+    done
+    case " $anc " in *" $p "*) return 0 ;; esac
+    up=$p; n=0
+    while [ "$n" -lt 20 ]; do
+        up=$(ps -o ppid= -p "$up" 2>/dev/null | tr -d ' ')
+        [ -n "$up" ] && [ "$up" -gt 1 ] 2>/dev/null || break
+        [ "$up" = "$$" ] && return 0
+        n=$((n + 1))
+    done
+    return 1
+}
 _oa_live() { # prints the first live signal; 0 live, 1 none, 2 cannot tell
-    local list label s rest pid cwd slugs cols
+    local list label s rest pid cwd slugs cols cmd
     list=$(launchctl list 2>/dev/null) || { printf 'launchctl list failed'; return 2; }
     slugs="$(_oa_safe "$branch")"
     if [ -n "$OA_WT" ]; then slugs="$slugs $(_oa_safe "$(basename "$OA_WT")")"; fi
@@ -137,11 +157,15 @@ _oa_live() { # prints the first live signal; 0 live, 1 none, 2 cannot tell
         *,post-plan-running,*) printf 'post-plan-running label\n'; return 0 ;;
     esac
     if [ -n "$OA_WT" ]; then
-        if pgrep -lf -- "$OA_WT" 2>/dev/null | grep -v "^$$ " | grep -Eq 'post-plan|postplan'; then
-            printf 'a post-plan process names %s' "$OA_WT"; return 0
-        fi
+        for pid in $(pgrep -f -- "$OA_WT" 2>/dev/null); do
+            _oa_mine "$pid" && continue
+            cmd=$(ps -o command= -p "$pid" 2>/dev/null)
+            if grep -Eq 'post-plan|postplan' <<< "$cmd"; then
+                printf 'a post-plan process names %s' "$OA_WT"; return 0
+            fi
+        done
         for pid in $(pgrep -f 'post-plan|postplan' 2>/dev/null); do
-            [ "$pid" = "$$" ] && continue
+            _oa_mine "$pid" && continue
             cwd=$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p')
             case "$cwd" in
                 "$OA_WT"|"$OA_WT"/*) printf 'post-plan process %s runs in %s' "$pid" "$OA_WT"; return 0 ;;

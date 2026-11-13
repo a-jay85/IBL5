@@ -354,3 +354,40 @@ def test_run_exits_3_when_degraded(repo, tmp_path, capsys):
     out = capsys.readouterr()
     assert out.out.strip().splitlines()[-1].endswith("degraded=1")
     assert "seat=degraded" in out.err
+
+
+def _score_file(tmp_path, name, line):
+    f = tmp_path / name
+    f.write_text("noise\n" + line + "\n")
+    return str(f)
+
+
+def _line(c="c" * 12, mh="0/2", eh="0/3"):
+    return f"second-review-eval v={'a' * 12} c={c} missed_holds={mh} extra_holds={eh} degraded=0"
+
+
+def test_compare_worse_exits_1(tmp_path, capsys):
+    f1 = _score_file(tmp_path, "b.txt", _line())
+    f2 = _score_file(tmp_path, "a.txt", _line(mh="1/2"))
+    assert sre.main(["compare", "--before", f1, "--after", f2]) == 1
+    assert "worse: missed_holds 0->1 extra_holds 0->0" in capsys.readouterr().out
+
+
+def test_compare_differing_denominators_exits_2(tmp_path, capsys):
+    f1 = _score_file(tmp_path, "b.txt", _line())
+    f2 = _score_file(tmp_path, "a.txt", _line(mh="0/3"))
+    assert sre.main(["compare", "--before", f1, "--after", f2]) == 2
+    assert "denominators differ" in capsys.readouterr().err
+
+
+def test_compare_equal_exits_0(tmp_path, capsys):
+    f1 = _score_file(tmp_path, "b.txt", _line())
+    f2 = _score_file(tmp_path, "a.txt", _line())
+    assert sre.main(["compare", "--before", f1, "--after", f2]) == 0
+    out = capsys.readouterr().out
+    assert "before:" in out and "after:" in out and "worse:" not in out
+
+
+def test_compare_missing_file_exits_2(tmp_path):
+    f1 = _score_file(tmp_path, "b.txt", _line())
+    assert sre.main(["compare", "--before", f1, "--after", str(tmp_path / "nope")]) == 2

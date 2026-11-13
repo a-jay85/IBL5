@@ -680,9 +680,99 @@ def _cmd_run(args: argparse.Namespace, spawn_factory=None) -> int:
     return 3 if score.degraded else 0
 
 
-def _not_implemented(args: argparse.Namespace) -> int:
-    print("not implemented", file=sys.stderr)
-    return 2
+def _read_score(path: str) -> SecondScore:
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except OSError as e:
+        raise EvalUsageError(f"cannot read score file {path}: {e}") from e
+    return parse_score_line(_last_line(text))
+
+
+def _cmd_compare(args: argparse.Namespace) -> int:
+    before = _read_score(args.before)
+    after = _read_score(args.after)
+    before_line, after_line = format_score_line(before), format_score_line(after)
+    if (before.c, before.should_hold, before.should_clear) != (after.c, after.should_hold, after.should_clear):
+        print(f"denominators differ: {before_line} vs {after_line}", file=sys.stderr)
+        return 2
+    print(f"before: {before_line}")
+    print(f"after:  {after_line}")
+    if is_worse(before, after):
+        print(f"worse: missed_holds {before.missed}->{after.missed} "
+              f"extra_holds {before.extra}->{after.extra}")
+        return 1
+    return 0
+
+
+class _FakeLlm:
+    """Records seat calls and replies with a canned clearing verdict; never imports the client."""
+
+    REPLY = "CLEARS 7: the hold is safe to clear for this diff\nVERDICT: CLEAN"
+
+    def __init__(self) -> None:
+        self.calls: list[tuple] = []
+
+    def call_tooled(self, label, model, prompt, **kw):
+        self.calls.append((label, model, prompt, kw))
+        return self.REPLY
+
+
+def _cmd_smoke(args: argparse.Namespace) -> int:
+    lines = _FakeLlm.REPLY.splitlines()
+    if not (second_review._CLEARS_RE.match(lines[0]) and second_review._VERDICT_RE.match(lines[-1])):
+        print("smoke reply does not match the seat's verdict shapes", file=sys.stderr)
+        return 1
+    tmp = tempfile.mkdtemp(prefix="second-review-smoke-")
+    try:
+        repo = Path(tmp) / "repo"
+        repo.mkdir()
+
+        def run_git(*argv: str) -> str:
+            r = subprocess.run(["git", "-C", str(repo), *argv], capture_output=True, text=True)
+            if r.returncode != 0:
+                raise EvalUsageError(f"smoke git {argv[0]} failed: {r.stderr.strip()}")
+            return r.stdout.strip()
+
+        run_git("init", "-q")
+        run_git("config", "user.email", "smoke@example.invalid")
+        run_git("config", "user.name", "smoke")
+        run_git("config", "commit.gpgsign", "false")
+        (repo / "a.txt").write_text("one\n", encoding="utf-8")
+        run_git("add", "a.txt")
+        run_git("commit", "-qm", "base")
+        base = run_git("rev-parse", "HEAD")
+        (repo / "a.txt").write_text("one\ntwo\n", encoding="utf-8")
+        run_git("commit", "-qam", "change")
+        head = run_git("rev-parse", "HEAD")
+        corpus = {"version": 1, "cases": [{
+            "id": "smoke-clear7", "pr": 999999, "status": "confirmed", "expected": "clear",
+            "label_basis": "seat-cleared-clean", "base_sha": base, "replay_sha": head,
+            "holds": {"7": "smoke hold"}, "reason": "smoke reason",
+            "reason_source": "plan", "evidence": "smoke"}]}
+        errors = validate_schema(corpus)
+        if errors:
+            print("smoke corpus invalid: " + "; ".join(errors), file=sys.stderr)
+            return 1
+        fake = _FakeLlm()
+        score = run_eval(repo, corpus, spawn_factory=lambda wt: second_review.spawner(fake, wt),
+                         cache_dir=Path(tmp) / "cache")
+        line = format_score_line(score)
+        print(line)
+        problems = []
+        if not line.endswith("missed_holds=0/0 extra_holds=0/1 degraded=0"):
+            problems.append("unexpected score line")
+        if len(fake.calls) != 1:
+            problems.append(f"fake saw {len(fake.calls)} calls, expected 1")
+        else:
+            prompt = fake.calls[0][2]
+            if "## Holds" not in prompt or "- (7)" not in prompt:
+                problems.append("prompt lacks '## Holds' or '- (7)'")
+        if problems:
+            print("smoke mismatch: " + "; ".join(problems), file=sys.stderr)
+            return 1
+        return 0
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 def main(argv: Optional[list[str]] = None) -> int:
@@ -710,10 +800,12 @@ def main(argv: Optional[list[str]] = None) -> int:
     sp.set_defaults(func=_cmd_run)
 
     sp = sub.add_parser("compare", help="compare two score files")
-    sp.set_defaults(func=_not_implemented)
+    sp.add_argument("--before", required=True)
+    sp.add_argument("--after", required=True)
+    sp.set_defaults(func=_cmd_compare)
 
     sp = sub.add_parser("smoke", help="run the seat path with a fake model")
-    sp.set_defaults(func=_not_implemented)
+    sp.set_defaults(func=_cmd_smoke)
 
     args = p.parse_args(argv)
     try:

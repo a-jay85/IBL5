@@ -1,0 +1,9 @@
+{
+  "case": "matrix-overrides-file-list",
+  "expect": {
+    "3": "clear",
+    "18": "clear",
+    "body_numbers": "consistent"
+  },
+  "why": "The file list and a phase sentence say to modify tools/demo/fleet-check, but its matrix row says it needs no change and marks it (run-only). The test table wins, so nothing is missing (the shape of PR 3702)."
+}

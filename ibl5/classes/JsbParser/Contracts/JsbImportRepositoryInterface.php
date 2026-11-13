@@ -42,6 +42,25 @@ interface JsbImportRepositoryInterface
     public function upsertAllStarScore(array $record): int;
 
     /**
+     * Return another season whose six stored All-Star roster lists equal $rosters, or null.
+     *
+     * @param array<string, list<int>> $rosters event_type => pids in slot order
+     */
+    public function findOtherSeasonWithIdenticalRosters(int $seasonYear, array $rosters): ?int;
+
+    /**
+     * Conference ('Eastern'|'Western') of the player's team that season, or null when unmapped.
+     */
+    public function findAllStarConference(int $pid, int $seasonYear): ?string;
+
+    /**
+     * Insert an award unless that row or its family sibling already exists.
+     *
+     * @return int 1 inserted, 0 skipped
+     */
+    public function insertAwardUnlessFamilyExists(int $year, string $award, string $name, string $siblingAward): int;
+
+    /**
      * Upsert an award row into `ibl_awards` from bulk import.
      *
      * @param int $year Season ending year

@@ -85,8 +85,7 @@ const EXPECTED_CHIPS: Record<string, Styles> = {
   recap: {
     display: 'block', borderTopLeftRadius: '4.5px', fontWeight: '700', whiteSpace: 'normal',
     textTransform: 'uppercase', paddingTop: '1px', paddingLeft: '6px', backgroundColor: 'rgb(30, 41, 59)',
-    color: 'rgb(255, 255, 255)', fontSize: '12.375px', letterSpacing: '1.2375px',
-    fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+    color: 'rgb(255, 255, 255)', fontSize: '12.375px', letterSpacing: '1.2375px', fontFamily: BARLOW,
   },
   allstar: {
     display: 'inline', borderTopLeftRadius: '9999px', fontWeight: '500', whiteSpace: 'nowrap',

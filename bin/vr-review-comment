@@ -67,7 +67,7 @@ const { parseManualBullets, buildManualSection, manualShotUrl, manualShotFile } 
   await import(resolve(ibl5Dir, 'tests/e2e/vr-manual-rows.ts'));
 
 const USAGE =
-  'Usage: bin/vr-review-comment --gallery=PATH --coverage=PATH --pages-url=URL [--out=PATH]\n' +
+  'Usage: bin/vr-review-comment --gallery=PATH --coverage=PATH --pages-url=URL [--base-sha=SHA] [--out=PATH]\n' +
   '   or: bin/vr-review-comment --gallery=PATH --copy-new-screens=DEST [--renders-dir=SRC]\n' +
   '   or: bin/vr-review-comment --gallery=PATH --gallery-dir=DIR --crop-changed=DEST\n' +
   '   or: bin/vr-review-comment --gallery=PATH --pages-url=URL --update-pr-body=N [--spots=PATH] [--head-sha=SHA] [--run-time=ISO] [--dry-run] [--body-file-in=PATH]\n' +
@@ -93,6 +93,7 @@ let cropDest: string | null = null;
 let galleryDir: string | null = null;
 let spotsPath: string | null = null;
 let headSha = '';
+let baseSha = '';
 let runTimeArg: string | null = null;
 let publishAgentShots: string | null = null;
 let agentShotsPath: string | null = null;
@@ -108,6 +109,7 @@ for (const arg of process.argv.slice(2)) {
   else if (arg.startsWith('--gallery-dir=')) galleryDir = arg.slice('--gallery-dir='.length);
   else if (arg.startsWith('--spots=')) spotsPath = arg.slice('--spots='.length);
   else if (arg.startsWith('--head-sha=')) headSha = arg.slice('--head-sha='.length);
+  else if (arg.startsWith('--base-sha=')) baseSha = arg.slice('--base-sha='.length);
   else if (arg.startsWith('--run-time=')) runTimeArg = arg.slice('--run-time='.length);
   else if (arg.startsWith('--publish-agent-shots='))
     publishAgentShots = arg.slice('--publish-agent-shots='.length);
@@ -454,6 +456,11 @@ if (composeManual !== null) {
   process.exit(0);
 }
 
+if (baseSha !== '' && !/^[0-9a-f]{40}$/i.test(baseSha)) {
+  process.stderr.write(`--base-sha must be a 40-hex SHA\n${USAGE}\n`);
+  process.exit(2);
+}
+
 if (pagesUrl === null) {
   process.stderr.write(`--pages-url is required\n${USAGE}\n`);
   process.exit(2);
@@ -610,6 +617,7 @@ const markdown = buildComment({
   uncoveredChangedPaths: coverage.uncoveredChangedPaths ?? [],
   globalChange: coverage.globalChange ?? false,
   pagesUrl,
+  baseSha: baseSha === '' ? undefined : baseSha.toLowerCase(),
 });
 
 if (outPath !== null) {

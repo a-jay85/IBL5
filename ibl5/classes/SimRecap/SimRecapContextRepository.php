@@ -17,10 +17,11 @@ use League\LeagueContext;
  * injected via db/db.php; it composes no credential of its own.
  *
  * @phpstan-type PlayerLine array{pid:int,name:string,min:int,pts:int,reb:int,ast:int,stl:int,blk:int,fgm:int,fga:int,tpm:int,tpa:int}
- * @phpstan-type GameInjury array{pid:int,name:string,injuryDescription:string,injuryGamesMissed:int}
+ * @phpstan-type PerformerLine array{pid:int,name:string,min:int,pts:int,reb:int,ast:int,stl:int,blk:int,fgm:int,fga:int,tpm:int,tpa:int,double:string|null}
+ * @phpstan-type GameInjury array{pid:int,name:string,injuryDescription:string,injuryGamesMissed:int,returnDate:string}
  * @phpstan-type GameRow array{id:int,season_year:int,box_id:int,game_date:string,visitor_teamid:int,visitor_score:int,home_teamid:int,home_score:int,visitor_name:string|null,home_name:string|null,visitor_city:string|null,home_city:string|null,game_of_that_day:int|null}
  * @phpstan-type BoxLine array{game_date:string,visitor_teamid:int,home_teamid:int,teamid:int,pid:int,name:string,min:int,pts:int,reb:int,ast:int,stl:int,blk:int,fgm:int,fga:int,tpm:int,tpa:int}
- * @phpstan-type GameFact array{key:string,season_year:int,game_date:string,box_id:int|null,game_of_that_day:int|null,visitor_teamid:int,home_teamid:int,visitor_name:string|null,home_name:string|null,visitor_city:string|null,home_city:string|null,visitor_score:int,home_score:int,visitor_top:list<PlayerLine>,home_top:list<PlayerLine>,injuries:list<GameInjury>}
+ * @phpstan-type GameFact array{key:string,season_year:int,game_date:string,box_id:int|null,game_of_that_day:int|null,visitor_teamid:int,home_teamid:int,visitor_name:string|null,home_name:string|null,visitor_city:string|null,home_city:string|null,visitor_score:int,home_score:int,visitor_top:list<PerformerLine>,home_top:list<PerformerLine>,injuries:list<GameInjury>}
  * @phpstan-type StandingRow array{teamid:int,name:string,city:string|null,wins:int,losses:int,conference:string|null,division:string|null,conf_gb:string|null,streak:string,last10:string}
  * @phpstan-type InjuryRow array{pid:int,name:string,pos:string,date:string,injuryDescription:string,injuryGamesMissed:int,daysRemaining:int,returnDate:string,isNew:bool,current_teamid:int}
  */
@@ -404,6 +405,23 @@ final class SimRecapContextRepository extends \Database\BaseMysqliRepository
     }
 
     /**
+     * ibl_jsb_transactions.injury_games_missed is a count of calendar days, not
+     * games. The player is back on injury date + that many days. This matches
+     * PlayerInjuryCalculator::getInjuryReturnDate(), which the team pages use:
+     * it adds (ibl_plr.injured + 1) days to the sim end date, and ibl_plr.injured
+     * at sim end is (days - days since injury - 1).
+     */
+    private static function injuryReturnDate(string $injuryDate, int $days): string
+    {
+        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $injuryDate);
+        if ($date === false) {
+            return '';
+        }
+
+        return $date->modify('+' . $days . ' days')->format('Y-m-d');
+    }
+
+    /**
      * Attaches top performers (per side) and game-date injuries to each game and
      * assigns the script-owned key "g<N>" in final order.
      *
@@ -458,6 +476,7 @@ final class SimRecapContextRepository extends \Database\BaseMysqliRepository
                         'name'              => $injury['name'],
                         'injuryDescription' => $injury['injuryDescription'],
                         'injuryGamesMissed' => $injury['injuryGamesMissed'],
+                        'returnDate'        => self::injuryReturnDate($injury['date'], $injury['injuryGamesMissed']),
                     ];
                 }
             }
@@ -486,8 +505,12 @@ final class SimRecapContextRepository extends \Database\BaseMysqliRepository
     }
 
     /**
+     * The top scorers per side, plus every other player with a double-double
+     * or better. Each line carries a "double" tag so the recap writer never
+     * has to count to ten itself.
+     *
      * @param list<PlayerLine> $lines
-     * @return list<PlayerLine>
+     * @return list<PerformerLine>
      */
     private function topPerformers(array $lines): array
     {
@@ -496,7 +519,39 @@ final class SimRecapContextRepository extends \Database\BaseMysqliRepository
             static fn (array $a, array $b): int => [$b['pts'], $b['reb'], $a['pid']] <=> [$a['pts'], $a['reb'], $b['pid']]
         );
 
-        return array_slice($lines, 0, self::TOP_PERFORMERS_PER_SIDE);
+        $out = [];
+        foreach ($lines as $i => $line) {
+            $double = self::doubleTag($line);
+            if ($i < self::TOP_PERFORMERS_PER_SIDE || $double !== null) {
+                $line['double'] = $double;
+                $out[] = $line;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Counts pts, reb, ast, stl, and blk at 10 or more.
+     *
+     * @param PlayerLine $line
+     */
+    public static function doubleTag(array $line): ?string
+    {
+        $count = 0;
+        foreach (['pts', 'reb', 'ast', 'stl', 'blk'] as $stat) {
+            if ($line[$stat] >= 10) {
+                $count++;
+            }
+        }
+
+        return match (true) {
+            $count >= 5 => 'quintuple-double',
+            $count === 4 => 'quadruple-double',
+            $count === 3 => 'triple-double',
+            $count === 2 => 'double-double',
+            default => null,
+        };
     }
 
     /**

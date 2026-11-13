@@ -61,6 +61,21 @@ class JsbImportRepository extends \Database\BaseMysqliRepository implements JsbI
         return $this->asw->upsertAllStarScore($record);
     }
 
+    public function findOtherSeasonWithIdenticalRosters(int $seasonYear, array $rosters): ?int
+    {
+        return $this->asw->findOtherSeasonWithIdenticalRosters($seasonYear, $rosters);
+    }
+
+    public function findAllStarConference(int $pid, int $seasonYear): ?string
+    {
+        return $this->asw->findAllStarConference($pid, $seasonYear);
+    }
+
+    public function insertAwardUnlessFamilyExists(int $year, string $award, string $name, string $siblingAward): int
+    {
+        return $this->asw->insertAwardUnlessFamilyExists($year, $award, $name, $siblingAward);
+    }
+
     public function upsertAward(int $year, string $award, string $name): int
     {
         return $this->awa->upsertAward($year, $award, $name);

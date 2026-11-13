@@ -574,6 +574,97 @@ chk "NO-TIMEOUT reported" has "$OUT" "NO-TIMEOUT"
 chk "NO-TIMEOUT leaves target" eq "$(sha "$R/target.txt")" "$BEFORE"
 end_case
 
+# --- exec-lock cases (backlog#1827): one plant/revert owner per worktree -----------------
+XL_DEAD=""; XL_LIVE=""
+xl_pids() {
+    [ -n "$XL_LIVE" ] && return 0
+    sleep 300 & XL_LIVE=$!; disown "$XL_LIVE"
+    sleep 0 & XL_DEAD=$!; wait "$XL_DEAD" 2>/dev/null
+    trap 'kill "$XL_LIVE" 2>/dev/null; git -C "$REPO_ROOT" worktree remove --force "${WT:-/nonexistent}" >/dev/null 2>&1; rm -rf "$TMP"' EXIT
+}
+# xl_plant <repo> <lock-pid>: a journal entry as a killed run leaves it, plus run.lock.
+xl_plant() {
+    local J; J="$(jdir "$1")"; mkdir -p "$J"
+    XL_BEFORE=$(sha "$1/target.txt")
+    cp -p "$1/target.txt" "$J/1.orig"
+    printf 'path=target.txt\nsha256-before=%s\n' "$XL_BEFORE" > "$J/1.meta"
+    printf 'BETA\n' > "$1/target.txt"
+    mkdir "$J/run.lock"; printf '%s\n' "$2" > "$J/run.lock/pid"
+}
+xl_journal_sum() { (cd "$(jdir "$1")" && cat 1.meta 1.orig | cksum); }
+
+start_case exec_lock_held_journal
+xl_pids
+R="$TMP/xl1"; mkrepo "$R" 'true'
+xl_plant "$R" "$XL_LIVE"
+JSUM=$(xl_journal_sum "$R"); TSUM=$(sha "$R/target.txt")
+OUT=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+chk "exit 4" eq "$RC" 4
+chk "EXEC-LOCKED reported" has "$OUT" "EXEC-LOCKED"
+chk "no verdict line" eval '! grep -qE "^(TRIPPED|HELD|BASELINE-FAILED) row" <<< "$OUT"'
+chk "target untouched" eq "$(sha "$R/target.txt")" "$TSUM"
+chk "journal byte-identical" eq "$(xl_journal_sum "$R")" "$JSUM"
+chk "live holder keeps the lock" eq "$(cat "$(jdir "$R")/run.lock/pid")" "$XL_LIVE"
+end_case
+
+start_case exec_lock_concurrent
+xl_pids
+R="$TMP/xl2"; mkrepo "$R" 'sleep 4; exit 1'
+SOLO=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); SRC=$?
+"$LIB" run --root "$R" "$R.plan.md" > "$TMP/xl2.a" 2>&1 &
+APID=$!
+i=0
+while [ "$(cat "$(jdir "$R")/run.lock/pid" 2>/dev/null)" != "$APID" ] && [ "$i" -lt 25 ]; do sleep 0.2; i=$((i + 1)); done
+chk "run A holds the lock" eq "$(cat "$(jdir "$R")/run.lock/pid" 2>/dev/null)" "$APID"
+OUT=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+chk "run B exits 4" eq "$RC" 4
+chk "run B EXEC-LOCKED" has "$OUT" "EXEC-LOCKED"
+chk "run B prints no verdict" eval '! grep -qE "^(TRIPPED|HELD|BASELINE-FAILED|NOT-APPLIED|UNDECIDED) row" <<< "$OUT"'
+wait "$APID"; ARC=$?
+chk "run A exits as it does alone" eq "$ARC" "$SRC"
+chk "run A prints its solo output" eq "$(cat "$TMP/xl2.a")" "$SOLO"
+end_case
+
+start_case exec_lock_stale_run
+xl_pids
+R="$TMP/xl3"; mkrepo "$R" 'grep -q ALPHA target.txt'
+J="$(jdir "$R")"; mkdir -p "$J/run.lock"; printf '%s\n' "$XL_DEAD" > "$J/run.lock/pid"
+OUT=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+chk "usual exit 0" eq "$RC" 0
+chk "usual TRIPPED" has "$OUT" "TRIPPED row 1"
+"$LIB" pending --root "$R"; PRC=$?
+chk "pending exits 1" eq "$PRC" 1
+end_case
+
+start_case exec_lock_release
+R="$TMP/xl4"; mkrepo "$R" 'grep -q ALPHA target.txt'
+OUT=$("$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+chk "exit 0" eq "$RC" 0
+chk "run.lock released" eval '[ ! -e "$(jdir "$R")/run.lock" ]'
+end_case
+
+start_case exec_lock_recover_stale
+xl_pids
+R="$TMP/xl5"; mkrepo "$R" 'true'
+xl_plant "$R" "$XL_DEAD"
+OUT=$("$LIB" recover --root "$R" 2>&1); RC=$?
+chk "exit 0" eq "$RC" 0
+chk "RECOVERED reported" has "$OUT" "RECOVERED target.txt"
+chk "target restored" eq "$(sha "$R/target.txt")" "$XL_BEFORE"
+chk "run.lock released" eval '[ ! -e "$(jdir "$R")/run.lock" ]'
+end_case
+
+start_case exec_lock_recover_live
+xl_pids
+R="$TMP/xl6"; mkrepo "$R" 'true'
+xl_plant "$R" "$XL_LIVE"
+JSUM=$(xl_journal_sum "$R")
+OUT=$("$LIB" recover --root "$R" 2>&1); RC=$?
+chk "exit 4" eq "$RC" 4
+chk "EXEC-LOCKED reported" has "$OUT" "EXEC-LOCKED"
+chk "journal byte-identical" eq "$(xl_journal_sum "$R")" "$JSUM"
+end_case
+
 # row20_e2e: the PR #3264 row 20 false claim, replayed on a detached worktree copy of
 # HEAD so no write touches this checkout. The mutation adds a second checkout `ref:`
 # naming the PR head to the after-merge-checklist job. bin/check-workflow-checkout

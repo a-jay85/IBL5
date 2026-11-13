@@ -4,7 +4,7 @@ description: "Plan an implementation task: enforces a verification matrix, direc
 disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
-last_verified: 2026-11-10
+last_verified: 2026-11-11
 ---
 
 # /plan — Implementation Planning with Verification Matrix
@@ -35,7 +35,7 @@ Read `.claude/review-shared/_plan-verification.md` and use its full content as `
 
 **Prefer direct tool calls over Explore agents.** Most orientation can be done without spawning an agent:
 
-1. Read `.claude/rules/codebase-map.md` to identify affected modules and their file locations. Skip it when the request's pointers already name the files.
+1. Read `.claude/rules/codebase-map.md` and `.claude/rules/codebase-map-detail.md` (the dependency list) to identify affected modules and their file locations. Skip it when the request's pointers already name the files.
 2. Run targeted `grep`/`find` via Bash for specific symbols, callers, or file paths
 3. Read key files directly (migrations, interfaces, existing tests)
 

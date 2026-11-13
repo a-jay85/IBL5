@@ -54,13 +54,14 @@ final class RecordHoldersRepositoryTest extends WideUnitTestCase
         $this->assertQueryExecuted('q2_points');
     }
 
-    public function testGetBestWorstSeasonRecordQueriesWinLoss(): void
+    public function testGetBestWorstSeasonRecordQueriesSeasonRecordsTable(): void
     {
         $this->mockDb->setMockData([]);
 
         $this->repository->getBestWorstSeasonRecord('DESC');
 
-        $this->assertQueryExecuted('ibl_team_win_loss');
+        $this->assertQueryExecuted('ibl_team_season_records');
+        $this->assertQueryNotExecuted('ibl_team_win_loss');
     }
 
     public function testGetMostPlayoffAppearancesQueriesPlayoffResults(): void

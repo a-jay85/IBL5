@@ -1,6 +1,6 @@
 ---
 description: Classify each failing visual-review cell as NEW (no committed baseline) vs CHANGED (a real pixel regression) using git ls-files on the tracked index, and render NEW views in a distinct section of the sticky PR comment.
-last_verified: 2026-11-10
+last_verified: 2026-11-11
 ---
 
 # ADR-0069: NEW vs CHANGED classification in the visual-review PR comment
@@ -125,7 +125,7 @@ today's output.
   `DiffCell.isNew`.
 - `ibl5/tests/ts-unit/vr-review-comment.test.ts` — unit tests for the classifier and
   `buildComment` NEW/CHANGED rendering.
-- `.claude/rules/visual-review-prs.md` — operator-facing rule; "Reading the comment"
+- `.claude/rules/visual-review-prs-detail.md`: operator-facing rule; "Reading the comment"
   section documents the NEW section.
 - `ibl5/playwright.visual.config.ts` — snapshot path template
   (`snapshotPathTemplate: '{testDir}/{testFileDir}/{testFileName}-snapshots/{arg}{ext}'`).

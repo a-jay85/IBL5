@@ -1,6 +1,6 @@
 ---
 description: Provides database-backed key-value caching and file-based full-page HTML caching.
-last_verified: 2026-10-03
+last_verified: 2026-11-11
 ---
 
 # Cache
@@ -30,4 +30,6 @@ Measured on 2026-10-03 against the main-stack database (1,627 players, 623,335 b
 | AwardHistory | about 0.005 s | PageCache only |
 | FranchiseRecordBook | about 0.001 s (reads the precomputed `ibl_rcb_alltime_records`) | PageCache only |
 
-The SeasonHighs decorator expires entries by TTL alone. Its key carries the league, the date range, the location filter, and a hash of the stat-expression map, so an edit to `SeasonHighsService::STATS` starts a fresh key set with no manual version bump. The warm-cache script does not pre-warm SeasonHighs.
+The SeasonHighs decorator expires lazily written entries by TTL. Its key carries the league, the date range, the location filter, and a hash of the stat-expression map, so an edit to `SeasonHighsService::STATS` starts a fresh key set with no manual version bump. The warm-cache script does not pre-warm SeasonHighs.
+
+Season Highs keys owned by `SeasonHighsCacheWarmer` are deleted and rewarmed after every IBL sim with `WARM_TTL_SECONDS` (30 days), and the updater never purges PageCache.

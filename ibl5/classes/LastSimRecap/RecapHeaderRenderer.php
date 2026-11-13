@@ -45,10 +45,10 @@ final class RecapHeaderRenderer
             $netValue = $netSign . $netAbs;
 
             $h .= '  <div class="last-sim-recap__meta">';
-            $h .= '    <span>Net margin: <span class="last-sim-recap__meta-value">' . HtmlSanitizer::e($netValue) . '</span></span>';
+            $h .= '    <span class="last-sim-recap__meta-net"><span>Net margin:</span><span class="last-sim-recap__meta-value">' . HtmlSanitizer::e($netValue) . '</span></span>';
             $h .= '    <span class="last-sim-recap__meta-bw">';
-            $h .= '      <span class="last-sim-recap__meta-bw-row"><span class="last-sim-recap__meta-bw-label">&nbsp;Best:</span>&nbsp;<span class="last-sim-recap__meta-value">' . HtmlSanitizer::e($slate->bestLabel) . '</span></span>';
-            $h .= '      <span class="last-sim-recap__meta-bw-row"><span class="last-sim-recap__meta-bw-label">Worst:</span>&nbsp;<span class="last-sim-recap__meta-value">' . HtmlSanitizer::e($slate->worstLabel) . '</span></span>';
+            $h .= '      <span class="last-sim-recap__meta-bw-label">Best:</span><span class="last-sim-recap__meta-value">' . HtmlSanitizer::e($slate->bestLabel) . '</span>';
+            $h .= '      <span class="last-sim-recap__meta-bw-label">Worst:</span><span class="last-sim-recap__meta-value">' . HtmlSanitizer::e($slate->worstLabel) . '</span>';
             $h .= '    </span>';
             $h .= '  </div>';
         }

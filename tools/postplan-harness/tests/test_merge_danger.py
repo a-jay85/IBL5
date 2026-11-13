@@ -8,6 +8,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness import merge_danger as md
+from harness import migration_revert_proof as md_proof
 from harness.gate_backtest import GateChange, changes_from_unified_diff
 from harness.merge_danger import MalformedMergeDanger, MergeDanger
 
@@ -37,6 +38,96 @@ def test_destructive_migration_forces_one_way():
     assert d.door == "one-way"
     assert d.blast == "site-wide"
     assert f"destructive-migration:{MIG}" in d.triggers
+
+
+# --- derivation: a proven-revertible destructive migration ------------------------------------
+
+UP = "ibl5/migrations/900_demo_truncate.sql"
+DOWN = "ibl5/migrations/900_demo_truncate.down.sql"
+UP_SQL = ("CREATE TABLE ibl_demo_backup_900 AS SELECT * FROM ibl_demo;",
+          "TRUNCATE TABLE ibl_demo;",
+          "INSERT INTO ibl_demo (id, name) VALUES (1, 'a');")
+DOWN_SQL = ("-- restores: ibl_demo",
+            "DELETE FROM ibl_demo;",
+            "INSERT INTO ibl_demo SELECT * FROM ibl_demo_backup_900;")
+ROUNDTRIP_TEXT = "function testEveryPairedMigrationRoundTrips() { glob('/migrations/*.down.sql'); '/^--\\s*restores:/'; }"
+
+
+def _read_test(path):
+    return ROUNDTRIP_TEXT if path == md_proof.ROUNDTRIP_TEST else None
+
+
+def _proven_pair_diff():
+    return _migration_diff(UP, *UP_SQL) + _migration_diff(DOWN, *DOWN_SQL)
+
+
+def _destructive_triggers(d):
+    return [t for t in d.triggers if t.startswith("destructive-migration:")]
+
+
+@pytest.fixture
+def demo_is_static(monkeypatch):
+    """Treat ibl_demo as a table no site code writes, so the pair below proves."""
+    monkeypatch.setattr(md_proof, "SITE_STATIC_TABLES", frozenset({"ibl_demo"}))
+
+
+def test_proven_truncate_migration_is_two_way(demo_is_static):
+    d = _derive([("A", UP), ("A", DOWN)], _proven_pair_diff(), read=_read_test)
+    assert d.door == "two-way"
+    assert _destructive_triggers(d) == []
+
+
+def test_truncate_without_down_file_stays_one_way():
+    d = _derive([("A", UP)], _migration_diff(UP, *UP_SQL), read=_read_test)
+    assert d.door == "one-way"
+    assert f"destructive-migration:{UP}" in d.triggers
+
+
+def test_truncate_down_without_backup_stays_one_way():
+    diff = _migration_diff(UP, "TRUNCATE TABLE ibl_demo;", UP_SQL[2]) + _migration_diff(DOWN, *DOWN_SQL)
+    d = _derive([("A", UP), ("A", DOWN)], diff, read=_read_test)
+    assert d.door == "one-way"
+    assert f"destructive-migration:{UP}" in d.triggers
+    assert f"destructive-migration:{DOWN}" in d.triggers
+
+
+def test_one_unproven_migration_keeps_every_trigger(demo_is_static):
+    drop = "ibl5/migrations/901_drop.sql"
+    diff = _proven_pair_diff() + _migration_diff(drop, "ALTER TABLE ibl_x DROP COLUMN y;")
+    d = _derive([("A", UP), ("A", DOWN), ("A", drop)], diff, read=_read_test)
+    assert d.door == "one-way"
+    assert sorted(_destructive_triggers(d)) == sorted(f"destructive-migration:{p}" for p in (UP, DOWN, drop))
+
+
+def test_orphan_down_file_keeps_trigger(demo_is_static):
+    orphan = "ibl5/migrations/899_old.down.sql"
+    diff = _proven_pair_diff() + _migration_diff(orphan, "-- restores: ibl_demo", "DELETE FROM ibl_demo;")
+    d = _derive([("A", UP), ("A", DOWN), ("A", orphan)], diff, read=_read_test)
+    assert d.door == "one-way"
+    assert sorted(_destructive_triggers(d)) == sorted(f"destructive-migration:{p}" for p in (UP, DOWN, orphan))
+
+
+def test_backup_and_restore_on_site_table_stays_one_way():
+    """The proven shape on a live table: reverting would wipe rows written since merge."""
+    def swap(rows):
+        return [r.replace("ibl_demo", "ibl_plr") for r in rows]
+    diff = _migration_diff(UP, *swap(UP_SQL)) + _migration_diff(DOWN, *swap(DOWN_SQL))
+    d = _derive([("A", UP), ("A", DOWN)], diff, read=_read_test)
+    assert d.door == "one-way"
+    assert sorted(_destructive_triggers(d)) == sorted(f"destructive-migration:{p}" for p in (UP, DOWN))
+
+
+def test_revert_proof_edit_is_self_governing():
+    path = "tools/postplan-harness/harness/migration_revert_proof.py"
+    d = _derive([("M", path)])
+    assert d.self_governing is True
+    assert f"arming-path:{path}" in d.triggers
+    # _REPLAY_GUARD_PATHS keeps the trigger even when the replay would clear it. The
+    # _ARMING_PATHS listing alone lets a clean replay drop it.
+    r = md.derive_merge_danger([("M", path)], "", [], _none, replay=_clear)
+    assert r.self_governing is True
+    assert f"arming-path:{path}" in r.triggers
+    assert r.replay_note == "replay not run (migration_revert_proof.py outside its reach)"
 
 
 def test_destructive_bypass_marker_does_not_lower_door():

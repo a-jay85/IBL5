@@ -1,0 +1,1471 @@
+diff --git a/ibl5/classes/JsbParser/Contracts/JsbImportRepositoryInterface.php b/ibl5/classes/JsbParser/Contracts/JsbImportRepositoryInterface.php
+index b8a221995b..860f7a1415 100644
+--- a/ibl5/classes/JsbParser/Contracts/JsbImportRepositoryInterface.php
++++ b/ibl5/classes/JsbParser/Contracts/JsbImportRepositoryInterface.php
+@@ -41,6 +41,25 @@ public function upsertAllStarRoster(array $record): int;
+      */
+     public function upsertAllStarScore(array $record): int;
+ 
++    /**
++     * Return another season whose six stored All-Star roster lists equal $rosters, or null.
++     *
++     * @param array<string, list<int>> $rosters event_type => pids in slot order
++     */
++    public function findOtherSeasonWithIdenticalRosters(int $seasonYear, array $rosters): ?int;
++
++    /**
++     * Conference ('Eastern'|'Western') of the player's team that season, or null when unmapped.
++     */
++    public function findAllStarConference(int $pid, int $seasonYear): ?string;
++
++    /**
++     * Insert an award unless that row or its family sibling already exists.
++     *
++     * @return int 1 inserted, 0 skipped
++     */
++    public function insertAwardUnlessFamilyExists(int $year, string $award, string $name, string $siblingAward): int;
++
+     /**
+      * Upsert an award row into `ibl_awards` from bulk import.
+      *
+diff --git a/ibl5/classes/JsbParser/Contracts/JsbImportServiceInterface.php b/ibl5/classes/JsbParser/Contracts/JsbImportServiceInterface.php
+index 2aa7c65f19..6e274d3403 100644
+--- a/ibl5/classes/JsbParser/Contracts/JsbImportServiceInterface.php
++++ b/ibl5/classes/JsbParser/Contracts/JsbImportServiceInterface.php
+@@ -67,6 +67,7 @@ public function processHisFile(string $filePath, ?string $sourceLabel = null): J
+ 
+     /**
+      * Process raw .asw data and upsert records into `ibl_jsb_allstar_`* tables.
++     * Rejects the file and writes nothing when its rosters equal another stored season (stale .asw).
+      *
+      * @param int $seasonYear Season year for the All-Star data
+      * @return JsbImportResult Summary of import results
+diff --git a/ibl5/classes/JsbParser/Importers/AswImporter.php b/ibl5/classes/JsbParser/Importers/AswImporter.php
+index 1e19b7f4e4..8f31c8c41a 100644
+--- a/ibl5/classes/JsbParser/Importers/AswImporter.php
++++ b/ibl5/classes/JsbParser/Importers/AswImporter.php
+@@ -10,6 +10,15 @@
+ 
+ class AswImporter
+ {
++    private const AWARD_BY_EVENT = [
++        'rookie_1' => ['Rookie-Sophomore Challenge', 'Rookie-Sophomore Challenge - MVP'],
++        'rookie_2' => ['Rookie-Sophomore Challenge', 'Rookie-Sophomore Challenge - MVP'],
++        'three_point' => ['Three-Point Contest', 'Three-Point Contest - Winner'],
++        'dunk_contest' => ['Slam Dunk Competition', 'Slam Dunk Competition - Winner'],
++    ];
++
++    private const CONFERENCE_EVENTS = ['allstar_1', 'allstar_2'];
++
+     private JsbImportRepositoryInterface $repository;
+ 
+     public function __construct(JsbImportRepositoryInterface $repository)
+@@ -17,7 +26,7 @@ public function __construct(JsbImportRepositoryInterface $repository)
+         $this->repository = $repository;
+     }
+ 
+-    public function import(string $data, int $seasonYear): JsbImportResult
++    public function import(string $data, int $seasonYear, bool $rejectStaleRosters = false): JsbImportResult
+     {
+         $result = new JsbImportResult();
+ 
+@@ -30,9 +39,29 @@ public function import(string $data, int $seasonYear): JsbImportResult
+ 
+         /** @var array<string, list<int>> $rosters */
+         $rosters = $parsed['rosters'];
++        if ($rejectStaleRosters) {
++            try {
++                $staleYear = $this->repository->findOtherSeasonWithIdenticalRosters($seasonYear, $rosters);
++            } catch (\RuntimeException $e) {
++                $result->addError('ASW stale check failed; nothing written: ' . $e->getMessage());
++                return $result;
++            }
++            if ($staleYear !== null) {
++                $result->addMessage(sprintf(
++                    'ASW rejected as stale: rosters are identical to season %d; nothing written for season %d',
++                    $staleYear,
++                    $seasonYear
++                ));
++                return $result;
++            }
++        }
++
++        /** @var array<string, array<int, string|null>> $playerNames */
++        $playerNames = [];
+         foreach ($rosters as $eventType => $playerIds) {
+             foreach ($playerIds as $slot => $pid) {
+                 $playerName = $this->repository->getPlayerName($pid);
++                $playerNames[$eventType][$slot] = $playerName;
+ 
+                 try {
+                     $affected = $this->repository->upsertAllStarRoster([
+@@ -54,6 +83,7 @@ public function import(string $data, int $seasonYear): JsbImportResult
+         $this->importContestScores($parsed['scores']['three_pt_round1'], 'three_point', 1, $seasonYear, $rosters['three_point'], $result);
+         $this->importContestScores($parsed['scores']['three_pt_semis'], 'three_point', 2, $seasonYear, $rosters['three_point'], $result);
+         $this->importContestScores($parsed['scores']['three_pt_finals'], 'three_point', 3, $seasonYear, $rosters['three_point'], $result);
++        $this->importParticipantAwards($rosters, $playerNames, $seasonYear, $result);
+ 
+         return $result;
+     }
+@@ -63,6 +93,47 @@ public function importFile(string $filePath, int $seasonYear): JsbImportResult
+         return FileReader::readOrFail($filePath, 'ASW', fn (string $data) => $this->import($data, $seasonYear));
+     }
+ 
++    /**
++     * @param array<string, list<int>> $rosters
++     * @param array<string, array<int, string|null>> $playerNames
++     */
++    private function importParticipantAwards(array $rosters, array $playerNames, int $seasonYear, JsbImportResult $result): void
++    {
++        $unnamed = 0;
++        foreach ($rosters as $eventType => $playerIds) {
++            foreach ($playerIds as $slot => $pid) {
++                $name = $playerNames[$eventType][$slot] ?? null;
++                if ($name === null || $name === '') {
++                    $unnamed++;
++                    continue;
++                }
++                try {
++                    if (in_array($eventType, self::CONFERENCE_EVENTS, true)) {
++                        $conference = $this->repository->findAllStarConference($pid, $seasonYear);
++                        if ($conference !== 'Eastern' && $conference !== 'Western') {
++                            $result->addMessage(sprintf('ASW award skipped: no conference for %s (pid %d) in %d', $name, $pid, $seasonYear));
++                            continue;
++                        }
++                        $award = $conference . ' Conference All-Star';
++                        $sibling = ($conference === 'Eastern' ? 'Western' : 'Eastern') . ' Conference All-Star';
++                    } elseif (isset(self::AWARD_BY_EVENT[$eventType])) {
++                        [$award, $sibling] = self::AWARD_BY_EVENT[$eventType];
++                    } else {
++                        continue;
++                    }
++                    $result->recordUpsert(
++                        $this->repository->insertAwardUnlessFamilyExists($seasonYear, $award, $name, $sibling)
++                    );
++                } catch (\RuntimeException $e) {
++                    $result->addError('All-Star award insert failed: ' . $e->getMessage());
++                }
++            }
++        }
++        if ($unnamed > 0) {
++            $result->addMessage(sprintf('ASW awards: %d roster slots skipped (unknown player name)', $unnamed));
++        }
++    }
++
+     /**
+      * @param list<int> $scores
+      * @param list<int> $participants
+diff --git a/ibl5/classes/JsbParser/JsbImportRepository.php b/ibl5/classes/JsbParser/JsbImportRepository.php
+index 792ae77025..18e9295b9a 100644
+--- a/ibl5/classes/JsbParser/JsbImportRepository.php
++++ b/ibl5/classes/JsbParser/JsbImportRepository.php
+@@ -61,6 +61,21 @@ public function upsertAllStarScore(array $record): int
+         return $this->asw->upsertAllStarScore($record);
+     }
+ 
++    public function findOtherSeasonWithIdenticalRosters(int $seasonYear, array $rosters): ?int
++    {
++        return $this->asw->findOtherSeasonWithIdenticalRosters($seasonYear, $rosters);
++    }
++
++    public function findAllStarConference(int $pid, int $seasonYear): ?string
++    {
++        return $this->asw->findAllStarConference($pid, $seasonYear);
++    }
++
++    public function insertAwardUnlessFamilyExists(int $year, string $award, string $name, string $siblingAward): int
++    {
++        return $this->asw->insertAwardUnlessFamilyExists($year, $award, $name, $siblingAward);
++    }
++
+     public function upsertAward(int $year, string $award, string $name): int
+     {
+         return $this->awa->upsertAward($year, $award, $name);
+diff --git a/ibl5/classes/JsbParser/JsbImportService.php b/ibl5/classes/JsbParser/JsbImportService.php
+index 0d8547aeff..96ed5e3b96 100644
+--- a/ibl5/classes/JsbParser/JsbImportService.php
++++ b/ibl5/classes/JsbParser/JsbImportService.php
+@@ -84,7 +84,7 @@ public function processHisFile(string $filePath, ?string $sourceLabel = null): J
+     /** @see JsbImportServiceInterface::processAswData() */
+     public function processAswData(string $data, int $seasonYear): JsbImportResult
+     {
+-        return $this->asw->import($data, $seasonYear);
++        return $this->asw->import($data, $seasonYear, rejectStaleRosters: true);
+     }
+ 
+     /** @see JsbImportServiceInterface::processAswFile() */
+diff --git a/ibl5/classes/JsbParser/Repositories/AswRepository.php b/ibl5/classes/JsbParser/Repositories/AswRepository.php
+index 96257ccf1b..5903aee155 100644
+--- a/ibl5/classes/JsbParser/Repositories/AswRepository.php
++++ b/ibl5/classes/JsbParser/Repositories/AswRepository.php
+@@ -55,4 +55,93 @@ public function upsertAllStarScore(array $record): int
+             $record['score']
+         );
+     }
++
++    private const EVENT_TYPES = ['allstar_1', 'allstar_2', 'rookie_1', 'rookie_2', 'three_point', 'dunk_contest'];
++
++    /**
++     * Return another season whose six stored roster lists equal $rosters, or null.
++     *
++     * @param array<string, list<int>> $rosters event_type => pids in slot order
++     */
++    public function findOtherSeasonWithIdenticalRosters(int $seasonYear, array $rosters): ?int
++    {
++        /** @var list<array{season_year: int, event_type: string, roster_slot: int, pid: int|null}> $rows */
++        $rows = $this->fetchAll(
++            // @phpstan-ignore ibl.orderByMissingTiebreaker (roster_slot is unique within season_year + event_type)
++            'SELECT season_year, event_type, roster_slot, pid
++               FROM `ibl_jsb_allstar_rosters`
++              WHERE season_year <> ?
++              ORDER BY season_year, event_type, roster_slot',
++            'i',
++            $seasonYear
++        );
++        /** @var array<int, array<string, list<int|null>>> $stored */
++        $stored = [];
++        foreach ($rows as $row) {
++            $stored[$row['season_year']][$row['event_type']][] = $row['pid'];
++        }
++        $target = self::normalizeRosters($rosters);
++        foreach ($stored as $year => $byEvent) {
++            if (self::normalizeRosters($byEvent) === $target) {
++                return $year;
++            }
++        }
++        return null;
++    }
++
++    /**
++     * @param array<string, list<int|null>> $byEvent
++     * @return list<list<int|null>>
++     */
++    private static function normalizeRosters(array $byEvent): array
++    {
++        $out = [];
++        foreach (self::EVENT_TYPES as $type) {
++            $out[] = array_values($byEvent[$type] ?? []);
++        }
++        return $out;
++    }
++
++    /** Conference ('Eastern'|'Western') of the player's team that season: ibl_hist first, ibl_plr fallback. */
++    public function findAllStarConference(int $pid, int $seasonYear): ?string
++    {
++        /** @var array{conference: string}|null $row */
++        $row = $this->fetchOne(
++            'SELECT lc.conference
++               FROM `ibl_league_config` lc
++              WHERE lc.season_ending_year = ?
++                AND lc.teamid = COALESCE(
++                    (SELECT h.teamid FROM `ibl_hist` h WHERE h.pid = ? AND h.year = ? LIMIT 1),
++                    (SELECT p.teamid FROM `ibl_plr` p WHERE p.pid = ?)
++                )
++              LIMIT 1',
++            'iiii',
++            $seasonYear,
++            $pid,
++            $seasonYear,
++            $pid
++        );
++        return $row === null ? null : $row['conference'];
++    }
++
++    /** Insert (year, award, name) unless that row or its family sibling exists. Returns 1 inserted, 0 skipped. */
++    public function insertAwardUnlessFamilyExists(int $year, string $award, string $name, string $siblingAward): int
++    {
++        return $this->execute(
++            'INSERT INTO `ibl_awards` (year, award, name)
++             SELECT ?, ?, ? FROM DUAL
++              WHERE NOT EXISTS (
++                  SELECT 1 FROM `ibl_awards`
++                   WHERE year = ? AND name = ? AND award IN (?, ?)
++              )',
++            'ississs',
++            $year,
++            $award,
++            $name,
++            $year,
++            $name,
++            $award,
++            $siblingAward
++        );
++    }
+ }
+diff --git a/ibl5/migrations/210_asw_stale_rows_allstar_awards_backfill.sql b/ibl5/migrations/210_asw_stale_rows_allstar_awards_backfill.sql
+new file mode 100644
+index 0000000000..f070f47105
+--- /dev/null
++++ b/ibl5/migrations/210_asw_stale_rows_allstar_awards_backfill.sql
+@@ -0,0 +1,98 @@
++-- Part 1: ibl_jsb_allstar_* season 2009 is a byte copy of 2007 written by a stale
++-- IBL5.asw import (a-jay85/ibl5-bugs#29). Back up, then delete. The 2009 weekend
++-- has not been played.
++-- destructive-migration[rewrite-no-backup]: both DELETEs below first copy their rows into a _backup_210 table in this file, and the undo script lives at ibl5/scripts/undo/210_asw_stale_rows_allstar_awards_backfill.sql, kept outside ibl5/migrations/ so the migration runner never applies it.
++-- rollback-incompatible: only production's SchemaInvariantTest FK-gap inventory breaks, since it pins the exact list of pid columns without an FK and the two FK-free _backup_210 tables add two; production PHP never reads the backup tables
++-- literal-check: 2009 -> ibl_jsb_allstar_rosters.season_year smallint(5) unsigned (per ibl5/docs/schema/current-schema.sql)
++-- literal-check: 2009 -> ibl_jsb_allstar_scores.season_year smallint(5) unsigned (per ibl5/docs/schema/current-schema.sql)
++CREATE TABLE IF NOT EXISTS ibl_jsb_allstar_rosters_backup_210 LIKE ibl_jsb_allstar_rosters;
++INSERT INTO ibl_jsb_allstar_rosters_backup_210
++  SELECT * FROM ibl_jsb_allstar_rosters WHERE season_year = 2009;
++DELETE FROM ibl_jsb_allstar_rosters WHERE season_year = 2009;
++
++CREATE TABLE IF NOT EXISTS ibl_jsb_allstar_scores_backup_210 LIKE ibl_jsb_allstar_scores;
++INSERT INTO ibl_jsb_allstar_scores_backup_210
++  SELECT * FROM ibl_jsb_allstar_scores WHERE season_year = 2009;
++DELETE FROM ibl_jsb_allstar_scores WHERE season_year = 2009;
++
++-- Part 2: 2008 All-Star Weekend participants. Idempotent; never relabels.
++-- Runs only where the 2008 weekend rosters exist, so a DB without league history
++-- (the CI seed) gets no rows.
++-- literal-check: 2008 -> ibl_jsb_allstar_rosters.season_year smallint(5) unsigned (per ibl5/docs/schema/current-schema.sql)
++-- literal-check: 2008 -> ibl_awards.year int(11) (per ibl5/docs/schema/current-schema.sql)
++-- literal-check: 'Rookie-Sophomore Challenge - MVP' (32 chars, longest award) -> ibl_awards.award varchar(128) (per ibl5/docs/schema/current-schema.sql)
++-- literal-check: player names (19 chars max) -> ibl_awards.name varchar(32) (per ibl5/docs/schema/current-schema.sql)
++INSERT INTO ibl_awards (year, award, name)
++SELECT v.year, v.award, v.name FROM (
++            SELECT 2008 AS year, 'Eastern Conference All-Star' AS award, 'Chris Paul' AS name
++  UNION ALL SELECT 2008, 'Eastern Conference All-Star', 'Shareef Abdur-Rahim'
++  UNION ALL SELECT 2008, 'Eastern Conference All-Star', 'Karl-Anthony Towns'
++  UNION ALL SELECT 2008, 'Eastern Conference All-Star', 'James Harden'
++  UNION ALL SELECT 2008, 'Eastern Conference All-Star', 'Devin Booker'
++  UNION ALL SELECT 2008, 'Eastern Conference All-Star', 'LeBron James'
++  UNION ALL SELECT 2008, 'Eastern Conference All-Star', 'Tyrese Haliburton'
++  UNION ALL SELECT 2008, 'Eastern Conference All-Star', 'Jermaine O''Neal'
++  UNION ALL SELECT 2008, 'Eastern Conference All-Star', 'Anthony Edwards'
++  UNION ALL SELECT 2008, 'Eastern Conference All-Star', 'Nate Thurmond'
++  UNION ALL SELECT 2008, 'Eastern Conference All-Star', 'Tyreke Evans'
++  UNION ALL SELECT 2008, 'Eastern Conference All-Star', 'Immanuel Quickley'
++  UNION ALL SELECT 2008, 'Western Conference All-Star', 'A''Ja Wilson'
++  UNION ALL SELECT 2008, 'Western Conference All-Star', 'Dwyane Wade'
++  UNION ALL SELECT 2008, 'Western Conference All-Star', 'Blake Griffin'
++  UNION ALL SELECT 2008, 'Western Conference All-Star', 'Nancy Lieberman'
++  UNION ALL SELECT 2008, 'Western Conference All-Star', 'George Mikan'
++  UNION ALL SELECT 2008, 'Western Conference All-Star', 'Takenori Akagi'
++  UNION ALL SELECT 2008, 'Western Conference All-Star', 'Dwight Howard'
++  UNION ALL SELECT 2008, 'Western Conference All-Star', 'Stephen Curry'
++  UNION ALL SELECT 2008, 'Western Conference All-Star', 'Anfernee Hardaway'
++  UNION ALL SELECT 2008, 'Western Conference All-Star', 'Kobe Bryant'
++  UNION ALL SELECT 2008, 'Western Conference All-Star', 'Shaquille O''Neal'
++  UNION ALL SELECT 2008, 'Western Conference All-Star', 'Kristaps Porzingis'
++  UNION ALL SELECT 2008, 'Rookie-Sophomore Challenge', 'Darius Garland'
++  UNION ALL SELECT 2008, 'Rookie-Sophomore Challenge', 'Mike Kent'
++  UNION ALL SELECT 2008, 'Rookie-Sophomore Challenge', 'Coby White'
++  UNION ALL SELECT 2008, 'Rookie-Sophomore Challenge', 'Vassillis Spanoulis'
++  UNION ALL SELECT 2008, 'Rookie-Sophomore Challenge', 'Elgin Baylor'
++  UNION ALL SELECT 2008, 'Rookie-Sophomore Challenge', 'DeAndre Hunter'
++  UNION ALL SELECT 2008, 'Rookie-Sophomore Challenge', 'Zion Williamson'
++  UNION ALL SELECT 2008, 'Rookie-Sophomore Challenge', 'Jaren Jackson Jr'
++  UNION ALL SELECT 2008, 'Rookie-Sophomore Challenge', 'Kareem Abdul-Jabbar'
++  UNION ALL SELECT 2008, 'Rookie-Sophomore Challenge', 'Bol Bol'
++  UNION ALL SELECT 2008, 'Rookie-Sophomore Challenge', 'Jason Williams'
++  UNION ALL SELECT 2008, 'Rookie-Sophomore Challenge', 'Mike Bibby'
++  UNION ALL SELECT 2008, 'Rookie-Sophomore Challenge', 'Vince Carter'
++  UNION ALL SELECT 2008, 'Rookie-Sophomore Challenge', 'Cuttino Mobley'
++  UNION ALL SELECT 2008, 'Rookie-Sophomore Challenge', 'Modestas Paulauskas'
++  UNION ALL SELECT 2008, 'Rookie-Sophomore Challenge', 'Kiki Vandeweghe'
++  UNION ALL SELECT 2008, 'Rookie-Sophomore Challenge', 'Dirk Nowitzki'
++  UNION ALL SELECT 2008, 'Rookie-Sophomore Challenge', 'Danny Manning'
++  UNION ALL SELECT 2008, 'Rookie-Sophomore Challenge', 'Jean-Paul Beugnot'
++  UNION ALL SELECT 2008, 'Rookie-Sophomore Challenge', 'Michael Olowokandi'
++  UNION ALL SELECT 2008, 'Three-Point Contest', 'Karl-Anthony Towns'
++  UNION ALL SELECT 2008, 'Three-Point Contest', 'Stephen Curry'
++  UNION ALL SELECT 2008, 'Three-Point Contest', 'Immanuel Quickley'
++  UNION ALL SELECT 2008, 'Three-Point Contest', 'Anthony Edwards'
++  UNION ALL SELECT 2008, 'Three-Point Contest', 'LaMelo Ball'
++  UNION ALL SELECT 2008, 'Three-Point Contest', 'Jamal Mashburn'
++  UNION ALL SELECT 2008, 'Three-Point Contest', 'J.R. Smith'
++  UNION ALL SELECT 2008, 'Three-Point Contest', 'Jrue Holiday'
++  UNION ALL SELECT 2008, 'Slam Dunk Competition', 'Pete Maravich'
++  UNION ALL SELECT 2008, 'Slam Dunk Competition', 'Stephon Marbury'
++  UNION ALL SELECT 2008, 'Slam Dunk Competition', 'Kobe Bryant'
++  UNION ALL SELECT 2008, 'Slam Dunk Competition', 'Mike Kent'
++  UNION ALL SELECT 2008, 'Slam Dunk Competition', 'Issac Okoro'
++  UNION ALL SELECT 2008, 'Slam Dunk Competition', 'J.R. Smith'
++  UNION ALL SELECT 2008, 'Slam Dunk Competition', 'Allen Iverson'
++  UNION ALL SELECT 2008, 'Slam Dunk Competition', 'Ruben Patterson'
++) AS v
++WHERE NOT EXISTS (
++  SELECT 1 FROM ibl_awards a
++   WHERE a.year = v.year AND a.name = v.name
++     AND (a.award = v.award
++       OR (v.award IN ('Eastern Conference All-Star', 'Western Conference All-Star')
++           AND a.award IN ('Eastern Conference All-Star', 'Western Conference All-Star'))
++       OR (v.award = 'Rookie-Sophomore Challenge' AND a.award = 'Rookie-Sophomore Challenge - MVP')
++       OR (v.award = 'Three-Point Contest' AND a.award = 'Three-Point Contest - Winner')
++       OR (v.award = 'Slam Dunk Competition' AND a.award = 'Slam Dunk Competition - Winner'))
++)
++AND EXISTS (SELECT 1 FROM ibl_jsb_allstar_rosters r WHERE r.season_year = 2008);
+diff --git a/ibl5/scripts/undo/210_asw_stale_rows_allstar_awards_backfill.sql b/ibl5/scripts/undo/210_asw_stale_rows_allstar_awards_backfill.sql
+new file mode 100644
+index 0000000000..79ec7ccfbc
+--- /dev/null
++++ b/ibl5/scripts/undo/210_asw_stale_rows_allstar_awards_backfill.sql
+@@ -0,0 +1,10 @@
++-- Manual undo for migration 210. Never runs automatically (scripts/undo/ is outside migrations/).
++INSERT IGNORE INTO ibl_jsb_allstar_rosters SELECT * FROM ibl_jsb_allstar_rosters_backup_210;
++INSERT IGNORE INTO ibl_jsb_allstar_scores SELECT * FROM ibl_jsb_allstar_scores_backup_210;
++DELETE FROM ibl_awards
++ WHERE year = 2008
++   AND award IN ('Eastern Conference All-Star', 'Rookie-Sophomore Challenge',
++                 'Three-Point Contest', 'Slam Dunk Competition');
++DELETE FROM ibl_awards
++ WHERE year = 2008 AND award = 'Western Conference All-Star'
++   AND name NOT IN ('Chris Bosh', 'Myles Turner', 'Tyrese Maxey');
+diff --git a/ibl5/tests/DatabaseIntegration/AswImportCycleTest.php b/ibl5/tests/DatabaseIntegration/AswImportCycleTest.php
+new file mode 100644
+index 0000000000..2b94f1eba3
+--- /dev/null
++++ b/ibl5/tests/DatabaseIntegration/AswImportCycleTest.php
+@@ -0,0 +1,205 @@
++<?php
++
++declare(strict_types=1);
++
++namespace Tests\DatabaseIntegration;
++
++use JsbParser\AswFileParser;
++use JsbParser\Importers\AswImporter;
++use JsbParser\JsbImportRepository;
++use JsbParser\JsbImportService;
++use JsbParser\PlayerIdResolver;
++use PHPUnit\Framework\Attributes\Group;
++use Tests\JsbParser\Importers\BuildsAswFixtures;
++
++require_once __DIR__ . '/../JsbParser/Importers/BuildsAswFixtures.php';
++
++/**
++ * Full .asw import cycles against real MariaDB: the canonical roster table, the
++ * participant awards written beside it, the updater-path stale guard, and the
++ * bulk path that skips it.
++ */
++#[Group('database')]
++class AswImportCycleTest extends DatabaseTestCase
++{
++    use BuildsAswFixtures;
++
++    private const PID_ALLSTAR = 200000101;
++    private const PID_ROOKIE = 200000201;
++    private const PID_THREE_POINT = 200000301;
++    private const PID_DUNK = 200000401;
++
++    private AswImporter $importer;
++    private JsbImportService $service;
++
++    protected function setUp(): void
++    {
++        parent::setUp();
++        $repository = new JsbImportRepository($this->db);
++        $this->importer = new AswImporter($repository);
++        $this->service = new JsbImportService($repository, new PlayerIdResolver($this->db));
++    }
++
++    public function testFullImportCycleWritesRostersAndAwards(): void
++    {
++        $bytes = $this->seedPlayersAndBuildBytes();
++
++        $this->importer->import($bytes, 2090);
++
++        self::assertSame($this->parsedSlotCount($bytes), $this->countRows('ibl_jsb_allstar_rosters', 'season_year = 2090'));
++        self::assertSame(
++            [
++                'Eastern Conference All-Star|Asw Cycle AllStar',
++                'Rookie-Sophomore Challenge|Asw Cycle Rookie',
++                'Slam Dunk Competition|Asw Cycle Dunker',
++                'Three-Point Contest|Asw Cycle Shooter',
++            ],
++            $this->awardRows(2090)
++        );
++        self::assertSame(0, $this->countRows('ibl_awards', "year = 2090 AND (award LIKE '% - Winner' OR award LIKE '% - MVP')"));
++    }
++
++    public function testSecondImportCycleAddsNoAwardRows(): void
++    {
++        $bytes = $this->seedPlayersAndBuildBytes();
++        $this->importer->import($bytes, 2090);
++        $awardsAfterFirst = $this->countRows('ibl_awards', 'year = 2090');
++        self::assertSame(4, $awardsAfterFirst);
++
++        $second = $this->importer->import($bytes, 2090);
++
++        self::assertSame(0, $second->errors);
++        self::assertSame($awardsAfterFirst, $this->countRows('ibl_awards', 'year = 2090'));
++    }
++
++    public function testStaleUpdaterImportLeavesTablesUnchanged(): void
++    {
++        $bytes = $this->seedPlayersAndBuildBytes();
++        $path = $this->writeTempFile($bytes);
++        try {
++            $this->service->processAswFile($path, 2089);
++
++            $result = $this->service->processAswData($bytes, 2090);
++        } finally {
++            unlink($path);
++        }
++
++        self::assertSame(0, $this->countRows('ibl_jsb_allstar_rosters', 'season_year = 2090'));
++        self::assertSame(0, $this->countRows('ibl_jsb_allstar_scores', 'season_year = 2090'));
++        self::assertSame(0, $this->countRows('ibl_awards', 'year = 2090'));
++        self::assertStringContainsString('season 2089', implode("\n", $result->messages));
++    }
++
++    public function testBulkImportSkipsStaleCheck(): void
++    {
++        $bytes = $this->seedPlayersAndBuildBytes();
++        $path = $this->writeTempFile($bytes);
++        try {
++            $this->service->processAswFile($path, 2089);
++            $this->service->processAswFile($path, 2090);
++        } finally {
++            unlink($path);
++        }
++
++        self::assertSame($this->parsedSlotCount($bytes), $this->countRows('ibl_jsb_allstar_rosters', 'season_year = 2090'));
++    }
++
++    // ── Private helpers ────────────────────────────────────────────────────────
++
++    /**
++     * Seeds the four named players on team 1, the 2090 conference mapping, and returns
++     * a .asw file whose rosters lead with those players.
++     */
++    private function seedPlayersAndBuildBytes(): string
++    {
++        $bytes = $this->buildRookieAwareFixture();
++        $rosters = AswFileParser::parse($bytes)['rosters'];
++
++        $firstPids = [
++            ['allstar_1', 'Asw Cycle AllStar'],
++            ['rookie_1', 'Asw Cycle Rookie'],
++            ['three_point', 'Asw Cycle Shooter'],
++            ['dunk_contest', 'Asw Cycle Dunker'],
++        ];
++        foreach ($firstPids as [$eventType, $name]) {
++            $this->insertTestPlayer($rosters[$eventType][0], $name, ['teamid' => 1]);
++        }
++
++        $this->insertRow('ibl_league_config', [
++            'season_ending_year' => 2090,
++            'team_slot' => 1,
++            'team_name' => 'Asw Cycle Team',
++            'teamid' => 1,
++            'conference' => 'Eastern',
++            'division' => 'Atlantic',
++            'playoff_qualifiers_per_conf' => 4,
++            'playoff_round1_format' => 'bo7',
++            'playoff_round2_format' => 'bo7',
++            'playoff_round3_format' => 'bo7',
++            'playoff_round4_format' => 'bo7',
++            'team_count' => 1,
++        ]);
++
++        return $bytes;
++    }
++
++    /**
++     * buildAswFile() leaves the rookie rosters empty, so overwrite the first Rookie 1 line.
++     */
++    private function buildRookieAwareFixture(): string
++    {
++        $bytes = $this->buildAswFile(
++            allstar1: [self::PID_ALLSTAR, self::PID_ALLSTAR + 1],
++            threePointPids: [self::PID_THREE_POINT, self::PID_THREE_POINT + 1],
++            dunkPids: [self::PID_DUNK, self::PID_DUNK + 1],
++            dunkRound1Scores: [455, 480, 470],
++            threePtRound1Scores: [18, 21],
++        );
++        $lines = explode("\r\n", $bytes);
++        $lines[AswFileParser::ROOKIE_1_START] = (string) self::PID_ROOKIE;
++
++        return str_pad(rtrim(implode("\r\n", $lines), ' '), AswFileParser::FILE_SIZE);
++    }
++
++    private function parsedSlotCount(string $bytes): int
++    {
++        $total = 0;
++        foreach (AswFileParser::parse($bytes)['rosters'] as $pids) {
++            $total += count($pids);
++        }
++        return $total;
++    }
++
++    private function writeTempFile(string $bytes): string
++    {
++        $path = tempnam(sys_get_temp_dir(), 'asw_cycle_');
++        self::assertIsString($path);
++        file_put_contents($path, $bytes);
++        return $path;
++    }
++
++    /**
++     * @return list<string> "award|name" rows for the year, sorted
++     */
++    private function awardRows(int $year): array
++    {
++        $result = $this->db->query("SELECT award, name FROM ibl_awards WHERE year = $year ORDER BY award, name");
++        self::assertInstanceOf(\mysqli_result::class, $result);
++        $rows = [];
++        while ($row = $result->fetch_assoc()) {
++            $rows[] = $row['award'] . '|' . $row['name'];
++        }
++        $result->free();
++        return $rows;
++    }
++
++    private function countRows(string $table, string $where): int
++    {
++        $result = $this->db->query("SELECT COUNT(*) AS c FROM $table WHERE $where");
++        self::assertInstanceOf(\mysqli_result::class, $result);
++        $row = $result->fetch_assoc();
++        $result->free();
++        self::assertNotNull($row);
++        return (int) $row['c'];
++    }
++}
+diff --git a/ibl5/tests/DatabaseIntegration/AswRepositoryAllStarAwardsTest.php b/ibl5/tests/DatabaseIntegration/AswRepositoryAllStarAwardsTest.php
+new file mode 100644
+index 0000000000..373630c609
+--- /dev/null
++++ b/ibl5/tests/DatabaseIntegration/AswRepositoryAllStarAwardsTest.php
+@@ -0,0 +1,202 @@
++<?php
++
++declare(strict_types=1);
++
++namespace Tests\DatabaseIntegration;
++
++use JsbParser\Repositories\AswRepository;
++use PHPUnit\Framework\Attributes\Group;
++
++/**
++ * DB-integration tests for the stale-roster finder, the conference lookup, and the
++ * family-guarded award insert on AswRepository.
++ *
++ * Seasons 2089 and 2090 never collide with ci-seed rows; every fixture rolls back
++ * with the DatabaseTestCase transaction.
++ */
++#[Group('database')]
++class AswRepositoryAllStarAwardsTest extends DatabaseTestCase
++{
++    private const PID = 200000401;
++    private const HIST_YEAR = 2090;
++    private const EVENT_TYPES = ['allstar_1', 'allstar_2', 'rookie_1', 'rookie_2', 'three_point', 'dunk_contest'];
++
++    private AswRepository $repo;
++    private int $nextSlot = 1;
++
++    protected function setUp(): void
++    {
++        parent::setUp();
++        $this->repo = new AswRepository($this->db);
++    }
++
++    public function testFindOtherSeasonReturnsMatchingEarlierYear(): void
++    {
++        $rosters = $this->sampleRosters();
++        $this->seedRosters(2089, $rosters);
++
++        self::assertSame(2089, $this->repo->findOtherSeasonWithIdenticalRosters(2090, $rosters));
++    }
++
++    public function testFindOtherSeasonIgnoresTargetSeason(): void
++    {
++        $rosters = $this->sampleRosters();
++        $this->seedRosters(2090, $rosters);
++
++        self::assertNull($this->repo->findOtherSeasonWithIdenticalRosters(2090, $rosters));
++    }
++
++    public function testFindOtherSeasonReturnsNullWhenOneSlotDiffers(): void
++    {
++        $rosters = $this->sampleRosters();
++        $this->seedRosters(2089, $rosters);
++
++        $differing = $rosters;
++        $differing['dunk_contest'] = [200000301, 200000399];
++
++        self::assertNull($this->repo->findOtherSeasonWithIdenticalRosters(2090, $differing));
++    }
++
++    public function testFindConferencePrefersHistTeam(): void
++    {
++        $this->insertTestPlayer(self::PID, 'Asw Conf Player', ['teamid' => 2]);
++        $this->insertHistRow(self::PID, 'Asw Conf Player', self::HIST_YEAR, ['teamid' => 1]);
++        $this->seedConfig(2090, 1, 'Eastern');
++        $this->seedConfig(2090, 2, 'Western');
++
++        self::assertSame('Eastern', $this->repo->findAllStarConference(self::PID, 2090));
++    }
++
++    public function testFindConferenceFallsBackToPlrTeam(): void
++    {
++        $this->insertTestPlayer(self::PID, 'Asw Conf Player', ['teamid' => 2]);
++        $this->seedConfig(2090, 1, 'Eastern');
++        $this->seedConfig(2090, 2, 'Western');
++
++        self::assertSame('Western', $this->repo->findAllStarConference(self::PID, 2090));
++    }
++
++    public function testFindConferenceReturnsNullForUnmappedTeam(): void
++    {
++        $this->insertTestPlayer(self::PID, 'Asw Conf Player', ['teamid' => 3]);
++        $this->seedConfig(2090, 1, 'Eastern');
++        $this->seedConfig(2090, 2, 'Western');
++
++        self::assertNull($this->repo->findAllStarConference(self::PID, 2090));
++    }
++
++    public function testInsertAwardInsertsWhenAbsent(): void
++    {
++        $affected = $this->repo->insertAwardUnlessFamilyExists(
++            2090,
++            'Eastern Conference All-Star',
++            'Asw Test',
++            'Western Conference All-Star'
++        );
++
++        self::assertSame(1, $affected);
++        self::assertSame(1, $this->awardCount('Asw Test'));
++    }
++
++    public function testInsertAwardSkipsExactDuplicate(): void
++    {
++        $this->repo->insertAwardUnlessFamilyExists(2090, 'Eastern Conference All-Star', 'Asw Test', 'Western Conference All-Star');
++
++        $affected = $this->repo->insertAwardUnlessFamilyExists(
++            2090,
++            'Eastern Conference All-Star',
++            'Asw Test',
++            'Western Conference All-Star'
++        );
++
++        self::assertSame(0, $affected);
++        self::assertSame(1, $this->awardCount('Asw Test'));
++    }
++
++    public function testInsertAwardSkipsWhenSiblingFamilyRowExists(): void
++    {
++        $this->insertRow('ibl_awards', [
++            'year' => 2090,
++            'award' => 'Western Conference All-Star',
++            'name' => 'Asw Test',
++        ]);
++
++        $affected = $this->repo->insertAwardUnlessFamilyExists(
++            2090,
++            'Eastern Conference All-Star',
++            'Asw Test',
++            'Western Conference All-Star'
++        );
++
++        self::assertSame(0, $affected);
++        self::assertSame(1, $this->awardCount('Asw Test'));
++        $result = $this->db->query(
++            "SELECT COUNT(*) AS c FROM ibl_awards WHERE name = 'Asw Test' AND award = 'Eastern Conference All-Star'"
++        );
++        self::assertInstanceOf(\mysqli_result::class, $result);
++        $row = $result->fetch_assoc();
++        $result->free();
++        self::assertNotNull($row);
++        self::assertSame(0, (int) $row['c']);
++    }
++
++    /**
++     * @return array<string, list<int>>
++     */
++    private function sampleRosters(): array
++    {
++        return [
++            'allstar_1' => [200000101, 200000102],
++            'allstar_2' => [200000111],
++            'rookie_1' => [200000201],
++            'rookie_2' => [200000211],
++            'three_point' => [200000301, 200000302],
++            'dunk_contest' => [200000301, 200000302],
++        ];
++    }
++
++    /**
++     * @param array<string, list<int>> $rosters
++     */
++    private function seedRosters(int $seasonYear, array $rosters): void
++    {
++        foreach (self::EVENT_TYPES as $eventType) {
++            foreach ($rosters[$eventType] as $index => $pid) {
++                $this->insertRow('ibl_jsb_allstar_rosters', [
++                    'season_year' => $seasonYear,
++                    'event_type' => $eventType,
++                    'roster_slot' => $index + 1,
++                    'pid' => $pid,
++                ]);
++            }
++        }
++    }
++
++    private function seedConfig(int $seasonEndingYear, int $teamId, string $conference): void
++    {
++        $this->insertRow('ibl_league_config', [
++            'season_ending_year' => $seasonEndingYear,
++            'team_slot' => $this->nextSlot++,
++            'team_name' => 'Asw Config Team ' . $teamId,
++            'teamid' => $teamId,
++            'conference' => $conference,
++            'division' => 'Atlantic',
++            'playoff_qualifiers_per_conf' => 4,
++            'playoff_round1_format' => 'bo7',
++            'playoff_round2_format' => 'bo7',
++            'playoff_round3_format' => 'bo7',
++            'playoff_round4_format' => 'bo7',
++            'team_count' => 2,
++        ]);
++    }
++
++    private function awardCount(string $name): int
++    {
++        $result = $this->db->query("SELECT COUNT(*) AS c FROM ibl_awards WHERE year = 2090 AND name = '" . $this->db->real_escape_string($name) . "'");
++        self::assertInstanceOf(\mysqli_result::class, $result);
++        $row = $result->fetch_assoc();
++        $result->free();
++        self::assertNotNull($row);
++        return (int) $row['c'];
++    }
++}
+diff --git a/ibl5/tests/DatabaseIntegration/AswStaleRosterMigrationTest.php b/ibl5/tests/DatabaseIntegration/AswStaleRosterMigrationTest.php
+new file mode 100644
+index 0000000000..87f29770b8
+--- /dev/null
++++ b/ibl5/tests/DatabaseIntegration/AswStaleRosterMigrationTest.php
+@@ -0,0 +1,182 @@
++<?php
++
++declare(strict_types=1);
++
++namespace Tests\DatabaseIntegration;
++
++use PHPUnit\Framework\Attributes\Group;
++
++/**
++ * Runs the shipped stale-ASW-rows migration against seeded rows: the 2009 delete
++ * with its backup, the 2008 participant backfill, the conference-family guard,
++ * and the rerun no-op.
++ *
++ * CI applies every migration before the suite, so the backup tables already exist
++ * (asserted first). The test executes only the non-DDL statements, which keeps the
++ * run inside DatabaseTestCase's transaction and rolls every row back in tearDown.
++ */
++#[Group('database')]
++final class AswStaleRosterMigrationTest extends DatabaseTestCase
++{
++    private const ROSTER_BACKUP = 'ibl_jsb_allstar_rosters_backup_210';
++    private const SCORE_BACKUP = 'ibl_jsb_allstar_scores_backup_210';
++
++    protected function setUp(): void
++    {
++        parent::setUp();
++        $this->assertBackupTablesExist();
++        $this->seedRows();
++    }
++
++    public function testMigrationDeletesOnly2009RowsAndBacksThemUp(): void
++    {
++        $before2009Rosters = $this->countRows('ibl_jsb_allstar_rosters', 'season_year = 2009');
++        $before2009Scores = $this->countRows('ibl_jsb_allstar_scores', 'season_year = 2009');
++        $before2007Rosters = $this->countRows('ibl_jsb_allstar_rosters', 'season_year = 2007');
++        $before2007Scores = $this->countRows('ibl_jsb_allstar_scores', 'season_year = 2007');
++        $before2008Rosters = $this->countRows('ibl_jsb_allstar_rosters', 'season_year = 2008');
++        self::assertGreaterThan(0, $before2009Rosters);
++        self::assertGreaterThan(0, $before2009Scores);
++
++        $this->runMigration();
++
++        self::assertSame(0, $this->countRows('ibl_jsb_allstar_rosters', 'season_year = 2009'));
++        self::assertSame(0, $this->countRows('ibl_jsb_allstar_scores', 'season_year = 2009'));
++        self::assertSame($before2007Rosters, $this->countRows('ibl_jsb_allstar_rosters', 'season_year = 2007'));
++        self::assertSame($before2007Scores, $this->countRows('ibl_jsb_allstar_scores', 'season_year = 2007'));
++        self::assertSame($before2008Rosters, $this->countRows('ibl_jsb_allstar_rosters', 'season_year = 2008'));
++        self::assertGreaterThanOrEqual($before2009Rosters, $this->countRows(self::ROSTER_BACKUP, 'season_year = 2009'));
++        self::assertGreaterThanOrEqual($before2009Scores, $this->countRows(self::SCORE_BACKUP, 'season_year = 2009'));
++    }
++
++    public function testMigrationBackfills2008ParticipantCounts(): void
++    {
++        $this->runMigration();
++
++        self::assertSame(20, $this->awardCount('Rookie-Sophomore Challenge'));
++        self::assertSame(8, $this->awardCount('Three-Point Contest'));
++        self::assertSame(8, $this->awardCount('Slam Dunk Competition'));
++    }
++
++    public function testMigrationHonorsConferenceFamilyGuard(): void
++    {
++        $this->runMigration();
++
++        $result = $this->db->query(
++            "SELECT award FROM ibl_awards WHERE year = 2008 AND name = 'Chris Paul'"
++            . " AND award IN ('Eastern Conference All-Star', 'Western Conference All-Star')"
++        );
++        self::assertInstanceOf(\mysqli_result::class, $result);
++        $awards = [];
++        while ($row = $result->fetch_assoc()) {
++            $awards[] = (string) $row['award'];
++        }
++        $result->free();
++
++        self::assertSame(['Western Conference All-Star'], $awards);
++    }
++
++    public function testMigrationSkipsBackfillWhen2008RostersAreMissing(): void
++    {
++        $this->db->query('DELETE FROM ibl_jsb_allstar_rosters WHERE season_year = 2008');
++        $before = $this->countRows('ibl_awards', 'year = 2008');
++
++        $this->runMigration();
++
++        self::assertSame($before, $this->countRows('ibl_awards', 'year = 2008'));
++    }
++
++    public function testMigrationSecondRunInsertsNothing(): void
++    {
++        $this->runMigration();
++        $afterFirst = $this->countRows('ibl_awards', 'year = 2008');
++        self::assertGreaterThan(0, $afterFirst);
++
++        $this->runMigration();
++
++        self::assertSame($afterFirst, $this->countRows('ibl_awards', 'year = 2008'));
++    }
++
++    // ── Private helpers ────────────────────────────────────────────────────────
++
++    private function assertBackupTablesExist(): void
++    {
++        foreach ([self::ROSTER_BACKUP, self::SCORE_BACKUP] as $table) {
++            $result = $this->db->query(
++                "SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '" . $table . "'"
++            );
++            self::assertInstanceOf(\mysqli_result::class, $result);
++            $exists = $result->num_rows > 0;
++            $result->free();
++            self::assertTrue($exists, "Backup table $table must exist; apply migrations first (bin/db-migrate)");
++        }
++    }
++
++    private function seedRows(): void
++    {
++        foreach ([2007, 2008, 2009] as $year) {
++            $this->db->query(
++                "INSERT IGNORE INTO ibl_jsb_allstar_rosters (season_year, event_type, roster_slot, pid, player_name)"
++                . " VALUES ($year, 'allstar_1', 1, NULL, NULL)"
++            );
++        }
++        foreach ([2007, 2009] as $year) {
++            $this->db->query(
++                "INSERT IGNORE INTO ibl_jsb_allstar_scores (season_year, contest_type, round, participant_slot, pid, score)"
++                . " VALUES ($year, 'three_point', 1, 1, NULL, 10)"
++            );
++        }
++        // CI already applied the migration, so clear its 2008 rows (rolled back in tearDown)
++        // before seeding the one Western row the family guard must respect.
++        $this->db->query('DELETE FROM ibl_awards WHERE year = 2008');
++        $this->db->query(
++            "INSERT INTO ibl_awards (year, award, name) VALUES (2008, 'Western Conference All-Star', 'Chris Paul')"
++        );
++    }
++
++    /**
++     * @return list<string>
++     */
++    private function statements(): array
++    {
++        $matches = glob(dirname(__DIR__, 2) . '/migrations/*_asw_stale_rows_allstar_awards_backfill.sql');
++        self::assertIsArray($matches);
++        self::assertCount(1, $matches, 'expected exactly one asw_stale_rows_allstar_awards_backfill migration');
++        $sql = file_get_contents($matches[0]); // phpunit-hygiene-allow: migration SQL has no executable seam other than its text
++        self::assertIsString($sql);
++        $sql = (string) preg_replace('/--[^\n]*/', '', $sql);
++
++        $statements = [];
++        foreach (explode(';', $sql) as $statement) {
++            $statement = trim($statement);
++            if ($statement === '' || stripos($statement, 'CREATE TABLE') === 0) {
++                continue;
++            }
++            $statements[] = $statement;
++        }
++        self::assertNotSame([], $statements);
++        return $statements;
++    }
++
++    private function runMigration(): void
++    {
++        foreach ($this->statements() as $sql) {
++            $this->db->query($sql);
++        }
++    }
++
++    private function countRows(string $table, string $where): int
++    {
++        $result = $this->db->query("SELECT COUNT(*) AS c FROM $table WHERE $where");
++        self::assertInstanceOf(\mysqli_result::class, $result);
++        $row = $result->fetch_assoc();
++        $result->free();
++        self::assertNotNull($row);
++        return (int) $row['c'];
++    }
++
++    private function awardCount(string $award): int
++    {
++        return $this->countRows('ibl_awards', "year = 2008 AND award = '" . $this->db->real_escape_string($award) . "'");
++    }
++}
+diff --git a/ibl5/tests/DatabaseIntegration/SchemaInvariantTest.php b/ibl5/tests/DatabaseIntegration/SchemaInvariantTest.php
+index f3c0a211b7..242de6a1d7 100644
+--- a/ibl5/tests/DatabaseIntegration/SchemaInvariantTest.php
++++ b/ibl5/tests/DatabaseIntegration/SchemaInvariantTest.php
+@@ -172,6 +172,8 @@ class SchemaInvariantTest extends DatabaseTestCase
+         'ibl_box_scores_teams_season2007_phantom_backup.home_teamid' => 'season-2007 phantom-delete undo record; deliberately FK-free so an ON DELETE CASCADE from ibl_plr / ibl_team_info can never erase the rows the rollback restores from',
+         'ibl_box_scores_teams_season2007_phantom_backup.visitor_teamid' => 'season-2007 phantom-delete undo record; deliberately FK-free so an ON DELETE CASCADE from ibl_plr / ibl_team_info can never erase the rows the rollback restores from',
+         'ibl_gm_tenures_backup_207.franchise_id' => 'migration-207 backfill undo record; CREATE TABLE ... LIKE copies no FKs, and staying FK-free means an ON DELETE CASCADE from ibl_team_info can never erase the rows the undo script restores from',
++        'ibl_jsb_allstar_rosters_backup_210.pid' => 'migration-210 backfill undo record; CREATE TABLE ... LIKE copies no FKs, and staying FK-free means an ON DELETE CASCADE from ibl_plr can never erase the rows the undo script restores from',
++        'ibl_jsb_allstar_scores_backup_210.pid' => 'migration-210 backfill undo record; CREATE TABLE ... LIKE copies no FKs, and staying FK-free means an ON DELETE CASCADE from ibl_plr can never erase the rows the undo script restores from',
+         'ibl_cash_considerations.counterparty_teamid' => 'secondary team reference; the primary teamid column is FK-constrained',
+         'ibl_hist.pid' => 'append-only transaction log; retains rows for deleted players (no cascade)',
+         'ibl_hist.teamid' => 'append-only transaction log; team marker retained across franchise changes',
+diff --git a/ibl5/tests/JsbParser/Importers/AswImporterTest.php b/ibl5/tests/JsbParser/Importers/AswImporterTest.php
+index 15aaa54784..4fb2221093 100644
+--- a/ibl5/tests/JsbParser/Importers/AswImporterTest.php
++++ b/ibl5/tests/JsbParser/Importers/AswImporterTest.php
+@@ -4,114 +4,25 @@
+ 
+ namespace Tests\JsbParser\Importers;
+ 
+-use JsbParser\AswFileParser;
+ use JsbParser\Contracts\JsbImportRepositoryInterface;
+ use JsbParser\Importers\AswImporter;
+ use PHPUnit\Framework\TestCase;
+ 
++require_once __DIR__ . '/BuildsAswFixtures.php';
++
+ /**
+  * @covers \JsbParser\Importers\AswImporter
+  */
+ final class AswImporterTest extends TestCase
+ {
++    use BuildsAswFixtures;
++
+     /** @var list<array<string, mixed>> */
+     private array $captured = [];
+ 
+     /** @var list<array<string, mixed>> */
+     private array $capturedScores = [];
+ 
+-    /**
+-     * Build a synthetic .asw file with known roster and score data.
+-     *
+-     * The .asw format has 112 data lines. Sections:
+-     * - Lines 0-15: All-Star Team 1 roster (PIDs)
+-     * - Lines 16-30: All-Star Team 2 roster
+-     * - Lines 31-45: Rookie Team 1 roster
+-     * - Lines 46-60: Rookie Team 2 roster
+-     * - Lines 61-70: 3-Point Shootout participants
+-     * - Lines 71-80: Dunk Contest participants
+-     * - Lines 81-96: Dunk scores (81=header, 82-89=round1, 90-92=finals)
+-     * - Lines 97-111: 3-pt scores (97-104=round1, 105-108=semis, 109-110=finals)
+-     *
+-     * @param list<int> $allstar1 PIDs for All-Star Team 1 (up to 16)
+-     * @param list<int> $allstar2 PIDs for All-Star Team 2 (up to 15)
+-     * @param list<int> $threePointPids 3-pt contest participant PIDs
+-     * @param list<int> $dunkPids Dunk contest participant PIDs
+-     * @param list<int> $dunkRound1Scores Dunk round 1 scores (stored as score*10)
+-     * @param list<int> $dunkFinalsScores Dunk finals scores
+-     * @param list<int> $threePtRound1Scores 3-pt round 1 scores (raw count)
+-     * @param list<int> $threePtSemisScores 3-pt semis scores
+-     * @param list<int> $threePtFinalsScores 3-pt finals scores
+-     */
+-    private function buildAswFile(
+-        array $allstar1 = [],
+-        array $allstar2 = [],
+-        array $threePointPids = [],
+-        array $dunkPids = [],
+-        array $dunkRound1Scores = [],
+-        array $dunkFinalsScores = [],
+-        array $threePtRound1Scores = [],
+-        array $threePtSemisScores = [],
+-        array $threePtFinalsScores = [],
+-    ): string {
+-        // Initialize 112 lines with "0". array_map with a string-typed callback yields
+-        // list<string> (not list<'0'>), matching fillLines()'s by-ref param type.
+-        $lines = array_map(
+-            static fn (int $i): string => '0',
+-            range(0, AswFileParser::TOTAL_DATA_LINES - 1)
+-        );
+-
+-        // Fill roster sections
+-        $this->fillLines($lines, AswFileParser::ALLSTAR_1_START, $allstar1);
+-        $this->fillLines($lines, AswFileParser::ALLSTAR_2_START, $allstar2);
+-        // Rookie rosters left as 0
+-        $this->fillLines($lines, AswFileParser::THREE_POINT_START, $threePointPids);
+-        $this->fillLines($lines, AswFileParser::DUNK_CONTEST_START, $dunkPids);
+-
+-        // Fill dunk scores: 82-89 = round1, 90-92 = finals
+-        $this->fillLines($lines, 82, $dunkRound1Scores);
+-        $this->fillLines($lines, 90, $dunkFinalsScores);
+-
+-        // Fill 3-pt scores: 97-104 = round1, 105-108 = semis, 109-110 = finals
+-        $this->fillLines($lines, 97, $threePtRound1Scores);
+-        $this->fillLines($lines, 105, $threePtSemisScores);
+-        $this->fillLines($lines, 109, $threePtFinalsScores);
+-
+-        $content = implode("\r\n", $lines) . "\r\n";
+-
+-        // Pad to exactly 10,000 bytes
+-        if (strlen($content) < AswFileParser::FILE_SIZE) {
+-            $content = str_pad($content, AswFileParser::FILE_SIZE);
+-        }
+-
+-        return $content;
+-    }
+-
+-    /**
+-     * Fill lines array starting at offset with values.
+-     *
+-     * @param array<int, string> $lines Lines array (modified in place)
+-     * @param int $startLine Starting line index
+-     * @param list<int> $values Values to fill
+-     */
+-    private function fillLines(array &$lines, int $startLine, array $values): void
+-    {
+-        foreach ($values as $i => $value) {
+-            $lines[$startLine + $i] = (string) $value;
+-        }
+-    }
+-
+-    private function buildFixture(): string
+-    {
+-        return $this->buildAswFile(
+-            allstar1: [101, 102],
+-            threePointPids: [301, 302],
+-            dunkPids: [401, 402],
+-            dunkRound1Scores: [455, 480, 470],
+-            threePtRound1Scores: [18, 21],
+-        );
+-    }
+-
+     private function repositoryCapturing(string $method): JsbImportRepositoryInterface&\PHPUnit\Framework\MockObject\Stub
+     {
+         $repo = self::createStub(JsbImportRepositoryInterface::class);
+@@ -295,6 +206,197 @@ public function testImportConvertsRosterExceptionToError(): void
+         $this->assertCount(5, $this->capturedScores);
+     }
+ 
++    private function buildAwardFixture(): string
++    {
++        return $this->buildAswFile(
++            allstar1: [101],
++            allstar2: [102],
++            threePointPids: [301],
++            dunkPids: [401],
++            rookie1: [201],
++            rookie2: [202],
++        );
++    }
++
++    /**
++     * @return JsbImportRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject
++     */
++    private function strictRepositoryWithWrites(): JsbImportRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject
++    {
++        $repo = self::createMock(JsbImportRepositoryInterface::class);
++        $repo->method('getPlayerName')->willReturnCallback(static fn (int $pid): string => 'P' . $pid);
++        $repo->method('findAllStarConference')->willReturn('Western');
++        $repo->method('upsertAllStarRoster')->willReturn(1);
++        $repo->method('upsertAllStarScore')->willReturn(1);
++        return $repo;
++    }
++
++    public function testStaleRostersRejectedWritesNothing(): void
++    {
++        $repo = self::createMock(JsbImportRepositoryInterface::class);
++        $repo->expects(self::once())->method('findOtherSeasonWithIdenticalRosters')->willReturn(2007);
++        $repo->expects(self::never())->method('upsertAllStarRoster');
++        $repo->expects(self::never())->method('upsertAllStarScore');
++        $repo->expects(self::never())->method('insertAwardUnlessFamilyExists');
++        $repo->expects(self::never())->method('getPlayerName');
++
++        $result = (new AswImporter($repo))->import($this->buildFixture(), 2009, true);
++
++        $this->assertSame(0, $result->inserted);
++        $this->assertSame(0, $result->errors);
++        $this->assertStringContainsString('season 2007', implode("\n", $result->messages));
++        $this->assertStringContainsString('nothing written for season 2009', implode("\n", $result->messages));
++    }
++
++    public function testStaleCheckSkippedWhenFlagOff(): void
++    {
++        $repo = $this->strictRepositoryWithWrites();
++        $repo->expects(self::never())->method('findOtherSeasonWithIdenticalRosters');
++        $repo->expects(self::atLeastOnce())->method('insertAwardUnlessFamilyExists')->willReturn(1);
++
++        $result = (new AswImporter($repo))->import($this->buildFixture(), 2009);
++
++        $this->assertSame(0, $result->errors);
++        $this->assertGreaterThan(0, $result->inserted);
++        $this->assertStringNotContainsString('stale', implode("\n", $result->messages));
++    }
++
++    public function testStaleCheckFailureWritesNothing(): void
++    {
++        $repo = self::createMock(JsbImportRepositoryInterface::class);
++        $repo->expects(self::once())->method('findOtherSeasonWithIdenticalRosters')
++            ->willThrowException(new \RuntimeException('db down'));
++        $repo->expects(self::never())->method('upsertAllStarRoster');
++        $repo->expects(self::never())->method('upsertAllStarScore');
++        $repo->expects(self::never())->method('insertAwardUnlessFamilyExists');
++
++        $result = (new AswImporter($repo))->import($this->buildFixture(), 2009, true);
++
++        $this->assertSame(1, $result->errors);
++        $this->assertSame(0, $result->inserted);
++        $this->assertStringContainsString('ASW stale check failed; nothing written: db down', implode("\n", $result->messages));
++    }
++
++    public function testAcceptedImportWritesParticipantAwards(): void
++    {
++        /** @var list<array{int, string, string, string}> $calls */
++        $calls = [];
++        $repo = $this->strictRepositoryWithWrites();
++        $repo->expects(self::once())->method('findOtherSeasonWithIdenticalRosters')->willReturn(null);
++        $repo->expects(self::exactly(6))->method('insertAwardUnlessFamilyExists')->willReturnCallback(
++            static function (int $year, string $award, string $name, string $sibling) use (&$calls): int {
++                $calls[] = [$year, $award, $name, $sibling];
++                return 1;
++            }
++        );
++
++        $result = (new AswImporter($repo))->import($this->buildAwardFixture(), 2009, true);
++
++        $this->assertSame(0, $result->errors);
++        $this->assertSame([
++            [2009, 'Western Conference All-Star', 'P101', 'Eastern Conference All-Star'],
++            [2009, 'Western Conference All-Star', 'P102', 'Eastern Conference All-Star'],
++            [2009, 'Rookie-Sophomore Challenge', 'P201', 'Rookie-Sophomore Challenge - MVP'],
++            [2009, 'Rookie-Sophomore Challenge', 'P202', 'Rookie-Sophomore Challenge - MVP'],
++            [2009, 'Three-Point Contest', 'P301', 'Three-Point Contest - Winner'],
++            [2009, 'Slam Dunk Competition', 'P401', 'Slam Dunk Competition - Winner'],
++        ], $calls);
++        foreach ($calls as [, $award]) {
++            $this->assertStringEndsNotWith('- Winner', $award);
++            $this->assertStringEndsNotWith('- MVP', $award);
++        }
++    }
++
++    public function testAllStarWithoutConferenceIsSkippedAndReported(): void
++    {
++        $repo = self::createMock(JsbImportRepositoryInterface::class);
++        $repo->method('getPlayerName')->willReturnCallback(static fn (int $pid): string => 'P' . $pid);
++        $repo->method('findAllStarConference')->willReturn(null);
++        $repo->method('upsertAllStarRoster')->willReturn(1);
++        $repo->method('upsertAllStarScore')->willReturn(1);
++        /** @var list<string> $awards */
++        $awards = [];
++        $repo->expects(self::exactly(4))->method('insertAwardUnlessFamilyExists')->willReturnCallback(
++            static function (int $year, string $award) use (&$awards): int {
++                $awards[] = $award;
++                return 1;
++            }
++        );
++
++        $result = (new AswImporter($repo))->import($this->buildAwardFixture(), 2009);
++
++        $this->assertSame(0, $result->errors);
++        $this->assertSame([
++            'Rookie-Sophomore Challenge',
++            'Rookie-Sophomore Challenge',
++            'Three-Point Contest',
++            'Slam Dunk Competition',
++        ], $awards);
++        $messages = implode("\n", $result->messages);
++        $this->assertStringContainsString('no conference for P101 (pid 101) in 2009', $messages);
++        $this->assertStringContainsString('no conference for P102 (pid 102) in 2009', $messages);
++    }
++
++    public function testAwardSkippedWhenPlayerNameUnknown(): void
++    {
++        $repo = self::createMock(JsbImportRepositoryInterface::class);
++        $repo->method('getPlayerName')->willReturn(null);
++        $repo->method('upsertAllStarRoster')->willReturn(1);
++        $repo->method('upsertAllStarScore')->willReturn(1);
++        $repo->expects(self::never())->method('findAllStarConference');
++        $repo->expects(self::never())->method('insertAwardUnlessFamilyExists');
++
++        $result = (new AswImporter($repo))->import($this->buildAwardFixture(), 2009);
++
++        $this->assertSame(0, $result->errors);
++        $this->assertStringContainsString('ASW awards: 6 roster slots skipped (unknown player name)', implode("\n", $result->messages));
++    }
++
++    public function testUnnamedSlotDoesNotStopLaterSlotsInSameEvent(): void
++    {
++        $repo = self::createMock(JsbImportRepositoryInterface::class);
++        $repo->method('getPlayerName')->willReturnMap([[101, null], [102, 'P102']]);
++        $repo->method('findAllStarConference')->willReturn('Eastern');
++        $repo->method('upsertAllStarRoster')->willReturn(1);
++        $repo->method('upsertAllStarScore')->willReturn(1);
++        $repo->expects(self::once())->method('insertAwardUnlessFamilyExists')
++            ->with(2009, 'Eastern Conference All-Star', 'P102', 'Western Conference All-Star')
++            ->willReturn(1);
++
++        $result = (new AswImporter($repo))->import($this->buildAswFile(allstar1: [101, 102]), 2009);
++
++        $this->assertSame(0, $result->errors);
++        $this->assertStringContainsString('ASW awards: 1 roster slots skipped (unknown player name)', implode("\n", $result->messages));
++    }
++
++    public function testMissingConferenceDoesNotStopLaterSlotsInSameEvent(): void
++    {
++        $repo = self::createMock(JsbImportRepositoryInterface::class);
++        $repo->method('getPlayerName')->willReturnCallback(static fn (int $pid): string => 'P' . $pid);
++        $repo->method('findAllStarConference')->willReturnMap([[101, 2009, null], [102, 2009, 'Eastern']]);
++        $repo->method('upsertAllStarRoster')->willReturn(1);
++        $repo->method('upsertAllStarScore')->willReturn(1);
++        $repo->expects(self::once())->method('insertAwardUnlessFamilyExists')
++            ->with(2009, 'Eastern Conference All-Star', 'P102', 'Western Conference All-Star')
++            ->willReturn(1);
++
++        $result = (new AswImporter($repo))->import($this->buildAswFile(allstar1: [101, 102]), 2009);
++
++        $this->assertSame(0, $result->errors);
++        $this->assertStringContainsString('no conference for P101 (pid 101) in 2009', implode("\n", $result->messages));
++    }
++
++    public function testAllNamedSlotsReportNoSkippedSlots(): void
++    {
++        $repo = $this->strictRepositoryWithWrites();
++        $repo->expects(self::exactly(6))->method('insertAwardUnlessFamilyExists')->willReturn(1);
++
++        $result = (new AswImporter($repo))->import($this->buildAwardFixture(), 2009);
++
++        $this->assertSame(0, $result->errors);
++        $this->assertStringNotContainsString('roster slots skipped', implode("\n", $result->messages));
++    }
++
+     public function testImportFileReportsMissingFile(): void
+     {
+         $result = (new AswImporter(self::createStub(JsbImportRepositoryInterface::class)))->importFile('/nonexistent/x.asw', 2024);
+diff --git a/ibl5/tests/JsbParser/Importers/BuildsAswFixtures.php b/ibl5/tests/JsbParser/Importers/BuildsAswFixtures.php
+new file mode 100644
+index 0000000000..569b9b82f4
+--- /dev/null
++++ b/ibl5/tests/JsbParser/Importers/BuildsAswFixtures.php
+@@ -0,0 +1,110 @@
++<?php
++
++declare(strict_types=1);
++
++namespace Tests\JsbParser\Importers;
++
++use JsbParser\AswFileParser;
++
++/**
++ * Synthetic .asw file builders shared by the unit and integration tests.
++ */
++trait BuildsAswFixtures
++{
++    /**
++     * Build a synthetic .asw file with known roster and score data.
++     *
++     * The .asw format has 112 data lines. Sections:
++     * - Lines 0-15: All-Star Team 1 roster (PIDs)
++     * - Lines 16-30: All-Star Team 2 roster
++     * - Lines 31-45: Rookie Team 1 roster
++     * - Lines 46-60: Rookie Team 2 roster
++     * - Lines 61-70: 3-Point Shootout participants
++     * - Lines 71-80: Dunk Contest participants
++     * - Lines 81-96: Dunk scores (81=header, 82-89=round1, 90-92=finals)
++     * - Lines 97-111: 3-pt scores (97-104=round1, 105-108=semis, 109-110=finals)
++     *
++     * @param list<int> $allstar1 PIDs for All-Star Team 1 (up to 16)
++     * @param list<int> $allstar2 PIDs for All-Star Team 2 (up to 15)
++     * @param list<int> $threePointPids 3-pt contest participant PIDs
++     * @param list<int> $dunkPids Dunk contest participant PIDs
++     * @param list<int> $dunkRound1Scores Dunk round 1 scores (stored as score*10)
++     * @param list<int> $dunkFinalsScores Dunk finals scores
++     * @param list<int> $threePtRound1Scores 3-pt round 1 scores (raw count)
++     * @param list<int> $threePtSemisScores 3-pt semis scores
++     * @param list<int> $threePtFinalsScores 3-pt finals scores
++     * @param list<int> $rookie1 PIDs for Rookie Team 1 (up to 15)
++     * @param list<int> $rookie2 PIDs for Rookie Team 2 (up to 15)
++     */
++    private function buildAswFile(
++        array $allstar1 = [],
++        array $allstar2 = [],
++        array $threePointPids = [],
++        array $dunkPids = [],
++        array $dunkRound1Scores = [],
++        array $dunkFinalsScores = [],
++        array $threePtRound1Scores = [],
++        array $threePtSemisScores = [],
++        array $threePtFinalsScores = [],
++        array $rookie1 = [],
++        array $rookie2 = [],
++    ): string {
++        // Initialize 112 lines with "0". array_map with a string-typed callback yields
++        // list<string> (not list<'0'>), matching fillLines()'s by-ref param type.
++        $lines = array_map(
++            static fn (int $i): string => '0',
++            range(0, AswFileParser::TOTAL_DATA_LINES - 1)
++        );
++
++        // Fill roster sections
++        $this->fillLines($lines, AswFileParser::ALLSTAR_1_START, $allstar1);
++        $this->fillLines($lines, AswFileParser::ALLSTAR_2_START, $allstar2);
++        $this->fillLines($lines, AswFileParser::ROOKIE_1_START, $rookie1);
++        $this->fillLines($lines, AswFileParser::ROOKIE_2_START, $rookie2);
++        $this->fillLines($lines, AswFileParser::THREE_POINT_START, $threePointPids);
++        $this->fillLines($lines, AswFileParser::DUNK_CONTEST_START, $dunkPids);
++
++        // Fill dunk scores: 82-89 = round1, 90-92 = finals
++        $this->fillLines($lines, 82, $dunkRound1Scores);
++        $this->fillLines($lines, 90, $dunkFinalsScores);
++
++        // Fill 3-pt scores: 97-104 = round1, 105-108 = semis, 109-110 = finals
++        $this->fillLines($lines, 97, $threePtRound1Scores);
++        $this->fillLines($lines, 105, $threePtSemisScores);
++        $this->fillLines($lines, 109, $threePtFinalsScores);
++
++        $content = implode("\r\n", $lines) . "\r\n";
++
++        // Pad to exactly 10,000 bytes
++        if (strlen($content) < AswFileParser::FILE_SIZE) {
++            $content = str_pad($content, AswFileParser::FILE_SIZE);
++        }
++
++        return $content;
++    }
++
++    /**
++     * Fill lines array starting at offset with values.
++     *
++     * @param array<int, string> $lines Lines array (modified in place)
++     * @param int $startLine Starting line index
++     * @param list<int> $values Values to fill
++     */
++    private function fillLines(array &$lines, int $startLine, array $values): void
++    {
++        foreach ($values as $i => $value) {
++            $lines[$startLine + $i] = (string) $value;
++        }
++    }
++
++    private function buildFixture(): string
++    {
++        return $this->buildAswFile(
++            allstar1: [101, 102],
++            threePointPids: [301, 302],
++            dunkPids: [401, 402],
++            dunkRound1Scores: [455, 480, 470],
++            threePtRound1Scores: [18, 21],
++        );
++    }
++}

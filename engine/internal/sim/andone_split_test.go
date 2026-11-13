@@ -95,11 +95,11 @@ func TestAndOneWeightOrder(t *testing.T) {
 	if raw+away >= andOneBucketFloor {
 		t.Fatalf("fixture: raw %v plus away HCA %v must fall below the floor", raw, away)
 	}
-	if got := max(andOneBucketRaw(0, p)+away, andOneBucketFloor); got != andOneBucketFloor {
+	if got := halfCourtAndOneWeight(0, p, away); got != andOneBucketFloor {
 		t.Errorf("below the floor: got %v, want exactly %v", got, andOneBucketFloor)
 	}
 	home := hcaMagnitude * hcaSite2BasisScale
-	if got, want := max(andOneBucketRaw(0, p)+home, andOneBucketFloor), raw+home; got != want {
+	if got, want := halfCourtAndOneWeight(0, p, home), raw+home; got != want {
 		t.Errorf("above the floor: got %v, want raw plus HCA %v", got, want)
 	}
 	if got := andOneBucketWeight(0, p); got != raw {

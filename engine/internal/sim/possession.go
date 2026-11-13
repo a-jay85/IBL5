@@ -292,7 +292,7 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 		in := outcomeInputs{
 			twoPtWeight:      twoPtW,
 			threePtWeight:    threePtW,
-			andOneWeight:     max(andOneBucketRaw(mq, bh)+hcaScaled, andOneBucketFloor), // leg D: e90 inherits e88's +hca, floored after (FUN_004e1ba0 97165-97168)
+			andOneWeight:     halfCourtAndOneWeight(mq, bh, hcaScaled), // leg D: e90 inherits e88's +hca, floored after (FUN_004e1ba0 97165-97168)
 			foulOnlyWeight:   foulW,
 			turnoverDefValue: energyCeiling(bh),
 		}

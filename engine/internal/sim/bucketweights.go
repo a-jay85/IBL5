@@ -290,6 +290,13 @@ func andOneBucketRaw(mq float64, p onCourt) float64 {
 	return mq*0.25 + float64(floor1(p.FGP))*andOneMadeRateScale
 }
 
+// halfCourtAndOneWeight is the half-court and-one bucket weight: the HCA term
+// joins the raw weight first, then andOneBucketFloor applies to the sum
+// (FUN_004e1ba0 97165-97168: local_e90 inherits local_e88's +hca, floored after).
+func halfCourtAndOneWeight(mq float64, p onCourt, hcaScaled float64) float64 {
+	return max(andOneBucketRaw(mq, p)+hcaScaled, andOneBucketFloor)
+}
+
 // foulBucketWeight is the faithful JSB 5.60 foul bucket: a symmetric two-arm BASE
 // plus the small ±0.2 half-court HCA legs (jsb560_decompiled.c:97116-97173, J15
 // Phase 5 2026-07-11). It takes the ball handler, the offense AND defense lineups,

@@ -1,0 +1,1004 @@
+diff --git a/ibl5/classes/Rivalries/RivalriesController.php b/ibl5/classes/Rivalries/RivalriesController.php
+index 9501c857d2..104524b00b 100644
+--- a/ibl5/classes/Rivalries/RivalriesController.php
++++ b/ibl5/classes/Rivalries/RivalriesController.php
+@@ -102,13 +102,9 @@ public function handle(array $get, ?string $userTeamKey, ?string $userGm): strin
+                 }
+                 $teamRivals = $this->service->getTopFranchiseRivals($id, self::TOP_LIMIT);
+                 $owner = $this->teams->getOwnerName($id);
+-                $gm = $owner !== null && $owner !== '' ? $this->repo->findGmName($owner) : null;
+-                // The GM-change trigger stores the site username, so a tenure row can hold
+-                // "SpecBob" while owner_name reads "Spec-Bob".
+-                if ($gm === null) {
+-                    $username = $this->teams->getUsernameFromTeamname($name);
+-                    $gm = $username !== null && $username !== '' ? $this->repo->findGmName($username) : null;
+-                }
++                // Migration 207's trigger names a tenure after gm_username when owner_name is empty.
++                $tenureName = $owner !== null && $owner !== '' ? $owner : $this->teams->getUsernameFromTeamname($name);
++                $gm = $tenureName !== null && $tenureName !== '' ? $this->repo->findGmName($tenureName) : null;
+                 $gmRivals = $gm === null ? [] : $this->service->getTopGmRivals($gm, self::TOP_LIMIT);
+                 $team = $this->teams->getTeamByName($name);
+                 $teamLabel = $team !== null && $team['team_city'] !== '' ? $team['team_city'] . ' ' . $name : $name;
+diff --git a/ibl5/migrations/207_gm_tenure_trigger_display_name.sql b/ibl5/migrations/207_gm_tenure_trigger_display_name.sql
+new file mode 100644
+index 0000000000..189391c9c4
+--- /dev/null
++++ b/ibl5/migrations/207_gm_tenure_trigger_display_name.sql
+@@ -0,0 +1,197 @@
++-- Migration 207: trg_gm_tenure_track stores GM display names and follows owner_name renames (backlog#1708).
++--
++-- rollback-incompatible: the trigger now opens tenures under owner_name, so pre-migration code that sets only gm_username on a team with an owner_name reads a different tenure name
++--
++-- Before: the trigger opened a tenure under ibl_team_info.gm_username (the site username) and closed
++-- the old tenure by matching that same username. Every other ibl_gm_tenures row holds a display name,
++-- the same spelling as ibl_team_info.owner_name. So the next GM change wrote a username row, and the
++-- close step could never find a row that held a display name.
++--
++-- After:
++--   * A gm_username change closes the franchise's open tenure by franchise and open state, then opens
++--     the new tenure under owner_name. An empty owner_name falls back to gm_username.
++--   * An owner_name change with an unchanged gm_username is a rename of the same person. The trigger
++--     rewrites the franchise's open tenure and the matching 'Name (Team)' rows in ibl_gm_history.
++--   * ibl_gm_awards and ibl_votes_EOY are out of scope. Their name columns carry no franchise key.
++--
++-- Write orders for the two columns (no PHP writer exists, so an admin edits them in a DB tool):
++--   1. Both columns in one UPDATE statement: exact. This is the supported procedure.
++--   2. gm_username first, then owner_name: exact when the outgoing tenure started in an earlier
++--      season. The second statement takes the rename branch and fixes the tenure the first statement
++--      opened under the stale name. If the outgoing tenure started this season under the same
++--      name, the first statement hits the uq_tenure key and fails, so use order 1.
++--   3. owner_name first, then gm_username: the rename branch renames the outgoing GM's open tenure
++--      to the incoming GM's name before the second statement closes it. One closed row then carries
++--      the wrong name. No single-row AFTER UPDATE trigger can tell this from a plain rename.
++--      Recovery is a one-row UPDATE on that closed tenure.
++--
++-- Apply-time guard: the new trigger closes and renames "the franchise's open tenure", so exactly one
++-- open row per franchise must hold when it takes over. The guard runs before any DROP, so an abort
++-- leaves both triggers in place.
++--
++-- Backup: before the backfill, every row it will rewrite (open and closed tenures stored under a
++-- username) is copied whole into ibl_gm_tenures_backup_207, using the backfill's own WHERE. Drop
++-- that table in a later migration once the backfill has held.
++--
++-- Rollback: re-run the trigger block of migration 192 (trg_gm_tenure_track), then apply
++-- ibl5/scripts/undo/207_gm_tenure_trigger_display_name.sql by hand. It restores gm_display_name
++-- by id from ibl_gm_tenures_backup_207.
++-- Idempotent: DROP TRIGGER IF EXISTS, CREATE TABLE IF NOT EXISTS, and a backup fill and backfill whose
++-- WHERE matches nothing on a second run. INSERT IGNORE keeps the first run's old values.
++--
++-- trg_team_identity_sync is recreated with migration 192's body unchanged and no ordering clause
++-- (action_order 1). trg_gm_tenure_track is recreated FOLLOWS it (action_order 2), which avoids the
++-- PRECEDES/FOLLOWS circular dependency.
++--
++-- destructive-migration[rewrite-no-backup]: the flagged UPDATEs of ibl_league_config and ibl_gm_tenures sit inside the CREATE TRIGGER bodies of trg_team_identity_sync and trg_gm_tenure_track, so they run per row at trigger time, not at migration time. The one migration-time backfill below has its own backup fill and an undo script at ibl5/scripts/undo/207_gm_tenure_trigger_display_name.sql, kept outside ibl5/migrations/ so the migration runner never applies it.
++
++DELIMITER $$
++
++BEGIN NOT ATOMIC
++  IF EXISTS (SELECT 1 FROM ibl_gm_tenures
++              WHERE end_season_year IS NULL
++              GROUP BY franchise_id HAVING COUNT(*) > 1) THEN
++    SIGNAL SQLSTATE '45000'
++      SET MESSAGE_TEXT = 'gm_tenure_trigger_display_name aborted: a franchise has more than one open ibl_gm_tenures row';
++  END IF;
++END$$
++
++DROP TRIGGER IF EXISTS trg_gm_tenure_track$$
++DROP TRIGGER IF EXISTS trg_team_identity_sync$$
++
++-- trg_team_identity_sync: migration 192 body, unchanged.
++CREATE TRIGGER trg_team_identity_sync
++AFTER UPDATE ON ibl_team_info
++FOR EACH ROW
++BEGIN
++  DECLARE v_ending_year    SMALLINT UNSIGNED;
++  DECLARE v_beginning_year SMALLINT UNSIGNED;
++
++  IF OLD.team_city <> NEW.team_city OR OLD.team_name <> NEW.team_name THEN
++
++    SELECT CAST(setting_value AS UNSIGNED) INTO v_ending_year
++      FROM ibl_settings
++     WHERE setting_key = 'Current Season Ending Year'
++     LIMIT 1;
++
++    SET v_beginning_year = v_ending_year - 1;
++
++    INSERT INTO ibl_franchise_seasons
++      (franchise_id, season_year, season_ending_year, team_city, team_name)
++    VALUES
++      (NEW.teamid, v_beginning_year, v_ending_year, NEW.team_city, NEW.team_name)
++    ON DUPLICATE KEY UPDATE
++      team_city = NEW.team_city,
++      team_name = NEW.team_name;
++
++    -- maintenance-28 (15.19): keep the denormalized league-config name in sync.
++    UPDATE ibl_league_config
++       SET team_name = NEW.team_name
++     WHERE teamid = NEW.teamid;
++
++  END IF;
++END$$
++
++CREATE TRIGGER trg_gm_tenure_track
++AFTER UPDATE ON ibl_team_info
++FOR EACH ROW
++FOLLOWS trg_team_identity_sync
++BEGIN
++  DECLARE v_ending_year    SMALLINT UNSIGNED;
++  DECLARE v_beginning_year SMALLINT UNSIGNED;
++  DECLARE v_phase          VARCHAR(128);
++  DECLARE v_is_mid_season  TINYINT(1);
++  DECLARE v_new_name       VARCHAR(60);
++
++  IF NOT (OLD.gm_username <=> NEW.gm_username) THEN
++
++    SELECT CAST(setting_value AS UNSIGNED) INTO v_ending_year
++      FROM ibl_settings
++     WHERE setting_key = 'Current Season Ending Year'
++     LIMIT 1;
++
++    SET v_beginning_year = v_ending_year - 1;
++
++    SELECT setting_value INTO v_phase
++      FROM ibl_settings
++     WHERE setting_key = 'Current Season Phase'
++     LIMIT 1;
++
++    SET v_is_mid_season = (v_phase IN ('Regular Season', 'Playoffs', 'HEAT'));
++
++    -- Close the franchise's open tenure whatever name it holds.
++    UPDATE ibl_gm_tenures
++       SET end_season_year   = v_beginning_year,
++           is_mid_season_end = v_is_mid_season
++     WHERE franchise_id    = OLD.teamid
++       AND end_season_year IS NULL;
++
++    IF NEW.gm_username IS NOT NULL AND NEW.gm_username <> '' THEN
++      SET v_new_name = IF(NEW.owner_name <> '', NEW.owner_name, NEW.gm_username);
++      INSERT INTO ibl_gm_tenures
++        (franchise_id, gm_display_name, start_season_year, is_mid_season_start)
++      VALUES
++        (NEW.teamid, v_new_name, v_beginning_year, v_is_mid_season);
++    END IF;
++
++  ELSEIF NOT (OLD.owner_name <=> NEW.owner_name) AND NEW.owner_name <> '' THEN
++
++    -- Same GM, new display name: rename the franchise's open tenure only.
++    UPDATE ibl_gm_tenures
++       SET gm_display_name = NEW.owner_name
++     WHERE franchise_id    = NEW.teamid
++       AND end_season_year IS NULL
++       AND gm_display_name <> NEW.owner_name;
++
++    -- ibl_gm_history stores 'Name (Team)'. The team suffix is the franchise key.
++    IF OLD.owner_name <> ''
++       AND CHAR_LENGTH(CONCAT(NEW.owner_name, ' (', NEW.team_name, ')')) <= 50 THEN
++      UPDATE ibl_gm_history
++         SET name = CONCAT(NEW.owner_name, ' (', NEW.team_name, ')')
++       WHERE name = CONCAT(OLD.owner_name, ' (', NEW.team_name, ')');
++    END IF;
++
++  END IF;
++END$$
++
++DELIMITER ;
++
++-- Backup: copy every row the backfill below will rewrite. The FROM, JOINs and WHERE match the backfill's exactly.
++--
++-- Scope: every tenure, open or closed, whose gm_display_name is a site username that maps to exactly one
++-- non-empty owner_name in ibl_team_info. Migration 192's trigger wrote such rows under the username. A closed
++-- row left under the username would split one GM across two names, and RivalriesController keys GM rivalry
++-- totals on gm_display_name, so it would drop that GM's earlier games. A username shared by teams with
++-- different owner_names maps to no one and is left alone. A row is also left alone when its franchise already
++-- has a row under the owner_name with the same start_season_year, because renaming it would break uq_tenure.
++CREATE TABLE IF NOT EXISTS ibl_gm_tenures_backup_207 LIKE ibl_gm_tenures;
++
++INSERT IGNORE INTO ibl_gm_tenures_backup_207
++SELECT t.*
++  FROM ibl_gm_tenures t
++  JOIN (SELECT gm_username, MIN(owner_name) AS owner_name
++          FROM ibl_team_info
++         WHERE gm_username IS NOT NULL AND gm_username <> '' AND owner_name <> ''
++         GROUP BY gm_username
++        HAVING COUNT(DISTINCT owner_name) = 1) m ON m.gm_username = t.gm_display_name
++  LEFT JOIN ibl_gm_tenures dup
++         ON dup.franchise_id      = t.franchise_id
++        AND dup.start_season_year = t.start_season_year
++        AND dup.gm_display_name   = m.owner_name
++ WHERE t.gm_display_name <> m.owner_name
++   AND dup.id IS NULL;
++
++-- Backfill: open and closed rows that hold exactly a mapped username get that GM's display name.
++UPDATE ibl_gm_tenures t
++  JOIN (SELECT gm_username, MIN(owner_name) AS owner_name
++          FROM ibl_team_info
++         WHERE gm_username IS NOT NULL AND gm_username <> '' AND owner_name <> ''
++         GROUP BY gm_username
++        HAVING COUNT(DISTINCT owner_name) = 1) m ON m.gm_username = t.gm_display_name
++  LEFT JOIN ibl_gm_tenures dup
++         ON dup.franchise_id      = t.franchise_id
++        AND dup.start_season_year = t.start_season_year
++        AND dup.gm_display_name   = m.owner_name
++   SET t.gm_display_name = m.owner_name
++ WHERE t.gm_display_name <> m.owner_name
++   AND dup.id IS NULL;
+diff --git a/ibl5/scripts/undo/207_gm_tenure_trigger_display_name.sql b/ibl5/scripts/undo/207_gm_tenure_trigger_display_name.sql
+new file mode 100644
+index 0000000000..61f9e175af
+--- /dev/null
++++ b/ibl5/scripts/undo/207_gm_tenure_trigger_display_name.sql
+@@ -0,0 +1,12 @@
++-- Undo for migration 207's backfill. Apply by hand. It lives outside ibl5/migrations/, so bin/db-migrate never runs it.
++--
++-- Restores ibl_gm_tenures.gm_display_name to the value it held before the backfill, by id, from the
++-- full-row copies migration 207 wrote to ibl_gm_tenures_backup_207. Rows the backfill did not touch
++-- have no backup row and are left alone. Re-running is safe: it writes the same old values again.
++--
++-- Restore the old trigger first (migration 192's trg_gm_tenure_track block), or the next GM change
++-- opens a display-name tenure again.
++
++UPDATE ibl_gm_tenures, ibl_gm_tenures_backup_207 b
++   SET ibl_gm_tenures.gm_display_name = b.gm_display_name
++ WHERE ibl_gm_tenures.id = b.id;
+diff --git a/ibl5/tests/DatabaseIntegration/GmTenureTriggerDisplayNameTest.php b/ibl5/tests/DatabaseIntegration/GmTenureTriggerDisplayNameTest.php
+new file mode 100644
+index 0000000000..f7c17c3941
+--- /dev/null
++++ b/ibl5/tests/DatabaseIntegration/GmTenureTriggerDisplayNameTest.php
+@@ -0,0 +1,627 @@
++<?php
++
++declare(strict_types=1);
++
++namespace Tests\DatabaseIntegration;
++
++use PHPUnit\Framework\Attributes\Group;
++
++/**
++ * Covers trg_gm_tenure_track after migration 207 (backlog#1708): the trigger stores GM display
++ * names (ibl_team_info.owner_name) instead of site usernames, closes the franchise's open tenure
++ * by franchise rather than by name, and follows owner_name renames.
++ *
++ * Three write orders exist for the two columns, since an admin edits them in a DB tool:
++ *   1. Both columns in one UPDATE statement: exact. This is the supported procedure.
++ *   2. gm_username first, then owner_name: exact when the outgoing tenure started in an earlier
++ *      season. The second statement takes the rename branch and fixes the open tenure the first
++ *      statement opened under the stale name. If the outgoing tenure started this season under the
++ *      same name, the first statement hits the uq_tenure key and fails, so use order 1.
++ *   3. owner_name first, then gm_username: the rename branch renames the outgoing GM's open
++ *      tenure to the incoming GM's name before the second statement closes it, so one closed row
++ *      carries the wrong name. This is the named residual and is not tested.
++ */
++#[Group('database')]
++class GmTenureTriggerDisplayNameTest extends DatabaseTestCase
++{
++    public function testGmChangeOpensTenureUnderOwnerName(): void
++    {
++        [$a] = $this->probeTeams();
++
++        $this->setTeamGm($a, 'zzolduser', 'ZZ Old Gm');
++        $this->setTeamGm($a, 'zznewuser', 'ZZ New Gm');
++
++        $open = array_values(array_filter(
++            $this->openTenures($a),
++            static fn (array $row): bool => $row['end_season_year'] === null
++        ));
++        self::assertCount(1, $open);
++        self::assertSame('ZZ New Gm', $open[0]['gm_display_name']);
++        self::assertSame(2025, $open[0]['start_season_year']);
++
++        $userRows = $this->db->query(
++            "SELECT COUNT(*) AS cnt FROM ibl_gm_tenures WHERE gm_display_name = 'zznewuser'"
++        )->fetch_assoc();
++        self::assertIsArray($userRows);
++        self::assertSame(0, $userRows['cnt']);
++    }
++
++    public function testGmChangeClosesOpenTenureByFranchiseNotByName(): void
++    {
++        [$a] = $this->probeTeams();
++
++        $this->setTeamGm($a, 'zzolduser', 'ZZ Old Gm');
++        $this->setTeamGm($a, null, '');
++        $this->insertRow('ibl_gm_tenures', [
++            'franchise_id' => $a,
++            'gm_display_name' => 'ZZ Manual Entry',
++            'start_season_year' => 2020,
++        ]);
++
++        $this->setTeamGm($a, 'zznewuser', 'ZZ New Gm');
++
++        $rows = $this->openTenures($a);
++        $manual = array_values(array_filter(
++            $rows,
++            static fn (array $row): bool => $row['gm_display_name'] === 'ZZ Manual Entry'
++        ));
++        self::assertCount(1, $manual);
++        self::assertSame(2025, $manual[0]['end_season_year']);
++
++        $open = array_values(array_filter(
++            $rows,
++            static fn (array $row): bool => $row['end_season_year'] === null
++        ));
++        self::assertCount(1, $open);
++        self::assertSame('ZZ New Gm', $open[0]['gm_display_name']);
++    }
++
++    public function testGmChangeWithEmptyOwnerNameFallsBackToUsername(): void
++    {
++        [$a] = $this->probeTeams();
++
++        $this->setTeamGm($a, 'zzonlyuser', '');
++
++        $rows = $this->openTenures($a);
++        self::assertCount(1, $rows);
++        self::assertSame('zzonlyuser', $rows[0]['gm_display_name']);
++        self::assertNull($rows[0]['end_season_year']);
++    }
++
++    public function testGmChangeThenOwnerNameInSeparateStatementsConverges(): void
++    {
++        [$a] = $this->probeTeams();
++
++        $this->setTeamGm($a, 'zzolduser', 'ZZ Old Gm');
++        // Backdate the old tenure. The username-only statement reopens a tenure under the stale
++        // name at the current season start, and uq_tenure (franchise, name, start) would reject
++        // that against an old tenure that also started this season.
++        $this->db->query("UPDATE ibl_gm_tenures SET start_season_year = 2020 WHERE franchise_id = $a");
++        $this->setUsername($a, 'zznewuser');
++        $this->setOwnerName($a, 'ZZ New Gm');
++
++        $rows = $this->openTenures($a);
++        self::assertCount(2, $rows);
++        self::assertSame('ZZ Old Gm', $rows[0]['gm_display_name']);
++        self::assertSame(2025, $rows[0]['end_season_year']);
++        self::assertSame('ZZ New Gm', $rows[1]['gm_display_name']);
++        self::assertNull($rows[1]['end_season_year']);
++    }
++
++    public function testOwnerNameRenameUpdatesOnlyTheFranchiseOpenTenure(): void
++    {
++        [$a, $b] = $this->probeTeams();
++
++        $this->setTeamGm($a, 'zzuser_a', 'ZZ Shared Name');
++        $this->setTeamGm($b, 'zzuser_b', 'ZZ Shared Name');
++        $this->insertRow('ibl_gm_tenures', [
++            'franchise_id' => $a,
++            'gm_display_name' => 'ZZ Shared Name',
++            'start_season_year' => 2010,
++            'end_season_year' => 2012,
++        ]);
++
++        $this->setOwnerName($a, 'ZZ Renamed');
++
++        $rowsA = $this->openTenures($a);
++        $openA = array_values(array_filter(
++            $rowsA,
++            static fn (array $row): bool => $row['end_season_year'] === null
++        ));
++        self::assertCount(1, $openA);
++        self::assertSame('ZZ Renamed', $openA[0]['gm_display_name']);
++
++        $closedA = array_values(array_filter(
++            $rowsA,
++            static fn (array $row): bool => $row['start_season_year'] === 2010
++        ));
++        self::assertCount(1, $closedA);
++        self::assertSame('ZZ Shared Name', $closedA[0]['gm_display_name']);
++
++        $rowsB = $this->openTenures($b);
++        self::assertCount(1, $rowsB);
++        self::assertSame('ZZ Shared Name', $rowsB[0]['gm_display_name']);
++    }
++
++    public function testOwnerNameRenameRewritesGmHistoryCompositeName(): void
++    {
++        [$a, $b] = $this->probeTeams();
++        $teamNameA = $this->teamName($a);
++        $teamNameB = $this->teamName($b);
++
++        $this->setTeamGm($a, 'zzuser_a', 'ZZ Old Gm');
++        $this->insertRow('ibl_gm_history', [
++            'year' => '2025',
++            'name' => "ZZ Old Gm ($teamNameA)",
++            'award' => 'ZZ Probe Award',
++            'prim' => 9900001,
++        ]);
++        $this->insertRow('ibl_gm_history', [
++            'year' => '2025',
++            'name' => "ZZ Old Gm ($teamNameB)",
++            'award' => 'ZZ Probe Award',
++            'prim' => 9900002,
++        ]);
++
++        $this->setOwnerName($a, 'ZZ New Gm');
++
++        self::assertSame("ZZ New Gm ($teamNameA)", $this->gmHistoryName(9900001));
++        self::assertSame("ZZ Old Gm ($teamNameB)", $this->gmHistoryName(9900002));
++    }
++
++    public function testOwnerNameRenameLeavesGmAwardsUntouched(): void
++    {
++        [$a] = $this->probeTeams();
++
++        $this->setTeamGm($a, 'zzuser_a', 'ZZ Old Gm');
++        $this->insertRow('ibl_gm_awards', [
++            'year' => 2025,
++            'award' => 'ZZ Probe GM Award',
++            'name' => 'ZZ Old Gm',
++        ]);
++
++        $this->setOwnerName($a, 'ZZ New Gm');
++
++        $row = $this->db->query(
++            "SELECT name FROM ibl_gm_awards WHERE award = 'ZZ Probe GM Award'"
++        )->fetch_assoc();
++        self::assertIsArray($row);
++        self::assertSame('ZZ Old Gm', $row['name'], 'ibl_gm_awards.name carries no franchise key, so a rename must not touch it');
++    }
++
++    public function testUnrelatedColumnUpdateLeavesTenuresUntouched(): void
++    {
++        [$a] = $this->probeTeams();
++
++        $this->setTeamGm($a, 'zzuser_a', 'ZZ Old Gm');
++        $before = $this->openTenures($a);
++
++        $arena = 'ZZ Probe Arena';
++        $stmt = $this->db->prepare('UPDATE ibl_team_info SET arena = ? WHERE teamid = ?');
++        self::assertNotFalse($stmt);
++        $stmt->bind_param('si', $arena, $a);
++        $stmt->execute();
++        $stmt->close();
++
++        self::assertSame($before, $this->openTenures($a));
++    }
++
++    public function testOwnerNameRenameToEmptyStringIsIgnored(): void
++    {
++        [$a] = $this->probeTeams();
++
++        $this->setTeamGm($a, 'zzuser_a', 'ZZ Old Gm');
++        $this->setOwnerName($a, '');
++
++        $rows = $this->openTenures($a);
++        self::assertCount(1, $rows);
++        self::assertSame('ZZ Old Gm', $rows[0]['gm_display_name']);
++        self::assertNull($rows[0]['end_season_year']);
++    }
++
++    public function testMigrationGuardAbortsWhenFranchiseHasTwoOpenTenures(): void
++    {
++        [$a] = $this->probeTeams();
++
++        $this->setTeamGm($a, null, '');
++        $this->insertRow('ibl_gm_tenures', [
++            'franchise_id' => $a,
++            'gm_display_name' => 'ZZ Open One',
++            'start_season_year' => 2010,
++        ]);
++        $this->insertRow('ibl_gm_tenures', [
++            'franchise_id' => $a,
++            'gm_display_name' => 'ZZ Open Two',
++            'start_season_year' => 2015,
++        ]);
++
++        $guard = null;
++        foreach ($this->migrationStatements() as $statement) {
++            if (str_contains($statement, 'BEGIN NOT ATOMIC')) {
++                $guard = $statement;
++                break;
++            }
++        }
++        self::assertNotNull($guard, 'migration has no BEGIN NOT ATOMIC guard statement');
++
++        $this->expectException(\mysqli_sql_exception::class);
++        $this->expectExceptionMessageMatches('/more than one open ibl_gm_tenures row/');
++
++        $this->db->query($guard);
++    }
++
++    public function testMigrationIsIdempotentAndKeepsTriggerOrder(): void
++    {
++        // No probe rows: the DDL inside the migration commits the surrounding transaction.
++        $statements = $this->migrationStatements();
++        self::assertNotSame([], $statements);
++
++        // The migration's backfill runs outside any transaction (DDL committed it already), so it
++        // would leave seed tenure names rewritten for every later test. Snapshot and restore them.
++        $before = [];
++        $snapshot = $this->db->query('SELECT id, gm_display_name FROM ibl_gm_tenures');
++        while ($row = $snapshot->fetch_assoc()) {
++            $before[(int) $row['id']] = (string) $row['gm_display_name'];
++        }
++
++        try {
++            for ($run = 0; $run < 2; $run++) {
++                foreach ($statements as $statement) {
++                    $this->db->query($statement);
++                }
++            }
++        } finally {
++            $restore = $this->db->prepare('UPDATE ibl_gm_tenures SET gm_display_name = ? WHERE id = ?');
++            self::assertNotFalse($restore);
++            foreach ($before as $id => $name) {
++                $restore->bind_param('si', $name, $id);
++                $restore->execute();
++            }
++            $restore->close();
++        }
++
++        $names = [];
++        $orders = [];
++        $actions = [];
++        $res = $this->db->query(
++            "SELECT TRIGGER_NAME, ACTION_ORDER, ACTION_STATEMENT FROM INFORMATION_SCHEMA.TRIGGERS
++             WHERE TRIGGER_SCHEMA = DATABASE() AND EVENT_OBJECT_TABLE = 'ibl_team_info'
++               AND ACTION_TIMING = 'AFTER' AND EVENT_MANIPULATION = 'UPDATE'
++             ORDER BY ACTION_ORDER"
++        );
++        while ($row = $res->fetch_assoc()) {
++            $name = (string) $row['TRIGGER_NAME'];
++            $names[] = $name;
++            $orders[] = (int) $row['ACTION_ORDER'];
++            $actions[$name] = (string) $row['ACTION_STATEMENT'];
++        }
++
++        self::assertSame(['trg_team_identity_sync', 'trg_gm_tenure_track'], $names);
++        self::assertSame([1, 2], $orders);
++        self::assertStringContainsString('NEW.owner_name', $actions['trg_gm_tenure_track']);
++    }
++
++    public function testBackfillBackupHoldsChangedRowsAndUndoRestoresThem(): void
++    {
++        [$a, $b] = $this->probeTeams();
++
++        // Run only the migration's DML, inside the test transaction. Its CREATE TABLE would commit,
++        // and the test DB already holds ibl_gm_tenures_backup_207 because every migration is applied.
++        $backupFill = null;
++        $backfill = null;
++        foreach ($this->migrationStatements() as $statement) {
++            if (str_starts_with($statement, 'INSERT IGNORE INTO ibl_gm_tenures_backup_207')) {
++                $backupFill = $statement;
++            } elseif (preg_match('/^UPDATE ibl_gm_tenures t\s/m', $statement) === 1) {
++                $backfill = $statement;
++            }
++        }
++        self::assertNotNull($backupFill, 'migration has no backup fill of ibl_gm_tenures_backup_207');
++        self::assertNotNull($backfill, 'migration has no backfill UPDATE');
++        $text = $this->migrationText();
++        self::assertLessThan(strpos($text, $backfill), strpos($text, $backupFill), 'backup fill must run before the backfill');
++
++        $undo = file_get_contents(__DIR__ . '/../../scripts/undo/207_gm_tenure_trigger_display_name.sql');
++        self::assertIsString($undo);
++
++        // Team A: an open tenure still holding the username (a backfill target) and a closed one.
++        $this->setTeamGm($a, 'zzusera', 'ZZ Owner A');
++        $legacy = $this->db->prepare(
++            "UPDATE ibl_gm_tenures SET gm_display_name = 'zzusera' WHERE franchise_id = ? AND end_season_year IS NULL"
++        );
++        self::assertNotFalse($legacy);
++        $legacy->bind_param('i', $a);
++        $legacy->execute();
++        $legacy->close();
++        $closedA = $this->insertRow('ibl_gm_tenures', [
++            'franchise_id' => $a,
++            'gm_display_name' => 'zzusera',
++            'start_season_year' => 2010,
++            'end_season_year' => 2015,
++        ]);
++        // Same GM, a closed tenure at another franchise, still under the username (migration 192 wrote it).
++        $closedAatB = $this->insertRow('ibl_gm_tenures', [
++            'franchise_id' => $b,
++            'gm_display_name' => 'zzusera',
++            'start_season_year' => 2004,
++            'end_season_year' => 2009,
++        ]);
++        // A closed username row whose rename would collide with an existing display-name row on uq_tenure.
++        $collides = $this->insertRow('ibl_gm_tenures', [
++            'franchise_id' => $a,
++            'gm_display_name' => 'zzusera',
++            'start_season_year' => 2001,
++            'end_season_year' => 2002,
++        ]);
++        $this->insertRow('ibl_gm_tenures', [
++            'franchise_id' => $a,
++            'gm_display_name' => 'ZZ Owner A',
++            'start_season_year' => 2001,
++            'end_season_year' => 2001,
++        ]);
++        // A closed row under a username no team holds: no mapping, left alone.
++        $orphan = $this->insertRow('ibl_gm_tenures', [
++            'franchise_id' => $a,
++            'gm_display_name' => 'zzgoneuser',
++            'start_season_year' => 1998,
++            'end_season_year' => 1999,
++        ]);
++        // Team B: an open tenure that already holds the display name.
++        $this->setTeamGm($b, 'zzuserb', 'ZZ Owner B');
++
++        // Earlier committed runs of the whole migration may have left backup rows. Rolled back in tearDown.
++        $this->db->query('DELETE FROM ibl_gm_tenures_backup_207 WHERE id > 0');
++        $before = $this->tenureNames();
++
++        $this->db->query($backupFill);
++        $this->db->query($backfill);
++
++        $after = $this->tenureNames();
++        $changed = [];
++        foreach ($before as $id => $name) {
++            if (($after[$id] ?? null) !== $name) {
++                $changed[$id] = $name;
++            }
++        }
++        $openA = array_values(array_filter(
++            $this->openTenures($a),
++            static fn (array $row): bool => $row['end_season_year'] === null
++        ));
++        self::assertCount(1, $openA);
++        self::assertSame('ZZ Owner A', $openA[0]['gm_display_name']);
++        // Closed tenures under the same username join the GM's display name, at any franchise.
++        self::assertSame('ZZ Owner A', $after[$closedA]);
++        self::assertSame('ZZ Owner A', $after[$closedAatB]);
++        self::assertArrayHasKey($closedA, $changed);
++        self::assertArrayHasKey($closedAatB, $changed);
++        self::assertSame('zzusera', $after[$collides]);
++        self::assertSame('zzgoneuser', $after[$orphan]);
++        self::assertContains('zzusera', $changed);
++        self::assertNotContains('ZZ Owner B', $changed);
++
++        $backup = [];
++        $res = $this->db->query('SELECT id, gm_display_name FROM ibl_gm_tenures_backup_207 ORDER BY id');
++        while ($row = $res->fetch_assoc()) {
++            $backup[(int) $row['id']] = (string) $row['gm_display_name'];
++        }
++        self::assertSame($changed, $backup);
++
++        self::assertTrue($this->db->multi_query($undo));
++        do {
++            $result = $this->db->store_result();
++            if ($result instanceof \mysqli_result) {
++                $result->free();
++            }
++        } while ($this->db->more_results() && $this->db->next_result());
++
++        self::assertSame($before, $this->tenureNames());
++    }
++
++    /**
++     * @return array<int, string>
++     */
++    private function tenureNames(): array
++    {
++        $names = [];
++        $res = $this->db->query('SELECT id, gm_display_name FROM ibl_gm_tenures ORDER BY id');
++        while ($row = $res->fetch_assoc()) {
++            $names[(int) $row['id']] = (string) $row['gm_display_name'];
++        }
++
++        return $names;
++    }
++
++    private function migrationText(): string
++    {
++        $files = glob(__DIR__ . '/../../migrations/*_gm_tenure_trigger_display_name.sql');
++        self::assertIsArray($files);
++        self::assertCount(1, $files);
++        $contents = file_get_contents($files[0]);
++        self::assertIsString($contents);
++
++        return $contents;
++    }
++
++    /**
++     * Returns the two lowest real teamids and clears their tenures so each test starts clean.
++     *
++     * @return array{int, int}
++     */
++    private function probeTeams(): array
++    {
++        $res = $this->db->query('SELECT teamid FROM ibl_team_info WHERE teamid > 0 ORDER BY teamid LIMIT 2');
++        $ids = [];
++        while ($row = $res->fetch_assoc()) {
++            $ids[] = (int) $row['teamid'];
++        }
++        self::assertCount(2, $ids, 'seed needs at least two real teams');
++
++        $stmt = $this->db->prepare('DELETE FROM ibl_gm_tenures WHERE franchise_id IN (?, ?)');
++        self::assertNotFalse($stmt);
++        $stmt->bind_param('ii', $ids[0], $ids[1]);
++        $stmt->execute();
++        $stmt->close();
++
++        return [$ids[0], $ids[1]];
++    }
++
++    private function setTeamGm(int $teamid, ?string $username, string $ownerName): void
++    {
++        if ($username === null) {
++            $stmt = $this->db->prepare('UPDATE ibl_team_info SET gm_username = NULL, owner_name = ? WHERE teamid = ?');
++            self::assertNotFalse($stmt);
++            $stmt->bind_param('si', $ownerName, $teamid);
++        } else {
++            $stmt = $this->db->prepare('UPDATE ibl_team_info SET gm_username = ?, owner_name = ? WHERE teamid = ?');
++            self::assertNotFalse($stmt);
++            $stmt->bind_param('ssi', $username, $ownerName, $teamid);
++        }
++        $stmt->execute();
++        $stmt->close();
++    }
++
++    private function setOwnerName(int $teamid, string $ownerName): void
++    {
++        $stmt = $this->db->prepare('UPDATE ibl_team_info SET owner_name = ? WHERE teamid = ?');
++        self::assertNotFalse($stmt);
++        $stmt->bind_param('si', $ownerName, $teamid);
++        $stmt->execute();
++        $stmt->close();
++    }
++
++    private function setUsername(int $teamid, string $username): void
++    {
++        $stmt = $this->db->prepare('UPDATE ibl_team_info SET gm_username = ? WHERE teamid = ?');
++        self::assertNotFalse($stmt);
++        $stmt->bind_param('si', $username, $teamid);
++        $stmt->execute();
++        $stmt->close();
++    }
++
++    private function teamName(int $teamid): string
++    {
++        $stmt = $this->db->prepare('SELECT team_name FROM ibl_team_info WHERE teamid = ?');
++        self::assertNotFalse($stmt);
++        $stmt->bind_param('i', $teamid);
++        $stmt->execute();
++        $row = $stmt->get_result()->fetch_assoc();
++        $stmt->close();
++        self::assertIsArray($row);
++
++        return (string) $row['team_name'];
++    }
++
++    private function gmHistoryName(int $prim): string
++    {
++        $stmt = $this->db->prepare('SELECT name FROM ibl_gm_history WHERE prim = ?');
++        self::assertNotFalse($stmt);
++        $stmt->bind_param('i', $prim);
++        $stmt->execute();
++        $row = $stmt->get_result()->fetch_assoc();
++        $stmt->close();
++        self::assertIsArray($row);
++
++        return (string) $row['name'];
++    }
++
++    /**
++     * @return list<array{gm_display_name: string, start_season_year: int, end_season_year: ?int}>
++     */
++    private function openTenures(int $teamid): array
++    {
++        $stmt = $this->db->prepare(
++            'SELECT gm_display_name, start_season_year, end_season_year
++             FROM ibl_gm_tenures WHERE franchise_id = ? ORDER BY id'
++        );
++        self::assertNotFalse($stmt);
++        $stmt->bind_param('i', $teamid);
++        $stmt->execute();
++        $result = $stmt->get_result();
++
++        $rows = [];
++        while ($row = $result->fetch_assoc()) {
++            $rows[] = [
++                'gm_display_name' => (string) $row['gm_display_name'],
++                'start_season_year' => (int) $row['start_season_year'],
++                'end_season_year' => $row['end_season_year'] === null ? null : (int) $row['end_season_year'],
++            ];
++        }
++        $stmt->close();
++
++        return $rows;
++    }
++
++    /**
++     * @return list<string>
++     */
++    private function migrationStatements(): array
++    {
++        $files = glob(__DIR__ . '/../../migrations/*_gm_tenure_trigger_display_name.sql');
++        self::assertIsArray($files);
++        self::assertCount(1, $files);
++
++        $contents = file_get_contents($files[0]);
++        self::assertIsString($contents);
++
++        $statements = [];
++        $delim = ';';
++        $buffer = '';
++        $flush = static function () use (&$buffer, &$delim, &$statements): void {
++            foreach (explode($delim, $buffer) as $piece) {
++                $trimmed = trim($piece);
++                if ($trimmed === '') {
++                    continue;
++                }
++                $nonComment = array_filter(
++                    explode("\n", str_replace("\r\n", "\n", $trimmed)),
++                    static fn (string $line): bool => !str_starts_with(trim($line), '--') && trim($line) !== ''
++                );
++                if ($nonComment === []) {
++                    continue;
++                }
++                $statements[] = $trimmed;
++            }
++            $buffer = '';
++        };
++
++        foreach (explode("\n", str_replace("\r\n", "\n", $contents)) as $line) {
++            if (preg_match('/^DELIMITER\s+(\S+)/', $line, $m) === 1) {
++                $flush();
++                $delim = $m[1];
++                continue;
++            }
++            $buffer .= $line . "\n";
++        }
++        $flush();
++
++        return $statements;
++    }
++
++    public function testUndoScriptPutsBackfilledNameBack(): void
++    {
++        [$a] = $this->probeTeams();
++        $this->setTeamGm($a, 'zzundouser', 'ZZ Undo Owner');
++
++        $undo = file_get_contents(__DIR__ . '/../../scripts/undo/207_gm_tenure_trigger_display_name.sql');
++        self::assertIsString($undo);
++
++        $this->db->query('DELETE FROM ibl_gm_tenures_backup_207 WHERE id > 0');
++        $this->db->query(
++            "INSERT INTO ibl_gm_tenures_backup_207 SELECT * FROM ibl_gm_tenures WHERE franchise_id = $a AND end_season_year IS NULL"
++        );
++        $this->db->query(
++            "UPDATE ibl_gm_tenures SET gm_display_name = 'ZZ Backfilled' WHERE franchise_id = $a AND end_season_year IS NULL"
++        );
++        self::assertSame('ZZ Backfilled', $this->openTenures($a)[0]['gm_display_name']);
++
++        self::assertTrue($this->db->multi_query($undo));
++        do {
++            $result = $this->db->store_result();
++            if ($result instanceof \mysqli_result) {
++                $result->free();
++            }
++        } while ($this->db->more_results() && $this->db->next_result());
++
++        self::assertSame('ZZ Undo Owner', $this->openTenures($a)[0]['gm_display_name']);
++    }
++}
+diff --git a/ibl5/tests/DatabaseIntegration/SchemaInvariantTest.php b/ibl5/tests/DatabaseIntegration/SchemaInvariantTest.php
+index eb894f1a36..f3c0a211b7 100644
+--- a/ibl5/tests/DatabaseIntegration/SchemaInvariantTest.php
++++ b/ibl5/tests/DatabaseIntegration/SchemaInvariantTest.php
+@@ -171,6 +171,7 @@ class SchemaInvariantTest extends DatabaseTestCase
+         'ibl_box_scores_season2007_phantom_backup.visitor_teamid' => 'season-2007 phantom-delete undo record; deliberately FK-free so an ON DELETE CASCADE from ibl_plr / ibl_team_info can never erase the rows the rollback restores from',
+         'ibl_box_scores_teams_season2007_phantom_backup.home_teamid' => 'season-2007 phantom-delete undo record; deliberately FK-free so an ON DELETE CASCADE from ibl_plr / ibl_team_info can never erase the rows the rollback restores from',
+         'ibl_box_scores_teams_season2007_phantom_backup.visitor_teamid' => 'season-2007 phantom-delete undo record; deliberately FK-free so an ON DELETE CASCADE from ibl_plr / ibl_team_info can never erase the rows the rollback restores from',
++        'ibl_gm_tenures_backup_207.franchise_id' => 'migration-207 backfill undo record; CREATE TABLE ... LIKE copies no FKs, and staying FK-free means an ON DELETE CASCADE from ibl_team_info can never erase the rows the undo script restores from',
+         'ibl_cash_considerations.counterparty_teamid' => 'secondary team reference; the primary teamid column is FK-constrained',
+         'ibl_hist.pid' => 'append-only transaction log; retains rows for deleted players (no cascade)',
+         'ibl_hist.teamid' => 'append-only transaction log; team marker retained across franchise changes',
+diff --git a/ibl5/tests/DatabaseIntegration/SettingsRenameTriggerTest.php b/ibl5/tests/DatabaseIntegration/SettingsRenameTriggerTest.php
+index c63654cdca..135fc17be4 100644
+--- a/ibl5/tests/DatabaseIntegration/SettingsRenameTriggerTest.php
++++ b/ibl5/tests/DatabaseIntegration/SettingsRenameTriggerTest.php
+@@ -170,7 +170,9 @@ public function testGmTenureTrackTriggerReadsSettingsPhase(): void
+         $teamid = (int) $team['teamid'];
+ 
+         $gm = 'ZZTenureProbe';
+-        $stmt = $this->db->prepare('UPDATE ibl_team_info SET gm_username = ? WHERE teamid = ?');
++        // The trigger opens the tenure under owner_name and falls back to gm_username only when
++        // owner_name is empty. Seed team rows carry an owner_name, so clear it to exercise the fallback.
++        $stmt = $this->db->prepare("UPDATE ibl_team_info SET gm_username = ?, owner_name = '' WHERE teamid = ?");
+         self::assertNotFalse($stmt);
+         $stmt->bind_param('si', $gm, $teamid);
+         $stmt->execute();
+diff --git a/ibl5/tests/Rivalries/RivalriesControllerTest.php b/ibl5/tests/Rivalries/RivalriesControllerTest.php
+index 668a37174e..cc81ad4dcb 100644
+--- a/ibl5/tests/Rivalries/RivalriesControllerTest.php
++++ b/ibl5/tests/Rivalries/RivalriesControllerTest.php
+@@ -19,8 +19,6 @@ final class RivalriesControllerTest extends TestCase
+     private ControllerFakeView $view;
+     /** @var array<int, string> teamid => owner name */
+     private array $owners = [];
+-    /** @var array<string, string> team nickname => site username */
+-    private array $usernames = [];
+     /** @var array<string, string> team nickname => city; a missing nickname means no ibl_team_info row */
+     private array $cities = ['Metros' => 'Metro City'];
+ 
+@@ -52,9 +50,6 @@ public function findGmName(string $gmName): ?string
+         $teams->method('getOwnerName')->willReturnCallback(
+             fn (int $id): ?string => $this->owners[$id] ?? null,
+         );
+-        $teams->method('getUsernameFromTeamname')->willReturnCallback(
+-            fn (string $name): ?string => $this->usernames[$name] ?? null,
+-        );
+         $teams->method('getTeamByName')->willReturnCallback(
+             fn (string $name): ?array => isset($this->cities[$name])
+                 ? ['teamid' => 3, 'team_city' => $this->cities[$name], 'team_name' => $name]
+@@ -192,45 +187,50 @@ public function testTeamPageWithUnknownOwnerPassesNullGm(): void
+         self::assertSame([['getTopFranchiseRivals', 3, RivalriesController::TOP_LIMIT]], $this->service->calls);
+     }
+ 
+-    public function testTeamPageFallsBackToUsernameWhenOwnerNameIsNotStored(): void
+-    {
+-        $this->owners[3] = 'Mover-Gm';
+-        $this->usernames['Metros'] = 'mover gm';
+-
+-        $this->controller->handle(['op' => 'team', 'team' => '3'], null, null);
+-
+-        self::assertSame('Mover Gm', $this->view->teamArgs['gmName']);
+-        self::assertSame(['getTopGmRivals', 'Mover Gm', RivalriesController::TOP_LIMIT], $this->service->calls[1]);
+-    }
+-
+-    public function testTeamPageWithoutOwnerFallsBackToUsername(): void
++    public function testTeamPageDoesNotFallBackToUsernameWhenOwnerHasNoTenure(): void
+     {
+-        $this->usernames['Metros'] = 'Rival Gm';
++        $teams = self::createMock(TeamIdentityRepositoryInterface::class);
++        $teams->expects(self::never())->method('getUsernameFromTeamname');
++        $teams->method('getTeamnameFromTeamID')->willReturn('Metros');
++        $teams->method('getOwnerName')->willReturn('ZZ Owner Without Tenure');
++        $teams->method('getTeamByName')->willReturn(
++            ['teamid' => 3, 'team_city' => 'Metro City', 'team_name' => 'Metros'],
++        );
++        $controller = new RivalriesController($this->service, $this->view, $this->repo, $teams);
+ 
+-        $this->controller->handle(['op' => 'team', 'team' => '3'], null, null);
++        $controller->handle(['op' => 'team', 'team' => '3'], null, null);
+ 
+-        self::assertSame('Rival Gm', $this->view->teamArgs['gmName']);
++        self::assertNull($this->view->teamArgs['gmName']);
++        self::assertSame([], $this->view->teamArgs['gmRivals']);
++        self::assertSame(1, $this->repo->calls['findGmName']);
+     }
+ 
+-    public function testTeamPageWithUnknownOwnerAndUsernamePassesNullGm(): void
++    /**
++     * @return array<string, array{?string}>
++     */
++    public static function missingOwnerProvider(): array
+     {
+-        $this->owners[3] = 'Ghost Gm';
+-        $this->usernames['Metros'] = 'ghostly';
+-
+-        $this->controller->handle(['op' => 'team', 'team' => '3'], null, null);
+-
+-        self::assertNull($this->view->teamArgs['gmName']);
++        return [
++            'null owner' => [null],
++            'empty owner' => [''],
++        ];
+     }
+ 
+-    public function testTeamPageWithEmptyUsernameSkipsTheLookup(): void
++    #[DataProvider('missingOwnerProvider')]
++    public function testTeamPageWithoutOwnerNameFallsBackToUsernameTenure(?string $owner): void
+     {
+-        $this->owners[3] = 'Ghost Gm';
+-        $this->usernames['Metros'] = '';
++        $teams = self::createMock(TeamIdentityRepositoryInterface::class);
++        $teams->expects(self::once())->method('getUsernameFromTeamname')->with('Metros')->willReturn('mover gm');
++        $teams->method('getTeamnameFromTeamID')->willReturn('Metros');
++        $teams->method('getOwnerName')->willReturn($owner);
++        $teams->method('getTeamByName')->willReturn(
++            ['teamid' => 3, 'team_city' => 'Metro City', 'team_name' => 'Metros'],
++        );
++        $controller = new RivalriesController($this->service, $this->view, $this->repo, $teams);
+ 
+-        $this->controller->handle(['op' => 'team', 'team' => '3'], null, null);
++        $controller->handle(['op' => 'team', 'team' => '3'], null, null);
+ 
+-        self::assertNull($this->view->teamArgs['gmName']);
+-        self::assertSame(1, $this->repo->calls['findGmName']);
++        self::assertSame('Mover Gm', $this->view->teamArgs['gmName']);
+     }
+ 
+     public function testTeamPageColorMapsUseTeamColorAndGmColorFranchise(): void

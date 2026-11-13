@@ -1,0 +1,42 @@
+name: Text hold re-check
+# Dispatches text-hold-recheck-run.yml on master when a PR body is edited. That run re-arms
+# auto-merge when a held PR's only recorded holds were body-text conditions (18 missing or
+# malformed, 20) and the edited body now passes them (ADR-0245).
+#
+# Security: the pull_request event runs the PR head's copy of this file. A same-repo PR gets
+# a token limited by the permissions block below; a fork PR gets a read-only token and cannot
+# dispatch. The job never checks out the repository, never runs PR code, and uses no secret.
+# The dispatched run is master's copy and runs master's bin/, so a PR cannot change the code
+# that decides whether it arms. A forged dispatch only asks master to re-check one PR, and
+# master re-derives every arming input itself. GitHub blocks pull_request_target by default
+# for public repos (ADR-0223 addendum of 2026-11-09).
+#
+# On the PR that adds this file, master has no text-hold-recheck-run.yml yet, so the step
+# finds a 404 and exits 0 with a notice instead of failing.
+on:
+  pull_request:
+    types: [edited]
+permissions:
+  actions: write   # gh workflow run text-hold-recheck-run.yml
+  contents: read   # check that master carries the dispatch target
+jobs:
+  dispatch:
+    name: Dispatch text hold re-check
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.state == 'open'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    steps:
+      - name: Dispatch the re-check on master
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if ! out=$(gh api "repos/$GH_REPO/contents/.github/workflows/text-hold-recheck-run.yml?ref=master" --silent 2>&1); then
+            case "$out" in
+              *"HTTP 404"*) echo "::notice::master has no text-hold-recheck-run.yml yet; nothing to dispatch"; exit 0 ;;
+            esac
+            echo "$out" >&2
+            exit 1
+          fi
+          gh workflow run text-hold-recheck-run.yml --ref master -f pr="$PR_NUMBER"

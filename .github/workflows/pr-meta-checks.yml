@@ -196,6 +196,9 @@ jobs:
       - name: Run bin/test-check-model-pins
         if: ${{ !cancelled() }}
         run: bin/test-check-model-pins
+      - name: Run bin/test-text-hold-recheck
+        if: ${{ !cancelled() }}
+        run: bin/test-text-hold-recheck
 
       # --- decompile-token gate: UNCONDITIONAL on every PR, no path filter. It
       # scans added lines in every path and lets tokens through only under the

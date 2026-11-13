@@ -34,6 +34,7 @@ on:
       - Python tests (post-plan harness)
       - Sim recap
       - Tests and Analysis
+      - Text hold re-check
       - VR Baseline Regen
       - VR Refresh
     types: [completed]

@@ -228,6 +228,17 @@ BLOCKED-CHECK PR is exempt, so `bin/pr-cycle-tick` needs no filter: its retry ca
 a second rescue on an unchanged patch-id. A skipped PR stays in the your-turn DM under
 `**Skipped (K)**` with the condition names after `waiting on:`. The skip never arms a PR.
 
+### Text-hold re-check on body edit
+
+A held sticky carries one audit-trail line, `<!-- pr-ready-holds: v1 diff=<patch-id> held=<n>[:<STATE>],... -->`,
+written by `fidelity.machine_hold_record` above the verdict marker. `THR_RECORD_RE` in
+`bin/lib/text-hold-recheck.sh` parses it, so the two change together. On a PR body edit,
+`.github/workflows/text-hold-recheck.yml` dispatches `.github/workflows/text-hold-recheck-run.yml`
+on master, which runs `bin/text-hold-recheck` with `CI_PAT`. It arms only when every recorded
+hold is (20) or (18) in state `MISSING` or `MALFORMED`, the patch-id still equals `diff=`, the UI
+floor passes, and both body checks now pass. A push never re-arms here. A push that changes the
+diff changes its patch-id, and `bin/pr-cycle` re-runs full post-plan instead (ADR-0245).
+
 ## Rebase-only mode
 
 `bin/pr-cycle` fires a DIRTY PR with `--rebase-only-prs=<N>` when the

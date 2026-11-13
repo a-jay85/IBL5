@@ -165,6 +165,82 @@ out=$(ph_probe 'echo 1577836800 > "$IBL5_USAGE_GATE_STATE_DIR/cleared/$PH_SID"')
     || { h_fail "paused-held + old cleared stamp: got '$out'"; exit 1; }
 rm -rf "$PH"
 
+# --- Lying-mkdir cases (uutils mkdir may report success to both racers) ------
+# The stub's mkdir always exits 0, so only the O_EXCL claim file can pick a winner.
+# A matrix row greps the bare line `ok <name>`; a failure prints `FAIL <name> ...`.
+# shellcheck source=bin/lib/claim-file.sh
+. "$(dirname "$GATE_LIB")/claim-file.sh"
+row_ok() { H_PASS=$((H_PASS + 1)); printf 'ok %s\n' "$1"; }
+row_fail() { printf 'FAIL %s %s\n' "$1" "${2:-}" >&2; h_fail "$1" "${2:-}"; }
+
+LM="$(mktemp -d)"
+claim_file_lying_mkdir_stub "$LM/lie"
+
+# cost_lock_lying_mkdir_one_holder: two racers, one holder, and the holder's pid file stays its own.
+{
+    echo 'set -u'
+    echo 'NIGHTLY_DIR="$1"; LOG="$1/log"; export PATH="$2:$PATH"'
+    printf '. "%s"\n' "$GATE_LIB"
+    iso_region acquire_cost_lock
+    cat <<'PROBE'
+if acquire_cost_lock; then
+    echo "$$" >> "$1/winners"
+    sleep 4
+else
+    echo "$$" >> "$1/losers"
+fi
+PROBE
+} > "$LM/cost-probe.sh"
+mkdir -p "$LM/cost/reports"
+: > "$LM/cost/log"
+bash "$LM/cost-probe.sh" "$LM/cost" "$LM/lie" &
+bash "$LM/cost-probe.sh" "$LM/cost" "$LM/lie" &
+sleep 3
+cl_pid=$(cat "$LM/cost/reports/.cost-report.lock/pid" 2>/dev/null) || cl_pid=""
+wait
+cl_wins=$(wc -l < "$LM/cost/winners" 2>/dev/null | tr -d ' ') || cl_wins=0
+cl_win_pid=$(head -n 1 "$LM/cost/winners" 2>/dev/null) || cl_win_pid=""
+if [ "$cl_wins" = 1 ] && [ -n "$cl_pid" ] && [ "$cl_pid" = "$cl_win_pid" ]; then
+    row_ok cost_lock_lying_mkdir_one_holder
+else
+    row_fail cost_lock_lying_mkdir_one_holder "wins=$cl_wins pidfile=[$cl_pid] winner=[$cl_win_pid]"
+fi
+
+# claim_next_plan_lying_mkdir_one_claimer: two racers, one queued plan, exactly one claims it.
+{
+    echo 'set -u'
+    echo 'export IBL5_USAGE_GATE_STATE_DIR="$1/state"; mkdir -p "$1/state/markers" "$1/state/cleared"'
+    echo 'QUEUE_DIR="$1/queue"; LOG="$1/log"; LOCK_TTL_SECS=60; export PATH="$2:$PATH"'
+    echo 'CAP_DEFERRED=" "; DEPENDS_HELD=" "; SINGLE_PLAN=""; RESUME_PLAN=""; RESUME_SID=""'
+    printf '. "%s"\n' "$GATE_LIB"
+    printf '. "%s/../automouse/lib-queue-order"\n' "$(dirname "$GATE_LIB")"
+    iso_region claim_next_plan
+    cat <<'PROBE'
+out=$(claim_next_plan); rc=$?
+if [ "$rc" = 0 ]; then
+    echo "$$ $(basename "$out")" >> "$1/claimers"
+    sleep 4
+fi
+PROBE
+} > "$LM/claim-probe.sh"
+mkdir -p "$LM/claim/queue"
+: > "$LM/claim/log"
+: > "$LM/claim/queue/only.md"
+bash "$LM/claim-probe.sh" "$LM/claim" "$LM/lie" &
+bash "$LM/claim-probe.sh" "$LM/claim" "$LM/lie" &
+sleep 3
+cn_pid=$(cat "$LM/claim/queue/only.md.lock/pid" 2>/dev/null) || cn_pid=""
+wait
+cn_wins=$(wc -l < "$LM/claim/claimers" 2>/dev/null | tr -d ' ') || cn_wins=0
+cn_win_pid=$(awk 'NR==1 {print $1}' "$LM/claim/claimers" 2>/dev/null) || cn_win_pid=""
+if [ "$cn_wins" = 1 ] && [ -n "$cn_pid" ] && [ "$cn_pid" = "$cn_win_pid" ]; then
+    row_ok claim_next_plan_lying_mkdir_one_claimer
+else
+    row_fail claim_next_plan_lying_mkdir_one_claimer "wins=$cn_wins pidfile=[$cn_pid] winner=[$cn_win_pid]"
+fi
+rm -rf "$LM"
+if [ "$H_FAIL" -ne 0 ]; then echo "RESULT: FAILED (lying-mkdir cases)"; exit 1; fi
+
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 ROOT="$(mktemp -d)"
 trap 'rm -rf "$ROOT"; h_cleanup' EXIT

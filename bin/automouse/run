@@ -564,6 +564,8 @@ source "$SELF_DIR/lib-queue-order"
 # A copy of this script run outside the tree (the tests do) finds the libs via $REPO.
 _LIB_DIR="$SELF_DIR/../lib"
 [ -f "$_LIB_DIR/usage-gate.sh" ] || _LIB_DIR="$REPO/bin/lib"
+# shellcheck source=../lib/claim-file.sh
+. "$_LIB_DIR/claim-file.sh"
 # shellcheck source=../lib/usage-gate.sh
 . "$_LIB_DIR/usage-gate.sh"
 # shellcheck source=../lib/login-preflight.sh
@@ -981,8 +983,7 @@ acquire_cost_lock() {
     local owner now lock_epoch attempt=0 max_attempts=10
     mkdir -p "$(dirname "$lock")"
     while [ "$attempt" -lt "$max_attempts" ]; do
-        if mkdir "$lock" 2>/dev/null; then
-            echo "$$" > "$lock/pid"
+        if mkdir "$lock" 2>/dev/null && claim_file "$lock/pid" printf '%s\n' "$$"; then
             return 0
         fi
         owner=$(cat "$lock/pid" 2>/dev/null) || owner=""
@@ -991,8 +992,7 @@ acquire_cost_lock() {
         if { [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; } \
            || [ "$(( now - lock_epoch ))" -gt "$cost_lock_ttl" ]; then
             rm -rf "$lock" 2>/dev/null || true
-            if mkdir "$lock" 2>/dev/null; then
-                echo "$$" > "$lock/pid"
+            if mkdir "$lock" 2>/dev/null && claim_file "$lock/pid" printf '%s\n' "$$"; then
                 printf '[%s] cost-report: stole stale lock (dead/expired owner=%s)\n' \
                     "$(date +%H:%M:%S)" "${owner:-?}" >> "$LOG"
                 return 0
@@ -2321,8 +2321,7 @@ claim_next_plan() {
         case "${DEPENDS_HELD:- }" in *" $plan_name "*) continue ;; esac
         lock="$QUEUE_DIR/${plan_name}.lock"
         # Fast path: unlocked plan — claim atomically.
-        if mkdir "$lock" 2>/dev/null; then
-            echo "$$" > "$lock/pid"
+        if mkdir "$lock" 2>/dev/null && claim_file "$lock/pid" printf '%s\n' "$$"; then
             printf '%s\n' "$plan"
             return 0
         fi
@@ -2351,8 +2350,7 @@ claim_next_plan() {
             rm -rf "$lock" 2>/dev/null || true
             # Re-create atomically; the loser of a two-stealer race fails mkdir
             # here and simply falls through to the next plan.
-            if mkdir "$lock" 2>/dev/null; then
-                echo "$$" > "$lock/pid"
+            if mkdir "$lock" 2>/dev/null && claim_file "$lock/pid" printf '%s\n' "$$"; then
                 printf '[%s] stole stale lock for %s (dead/expired owner=%s)\n' \
                     "$(date +%H:%M:%S)" "$plan_name" "${owner:-?}" >> "$LOG"
                 printf '%s\n' "$plan"

@@ -228,6 +228,7 @@ usage_space_form() {
     want_out "--option needs =<value>"
     no_gh
 }
+# Fails when _oa_post writes $OA_ROOT/body.md instead of its mktemp -d file (row 36).
 no_repo_writes() {
     fresh no_repo_writes
     seed_ready
@@ -253,6 +254,7 @@ live_launchd_now() {
     echo 2 > "$FX/launchctl.left"
     live_ok "launchd label com.ibl5.postplan-now-case-live_launchd_now-20261112-101010-4242"
 }
+# Fails when _oa_live matches post-plan-fleet-X$OA_PR instead of post-plan-fleet-$OA_PR (row 12).
 live_launchd_fleet() {
     fresh live_launchd_fleet
     printf -- '-\t0\tcom.ibl5.post-plan-fleet-%s\n' "$PR" > "$FX/launchctl.out"

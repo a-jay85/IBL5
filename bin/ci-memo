@@ -8,8 +8,10 @@
 #
 # Usage:
 #   bin/ci-memo hash   <scope> [--manifest P] [--extra k=v]... [--fail-open]
+#                      [--worktree] [--path P]...
 #       -> 40-hex digest on stdout
 #   bin/ci-memo key    <scope> [--manifest P] [--extra k=v]... [--fail-open]
+#                      [--worktree] [--path P]...
 #       -> "hash=<hex>" and "key=ci-memo-<scope>-v1-<hex>" on stdout, and the
 #          same two lines appended to $GITHUB_OUTPUT when that is set
 #   bin/ci-memo paths  <scope> [--manifest P]
@@ -45,7 +47,9 @@ export LC_ALL=C
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     cat <<'EOF'
 Usage: bin/ci-memo hash   <scope> [--manifest P] [--extra k=v]... [--fail-open]
+                          [--worktree] [--path P]...
        bin/ci-memo key    <scope> [--manifest P] [--extra k=v]... [--fail-open]
+                          [--worktree] [--path P]...
        bin/ci-memo paths  <scope> [--manifest P]
        bin/ci-memo record <scope> <hash> <sentinel-file>
        bin/ci-memo report <scope> <hash> <hit|miss> <sentinel-file>
@@ -66,6 +70,9 @@ Options:
   --manifest P    Override manifest directory (default: .github/ci-memo).
   --extra k=v     Fold extra key=value pairs into the digest.
   --fail-open     On errors 3/4: print empty hash= and key=, exit 0.
+  --worktree      Hash working-tree content (staged, unstaged, untracked
+                  non-ignored files) instead of the HEAD tree.
+  --path P        Pathspec to hash; repeatable. Replaces the scope manifest.
 
 Environment:
   CI_MEMO_REPO           Repo to hash (default: repo containing cwd).
@@ -82,7 +89,7 @@ FORMAT_VERSION="v1"
 GHCR_IMAGE="ghcr.io/a-jay85/ibl5/php-apache:latest"
 
 usage() {
-    sed -n '9,24p' "$0" | sed 's/^# \{0,1\}//' >&2
+    sed -n '9,26p' "$0" | sed 's/^# \{0,1\}//' >&2
     exit 2
 }
 
@@ -115,6 +122,8 @@ SCOPE="$1"; shift
 [[ "$SCOPE" =~ ^[a-z0-9][a-z0-9-]*$ ]] || die_usage "invalid scope: $SCOPE"
 
 MANIFEST=""
+WORKTREE=0
+INLINE_PATHS=()
 EXTRAS=()
 POSITIONAL=()
 while [[ $# -gt 0 ]]; do
@@ -127,6 +136,8 @@ while [[ $# -gt 0 ]]; do
             EXTRAS+=("$2"); shift 2 ;;
         --fail-open)
             FAIL_OPEN=1; shift ;;
+        --worktree) WORKTREE=1; shift ;;
+        --path) [[ $# -ge 2 ]] || die_usage "--path requires a value"; INLINE_PATHS+=("$2"); shift 2 ;;
         --*)
             die_usage "unknown flag: $1" ;;
         *)
@@ -150,13 +161,17 @@ if [[ "$SUBCMD" == "record" ]]; then
     hash="${POSITIONAL[0]}"
     sentinel="${POSITIONAL[1]}"
     [[ "$hash" =~ ^[0-9a-f]{40}$ ]] || die_usage "record needs a 40-hex hash"
+    # Temp file in the sentinel's own directory, then rename: a concurrent
+    # reader sees no file or a complete one, never a partial write.
+    rec_tmp="$(mktemp "$(dirname -- "$sentinel")/.ci-memo-rec.XXXXXX")" || fail 4 "mktemp failed"
     {
         echo "scope=$SCOPE"
         echo "hash=$hash"
         echo "run_id=${GITHUB_RUN_ID:-local}"
         echo "sha=${GITHUB_SHA:-$(git rev-parse HEAD 2>/dev/null || echo unknown)}"
         echo "recorded_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    } > "$sentinel"
+    } > "$rec_tmp"
+    mv -f -- "$rec_tmp" "$sentinel" || { rm -f -- "$rec_tmp"; fail 4 "cannot write sentinel: $sentinel"; }
     exit 0
 fi
 
@@ -191,20 +206,25 @@ fi
 TOPLEVEL="$(git rev-parse --show-toplevel 2>/dev/null)" || fail 4 "not inside a git repository"
 cd "$TOPLEVEL"
 
-if [[ -z "$MANIFEST" ]]; then
-    MANIFEST="${CI_MEMO_MANIFEST_DIR:-$TOPLEVEL/.github/ci-memo}/$SCOPE.paths"
-fi
-[[ -r "$MANIFEST" ]] || fail 4 "manifest not readable: $MANIFEST"
-
 PATHSPECS=()
-while IFS= read -r line || [[ -n "$line" ]]; do
-    line="${line%$'\r'}"
-    trimmed="${line#"${line%%[![:space:]]*}"}"
-    trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
-    [[ -z "$trimmed" || "$trimmed" == \#* ]] && continue
-    PATHSPECS+=("$trimmed")
-done < "$MANIFEST"
-[[ ${#PATHSPECS[@]} -gt 0 ]] || fail 4 "manifest has no pathspecs: $MANIFEST"
+if [[ ${#INLINE_PATHS[@]} -gt 0 ]]; then
+    # Inline --path set: no manifest file is read or required.
+    PATHSPECS=("${INLINE_PATHS[@]}")
+else
+    if [[ -z "$MANIFEST" ]]; then
+        MANIFEST="${CI_MEMO_MANIFEST_DIR:-$TOPLEVEL/.github/ci-memo}/$SCOPE.paths"
+    fi
+    [[ -r "$MANIFEST" ]] || fail 4 "manifest not readable: $MANIFEST"
+
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line%$'\r'}"
+        trimmed="${line#"${line%%[![:space:]]*}"}"
+        trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
+        [[ -z "$trimmed" || "$trimmed" == \#* ]] && continue
+        PATHSPECS+=("$trimmed")
+    done < "$MANIFEST"
+    [[ ${#PATHSPECS[@]} -gt 0 ]] || fail 4 "manifest has no pathspecs: $MANIFEST"
+fi
 
 if [[ "$SUBCMD" == "paths" ]]; then
     printf '%s\n' "${PATHSPECS[@]}"
@@ -226,18 +246,45 @@ fi
 TMP_INDEX="$(mktemp "${TMPDIR:-/tmp}/ci-memo-index.XXXXXX")"
 trap 'rm -f "$TMP_INDEX"' EXIT
 rm -f "$TMP_INDEX"
-GIT_INDEX_FILE="$TMP_INDEX" git read-tree HEAD 2>/dev/null || fail 4 "git read-tree HEAD failed"
+if [[ "$WORKTREE" != 1 ]]; then
+    GIT_INDEX_FILE="$TMP_INDEX" git read-tree HEAD 2>/dev/null || fail 4 "git read-tree HEAD failed"
+fi
 
 list_head() {
     GIT_INDEX_FILE="$TMP_INDEX" git ls-files -s -- "$@"
 }
 
+# list_worktree: one line per file in working-tree state. Untracked files
+# that .gitignore does not exclude count; deleted tracked files leave a
+# "deleted" line so a deletion changes the hash. hash-object runs without -w,
+# so nothing is written to the shared object store.
+list_worktree() {
+    local f mode sha
+    git ls-files -c -o --exclude-standard -- "$@" | sort -u | while IFS= read -r f; do
+        if [[ -f "$f" ]]; then
+            mode=100644; [[ -x "$f" ]] && mode=100755
+            sha="$(git hash-object -- "$f")" || return 1
+            printf '%s %s\t%s\n' "$mode" "$sha" "$f"
+        else
+            printf 'deleted\t%s\n' "$f"
+        fi
+    done
+}
+
 for p in "${PATHSPECS[@]}"; do
-    out="$(list_head "$p" 2>/dev/null)" || fail 4 "git ls-files failed on pathspec: $p"
+    if [[ "$WORKTREE" = 1 ]]; then
+        out="$(list_worktree "$p" 2>/dev/null)" || fail 4 "git ls-files failed on pathspec: $p"
+    else
+        out="$(list_head "$p" 2>/dev/null)" || fail 4 "git ls-files failed on pathspec: $p"
+    fi
     [[ -n "$out" ]] || fail 3 "pathspec matches nothing at HEAD: $p"
 done
 
-BODY="$(list_head "${PATHSPECS[@]}" 2>/dev/null | sort -u)" || fail 4 "git ls-files failed"
+if [[ "$WORKTREE" = 1 ]]; then
+    BODY="$(list_worktree "${PATHSPECS[@]}" 2>/dev/null | sort -u)" || fail 4 "git ls-files failed"
+else
+    BODY="$(list_head "${PATHSPECS[@]}" 2>/dev/null | sort -u)" || fail 4 "git ls-files failed"
+fi
 
 # Scopes whose job boots the prebuilt GHCR php-apache image. e2e-tests.yml starts
 # it through .github/actions/setup-docker-e2e, so the image digest is a real input
@@ -268,6 +315,7 @@ DIGEST="$(
     {
         echo "ci-memo/$FORMAT_VERSION"
         echo "job=$SCOPE"
+        [[ "$WORKTREE" = 1 ]] && echo "mode=worktree"
         [[ -n "$EXTRA_BLOCK" ]] && printf '%s\n' "$EXTRA_BLOCK"
         echo "---"
         printf '%s\n' "$BODY"

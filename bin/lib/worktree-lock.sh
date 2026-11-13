@@ -10,6 +10,9 @@
 # for that pid-less case. An unreadable or non-numeric pid file reads as held.
 # Every read uses a redirect or a here-string, never a pipe into grep -q (SIGPIPE-safe).
 
+# shellcheck source=bin/lib/claim-file.sh
+. "$(dirname "${BASH_SOURCE[0]}")/claim-file.sh"
+
 WTLOCK_SELF_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 
 # wtlock_path <worktree-dir>: prints <absolute git dir>/post-plan-now.lock; rc 1 when git
@@ -80,13 +83,15 @@ wtlock_stale() {
     wtlock_pidless_old "$1"
 }
 
-# wtlock_create <lockdir> <pid>: mkdir the lock and record <pid>; rc 1 when the dir already
-# exists. When the pid write fails it removes the dir it just made, so it never leaves a
-# pid-less lock behind.
+# wtlock_create <lockdir> <pid>: mkdir the lock and claim pid with noclobber; rc 1 when the
+# dir or pid already exists. When the pid write fails it removes the dir it just made, so it
+# never leaves a pid-less lock behind.
 wtlock_create() {
     mkdir "$1" 2>/dev/null || return 1
-    wtlock_write_pid "$1" "$2" && return 0
-    rm -rf "$1"; return 1
+    claim_file "$1/pid" printf '%s\n' "$2" && return 0
+    # A lost claim leaves the winner's pid in place; only clean up a dir whose pid never landed.
+    [ -e "$1/pid" ] || rm -rf "$1"
+    return 1
 }
 
 # wtlock_acquire <lockdir> <pid> [--steal]: rc 0 when <pid> now holds the lock; rc 1 and
@@ -104,20 +109,20 @@ wtlock_acquire() {
     fi
     # Stale or gone. A mutex older than the grace was left by a run killed mid-reclaim:
     # clear it and retry once.
-    if ! mkdir "$m" 2>/dev/null; then
-        if wtlock_pidless_old "$m" && rmdir "$m" 2>/dev/null && mkdir "$m" 2>/dev/null; then :
+    if ! { mkdir "$m" 2>/dev/null && claim_file "$m/owner" printf '%s\n' "$me"; }; then
+        if wtlock_pidless_old "$m" && rm -rf "$m" && mkdir "$m" 2>/dev/null && claim_file "$m/owner" printf '%s\n' "$me"; then :
         else echo unknown; return 1
         fi
     fi
     # Under the mutex, re-check: another run may have taken the lock since the probe above.
     if [ -e "$d" ] && ! wtlock_stale "$d"; then
-        rmdir "$m" 2>/dev/null
+        rm -rf "$m"
         h=$(wtlock_read_pid "$d") || h=unknown
         printf '%s\n' "$h"; return 1
     fi
     rm -rf "$d"
-    if wtlock_create "$d" "$me"; then rmdir "$m" 2>/dev/null; return 0; fi
-    rmdir "$m" 2>/dev/null
+    if wtlock_create "$d" "$me"; then rm -rf "$m"; return 0; fi
+    rm -rf "$m"
     h=$(wtlock_read_pid "$d") || h=unknown
     printf '%s\n' "$h"; return 1
 }

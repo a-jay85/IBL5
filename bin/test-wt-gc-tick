@@ -957,7 +957,8 @@ git init -q "$EMIT" >/dev/null 2>&1
 cp "$CRON_SETUP" "$EMIT/bin/wt-gc-cron-setup"
 chmod +x "$EMIT/bin/wt-gc-cron-setup"
 mkdir -p "$EMIT/bin/lib"
-cp "$SCRIPT_DIR/lib/launchd-sched.sh" "$SCRIPT_DIR/lib/launchd-job.sh" "$EMIT/bin/lib/"
+cp "$SCRIPT_DIR/lib/launchd-sched.sh" "$SCRIPT_DIR/lib/launchd-job.sh" \
+   "$SCRIPT_DIR/lib/claim-file.sh" "$EMIT/bin/lib/"
 
 if should_run G13-plist; then
 begin_case G13-plist

@@ -162,7 +162,13 @@ fi
 # a pid-less dir older than the grace is reclaimable.
 if should_run lib-pidless; then
     reset_lock
-    RC=0; OUT=$( wtlock_write_pid() { return 1; }; wtlock_acquire "$L" "$LIVE" ) || RC=$?
+    # The pid is claimed through claim_file; deny only that claim (not the reclaim mutex's owner).
+    RC=0; OUT=$(
+        cf_src=$(declare -f claim_file)
+        eval "${cf_src/claim_file/_real_claim_file}"
+        claim_file() { if [[ "$1" == */pid ]]; then return 1; fi; _real_claim_file "$@"; }
+        wtlock_acquire "$L" "$LIVE"
+    ) || RC=$?
     h_eq "lib-pidless: failed pid write refuses (rc 1)" "1" "$RC"
     h_absent "lib-pidless: failed pid write leaves no lock dir" "$L"
     reset_lock
@@ -368,6 +374,63 @@ if should_run pcw-inflight; then
     plant "$LIVE"
     h_eq "pcw-inflight: a lock on feat-a does not hold feat-ab" "1" "$(pcw_probe feat-ab)"
     h_eq "pcw-inflight: a branch with no worktree is not in flight" "1" "$(pcw_probe no-such-branch)"
+    reset_lock
+fi
+
+# Matrix rows grep `^ *ok <case>$` and `^ *FAIL <case>`; h_pass/h_fail print `ok: `/`FAIL: `.
+pass_row() { H_PASS=$((H_PASS + 1)); printf 'ok %s\n' "$1"; }
+fail_row() { h_fail "$@"; printf 'FAIL %s\n' "$1"; }
+
+# A mkdir that always reports success (uutils under a race): the pid file is the claim, so
+# exactly one of two acquirers wins. Distinct live pids: the same pid twice is a re-entrant win.
+if should_run wtlock_lying_mkdir_one_owner; then
+    reset_lock
+    sleep 300 & OTHER=$!; disown "$OTHER"
+    # shellcheck source=bin/lib/claim-file.sh
+    . "$REPO/bin/lib/claim-file.sh"
+    claim_file_lying_mkdir_stub "$TMP/lie"
+    rm -f "$TMP/lie-wins"
+    for P in "$LIVE" "$OTHER"; do
+        ( PATH="$TMP/lie:$PATH"; wtlock_acquire "$L" "$P" >/dev/null && echo won >> "$TMP/lie-wins" ) || true &
+    done
+    wait || true
+    WINS=$(grep -c won "$TMP/lie-wins" 2>/dev/null || true)
+    HOLDER=$(cat "$L/pid" 2>/dev/null || true)
+    if [ "$WINS" = 1 ] && { [ "$HOLDER" = "$LIVE" ] || [ "$HOLDER" = "$OTHER" ]; }; then
+        pass_row wtlock_lying_mkdir_one_owner
+    else
+        fail_row wtlock_lying_mkdir_one_owner "wins=$WINS holder=$HOLDER"
+    fi
+    reset_lock
+fi
+
+# A lost claim must leave the winner's lock dir and pid alone (no rm -rf of a live holder).
+if should_run wtlock_lost_claim_keeps_winner; then
+    plant "$LIVE"
+    # shellcheck source=bin/lib/claim-file.sh
+    . "$REPO/bin/lib/claim-file.sh"
+    claim_file_lying_mkdir_stub "$TMP/lie"
+    RC=0; ( PATH="$TMP/lie:$PATH"; wtlock_create "$L" 99999 ) || RC=$?
+    if [ "$RC" = 1 ] && [ -d "$L" ] && [ "$(cat "$L/pid" 2>/dev/null || true)" = "$LIVE" ]; then
+        pass_row wtlock_lost_claim_keeps_winner
+    else
+        fail_row wtlock_lost_claim_keeps_winner "rc=$RC pid=$(cat "$L/pid" 2>/dev/null || true)"
+    fi
+    reset_lock
+fi
+
+# A reclaim mutex that holds an owner file and is older than the grace is still aged out.
+if should_run wtlock_stale_mutex_with_owner_cleared; then
+    plant "$DEAD"
+    rm -rf "$L.reclaim"; mkdir "$L.reclaim"
+    printf '%s\n' 99999 > "$L.reclaim/owner"
+    touch -t 200001010000 "$L.reclaim"
+    RC=0; WTLOCK_GRACE_SECS=1 wtlock_acquire "$L" "$LIVE" >/dev/null || RC=$?
+    if [ "$RC" = 0 ] && [ "$(cat "$L/pid" 2>/dev/null || true)" = "$LIVE" ] && [ ! -e "$L.reclaim" ]; then
+        pass_row wtlock_stale_mutex_with_owner_cleared
+    else
+        fail_row wtlock_stale_mutex_with_owner_cleared "rc=$RC pid=$(cat "$L/pid" 2>/dev/null || true)"
+    fi
     reset_lock
 fi
 

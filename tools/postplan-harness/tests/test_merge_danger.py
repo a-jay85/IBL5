@@ -728,3 +728,9 @@ def test_bar_keeps_owner_channel_mention_with_other_loss():
 def test_bar_off_keeps_rebuildable_one_way():
     line = md.parse_merge_danger(_FIXROUND_LINE)
     assert _bar(line.why, bar=False) == "one-way"
+
+
+def test_bar_keeps_registered_table_with_overwrite():
+    why = "Deletes ibl_hist rows and overwrites every player's contract"
+    assert _bar(why) == "one-way"
+    assert md._bar_exempt("Deletes ibl_hist rows") is True

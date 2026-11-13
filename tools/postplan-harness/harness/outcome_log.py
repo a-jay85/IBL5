@@ -355,8 +355,8 @@ def build_cycles(events, since=None, until=None) -> dict:
 
     A cycle is a batch of one PR's phase4.5 events; a new batch starts where two consecutive
     events sit more than _CYCLE_GAP_SECONDS apart. A PR is in range when the UTC day of its
-    last phase4.5 event is. Blind spot: a review run that logged zero finding outcomes writes
-    no event, so a clean first pass on a PR with no findings is invisible.
+    last phase4.5 event is. A run that logged zero finding outcomes writes one cycle marker
+    (record_cycle_marker), a phase4.5-sourced event, so it counts as a batch too.
     """
     per_pr = {}
     for e in events:
@@ -555,7 +555,7 @@ def _format_cycles(c) -> list:
     return [f"cycles-to-pass: {c['prs']} PRs  mean {mean}  median {median}  max {mx}",
             f"cycles histogram: {hist}",
             f"note: cycles = phase4.5 outcome batches per PR split at gaps over "
-            f"{c['gap_seconds']}s; review runs that logged zero findings are not counted"]
+            f"{c['gap_seconds']}s; a review run that logged zero findings counts once via its cycle marker"]
 
 
 def format_report(report) -> str:

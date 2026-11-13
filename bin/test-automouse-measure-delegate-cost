@@ -433,6 +433,11 @@ os.makedirs(f"{ROOT}/T_rt/logs", exist_ok=True)
 with open(f"{ROOT}/T_rt/logs/2026-11-01.costs.jsonl", "w") as f:
     f.write(row("impl", "claude-sonnet-4-6", "Sonnet", "rt.md", "RT-impl", 0, out=1000) + "\n")
     f.write(row("postplan", "claude-sonnet-4-6", "Sonnet", "rt.md", "RT-pp", 1.0) + "\n")
+
+os.makedirs(f"{ROOT}/T_mp/logs", exist_ok=True)
+with open(f"{ROOT}/T_mp/logs/2026-11-01.costs.jsonl", "w") as f:
+    f.write(row("impl", "claude-sonnet-4-6", "Sonnet", "mp.md", "MP-impl", 0, out=1000) + "\n")
+    f.write(row("postplan", "claude-sonnet-4-6", "Sonnet", "mp.md", "MP-pp", 1.0) + "\n")
 PY
 
 for t_name in T_keep T_drop T_cost T_few T_pk T_inh; do
@@ -481,6 +486,28 @@ grep -qF -- 'no delegate-attempts files' <<< "$TN_ERR" \
     > "$TMPROOT/T_rt/trial.json" 2>/dev/null
 assert_eq "$(jget "$TMPROOT/T_rt/trial.json" arms.low-first.packets)" "2" \
     "trial-roundtrip-record-then-read: low-first packets=2"
+
+# Three Delegate packets in one plan phase, recorded per the impl addendum with
+# --phase 1, 2, 3. Only packet 2 is retried. Each packet must stay its own row:
+# packets=3, first pass 2/3, final pass 3/3.
+for mp_pk in 1 2 3; do
+    mp_res=pass; mp_exit=0
+    [ "$mp_pk" = 2 ] && { mp_res=fail; mp_exit=1; }
+    "$SCRIPT" --record-attempt --nightly-dir "$TMPROOT/T_mp" --plan mp.md --phase "$mp_pk" \
+        --arm low-first --attempt 1 --effort low --check-result "$mp_res" --check-exit "$mp_exit"
+done
+"$SCRIPT" --record-attempt --nightly-dir "$TMPROOT/T_mp" --plan mp.md --phase 2 \
+    --arm low-first --attempt 2 --effort high --check-result pass --check-exit 0
+"$SCRIPT" --trial --nightly-dir "$TMPROOT/T_mp" --out "$TMPROOT/T_mp/trial.md" --json \
+    > "$TMPROOT/T_mp/trial.json" 2>/dev/null
+assert_eq "$(jget "$TMPROOT/T_mp/trial.json" arms.low-first.packets)" "3" \
+    "trial-packets-in-one-phase-not-merged: low-first packets=3"
+assert_eq "$(jget "$TMPROOT/T_mp/trial.json" arms.low-first.retried)" "1" \
+    "trial-packets-in-one-phase-not-merged: retried=1"
+assert_close "$(jget "$TMPROOT/T_mp/trial.json" arms.low-first.first_pass_rate)" "0.6667" \
+    "trial-packets-in-one-phase-not-merged: first_pass_rate=2/3"
+assert_close "$(jget "$TMPROOT/T_mp/trial.json" arms.low-first.final_pass_rate)" "1.0" \
+    "trial-packets-in-one-phase-not-merged: final_pass_rate=1.0"
 
 printf '\n=== case_archive_rotation ===\n'
 # archive_stale is extracted from the runner, not copied, so this cannot drift.

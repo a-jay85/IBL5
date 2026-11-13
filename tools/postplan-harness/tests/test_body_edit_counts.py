@@ -78,6 +78,62 @@ def test_strip_edit_counts_leaves_near_misses_unchanged(text):
     assert strip_edit_counts(text) == text
 
 
+_ISSUE_1758_SENTENCES = [
+    "Phase 2 and 3 tests were updated.\n",
+    "Phase 2 and 3 files were updated.\n",
+    "This touches 3 files and 4 tests.\n",
+    "Phase 2 and 5 files changed.\n",
+]
+
+
+@pytest.mark.parametrize(
+    "text",
+    _ISSUE_1758_SENTENCES
+    + [
+        "Phases 2 and 3 tests were updated.",
+        "Phase 1, 2 and 3 tests were updated.",
+        "Phase 2 and\n3 tests were updated.",
+        "- Phase 2 and 3 tests were updated.",
+        "**Phase 2 and 3** tests were updated.",
+        "Phase 2 and Phase 3 tests were updated.",
+        "PR 12 and 3 tests were updated.",
+    ],
+)
+def test_strip_edit_counts_keeps_and_joined_number_1758(text):
+    assert strip_edit_counts(text) == text
+
+
+def test_strip_edit_counts_keeps_oxford_list_number_1758():
+    text = "Phases 1, 2, and 3 tests were updated."
+    assert strip_edit_counts(text) == text
+
+
+def test_strip_edit_counts_still_strips_clause_opener_and_1758():
+    result = strip_edit_counts("It adds cases, and 3 tests were updated.")
+    assert result == "It adds cases, and tests were updated."
+
+
+_FIVE_FILE_NAME_STATUS = (
+    "M\tsrc/a.py\nM\tsrc/b.py\nM\tsrc/c.py\nM\tsrc/d.py\nM\tsrc/e.py\n"
+)
+_FIVE_FILE_NUMSTAT = (
+    "1\t1\tsrc/a.py\n1\t1\tsrc/b.py\n1\t1\tsrc/c.py\n1\t1\tsrc/d.py\n1\t1\tsrc/e.py\n"
+)
+
+
+@pytest.mark.parametrize("body", _ISSUE_1758_SENTENCES)
+def test_correct_body_numbers_keeps_and_joined_number_1758(body):
+    result = correct_body_numbers(body, _FIVE_FILE_NAME_STATUS, _FIVE_FILE_NUMSTAT)
+    assert body.rstrip("\n") in result.splitlines()
+
+
+def test_correct_body_numbers_five_file_fixture_counts_five_1758():
+    result = correct_body_numbers(
+        "3 files changed.\n", _FIVE_FILE_NAME_STATUS, _FIVE_FILE_NUMSTAT
+    )
+    assert "5 files changed." in result.splitlines()
+
+
 @pytest.mark.parametrize(
     "before",
     [

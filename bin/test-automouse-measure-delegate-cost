@@ -284,7 +284,7 @@ assert_eq "$F_S_N" "19" "F Sonnet n=19"
 assert_eq "$F_VERDICT" "insufficient-sample" "F verdict=insufficient-sample"
 
 printf '\n=== case_empty_env (Fixture A, env -i) ===\n'
-ENV_VERDICT=$(env -i PATH=/usr/bin:/bin python3 "$SCRIPT" \
+ENV_VERDICT=$(env -i PATH=/usr/bin:/bin IBL5_USAGE_GATE_STATE_DIR="${IBL5_USAGE_GATE_STATE_DIR:-}" python3 "$SCRIPT" \
     --nightly-dir "$TMPROOT/A" --out "$TMPROOT/A/report2.md" --json 2>/dev/null \
     | python3 -c 'import json,sys; print(json.load(sys.stdin)["verdict"])')
 assert_eq "$ENV_VERDICT" "sonnet-cheaper" "empty-env verdict=sonnet-cheaper"

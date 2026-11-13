@@ -5,6 +5,10 @@ on a diff, and `read_reasons`, which reads the impl session's reasons file under
 Phase 6.5 shell twin is `pr_removed_guards_hold` in `bin/lib/pr-armable.sh`; both are held to the
 shared case table `bin/fixtures/removed-guards/cases.json`, so a one-sided edit goes red.
 
+Hold tokens: `removed-guards:UNFILLED:<key>` (empty, filler-word or `<...>` reason),
+`removed-guards:UNJUSTIFIED:<key>` (any other reason under `REASON_MIN` chars),
+`removed-guards:UNLISTED:<key>` (flagged key with no bullet) and `removed-guards:MALFORMED`.
+
 Fail-closed: a detector that cannot run returns `(False, [])`, and the caller holds the PR.
 """
 from __future__ import annotations
@@ -16,6 +20,9 @@ from typing import Optional, Sequence
 BEGIN = "<!-- removed-guards:begin -->"
 END = "<!-- removed-guards:end -->"
 PLACEHOLDER = "<one-line reason required>"
+# Prefix on a reason the post-plan fixer wrote after an Opus checker approved it. Both classifiers
+# strip it before judging, so pasting it in front of a filler word still holds.
+HARNESS_MARKER = "(harness-written, checker-approved) "
 REASONS_FILE = "removed-guards-reasons.tsv"
 SCOPE_NOTES_END = "<!-- scope-notes:end -->"
 INTRO = "The deleted-guard check flagged these removals. Each needs a one-line reason, or auto-merge holds."
@@ -28,14 +35,66 @@ _PLACEHOLDER_RE = re.compile(r"^<.*>$")
 Row = tuple  # (key, path, kind, snippet)
 
 
+def reason_verdict(reason: str) -> str:
+    """`"unfilled"` for an empty, filler-word or `<...>` placeholder reason; `"short"` for any other
+    reason under `REASON_MIN` chars after trimming; else `"ok"`. A leading `HARNESS_MARKER` is stripped
+    first, so a marked reason is judged on its own words."""
+    reason = reason.strip().removeprefix(HARNESS_MARKER).strip()
+    if reason == HARNESS_MARKER.strip():
+        reason = ""
+    if not reason or _PLACEHOLDER_RE.match(reason) or _FILLER_RE.match(reason.lower()):
+        return "unfilled"
+    if len(reason) < REASON_MIN:
+        return "short"
+    return "ok"
+
+
 def is_substantive(reason: str) -> bool:
     """Design decision 9: 15+ chars after trimming, not a filler word, not a `<...>` placeholder."""
-    r = reason.strip()
-    if len(r) < REASON_MIN:
-        return False
-    if _FILLER_RE.match(r.lower()) or _PLACEHOLDER_RE.match(r):
-        return False
-    return True
+    return reason_verdict(reason) == "ok"
+
+
+def mark_reason(text: str) -> str:
+    """`HARNESS_MARKER` + the trimmed reason. Raises `ValueError` on a newline, a backtick, a leading
+    `<`, or a non-substantive reason, so a marked reason can never be a placeholder or filler."""
+    if "\n" in text or "\r" in text or "`" in text or text.strip().startswith("<"):
+        raise ValueError(f"reason not writable into a bullet: {text!r}")
+    if not is_substantive(text):
+        raise ValueError(f"reason not substantive: {text!r}")
+    return HARNESS_MARKER + text.strip()
+
+
+def set_reason(body: str, key: str, reason: str) -> str:
+    """Replace the reason on `key`'s bullet, only while it is not yet substantive. Returns `body`
+    unchanged when the block is missing or malformed, `key` has no bullet, or the bullet already
+    carries a substantive reason. The bullet prefix and the `removed:` line stay byte-identical."""
+    if "\n" in reason or "\r" in reason:
+        raise ValueError("reason must be one line")
+    body = body or ""
+    if BEGIN not in body or "removed-guards:MALFORMED" in classify_body(body):
+        return body
+    lines = body.split("\n")
+    inside = False
+    for i, raw in enumerate(lines):
+        cr = "\r" if raw.endswith("\r") else ""
+        line = raw[:-1] if cr else raw
+        if line == BEGIN:
+            inside = True
+            continue
+        if line == END:
+            inside = False
+            continue
+        if not inside:
+            continue
+        m = _BULLET_RE.match(line)
+        if not m or m.group(1) != key:
+            continue
+        current = m.group(2)
+        if is_substantive(current):
+            return body
+        lines[i] = line[:m.start(2)] + reason + cr
+        return "\n".join(lines)
+    return body
 
 
 def classify_body(body: str, flagged_keys: Optional[Sequence[str]] = None) -> list[str]:
@@ -66,7 +125,10 @@ def classify_body(body: str, flagged_keys: Optional[Sequence[str]] = None) -> li
             continue
         key, reason = m.group(1), m.group(2)
         bullet_keys.append(key)
-        if not is_substantive(reason):
+        verdict = reason_verdict(reason)
+        if verdict == "unfilled":
+            out.append(f"removed-guards:UNFILLED:{key}")
+        elif verdict == "short":
             out.append(f"removed-guards:UNJUSTIFIED:{key}")
     if nb == 0 and ne == 0:
         return [f"removed-guards:UNLISTED:{k}" for k in keys]

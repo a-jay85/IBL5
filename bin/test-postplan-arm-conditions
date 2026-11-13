@@ -1871,6 +1871,36 @@ if [ -z "$_dangling" ]; then echo "ok: no_dangling_retired_phase_refs"
 else echo "FAIL: no_dangling_retired_phase_refs:"; printf '%s\n' "$_dangling"; FAILED=1; fi
 # --- end skill carries no arming logic ---
 
+# --- removed-guards shared case table (bin/fixtures/removed-guards/cases.json) ---
+# Shell twin of tests/test_removed_guards.py::test_classify_body_matches_shared_case_table.
+# Every row must give the same hold lines through pr_removed_guards_hold as through
+# harness/removed_guards.py classify_body, so a one-sided classifier edit goes red.
+_rg_cases="$REPO_ROOT/bin/fixtures/removed-guards/cases.json"
+_rg_pass=0
+_rg_fail=0
+while IFS= read -r _rg_row; do
+    _rg_name=$(jq -r '.name' <<< "$_rg_row")
+    _rg_body=$(jq -r '.body' <<< "$_rg_row")
+    _rg_keys=$(jq -r '.flagged_keys | join("\n")' <<< "$_rg_row")
+    _rg_want=$(jq -r '.expected | join("\n")' <<< "$_rg_row")
+    _rg_got=$(bash -c 'source "$1"; pr_removed_guards_hold "$2" "$3"' _ \
+        "$REPO_ROOT/bin/lib/pr-armable.sh" "$_rg_body" "$_rg_keys")
+    if [ "$_rg_got" = "$_rg_want" ]; then
+        _rg_pass=$((_rg_pass + 1))
+    else
+        _rg_fail=$((_rg_fail + 1))
+        echo "FAIL: removed-guards case $_rg_name"
+        echo "  expected: $(printf '%s' "$_rg_want" | tr '\n' ' ')"
+        echo "  got:      $(printf '%s' "$_rg_got" | tr '\n' ' ')"
+        FAILED=1
+    fi
+done < <(jq -c '.[]' "$_rg_cases")
+if [ "$_rg_pass" -eq 0 ]; then
+    echo "FAIL: removed-guards cases: no rows ran from $_rg_cases"; FAILED=1
+fi
+echo "removed-guards cases: $_rg_pass passed, $_rg_fail failed"
+# --- end removed-guards shared case table ---
+
 if [ "$FAILED" -eq 0 ]; then
     echo "All post-plan block checks passed."
 else

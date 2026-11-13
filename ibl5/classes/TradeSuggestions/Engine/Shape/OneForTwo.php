@@ -31,7 +31,7 @@ final class OneForTwo implements DealShapeInterface
         if (!NeedPairGate::buriedOrDepth($s, $partnerTid, $userTid)) {
             return;
         }
-        $partnerPids = array_values(array_slice($pool->partnerPids, 0, CandidateBudget::PLAYERS_PER_PARTNER));
+        $partnerPids = array_slice($pool->partnerPids, 0, CandidateBudget::PLAYERS_PER_PARTNER);
         $count = count($partnerPids);
         for ($i = 0; $i < $count; $i++) {
             for ($j = $i + 1; $j < $count; $j++) {

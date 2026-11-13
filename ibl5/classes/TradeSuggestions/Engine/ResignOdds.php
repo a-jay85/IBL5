@@ -60,7 +60,7 @@ final class ResignOdds
             $p->prefs,
             $p->bird,
             $teamFactors[$tid] ?? new TeamFactors($tid, 0, 0, 0, 0),
-            TeamFactors::average(array_values($teamFactors)),
+            TeamFactors::average($teamFactors),
             $own,
             $rival,
         );

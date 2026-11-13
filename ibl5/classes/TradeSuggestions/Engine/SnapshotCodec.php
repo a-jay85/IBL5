@@ -349,7 +349,7 @@ final class SnapshotCodec
             modes: $modes,
             injury: $injury,
             teamFactors: $teamFactors,
-            rivalFactors: TeamFactors::average(array_values($teamFactors)),
+            rivalFactors: TeamFactors::average($teamFactors),
             resignLikelihood: $resignLikelihood,
             likelyToWalk: $likelyToWalk,
             teamNames: $teamNames,

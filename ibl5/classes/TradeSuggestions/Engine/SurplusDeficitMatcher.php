@@ -101,10 +101,10 @@ final class SurplusDeficitMatcher
         if ($pair->kind === NeedPair::KIND_SLOT) {
             $starter = $lineup->starterPid($pair->key);
             $ranks = $s->slotRanks[$pair->offset] ?? null;
-            $rest = array_values(array_filter(
+            $rest = array_filter(
                 $lineup->rotation[$pair->key] ?? [],
                 static fn (int $pid): bool => $pid !== $starter,
-            ));
+            );
             usort($rest, static function (int $a, int $b) use ($ranks, $pair): int {
                 $ra = $ranks?->poolRank($pair->key, $a) ?? PHP_INT_MAX;
                 $rb = $ranks?->poolRank($pair->key, $b) ?? PHP_INT_MAX;

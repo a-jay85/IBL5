@@ -290,12 +290,13 @@ _REBUILD_WORD_RE = re.compile(r"delet(e|es|ed|ing|ion)", re.IGNORECASE)
 def _bar_exempt(core: str) -> bool:
     """True when the Why's only cited loss is rebuildable-table rows or an owner-only alert."""
     names_registered = any(t in rebuildable.REBUILDABLE_TABLES for t in _TABLE_TOKEN_RE.findall(core))
-    if not (names_registered or _OWNER_CHANNEL_RE.search(core)):
+    owner_channel = bool(_OWNER_CHANNEL_RE.search(core))
+    if not (names_registered or owner_channel):
         return False
     allowed = []
     if names_registered:
         allowed.append(_REBUILD_WORD_RE)
-    if _OWNER_CHANNEL_RE.search(core):
+    if owner_channel:
         allowed.append(_ALERT_WORD_RE)
     if any(not any(a.fullmatch(m.group(0)) for a in allowed) for m in _IRREVERSIBLE_RE.finditer(core)):
         return False  # any irreversible word beyond a rebuild or an owner alert keeps the raise

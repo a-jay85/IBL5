@@ -716,6 +716,8 @@ def test_bar_keeps_discord_dm_why():
 
 def test_owner_channel_hash_dev_near_miss():
     assert md._bar_exempt("posts to #develop and deletes rows") is False
+    # Only the channel name differs from the exempt line below, so a bare #dev match flips it.
+    assert md._bar_exempt("posts to #develop and sends a message") is False
     assert md._bar_exempt("posts to #dev and sends a message") is True
     assert md._bar_exempt("posts to #dev and deletes rows") is False
 

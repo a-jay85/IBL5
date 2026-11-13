@@ -132,7 +132,7 @@ if [ -d "$DONE_DIR" ]; then
     case "$COMPLETED_SEEN" in *":${base}:"*) continue ;; esac
     COMPLETED_SEEN="${COMPLETED_SEEN}:${base}:"
     COMPLETED+=("$base")
-  done < <(find_in_window "$DONE_DIR" \( -type f -o -type l \))
+  done < <(find_in_window "$DONE_DIR" \( -type f -o -type l \) ! -name '.*')
 fi
 
 # Find skipped plans
@@ -144,7 +144,8 @@ if [ -d "$SKIPPED_DIR" ]; then
     case "$SKIPPED_SEEN" in *":${base}:"*) continue ;; esac
     SKIPPED_SEEN="${SKIPPED_SEEN}:${base}:"
     SKIPPED_PLANS+=("$base")
-  done < <(find_in_window "$SKIPPED_DIR" \( -type f -o -type l \))
+  # ! -name '.*': Finder drops .DS_Store here when the owner browses the folder.
+  done < <(find_in_window "$SKIPPED_DIR" \( -type f -o -type l \) ! -name '.*')
 fi
 
 # Build a colon-delimited set of completed slugs for dedup (bash 3.2 compat)

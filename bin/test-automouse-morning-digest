@@ -582,4 +582,16 @@ calls=$(cat "$TMP/dm-calls.log" 2>/dev/null || true)
 assert_contains     "row37: quiet night still sends" "CALLED" "$calls"
 assert_not_contains "row37: quiet night no ping"     "--ping" "$calls"
 h_pass "row37 — ping only when a plan was skipped"
+# --- row38: Finder's .DS_Store in skipped/ or done/ is not a plan ---
+setup
+pin "$NDIR/skipped/.DS_Store" "$NDIR/done/.DS_Store" "$NDIR/done/plan-a.md"
+rm -f "$TMP/dm-calls.log"
+body=$(run_digest --dry-run)
+assert_not_contains "row38: no .DS_Store line" ".DS_Store" "$body"
+assert_not_contains "row38: no skipped count"  "Skipped"    "$body"
+assert_contains     "row38: real plan counted" "plan-a"     "$body"
+run_digest >/dev/null 2>&1
+calls=$(cat "$TMP/dm-calls.log" 2>/dev/null || true)
+assert_not_contains "row38: dotfile does not ping" "--ping" "$calls"
+h_pass "row38 — dotfiles in skipped/ and done/ are ignored"
 h_done

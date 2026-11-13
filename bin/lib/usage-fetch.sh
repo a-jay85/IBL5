@@ -85,21 +85,23 @@ _usage_log_size() {
     printf '%s\n' "${n:-0}"
 }
 
+# shellcheck source=bin/lib/claim-file.sh
+. "$(dirname "${BASH_SOURCE[0]}")/claim-file.sh"
 # _usage_log_rotate <state_dir>: moves usage-gate.log to usage-gate.log.1 once it reaches
 # USAGE_LOG_MAX_BYTES. Never waits and never fails. usage-log-rotate.lock.d serializes
 # rotators; a lock dir more than a minute old is an orphan from a killed rotator and is reclaimed.
 _usage_log_rotate() {
     local lock="$1/usage-log-rotate.lock.d"
     [ "$(_usage_log_size "$1/usage-gate.log")" -ge "$USAGE_LOG_MAX_BYTES" ] || return 0
-    if ! mkdir "$lock" 2>/dev/null; then
+    if ! { mkdir "$lock" 2>/dev/null && claim_file "$lock/owner" printf '%s\n' "$$"; }; then
         [ -n "$(find "$lock" -maxdepth 0 -mmin +1 2>/dev/null)" ] || return 0
         _usage_lock_hook rotate-orphan-reclaim
-        rmdir "$lock" 2>/dev/null
-        mkdir "$lock" 2>/dev/null || return 0
+        rm -rf "$lock"
+        { mkdir "$lock" 2>/dev/null && claim_file "$lock/owner" printf '%s\n' "$$"; } || return 0
     fi
     _usage_lock_hook rotate-lock-won
     _usage_log_rotate_locked "$1"
-    rmdir "$lock" 2>/dev/null
+    rm -rf "$lock"
     return 0
 }
 
@@ -365,8 +367,11 @@ _usage_fetch_lock_acquire() {
     now=$(date +%s)
     if mkdir "$lock" 2>/dev/null; then
         _usage_lock_hook fetch-mkdir-won
-        { printf '%s %s\n' "$now" "$$" > "$lock/at"; } 2>/dev/null
-        return 0
+        # owner is the O_EXCL claim; a lost claim falls through to the busy path below.
+        if claim_file "$lock/owner" printf '%s\n' "$$"; then
+            { printf '%s %s\n' "$now" "$$" > "$lock/at"; } 2>/dev/null
+            return 0
+        fi
     fi
     if [ ! -f "$lock/at" ]; then
         # Orphan from a holder that died between mkdir and its stamp: stamp it so it ages out.
@@ -381,15 +386,15 @@ _usage_fetch_lock_acquire() {
     [ $((now - at)) -gt "$USAGE_FETCH_LOCK_STALE" ] || return 1
     _usage_lock_hook fetch-reclaim-stale
     # One reclaimer at a time. Without this, a peer's mv can take the lock this reclaim just made.
-    if ! mkdir "$mutex" 2>/dev/null; then
+    if ! { mkdir "$mutex" 2>/dev/null && claim_file "$mutex/owner" printf '%s\n' "$$"; }; then
         # A reclaimer died holding the mutex: age it out the way _usage_log_rotate does.
         [ -n "$(find "$mutex" -maxdepth 0 -mmin +1 2>/dev/null)" ] || return 1
-        rmdir "$mutex" 2>/dev/null
-        mkdir "$mutex" 2>/dev/null || return 1
+        rm -rf "$mutex"
+        { mkdir "$mutex" 2>/dev/null && claim_file "$mutex/owner" printf '%s\n' "$$"; } || return 1
     fi
     _usage_fetch_lock_reclaim "$lock" "$now" "$at $pid"
     rc=$?
-    rmdir "$mutex" 2>/dev/null
+    rm -rf "$mutex"
     return "$rc"
 }
 
@@ -410,7 +415,7 @@ _usage_fetch_lock_reclaim() {
         return 1
     fi
     rm -rf "$lock.stale.$$"
-    mkdir "$lock" 2>/dev/null || return 1
+    { mkdir "$lock" 2>/dev/null && claim_file "$lock/owner" printf '%s\n' "$$"; } || return 1
     _usage_lock_hook fetch-reclaim-won
     { printf '%s %s\n' "$now" "$$" > "$lock/at"; } 2>/dev/null
     return 0

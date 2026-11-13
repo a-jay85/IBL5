@@ -463,8 +463,7 @@ usage_token_acquire() {
     local sid="${1:-}" pid="${2:-}" dir
     usage_valid_sid "$sid" || return 1
     dir=$(usage_token_dir)
-    if mkdir "$dir" 2>/dev/null; then
-        printf '%s %s %s\n' "$sid" "$pid" "$(date +%s)" > "$dir/holder"
+    if mkdir "$dir" 2>/dev/null && claim_file "$dir/holder" printf '%s %s %s\n' "$sid" "$pid" "$(date +%s)"; then
         return 0
     fi
     if [ "$(usage_token_holder)" = "$sid" ]; then

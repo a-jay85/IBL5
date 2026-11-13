@@ -31,6 +31,13 @@ assert_file() {  # name path
 assert_no_file() {  # name path
     if [ ! -e "$2" ]; then pass "$1"; else fail "$1" "unexpected file $2"; fi
 }
+# row_result <name> <expected> <actual>: like assert_eq, but a pass prints the bare line `ok <name>`
+# that the plan's matrix rows grep for. A failure prints `FAIL <name> ...`.
+row_result() {
+    if [ "$2" = "$3" ]; then PASS=$((PASS + 1)); echo "ok $1"; else fail "$1" "expected [$2] got [$3]"; fi
+}
+# shellcheck source=bin/lib/claim-file.sh
+. "$REPO_ROOT/bin/lib/claim-file.sh"
 
 TMPROOT=$(mktemp -d)
 trap 'rm -rf "$TMPROOT"' EXIT
@@ -3057,6 +3064,58 @@ test_fetch_lock_reclaim_mutex_orphan_ages_out() {  # a dead reclaimer's mutex ne
     won=$(ep "_usage_fetch_lock_acquire '$d' && echo \$\$")
     assert_eq reclaim_mutex_orphan:stamp-pid "${won:-none}" "$(cut -d' ' -f2 "$d/fetch.lock.d/at")"
     assert_no_file reclaim_mutex_orphan:mutex-gone "$d/fetch-reclaim.lock.d"
+}
+
+# Lying-mkdir cases: the stub's mkdir always exits 0, so only the O_EXCL claim file can pick a winner.
+test_fetch_lying_mkdir_one_owner() {
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR" lib="$REPO_ROOT/bin/lib/usage-fetch.sh" i wins=0
+    claim_file_lying_mkdir_stub "$T/lie"
+    for i in 1 2; do
+        bash -c "PATH='$T/lie':\$PATH; . '$lib'; _usage_fetch_lock_acquire '$d'; echo \$? >> '$T/rcs'" &
+    done
+    wait
+    wins=$(grep -cx 0 "$T/rcs" 2>/dev/null || true)
+    row_result fetch_lying_mkdir_one_owner 1 "$wins"
+}
+
+test_rotate_lying_mkdir_one_rotator() {
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR" lib="$REPO_ROOT/bin/lib/usage-fetch.sh" i won
+    claim_file_lying_mkdir_stub "$T/lie"
+    seed_log 4096 "$d/usage-gate.log"
+    for i in 1 2; do
+        bash -c "PATH='$T/lie':\$PATH; . '$lib'; _usage_lock_hook() { printf '%s\n' \"\$1\" >> '$T/rot.trace'; [ \"\$1\" = rotate-lock-won ] && sleep 1; return 0; }; _usage_log_rotate '$d'" &
+    done
+    wait
+    won=$(grep -cx rotate-lock-won "$T/rot.trace" 2>/dev/null || true)
+    row_result rotate_lying_mkdir_one_rotator 1 "$won"
+}
+
+test_token_lying_mkdir_one_holder() {
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR" lib="$REPO_ROOT/bin/lib/usage-gate.sh" wins=0 holder
+    claim_file_lying_mkdir_stub "$T/lie"
+    bash -c "PATH='$T/lie':\$PATH; . '$lib'; usage_token_acquire $SID_A 11111; echo \$? >> '$T/rcs'" &
+    bash -c "PATH='$T/lie':\$PATH; . '$lib'; usage_token_acquire $SID_B 22222; echo \$? >> '$T/rcs'" &
+    wait
+    wins=$(grep -cx 0 "$T/rcs" 2>/dev/null || true)
+    holder=$(cut -d' ' -f1 "$d/drain-token.d/holder" 2>/dev/null)
+    if [ "$wins" = 1 ] && { [ "$holder" = "$SID_A" ] || [ "$holder" = "$SID_B" ]; }; then
+        row_result token_lying_mkdir_one_holder ok ok
+    else
+        row_result token_lying_mkdir_one_holder "wins=1 holder=sid" "wins=$wins holder=$holder"
+    fi
+}
+
+test_fetch_reclaim_mutex_owner_aged_out() {  # an aged mutex holding an owner file is cleared (rmdir would fail)
+    new_env
+    local d="$IBL5_USAGE_GATE_STATE_DIR" won
+    stale_fetch_lock "$d"
+    mkdir "$d/fetch-reclaim.lock.d"; printf '%s\n' 99999 > "$d/fetch-reclaim.lock.d/owner"
+    touch -t 202001010000 "$d/fetch-reclaim.lock.d"
+    won=$(ep "_usage_fetch_lock_acquire '$d' && echo won")
+    row_result fetch_reclaim_mutex_owner_aged_out won "${won:-lost}"
 }
 
 test_fetch_lock_reclaim_stamp_changed_loses() {  # stamp re-stamped since the stale verdict: hands off

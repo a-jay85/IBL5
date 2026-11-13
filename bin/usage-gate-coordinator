@@ -237,18 +237,17 @@ pause_wave_dm() {
 
 LOCK="$STATE/coordinator.lock.d"
 if [ "$DRY" -ne 1 ]; then
-    if ! mkdir "$LOCK" 2>/dev/null; then
+    if ! { mkdir "$LOCK" 2>/dev/null && claim_file "$LOCK/at" printf '%s\n' "$NOW"; }; then
         lock_at=$(cat "$LOCK/at" 2>/dev/null || echo "$NOW")
         case "$lock_at" in ''|*[!0-9]*) lock_at=$NOW ;; esac
         if [ $(( NOW - lock_at )) -gt 300 ]; then
             rm -rf "$LOCK"
-            mkdir "$LOCK" 2>/dev/null || { usage_log "tick-busy"; exit 0; }
+            { mkdir "$LOCK" 2>/dev/null && claim_file "$LOCK/at" printf '%s\n' "$NOW"; } || { usage_log "tick-busy"; exit 0; }
         else
             usage_log "tick-busy"
             exit 0
         fi
     fi
-    printf '%s\n' "$NOW" > "$LOCK/at"
     trap 'rm -rf "$LOCK"' EXIT
     usage_token_reclaim_dead
 fi

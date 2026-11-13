@@ -2,10 +2,16 @@
 
 Pure rendering tests. Notes and numstat dicts are built by hand.
 """
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import runner
 from harness.classify import (SCOPE_GAP_RULE, SCOPE_NOTES_BEGIN, SCOPE_NOTES_END, SCOPE_RULE,
                               extract_scope_reasons, numstat_counts, render_scope_notes)
 from harness.scope_conformance import scope_notes
-from harness.state import PlanInfo
+from harness.state import Classification, HarnessError, PlanInfo
 
 
 def _plan(tmp_path, critical: list[str], name: str = "plan.md") -> PlanInfo:
@@ -164,3 +170,81 @@ def test_numstat_counts_parses_rows_and_binary():
     diff = ("diff --git a/x.php b/x.php\nindex 1..2 100644\n--- a/x.php\n+++ b/x.php\n"
             "@@ -1 +1,2 @@\n-a\n+b\n+c\n")
     assert numstat_counts(diff).get("x.php") == (2, 1)
+
+
+def _mod_diff(paths: list[str]) -> str:
+    out = []
+    for p in paths:
+        out += [f"diff --git a/{p} b/{p}", "index 1111111..2222222 100644",
+                f"--- a/{p}", f"+++ b/{p}", "@@ -1 +1 @@", "-x", "+y"]
+    return "\n".join(out) + "\n"
+
+
+def test_inject_scope_notes_inlines_reason_and_strips_section(tmp_path):
+    plan = _plan(tmp_path, ["ibl5/a.php"])
+    files = ["ibl5/a.php", "ibl5/rogue.php"]
+    copy = {"summary_md": "## Summary\n- x\n\n## Unplanned change reasons\n"
+                          "- `ibl5/rogue.php`: hand fix\n"}
+    runner._inject_scope_notes(copy, plan, files, _mod_diff(files), copy["summary_md"],
+                               lambda _m: None)
+    body = copy["summary_md"]
+    assert "## Unplanned change reasons" not in body
+    block = body[body.index(SCOPE_NOTES_BEGIN):body.index(SCOPE_NOTES_END)]
+    assert "hand fix" in block
+
+
+def test_unplanned_candidates_lists_unplanned_paths(tmp_path):
+    plan = _plan(tmp_path, ["ibl5/a.php"])
+    files = ["ibl5/a.php", "ibl5/rogue.php"]
+    out = runner._unplanned_candidates(plan, files, _mod_diff(files), lambda _m: None)
+    assert out == ["ibl5/rogue.php"]
+
+
+def test_unplanned_candidates_swallows_scope_timeout(tmp_path, monkeypatch):
+    plan = _plan(tmp_path, ["ibl5/a.php"])
+
+    def _hang(*_a, **_k):
+        raise HarnessError("subprocess-timeout", "scope-check timed out")
+
+    monkeypatch.setattr(runner.scope_conformance, "scope_notes", _hang)
+    logs: list[str] = []
+    out = runner._unplanned_candidates(plan, ["ibl5/a.php"], "", logs.append)
+    assert out == []
+    assert any("scope pre-pass skipped" in m for m in logs)
+
+
+def test_pr_copy_forwards_unplanned_paths(monkeypatch):
+    monkeypatch.setattr(runner, "_unplanned_candidates", lambda *_a, **_k: ["ibl5/rogue.php"])
+    seen: dict = {}
+
+    def _spy(*_a, **kw):
+        seen.update(kw)
+        return "prompt"
+
+    monkeypatch.setattr(runner.llm_calls, "pr_copy_prompt", _spy)
+
+    class _Gh:
+        def pr_exists(self):
+            return False
+
+    class _Git:
+        def branch_head_subject(self, *_a, **_k):
+            return "chore: x"
+
+    class _Llm:
+        def call(self, *_a, **_k):
+            raise HarnessError("llm-invalid-output", "bad json")
+
+    runner._pr_copy(_Llm(), _Git(), _Gh(), None, "slug", Classification(), PlanInfo(),
+                    lambda _m: None, files=["ibl5/rogue.php"], diff_body="x")
+    assert seen.get("unplanned_paths") == ["ibl5/rogue.php"]
+
+
+def test_inject_scope_notes_empty_notes_removes_stale_block(tmp_path):
+    plan = _plan(tmp_path, ["ibl5/a.php"])
+    stale = (f"## Summary\n- x\n\n{SCOPE_NOTES_BEGIN}\n## Unplanned changes\n- `ibl5/old.php`: "
+             f"(no reason given)\n{SCOPE_NOTES_END}\n")
+    copy = {"summary_md": stale}
+    runner._inject_scope_notes(copy, plan, ["ibl5/a.php"], _mod_diff(["ibl5/a.php"]),
+                               copy["summary_md"], lambda _m: None)
+    assert SCOPE_NOTES_BEGIN not in copy["summary_md"]

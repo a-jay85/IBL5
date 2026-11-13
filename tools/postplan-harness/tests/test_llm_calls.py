@@ -124,3 +124,22 @@ def test_retrospective_prompt_carries_fidelity_outcome():
 
     prompt_none = retrospective_prompt("my-slug", "shipped-armed", None, 0, None, None)
     assert "fidelity=none" in prompt_none
+
+
+def test_pr_copy_prompt_lists_unplanned_paths():
+    prompt = pr_copy_prompt("s", _cls(), PlanInfo(), "", unplanned_paths=["ibl5/rogue.php"])
+    assert "## Unplanned change reasons" in prompt
+    assert "- `ibl5/rogue.php`" in prompt
+
+
+def test_pr_copy_prompt_omits_reasons_block_without_paths():
+    for paths in (None, []):
+        prompt = pr_copy_prompt("s", _cls(), PlanInfo(), "", unplanned_paths=paths)
+        assert "UNPLANNED PATHS" not in prompt
+
+
+def test_pr_copy_prompt_caps_unplanned_paths():
+    paths = [f"ibl5/p{i:02d}.php" for i in range(61)]
+    prompt = pr_copy_prompt("s", _cls(), PlanInfo(), "", unplanned_paths=paths)
+    assert "ibl5/p59.php" in prompt
+    assert "ibl5/p60.php" not in prompt

@@ -65,6 +65,7 @@ from harness.classify import (BACKLOG_REPO, render_merge_digest,
                               qualify_backlog_refs,
                               render_gate_fix,
                               render_residual_phases,
+                              extract_scope_reasons, numstat_counts,
                               render_scope_notes,
                               restore_manual_testing_section, strip_change_blocks,
                               strip_manual_testing_section,
@@ -443,7 +444,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             return _finish(res, out_dir)
 
         phase2_merge_danger = None   # MergeDanger this run's Phase 2 injected; None on the clean-tree rerun
-        copy, copy_degraded = _pr_copy(llm, git, gh, fixture, slug, cls, plan, log)
+        copy, copy_degraded = _pr_copy(llm, git, gh, fixture, slug, cls, plan, log,
+                                       files=files, diff_body=diff)
         summary, stripped = strip_manual_testing_section(copy["summary_md"])
         if stripped:
             copy["summary_md"] = summary
@@ -2604,7 +2606,23 @@ def _remediate_doc_staleness(worktree: str, git, log) -> int:
     return n
 
 
-def _pr_copy(llm, git, gh, fixture, slug, cls, plan, log) -> tuple[dict, bool]:
+def _unplanned_candidates(plan, files: list[str], diff_body: str, log) -> list[str]:
+    """Pre-pass for pr-copy: the unplanned paths before any `## Declared scope` exists.
+
+    A superset of the final list, since a declared path only clears notes. A scope-check
+    hang logs and returns [], so the pre-pass adds no failure mode; the later call in
+    _inject_scope_notes keeps its fail-closed timeout.
+    """
+    try:
+        notes = scope_conformance.scope_notes(plan, files, diff_body, "")
+    except HarnessError as e:
+        log(f"phase2: scope pre-pass skipped ({e.kind})")
+        return []
+    return [n.split(" ", 2)[1] for n in notes if n.startswith("unplanned ")]
+
+
+def _pr_copy(llm, git, gh, fixture, slug, cls, plan, log, files=None,
+             diff_body="") -> tuple[dict, bool]:
     """Phase 2 commit/PR copy: ({title, commit_subject, summary_md}, degraded).
 
     Re-run with an open PR and nothing to commit: the Sonnet call is skipped. Its title
@@ -2640,9 +2658,11 @@ def _pr_copy(llm, git, gh, fixture, slug, cls, plan, log) -> tuple[dict, bool]:
             plan_excerpt = fh.read()[:4000]
     else:
         plan_excerpt = ""
+    unplanned_paths = _unplanned_candidates(plan, files, diff_body, log) if files else []
     try:
         copy = llm.call(schemas.PR_COPY_PURPOSE, "sonnet",
-                        llm_calls.pr_copy_prompt(slug, cls, plan, plan_excerpt),
+                        llm_calls.pr_copy_prompt(slug, cls, plan, plan_excerpt,
+                                                 unplanned_paths=unplanned_paths),
                         schemas.validate_pr_copy,
                         normalizer=schemas.normalize_pr_copy)
         return schemas.coerce_pr_copy(copy, cls), False
@@ -3104,10 +3124,15 @@ def _inject_scope_notes(copy: dict, plan, files: list[str], diff_body: str, pr_b
     out of scope_notes. `pr_body` is the body being authored, so a `## Declared scope` or
     `## Plan gaps` section in it clears its own note; the helper strips generated
     marker spans first, so this block never declares itself. Idempotent: an empty note
-    list removes a stale block. Returns the notes for the caller's log line.
+    list removes a stale block. Returns the notes for the caller's log line. A pr-copy
+    `## Unplanned change reasons` section is removed from the body and each reason is
+    inlined on its path's bullet; the helper ignores that section, so a reason never clears a note.
     """
     notes = scope_conformance.scope_notes(plan, files, diff_body, pr_body)
-    copy["summary_md"] = upsert_scope_notes(copy["summary_md"], render_scope_notes(notes))
+    reasons, copy["summary_md"] = extract_scope_reasons(copy["summary_md"])
+    block = render_scope_notes(notes, numstat=numstat_counts(diff_body), reasons=reasons,
+                               changed_count=len(files))
+    copy["summary_md"] = upsert_scope_notes(copy["summary_md"], block)
     for n in notes:
         log(f"phase2 scope-note: {n}")
     return notes

@@ -9,7 +9,7 @@ import difflib
 import re
 
 from .classify import (FILES_CHANGED_BEGIN, FILES_CHANGED_END, MERGE_DIGEST_BEGIN,
-                       MERGE_DIGEST_END, strip_runner_blocks)
+                       MERGE_DIGEST_END, SCOPE_REASONS_HEADING, strip_runner_blocks)
 from . import unplanned_scope
 from .state import ArmDecision, Classification, PlanInfo
 
@@ -42,8 +42,24 @@ def _gm_visible_rubric(cls: Classification) -> str:
 # the diff is longer, so the model never states a count that spans text it was not shown.
 PR_COPY_DIFF_CAP = 60000
 
+# pr-copy is asked for a reason on at most this many unplanned paths; the rest render the placeholder.
+SCOPE_REASON_PROMPT_CAP = 60
 
-def pr_copy_prompt(slug: str, cls: Classification, plan: PlanInfo, plan_excerpt: str) -> str:
+
+def _scope_reasons_block(paths: list[str] | None) -> str:
+    if not paths:
+        return ""
+    listed = "\n".join(f"- `{p}`" for p in paths[:SCOPE_REASON_PROMPT_CAP])
+    return ("\n\nUNPLANNED PATHS: the plan names none of these changed paths:\n" + listed
+            + f"\nIn summary_md, add a `{SCOPE_REASONS_HEADING}` section with one bullet per "
+            "path: - `<path>`: <one line on why this branch changes it>. Write these reasons "
+            "in that section only, never under `## Declared scope`; keep `## Declared scope` "
+            "to its existing rules. The runner moves each reason into the `## Unplanned changes` "
+            "block and removes your section.")
+
+
+def pr_copy_prompt(slug: str, cls: Classification, plan: PlanInfo, plan_excerpt: str,
+                   unplanned_paths: list[str] | None = None) -> str:
     """Commit/PR title + summary. Judgment retained: the feat-vs-chore GM test
     and a faithful summary of intent. Type rubric inlined from
     .claude/rules/auto-commit.md."""
@@ -87,6 +103,7 @@ def pr_copy_prompt(slug: str, cls: Classification, plan: PlanInfo, plan_excerpt:
         + (f"\nPLAN EXCERPT (intent):\n{plan_excerpt[:4000]}\n" if plan.found else "")
         + "\nDIFF:\n" + diff_text
         + truncation_note
+        + _scope_reasons_block(unplanned_paths)
         + '\n\nNEVER write a "## Manual Testing" heading or any manual-testing checklist '
         'inside summary_md. The runner owns that section and appends it after you; '
         'duplicating it corrupts the arming gate.'

@@ -2661,8 +2661,7 @@ def _pr_copy(llm, git, gh, fixture, slug, cls, plan, log, files=None,
     unplanned_paths = _unplanned_candidates(plan, files, diff_body, log) if files else []
     try:
         copy = llm.call(schemas.PR_COPY_PURPOSE, "sonnet",
-                        llm_calls.pr_copy_prompt(slug, cls, plan, plan_excerpt,
-                                                 unplanned_paths=unplanned_paths),
+                        llm_calls.pr_copy_prompt(slug, cls, plan, plan_excerpt, unplanned_paths=unplanned_paths),
                         schemas.validate_pr_copy,
                         normalizer=schemas.normalize_pr_copy)
         return schemas.coerce_pr_copy(copy, cls), False

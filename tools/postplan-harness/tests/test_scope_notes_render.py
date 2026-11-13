@@ -51,14 +51,14 @@ def test_render_orders_claude_paths_first():
 def test_render_orders_test_net_deletion_before_source_edit():
     out = render_scope_notes(
         [_u("ibl5/a.php"), _u("tools/postplan-harness/tests/test_x.py")],
-        numstat={"ibl5/a.php": (20, 20), "tools/postplan-harness/tests/test_x.py": (0, 147)})
+        numstat={"ibl5/a.php": (80, 80), "tools/postplan-harness/tests/test_x.py": (0, 147)})
     assert out.index("tests/test_x.py") < out.index("ibl5/a.php")
 
 
 def test_render_orders_large_new_code_before_rest():
     out = render_scope_notes(
         [_u("ibl5/edit.php"), _u("ibl5/new.php")],
-        numstat={"ibl5/edit.php": (30, 30), "ibl5/new.php": (150, 0)})
+        numstat={"ibl5/edit.php": (90, 90), "ibl5/new.php": (150, 0)})
     assert out.index("ibl5/new.php") < out.index("ibl5/edit.php")
 
 

@@ -20,6 +20,11 @@ from .state import HarnessError
 MAX_ROWS = 3
 MATCH_SIMILARITY_MIN = 0.6
 SYNTAX_TIMEOUT_S = 30
+# Reasons that void every proposal in the batch. `proposal-mismatch` carries a row id
+# but means the plan copy no longer says what was proposed, so it voids the batch too.
+BATCH_REASONS = frozenset({"row-count-changed", "row-order-changed", "reparse-failed",
+                           "proposal-mismatch"})
+_ROW_REASON_RE = re.compile(r"^(?P<reason>[a-z-]+) row (?P<row>\S+)$")
 
 ELIGIBLE_RE = re.compile(r"^row (?P<row>[0-9]+(?:-[A-Za-z0-9]+)*) (?P<kind>HELD|NOT-APPLIED) — (?P<detail>.*)$")
 NEW_MATCH_RE = re.compile(r"^NEW-MATCH: (.*)$", re.M)
@@ -166,8 +171,75 @@ def syntax_ok(path: str, text: str) -> bool:
     return False
 
 
-def validate_repair(old_rows, new_rows, repaired, read_file: Callable[[str], Optional[str]]) -> list[str]:
-    """Why the new rows are refused; an empty list accepts them. Only `match` may move."""
+_HUNK_BODY_TAGS = (" ", "-", "+", "\\")
+
+
+def _diff_hunks(diff: str):
+    """(path, removed, added) per hunk of a unified git diff, or None when a hunk
+    body line has an unknown prefix. `path` is the `+++ b/` path, None for a deletion."""
+    hunks = []
+    path = None
+    cur = None
+    for line in diff.splitlines():
+        if line.startswith("diff --git "):
+            path, cur = None, None
+            continue
+        if cur is None and line.startswith("+++ "):
+            path = line[len("+++ b/"):] if line.startswith("+++ b/") else None
+            continue
+        if line.startswith("@@"):
+            cur = (path, [], [])
+            hunks.append(cur)
+            continue
+        if cur is None:
+            continue
+        tag = line[:1]
+        if tag not in _HUNK_BODY_TAGS:
+            return None
+        if tag == "-":
+            cur[1].append(line[1:])
+        elif tag == "+":
+            cur[2].append(line[1:])
+    return hunks
+
+
+def rewritten_in_diff(diff: Optional[str], path: str, old_match: str, new_match: str) -> bool:
+    """The branch diff removed a line holding `old_match` and added a line holding
+    `new_match`, both in one hunk of `path`. Fails closed on a missing or unparseable diff."""
+    if diff is None or not old_match.strip() or not new_match.strip():
+        return False
+    hunks = _diff_hunks(diff)
+    if hunks is None:
+        return False
+    for p, removed, added in hunks:
+        if p != path:
+            continue
+        if any(old_match in r for r in removed) and any(new_match in a for a in added):
+            return True
+    return False
+
+
+def split_reasons(reasons) -> tuple[list[str], set]:
+    """Batch-level reasons, and the ids of rows refused on their own.
+
+    A reason not shaped `<reason> row <id>` counts as batch-level, so an unknown
+    reason fails closed and refuses the whole batch."""
+    batch: list[str] = []
+    refused: set = set()
+    for reason in reasons:
+        m = _ROW_REASON_RE.match(reason)
+        if m is None or m.group("reason") in BATCH_REASONS:
+            batch.append(reason)
+        else:
+            refused.add(m.group("row"))
+    return batch, refused
+
+
+def validate_repair(old_rows, new_rows, repaired, read_file: Callable[[str], Optional[str]],
+                    diff: Optional[str] = None) -> list[str]:
+    """Why the new rows are refused; an empty list accepts them. Only `match` may move.
+
+    A dissimilar new match passes when `diff` shows the old line rewritten into it."""
     if len(old_rows) != len(new_rows):
         return ["row-count-changed"]
     if [o.row for o in old_rows] != [n.row for n in new_rows]:
@@ -197,7 +269,8 @@ def validate_repair(old_rows, new_rows, repaired, read_file: Callable[[str], Opt
                 - set(_IDENT_RE.findall(text))):
             # A renamed identifier left in `replace` would trip on a NameError, not on the test.
             reasons.append(f"replace-stale-identifier row {o.row}")
-        if difflib.SequenceMatcher(None, o.match, n.match).ratio() < MATCH_SIMILARITY_MIN:
+        if (difflib.SequenceMatcher(None, o.match, n.match).ratio() < MATCH_SIMILARITY_MIN
+                and not rewritten_in_diff(diff, n.file, o.match, n.match)):
             reasons.append(f"match-dissimilar row {o.row}")
     return reasons
 

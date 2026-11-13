@@ -1263,7 +1263,7 @@ class LiveGit:
         from ..conflict import (
             DECLINE_RETRY_MODEL, MAX_DECLINE_RETRIES, SYNC_BRANCH_STAGE,
             abort_and_restore, assert_text_only, inventory_conflicts,
-            purge_verdict_artifacts, resolve_all,
+            purge_verdict_artifacts, resolve_all, restore_prior_verdict,
         )
         from ..conflict_ladder import RUNG_REGEN, ladder_failure_reason
 
@@ -1294,7 +1294,7 @@ class LiveGit:
             Path(lostwork_pre_path(key)).write_bytes(pre_patch)
 
         self._reconcile_conflict_flag(branch, key, base)
-        purge_verdict_artifacts(key)
+        purge_verdict_artifacts(key, keep_sha=pre_rebase_sha)
 
         contained_rc, _ = self._run_out("merge-base", "--is-ancestor", master_sha, "HEAD")
         if contained_rc == 0:
@@ -1318,6 +1318,8 @@ class LiveGit:
                     raise HarnessError("rebase-conflict", out)
                 self._record_resolution(
                     key, branch, master_sha, premerged.files, proof_out=out)
+            if premerged is None:
+                restore_prior_verdict(key, self._run("rev-parse", "HEAD").strip())
             return
         if premerged is not None:
             # The ladder's review would cover only its own files, so a pre-merged head

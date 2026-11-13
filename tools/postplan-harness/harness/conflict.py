@@ -780,15 +780,63 @@ def rereview_absent(llm, run, *, worktree, key, attempts=CONFLICT_REREVIEW_ATTEM
     return verdict, calls, "reviewed"
 
 
-def purge_verdict_artifacts(key: str) -> None:
+def prior_sidecar_path(key: str) -> str:
+    """Where purge parks a sidecar whose SHA is the pre-rebase HEAD. conflict_verdict_for never reads it."""
+    return f"/tmp/postplan-conflict-sha-{key}.prior"
+
+
+def purge_verdict_artifacts(key: str, keep_sha: Optional[str] = None) -> None:
     """Remove the sidecar and verdict temp files for key (per-rebase). Never removes the
     conflict flag file, and never removes the auto-resolved list: a BEHIND re-rebase in the
-    same run must not drop files an earlier rebase recorded (see purge_autoresolved_list)."""
+    same run must not drop files an earlier rebase recorded (see purge_autoresolved_list).
+
+    keep_sha is the pre-rebase HEAD. When the live sidecar names exactly that SHA and its
+    verdict file exists, the sidecar is parked at prior_sidecar_path and that one verdict
+    file is kept, so restore_prior_verdict can bring it back if the rebase leaves HEAD
+    unchanged (backlog#1778). Parked state is unreadable by conflict_verdict_for, so any
+    path that never restores it reads ABSENT, as before."""
     sidecar = f"/tmp/postplan-conflict-sha-{key}.txt"
+    pending = prior_sidecar_path(key)
+    if os.path.exists(pending):
+        os.unlink(pending)
+    kept = None
+    if keep_sha:
+        try:
+            live = Path(sidecar).read_text().strip()
+        except OSError:
+            live = ""
+        if live == keep_sha and os.path.exists(verdict_ok_path(key, keep_sha)):
+            kept = keep_sha
     if os.path.exists(sidecar):
-        os.unlink(sidecar)
+        if kept is not None:
+            os.replace(sidecar, pending)
+        else:
+            os.unlink(sidecar)
     for p in glob.glob(f"/tmp/postplan-conflict-verdict-{key}-*.ok"):
+        if kept is not None and p == verdict_ok_path(key, kept):
+            continue
         os.unlink(p)
+
+
+def restore_prior_verdict(key: str, head_sha: str) -> bool:
+    """Un-park the sidecar purge kept, only when its SHA is head_sha, no fresh sidecar was
+    written since, and its verdict file still exists. Otherwise drop the parked file (and
+    its verdict file when no live sidecar exists). Returns True only on restore."""
+    pending = prior_sidecar_path(key)
+    sidecar = f"/tmp/postplan-conflict-sha-{key}.txt"
+    try:
+        sha = Path(pending).read_text().strip()
+    except OSError:
+        return False
+    os.unlink(pending)
+    live_exists = os.path.exists(sidecar)
+    ok = bool(sha) and sha == head_sha and not live_exists and os.path.exists(verdict_ok_path(key, sha))
+    if ok:
+        Path(sidecar).write_text(sha)
+        return True
+    if sha and not live_exists and os.path.exists(verdict_ok_path(key, sha)):
+        os.unlink(verdict_ok_path(key, sha))
+    return False
 
 
 def purge_autoresolved_list(key: str) -> None:

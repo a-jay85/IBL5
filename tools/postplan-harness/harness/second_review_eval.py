@@ -633,9 +633,9 @@ def run_eval(root: Path, corpus: dict, *, spawn_factory, cache_dir, case_ids=Non
              log: Optional[Callable[[str], None]] = None) -> SecondScore:
     """Replay every confirmed case (or the `case_ids` subset) and score the outcomes."""
     v = surface_hash_worktree(Path(root))
-    c = corpus_digest(corpus)
     cases = sorted((x for x in corpus["cases"] if x.get("status") == "confirmed"
                     and (case_ids is None or x["id"] in case_ids)), key=lambda x: x["id"])
+    c = corpus_digest({"cases": cases})
     outcomes = []
     for case in cases:
         cache_file = _cache_path(Path(cache_dir), case, v)

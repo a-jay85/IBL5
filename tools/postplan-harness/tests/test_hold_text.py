@@ -141,9 +141,9 @@ def test_raw_reasons_move_to_the_audit_trail():
                      "removed-guards:UNJUSTIFIED:catch@ibl5/classes/A.php#b2eb25e1; "
                      "removed-guards:UNJUSTIFIED:catch@ibl5/classes/A.php#0df54b62; "
                      "removed-guards:UNLISTED:command-guard@bin/fleet-status#58bc4462"),
-     "This PR removes safety checks, and the PR body does not explain a command-exists "
-     "check in bin/fleet-status; and the PR body explains these too briefly: an error "
-     "catch in ibl5/classes/A.php."),
+     "This PR removes safety checks, and the PR body explains these too briefly: an error "
+     "catch in ibl5/classes/A.php; and the PR body does not explain a command-exists "
+     "check in bin/fleet-status."),
     (ConditionResult(20, "removed-guards", True, "removed-guards:MALFORMED"),
      "The PR body's list of removed safety checks could not be read."),
 ])
@@ -158,6 +158,36 @@ def test_condition_19_plan_checks_wording():
     assert hold_text.plain_hold(cond) == (
         "The Plan checks CI job has not passed, or post-plan could not confirm its block: "
         "Plan checks CI job concluded FAILURE; could not add the plan-checks label.")
+
+
+def test_removed_guards_unfilled_wording():
+    c = ConditionResult(20, "removed-guards", True,
+                        "removed-guards:UNFILLED:catch@ibl5/classes/A.php#b2eb25e1")
+    text = hold_text.plain_hold(c)
+    assert text == ("This PR removes safety checks, and the PR body has no reason filled in "
+                    "for these: an error catch in ibl5/classes/A.php.")
+    assert "too briefly" not in text
+
+
+def test_removed_guards_unjustified_wording_kept():
+    c = ConditionResult(20, "removed-guards", True,
+                        "removed-guards:UNJUSTIFIED:catch@ibl5/classes/A.php#b2eb25e1")
+    text = hold_text.plain_hold(c)
+    assert text == ("This PR removes safety checks, and the PR body explains these too "
+                    "briefly: an error catch in ibl5/classes/A.php.")
+    assert "no reason filled in" not in text
+
+
+def test_removed_guards_all_three_tokens_render_in_order():
+    c = ConditionResult(20, "removed-guards", True,
+                        "removed-guards:UNLISTED:command-guard@bin/fleet-status#58bc4462; "
+                        "removed-guards:UNJUSTIFIED:catch@ibl5/classes/A.php#b2eb25e1; "
+                        "removed-guards:UNFILLED:try@ibl5/classes/B.php#0df54b62")
+    text = hold_text.plain_hold(c)
+    i_unfilled = text.index("no reason filled in")
+    i_short = text.index("too briefly")
+    i_unlisted = text.index("does not explain")
+    assert i_unfilled < i_short < i_unlisted
 
 
 def test_self_governing_merge_danger_has_its_own_words():

@@ -92,7 +92,14 @@ final class PlayerActionController
         $validator = new RookieOptionValidator();
         $formView = new RookieOptionView();
 
-        $player = Player::withPlayerID($this->mysqliDb, $playerID);
+        // A missing or stale pid (crawler, hand-typed URL, bad redirect) would
+        // otherwise surface as an uncaught exception; renderNegotiation() already
+        // turns the same case into an error message.
+        try {
+            $player = Player::withPlayerID($this->mysqliDb, $playerID);
+        } catch (PlayerNotFoundException) {
+            return $this->renderErrorWithGoBack('Player not found.');
+        }
 
         // Returns null for a logged-in user with no `ibl_team_info` row (a registered
         // non-GM); validatePlayerOwnership() declares `string $userTeamName`, so null is

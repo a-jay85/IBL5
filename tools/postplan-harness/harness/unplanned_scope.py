@@ -121,22 +121,76 @@ def _only_machine_commits(subjects: Sequence[str]) -> bool:
     return bool(subjects) and all(is_machine_commit(subject) for subject in subjects)
 
 
+_MAX_INHERIT_DEPTH = 3
+
+
 def commit_subjects_for(worktree: str, base_sha: str,
                         paths: Iterable[str]) -> dict[str, list[str]]:
-    """Commit subjects on `base_sha..HEAD` per path. A failed lookup maps that path to []."""
-    return {path: _subjects_for(worktree, base_sha, path) for path in paths}
+    """Commit subjects on `base_sha..HEAD` per path. A failed lookup maps that path to [].
+
+    A path added by a commit that also deleted another path gets the deleted path's earlier
+    subjects too. A rename with a full rewrite reads as add plus delete, and `--follow` does
+    not cross it (backlog#1789).
+    """
+    return {path: _subjects_with_inherited(worktree, base_sha, path) for path in paths}
+
+
+def _subjects_with_inherited(worktree: str, base_sha: str, path: str) -> list[str]:
+    own = _subjects_for(worktree, base_sha, path)
+    inherited = _inherited_subjects(worktree, base_sha, path, "HEAD", _MAX_INHERIT_DEPTH, {path})
+    if inherited is None:
+        return []  # unresolved fold reads as keep
+    return own + [s for s in inherited if s not in own]
+
+
+def _inherited_subjects(worktree: str, base_sha: str, path: str, head: str, depth: int,
+                        seen: set[str]) -> Optional[list[str]]:
+    """Subjects of each path deleted by a `base_sha..head` commit that adds `path`, recursively.
+
+    None when a git call fails or the chain needs more than `depth` hops.
+    """
+    adders = _git_out(worktree, "log", "--no-merges", "--no-renames", "--diff-filter=A",
+                      "--format=%H", f"{base_sha}..{head}", "--", path)
+    if adders is None:
+        return None
+    found: list[str] = []
+    for sha in adders.split():
+        deleted = _git_out(worktree, "diff-tree", "-r", "-z", "--no-commit-id", "--no-renames",
+                           "--name-only", "--diff-filter=D", sha)
+        if deleted is None:
+            return None
+        for old in [p for p in deleted.split("\0") if p]:
+            if old in seen:
+                continue
+            if depth <= 0:
+                return None
+            seen.add(old)
+            parent = f"{sha}^"
+            subjects = _git_out(worktree, "log", "--follow", "--no-merges", "--format=%s",
+                                f"{base_sha}..{parent}", "--", old)
+            deeper = _inherited_subjects(worktree, base_sha, old, parent, depth - 1, seen)
+            if subjects is None or deeper is None:
+                return None
+            found += subjects.splitlines() + deeper
+    return found
 
 
 def _subjects_for(worktree: str, base_sha: str, path: str) -> list[str]:
-    cmd = ["git", "-C", worktree, "log", "--follow", "--no-merges", "--format=%s",
-           f"{base_sha}..HEAD", "--", path]
+    out = _git_out(worktree, "log", "--follow", "--no-merges", "--format=%s",
+                   f"{base_sha}..HEAD", "--", path)
+    return out.splitlines() if out is not None else []
+
+
+def _git_out(worktree: str, *args: str) -> Optional[str]:
+    """Stdout of `git -C worktree <args>`, or None on any failure."""
+    cmd = ["git", "-C", worktree, *args]
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
     except (OSError, ValueError, subprocess.SubprocessError):
-        return []
+        return None
     if proc.returncode != 0:
-        return []
-    return proc.stdout.splitlines()
+        return None
+    return proc.stdout
 
 
 def context_for(worktree: str, base_sha: str, plan_text: str, changed_paths: Iterable[str],

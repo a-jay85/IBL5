@@ -161,6 +161,126 @@ def test_subjects_for_follows_a_rename_on_the_branch(tmp_path):
         "fix: machine rename", "user grew this", "user wrote this"]
 
 
+MACHINE = fidelity.REMEDIATION_COMMIT_MSG
+NEEDS_GIT = pytest.mark.skipif(shutil.which("git") is None, reason="needs git")
+
+
+def _lines(tag, n=30):
+    return "".join(f"{tag} line {i}\n" for i in range(n))
+
+
+def _commit_file(repo, rel, text, subject):
+    target = repo / rel
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(text, encoding="utf-8")
+    _git(repo, "add", rel)
+    _git(repo, "commit", "-q", "-m", subject)
+
+
+def _rename_rewrite(repo, old, new, subject, also=None):
+    """One commit that moves `old` to `new` and replaces every line, so git sees add plus delete."""
+    (repo / new).parent.mkdir(parents=True, exist_ok=True)
+    _git(repo, "mv", old, new)
+    (repo / new).write_text(_lines(f"rewrite {new}"), encoding="utf-8")
+    _git(repo, "add", new)
+    if also:
+        (repo / also).write_text(_lines(f"edit {also}"), encoding="utf-8")
+        _git(repo, "add", also)
+    _git(repo, "commit", "-q", "-m", subject)
+
+
+def _tagged(path):
+    return f"- [BLOCKING] [unplanned-scope] Remove or plan {path}."
+
+
+def _two_hop_chain(repo):
+    base = _repo_with_subjects(repo, "src/a.css", [])
+    _commit_file(repo, "src/a.css", _lines("user"), FEAT)
+    _rename_rewrite(repo, "src/a.css", "src/b.css", MACHINE)
+    _rename_rewrite(repo, "src/b.css", "src/c.css", MACHINE)
+    return base
+
+
+@NEEDS_GIT
+def test_commit_subjects_for_folds_history_across_rename_and_rewrite(tmp_path):
+    repo = tmp_path / "repo"
+    base = _repo_with_subjects(repo, "src/old.css", [])
+    _commit_file(repo, "src/old.css", _lines("user"), FEAT)
+    _rename_rewrite(repo, "src/old.css", "src/new.css", MACHINE)
+
+    # git alone loses the user commit: this is the backlog#1789 premise.
+    assert us._subjects_for(str(repo), base, "src/new.css") == [MACHINE]
+    subjects = us.commit_subjects_for(str(repo), base, ["src/new.css"])
+    assert subjects == {"src/new.css": [MACHINE, FEAT]}
+    assert _classify(_tagged("src/new.css"), changed=("src/new.css",), subjects=subjects) == "keep"
+
+
+@NEEDS_GIT
+def test_rename_rewrite_of_machine_file_stays_remove_when_commit_also_edits_user_file(tmp_path):
+    repo = tmp_path / "repo"
+    base = _repo_with_subjects(repo, "src/user.txt", [FEAT])
+    _commit_file(repo, "src/a.css", _lines("machine"), MACHINE)
+    _rename_rewrite(repo, "src/a.css", "src/b.css", MACHINE, also="src/user.txt")
+
+    subjects = us.commit_subjects_for(str(repo), base, ["src/b.css"])
+    assert subjects == {"src/b.css": [MACHINE]}
+    assert _classify(_tagged("src/b.css"), changed=("src/b.css",), subjects=subjects) == "remove"
+
+
+@NEEDS_GIT
+def test_commit_subjects_for_folds_a_two_hop_chain(tmp_path):
+    repo = tmp_path / "repo"
+    base = _two_hop_chain(repo)
+    assert us.commit_subjects_for(str(repo), base, ["src/c.css"]) == {"src/c.css": [MACHINE, FEAT]}
+
+
+@NEEDS_GIT
+def test_chain_past_max_depth_maps_to_empty(tmp_path, monkeypatch):
+    repo = tmp_path / "repo"
+    base = _two_hop_chain(repo)
+    monkeypatch.setattr(us, "_MAX_INHERIT_DEPTH", 1)
+    subjects = us.commit_subjects_for(str(repo), base, ["src/c.css"])
+    assert subjects == {"src/c.css": []}
+    assert _classify(_tagged("src/c.css"), changed=("src/c.css",), subjects=subjects) == "keep"
+
+
+@NEEDS_GIT
+def test_failed_fold_lookup_maps_to_empty(tmp_path, monkeypatch):
+    repo = tmp_path / "repo"
+    base = _repo_with_subjects(repo, "src/old.css", [])
+    _commit_file(repo, "src/old.css", _lines("user"), MACHINE)
+    _rename_rewrite(repo, "src/old.css", "src/new.css", MACHINE)
+    real = us._git_out
+    monkeypatch.setattr(us, "_git_out",
+                        lambda wt, *args: None if args[0] == "diff-tree" else real(wt, *args))
+    subjects = us.commit_subjects_for(str(repo), base, ["src/new.css"])
+    assert subjects == {"src/new.css": []}
+    assert _classify(_tagged("src/new.css"), changed=("src/new.css",), subjects=subjects) == "keep"
+
+
+@NEEDS_GIT
+def test_fold_reads_a_deleted_path_with_spaces(tmp_path):
+    repo = tmp_path / "repo"
+    base = _repo_with_subjects(repo, "src/old name.css", [])
+    _commit_file(repo, "src/old name.css", _lines("user"), FEAT)
+    _rename_rewrite(repo, "src/old name.css", "src/new.css", MACHINE)
+    assert us.commit_subjects_for(str(repo), base, ["src/new.css"]) == {"src/new.css": [MACHINE, FEAT]}
+
+
+@NEEDS_GIT
+def test_pure_rename_subjects_are_not_duplicated(tmp_path):
+    repo = tmp_path / "repo"
+    base = _repo_with_subjects(repo, "src/old.txt", ["user wrote this"])
+    (repo / "src" / "old.txt").write_text(_lines("user"), encoding="utf-8")
+    _git(repo, "add", "src/old.txt")
+    _git(repo, "commit", "-q", "-m", "user grew this")
+    _git(repo, "mv", "src/old.txt", "src/new.txt")
+    _git(repo, "commit", "-q", "-m", "fix: machine rename")
+    want = ["fix: machine rename", "user grew this", "user wrote this"]
+    assert us._subjects_for(str(repo), base, "src/new.txt") == want
+    assert us.commit_subjects_for(str(repo), base, ["src/new.txt"]) == {"src/new.txt": want}
+
+
 @pytest.mark.skipif(shutil.which("git") is None, reason="needs git")
 def test_non_utf8_commit_subject_maps_to_empty_and_keeps(tmp_path):
     repo = tmp_path / "repo"

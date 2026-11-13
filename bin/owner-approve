@@ -25,6 +25,11 @@
 # condition recorded, run --finish after the fix is pushed.
 set -uo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    awk 'NR==1{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"
+    exit 0
+fi
+
 if [ -n "${CLAUDE_HEADLESS:-}" ]; then
     printf 'owner-approve: CLAUDE_HEADLESS is set. An owner approval needs an interactive session. Nothing posted.\n' >&2
     printf 'RESULT: headless\n'
@@ -120,7 +125,7 @@ _oa_find_wt() { # prints the worktree checked out on $branch, or nothing
 _oa_mine() { # 0 when $1 is this script, a subshell or child of it, or an ancestor of it
     local p="$1" up n=0 anc
     [ -n "$p" ] || return 1
-    anc="$$ $BASHPID"
+    anc="$$ ${BASHPID:-}"
     up=$$
     while [ "$n" -lt 20 ]; do
         up=$(ps -o ppid= -p "$up" 2>/dev/null | tr -d ' ')

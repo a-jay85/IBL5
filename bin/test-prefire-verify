@@ -24,7 +24,7 @@ export PATH="$TMP/shims:$PATH"
 export IBL5_USAGE_GATE_STATE_DIR="$TMP/gate"
 mkdir -p "$IBL5_USAGE_GATE_STATE_DIR"
 export POSTPLAN_LOG_DIR="$TMP/runlog" PLAN_NOW_LOG_DIR="$TMP/runlog"
-unset CLAUDE_HEADLESS
+unset CLAUDE_HEADLESS SHELLCHECK_OPTS
 
 WHY=""      # failure reasons for the current case
 OUT=""      # combined stdout+stderr of the last run
@@ -1530,6 +1530,85 @@ test_phpunit_subset_leaves_worktree_clean() {
 }
 
 # ---------------------------------------------------------------------------
+# SHELLCHECK_OPTS for actionlint / shellcheck rows (backlog#1803)
+# ---------------------------------------------------------------------------
+# A fake linter that models shellcheck's severity filter. It records the
+# SHELLCHECK_OPTS it saw in $D/opts. `info` fails unless the severity is
+# warning or error; `warning` fails unless the severity is error.
+make_sc_stub() { # <path>
+    mkdir -p "$(dirname "$1")"
+    cat > "$1" <<'STUB'
+#!/usr/bin/env bash
+printf '%s' "${SHELLCHECK_OPTS-}" > "$(dirname "$(dirname "$0")")/opts"
+case " ${SHELLCHECK_OPTS-} " in
+    *" --severity=error "*) lvl=error ;;
+    *" --severity=warning "*) lvl=warning ;;
+    *) lvl=style ;;
+esac
+case "$1:$lvl" in
+    info:style) echo "SC2086 (info): fake finding"; exit 1 ;;
+    warning:style|warning:warning) echo "SC2046 (warning): fake finding"; exit 1 ;;
+esac
+exit 0
+STUB
+    chmod +x "$1"
+}
+
+# A fake command that fails whenever SHELLCHECK_OPTS is set at all.
+make_opts_refusing_stub() { # <path>
+    mkdir -p "$(dirname "$1")"
+    printf '#!/usr/bin/env bash\n[ -z "${SHELLCHECK_OPTS+x}" ]\n' > "$1"
+    chmod +x "$1"
+}
+
+test_sc_row_info_finding_passes_under_shared_opts() {
+    new_case
+    make_sc_stub "$D/bin/actionlint"
+    make_sc_stub "$D/sbin/shellcheck"
+    write_plan "$(row 1 "$D/bin/actionlint info")" "$(row 2 "$D/sbin/shellcheck info")"
+    run_gate --plan "$PLAN" --stage matrix
+    want_rc 0
+    want_out "matrix passed"
+    # shellcheck source=bin/lib/shell-lint-opts.sh
+    . "$REPO/bin/lib/shell-lint-opts.sh"
+    [ "$(cat "$D/opts")" = "$IBL5_SC_OPTS" ] \
+        || note "row saw SHELLCHECK_OPTS='$(cat "$D/opts" 2>/dev/null)'"
+}
+
+test_sc_row_warning_finding_still_fails() {
+    new_case
+    make_sc_stub "$D/bin/actionlint"
+    write_plan "$(row 1 "$D/bin/actionlint warning")"
+    run_gate --plan "$PLAN" --stage matrix
+    want_rc 1
+    want_out "FAIL matrix row 1 exited 1"
+}
+
+test_non_sc_row_gets_no_opts() {
+    new_case
+    make_opts_refusing_stub "$D/bin/myactionlint"
+    make_opts_refusing_stub "$D/bin/actionlint.sh"
+    make_opts_refusing_stub "$D/bin/shellcheck-wrap"
+    write_plan "$(row 1 "$D/bin/myactionlint")" "$(row 2 "$D/bin/actionlint.sh")" \
+        "$(row 3 "$D/bin/shellcheck-wrap")"
+    run_gate --plan "$PLAN" --stage matrix
+    want_rc 0
+    want_out "matrix passed"
+}
+
+test_sc_opts_single_source() {
+    # shellcheck source=bin/lib/shell-lint-opts.sh
+    . "$REPO/bin/lib/shell-lint-opts.sh"
+    local hits
+    hits=$(cd "$REPO" && grep -lF -- "$IBL5_SC_EXCLUDE" \
+        bin/lint-workflows bin/lib/prefire-verify bin/lib/shell-lint-opts.sh)
+    [ "$hits" = "bin/lib/shell-lint-opts.sh" ] || note "flag literal found in: $hits"
+    # shellcheck disable=SC2016
+    grep -qF '$IBL5_SC_OPTS' "$REPO/bin/lint-workflows" \
+        || note "bin/lint-workflows does not read IBL5_SC_OPTS"
+}
+
+# ---------------------------------------------------------------------------
 ALL_CASES="
 test_matrix_row_failure_refuses_and_names_row
 test_unrun_row_refuses_without_gate_record
@@ -1635,6 +1714,10 @@ test_phpunit_deleted_test_only_skips
 test_phpunit_bad_base_with_unmapped_file_runs_full
 test_phpunit_force_full_env_with_unmapped_file_runs_full
 test_phpunit_subset_key_changes_with_selected_set
+test_sc_row_info_finding_passes_under_shared_opts
+test_sc_row_warning_finding_still_fails
+test_non_sc_row_gets_no_opts
+test_sc_opts_single_source
 "
 
 if [ $# -gt 0 ]; then CASES="$*"; else CASES="$ALL_CASES"; fi

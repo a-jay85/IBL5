@@ -19,6 +19,7 @@ use TradeSuggestions\Engine\SideGain;
 use TradeSuggestions\Engine\TeamStateRebuilder;
 use Tests\TradeSuggestions\Fixtures\ProjectionFactory;
 use TradeSuggestions\Profile\ProfileDimension;
+use TradeSuggestions\Projection\ProjectionPlayer;
 use TradeSuggestions\SlotMapper;
 use TradeSuggestions\TeamMode;
 use TradeSuggestions\TradeCandidate;
@@ -310,6 +311,61 @@ final class DealScorerTest extends TestCase
 
         $user = self::mixOutcomes($s, $c, 1, $offset, [207 => $factor], [207], [], true);
         self::assertMixedComponents($user['base'], $user['mixed'], $deal->user->components()[$offset]);
+    }
+
+    public function testReceivedWalkerWhoseNextSeasonIsUnpaidStillMixesInLaterSeasons(): void
+    {
+        $in = SnapshotFactory::inputs(4, 13);
+        $byTid = $in->playersByTid;
+        foreach ($byTid[2] as $i => $p) {
+            if ($p->pid === 207) {
+                $byTid[2][$i] = self::withSalaries($p, [1 => 500, 2 => 0, 3 => 500, 4 => 0, 5 => 0, 6 => 0]);
+            }
+        }
+        $s = LeagueSnapshotBuilder::build(new LeagueSnapshotInputs(...[...get_object_vars($in), 'playersByTid' => $byTid]));
+        $odds = ResignOdds::forTeam($s->players[207], 1, $s->lineups[0], $s->slotRanks[0], $s->teamFactors);
+        self::assertTrue($odds['walks']);
+        self::assertFalse($s->players[207]->onRosterAt(1));
+        self::assertTrue($s->players[207]->onRosterAt(2));
+        $c = new TradeCandidate(1, 2, [], [], [207], []);
+        $offset = 2;
+        $factor = ResignLikelihood::futureValueFactor($offset, true, true, $odds['likelihood']);
+
+        $deal = DealScorer::score($s, $c, 'one_for_one');
+
+        $user = self::mixOutcomes($s, $c, 1, $offset, [207 => $factor], [207], [], true);
+        self::assertMixedComponents($user['base'], $user['mixed'], $deal->user->components()[$offset]);
+    }
+
+    /**
+     * @param array<int, int> $salaryByYear
+     */
+    private static function withSalaries(ProjectionPlayer $p, array $salaryByYear): ProjectionPlayer
+    {
+        return new ProjectionPlayer(
+            pid: $p->pid,
+            name: $p->name,
+            pos: $p->pos,
+            tid: $p->tid,
+            age: $p->age,
+            injuredDays: $p->injuredDays,
+            exp: $p->exp,
+            talent: $p->talent,
+            bird: $p->bird,
+            draftRound: $p->draftRound,
+            draftYear: $p->draftYear,
+            draftPickNo: $p->draftPickNo,
+            prefs: $p->prefs,
+            ratings: $p->ratings,
+            depth: $p->depth,
+            dcDepth: $p->dcDepth,
+            dcMinutes: $p->dcMinutes,
+            effectiveCy: $p->effectiveCy,
+            salaryByYear: $salaryByYear,
+            production: $p->production,
+            tradeable: $p->tradeable,
+            productionFouls: $p->productionFouls,
+        );
     }
 
     public function testSentWalkerMissingFromTheSnapshotWalkMapIsNotMixed(): void

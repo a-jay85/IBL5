@@ -131,6 +131,18 @@ final class LegalityPreFilterTest extends TestCase
         self::assertNull(LegalityPreFilter::reason($s, $c));
     }
 
+    public function testRosterIsReadFromTheOffsetZeroLineupOnly(): void
+    {
+        $s = self::league(array_fill(0, 10, 100), array_fill(0, 10, 100));
+        $lineups = $s->lineups;
+        unset($lineups[1][1]);
+        $s = new LeagueSnapshot(...[...get_object_vars($s), 'lineups' => $lineups]);
+        self::assertArrayHasKey(1, $s->lineups[0]);
+        $c = new TradeCandidate(1, 2, [101], [], [201], []);
+
+        self::assertNull(LegalityPreFilter::reason($s, $c));
+    }
+
     /**
      * Two teams with the given current-season salaries, one player each.
      *

@@ -79,6 +79,20 @@ final class ChangeOfSceneryTest extends TestCase
         self::assertSame(self::one(106), self::candidates($twentyNineBeforeNull, self::BENCH));
     }
 
+    public function testBenchOfASlotRankedZeroIsStillConsidered(): void
+    {
+        $s = self::snapshot(['PG' => [25], 'SF' => [0]]);
+
+        self::assertSame(self::one(108), self::candidates($s, [108]));
+    }
+
+    public function testBenchOfASlotRankedBelowZeroIsNotConsidered(): void
+    {
+        $s = self::snapshot(['PG' => [25], 'SF' => [-1]]);
+
+        self::assertSame([], self::candidates($s, [108]));
+    }
+
     public function testOnlyBenchPlayersInThePoolAreCandidates(): void
     {
         $s = self::snapshot(['PG' => [22], 'SG' => [25], 'SF' => [23], 'PF' => [21], 'C' => [24]]);

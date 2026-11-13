@@ -197,6 +197,21 @@ final class LeagueSnapshotBuilderTest extends TestCase
         self::assertGreaterThan(0.0, $s->resignLikelihood[901]);
     }
 
+    public function testPlayerWithNoOffsetZeroSalaryDoesNotStopOddsForLaterPlayers(): void
+    {
+        $base = SnapshotFactory::inputs();
+        $roster = $base->playersByTid[1];
+        $first = self::copy($roster[0], salaryByYear: [1 => 0, 2 => 500, 3 => 500, 4 => 0, 5 => 0, 6 => 0]);
+        $roster[0] = $first;
+        $s = LeagueSnapshotBuilder::build(SnapshotFactory::inputs(overrideRosters: [1 => $roster]));
+
+        self::assertArrayNotHasKey($first->pid, $s->resignLikelihood);
+        self::assertArrayNotHasKey($first->pid, $s->likelyToWalk);
+        self::assertArrayHasKey(102, $s->resignLikelihood);
+        self::assertArrayHasKey(102, $s->likelyToWalk);
+        self::assertArrayHasKey(201, $s->resignLikelihood);
+    }
+
     public function testNonPoolPlayerIsNeverAWalker(): void
     {
         $s = self::league();

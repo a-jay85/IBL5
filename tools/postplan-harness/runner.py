@@ -2867,10 +2867,16 @@ def _run_removed_guard_fix(gh, llm, git, worktree, plan, pr, body, log) -> None:
         return
     if not removed_guard_fix.enabled(os.environ):
         return
+    def _fillable(text: str) -> bool:
+        return any(h.startswith(removed_guard_fix.FILLABLE_PREFIXES)
+                   for h in removed_guards.classify_body(text, []))
     try:
+        # Cheap pre-check on the body `_evaluate_arm` will read; no fresh fetch, no LLM call.
+        if not _fillable(gh.pr_body() or body):
+            return
+        # Write only on top of the body GitHub holds now, so a raw `gh pr edit` is not clobbered.
         live = gh.pr_body_fresh() or body
-        if not any(h.startswith(removed_guard_fix.FILLABLE_PREFIXES)
-                   for h in removed_guards.classify_body(live, [])):
+        if not _fillable(live):
             return
         diff = git.diff_vs_base()
         ok, rows = removed_guards.run_detector(

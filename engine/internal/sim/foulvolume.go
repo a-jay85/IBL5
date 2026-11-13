@@ -33,3 +33,12 @@ func forcedFoulFires(period, clock, offenseLead int) bool {
 		offenseLead >= forcedFoulMinLead &&
 		offenseLead <= forcedFoulMaxLead
 }
+
+// andOneMadeTwoCut is _DAT_0066c7d8: after a made 2pt on the local_130 == 1
+// shot path (FUN_004d8570 93919-93926), a uniform draw strictly below it sets
+// local_130 = 3 and local_150 = 1, an and-one foul on top of the made basket.
+// JSB rolls it on every made 2, apart from the FUN_004e1ba0 and-one bucket.
+const andOneMadeTwoCut = 0.05
+
+// andOneMadeTwoFires reports whether the made-2pt and-one roll fires.
+func andOneMadeTwoFires(draw float64) bool { return draw < andOneMadeTwoCut }

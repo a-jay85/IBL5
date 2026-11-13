@@ -177,7 +177,11 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 			// putback after an offensive rebound within the break (the possession
 			// ORIGIN is the fast break, so the half-court oreb_continuation bucket
 			// stays half-court-only for the ADR-0042 empty-FGA split).
-			if made, _ := gs.shotAttempt(offense, defense, bh, sv2, result.ShotTwoPoint, result.OriginTransition, periodIdx); !made {
+			made, _ := gs.shotAttempt(offense, defense, bh, sv2, result.ShotTwoPoint, result.OriginTransition, periodIdx)
+			if made && andOneMadeTwoFires(gs.rng.Float64()) { // JSB made-2pt roll: and-one
+				gs.resolveFoul(offense, defense, bh, def, 1, true, false, periodIdx)
+			}
+			if !made {
 				gs.creditBlock(offense, defense, bh, def)
 				if cont, next := gs.rebound(offense, defense, periodIdx); cont {
 					bh = next
@@ -189,13 +193,16 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 		case outcome3pt:
 			// Faithful fast-break 3pt resolution — mirrors possession.go:311-332.
 			sv3 := shotValue3pt(net, bh.D80, gs.shotBaselineOrFallback(), gs.leagueBlk48, defBlkSum)
-			made, _ := gs.shotAttempt(offense, defense, bh, sv3, result.ShotThree, result.OriginTransition, periodIdx)
+			res := gs.threePtShot(offense, defense, bh, def, sv3, result.OriginTransition, periodIdx)
+			if res == threePtFouled {
+				return possNormal // JSB 94102-94150: fouled missed 3, FTs already shot
+			}
+			made := res == threePtMade
 			if gs.threePtDiag != nil {
 				b3 := gs.shotBaselineOrFallback() * 1.5
 				gs.threePtDiag.Add(float64(bh.D80), net*netToShotValue/b3, blockMod(b3, gs.leagueBlk48, defBlkSum), made, fatigueFactor(bh.Stamina), sv3)
 			}
 			if !made {
-				gs.creditBlock(offense, defense, bh, def)
 				if cont, next := gs.rebound(offense, defense, periodIdx); cont {
 					bh = next
 					continue

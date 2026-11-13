@@ -1,7 +1,8 @@
 """The PR body's `**Merge danger:**` field: mechanical derivation, verdict merge, parse, render.
 
 Pure functions only. No subprocess, network, or git calls live here, apart from the one IO shim
-`derive_from_worktree`, which reads candidate files from a checked-out tree. The field format is
+`derive_from_worktree`, which reads candidate files from a checked-out tree and hands
+`derive_merge_danger` a replay callable from `harness/arming_replay.py`. The field format is
 the contract between `/post-plan` Phase 2 (writer), the harness body check (validator), Phase 6.5
 condition (18) (reader), and `bin/digest-dm-build` (reader). The Phase 6.5 shell twin is
 `pr_merge_danger_hold` in `bin/lib/pr-armable.sh`; keep its regex in step with `FIELD_RE`.
@@ -32,6 +33,13 @@ from harness.gate_backtest import GateChange, changes_from_unified_diff, detect_
 # Private name imported on purpose: the arming paths are the bootstrap-hazard set, and a public
 # alias would mean another edit to a file several open PRs touch.
 from harness.gate_backtest import _ARMING_PATHS, _SEAT_FEED_PATH, _SEAT_FEED_RE
+from harness import arming_replay
+
+# Files the replay itself runs from. Editing one changes how every later arming edit is judged,
+# so each is an arming-path trigger that the replay never clears.
+_REPLAY_DIR = "tools/postplan-harness/harness/"
+_REPLAY_GUARD_PATHS = tuple(_REPLAY_DIR + n for n in (
+    "arming_replay.py", "arming_replay_driver.py", "arming_replay_corpus.json", "merge_danger.py"))
 
 DOORS = ("two-way", "one-way")                                  # index = rank; higher is more dangerous
 BLAST = ("localized", "module", "site-wide", "external")        # index = rank
@@ -62,6 +70,7 @@ class MergeDanger:
     why: str
     triggers: tuple[str, ...] = ()
     self_governing: bool = False
+    replay_note: str = ""
 
 
 class MalformedMergeDanger(ValueError):
@@ -156,6 +165,7 @@ def derive_merge_danger(
     diff_text: str,
     gate_changes: list[GateChange],
     read_candidate: Callable[[str], str | None],
+    replay: Callable[[tuple[str, ...]], "arming_replay.ReplayVerdict"] | None = None,
 ) -> MergeDanger:
     """The mechanical floor. A destructive, external or notify trigger makes the door one-way;
     an arming-path or gate-removed trigger sets self_governing and leaves the door alone.
@@ -208,6 +218,9 @@ def derive_merge_danger(
             add(f"arming-path:{p}")
         elif p == _SEAT_FEED_PATH and _touches_seat_feed(_section_for(diff_text or "", p)):
             add(f"arming-path:{p}")
+    for p in paths:
+        if p in _REPLAY_GUARD_PATHS:
+            add(f"arming-path:{p}")
     for g in gate_changes:
         if g.kind == "arming-harness":
             add(f"arming-path:{g.path}")
@@ -217,14 +230,33 @@ def derive_merge_danger(
         if g.state == "removed":
             add(f"gate-removed:{g.path}")
 
+    # 5. Arming replay. An arming-path trigger is dropped only when the replay shows that the
+    # diff loosens no corpus decision. Every other outcome keeps it. gate-removed is never dropped.
+    replay_note = ""
+    arming = tuple(t.split(":", 1)[1] for t in triggers if t.startswith("arming-path:"))
+    if arming and replay is not None:
+        outside = [p for p in arming if p in _REPLAY_GUARD_PATHS
+                   or not (p.startswith(_REPLAY_DIR) and p.endswith(".py"))]
+        if outside:
+            replay_note = f"replay not run ({outside[0].rsplit('/', 1)[-1]} outside its reach)"
+        else:
+            try:
+                verdict = replay(arming)
+                cleared, replay_note = verdict.cleared is True, str(verdict.note)
+            except Exception:
+                cleared, replay_note = False, "replay kept arming-path (error)"
+            if cleared:
+                triggers = [t for t in triggers if not t.startswith("arming-path:")]
+
     door_triggers = [t for t in triggers if t.split(":", 1)[0] not in SELF_GOVERNING_KINDS]
     door = "one-way" if door_triggers else "two-way"
     self_governing = len(door_triggers) < len(triggers)
     blast = _blast_radius(paths, gate_changes, external)
-    why = ("mechanical: " + "; ".join(triggers)) if triggers else \
+    parts = ([replay_note] if replay_note else []) + list(triggers)
+    why = ("mechanical: " + "; ".join(parts)) if parts else \
         "mechanical: no one-way trigger in the realized diff"
     return MergeDanger(door, blast, why[:WHY_MAX].rstrip(), tuple(triggers),
-                       self_governing=self_governing)
+                       self_governing=self_governing, replay_note=replay_note)
 
 
 def _rank(value: str | None, scale: tuple[str, ...]) -> int:
@@ -338,7 +370,7 @@ def merge_verdicts(
     blast = BLAST[max(_rank(mechanical.blast, BLAST), _rank(llm_blast, BLAST))]
     if len(core) < WHY_MIN:
         why = mechanical.why
-    elif mechanical.door == "one-way" or mechanical.self_governing:
+    elif mechanical.door == "one-way" or mechanical.self_governing or mechanical.replay_note:
         # Cut first, then re-check: a long prefix can leave under WHY_MIN core chars, and a
         # later re-application would see that short core and fall back, breaking the fixed point.
         why = f"{mechanical.why}. {core}"[:WHY_MAX].rstrip()
@@ -347,7 +379,8 @@ def merge_verdicts(
     else:
         why = core
     return MergeDanger(door, blast, why[:WHY_MAX], mechanical.triggers,
-                       self_governing=mechanical.self_governing or (llm_self_governing and not llm_raise_bar))
+                       self_governing=mechanical.self_governing or (llm_self_governing and not llm_raise_bar),
+                       replay_note=mechanical.replay_note)
 
 
 def render_merge_danger(md: MergeDanger) -> str:
@@ -460,4 +493,12 @@ def derive_from_worktree(worktree: str | Path, diff_text: str) -> MergeDanger:
     check_sources = {f"bin/{p.name}": p.read_text(encoding="utf-8", errors="replace")
                      for p in sorted(bin_dir.glob("check-*")) if p.is_file()} if bin_dir.is_dir() else {}
     gates = detect_gate_changes(changed, read_candidate, check_sources)
-    return derive_merge_danger(changed, diff_text, gates, read_candidate)
+
+    def _replay(arming_paths: tuple[str, ...]):
+        sections: dict[str, str | None] = {p: None for p in arming_paths}
+        for path, section in _diff_sections(diff_text) or ():
+            if path.startswith(_REPLAY_DIR) and path.endswith(".py"):
+                sections[path] = section
+        return arming_replay.replay_worktree(root, diff_text, sections, frozenset(arming_paths))
+
+    return derive_merge_danger(changed, diff_text, gates, read_candidate, replay=_replay)

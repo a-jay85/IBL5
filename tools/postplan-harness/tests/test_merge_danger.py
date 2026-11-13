@@ -581,6 +581,13 @@ def test_derive_arming_path_only_two_way_self_governing():
     assert "arming-path:bin/lib/pr-armable.sh" in d.triggers
 
 
+def test_arming_python_path_is_self_governing_without_replay():
+    d = _derive([("M", "tools/postplan-harness/harness/armable.py")])
+    assert d.self_governing is True
+    assert "arming-path:tools/postplan-harness/harness/armable.py" in d.triggers
+    assert d.why == "mechanical: arming-path:tools/postplan-harness/harness/armable.py"
+
+
 def test_derive_gate_removed_only_two_way_self_governing():
     d = _derive([("D", "bin/check-foo")], gates=_GATE_RM)
     assert d.door == "two-way"
@@ -736,3 +743,103 @@ def test_bar_keeps_registered_table_with_overwrite():
     why = "Deletes ibl_hist rows and overwrites every player's contract"
     assert _bar(why) == "one-way"
     assert md._bar_exempt("Deletes ibl_hist rows") is True
+
+
+# --- arming replay wiring ----------------------------------------------------------------------
+
+from harness.arming_replay import ReplayVerdict  # noqa: E402
+
+_PY_ARM = "tools/postplan-harness/harness/armable.py"
+_CLEAR_NOTE = ("replay cleared arming-path (48 inputs: 0 loosened (0 held->armed), "
+               "0 tightened (0 armed->held))")
+_KEEP_NOTE = ("replay kept arming-path (48 inputs: 1 loosened (1 held->armed), "
+              "0 tightened (0 armed->held))")
+
+
+def _clear(_paths):
+    return ReplayVerdict(True, _CLEAR_NOTE, "clean")
+
+
+def _loosened(_paths):
+    return ReplayVerdict(False, _KEEP_NOTE, _KEEP_NOTE[len("replay kept arming-path ("):-1])
+
+
+def _raising(_paths):
+    raise RuntimeError("fixture replay crash")
+
+
+def _never(_paths):
+    raise AssertionError("replay must not be called for this path")
+
+
+def _derive_r(changed, replay, diff="", gates=()):
+    return md.derive_merge_danger(changed, diff, list(gates), _none, replay=replay)
+
+
+def test_replay_cleared_drops_arming_path():
+    d = _derive_r([("M", _PY_ARM)], _clear)
+    assert d.self_governing is False
+    assert d.door == "two-way"
+    assert not any(t.startswith("arming-path:") for t in d.triggers)
+    assert d.replay_note == _CLEAR_NOTE
+
+
+def test_replay_loosened_keeps_arming_path():
+    d = _derive_r([("M", _PY_ARM)], _loosened)
+    assert d.self_governing is True
+    assert f"arming-path:{_PY_ARM}" in d.triggers
+    assert d.replay_note == _KEEP_NOTE
+
+
+def test_replay_raising_keeps_arming_path():
+    d = _derive_r([("M", _PY_ARM)], _raising)
+    assert d.self_governing is True
+    assert f"arming-path:{_PY_ARM}" in d.triggers
+    assert d.replay_note == "replay kept arming-path (error)"
+
+
+@pytest.mark.parametrize("changed", [
+    [("M", "bin/lib/pr-armable.sh")],
+    [("M", ".claude/agents/pr-second-reviewer.md")],
+    [("M", "bin/lib/ui-change-classifier.sh")],
+    [("M", _PY_ARM), ("M", "bin/lib/pr-armable.sh")],
+])
+def test_replay_not_called_for_path_outside_reach(changed):
+    d = _derive_r(changed, _never)
+    assert d.self_governing is True
+    assert d.replay_note.startswith("replay not run (")
+    assert d.replay_note.endswith(" outside its reach)")
+
+
+@pytest.mark.parametrize("path", md._REPLAY_GUARD_PATHS)
+def test_replay_guard_path_is_self_governing_and_never_cleared(path):
+    assert _derive([("M", path)]).self_governing is True
+    d = _derive_r([("M", path)], _never)
+    assert d.self_governing is True
+    assert f"arming-path:{path}" in d.triggers
+    assert d.replay_note == f"replay not run ({path.rsplit('/', 1)[-1]} outside its reach)"
+    mixed = _derive_r([("M", _PY_ARM), ("M", path)], _never)
+    assert mixed.self_governing is True
+
+
+def test_replay_cleared_leaves_gate_removed_and_one_way():
+    changed = [("M", _PY_ARM), ("D", "bin/check-foo"), ("A", MIG)]
+    d = _derive_r(changed, _clear, diff=_DROP_DIFF, gates=_GATE_RM)
+    assert d.door == "one-way"
+    assert "gate-removed:bin/check-foo" in d.triggers
+    assert f"destructive-migration:{MIG}" in d.triggers
+    assert not any(t.startswith("arming-path:") for t in d.triggers)
+    assert d.self_governing is True
+
+
+def test_replay_note_leads_why_and_survives_merge_verdicts():
+    d = _derive_r([("M", _PY_ARM)], _clear)
+    assert d.why.startswith("mechanical: replay cleared arming-path (")
+    assert len(d.why) <= md.WHY_MAX
+    assert ". " not in d.why
+    merged = md.merge_verdicts(d, "two-way", "localized", _LLM_WHY)
+    assert _CLEAR_NOTE in merged.why
+    assert merged.replay_note == _CLEAR_NOTE
+    again = md.merge_verdicts(d, merged.door, merged.blast, merged.why)
+    assert again.why == merged.why
+    assert md.parse_merge_danger(_body(md.render_merge_danger(merged))) is not None

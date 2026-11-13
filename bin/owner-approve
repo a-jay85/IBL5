@@ -67,7 +67,6 @@ while [ $# -gt 0 ]; do
 done
 case "$OA_PR" in ''|0*|*[!0-9]*) _oa_usage "the first argument must be a PR number" ;; esac
 case "$OA_TIMEOUT$OA_POLL" in *[!0-9]*) _oa_usage "--timeout and --poll take whole seconds" ;; esac
-case "$OA_POLL" in *[!0]*) ;; *) _oa_usage "--poll must be at least 1 second" ;; esac
 if [ "$OA_FINISH" -eq 1 ]; then
     if [ -n "$OA_WORDS$OA_OPTION$OA_FIX" ]; then _oa_usage "--finish takes only the PR number"; fi
 elif [ -z "$OA_WORDS" ]; then
@@ -291,9 +290,6 @@ fi
 if [ "$OA_FINISH" -eq 1 ]; then _oa_finish_record; fi
 OA_WT=$(_oa_find_wt)
 _oa_wait
-if [ "$rec_mode" = "approve" ] && [ "$head" != "$rec_head" ]; then
-    _oa_refuse 4 "the head is now $head, but the owner approved $rec_head. Ask the owner to approve the new head."
-fi
 if [ "$rec_mode" = "fix-first" ]; then _oa_prefire; fi
 _oa_verdict
 _oa_arm

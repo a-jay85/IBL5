@@ -277,11 +277,20 @@ _KEEP_ONE_WAY_RE = re.compile(
 _TABLE_TOKEN_RE = re.compile(r"\b(?:ibl|nuke)_\w+\b|\bcache\b|(?<=`)\w+_\w+(?=`)")
 
 
+# Irreversible words an owner-channel alert may use without losing the exemption.
+_ALERT_WORD_RE = re.compile(
+    r"send(s|ing)?|sent|recall(s|ed|ing)?|cannot be recalled|notif(y|ies|ied|ying|ication)|discord",
+    re.IGNORECASE)
+
+
 def _bar_exempt(core: str) -> bool:
     """True when the Why's only cited loss is rebuildable-table rows or an owner-only alert."""
     names_registered = any(t in rebuildable.REBUILDABLE_TABLES for t in _TABLE_TOKEN_RE.findall(core))
     if not (names_registered or _OWNER_CHANNEL_RE.search(core)):
         return False
+    if not names_registered and any(
+            not _ALERT_WORD_RE.fullmatch(m.group(0)) for m in _IRREVERSIBLE_RE.finditer(core)):
+        return False  # owner-channel mention alone: any other irreversible loss keeps the raise
     if _KEEP_ONE_WAY_RE.search(core):
         return False
     if any(t not in rebuildable.REBUILDABLE_TABLES for t in _TABLE_TOKEN_RE.findall(core)):

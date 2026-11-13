@@ -716,7 +716,13 @@ def test_bar_keeps_discord_dm_why():
 
 def test_owner_channel_hash_dev_near_miss():
     assert md._bar_exempt("posts to #develop and deletes rows") is False
-    assert md._bar_exempt("posts to #dev and deletes rows") is True
+    assert md._bar_exempt("posts to #dev and sends a message") is True
+    assert md._bar_exempt("posts to #dev and deletes rows") is False
+
+
+def test_bar_keeps_owner_channel_mention_with_other_loss():
+    why = "Deletes the production uploads directory in .github/workflows/deploy.yml"
+    assert _bar(why) == "one-way"
 
 
 def test_bar_off_keeps_rebuildable_one_way():

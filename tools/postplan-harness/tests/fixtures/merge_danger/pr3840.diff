@@ -1,0 +1,623 @@
+diff --git a/ibl5/classes/FranchiseHistory/FranchiseHistoryRepository.php b/ibl5/classes/FranchiseHistory/FranchiseHistoryRepository.php
+index 17adeeb553..997dba75a5 100644
+--- a/ibl5/classes/FranchiseHistory/FranchiseHistoryRepository.php
++++ b/ibl5/classes/FranchiseHistory/FranchiseHistoryRepository.php
+@@ -25,61 +25,17 @@
+ class FranchiseHistoryRepository extends \Database\BaseMysqliRepository implements FranchiseHistoryRepositoryInterface
+ {
+     /**
+-     * Rolling five-season window. Inlines the CTE chain of the team win/loss view
+-     * with a sargable game_date range (see getFiveSeasonWindowRows docblock for the
+-     * equivalence argument). Public so the DB-integration perf report can EXPLAIN it.
++     * Rolling five-season window over the regular-season rows of
++     * ibl_team_season_records. Public so the DB-integration perf report can EXPLAIN it.
+      */
+     public const FIVE_SEASON_WINDOW_SQL = <<<'SQL'
+-        WITH canonical_games AS (
+-            SELECT game_date, visitor_teamid, home_teamid, MIN(game_of_that_day) AS game_of_that_day
+-            FROM `ibl_box_scores_teams`
+-            WHERE game_type = 1 AND game_date >= ? AND game_date < ?
+-            GROUP BY game_date, visitor_teamid, home_teamid
+-        ), unique_games AS (
+-            SELECT b.game_date, b.visitor_teamid, b.home_teamid,
+-                   MIN(b.id) AS visitor_row_id, MAX(b.id) AS home_row_id
+-            FROM `ibl_box_scores_teams` b
+-            JOIN canonical_games c
+-              ON c.game_date = b.game_date AND c.visitor_teamid = b.visitor_teamid
+-             AND c.home_teamid = b.home_teamid AND c.game_of_that_day <=> b.game_of_that_day
+-            WHERE b.game_type = 1 AND b.game_date >= ? AND b.game_date < ?
+-            GROUP BY b.game_date, b.visitor_teamid, b.home_teamid
+-        ), scored_games AS (
+-            SELECT u.game_date, u.visitor_teamid, u.home_teamid,
+-                   COALESCE(v.visitor_q1_points + v.visitor_q2_points + v.visitor_q3_points + v.visitor_q4_points + COALESCE(v.visitor_ot_points, 0), v.calc_points) AS visitor_total,
+-                   COALESCE(v.home_q1_points + v.home_q2_points + v.home_q3_points + v.home_q4_points + COALESCE(v.home_ot_points, 0), h.calc_points) AS home_total
+-            FROM unique_games u
+-            JOIN `ibl_box_scores_teams` v ON v.id = u.visitor_row_id
+-            JOIN `ibl_box_scores_teams` h ON h.id = u.home_row_id
+-        ), team_games AS (
+-            SELECT visitor_teamid AS teamid, game_date,
+-                   IF(visitor_total > home_total, 1, 0) AS win, IF(visitor_total < home_total, 1, 0) AS loss
+-            FROM scored_games
+-            UNION ALL
+-            SELECT home_teamid AS teamid, game_date,
+-                   IF(home_total > visitor_total, 1, 0) AS win, IF(home_total < visitor_total, 1, 0) AS loss
+-            FROM scored_games
+-        ), season_rows AS (
+-            SELECT CASE WHEN MONTH(tg.game_date) >= 10 THEN YEAR(tg.game_date) + 1 ELSE YEAR(tg.game_date) END AS year,
+-                   ti.team_name AS currentname,
+-                   COALESCE(fs.team_name, ti.team_name) AS namethatyear,
+-                   CAST(SUM(tg.win) AS UNSIGNED) AS wins,
+-                   CAST(SUM(tg.loss) AS UNSIGNED) AS losses
+-            FROM team_games tg
+-            JOIN `ibl_team_info` ti ON ti.teamid = tg.teamid
+-            LEFT JOIN `ibl_franchise_seasons` fs
+-              ON fs.franchise_id = tg.teamid
+-             AND fs.season_ending_year = CASE WHEN MONTH(tg.game_date) >= 10 THEN YEAR(tg.game_date) + 1 ELSE YEAR(tg.game_date) END
+-            GROUP BY tg.teamid,
+-                     CASE WHEN MONTH(tg.game_date) >= 10 THEN YEAR(tg.game_date) + 1 ELSE YEAR(tg.game_date) END,
+-                     ti.team_name, COALESCE(fs.team_name, ti.team_name)
+-        )
+-        SELECT currentname,
+-               CAST(SUM(wins) AS UNSIGNED) AS five_season_wins,
+-               CAST(SUM(losses) AS UNSIGNED) AS five_season_losses
+-        FROM season_rows
+-        WHERE year BETWEEN ? AND ?
+-        GROUP BY currentname
++        SELECT ti.team_name AS currentname,
++               CAST(SUM(r.wins) AS UNSIGNED) AS five_season_wins,
++               CAST(SUM(r.losses) AS UNSIGNED) AS five_season_losses
++        FROM `ibl_team_season_records` r
++        JOIN `ibl_team_info` ti ON ti.teamid = r.team_id
++        WHERE r.game_type = 1 AND r.year BETWEEN ? AND ?
++        GROUP BY ti.team_name
+         SQL;
+ 
+     /**
+@@ -107,14 +63,10 @@ public function getFranchiseSummaryRows(int $currentEndingYear): array
+     }
+ 
+     /**
+-     * The team win/loss view derives a season-ending `year` of
+-     * MONTH(game_date) >= 10 ? YEAR + 1 : YEAR, and game_type = 1 already excludes
+-     * months 6, 9 and 10. So for ending years A..B, a game_type = 1 row has `year`
+-     * in [A, B] exactly when game_date >= '(A-1)-10-01' AND game_date < 'B-10-01'.
+-     * game_date is a GROUP BY key in both canonical_games and unique_games, so the
+-     * range keeps or drops whole groups and MIN(game_of_that_day) is unchanged. The
+-     * outer `year BETWEEN` filter stays, so the range only removes rows it would
+-     * also remove, while letting the box-score scans use a game_date range.
++     * Sums the per-season rows RefreshTeamSeasonRecordsStep rebuilds each sim, so
++     * W-L counts lag a box-score edit until the next refresh. The team name joins live
++     * from ibl_team_info, which keeps these rows keyed like getFranchiseSummaryRows()
++     * after a rename.
+      *
+      * @see FranchiseHistoryRepositoryInterface::getFiveSeasonWindowRows()
+      *
+@@ -124,20 +76,10 @@ public function getFiveSeasonWindowRows(int $currentEndingYear): array
+     {
+         $fiveSeasonsAgoEndingYear = $currentEndingYear - 4;
+ 
+-        // Sargable window: game_type = 1 rows whose season-ending year is in
+-        // [$fiveSeasonsAgoEndingYear, $currentEndingYear] are exactly the rows with
+-        // game_date in [(start - 1)-10-01, end-10-01).
+-        $rangeStart = sprintf('%04d-10-01', $fiveSeasonsAgoEndingYear - 1);
+-        $rangeEnd = sprintf('%04d-10-01', $currentEndingYear);
+-
+         /** @var list<WindowRow> $windowRows */
+         $windowRows = $this->fetchAll(
+             self::FIVE_SEASON_WINDOW_SQL,
+-            "ssssii",
+-            $rangeStart,
+-            $rangeEnd,
+-            $rangeStart,
+-            $rangeEnd,
++            "ii",
+             $fiveSeasonsAgoEndingYear,
+             $currentEndingYear
+         );
+diff --git a/ibl5/classes/Updater/Steps/RefreshTeamSeasonRecordsStep.php b/ibl5/classes/Updater/Steps/RefreshTeamSeasonRecordsStep.php
+index fa8399bcf1..c6607cb41f 100644
+--- a/ibl5/classes/Updater/Steps/RefreshTeamSeasonRecordsStep.php
++++ b/ibl5/classes/Updater/Steps/RefreshTeamSeasonRecordsStep.php
+@@ -15,7 +15,15 @@
+  * A (game_date, visitor_teamid, home_teamid) triple is one game: the league
+  * has no doubleheaders. A repeat of the triple with a different
+  * game_of_that_day is a phantom, and only the lowest-ordinal copy counts.
+- * Same dedupe as FranchiseHistoryRepository::FIVE_SEASON_WINDOW_SQL.
++ * FranchiseHistoryRepository::FIVE_SEASON_WINDOW_SQL and vw_franchise_summary read
++ * these rows, so this dedupe is the franchise page's dedupe.
++ *
++ * Both readers lag ibl_box_scores_teams until this step reruns. Inside the sim,
++ * updateAllTheThings runs CleanupPreseasonDataStep and ProcessBoxscoresStep (which
++ * reach BoxscoreRepository deletes and inserts) before this step, so a sim never
++ * leaves the table stale. Outside the sim, a migration that deletes or restores
++ * box-score rows must rerun this step afterwards, as migration 184 does.
++ * Name-only box-score updates (AllStarTeamRepository) do not change W-L.
+  *
+  * Runs DELETE + two INSERTs inside a transaction so the table is never
+  * empty on error. Uses DELETE (not TRUNCATE) because TRUNCATE is DDL and
+@@ -156,6 +164,27 @@ public function rebuildWithinCurrentTransaction(): array
+     COALESCE(fs.team_name, ti.team_name)
+ SQL;
+ 
++    /**
++     * Counts regular-season rows where this table and the live ibl_team_win_loss view
++     * disagree, in either direction. Zero right after a rebuild means the materialized
++     * window matches the box-score CTE. Read by the deploy-time rebuild migration.
++     */
++    public const string REGULAR_SEASON_DRIFT_SQL = <<<'SQL'
++        SELECT COUNT(*) AS drift FROM (
++            (SELECT currentname, year, CAST(wins AS UNSIGNED) AS wins, CAST(losses AS UNSIGNED) AS losses
++             FROM `ibl_team_season_records` WHERE game_type = 1
++             EXCEPT
++             SELECT currentname, year, CAST(wins AS UNSIGNED), CAST(losses AS UNSIGNED)
++             FROM `ibl_team_win_loss`)
++            UNION ALL
++            (SELECT currentname, year, CAST(wins AS UNSIGNED), CAST(losses AS UNSIGNED)
++             FROM `ibl_team_win_loss`
++             EXCEPT
++             SELECT currentname, year, CAST(wins AS UNSIGNED), CAST(losses AS UNSIGNED)
++             FROM `ibl_team_season_records` WHERE game_type = 1)
++        ) d
++        SQL;
++
+     /**
+      * HEAT records (game_type=3). Year is YEAR(game_date), franchise lookup
+      * uses year+1 to match the season-ending convention. Filters out the
+diff --git a/ibl5/migrations/209_rebuild_team_season_records_for_window.php b/ibl5/migrations/209_rebuild_team_season_records_for_window.php
+new file mode 100644
+index 0000000000..056d3b0c02
+--- /dev/null
++++ b/ibl5/migrations/209_rebuild_team_season_records_for_window.php
+@@ -0,0 +1,88 @@
++<?php
++
++declare(strict_types=1);
++
++/**
++ * Migration 209: rebuild ibl_team_season_records for the five-season window.
++ *
++ * FranchiseHistoryRepository::FIVE_SEASON_WINDOW_SQL now reads the regular-season
++ * rows of ibl_team_season_records instead of the ibl_team_win_loss view. This script
++ * rebuilds that table with RefreshTeamSeasonRecordsStep, which materializes the
++ * dedupe from PR #3419 and the NULL-quarter rules from PR #3502. Earlier box-score
++ * repair migrations deleted rows without refreshing the table, so it can be stale
++ * on prod.
++ *
++ * After the rebuild the script compares the regular-season rows with the live
++ * ibl_team_win_loss view in both directions. Any disagreement rolls the rebuild
++ * back and exits 1, so the deploy stops before the window reads a wrong table.
++ *
++ * Idempotent: a rerun rebuilds the same rows. The rebuild is additive and
++ * data-only. It changes no schema and tightens nothing, so no schema-safety guard
++ * applies.
++ *
++ * Usage:
++ *   php ibl5/migrations/209_rebuild_team_season_records_for_window.php --dry-run   # rebuild, check, roll back, exit 0
++ *   php ibl5/migrations/209_rebuild_team_season_records_for_window.php             # real run
++ *
++ * DRY_RUN=1 in the environment also reports without writing, but exits 3. That is
++ * deliberate: MigrationRunner records a migration as applied whenever the subprocess
++ * exits 0 and migrations are forward-only, so a dry run that exited 0 under the runner
++ * would permanently mark the rebuild as done without writing anything. Failing closed
++ * makes a stray env var break the deploy loudly instead of silently skipping the rebuild.
++ */
++
++require_once __DIR__ . '/../vendor/autoload.php';
++
++// Worktree fix: vendor/ symlinks to the main repo, so PSR-4 resolves classes/ there;
++// register the local classes/ dir first so this worktree's code is the code that runs.
++// No-op in the main checkout and in production, where the two paths coincide.
++$localClassesDir = realpath(__DIR__ . '/../classes');
++if ($localClassesDir !== false) {
++    spl_autoload_register(static function (string $class) use ($localClassesDir): void {
++        $path = $localClassesDir . '/' . str_replace('\\', '/', $class) . '.php';
++        if (file_exists($path)) {
++            require_once $path;
++        }
++    }, true, true);
++}
++
++include __DIR__ . '/../config.php';
++include __DIR__ . '/../db/db.php';
++
++/** @var mysqli $mysqli_db */
++
++$flagDryRun = in_array('--dry-run', $argv ?? [], true);
++$envDryRun  = getenv('DRY_RUN') === '1';
++
++if ($envDryRun) {
++    fwrite(STDERR, "DRY_RUN=1 was set in the environment - refusing to report success.\n");
++    fwrite(STDERR, "Exiting 3 so a migration runner cannot record this rebuild as applied.\n");
++    exit(3);
++}
++
++$dryRun = $flagDryRun || $envDryRun;
++$step = new Updater\Steps\RefreshTeamSeasonRecordsStep($mysqli_db);
++
++$mysqli_db->begin_transaction();
++try {
++    $counts = $step->rebuildWithinCurrentTransaction();
++    $result = $mysqli_db->query(Updater\Steps\RefreshTeamSeasonRecordsStep::REGULAR_SEASON_DRIFT_SQL);
++    $row = $result instanceof mysqli_result ? $result->fetch_assoc() : null;
++    $drift = is_array($row) && is_numeric($row['drift'] ?? null) ? (int) $row['drift'] : -1;
++    if ($drift !== 0) {
++        $mysqli_db->rollback();
++        fwrite(STDERR, "ibl_team_season_records disagrees with ibl_team_win_loss on {$drift} rows after rebuild; rolled back.\n");
++        exit(1);
++    }
++    if ($dryRun) {
++        $mysqli_db->rollback();
++        echo "dry run: rebuilt {$counts['regular']} regular + {$counts['heat']} HEAT rows, drift 0, rolled back\n";
++        exit(0);
++    }
++    $mysqli_db->commit();
++    echo "rebuilt {$counts['regular']} regular + {$counts['heat']} HEAT rows, drift 0\n";
++} catch (Throwable $e) {
++    $mysqli_db->rollback();
++    fwrite(STDERR, 'ibl_team_season_records rebuild failed: ' . $e->getMessage() . "\n");
++    exit(1);
++}
+diff --git a/ibl5/tests/DatabaseIntegration/FranchiseHistoryQueryEquivalenceTest.php b/ibl5/tests/DatabaseIntegration/FranchiseHistoryQueryEquivalenceTest.php
+index cf6c793735..956ba3d08a 100644
+--- a/ibl5/tests/DatabaseIntegration/FranchiseHistoryQueryEquivalenceTest.php
++++ b/ibl5/tests/DatabaseIntegration/FranchiseHistoryQueryEquivalenceTest.php
+@@ -179,6 +179,7 @@ public function testDuplicateGameOfThatDayReplayCountedOnce(): void
+             ]);
+         }
+ 
++        $this->refreshRegularSeasonRecordsInTransaction();
+         $window = $this->indexBy($this->repository->getFiveSeasonWindowRows(2014), 'currentname');
+ 
+         self::assertArrayHasKey($name1, $window);
+@@ -208,6 +209,7 @@ public function testWindowBoundaryDatesMatchFrozenQuery(): void
+             $this->insertTeamBoxscoreRow($date, 'Home', 1, $t1, $t2);
+         }
+ 
++        $this->refreshRegularSeasonRecordsInTransaction();
+         $window = $this->indexBy($this->repository->getFiveSeasonWindowRows(2014), 'currentname');
+ 
+         self::assertArrayHasKey($name1, $window);
+@@ -222,9 +224,35 @@ public function testEmptyWindowReturnsEmptyList(): void
+         self::assertSame([], $this->runFrozen(self::FROZEN_WINDOW_SQL, 'ii', 1896, 1900));
+     }
+ 
++    public function testWindowKeepsLiveTeamNameAfterRenameWithoutRefresh(): void
++    {
++        [$t1, $t2, $name1] = $this->firstTwoTeams();
++
++        $this->insertTeamBoxscoreRow('2013-11-05', 'Visitor', 1, $t1, $t2);
++        $this->insertTeamBoxscoreRow('2013-11-05', 'Home', 1, $t1, $t2);
++        $this->refreshRegularSeasonRecordsInTransaction();
++
++        $before = $this->indexBy($this->repository->getFiveSeasonWindowRows(2014), 'currentname');
++        self::assertArrayHasKey($name1, $before);
++
++        $stmt = $this->db->prepare("UPDATE ibl_team_info SET team_name = 'Renamed FC' WHERE teamid = ?");
++        self::assertNotFalse($stmt, 'prepare failed: ' . $this->db->error);
++        $stmt->bind_param('i', $t1);
++        $stmt->execute();
++        $stmt->close();
++
++        $after = $this->indexBy($this->repository->getFiveSeasonWindowRows(2014), 'currentname');
++
++        self::assertArrayNotHasKey($name1, $after);
++        self::assertArrayHasKey('Renamed FC', $after);
++        self::assertSame($before[$name1]['five_season_wins'], $after['Renamed FC']['five_season_wins']);
++        self::assertSame($before[$name1]['five_season_losses'], $after['Renamed FC']['five_season_losses']);
++    }
++
+     public function testWritesExplainAndTimingReport(): void
+     {
+         $stats = $this->seedProdScaleVolume();
++        $this->refreshRegularSeasonRecordsInTransaction();
+         $year = self::SEED_CURRENT_ENDING_YEAR;
+ 
+         $versionResult = $this->db->query('SELECT VERSION()');
+@@ -275,38 +303,72 @@ public function testWritesExplainAndTimingReport(): void
+         self::assertNotFalse(file_put_contents('/tmp/franchise-history-perf-report.txt', $text));
+     }
+ 
+-    public function testChosenFixAppearsInQueryPlan(): void
++    public function testWindowQueryPlanReadsSeasonRecords(): void
+     {
+         $this->seedProdScaleVolume();
++        $this->refreshRegularSeasonRecordsInTransaction();
+ 
+-        self::assertStringContainsString(
+-            'game_date >= ? AND game_date < ?',
+-            FranchiseHistoryRepository::FIVE_SEASON_WINDOW_SQL
+-        );
++        self::assertStringNotContainsString('ibl_box_scores_teams', FranchiseHistoryRepository::FIVE_SEASON_WINDOW_SQL);
+ 
+         $window = $this->currentSqlMap(self::SEED_CURRENT_ENDING_YEAR)['getFiveSeasonWindowRows'];
+         $explainRows = $this->runFrozen('EXPLAIN ' . $window['sql'], $window['types'], ...$window['params']);
+-        self::assertNotSame([], self::dateFilteredBoxScoreRows($explainRows), 'window EXPLAIN never pushes the game_date range into idx_gt_date_teams');
++        $tables = array_map(static fn (array $row): string => is_string($row['table']) ? $row['table'] : '', $explainRows);
++        sort($tables);
++        self::assertSame(['r', 'ti'], $tables, 'window plan must read only ibl_team_season_records and ibl_team_info');
++    }
+ 
+-        $year = self::SEED_CURRENT_ENDING_YEAR;
+-        $frozenExplain = $this->runFrozen('EXPLAIN ' . self::FROZEN_WINDOW_SQL, 'ii', $year - 4, $year);
+-        self::assertSame([], self::dateFilteredBoxScoreRows($frozenExplain), 'the pre-fix window plan already pushes a game_date range, so this check proves nothing');
++    public function testWindowSumsOnlyRegularSeasonRowsInsideYearRange(): void
++    {
++        [$t1, , $name1] = $this->firstTwoTeams();
++
++        $deleted = $this->db->query('DELETE FROM ibl_team_season_records WHERE team_id = ' . $t1);
++        self::assertTrue($deleted);
++
++        $rows = [
++            [2009, 1, 7, 0], // below range
++            [2010, 1, 2, 1], // inside
++            [2014, 1, 3, 2], // inside
++            [2015, 1, 11, 0], // above range
++            [2012, 3, 5, 5], // HEAT, excluded
++        ];
++        foreach ($rows as [$year, $gameType, $wins, $losses]) {
++            $this->insertRow('ibl_team_season_records', [
++                'team_id' => $t1,
++                'currentname' => $name1,
++                'namethatyear' => $name1,
++                'year' => $year,
++                'game_type' => $gameType,
++                'wins' => $wins,
++                'losses' => $losses,
++            ]);
++        }
++
++        $window = $this->indexBy($this->repository->getFiveSeasonWindowRows(2014), 'currentname');
++
++        self::assertArrayHasKey($name1, $window);
++        self::assertSame(5, (int) $window[$name1]['five_season_wins']);
++        self::assertSame(3, (int) $window[$name1]['five_season_losses']);
+     }
+ 
+-    /**
+-     * EXPLAIN rows where MariaDB applies the game_date range through idx_gt_date_teams
+-     * (index condition pushdown). MariaDB 10.11 plans these as `ref` on game_type, not `range`.
+-     *
+-     * @param list<array<string, mixed>> $explainRows
+-     * @return list<array<string, mixed>>
+-     */
+-    private static function dateFilteredBoxScoreRows(array $explainRows): array
++    public function testWindowLagsBoxScoreInsertUntilRefresh(): void
+     {
+-        return array_values(array_filter(
+-            $explainRows,
+-            static fn (array $row): bool => ($row['key'] ?? null) === 'idx_gt_date_teams'
+-                && str_contains((string) ($row['Extra'] ?? ''), 'Using index condition')
+-        ));
++        [$t1, $t2, $name1] = $this->firstTwoTeams();
++        $this->refreshRegularSeasonRecordsInTransaction();
++
++        $before = $this->indexBy($this->repository->getFiveSeasonWindowRows(2099), 'currentname');
++        self::assertArrayNotHasKey($name1, $before);
++
++        $this->insertTeamBoxscoreRow('2098-11-05', 'Visitor', 1, $t1, $t2);
++        $this->insertTeamBoxscoreRow('2098-11-05', 'Home', 1, $t1, $t2);
++
++        $lagged = $this->indexBy($this->repository->getFiveSeasonWindowRows(2099), 'currentname');
++        self::assertArrayNotHasKey($name1, $lagged, 'the window must lag a box-score insert until the next refresh');
++
++        $this->refreshRegularSeasonRecordsInTransaction();
++
++        $after = $this->indexBy($this->repository->getFiveSeasonWindowRows(2099), 'currentname');
++        self::assertArrayHasKey($name1, $after);
++        self::assertSame(1, (int) $after[$name1]['five_season_wins'] + (int) $after[$name1]['five_season_losses']);
+     }
+ 
+     /**
+@@ -320,15 +382,8 @@ private function currentSqlMap(int $currentEndingYear): array
+             'getFranchiseSummaryRows' => ['sql' => self::FROZEN_SUMMARY_SQL, 'types' => 'i', 'params' => [League::FREE_AGENTS_TEAMID]],
+             'getFiveSeasonWindowRows' => [
+                 'sql' => FranchiseHistoryRepository::FIVE_SEASON_WINDOW_SQL,
+-                'types' => 'ssssii',
+-                'params' => [
+-                    sprintf('%04d-10-01', $currentEndingYear - 5),
+-                    sprintf('%04d-10-01', $currentEndingYear),
+-                    sprintf('%04d-10-01', $currentEndingYear - 5),
+-                    sprintf('%04d-10-01', $currentEndingYear),
+-                    $currentEndingYear - 4,
+-                    $currentEndingYear,
+-                ],
++                'types' => 'ii',
++                'params' => [$currentEndingYear - 4, $currentEndingYear],
+             ],
+             'getRawPlayoffTotals' => ['sql' => self::FROZEN_PLAYOFF_TOTALS_SQL, 'types' => '', 'params' => []],
+             'getRawHeatTotals' => ['sql' => self::FROZEN_HEAT_TOTALS_SQL, 'types' => '', 'params' => []],
+@@ -364,6 +419,8 @@ private function timeRepositoryMethod(string $method, int $currentEndingYear): a
+ 
+     private function assertAllFourMatchFrozen(int $currentEndingYear): void
+     {
++        $this->refreshRegularSeasonRecordsInTransaction();
++
+         self::assertSame(
+             $this->runFrozen(self::FROZEN_SUMMARY_SQL, 'i', League::FREE_AGENTS_TEAMID),
+             $this->repository->getFranchiseSummaryRows($currentEndingYear),
+diff --git a/ibl5/tests/DatabaseIntegration/FranchiseHistoryRepositoryTest.php b/ibl5/tests/DatabaseIntegration/FranchiseHistoryRepositoryTest.php
+index 726cb85452..0ab26c4836 100644
+--- a/ibl5/tests/DatabaseIntegration/FranchiseHistoryRepositoryTest.php
++++ b/ibl5/tests/DatabaseIntegration/FranchiseHistoryRepositoryTest.php
+@@ -9,6 +9,7 @@
+ use FranchiseHistory\FranchiseHistoryRepository;
+ use FranchiseHistory\FranchiseHistoryService;
+ use League\League;
++use Updater\Steps\RefreshTeamSeasonRecordsStep;
+ 
+ /**
+  * Database integration tests for franchise history assembly over the real DB.
+@@ -18,8 +19,9 @@
+  * behavior is byte-identical after the Repository→Service extraction.
+  *
+  * Tests the VIEW chain: vw_franchise_summary (W/L from ibl_team_season_records, refreshed by
+- * RefreshTeamSeasonRecordsStep), the five-season window over ibl_team_win_loss → ibl_box_scores_teams,
+- * plus vw_playoff_series_results and ibl_heat_win_loss.
++ * RefreshTeamSeasonRecordsStep), plus vw_playoff_series_results and ibl_heat_win_loss.
++ * The five-season window reads ibl_team_season_records too, so window tests rebuild it
++ * after seeding box scores.
+  */
+ #[Group('database')]
+ class FranchiseHistoryRepositoryTest extends DatabaseTestCase
+@@ -94,6 +96,7 @@ public function testFiveSeasonWindowAggregatesCorrectly(): void
+             $this->insertTeamBoxscoreRow($s['date'], 'Sharks', 1, 2, 1);
+         }
+ 
++        (new RefreshTeamSeasonRecordsStep($this->db))->rebuildWithinCurrentTransaction();
+         $result = $this->repo->getAllFranchiseHistory(2098);
+ 
+         $metros = null;
+@@ -118,6 +121,7 @@ public function testFiveSeasonWindowExcludesOutOfRange(): void
+         $this->insertTeamBoxscoreRow('2092-01-15', 'Metros', 1, 2, 1);
+         $this->insertTeamBoxscoreRow('2092-01-15', 'Sharks', 1, 2, 1);
+ 
++        (new RefreshTeamSeasonRecordsStep($this->db))->rebuildWithinCurrentTransaction();
+         $result = $this->repo->getAllFranchiseHistory(2098);
+         $metros = null;
+         foreach ($result as $row) {
+diff --git a/ibl5/tests/DatabaseIntegration/UpdateAllTheThings/NullQuarterGameFallbackTest.php b/ibl5/tests/DatabaseIntegration/UpdateAllTheThings/NullQuarterGameFallbackTest.php
+index 9aa0171d05..0f6c6cf764 100644
+--- a/ibl5/tests/DatabaseIntegration/UpdateAllTheThings/NullQuarterGameFallbackTest.php
++++ b/ibl5/tests/DatabaseIntegration/UpdateAllTheThings/NullQuarterGameFallbackTest.php
+@@ -108,8 +108,10 @@ public function testFiveSeasonWindowCountsNullQuarterGame(): void
+         $names = [$v => $this->teamName($v), $h => $this->teamName($h)];
+         $repo = new FranchiseHistoryRepository($this->db);
+ 
++        $this->rebuild();
+         $before = $this->windowFor($repo, $names);
+         $this->seedNullQuarterGame(self::REGULAR_DATE, 6, $v, $h, 45, 55);
++        $this->rebuild();
+         $after = $this->windowFor($repo, $names);
+ 
+         self::assertSame(1, $after[$h]['wins'] - $before[$h]['wins'], 'home five-season wins delta');
+diff --git a/ibl5/tests/DatabaseIntegration/UpdateAllTheThings/RefreshTeamSeasonRecordsDedupeTest.php b/ibl5/tests/DatabaseIntegration/UpdateAllTheThings/RefreshTeamSeasonRecordsDedupeTest.php
+index bc19db9ea9..c9ae4df85a 100644
+--- a/ibl5/tests/DatabaseIntegration/UpdateAllTheThings/RefreshTeamSeasonRecordsDedupeTest.php
++++ b/ibl5/tests/DatabaseIntegration/UpdateAllTheThings/RefreshTeamSeasonRecordsDedupeTest.php
+@@ -4,7 +4,6 @@
+ 
+ namespace Tests\DatabaseIntegration\UpdateAllTheThings;
+ 
+-use FranchiseHistory\FranchiseHistoryRepository;
+ use League\League;
+ use PHPUnit\Framework\Attributes\Group;
+ use Tests\DatabaseIntegration\DatabaseTestCase;
+@@ -58,6 +57,27 @@ public function testRegularSeasonPhantomWithHigherOrdinalCountedOnce(): void
+         $this->assertSame(0, $after2['losses'] - $before2['losses']);
+     }
+ 
++    public function testDriftFromLiveViewIsZeroAfterRebuild(): void
++    {
++        $this->rebuild();
++
++        self::assertSame(0, $this->driftCount());
++    }
++
++    public function testDriftFromLiveViewCountsBoxScoreAddedAfterRebuild(): void
++    {
++        $this->rebuild();
++
++        $this->insertTeamBoxscoreRow(self::REGULAR_DATE, 'Visitor', 1, 1, 2);
++        $this->insertTeamBoxscoreRow(self::REGULAR_DATE, 'Home', 1, 1, 2);
++
++        self::assertGreaterThan(0, $this->driftCount());
++
++        $this->rebuild();
++
++        self::assertSame(0, $this->driftCount());
++    }
++
+     public function testHeatPhantomWithHigherOrdinalCountedOnce(): void
+     {
+         [$t1, $t2] = $this->realTeams(2);
+@@ -199,17 +219,16 @@ public function testRegularSeasonDeltaMatchesFiveSeasonWindowQuery(): void
+         $this->assertTripleEmpty(self::REGULAR_DATE, $t1, $t2);
+ 
+         $names = [$t1 => $this->teamName($t1), $t2 => $this->teamName($t2)];
+-        $repo = new FranchiseHistoryRepository($this->db);
+ 
+         $this->rebuild();
+         $tableBefore = $this->recordsFor([$t1, $t2], self::REGULAR_YEAR, 1);
+-        $windowBefore = $this->windowFor($repo, $names);
++        $windowBefore = $this->windowFor($names);
+ 
+         $this->seedRealGame(self::REGULAR_DATE, 3, $t1, $t2);
+         $this->seedPhantom(self::REGULAR_DATE, 7, $t1, $t2);
+         $this->rebuild();
+         $tableAfter = $this->recordsFor([$t1, $t2], self::REGULAR_YEAR, 1);
+-        $windowAfter = $this->windowFor($repo, $names);
++        $windowAfter = $this->windowFor($names);
+ 
+         foreach ([$t1, $t2] as $tid) {
+             $this->assertSame(
+@@ -275,6 +294,17 @@ private function teamName(int $teamId): string
+         return $name;
+     }
+ 
++    private function driftCount(): int
++    {
++        $result = $this->db->query(RefreshTeamSeasonRecordsStep::REGULAR_SEASON_DRIFT_SQL);
++        self::assertInstanceOf(\mysqli_result::class, $result, 'Drift query failed: ' . $this->db->error);
++        $row = $result->fetch_assoc();
++        self::assertIsArray($row);
++        self::assertIsNumeric($row['drift']);
++
++        return (int) $row['drift'];
++    }
++
+     private function assertTripleEmpty(string $date, int $visitor, int $home): void
+     {
+         $stmt = $this->db->prepare(
+@@ -344,11 +374,22 @@ private function recordsFor(array $teamIds, int $year, int $gameType): array
+      * @param array<int, string> $names team id => team_name
+      * @return array<int, array{wins: int, losses: int}>
+      */
+-    private function windowFor(FranchiseHistoryRepository $repo, array $names): array
++    private function windowFor(array $names): array
+     {
++        // Reads the live view, not the table, so this stays an oracle independent of the refresh step.
++        $result = $this->db->query(
++            'SELECT currentname,
++                    CAST(SUM(wins) AS UNSIGNED) AS five_season_wins,
++                    CAST(SUM(losses) AS UNSIGNED) AS five_season_losses
++             FROM ibl_team_win_loss
++             WHERE year BETWEEN 2095 AND 2099
++             GROUP BY currentname'
++        );
++        self::assertInstanceOf(\mysqli_result::class, $result);
++
+         $byName = [];
+-        foreach ($repo->getFiveSeasonWindowRows(2099) as $row) {
+-            $byName[$row['currentname']] = [
++        foreach ($result->fetch_all(MYSQLI_ASSOC) as $row) {
++            $byName[(string) $row['currentname']] = [
+                 'wins' => (int) $row['five_season_wins'],
+                 'losses' => (int) $row['five_season_losses'],
+             ];
+diff --git a/ibl5/tests/FranchiseHistory/FranchiseHistoryRepositoryTest.php b/ibl5/tests/FranchiseHistory/FranchiseHistoryRepositoryTest.php
+index 7f9aea14d4..522ec7967c 100644
+--- a/ibl5/tests/FranchiseHistory/FranchiseHistoryRepositoryTest.php
++++ b/ibl5/tests/FranchiseHistory/FranchiseHistoryRepositoryTest.php
+@@ -55,17 +55,17 @@ public function testSummaryFetchQueriesFranchiseSummaryView(): void
+         }
+     }
+ 
+-    public function testFiveSeasonWindowFetchUsesSargableDateRange(): void
++    public function testFiveSeasonWindowFetchReadsRegularSeasonRecordsByYearRange(): void
+     {
+         $this->assertStringContainsString(
+-            'game_date >= ? AND game_date < ?',
++            '`ibl_team_season_records`',
+             $this->repositorySource(),
+-            'Rolling 5-season window query must filter box scores by a sargable game_date range'
++            'Rolling 5-season window query must read the materialized ibl_team_season_records table'
+         );
+         $this->assertStringContainsString(
+-            'WHERE year BETWEEN ? AND ?',
++            'r.game_type = 1 AND r.year BETWEEN ? AND ?',
+             $this->repositorySource(),
+-            'Rolling 5-season window query must keep the outer season-ending year filter'
++            'Rolling 5-season window query must filter regular-season rows by a season-ending year range'
+         );
+     }
+ 

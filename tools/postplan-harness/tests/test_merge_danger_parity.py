@@ -102,6 +102,9 @@ def _new_body(changed, diff, gates, read):
 
 def test_new_held_set_matches_legacy_both_twins():
     legacy = {label: held for label, _, held in LEGACY_BODIES}
+    # L6 was the notify-workflow trigger. Workflow alerts reach only the owner's channels, so
+    # the floor now derives it two-way on purpose. The legacy L6 body itself still holds.
+    legacy["L6"] = False
     for label, changed, diff, gates, read in DIFF_FIXTURES:
         body = _new_body(changed, diff, gates, read)
         assert _python_held(merge_danger.classify_body(body)) == legacy[label], label

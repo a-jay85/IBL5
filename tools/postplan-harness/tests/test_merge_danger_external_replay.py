@@ -223,12 +223,14 @@ def test_promote_workflow_comment_only_is_one_way():
     _assert_one_way(_replay_text(_section(PROMOTE, 1, body)), f"external-path:{PROMOTE}")
 
 
-def test_pin_pr3813_mutation_still_notify_workflow():
+def test_pin_pr3813_mutation_workflow_is_two_way():
+    # The notify-workflow trigger is gone: a workflow's alerts reach only the owner's channels.
     sec = _load("pr3813-mutation-yml.diff")
     yml = _load("pr3813-mutation.yml")
     d = md.derive_merge_danger(changes_from_unified_diff(sec), sec, [],
                                lambda p: yml if p == ".github/workflows/mutation.yml" else None)
-    _assert_one_way(d, "notify-workflow:.github/workflows/mutation.yml")
+    assert d.door == "two-way"
+    assert not any(t.startswith("notify-workflow") for t in d.triggers)
 
 
 def test_llm_one_way_survives_two_way_floor():

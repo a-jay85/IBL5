@@ -115,10 +115,14 @@ def test_path_corpus_one_way_flip_set():
         sg = [t for t in md.triggers if t.split(":", 1)[0] in merge_danger.SELF_GOVERNING_KINDS
               and t != _RUNNER_TRIGGER]
         return md.door == "one-way" or bool(sg)
+    # The notify-workflow trigger was removed (workflow alerts reach only the owner's channels),
+    # so 3058 (workflow send lines only) left the held set. 3050 stays one-way: it edits
+    # .github/actions/notify-discord/ itself, an external path. Old one-way set {3050, 3058};
+    # new one-way set {3050}.
     got = {n for n, (md, _) in _DERIVED.items() if held(md)}
-    want = set(_PATHS["expected_one_way"])
+    want = set(_PATHS["expected_one_way"]) - {3058}
     assert got == want, f"measured held set {sorted(got)} != expected {sorted(want)}"
-    assert {n for n, (md, _) in _DERIVED.items() if md.door == "one-way"} == {3050, 3058}
+    assert {n for n, (md, _) in _DERIVED.items() if md.door == "one-way"} == {3050}
     assert {n for n, (md, _) in _DERIVED.items() if held(md) and md.self_governing} == {
         3043, 3112, 3114}
     runner_prs = {e["number"] for e in _PATHS["prs"] if _RUNNER in e["files"]}
@@ -127,7 +131,7 @@ def test_path_corpus_one_way_flip_set():
     for n in want:
         triggers = _DERIVED[n][0].triggers
         assert triggers, n
-        assert any(t.startswith(("arming-path:", "notify-workflow:")) for t in triggers), (n, triggers)
+        assert any(t.startswith(("arming-path:", "external-path:")) for t in triggers), (n, triggers)
 
 
 def test_path_corpus_broad_rule_would_hold_a_third():

@@ -1,4 +1,4 @@
-"""Real-PR replays for the merge-danger notify trigger, plus its stay-one-way cases."""
+"""Real-PR replays for the merge-danger floor: workflow alerts are two-way, GM senders stay one-way."""
 import os
 import sys
 from pathlib import Path
@@ -34,9 +34,9 @@ def _main_with_diff(diff: str) -> md.MergeDanger:
     return md.derive_merge_danger([("M", MAIN)], diff, [], {MAIN: text}.get)
 
 
-def _assert_main_one_way(d: md.MergeDanger) -> None:
-    assert d.door == "one-way"
-    assert f"notify-workflow:{MAIN}" in d.triggers
+def _assert_main_two_way(d: md.MergeDanger) -> None:
+    # The notify-workflow trigger is gone: a workflow's alerts reach only the owner's channels.
+    _assert_two_way(d)
 
 
 def _renamed(section: str) -> md.MergeDanger:
@@ -55,28 +55,69 @@ def test_replay_pr3576_opcache_step_is_two_way():
     _assert_two_way(_replay(("pr3576-main", MAIN)))
 
 
-def test_empty_diff_keeps_notify_workflow_one_way():
-    _assert_main_one_way(_main_with_diff(""))
+def test_empty_diff_workflow_is_two_way():
+    _assert_main_two_way(_main_with_diff(""))
 
 
-def test_quoted_path_header_keeps_notify_workflow_one_way():
+def test_quoted_path_header_workflow_is_two_way():
     lines = (FIX / "pr3576-main.diff").read_text().split("\n")
     lines[0] = f'diff --git "a/{MAIN}" "b/{MAIN}"'
-    _assert_main_one_way(_main_with_diff("\n".join(lines)))
+    _assert_main_two_way(_main_with_diff("\n".join(lines)))
 
 
-def test_bare_hunk_keeps_notify_workflow_one_way():
+def test_bare_hunk_workflow_is_two_way():
     diff = (FIX / "pr3576-main.diff").read_text()
-    _assert_main_one_way(_main_with_diff(diff[diff.index("@@"):]))
+    _assert_main_two_way(_main_with_diff(diff[diff.index("@@"):]))
 
 
-def test_renamed_workflow_with_send_edit_is_one_way():
+def test_renamed_workflow_with_send_edit_is_two_way():
     n = _line_of(_MAIN_LIKE, "if: ${{ always()")
     new_line = _MAIN_LIKE.split("\n")[n - 1]
     hunk = f"@@ -{n} +{n} @@\n-    if: ${{{{ failure() }}}}\n+{new_line}\n"
-    d = _renamed(RENAME_META + f"--- a/{OLD}\n+++ b/{NEW}\n" + hunk)
+    _assert_two_way(_renamed(RENAME_META + f"--- a/{OLD}\n+++ b/{NEW}\n" + hunk))
+
+
+# Replays of real PRs whose door a later phase wrongly held one-way (backlog#1825).
+MD_FIX = Path(__file__).parent / "fixtures" / "merge_danger"
+REPO_ROOT = Path(__file__).resolve().parents[3]
+OWNER_ALERT_WHY = ("Edits the alert job that posts to DISCORD_DEV_WEBHOOK_URL (#dev); "
+                   "a sent message cannot be recalled")
+
+
+def _one_file_diff(path: str) -> str:
+    return (f"diff --git a/{path} b/{path}\n--- a/{path}\n+++ b/{path}\n"
+            "@@ -1 +1 @@\n-old line\n+new line\n")
+
+
+def test_pr3813_replay_derives_two_way():
+    mech = md.derive_from_worktree(REPO_ROOT, (MD_FIX / "pr3813.diff").read_text())
+    assert mech.door == "two-way", mech
+    assert not any(t.startswith("notify-workflow") for t in mech.triggers)
+    assert md.merge_verdicts(mech, None, None, None, llm_raise_bar=True).door == "two-way"
+    raised = md.merge_verdicts(mech, "one-way", "contained", OWNER_ALERT_WHY, llm_raise_bar=True)
+    assert raised.door == "two-way"
+
+
+def test_pr3840_replay_derives_two_way():
+    mech = md.derive_from_worktree(REPO_ROOT, (MD_FIX / "pr3840.diff").read_text())
+    assert mech.door == "two-way", mech
+    line = md.parse_merge_danger((MD_FIX / "pr3840_fixround_line.txt").read_text())
+    assert line is not None and line.door == "one-way"
+    merged = md.merge_verdicts(mech, line.door, line.blast, line.why, llm_raise_bar=True)
+    assert merged.door == "two-way"
+
+
+def test_discord_dm_diff_still_one_way():
+    d = md.derive_from_worktree(REPO_ROOT, _one_file_diff("bin/discord-dm"))
     assert d.door == "one-way"
-    assert f"notify-workflow:{NEW}" in d.triggers
+    assert "external-path:bin/discord-dm" in d.triggers
+
+
+def test_notify_discord_action_diff_still_one_way():
+    path = ".github/actions/notify-discord/action.yml"
+    d = md.derive_from_worktree(REPO_ROOT, _one_file_diff(path))
+    assert d.door == "one-way"
+    assert f"external-path:{path}" in d.triggers
 
 
 def test_renamed_workflow_without_changes_is_two_way():

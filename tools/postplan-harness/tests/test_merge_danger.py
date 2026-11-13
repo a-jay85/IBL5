@@ -146,27 +146,29 @@ def test_db_sync_preserve_list_with_three_bin_files_is_module():
     assert (d.door, d.blast) == ("two-way", "module")
 
 
-def test_notify_workflow_text_is_external_one_way():
+def test_notify_workflow_text_is_two_way():
+    # Workflow alerts reach only the owner's #dev, #merged and #reviews channels.
     wf = ".github/workflows/nightly.yml"
     d = _derive([("M", wf)], read=lambda p: "env:\n  DISCORD_WEBHOOK: x\n" if p == wf else None)
-    assert (d.door, d.blast) == ("one-way", "external")
-    assert f"notify-workflow:{wf}" in d.triggers
+    assert (d.door, d.blast) == ("two-way", "site-wide")
+    assert not any(t.startswith("notify-workflow") for t in d.triggers)
 
 
-def test_rename_into_workflows_with_notify_text_fires():
+def test_rename_into_workflows_with_notify_text_is_two_way():
     wf = ".github/workflows/nightly.yml"
     diff = (f"diff --git a/scripts/nightly.yml b/{wf}\nsimilarity index 100%\n"
             f"rename from scripts/nightly.yml\nrename to {wf}\n")
     d = _derive([("R", wf)], diff=diff, read=lambda p: "env:\n  DISCORD_WEBHOOK: x\n" if p == wf else None)
-    assert (d.door, d.blast) == ("one-way", "external")
-    assert f"notify-workflow:{wf}" in d.triggers
+    assert (d.door, d.blast) == ("two-way", "site-wide")
+    assert not any(t.startswith("notify-workflow") for t in d.triggers)
 
 
-def test_unreadable_modified_workflow_fails_closed():
+def test_unreadable_modified_workflow_is_two_way():
+    # The floor no longer reads a workflow's text, so an unreadable one changes nothing.
     wf = ".github/workflows/nightly.yml"
     d = _derive([("M", wf)], read=lambda p: None)
-    assert (d.door, d.blast) == ("one-way", "external")
-    assert f"notify-workflow:{wf}" in d.triggers
+    assert (d.door, d.blast) == ("two-way", "site-wide")
+    assert not any(t.startswith("notify-workflow") for t in d.triggers)
 
 
 def test_workflow_without_notify_text_is_two_way_site_wide():
@@ -586,11 +588,10 @@ def test_derive_gate_removed_only_two_way_self_governing():
 
 
 def test_derive_true_one_way_kinds_unchanged():
-    wf = ".github/workflows/nightly.yml"
     cases = [
         _derive([("A", MIG)], _DROP_DIFF),
         _derive([("M", "bin/db-sync-prod")]),
-        _derive([("M", wf)], read=lambda p: "env:\n  DISCORD_WEBHOOK: x\n" if p == wf else None),
+        _derive([("M", "bin/discord-dm")]),
     ]
     for d in cases:
         assert d.door == "one-way", d
@@ -671,3 +672,67 @@ def test_classify_with_floor_lowered_door_holds():
                 md.render_merge_danger(_derive([("M", "docs/a.md")])))
     assert md.classify_with_floor(two, one_floor) == "MALFORMED"
     assert md.classify_with_floor(None, one_floor) == "UNREADABLE"
+
+
+# Raise-bar exemptions: rebuildable-table rows and owner-only alerts (backlog#1825).
+from pathlib import Path
+
+_FIXROUND_LINE = (Path(__file__).parent / "fixtures" / "merge_danger" / "pr3840_fixround_line.txt").read_text()
+_TWO_FLOOR = MergeDanger("two-way", "site-wide", "mechanical: no one-way trigger in the realized diff")
+
+
+def _bar(why, *, bar=True):
+    return md.merge_verdicts(_TWO_FLOOR, "one-way", "site-wide", why, llm_raise_bar=bar).door
+
+
+def test_bar_refuses_rebuildable_row_loss_why():
+    line = md.parse_merge_danger(_FIXROUND_LINE)
+    assert line.door == "one-way"
+    assert md._IRREVERSIBLE_RE.search(line.why)  # the old bar accepted it
+    assert _bar(line.why) == "two-way"
+
+
+def test_bar_keeps_rebuildable_table_with_column_drop():
+    assert _bar("Drops column wins from ibl_team_season_records; revert cannot restore the data") == "one-way"
+
+
+def test_bar_keeps_unregistered_backup_table_token():
+    why = ("Deletes every ibl_team_season_records row and copies them to "
+           "ibl_team_season_records_backup first; a revert does not restore them")
+    assert _bar(why) == "one-way"
+
+
+def test_bar_refuses_owner_channel_alert_why():
+    why = "Edits the alert job that posts to DISCORD_DEV_WEBHOOK_URL (#dev); a sent message cannot be recalled"
+    assert _bar(why) == "two-way"
+
+
+def test_bar_keeps_discord_dm_why():
+    why = ("Posts to #dev and sends a DM to every GM through bin/discord-dm; "
+           "a sent message cannot be recalled")
+    assert md._OWNER_CHANNEL_RE.search(why)  # the exemption path is reached
+    assert _bar(why) == "one-way"
+
+
+def test_owner_channel_hash_dev_near_miss():
+    assert md._bar_exempt("posts to #develop and deletes rows") is False
+    # Only the channel name differs from the exempt line below, so a bare #dev match flips it.
+    assert md._bar_exempt("posts to #develop and sends a message") is False
+    assert md._bar_exempt("posts to #dev and sends a message") is True
+    assert md._bar_exempt("posts to #dev and deletes rows") is False
+
+
+def test_bar_keeps_owner_channel_mention_with_other_loss():
+    why = "Deletes the production uploads directory in .github/workflows/deploy.yml"
+    assert _bar(why) == "one-way"
+
+
+def test_bar_off_keeps_rebuildable_one_way():
+    line = md.parse_merge_danger(_FIXROUND_LINE)
+    assert _bar(line.why, bar=False) == "one-way"
+
+
+def test_bar_keeps_registered_table_with_overwrite():
+    why = "Deletes ibl_hist rows and overwrites every player's contract"
+    assert _bar(why) == "one-way"
+    assert md._bar_exempt("Deletes ibl_hist rows") is True

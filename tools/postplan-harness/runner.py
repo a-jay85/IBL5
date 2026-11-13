@@ -72,6 +72,8 @@ from harness.classify import (BACKLOG_REPO, render_merge_digest,
                               upsert_scope_notes)
 from harness.gate_backtest import upsert_gate_backtest
 from harness import merge_danger
+from harness import savedline
+from harness.merge_danger import parse_merge_danger, render_merge_danger
 from harness import removed_guards
 from harness import removed_guard_fix
 from harness import second_review
@@ -457,7 +459,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         log("phase2: starting scope check")
         _inject_scope_notes(copy, plan, files, diff, copy["summary_md"], log)
         _inject_removed_guards(copy, plan, diff, worktree, log)
-        if _inject_merge_danger(copy, worktree, diff, log):
+        _md_sd = _state_dir(out_dir, live, state_dir) if (live or state_dir is not None) else None
+        if _inject_merge_danger(copy, worktree, diff, log, state_dir=_md_sd, slug=slug):
             merge_danger_degraded = True
         phase2_merge_danger = _phase2_merge_danger_of(copy["summary_md"])
         _inject_how_to_revert(copy, diff, log)
@@ -730,7 +733,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         _gate_fix_block = render_gate_fix(res.gate_fix)
         if _gate_fix_block:   # never strips a block an earlier run published
             body = upsert_gate_fix(body, _gate_fix_block)
-        body = _merge_danger_body(body, worktree, diff, log, "phase6")
+        _md_sd = _state_dir(out_dir, live, state_dir) if (live or state_dir is not None) else None
+        body = _merge_danger_body(body, worktree, diff, log, "phase6", state_dir=_md_sd, slug=slug)
         gh.pr_edit_body(pr, body)
         _check_backlog_closes(gh, pr, plan, log)
         _sweep_out_of_scope(gh, pr, plan, slug, log)
@@ -876,8 +880,10 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             plan_checks_holding = _plan_checks_step(gh, plan, worktree, pr, live, log, fixture)
             _arm_body = gh.pr_body() or body
             if live and pr:
+                _md_sd = _state_dir(out_dir, live, state_dir) if (live or state_dir is not None) else None
                 _arm_body = _retry_merge_danger(gh, pr, _arm_body, phase2_merge_danger, worktree,
-                                                git.diff_vs_base(), log, res)
+                                                git.diff_vs_base(), log, res,
+                                                state_dir=_md_sd, slug=slug)
             # Condition (20): rerun the detector on the realized diff so a body without the
             # Removed guards block (or a hand-edited one) cannot release the hold.
             _rg_holds = _removed_guards_holds(worktree, git.diff_vs_base(), plan, _arm_body)
@@ -1282,7 +1288,10 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             sha, outcome = _ci_fix_loop(git, gh, llm, log, res, worktree=worktree, pr=pr,
                                         sha=sha, outcome=outcome, out_dir=out_dir,
                                         mode=mode, fixture=fixture,
-                                        run_started=run_started)
+                                        run_started=run_started,
+                                        md_state_dir=(_state_dir(out_dir, live, state_dir)
+                                                      if (live or state_dir is not None) else None),
+                                        slug=slug)
             res.ci_head = sha or None
             res.ci_outcome = {0: "green", 8: "failed"}.get(outcome.exit_code,
                                                            "indeterminate")
@@ -2069,7 +2078,7 @@ def _meta_check_skip(gh, pr, res, names, out_dir) -> list[str]:
 
 
 def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
-                 mode, fixture, run_started):
+                 mode, fixture, run_started, md_state_dir=None, slug=""):
     """Phase 7 CI fix loop — attempts to fix red CI with Opus.
 
     Returns (sha, outcome) where outcome reflects the post-fix CI state.
@@ -2323,7 +2332,8 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
         body_applied, baseline = False, None
         proposal = cifix_ship.read_proposal(fix_dir)
         if proposal is not None:
-            verdict = cifix_ship.judge_proposal(gh.pr_body_fresh() or "", proposal,
+            _md_round_start = gh.pr_body_fresh() or ""
+            verdict = cifix_ship.judge_proposal(_md_round_start, proposal,
                                                 signature=_body_signature)
             if verdict.action == "refuse":
                 log(f"phase7 ci-fix: body proposal refused ({verdict.reason})")
@@ -2332,7 +2342,9 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
                 baseline = cifix_ship.meta_run_id(gh.pr_checks_json(pr))
                 # The fixer's body may drop or lower the Merge danger line; re-apply the floor.
                 gh.pr_edit_body(pr, _merge_danger_body(verdict.body, worktree,
-                                                       git.diff_vs_base(), log, "phase7"))
+                                                       git.diff_vs_base(), log, "phase7",
+                                                       state_dir=md_state_dir, slug=slug,
+                                                       round_start_body=_md_round_start))
                 body_applied = True
                 log("phase7 ci-fix: body proposal applied")
 
@@ -2727,7 +2739,8 @@ def _inject_residual_phases(copy: dict, plan, files: list[str], log) -> list[str
     return items
 
 
-def _inject_merge_danger(copy: dict, worktree: str, diff_body: str, log) -> list[str]:
+def _inject_merge_danger(copy: dict, worktree: str, diff_body: str, log, *,
+                         state_dir=None, slug: str = "") -> list[str]:
     """Phase 2: mechanical Merge danger floor; the LLM line in summary_md only supplies Why
     and may raise Door / Blast radius. Always runs, fixture or live, degraded or not.
 
@@ -2738,7 +2751,8 @@ def _inject_merge_danger(copy: dict, worktree: str, diff_body: str, log) -> list
     (18) reads that body at arm time."""
     if not copy["summary_md"]:
         return []
-    copy["summary_md"] = _merge_danger_body(copy["summary_md"], worktree, diff_body, log, "phase2")
+    copy["summary_md"] = _merge_danger_body(copy["summary_md"], worktree, diff_body, log, "phase2",
+                                            state_dir=state_dir, slug=slug)
     findings = merge_danger.validate_merge_danger_field(copy["summary_md"])
     for f in findings:
         log(f"phase2 finding: {f}")
@@ -2755,7 +2769,8 @@ def _phase2_merge_danger_of(summary_md: str):
         return None
 
 
-def _retry_merge_danger(gh, pr, body: str, phase2_md, worktree, diff_body: str, log, res) -> str:
+def _retry_merge_danger(gh, pr, body: str, phase2_md, worktree, diff_body: str, log, res, *,
+                        state_dir=None, slug: str = "") -> str:
     """Phase 6.5: one bounded refill of the Merge danger line this run's Phase 2 wrote.
 
     Retries only when Phase 2 computed a line this run (phase2_md) and the live body
@@ -2769,7 +2784,8 @@ def _retry_merge_danger(gh, pr, body: str, phase2_md, worktree, diff_body: str, 
     res.retries["merge-danger"] = 1
     try:
         refilled = merge_danger.inject_merge_danger(body, phase2_md)
-        refilled = _merge_danger_body(refilled, worktree, diff_body, log, "phase6.5")
+        refilled = _merge_danger_body(refilled, worktree, diff_body, log, "phase6.5",
+                                      state_dir=state_dir, slug=slug)
         gh.pr_edit_body(pr, refilled)
         fresh = gh.pr_body_fresh() or ""   # what GitHub holds now, never our own last write
         log("phase6.5: merge-danger line missing from the live body; re-applied the Phase 2 "
@@ -2793,15 +2809,71 @@ def _inject_how_to_revert(copy: dict, diff_body: str, log) -> None:
     log(f"phase2: how-to-revert source={source}")
 
 
-def _merge_danger_body(body: str, worktree: str, diff_body: str, log, phase: str) -> str:
-    """Return `body` carrying exactly one Merge danger line: the mechanical floor merged
-    with any line already in the body, which may only raise Door / Blast radius.
+def _door_owner(phase: str, body: str, round_start_body, state_dir, slug: str, log):
+    """(owned, fresh, start_md) for a later phase's Merge danger line.
 
-    Phase 2 writes the line. In Phase 2 an LLM one-way above the floor survives only when its
-    Why names an irreversible effect; later phases apply no bar, so a human raise is kept. Any later phase (6, 5.5, 7) only re-applies the floor to a
-    body that already carries one well-formed line, so a raised Door cannot be lowered. A
-    missing or malformed line is left alone there and condition (18) holds it until a human
-    adds the line: refilling it would turn a deleted one-way line into the mechanical two-way."""
+    owned: the line the PR carried at round start equals the line the harness last saved.
+    fresh: owned, and the line in `body` differs from the saved one, so an LLM spoke this round.
+    start_md: the parsed round-start line, or None. A saved line that differs from the round-start
+    line writes the sticky tombstone. Phase 2, a missing state dir or slug, and any error all
+    return not owned (fail closed)."""
+    if phase == "phase2" or state_dir is None or not slug:
+        return False, False, None
+    try:
+        try:
+            prior = parse_merge_danger(body)
+        except merge_danger.MalformedMergeDanger:
+            prior = None
+        start = body if round_start_body is None else round_start_body
+        try:
+            start_md = parse_merge_danger(start)
+        except merge_danger.MalformedMergeDanger:
+            start_md = None
+        saved = savedline.load_line(state_dir, slug)
+        owned = saved is not None and start_md is not None and render_merge_danger(start_md) == saved
+        if saved is not None and start_md is not None and not owned:
+            savedline.mark_human(state_dir, slug)
+            log(f"{phase}: Merge danger line edited outside the harness; raise-only from now on")
+        fresh = owned and prior is not None and render_merge_danger(prior) != saved
+        return owned, fresh, start_md
+    except Exception as exc:  # noqa: BLE001 - fail closed: unknown ownership is raise-only
+        log(f"{phase}: Merge danger ownership check failed ({exc}); raise-only")
+        return False, False, None
+
+
+def _keep_round_start_raise(prior, start_md):
+    """Raise-only against the round-start line: a non-owned round never lowers the Door or
+    Blast radius the PR carried when the round began. Returns the line to merge with the floor."""
+    if start_md is None or prior is None:
+        return prior if prior is not None else start_md
+    door_up = _md_rank(start_md.door, merge_danger.DOORS) > _md_rank(prior.door, merge_danger.DOORS)
+    blast_up = _md_rank(start_md.blast, merge_danger.BLAST) > _md_rank(prior.blast, merge_danger.BLAST)
+    if not (door_up or blast_up or (start_md.self_governing and not prior.self_governing)):
+        return prior
+    return merge_danger.MergeDanger(
+        start_md.door if door_up else prior.door,
+        start_md.blast if blast_up else prior.blast,
+        start_md.why if door_up else prior.why,
+        self_governing=prior.self_governing or start_md.self_governing)
+
+
+def _md_rank(value: str, scale) -> int:
+    return scale.index(value) if value in scale else 0
+
+
+def _merge_danger_body(body: str, worktree: str, diff_body: str, log, phase: str, *,
+                       state_dir: str | None = None, slug: str = "",
+                       round_start_body: str | None = None) -> str:
+    """Return `body` carrying exactly one Merge danger line: the mechanical floor merged
+    with the line in the body.
+
+    Phase 2 writes the line, applies the raise bar to an LLM one-way above the floor, and saves
+    the line it wrote. A later phase whose round-start line equals the saved line owns it, so it
+    re-judges the newest LLM line with the Phase 2 bar and may lower the Door to the floor. Any
+    other later phase is raise-only against both the floor and the round-start line. A round-start
+    line that differs from the saved one leaves a tombstone, so the PR stays raise-only for good.
+    A later phase leaves a missing or malformed line alone for condition (18) to hold: refilling
+    it would turn a deleted one-way line into the mechanical two-way."""
     if phase != "phase2":
         try:
             if merge_danger.parse_merge_danger(body) is None:
@@ -2816,16 +2888,23 @@ def _merge_danger_body(body: str, worktree: str, diff_body: str, log, phase: str
     except merge_danger.MalformedMergeDanger as exc:
         log(f"{phase}: merge-danger line malformed, using mechanical Why ({exc})")
         prior = None
+    owned, fresh, start_md = _door_owner(phase, body, round_start_body, state_dir, slug, log)
+    if phase != "phase2" and not owned:
+        prior = _keep_round_start_raise(prior, start_md)
     final = merge_danger.merge_verdicts(mech, prior.door if prior else None,
                                         prior.blast if prior else None,
                                         prior.why if prior else None,
                                         llm_self_governing=(prior.self_governing if prior else False),
-                                        llm_raise_bar=(phase == "phase2"))
+                                        llm_raise_bar=(phase == "phase2" or (owned and fresh)))
+    if owned and fresh and start_md.self_governing:
+        final = dataclasses.replace(final, self_governing=True)
     if prior and prior.door == "one-way" and final.door == "two-way":
         log(f"{phase}: LLM one-way kept at the mechanical two-way floor; the Why names no "
             f"irreversible effect ({prior.why[:80]!r})")
     log(f"{phase}: merge danger Door={final.door} Blast={final.blast} "
-        f"self_governing={final.self_governing} triggers={list(final.triggers)}")
+        f"self_governing={final.self_governing} triggers={list(final.triggers)} owned={owned}")
+    if state_dir is not None and slug and (phase == "phase2" or owned):
+        savedline.save_line(state_dir, slug, render_merge_danger(final))
     return merge_danger.inject_merge_danger(body, final)
 
 
@@ -3827,6 +3906,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         sha, terminal = None, False
         raw_before_round = ""  # pinned to attempt 0; used for the per-round restore
         gate_denial = ""  # set by a local-gate denial; fed to the retry's fixer
+        _md_round_start = ""  # the Merge danger round-start body; empty reads as no line
         # The retry lives INSIDE the iteration, so a retry can never advance round_num
         # and the fixer spawn count stays bounded at 2 * MAX_FIDELITY_ROUNDS.
         for attempt in range(_MAX_ROUND_RETRIES + 1):
@@ -3840,6 +3920,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
             sig_before = _body_signature(raw_before)
             if attempt == 0:
                 raw_before_round = raw_before
+                _md_round_start = raw_before or ""
             try:
                 sha = fidelity.remediate(
                     llm, git, out_dir, worktree or ".", packet, current_verdict_path,
@@ -3967,7 +4048,9 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         # Re-derived on the post-round diff: a remediation commit can add a one-way trigger,
         # and a fixer that drops the line would otherwise hold condition (18) as MISSING.
         body = _merge_danger_body(body, worktree, git.diff_vs_base(), log,
-                                  f"phase5.5 round {round_num}")
+                                  f"phase5.5 round {round_num}",
+                                  state_dir=(state_dir if (live or state_dir is not None) else None),
+                                  slug=slug, round_start_body=_md_round_start)
         gh.pr_edit_body(pr, body)
         # sha is either a real commit sha or BODY_ONLY_SHA. fidelity.re_review()'s only
         # test of it is `if not remediation_sha: return None, None, None`, so a non-empty

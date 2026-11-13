@@ -1982,4 +1982,23 @@ STUB
     h_pass "row49 — claimed plan identifiers never carry the NNN- prefix"
 fi
 
+# Lying-mkdir characterization: _queue_lock_take claims by its owner file, so two takers
+# that both see mkdir succeed still produce one owner. Green on master by design.
+# shellcheck source=bin/lib/claim-file.sh
+. "$SCRIPT_DIR/lib/claim-file.sh"
+if [ "$AQ_ONLY" != judge ]; then
+    QL_DIR="$TMP/qlock"; mkdir -p "$QL_DIR"
+    claim_file_lying_mkdir_stub "$QL_DIR/lie"
+    for _i in 1 2; do
+        ( PATH="$QL_DIR/lie:$PATH"; . "$LIB"; _queue_lock_take "$QL_DIR/x.lock" && echo won >> "$QL_DIR/wins" ) &
+    done
+    wait
+    QL_WINS=$(grep -c won "$QL_DIR/wins" 2>/dev/null || true)
+    if [ "$QL_WINS" = 1 ]; then
+        H_PASS=$((H_PASS + 1)); printf 'ok %s\n' queue_lock_lying_mkdir_one_owner
+    else
+        h_fail "queue_lock_lying_mkdir_one_owner" "wins=$QL_WINS"
+    fi
+fi
+
 h_done

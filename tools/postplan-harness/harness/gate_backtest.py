@@ -179,6 +179,28 @@ _ARMING_PATHS = (
     "tools/postplan-harness/harness/planfile.py",
     "bin/lib/ui-change-classifier.sh",
     "bin/lib/human-signoff-classifier.sh",
+    # armable.py reads PR labels through this module to decide holds.
+    "tools/postplan-harness/harness/labels.py",
+    # The merge-danger floor (condition 18) and the helpers whose verdicts it uses. A looser
+    # helper can turn a one-way door two-way. tests/test_arming_paths_drift.py fails when
+    # armable.py or merge_danger.py imports a harness module that is neither here nor on its
+    # helper allowlist.
+    "tools/postplan-harness/harness/merge_danger.py",
+    "tools/postplan-harness/harness/workflow_scope.py",
+    "tools/postplan-harness/harness/external_scope.py",
+    "tools/postplan-harness/harness/sql_comments.py",
+    # merge_danger.py reads REBUILDABLE_TABLES here to decide whether a loss of rows is one-way.
+    "tools/postplan-harness/harness/rebuildable.py",
+    # merge_danger.py imports this. It runs the self-governing replay that decides whether the
+    # segment clears.
+    "tools/postplan-harness/harness/arming_replay.py",
+    "tools/postplan-harness/harness/gate_backtest.py",
+    # The re-arm path. It turns auto-merge back on with CI_PAT after a body edit clears a
+    # text hold.
+    "bin/text-hold-recheck",
+    "bin/lib/text-hold-recheck.sh",
+    ".github/workflows/text-hold-recheck.yml",
+    ".github/workflows/text-hold-recheck-run.yml",
 )
 
 # runner.py builds ArmInputs and calls the seat, but most edits to it are not merge-rule

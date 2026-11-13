@@ -4,6 +4,7 @@ These tests drive LiveGit.rebase_onto() against scratch repos and pin the rebase
 shape: the branch stays linear on top of origin/master, a resolved conflict lands as
 one replayed commit, and every failure path leaves no rebase or merge state behind.
 """
+import glob
 import os
 import shutil
 import subprocess
@@ -18,9 +19,16 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from harness.adapters.gitad import LiveGit
-from harness.armable import conflict_flag_path, conflict_verdict_for, evaluate
+from harness.armable import (
+    conflict_flag_path,
+    conflict_verdict_for,
+    evaluate,
+    record_conflict_resolution,
+)
+from harness.conflict import prior_sidecar_path, verdict_ok_path
 from harness.state import HarnessError
 from test_armable_phase4 import _held, inputs
+from runner import _conflict_key
 from test_gitad_stacked_rebase import (
     _LOSTWORK_EQUIV,
     _WritingLlm,
@@ -414,3 +422,72 @@ def test_reconcile_keeps_sha_marker_when_git_fails(tmp_path):
     finally:
         if os.path.exists(flag):
             os.unlink(flag)
+
+
+# ── Prior conflict review across a clean re-run (backlog#1778) ────────────────
+
+def _purge_keep_repo(*, contain_master):
+    """A _make_clean_repo scratch repo on a fresh `purge-keep-*` branch.
+
+    contain_master=True merges origin/master first, so the plain rebase takes its
+    no-op exit; False leaves origin/master one commit ahead on a file the branch never
+    touches, so the replay is clean and HEAD moves.
+    """
+    d, _key, old_branch, _shas, _master = _make_clean_repo()
+    branch = f"purge-keep-{uuid.uuid4().hex[:10]}"
+    _sh(d, "branch", "-m", old_branch, branch)
+    if contain_master:
+        _sh(d, "merge", "--no-edit", "origin/master")
+    return d, branch, _conflict_key(branch)
+
+
+def _seed_prior_clean_review(branch, key, head):
+    """The state a prior run leaves after a reviewed conflict resolution at head."""
+    record_conflict_resolution(branch, head)
+    with open(f"/tmp/postplan-conflict-sha-{key}.txt", "w") as fh:
+        fh.write(head)
+    with open(verdict_ok_path(key, head), "w") as fh:
+        fh.write("CONFLICT-REVIEW=CLEAN\nreply\n")
+
+
+def _purge_keep_cleanup(d, branch, key):
+    for path in (conflict_flag_path(branch),
+                 f"/tmp/postplan-conflict-sha-{key}.txt",
+                 prior_sidecar_path(key),
+                 *glob.glob(f"/tmp/postplan-conflict-verdict-{key}-*.ok")):
+        if os.path.exists(path):
+            os.unlink(path)
+    _cleanup_full(key, branch, d)
+
+
+def test_plain_rebase_noop_restores_prior_verdict():
+    d, branch, key = _purge_keep_repo(contain_master=True)
+    try:
+        head = _rev(d, "HEAD")
+        _seed_prior_clean_review(branch, key, head)
+        assert conflict_verdict_for(branch) == "CONFLICT-REVIEW=CLEAN"
+
+        LiveGit(d).rebase_onto()
+
+        assert _rev(d, "HEAD") == head
+        assert conflict_verdict_for(branch) == "CONFLICT-REVIEW=CLEAN"
+        assert not os.path.exists(prior_sidecar_path(key))
+        with open(conflict_flag_path(branch)) as fh:
+            assert head in fh.read()
+    finally:
+        _purge_keep_cleanup(d, branch, key)
+
+
+def test_plain_rebase_moving_head_reads_absent():
+    d, branch, key = _purge_keep_repo(contain_master=False)
+    try:
+        head = _rev(d, "HEAD")
+        _seed_prior_clean_review(branch, key, head)
+        assert conflict_verdict_for(branch) == "CONFLICT-REVIEW=CLEAN"
+
+        LiveGit(d).rebase_onto()
+
+        assert _rev(d, "HEAD") != head
+        assert conflict_verdict_for(branch) is None
+    finally:
+        _purge_keep_cleanup(d, branch, key)

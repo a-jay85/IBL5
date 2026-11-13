@@ -28,6 +28,7 @@ from pathlib import Path
 from harness import rebuildable
 from harness.armable import DESTRUCTIVE_SQL
 from harness.sql_comments import strip_added_sql_comments
+from harness.migration_revert_proof import unproven_migrations
 from harness.external_scope import external_send_change
 from harness.gate_backtest import GateChange, changes_from_unified_diff, detect_gate_changes
 # Private name imported on purpose: the arming paths are the bootstrap-hazard set, and a public
@@ -39,7 +40,9 @@ from harness import arming_replay
 # so each is an arming-path trigger that the replay never clears.
 _REPLAY_DIR = "tools/postplan-harness/harness/"
 _REPLAY_GUARD_PATHS = tuple(_REPLAY_DIR + n for n in (
-    "arming_replay.py", "arming_replay_driver.py", "arming_replay_corpus.json", "merge_danger.py"))
+    "arming_replay.py", "arming_replay_driver.py", "arming_replay_corpus.json", "merge_danger.py",
+    # Its SITE_STATIC_TABLES list decides which migrations trigger 1 may call two-way.
+    "migration_revert_proof.py"))
 
 DOORS = ("two-way", "one-way")                                  # index = rank; higher is more dangerous
 BLAST = ("localized", "module", "site-wide", "external")        # index = rank
@@ -186,10 +189,15 @@ def derive_merge_danger(
     # note or a `-- G1: ... would truncate` remark does not force the door; an unterminated
     # block or quote is matched raw (fail closed). The `-- destructive-migration[trigger]:`
     # bypass marker is never read: a bypassed destructive migration is still irreversible.
+    # Since PR #3889 a revert deploy runs a migration's paired down SQL, so a diff whose every
+    # up migration migration_revert_proof proves revertible stays two-way. The proof refuses
+    # any table site code may write after merge (only SITE_STATIC_TABLES qualify, empty today):
+    # reloading a backup there would wipe every row written since merge. Any unproven
+    # migration, or a down file with no up partner in the diff, keeps every path (fail closed).
     migrations = [p for p in paths if _MIGRATION_RE.match(p)]
     if migrations and DESTRUCTIVE_SQL.search(
             strip_added_sql_comments(_migration_sections(diff_text or ""))):
-        for p in migrations:
+        for p in unproven_migrations(migrations, diff_text or "", read_candidate):
             add(f"destructive-migration:{p}")
 
     # 2. Prod external state and outbound senders that can reach a GM.

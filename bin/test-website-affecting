@@ -57,6 +57,8 @@ assert_exit "exempt-main-yml"        1 ".github/workflows/main.yml"
 assert_exit "exempt-smoke-prod"      1 ".github/workflows/smoke-prod.yml"
 assert_exit "exempt-cache-deps"      1 ".github/workflows/cache-dependencies.yml"
 assert_exit "exempt-deploy-rehearsal" 1 ".github/workflows/deploy-rehearsal.yml"
+assert_exit "exempt-harness-legs"    1 ".github/workflows/harness-legs.txt"
+assert_exit "harness-legs-plus-web"  0 $'.github/workflows/harness-legs.txt\nibl5/classes/Foo.php'
 
 # --- tools/ deny: host-side dev tooling never reaches a render ---
 assert_exit "deny-tools-harness"      1 "tools/postplan-harness/runner.py"

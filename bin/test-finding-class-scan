@@ -583,6 +583,8 @@ case_hotspot_issue_body() {
     body="$(cat "$STUB_DIR/gh.body.1")"
     expect_eq "hotspot: label is bug" "bug" "$(cat "$STUB_DIR/gh.label.1")"
     expect_has "hotspot: body names the hotspot file" "$body" 'ibl5/classes/Hot.php'
+    # The occurrences table also prints the path, so pin the recipe line hpath fills.
+    expect_has "hotspot: recipe names the hotspot file" "$body" '3. Fix `ibl5/classes/Hot.php` until every new case passes.'
     expect_has "hotspot: body carries the fix recipe" "$body" '## Fix recipe'
     expect_has "hotspot: recipe asks for a regression test" "$body" 'Add a regression test'
     if "$REPO_ROOT/bin/check-prose" --stdin < "$STUB_DIR/gh.body.1" >/dev/null 2>&1; then ok "hotspot: body passes check-prose"

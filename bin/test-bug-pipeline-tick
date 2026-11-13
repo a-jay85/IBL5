@@ -9,6 +9,8 @@
 set -u
 # shellcheck source=bin/lib/bug-pipeline-test-stubs.sh
 source "$(cd "$(dirname "$0")" && pwd)/lib/bug-pipeline-test-stubs.sh"
+# shellcheck source=bin/lib/claim-file.sh
+source "$(cd "$(dirname "$0")" && pwd)/lib/claim-file.sh"
 
 bpt_setup
 
@@ -613,6 +615,37 @@ bpt_set_actionable '[{"id":55,"status":"gathering","class":"feature","original_t
 bpt_run
 bpt_expect_eq "flag-off gathering exits 0" 0 "$BPT_RC"
 bpt_log_lacks "$STUB" transition.log "filed"  "flag-off gathering never reaches filed"
+
+# ── ci_lock_acquire: a mkdir that lies (uutils race) must not mint a second owner ─
+# The winner's mkdir and claim land between the loser's -d check and its own mkdir. The stub
+# models that: for the lock path it seeds the winner's pid file, then makes the dir and exits 0
+# like the lying stub; every other mkdir passes through. The loser's claim file then fails.
+bpt_named_ok()   { printf 'ok %s\n' "$1"; H_PASS=$((H_PASS + 1)); }
+bpt_named_fail() { printf 'FAIL %s%s\n' "$1" "${2:+ ($2)}"; H_FAIL=$((H_FAIL + 1)); FAILED=1; }
+_cl_lock="$STUB/lying-ci.lock"
+_cl_bin="$STUB/lying-ci-bin"
+claim_file_lying_mkdir_stub "$_cl_bin"
+printf '%s\n' '#!/bin/bash' \
+    'for a in "$@"; do last="$a"; done' \
+    'if [ "$last" = "'"$_cl_lock"'" ]; then' \
+    '    /bin/mkdir -p "$last" && printf "%s\n" "winner-12345" >"$last/pid"' \
+    '    exit 0' \
+    'fi' \
+    'exec /bin/mkdir "$@"' >| "$_cl_bin/mkdir"
+rm -rf "$_cl_lock"
+_cl_rc=0
+_cl_out="$(PATH="$_cl_bin:$PATH" BUG_PIPELINE_CI_AUTOFIX_LOCK="$_cl_lock" \
+    bash -c 'cd "$(dirname "$1")" && source "$1" && ci_lock_acquire' bpt-lock-shim "$BPT_DRIVER" 2>&1)" || _cl_rc=$?
+_cl_ok=1
+[ "$_cl_rc" = 1 ] || _cl_ok=0
+[ "$(cat "$_cl_lock/pid" 2>/dev/null)" = "winner-12345" ] || _cl_ok=0
+grep -qF "race" "$STUB/ci-autofix.log" 2>/dev/null || _cl_ok=0
+if [ "$_cl_ok" = 1 ]; then
+    bpt_named_ok ci_lock_lying_mkdir_one_owner
+else
+    bpt_named_fail ci_lock_lying_mkdir_one_owner "rc=$_cl_rc out=$_cl_out pid=$(cat "$_cl_lock/pid" 2>/dev/null)"
+fi
+rm -rf "$_cl_lock"
 
 echo "----"
 [ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"

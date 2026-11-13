@@ -11,6 +11,8 @@
 set -uo pipefail
 # shellcheck source=bin/lib/harness.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+# shellcheck source=bin/lib/claim-file.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/claim-file.sh"
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     awk 'NR==1{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"
@@ -40,6 +42,10 @@ EOF
 chmod +x "$STUBS/docker" "$STUBS/php"
 
 CASE_N=0
+
+# Named cases print `ok <name>` / `FAIL <name>` bare; the plan matrix greps those exact shapes.
+named_ok() { printf 'ok %s\n' "$1"; H_PASS=$((H_PASS + 1)); }
+named_fail() { printf 'FAIL %s%s\n' "$1" "${2:+ ($2)}"; H_FAIL=$((H_FAIL + 1)); }
 REPO=""
 LOG=""
 
@@ -101,6 +107,7 @@ make_repo() {
     echo readme >"$REPO/README.md"
     cp "$SRC_BIN/mutation-diff" "$REPO/bin/mutation-diff"
     cp "$SRC_BIN/lib/db-helpers.sh" "$REPO/bin/lib/db-helpers.sh"
+    cp "$SRC_BIN/lib/claim-file.sh" "$REPO/bin/lib/claim-file.sh"
     cat >"$REPO/bin/db-test-up" <<'EOF'
 #!/bin/sh
 echo "$*" >>"$LOG/dbtu.args"
@@ -254,6 +261,33 @@ mkdir -p "$LOCK_DIR_UNDER_TEST"
 run_md base
 h_eq "pidless lock exits 4: exit" 4 "$RC"
 h_contains "pidless lock exits 4" "$ERR" "no pid file"
+
+# 12b a mkdir that always exits 0 (the uutils race outcome) must not give a second run the
+# lock: the live holder's claim file already exists, so the run exits 4 and leaves the
+# winner's lock dir and pid alone (the EXIT trap must not rm -rf it).
+make_repo
+modify_class
+claim_file_lying_mkdir_stub "$TMP/lying$CASE_N" || exit 2
+/bin/sleep 60 &
+HOLDER_PID=$!
+mkdir -p "$LOCK_DIR_UNDER_TEST"
+echo "$HOLDER_PID" >"$LOCK_DIR_UNDER_TEST/pid"
+RC=0
+OUT="$(cd "$REPO" && PATH="$TMP/lying$CASE_N:$STUBS:$PATH" bin/mutation-diff base 2>"$TMP/stderr")" || RC=$?
+ERR="$(cat "$TMP/stderr")"
+kill "$HOLDER_PID" 2>/dev/null
+wait "$HOLDER_PID" 2>/dev/null || true
+md_ok=1
+[ "$RC" = 4 ] || md_ok=0
+case "$OUT$ERR" in *"another bin/mutation-diff run holds"*) ;; *) md_ok=0 ;; esac
+[ -d "$LOCK_DIR_UNDER_TEST" ] || md_ok=0
+[ "$(cat "$LOCK_DIR_UNDER_TEST/pid" 2>/dev/null)" = "$HOLDER_PID" ] || md_ok=0
+[ ! -e "$LOG/dbtu.args" ] || md_ok=0
+if [ "$md_ok" = 1 ]; then
+    named_ok md_lying_mkdir_loser_keeps_winner_lock
+else
+    named_fail md_lying_mkdir_loser_keeps_winner_lock "rc=$RC out=$OUT err=$ERR pid=$(cat "$LOCK_DIR_UNDER_TEST/pid" 2>/dev/null) want=$HOLDER_PID"
+fi
 
 # 13
 make_repo

@@ -11,12 +11,17 @@
 set -uo pipefail
 # shellcheck source=bin/lib/harness.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+# shellcheck source=bin/lib/claim-file.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/claim-file.sh"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOOP="$REPO_ROOT/bin/burndown-loop"
 
 pass() { h_pass "$1"; }
 fail() { h_fail "$@"; }
+# Named cases print `ok <name>` / `FAIL <name>` bare; the plan matrix greps those exact shapes.
+named_ok() { printf 'ok %s\n' "$1"; H_PASS=$((H_PASS + 1)); }
+named_fail() { printf 'FAIL %s%s\n' "$1" "${2:+ ($2)}"; H_FAIL=$((H_FAIL + 1)); }
 
 assert_eq() {  # name expected actual
     if [ "$2" = "$3" ]; then pass "$1"; else fail "$1" "expected [$2] got [$3]"; fi
@@ -522,6 +527,33 @@ test_lock_live_exits_4() {
     assert_eq lock_live:rc 4 "$RC"
     assert_contains lock_live:msg "$OUT" "already running"
     assert_no_file lock_live:no-claude "$T/claude.calls"
+}
+
+# A mkdir that always exits 0 (the uutils race outcome) must not give a second runner the lock:
+# the claim file under the live holder's lock dir already exists, so the runner exits 4.
+test_lock_lying_mkdir_one_runner() {
+    local holder before ok=1
+    new_env
+    seed_usage 0 1
+    claim_file_lying_mkdir_stub "$T/lying" || { named_fail bl_lying_mkdir_one_runner "stub setup"; return 0; }
+    /bin/sleep 60 &
+    holder=$!
+    mkdir -p "$STATE/lock"
+    echo "$holder" > "$STATE/lock/pid"
+    before=$(cat "$STATE/lock/pid")
+    OUT=$(PATH="$T/lying:$PATH" "$LOOP" run --once 2>&1)
+    RC=$?
+    kill "$holder" 2>/dev/null
+    wait "$holder" 2>/dev/null
+    [ "$RC" = 4 ] || ok=0
+    case "$OUT" in *"burndown-loop: already running"*) ;; *) ok=0 ;; esac
+    [ "$(cat "$STATE/lock/pid" 2>/dev/null)" = "$before" ] || ok=0
+    [ ! -e "$T/claude.calls" ] || ok=0
+    if [ "$ok" = 1 ]; then
+        named_ok bl_lying_mkdir_one_runner
+    else
+        named_fail bl_lying_mkdir_one_runner "rc=$RC out=$OUT pid=$(cat "$STATE/lock/pid" 2>/dev/null) want=$before"
+    fi
 }
 
 test_lock_stale_reclaimed() {

@@ -46,6 +46,7 @@ fi
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=bin/lib/db-helpers.sh
 source "$REPO_ROOT/bin/lib/db-helpers.sh"
+source "$REPO_ROOT/bin/lib/claim-file.sh"
 
 BASE=""
 NPOS=0
@@ -131,8 +132,7 @@ fi
 LOCK_DIR="${MUTATION_DIFF_LOCK_DIR:-/tmp/ibl5-mutation-diff.lock}"
 LOCK_HELD=0
 trap 'if [ -n "${INFECTION_LOG:-}" ]; then rm -f "$INFECTION_LOG"; fi; if [ "${LOCK_HELD:-0}" = 1 ]; then rm -rf "$LOCK_DIR"; fi' EXIT
-if mkdir "$LOCK_DIR" 2>/dev/null; then
-    echo "$$" >"$LOCK_DIR/pid"
+if mkdir "$LOCK_DIR" 2>/dev/null && claim_file "$LOCK_DIR/pid" printf '%s\n' "$$"; then
     LOCK_HELD=1
 else
     pid=""
@@ -149,11 +149,10 @@ else
     fi
     echo "Notice: reclaiming stale lock $LOCK_DIR (pid $pid is not running)."
     rm -rf "$LOCK_DIR"
-    if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+    if ! { mkdir "$LOCK_DIR" 2>/dev/null && claim_file "$LOCK_DIR/pid" printf '%s\n' "$$"; }; then
         echo "Error: could not take $LOCK_DIR after reclaiming it." >&2
         exit 4
     fi
-    echo "$$" >"$LOCK_DIR/pid"
     LOCK_HELD=1
 fi
 

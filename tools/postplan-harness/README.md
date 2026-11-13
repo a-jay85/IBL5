@@ -51,7 +51,10 @@ not land. `result.json` carries `retries` (`{"conflict-review": 1, "merge-danger
 only when a retry ran. No per-run call cap exists to raise: the budget grows by at most one
 `conflict-review` call per run.
 Arming-path and gate-removed changes carry ` · Self-governing: yes` with a two-way Door, and
-condition (18) holds them as `SELF-GOVERNING`. The arm step re-checks a two-way body against the
+condition (18) holds them as `SELF-GOVERNING`. An arming-path change limited to Python files
+under `harness/` drops the segment when the arming replay (ADR-0246) shows no loosened decision
+over `harness/arming_replay_corpus.json`. Any replay failure keeps the segment, and the Why
+records the record counts. The arm step re-checks a two-way body against the
 diff floor, so a stripped segment or a hand-lowered Door still holds.
 
 **Second-reviewer clear (ADR-0231).** A blind Opus seat may clear conditions 7, 10, 12 and 17. It runs only when every blocked condition is one of those four, and a floor keeps one-way and merge-rule changes with the owner. The UI path floor covers all four conditions: a PR that changes a UI file gets no seat. Condition 21 is never clearable, so a reviewer-added hold keeps the seat from running. Condition 7 also needs every `hold_trigger` token to be reviewer-clearable (`security-surface`, `gate-weakening`, `golden-snapshot`). The owner-held tokens include `bootstrap-hazard`, `security-irreducible` and `golden-new`, the must-ask shapes of gate 14. The verdict binds to the tree captured before the spawn, so any later push makes it stale. Each clear prints in the merge digest with the condition and the reviewer's reason.

@@ -581,6 +581,13 @@ def test_derive_arming_path_only_two_way_self_governing():
     assert "arming-path:bin/lib/pr-armable.sh" in d.triggers
 
 
+def test_arming_python_path_is_self_governing_without_replay():
+    d = _derive([("M", "tools/postplan-harness/harness/armable.py")])
+    assert d.self_governing is True
+    assert "arming-path:tools/postplan-harness/harness/armable.py" in d.triggers
+    assert d.why == "mechanical: arming-path:tools/postplan-harness/harness/armable.py"
+
+
 def test_derive_gate_removed_only_two_way_self_governing():
     d = _derive([("D", "bin/check-foo")], gates=_GATE_RM)
     assert d.door == "two-way"

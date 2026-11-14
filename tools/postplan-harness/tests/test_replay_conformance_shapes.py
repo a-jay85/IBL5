@@ -216,3 +216,18 @@ def test_ci_runs_the_whole_harness_suite_with_the_documented_command():
     """`.github/workflows/python-tests.yml:54` is the command the whole-suite gate must match."""
     workflow = (REPO / ".github" / "workflows" / "python-tests.yml").read_text(encoding="utf-8")
     assert "python -m pytest tools/postplan-harness/tests/ -q" in workflow
+
+
+def test_phase_with_touched_evidence_path_is_not_missing():
+    """Mutation caught: the `_touched` candidate check in phase_omission_items set to `if False:`.
+
+    The heading carries no `.` word and no identifier, and no diff_text is passed, so the
+    heading-named and content-match clearances cannot rescue the phase.
+    """
+    from harness.conformance import phase_omission_items
+    from harness.planfile import parse_phases
+    from harness.state import PlanInfo
+
+    plan = PlanInfo(found=True, has_matrix=True,
+                    phases=parse_phases("## Phase 1: Mask the stack\n\nEdit `bin/wt-up`.\n"))
+    assert phase_omission_items(plan, ["bin/wt-up"], tracked_files=["bin/wt-up"]) == []

@@ -732,8 +732,10 @@ _EXAMPLE_SUFFIX_RE = re.compile(r"^\s*\(example\)")
 # alone survive the (example) skip below. Token side is the exact uppercase literal
 # (`NNN`/`NNNN` for a migration, `NNNN` for an ADR); `nnn`, `N{5}` and any other
 # directory are not placeholders and stay skipped like every other (example) token.
+# A migration placeholder may end `.sql` or `.php` (a PHP migration driver, as in
+# `ibl5/migrations/171_restore_2004_suns_heat_boxscore.php`); every other suffix stays skipped.
 _PLACEHOLDER_TOKEN_RE = re.compile(
-    r"^(?:ibl5/migrations/N{3,4}_[^/\s]+\.sql|ibl5/docs/decisions/NNNN-[^/\s]+\.md)$")
+    r"^(?:ibl5/migrations/N{3,4}_[^/\s]+\.(?:sql|php)|ibl5/docs/decisions/NNNN-[^/\s]+\.md)$")
 _LINE_SUFFIX_RE = re.compile(r"(?::|#)L?\d+(?:-L?\d+)?$")
 NO_DIFF_MIN_REASON = 15
 _NO_DIFF_MARKER_RE = re.compile(r"^\s*(?:[-*]\s+)?\*\*No diff:\*\*[ \t]*(.*?)\s*$")

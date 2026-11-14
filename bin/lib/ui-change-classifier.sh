@@ -172,6 +172,20 @@ _ui_lock_entry_name() {
     printf '%s %s\n' "$key" "$name"
 }
 
+# _ui_lock_key_names <key> <name>: rc 0 when the lock key names its own package:
+# the key equals the name, or the key is a nested path whose parent part ends in
+# a whole package name. A parent part ending in a bare scope (@x) is rejected,
+# so key "@evil/bar" cannot pass for package "bar".
+_ui_lock_key_names() {
+    local key="$1" name="$2" parent last
+    [ "$key" = "$name" ] && return 0
+    [ "${key%/"$name"}" != "$key" ] || return 1
+    parent="${key%/"$name"}"
+    last="${parent##*/}"
+    case "$last" in @*) return 1 ;; esac
+    return 0
+}
+
 # _ui_lock_ok <base_root> <head_root>: rc 0 when every changed line of
 # ibl5/bun.lock is a registry entry for a package outside the gallery
 # toolchain, or a workspace devDependencies line that matches its own side's
@@ -191,7 +205,7 @@ _ui_lock_ok() {
             jq -e --arg k "$key" --arg v "$spec" '.devDependencies[$k] == $v' "$side/ibl5/package.json" >/dev/null 2>&1 || return 1
         elif kn=$(_ui_lock_entry_name "$body"); then
             read -r key name <<< "$kn"
-            { [ "$key" = "$name" ] || [ "${key%/"$name"}" != "$key" ]; } || return 1
+            _ui_lock_key_names "$key" "$name" || return 1
             if _ui_toolchain "$key" || _ui_toolchain "$name"; then return 1; fi
         else return 1  # any other lock line holds
         fi

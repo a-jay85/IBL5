@@ -1835,6 +1835,8 @@ dp_reset; DP_L_TW_WS='^4.3.7' dp_head_3920
 dp_verdict_is dp_lock_workspace_mismatch_holds ui-paths "$BOT" synchronize "" "$L" "$P"
 dp_reset; DP_L_TWCSS_NAME=evil dp_head_3920
 dp_verdict_is dp_lock_key_swap_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_L_EXTRA="\"@evil/left-pad\": [\"left-pad@1.3.0\", \"\", {}, \"sha512-$DP_SHA_B\"]," dp_head_3920
+dp_verdict_is dp_lock_scope_key_swap_holds ui-paths "$BOT" synchronize "" "$L" "$P"
 dp_reset; dp_head_3920; mv "$DP/head/ibl5/package.json" "$DP/real.json"; ln -s "$DP/real.json" "$DP/head/ibl5/package.json"
 dp_verdict_is dp_symlink_holds ui-paths "$BOT" synchronize "" "$L" "$P"
 # Every registry entry in the real ibl5/bun.lock fits the entry shape, so the

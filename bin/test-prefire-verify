@@ -25,6 +25,9 @@ export IBL5_USAGE_GATE_STATE_DIR="$TMP/gate"
 mkdir -p "$IBL5_USAGE_GATE_STATE_DIR"
 export POSTPLAN_LOG_DIR="$TMP/runlog" PLAN_NOW_LOG_DIR="$TMP/runlog"
 unset CLAUDE_HEADLESS SHELLCHECK_OPTS
+# The phases stage runs conformance against the plan; true ignores its arguments and
+# exits 0, so every case not about that stage passes it. Phases cases override this.
+export PREFIRE_PHASES_CMD=true
 
 WHY=""      # failure reasons for the current case
 OUT=""      # combined stdout+stderr of the last run
@@ -56,7 +59,8 @@ new_case() {
     R="$D/repo"
     CNT="$D/cnt"
     PLAN="$D/plan.md"
-    mkdir -p "$R/ibl5/vendor/bin" "$CNT" "$D/stubs"
+    # tools/postplan-harness: the phases stage runs from it. An empty dir is not in the tree hash.
+    mkdir -p "$R/ibl5/vendor/bin" "$R/tools/postplan-harness" "$CNT" "$D/stubs"
     export CNT
     unset STUB_PHPUNIT_RC STUB_MUT_MODE STUB_PYTEST_RC STUB_PYTEST_PREREQ_RC
     cat > "$R/ibl5/vendor/bin/phpunit" <<'EOF'
@@ -378,7 +382,7 @@ test_all_never_invokes_infection() {
     chmod +x "$R/bin/mutation-diff" "$R/ibl5/bin/check-infection-excludes"
     run_gate --plan "$PLAN"
     want_rc 0
-    want_out "all requested stages passed (matrix phpunit pytest)"
+    want_out "all requested stages passed (phases matrix phpunit pytest)"
     want_cnt mutation 0
     want_cnt excludes 0
     [ ! -e "$D/mutation-diff-called" ] || note "bin/mutation-diff ran under --stage all"
@@ -429,6 +433,7 @@ new_ppn_case() {
     ) || { echo "HARNESS-SETUP: ppn fixture failed" >&2; exit 2; }
     git -C "$WT" config branch.feat-x.iblBase master
     printf 'new\n' > "$WT/NewTest.php"
+    mkdir -p "$WT/tools/postplan-harness"   # the phases stage runs from here
     R="$WT"   # the gate state helpers now point at the worktree
     PLAN="$D/plan.md"
     rm -f "$D"/runlog.* 2>/dev/null || true
@@ -807,7 +812,7 @@ case_fire_point_skips_exec_mutations() {
     OUT=$(cd "$R" && PREFIRE_EXEC_MUTATIONS_LIB="$D/stubs/xmlib-sentinel" "$GATE" --base master --plan "$PLAN" --fire-point 2>&1); RC=$?
     want_rc 0
     refute_out "exec-mutations passed"
-    want_out "all requested stages passed (matrix phpunit pytest)"
+    want_out "all requested stages passed (phases matrix phpunit pytest)"
     [ ! -e "$D/xmlib-called" ] || note "plan-exec-mutations ran at the fire point"
 }
 
@@ -1131,7 +1136,7 @@ test_xm_bad_stage_rejected() {
     new_case
     run_gate --stage exec_mutations
     want_rc 2
-    want_out "--stage must be matrix, phpunit, pytest, exec-mutations, or all"
+    want_out "--stage must be matrix, phases, phpunit, pytest, exec-mutations, or all"
 }
 
 test_help_lists_exec_mutations() {
@@ -1712,7 +1717,7 @@ test_stage_rejects_unknown_name_lists_pytest() {
     new_case
     run_gate --stage pytests
     want_rc 2
-    want_out "--stage must be matrix, phpunit, pytest, exec-mutations, or all (got 'pytests')"
+    want_out "--stage must be matrix, phases, phpunit, pytest, exec-mutations, or all (got 'pytests')"
 }
 
 test_pytest_all_includes_pytest_stage() {
@@ -1721,8 +1726,127 @@ test_pytest_all_includes_pytest_stage() {
     touch_file tools/postplan-harness/tests/test_unrelated.py
     run_gate --plan "$PLAN"
     want_rc 0
-    want_out "all requested stages passed (matrix phpunit pytest)"
+    want_out "all requested stages passed (phases matrix phpunit pytest)"
     want_cnt pytest 1
+}
+
+# ---------------------------------------------------------------------------
+# phases stage: conformance's MISSING-PHASE check on the working tree
+# ---------------------------------------------------------------------------
+# phases_stub <exit-code> <stdout-line>  — writes $D/stubs/phases and points the seam at it.
+phases_stub() {
+    printf '#!/usr/bin/env bash\necho run >> "$CNT/phases"\nprintf "%%s\\n" %q\nexit %s\n' "$2" "$1" > "$D/stubs/phases"
+    chmod +x "$D/stubs/phases"
+    export PREFIRE_PHASES_CMD="$D/stubs/phases"
+}
+
+# phases stage: stub MISSING-PHASE fails
+test_phases_stub_missing_phase_fails() {
+    new_case
+    green_plan
+    phases_stub 1 'MISSING-PHASE: 2 — Phase 2: x (phase cites a; none appeared in the diff)'
+    run_gate --plan "$PLAN" --stage phases
+    export PREFIRE_PHASES_CMD=true
+    want_rc 1
+    want_out 'MISSING-PHASE: 2'
+    want_out 'FAIL phases: a plan phase shows no diff'
+    want_cnt phases 1
+}
+
+# phases stage: non-item failures exit 3
+test_phases_non_item_failures_exit_3() {
+    new_case
+    green_plan
+    phases_stub 1 'Traceback (most recent call last):'
+    run_gate --plan "$PLAN" --stage phases
+    want_rc 3
+    want_out 'FAIL phases could not run'
+    want_out '(conformance exit 1)'
+    refute_out 'FAIL phases: a plan phase shows no diff'
+    phases_stub 2 'cannot evaluate'
+    run_gate --plan "$PLAN" --stage phases
+    want_rc 3
+    want_out 'FAIL phases could not run'
+    want_out '(conformance exit 2)'
+    export PREFIRE_PHASES_CMD=/nonexistent/conformance
+    run_gate --plan "$PLAN" --stage phases
+    export PREFIRE_PHASES_CMD=true
+    want_rc 3
+    want_out 'FAIL phases could not run'
+}
+
+# phases stage: no plan skips
+test_phases_no_plan_skips() {
+    new_case
+    phases_stub 1 'MISSING-PHASE: 1 — must not run'
+    run_gate --stage phases
+    export PREFIRE_PHASES_CMD=true
+    want_rc 0
+    want_out 'SKIP phases'
+    want_cnt phases 0
+}
+
+# phases stage: near-miss stage name rejected
+test_phases_near_miss_stage_name_rejected() {
+    new_case
+    green_plan
+    run_gate --plan "$PLAN" --stage phase
+    want_rc 2
+    want_out '--stage must be matrix, phases'
+    want_out "(got 'phase')"
+}
+
+# phases stage: all order runs phases first
+test_phases_all_order_runs_phases_first() {
+    new_case
+    green_plan
+    run_gate --plan "$PLAN"
+    want_rc 0
+    want_out 'all requested stages passed (phases matrix phpunit pytest)'
+}
+
+# phases_real_case: new_case plus a tracked src/a.txt, the real harness symlinked
+# in, and origin/master at HEAD. The plan has one phase citing the untouched file.
+phases_real_case() { # <extra phase-body line, may be empty>
+    new_case
+    (
+        cd "$R" || exit 1
+        mkdir -p src tools
+        printf 'a\n' > src/a.txt
+        git add src/a.txt && git commit -q -m src
+        rmdir tools/postplan-harness
+        ln -s "$REPO/tools/postplan-harness" tools/postplan-harness
+        printf 'tools/\n' >> .git/info/exclude
+        git update-ref refs/remotes/origin/master HEAD
+    ) || { echo "HARNESS-SETUP: phases fixture failed" >&2; exit 2; }
+    {
+        printf '# Plan\n\n## Phase 1: Edit the file\n\nEdit `src/a.txt`.\n'
+        [ -n "$1" ] && printf '%s\n' "$1"
+        printf '\n## Verification Matrix\n\n'
+        printf '| # | What to verify | Test type | Timing | Test file / location |\n'
+        printf '|---|----------------|-----------|--------|----------------------|\n'
+        printf '%s\n' "$(row 1 "echo x")"
+    } > "$PLAN"
+}
+
+# phases stage: real conformance with the seam unset
+test_phases_real_conformance_seam_unset() {
+    phases_real_case ''
+    OUT=$(cd "$R" && env -u PREFIRE_PHASES_CMD "$GATE" --base master --plan "$PLAN" --stage phases 2>&1); RC=$?
+    want_rc 1
+    want_out 'MISSING-PHASE: 1'
+    phases_real_case '**No diff:** landed on master in abc1234 (#1)'
+    OUT=$(cd "$R" && env -u PREFIRE_PHASES_CMD "$GATE" --base master --plan "$PLAN" --stage phases 2>&1); RC=$?
+    want_rc 0
+    want_out 'phases passed'
+}
+
+# phases stage: empty seam uses the default
+test_phases_empty_seam_uses_default() {
+    phases_real_case ''
+    OUT=$(cd "$R" && env PREFIRE_PHASES_CMD="" "$GATE" --base master --plan "$PLAN" --stage phases 2>&1); RC=$?
+    want_rc 1
+    want_out 'MISSING-PHASE: 1'
 }
 
 # ---------------------------------------------------------------------------
@@ -1930,6 +2054,13 @@ test_pytest_failing_test_exits_1
 test_pytest_subset_pass_is_cached
 test_stage_rejects_unknown_name_lists_pytest
 test_pytest_all_includes_pytest_stage
+test_phases_stub_missing_phase_fails
+test_phases_non_item_failures_exit_3
+test_phases_no_plan_skips
+test_phases_near_miss_stage_name_rejected
+test_phases_all_order_runs_phases_first
+test_phases_real_conformance_seam_unset
+test_phases_empty_seam_uses_default
 "
 
 if [ $# -gt 0 ]; then CASES="$*"; else CASES="$ALL_CASES"; fi

@@ -511,6 +511,7 @@ branch: demo-slug
 base: master
 commit_type: "chore"
 auto_merge: false
+hold_trigger: gate-weakening
 impl_model: sonnet
 last_verified: 2026-07-29
 ---

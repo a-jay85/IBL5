@@ -18,7 +18,7 @@
 # a row fails on the findings CI fails on and passes on the info notes CI ignores.
 # A row that sets SHELLCHECK_OPTS inline overrides it.
 #
-# Usage: bin/lib/prefire-verify [--plan <path>] [--stage matrix|phpunit|pytest|exec-mutations|all]
+# Usage: bin/lib/prefire-verify [--plan <path>] [--stage matrix|phases|phpunit|pytest|exec-mutations|all]
 #                               [--base <ref>] [--bypass <reason>] [--fire-point]
 #   --fire-point  exec-mutations only: use the larger limits (300 s per check run, 1800 s
 #                 total) instead of the implementer's 120 s / 300 s. The fire point's "all" run
@@ -30,6 +30,7 @@
 #   0  every requested stage passed (fresh run, or a valid pass record for this tree)
 #   1  a check failed (the message names the matrix row or the stage)
 #      (an exec-mutations row that did not trip, or a mutation revert that failed)
+#      (a phases-stage MISSING-PHASE item: a plan phase whose cited files the diff never touched)
 #   2  usage error, including --plan with an empty value (omit the flag when there is no plan)
 #   3  prerequisite missing: vendor/bin/phpunit, python3 -m pytest, docker, the DB container, gtimeout/timeout
 #   4  the checks changed the working tree, so no pass record was written
@@ -38,6 +39,7 @@
 #   PREFIRE_PHPUNIT_CMD    default vendor/bin/phpunit, run from ibl5/; subset mode appends test paths as arguments
 #   PREFIRE_PYTEST_CMD     default python3 -m pytest; "<cmd> --version" is the prerequisite probe; a run goes from tools/postplan-harness/ with -q -p no:xdist -p no:cacheprovider and the test paths
 #   PREFIRE_DB_PROBE_CMD   default bin/db-query "SELECT 1", run from the repo root
+#   PREFIRE_PHASES_CMD     default python3 -m harness.conformance, run from tools/postplan-harness/ as "<cmd> --phases <plan> <root>"; empty means the default
 #   PREFIRE_EXEC_MUTATIONS_LIB  default bin/lib/plan-exec-mutations
 #
 # Environment:
@@ -82,9 +84,9 @@ while [ $# -gt 0 ]; do
 done
 
 case "$STAGE" in
-    matrix|phpunit|pytest|exec-mutations|all) : ;;
+    matrix|phases|phpunit|pytest|exec-mutations|all) : ;;
     infection) die 2 "--stage infection was removed; CI's required check \"Infection PHP (per-PR diff)\" covers mutation testing, so skip this call" ;;
-    *) die 2 "--stage must be matrix, phpunit, pytest, exec-mutations, or all (got '$STAGE')" ;;
+    *) die 2 "--stage must be matrix, phases, phpunit, pytest, exec-mutations, or all (got '$STAGE')" ;;
 esac
 case "${PREFIRE_PHPUNIT_FULL:-}" in
     ''|0|1) : ;;
@@ -716,9 +718,41 @@ stage_exec_mutations() {
     return 0
 }
 
+# --- phases stage -----------------------------------------------------------
+# Runs conformance's MISSING-PHASE check on the working tree. harness.conformance
+# --phases diffs origin/master...HEAD plus uncommitted and untracked paths, the
+# same base post-plan Phase 5.0 uses, so this stage takes no --base. Exit 1 only
+# when the run printed a MISSING-PHASE: item; any other non-zero result (an
+# ImportError also exits 1) means the check could not run, which is exit 3.
+stage_phases() {
+    local out rc cmd="${PREFIRE_PHASES_CMD:-python3 -m harness.conformance}"
+    if [ -z "$PLAN" ]; then # phases ad-hoc skip
+        say "SKIP phases: no plan (ad-hoc path)"
+        return 0
+    fi
+    if [ ! -d "$PYTEST_HOME" ]; then
+        say "FAIL phases prerequisite missing: $PYTEST_HOME not found" >&2
+        return 3
+    fi
+    out=$(cd "$PYTEST_HOME" && PYTHONDONTWRITEBYTECODE=1 bash -c "$cmd --phases \"\$@\"" prefire-phases "$PLAN" "$ROOT" 2>&1); rc=$?
+    if [ "$rc" -eq 0 ]; then
+        [ -n "$out" ] && printf '%s\n' "$out"
+        say "phases passed"
+        return 0
+    fi
+    if [ "$rc" -eq 1 ] && grep -q '^MISSING-PHASE:' <<< "$out"; then
+        printf '%s\n' "$out" >&2
+        say "FAIL phases: a plan phase shows no diff; follow the HINT line above, then re-run" >&2
+        return 1 # phases-red
+    fi
+    printf '%s\n' "$out" >&2
+    say "FAIL phases could not run (conformance exit $rc); fix the environment or the plan file, then re-run" >&2
+    return 3
+}
+
 # --- run --------------------------------------------------------------------
 case "$STAGE" in
-    all) STAGES="matrix phpunit pytest" ;;
+    all) STAGES="phases matrix phpunit pytest" ;;
     *)   STAGES="$STAGE" ;;
 esac
 

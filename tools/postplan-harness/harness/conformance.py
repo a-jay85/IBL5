@@ -358,9 +358,46 @@ def _heading_named_change(words: list[str], changed_files: list[str],
     return None
 
 
+# Heading identifier shape for the diff-content clearance in phase_omission_items:
+# letter/underscore start, >= 6 chars, and an inner underscore joining two alphanumerics
+# (`stage_pytest`, `SHELLCHECK_OPTS`). Plain words, all-caps words without an underscore
+# and camelCase brand words (`GitHub`) never qualify.
+_IDENTIFIER_SHAPE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{5,}$")
+_IDENTIFIER_JOIN = re.compile(r"[A-Za-z0-9]_[A-Za-z0-9]")
+
+
+def _added_lines(diff_text: str) -> list[str]:
+    """Content of every added line of a unified diff (leading `+` dropped). File headers
+    (`+++ `), removed lines and context lines are excluded."""
+    return [ln[1:] for ln in diff_text.splitlines()
+            if ln.startswith("+") and not ln.startswith("+++ ")]
+
+
+def _heading_identifiers(words: list[str]) -> list[str]:
+    """Heading words that are code identifiers (see _IDENTIFIER_SHAPE), deduped, in order."""
+    out: list[str] = []
+    for w in words:
+        tok = w[1:] if w.startswith("$") else w
+        if tok.endswith("()"):
+            tok = tok[:-2]
+        if _IDENTIFIER_SHAPE.match(tok) and _IDENTIFIER_JOIN.search(tok) and tok not in out:
+            out.append(tok)
+    return out
+
+
+def _content_matched_identifier(words: list[str], added: list[str]) -> str | None:
+    """First heading identifier present as a whole token on an added diff line, else None."""
+    for ident in _heading_identifiers(words):
+        pat = re.compile(rf"(?<![A-Za-z0-9_]){re.escape(ident)}(?![A-Za-z0-9_])")
+        if any(pat.search(ln) for ln in added):
+            return ident
+    return None
+
+
 def phase_omission_items(plan: PlanInfo, changed_files: list[str],
                          tracked_files: list[str] | tuple[str, ...] | None = None,
-                         notes: list[str] | None = None) -> list[str]:
+                         notes: list[str] | None = None,
+                         *, diff_text: str | None = None) -> list[str]:
     """`MISSING-PHASE:` items for plan phases with evidence paths none of which the diff touched.
 
     Exempt, in order: a phase whose heading carries an all-S `[phases: S]` marker
@@ -378,18 +415,24 @@ def phase_omission_items(plan: PlanInfo, changed_files: list[str],
     nothing. Hold-only: the items flow into arming condition (3) via check();
     fidelity.build_work_list excludes them from the fixer loop.
 
-    A phase citing a contract placeholder (`ibl5/migrations/NNN_<slug>.sql`,
+    A phase citing a contract placeholder (`ibl5/migrations/NNN_<slug>.sql` or `.php`,
     `ibl5/docs/decisions/NNNN-<slug>.md`) is cleared when a changed file in that directory
     carries the same suffix under any number (`_placeholder_deliverable`).
 
+    A phase that would still hold is cleared when `diff_text` is a non-empty string and a
+    heading identifier (underscore-joined, 6+ chars, see `_heading_identifiers`) appears as
+    a whole token on an added diff line. `None`, an empty diff, or an error while matching
+    keeps the hold (fail closed, today's behaviour).
+
     `notes` is an out-param like `resolutions` on `check`. Each exemption appends one
     `NO-DIFF-PHASE:` / `UNCHECKABLE-PHASE:` / `NON-REPO-CITATION:` / `PLACEHOLDER-MATCHED-PHASE:`
-    line, and a rejected marker appends
+    / `CONTENT-MATCHED-PHASE:` / `CONTENT-MATCH-ERROR:` line, and a rejected marker appends
     `NO-DIFF-IGNORED:`. Notes are never returned as items, so they never hold a PR.
     """
     if not plan.found or not plan.phases:
         return []
     deferred = set(plan.deferred_phase_numbers)
+    added: list[str] | None = None
     items: list[str] = []
     for ph in plan.phases:
         if ph.bookkeeping or ph.number in deferred:
@@ -426,6 +469,19 @@ def phase_omission_items(plan: PlanInfo, changed_files: list[str],
         if named:
             _note(notes, f"HEADING-NAMED-PHASE: {ph.number} — {ph.heading[:80]} "
                          f"(heading names {named[0]}, changed as {named[1]})")
+            continue
+        content_ident: str | None = None
+        if isinstance(diff_text, str) and diff_text:
+            try:
+                added = _added_lines(diff_text)
+                content_ident = _content_matched_identifier(ph.heading_words, added)
+            except Exception as exc:  # noqa: BLE001
+                content_ident = None  # fail closed: hold as today
+                _note(notes, f"CONTENT-MATCH-ERROR: {ph.number} — {type(exc).__name__}; "
+                             f"phase checked without diff content")
+        if content_ident:
+            _note(notes, f"CONTENT-MATCHED-PHASE: {ph.number} — {ph.heading[:80]} "
+                         f"(heading identifier {content_ident} on an added diff line)")
             continue
         sample = ", ".join(cands[:3])
         more = f" (+{len(cands) - 3} more)" if len(cands) > 3 else ""
@@ -589,7 +645,8 @@ def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
     items: list[str] = _contract_items(plan, changed_files, phase5_status)
     # Runs before the has_matrix gate on purpose: a matrix-less doc/tooling plan still
     # has phases, and a phase that shipped nothing is the same defect either way.
-    items.extend(phase_omission_items(plan, changed_files, tracked_files, notes))
+    items.extend(phase_omission_items(plan, changed_files, tracked_files, notes,
+                                      diff_text=diff_body))
     if not plan.has_matrix:
         return items
     _tracked: set[str] | None = None  # lazy; only a (run-only) or reference-only miss pays for git ls-files
@@ -728,13 +785,85 @@ def main(argv: list[str] | None = None) -> int:
       1  items found — each printed to stdout, one per line
       2  could not evaluate — bad usage, non-absolute or missing plan path,
          unresolvable repo root, or `plan.found == False`
+
+    `--phases <abs-plan-path> [repo-root]` is a separate mode for bin/lib/prefire-verify.
+    It prints the `MISSING-PHASE:` items for the working tree, plus a `HINT:` line naming
+    the `**No diff:**` fix, and a non-failing `REMINDER:` line when a held plan marks
+    phases as landed or deferred. Same 0/1/2 exit contract. The default mode above never
+    reports `MISSING-PHASE:`.
     """
+    args = argv if argv is not None else sys.argv[1:]
+    if args and args[0] == "--phases":
+        return _phases_main(args[1:])
+    parsed = _parse_seam_args(args, "usage: python3 -m harness.conformance <abs-plan-path> [repo-root]")
+    if isinstance(parsed, int):
+        return parsed
+    plan, repo_root = parsed
+    items = early_missing_items(plan, _changed_files(repo_root))
+    for item in items:
+        print(item)
+    return 1 if items else 0
+
+
+PHASES_USAGE = "usage: python3 -m harness.conformance --phases <abs-plan-path> [repo-root]"
+PHASES_HINT = ("HINT: a phase above shows no diff. If its work already landed on master, "
+               "add `**No diff:** landed on master in <sha> (#PR)` to that phase body, "
+               "or list the phase number under `## Out of Scope`. Otherwise do the "
+               "phase's work.")
+
+
+def _phases_main(args: list[str]) -> int:
+    """`--phases` seam for bin/lib/prefire-verify: MISSING-PHASE items on the working tree."""
+    parsed = _parse_seam_args(args, PHASES_USAGE)
+    if isinstance(parsed, int):
+        return parsed
+    plan, repo_root = parsed
+    notes: list[str] = []
+    try:
+        tracked = _git_lines(["ls-files"], repo_root)
+        items = phase_omission_items(plan, _changed_files(repo_root), tracked_files=tracked, notes=notes)
+        reminder = _hold_trigger_reminder(plan)
+    except Exception as exc:  # noqa: BLE001 - any failure means the seam cannot evaluate
+        print(f"conformance --phases: could not evaluate: {exc}", file=sys.stderr)
+        return 2  # phases could not evaluate
+    for item in items:
+        print(item)
+    if items:
+        print(PHASES_HINT)
+    if reminder:
+        print(reminder)
+    return 1 if items else 0  # phases mode
+
+
+def _phase_marked(ph: PhaseInfo, deferred: set) -> bool:
+    """True when the phase carries an honoured `**No diff:**` marker or is listed deferred."""
+    return bool(ph.no_diff_reason) or ph.number in deferred
+
+
+def _hold_trigger_reminder(plan: PlanInfo) -> str | None:
+    """Non-failing reminder to re-derive hold_trigger when a held plan marks phases landed."""
+    from .planfile import frontmatter_hold_triggers  # local import keeps module-level cycle-free
+
+    with open(plan.path, encoding="utf-8") as fh:
+        triggers = frontmatter_hold_triggers(fh.read())
+    if not triggers:
+        return None
+    deferred = set(plan.deferred_phase_numbers)
+    marked = [str(ph.number) for ph in plan.phases if _phase_marked(ph, deferred)]
+    if not marked:
+        return None
+    return (f"REMINDER: this held plan marks phase(s) {', '.join(marked)} as landed or "
+            f"deferred; re-derive hold_trigger: ({', '.join(triggers)}) from what the final "
+            "diff touches (.claude/skills/plan/_validate-and-write.md). This line never "
+            "fails the check.")
+
+
+def _parse_seam_args(args: list[str], usage: str) -> tuple[PlanInfo, str] | int:
+    """Validate `<abs-plan-path> [repo-root]`; the exit code on error, else (plan, repo_root)."""
     from .planfile import locate_plan  # local import keeps module-level cycle-free
 
-    args = argv if argv is not None else sys.argv[1:]
     if not args or len(args) > 2:
-        print("usage: python3 -m harness.conformance <abs-plan-path> [repo-root]",
-              file=sys.stderr)
+        print(usage, file=sys.stderr)
         return 2
     plan_path = args[0]
     if not os.path.isabs(plan_path):
@@ -765,10 +894,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"conformance: plan not readable as a plan file: {plan_path}",
               file=sys.stderr)
         return 2
-    items = early_missing_items(plan, _changed_files(repo_root))
-    for item in items:
-        print(item)
-    return 1 if items else 0
+    return plan, repo_root
 
 
 if __name__ == "__main__":

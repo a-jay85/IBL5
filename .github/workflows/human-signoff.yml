@@ -170,6 +170,12 @@ jobs:
           # ui_dev_patch_exempt reads ibl5/package.json and ibl5/bun.lock from
           # both checkouts: the trusted base at .hs-base and the PR head at the root.
           export UI_BASE_DIR="$GITHUB_WORKSPACE/.hs-base" UI_HEAD_DIR="$GITHUB_WORKSPACE"
+          # The memo-hit gallery fallback reads the E2E memo coverage list from the
+          # base ref, never from PR-head code. A missing list has no include
+          # patterns, so the fallback refuses and the PR holds.
+          cp "$GITHUB_WORKSPACE/.hs-base/.github/ci-memo/e2e.paths" "$RUNNER_TEMP/base-e2e.paths" 2>/dev/null \
+            || : > "$RUNNER_TEMP/base-e2e.paths"
+          export UI_MEMO_PATHS_FILE="$RUNNER_TEMP/base-e2e.paths"
           # The approving label run skips the gallery wait so its record lands
           # before a sync run's bounded HS_AWAIT wait gives up.
           UI_VERDICT=$(ui_workflow_verdict "$PATHS" "$PR_AUTHOR" ui_fetch_gallery_gh "$ACTION" "$EVENT_LABEL") || true

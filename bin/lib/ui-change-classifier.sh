@@ -290,8 +290,10 @@ ui_await_gallery() {
 # for this PR. The PR matches by number in pull_requests[], or by head branch
 # and head repo, because the API leaves pull_requests[] empty for a fork PR.
 # A same-tree re-push gets no reuse. An E2E memo hit uploads nothing for the
-# new SHA, so that PR holds as vr-missing. A PR that edits a gallery producer
-# holds on its paths (UI_PATH_RE).
+# new SHA. `_ui_memo_fallback` then reuses the gallery of an earlier same-PR
+# run, but only when no file changed since that run matches `UI_PATH_RE` or the
+# base-ref `.github/ci-memo/e2e.paths` list. Any doubt keeps `vr-missing`. A PR
+# that edits a gallery producer holds on its paths (UI_PATH_RE).
 _ui_e2e_runs() {
     local json
     case "${HEAD_SHA:-}" in ''|*[!0-9a-f]*) return 1 ;; esac
@@ -308,12 +310,12 @@ _ui_e2e_runs() {
         | sort_by(.created_at) | reverse | .[] | "\(.id) \(.status)"' <<< "$json" || return 1
 }
 
-# _ui_artifact_id <run_id>: prints the newest unexpired gallery artifact id that
-# this run uploaded for HEAD_SHA, or nothing. rc 1 on a gh error.
+# _ui_artifact_id <run_id> [sha]: prints the newest unexpired gallery artifact id
+# that this run uploaded for <sha> (default HEAD_SHA), or nothing. rc 1 on a gh error.
 _ui_artifact_id() {
-    local json
+    local want_sha="${2:-$HEAD_SHA}" json
     json=$(gh api "repos/$GH_REPO/actions/runs/$1/artifacts?per_page=100") || return 1
-    jq -r --arg pre "$UI_GALLERY_ARTIFACT_PREFIX" --arg sha "$HEAD_SHA" --argjson rid "$1" '
+    jq -r --arg pre "$UI_GALLERY_ARTIFACT_PREFIX" --arg sha "$want_sha" --argjson rid "$1" '
         [.artifacts[]?
          | select(.expired == false and (.name | startswith($pre))
                   and .workflow_run.id == $rid and .workflow_run.head_sha == $sha)]
@@ -335,6 +337,113 @@ _ui_download_gallery() {
     [ -s "$2" ] || return 1
 }
 
+_ui_memo_log() { printf 'UI memo fallback: %s\n' "$*" >&2; }
+
+# Path match for one e2e.paths entry. rc 0 match, 1 no match, 2 unknown magic.
+_ui_memo_pat_match() {
+    case "$3" in
+        ,glob,)
+            # shellcheck disable=SC2053
+            [[ $1 == $2 ]]; return ;;
+        ,|,,|,top,|,literal,) ;;
+        *) return 2 ;;
+    esac
+    [ "$1" = "$2" ] || [[ $1 == "$2"/* ]]
+}
+
+# rc 0 when the base-ref e2e.paths list covers <path> (any include, no exclude).
+# Unknown magic counts as an include match and never as an exclude match.
+_ui_memo_covered() {
+    local path="$1" line magic pat m rc inc=0 exc=0
+    while IFS= read -r line || [ -n "$line" ]; do
+        case "$line" in ''|'#'*) continue ;; esac
+        magic=""; pat="$line"
+        case "$line" in
+            ':('*')'*) magic="${line#:(}"; magic="${magic%%)*}"; pat="${line#*)}" ;;
+            ':!'*|':^'*) magic="exclude"; pat="${line#:?}" ;;
+        esac
+        m=",$magic,"; m="${m//,exclude,/,}"
+        rc=0; _ui_memo_pat_match "$path" "$pat" "$m" || rc=$?
+        case ",$magic," in
+            *,exclude,*) if [ "$rc" = 0 ]; then exc=1; fi ;;
+            *) if [ "$rc" != 1 ]; then inc=1; fi ;;
+        esac
+    done <"$UI_MEMO_PATHS_FILE"
+    [ "$inc" = 1 ] && [ "$exc" = 0 ]
+}
+
+# rc 0 when the run's jobs look like a memo hit. This is a trigger, not proof.
+_ui_memo_hit_shape() {
+    local jobs
+    jobs=$(gh api "repos/$GH_REPO/actions/runs/$1/jobs?per_page=100" 2>/dev/null) || { _ui_memo_log "jobs API unreadable for run $1"; return 1; }
+    jq -e '[.jobs[]
+        | select((.name == "E2E Memo Check" and .conclusion == "success")
+              or (.name == "Visual Regression" and .conclusion == "skipped")
+              or (.name == "E2E Tests" and .conclusion == "success"))
+        | .name] | unique | length == 3' >/dev/null <<<"$jobs"
+}
+
+# Same-PR source candidates: "<id> <head_sha>", newest first, at most 5.
+# The same-PR rule mirrors _ui_e2e_runs; keep the two in sync.
+_ui_memo_source_runs() {
+    gh api "repos/$GH_REPO/actions/workflows/e2e-tests.yml/runs?event=pull_request&branch=$HEAD_REF&per_page=50" 2>/dev/null \
+        | jq -r --arg h "$HEAD_SHA" --arg wf ".github/workflows/e2e-tests.yml" \
+            --argjson mpr "$PR" --arg mref "$HEAD_REF" --arg mrepo "$HEAD_REPO" '
+        [.workflow_runs[]
+          | select(.path == $wf and .event == "pull_request")
+          | select(.status == "completed" and .conclusion == "success")
+          | select(.head_sha != $h)
+          | select((((.pull_requests // []) | map(.number) | index($mpr)) != null)
+                   or (.head_branch == $mref and .head_repository.full_name == $mrepo))]
+        | sort_by(.created_at, .id) | reverse | .[:5][] | "\(.id) \(.head_sha)"'
+}
+
+# rc 0 when every file changed between <src_sha> and HEAD_SHA is outside both
+# UI_PATH_RE and the base-ref memo coverage list.
+_ui_memo_neutral_diff() {
+    local src="$1" cmp f
+    cmp=$(gh api "repos/$GH_REPO/compare/$src...$HEAD_SHA" 2>/dev/null) || { _ui_memo_log "compare API unreadable for $src"; return 1; }
+    jq -e '.status == "ahead" or .status == "identical"' >/dev/null <<<"$cmp" || { _ui_memo_log "compare status $(jq -r .status <<<"$cmp") for $src"; return 1; }
+    jq -e '((.files // []) | length) < 300' >/dev/null <<<"$cmp" || { _ui_memo_log "compare file list may be truncated for $src"; return 1; }
+    while IFS= read -r f; do
+        [ -n "$f" ] || continue
+        if command grep -Eq -- "$UI_PATH_RE" <<<"$f"; then _ui_memo_log "UI path changed since $src: $f"; return 1; fi
+        if _ui_memo_covered "$f"; then _ui_memo_log "memo-covered path changed since $src: $f"; return 1; fi
+    done <<<"$(jq -r '(.files // [])[] | .filename, (.previous_filename // empty)' <<<"$cmp")"
+    return 0
+}
+
+# Called only when every trusted head run completed with no gallery artifact.
+# UI_PR_PATHS is the PR path list file that ui_workflow_verdict scopes.
+_ui_memo_fallback() {
+    local out="$1" n_inc head_id cands src_id src_sha art p
+    [ -n "${UI_MEMO_PATHS_FILE:-}" ] && [ -r "$UI_MEMO_PATHS_FILE" ] || { _ui_memo_log "no base-ref memo paths file"; return 1; }
+    n_inc=$(command grep -cvE '^[[:space:]]*(#|$)|^:\([^)]*exclude|^:[!^]' "$UI_MEMO_PATHS_FILE" || true)
+    [ "${n_inc:-0}" -gt 0 ] || { _ui_memo_log "memo paths file has no include patterns"; return 1; }
+    [ -n "${UI_PR_PATHS+x}" ] || { _ui_memo_log "PR path list unknown"; return 1; }
+    [ -r "$UI_PR_PATHS" ] || { _ui_memo_log "PR path list unreadable"; return 1; }
+    while IFS= read -r p || [ -n "$p" ]; do
+        case "$p" in
+            bin/ci-memo|.github/ci-memo/*) _ui_memo_log "PR edits memo machinery: $p"; return 1 ;;
+        esac
+    done <"$UI_PR_PATHS"
+    head_id=$(_ui_e2e_runs | awk 'NR==1{print $1}') || return 1
+    [ -n "$head_id" ] || return 1
+    _ui_memo_hit_shape "$head_id" || { _ui_memo_log "head run $head_id is not memo-hit shaped"; return 1; }
+    cands=$(_ui_memo_source_runs) || { _ui_memo_log "source run list unreadable"; return 1; }
+    while read -r src_id src_sha; do
+        [ -n "$src_id" ] || continue
+        art=$(_ui_artifact_id "$src_id" "$src_sha") || art=""
+        [ -n "$art" ] || continue
+        _ui_memo_neutral_diff "$src_sha" || continue
+        _ui_download_gallery "$art" "$out" || continue
+        _ui_memo_log "head run $head_id reused gallery of run $src_id (sha $src_sha)"
+        return 0
+    done <<<"$cands"
+    _ui_memo_log "no same-PR source run with an unexpired gallery and unchanged covered paths"
+    return 1
+}
+
 # ui_fetch_gallery_gh <out_file> — the production fetch for ui_await_gallery.
 # Env: see _ui_e2e_runs.
 #   rc 0 gallery written, 3 every trusted E2E run completed with no artifact,
@@ -354,8 +463,9 @@ ui_fetch_gallery_gh() {
         fi
         [ "$status" = completed ] || finished=0
     done <<< "$runs"
-    [ "$finished" = 1 ] && return 3
-    return 1
+    [ "$finished" = 1 ] || return 1
+    if _ui_memo_fallback "$out"; then return 0; fi
+    return 3
 }
 
 # ui_approving_event <action> <event_label>: rc 0 for the `labeled human-approved` event.
@@ -373,6 +483,7 @@ ui_approving_event() {
 # rc follows ui_decide (0 not-ui, 1 hold).
 # A Dependabot dev-dependency patch bump (ui_dev_patch_exempt) waits on the gallery like a non-UI PR.
 ui_workflow_verdict() {
+    local UI_PR_PATHS="$1"
     local paths="$1" author="$2" fetch="$3" renderable rc=0 gallery="" tmp dev_patch=0
     renderable=$(ui_renderable "$paths" "$author")
     ui_paths_touch_ui < "$paths" >/dev/null || rc=$?

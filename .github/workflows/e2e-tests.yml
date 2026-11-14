@@ -467,7 +467,10 @@ jobs:
       # PR changes the UI (bin/lib/ui-change-classifier.sh). The classifier
       # trusts this artifact only through the run API: this workflow, a
       # pull_request run for that PR, on its exact head SHA. The name alone
-      # proves nothing. An E2E memo hit uploads none, so that PR holds.
+      # proves nothing. A memo hit skips VR and uploads no gallery for this SHA.
+      # The human-signoff gate then reuses the gallery of the earlier same-PR
+      # run through `_ui_memo_fallback` in `bin/lib/ui-change-classifier.sh`, so
+      # `retention-days: 30` also bounds how long that reuse works.
       - name: Upload VR gallery JSON for the UI-review hold
         if: always() && steps.vr-gallery.outcome == 'success' && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

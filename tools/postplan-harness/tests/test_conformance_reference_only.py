@@ -173,3 +173,19 @@ def test_run_only_and_no_change_unaffected():
     vr_notes: list[str] = []
     assert check(_plan(HDR + VR_NO_CHANGE), [], tracked_files=[VR_SNAP], notes=vr_notes) == []
     assert vr_notes == []
+
+
+def test_new_cue_alone_refuses_reference_only_for_tracked_file():
+    """Mutation caught: `_REF_CREATION_CUE_RE` shrunk to one dead alternative.
+
+    WF is tracked here, so the `NEW` cue in its matrix row is the only reason left to
+    refuse the reference-only exemption. The same fixture with the plain row clears.
+    """
+    notes: list[str] = []
+    body = CF_REF + PHASE_REF + MATRIX + SPEC_ROW + ENV_ROW_NEW + OOS_NO_EDIT
+    items = check(_plan(body), [SPEC], tracked_files=[WF, SPEC], notes=notes)
+    assert MISSING_WF in items
+    refused = [n for n in notes if n.startswith("REFERENCE-ONLY-REFUSED: " + WF)]
+    assert len(refused) == 1
+    plain = CF_REF + PHASE_REF + MATRIX + SPEC_ROW + ENV_ROW + OOS_NO_EDIT
+    assert check(_plan(plain), [SPEC], tracked_files=[WF, SPEC]) == []

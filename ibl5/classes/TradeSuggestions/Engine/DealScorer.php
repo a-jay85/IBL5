@@ -49,6 +49,7 @@ final class DealScorer
     {
         $components = [];
         $deltas = [];
+        $oddsContext = TeamStateRebuilder::afterOddsContext($s, $c, $memo);
 
         foreach (Horizon::OFFSETS as $offset) {
             $after = TeamStateRebuilder::after($s, $c, $offset, $memo);
@@ -58,7 +59,7 @@ final class DealScorer
             ];
             foreach ($sides as $tid => [$afterState, $received, $sent]) {
                 $before = TeamStateRebuilder::before($s, $tid, $offset);
-                $odds = self::receivedOdds($s, $tid, $received);
+                $odds = self::receivedOdds($s, $tid, $received, $oddsContext);
                 $walkFactor = self::receivedFactors($s, $offset, $odds);
                 $base = SideGain::fromStates($before, $afterState, $s, $c, $tid, $walkFactor);
                 if ($offset >= 1) {
@@ -100,10 +101,15 @@ final class DealScorer
      * not against the team the snapshot scored him with. Players with no
      * offset-0 salary have no odds, as in the snapshot.
      *
+     * The lineups and slot ranks are the post-trade offset-0 ones, so the
+     * money at the player's slot counts who the receiver keeps and adds, not
+     * who it sends away.
+     *
      * @param list<int> $received
+     * @param array{lineups: array<int, \TradeSuggestions\Profile\SeasonLineup>, ranks: SlotRankState} $oddsContext
      * @return array<int, array{likelihood: float, walks: bool}>
      */
-    private static function receivedOdds(LeagueSnapshot $s, int $tid, array $received): array
+    private static function receivedOdds(LeagueSnapshot $s, int $tid, array $received, array $oddsContext): array
     {
         $odds = [];
         foreach ($received as $pid) {
@@ -112,7 +118,7 @@ final class DealScorer
             if ($p->salaryAt(0) <= 0) {
                 continue;
             }
-            $odds[$pid] = ResignOdds::forTeam($p, $tid, $s->lineups[0], $s->slotRanks[0], $s->teamFactors);
+            $odds[$pid] = ResignOdds::forTeam($p, $tid, $oddsContext['lineups'], $oddsContext['ranks'], $s->teamFactors);
         }
 
         return $odds;

@@ -51,7 +51,7 @@ final class TeamStateRebuilder
         /** @infection-ignore-all Equivalent: rebuild() reads only the roster's values, never its keys. array_values is there so PHPStan sees a list. */
         $roster = array_values(array_diff(array_keys($s->lineup($offset, $tid)->players), $absentPids));
 
-        return self::rebuild($s, $offset, $memo, [$tid => $roster])[$tid];
+        return self::rebuild($s, $offset, $memo, [$tid => $roster])['states'][$tid];
     }
 
     /**
@@ -64,9 +64,27 @@ final class TeamStateRebuilder
             $c->userTid => self::rosterAfter($s, $offset, $c->userTid, $c->userPids, $c->partnerPids, $absentPids),
             $c->partnerTid => self::rosterAfter($s, $offset, $c->partnerTid, $c->partnerPids, $c->userPids, $absentPids),
         ];
-        $states = self::rebuild($s, $offset, $memo, $rosters);
+        $states = self::rebuild($s, $offset, $memo, $rosters)['states'];
 
         return ['user' => $states[$c->userTid], 'partner' => $states[$c->partnerTid]];
+    }
+
+    /**
+     * Every team's offset-0 lineup with the two trading teams replaced by
+     * their post-trade lineups, and the slot ranks re-ranked to match. Re-sign
+     * odds for a received player read this.
+     *
+     * @return array{lineups: array<int, SeasonLineup>, ranks: SlotRankState}
+     */
+    public static function afterOddsContext(LeagueSnapshot $s, TradeCandidate $c, PairRecordMemo $memo): array
+    {
+        $rosters = [
+            $c->userTid => self::rosterAfter($s, 0, $c->userTid, $c->userPids, $c->partnerPids, []),
+            $c->partnerTid => self::rosterAfter($s, 0, $c->partnerTid, $c->partnerPids, $c->userPids, []),
+        ];
+        $built = self::rebuild($s, 0, $memo, $rosters);
+
+        return ['lineups' => array_replace($s->lineups[0], $built['lineups']), 'ranks' => $built['ranks']];
     }
 
     /**
@@ -89,7 +107,7 @@ final class TeamStateRebuilder
 
     /**
      * @param array<int, list<int>> $rosters tid => pids, one or two teams
-     * @return array<int, TeamState>
+     * @return array{states: array<int, TeamState>, lineups: array<int, SeasonLineup>, ranks: SlotRankState}
      */
     private static function rebuild(LeagueSnapshot $s, int $offset, PairRecordMemo $memo, array $rosters): array
     {
@@ -140,7 +158,7 @@ final class TeamStateRebuilder
             );
         }
 
-        return $out;
+        return ['states' => $out, 'lineups' => $lineups, 'ranks' => $state];
     }
 
     /**

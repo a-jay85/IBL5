@@ -204,6 +204,35 @@ final class DealScorerTest extends TestCase
         self::assertGreaterThan(0, $memo->size());
     }
 
+    public function testReceivedOddsReadPostTradeLineupsWhenReceiverSendsASameSlotPlayer(): void
+    {
+        $s = self::smallLeague();
+        $odds = new \ReflectionMethod(DealScorer::class, 'receivedOdds');
+        $found = false;
+        foreach (array_keys($s->lineups[0][1]->players) as $sentPid) {
+            foreach (array_keys($s->lineups[0][2]->players) as $receivedPid) {
+                $c = new TradeCandidate(1, 2, [$sentPid], [], [$receivedPid], []);
+                $context = TeamStateRebuilder::afterOddsContext($s, $c, new PairRecordMemo());
+                $p = $s->players[$receivedPid];
+                if ($p->salaryAt(0) <= 0) {
+                    continue;
+                }
+                $before = ResignOdds::forTeam($p, 1, $s->lineups[0], $s->slotRanks[0], $s->teamFactors);
+                $after = ResignOdds::forTeam($p, 1, $context['lineups'], $context['ranks'], $s->teamFactors);
+                if (abs($before['likelihood'] - $after['likelihood']) < 1e-9) {
+                    continue;
+                }
+                $found = true;
+                /** @var array<int, array{likelihood: float, walks: bool}> $actual */
+                $actual = $odds->invoke(null, $s, 1, [$receivedPid], $context);
+                self::assertEqualsWithDelta($after['likelihood'], $actual[$receivedPid]['likelihood'], 1e-12);
+                self::assertNotEqualsWithDelta($before['likelihood'], $actual[$receivedPid]['likelihood'], 1e-9);
+                break 2;
+            }
+        }
+        self::assertTrue($found, 'no same-slot swap changed the likelihood');
+    }
+
     public function testReceivedPlayerWhoWillNotWalkAgainstTheReceiverScoresAsPlain(): void
     {
         // 202 is not a walker for team 1 on offset-0 slot ranks (he would be on offset-1 ranks)

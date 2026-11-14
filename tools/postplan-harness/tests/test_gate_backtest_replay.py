@@ -1,6 +1,7 @@
 import os
 import subprocess
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -8,7 +9,8 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness import gate_backtest_replay as gbr
-from harness.gate_backtest import GateChange, HistoricalPR, ReplaySpec, classify_exit
+from harness.gate_backtest import (GateChange, HistoricalPR, ReplaySpec, Truth, classify_exit,
+                                   compute_verdict)
 from harness.gate_backtest_replay import (ScratchTree, _fix_patch, ensure_pr_heads, fetch_history,
                                           make_git, resolve_plan, run_backtest)
 
@@ -153,8 +155,18 @@ def test_overlay_uses_candidate_version(tmp_path):
 
 def test_replay_timeout_is_timeout(tmp_path):
     repo, shas = build_repo(tmp_path)
-    results = run(repo, shas[:2], tmp_path, script="#!/bin/sh\nsleep 5\n", per_replay_timeout=1)
+    results = run(repo, shas[:2], tmp_path, script="#!/bin/sh\nsleep 5\n", per_replay_timeout=1,
+                  retry_timeouts=False)
     assert {r.outcome for r in results} == {"timeout"}
+
+
+def test_sleeping_gate_verdict_is_unknown(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    results = run(repo, shas[:1], tmp_path, script="#!/bin/sh\nsleep 5\n", per_replay_timeout=1)
+    truth = {r.pr: Truth("clean") for r in results}
+    v = compute_verdict([gate()], results, truth)
+    assert v.state == "UNKNOWN"
+    assert "replay failed (timeout: 1s)" in v.reason
 
 
 def test_total_cap_marks_remaining(tmp_path):
@@ -227,11 +239,157 @@ def test_base_replay_absent_gate_is_absent(tmp_path):
 def test_base_replay_timeout_fails_closed(tmp_path):
     repo, shas = build_repo(tmp_path)
     # 10 s, because on a loaded machine the head replay can take over 2 s and time out too.
-    results = run(repo, shas, tmp_path, per_replay_timeout=10,
+    results = run(repo, shas, tmp_path, per_replay_timeout=10, retry_timeouts=False,
                   base_overlay=base("#!/bin/sh\n# gate-backtest-argv:\nsleep 30\n"))
     for r in (r for r in results if r.pr in (3, 5)):
         assert r.outcome == "flag"
         assert r.base_outcome == "timeout" and r.base_detail == "10s"
+
+
+EXPECTED = {1: "pass", 2: "pass", 3: "flag", 4: "pass", 5: "flag", 6: "pass"}
+
+
+def flaky_runner(calls, fail_calls=(), drain_stdin=False):
+    """Raise TimeoutExpired on the listed 1-based call numbers; run the real replay otherwise."""
+    def runner(argv, *, cwd, env, stdin, timeout):
+        calls.append(argv)
+        if len(calls) in fail_calls:
+            if drain_stdin and hasattr(stdin, "read"):
+                stdin.read()
+            raise subprocess.TimeoutExpired(argv, timeout)
+        return gbr._run_in_session(argv, cwd=cwd, env=env, stdin=stdin, timeout=timeout)
+    return runner
+
+
+def test_timeout_then_pass_gives_real_verdict(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    calls = []
+    results = run(repo, shas, tmp_path, runner=flaky_runner(calls, {3}), per_replay_timeout=60)
+    assert {r.pr: r.outcome for r in results} == EXPECTED
+    assert len(calls) == 7
+    assert sum(1 for r in results if len(r.attempt_secs) == 2) == 1
+    assert all(r.attempt_secs == () for r in results if len(r.attempt_secs) != 2)
+
+
+def test_timeout_twice_stays_timeout(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    calls = []
+    results = run(repo, shas[:1], tmp_path, runner=flaky_runner(calls, range(1, 10)),
+                  per_replay_timeout=60)
+    assert len(results) == 1
+    assert results[0].outcome == "timeout" and results[0].detail == "60s"
+    assert len(results[0].attempt_secs) == 2
+    assert len(calls) == 2
+
+
+def test_first_try_success_runs_once(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    calls = []
+    results = run(repo, shas, tmp_path, runner=flaky_runner(calls))
+    assert len(calls) == 6
+    assert {r.pr: r.outcome for r in results} == EXPECTED
+    for r in results:
+        assert r.attempt_secs == () and r.base_attempt_secs == () and r.fix_attempt_secs == ()
+
+
+def test_oserror_is_not_retried(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    calls = []
+
+    def runner(argv, *, cwd, env, stdin, timeout):
+        calls.append(argv)
+        raise OSError("boom")
+
+    results = run(repo, shas[:1], tmp_path, runner=runner)
+    assert results[0].outcome == "error" and results[0].detail == "boom"
+    assert len(calls) == 1
+
+
+def test_total_cap_never_invokes_runner(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    calls = []
+    results = run(repo, shas, tmp_path, total_cap=0, runner=flaky_runner(calls))
+    assert calls == []
+    assert results and all((r.outcome, r.detail) == ("timeout", "total-cap") for r in results)
+
+
+def test_retry_off_runs_once(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    calls = []
+    results = run(repo, shas[:1], tmp_path, runner=flaky_runner(calls, range(1, 10)),
+                  retry_timeouts=False, per_replay_timeout=60)
+    assert len(calls) == 1
+    assert results[0].outcome == "timeout" and results[0].attempt_secs == ()
+
+
+def test_retry_reopens_stdin(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    kw = dict(gates=[gate(STDIN_SPEC)], script=STDIN_GATE, bodies={1: TAGGED, 2: "no marker here"})
+    base_pairs = [(r.pr, r.outcome) for r in run(repo, shas[:2], tmp_path, **kw)]
+    calls = []
+    results = run(repo, shas[:2], tmp_path, runner=flaky_runner(calls, {1}, drain_stdin=True), **kw)
+    assert [(r.pr, r.outcome) for r in results] == base_pairs
+    assert len(calls) == 3
+
+
+def test_base_retry_records_base_durations(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    state = {"armed": False, "fired": False}
+    calls = []
+
+    def runner(argv, *, cwd, env, stdin, timeout):
+        calls.append(argv)
+        if state["armed"] and not state["fired"]:
+            state["fired"] = True
+            raise subprocess.TimeoutExpired(argv, timeout)
+        rc, out = gbr._run_in_session(argv, cwd=cwd, env=env, stdin=stdin, timeout=timeout)
+        if rc == 1:
+            state["armed"] = True
+        return rc, out
+
+    results = run(repo, shas[:3], tmp_path, runner=runner, per_replay_timeout=60,
+                  base_overlay=base("#!/bin/sh\n# gate-backtest-argv:\nexit 0\n"))
+    r3 = next(r for r in results if r.pr == 3)
+    assert r3.outcome == "flag" and r3.base_outcome == "pass"
+    assert len(r3.base_attempt_secs) == 2 and r3.attempt_secs == ()
+
+
+def test_timeout_kills_process_group(tmp_path):
+    script = tmp_path / "gate.sh"
+    script.write_text('#!/bin/sh\nsleep 30 &\necho $! > "$PIDFILE"\nwait\n')
+    script.chmod(0o755)
+    pidfile = tmp_path / "pid"
+    with pytest.raises(subprocess.TimeoutExpired):
+        gbr._run_in_session([str(script)], cwd=str(tmp_path),
+                            env=dict(os.environ, PIDFILE=str(pidfile)),
+                            stdin=subprocess.DEVNULL, timeout=1)
+    pid = int(pidfile.read_text().strip())
+    deadline = time.monotonic() + 3
+    alive = True
+    while time.monotonic() < deadline:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            alive = False
+            break
+        stat = subprocess.run(["ps", "-o", "stat=", "-p", str(pid)], capture_output=True,
+                              text=True).stdout.strip()
+        if stat.startswith("Z"):
+            alive = False
+            break
+        time.sleep(0.1)
+    assert not alive, "the gate's sleep child survived the group kill"
+
+
+def test_retry_logs_both_durations_to_stderr(tmp_path, capsys):
+    repo, shas = build_repo(tmp_path)
+    calls = []
+    ticks = iter([0.0, 60.0, 100.0, 112.3])
+    results = run(repo, shas[:1], tmp_path, runner=flaky_runner(calls, {1}),
+                  timer=lambda: next(ticks), per_replay_timeout=60)
+    assert ("gate-backtest: bin/check-fake replay timed out after 60.0 s; "
+            "retry ended pass after 12.3 s") in capsys.readouterr().err
+    assert results[0].attempt_secs == (60.0, 12.3)
 
 
 def test_base_replay_no_spec_fails_closed(tmp_path):

@@ -728,13 +728,85 @@ def main(argv: list[str] | None = None) -> int:
       1  items found — each printed to stdout, one per line
       2  could not evaluate — bad usage, non-absolute or missing plan path,
          unresolvable repo root, or `plan.found == False`
+
+    `--phases <abs-plan-path> [repo-root]` is a separate mode for bin/lib/prefire-verify.
+    It prints the `MISSING-PHASE:` items for the working tree, plus a `HINT:` line naming
+    the `**No diff:**` fix, and a non-failing `REMINDER:` line when a held plan marks
+    phases as landed or deferred. Same 0/1/2 exit contract. The default mode above never
+    reports `MISSING-PHASE:`.
     """
+    args = argv if argv is not None else sys.argv[1:]
+    if args and args[0] == "--phases":
+        return _phases_main(args[1:])
+    parsed = _parse_seam_args(args, "usage: python3 -m harness.conformance <abs-plan-path> [repo-root]")
+    if isinstance(parsed, int):
+        return parsed
+    plan, repo_root = parsed
+    items = early_missing_items(plan, _changed_files(repo_root))
+    for item in items:
+        print(item)
+    return 1 if items else 0
+
+
+PHASES_USAGE = "usage: python3 -m harness.conformance --phases <abs-plan-path> [repo-root]"
+PHASES_HINT = ("HINT: a phase above shows no diff. If its work already landed on master, "
+               "add `**No diff:** landed on master in <sha> (#PR)` to that phase body, "
+               "or list the phase number under `## Out of Scope`. Otherwise do the "
+               "phase's work.")
+
+
+def _phases_main(args: list[str]) -> int:
+    """`--phases` seam for bin/lib/prefire-verify: MISSING-PHASE items on the working tree."""
+    parsed = _parse_seam_args(args, PHASES_USAGE)
+    if isinstance(parsed, int):
+        return parsed
+    plan, repo_root = parsed
+    notes: list[str] = []
+    try:
+        tracked = _git_lines(["ls-files"], repo_root)
+        items = phase_omission_items(plan, _changed_files(repo_root), tracked_files=tracked, notes=notes)
+        reminder = _hold_trigger_reminder(plan)
+    except Exception as exc:  # noqa: BLE001 - any failure means the seam cannot evaluate
+        print(f"conformance --phases: could not evaluate: {exc}", file=sys.stderr)
+        return 2  # phases could not evaluate
+    for item in items:
+        print(item)
+    if items:
+        print(PHASES_HINT)
+    if reminder:
+        print(reminder)
+    return 1 if items else 0  # phases mode
+
+
+def _phase_marked(ph: PhaseInfo, deferred: set) -> bool:
+    """True when the phase carries an honoured `**No diff:**` marker or is listed deferred."""
+    return bool(ph.no_diff_reason) or ph.number in deferred
+
+
+def _hold_trigger_reminder(plan: PlanInfo) -> str | None:
+    """Non-failing reminder to re-derive hold_trigger when a held plan marks phases landed."""
+    from .planfile import frontmatter_hold_triggers  # local import keeps module-level cycle-free
+
+    with open(plan.path, encoding="utf-8") as fh:
+        triggers = frontmatter_hold_triggers(fh.read())
+    if not triggers:
+        return None
+    deferred = set(plan.deferred_phase_numbers)
+    marked = [str(ph.number) for ph in plan.phases if _phase_marked(ph, deferred)]
+    if not marked:
+        return None
+    return (f"REMINDER: this held plan marks phase(s) {', '.join(marked)} as landed or "
+            f"deferred; re-derive hold_trigger: ({', '.join(triggers)}) from what the final "
+            "diff touches (.claude/skills/plan/_validate-and-write.md). This line never "
+            "fails the check.")
+
+
+def _parse_seam_args(args: list[str], usage: str) -> tuple[PlanInfo, str] | int:
+    """Validate `<abs-plan-path> [repo-root]`; the exit code on error, else (plan, repo_root)."""
     from .planfile import locate_plan  # local import keeps module-level cycle-free
 
-    args = argv if argv is not None else sys.argv[1:]
     if not args or len(args) > 2:
-        print("usage: python3 -m harness.conformance <abs-plan-path> [repo-root]",
-              file=sys.stderr)
+        print(usage, file=sys.stderr)
         return 2
     plan_path = args[0]
     if not os.path.isabs(plan_path):
@@ -765,10 +837,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"conformance: plan not readable as a plan file: {plan_path}",
               file=sys.stderr)
         return 2
-    items = early_missing_items(plan, _changed_files(repo_root))
-    for item in items:
-        print(item)
-    return 1 if items else 0
+    return plan, repo_root
 
 
 if __name__ == "__main__":

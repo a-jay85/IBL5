@@ -125,7 +125,8 @@ _oa_find_wt() { # prints the worktree checked out on $branch, or nothing
 _oa_mine() { # 0 when $1 is this script, a subshell or child of it, or an ancestor of it
     local p="$1" up n=0 anc
     [ -n "$p" ] || return 1
-    anc="$$ ${BASHPID:-}"
+    # sh's parent is the current subshell (bash 3.2 has no BASHPID).
+    anc="$$ $(exec sh -c 'echo "$PPID"')"
     up=$$
     while [ "$n" -lt 20 ]; do
         up=$(ps -o ppid= -p "$up" 2>/dev/null | tr -d ' ')
@@ -142,7 +143,11 @@ _oa_mine() { # 0 when $1 is this script, a subshell or child of it, or an ancest
     done
     return 1
 }
-_oa_live() { # prints the first live signal; 0 live, 1 none, 2 cannot tell
+OA_NONE=OA_NO_LIVE_RUN
+# Prints the first live signal and returns 0, or prints exactly $OA_NONE and
+# returns 0 when no run is live, or returns 2 when it cannot tell. The caller
+# reads anything else, a crash included, as live.
+_oa_live() {
     local list label s rest pid cwd slugs cols cmd
     list=$(launchctl list 2>/dev/null) || { printf 'launchctl list failed'; return 2; }
     slugs="$(_oa_safe "$branch")"
@@ -177,15 +182,17 @@ _oa_live() { # prints the first live signal; 0 live, 1 none, 2 cannot tell
             esac
         done
     fi
-    return 1
+    printf '%s' "$OA_NONE"
+    return 0
 }
 _oa_pause() { sleep "$1"; }
 _oa_wait() {
     local start=$SECONDS why rc
     while :; do
         why=$(_oa_live); rc=$?
-        if [ "$rc" -eq 1 ]; then return 0; fi
-        if [ "$rc" -ne 0 ]; then _oa_refuse 4 "could not check for a live post-plan run ($why)."; fi
+        if [ "$rc" -eq 0 ] && [ "$why" = "$OA_NONE" ]; then return 0; fi
+        if [ "$rc" -eq 2 ]; then _oa_refuse 4 "could not check for a live post-plan run ($why)."; fi
+        if [ "$rc" -ne 0 ]; then why="liveness check crashed (exit $rc)"; fi
         if [ $((SECONDS - start)) -ge "$OA_TIMEOUT" ]; then
             _oa_refuse 5 "a post-plan run on this PR was still live after ${OA_TIMEOUT}s ($why). Run bin/owner-approve $OA_PR --finish once it ends."
         fi

@@ -102,7 +102,7 @@ func TestFreeThrows_ChargesDefenderAndShooter(t *testing.T) {
 	defender := defense.players[0]
 	gs := &gameState{rng: rng.New(1), period: 1, clock: 600}
 
-	gs.freeThrows(offense, defense, shooter, defender, 2, 0)
+	gs.freeThrows(offense, defense, shooter, defender, 2, 0, result.FoulSiteShootingTwo)
 
 	var foul, ft *result.Event
 	for i := range gs.events {

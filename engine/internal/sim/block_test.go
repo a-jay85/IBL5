@@ -105,7 +105,7 @@ func TestFreeThrows_NeverBlocked(t *testing.T) {
 		shooter := offense.players[0]
 		defender := defense.players[0]
 		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500}
-		gs.freeThrows(offense, defense, shooter, defender, 2, 0)
+		gs.freeThrows(offense, defense, shooter, defender, 2, 0, result.FoulSiteShootingTwo)
 		for _, e := range gs.events {
 			if e.Kind == result.EventBlock {
 				t.Fatalf("seed %d: free-throw path emitted an EventBlock", seed)

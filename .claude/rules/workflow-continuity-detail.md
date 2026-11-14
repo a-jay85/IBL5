@@ -1,6 +1,6 @@
 ---
 description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made. Lazy companion to workflow-continuity.md; loads only when a post-plan surface is in play.
-last_verified: 2026-11-10
+last_verified: 2026-11-13
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
@@ -126,7 +126,7 @@ suppresses re-runs. It never ticks a matrix row, arms a PR or changes an arming 
 one in rebase-only mode: `tools/postplan-harness/README.md` § Held-unchanged skip and
 § Rebase-only mode.
 
-**Conflict autofix.** When a fleet run ends in a rebase conflict, `bin/post-plan-fleet` runs one `bin/postplan-fix --headless <PR>` per (PR, head SHA), recorded under `conflict-fix/<pr>` in the pr-cycle-watch state dir. On `result=committed` it re-fires post-plan once, and the harness proves and reviews the rebase before it pushes. Any other fix result gives up, restores the worktree to the pre-fix head when the bot rebase is unpublished, and DMs the paste line. That includes `result=clean` (`gave-up-clean-unproven`, since a clean rebase writes no pre-merge manifest). A re-fire gives up the same way when it ends in a rebase conflict again (`gave-up-refire-conflict`), times out (`gave-up-refire-timeout`) or prints no `RESULT:` line (`gave-up-refire-no-result`). A re-fire with any other `RESULT:` line, such as FAILED, DECLINED or PAUSED, keeps its own outcome and leaves the bot rebase in the worktree. Outcome words: `conflict-fixed` (reason = the re-fire's outcome) and `conflict-fix-gave-up` (reason = why). `bin/pr-cycle` passes `--conflict-fix-prs=` by default. `PR_CYCLE_CONFLICT_AUTOFIX=0` turns it off. The tick's DIRTY rescue goes through `bin/pr-cycle` and takes the same route.
+**Conflict autofix.** When a fleet run ends in a rebase conflict, `bin/post-plan-fleet` runs one `bin/postplan-fix --headless <PR>` per (PR, head SHA), recorded under `conflict-fix/<pr>` in the pr-cycle-watch state dir. On `result=committed` it re-fires post-plan once. That run replays it onto a newer `origin/master`, then proves, reviews and pushes. Any other fix result gives up, restores the worktree to the pre-fix head when the bot rebase is unpublished, and DMs the paste line. That includes `result=clean` (`gave-up-clean-unproven`, since a clean rebase writes no pre-merge manifest). A re-fire gives up the same way when it ends in a rebase conflict again (`gave-up-refire-conflict`), times out (`gave-up-refire-timeout`) or prints no `RESULT:` line (`gave-up-refire-no-result`). A re-fire with any other `RESULT:` line, such as FAILED, DECLINED or PAUSED, keeps its own outcome and leaves the bot rebase in the worktree. Outcome words: `conflict-fixed` (reason = the re-fire's outcome) and `conflict-fix-gave-up` (reason = why). `bin/pr-cycle` passes `--conflict-fix-prs=` by default. `PR_CYCLE_CONFLICT_AUTOFIX=0` turns it off. The tick's DIRTY rescue goes through `bin/pr-cycle` and takes the same route.
 
 ## What `--auto` adds
 

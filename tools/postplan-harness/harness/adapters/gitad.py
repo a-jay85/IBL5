@@ -1224,6 +1224,57 @@ class LiveGit:
             abort_and_restore(self._run, worktree=self.worktree,
                               pre_rebase_sha=pre_rebase_sha, reason=reason)
 
+    def _replay_premerged(self, master_sha: str, pre_rebase_sha: str) -> None:
+        """Replay a bin/postplan-fix head onto a master that moved after the fix. The
+        head is already one linear commit on the old master, so no squash runs. A
+        conflict never enters the ladder, whose review would cover only its own files:
+        restore the pre-merged head and fail closed."""
+        from ..conflict import abort_and_restore
+        upstream = self._replay_upstream(master_sha)
+        proc = self._bounded(
+            (*_NO_RERERE, "rebase", "--onto", master_sha, upstream), errors="replace")
+        if proc.returncode == 0:
+            self._assert_no_sync_merges(master_sha, pre_rebase_sha)
+            return
+        if not self._rebase_in_progress():
+            raise HarnessError(
+                "rebase-conflict",
+                f"rebase did not start: {(proc.stderr or proc.stdout).strip()[:400]}")
+        reason = ("premerged head is stale: replaying it onto origin/master conflicted; "
+                  "rerun bin/postplan-fix --headless")
+        abort_and_restore(self._run, worktree=self.worktree, pre_rebase_sha=pre_rebase_sha, reason=reason)
+
+    def _prove_premerged(self, premerged, master_sha: str, branch: str, key: str,
+                         pre_rebase_sha: str) -> None:
+        """Prove a pre-merged head, replayed or not, against the pre-fix patch. A replayed
+        head that fails the proof is reset to the pre-merged SHA, so the manifest and the
+        condition-(14) marker still name a commit in history. A passing replay rebinds
+        both to the new HEAD before the conflict review runs."""
+        from .. import premerge
+        from ..conflict import abort_and_restore
+        replayed = self._run("rev-parse", "HEAD").strip() != pre_rebase_sha
+        out = ""
+        lostwork_path = self._load_lostwork(master_sha, key)
+        if lostwork_path is None:  # premerged-lostwork-missing
+            detail = "tree proof failed: lostwork.sh missing at origin/master"
+        else:
+            ok, out = self._prove_tree_equivalent(lostwork_path, key)
+            detail = "" if ok else out
+        if detail:
+            if replayed:
+                abort_and_restore(self._run, worktree=self.worktree, pre_rebase_sha=pre_rebase_sha, reason=detail)
+            raise HarnessError("rebase-conflict", detail)
+        if replayed:
+            try:
+                premerge.record(self.worktree, branch, premerged.pre_sha, premerged.files)
+            except premerge.PremergeError as exc:
+                # A stacked base puts the replayed parent outside origin/master, which
+                # record() refuses. Restore the pre-merged head and fail closed.
+                rebind_reason = f"premerged replay could not rebind the manifest: {exc}"
+                abort_and_restore(self._run, worktree=self.worktree,
+                                  pre_rebase_sha=pre_rebase_sha, reason=rebind_reason)
+        self._record_resolution(key, branch, master_sha, premerged.files, proof_out=out)
+
     def _replay_upstream(self, target_sha: str) -> str:
         """The commit a `rebase --onto <target_sha>` replay starts after.
 
@@ -1297,37 +1348,23 @@ class LiveGit:
         purge_verdict_artifacts(key, keep_sha=pre_rebase_sha)
 
         contained_rc, _ = self._run_out("merge-base", "--is-ancestor", master_sha, "HEAD")
-        if contained_rc == 0:
-            if premerged is not None:
-                # A bin/postplan-fix head already holds the target: no history change,
-                # and the proof still runs on the local result. A head that still carries
-                # a merge commit (a manifest from the old merge-based script) fails closed.
-                merges = self._run("rev-list", "--merges", f"{master_sha}..HEAD").strip()
-                if merges:
-                    raise HarnessError(
-                        "rebase-conflict",
-                        "premerged head carries a merge commit; "
-                        "rerun bin/postplan-fix --headless")
-                lostwork_path = self._load_lostwork(master_sha, key)
-                if lostwork_path is None:  # premerged-lostwork-missing
-                    raise HarnessError(
-                        "rebase-conflict",
-                        "tree proof failed: lostwork.sh missing at origin/master")
-                ok, out = self._prove_tree_equivalent(lostwork_path, key)
-                if not ok:
-                    raise HarnessError("rebase-conflict", out)
-                self._record_resolution(
-                    key, branch, master_sha, premerged.files, proof_out=out)
-            if premerged is None:
-                restore_prior_verdict(key, self._run("rev-parse", "HEAD").strip())
-            return
         if premerged is not None:
-            # The ladder's review would cover only its own files, so a pre-merged head
-            # never enters it. Fail closed.
-            raise HarnessError(  # premerged-newer-master
-                "rebase-conflict",
-                "premerged head is stale: origin/master moved after the fix "
-                "(no conflict was tested); rerun bin/postplan-fix --headless")
+            # A head that still carries a merge commit (a manifest from the old
+            # merge-based script) fails closed, behind master or not. A replay would
+            # drop the merge and any edit made inside it.
+            merges = self._run("rev-list", "--merges", f"{master_sha}..HEAD").strip()
+            if merges:  # premerged-merge-guard
+                raise HarnessError(
+                    "rebase-conflict",
+                    "premerged head carries a merge commit; "
+                    "rerun bin/postplan-fix --headless")
+            if contained_rc != 0:
+                self._replay_premerged(master_sha, pre_rebase_sha)
+            self._prove_premerged(premerged, master_sha, branch, key, pre_rebase_sha)
+            return
+        if contained_rc == 0:
+            restore_prior_verdict(key, self._run("rev-parse", "HEAD").strip())
+            return
 
         upstream = self._replay_upstream(master_sha)
         # A per-commit replay drops merge commits, and any edit made inside one with them.

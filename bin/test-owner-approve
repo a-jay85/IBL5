@@ -294,6 +294,43 @@ live_pgrep_cwd() {
     echo 2 > "$FX/pgrep.left"
     live_ok "post-plan process 556 runs in $WT"
 }
+# Fails when a crashed _oa_live reads as "no live run". The copy exits 1 (the old
+# "none" status) before it checks anything, so the script must wait, time out, and not arm.
+live_crash_fails_closed() {
+    fresh live_crash_fails_closed
+    sed 's/^_oa_live() {/_oa_live() { exit 1;/' "$OA" > "$TMP/fix/bin/owner-approve-crash"
+    chmod +x "$TMP/fix/bin/owner-approve-crash"
+    grep -qF '_oa_live() { exit 1;' "$TMP/fix/bin/owner-approve-crash" || note "crash seam did not apply"
+    seed_ready
+    run_oa_env "$TMP/fix/bin/owner-approve-crash" "$PR" "ok" --poll=0 --timeout=0
+    want_rc 5
+    want_out "liveness check crashed (exit 1)"
+    refute_gh "pr edit"
+    refute_gh "pr merge"
+}
+# Runs the pgrep cases under /bin/bash, which is 3.2 on macOS and has no BASHPID.
+live_ok_bin_bash() { # <signal text>
+    seed_ready
+    run_oa_env /bin/bash "$OA" "$PR" "ok" --poll=0 --timeout=30
+    want_rc 0
+    want_out "waiting 0s: $1"
+    want_gh "pr merge $PR -R a-jay85/IBL5 --squash --auto --match-head-commit $H"
+}
+live_pgrep_args_bin_bash() {
+    [ -x /bin/bash ] || return 0
+    fresh live_pgrep_args_bin_bash
+    printf '555 bash bin/post-plan-now --auto %s\n' "$WT" > "$FX/pgrep.lf"
+    echo 2 > "$FX/pgrep.left"
+    live_ok_bin_bash "a post-plan process names $WT"
+}
+live_pgrep_cwd_bin_bash() {
+    [ -x /bin/bash ] || return 0
+    fresh live_pgrep_cwd_bin_bash
+    echo 556 > "$FX/pgrep.f"
+    printf 'p556\nn%s\n' "$WT" > "$FX/lsof.out"
+    echo 2 > "$FX/pgrep.left"
+    live_ok_bin_bash "post-plan process 556 runs in $WT"
+}
 live_near_miss() {
     fresh live_near_miss
     printf '77\t0\tcom.ibl5.postplan-now-case-live_near_miss-old-20261112-101010-77\n-\t0\tcom.ibl5.post-plan-fleet-7770\n' > "$FX/launchctl.out"
@@ -578,6 +615,7 @@ ALL_CASES="
 body_literal body_option ids_unset ids_empty headless_refuses headless_empty_proceeds
 usage_unknown_flag usage_space_form no_repo_writes
 live_launchd_now live_launchd_fleet live_label live_pgrep_args live_pgrep_cwd live_near_miss live_timeout
+live_crash_fails_closed live_pgrep_args_bin_bash live_pgrep_cwd_bin_bash
 verdict_ready_arms verdict_notes_arms verdict_stale_tree verdict_none verdict_not_ready
 verdict_unrecorded verdict_no_tree_line verdict_rereview_wins verdict_rereview_suffix verdict_banner_near_miss
 verdict_foreign_author verdict_ignores_approval_text verdict_gh_error

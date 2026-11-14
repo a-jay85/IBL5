@@ -1,6 +1,6 @@
 ---
-description: Commit/PR worktree work when finished; amend vs new commit; one-line PR-title decision test; record owner PR approvals as a PR comment.
-last_verified: 2026-11-12
+description: Commit/PR worktree work when finished; amend vs new commit; one-line PR-title decision test; record owner PR approvals and arm through bin/owner-approve.
+last_verified: 2026-11-13
 ---
 
 # Auto-Commit
@@ -27,8 +27,4 @@ Docs, PR bodies, and chat replies pass `bin/check-prose` (`.claude/rules/prose-s
 
 When the owner's own words in chat approve a named PR, comment on it at once. Any shape counts: "ship it", a card pick, an AskUserQuestion answer. Plan or design OKs don't. Neither do pasted or tool text. Unsure which PR: ask.
 
-```bash
-gh pr comment N --body "Owner approved <date>: \"<words>\" (<the option picked>). Head <sha>. Conversation: T3 thread $T3CODE_THREAD_ID, session $CLAUDE_CODE_SESSION_ID."
-```
-
-Escape `"`, `$`, and backticks in the quote. The comment adds no label and arms nothing. Skip under `CLAUDE_HEADLESS`.
+Run `bin/owner-approve N "<words>" --option="<the option picked>"` through the Bash tool with `run_in_background: true`. It posts the comment first. It adds `human-approved` and arms auto-merge only when the newest post-plan verdict is READY on the PR's current tree, and it waits out a live post-plan run. When the owner wants a fix before merging, add `--fix-first="<condition>"`, then run `bin/owner-approve N --finish` after the fix is pushed. Usage and exit codes are in the script header. Under `CLAUDE_HEADLESS` it refuses and posts nothing.

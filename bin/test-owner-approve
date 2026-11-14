@@ -1,0 +1,648 @@
+#!/usr/bin/env bash
+# Tests bin/owner-approve with a fixture repo and PATH shims for gh, launchctl,
+# pgrep and lsof. No case touches GitHub, launchd, or the real repo.
+#
+# Usage: bin/test-owner-approve [case_name ...]
+# With no arguments every case runs; with arguments only the named cases run.
+# Prints `PASS <name>` / `FAIL <name>: <why>` per case. Exit 0 iff all pass.
+set -uo pipefail
+
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+h_tmp TMP
+mkdir -p "$TMP/shims" "$TMP/fx" "$TMP/wt"
+export PATH="$TMP/shims:$PATH"
+export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.invalid
+export GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.invalid
+unset CLAUDE_HEADLESS T3CODE_THREAD_ID CLAUDE_CODE_SESSION_ID
+
+WHY=""      # failure reasons for the current case
+OUT=""      # combined stdout+stderr of the last run
+RC=0        # exit code of the last run
+FX=""       # per-case fixture dir
+WT=""       # per-case worktree
+H=""        # per-case worktree HEAD
+OA="$TMP/fix/bin/owner-approve"
+PR=777
+
+note() { WHY="${WHY:+$WHY; }$*"; }
+want_rc() { [ "$RC" -eq "$1" ] || note "expected exit $1, got $RC"; }
+want_out() { grep -qF -- "$1" <<< "$OUT" || note "output lacks '$1'"; }
+refute_out() { if grep -qF -- "$1" <<< "$OUT"; then note "output unexpectedly has '$1'"; fi; }
+want_gh() { grep -qF -- "$1" "$FX/gh.log" 2>/dev/null || note "gh.log lacks '$1'"; }
+refute_gh() { if grep -qF -- "$1" "$FX/gh.log" 2>/dev/null; then note "gh.log unexpectedly has '$1'"; fi; }
+want_posted() { cat "$FX"/posted.*.md 2>/dev/null | grep -qF -- "$1" || note "no posted comment has '$1'"; }
+no_gh() { [ ! -e "$FX/gh.log" ] || note "gh ran but should not have"; }
+want_order() { # <first> <second>: both in gh.log, first line number lower
+    local a b
+    a=$(grep -nF -- "$1" "$FX/gh.log" 2>/dev/null | head -n 1 | cut -d: -f1)
+    b=$(grep -nF -- "$2" "$FX/gh.log" 2>/dev/null | tail -n 1 | cut -d: -f1)
+    if [ -z "$a" ] || [ -z "$b" ]; then note "gh.log lacks '$1' or '$2'"; return 0; fi
+    [ "$a" -lt "$b" ] || note "'$1' (line $a) is not before '$2' (line $b)"
+}
+
+# ---------------------------------------------------------------------------
+# Shims. Every one reads its state from $FX.
+# ---------------------------------------------------------------------------
+cat > "$TMP/shims/gh" <<'SHIM'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$FX/gh.log"
+case "${1:-} ${2:-}" in
+    "pr view")
+        [ -e "$FX/fail.pr-view" ] && exit 1
+        left=0
+        [ -f "$FX/pr.live.left" ] && left=$(cat "$FX/pr.live.left")
+        if [ "$left" -gt 0 ]; then
+            echo $((left - 1)) > "$FX/pr.live.left"
+            cat "$FX/pr.live.json"
+        else
+            cat "$FX/pr.json"
+        fi ;;
+    "pr comment")
+        f=""; prev=""
+        for x in "$@"; do
+            [ "$prev" = "--body-file" ] && f=$x
+            prev=$x
+        done
+        [ -n "$f" ] || exit 1
+        n=$(( $(ls "$FX"/posted.*.md 2>/dev/null | wc -l | tr -d ' ') + 1 ))
+        cp "$f" "$FX/posted.$n.md"
+        jq -nc --rawfile b "$f" '{user:{login:"owner"},body:$b}' >> "$FX/comments.ndjson" ;;
+    "pr edit") [ -e "$FX/fail.edit" ] && exit 1; exit 0 ;;
+    "pr merge") [ -e "$FX/fail.merge" ] && exit 1; exit 0 ;;
+    "api user") echo owner ;;
+    "api --paginate")
+        [ -e "$FX/fail.comments" ] && exit 1
+        jq -s . "$FX/comments.ndjson" ;;
+    api\ repos/*) cat "$FX/tree" ;;
+    *) exit 0 ;;
+esac
+SHIM
+cat > "$TMP/shims/launchctl" <<'SHIM'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$FX/launchctl.log"
+printf 'PID\tStatus\tLabel\n'
+left=0
+[ -f "$FX/launchctl.left" ] && left=$(cat "$FX/launchctl.left")
+if [ "$left" -gt 0 ] && [ -f "$FX/launchctl.out" ]; then
+    echo $((left - 1)) > "$FX/launchctl.left"
+    cat "$FX/launchctl.out"
+fi
+exit 0
+SHIM
+cat > "$TMP/shims/pgrep" <<'SHIM'
+#!/usr/bin/env bash
+left=0
+[ -f "$FX/pgrep.left" ] && left=$(cat "$FX/pgrep.left")
+[ "$left" -gt 0 ] || exit 1
+out=""
+case "${1:-}" in
+    -f)
+        # `pgrep -f -- <worktree>` matches pgrep.lf lines ("<pid> <command>");
+        # a bare `pgrep -f <pattern>` returns the pids in pgrep.f.
+        if [ "${2:-}" = "--" ]; then
+            out=$(grep -F -- "${3:-}" "$FX/pgrep.lf" 2>/dev/null | cut -d' ' -f1)
+        else
+            out=$(cat "$FX/pgrep.f" 2>/dev/null)
+        fi ;;
+esac
+[ -n "$out" ] || exit 1
+echo $((left - 1)) > "$FX/pgrep.left"
+printf '%s\n' "$out"
+SHIM
+cat > "$TMP/shims/lsof" <<'SHIM'
+#!/usr/bin/env bash
+case " $* " in
+    *" -d cwd "*) cat "$FX/lsof.out" 2>/dev/null ;;
+esac
+exit 0
+SHIM
+# ps: `ps -o command= -p <pid>` for a pid in pgrep.lf prints that line's command.
+# Every other call (the ppid walks in _oa_mine) goes to the real /bin/ps.
+cat > "$TMP/shims/ps" <<'SHIM'
+#!/usr/bin/env bash
+if [ "${1:-}" = "-o" ] && [ "${2:-}" = "command=" ] && [ "${3:-}" = "-p" ] && [ -f "$FX/pgrep.lf" ]; then
+    line=$(grep -E "^${4:-x} " "$FX/pgrep.lf" 2>/dev/null)
+    if [ -n "$line" ]; then printf '%s\n' "${line#* }"; exit 0; fi
+fi
+exec /bin/ps "$@"
+SHIM
+chmod +x "$TMP/shims/gh" "$TMP/shims/launchctl" "$TMP/shims/pgrep" "$TMP/shims/lsof" "$TMP/shims/ps"
+
+# ---------------------------------------------------------------------------
+# Fixture repo: the script under test, bin/lib, and a prefire-verify stub.
+# ---------------------------------------------------------------------------
+git init -q "$TMP/fix"
+git -C "$TMP/fix" symbolic-ref HEAD refs/heads/master
+git -C "$TMP/fix" config commit.gpgsign false
+mkdir -p "$TMP/fix/bin"
+cp "$REPO/bin/owner-approve" "$TMP/fix/bin/owner-approve"
+cp -R "$REPO/bin/lib" "$TMP/fix/bin/lib"
+cat > "$TMP/fix/bin/lib/prefire-verify" <<'STUB'
+#!/bin/sh
+git rev-parse HEAD >> "$PF_LOG"
+exit "${PF_RC:-0}"
+STUB
+chmod +x "$TMP/fix/bin/lib/prefire-verify" "$TMP/fix/bin/owner-approve"
+git -C "$TMP/fix" add -A
+git -C "$TMP/fix" commit -q -m base
+
+# ---------------------------------------------------------------------------
+# Per-case fixture
+# ---------------------------------------------------------------------------
+A40=$(printf '%040d' 0 | tr 0 a)
+B40=$(printf '%040d' 0 | tr 0 b)
+C40=$(printf '%040d' 0 | tr 0 c)
+
+write_pr() { # <head> [state] [labels json]
+    jq -nc --arg h "$1" --arg b "case/$CASE" --arg s "${2:-OPEN}" --argjson l "${3:-[]}" \
+        '{state:$s,headRefOid:$h,headRefName:$b,labels:$l}' > "$FX/pr.json"
+}
+fresh() { # <case>
+    CASE=$1
+    FX="$TMP/fx/$CASE"
+    mkdir -p "$FX"
+    git -C "$TMP/fix" worktree add -q -b "case/$CASE" "$TMP/wt/$CASE" >/dev/null 2>&1
+    WT=$(git -C "$TMP/fix" worktree list --porcelain | awk -v b="branch refs/heads/case/$CASE" '/^worktree /{w=substr($0,10)} $0==b {print w}')
+    H=$(git -C "$WT" rev-parse HEAD)
+    : > "$FX/comments.ndjson"
+    printf '%s' "$A40" > "$FX/tree"
+    write_pr "$H"
+    export FX PF_LOG="$FX/pf.log" PF_RC=0
+}
+seed_sticky() { # <author> <banner word> [extra lines...]
+    local author=$1 word=$2 body
+    shift 2
+    body="**$word** · 2026-11-12 · auto-merge held"$'\n'
+    while [ $# -gt 0 ]; do body="$body$1"$'\n'; shift; done
+    body="${body}Reviewer: opus"$'\n''<!-- pr-ready-verdict -->'
+    jq -nc --arg u "$author" --arg b "$body" '{user:{login:$u},body:$b}' >> "$FX/comments.ndjson"
+}
+seed_ready() { seed_sticky owner READY "**Reviewed tree:** $(cat "$FX/tree")"; }
+run_oa_env() { OUT=$(cd "$TMP/fix" && env "$@" 2>&1); RC=$?; }
+run_oa() { run_oa_env "$OA" "$@"; }
+new_commit() { # commits in the case worktree, points pr.json at it
+    git -C "$WT" commit -q --allow-empty -m "fix $CASE"
+    H=$(git -C "$WT" rev-parse HEAD)
+    write_pr "$H"
+}
+live_flags() { echo "--poll=0 --timeout=30"; }
+
+# ---------------------------------------------------------------------------
+# Phase 1 cases
+# ---------------------------------------------------------------------------
+body_literal() {
+    fresh body_literal
+    local words='He said "go" for $HOME, ran `ls` and $(id)' want
+    run_oa_env T3CODE_THREAD_ID=t3-1 CLAUDE_CODE_SESSION_ID=s-1 "$OA" "$PR" "$words"
+    want="Owner approved $(date +%F): \"$words\". Head $H. Conversation: T3 thread t3-1, session s-1."
+    [ "$(sed -n 1p "$FX/posted.1.md" 2>/dev/null)" = "$want" ] || note "line 1 is '$(sed -n 1p "$FX/posted.1.md" 2>/dev/null)'"
+    want_gh "--body-file"
+}
+body_option() {
+    fresh body_option
+    run_oa "$PR" "ok" "--option=Ship it (card B)"
+    grep -qF '"ok" (Ship it (card B)). Head' "$FX/posted.1.md" 2>/dev/null || note "option text not in the parentheses: $(sed -n 1p "$FX/posted.1.md" 2>/dev/null)"
+}
+ids_unset() {
+    fresh ids_unset
+    run_oa "$PR" "ok"
+    grep -qF 'T3 thread unknown, session unknown.' "$FX/posted.1.md" 2>/dev/null || note "ids not unknown"
+}
+ids_empty() {
+    fresh ids_empty
+    run_oa_env T3CODE_THREAD_ID= CLAUDE_CODE_SESSION_ID= "$OA" "$PR" "ok"
+    grep -qF 'T3 thread unknown, session unknown.' "$FX/posted.1.md" 2>/dev/null || note "empty ids not unknown"
+}
+headless_refuses() {
+    fresh headless_refuses
+    run_oa_env CLAUDE_HEADLESS=1 "$OA" "$PR" "ok"
+    want_rc 3
+    want_out "RESULT: headless"
+    no_gh
+}
+headless_empty_proceeds() {
+    fresh headless_empty_proceeds
+    run_oa_env CLAUDE_HEADLESS= "$OA" "$PR" "ok"
+    [ -f "$FX/posted.1.md" ] || note "no approval comment posted"
+}
+usage_unknown_flag() {
+    fresh usage_unknown_flag
+    run_oa "$PR" "ok" --bogus
+    want_rc 2
+    no_gh
+}
+usage_space_form() {
+    fresh usage_space_form
+    run_oa "$PR" --option "card B"
+    want_rc 2
+    want_out "--option needs =<value>"
+    no_gh
+}
+# Fails when _oa_post writes $OA_ROOT/body.md instead of its mktemp -d file (row 36).
+no_repo_writes() {
+    fresh no_repo_writes
+    seed_ready
+    run_oa "$PR" "ok"
+    want_rc 0
+    [ -z "$(git -C "$TMP/fix" status --porcelain)" ] || note "fixture repo is dirty"
+    [ -z "$(git -C "$WT" status --porcelain)" ] || note "case worktree is dirty"
+}
+
+# ---------------------------------------------------------------------------
+# Phase 2 cases
+# ---------------------------------------------------------------------------
+live_ok() { # <signal text>
+    seed_ready
+    run_oa "$PR" "ok" --poll=0 --timeout=30
+    want_rc 0
+    want_out "waiting 0s: $1"
+    want_gh "pr merge $PR -R a-jay85/IBL5 --squash --auto --match-head-commit $H"
+}
+live_launchd_now() {
+    fresh live_launchd_now
+    printf '4242\t0\tcom.ibl5.postplan-now-case-live_launchd_now-20261112-101010-4242\n' > "$FX/launchctl.out"
+    echo 2 > "$FX/launchctl.left"
+    live_ok "launchd label com.ibl5.postplan-now-case-live_launchd_now-20261112-101010-4242"
+}
+# Fails when _oa_live matches post-plan-fleet-X$OA_PR instead of post-plan-fleet-$OA_PR (row 12).
+live_launchd_fleet() {
+    fresh live_launchd_fleet
+    printf -- '-\t0\tcom.ibl5.post-plan-fleet-%s\n' "$PR" > "$FX/launchctl.out"
+    echo 2 > "$FX/launchctl.left"
+    live_ok "launchd label com.ibl5.post-plan-fleet-$PR"
+}
+live_label() {
+    fresh live_label
+    jq -nc --arg h "$H" --arg b "case/$CASE" '{state:"OPEN",headRefOid:$h,headRefName:$b,labels:[{name:"post-plan-running"}]}' > "$FX/pr.live.json"
+    echo 2 > "$FX/pr.live.left"
+    live_ok "post-plan-running label"
+}
+live_pgrep_args() {
+    fresh live_pgrep_args
+    printf '555 bash bin/post-plan-now --auto %s\n' "$WT" > "$FX/pgrep.lf"
+    echo 2 > "$FX/pgrep.left"
+    live_ok "a post-plan process names $WT"
+}
+live_pgrep_cwd() {
+    fresh live_pgrep_cwd
+    echo 556 > "$FX/pgrep.f"
+    printf 'p556\nn%s\n' "$WT" > "$FX/lsof.out"
+    echo 2 > "$FX/pgrep.left"
+    live_ok "post-plan process 556 runs in $WT"
+}
+# Fails when a crashed _oa_live reads as "no live run". The copy exits 1 (the old
+# "none" status) before it checks anything, so the script must wait, time out, and not arm.
+live_crash_fails_closed() {
+    fresh live_crash_fails_closed
+    sed 's/^_oa_live() {/_oa_live() { exit 1;/' "$OA" > "$TMP/fix/bin/owner-approve-crash"
+    chmod +x "$TMP/fix/bin/owner-approve-crash"
+    grep -qF '_oa_live() { exit 1;' "$TMP/fix/bin/owner-approve-crash" || note "crash seam did not apply"
+    seed_ready
+    run_oa_env "$TMP/fix/bin/owner-approve-crash" "$PR" "ok" --poll=0 --timeout=0
+    want_rc 5
+    want_out "liveness check crashed (exit 1)"
+    refute_gh "pr edit"
+    refute_gh "pr merge"
+}
+# Runs the pgrep cases under /bin/bash, which is 3.2 on macOS and has no BASHPID.
+live_ok_bin_bash() { # <signal text>
+    seed_ready
+    run_oa_env /bin/bash "$OA" "$PR" "ok" --poll=0 --timeout=30
+    want_rc 0
+    want_out "waiting 0s: $1"
+    want_gh "pr merge $PR -R a-jay85/IBL5 --squash --auto --match-head-commit $H"
+}
+live_pgrep_args_bin_bash() {
+    [ -x /bin/bash ] || return 0
+    fresh live_pgrep_args_bin_bash
+    printf '555 bash bin/post-plan-now --auto %s\n' "$WT" > "$FX/pgrep.lf"
+    echo 2 > "$FX/pgrep.left"
+    live_ok_bin_bash "a post-plan process names $WT"
+}
+live_pgrep_cwd_bin_bash() {
+    [ -x /bin/bash ] || return 0
+    fresh live_pgrep_cwd_bin_bash
+    echo 556 > "$FX/pgrep.f"
+    printf 'p556\nn%s\n' "$WT" > "$FX/lsof.out"
+    echo 2 > "$FX/pgrep.left"
+    live_ok_bin_bash "post-plan process 556 runs in $WT"
+}
+live_near_miss() {
+    fresh live_near_miss
+    printf '77\t0\tcom.ibl5.postplan-now-case-live_near_miss-old-20261112-101010-77\n-\t0\tcom.ibl5.post-plan-fleet-7770\n' > "$FX/launchctl.out"
+    echo 9 > "$FX/launchctl.left"
+    seed_ready
+    run_oa "$PR" "ok" --poll=0 --timeout=30
+    want_rc 0
+    refute_out "waiting"
+}
+live_timeout() {
+    fresh live_timeout
+    printf -- '-\t0\tcom.ibl5.post-plan-fleet-%s\n' "$PR" > "$FX/launchctl.out"
+    echo 99 > "$FX/launchctl.left"
+    seed_ready
+    run_oa "$PR" "ok" --poll=0 --timeout=0
+    want_rc 5
+    want_out "RESULT: timeout"
+    grep -qF 'still live after 0s' "$FX/posted.2.md" 2>/dev/null || note "posted.2.md lacks 'still live after 0s'"
+    refute_gh "pr edit"
+    refute_gh "pr merge"
+}
+
+# ---------------------------------------------------------------------------
+# Phase 3 cases
+# ---------------------------------------------------------------------------
+verdict_ready_arms() {
+    fresh verdict_ready_arms
+    seed_ready
+    run_oa "$PR" "ok"
+    want_rc 0
+    want_out "RESULT: armed"
+    want_order "pr edit $PR -R a-jay85/IBL5 --add-label human-approved" "pr merge $PR -R a-jay85/IBL5 --squash --auto --match-head-commit $H"
+    refute_gh "--admin"
+}
+verdict_notes_arms() {
+    fresh verdict_notes_arms
+    seed_sticky owner "READY WITH NOTES" "**Reviewed tree:** $A40"
+    run_oa "$PR" "ok"
+    want_rc 0
+    want_out "RESULT: armed"
+    want_gh "pr merge $PR"
+}
+verdict_stale_tree() {
+    fresh verdict_stale_tree
+    seed_sticky owner READY "**Reviewed tree:** $B40"
+    run_oa "$PR" "ok"
+    want_rc 4
+    want_posted "covers tree bbbb"
+    refute_gh "pr edit"
+    refute_gh "pr merge"
+}
+verdict_none() {
+    fresh verdict_none
+    run_oa "$PR" "ok"
+    want_rc 4
+    want_posted "has no post-plan verdict comment"
+}
+verdict_not_ready() {
+    fresh verdict_not_ready
+    seed_sticky owner "NOT READY" "**Reviewed tree:** $A40"
+    run_oa "$PR" "ok"
+    want_rc 4
+    want_posted "is NOT READY"
+    refute_gh "pr merge"
+}
+verdict_unrecorded() {
+    fresh verdict_unrecorded
+    seed_sticky owner READY "**Reviewed tree:** unrecorded"
+    run_oa "$PR" "ok"
+    want_rc 4
+    want_posted "names no reviewed tree"
+}
+verdict_no_tree_line() {
+    fresh verdict_no_tree_line
+    seed_sticky owner READY "no tree here"
+    run_oa "$PR" "ok"
+    want_rc 4
+    want_posted "names no reviewed tree"
+}
+verdict_rereview_wins() {
+    fresh verdict_rereview_wins
+    seed_sticky owner READY "**Reviewed tree:** $B40" "**Re-reviewed tree:** $A40"
+    run_oa "$PR" "ok"
+    want_rc 0
+    want_out "RESULT: armed"
+}
+verdict_rereview_suffix() {
+    fresh verdict_rereview_suffix
+    seed_sticky owner READY "**Reviewed tree:** $B40" "**Re-reviewed tree:** $A40 (READY)"
+    run_oa "$PR" "ok"
+    want_rc 0
+    want_out "RESULT: armed"
+    rm -f "$FX"/posted.*.md "$FX/gh.log"
+    : > "$FX/comments.ndjson"
+    seed_sticky owner READY "**Reviewed tree:** $B40" "**Re-reviewed tree:** $A40 (NOT READY)"
+    run_oa "$PR" "ok"
+    want_rc 4
+    want_posted "not READY"
+}
+verdict_banner_near_miss() {
+    fresh verdict_banner_near_miss
+    seed_sticky owner "READY-ish" "**Reviewed tree:** $A40"
+    run_oa "$PR" "ok"
+    want_rc 4
+    want_posted "banner is missing or unreadable"
+    rm -f "$FX"/posted.*.md "$FX/gh.log"
+    : > "$FX/comments.ndjson"
+    seed_sticky owner READY "**Reviewed tree:** $A40" "NOT READY was the old verdict"
+    run_oa "$PR" "ok"
+    want_rc 0
+    want_out "RESULT: armed"
+}
+verdict_foreign_author() {
+    fresh verdict_foreign_author
+    seed_sticky someone-else READY "**Reviewed tree:** $A40"
+    run_oa "$PR" "ok"
+    want_rc 4
+    want_posted "posted by someone-else"
+}
+verdict_ignores_approval_text() {
+    fresh verdict_ignores_approval_text
+    seed_ready
+    run_oa "$PR" "go <!-- pr-ready-verdict -->"
+    want_rc 0
+    want_out "RESULT: armed"
+}
+verdict_gh_error() {
+    fresh verdict_gh_error
+    seed_ready
+    : > "$FX/fail.comments"
+    run_oa "$PR" "ok"
+    want_rc 4
+    want_posted "could not read the comments"
+}
+arm_label_fail() {
+    fresh arm_label_fail
+    seed_ready
+    : > "$FX/fail.edit"
+    run_oa "$PR" "ok"
+    want_rc 4
+    refute_gh "pr merge"
+}
+arm_merge_fail_rollback() {
+    fresh arm_merge_fail_rollback
+    seed_ready
+    : > "$FX/fail.merge"
+    run_oa "$PR" "ok"
+    want_rc 4
+    want_order "pr merge $PR" "--remove-label human-approved"
+}
+pr_closed() {
+    fresh pr_closed
+    write_pr "$H" MERGED
+    seed_ready
+    run_oa "$PR" "ok"
+    want_rc 4
+    grep -qF 'Owner approved' "$FX/posted.1.md" 2>/dev/null || note "posted.1.md is not the approval comment"
+    refute_gh "pr edit"
+}
+
+# ---------------------------------------------------------------------------
+# Phase 4 cases
+# ---------------------------------------------------------------------------
+fixfirst_records() {
+    fresh fixfirst_records
+    run_oa "$PR" "fix the copy first" "--fix-first=rename the button"
+    want_rc 6
+    want_out "RESULT: fix-first-recorded"
+    grep -qF 'Condition: rename the button' "$FX/posted.1.md" 2>/dev/null || note "no Condition line"
+    grep -qF "<!-- owner-approve mode=fix-first head=$H -->" "$FX/posted.1.md" 2>/dev/null || note "no record line"
+    [ ! -e "$FX/launchctl.log" ] || note "the script waited"
+    refute_gh "pr edit"
+    refute_gh "pr merge"
+}
+finish_no_record() {
+    fresh finish_no_record
+    run_oa "$PR" --finish
+    want_rc 4
+    want_posted "no owner approval comment"
+}
+finish_head_unmoved() {
+    fresh finish_head_unmoved
+    run_oa "$PR" "go" "--fix-first=fix it"
+    want_rc 6
+    seed_ready
+    run_oa "$PR" --finish
+    want_rc 4
+    want_posted "the head is still"
+}
+finish_wt_mismatch() {
+    fresh finish_wt_mismatch
+    run_oa "$PR" "go" "--fix-first=fix it"
+    want_rc 6
+    new_commit
+    write_pr "$C40"
+    seed_ready
+    run_oa "$PR" --finish
+    want_rc 4
+    want_posted "but the PR head is"
+}
+finish_wt_dirty() {
+    fresh finish_wt_dirty
+    run_oa "$PR" "go" "--fix-first=fix it"
+    want_rc 6
+    new_commit
+    : > "$WT/untracked.txt"
+    seed_ready
+    run_oa "$PR" --finish
+    want_rc 4
+    want_posted "uncommitted changes"
+}
+finish_prefire_fail() {
+    fresh finish_prefire_fail
+    run_oa "$PR" "go" "--fix-first=fix it"
+    want_rc 6
+    new_commit
+    seed_ready
+    PF_RC=1 run_oa_env PF_RC=1 "$OA" "$PR" --finish
+    want_rc 4
+    want_posted "prefire-verify exited 1"
+    refute_gh "pr edit"
+}
+finish_prefire_prereq() {
+    fresh finish_prefire_prereq
+    run_oa "$PR" "go" "--fix-first=fix it"
+    want_rc 6
+    new_commit
+    seed_ready
+    run_oa_env PF_RC=3 "$OA" "$PR" --finish
+    want_rc 4
+    want_posted "exited 3"
+    refute_gh "pr edit"
+}
+finish_arms() {
+    fresh finish_arms
+    run_oa "$PR" "go" "--fix-first=fix it"
+    want_rc 6
+    new_commit
+    seed_ready
+    run_oa "$PR" --finish
+    want_rc 0
+    want_out "RESULT: armed"
+    [ "$(cat "$FX/pf.log" 2>/dev/null)" = "$H" ] || note "pf.log is '$(cat "$FX/pf.log" 2>/dev/null)', want $H"
+    want_gh "--match-head-commit $H"
+}
+finish_after_plain() {
+    fresh finish_after_plain
+    printf -- '-\t0\tcom.ibl5.post-plan-fleet-%s\n' "$PR" > "$FX/launchctl.out"
+    echo 99 > "$FX/launchctl.left"
+    seed_ready
+    run_oa "$PR" "go" --poll=1 --timeout=0
+    want_rc 5
+    : > "$FX/launchctl.out"
+    run_oa "$PR" --finish
+    want_rc 0
+    want_out "RESULT: armed"
+    [ ! -e "$FX/pf.log" ] || note "prefire-verify ran after a plain approval"
+}
+finish_extra_args() {
+    fresh finish_extra_args
+    run_oa "$PR" --finish --option=x
+    want_rc 2
+    no_gh
+}
+
+# ---------------------------------------------------------------------------
+# Phase 5 case: the docs route through the script
+# ---------------------------------------------------------------------------
+docs_route_through_script() {
+    local skill="$REPO/.claude/skills/pr-burndown/SKILL.md" rule="$REPO/.claude/rules/auto-commit.md"
+    OUT=""
+    if command grep -nE 'gh pr merge [^`]*--auto|add-label human-approved' "$skill" >/dev/null 2>&1; then
+        note "the skill still arms or labels directly"
+    fi
+    grep -qF 'bin/owner-approve' "$skill" || note "the skill never names bin/owner-approve"
+    grep -qF "When the owner's own words in chat approve a named PR, comment on it at once." "$rule" || note "the rule lost its trigger sentence"
+    grep -qF 'bin/owner-approve N' "$rule" || note "the rule does not point at bin/owner-approve N"
+    if grep -qF 'gh pr comment N --body' "$rule"; then note "the manual comment command survives in the rule"; fi
+}
+
+ALL_CASES="
+body_literal body_option ids_unset ids_empty headless_refuses headless_empty_proceeds
+usage_unknown_flag usage_space_form no_repo_writes
+live_launchd_now live_launchd_fleet live_label live_pgrep_args live_pgrep_cwd live_near_miss live_timeout
+live_crash_fails_closed live_pgrep_args_bin_bash live_pgrep_cwd_bin_bash
+verdict_ready_arms verdict_notes_arms verdict_stale_tree verdict_none verdict_not_ready
+verdict_unrecorded verdict_no_tree_line verdict_rereview_wins verdict_rereview_suffix verdict_banner_near_miss
+verdict_foreign_author verdict_ignores_approval_text verdict_gh_error
+arm_label_fail arm_merge_fail_rollback pr_closed
+fixfirst_records finish_no_record finish_head_unmoved finish_wt_mismatch finish_wt_dirty
+finish_prefire_fail finish_prefire_prereq finish_arms finish_after_plain finish_extra_args
+docs_route_through_script
+"
+
+if [ $# -gt 0 ]; then CASES="$*"; else CASES="$ALL_CASES"; fi
+
+for name in $CASES; do
+    if ! declare -F "$name" >/dev/null; then
+        echo "FAIL $name: no such case"
+        H_FAIL=$((H_FAIL + 1))
+        continue
+    fi
+    WHY=""
+    "$name"
+    if [ -z "$WHY" ]; then
+        echo "PASS $name"
+        H_PASS=$((H_PASS + 1))
+    else
+        echo "FAIL $name: $WHY"
+        printf '%s\n' "$OUT" | sed -n '1,15p' | sed 's/^/    | /'
+        H_FAIL=$((H_FAIL + 1))
+    fi
+done
+
+h_done

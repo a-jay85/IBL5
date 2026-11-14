@@ -1,7 +1,7 @@
 ---
 name: pr-burndown
 description: "Burn down the open PRs that wait on the owner. Background headless jobs do the prep that needs no owner call (rebase, regenerate snapshots, write promised tests, fix review findings, re-fire post-plan). The owner sees only the decisions that are theirs: a status card per PR (CI on the current head, review threads, post-plan verdict, door and blast radius, conflicts, hold reasons, visual links) with a recommended option, answered in a batch."
-last_verified: 2026-11-12
+last_verified: 2026-11-13
 ---
 
 # /pr-burndown
@@ -42,19 +42,8 @@ This skill moves existing PRs. To find and queue new work, run `/reset-ready` fi
   "test row 43".
 - Every claim on the card comes from live state fetched this turn. A scout summary or an
   earlier fetch is not evidence. A "green, just click" summary has been wrong before.
-- You add `human-approved`, tick a manual-test box, or arm `gh pr merge --auto` only
-  after the owner approves that specific PR in chat. The approval comment comes from
-  `.claude/rules/auto-commit.md` § Owner approval comment. Nothing in this skill approves a PR on its own.
-- When the owner approves a PR for merge in chat, arm auto-merge on it right away:
-  `gh pr merge N --squash --auto`. Don't wait for post-plan to arm it. GitHub then
-  merges it once every required check passes and the branch is up to date with master.
-  The merge line updates only armed PRs, so arming also starts the update from master.
-  The required checks still gate the merge, including `human-signoff`, which waits for
-  the `human-approved` label. Arming never skips a check.
-  When no job will push to the PR, add the label and arm it in this session. When a
-  job will push (a rebase, an asked-for fix), the job arms it after its last push
-  (Step 6, step 7). Run the Step 6 live-run check before you arm. If a post-plan run is
-  live, arm after it ends: its fix round disarms any PR that gets armed mid-run.
+- You tick a manual-test box, or run `bin/owner-approve`, only after the owner approves that specific PR in chat. Rule: `.claude/rules/auto-commit.md` § Owner approval comment. Nothing in this skill approves a PR on its own.
+- When the owner approves a PR for merge in chat, run `bin/owner-approve N "<words>"` right away with `run_in_background: true`. It waits for a live post-plan run to end, then arms only when the verdict covers the current head. When the owner asks for a fix first, pass `--fix-first="<condition>"`.
 - Never touch a PR's worktree while a post-plan run is live in it. Check `launchctl list`
   first (Step 6 has the command). A run started from a terminal has no launchctl label,
   so also treat a `post-plan-running` label or a `pgrep -f <abs worktree path>` hit as
@@ -239,8 +228,8 @@ check, and updates only that one (ADR-0081). Each armed PR gets updated once, wh
 turn comes.
 
 - **`BEHIND` with no conflict.** Don't rebase it. List no rebase in the job's chores. Once
-  the PR is armed, the merge line keeps it current. A Ship pick needs only the label and
-  the arm. Do both in this session, with no job.
+  the PR is armed, the merge line keeps it current. A Ship pick needs only
+  `bin/owner-approve`. Run it in this session, with no job.
 - **`DIRTY`.** Rebase it in the job. The merge line skips conflicted PRs, so nothing else
   will.
 - **Two approved PRs that clash with each other.** Rebase and ship the higher-ranked one
@@ -335,13 +324,7 @@ Owner decision on PR #N (branch <branch>), <date>: "<owner's words>". <What it c
 6. Do NOT run post-plan or /pr-ready. This session is headless and bin/post-plan-now refuses
    to start here. The parent session re-fires post-plan after you finish.
 7. <One of:>
-   - Ship: add `human-approved` to every approved PR, tick the manual boxes the owner
-     confirmed. The parent session already posted the approval comment. Then, after the push in
-     step 5, arm it: gh pr merge N --squash --auto. GitHub merges it once every required
-     check passes and the branch is up to date with master. The label also clears
-     post-plan condition (7) for a PR whose plan says auto_merge: false, while the
-     recorded fingerprint matches the diff. Arm after the last push, because a push that
-     changes the PR's changed lines drops the label.
+   - Ship: tick the manual boxes the owner confirmed. After the last push in step 5, the parent session runs `bin/owner-approve N --finish` with `run_in_background: true`. After a plain approval the script waits out any live post-plan run, then arms only on a READY verdict for the pushed head's tree. After a `--fix-first` approval it first checks the pushed head and runs `bin/lib/prefire-verify` in the worktree.
      Master refuses any merge while a review thread is open (ci-gotchas.md § Conversation
      resolution). Before you report the PR as shipping, list its open threads. File each
      finding the owner deferred to the backlog, reply "Deferred to
@@ -406,7 +389,7 @@ can do it, and stop any watcher this session started (`TaskStop`).
   `prb-<run>-N`. The brief holds only what that PR needs: the goal, the owner's words and
   date, why it's held, the `.result` path and job pid, and numbered steps. The steps: wait
   with its own background Monitor, re-fire post-plan, wait for its `RESULT:` line, then
-  arm or build the card. For a card, the brief says to run `/pr-burndown N` from Step 3.
+  run `bin/owner-approve N --finish` or build the card. For a card, the brief says to run `/pr-burndown N` from Step 3.
   Name each thread by its `link` in your reply.
 - **This session.** Use it only while the owner is still answering cards and the job will
   land inside the hour.
@@ -416,7 +399,7 @@ DM is its completion signal. That DM exists only once post-plan starts. A refuse
 check exits before then, so whoever fires `post-plan-now` reports a non-zero exit itself.
 
 Post-plan holds condition 7 when the plan says `auto_merge: false`. The hold lasts until
-`human-approved` is on the PR and the `human-signoff` workflow has recorded the diff
+`bin/owner-approve` adds `human-approved` to the PR and the `human-signoff` workflow has recorded the diff
 fingerprint. A PR the owner approved in chat is already armed by then, so it merges once
 `human-signoff` passes. A push that changes the PR's changed lines drops the label, and
 the hold comes back. The PR stays armed but can't merge until someone adds the label again.

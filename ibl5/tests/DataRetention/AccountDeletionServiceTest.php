@@ -76,28 +76,27 @@ class AccountDeletionServiceTest extends TestCase
         $this->repository->method('findTeamsByGmUsername')->willReturn([]);
         $this->repository->expects(self::never())->method('countAccountTarget');
 
-        $inTransaction = false;
+        $events = [];
         $this->repository->expects(self::once())->method('runInTransaction')
-            ->willReturnCallback(static function (callable $work) use (&$inTransaction): mixed {
-                $inTransaction = true;
+            ->willReturnCallback(static function (callable $work) use (&$events): mixed {
+                $events[] = 'begin';
                 $result = $work();
-                $inTransaction = false;
+                $events[] = 'end';
                 return $result;
             });
 
-        $applied = [];
         $this->repository->expects(self::exactly(count(AccountFootprintTarget::cases())))->method('applyAccountTarget')
-            ->willReturnCallback(static function (AccountFootprintTarget $target, int $userId, ?string $username) use (&$applied, &$inTransaction): int {
-                self::assertTrue($inTransaction, $target->name . ' ran outside the transaction');
+            ->willReturnCallback(static function (AccountFootprintTarget $target, int $userId, ?string $username) use (&$events): int {
                 self::assertSame(42, $userId);
                 self::assertSame('gm42', $username);
-                $applied[] = $target;
+                $events[] = $target->name;
                 return $target === AccountFootprintTarget::AuthUsers ? 1 : 2;
             });
 
         $report = $this->service->deleteAccount(42, true);
 
-        self::assertSame(AccountFootprintTarget::cases(), $applied);
+        $expected = array_map(static fn (AccountFootprintTarget $t): string => $t->name, AccountFootprintTarget::cases());
+        self::assertSame(['begin', ...$expected, 'end'], $events);
         self::assertFalse($report->dryRun);
         self::assertSame(1, $report->affected[AccountFootprintTarget::AuthUsers->value]);
         self::assertSame(2, $report->affected[AccountFootprintTarget::Confirmations->value]);
@@ -111,9 +110,12 @@ class AccountDeletionServiceTest extends TestCase
             ->willReturnCallback(static fn (callable $work): mixed => $work());
         $this->repository->method('applyAccountTarget')->willReturn(0);
 
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('expected to delete 1 auth_users row');
-        $this->service->deleteAccount(42, true);
+        try {
+            $this->service->deleteAccount(42, true);
+            self::fail('expected RuntimeException');
+        } catch (\RuntimeException $e) {
+            self::assertStringContainsString('expected to delete 1 auth_users row', $e->getMessage());
+        }
     }
 
     public function testDeleteAccountWithNullUsernameSkipsUsernameTargets(): void

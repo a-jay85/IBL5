@@ -752,6 +752,7 @@ See ibl5/docs/decisions/NNNN-x.md for the decision.
 # doesn't co-fire and reattribute this fixture's exit code.
 assert "gateH-hold-no-justification" 1 '---
 auto_merge: false
+hold_trigger: gate-weakening
 impl_model: sonnet
 ---'"$M"
 
@@ -761,6 +762,7 @@ impl_model: sonnet
 # reattribute this fixture's exit code away from gate H.
 assert "gateH-hold-with-justification" 0 '---
 auto_merge: false
+hold_trigger: gate-weakening
 impl_model: sonnet
 ---'"$M"'
 ## Automouse Hold Justification
@@ -773,6 +775,38 @@ Intrinsic (gate 14b): touched security surface — per-site authz verdicts are d
 assert "gateH-no-hold-armed" 0 '---
 impl_model: sonnet
 ---'"$M"
+
+# Gate H hold_trigger: a held plan must name a known token on its line-1
+# frontmatter. The first fixture copies the real events-review-likely-bot-split.md
+# frontmatter (auto_merge: false, no hold_trigger:). Each case also asserts the
+# message text, so the [H] exit is attributable to the hold_trigger check.
+HT_JUST='
+## Automouse Hold Justification
+
+**Decision:** Merge if you accept the stricter plan bookkeeping.
+'
+assert_msg "gateH-hold-trigger-missing-events-review-shape" 1 "no non-empty hold_trigger:" "" '---
+impl_model: sonnet
+auto_merge: false
+---'"$M$HT_JUST"
+assert_msg "gateH-hold-trigger-golden-snapshot-passes" 0 "" "hold_trigger" '---
+impl_model: sonnet
+auto_merge: false
+hold_trigger: golden-snapshot
+---'"$M$HT_JUST"
+assert_msg "gateH-hold-trigger-unknown-golden-snap" 1 "hold_trigger token 'golden-snap'" "" '---
+impl_model: sonnet
+auto_merge: false
+hold_trigger: golden-snap
+---'"$M$HT_JUST"
+assert_msg "gateH-hold-trigger-body-only" 1 "no non-empty hold_trigger:" "" '---
+impl_model: sonnet
+auto_merge: false
+---'"$M"'
+## Context
+
+hold_trigger: gate-weakening
+'"$HT_JUST"
 
 # Gate H (a): the crammed one-line form must flag (exit 1). This is the whole
 # point of the sub-check — WITHOUT it the fixture below is silently read as
@@ -812,6 +846,7 @@ impl_model: sonnet
 # "A human must confirm X" is the exact sentence this gate rejects.
 assert_viol "gateHb-ask-shaped-sentence" 1 "[H]" '---
 auto_merge: false
+hold_trigger: gate-weakening
 impl_model: sonnet
 ---'"$M"'
 ## Automouse Hold Justification
@@ -824,6 +859,7 @@ impl_model: sonnet
 # (e.g. "accept an irreversible move") and the gate stays silent (exit 0).
 assert_viol "gateHb-decision-line-exempt" 0 "[H]" '---
 auto_merge: false
+hold_trigger: gate-weakening
 impl_model: sonnet
 ---'"$M"'
 ## Automouse Hold Justification
@@ -839,6 +875,7 @@ impl_model: sonnet
 # switch would pass this test with exit 0 — then this fixture catches it.
 assert_viol "gateHb-decision-block-ends-at-blank-line" 1 "[H]" '---
 auto_merge: false
+hold_trigger: gate-weakening
 impl_model: sonnet
 ---'"$M"'
 ## Automouse Hold Justification
@@ -855,6 +892,7 @@ A reviewer must verify the counts agree.
 # also contains "reviewer" or "must".
 assert_viol "gateHb-perception-hold-passes" 0 "[H]" '---
 auto_merge: false
+hold_trigger: gate-weakening
 impl_model: sonnet
 ---'"$M"'
 ## Automouse Hold Justification
@@ -868,6 +906,7 @@ Intrinsic (gate 14a): does the drag-reorder flow feel right? A reviewer must acc
 # diff) is not asking a human to act; the gate must stay silent (exit 0).
 assert_viol "gateHb-capability-prose-passes" 0 "[H]" '---
 auto_merge: false
+hold_trigger: gate-weakening
 impl_model: sonnet
 ---'"$M"'
 ## Automouse Hold Justification
@@ -880,6 +919,7 @@ Intrinsic (gate 14b): a reviewer can confirm each authz verdict from the diff, b
 # sentences like this") must NOT flag (exit 0) — this fixture ensures fencing works.
 assert_viol "gateHb-fenced-example-passes" 0 "[H]" '---
 auto_merge: false
+hold_trigger: gate-weakening
 impl_model: sonnet
 ---'"$M"'
 ## Automouse Hold Justification
@@ -908,6 +948,7 @@ A human must confirm every class reference resolves under the new namespace.
 # ---------------------------------------------------------------------------
 FM_HOLD_DOC='---
 auto_merge: false
+hold_trigger: gate-weakening
 impl_model: sonnet
 ---'
 # _hc_words <n> — n filler words, so a case hits an exact word count.
@@ -4749,14 +4790,15 @@ _corpus_guard_ok() {
     # Gate [AB] is downgradeable too: it postdates every frozen corpus plan, and
     # the plans it flags carry genuine plan-only negated greps (true positives).
     # Gate [CW] is the same: frozen plans shipped before prefire-verify ran their rows.
+    # The [H] missing-hold_trigger line is the same: frozen held plans predate the key.
     _cgo_other="$(printf '%s\n' "$_cgo_out" | awk '
         /^check-plan: violations in /{v=1; next}
         /^check-plan: /{v=0}
-        v && /^\[/ && !/^\[E\]/ && !/^\[AB\]/ && !/^\[CW\]/ && !/^\[V\].*unbalanced backtick after Phase 5\.0 strip/ && !/^\[F\] ## Critical Files entry has an absolute path/ {print}')"
+        v && /^\[/ && !/^\[E\]/ && !/^\[AB\]/ && !/^\[CW\]/ && !/^\[V\].*unbalanced backtick after Phase 5\.0 strip/ && !/^\[F\] ## Critical Files entry has an absolute path/ && !/^\[H\].*no non-empty hold_trigger:/ {print}')"
     _cgo_dvio="$(printf '%s\n' "$_cgo_out" | awk '
         /^check-plan: violations in /{v=1; next}
         /^check-plan: /{v=0}
-        v && (/^\[E\]/ || /^\[AB\]/ || /^\[CW\]/ || /^\[V\].*unbalanced backtick after Phase 5\.0 strip/ || /^\[F\] ## Critical Files entry has an absolute path/) {print}' | head -1)"
+        v && (/^\[E\]/ || /^\[AB\]/ || /^\[CW\]/ || /^\[V\].*unbalanced backtick after Phase 5\.0 strip/ || /^\[F\] ## Critical Files entry has an absolute path/ || /^\[H\].*no non-empty hold_trigger:/) {print}' | head -1)"
     # Downgrade ONLY when: non-zero exit, zero non-downgradeable lines, and at
     # least one downgradeable line actually explains the failure. A non-zero exit
     # with no visible violation line still fails loudly instead of passing silently.

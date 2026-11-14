@@ -137,12 +137,32 @@ def test_added_lines_error_still_missing(monkeypatch):
     """Mutation caught: `content_ident = "MUTANT"` in the except branch."""
     def _boom(_diff):
         raise RuntimeError("diff unreadable")
-    monkeypatch.setattr(conformance, "_added_lines", _boom)
+    monkeypatch.setattr(conformance, "_clearing_added_lines", lambda *_a: _boom(None))
     items, notes = _run(SHELLCHECK_3923, CHANGED_3923, TRACKED_3923, diff_text=DIFF_3923)
     _assert_one_missing(items, 3)
     errors = [n for n in notes if n.startswith("CONTENT-MATCH-ERROR: 3 ")]
     assert len(errors) == 1
     assert "RuntimeError" in errors[0]
+
+
+def test_other_phase_file_does_not_clear_phase():
+    """Mutation caught: other-phase files not excluded from the clearing lines."""
+    content = ("## Phase 2: Handle SHELLCHECK_OPTS in `bin/lib/prefire-verify`\n\nBody.\n\n"
+               + SHELLCHECK_3923)
+    diff = ("diff --git a/bin/lib/prefire-verify b/bin/lib/prefire-verify\n"
+            "--- a/bin/lib/prefire-verify\n+++ b/bin/lib/prefire-verify\n"
+            "@@ -1,1 +1,2 @@\n context\n+SHELLCHECK_OPTS=x\n")
+    items, _ = _run(content, ["bin/lib/prefire-verify"], TRACKED_3923, diff_text=diff)
+    assert [i for i in items if i.startswith("MISSING-PHASE: 3 ")]
+
+
+def test_doc_only_identifier_does_not_clear_phase():
+    """Mutation caught: prose/fixture files not excluded from the clearing lines."""
+    diff = ("diff --git a/docs/notes.md b/docs/notes.md\n"
+            "--- a/docs/notes.md\n+++ b/docs/notes.md\n"
+            "@@ -1,1 +1,2 @@\n context\n+Uses SHELLCHECK_OPTS here\n")
+    items, _ = _run(SHELLCHECK_3923, CHANGED_3923, TRACKED_3923, diff_text=diff)
+    _assert_one_missing(items, 3)
 
 
 def test_generic_heading_words_do_not_clear():

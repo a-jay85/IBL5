@@ -52,4 +52,13 @@ class ContractsEntryPointTest extends ModuleEntryPointTestCase
         $this->assertStringContainsString('Cap Info', $output);
         $this->assertStringNotContainsString('Master Contract List', $output);
     }
+
+    public function testDefaultTabQueriesCapSpaceData(): void
+    {
+        $this->mockDb->setMockData([]);
+
+        $this->runModule('Contracts');
+
+        $this->assertQueryExecuted('ibl_team_info');
+    }
 }

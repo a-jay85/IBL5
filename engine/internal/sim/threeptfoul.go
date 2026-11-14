@@ -40,6 +40,12 @@ func (gs *gameState) threePtShot(offense, defense *teamState, shooter, defender 
 		return threePtMade
 	}
 	blocked := gs.rng.Float64() < blockProbability(defender, gs.madeFG[shooter.PID])
+	// backlog#1841, undetermined statically (engine/docs/j27-foul-volume-3-port.md):
+	// at 94106 cVar6 = FUN_004d7e10() is 1 only when the FUN_004e3400 block roll
+	// picks a blocker, and the 1% roll at 94131-94149 sits after the
+	// if (cVar6 == '\0') block (94108-94127) on both paths. No block-stat write is
+	// visible in the decompile, so the plan keeps the !blocked guard until a
+	// debugger read (engine/docs/x32dbg-foul-divisor-pin-runbook.md) settles it.
 	if !blocked && threePtFoulFires(gs.rng.Float64()) { // 94102-94150: fouled missed 3
 		gs.resolveFoulShot(offense, defense, shooter, defender, 3, false, true, false, periodIdx)
 		return threePtFouled

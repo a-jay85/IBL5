@@ -17,19 +17,10 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-use SeasonLeaderboards\CachedSeasonLeaderboardsRepository;
-use SeasonLeaderboards\SeasonLeaderboardsRepository;
-use SeasonLeaderboards\SeasonLeaderboardsService;
-use SeasonLeaderboards\SeasonLeaderboardsView;
-
-$tabs = new \UI\Components\PageTabs(['season' => 'Season', 'career' => 'Career'], 'season');
+$tabs = \Module\ModuleServices::current()->factory(\Module\Factories\LeaderboardsFactory::class)->tabs();
 $tab = $tabs->resolve($_GET['tab'] ?? null);
 
 $pagetitle = '- Leaderboards: ' . ($tab === 'career' ? 'Career' : 'Season');
-
-global $mysqli_db, $leagueContext;
-/** @var \mysqli $mysqli_db */
-/** @var \League\LeagueContext $leagueContext */
 
 PageLayout\PageLayout::header();
 
@@ -37,11 +28,10 @@ ob_start();
 
 if ($tab === 'career') {
     // Initialize classes
-    $dbCache = new \Cache\DatabaseCache($mysqli_db);
-    $innerRepository = new \CareerLeaderboards\CareerLeaderboardsRepository($mysqli_db);
-    $repository = new \CareerLeaderboards\CachedCareerLeaderboardsRepository($innerRepository, $dbCache);
-    $service = new CareerLeaderboards\CareerLeaderboardsService();
-    $view = new \CareerLeaderboards\CareerLeaderboardsView($service);
+    $careerFactory = \Module\ModuleServices::current()->factory(\Module\Factories\CareerLeaderboardsFactory::class);
+    $repository = $careerFactory->repository();
+    $service = $careerFactory->service();
+    $view = $careerFactory->view();
 
     // Read filter parameters from the query string (allowlisted by the service)
     $getString = static fn (string $key, string $default): string => is_string($_GET[$key] ?? null) ? $_GET[$key] : $default;
@@ -96,11 +86,10 @@ if ($tab === 'career') {
     }
 } else {
     // Initialize classes
-    $dbCache = new \Cache\DatabaseCache($mysqli_db);
-    $innerRepository = new SeasonLeaderboardsRepository($mysqli_db, $leagueContext);
-    $repository = new CachedSeasonLeaderboardsRepository($innerRepository, $dbCache);
-    $service = new SeasonLeaderboardsService($repository);
-    $view = new SeasonLeaderboardsView($service);
+    $seasonFactory = \Module\ModuleServices::current()->factory(\Module\Factories\SeasonLeaderboardsFactory::class);
+    $repository = $seasonFactory->repository();
+    $service = $seasonFactory->service();
+    $view = $seasonFactory->view();
 
     // Read filter parameters from the query string
     $getString = static fn (string $key): string => is_string($_GET[$key] ?? null) ? $_GET[$key] : '';

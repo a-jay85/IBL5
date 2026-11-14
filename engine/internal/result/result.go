@@ -54,6 +54,46 @@ const (
 	OriginTransition ShotOrigin = "transition"        // a fast-break attempt
 )
 
+// FoulSite names the engine call site that charged a personal foul. It is
+// meaningful only on EventFoul and is excluded from JSON (json:"-"), so it
+// never changes CLI output or golden.json. Calibration walks read it in memory
+// to report PF per team-game by site (J27 pass 3).
+type FoulSite uint8
+
+const (
+	FoulSiteUnknown       FoulSite = iota // zero value; a tagged run never emits it
+	FoulSiteShootingTwo                   // shooting foul on a 2pt attempt
+	FoulSiteShootingThree                 // 1% fouled missed 3 (threeptfoul.go)
+	FoulSiteAndOne                        // foul on a made FG (and-one)
+	FoulSiteNonShooting                   // non-shooting foul from the foul-weight roll
+	FoulSiteLateGame                      // late-game forced foul (pass 1)
+)
+
+// FoulSites lists every tagged site in declaration order, FoulSiteUnknown
+// first, for walks that log one line per site.
+var FoulSites = []FoulSite{
+	FoulSiteUnknown, FoulSiteShootingTwo, FoulSiteShootingThree,
+	FoulSiteAndOne, FoulSiteNonShooting, FoulSiteLateGame,
+}
+
+// String returns the walk-log label for a foul site.
+func (s FoulSite) String() string {
+	switch s {
+	case FoulSiteShootingTwo:
+		return "shooting-two"
+	case FoulSiteShootingThree:
+		return "shooting-three"
+	case FoulSiteAndOne:
+		return "and-one"
+	case FoulSiteNonShooting:
+		return "non-shooting"
+	case FoulSiteLateGame:
+		return "late-game"
+	default:
+		return "unknown"
+	}
+}
+
 // Event is one structured per-possession event. Which fields are meaningful
 // depends on Kind; a zero value means "not applicable to this event kind".
 type Event struct {
@@ -74,6 +114,10 @@ type Event struct {
 	// serializes on initial shots (omitempty drops only the "" zero value, which
 	// no shot event carries).
 	Origin ShotOrigin `json:"shot_origin,omitempty"`
+
+	// FoulSite tags the engine site that charged this foul. Only meaningful
+	// when Kind == EventFoul. json:"-" keeps it out of every serialized form.
+	FoulSite FoulSite `json:"-"`
 
 	// OffensiveRebound distinguishes an offensive (true) from a defensive
 	// (false) rebound. Only meaningful when Kind == EventRebound.

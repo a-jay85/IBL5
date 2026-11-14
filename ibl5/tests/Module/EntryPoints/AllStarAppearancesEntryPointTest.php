@@ -22,4 +22,13 @@ class AllStarAppearancesEntryPointTest extends ModuleEntryPointTestCase
         $this->assertStringContainsString('Test Player', $output);
         $this->assertStringNotContainsString('Most All-Star Appearances', $output);
     }
+
+    public function testAllStarAppearancesQueriesAllStarTable(): void
+    {
+        $this->mockDb->setMockData([]);
+
+        $this->runModule('AllStarAppearances', [], [], $this->dbGlobals());
+
+        $this->assertQueryExecuted('ibl_awards');
+    }
 }

@@ -54,11 +54,28 @@ class MockMysqliResult implements \Iterator
     }
 
     /**
-     * @return list<array<string, mixed>>
+     * Mirrors mysqli_result::fetch_all(): ASSOC keeps column keys, NUM returns
+     * list rows, BOTH returns column keys followed by numeric keys.
+     *
+     * @return list<array<int|string, mixed>>
      */
     public function fetch_all(int $mode = MYSQLI_NUM): array
     {
-        return $this->data;
+        if ($mode === MYSQLI_ASSOC) {
+            return $this->data;
+        }
+
+        if ($mode === MYSQLI_BOTH) {
+            return array_map(
+                static fn (array $row): array => $row + array_values($row),
+                $this->data
+            );
+        }
+
+        return array_map(
+            static fn (array $row): array => array_values($row),
+            $this->data
+        );
     }
 
     public function free(): void

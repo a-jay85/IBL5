@@ -54,7 +54,10 @@ type ftaDecompArtifact struct {
 	EngineOnlyAndOneSeqs  int `json:"engine_only_and_one_seqs"`
 	EngineOnlyEndFT       int `json:"engine_only_end_ft"`
 	EngineOnlyFouls       int `json:"engine_only_fouls"`
-	EngineOnlyFTA         int `json:"engine_only_fta"`
+	// EngineFoulsBySite is engine PF per team-game split by the FoulSite tag
+	// (J27 pass 3); the values sum to EngineSummary.PFPerG.
+	EngineFoulsBySite map[string]float64 `json:"engine_fouls_by_site_per_team_game"`
+	EngineOnlyFTA     int                `json:"engine_only_fta"`
 
 	// ExcludedDegenerateGames counts engine games dropped by isDegenerateFTAGame
 	// (0-0 score and 0 FTA on both teams) before any FTASide or ending-mix sum.
@@ -112,6 +115,7 @@ func TestRealArchive_FTADecomp(t *testing.T) {
 
 	var engSide, scoSide FTASide
 	var mix sim.EndingMixCounts
+	siteFouls := map[result.FoulSite]int{}
 	excludedDegenerate := 0
 	snapshots := 0
 
@@ -172,6 +176,9 @@ func TestRealArchive_FTADecomp(t *testing.T) {
 			mix.Games++
 			var cur []result.Event
 			for _, e := range gr.Events {
+				if e.Kind == result.EventFoul {
+					siteFouls[e.FoulSite]++
+				}
 				if e.Kind == result.EventPossessionStart {
 					sim.ClassifyPossession(cur, &mix)
 					cur = cur[:0]
@@ -233,6 +240,16 @@ func TestRealArchive_FTADecomp(t *testing.T) {
 	}
 	branch, target, rationale := SelectFTABranch(engSum, scoSum)
 
+	// Per-site PF per team-game, over the same non-degenerate team-games the
+	// engine PF/g divides by, so the site values must sum to engSum.PFPerG.
+	foulsBySite := make(map[string]float64, len(result.FoulSites))
+	siteSum := 0.0
+	for _, site := range result.FoulSites {
+		v := float64(siteFouls[site]) / engSide.TeamGames
+		foulsBySite[site.String()] = v
+		siteSum += v
+	}
+
 	art := ftaDecompArtifact{
 		Generated:      time.Now().Format(time.RFC3339),
 		Snapshots:      snapshots,
@@ -251,6 +268,7 @@ func TestRealArchive_FTADecomp(t *testing.T) {
 		EngineOnlyEndFT:         mix.EndFT,
 		EngineOnlyFouls:         mix.Fouls,
 		EngineOnlyFTA:           mix.FTA,
+		EngineFoulsBySite:       foulsBySite,
 		ExcludedDegenerateGames: excludedDegenerate,
 
 		Branch:    branch,
@@ -270,6 +288,16 @@ func TestRealArchive_FTADecomp(t *testing.T) {
 	logSummary("sco   ", scoSum)
 	t.Logf("  engine-only: possessions=%d and_one_seqs=%d end_ft=%d fouls=%d fta=%d",
 		mix.Possessions, mix.AndOneSeqs, mix.EndFT, mix.Fouls, mix.FTA)
+	for _, site := range result.FoulSites {
+		t.Logf("  pf-by-site: %-16s %.3f", site, foulsBySite[site.String()])
+	}
+	t.Logf("  pf-by-site-sum: %.3f (engine pf/g %.3f)", siteSum, engSum.PFPerG)
+	if d := siteSum - engSum.PFPerG; d > 0.001 || d < -0.001 {
+		t.Errorf("pf-by-site sum %.4f differs from engine pf/g %.4f by more than 0.001", siteSum, engSum.PFPerG)
+	}
+	if n := siteFouls[result.FoulSiteUnknown]; n != 0 {
+		t.Errorf("%d engine fouls carry FoulSiteUnknown", n)
+	}
 
 	out, err := json.MarshalIndent(art, "", "  ")
 	if err != nil {

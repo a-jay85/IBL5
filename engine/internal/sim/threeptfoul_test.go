@@ -170,3 +170,50 @@ func TestThreePtMissFoulShootsThree(t *testing.T) {
 		t.Errorf("blocked miss (seed %d) events = %+v, want attempt, miss, block", seed, gs.events)
 	}
 }
+
+// TestThreePtBlockedMissFoulVerdict pins the backlog#1841 verdict for a blocked
+// 3pt miss whose foul draw would fire. Decompile reading (jsb560_decompiled.c):
+// FUN_004d7e10 (92550-92623) returns 1 only when the FUN_004e3400 block roll
+// picks a blocker; the 1% roll (94131-94149) runs after the cVar6 == 0 block
+// (94108-94127) closes. No block-stat increment is visible anywhere in the
+// decompile, so the verdict is "undetermined statically" and the engine keeps
+// the !blocked guard: the blocked miss stays a miss, the block is credited, and
+// no fouled-3 foul is charged.
+func TestThreePtBlockedMissFoulVerdict(t *testing.T) {
+	_, offense0, defense0 := threePtTestState(1)
+	shooter, defender := offense0.players[0], defense0.players[0]
+	defender.BLK = int(blockRatingScale)
+	defender.fatigue = 1
+	pBlock := blockProbability(defender, 0)
+	seed := uint64(0)
+	for s := uint64(1); s <= 200000; s++ {
+		ref := rng.New(s)
+		ref.IntN(1000) // make roll (always a miss at shot value 0)
+		if ref.Float64() < pBlock && threePtFoulFires(ref.Float64()) {
+			seed = s
+			break
+		}
+	}
+	if seed == 0 {
+		t.Fatal("no seed gives a blocked miss followed by a foul-cut draw")
+	}
+	gs, offense, defense := threePtTestState(seed)
+	res := gs.threePtShot(offense, defense, shooter, defender, 0, result.OriginInitial, 0)
+	if res != threePtMissed {
+		t.Errorf("blocked miss with a firing foul draw (seed %d): threePtShot = %v, want threePtMissed", seed, res)
+	}
+	blocks := 0
+	for _, e := range gs.events {
+		switch {
+		case e.Kind == result.EventBlock:
+			blocks++
+		case e.Kind == result.EventFoul && e.FoulSite == result.FoulSiteShootingThree:
+			t.Errorf("blocked miss (seed %d) charged a fouled-3 foul", seed)
+		case e.Kind == result.EventFreeThrow:
+			t.Errorf("blocked miss (seed %d) shot %d free throws", seed, e.FTAttempts)
+		}
+	}
+	if blocks != 1 {
+		t.Errorf("blocked miss (seed %d) emitted %d EventBlock, want 1", seed, blocks)
+	}
+}

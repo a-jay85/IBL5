@@ -65,15 +65,6 @@ final class MissingTeamRowRestore extends BaseMysqliRepository
         'game_orb', 'game_drb', 'game_ast', 'game_stl', 'game_tov', 'game_blk', 'game_pf',
     ];
 
-    /** Same columns as COLUMNS, as constant SQL text (the DB test pins the pairing). */
-    private const COLUMN_LIST = 'game_date, name, game_of_that_day, visitor_teamid, home_teamid, attendance, capacity, visitor_wins, visitor_losses, home_wins, home_losses, visitor_q1_points, visitor_q2_points, visitor_q3_points, visitor_q4_points, visitor_ot_points, home_q1_points, home_q2_points, home_q3_points, home_q4_points, home_ot_points, game_2gm, game_2ga, game_ftm, game_fta, game_3gm, game_3ga, game_orb, game_drb, game_ast, game_stl, game_tov, game_blk, game_pf';
-
-    private const INSERT_SQL = 'INSERT INTO `ibl_box_scores_teams` (' . self::COLUMN_LIST
-        . ') VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
-
-    private const INSERT_WITH_ID_SQL = 'INSERT INTO `ibl_box_scores_teams` (id, ' . self::COLUMN_LIST
-        . ') VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
-
     private const SUM_SQL = 'SELECT COUNT(*) AS n, SUM(game_2gm) AS game_2gm, SUM(game_2ga) AS game_2ga, SUM(game_ftm) AS game_ftm, SUM(game_fta) AS game_fta, SUM(game_3gm) AS game_3gm, SUM(game_3ga) AS game_3ga, SUM(game_orb) AS game_orb, SUM(game_drb) AS game_drb, SUM(game_ast) AS game_ast, SUM(game_stl) AS game_stl, SUM(game_tov) AS game_tov, SUM(game_blk) AS game_blk, SUM(game_pf) AS game_pf
         FROM `ibl_box_scores` WHERE game_date = ? AND visitor_teamid = ? AND home_teamid = ? AND teamid = ?';
 
@@ -299,14 +290,28 @@ final class MissingTeamRowRestore extends BaseMysqliRepository
         }
         if ($explicitId !== null) {
             array_unshift($values, $explicitId);
-            $this->execute(self::INSERT_WITH_ID_SQL, 'i' . $types, ...$values);
+            $this->execute(self::insertSql(true), 'i' . $types, ...$values);
 
             return $explicitId;
         }
 
-        $this->execute(self::INSERT_SQL, $types, ...$values);
+        $this->execute(self::insertSql(false), $types, ...$values);
 
         return $this->getLastInsertId();
+    }
+
+    /**
+     * Built from COLUMNS so the column list and the bound values (bound in COLUMNS order) cannot drift.
+     */
+    private static function insertSql(bool $withId): string
+    {
+        $columnList = implode(', ', self::COLUMNS);
+        $placeholders = implode(', ', array_fill(0, count(self::COLUMNS), '?'));
+        if ($withId) {
+            return 'INSERT INTO `ibl_box_scores_teams` (id, ' . $columnList . ') VALUES (?, ' . $placeholders . ')';
+        }
+
+        return 'INSERT INTO `ibl_box_scores_teams` (' . $columnList . ') VALUES (' . $placeholders . ')';
     }
 
     private function intValue(mixed $value): int

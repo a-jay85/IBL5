@@ -373,6 +373,46 @@ def _added_lines(diff_text: str) -> list[str]:
             if ln.startswith("+") and not ln.startswith("+++ ")]
 
 
+_DIFF_FILE_HEADER = re.compile(r"^diff --git a/(.+?) b/(.+)$")
+_PROSE_SUFFIXES = (".md", ".txt", ".rst", ".json", ".lock")
+_PROSE_DIR_PARTS = ("docs", "fixtures", "snapshots", "__snapshots__")
+
+
+def _is_prose_or_fixture(path: str) -> bool:
+    """Docs, changelogs and fixtures quote identifiers without implementing them."""
+    p = PurePosixPath(path)
+    return (p.suffix.lower() in _PROSE_SUFFIXES
+            or "changelog" in p.name.lower()
+            or any(part in _PROSE_DIR_PARTS for part in p.parts[:-1]))
+
+
+def _added_lines_by_file(diff_text: str) -> dict[str, list[str]]:
+    """Added lines per file (new path), leading `+` dropped, `+++ ` headers excluded."""
+    out: dict[str, list[str]] = {}
+    cur: str | None = None
+    for ln in diff_text.splitlines():
+        m = _DIFF_FILE_HEADER.match(ln)
+        if m:
+            cur = m.group(2)
+            out.setdefault(cur, [])
+        elif cur is not None and ln.startswith("+") and not ln.startswith("+++ "):
+            out[cur].append(ln[1:])
+    return out
+
+
+def _clearing_added_lines(diff_text: str, other_phase_paths: list[str]) -> list[str]:
+    """Added lines a phase's heading identifier may clear against: skips files another
+    phase cites (that phase's work cannot stand in for this one) and prose/fixture files."""
+    lines: list[str] = []
+    for path, added in _added_lines_by_file(diff_text).items():
+        if _is_prose_or_fixture(path):
+            continue
+        if any(_touched(tok, [path]) for tok in other_phase_paths):
+            continue
+        lines.extend(added)
+    return lines
+
+
 def _heading_identifiers(words: list[str]) -> list[str]:
     """Heading words that are code identifiers (see _IDENTIFIER_SHAPE), deduped, in order."""
     out: list[str] = []
@@ -473,8 +513,9 @@ def phase_omission_items(plan: PlanInfo, changed_files: list[str],
         content_ident: str | None = None
         if isinstance(diff_text, str) and diff_text:
             try:
-                if added is None:
-                    added = _added_lines(diff_text)
+                other_paths = [t for o in plan.phases if o is not ph
+                               for t in o.evidence_paths]
+                added = _clearing_added_lines(diff_text, other_paths)
                 content_ident = _content_matched_identifier(ph.heading_words, added)
             except Exception as exc:  # noqa: BLE001
                 content_ident = None  # fail closed: hold as today

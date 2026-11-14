@@ -72,3 +72,18 @@ def test_adr_tier_flips_only_adr_tokens(monkeypatch):
         assert after[t] is not None and after[t].startswith(_ADR_PREFIX)
     same = [t for t in toks if t not in flips]
     assert all(before[t] == after[t] for t in same)
+
+
+def test_untouched_phase_item_carries_missing_phase_prefix():
+    """Mutation caught: the `MISSING-PHASE:` item prefix renamed in phase_omission_items.
+
+    Runs without the corpus flag: explicit tracked_files keeps it off git.
+    """
+    from harness.planfile import parse_phases
+    from harness.state import PlanInfo
+
+    plan = PlanInfo(found=True, has_matrix=True,
+                    phases=parse_phases("## Phase 1: Mask the stack\n\nEdit `bin/wt-up`.\n"))
+    items = conformance.phase_omission_items(plan, ["bin/other"], tracked_files=["bin/wt-up"])
+    assert len(items) == 1
+    assert items[0].startswith("MISSING-PHASE: 1 ")

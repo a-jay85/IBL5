@@ -603,3 +603,20 @@ def test_line_suffixed_evidence_citation_matches_changed_file():
     assert "bin/check-prose" in phases[0].evidence_paths
     assert phase_omission_items(plan, ["bin/check-prose"],
                                 tracked_files=("bin/check-prose",)) == []
+
+
+def test_touched_exact_and_suffix_match_return_before_basename_fallback(monkeypatch):
+    """Mutation caught: the exact/suffix branch of `_touched` set to `if False:`.
+
+    That branch is an equivalent mutant on plain inputs: every exact or suffix hit is
+    also a basename hit. This test pins that exact and suffix matches return before the
+    basename/parent fallback runs, by making the fallback raise.
+    """
+    from harness import conformance
+
+    def _no_fallback(*_a, **_k):
+        raise AssertionError("basename fallback reached on an exact or suffix match")
+
+    monkeypatch.setattr(conformance, "PurePosixPath", _no_fallback)
+    assert conformance._touched("bin/wt-up", ["bin/wt-up"]) is True
+    assert conformance._touched("lib/x.sh", ["bin/lib/x.sh"]) is True

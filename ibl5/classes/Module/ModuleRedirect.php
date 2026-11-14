@@ -39,7 +39,15 @@ final class ModuleRedirect
             return;
         }
 
-        (new \Api\Response\RedirectResponder())->redirect($target);
+        self::to($target);
+    }
+
+    /**
+     * Send a plain Location redirect to an already-built URL. Callers must return after it.
+     */
+    public static function to(string $url, int $status = 302): void
+    {
+        (new \Api\Response\RedirectResponder())->redirect($url, $status);
     }
 
     /**

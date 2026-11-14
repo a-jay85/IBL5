@@ -13,15 +13,13 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-global $mysqli_db;
-/** @var \mysqli $mysqli_db */
-
 $pagetitle = '- All-Star Appearances';
 
 PageLayout\PageLayout::header();
 
-$appearancesRepository = new \AllStarAppearances\AllStarAppearancesRepository($mysqli_db);
-$appearancesView = new \AllStarAppearances\AllStarAppearancesView();
+$factory = \Module\ModuleServices::current()->factory(\Module\Factories\AllStarAppearancesFactory::class);
+$appearancesRepository = $factory->repository();
+$appearancesView = $factory->view();
 echo $appearancesView->render($appearancesRepository->getAllStarAppearances());
 
 PageLayout\PageLayout::footer();

@@ -13,16 +13,6 @@ final class RecordHoldersFactory implements \Module\Contracts\ModuleFactoryInter
     {
     }
 
-    public function allStarRepository(): \AllStarAppearances\AllStarAppearancesRepository
-    {
-        return new \AllStarAppearances\AllStarAppearancesRepository($this->services->db());
-    }
-
-    public function allStarView(): \AllStarAppearances\AllStarAppearancesView
-    {
-        return new \AllStarAppearances\AllStarAppearancesView();
-    }
-
     public function service(): \RecordHolders\CachedRecordHoldersService
     {
         $db = $this->services->db();

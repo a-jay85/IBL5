@@ -44,7 +44,7 @@ if (!$nukeCompat->isUser($user)) {
 
     $username = $authService->getUsername() ?? '';
     $userTeamName = $commonRepository->getTeamnameFromUsername($username) ?? '';
-    $userTeam = \Team\Team::initialize(\Module\ModuleServices::current()->db(), $userTeamName);
+    $userTeam = $factory->teamResolver()($userTeamName);
 
     // Initialize services
     $service = $factory->service($teamPowerRankings);

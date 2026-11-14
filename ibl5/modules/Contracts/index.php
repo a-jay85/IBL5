@@ -18,16 +18,7 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-use CapSpace\CapSpaceRepository;
-use CapSpace\CapSpaceService;
-use CapSpace\CapSpaceView;
-use ContractList\ContractListRepository;
-use ContractList\ContractListService;
-use ContractList\ContractListView;
 use Contracts\ContractsView;
-
-global $mysqli_db;
-/** @var \mysqli $mysqli_db */
 
 $module_name = basename(dirname(__FILE__));
 
@@ -35,13 +26,15 @@ $activeTab = ContractsView::resolveTab($_GET['tab'] ?? null);
 $pagetitle = '- Contracts: ' . ContractsView::TABS[$activeTab];
 
 if ($activeTab === ContractsView::TAB_PLAYERS) {
-    $service = new ContractListService(new ContractListRepository($mysqli_db));
-    $tabContentHtml = (new ContractListView())->render($service->getContractsWithCalculations());
+    $factory = \Module\ModuleServices::current()->factory(\Module\Factories\ContractListFactory::class);
+    $service = $factory->service();
+    $tabContentHtml = $factory->view()->render($service->getContractsWithCalculations());
 } else {
-    $season = \Season\SharedSeason::get($mysqli_db);
-    $service = new CapSpaceService(new CapSpaceRepository($mysqli_db), $mysqli_db);
+    $factory = \Module\ModuleServices::current()->factory(\Module\Factories\CapSpaceFactory::class);
+    $season = $factory->season();
+    $service = $factory->service();
     $displayYears = $service->getDisplayYears($season);
-    $tabContentHtml = (new CapSpaceView())->render(
+    $tabContentHtml = $factory->view()->render(
         $service->getTeamsCapData($season),
         $displayYears['beginningYear'],
         $displayYears['endingYear']
@@ -50,6 +43,6 @@ if ($activeTab === ContractsView::TAB_PLAYERS) {
 
 PageLayout\PageLayout::header();
 
-echo (new ContractsView())->render($activeTab, $tabContentHtml);
+echo \Module\ModuleServices::current()->factory(\Module\Factories\ContractsFactory::class)->view()->render($activeTab, $tabContentHtml);
 
 PageLayout\PageLayout::footer();

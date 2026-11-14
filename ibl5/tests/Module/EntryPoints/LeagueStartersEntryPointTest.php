@@ -49,4 +49,11 @@ class LeagueStartersEntryPointTest extends ModuleEntryPointTestCase
 
         $this->assertNotSame('', $output);
     }
+
+    public function testDefaultQueriesStartersData(): void
+    {
+        $this->runModule('LeagueStarters');
+
+        $this->assertQueryExecuted('ibl_plr');
+    }
 }

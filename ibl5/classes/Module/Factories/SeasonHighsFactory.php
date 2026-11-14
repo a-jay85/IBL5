@@ -18,7 +18,7 @@ final class SeasonHighsFactory implements \Module\Contracts\ModuleFactoryInterfa
     public function season(): \Season\Season
     {
         if ($this->season === null) {
-            $this->season = new \Season\Season($this->services->db(), $this->services->leagueContext());
+            $this->season = \Season\SharedSeason::get($this->services->db(), $this->services->leagueContext());
         }
 
         return $this->season;

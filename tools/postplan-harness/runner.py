@@ -3049,7 +3049,7 @@ def _partition_unplanned(work, kept_all, worktree, git, gh, plan, master_sha, bo
         return work, []
     ctx = _unplanned_ctx(worktree, git, plan, master_sha, None, log)
     work, kept, held = unplanned_scope.partition(work, ctx)
-    kept_all.extend(item for item in kept if item not in kept_all)
+    unplanned_scope.merge_kept(kept_all, kept, (ctx or {}).get("changed_paths", ()))
     res.fidelity["held_unplanned"] = [unplanned_scope.title_of(i["text"]) for i in held]
     log(f"phase5.5: unplanned-scope kept={len(kept)} held={len(held)}")
     if kept_all and ctx is not None:

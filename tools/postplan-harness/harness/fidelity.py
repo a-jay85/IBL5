@@ -2051,9 +2051,15 @@ _WATCH_LABEL = "**Watch:**"
 
 
 def _watch_with_kept(row: str, kept_titles) -> str:
-    """`**Watch:**` plus one clause per kept change. A `none` value is replaced outright."""
+    """`**Watch:**` plus one count clause for the kept changes. A `none` value is replaced outright.
+
+    The PR body's kept-unplanned block lists each change in full. Watch only points there, so
+    the Discord merge DM still flags kept changes without repeating every finding.
+    """
     value = row[len(_WATCH_LABEL):].strip()
-    clauses = [f"kept unplanned change: {title}" for title in kept_titles]
+    n = len(tuple(kept_titles))
+    noun = "change" if n == 1 else "changes"
+    clauses = [f"{n} kept unplanned {noun}, listed under Kept unplanned changes in the PR body"]
     if value and value.rstrip(".").lower() != "none":
         clauses.insert(0, value)
     return f"{_WATCH_LABEL} " + "; ".join(clauses)

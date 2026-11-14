@@ -1,0 +1,99 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Delete one account and every row keyed to it, in one transaction.
+ *
+ * The default run is a dry run that only counts rows. Pass --confirm to write.
+ * Run on prod after a fresh dump; see ibl5/docs/OPERATIONS_RUNBOOK.md section 9.
+ *
+ * Exit codes: 0 done, 1 failed and rolled back, 2 bad flags or no DB, 3 unknown id.
+ */
+
+if (php_sapi_name() !== 'cli') {
+    http_response_code(403);
+    exit('This script must be run from the command line.');
+}
+
+$documentRoot = dirname(__DIR__, 2);
+$_SERVER['DOCUMENT_ROOT'] = $documentRoot;
+require $documentRoot . '/ibl5/vendor/autoload.php';
+
+// Fallback PSR-4 loader for `docker exec php ...` on macOS; see ibl5/bin/check-boxscore-schedule-run.
+spl_autoload_register(static function (string $class) use ($documentRoot): void {
+    $path = $documentRoot . '/ibl5/classes/' . str_replace('\\', '/', $class) . '.php';
+    if (is_file($path)) {
+        require_once $path;
+    }
+});
+
+const DELETE_ACCOUNT_USAGE = "usage: delete-account --user-id=N [--confirm] [--help]\n";
+
+// Parse before loading config, so a bad flag fails on a machine with no database.
+/** @var list<string> $argv */
+try {
+    $opts = \DataRetention\RetentionCliOptionParser::parse(
+        array_values(array_slice($argv, 1)), // @phpstan-ignore ibl.unguardedArgvFlag (hand-guarded: RetentionCliOptionParser rejects unknown flags, exit 2)
+        ['--user-id' => 4294967295, '--confirm' => null, '--help' => null]
+    );
+} catch (\InvalidArgumentException $e) {
+    fwrite(STDERR, 'delete-account: ' . $e->getMessage() . "\n");
+    fwrite(STDERR, DELETE_ACCOUNT_USAGE);
+    exit(2);
+}
+
+if (isset($opts['--help'])) {
+    echo DELETE_ACCOUNT_USAGE;
+    echo "  --user-id=N  auth_users.id of the account to delete\n";
+    echo "  --confirm    write the changes; without it the run only counts rows\n";
+    exit(0);
+}
+
+if (!isset($opts['--user-id']) || !is_int($opts['--user-id'])) {
+    fwrite(STDERR, "delete-account: missing required flag '--user-id'\n");
+    fwrite(STDERR, DELETE_ACCOUNT_USAGE);
+    exit(2);
+}
+$userId = $opts['--user-id'];
+$confirm = isset($opts['--confirm']);
+
+include $documentRoot . '/ibl5/config.php';
+
+// Direct mysqli connection; see ibl5/bin/check-boxscore-schedule-run for why db/db.php is bypassed.
+/** @var string $dbhost */
+/** @var string $dbuname */
+/** @var string $dbpass */
+/** @var string $dbname */
+$mysqli_db = new \mysqli();
+$mysqli_db->options(MYSQLI_OPT_INT_AND_FLOAT_NATIVE, 1);
+if (!$mysqli_db->real_connect($dbhost, $dbuname, $dbpass, $dbname)) {
+    fwrite(STDERR, "Failed to connect to MariaDB ({$mysqli_db->connect_errno}): {$mysqli_db->connect_error}\n");
+    exit(2);
+}
+$mysqli_db->set_charset('utf8mb4');
+
+try {
+    $service = new \DataRetention\DataRetentionService(new \DataRetention\DataRetentionRepository($mysqli_db));
+    $report = $service->deleteAccount($userId, $confirm);
+} catch (\DataRetention\UnknownAccountException) {
+    fwrite(STDERR, 'delete-account: no account with id ' . $userId . "; nothing changed.\n");
+    exit(3);
+} catch (\Throwable $e) {
+    fwrite(STDERR, 'delete-account: FAILED, transaction rolled back: ' . $e->getMessage() . "\n");
+    exit(1);
+}
+
+echo 'delete-account: user id ' . $report->userId . "\n";
+echo $report->dryRun
+    ? "DRY RUN: nothing changed; rerun with --confirm to delete.\n"
+    : "DELETED.\n";
+foreach ($report->affected as $label => $count) {
+    echo '  ' . $label . ': ' . $count . "\n";
+}
+foreach ($report->vacatedTeams as $team) {
+    $teamLabel = (string) preg_replace('/[^\x20-\x7E]/', '?', $team['team_name']);
+    echo 'WARNING: team ' . $team['teamid'] . ' (' . $teamLabel . ") has no GM now.\n";
+}
+exit(0);

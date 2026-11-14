@@ -1,6 +1,6 @@
 ---
-description: Production operations runbook covering deploy, rollback, DB restore, sim-file recovery, logs, secrets, sim recap hosting, the admin-only faprep.php report, and running the app without the Claude Code harness.
-last_verified: 2026-11-01
+description: Production operations runbook covering deploy, rollback, DB restore, sim-file recovery, logs, secrets, sim recap hosting, data retention and account deletion, the admin-only faprep.php report, and running the app without the Claude Code harness.
+last_verified: 2026-11-13
 ---
 
 # IBL5 Operations Runbook
@@ -501,7 +501,85 @@ This runs `launchctl bootout` (no-op if not loaded) followed by `launchctl boots
 
 `bin/sim-recap-tick` has no self-unload path. A manual run with `--dry-run` never touches the queue or the DB, and `--sim=N` skips the phase gate so a specific sim can be processed by hand.
 
-## 9. Free Agent Prep Report (faprep.php)
+## 9. Data Retention and Account Deletion
+
+This section covers how long the app keeps personal data and how an admin deletes one account on request (backlog#1258).
+
+### What is kept, and for how long
+
+| Data | Kept for | How it goes away |
+|------|----------|------------------|
+| `auth_users_audit_log` rows | 180 days (`DataRetentionService::AUDIT_LOG_RETENTION_DAYS`) | `db-backup.yml` runs `purge-audit-log` every night after the dump is verified. |
+| `nuke_stories.rating_ip` | Not kept | Migration 214 reset every stored value to `'0'`. No code writes or reads it. |
+| `last_moderation_ip` | Not kept | Migration 073 dropped the column. |
+| Database dumps | 14 days | The backup rotation deletes older dumps. |
+
+### Audit-log purge
+
+Run these from `www` on prod:
+
+```bash
+php ibl5/bin/purge-audit-log --dry-run
+php ibl5/bin/purge-audit-log --days=365 --dry-run
+php ibl5/bin/purge-audit-log
+```
+
+The first command counts the rows past 180 days. The second counts with a longer window. The third deletes the rows past 180 days.
+
+The nightly job prints `purge-audit-log: SKIP: script not on prod yet` until a promote-to-production run ships the script. When the purge fails, the workflow sends the owner a Discord DM.
+
+### Deleting an account
+
+1. Take a fresh dump first. The delete cannot be undone except from a dump.
+2. Find the account id:
+
+   ```sql
+   SELECT id FROM auth_users WHERE username = '...';
+   ```
+
+3. Run a dry run. It counts the rows in each table and changes nothing:
+
+   ```bash
+   php ibl5/bin/delete-account --user-id=7
+   ```
+
+   Read the counts. A `WARNING: team N (Name) has no GM now.` line names each team whose GM slot the delete will empty.
+
+4. Delete the account. All writes run in one transaction:
+
+   ```bash
+   php ibl5/bin/delete-account --user-id=7 --confirm
+   ```
+
+Exit codes:
+
+| Code | Meaning |
+|------|---------|
+| 0 | Done. A dry run counted rows, or a confirm run deleted them. |
+| 1 | Failed. The transaction rolled back and nothing changed. |
+| 2 | Bad flags, or the script could not reach the database. |
+| 3 | No account has that id. Nothing changed. |
+
+### What it does not touch
+
+- The team row, its owner fields, and its awards stay. The delete sets `ibl_team_info.gm_username` to NULL.
+- Other `ibl_events` columns stay. The delete sets `ibl_events.username` to NULL.
+- Audit rows that the account wrote as an admin about other users stay. The delete sets their `admin_id` to NULL.
+- Login throttling rows expire on their own.
+- Backups keep the account for 14 days, until the rotation deletes them.
+- An open session for the account ends at its next request.
+
+### Restoring purged audit rows
+
+Pull the table out of a dump into a scratch database:
+
+```bash
+zcat dump.sql.gz | sed -n '/^-- Table structure for table `auth_users_audit_log`/,/^-- Table structure for table `auth_users_confirmations`/p' > audit.sql
+```
+
+Load `audit.sql` into the scratch database. Then copy back only the range you need with `INSERT ... SELECT`.
+
+## 10. Free Agent Prep Report (faprep.php)
 
 `ibl5/faprep.php` is a standalone admin page. It renders one HTML table of every non-retired player (`ibl_plr` rows with `retired = 0`, ordered by `ordinal`), joined to `ibl_team_info` for the team name. The commissioner uses it to prepare the free agency period.
 

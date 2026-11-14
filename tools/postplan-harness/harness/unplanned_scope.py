@@ -32,7 +32,7 @@ _KEPT_VETO = ("Phase 5.5 kept these changes. No plan phase covers them, and they
               "authored by a post-plan fix commit. Veto any of them before merging.")
 
 _TAGGED_RE = re.compile(
-    r"^\s*(?:[-*]|\d+[.)])\s+\[(?:BLOCKING|NOTE)\]\s+\[unplanned-scope\](?=\s|$)"
+    r"^\s*(?:[-*]|\d+[.)])\s+\[(?:BLOCKING|NOTE)\]\s+(?:\[[^\[\]\s][^\[\]]*\]\s+)*\[unplanned-scope\](?=\s|$)"
 )
 _MP_HEADING_RE = re.compile(r"^## Must preserve\s*$")
 _INTENDED_HEADING_RE = re.compile(r"^### Intended removals\s*$")
@@ -43,7 +43,7 @@ _ESCAPED_PLACEHOLDER_RE = re.compile(r"\\\{\w+\\\}")
 
 
 def is_unplanned_scope(item_text: str) -> bool:
-    """True only when the item's first line carries the tag right after its severity marker."""
+    """True only when the item's first line carries the tag among the bracketed tags after its severity marker."""
     lines = item_text.splitlines()
     return bool(lines) and _TAGGED_RE.match(lines[0]) is not None
 

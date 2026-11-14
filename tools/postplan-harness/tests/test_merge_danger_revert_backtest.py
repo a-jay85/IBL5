@@ -28,8 +28,11 @@ CASES = {
     "pr3861.diff": "ibl5/migrations/210_asw_stale_rows_allstar_awards_backfill.sql",
 }
 
-# The mechanical door each fixture derived on master before this change (Phase 1 replay).
-DOORS = {"pr3880.diff": "two-way", "pr3806.diff": "two-way", "pr3861.diff": "two-way"}
+# The mechanical door each fixture derives. Before the DELETE floor (backlog#1826) all three read
+# two-way. pr3880 and pr3861 now read one-way: their up migrations DELETE from ibl_awards and
+# ibl_jsb_allstar_* tables, none in REBUILDABLE_TABLES. pr3806 stays two-way: its DELETEs sit in
+# PHP classes, not in a migration file.
+DOORS = {"pr3880.diff": "one-way", "pr3806.diff": "two-way", "pr3861.diff": "one-way"}
 
 
 def _none(_path):
@@ -53,10 +56,11 @@ def _inject_truncate(text, up_path):
 
 
 @pytest.mark.parametrize("name", sorted(CASES))
-def test_backtest_fixture_has_no_destructive_trigger(name):
+def test_backtest_fixture_door_and_destructive_trigger(name):
     d = _replay_text(_text(name))
-    assert [t for t in d.triggers if t.startswith("destructive-migration:")] == []
+    destructive = [t for t in d.triggers if t.startswith("destructive-migration:")]
     assert d.door == DOORS[name]
+    assert bool(destructive) == (DOORS[name] == "one-way")
 
 
 @pytest.mark.parametrize("name", sorted(CASES))

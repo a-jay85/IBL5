@@ -28,7 +28,7 @@ global $leagueContext;
 if (!($leagueContext instanceof \League\LeagueContext && $leagueContext->isOlympics())) {
     $target = \Records\RecordsController::legacyRedirectUrl('SeasonHighs', $_GET + $_POST)
         ?? 'modules.php?name=Records&tab=' . \Records\RecordsController::TAB_THISSEASON;
-    (new \Api\Response\RedirectResponder())->redirect($target);
+    \Module\ModuleRedirect::to($target);
     return;
 }
 

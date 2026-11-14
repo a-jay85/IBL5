@@ -42,6 +42,7 @@ final class ModuleFactorySecuritySurfaceTest extends TestCase
      * @var array<string, list<string>>
      */
     private const GATED_BEFORE_WIRING = [
+        'DraftInfo' => ['->isAdmin('],
         'LeagueControlPanel' => ['->isAuthenticated(', '->isAdmin('],
         'NextSim' => ['->loginBox('],
         'TrainingCampRatingsDiff' => ['->loginBox('],
@@ -381,6 +382,25 @@ final class ModuleFactorySecuritySurfaceTest extends TestCase
             [],
             self::detectRequestOrAuthState('<?php $this->services->auth();', $authMethods)
         );
+    }
+
+    public function testDetectorFlagsAuthReadInsideDraftInfoFactoryView(): void
+    {
+        // phpunit-hygiene-allow: mutates the real DraftInfoFactory source in memory to prove the scan turns red when view() interrogates auth; no seam exists for a source-scan detector
+        $source = file_get_contents(self::ibl5Root() . '/classes/Module/Factories/DraftInfoFactory.php');
+        $this->assertNotFalse($source);
+        $authMethods = self::authMethodNames();
+
+        $this->assertSame([], self::detectRequestOrAuthState($source, $authMethods));
+
+        $mutated = str_replace(
+            'return new DraftInfoView();',
+            '$this->services->auth()->isAdmin(); return new DraftInfoView();',
+            $source,
+            $replaced
+        );
+        $this->assertSame(1, $replaced, 'DraftInfoFactory::view() no longer returns new DraftInfoView()');
+        $this->assertNotSame([], self::detectRequestOrAuthState($mutated, $authMethods));
     }
 
     public function testDetectorFlagsWiringAboveGuard(): void

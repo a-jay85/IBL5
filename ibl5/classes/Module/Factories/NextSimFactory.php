@@ -28,7 +28,19 @@ final class NextSimFactory implements ModuleFactoryInterface
         return $this->services->season();
     }
 
-    public function standingsRepository(): \Standings\StandingsRepository
+    /**
+     * The factory supplies the handle; the entry point supplies the identity.
+     *
+     * @return \Closure(int|string): \Team\Team
+     */
+    public function teamResolver(): \Closure
+    {
+        $db = $this->services->db();
+
+        return static fn (int|string $identifier): \Team\Team => \Team\Team::initialize($db, $identifier);
+    }
+
+    public function standingsRepository():\Standings\StandingsRepository
     {
         return new \Standings\StandingsRepository($this->services->db());
     }

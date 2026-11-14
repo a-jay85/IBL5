@@ -6,23 +6,12 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-use Auth\AuthRepository;
-use Auth\AuthService;
-use DraftHistory\DraftHistoryRepository;
-use DraftHistory\DraftHistoryView;
 use DraftInfo\DraftInfoView;
 use DraftInfo\HistorySubTabState;
-use DraftPickLocator\DraftPickLocatorRepository;
-use DraftPickLocator\DraftPickLocatorService;
-use DraftPickLocator\DraftPickLocatorView;
-use ProjectedDraftOrder\ProjectedDraftOrderRepository;
-use ProjectedDraftOrder\ProjectedDraftOrderService;
-use ProjectedDraftOrder\ProjectedDraftOrderView;
-use Repositories\TeamIdentityRepository;
 
 $module_name = basename(dirname(__FILE__));
-global $mysqli_db;
-/** @var \mysqli $mysqli_db */
+global $authService;
+/** @var \Auth\Contracts\AuthServiceInterface $authService */
 
 // Admin-only JSON POST endpoint. Replaces the former standalone
 // modules/ProjectedDraftOrder/save_order.php, now reached via
@@ -34,8 +23,6 @@ $op = is_string($httpRequest->request('op')) ? $httpRequest->request('op') : '';
 
 if ($op === 'save_order') {
     header('Content-Type: application/json');
-
-    $authService = new AuthService(new AuthRepository($mysqli_db));
 
     if (!$authService->isAdmin()) {
         http_response_code(403);
@@ -91,9 +78,9 @@ if ($op === 'save_order') {
     }
 
     try {
-        $season = \Season\SharedSeason::get($mysqli_db);
-        $orderRepository = new ProjectedDraftOrderRepository($mysqli_db);
-        $orderService = new ProjectedDraftOrderService($orderRepository);
+        $orderFactory = \Module\ModuleServices::current()->factory(\Module\Factories\ProjectedDraftOrderFactory::class);
+        $season = $orderFactory->season();
+        $orderService = $orderFactory->service();
         $orderService->saveLotteryOrder($season->endingYear, $intOrder);
 
         echo json_encode(['success' => true]);
@@ -108,44 +95,46 @@ if ($op === 'save_order') {
 // Route HTMX API requests for the history tab (no PageLayout, returns HTML fragment only)
 $getOp = is_string($_GET['op'] ?? null) ? $_GET['op'] : '';
 if ($getOp === 'api') {
-    $handler = new DraftHistory\DraftHistoryApiHandler($mysqli_db);
+    $handler = \Module\ModuleServices::current()->factory(\Module\Factories\DraftHistoryFactory::class)->apiHandler();
     $handler->handle();
     return;
 }
 
 // Tab resolution
-$tabs = new \UI\Components\PageTabs(DraftInfoView::TABS, DraftInfoView::DEFAULT_TAB);
+$infoFactory = \Module\ModuleServices::current()->factory(\Module\Factories\DraftInfoFactory::class);
+$tabs = $infoFactory->tabs();
 $tab = $tabs->resolve($_GET['tab'] ?? null);
 
 $trailingHtml = '';
-$draftInfoView = new DraftInfoView();
+$draftInfoView = $infoFactory->view();
 
 if ($tab === DraftInfoView::TAB_PICKS) {
-    $season = \Season\SharedSeason::get($mysqli_db);
-    $picksRepository = new DraftPickLocatorRepository($mysqli_db);
-    $picksService = new DraftPickLocatorService($picksRepository);
-    $picksView = new DraftPickLocatorView();
+    $picksFactory = \Module\ModuleServices::current()->factory(\Module\Factories\DraftPickLocatorFactory::class);
+    $season = $picksFactory->season();
+    $picksService = $picksFactory->service();
+    $picksView = $picksFactory->view();
     $teamsWithPicks = $picksService->getAllTeamsWithPicks();
     $tabBodyHtml = $picksView->render($teamsWithPicks, $season->endingYear);
     $pagetitle = '- Draft Pick Locator';
 } elseif ($tab === DraftInfoView::TAB_HISTORY) {
-    $historyRepository = new DraftHistoryRepository($mysqli_db);
-    $historyView = new DraftHistoryView();
+    $historyFactory = \Module\ModuleServices::current()->factory(\Module\Factories\DraftHistoryFactory::class);
+    $historyRepository = $historyFactory->repository();
+    $historyView = $historyFactory->view();
 
     $teamid = is_string($_GET['teamid'] ?? null) ? (int) $_GET['teamid'] : 0;
 
     $team = null;
     if ($teamid > 0) {
-        $candidate = \Team\Team::initialize($mysqli_db, $teamid);
+        $candidate = $historyFactory->team($teamid);
         if ($candidate->teamid > 0) {
             $team = $candidate;
         }
     }
 
     $view = is_string($_GET['view'] ?? null) ? $_GET['view'] : '';
-    $identityRepository = new TeamIdentityRepository($mysqli_db);
+    $identityRepository = $infoFactory->teamIdentity();
     $viewerTeamId = HistorySubTabState::resolveViewerTeamId(
-        (new AuthService(new AuthRepository($mysqli_db)))->getUsername(),
+        $authService->getUsername(),
         $identityRepository->getTeamnameFromUsername(...),
         $identityRepository->getTidFromTeamname(...),
     );
@@ -157,7 +146,7 @@ if ($tab === DraftInfoView::TAB_PICKS) {
     } elseif ($state->teamIdToRender !== null) {
         $renderTeam = ($team instanceof \Team\Team && $team->teamid === $state->teamIdToRender)
             ? $team
-            : \Team\Team::initialize($mysqli_db, $state->teamIdToRender);
+            : $historyFactory->team($state->teamIdToRender);
         $panelHtml = $historyView->renderTeamHistory($renderTeam, $historyRepository->getDraftPicksByTeam($renderTeam->name));
         $pagetitle = "- {$renderTeam->name} Draft History";
     } else {
@@ -170,12 +159,12 @@ if ($tab === DraftInfoView::TAB_PICKS) {
     $tabBodyHtml = $draftInfoView->renderHistorySubTabs($state->activeSubTab, $state->teamTabLabel, $state->otherTeamId, $panelHtml);
 } else {
     // order tab (default)
-    $season = \Season\SharedSeason::get($mysqli_db);
-    $orderRepository = new ProjectedDraftOrderRepository($mysqli_db);
-    $orderService = new ProjectedDraftOrderService($orderRepository);
-    $orderView = new ProjectedDraftOrderView();
+    $orderFactory = \Module\ModuleServices::current()->factory(\Module\Factories\ProjectedDraftOrderFactory::class);
+    $season = $orderFactory->season();
+    $orderRepository = $orderFactory->repository();
+    $orderService = $orderFactory->service();
+    $orderView = $orderFactory->view();
 
-    $authService = new AuthService(new AuthRepository($mysqli_db));
     $isAdmin = $authService->isAdmin();
     $isFinalized = $orderRepository->isDraftOrderFinalized();
     $isDraftStarted = $isFinalized && $orderRepository->isDraftStarted($season->endingYear);

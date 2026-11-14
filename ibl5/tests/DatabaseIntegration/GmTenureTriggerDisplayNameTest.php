@@ -108,6 +108,71 @@ class GmTenureTriggerDisplayNameTest extends DatabaseTestCase
         self::assertNull($rows[1]['end_season_year']);
     }
 
+    public function testUsernameOnlyChangeInSameSeasonOpensTenureUnderUsername(): void
+    {
+        [$a] = $this->probeTeams();
+
+        $this->setTeamGm($a, 'zzolduser', 'ZZ Old Gm');
+        $this->setUsername($a, 'zznewuser');
+
+        self::assertSame(
+            [['ZZ Old Gm', 2025, 2025], ['zznewuser', 2025, null]],
+            $this->tenureShape($a)
+        );
+
+        $open = array_values(array_filter(
+            $this->openTenures($a),
+            static fn (array $row): bool => $row['end_season_year'] === null
+        ));
+        self::assertCount(1, $open, 'the franchise must keep exactly one open tenure');
+    }
+
+    public function testUsernameOnlyChangeAfterEarlierSeasonTenureKeepsOwnerName(): void
+    {
+        [$a] = $this->probeTeams();
+
+        $this->setTeamGm($a, 'zzolduser', 'ZZ Old Gm');
+        $this->db->query("UPDATE ibl_gm_tenures SET start_season_year = 2020 WHERE franchise_id = $a");
+        $this->setUsername($a, 'zznewuser');
+
+        self::assertSame(
+            [['ZZ Old Gm', 2020, 2025], ['ZZ Old Gm', 2025, null]],
+            $this->tenureShape($a)
+        );
+    }
+
+    public function testSameSeasonWriteOrdersOneAndTwoConverge(): void
+    {
+        [$a, $b] = $this->probeTeams();
+
+        // Order 1: both columns in one statement.
+        $this->setTeamGm($a, 'zzold_a', 'ZZ Old Gm');
+        $this->setTeamGm($a, 'zznew_a', 'ZZ New Gm');
+
+        // Order 2: gm_username first, then owner_name. The outgoing tenure started this season.
+        $this->setTeamGm($b, 'zzold_b', 'ZZ Old Gm');
+        $this->setUsername($b, 'zznew_b');
+        $this->setOwnerName($b, 'ZZ New Gm');
+
+        $expected = [['ZZ New Gm', 2025, null], ['ZZ Old Gm', 2025, 2025]];
+        self::assertSame($expected, $this->tenureShape($a));
+        self::assertSame($expected, $this->tenureShape($b));
+    }
+
+    public function testUsernameFlipBackInSameSeasonReopensTenure(): void
+    {
+        [$a] = $this->probeTeams();
+
+        $this->setTeamGm($a, 'zzflip_one', '');
+        $this->setUsername($a, 'zzflip_two');
+        $this->setUsername($a, 'zzflip_one');
+
+        self::assertSame(
+            [['zzflip_one', 2025, null], ['zzflip_two', 2025, 2025]],
+            $this->tenureShape($a)
+        );
+    }
+
     public function testOwnerNameRenameUpdatesOnlyTheFranchiseOpenTenure(): void
     {
         [$a, $b] = $this->probeTeams();
@@ -415,6 +480,26 @@ class GmTenureTriggerDisplayNameTest extends DatabaseTestCase
         } while ($this->db->more_results() && $this->db->next_result());
 
         self::assertSame($before, $this->tenureNames());
+    }
+
+    /**
+     * Each tenure of the franchise as [gm_display_name, start_season_year, end_season_year], sorted.
+     *
+     * @return list<array{0: string, 1: int, 2: int|null}>
+     */
+    private function tenureShape(int $teamId): array
+    {
+        $shape = array_map(
+            static fn (array $row): array => [
+                $row['gm_display_name'],
+                $row['start_season_year'],
+                $row['end_season_year'],
+            ],
+            $this->openTenures($teamId)
+        );
+        sort($shape);
+
+        return $shape;
     }
 
     /**

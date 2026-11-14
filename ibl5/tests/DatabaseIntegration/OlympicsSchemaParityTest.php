@@ -35,6 +35,7 @@ class OlympicsSchemaParityTest extends DatabaseTestCase
             'sim_depth',
             'asg_vote',
             'eoy_vote',
+            'trade_mode',
         ],
     ];
 

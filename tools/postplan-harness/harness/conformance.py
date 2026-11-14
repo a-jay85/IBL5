@@ -378,7 +378,7 @@ def phase_omission_items(plan: PlanInfo, changed_files: list[str],
     nothing. Hold-only: the items flow into arming condition (3) via check();
     fidelity.build_work_list excludes them from the fixer loop.
 
-    A phase citing a contract placeholder (`ibl5/migrations/NNN_<slug>.sql`,
+    A phase citing a contract placeholder (`ibl5/migrations/NNN_<slug>.sql` or `.php`,
     `ibl5/docs/decisions/NNNN-<slug>.md`) is cleared when a changed file in that directory
     carries the same suffix under any number (`_placeholder_deliverable`).
 

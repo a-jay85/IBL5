@@ -91,7 +91,7 @@ from harness.state import (PRECOMMIT_HANG, SUBPROCESS_TIMEOUT, HarnessError, Run
                            UsageLedger)
 from harness.thread_ingestion import run_thread_ingestion
 from harness.adapters.ghad import LiveGh, RecordingGh
-from harness.adapters.gitad import (LiveGit, ReplayGit, classify_local_gate_denial,
+from harness.adapters.gitad import (LiveGit, MASTER_REVIEW_BASE, ReplayGit, classify_local_gate_denial,
                                     is_stale_base, is_stale_lease)
 from harness.adapters.llm import ClaudeCli, FixtureLlm, TOOLED_TIMEOUT, reap_live_groups
 from harness.adapters.probe import FixtureProbe, LiveProbe
@@ -580,8 +580,11 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 f"still_missing={after or 'none'}")
         # Review cache key, taken after Phase 4.5 so it hashes the diff the review reads.
         cache_dir = _state_dir(out_dir, live, state_dir)
+        review = _review_base(git, log, "phase5.5")
         cache_key, cache_files = _review_cache_context(git, worktree, _master_sha(worktree), meta, plan,
-                                                       HARNESS_ROOT, log)
+                                                       HARNESS_ROOT, log,
+                                                       diff=None if review.parent is None
+                                                       else git.diff_vs_base(review.ref))
         cache_rec = reviewcache.load_record(cache_dir, slug)
         if cache_rec is not None and not reviewcache.pr_matches(cache_rec, pr):
             log(f"reviewcache: record belongs to PR {cache_rec.get('pr_number')}, not {pr}; ignored")
@@ -748,7 +751,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         # against HEAD at arming time, so capturing it after would always match.
         master_sha = _master_sha(worktree)
         reviewed_tree = git.head_tree()
-        _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_sha,
+        review_diff = diff if review.parent is None else git.diff_vs_base(review.ref)
+        _run_fidelity(llm, out_dir, worktree, git, gh, plan, review_diff, body, pr, master_sha,
                       reviewed_tree, live, log, res, before_remediation=_join_review,
                       unresolved_conformance=res.unresolved_conformance,
                       meta_check_failures=res.meta_check_failures,
@@ -1065,7 +1069,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                     return {"ran": False, "reason": "no-file-blocker"}
                 try:
                     packet = fidelity.build_packet(
-                        out_dir, master_sha, git.head_tree(), plan, git.diff_vs_base(), body, pr,
+                        out_dir, master_sha, git.head_tree(), plan, git.diff_vs_base(review.ref), body, pr,
                         phase4b_ran=getattr(res, "phase4b_code_ran", False),
                         worktree=worktree or ".", packet_name="fidelity-packet-fix-round")
                 except HarnessError as e:
@@ -3009,6 +3013,16 @@ def _removed_guards_holds(worktree, diff_body: str, plan, arm_body: str) -> list
     return removed_guards.classify_body(arm_body, [r[0] for r in rows])
 
 
+def _review_base(git, log=None, label="phase5.5"):
+    """The review base for reviewer-facing diffs (LiveGit.review_base). A git double that
+    lacks the method reviews the master diff, as every run did before stacked review."""
+    fn = getattr(git, "review_base", None)
+    rb = fn() if callable(fn) else MASTER_REVIEW_BASE
+    if log is not None:
+        log(f"{label}: review base: {rb.describe()}")
+    return rb
+
+
 def _unplanned_ctx(worktree, git, plan, master_sha, diff_body, log):
     """Classifier inputs for `unplanned_scope`, or None when any of them cannot be read.
 
@@ -3026,8 +3040,11 @@ def _unplanned_ctx(worktree, git, plan, master_sha, diff_body, log):
             if plan_path:
                 with open(plan_path, encoding="utf-8") as fh:
                     plan_text = fh.read()
-            return unplanned_scope.context_for(worktree or ".", master_sha, plan_text,
-                                               git.changed_files(), rows)
+            review = _review_base(git)
+            changed = git.changed_files() if review.parent is None else git.changed_files(review.ref)
+            base_sha = master_sha if review.parent is None else review.ref
+            return unplanned_scope.context_for(worktree or ".", base_sha, plan_text,
+                                               changed, rows)
     except (HarnessError, OSError, ValueError, subprocess.SubprocessError) as e:
         log(f"phase5.5: unplanned-scope context error ({e.__class__.__name__}: {e})")
     log("phase5.5: unplanned-scope context unavailable")
@@ -3581,20 +3598,25 @@ def _same_run_delta_review(review_phase, meta, cls, plan, git, gh, res, delta, w
     from the post-fix tree, so the review-cache record the run writes later is keyed to
     the diff its merged findings describe. Findings on unchanged files come from memory.
     """
-    files = git.changed_files()
-    diff = git.diff_vs_base()
+    review = _review_base(git, log, "delta-review")
+    files = git.changed_files() if review.parent is None else git.changed_files(review.ref)
+    diff = git.diff_vs_base() if review.parent is None else git.diff_vs_base(review.ref)
     meta = gh.pr_meta() or meta
-    cls = classify(files, diff, git.modified_files())
+    review_cls = classify(files, diff, git.modified_files())
     cache_key, cache_files = _review_cache_context(git, worktree, master_sha, meta, plan,
-                                                   HARNESS_ROOT, log)
-    if not reviewcache.subset_diff(cls.filtered_diff, delta):
+                                                   HARNESS_ROOT, log,
+                                                   diff=None if review.parent is None else diff)
+    # The returned cls feeds arming (holds, safety verdict), so it always covers the master diff.
+    cls = review_cls if review.parent is None else classify(
+        git.changed_files(), git.diff_vs_base(), git.modified_files())
+    if not reviewcache.subset_diff(review_cls.filtered_diff, delta):
         log("phase4.5b: delta lives only in filtered-out files; no delta review")
         return 0, cls, meta, cache_key, cache_files
     if seat_out is not None:
         seat_out["seat"] = security_model   # the seat really re-reviewed the delta
     keep_f, keep_s = reviewcache.reusable_by_path(res.findings, res.scored_findings, delta,
                                                   set(cache_files))
-    findings, _gates, scored, degraded = _interdiff_review(review_phase, meta, cls, plan, delta,
+    findings, _gates, scored, degraded = _interdiff_review(review_phase, meta, review_cls, plan, delta,
                                                            keep_f, keep_s, log,
                                                            security_model=security_model)
     res.findings, res.scored_findings = findings, scored
@@ -3656,11 +3678,13 @@ def _write_review_cache(res, cache_key, cache_files, cache_rec, cache_dir, slug,
         log(f"reviewcache: record write skipped ({exc})")
 
 
-def _review_cache_context(gitad, worktree, master_sha, meta, plan, harness_root, log):
+def _review_cache_context(gitad, worktree, master_sha, meta, plan, harness_root, log, diff=None):
     """Key inputs for the review cache, taken AFTER Phase 4.5 (thread ingestion can move HEAD).
     Returns (key, per_file_ids). Any failure yields a key whose diff_id or version is ""
-    so reviewcache.key_matches is False and every arm runs in full."""
-    diff = gitad.diff_vs_base()
+    so reviewcache.key_matches is False and every arm runs in full.
+    diff, when given, is the review diff the reviewer will see; the key must hash that same text."""
+    if diff is None:  # caller passed no review diff
+        diff = gitad.diff_vs_base()
     per_file = reviewcache.per_file_patch_ids(diff)
     diff_id = fidelity.diff_patch_id(diff)
     version = _harness_version(worktree, master_sha, harness_root, log)

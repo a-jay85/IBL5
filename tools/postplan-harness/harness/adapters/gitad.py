@@ -165,6 +165,21 @@ def lostwork_pre_path(key: str) -> str:
     return f"/tmp/pr-ready-diff-pre-{key}.patch"
 
 
+@dataclass(frozen=True)
+class ReviewBase:
+    """Where the review-facing diff starts. parent is None for the master base and ref is
+    then "origin/master". For a stacked PR whose parent is still open, ref is a full commit
+    SHA on the parent's side of HEAD, so diff_vs_base(ref) holds only this branch's work."""
+    ref: str
+    parent: Optional[str] = None
+
+    def describe(self) -> str:
+        return "master" if self.parent is None else f"parent {self.parent}@{self.ref[:12]}"
+
+
+MASTER_REVIEW_BASE = ReviewBase("origin/master")
+
+
 class LiveGit:
     def __init__(self, worktree: str, push_remote: str | None = None, llm=None,
                  state_dir: str | None = None):
@@ -1275,6 +1290,53 @@ class LiveGit:
                                   pre_rebase_sha=pre_rebase_sha, reason=rebind_reason)
         self._record_resolution(key, branch, master_sha, premerged.files, proof_out=out)
 
+    def _is_ancestor(self, older: str, newer: str) -> bool:
+        rc, _ = self._run_out("merge-base", "--is-ancestor", older, newer)
+        return rc == 0
+
+    def _parent_landed(self, tip: str) -> bool:
+        """True when the parent's changes already sit in origin/master: merged by merge
+        commit or fast-forward (tip is an ancestor), or squash-merged (every file the
+        parent changed matches origin/master byte for byte). A parent with no changes of
+        its own counts as landed: there is nothing to exclude."""
+        if self._is_ancestor(tip, "origin/master"):
+            return True
+        fork = self._run("merge-base", tip, "origin/master").strip()
+        paths = [p for p in self._run("diff", "--name-only", fork, tip).splitlines() if p]
+        if not paths:
+            return True
+        rc, _ = self._run_out("diff", "--quiet", "origin/master", tip, "--", *paths)
+        return rc == 0
+
+    def review_base(self) -> ReviewBase:
+        """The base for review-facing diffs (Phase 5.5 packet, review cache key,
+        unplanned-scope context). Fails closed to MASTER_REVIEW_BASE on an unstacked
+        branch, any resolver or git error, a parent ref that is gone, a parent that
+        already holds HEAD, a parent that has landed on master, or no candidate newer
+        than the master fork point. The review then never covers less than this PR."""
+        try:
+            target = self.merge_target()
+            if target == "origin/master":
+                return MASTER_REVIEW_BASE  # unstacked
+            tip = self._run("rev-parse", "--verify", "--quiet", f"{target}^{{commit}}",
+                            check=False).strip()
+            if not tip:
+                return MASTER_REVIEW_BASE  # parent ref gone
+            if self._is_ancestor("HEAD", tip):
+                return MASTER_REVIEW_BASE  # parent already holds HEAD
+            if self._parent_landed(tip):
+                return MASTER_REVIEW_BASE  # parent landed on master
+            master_mb = self._run("merge-base", "HEAD", "origin/master").strip()
+            best = master_mb
+            for cand in (self._run("merge-base", "HEAD", tip).strip(), self.branch_base()):
+                if cand and self._is_ancestor(cand, "HEAD") and self._is_ancestor(best, cand):
+                    best = cand
+            if best == master_mb:
+                return MASTER_REVIEW_BASE  # nothing newer than master
+            return ReviewBase(best, target[len("origin/"):])
+        except (HarnessError, OSError, subprocess.SubprocessError):
+            return MASTER_REVIEW_BASE  # fail closed
+
     def _replay_upstream(self, target_sha: str) -> str:
         """The commit a `rebase --onto <target_sha>` replay starts after.
 
@@ -2131,6 +2193,12 @@ class ReplayGit:
 
     def merge_target(self) -> str:
         return self.fx.get("merge_target", "origin/master")
+
+    def review_base(self) -> ReviewBase:
+        parent = self.fx.get("review_base_parent")
+        if not parent:
+            return MASTER_REVIEW_BASE
+        return ReviewBase(self.fx.get("review_base_ref", "origin/master"), parent)
 
     def stage_all(self) -> None:
         return

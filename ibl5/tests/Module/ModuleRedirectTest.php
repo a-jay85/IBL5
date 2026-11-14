@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Module;
 
+use Api\Response\RedirectResponder;
 use Module\ModuleRedirect;
 use Module\ModuleRegistry;
 use PHPUnit\Framework\TestCase;
@@ -155,6 +156,38 @@ class ModuleRedirectTest extends TestCase
         $url = ModuleRedirect::passthroughUrl(self::BASE, ['teamid'], ['teamid' => 'abc'], ['teamid' => 'ctype_digit']);
         $this->assertSame(self::BASE, $url);
         $this->assertStringNotContainsString('teamid', $url);
+    }
+
+    public function testToRedirectsWithDefault302(): void
+    {
+        $spy = $this->createMock(RedirectResponder::class);
+        $spy->expects($this->once())->method('redirect')->with('x.php', 302);
+
+        ModuleRedirect::to('x.php', responder: $spy);
+    }
+
+    public function testToPassesExplicitStatus(): void
+    {
+        $spy = $this->createMock(RedirectResponder::class);
+        $spy->expects($this->once())->method('redirect')->with('x.php', 301);
+
+        ModuleRedirect::to('x.php', 301, $spy);
+    }
+
+    public function testSendRedirectsRetiredModuleToItsTarget(): void
+    {
+        $spy = $this->createMock(RedirectResponder::class);
+        $spy->expects($this->once())->method('redirect')->with('modules.php?name=Voting', 302);
+
+        ModuleRedirect::send('VotingResults', $spy);
+    }
+
+    public function testSendDoesNothingForUnknownModule(): void
+    {
+        $spy = $this->createMock(RedirectResponder::class);
+        $spy->expects($this->never())->method('redirect');
+
+        ModuleRedirect::send('NoSuchModule', $spy);
     }
 
     public function testPassthroughUrlIsStatelessFunction(): void

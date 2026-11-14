@@ -216,6 +216,25 @@ class DraftInfoEntryPointTest extends ModuleEntryPointTestCase
         $this->assertStringContainsString('class="ibl-tab-panel" data-tab="history"', $output);
     }
 
+    public function testPicksTabQueriesDraftPickData(): void
+    {
+        $this->mockDb->setMockData([]);
+
+        $this->runModule('DraftInfo', ['tab' => 'picks']);
+
+        $this->assertQueryExecuted('ibl_draft_picks');
+    }
+
+    public function testOrderTabQueriesProjectedOrderData(): void
+    {
+        $this->mockDb->onQuery('Draft Order Finalized', [['setting_value' => 'No']]);
+        $this->mockDb->setMockData([]);
+
+        $this->runModule('DraftInfo');
+
+        $this->assertQueryExecuted('ibl_standings');
+    }
+
     public function testSaveOrderRejectsNonAdmin(): void
     {
         $this->mockDb->setMockData([]);
@@ -224,6 +243,29 @@ class DraftInfoEntryPointTest extends ModuleEntryPointTestCase
 
         $this->assertStringContainsString('"error":"Unauthorized"', $output);
         $this->assertStringNotContainsString('ibl-tabs', $output);
+    }
+
+    public function testSaveOrderAdminPassesAdminGate(): void
+    {
+        $this->authenticateAsAdmin('adminuser');
+        $this->mockDb->setMockData([]);
+        $_SERVER['REQUEST_METHOD'] = 'GET';
+
+        $output = $this->runModule('DraftInfo', ['op' => 'save_order']);
+
+        $this->assertStringNotContainsString('"error":"Unauthorized"', $output);
+        $this->assertStringContainsString('"error":"Method not allowed"', $output);
+    }
+
+    public function testOrderTabRendersDragScriptForAdmin(): void
+    {
+        $this->authenticateAsAdmin('adminuser');
+        $this->mockDb->onQuery('Draft Order Finalized', [['setting_value' => 'No']]);
+        $this->mockDb->setMockData([]);
+
+        $output = $this->runModule('DraftInfo');
+
+        $this->assertStringContainsString('draft-order-drag.js', $output);
     }
 
     public function testOrderTabOmitsDragScriptForAnonymous(): void

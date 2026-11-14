@@ -23,5 +23,6 @@ class HeadToHeadRecordsEntryPointTest extends ModuleEntryPointTestCase
 
         $this->assertNotSame('', $output);
         $this->assertStringContainsString('Head-to-Head Records', $output);
+        $this->assertQueryExecuted('ibl_box_scores_teams');
     }
 }

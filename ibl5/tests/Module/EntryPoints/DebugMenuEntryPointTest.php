@@ -15,7 +15,7 @@ use PHPUnit\Framework\TestCase;
  */
 class DebugMenuEntryPointTest extends TestCase
 {
-    public function testDebugMenuRendersDefaultView(): void
+    public function testDebugMenuSourcePinsToggleDispatchAndRedirect(): void
     {
         // phpunit-hygiene-allow: DebugMenu index.php exits via redirect and loads the global legacy runtime, so no executable seam exists; guards the route cases and redirect target text
         $source = file_get_contents(dirname(__DIR__, 3) . '/modules/DebugMenu/index.php');

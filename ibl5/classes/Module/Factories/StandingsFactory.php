@@ -25,7 +25,7 @@ final class StandingsFactory implements ModuleFactoryInterface
         $leagueContext = $this->services->leagueContext();
 
         $repository = new \Standings\StandingsRepository($db, $leagueContext);
-        $season = new \Season\Season($db, $leagueContext);
+        $season = \Season\SharedSeason::get($db, $leagueContext);
 
         if ($leagueContext->isOlympics()) {
             $realTeamIds = \League\OlympicsTeamFilter::getRealTeamIds($db);

@@ -7,16 +7,17 @@ namespace Tests\DatabaseIntegration;
 use PHPUnit\Framework\Attributes\Group;
 
 /**
- * Covers trg_gm_tenure_track after migration 207 (backlog#1708): the trigger stores GM display
+ * Covers trg_gm_tenure_track after migration 207 (backlog#1708) and its backlog#1812 follow-up: the trigger stores GM display
  * names (ibl_team_info.owner_name) instead of site usernames, closes the franchise's open tenure
  * by franchise rather than by name, and follows owner_name renames.
  *
  * Three write orders exist for the two columns, since an admin edits them in a DB tool:
  *   1. Both columns in one UPDATE statement: exact. This is the supported procedure.
- *   2. gm_username first, then owner_name: exact when the outgoing tenure started in an earlier
- *      season. The second statement takes the rename branch and fixes the open tenure the first
- *      statement opened under the stale name. If the outgoing tenure started this season under the
- *      same name, the first statement hits the uq_tenure key and fails, so use order 1.
+ *   2. gm_username first, then owner_name: exact. If the outgoing tenure started in an earlier
+ *      season, the first statement opens the new tenure under the stale owner_name. If it started
+ *      this season, owner_name already names a tenure from this season, so the first statement opens
+ *      the new tenure under gm_username (backlog#1812). The second statement takes the rename branch
+ *      and sets the open tenure to the new owner_name, so orders 1 and 2 end in the same rows.
  *   3. owner_name first, then gm_username: the rename branch renames the outgoing GM's open
  *      tenure to the incoming GM's name before the second statement closes it, so one closed row
  *      carries the wrong name. This is the named residual and is not tested.
@@ -93,9 +94,8 @@ class GmTenureTriggerDisplayNameTest extends DatabaseTestCase
         [$a] = $this->probeTeams();
 
         $this->setTeamGm($a, 'zzolduser', 'ZZ Old Gm');
-        // Backdate the old tenure. The username-only statement reopens a tenure under the stale
-        // name at the current season start, and uq_tenure (franchise, name, start) would reject
-        // that against an old tenure that also started this season.
+        // Backdate the old tenure to cover the earlier-season path of write order 2.
+        // testSameSeasonWriteOrdersOneAndTwoConverge covers the same-season path.
         $this->db->query("UPDATE ibl_gm_tenures SET start_season_year = 2020 WHERE franchise_id = $a");
         $this->setUsername($a, 'zznewuser');
         $this->setOwnerName($a, 'ZZ New Gm');

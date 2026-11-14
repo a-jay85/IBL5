@@ -1,4 +1,4 @@
--- destructive-migration[rewrite-no-backup]: renames 10 known ibl_awards rows; the paired down.sql and scripts/undo/216 script restore every renamed row by table_id
+-- destructive-migration[rewrite-no-backup,down-file-missing]: renames 10 known ibl_awards rows; scripts/undo/216 restores every renamed row by table_id. No down file: the old-code-compat gate cannot apply one yet.
 -- backlog#1828: JSB award text wrote an apostrophe in a player name as a double quote.
 -- No IBL player name contains a double quote, so map it back to an apostrophe.
 -- Step 1: a quote row whose apostrophe twin already exists for the same (year, award)

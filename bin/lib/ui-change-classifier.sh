@@ -73,12 +73,14 @@ UI_PKG_DEP_RE='^    "[^"]+": "[^"]+",?$'
 UI_LOCK_WS_RE='^        "([^"]+)": "([^"]+)",?$'
 UI_LOCK_PKG_RE='^    "([@A-Za-z0-9._/-]+)": (\[.*\]),?$'
 UI_LOCK_NAME_RE='^(@[A-Za-z0-9._-]+/)?[A-Za-z0-9._-]+@(0|[1-9][0-9]*)[.](0|[1-9][0-9]*)[.](0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$'
+# A specifier passes only when it is a semver range: comparators, versions, ||, and hyphen ranges.
+UI_LOCK_SPEC_RE='^ *([|][|]|-|[~^<>=]* *v?(0|[1-9][0-9]*|[*xX])([.](0|[1-9][0-9]*|[*xX]))*(-[0-9A-Za-z.-]+)?)( +([|][|]|-|[~^<>=]* *v?(0|[1-9][0-9]*|[*xX])([.](0|[1-9][0-9]*|[*xX]))*(-[0-9A-Za-z.-]+)?))* *$'
 UI_LOCK_ENTRY_JQ='
 if type == "array" and length == 4
   and (.[0] | type == "string" and test($re))
   and .[1] == ""
   and (.[2] | type == "object")
-  and ([.[2] | (.dependencies, .optionalDependencies, .peerDependencies) | select(. != null) | if type == "object" then .[] else error("dependency map is not an object") end | if type == "string" then . else error("specifier is not a string") end | select(test(":"))] | length == 0)
+  and ([.[2] | (.dependencies, .optionalDependencies, .peerDependencies) | select(. != null) | if type == "object" then .[] else error("dependency map is not an object") end | if type == "string" then . else error("specifier is not a string") end | select(test($spec) | not)] | length == 0)
   and (.[3] | type == "string" and test("^sha512-[A-Za-z0-9+/]{86}==$"))
 then .[0] | sub("@[^@]*$"; "") else error("lock entry outside the registry shape") end'
 
@@ -168,7 +170,7 @@ _ui_lock_entry_name() {
     [[ $1 =~ $UI_LOCK_PKG_RE ]] || return 1
     key="${BASH_REMATCH[1]}"
     entry="${BASH_REMATCH[2]}"
-    name=$(jq -er --arg re "$UI_LOCK_NAME_RE" "$UI_LOCK_ENTRY_JQ" <<< "$entry" 2>/dev/null) || return 1
+    name=$(jq -er --arg re "$UI_LOCK_NAME_RE" --arg spec "$UI_LOCK_SPEC_RE" "$UI_LOCK_ENTRY_JQ" <<< "$entry" 2>/dev/null) || return 1
     printf '%s %s\n' "$key" "$name"
 }
 

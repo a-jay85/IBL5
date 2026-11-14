@@ -1825,6 +1825,10 @@ dp_reset; DP_L_EXTRA="\"evil\": [\"evil@1.0.0\", \"https://registry.evil.example
 dp_verdict_is dp_lock_registry_url_holds ui-paths "$BOT" synchronize "" "$L" "$P"
 dp_reset; DP_L_EXTRA="\"evil\": [\"evil@1.0.0\", \"\", { \"dependencies\": { \"x\": \"github:evil/x\" } }, \"sha512-$DP_SHA_A\"]," dp_head_3920
 dp_verdict_is dp_lock_specifier_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_L_EXTRA="\"evil\": [\"evil@1.0.0\", \"\", { \"dependencies\": { \"x\": \"evil/evil\" } }, \"sha512-$DP_SHA_A\"],"  dp_head_3920
+dp_verdict_is dp_lock_github_shorthand_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_L_EXTRA="\"evil\": [\"evil@1.0.0\", \"\", { \"dependencies\": { \"x\": \"../evil\" } }, \"sha512-$DP_SHA_A\"],"  dp_head_3920
+dp_verdict_is dp_lock_relative_path_holds ui-paths "$BOT" synchronize "" "$L" "$P"
 dp_reset; DP_L_EXTRA='"evil": ["evil@1.0.0", "", {}, "sha1-abc"],' dp_head_3920
 dp_verdict_is dp_lock_sha1_holds ui-paths "$BOT" synchronize "" "$L" "$P"
 dp_reset; DP_L_VER=2 dp_head_3920
@@ -1852,7 +1856,7 @@ DP_REAL=$(bash -c 'set -euo pipefail; source "$1"; n=0; : > "$3"
         if [[ $l =~ $UI_LOCK_PKG_RE ]]; then n=$((n + 1)); printf "%s\n" "${BASH_REMATCH[2]}" >> "$3"; fi
     done < "$2"
     # UI_LOCK_ENTRY_JQ prints the package name for an entry that fits and errors otherwise.
-    ok=$(jq -r --arg re "$UI_LOCK_NAME_RE" "$UI_LOCK_ENTRY_JQ" "$3" | grep -c . || true)
+    ok=$(jq -r --arg re "$UI_LOCK_NAME_RE" --arg spec "$UI_LOCK_SPEC_RE" "$UI_LOCK_ENTRY_JQ" "$3" | grep -c . || true)
     echo "n=$n ok=$ok"' _ "$UI_LIB" "$REPO_ROOT/ibl5/bun.lock" "$UI_TMP/dp-real-entries.txt" 2>&1)
 if [[ $DP_REAL =~ ^n=([0-9]+)\ ok=([0-9]+)$ ]] && [ "${BASH_REMATCH[1]}" = "${BASH_REMATCH[2]}" ] \
     && [ "${BASH_REMATCH[1]}" -ge 100 ]; then

@@ -189,6 +189,12 @@ def test_migration_corpus_one_way_set_matches_fixture():
     # A migration added to master after capture fails here; re-capture the fixture then.
     got = sorted(n for n, door in _migration_corpus_doors().items() if door == "one-way")
     assert got == _MIGRATIONS["expected_one_way"]
+    # No real .php migration holds SQL text (168, 181 and 184 delete through a repair class), so
+    # the corpus alone never exercises the .php branch. A synthetic one pins it.
+    php = "ibl5/migrations/999_synthetic_delete.php"
+    md = derive_merge_danger([("A", php)], _added_file_diff(php, '$db->query("DELETE FROM ibl_plr");'),
+                             [], _read_candidate)
+    assert f"destructive-migration:{php}" in md.triggers
 
 
 def test_migration_corpus_flips_are_explained():

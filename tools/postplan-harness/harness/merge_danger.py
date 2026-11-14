@@ -65,6 +65,8 @@ _MIGRATION_RE = re.compile(r"^ibl5/migrations/.*\.sql$")
 _PHP_MIGRATION_RE = re.compile(r"^ibl5/migrations/.*\.php$")
 _DIFF_HEADER_RE = re.compile(r"^diff --git a/.* b/(.*)$", re.MULTILINE)
 _RENAME_RE = re.compile(r"^rename from (.+)\nrename to (.+)$", re.MULTILINE)
+# `DELETE FROM t1, t2 USING ...` lists a second target after the first name (fails closed).
+_DELETE_LIST_RE = re.compile(r"\bDELETE\s+FROM\s+`?\w+`?\s*,", re.IGNORECASE)
 # A DELETE statement in a migration: `DELETE [LOW_PRIORITY|QUICK|IGNORE] [t1[, t2]] FROM t`.
 # An FK's `ON DELETE CASCADE` and a trigger's `AFTER DELETE ON` have no FROM and never match.
 _DELETE_STMT_RE = re.compile(
@@ -121,13 +123,11 @@ def _deletes_destroy(diff_text: str) -> bool:
     """True when an added DELETE statement can lose rows no refresh step rebuilds: its target is
     outside rebuildable.REBUILDABLE_TABLES, or the harness cannot read the target (a multi-table
     DELETE, or an interpolated or schema-qualified name). Fail closed."""
-    text = _added_text(diff_text)
-    for m in _DELETE_STMT_RE.finditer(text):
+    if _DELETE_LIST_RE.search(_added_text(diff_text)):
+        return True
+    for m in _DELETE_STMT_RE.finditer(_added_text(diff_text)):
         name = m.group("name")
         if m.group("multi") or name is None or name.lower() not in rebuildable.REBUILDABLE_TABLES:
-            return True
-        # `DELETE FROM t1, t2 USING ...` lists a second target after the first name.
-        if text[m.end():].lstrip().startswith(","):
             return True
     return False
 

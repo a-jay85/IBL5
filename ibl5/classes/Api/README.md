@@ -1,6 +1,6 @@
 ---
 description: Routes and handles all REST API requests entering through ibl5/api.php.
-last_verified: 2026-11-09
+last_verified: 2026-11-13
 ---
 
 # Api
@@ -9,7 +9,7 @@ Houses the full REST API layer for the application, entered via `ibl5/api.php`. 
 
 | Component | Purpose |
 |-----------|---------|
-| `Controller/` | 27 controllers including `PlayerDetailController`, `StandingsController`, `TeamDetailController`, `TradeAcceptController`. The trade accept/decline, reaction, and wake controllers call `Middleware/ServiceKeyGuard` first, so a standard-tier key gets 403 |
+| `Controller/` | 27 controllers including `PlayerDetailController`, `StandingsController`, `TeamDetailController`, `TradeAcceptController`. The trade accept/decline controllers and the nine bug-pipeline controllers call `Middleware/ServiceKeyGuard` first, so a standard-tier key gets 403 |
 | `Middleware/` | `ApiKeyAuthenticator` and `RateLimiter` |
 | `Transformer/` | Shapes domain objects into API response payloads |
 | `Pagination/` | Cursor/offset pagination support |
@@ -19,4 +19,4 @@ Houses the full REST API layer for the application, entered via `ibl5/api.php`. 
 
 ## Service-key routes
 
-Five bug-pipeline routes accept only the bot's service key: `bug-pipeline/wake`, `bug-pipeline/reaction`, `bug-pipeline/enqueue`, `bug-pipeline/source-updated`, and `bug-pipeline/source-deleted`. Each controller calls `ServiceKeyGuard::callerIsServiceKey()` as the first statement of `handle()`. A missing key, an unknown key, or a key whose `rate_limit_tier` is `standard` gets 403 `forbidden` before any body field is read or any row is written. Self-service keys are always `standard`, so only an operator-provisioned key passes. The trust boundary is described in ADR-0213.
+All nine bug-pipeline routes accept only the bot's service key: `bug-pipeline/wake`, `bug-pipeline/reaction`, `bug-pipeline/enqueue`, `bug-pipeline/source-updated`, `bug-pipeline/source-deleted`, `bug-pipeline/last-seen`, `bug-pipeline/thread-reply`, `bug-pipeline/state`, and `bug-pipeline/thread-by-pr`. Each controller calls `ServiceKeyGuard::callerIsServiceKey()` as the first statement of `handle()`. A missing key, an unknown key, or a key whose `rate_limit_tier` is `standard` gets 403 `forbidden` before any body field is read or any row is written. Self-service keys are always `standard`, so only an operator-provisioned key passes. The trust boundary is described in ADR-0213.

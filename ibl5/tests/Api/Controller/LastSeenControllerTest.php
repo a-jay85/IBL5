@@ -71,6 +71,26 @@ class LastSeenControllerTest extends TestCase
         ]);
     }
 
+    public function testUnknownKeyRejected403AndNoRepositoryCall(): void
+    {
+        $keys = self::createStub(ApiKeyRepository::class);
+        $keys->method('findByHash')->willReturn(null);
+
+        $bugRepo = $this->createMock(BugReportRepository::class);
+        $bugRepo->expects($this->never())->method('upsertPipelineState');
+
+        $responder = $this->createMock(JsonResponder::class);
+        $responder->expects($this->once())
+            ->method('error')
+            ->with(403, 'forbidden', 'Only the pipeline bot can record the last-seen message.');
+        $responder->expects($this->never())->method('success');
+
+        (new LastSeenController($bugRepo, $keys))->handle([], [], $responder, [
+            'channel_id' => '200000000000000002',
+            'message_id' => '300000000000000003',
+        ]);
+    }
+
     public function testElevatedTierKeyPassesGuard(): void
     {
         $bugRepo = $this->createMock(BugReportRepository::class);

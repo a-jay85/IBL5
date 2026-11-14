@@ -439,11 +439,13 @@ func (gs *gameState) creditMadeFieldGoal(offense *teamState, shooter onCourt, st
 
 // chargeFoul charges a personal foul to defender (feeding foul-out and
 // foul-trouble substitution) and emits the EventFoul that box PF is built from.
-func (gs *gameState) chargeFoul(defense *teamState, defender onCourt) {
+// site tags the event with the engine site that charged it (json:"-", so it
+// never reaches serialized output).
+func (gs *gameState) chargeFoul(defense *teamState, defender onCourt, site result.FoulSite) {
 	defense.fouls[defender.PID]++ // live PF tally for foul-out/trouble subs (box PF is event-derived)
 	gs.emit(result.Event{
 		Kind: result.EventFoul, Period: gs.period, Clock: gs.clock,
-		TeamID: defense.teamID, PlayerID: defender.PID,
+		TeamID: defense.teamID, PlayerID: defender.PID, FoulSite: site,
 	})
 }
 
@@ -451,8 +453,8 @@ func (gs *gameState) chargeFoul(defense *teamState, defender onCourt) {
 // free-throw attempts for the shooter, scoring each make. It emits the foul and
 // free-throw events (the latter carrying FTAttempts/FTMade so aggregateBoxes can
 // reconstruct GamePF/GameFTA/GameFTM); only the live score is mutated here.
-func (gs *gameState) freeThrows(offense, defense *teamState, shooter, defender onCourt, n, periodIdx int) {
-	gs.chargeFoul(defense, defender)
+func (gs *gameState) freeThrows(offense, defense *teamState, shooter, defender onCourt, n, periodIdx int, site result.FoulSite) {
+	gs.chargeFoul(defense, defender, site)
 	made := shootFreeThrows(shooter, n, gs.rng)
 	offense.addPeriodPoints(periodIdx, made)
 	gs.emit(result.Event{

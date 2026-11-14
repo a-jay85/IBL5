@@ -1,5 +1,7 @@
 package sim
 
+import "github.com/a-jay85/IBL5/engine/internal/result"
+
 // JSB 5.60 team-foul bonus (J27, a-jay85/IBL5-backlog#265). Decompile refs:
 // FUN_004d8570 in jsb560_decompiled.c: shooting draw 93469-93480, team-foul
 // increment 93515, FT guard 93647, per-period reset 94467-94468.
@@ -29,6 +31,27 @@ func foulAwardsFreeThrows(shooting bool, teamFouls int, andOne, threePt bool) bo
 	return shooting || teamFouls > teamFoulBonusThreshold || andOne || threePt
 }
 
+// foulSiteFor names the engine site of a foul charged by resolveFoulShot, from
+// the same flags that drive the 93469-93480 draw. forced marks the pass-1
+// late-game foul, threePt the fouled missed 3, andOne a foul on a made FG.
+// Everything else came from the foul-weight bucket: a shooting foul there is a
+// 2pt shooting foul, and a non-shooting one is charged whether or not the
+// bonus awards free throws.
+func foulSiteFor(shooting, andOne, threePt, forced bool) result.FoulSite {
+	switch {
+	case forced:
+		return result.FoulSiteLateGame
+	case threePt:
+		return result.FoulSiteShootingThree
+	case andOne:
+		return result.FoulSiteAndOne
+	case shooting:
+		return result.FoulSiteShootingTwo
+	default:
+		return result.FoulSiteNonShooting
+	}
+}
+
 // resolveFoul charges one defensive foul on a trip with no fouled 3-point
 // attempt. Every existing caller keeps this signature; see resolveFoulShot.
 func (gs *gameState) resolveFoul(offense, defense *teamState, shooter, defender onCourt, n int, andOne, forced bool, periodIdx int) bool {
@@ -44,11 +67,12 @@ func (gs *gameState) resolveFoul(offense, defense *teamState, shooter, defender 
 func (gs *gameState) resolveFoulShot(offense, defense *teamState, shooter, defender onCourt, n int, andOne, threePt, forced bool, periodIdx int) bool {
 	draw := gs.rng.Float64() // consumed on every foul, forced or not
 	shooting := isShootingFoul(draw, andOne, threePt, forced)
+	site := foulSiteFor(shooting, andOne, threePt, forced)
 	defense.teamFouls++
 	if foulAwardsFreeThrows(shooting, defense.teamFouls, andOne, threePt) {
-		gs.freeThrows(offense, defense, shooter, defender, n, periodIdx)
+		gs.freeThrows(offense, defense, shooter, defender, n, periodIdx, site)
 		return true
 	}
-	gs.chargeFoul(defense, defender) // below the bonus: PF only, no FTs
+	gs.chargeFoul(defense, defender, site) // below the bonus: PF only, no FTs
 	return false
 }

@@ -141,7 +141,7 @@ func TestGoldenFoulTally_ChargeFoulFeedsSubstitution(t *testing.T) {
 	defender := defense.players[0]
 	gs := &gameState{rng: rng.New(1), period: 1, clock: 600}
 
-	gs.chargeFoul(defense, defender) // a below-bonus foul: PF only
+	gs.chargeFoul(defense, defender, result.FoulSiteNonShooting) // a below-bonus foul: PF only
 	if got := defense.fouls[defender.PID]; got != 1 {
 		t.Fatalf("after chargeFoul, defender fouls = %d, want 1", got)
 	}

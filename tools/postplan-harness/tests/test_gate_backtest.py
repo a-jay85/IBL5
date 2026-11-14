@@ -437,6 +437,30 @@ def test_render_has_state_line_and_markers():
     assert "`bin/check-foo`" in block
 
 
+def test_render_lists_retried_replays():
+    gates, _, t, v = _verdict_for("HELD")
+    path = _g().path
+    res = [ReplayResult(12, path, "pass", "", attempt_secs=(60.0, 12.3)),
+           ReplayResult(13, path, "flag", "x", base_outcome="pass", base_attempt_secs=(60.0, 59.9))]
+    lines = render_gate_backtest(v, gates, res, t, 30).split("\n")
+    end = lines.index(GATE_BACKTEST_END)
+    for want in ("Replays retried once after a timeout:",
+                 f"- #12 `{path}` head: 60.0 s, then 12.3 s",
+                 f"- #13 `{path}` base: 60.0 s, then 59.9 s"):
+        assert want in lines and lines.index(want) < end
+
+
+def test_render_without_retry_has_no_retry_line():
+    gates, _, t, v = _verdict_for("HELD")
+    path = _g().path
+    res = [ReplayResult(12, path, "pass", ""),
+           ReplayResult(13, path, "flag", "x", base_outcome="pass")]
+    block = render_gate_backtest(v, gates, res, t, 30)
+    assert "retried once" not in block
+    one = [dataclasses.replace(r, attempt_secs=(60.0,)) for r in res]
+    assert block == render_gate_backtest(v, gates, one, t, 30)
+
+
 PLAN_SPEC = ReplaySpec(argv=("{plan_file}",), needs_plan=True)
 
 

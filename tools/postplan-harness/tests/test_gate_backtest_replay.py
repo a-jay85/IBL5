@@ -381,6 +381,17 @@ def test_timeout_kills_process_group(tmp_path):
     assert not alive, "the gate's sleep child survived the group kill"
 
 
+def test_retry_logs_both_durations_to_stderr(tmp_path, capsys):
+    repo, shas = build_repo(tmp_path)
+    calls = []
+    ticks = iter([0.0, 60.0, 100.0, 112.3])
+    results = run(repo, shas[:1], tmp_path, runner=flaky_runner(calls, {1}),
+                  timer=lambda: next(ticks), per_replay_timeout=60)
+    assert ("gate-backtest: bin/check-fake replay timed out after 60.0 s; "
+            "retry ended pass after 12.3 s") in capsys.readouterr().err
+    assert results[0].attempt_secs == (60.0, 12.3)
+
+
 def test_base_replay_no_spec_fails_closed(tmp_path):
     repo, shas = build_repo(tmp_path)
     results = run(repo, shas, tmp_path, base_overlay=base("#!/bin/sh\nexit 1\n"))

@@ -76,6 +76,9 @@ class ReplayResult:
     fix_skipped: tuple[str, ...] = ()   # paths whose chunk failed; non-empty = partial apply
     flag_lines: tuple[str, ...] = ()       # head stdout lines when outcome == "flag"
     base_flag_lines: tuple[str, ...] = ()  # base stdout lines when base_outcome == "flag"
+    attempt_secs: tuple[float, ...] = ()       # (first, retry) seconds; set only when the head replay was retried
+    base_attempt_secs: tuple[float, ...] = ()  # same for the base replay
+    fix_attempt_secs: tuple[float, ...] = ()   # same for the fix rerun
 
 
 HEAD_OID_FIELD = "headRefOid"
@@ -635,6 +638,18 @@ def _file_list(paths) -> str:
     return ", ".join(shown) + more
 
 
+def _retry_lines(results) -> list[str]:
+    """Lines naming each replay retried after a timeout; empty when none was retried."""
+    out = []
+    for r in results or []:
+        for stage, secs in (("head", r.attempt_secs), ("base", r.base_attempt_secs),
+                            ("fix", r.fix_attempt_secs)):
+            if len(secs) == 2:
+                out.append(f"- #{r.pr} `{_clean(r.gate)}` {stage}: "
+                           f"{secs[0]:.1f} s, then {secs[1]:.1f} s")
+    return ["", "Replays retried once after a timeout:", *out] if out else []
+
+
 def render_gate_backtest(verdict: Verdict, gates, results, truth: dict[int, Truth],
                          window_size: int, plan_sample: tuple[int, int] | None = None) -> str:
     """Markdown block for the PR body. Only PR numbers are rendered, never historical titles."""
@@ -714,6 +729,7 @@ def render_gate_backtest(verdict: Verdict, gates, results, truth: dict[int, Trut
         entries = [f"`{_clean(g.path)}` ({_clean(g.reason)})" for g in gates if g.state == state]
         if entries:
             lines.append(f"- {label}: " + ", ".join(entries))
+    lines.extend(_retry_lines(results))
     lines.append(GATE_BACKTEST_END)
     return "\n".join(lines)
 

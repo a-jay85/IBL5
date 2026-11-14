@@ -174,15 +174,17 @@ _ui_lock_entry_name() {
 
 # _ui_lock_key_names <key> <name>: rc 0 when the lock key names its own package:
 # the key equals the name, or the key is a nested path whose parent part ends in
-# a whole package name. A parent part ending in a bare scope (@x) is rejected,
-# so key "@evil/bar" cannot pass for package "bar".
+# a whole package name. The parent part must be a chain of whole package
+# names, so key "@evil/bar" (a bare scope) or "x@evil/bar" cannot pass for
+# package "bar".
+UI_LOCK_PARENT_RE='^((@[A-Za-z0-9._-]+/)?[A-Za-z0-9._-]+/)*(@[A-Za-z0-9._-]+/)?[A-Za-z0-9._-]+$'
 _ui_lock_key_names() {
-    local key="$1" name="$2" parent last
+    local key="$1" name="$2" parent
     [ "$key" = "$name" ] && return 0
     [ "${key%/"$name"}" != "$key" ] || return 1
     parent="${key%/"$name"}"
-    last="${parent##*/}"
-    case "$last" in @*) return 1 ;; esac
+    [[ $parent =~ $UI_LOCK_PARENT_RE ]] || return 1
+    case "${parent##*/}" in @*) return 1 ;; esac
     return 0
 }
 

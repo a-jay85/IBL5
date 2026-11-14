@@ -179,12 +179,17 @@ DIGEST = [
 
 def test_watch_line_carries_kept_change():
     rows = fidelity.digest_rows_for_display(DIGEST, {}, kept_titles=("the grid",))
-    assert rows[2] == "**Watch:** kept unplanned change: the grid"
+    assert rows[2] == ("**Watch:** 1 kept unplanned change, "
+                       "listed under Kept unplanned changes in the PR body")
     assert sum(row.startswith("**") for row in rows) == 5
 
     busy = [*DIGEST[:2], "**Watch:** the seam", *DIGEST[3:]]
     rows = fidelity.digest_rows_for_display(busy, {}, kept_titles=("x", "y"))
-    assert rows[2] == "**Watch:** the seam; kept unplanned change: x; kept unplanned change: y"
+    assert rows[2] == ("**Watch:** the seam; 2 kept unplanned changes, "
+                       "listed under Kept unplanned changes in the PR body")
+    long_title = "Get an owner decision. " * 40
+    rows = fidelity.digest_rows_for_display(DIGEST, {}, kept_titles=(long_title,))
+    assert long_title.strip() not in rows[2]
 
     # Captured from one run of the code before this change.
     assert fidelity.digest_rows_for_display(DIGEST, {"remediation_sha": "abc"}) == [
@@ -194,6 +199,39 @@ def test_watch_line_carries_kept_change():
         "**Touches:** c",
         "**Machine-authored fixes:** none (post-plan remediation: abc)",
     ]
+
+
+def _kept(text):
+    return {"hold": "12", "text": text}
+
+
+def test_merge_kept_replaces_a_reworded_finding_from_an_earlier_round():
+    changed = [GRID, OTHER]
+    first = _kept(f"- [BLOCKING] [GATE-EDIT] [unplanned-scope] Plan the grid in `{GRID}`.")
+    reworded = _kept(f"- [NOTE] [GATE-EDIT] [unplanned-scope] Still plan the grid in `{GRID}`.")
+    other = _kept(f"- [BLOCKING] [GATE-EDIT] [unplanned-scope] Plan the helper in `{OTHER}`.")
+    kept_all: list = []
+    us.merge_kept(kept_all, [first, other], changed)
+    us.merge_kept(kept_all, [reworded], changed)
+    assert kept_all == [reworded, other]
+    us.merge_kept(kept_all, [reworded], changed)
+    assert kept_all == [reworded, other]
+
+
+def test_merge_kept_keeps_distinct_findings_apart():
+    changed = [GRID, OTHER]
+    grid = _kept(f"- [BLOCKING] [unplanned-scope] Plan the grid in `{GRID}`.")
+    both = _kept(f"- [BLOCKING] [unplanned-scope] Plan the grid in `{GRID}` and `{OTHER}`.")
+    gate = _kept(f"- [BLOCKING] [GATE-EDIT] [unplanned-scope] Plan the grid in `{GRID}`.")
+    same_round = _kept(f"- [BLOCKING] [unplanned-scope] Also the grid in `{GRID}`.")
+    no_path_a = _kept("- [BLOCKING] [unplanned-scope] Plan the first thing.")
+    no_path_b = _kept("- [BLOCKING] [unplanned-scope] Plan the second thing.")
+    kept_all: list = []
+    us.merge_kept(kept_all, [grid, same_round], changed)
+    assert kept_all == [grid, same_round]
+    us.merge_kept(kept_all, [both, gate, no_path_a], changed)
+    us.merge_kept(kept_all, [no_path_b], changed)
+    assert kept_all == [grid, same_round, both, gate, no_path_a, no_path_b]
 
 
 def test_kept_block_survives_body_rewrite():

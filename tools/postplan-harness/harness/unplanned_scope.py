@@ -225,6 +225,52 @@ def partition(items: Iterable[dict], ctx: Optional[dict]) -> tuple[list, list, l
     return work, kept, held
 
 
+_TAG_RE = re.compile(r"\[([^\[\]\s][^\[\]]*)\]")
+_SEVERITY_TAGS = {"BLOCKING", "NOTE"}
+
+
+def _same_change_key(item_text: str, changed_paths: Iterable[str]) -> Optional[tuple]:
+    """(tags, cited paths) for a finding, or None when it cites no changed path.
+
+    Severity is left out because a re-review may move a finding from BLOCKING to NOTE.
+    """
+    paths = cited_paths(item_text, changed_paths)
+    if not paths:
+        return None
+    lines = item_text.splitlines()
+    first = lines[0] if lines else ""
+    tagged = _TAGGED_RE.match(first)
+    tags = _TAG_RE.findall(first[:tagged.end()]) if tagged else []
+    return (frozenset(t for t in tags if t not in _SEVERITY_TAGS), frozenset(paths))
+
+
+def merge_kept(kept_all: list, new_items: Iterable[dict], changed_paths: Iterable[str]) -> None:
+    """Add this round's kept items to `kept_all` in place.
+
+    A new item with the same tags and cited paths as an item from an earlier round replaces
+    it, so the newest wording is the one declared. That matters because `downgrade_applies`
+    looks for the current round's titles in the PR body. Items from the same round never
+    replace each other, and an item that cites no changed path is only skipped as an exact
+    copy, so two distinct findings are never folded together by accident.
+    """
+    changed = tuple(changed_paths)
+    earlier = len(kept_all)
+    replaced: set[int] = set()
+    for item in new_items:
+        if item in kept_all:
+            continue
+        key = _same_change_key(item["text"], changed)
+        match = None
+        if key is not None:
+            match = next((i for i in range(earlier) if i not in replaced
+                          and _same_change_key(kept_all[i]["text"], changed) == key), None)
+        if match is None:
+            kept_all.append(item)
+        else:
+            kept_all[match] = item
+            replaced.add(match)
+
+
 def title_of(item_text: str) -> str:
     """The first line minus bullet, severity marker and tag, cut before `. Next action`."""
     lines = item_text.splitlines()

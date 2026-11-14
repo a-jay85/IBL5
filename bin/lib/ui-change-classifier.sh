@@ -367,7 +367,7 @@ ui_composer_exempt() {
             "$_UI_COMPOSER_JSON_JQ" >/dev/null 2>&1 || return 1
     fi
     jq -en --slurpfile b "$base/ibl5/composer.lock" --slurpfile h "$head/ibl5/composer.lock" \
-        --argjson jc "$jc" "$_UI_COMPOSER_LOCK_JQ" >/dev/null 2>&1
+        --argjson jc "$jc" "$_UI_COMPOSER_LOCK_JQ" >/dev/null 2>&1 || return 1
 }
 
 # ui_decide <paths_file> <renderable 0|1> <gallery_json or ""> [dev_patch 0|1] [composer 0|1]: prints the verdict.

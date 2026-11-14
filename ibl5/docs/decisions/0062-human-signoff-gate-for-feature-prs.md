@@ -107,3 +107,18 @@ The flag skips only the `ui-paths` verdict. The VR gallery check still runs, so 
 Install scripts. The VR job runs `bun install` with no `trustedDependencies` key and no `--ignore-scripts` flag, so bun runs the install scripts of packages on its default trusted list. A toolchain bump holds because that code measures the gallery. Every other script comes from the npm registry under a sha512 integrity: the same bytes a merge installs. An owner who reads a version-string diff would not catch a hostile published version either.
 
 The workflow passes the two checkout roots as `UI_BASE_DIR` and `UI_HEAD_DIR`. The classifier reads the head tree as data and runs nothing from it. Post-plan arming condition (8) calls the `--paths` CLI, which has no exemption. The cases live in `bin/test-human-signoff-classifier` under the `dp_` prefix.
+
+## Addendum 2026-11-13: memo-hit gallery fallback
+
+An E2E memo hit skips Visual Regression, so the head SHA has no `vr-gallery-json-*` artifact and the gate held such PRs as `vr-missing`. The gate now reuses the gallery of an earlier run from the same PR when all of these hold:
+
+- The head run's jobs show `E2E Memo Check` success, `Visual Regression` skipped and `E2E Tests` success. This shape only triggers the fallback. It proves nothing on its own.
+- The source run is a completed, successful `pull_request` run of `e2e-tests.yml` for the same PR number, or for the same head repository and branch.
+- The source run still has an unexpired gallery artifact for its own head SHA.
+- The compare API reports the head as `ahead` of or `identical` to the source SHA, with fewer than 300 changed files.
+- No changed file, old rename paths included, matches `UI_PATH_RE` or the base-ref `.github/ci-memo/e2e.paths` list.
+- The PR does not edit `bin/ci-memo` or `.github/ci-memo/`.
+
+Any failed condition keeps `vr-missing`. The gate reads only GitHub API data and base-ref files. It never reads the memo log line or the cached sentinel, because PR-head code writes both.
+
+The gate checks file equality between two head commits and does not recompute the memo key. The key also covers the merge commit and the php-apache image digest, which the gate cannot read. Two gaps remain. If master changes between the two runs and the PR does not merge it, the reused gallery predates those master changes. The image digest can drift between the runs. Both affect only the comparison baseline, and both need either a forged memo hit, which the `bin/ci-memo` rule blocks, or a master change that an honest memo would treat as a miss.

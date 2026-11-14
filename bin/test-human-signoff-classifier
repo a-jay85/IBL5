@@ -1494,7 +1494,7 @@ else
 fi
 
 # ---- UI-change classifier (bin/lib/ui-change-classifier.sh) ----
-UI_LIB="$REPO_ROOT/bin/lib/ui-change-classifier.sh"
+UI_LIB="${UI_CLASSIFIER_LIB:-$REPO_ROOT/bin/lib/ui-change-classifier.sh}"
 UI_TMP=$(mktemp -d)
 # ui_paths_rc <name> <expected_rc> <path>... — ui_paths_touch_ui on the paths.
 ui_paths_rc() {
@@ -1662,6 +1662,12 @@ if command grep -qF 'ui_workflow_verdict "$PATHS" "$PR_AUTHOR" ui_fetch_gallery_
     h_pass "approval race: human-signoff.yml passes ACTION and EVENT_LABEL to ui_workflow_verdict"
 else
     h_fail "approval race: human-signoff.yml passes ACTION and EVENT_LABEL to ui_workflow_verdict" "call not found"
+fi
+# The memo-hit fallback needs the base-ref coverage list exported to the verdict step.
+if command grep -qF 'export UI_MEMO_PATHS_FILE=' "$REPO_ROOT/.github/workflows/human-signoff.yml"; then
+    h_pass "memo fallback: human-signoff.yml exports UI_MEMO_PATHS_FILE from the base-ref copy"
+else
+    h_fail "memo fallback: human-signoff.yml exports UI_MEMO_PATHS_FILE from the base-ref copy" "export not found"
 fi
 
 # shellcheck disable=SC2016  # literal workflow text
@@ -1910,6 +1916,7 @@ ui_paths_rc ui_paths_vr_action_nested_file_holds 0 .github/actions/setup-docker-
 # gallery shows as vr-missing (hold) and an accepted clean one as not-ui.
 UI_HEAD=2222222222222222222222222222222222222222
 UI_OTHER=3333333333333333333333333333333333333333
+UI_SRC=4444444444444444444444444444444444444444
 mkdir -p "$UI_TMP/fakebin" "$UI_TMP/zip-clean" "$UI_TMP/zip-dirty"
 printf '%s\n' '{"renderedCells":4,"changedCells":[],"newCells":[]}' > "$UI_TMP/zip-clean/vr-gallery.json"
 printf '%s\n' '{"renderedCells":4,"changedCells":[{"title":"x"}],"newCells":[]}' > "$UI_TMP/zip-dirty/vr-gallery.json"
@@ -1931,6 +1938,8 @@ case "$url" in
     */actions/workflows/e2e-tests.yml/runs\?*) json="$MOCK_RUNS" ;;
     */actions/runs/*/artifacts*) json="$MOCK_ARTS" ;;
     */actions/artifacts/*/zip) cat "$MOCK_ZIP"; exit 0 ;;
+    */actions/runs/*/jobs*) [ -n "${MOCK_JOBS:-}" ] || exit 1; printf '%s\n' "$MOCK_JOBS"; exit 0 ;;
+    */compare/*) [ -n "${MOCK_COMPARE:-}" ] || exit 1; printf '%s\n' "$MOCK_COMPARE"; exit 0 ;;
     *) exit 1 ;;
 esac
 jq -r "$filter" <<< "$json"
@@ -1938,10 +1947,10 @@ SH
 chmod +x "$UI_TMP/fakebin/gh"
 printf '%s\n' ibl5/classes/Team/TeamService.php > "$UI_TMP/backend-paths.txt"
 
-# ui_run <id> <head_sha> <path> <event> <pr_numbers_json> <head_branch> <head_repo> <status>
+# ui_run <id> <head_sha> <path> <event> <pr_numbers_json> <head_branch> <head_repo> <status> [conclusion]
 ui_run() {
-    printf '{"id":%s,"head_sha":"%s","path":"%s","event":"%s","pull_requests":%s,"head_branch":"%s","head_repository":{"full_name":"%s"},"status":"%s","created_at":"2026-11-01T00:00:00Z"}' \
-        "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8"
+    printf '{"id":%s,"head_sha":"%s","path":"%s","event":"%s","pull_requests":%s,"head_branch":"%s","head_repository":{"full_name":"%s"},"status":"%s","conclusion":"%s","created_at":"2026-11-01T00:00:00Z"}' \
+        "$1" "$2" "$3" "$4" "$5" "$6" "$7" "$8" "${9:-success}"
 }
 # ui_art <id> <run_id> <run_head_sha>
 ui_art() {
@@ -1961,7 +1970,7 @@ ui_trust_case() {
         HEAD_REF=feat HEAD_REPO=o/r UI_VR_ATTEMPTS=1 UI_VR_SLEEP=0 \
         MOCK_RUNS="$runs" MOCK_ARTS="$arts" MOCK_ZIP="$zipf" "$@" \
         bash -c 'set -euo pipefail; source "$1"; ui_workflow_verdict "$2" someone ui_fetch_gallery_gh || true' \
-        _ "$UI_LIB" "$UI_TMP/backend-paths.txt" 2>&1)
+        _ "$UI_LIB" "$UI_TMP/backend-paths.txt" 2>/dev/null)
     same "$name" "$got" "$want"
 }
 ui_trust_case "gallery trust: this PR's own E2E run on the head SHA is accepted" not-ui \
@@ -1989,6 +1998,138 @@ ui_trust_case "gallery trust: a same-branch run from another repo is rejected (h
 ui_trust_case "gallery trust: a missing PR number holds" vr-missing \
     "{\"workflow_runs\":[$UI_RUN_OK]}" "$UI_ART_OK" "$UI_TMP/clean.zip" PR=
 ui_trust_case "gallery trust: no E2E run holds" vr-missing '{"workflow_runs":[]}' "$UI_ART_OK"
+
+# ---- memo-hit gallery fallback (_ui_memo_fallback) ----
+# A memo hit uploads no gallery for the new SHA. The fallback reuses the gallery
+# of an earlier same-PR run when nothing UI-relevant changed since. The fake gh
+# also serves MOCK_JOBS (run jobs) and MOCK_COMPARE (compare API).
+cp "$REPO_ROOT/.github/ci-memo/e2e.paths" "$UI_TMP/e2e.paths"
+RENDERABLE="$UI_TMP/backend-paths.txt"
+# ui_jobs <memo_concl> <vr_concl> <gate_concl>
+ui_jobs() {
+    printf '{"jobs":[{"name":"E2E Tests (1/2)","conclusion":"skipped"},{"name":"E2E Memo Check","conclusion":"%s"},{"name":"Visual Regression","conclusion":"%s"},{"name":"E2E Tests","conclusion":"%s"}]}' \
+        "$1" "$2" "$3"
+}
+# ui_compare <status> [file | old=>new | @300]...
+ui_compare() {
+    local status="$1" f out="" sep="" n
+    shift
+    for f in "$@"; do
+        case "$f" in
+            @300) n=1; while [ "$n" -le 300 ]; do out="$out$sep{\"filename\":\"docs/f$n.txt\"}"; sep=","; n=$((n + 1)); done ;;
+            *'=>'*) out="$out$sep{\"filename\":\"${f#*=>}\",\"previous_filename\":\"${f%%=>*}\"}"; sep="," ;;
+            *) out="$out$sep{\"filename\":\"$f\"}"; sep="," ;;
+        esac
+    done
+    printf '{"status":"%s","files":[%s]}' "$status" "$out"
+}
+# ui_memo_case <name> <want> <paths_file> <runs> <arts> <jobs> <compare> [zip] [env...]
+# env args: NAME=value sets, -NAME unsets, both applied after the defaults.
+ui_memo_case() {
+    local name="$1" want="$2" paths="$3" runs="$4" arts="$5" jobs="$6" cmp="$7" zipf="${8:-$UI_TMP/clean.zip}" got a unset_list=""
+    local -a envargs=()
+    shift 8 2>/dev/null || shift $#
+    for a in "$@"; do
+        case "$a" in
+            -*) unset_list="$unset_list ${a#-}" ;;
+            *) envargs+=("$a") ;;
+        esac
+    done
+    # shellcheck disable=SC2016  # $1, $2 and $UI_UNSET expand inside the child bash
+    got=$(env PATH="$UI_TMP/fakebin:$PATH" GH_REPO=o/r HEAD_SHA="$UI_HEAD" PR=42 \
+        HEAD_REF=feat HEAD_REPO=o/r UI_VR_ATTEMPTS=1 UI_VR_SLEEP=0 \
+        UI_MEMO_PATHS_FILE="$UI_TMP/e2e.paths" UI_UNSET="$unset_list" \
+        MOCK_RUNS="$runs" MOCK_ARTS="$arts" MOCK_ZIP="$zipf" MOCK_JOBS="$jobs" MOCK_COMPARE="$cmp" \
+        ${envargs[@]+"${envargs[@]}"} \
+        bash -c 'set -euo pipefail; for v in $UI_UNSET; do unset "$v"; done; source "$1"; ui_workflow_verdict "$2" someone ui_fetch_gallery_gh || true' \
+        _ "$UI_LIB" "$paths" 2>/dev/null)
+    same "$name" "$got" "$want"
+}
+UI_RUN_HEAD=$(ui_run 900 "$UI_HEAD" "$UI_E2E" pull_request '[{"number":42}]' feat o/r completed)
+UI_RUN_SRC=$(ui_run 800 "$UI_SRC" "$UI_E2E" pull_request '[{"number":42}]' feat o/r completed success)
+ui_memo_case "memo-same-pr-clean: same-PR memo hit reuses the source gallery" not-ui \
+    "$RENDERABLE" "{\"workflow_runs\":[$UI_RUN_HEAD,$UI_RUN_SRC]}" "$(ui_art 81 800 "$UI_SRC")" \
+    "$(ui_jobs success skipped success)" "$(ui_compare ahead README.md)"
+# Shared fixtures; each case below changes only the field it names.
+M_RUNS="{\"workflow_runs\":[$UI_RUN_HEAD,$UI_RUN_SRC]}"
+M_ART=$(ui_art 81 800 "$UI_SRC")
+M_JOBS=$(ui_jobs success skipped success)
+M_CMP=$(ui_compare ahead README.md)
+M_ART_EXPIRED="${M_ART/\"expired\":false/\"expired\":true}"
+# m_runs_with_src <source_run_json>: head run plus one replacement source run.
+m_runs_with_src() { printf '{"workflow_runs":[%s,%s]}' "$UI_RUN_HEAD" "$1"; }
+ui_memo_case "memo-same-pr-gating: a gallery with a changed cell still holds as ui-vr" ui-vr \
+    "$RENDERABLE" "$M_RUNS" "$M_ART" "$M_JOBS" "$M_CMP" "$UI_TMP/dirty.zip"
+ui_memo_case "memo-other-pr: a source run for another PR is rejected" vr-missing \
+    "$RENDERABLE" "$(m_runs_with_src "$(ui_run 800 "$UI_SRC" "$UI_E2E" pull_request '[{"number":43}]' other o/r completed success)")" \
+    "$M_ART" "$M_JOBS" "$M_CMP"
+ui_memo_case "memo-fork-same-branch: a fork source run matches on head branch and repo" not-ui \
+    "$RENDERABLE" "$(m_runs_with_src "$(ui_run 800 "$UI_SRC" "$UI_E2E" pull_request '[]' feat o/r completed success)")" \
+    "$M_ART" "$M_JOBS" "$M_CMP"
+ui_memo_case "memo-other-fork-repo: a same-branch source run from another repo is rejected" vr-missing \
+    "$RENDERABLE" "$(m_runs_with_src "$(ui_run 800 "$UI_SRC" "$UI_E2E" pull_request '[]' feat x/y completed success)")" \
+    "$M_ART" "$M_JOBS" "$M_CMP"
+ui_memo_case "memo-src-failed: a failed source run is rejected" vr-missing \
+    "$RENDERABLE" "$(m_runs_with_src "$(ui_run 800 "$UI_SRC" "$UI_E2E" pull_request '[{"number":42}]' feat o/r completed failure)")" \
+    "$M_ART" "$M_JOBS" "$M_CMP"
+M_RUN_850=$(ui_run 850 "$UI_OTHER" "$UI_E2E" pull_request '[{"number":42}]' feat o/r completed success)
+M_ART_850_EXPIRED=$(ui_art 85 850 "$UI_OTHER")
+M_ART_850_EXPIRED="${M_ART_850_EXPIRED/\"expired\":false/\"expired\":true}"
+M_ARTS_BOTH=$(jq -c -s '{artifacts: (map(.artifacts) | add)}' <<< "$M_ART_850_EXPIRED $M_ART")
+ui_memo_case "memo-newest-expired-older-valid: an older source with a live gallery is used" not-ui \
+    "$RENDERABLE" "{\"workflow_runs\":[$UI_RUN_HEAD,$M_RUN_850,$UI_RUN_SRC]}" "$M_ARTS_BOTH" "$M_JOBS" "$M_CMP"
+ui_memo_case "memo-src-no-artifact: a source run with no gallery holds" vr-missing \
+    "$RENDERABLE" "$M_RUNS" '{"artifacts":[]}' "$M_JOBS" "$M_CMP"
+ui_memo_case "memo-src-expired: an expired source gallery holds" vr-missing \
+    "$RENDERABLE" "$M_RUNS" "$M_ART_EXPIRED" "$M_JOBS" "$M_CMP"
+ui_memo_case "memo-vr-ran: a head run whose VR job ran is not a memo hit" vr-missing \
+    "$RENDERABLE" "$M_RUNS" "$M_ART" "$(ui_jobs success success success)" "$M_CMP"
+ui_memo_case "memo-gate-failed: a failed E2E gate is not a memo hit" vr-missing \
+    "$RENDERABLE" "$M_RUNS" "$M_ART" "$(ui_jobs success skipped failure)" "$M_CMP"
+ui_memo_case "memo-jobs-unreadable: an unreadable jobs API holds" vr-missing \
+    "$RENDERABLE" "$M_RUNS" "$M_ART" "$M_JOBS" "$M_CMP" "$UI_TMP/clean.zip" -MOCK_JOBS
+ui_memo_case "memo-diverged: a diverged compare holds" vr-missing \
+    "$RENDERABLE" "$M_RUNS" "$M_ART" "$M_JOBS" "$(ui_compare diverged README.md)"
+ui_memo_case "memo-compare-300: a possibly truncated file list holds" vr-missing \
+    "$RENDERABLE" "$M_RUNS" "$M_ART" "$M_JOBS" "$(ui_compare ahead @300)"
+ui_memo_case "memo-covered-change: a changed file under e2e.paths holds" vr-missing \
+    "$RENDERABLE" "$M_RUNS" "$M_ART" "$M_JOBS" "$(ui_compare ahead bin/lib/foo.sh)"
+ui_memo_case "memo-rename-from-covered: a rename away from a covered path holds" vr-missing \
+    "$RENDERABLE" "$M_RUNS" "$M_ART" "$M_JOBS" "$(ui_compare ahead 'bin/lib/foo.sh=>notes/foo.sh')"
+command grep -vxF '.github' "$UI_TMP/e2e.paths" > "$UI_TMP/e2e-no-github.paths"
+ui_memo_case "memo-ui-path-only: a UI_PATH_RE file holds even when e2e.paths misses it" vr-missing \
+    "$RENDERABLE" "$M_RUNS" "$M_ART" "$M_JOBS" "$(ui_compare ahead .github/workflows/e2e-tests.yml)" \
+    "$UI_TMP/clean.zip" "UI_MEMO_PATHS_FILE=$UI_TMP/e2e-no-github.paths"
+ui_memo_case "memo-prefix-near-miss: ibl5-notes.txt is not under the ibl5 entry" not-ui \
+    "$RENDERABLE" "$M_RUNS" "$M_ART" "$M_JOBS" "$(ui_compare ahead ibl5-notes.txt)"
+printf '%s\n' ':(glob)tools/*.cfg' > "$UI_TMP/e2e-glob.paths"
+ui_memo_case "memo-glob-include: a glob include covers tools/a.cfg" vr-missing \
+    "$RENDERABLE" "$M_RUNS" "$M_ART" "$M_JOBS" "$(ui_compare ahead tools/a.cfg)" \
+    "$UI_TMP/clean.zip" "UI_MEMO_PATHS_FILE=$UI_TMP/e2e-glob.paths"
+ui_memo_case "memo-exclude: an excluded path is not covered" not-ui \
+    "$RENDERABLE" "$M_RUNS" "$M_ART" "$M_JOBS" "$(ui_compare ahead ibl5/docs/x.md)"
+ui_memo_case "memo-paths-unset: no memo paths file holds" vr-missing \
+    "$RENDERABLE" "$M_RUNS" "$M_ART" "$M_JOBS" "$M_CMP" "$UI_TMP/clean.zip" -UI_MEMO_PATHS_FILE
+ui_memo_case "memo-paths-empty: an empty memo paths variable holds" vr-missing \
+    "$RENDERABLE" "$M_RUNS" "$M_ART" "$M_JOBS" "$M_CMP" "$UI_TMP/clean.zip" UI_MEMO_PATHS_FILE=
+printf '%s\n' '# c' ':(exclude)ibl5/docs' > "$UI_TMP/e2e-excl.paths"
+ui_memo_case "memo-paths-no-includes: a list with no include pattern holds" vr-missing \
+    "$RENDERABLE" "$M_RUNS" "$M_ART" "$M_JOBS" "$M_CMP" "$UI_TMP/clean.zip" "UI_MEMO_PATHS_FILE=$UI_TMP/e2e-excl.paths"
+{ cat "$RENDERABLE"; printf '%s\n' bin/ci-memo; } > "$UI_TMP/paths-ci-memo.txt"
+ui_memo_case "memo-pr-edits-ci-memo: a PR that edits bin/ci-memo holds" vr-missing \
+    "$UI_TMP/paths-ci-memo.txt" "$M_RUNS" "$M_ART" "$M_JOBS" "$M_CMP"
+{ cat "$RENDERABLE"; printf '%s\n' bin/ci-memory; } > "$UI_TMP/paths-ci-memory.txt"
+ui_memo_case "memo-pr-ci-memo-near-miss: bin/ci-memory is not the memo machinery" not-ui \
+    "$UI_TMP/paths-ci-memory.txt" "$M_RUNS" "$M_ART" "$M_JOBS" "$M_CMP"
+# memo-direct-fetch: a direct ui_fetch_gallery_gh call leaves UI_PR_PATHS unset, so the fallback refuses.
+MEMO_DIRECT_RC=0
+# shellcheck disable=SC2016  # $1 and $2 expand inside the child bash
+env PATH="$UI_TMP/fakebin:$PATH" GH_REPO=o/r HEAD_SHA="$UI_HEAD" PR=42 HEAD_REF=feat HEAD_REPO=o/r \
+    UI_MEMO_PATHS_FILE="$UI_TMP/e2e.paths" MOCK_RUNS="$M_RUNS" MOCK_ARTS="$M_ART" MOCK_ZIP="$UI_TMP/clean.zip" \
+    MOCK_JOBS="$M_JOBS" MOCK_COMPARE="$M_CMP" \
+    bash -c 'set -euo pipefail; unset UI_PR_PATHS; source "$1"; ui_fetch_gallery_gh "$2"' _ "$UI_LIB" "$UI_TMP/g.json" \
+    > /dev/null 2>&1 || MEMO_DIRECT_RC=$?
+expect "memo-direct-fetch: ui_fetch_gallery_gh without UI_PR_PATHS returns rc 3" 3 "$MEMO_DIRECT_RC"
 
 # ui_fetch_rc <runs_json> <arts_json>: prints the fetch rc (3 = finished, no artifact).
 ui_fetch_rc() {

@@ -86,6 +86,8 @@ final class MissingTeamRowRestoreTest extends DatabaseTestCase
         self::assertSame($survivorBefore['home_q4_points'], $new['home_q4_points']);
         self::assertSame($survivorBefore['attendance'], $new['attendance']);
         self::assertSame($survivorBefore['visitor_wins'], $new['visitor_wins']);
+        self::assertSame($survivorBefore['home_wins'], $new['home_wins']);
+        self::assertSame($survivorBefore['home_losses'], $new['home_losses']);
         self::assertNull($new['game_min']);
         self::assertSame($survivorBefore, $this->rowById(28588));
     }

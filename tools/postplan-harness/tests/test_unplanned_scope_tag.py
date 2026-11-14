@@ -8,7 +8,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from harness import fidelity
+import pytest
+
+from harness import fidelity, unplanned_scope
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 REVIEW_CONTRACT = REPO_ROOT / ".claude" / "review-shared" / "_plan-fidelity-review.md"
@@ -57,3 +59,22 @@ def test_review_contract_blocking_clause_unchanged():
 
 def test_agent_def_carries_tag():
     assert "[unplanned-scope]" in AGENT_DEF.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    "line, expected",
+    [
+        ("- [BLOCKING] [unplanned-scope] Split the check.", True),
+        ("- [BLOCKING] [GATE-EDIT] [unplanned-scope] Split the new check-prose tell.", True),
+        ("* [NOTE] [GATE-EDIT] [SECURITY] [unplanned-scope] Two extra tags.", True),
+        ("1. [BLOCKING] [A] [B] [unplanned-scope]", True),
+        ("- [BLOCKING] [GATE-EDIT] Split the check.", False),
+        ("- [BLOCKING] Split the check [unplanned-scope] later.", False),
+        ("- [BLOCKING] [GATE-EDIT] prose [unplanned-scope] Split.", False),
+        ("- [GATE-EDIT] [unplanned-scope] Missing severity marker.", False),
+        ("[BLOCKING] [unplanned-scope] No bullet.", False),
+        ("- [BLOCKING] [GATE-EDIT] [unplanned-scope]x Glued suffix.", False),
+    ],
+)
+def test_is_unplanned_scope_tag_run(line, expected):
+    assert unplanned_scope.is_unplanned_scope(line) is expected

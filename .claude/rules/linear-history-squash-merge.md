@@ -1,6 +1,6 @@
 ---
 description: Linear history — squash/rebase-merge only — path-scoped, loads only for post-plan/rebase surfaces. Read before diagnosing a "SHA not in master" result or rebasing a stacked branch after its parent merged.
-last_verified: 2026-11-04
+last_verified: 2026-11-14
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - "tools/postplan-harness/**"
@@ -74,3 +74,5 @@ No path spawns a skill session *because of* a conflict. Engine split and exit co
 ## Harness
 
 The fleet's conflict autofix leaves a local rebased commit from `bin/postplan-fix --headless` on the PR branch (ADR-0228). `master` still lands squash-only. The harness pushes it with its usual explicit `--force-with-lease`.
+
+The Phase 5.5 review reads a stacked PR's own changes. While the parent PR is open, `LiveGit.review_base()` resolves a full commit SHA on the parent's side of HEAD. The reviewer packet, the review cache key and the unplanned-scope context all diff from that SHA, and the run logs `review base: parent <branch>@<sha>`. When the parent cannot be resolved, is gone, or has landed on master, the helper falls back to the master diff and logs `review base: master`. Arming checks always read the master diff.

@@ -62,8 +62,16 @@ _NARROWED_EXTERNAL_PATHS = ("bin/db-sync-prod", "bin/discord-dm")
 _NOTIFY_TEXT_RE = re.compile(r"notify-discord|DISCORD_")
 _SITE_WIDE_PATHS = ("ibl5/.htaccess", "ibl5/router.php", "ibl5/composer.json")
 _MIGRATION_RE = re.compile(r"^ibl5/migrations/.*\.sql$")
+_PHP_MIGRATION_RE = re.compile(r"^ibl5/migrations/.*\.php$")
 _DIFF_HEADER_RE = re.compile(r"^diff --git a/.* b/(.*)$", re.MULTILINE)
 _RENAME_RE = re.compile(r"^rename from (.+)\nrename to (.+)$", re.MULTILINE)
+# A DELETE statement in a migration: `DELETE [LOW_PRIORITY|QUICK|IGNORE] [t1[, t2]] FROM t`.
+# An FK's `ON DELETE CASCADE` and a trigger's `AFTER DELETE ON` have no FROM and never match.
+_DELETE_STMT_RE = re.compile(
+    r"\bDELETE\s+(?:(?:LOW_PRIORITY|QUICK|IGNORE)\s+)*"
+    r"(?P<multi>[`\w]+(?:\s*,\s*[`\w]+)*\s+)?"
+    r"FROM\s+(?:`?(?P<name>\w+)`?(?![\w.{$`]))?",
+    re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -93,13 +101,31 @@ def _diff_sections(diff_text: str) -> list[tuple[str, str]] | None:
     return sections
 
 
-def _migration_sections(diff_text: str) -> str:
-    """The diff text belonging to migration files. A diff without `diff --git` headers is
+def _migration_sections(diff_text: str, pattern: re.Pattern[str] = _MIGRATION_RE) -> str:
+    """The diff text belonging to files whose path matches pattern (default: .sql migrations). A diff without `diff --git` headers is
     searched whole, so a bare hunk still counts."""
     sections = _diff_sections(diff_text)
     if sections is None:
         return diff_text
-    return "".join(text for path, text in sections if _MIGRATION_RE.match(path))
+    return "".join(text for path, text in sections if pattern.match(path))
+
+
+def _added_text(diff_text: str) -> str:
+    """The diff's added lines with the `+` dropped, so a statement split across lines still reads
+    as one. File headers (`+++ b/`, `+++ /dev/null`) are skipped."""
+    return "\n".join(line[1:] for line in diff_text.splitlines()
+                     if line.startswith("+") and not line.startswith(("+++ b/", "+++ /dev/null")))
+
+
+def _deletes_destroy(diff_text: str) -> bool:
+    """True when an added DELETE statement can lose rows no refresh step rebuilds: its target is
+    outside rebuildable.REBUILDABLE_TABLES, or the harness cannot read the target (a multi-table
+    DELETE, or an interpolated or schema-qualified name). Fail closed."""
+    for m in _DELETE_STMT_RE.finditer(_added_text(diff_text)):
+        name = m.group("name")
+        if m.group("multi") or name is None or name.lower() not in rebuildable.REBUILDABLE_TABLES:
+            return True
+    return False
 
 
 def _section_for(diff_text: str, path: str) -> str | None:
@@ -194,10 +220,20 @@ def derive_merge_danger(
     # any table site code may write after merge (only SITE_STATIC_TABLES qualify, empty today):
     # reloading a backup there would wipe every row written since merge. Any unproven
     # migration, or a down file with no up partner in the diff, keeps every path (fail closed).
+    # A DELETE counts as destructive unless every DELETE targets a REBUILDABLE_TABLES table.
     migrations = [p for p in paths if _MIGRATION_RE.match(p)]
-    if migrations and DESTRUCTIVE_SQL.search(
-            strip_added_sql_comments(_migration_sections(diff_text or ""))):
+    sql_text = strip_added_sql_comments(_migration_sections(diff_text or "", _MIGRATION_RE))
+    if migrations and (DESTRUCTIVE_SQL.search(sql_text) or _deletes_destroy(sql_text)):
         for p in unproven_migrations(migrations, diff_text or "", read_candidate):
+            add(f"destructive-migration:{p}")
+
+    # A .php migration runs arbitrary code. No down file can pair with it, so the revert proof
+    # never applies. Its text is matched raw because PHP's `--`, `//` and `#` are not comment
+    # shapes the SQL stripper can trust (fail closed).
+    php_migrations = [p for p in paths if _PHP_MIGRATION_RE.match(p)]
+    php_text = _migration_sections(diff_text or "", _PHP_MIGRATION_RE)
+    if php_migrations and (DESTRUCTIVE_SQL.search(php_text) or _deletes_destroy(php_text)):
+        for p in php_migrations:
             add(f"destructive-migration:{p}")
 
     # 2. Prod external state and outbound senders that can reach a GM.

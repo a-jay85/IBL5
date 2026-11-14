@@ -32,22 +32,25 @@ final class ModuleRedirect
     }
 
     /** Sends the 302 for a retired module. Caller must `return` immediately after. */
-    public static function send(string $moduleName): void
+    public static function send(string $moduleName, ?\Api\Response\RedirectResponder $responder = null): void
     {
         $target = self::targetFor($moduleName);
         if ($target === null) {
             return;
         }
 
-        self::to($target);
+        self::to($target, responder: $responder);
     }
 
     /**
      * Send a plain Location redirect to an already-built URL. Callers must return after it.
      */
-    public static function to(string $url, int $status = 302): void
-    {
-        (new \Api\Response\RedirectResponder())->redirect($url, $status);
+    public static function to(
+        string $url,
+        int $status = 302,
+        ?\Api\Response\RedirectResponder $responder = null
+    ): void {
+        ($responder ?? new \Api\Response\RedirectResponder())->redirect($url, $status);
     }
 
     /**

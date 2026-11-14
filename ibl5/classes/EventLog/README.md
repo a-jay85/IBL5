@@ -1,6 +1,6 @@
 ---
 description: Fire-and-forget product-analytics request logging to the ibl_events table, with traffic classification and domain-event instrumentation.
-last_verified: 2026-10-27
+last_verified: 2026-11-10
 ---
 
 # EventLog
@@ -11,14 +11,14 @@ Single repository class (`EventLogRepository`) that writes request events to the
 
 Four columns were added in migration 159:
 
-- **`session_id`** (`VARCHAR(64) NULL`) — SHA-256 hash of `session_id()`. **NOT the raw session token** — the hash is one-way and cannot be replayed. Rotates on login (`session_regenerate_id(true)` at `classes/Auth/AuthService.php`), so one visit spanning a login produces two distinct hashes. `NULL` when no PHP session is active. Do not treat this as a stable visit key.
-- **`http_status`** (`SMALLINT NULL`) — HTTP response code, captured at shutdown by `EventLogger::flush()`. `NULL` when the request died before shutdown or returned a code outside 100–599.
+- **`session_id`** (`VARCHAR(64) NULL`): SHA-256 hash of `session_id()`. The column holds the hash and never the raw session token. The hash is one-way and cannot be replayed. Rotates on login (`session_regenerate_id(true)` at `classes/Auth/AuthService.php`), so one visit spanning a login produces two distinct hashes. `NULL` when no PHP session is active. Do not treat this as a stable visit key.
+- **`http_status`** (`SMALLINT NULL`): HTTP response code, captured at shutdown by `EventLogger::flush()`. `NULL` when the request died before shutdown or returned a code outside 100 to 599.
 - **`traffic_class`** (`VARCHAR(32) NULL`): Reporting label derived from the user agent and username. One of exactly five literals, evaluated in this order: `smoke-test`, `authenticated`, `crawler`, `spam`, `anonymous-human`. **NEVER use this column for authorization or rate-limiting**. It is a reporting label only, and an attacker can self-select into any class by crafting their user agent. An anonymous request whose user agent is missing, empty, or whitespace-only is a `crawler`; a logged-in GM with a blank user agent stays `authenticated`.
-- **`action`** (`VARCHAR(64) NULL`) — Domain-event literal set by a controller via `EventLogger::setAction()`. Always a hardcoded PHP string literal at the call site, never a value derived from `$_POST`/`$_GET`. `NULL` for plain pageviews.
+- **`action`** (`VARCHAR(64) NULL`): Domain-event literal set by a controller via `EventLogger::setAction()`. Always a hardcoded PHP string literal at the call site. It is never derived from `$_POST`/`$_GET`. `NULL` for plain pageviews.
 
 ## Return contract
 
-`EventLogRepository::insert()` now returns the new row id (`int`), or `0` when the write did not affect exactly one row. Callers that need to arm the shutdown flush must use this value — `getLastInsertId()` is `protected` on `BaseMysqliRepository` and is not reachable from outside the repository.
+`EventLogRepository::insert()` now returns the new row id (`int`), or `0` when the write did not affect exactly one row. Callers that need to arm the shutdown flush must use this value. `getLastInsertId()` is `protected` on `BaseMysqliRepository` and is not reachable from outside the repository.
 
 ## Shutdown pattern
 
@@ -41,7 +41,7 @@ At shutdown, PHP calls `EventLogger::flush()` which issues `EventLogRepository::
 
 ## Adding a new domain event
 
-Call `\EventLog\EventLogger::setAction('your_event')` on the **success path** of the POST handler, **before** any redirect or `exit`. Use a hardcoded snake_case literal ≤ 64 chars — **never** a value derived from `$_POST`/`$_GET`. The call must be placed *below* any CSRF or validation guard so failed attempts never inflate conversion metrics.
+Call `\EventLog\EventLogger::setAction('your_event')` on the **success path** of the POST handler, **before** any redirect or `exit`. Use a hardcoded snake_case literal ≤ 64 chars. Never use a value derived from `$_POST`/`$_GET`. The call must be placed *below* any CSRF or validation guard so failed attempts never inflate conversion metrics.
 
 ## Weekly review
 
@@ -58,3 +58,21 @@ Call `\EventLog\EventLogger::setAction('your_event')` on the **success path** of
 3. Export the four `EVENTS_REVIEW_*` variables: `EVENTS_REVIEW_SSH_HOST`, `EVENTS_REVIEW_DB_USER`, `EVENTS_REVIEW_DB_NAME`, `EVENTS_REVIEW_DB_PASSWORD_FILE`.
 4. Run `bin/events-review --print-schedule` to inspect the plist, then `--install-schedule` from the main checkout.
 5. Run `bin/events-review --dry-run` for an on-demand look with no model call and no DM.
+
+## Report-time traffic split (bin/events-review)
+
+The weekly digest splits `anonymous-human` events into three groups when it builds the report. The logged `traffic_class` stays as `TrafficClassifier` wrote it.
+
+- **Likely bot.** An event counts here when any of these holds:
+  - its session has one event in the window and its Referer is absent, the bare site origin, or another site;
+  - its Referer is the bare origin (`https://iblhoops.net` or `https://www.iblhoops.net`, either scheme, any case);
+  - its user agent contains `MSIE` or `Trident`;
+  - its user agent carries a `+http` contact link and is not the Google Sheets agent.
+- **Sheets import.** The `GoogleDocs; apps-spreadsheets` user agent. These are GMs pulling pages into their own spreadsheets with IMPORTHTML.
+- **Anonymous human.** Everything left over. The week-over-week line, routes, 4xx rows, sessions, Referer mix, and daily rows all use this group for both weeks.
+
+Events with no session id count as one-event sessions, so each one is judged alone.
+
+The digest calls the first group likely bot because the rules are heuristics. About 1,250 one-event visits a week with no Referer use a current Chrome build. Some of those could be real people who opened a single page. Read the likely-bot line as an upper bound on bot traffic.
+
+The Referer mix has a `bare-origin` bucket ahead of `internal`. It shows up in the likely-bot mix, since every bare-origin event lands in that group.

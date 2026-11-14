@@ -387,17 +387,18 @@ def _is_prose_or_fixture(path: str) -> bool:
 
 
 def _added_lines_by_file(diff_text: str) -> dict[str, list[str]]:
-    """Added lines per file (new path), leading `+` dropped, `+++ ` headers excluded."""
-    out: dict[str, list[str]] = {}
+    """Added lines per file (new path), filtered by `_added_lines`. Lines before the first
+    `diff --git` header belong to no file and are dropped."""
+    sections: dict[str, list[str]] = {}
     cur: str | None = None
     for ln in diff_text.splitlines():
         m = _DIFF_FILE_HEADER.match(ln)
         if m:
             cur = m.group(2)
-            out.setdefault(cur, [])
-        elif cur is not None and ln.startswith("+") and not ln.startswith("+++ "):
-            out[cur].append(ln[1:])
-    return out
+            sections.setdefault(cur, [])
+        elif cur is not None:
+            sections[cur].append(ln)
+    return {path: _added_lines("\n".join(body)) for path, body in sections.items()}
 
 
 def _clearing_added_lines(diff_text: str, other_phase_paths: list[str]) -> list[str]:

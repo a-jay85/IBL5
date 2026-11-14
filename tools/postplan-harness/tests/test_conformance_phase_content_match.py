@@ -4,6 +4,7 @@ Each test is named for the mutation it kills. The fixtures are the shapes of the
 false MISSING-PHASE holds on PR #3923 (Phase 3, `SHELLCHECK_OPTS`) and PR #3928
 (Phase 2, `stage_pytest`), plus the #3946 Phase 3 shape for the body-only negative.
 """
+import inspect
 import os
 import sys
 
@@ -100,8 +101,8 @@ def test_identifier_only_on_context_line_still_missing():
 
 def test_identifier_in_file_header_line_still_missing():
     """Mutation caught: the `+++ ` exclusion dropped from `_added_lines`."""
-    diff = ("diff --git a/docs/SHELLCHECK_OPTS b/docs/SHELLCHECK_OPTS\n"
-            "--- a/docs/SHELLCHECK_OPTS\n+++ b/docs/SHELLCHECK_OPTS\n"
+    diff = ("diff --git a/lib/SHELLCHECK_OPTS b/lib/SHELLCHECK_OPTS\n"
+            "--- a/lib/SHELLCHECK_OPTS\n+++ b/lib/SHELLCHECK_OPTS\n"
             "@@ -1,1 +1,2 @@\n context\n+unrelated line\n")
     items, _ = _run(SHELLCHECK_3923, CHANGED_3923, TRACKED_3923, diff_text=diff)
     _assert_one_missing(items, 3)
@@ -194,7 +195,11 @@ def test_boxscore_3946_body_only_identifier_does_not_clear():
 
 
 def test_default_call_matches_explicit_none():
-    """Mutation caught: the `diff_text` keyword default changed to `"+SHELLCHECK_OPTS"`."""
+    """Mutation caught: the `diff_text` keyword default changed to `"+SHELLCHECK_OPTS"`.
+
+    A headerless default is dropped by `_added_lines_by_file`, so the call alone cannot
+    tell it from None; the signature check pins the default itself."""
+    assert inspect.signature(phase_omission_items).parameters["diff_text"].default is None
     notes: list[str] = []
     default_items = phase_omission_items(_plan_with_phases(SHELLCHECK_3923), CHANGED_3923,
                                          tracked_files=TRACKED_3923, notes=notes)

@@ -1,6 +1,6 @@
 ---
 description: "PR body authoring rules: version/baseline citations must name their source file; external-state claims must carry a link or command output; negative-claim bullets must be re-read after every commit; coordinate citations (file:line, backlog row IDs) must be re-verified after every commit; Summary sentences about a touched file must be re-read; measured values must update the body in the same phase; test counts must come from a measurement and name their unit; departures from plan-exact content must be declared; backlog closing keywords come from the plan via the shared normalizer snippet; every body carries one Merge danger line whose Door is mechanically derived and never lowered below that floor, with a Self-governing segment for arming-path and gate-removed changes; an advisory How to revert line follows it; a Removed guards block lists every flagged guard removal with a one-line reason; pr-copy writes no exact count its packet does not show; a body names edited items and never tallies them by hand; an Unplanned change reasons section gives each unplanned path a one-line reason and never declares scope."
-last_verified: 2026-11-13
+last_verified: 2026-11-14
 ---
 
 # PR Body Claims
@@ -170,6 +170,8 @@ Any one of these triggers forces `Door: one-way`:
 - Outbound notification senders. A diff of `bin/discord-dm`, or of a file under `.github/actions/notify-discord/` or `ibl5/classes/Mail/`, that changes a code line. Comment, blank and indentation edits stay two-way. A `#!` line and a PHP `#[` attribute count as code, and a `.md` file under those folders never fires. A delete, a rename to or from one of these paths, or a diff section the harness cannot read fires the trigger. These can reach a GM, and a sent message cannot be recalled. A `.github/workflows/*.yml` edit that changes when or what a workflow posts is two-way. Workflow alerts go to #dev, #merged and #reviews, which only the owner reads.
 
 A one-way Door means an effect `git revert` cannot undo: lost data, a prod sync or other prod external state, or a message sent to a GM. A proven destructive migration is not such an effect, because the revert deploy restores tables that no site code wrote since merge.
+
+Trigger 1 also reads `.php` migrations and `DELETE` statements. A `.php` file under `ibl5/migrations/` is matched raw, comments included, and no down file can prove it, so a destructive one stays one-way. A `DELETE` in any migration is destructive unless its target is a table listed below. A multi-table `DELETE`, or a target the harness cannot read (an interpolated or schema-qualified name), counts as destructive. An FK's `ON DELETE` clause and a trigger's `AFTER DELETE` are not `DELETE` statements.
 
 The raise bar refuses a one-way `Why` whose only cited loss is rows of a table listed below, or an alert to #dev, #merged or #reviews. A delete-and-rebuild of a listed table is two-way, because its refresh step rebuilds the rows from source data. A schema change (DROP, ALTER, RENAME) on a listed table stays one-way. `REBUILDABLE_TABLES` in `tools/postplan-harness/harness/rebuildable.py` holds the list, and a test keeps this block equal to it:
 

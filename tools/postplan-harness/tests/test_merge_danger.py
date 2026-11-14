@@ -40,6 +40,95 @@ def test_destructive_migration_forces_one_way():
     assert f"destructive-migration:{MIG}" in d.triggers
 
 
+# --- derivation: DELETE and .php migrations (backlog#1826) ---
+
+SQL_DEL = "ibl5/migrations/900_delete_rows.sql"
+PHP_MIG = "ibl5/migrations/901_fix_rows.php"
+
+
+def _door_for(path, *lines):
+    return _derive([("A", path)], _migration_diff(path, *lines))
+
+
+def _assert_one_way(path, *lines):
+    d = _door_for(path, *lines)
+    assert d.door == "one-way"
+    assert f"destructive-migration:{path}" in d.triggers
+
+
+def _assert_two_way(path, *lines):
+    d = _door_for(path, *lines)
+    assert d.door == "two-way"
+    assert not [t for t in d.triggers if t.startswith("destructive-migration:")]
+
+
+def test_sql_delete_of_unregistered_table_forces_one_way():
+    _assert_one_way(SQL_DEL, "DELETE FROM ibl_plr WHERE pid = 1;")
+
+
+def test_sql_delete_of_rebuildable_table_stays_two_way():
+    _assert_two_way(SQL_DEL, "DELETE FROM ibl_hist WHERE year = 2026;")
+
+
+def test_sql_delete_mixed_rebuildable_and_unregistered_forces_one_way():
+    _assert_one_way(SQL_DEL, "DELETE FROM ibl_hist WHERE year = 2026;",
+                    "DELETE FROM ibl_plr WHERE pid = 1;")
+
+
+def test_sql_multi_table_delete_fails_closed():
+    _assert_one_way(SQL_DEL, "DELETE h FROM ibl_hist h JOIN ibl_plr p ON p.pid = h.pid;")
+
+
+def test_sql_delete_using_list_with_unregistered_second_target_fails_closed():
+    _assert_one_way(SQL_DEL, "DELETE FROM ibl_hist, ibl_plr USING ibl_hist JOIN ibl_plr ON ibl_plr.pid = ibl_hist.pid;")
+
+
+def test_sql_modified_delete_using_list_fails_closed():
+    _assert_one_way(SQL_DEL, "DELETE LOW_PRIORITY FROM ibl_hist, ibl_plr USING ibl_hist "
+                    "JOIN ibl_plr ON ibl_plr.pid = ibl_hist.pid;")
+
+
+def test_on_delete_cascade_is_not_a_delete():
+    _assert_two_way(SQL_DEL, "ALTER TABLE ibl_x ADD CONSTRAINT fk_x FOREIGN KEY (pid) "
+                    "REFERENCES ibl_plr (pid) ON DELETE CASCADE;")
+
+
+def test_trigger_after_delete_is_not_a_delete():
+    _assert_two_way(SQL_DEL, "CREATE TRIGGER trg_x AFTER DELETE ON ibl_plr FOR EACH ROW SET @x = 1;")
+
+
+def test_commented_sql_delete_stays_two_way():
+    _assert_two_way(SQL_DEL, "-- DELETE FROM ibl_plr WHERE pid = 1;")
+
+
+def test_delete_split_across_lines_detected():
+    _assert_one_way(SQL_DEL, "DELETE", "FROM ibl_plr WHERE pid = 1;")
+
+
+def test_php_migration_delete_forces_one_way():
+    _assert_one_way(PHP_MIG, '$db->query("DELETE FROM ibl_box_scores WHERE game_id = 1");')
+
+
+def test_php_migration_drop_table_forces_one_way():
+    _assert_one_way(PHP_MIG, '$db->query("DROP TABLE ibl_tmp_rows");')
+
+
+def test_php_migration_dynamic_table_delete_fails_closed():
+    _assert_one_way(PHP_MIG, '$db->query("DELETE FROM ibl_hist{$suffix} WHERE 1");')
+
+
+def test_php_migration_comment_delete_matched_raw():
+    _assert_one_way(PHP_MIG, "# DELETE FROM ibl_plr WHERE pid = 1;")
+
+
+def test_php_migration_rebuildable_delete_stays_two_way():
+    _assert_two_way(PHP_MIG, '$db->query("DELETE FROM ibl_team_season_records WHERE season_year = 2026");')
+
+
+def test_php_migration_without_destructive_text_stays_two_way():
+    _assert_two_way(PHP_MIG, '$db->query("INSERT INTO ibl_box_scores_teams (game_id) VALUES (1)");')
+
+
 # --- derivation: a proven-revertible destructive migration ------------------------------------
 
 UP = "ibl5/migrations/900_demo_truncate.sql"

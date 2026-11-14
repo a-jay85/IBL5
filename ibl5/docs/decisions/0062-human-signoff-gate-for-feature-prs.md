@@ -1,6 +1,6 @@
 ---
 description: Feature PRs (conventional-commit `feat:`) cannot merge until a human applies the `human-approved` label — a required CI check, not a convention, blocks auto-merge.
-last_verified: 2026-11-10
+last_verified: 2026-11-13
 ---
 
 # ADR-0062: Human sign-off gate for feature PRs
@@ -91,3 +91,19 @@ Post-plan condition (7) holds a PR whose plan says `auto_merge: false`. It now c
 when `hs_approval_state` in `bin/lib/human-signoff-classifier.sh` returns `match`: the label
 is on the PR and the latest github-actions[bot] record equals the current fingerprint.
 The harness, `bin/lib/pr-armable.sh` and `bin/pr-triage` all call that one function.
+
+## Update 2026-11-13: Dependabot dev-dependency patch bumps skip the ui-paths hold
+
+A Dependabot PR that only raises patch numbers in the `devDependencies` of `ibl5/package.json` no longer holds as `ui-paths`. `ui_dev_patch_exempt` in `bin/lib/ui-change-classifier.sh` sets the exemption flag when all of these hold:
+
+- The PR author in the event payload is `dependabot[bot]`.
+- The changed files are `ibl5/package.json`, with or without `ibl5/bun.lock`. Any other file, `ibl5/bun.lockb` (example) included, keeps the hold.
+- jq compares the base checkout's `ibl5/package.json` with the head's. Only version strings inside `devDependencies` differ. Each one keeps its major number, minor number, and `^` or `~` prefix, and raises its patch number. A value outside that three-number form, such as `5`, keeps the hold.
+- No bumped package belongs to the gallery toolchain: `pixelmatch`, `pngjs`, or any name that contains `playwright`.
+- Each changed line of `ibl5/bun.lock` is either a workspace `devDependencies` line that matches its own side's `ibl5/package.json`, or a registry entry. A registry entry has a plain `name@version`, an empty registry field, no `:` specifier in its dependency maps, a sha512 integrity, and a key that names the same package.
+
+The flag skips only the `ui-paths` verdict. The VR gallery check still runs, so a changed or new cell holds as `ui-vr` and a missing gallery holds as `vr-missing`. Any read, parse, or diff failure keeps the hold.
+
+Install scripts. The VR job runs `bun install` with no `trustedDependencies` key and no `--ignore-scripts` flag, so bun runs the install scripts of packages on its default trusted list. A toolchain bump holds because that code measures the gallery. Every other script comes from the npm registry under a sha512 integrity: the same bytes a merge installs. An owner who reads a version-string diff would not catch a hostile published version either.
+
+The workflow passes the two checkout roots as `UI_BASE_DIR` and `UI_HEAD_DIR`. The classifier reads the head tree as data and runs nothing from it. Post-plan arming condition (8) calls the `--paths` CLI, which has no exemption. The cases live in `bin/test-human-signoff-classifier` under the `dp_` prefix.

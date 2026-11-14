@@ -48,7 +48,7 @@ UI_PATH_RE+='|^ibl5/composer\.(json|lock)$|^ibl5/tsconfig\.json$'
 UI_PATH_RE+='|^docker-compose\.ci\.yml$|^Dockerfile$|^docker/'
 UI_EXCLUDE_RE='\.md$'
 UI_GALLERY_JQ='[(.changedCells // [])[] | select(.strict != true)] + (.newCells // []) | length'
-# Dependabot dev-dependency patch exemption (ADR-0062 Update 2026-11-12).
+# Dependabot dev-dependency patch exemption (ADR-0062 Update 2026-11-13).
 # ui_dev_patch_exempt compares ibl5/package.json and ibl5/bun.lock between the
 # base checkout (UI_BASE_DIR) and the PR head checkout (UI_HEAD_DIR). One regex
 # validates and splits a version: an optional ^ or ~, then three numbers.

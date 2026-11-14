@@ -1569,7 +1569,7 @@ ui_decide_is ui_decide_dependabot_clean_gallery_passes not-ui 1 "$UI_TMP/g-clean
 # bump of the app's own package or lock file holds on its path, gallery or not.
 # ui_decide gets no dev_patch flag here, so the verdict stays ui-paths. The flag
 # cases below and the dp_ cases cover the Dependabot dev-dependency patch
-# exemption (ADR-0062 Update 2026-11-12).
+# exemption (ADR-0062 Update 2026-11-13).
 ui_decide_is ui_decide_dependabot_app_lockfile_holds ui-paths 1 "$UI_TMP/g-clean.json" \
     ibl5/composer.lock ibl5/package.json ibl5/bun.lock
 # ui_decide_flag_is <name> <expected_verdict> <renderable> <gallery_or_empty> <dev_patch> <path>...
@@ -1672,7 +1672,7 @@ else
     h_fail "dev patch: human-signoff.yml exports UI_BASE_DIR and UI_HEAD_DIR" "export line not found"
 fi
 
-# Dependabot dev-dependency patch exemption (ADR-0062 Update 2026-11-12).
+# Dependabot dev-dependency patch exemption (ADR-0062 Update 2026-11-13).
 # dp_write <root> writes <root>/ibl5/package.json and <root>/ibl5/bun.lock in
 # the real files' line shapes. A DP_* variable set on the call changes one field.
 DP="$UI_TMP/dp"

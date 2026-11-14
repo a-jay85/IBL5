@@ -1,6 +1,6 @@
 ---
 description: The human-signoff hold keys on the diff and the VR gallery instead of the PR title. Amends ADR-0062.
-last_verified: 2026-11-09
+last_verified: 2026-11-14
 ---
 
 # ADR-0233: Diff-based UI review hold
@@ -52,3 +52,7 @@ Arming condition (8) is now `ui-review-floor`. `tools/postplan-harness/harness/a
 - `tools/postplan-harness/harness/armable.py`
 - `bin/lib/pr-armable.sh`
 - `.claude/rules/commit-conventions.md`
+
+## Update (2026-11-14): Dependabot composer bumps
+
+The residual-risk paragraph above says a Dependabot bump of `composer.json` or `composer.lock` holds. A Dependabot composer patch or minor bump now skips the path hold, under the checks in the 2026-11-14 update to ADR-0062. Major bumps, `composer-` type packages, and every other package or lock file still hold. The VR gallery check still runs for those PRs.

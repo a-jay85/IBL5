@@ -6,6 +6,8 @@ Two committed corpora under tests/fixtures/:
   * merge-danger-paths-corpus.json: the 100 newest merged PRs as of 2026-10-11 with their changed
     paths; exercises the path-derived door and blast radius through the pure
     `merge_danger.derive_merge_danger`.
+  * merge-danger-migration-corpus.json: every ibl5/migrations file on disk at capture, replayed as an
+    added-file diff; pins which migrations read one-way and why each flip from the pre-DELETE floor.
 """
 import json
 import os
@@ -29,6 +31,9 @@ with open(_FIXTURES / "pr-bodies-corpus.json", encoding="utf-8") as _fh:
     _BODIES = json.load(_fh)
 with open(_FIXTURES / "merge-danger-paths-corpus.json", encoding="utf-8") as _fh:
     _PATHS = json.load(_fh)
+
+with open(_FIXTURES / "merge-danger-migration-corpus.json", encoding="utf-8") as _fh:
+    _MIGRATIONS = json.load(_fh)
 
 _FIXED = MergeDanger("two-way", "module", "mechanical: no one-way trigger in the realized diff")
 _ONE_WAY_LINE = ("**Merge danger:** Door: one-way · Blast radius: site-wide · "
@@ -153,3 +158,47 @@ def test_path_corpus_blast_radius_distribution():
     assert all(b in BLAST for b in blasts)
     assert "localized" in blasts
     assert "site-wide" in blasts
+
+
+def _added_file_diff(rel, text):
+    lines = text.splitlines()
+    head = [f"diff --git a/{rel} b/{rel}", "new file mode 100644", "--- /dev/null",
+            f"+++ b/{rel}", f"@@ -0,0 +1,{len(lines)} @@"]
+    return "\n".join(head + ["+" + line for line in lines]) + "\n"
+
+
+def _migration_corpus_doors():
+    """{filename: door} for every migration file on disk: each .sql up file (with its .down.sql
+    when one exists) and each .php file, replayed as an added-file diff."""
+    doors = {}
+    for f in sorted((_REPO_ROOT / "ibl5" / "migrations").iterdir()):
+        if f.suffix not in (".sql", ".php") or f.name.endswith(".down.sql"):
+            continue
+        rel = f"ibl5/migrations/{f.name}"
+        changed, diff = [("A", rel)], _added_file_diff(rel, _read_candidate(rel))
+        down = rel[:-4] + ".down.sql"
+        if f.suffix == ".sql" and _read_candidate(down) is not None:
+            changed.append(("A", down))
+            diff += _added_file_diff(down, _read_candidate(down))
+        md = derive_merge_danger(changed, diff, [], _read_candidate)
+        doors[f.name] = "one-way" if f"destructive-migration:{rel}" in md.triggers else "two-way"
+    return doors
+
+
+def test_migration_corpus_one_way_set_matches_fixture():
+    # A migration added to master after capture fails here; re-capture the fixture then.
+    got = sorted(n for n, door in _migration_corpus_doors().items() if door == "one-way")
+    assert got == _MIGRATIONS["expected_one_way"]
+
+
+def test_migration_corpus_flips_are_explained():
+    got = {n for n, door in _migration_corpus_doors().items() if door == "one-way"}
+    before = set(_MIGRATIONS["before_one_way"])
+    assert before <= got, f"the change loosened the floor for {sorted(before - got)}"
+    assert got - before == set(_MIGRATIONS["flips"])
+    for name, reason in _MIGRATIONS["flips"].items():
+        assert len(reason) >= 20, name
+
+
+def test_migration_corpus_rebuild_migration_209_stays_two_way():
+    assert _migration_corpus_doors()["209_rebuild_team_season_records_for_window.php"] == "two-way"

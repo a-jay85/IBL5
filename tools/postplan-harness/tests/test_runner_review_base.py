@@ -158,3 +158,21 @@ def test_same_run_delta_review_reads_review_diff(monkeypatch):
                                       MASTER, [].append)
     assert kwargs["diff"] == "OWN"
     assert bases == [SHA]
+
+
+def test_same_run_delta_review_returns_master_classification(monkeypatch):
+    """The returned cls feeds arming, so it covers the master diff even on a stacked PR."""
+    git = types.SimpleNamespace(
+        review_base=lambda: ReviewBase(SHA, "parent"),
+        changed_files=lambda base="origin/master": ["B.txt"] if base == SHA else ["A.txt", "B.txt"],
+        diff_vs_base=lambda base="origin/master": "OWN" if base == SHA else "MASTER",
+        modified_files=lambda *a, **k: [])
+    gh = types.SimpleNamespace(pr_meta=lambda: {"title": "t"})
+    monkeypatch.setattr(runner, "classify",
+                        lambda files, diff, mod: types.SimpleNamespace(files=files, filtered_diff=diff))
+    monkeypatch.setattr(runner, "_review_cache_context", lambda *a, **k: ({}, {}))
+    monkeypatch.setattr(runner.reviewcache, "subset_diff", lambda *a: "")
+    _, cls, _, _, _ = runner._same_run_delta_review(None, {}, None, _plan(), git, gh, None, "x",
+                                                     ".", MASTER, [].append)
+    assert cls.files == ["A.txt", "B.txt"]
+    assert cls.filtered_diff == "MASTER"

@@ -3602,18 +3602,21 @@ def _same_run_delta_review(review_phase, meta, cls, plan, git, gh, res, delta, w
     files = git.changed_files() if review.parent is None else git.changed_files(review.ref)
     diff = git.diff_vs_base() if review.parent is None else git.diff_vs_base(review.ref)
     meta = gh.pr_meta() or meta
-    cls = classify(files, diff, git.modified_files())
+    review_cls = classify(files, diff, git.modified_files())
     cache_key, cache_files = _review_cache_context(git, worktree, master_sha, meta, plan,
                                                    HARNESS_ROOT, log,
                                                    diff=None if review.parent is None else diff)
-    if not reviewcache.subset_diff(cls.filtered_diff, delta):
+    # The returned cls feeds arming (holds, safety verdict), so it always covers the master diff.
+    cls = review_cls if review.parent is None else classify(
+        git.changed_files(), git.diff_vs_base(), git.modified_files())
+    if not reviewcache.subset_diff(review_cls.filtered_diff, delta):
         log("phase4.5b: delta lives only in filtered-out files; no delta review")
         return 0, cls, meta, cache_key, cache_files
     if seat_out is not None:
         seat_out["seat"] = security_model   # the seat really re-reviewed the delta
     keep_f, keep_s = reviewcache.reusable_by_path(res.findings, res.scored_findings, delta,
                                                   set(cache_files))
-    findings, _gates, scored, degraded = _interdiff_review(review_phase, meta, cls, plan, delta,
+    findings, _gates, scored, degraded = _interdiff_review(review_phase, meta, review_cls, plan, delta,
                                                            keep_f, keep_s, log,
                                                            security_model=security_model)
     res.findings, res.scored_findings = findings, scored

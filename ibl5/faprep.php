@@ -24,7 +24,7 @@ declare(strict_types=1);
  * tests/e2e/flows/faprep-xss-escape.spec.ts, and
  * tests/e2e/flows/role-gating-non-admin.spec.ts.
  *
- * Runbook: ibl5/docs/OPERATIONS_RUNBOOK.md, section 9.
+ * Runbook: ibl5/docs/OPERATIONS_RUNBOOK.md, section 10.
  */
 
 require __DIR__ . '/mainfile.php';

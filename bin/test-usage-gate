@@ -628,6 +628,17 @@ test_zone_boundaries() {
     assert_eq zone:weekly-max drain "$(gate_run "usage_zone '$(usage_json 95)'")"
 }
 
+test_zone_reset_window() {
+    new_env
+    local now
+    now=$(date +%s)
+    assert_eq zone_window:stop-in-last-day normal "$(gate_run "usage_zone '$(usage_json_resets 99 $((now + 3600)))'")"
+    assert_eq zone_window:drain-in-last-day normal "$(gate_run "usage_zone '$(usage_json_resets 95 $((now + 86000)))'")"
+    assert_eq zone_window:just-outside drain "$(gate_run "usage_zone '$(usage_json_resets 95 $((now + 90000)))'")"
+    assert_eq zone_window:past-reset stop "$(gate_run "usage_zone '$(usage_json_resets 99 $((now - 60)))'")"
+    assert_eq zone_window:no-resets stop "$(gate_run "usage_zone '$(usage_json_resets 99 "")'")"
+}
+
 test_thresholds_env_unset() {
     new_env
     assert_eq thresholds_unset "93 98" "$(env -u IBL5_USAGE_DRAIN_PCT -u IBL5_USAGE_STOP_PCT bash -c ". '$REPO_ROOT/bin/lib/usage-gate.sh'; usage_thresholds")"
@@ -925,7 +936,7 @@ blind_setup() {
 
 test_decide_blind_normal_allows() {
     local FUT out
-    FUT=$(( $(date +%s) + 3600 ))
+    FUT=$(( $(date +%s) + 172800 ))
     blind_setup 50 "$FUT"
     out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
     assert_eq decide_blind_normal:out "" "$out"
@@ -948,7 +959,7 @@ test_decide_stale_repeat_same_decision() {
 
 test_decide_blind_drain_pauses() {
     local FUT out m
-    FUT=$(( $(date +%s) + 3600 ))
+    FUT=$(( $(date +%s) + 172800 ))
     blind_setup 95 "$FUT"
     out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
     assert_eq decide_blind_drain:out "$PAUSE_JSON" "$out"
@@ -964,7 +975,7 @@ test_decide_blind_drain_pauses() {
 
 test_decide_blind_drain_allows_holder() {
     local FUT out
-    FUT=$(( $(date +%s) + 3600 ))
+    FUT=$(( $(date +%s) + 172800 ))
     blind_setup 95 "$FUT"
     gate_run "usage_token_acquire $SID_A $$"
     out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
@@ -974,7 +985,7 @@ test_decide_blind_drain_allows_holder() {
 
 test_decide_blind_stop_pauses_holder() {
     local FUT out
-    FUT=$(( $(date +%s) + 3600 ))
+    FUT=$(( $(date +%s) + 172800 ))
     blind_setup 99 "$FUT"
     gate_run "usage_token_acquire $SID_A $$"
     out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
@@ -1011,7 +1022,7 @@ test_decide_blind_resets_unparseable_allows() {
 
 test_decide_blind_seven_day_window() {
     local FUT PAST out
-    FUT=$(( $(date +%s) + 3600 ))
+    FUT=$(( $(date +%s) + 172800 ))
     PAST=$(( $(date +%s) - 60 ))
     blind_setup 96 "$FUT"
     out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
@@ -1026,7 +1037,7 @@ test_decide_blind_seven_day_window() {
 
 test_decide_blind_marker_write_fails_no_pause() {
     local FUT out log
-    FUT=$(( $(date +%s) + 3600 ))
+    FUT=$(( $(date +%s) + 172800 ))
     blind_setup 95 "$FUT"
     chmod 500 "$IBL5_USAGE_GATE_STATE_DIR/markers"
     out=$(IBL5_USAGE_GATE_RUNNER=plan-now IBL5_USAGE_GATE_RESUME_BIN="$RBIN" decide $SID_A)
@@ -1057,7 +1068,7 @@ test_decide_blind_age_boundary() {
 
 test_decide_blind_during_backoff() {
     local FUT out log
-    FUT=$(( $(date +%s) + 3600 ))
+    FUT=$(( $(date +%s) + 172800 ))
     blind_setup 95 "$FUT"
     make_stub_http "$STUB" "$SECRET_TOK" 429 "$RL_BODY"
     printf '%s\n' "$(( $(date +%s) + 300 )) 1" > "$IBL5_USAGE_GATE_STATE_DIR/fetch-backoff"
@@ -1767,7 +1778,7 @@ test_prestart_fail_open_stale_resets_passed() {
 
 test_prestart_blind_normal_allows() {
     local FUT
-    FUT=$(( $(date +%s) + 3600 ))
+    FUT=$(( $(date +%s) + 172800 ))
     blind_setup 50 "$FUT"
     in_env "usage_prestart_gate post-plan-now $SID_A $PPN_BIN"
     assert_eq prestart_blind_normal:rc 0 "$?"
@@ -1789,7 +1800,7 @@ test_prestart_stale_repeat_same_decision() {
 
 test_prestart_blind_drain_pauses() {
     local FUT rc m
-    FUT=$(( $(date +%s) + 3600 ))
+    FUT=$(( $(date +%s) + 172800 ))
     blind_setup 95 "$FUT"
     in_env "usage_prestart_gate post-plan-now $SID_A $PPN_BIN"
     rc=$?
@@ -1803,7 +1814,7 @@ test_prestart_blind_drain_pauses() {
 
 test_prestart_blind_stop_pauses() {
     local FUT rc m
-    FUT=$(( $(date +%s) + 3600 ))
+    FUT=$(( $(date +%s) + 172800 ))
     blind_setup 99 "$FUT"
     in_env "usage_prestart_gate post-plan-now $SID_A $PPN_BIN"
     rc=$?
@@ -1815,7 +1826,7 @@ test_prestart_blind_stop_pauses() {
 
 test_prestart_blind_drain_allows_holder() {
     local FUT
-    FUT=$(( $(date +%s) + 3600 ))
+    FUT=$(( $(date +%s) + 172800 ))
     blind_setup 95 "$FUT"
     in_env "usage_token_acquire $SID_A; usage_prestart_gate post-plan-now $SID_A $PPN_BIN"
     assert_eq prestart_blind_holder:rc 0 "$?"
@@ -1842,9 +1853,9 @@ test_coord_stale_never_pauses_or_grants() {
     coord_setup 95
     local now
     now=$(date +%s)
-    seed_cache "$(( now - 600 ))" "$(usage_json_resets 95 $(( now + 3600 )))"
+    seed_cache "$(( now - 600 ))" "$(usage_json_resets 95 $(( now + 172800 )))"
     coord_marker $SID_A plan-now
-    patch_marker $SID_A ".resets_at = $(( now + 3600 ))"
+    patch_marker $SID_A ".resets_at = $(( now + 172800 ))"
     run_coord --once >/dev/null 2>&1
     assert_no_file coord_stale_conservative:not-resumed "$T/launched.$SID_A"
     assert_no_file coord_stale_conservative:no-grant "$IBL5_USAGE_GATE_STATE_DIR/drain-token.d"
@@ -3267,7 +3278,7 @@ test_prestart_stale_episode_open_close() {
 test_stale_episode_blind_pass_keeps_open() {
     decide_setup 99
     local FUT
-    FUT=$(( $(date +%s) + 3600 ))
+    FUT=$(( $(date +%s) + 172800 ))
     seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json 99)"
     dec >/dev/null
     assert_eq stale_blind:open 1 "$(log_re_count "$DEC_OPEN_RE")"
@@ -3282,7 +3293,7 @@ test_prestart_blind_pass_keeps_open() {
     new_env
     make_stub_bin "$STUB" "" "$BODY_B"
     local FUT
-    FUT=$(( $(date +%s) + 3600 ))
+    FUT=$(( $(date +%s) + 172800 ))
     seed_cache "$(( $(date +%s) - 600 ))" "$(usage_json 95)"
     pre
     assert_eq prestart_blind:open 1 "$(log_re_count "$PRE_OPEN_RE")"

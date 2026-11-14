@@ -76,6 +76,9 @@ class ReplayResult:
     fix_skipped: tuple[str, ...] = ()   # paths whose chunk failed; non-empty = partial apply
     flag_lines: tuple[str, ...] = ()       # head stdout lines when outcome == "flag"
     base_flag_lines: tuple[str, ...] = ()  # base stdout lines when base_outcome == "flag"
+    attempt_secs: tuple[float, ...] = ()       # (first, retry) seconds; set only when the head replay was retried
+    base_attempt_secs: tuple[float, ...] = ()  # same for the base replay
+    fix_attempt_secs: tuple[float, ...] = ()   # same for the fix rerun
 
 
 HEAD_OID_FIELD = "headRefOid"

@@ -32,6 +32,7 @@ REPO_SLUG = "a-jay85/IBL5"
 PER_REPLAY_TIMEOUT = 60
 TOTAL_CAP = 1200
 HISTORY_LIMIT = 30
+KILL_GRACE = 10  # seconds to reap a killed replay's process group before giving up
 FETCH_CAP = 250  # merged PRs fetched; the newest HISTORY_LIMIT settled ones are replayed
 
 # Hooks must never run inside the scratch worktree: a post-checkout hook would be repo code
@@ -334,6 +335,30 @@ def select_plan_sample(fetched: list[HistoricalPR], truth: dict, plans_dir: str,
     return sample, depth
 
 
+def _run_in_session(argv, *, cwd, env, stdin, timeout) -> tuple[int, str]:
+    """Run one replay in its own session and return (returncode, stdout).
+
+    On timeout, SIGKILL the whole process group so the gate's awk/python/grep
+    children die too, reap it, then re-raise TimeoutExpired. A group that will
+    not exit raises OSError, which execute() reports as an error (fail closed)."""
+    proc = subprocess.Popen(argv, cwd=cwd, env=env, stdin=stdin,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            text=True, start_new_session=True)
+    try:
+        out, _ = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        try:
+            proc.communicate(timeout=KILL_GRACE)
+        except subprocess.TimeoutExpired as exc:
+            raise OSError("replay process group did not exit after SIGKILL") from exc
+        raise
+    return proc.returncode, out
+
+
 def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
                  history: list[HistoricalPR], overlay_files: dict[str, tuple[bytes, int]],
                  plans_dir: str, *, per_replay_timeout: int = PER_REPLAY_TIMEOUT,
@@ -341,7 +366,8 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
                  bodies: dict[int, str] | None = None,
                  base_overlay: dict[str, tuple[bytes, int] | None] | None = None,
                  fix_patch: bytes | None = None,
-                 plan_history: list[HistoricalPR] | None = None
+                 plan_history: list[HistoricalPR] | None = None,
+                 retry_timeouts: bool = True, runner=None, timer=time.monotonic
                  ) -> list[ReplayResult]:
     """Replay every replayable gate against every historical PR's tree, newest first.
 
@@ -395,32 +421,48 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
     git = make_git(repo)
     ensure_pr_heads(repo, [pr for pr, _ in schedule if pr.parent_count == 1])
 
-    def execute(spec, ctx: dict, gate_path: str) -> tuple[str, str, tuple[str, ...]]:
-        """Run one gate replay in ctx["tree"] and return (outcome, detail, flag_lines)."""
+    def execute(spec, ctx: dict, gate_path: str
+                ) -> tuple[str, str, tuple[str, ...], tuple[float, ...]]:
+        """Run one gate replay in ctx["tree"]; retry once if it times out.
+
+        Returns (outcome, detail, flag_lines, attempt_secs). attempt_secs is empty
+        unless a retry ran, so a replay that never timed out reports as before."""
         env = dict(os.environ)
         env.update(expand_env(spec, ctx))
         stdin_path = expand_stdin(spec, ctx)
-        stdin_fh = None
-        if stdin_path:
+        argv = [os.path.join(ctx["tree"], gate_path), *expand_argv(spec, ctx)]
+        run_one = runner if runner is not None else _run_in_session
+
+        def attempt():
+            stdin_fh = None
+            if stdin_path:
+                try:
+                    stdin_fh = open(stdin_path, "rb")  # reopened per attempt
+                except OSError as exc:
+                    return "error", re.sub(r"\s+", " ", f"stdin: {exc}")[:160], (), 0.0, False
+            began = timer()
             try:
-                stdin_fh = open(stdin_path, "rb")
+                rc, out = run_one(argv, cwd=ctx["tree"], env=env,
+                                  stdin=stdin_fh if stdin_fh is not None else subprocess.DEVNULL,
+                                  timeout=per_replay_timeout)
+            except subprocess.TimeoutExpired:
+                return "timeout", f"{per_replay_timeout}s", (), round(timer() - began, 1), True
             except OSError as exc:
-                return "error", re.sub(r"\s+", " ", f"stdin: {exc}")[:160], ()
-        try:
-            proc = subprocess.run(
-                [os.path.join(ctx["tree"], gate_path), *expand_argv(spec, ctx)],
-                cwd=ctx["tree"], env=env,
-                stdin=stdin_fh if stdin_fh is not None else subprocess.DEVNULL,
-                capture_output=True, text=True, timeout=per_replay_timeout)
-        except subprocess.TimeoutExpired:
-            return "timeout", f"{per_replay_timeout}s", ()
-        except OSError as exc:
-            return "error", re.sub(r"\s+", " ", str(exc))[:160], ()
-        finally:
-            if stdin_fh is not None:
-                stdin_fh.close()
-        outcome, detail = classify_exit(spec, proc.returncode, proc.stdout)
-        return outcome, detail, (flag_lines(proc.stdout) if outcome == "flag" else ())
+                return "error", re.sub(r"\s+", " ", str(exc))[:160], (), 0.0, False
+            finally:
+                if stdin_fh is not None:
+                    stdin_fh.close()
+            outcome, detail = classify_exit(spec, rc, out)
+            lines = flag_lines(out) if outcome == "flag" else ()
+            return outcome, detail, lines, round(timer() - began, 1), False
+
+        outcome, detail, lines, first_secs, timed_out = attempt()
+        if not timed_out or not retry_timeouts:
+            return outcome, detail, lines, ()
+        outcome, detail, lines, second_secs, _ = attempt()
+        print(f"gate-backtest: {gate_path} replay timed out after {first_secs:.1f} s; "
+              f"retry ended {outcome} after {second_secs:.1f} s", file=sys.stderr)
+        return outcome, detail, lines, (first_secs, second_secs)
 
     work = tempfile.mkdtemp(prefix="gate-backtest-files-")
     capped = False
@@ -461,9 +503,10 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
                     ctx = {"base": base, "head": pr.merge_sha, "tree": scratch.dir,
                            "diff_file": diff_file, "plan_file": plan_file, "body_file": body_file,
                            "pr_head": pr.head_oid}
-                    outcome, detail, head_lines = execute(spec, ctx, gate.path)
+                    outcome, detail, head_lines, head_secs = execute(spec, ctx, gate.path)
                     base_outcome = base_detail = ""
                     base_lines: tuple[str, ...] = ()
+                    base_secs: tuple[float, ...] = ()
                     if outcome == "flag" and base_overlay is not None:
                         kind, base_spec = base_plan[gate.path]
                         if kind == "absent":
@@ -477,7 +520,7 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
                                 scratch.overlay({k: v for k, v in base_overlay.items()
                                                  if v is not None})
                                 scratch.remove([k for k, v in base_overlay.items() if v is None])
-                                base_outcome, base_detail, base_lines = execute(
+                                base_outcome, base_detail, base_lines, base_secs = execute(
                                     base_spec, ctx, gate.path)
                             except OSError as exc:
                                 base_outcome = "error"
@@ -487,6 +530,7 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
                     fix_outcome = fix_detail = ""
                     fix_applied: list[str] = []
                     fix_skipped: list[str] = []
+                    fix_secs: tuple[float, ...] = ()
                     if outcome == "flag" and base_outcome != "flag" and fix_patch is not None:
                         if clock() - start >= total_cap:
                             fix_outcome, fix_detail = "timeout", "total-cap"
@@ -499,7 +543,7 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
                                     fix_outcome = "partial-no-reads" if not spec.reads else "partial-gate-read"
                                 else:
                                     scratch.overlay(overlay_files)
-                                    fix_outcome, fix_detail, _ = execute(spec, ctx, gate.path)
+                                    fix_outcome, fix_detail, _, fix_secs = execute(spec, ctx, gate.path)
                             except OSError as exc:
                                 fix_outcome = "error"
                                 fix_detail = re.sub(r"\s+", " ", f"fix-overlay: {exc}")[:160]
@@ -512,7 +556,10 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
                                                 fix_applied=tuple(fix_applied),
                                                 fix_skipped=tuple(fix_skipped),
                                                 flag_lines=head_lines,
-                                                base_flag_lines=base_lines))
+                                                base_flag_lines=base_lines,
+                                                attempt_secs=head_secs,
+                                                base_attempt_secs=base_secs,
+                                                fix_attempt_secs=fix_secs))
     finally:
         shutil.rmtree(work, ignore_errors=True)
     return results

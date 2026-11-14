@@ -1,3 +1,4 @@
+import dataclasses
 import glob
 import os
 import sys
@@ -334,6 +335,23 @@ def test_verdict_held_at_threshold():
     res = _results("bin/check-foo", _passes(1, 6) + [(10, "flag"), (11, "flag")])
     v = compute_verdict([_g()], res, _truth(clean=range(1, 12)))
     assert v.state == "HELD" and "2" in v.reason
+
+
+def test_attempt_secs_do_not_change_held_verdict():
+    res = _results("bin/check-foo", _passes(1, 6) + [(10, "flag"), (11, "flag")])
+    truth = _truth(clean=range(1, 12))
+    retried = [dataclasses.replace(r, attempt_secs=(60.0, 5.0)) for r in res]
+    before = compute_verdict([_g()], res, truth)
+    after = compute_verdict([_g()], retried, truth)
+    assert after.state == "HELD" and (after.state, after.reason) == (before.state, before.reason)
+
+
+def test_attempt_secs_do_not_change_unknown_verdict():
+    res = _results("bin/check-foo", _passes(1, 6)) + [
+        ReplayResult(12, "bin/check-foo", "timeout", "60s", attempt_secs=(60.0, 60.0))]
+    v = compute_verdict([_g()], res, _truth(clean=range(1, 13)))
+    assert v.state == "UNKNOWN"
+    assert "replay failed (timeout: 60s)" in v.reason
 
 
 def test_verdict_cleared_below_threshold():

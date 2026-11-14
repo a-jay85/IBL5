@@ -299,6 +299,12 @@ fi
 if [ "$OA_FINISH" -eq 1 ]; then _oa_finish_record; fi
 OA_WT=$(_oa_find_wt)
 _oa_wait
+# A plain approval covers only the head the owner saw. _oa_wait re-reads the PR,
+# and --finish reads the head fresh, so either can land on a newer commit.
+# Fix-first expects the head to move; _oa_finish_record and _oa_prefire guard it.
+if [ "$rec_mode" = "approve" ] && [ "$head" != "$rec_head" ]; then
+    _oa_refuse 4 "the head moved from $rec_head (the one the owner approved) to $head. Approve the new head again: bin/owner-approve $OA_PR \"<words>\"."
+fi
 if [ "$rec_mode" = "fix-first" ]; then _oa_prefire; fi
 _oa_verdict
 _oa_arm

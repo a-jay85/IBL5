@@ -589,6 +589,40 @@ finish_after_plain() {
     want_out "RESULT: armed"
     [ ! -e "$FX/pf.log" ] || note "prefire-verify ran after a plain approval"
 }
+# Fails when a plain approval arms whatever head _oa_wait re-reads. The first
+# pr view shows the approved head H with post-plan running; the re-read shows C.
+plain_head_moved_wait() {
+    fresh plain_head_moved_wait
+    local approved=$H
+    jq -nc --arg h "$H" --arg b "case/$CASE" '{state:"OPEN",headRefOid:$h,headRefName:$b,labels:[{name:"post-plan-running"}]}' > "$FX/pr.live.json"
+    echo 1 > "$FX/pr.live.left"
+    new_commit
+    seed_ready
+    run_oa "$PR" "go" --poll=0 --timeout=30
+    want_rc 4
+    want_posted "the head moved from $approved"
+    want_posted "Approve the new head again"
+    refute_gh "pr edit"
+    refute_gh "pr merge"
+}
+# Fails when --finish after a plain approval arms a head that moved after it.
+finish_after_plain_head_moved() {
+    fresh finish_after_plain_head_moved
+    local approved=$H
+    printf -- '-\t0\tcom.ibl5.post-plan-fleet-%s\n' "$PR" > "$FX/launchctl.out"
+    echo 99 > "$FX/launchctl.left"
+    seed_ready
+    run_oa "$PR" "go" --poll=1 --timeout=0
+    want_rc 5
+    : > "$FX/launchctl.out"
+    new_commit
+    run_oa "$PR" --finish
+    want_rc 4
+    want_posted "the head moved from $approved"
+    refute_gh "pr edit"
+    refute_gh "pr merge"
+    [ ! -e "$FX/pf.log" ] || note "prefire-verify ran after a plain approval"
+}
 finish_extra_args() {
     fresh finish_extra_args
     run_oa "$PR" --finish --option=x
@@ -621,7 +655,7 @@ verdict_unrecorded verdict_no_tree_line verdict_rereview_wins verdict_rereview_s
 verdict_foreign_author verdict_ignores_approval_text verdict_gh_error
 arm_label_fail arm_merge_fail_rollback pr_closed
 fixfirst_records finish_no_record finish_head_unmoved finish_wt_mismatch finish_wt_dirty
-finish_prefire_fail finish_prefire_prereq finish_arms finish_after_plain finish_extra_args
+finish_prefire_fail finish_prefire_prereq finish_arms finish_after_plain plain_head_moved_wait finish_after_plain_head_moved finish_extra_args
 docs_route_through_script
 "
 

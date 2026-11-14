@@ -48,6 +48,41 @@ UI_PATH_RE+='|^ibl5/composer\.(json|lock)$|^ibl5/tsconfig\.json$'
 UI_PATH_RE+='|^docker-compose\.ci\.yml$|^Dockerfile$|^docker/'
 UI_EXCLUDE_RE='\.md$'
 UI_GALLERY_JQ='[(.changedCells // [])[] | select(.strict != true)] + (.newCells // []) | length'
+# Dependabot dev-dependency patch exemption (ADR-0062 Update 2026-11-13).
+# ui_dev_patch_exempt compares ibl5/package.json and ibl5/bun.lock between the
+# base checkout (UI_BASE_DIR) and the PR head checkout (UI_HEAD_DIR). One regex
+# validates and splits a version: an optional ^ or ~, then three numbers.
+UI_DEVPATCH_SEMVER='^(?<p>[~^]?)(?<a>0|[1-9][0-9]{0,8})[.](?<i>0|[1-9][0-9]{0,8})[.](?<c>0|[1-9][0-9]{0,8})$'
+UI_DEVPATCH_JQ='
+if ($b | length) != 1 or ($h | length) != 1 then error("not one JSON document") else . end
+| $b[0] as $B | $h[0] as $H
+| if ($B | type) != "object" or ($H | type) != "object" then error("not an object") else . end
+| if ($B | del(.devDependencies)) != ($H | del(.devDependencies)) then error("a key outside devDependencies changed") else . end
+| $B.devDependencies as $bd | $H.devDependencies as $hd
+| if ($bd | type) != "object" or ($hd | type) != "object" then error("devDependencies is not an object") else . end
+| if ($bd | keys) != ($hd | keys) then error("a package was added or removed") else . end
+| [$hd | keys[] | select($bd[.] != $hd[.])] as $ch
+| if ($ch | length) == 0 then error("no version changed") else . end
+| $ch[] as $k | $bd[$k] as $o | $hd[$k] as $n
+| if ($o | type) != "string" or ($n | type) != "string" then error("version is not a string: \($k)") else . end
+| if ($o | test($re) | not) or ($n | test($re) | not) then error("unparseable version: \($k)") else . end
+| ($o | capture($re)) as $x | ($n | capture($re)) as $y
+| if $x.p == $y.p and $x.a == $y.a and $x.i == $y.i and ($y.c | tonumber) > ($x.c | tonumber) then $k else error("not a patch bump: \($k)") end
+'
+UI_PKG_DEP_RE='^    "[^"]+": "[^"]+",?$'
+UI_LOCK_WS_RE='^        "([^"]+)": "([^"]+)",?$'
+UI_LOCK_PKG_RE='^    "([@A-Za-z0-9._/-]+)": (\[.*\]),?$'
+UI_LOCK_NAME_RE='^(@[A-Za-z0-9._-]+/)?[A-Za-z0-9._-]+@(0|[1-9][0-9]*)[.](0|[1-9][0-9]*)[.](0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$'
+# A specifier passes only when it is a semver range: comparators, versions, ||, and hyphen ranges.
+UI_LOCK_SPEC_RE='^ *([|][|]|-|[~^<>=]* *v?(0|[1-9][0-9]*|[*xX])([.](0|[1-9][0-9]*|[*xX]))*(-[0-9A-Za-z.-]+)?)( +([|][|]|-|[~^<>=]* *v?(0|[1-9][0-9]*|[*xX])([.](0|[1-9][0-9]*|[*xX]))*(-[0-9A-Za-z.-]+)?))* *$'
+UI_LOCK_ENTRY_JQ='
+if type == "array" and length == 4
+  and (.[0] | type == "string" and test($re))
+  and .[1] == ""
+  and (.[2] | type == "object")
+  and ([.[2] | (.dependencies, .optionalDependencies, .peerDependencies) | select(. != null) | if type == "object" then .[] else error("dependency map is not an object") end | if type == "string" then . else error("specifier is not a string") end | select(test($spec) | not)] | length == 0)
+  and (.[3] | type == "string" and test("^sha512-[A-Za-z0-9+/]{86}==$"))
+then .[0] | sub("@[^@]*$"; "") else error("lock entry outside the registry shape") end'
 
 # ui_paths_touch_ui: stdin one path per line. rc 0 UI (prints hits), 1 not UI, 2 empty input.
 ui_paths_touch_ui() {
@@ -77,13 +112,152 @@ ui_gallery_count() {
     jq -r "$UI_GALLERY_JQ" "$1" 2>/dev/null || return 2
 }
 
-# ui_decide <paths_file> <renderable 0|1> <gallery_json or "">: prints the verdict.
+# _ui_regular_file <path>: rc 0 for a regular file that is not a symlink.
+_ui_regular_file() { [ -f "$1" ] && [ ! -L "$1" ]; }
+
+# _ui_toolchain <package>: rc 0 when the package runs inside the Playwright
+# process that measures the VR gallery.
+_ui_toolchain() {
+    case "$1" in
+        pixelmatch|pngjs|*playwright*) return 0 ;;
+    esac
+    return 1
+}
+
+# _ui_dev_patch_hits_only <hits>: rc 0 when every UI path hit is
+# ibl5/package.json or ibl5/bun.lock.
+_ui_dev_patch_hits_only() {
+    local line
+    while IFS= read -r line; do
+        case "$line" in ibl5/package.json|ibl5/bun.lock) ;; *) return 1 ;; esac
+    done <<< "$1"
+}
+
+# _ui_diff_changes <base_file> <head_file>: prints each changed line of a
+# normal-format diff with its "< " or "> " prefix. rc 1 when diff fails or
+# prints a line of any other kind.
+_ui_diff_changes() {
+    local out rc=0 line
+    out=$(diff "$1" "$2") || rc=$?
+    if [ "$rc" = 0 ]; then return 0; fi
+    if [ "$rc" != 1 ]; then return 1; fi
+    while IFS= read -r line; do
+        case "$line" in
+            '< '*|'> '*) printf '%s\n' "$line" ;;
+            ---) ;;
+            *) [[ $line =~ ^[0-9]+(,[0-9]+)?[acd][0-9]+(,[0-9]+)?$ ]] || return 1 ;;
+        esac
+    done <<< "$out"
+}
+
+# _ui_pkg_lines_ok <changes> <count>: rc 0 when the package.json diff holds
+# exactly <count> removed and <count> added lines, each one "name": "version".
+_ui_pkg_lines_ok() {
+    local line adds=0 rems=0
+    while IFS= read -r line; do
+        [[ ${line:2} =~ $UI_PKG_DEP_RE ]] || return 1
+        case "$line" in '<'*) rems=$((rems + 1)) ;; *) adds=$((adds + 1)) ;; esac
+    done <<< "$1"
+    [ "$adds" = "$2" ] && [ "$rems" = "$2" ]
+}
+
+# _ui_lock_entry_name <line>: prints "<key> <name>" when <line> is one registry
+# entry of bun.lock: four fields, a plain name@version, the default registry
+# (empty second field), only semver-range specifiers in its dependency maps, and a
+# sha512 integrity. rc 1 for any other line.
+_ui_lock_entry_name() {
+    local key entry name
+    [[ $1 =~ $UI_LOCK_PKG_RE ]] || return 1
+    key="${BASH_REMATCH[1]}"
+    entry="${BASH_REMATCH[2]}"
+    name=$(jq -er --arg re "$UI_LOCK_NAME_RE" --arg spec "$UI_LOCK_SPEC_RE" "$UI_LOCK_ENTRY_JQ" <<< "$entry" 2>/dev/null) || return 1
+    printf '%s %s\n' "$key" "$name"
+}
+
+# _ui_lock_key_names <key> <name>: rc 0 when the lock key names its own package:
+# the key equals the name, or the key is a nested path whose parent part ends in
+# a whole package name. The parent part must be a chain of whole package
+# names, so key "@evil/bar" (a bare scope) or "x@evil/bar" cannot pass for
+# package "bar".
+UI_LOCK_PARENT_RE='^((@[A-Za-z0-9._-]+/)?[A-Za-z0-9._-]+/)*(@[A-Za-z0-9._-]+/)?[A-Za-z0-9._-]+$'
+_ui_lock_key_names() {
+    local key="$1" name="$2" parent
+    [ "$key" = "$name" ] && return 0
+    [ "${key%/"$name"}" != "$key" ] || return 1
+    parent="${key%/"$name"}"
+    [[ $parent =~ $UI_LOCK_PARENT_RE ]] || return 1
+    case "${parent##*/}" in @*) return 1 ;; esac
+    return 0
+}
+
+# _ui_lock_ok <base_root> <head_root>: rc 0 when every changed line of
+# ibl5/bun.lock is a registry entry for a package outside the gallery
+# toolchain, or a workspace devDependencies line that matches its own side's
+# ibl5/package.json. rc 1 for any other change.
+_ui_lock_ok() {
+    local bl="$1/ibl5/bun.lock" hl="$2/ibl5/bun.lock" changes line body side key spec kn name
+    { _ui_regular_file "$bl" && _ui_regular_file "$hl"; } || return 1
+    changes=$(_ui_diff_changes "$bl" "$hl") || return 1
+    [ -n "$changes" ] || return 0
+    while IFS= read -r line; do
+        body="${line:2}"
+        case "$line" in '<'*) side="$1" ;; *) side="$2" ;; esac
+        if [[ $body =~ $UI_LOCK_WS_RE ]]; then
+            key="${BASH_REMATCH[1]}"
+            spec="${BASH_REMATCH[2]}"
+            if _ui_toolchain "$key"; then return 1; fi
+            jq -e --arg k "$key" --arg v "$spec" '.devDependencies[$k] == $v' "$side/ibl5/package.json" >/dev/null 2>&1 || return 1
+        elif kn=$(_ui_lock_entry_name "$body"); then
+            read -r key name <<< "$kn"
+            _ui_lock_key_names "$key" "$name" || return 1
+            if _ui_toolchain "$key" || _ui_toolchain "$name"; then return 1; fi
+        else return 1  # any other lock line holds
+        fi
+    done <<< "$changes"
+}
+
+# ui_dev_patch_exempt <paths_file> <pr_author>: rc 0 when the PR is a Dependabot
+# patch bump of ibl5 devDependencies that may skip the ui-paths verdict.
+# Env: UI_BASE_DIR (trusted base checkout root), UI_HEAD_DIR (PR head root).
+# The head tree is data only. rc 1 on every other input and on any failure.
+ui_dev_patch_exempt() {
+    local paths="$1" author="$2" base="${UI_BASE_DIR:-}" head="${UI_HEAD_DIR:-}"
+    local line has_pkg=0 names name n=0 changes
+    [ "$author" = 'dependabot[bot]' ] || return 1
+    { [ -n "$base" ] && [ -n "$head" ] && [ -d "$base" ] && [ -d "$head" ]; } || return 1
+    [ -f "$paths" ] || return 1
+    while IFS= read -r line; do
+        case "$line" in
+            '') ;;
+            ibl5/package.json) has_pkg=1 ;;
+            ibl5/bun.lock) ;;
+            *) return 1 ;;  # any other changed file holds
+        esac
+    done < "$paths"
+    [ "$has_pkg" = 1 ] || return 1
+    { _ui_regular_file "$base/ibl5/package.json" && _ui_regular_file "$head/ibl5/package.json"; } || return 1
+    names=$(jq -nr --arg re "$UI_DEVPATCH_SEMVER" --slurpfile b "$base/ibl5/package.json" \
+        --slurpfile h "$head/ibl5/package.json" "$UI_DEVPATCH_JQ" 2>/dev/null) || return 1
+    [ -n "$names" ] || return 1
+    while IFS= read -r name; do
+        if _ui_toolchain "$name"; then return 1; fi
+        n=$((n + 1))
+    done <<< "$names"
+    changes=$(_ui_diff_changes "$base/ibl5/package.json" "$head/ibl5/package.json") || return 1
+    _ui_pkg_lines_ok "$changes" "$n" || return 1
+    _ui_lock_ok "$base" "$head"
+}
+
+# ui_decide <paths_file> <renderable 0|1> <gallery_json or ""> [dev_patch 0|1]: prints the verdict.
 # Verdicts: ui-unknown ui-paths vr-missing ui-vr (rc 1, hold) | not-ui (rc 0).
+# dev_patch=1 comes from ui_dev_patch_exempt. It skips the ui-paths verdict
+# only when every UI path is ibl5/package.json or ibl5/bun.lock. The
+# renderable and gallery checks below still run.
 ui_decide() {
-    local paths="$1" renderable="$2" gallery="$3" rc=0 n
-    ui_paths_touch_ui < "$paths" >/dev/null || rc=$?
+    local paths="$1" renderable="$2" gallery="$3" dev_patch="${4:-0}" rc=0 n hits
+    hits=$(ui_paths_touch_ui < "$paths") || rc=$?
     if [ "$rc" = 2 ]; then echo ui-unknown; return 1; fi
-    if [ "$rc" = 0 ]; then echo ui-paths; return 1; fi
+    if [ "$rc" = 0 ] && ! { [ "$dev_patch" = 1 ] && _ui_dev_patch_hits_only "$hits"; }; then echo ui-paths; return 1; fi
     if [ "$renderable" != 1 ]; then echo not-ui; return 0; fi
     if [ -z "$gallery" ] || [ ! -s "$gallery" ]; then echo vr-missing; return 1; fi
     n=$(ui_gallery_count "$gallery") || { echo vr-missing; return 1; }
@@ -197,17 +371,19 @@ ui_approving_event() {
 # decides with no gallery, so it holds as vr-missing and records its
 # fingerprint at once. Every other event waits as before.
 # rc follows ui_decide (0 not-ui, 1 hold).
+# A Dependabot dev-dependency patch bump (ui_dev_patch_exempt) waits on the gallery like a non-UI PR.
 ui_workflow_verdict() {
-    local paths="$1" author="$2" fetch="$3" renderable rc=0 gallery="" tmp
+    local paths="$1" author="$2" fetch="$3" renderable rc=0 gallery="" tmp dev_patch=0
     renderable=$(ui_renderable "$paths" "$author")
     ui_paths_touch_ui < "$paths" >/dev/null || rc=$?
-    if [ "$rc" = 1 ] && [ "$renderable" = 1 ] && ! ui_approving_event "${4:-}" "${5:-}"; then
+    if [ "$rc" = 0 ] && ui_dev_patch_exempt "$paths" "$author"; then dev_patch=1; fi
+    if { [ "$rc" = 1 ] || [ "$dev_patch" = 1 ]; } && [ "$renderable" = 1 ] && ! ui_approving_event "${4:-}" "${5:-}"; then
         tmp=$(mktemp) || tmp=""
         if [ -n "$tmp" ] && ui_await_gallery "${UI_VR_ATTEMPTS:-90}" "${UI_VR_SLEEP:-30}" "$fetch" "$tmp"; then
             gallery="$tmp"
         fi
     fi
-    ui_decide "$paths" "$renderable" "$gallery"
+    ui_decide "$paths" "$renderable" "$gallery" "$dev_patch"
 }
 
 # ui_fetch_pr_gh — the production fetch for ui_live_pr_state. Prints the live

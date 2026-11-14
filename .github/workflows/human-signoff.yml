@@ -109,6 +109,7 @@ jobs:
       # Check out the PR HEAD (not the default refs/pull/N/merge), shallow. The
       # eval step deepens history only for a UI PR holding the label, so the
       # fingerprint is the PR's own diff against its merge base.
+      # The head tree is data only. ui_dev_patch_exempt parses its ibl5/package.json and ibl5/bun.lock with jq and diff.
       - name: Checkout the PR head (diff fingerprint only)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -166,6 +167,9 @@ jobs:
             : > "$PATHS"   # empty list -> ui-unknown -> hold
           fi
           if [ "$(wc -l < "$PATHS")" -ge 3000 ]; then : > "$PATHS"; fi  # API cap: cannot tell
+          # ui_dev_patch_exempt reads ibl5/package.json and ibl5/bun.lock from
+          # both checkouts: the trusted base at .hs-base and the PR head at the root.
+          export UI_BASE_DIR="$GITHUB_WORKSPACE/.hs-base" UI_HEAD_DIR="$GITHUB_WORKSPACE"
           # The approving label run skips the gallery wait so its record lands
           # before a sync run's bounded HS_AWAIT wait gives up.
           UI_VERDICT=$(ui_workflow_verdict "$PATHS" "$PR_AUTHOR" ui_fetch_gallery_gh "$ACTION" "$EVENT_LABEL") || true

@@ -1,6 +1,6 @@
 ---
 description: The AI-tell sentence shapes ("Claude slop") that must not land in repo prose, PR bodies, or chat replies, plus the three clarity faults no regex can catch. Lists each tell with its fix, the on-touch policy, and the escape hatches. Enforced by bin/check-prose in CI and by two hooks.
-last_verified: 2026-11-11
+last_verified: 2026-11-13
 paths:
   - "**/README.md"
   - ".claude/rules/*.md"
@@ -38,6 +38,7 @@ Each row is one regex in the script. The fix column is what the deny message pri
 | not-x-but-y | `not just X`, `not merely X`, `isn't only X`. | Say what it is. Drop the negated half. |
 | comma-not | `X, not Y`, `X, never Y`. | Keep the true half. Delete the tail. |
 | isnt-x-its-y | `It isn't X, it's Y`. `It's not about X, it's Y`. | Write only the half that is true. |
+| is-not-a-x-but-a-y | `is not a X but a Y`, with no comma before `but`. | Write only the half that is true. |
 | x-isnt-the-issue | `X isn't the problem`, `X isn't the point`. | Name the real issue directly. |
 | not-because-but-because | `not because X but because Y`. | Give the real reason only. |
 | not-x-not-y-just-z | A run of `Not X. Not Y. Just Z.` | Say the one thing it is. |

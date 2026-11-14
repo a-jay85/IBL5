@@ -100,7 +100,7 @@ A Dependabot PR that only raises patch numbers in the `devDependencies` of `ibl5
 - The changed files are `ibl5/package.json`, with or without `ibl5/bun.lock`. Any other file, `ibl5/bun.lockb` (example) included, keeps the hold.
 - jq compares the base checkout's `ibl5/package.json` with the head's. Only version strings inside `devDependencies` differ. Each one keeps its major number, minor number, and `^` or `~` prefix, and raises its patch number. A value outside that three-number form, such as `5`, keeps the hold.
 - No bumped package belongs to the gallery toolchain: `pixelmatch`, `pngjs`, or any name that contains `playwright`.
-- Each changed line of `ibl5/bun.lock` is either a workspace `devDependencies` line that matches its own side's `ibl5/package.json`, or a registry entry. A registry entry has a plain `name@version`, an empty registry field, no `:` specifier in its dependency maps, a sha512 integrity, and a key that names the same package.
+- Each changed line of `ibl5/bun.lock` is either a workspace `devDependencies` line that matches its own side's `ibl5/package.json`, or a registry entry. A registry entry has a plain `name@version`, an empty registry field, only semver-range specifiers in its dependency maps (a `github:` URL, a GitHub shorthand like `evil/evil`, or a path like `../evil` holds), a sha512 integrity, and a key that names the same package.
 
 The flag skips only the `ui-paths` verdict. The VR gallery check still runs, so a changed or new cell holds as `ui-vr` and a missing gallery holds as `vr-missing`. Any read, parse, or diff failure keeps the hold.
 

@@ -163,7 +163,7 @@ _ui_pkg_lines_ok() {
 
 # _ui_lock_entry_name <line>: prints "<key> <name>" when <line> is one registry
 # entry of bun.lock: four fields, a plain name@version, the default registry
-# (empty second field), no ":" specifier among its dependency maps, and a
+# (empty second field), only semver-range specifiers in its dependency maps, and a
 # sha512 integrity. rc 1 for any other line.
 _ui_lock_entry_name() {
     local key entry name

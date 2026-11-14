@@ -13,8 +13,8 @@ use OnThisDay\Contracts\OnThisDayMomentBuilderInterface;
  * updater (RebuildOnThisDayMomentsStep); this is the only OnThisDay class that
  * reads ibl_box_scores.
  *
- * Every player-game source reads the phantom-guarded derived table
- * (GUARDED_PLAYER_GAMES): one row per (game_date, visitor, home, pid). A repeated
+ * Every player-game source reads the phantom-guarded temp table
+ * (built once per collect() from GUARDED_PLAYER_GAMES): one row per (game_date, visitor, home, pid). A repeated
  * row set for the same game is a phantom, and grouping collapses it to one line.
  * Only games between real teams count: All-Star and Rookie/Sophomore box scores
  * share game_type 1 with the regular season, so the team-id filter drops them.
@@ -58,8 +58,24 @@ class OnThisDayMomentBuilder extends \Database\BaseMysqliRepository implements O
 
     private const GUARDED_GROUP_BY = " GROUP BY b.game_date, b.visitor_teamid, b.home_teamid, b.pid";
 
-    /** Whole history, for chronology (records) and team changes (trades). */
+    /** Body of the guarded temp table, built once per collect(). */
     private const GUARDED_PLAYER_GAMES = self::GUARDED_SELECT . self::GUARDED_GROUP_BY;
+
+    /** Session temp tables. Each collector names one of them once, so no statement reopens a temp table. */
+    private const DROP_GUARDED_SQL = 'DROP TEMPORARY TABLE IF EXISTS `tmp_otd_guarded_games`';
+
+    private const DROP_OLD_GAMES_SQL = 'DROP TEMPORARY TABLE IF EXISTS `tmp_otd_trade_old_games`';
+
+    /** Every game type; collectors keep filtering game_type after the aggregate, as before. */
+    private const CREATE_GUARDED_SQL = "CREATE TEMPORARY TABLE `tmp_otd_guarded_games` ENGINE=InnoDB AS "
+        . self::GUARDED_PLAYER_GAMES;
+
+    /** Regular-season copy for the trades `old` join, indexed for its lookup. */
+    private const CREATE_OLD_GAMES_SQL = "CREATE TEMPORARY TABLE `tmp_otd_trade_old_games`
+            (KEY `idx_otd_old_games` (pid, season_year, teamid, game_date)) ENGINE=InnoDB AS
+          SELECT g.pid, g.season_year, g.teamid, g.game_date, g.pts
+          FROM `tmp_otd_guarded_games` g
+          WHERE g.game_type = 1";
 
     /**
      * Regular-season guarded lines in the order the old running-MAX window used,
@@ -67,9 +83,52 @@ class OnThisDayMomentBuilder extends \Database\BaseMysqliRepository implements O
      */
     private const RECORD_STREAM_SQL = "SELECT g.game_date, g.visitor_teamid, g.home_teamid, g.pid, g.teamid,
             g.season_year, g.pts, g.reb, g.ast, g.stl, g.blk
-          FROM (" . self::GUARDED_PLAYER_GAMES . ") g
+          FROM `tmp_otd_guarded_games` g
           WHERE g.game_type = 1
           ORDER BY g.game_date, g.visitor_teamid, g.home_teamid, g.pid";
+
+    // LAG orders by game_date inside (pid, season_year), unique in the guarded table; the final ORDER BY is the ranked partition key, unique at headline_rank = 1.
+    private const TRADES_SQL = "WITH games AS (
+                    SELECT g.pid, g.season_year, g.game_date, g.teamid, g.pts,
+                      LAG(g.teamid) OVER (PARTITION BY g.pid, g.season_year ORDER BY g.game_date) AS prev_teamid
+                    FROM `tmp_otd_guarded_games` g
+                    WHERE g.game_type = 1
+                  ),
+                  moves AS (
+                    SELECT pid, season_year, game_date AS debut_date, prev_teamid AS from_tid, teamid AS to_tid
+                    FROM games
+                    WHERE prev_teamid IS NOT NULL AND prev_teamid <> teamid
+                  ),
+                  movers AS (
+                    SELECT m.pid, m.season_year, m.debut_date, m.from_tid, m.to_tid,
+                      AVG(old.pts) AS old_ppg, COUNT(*) AS old_games
+                    FROM moves m
+                    JOIN `tmp_otd_trade_old_games` old ON old.pid = m.pid
+                      AND old.season_year = m.season_year
+                      AND old.teamid = m.from_tid
+                      AND old.game_date < m.debut_date
+                    GROUP BY m.pid, m.season_year, m.debut_date, m.from_tid, m.to_tid
+                    HAVING AVG(old.pts) >= ? AND COUNT(*) >= ?
+                  ),
+                  ranked AS (
+                    SELECT mv.*,
+                      COUNT(*) OVER (PARTITION BY mv.season_year, mv.from_tid, mv.to_tid, mv.debut_date) AS players_moved,
+                      ROW_NUMBER() OVER (
+                        PARTITION BY mv.season_year, mv.from_tid, mv.to_tid, mv.debut_date
+                        ORDER BY mv.old_ppg DESC, mv.pid ASC
+                      ) AS headline_rank
+                    FROM movers mv
+                  )
+                  SELECT r.pid, r.season_year, r.debut_date, r.from_tid, r.to_tid, r.players_moved,
+                    p.name AS player_name,
+                    COALESCE(CONCAT(t.team_city, ' ', t.team_name), '') AS to_name,
+                    COALESCE(CONCAT(f.team_city, ' ', f.team_name), '') AS from_name
+                  FROM ranked r
+                  JOIN `ibl_plr` p ON p.pid = r.pid
+                  LEFT JOIN `ibl_team_info` t ON t.teamid = r.to_tid
+                  LEFT JOIN `ibl_team_info` f ON f.teamid = r.from_tid
+                  WHERE r.headline_rank = 1
+                  ORDER BY r.season_year, r.from_tid, r.to_tid, r.debut_date";
 
     private const INSERT_SQL = "INSERT INTO `ibl_on_this_day_moments`
             (moment_key, kind, game_date, month_day, season_year, pid, player_name,
@@ -87,15 +146,37 @@ class OnThisDayMomentBuilder extends \Database\BaseMysqliRepository implements O
      */
     public function collect(): array
     {
-        $moments = array_merge(
-            $this->collectPlayerGames(MomentKind::FiftyPointGame),
-            $this->collectPlayerGames(MomentKind::TripleDouble),
-            $this->collectRecordGames(),
-            $this->collectSeriesClinchers(),
-            $this->collectTrades(),
-        );
+        try {
+            $this->buildGuardedGames();
+            $moments = array_merge(
+                $this->collectPlayerGames(MomentKind::FiftyPointGame),
+                $this->collectPlayerGames(MomentKind::TripleDouble),
+                $this->collectRecordGames(),
+                $this->collectSeriesClinchers(),
+                $this->collectTrades(),
+            );
+        } finally {
+            $this->dropGuardedGames(); // also runs when a collector throws
+        }
 
         return $this->stampOrdinals($moments);
+    }
+
+    /**
+     * Aggregates ibl_box_scores once per collect(). Runs before the unbuffered
+     * record stream opens, because an open stream blocks every other query.
+     */
+    private function buildGuardedGames(): void
+    {
+        $this->dropGuardedGames(); // a leftover table from an earlier run on this session
+        $this->execute(self::CREATE_GUARDED_SQL);
+        $this->execute(self::CREATE_OLD_GAMES_SQL);
+    }
+
+    private function dropGuardedGames(): void
+    {
+        $this->execute(self::DROP_OLD_GAMES_SQL);
+        $this->execute(self::DROP_GUARDED_SQL);
     }
 
     /**
@@ -186,12 +267,12 @@ class OnThisDayMomentBuilder extends \Database\BaseMysqliRepository implements O
                     CASE WHEN g.teamid = g.visitor_teamid THEN g.home_teamid ELSE g.visitor_teamid END AS opponent_teamid,
                     COALESCE(CONCAT(t.team_city, ' ', t.team_name), '') AS team_name,
                     COALESCE(CONCAT(o.team_city, ' ', o.team_name), '') AS opponent_name
-                  FROM (" . self::GUARDED_PLAYER_GAMES . ") g
+                  FROM `tmp_otd_guarded_games` g
                   JOIN `ibl_plr` p ON p.pid = g.pid
                   LEFT JOIN `ibl_team_info` t ON t.teamid = g.teamid
                   LEFT JOIN `ibl_team_info` o
                     ON o.teamid = CASE WHEN g.teamid = g.visitor_teamid THEN g.home_teamid ELSE g.visitor_teamid END
-                  WHERE " . $predicate;
+                  WHERE " . $predicate . ' ORDER BY g.game_date, g.visitor_teamid, g.home_teamid, g.pid';
 
         $moments = [];
         foreach ($this->fetchAll($query) as $row) {
@@ -346,50 +427,7 @@ class OnThisDayMomentBuilder extends \Database\BaseMysqliRepository implements O
      */
     private function collectTrades(): array
     {
-        // The only ORDER BY is the LAG window, partitioned by pid: the guarded table holds one row per pid per game_date.
-        // @phpstan-ignore ibl.orderByMissingTiebreaker
-        $query = "WITH games AS (
-                    SELECT g.pid, g.season_year, g.game_date, g.teamid, g.pts,
-                      LAG(g.teamid) OVER (PARTITION BY g.pid, g.season_year ORDER BY g.game_date) AS prev_teamid
-                    FROM (" . self::GUARDED_PLAYER_GAMES . ") g
-                    WHERE g.game_type = 1
-                  ),
-                  moves AS (
-                    SELECT pid, season_year, game_date AS debut_date, prev_teamid AS from_tid, teamid AS to_tid
-                    FROM games
-                    WHERE prev_teamid IS NOT NULL AND prev_teamid <> teamid
-                  ),
-                  movers AS (
-                    SELECT m.pid, m.season_year, m.debut_date, m.from_tid, m.to_tid,
-                      AVG(old.pts) AS old_ppg, COUNT(*) AS old_games
-                    FROM moves m
-                    JOIN games old ON old.pid = m.pid
-                      AND old.season_year = m.season_year
-                      AND old.teamid = m.from_tid
-                      AND old.game_date < m.debut_date
-                    GROUP BY m.pid, m.season_year, m.debut_date, m.from_tid, m.to_tid
-                    HAVING AVG(old.pts) >= ? AND COUNT(*) >= ?
-                  ),
-                  ranked AS (
-                    SELECT mv.*,
-                      COUNT(*) OVER (PARTITION BY mv.season_year, mv.from_tid, mv.to_tid, mv.debut_date) AS players_moved,
-                      ROW_NUMBER() OVER (
-                        PARTITION BY mv.season_year, mv.from_tid, mv.to_tid, mv.debut_date
-                        ORDER BY mv.old_ppg DESC, mv.pid ASC
-                      ) AS headline_rank
-                    FROM movers mv
-                  )
-                  SELECT r.pid, r.season_year, r.debut_date, r.from_tid, r.to_tid, r.players_moved,
-                    p.name AS player_name,
-                    COALESCE(CONCAT(t.team_city, ' ', t.team_name), '') AS to_name,
-                    COALESCE(CONCAT(f.team_city, ' ', f.team_name), '') AS from_name
-                  FROM ranked r
-                  JOIN `ibl_plr` p ON p.pid = r.pid
-                  LEFT JOIN `ibl_team_info` t ON t.teamid = r.to_tid
-                  LEFT JOIN `ibl_team_info` f ON f.teamid = r.from_tid
-                  WHERE r.headline_rank = 1";
-
-        $rows = $this->fetchAll($query, 'ii', self::TRADE_MIN_PPG, self::TRADE_MIN_GAMES);
+        $rows = $this->fetchAll(self::TRADES_SQL, 'ii', self::TRADE_MIN_PPG, self::TRADE_MIN_GAMES);
 
         $moments = [];
         foreach ($rows as $row) {

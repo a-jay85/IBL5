@@ -192,6 +192,84 @@ final class OnThisDayMomentBuilderTest extends TestCase
         $this->assertStringContainsString('HAVING AVG(old.pts) >= 15 AND COUNT(*) >= 5', $tradeQueries[0]);
     }
 
+    public function testCollectBuildsGuardedTablesOnceAndDropsThemAfterReads(): void
+    {
+        $this->collect();
+
+        $log = $this->mockDb->getOperationLog();
+        $guarded = 'tmp_otd_guarded_games';
+        $oldGames = 'tmp_otd_trade_old_games';
+        $this->assertSame(1, $this->countContaining($log, 'CREATE TEMPORARY TABLE ' . $guarded));
+        $this->assertSame(1, $this->countContaining($log, 'CREATE TEMPORARY TABLE ' . $oldGames));
+        // Two drops each: the leftover guard before the build, then the finally.
+        $this->assertSame(2, $this->countContaining($log, 'DROP TEMPORARY TABLE IF EXISTS ' . $guarded));
+        $this->assertSame(2, $this->countContaining($log, 'DROP TEMPORARY TABLE IF EXISTS ' . $oldGames));
+
+        $createGuarded = $this->firstIndexContaining($log, 'CREATE TEMPORARY TABLE ' . $guarded);
+        $createOld = $this->firstIndexContaining($log, 'CREATE TEMPORARY TABLE ' . $oldGames);
+        $firstRead = $this->firstIndexContaining($log, 'g.pts >= 50');
+        $trades = $this->firstIndexContaining($log, 'WITH games AS');
+        $lastDrop = $this->lastIndexContaining($log, 'DROP TEMPORARY TABLE IF EXISTS ' . $guarded);
+        $this->assertNotNull($createGuarded);
+        $this->assertNotNull($createOld);
+        $this->assertNotNull($firstRead);
+        $this->assertNotNull($trades);
+        $this->assertNotNull($lastDrop);
+        $this->assertTrue($createGuarded < $createOld && $createOld < $firstRead);
+        $this->assertGreaterThan($trades, $lastDrop);
+    }
+
+    public function testCollectDropsGuardedTablesWhenACollectorThrows(): void
+    {
+        $failing = new class extends MockDatabase {
+            public function sql_query(string $query): bool|object
+            {
+                if (str_contains($query, 'ibl_playoff_series_results')) {
+                    throw new \RuntimeException('clincher query failed');
+                }
+
+                return parent::sql_query($query);
+            }
+        };
+        $failing->onQuery('first_season', []);
+        $failing->onQuery('g\.pts >= 50', []);
+        $failing->onQuery('g\.ast >= 10', []);
+
+        $this->expectException(\RuntimeException::class);
+        try {
+            (new OnThisDayMomentBuilder($failing))->collect();
+        } finally {
+            $log = $failing->getOperationLog();
+            $this->assertSame(2, $this->countContaining($log, 'DROP TEMPORARY TABLE IF EXISTS tmp_otd_guarded_games'));
+            $this->assertSame(2, $this->countContaining($log, 'DROP TEMPORARY TABLE IF EXISTS tmp_otd_trade_old_games'));
+            $this->assertNull($this->firstIndexContaining($log, 'WITH games AS'));
+        }
+    }
+
+    public function testTradeQueryReadsGuardedTempTables(): void
+    {
+        $this->collect();
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $trade = array_values(array_filter($queries, static fn (string $q): bool => str_contains($q, 'WITH games AS')));
+        $this->assertCount(1, $trade);
+        $this->assertStringContainsString('FROM tmp_otd_guarded_games g', $trade[0]);
+        $this->assertStringContainsString('JOIN tmp_otd_trade_old_games old', $trade[0]);
+        $this->assertStringNotContainsString('JOIN games old', $trade[0]);
+        $this->assertStringContainsString('HAVING AVG(old.pts) >= 15 AND COUNT(*) >= 5', $trade[0]);
+        $this->assertStringEndsWith('ORDER BY r.season_year, r.from_tid, r.to_tid, r.debut_date', $trade[0]);
+
+        foreach (['g.pts >= 50', 'g.ast >= 10'] as $marker) {
+            $player = array_values(array_filter($queries, static fn (string $q): bool => str_contains($q, $marker)));
+            $this->assertCount(1, $player);
+            $this->assertStringStartsWith('SELECT g.*, p.name AS player_name', $player[0]);
+            $this->assertMatchesRegularExpression('/WHERE g\\.\\w+ /', $player[0]);
+            $this->assertStringContainsString('FROM tmp_otd_guarded_games g', $player[0]);
+            $this->assertStringNotContainsString('GROUP BY b.game_date', $player[0]);
+            $this->assertStringEndsWith('ORDER BY g.game_date, g.visitor_teamid, g.home_teamid, g.pid', $player[0]);
+        }
+    }
+
     public function testCollectOrdersKindsFiftyTripleClincherTrade(): void
     {
         $this->mockDb->onQuery('g\.pts >= 50', [['game_date' => '2000-01-01', 'pid' => 1]]);
@@ -235,6 +313,10 @@ final class OnThisDayMomentBuilderTest extends TestCase
         $this->assertNotNull($delete);
         $this->assertNotNull($insert);
         $this->assertTrue($begin < $delete && $delete < $insert && $insert < $commit);
+        // The temp-table DDL finishes before BEGIN, so it never enters the write transaction.
+        $lastDrop = $this->lastIndexContaining($log, 'DROP TEMPORARY TABLE IF EXISTS tmp_otd_guarded_games');
+        $this->assertNotNull($lastDrop);
+        $this->assertLessThan($begin, $lastDrop);
 
         $this->assertSame('ssssiisisisssi', $this->mockDb->getLastBoundTypes());
         $this->assertSame(
@@ -270,5 +352,28 @@ final class OnThisDayMomentBuilderTest extends TestCase
         }
 
         return null;
+    }
+
+    /**
+     * @param list<string> $log
+     */
+    private function lastIndexContaining(array $log, string $needle): ?int
+    {
+        $last = null;
+        foreach ($log as $index => $entry) {
+            if (str_contains($entry, $needle)) {
+                $last = $index;
+            }
+        }
+
+        return $last;
+    }
+
+    /**
+     * @param list<string> $log
+     */
+    private function countContaining(array $log, string $needle): int
+    {
+        return count(array_filter($log, static fn (string $entry): bool => str_contains($entry, $needle)));
     }
 }

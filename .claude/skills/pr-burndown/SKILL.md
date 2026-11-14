@@ -228,9 +228,11 @@ were wasted. The merge line already handles `BEHIND`. On every master push,
 check, and updates only that one (ADR-0081). Each armed PR gets updated once, when its
 turn comes.
 
-- **`BEHIND` with no conflict.** Don't rebase it. List no rebase in the job's chores. Once
-  the PR is armed, the merge line keeps it current. A Ship pick needs only
-  `bin/owner-approve`. Run it in this session, with no job.
+- **`BEHIND` with no conflict, and no job.** Don't rebase it. Once the PR is armed, the
+  merge line keeps it current. A Ship pick needs only `bin/owner-approve`. Run it in this
+  session, with no job. When a job will push to a `BEHIND` PR anyway, the job rebases it
+  (the Step 6 brief, step 2), because `bin/pre-push-adr-hook` refuses a push that lacks
+  origin/master.
 - **`DIRTY`.** Rebase it in the job. The merge line skips conflicted PRs, so nothing else
   will.
 - **Two approved PRs that clash with each other.** Rebase and ship the higher-ranked one
@@ -327,7 +329,7 @@ Owner decision on PR #N (branch <branch>), <date>: "<owner's words>". <What it c
 6. Do NOT run post-plan or /pr-ready. This session is headless and bin/post-plan-now refuses
    to start here. The parent session re-fires post-plan after you finish.
 7. <One of:>
-   - Ship: tick the manual boxes the owner confirmed. The parent session records the approval with `bin/owner-approve N "<words>" --fix-first="<what this job pushes>"` before the job starts. A plain approval refuses once the head moves. After the last push in step 5, the parent session runs `bin/owner-approve N --finish` with `run_in_background: true`. The script checks the pushed head and runs `bin/lib/prefire-verify` in the worktree, waits out any live post-plan run, then arms only on a READY verdict for the pushed head's tree.
+   - Ship: tick the manual boxes the owner confirmed. The parent session records the approval with `bin/owner-approve N "<words>" --fix-first="<what this job pushes>"` before the job starts. A plain approval refuses once the head moves. After the last push in step 5, the parent session runs `bin/owner-approve N --finish` with `run_in_background: true`. The script checks that the head moved past the recorded one, waits out any live post-plan run, runs `bin/lib/prefire-verify` in the worktree, then arms only on a READY verdict for the pushed head's tree.
      A plain approval is for a pick with no push.
      Master refuses any merge while a review thread is open (ci-gotchas.md § Conversation
      resolution). Before you report the PR as shipping, list its open threads. File each

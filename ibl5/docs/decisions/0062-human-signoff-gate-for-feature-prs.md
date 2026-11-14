@@ -1,6 +1,6 @@
 ---
 description: Feature PRs (conventional-commit `feat:`) cannot merge until a human applies the `human-approved` label — a required CI check, not a convention, blocks auto-merge.
-last_verified: 2026-11-13
+last_verified: 2026-11-14
 ---
 
 # ADR-0062: Human sign-off gate for feature PRs
@@ -122,3 +122,18 @@ An E2E memo hit skips Visual Regression, so the head SHA has no `vr-gallery-json
 Any failed condition keeps `vr-missing`. The gate reads only GitHub API data and base-ref files. It never reads the memo log line or the cached sentinel, because PR-head code writes both.
 
 The gate checks file equality between two head commits and does not recompute the memo key. The key also covers the merge commit and the php-apache image digest, which the gate cannot read. Two gaps remain. If master changes between the two runs and the PR does not merge it, the reused gallery predates those master changes. The image digest can drift between the runs. Both affect only the comparison baseline, and both need either a forged memo hit, which the `bin/ci-memo` rule blocks, or a master change that an honest memo would treat as a miss.
+
+## Update (2026-11-14): Dependabot composer patch and minor bumps skip the path hold
+
+The owner decided that a Dependabot composer patch or minor bump needs no sign-off. A Dependabot PR that changes only `ibl5/composer.lock`, or that file and `ibl5/composer.json`, no longer holds as `ui-paths` when every changed package passes the checks below. Major bumps still hold.
+
+`ui_composer_exempt` in `bin/lib/ui-change-classifier.sh` makes the call. It reads the PR author and compares the base and head files that `.github/workflows/human-signoff.yml` checks out. It passes only when all of these hold:
+
+- The author is `dependabot[bot]` and the diff touches no other path.
+- The lock keeps the same package names in `packages` and in `packages-dev`.
+- Each changed package moves to a strictly higher `N.N.N` version with the same major. A `0.x` package also keeps its minor. A two-part tag such as `0.2` reads as `0.2.0`, because the real lock in PR #3848 bumped `sanmai/di-container` from `0.2` to `0.2.2`.
+- No changed package has a `composer-` type, so `composer install` in the VR job runs no plugin. Its source and dist hosts stay the same.
+- The other top-level lock keys stay equal. `content-hash` may change only when `composer.json` changes.
+- A `composer.json` change edits only package constraints in `require` and `require-dev`, in the shapes `^a.b.c`, `^a.b`, `~a.b.c` and `a.b.c`. Platform keys such as `php` and `ext-*` stay equal.
+
+The classifier judges a grouped PR per member, so one major member holds the whole group. A missing file, a symlink, a parse error, or any other shape holds. The PR still waits for its VR gallery and holds as `ui-vr` or `vr-missing` as before. Post-plan arming condition (8) runs the `--paths` CLI, which still lists both composer files as UI. Human PRs that touch either file still hold.

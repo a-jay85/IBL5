@@ -2067,9 +2067,19 @@ write_failure_report() {
         printf 'Read it to avoid repeating the same failure; it is capped and may be truncated mid-line.\n\n'
         printf '## Last %d lines of the failed attempt log (hard-capped to %d bytes)\n\n```\n' \
             "$FAILURE_TAIL_LINES" "$FAILURE_TAIL_BYTES"
-        sed -n "$(( _wfr_before + 1 )),\$p" "$LOG" \
-            | tail -n "$FAILURE_TAIL_LINES" \
-            | tail -c "$FAILURE_TAIL_BYTES"
+        # The byte cap reads a regular file. uutils tail 0.10.0 (the CI
+        # runner's tail) sometimes ignored -c on a pipe and printed ~2.5 KB
+        # past a 100-byte cap. If mktemp fails, fall back to the pipe.
+        if _wfr_tmp=$(mktemp 2>/dev/null); then
+            sed -n "$(( _wfr_before + 1 )),\$p" "$LOG" \
+                | tail -n "$FAILURE_TAIL_LINES" > "$_wfr_tmp"
+            tail -c "$FAILURE_TAIL_BYTES" "$_wfr_tmp"
+            rm -f "$_wfr_tmp"
+        else
+            sed -n "$(( _wfr_before + 1 )),\$p" "$LOG" \
+                | tail -n "$FAILURE_TAIL_LINES" \
+                | tail -c "$FAILURE_TAIL_BYTES"
+        fi
         printf '\n```\n'
     } > "$_wfr_file"
 }

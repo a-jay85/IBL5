@@ -36,6 +36,12 @@ UI_PATH_RE+='|-snapshots/'
 # that wires another action into the VR job must edit e2e-tests.yml or
 # setup-docker-e2e, and both hold. The app under test (PHP, SQL, CSS) is
 # what the gallery measures, so it is out of scope here.
+#
+# One carve-out: ui_composer_exempt lets a Dependabot composer patch or minor
+# bump skip the path hold. For a library, composer install runs no package
+# code, so the gallery stays trustworthy. composer-* packages (plugins and
+# installers), root composer.json scripts, and any other path still hold, and
+# that PR still waits for and is judged by its VR gallery.
 UI_PATH_RE+='|^\.github/workflows/e2e-tests\.yml$|^\.github/actions/setup-docker-e2e/|^bin/vr-build-gallery$'
 UI_PATH_RE+='|^bin/vr-review-comment$|^bin/vr-changed-coverage$|^bin/playwright-image-tag$'
 UI_PATH_RE+='|^ibl5/bin/run-migrations-ci$'
@@ -48,6 +54,76 @@ UI_PATH_RE+='|^ibl5/composer\.(json|lock)$|^ibl5/tsconfig\.json$'
 UI_PATH_RE+='|^docker-compose\.ci\.yml$|^Dockerfile$|^docker/'
 UI_EXCLUDE_RE='\.md$'
 UI_GALLERY_JQ='[(.changedCells // [])[] | select(.strict != true)] + (.newCells // []) | length'
+# _UI_COMPOSER_LOCK_JQ: $b and $h are the slurped base and head composer.lock,
+# $jc is 1 when composer.json is in the diff. true only when every changed
+# locked package is a strict patch or minor upgrade (0.x keeps its minor too).
+# A two-part tag such as 0.2 reads as 0.2.0; PR #3848 bumped one from 0.2.
+_UI_COMPOSER_LOCK_JQ='
+def ver: if type == "string" and test("^v?[0-9]+\\.[0-9]+\\.[0-9]+$")
+  then ltrimstr("v") | split(".") | map(tonumber)
+  elif type == "string" and test("^v?[0-9]+\\.[0-9]+$")
+  then ltrimstr("v") | split(".") | map(tonumber) | . + [0]
+  else null end;
+def bumpok($bv; $hv): $bv != null and $hv != null and $hv > $bv
+  and $hv[0] == $bv[0] and ($bv[0] > 0 or $hv[1] == $bv[1]);
+def host: if . == null then null elif type == "string"
+  then ((capture("^https://(?<h>[^/@]+)/") | .h) // false) else false end;
+def samehost($x; $y): ($x | host) as $p | ($y | host) as $q | $p == $q and $p != false;
+def entryok($e; $f): ($e | type) == "object" and ($f | type) == "object"
+  and $e.type == $f.type
+  and (($f.type // "library") | (type == "string" and (startswith("composer-") | not)))
+  and $e.source.type == $f.source.type and $e.dist.type == $f.dist.type
+  and samehost($e.source.url; $f.source.url) and samehost($e.dist.url; $f.dist.url)
+  and bumpok($e.version | ver; $f.version | ver);
+def names($a): [$a[] | .name];
+def sectok($bs; $hs): ($bs | type) == "array" and ($hs | type) == "array"
+  and (names($bs) + names($hs) | all(type == "string"))
+  and (names($bs) | sort) == (names($bs) | unique)
+  and (names($bs) | sort) == (names($hs) | sort);
+def changed($bs; $hs): ($bs | map({key: .name, value: .}) | from_entries) as $m
+  | [$hs[] | select(. != $m[.name]) | {b: $m[.name], h: .}];
+if ($b | length) != 1 or ($h | length) != 1 then false else
+  $b[0] as $b0 | $h[0] as $h0
+  | if ($b0 | type) != "object" or ($h0 | type) != "object" then false else
+      ($b0 | del(.packages, ."packages-dev", ."content-hash"))
+        == ($h0 | del(.packages, ."packages-dev", ."content-hash"))
+      and ($jc == 1 or $b0["content-hash"] == $h0["content-hash"])
+      and sectok($b0.packages; $h0.packages)
+      and sectok($b0["packages-dev"]; $h0["packages-dev"])
+      and ((names($h0.packages) + names($h0["packages-dev"])) | sort == unique)
+      and ((changed($b0.packages; $h0.packages)
+            + changed($b0["packages-dev"]; $h0["packages-dev"])) as $ch
+           | ($ch | length) >= 1 and ($ch | all(entryok(.b; .h))))
+    end
+  end'
+# _UI_COMPOSER_JSON_JQ: $b and $h are the slurped base and head composer.json.
+# true only when nothing outside require/require-dev changed, platform keys
+# (no "/" in the name: php, ext-*, lib-*) are equal, and each changed package
+# constraint is ^a.b.c, ^a.b, ~a.b.c or a.b.c moving strictly up in the same major.
+_UI_COMPOSER_JSON_JQ='
+def cons: if type == "string"
+  then ((capture("^(?<op>[\\^~]?)(?<v>[0-9]+\\.[0-9]+(\\.[0-9]+)?)$")) // null) else null end;
+def nparts: .v | split(".") | length;
+def parts: .v | split(".") | map(tonumber) | (. + [0, 0, 0])[0:3];
+def consok($x; $y): ($x | cons) as $p | ($y | cons) as $q
+  | if $p == null or $q == null or $p.op != $q.op then false
+    elif $p.op != "^" and (($p | nparts) != 3 or ($q | nparts) != 3) then false
+    else ($p | parts) as $bp | ($q | parts) as $hp
+      | $hp > $bp and $hp[0] == $bp[0] and ($bp[0] > 0 or $hp[1] == $bp[1])
+    end;
+def sect($o): if $o == null then {} elif ($o | type) == "object" then $o else error("section") end;
+def sectok($x; $y): sect($x) as $p | sect($y) as $q
+  | ($p | keys) == ($q | keys)
+    and ($p | to_entries | all(.key as $k | .value == $q[$k]
+         or (($k | contains("/")) and consok(.value; $q[$k]))));
+if ($b | length) != 1 or ($h | length) != 1 then false else
+  $b[0] as $b0 | $h[0] as $h0
+  | if ($b0 | type) != "object" or ($h0 | type) != "object" then false else
+      ($b0 | del(.require, ."require-dev")) == ($h0 | del(.require, ."require-dev"))
+      and sectok($b0.require; $h0.require)
+      and sectok($b0["require-dev"]; $h0["require-dev"])
+    end
+  end'
 # Dependabot dev-dependency patch exemption (ADR-0062 Update 2026-11-13).
 # ui_dev_patch_exempt compares ibl5/package.json and ibl5/bun.lock between the
 # base checkout (UI_BASE_DIR) and the PR head checkout (UI_HEAD_DIR). One regex
@@ -248,15 +324,64 @@ ui_dev_patch_exempt() {
     _ui_lock_ok "$base" "$head"
 }
 
-# ui_decide <paths_file> <renderable 0|1> <gallery_json or ""> [dev_patch 0|1]: prints the verdict.
+# _ui_composer_regular <file>: rc 0 for a readable regular file that is no
+# symlink and whose parent directory is no symlink.
+_ui_composer_regular() { [ -f "$1" ] && [ ! -L "$1" ] && [ ! -L "${1%/*}" ] && [ -r "$1" ]; }
+
+# _ui_composer_hits_only <paths_file>: rc 0 when every UI_PATH_RE hit is
+# ibl5/composer.json or ibl5/composer.lock.
+_ui_composer_hits_only() {
+    local hits
+    hits=$(ui_paths_touch_ui < "$1") || return 1
+    ! grep -qvE '^ibl5/composer\.(json|lock)$' <<< "$hits"
+}
+
+# ui_composer_exempt <paths_file> <pr_author>: rc 0 when a Dependabot PR changes
+# only ibl5/composer.lock (and maybe ibl5/composer.json) and every changed
+# locked package is a patch or minor upgrade. A grouped PR is judged per
+# member, so one major member holds the group. Env: UI_BASE_DIR (the trusted
+# base checkout) and UI_HEAD_DIR (the PR head, read as data only). Every
+# missing input, parse error, or unexpected shape returns 1, so the PR holds.
+ui_composer_exempt() {
+    local paths="$1" author="$2" base="${UI_BASE_DIR:-}" head="${UI_HEAD_DIR:-}" all p jc=0
+    [ "$author" = 'dependabot[bot]' ] || return 1 # composer author gate
+    if [ -z "$base" ] || [ -z "$head" ] || [ ! -d "$base" ] || [ ! -d "$head" ]; then return 1; fi
+    command -v jq >/dev/null 2>&1 || return 1
+    all=$(grep -v '^[[:space:]]*$' < "$paths" | sort -u) || return 1
+    while IFS= read -r p; do
+        case "$p" in
+            ibl5/composer.lock) ;;
+            ibl5/composer.json) jc=1 ;;
+            *) return 1 ;; # any other path holds
+        esac
+    done <<< "$all"
+    grep -qxF 'ibl5/composer.lock' <<< "$all" || return 1
+    for p in ibl5/composer.lock ibl5/composer.json; do
+        _ui_composer_regular "$base/$p" || return 1
+        _ui_composer_regular "$head/$p" || return 1
+    done
+    if [ "$jc" = 0 ]; then
+        cmp -s "$base/ibl5/composer.json" "$head/ibl5/composer.json" || return 1
+    else
+        jq -en --slurpfile b "$base/ibl5/composer.json" --slurpfile h "$head/ibl5/composer.json" \
+            "$_UI_COMPOSER_JSON_JQ" >/dev/null 2>&1 || return 1
+    fi
+    jq -en --slurpfile b "$base/ibl5/composer.lock" --slurpfile h "$head/ibl5/composer.lock" \
+        --argjson jc "$jc" "$_UI_COMPOSER_LOCK_JQ" >/dev/null 2>&1 || return 1
+}
+
+# ui_decide <paths_file> <renderable 0|1> <gallery_json or ""> [dev_patch 0|1] [composer 0|1]: prints the verdict.
 # Verdicts: ui-unknown ui-paths vr-missing ui-vr (rc 1, hold) | not-ui (rc 0).
 # dev_patch=1 comes from ui_dev_patch_exempt. It skips the ui-paths verdict
 # only when every UI path is ibl5/package.json or ibl5/bun.lock. The
 # renderable and gallery checks below still run.
+# composer=1 (from ui_composer_exempt) skips the ui-paths hold only when every
+# UI path hit is a composer file; the renderable and gallery checks still run.
 ui_decide() {
     local paths="$1" renderable="$2" gallery="$3" dev_patch="${4:-0}" rc=0 n hits
     hits=$(ui_paths_touch_ui < "$paths") || rc=$?
     if [ "$rc" = 2 ]; then echo ui-unknown; return 1; fi
+    if [ "$rc" = 0 ] && [ "${5:-0}" = 1 ] && _ui_composer_hits_only "$paths"; then rc=1; fi
     if [ "$rc" = 0 ] && ! { [ "$dev_patch" = 1 ] && _ui_dev_patch_hits_only "$hits"; }; then echo ui-paths; return 1; fi
     if [ "$renderable" != 1 ]; then echo not-ui; return 0; fi
     if [ -z "$gallery" ] || [ ! -s "$gallery" ]; then echo vr-missing; return 1; fi
@@ -482,19 +607,21 @@ ui_approving_event() {
 # fingerprint at once. Every other event waits as before.
 # rc follows ui_decide (0 not-ui, 1 hold).
 # A Dependabot dev-dependency patch bump (ui_dev_patch_exempt) waits on the gallery like a non-UI PR.
+# A Dependabot composer patch or minor bump (ui_composer_exempt) also waits.
 ui_workflow_verdict() {
     local UI_PR_PATHS="$1"
-    local paths="$1" author="$2" fetch="$3" renderable rc=0 gallery="" tmp dev_patch=0
+    local paths="$1" author="$2" fetch="$3" renderable rc=0 gallery="" tmp dev_patch=0 composer=0
     renderable=$(ui_renderable "$paths" "$author")
     ui_paths_touch_ui < "$paths" >/dev/null || rc=$?
     if [ "$rc" = 0 ] && ui_dev_patch_exempt "$paths" "$author"; then dev_patch=1; fi
-    if { [ "$rc" = 1 ] || [ "$dev_patch" = 1 ]; } && [ "$renderable" = 1 ] && ! ui_approving_event "${4:-}" "${5:-}"; then
+    if [ "$rc" = 0 ] && ui_composer_exempt "$paths" "$author"; then composer=1; fi
+    if { [ "$rc" = 1 ] || [ "$dev_patch" = 1 ] || [ "$composer" = 1 ]; } && [ "$renderable" = 1 ] && ! ui_approving_event "${4:-}" "${5:-}"; then
         tmp=$(mktemp) || tmp=""
         if [ -n "$tmp" ] && ui_await_gallery "${UI_VR_ATTEMPTS:-90}" "${UI_VR_SLEEP:-30}" "$fetch" "$tmp"; then
             gallery="$tmp"
         fi
     fi
-    ui_decide "$paths" "$renderable" "$gallery" "$dev_patch"
+    ui_decide "$paths" "$renderable" "$gallery" "$dev_patch" "$composer"
 }
 
 # ui_fetch_pr_gh — the production fetch for ui_live_pr_state. Prints the live

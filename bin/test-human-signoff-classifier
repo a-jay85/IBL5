@@ -36,6 +36,159 @@ run_pr() {
     return $?
 }
 
+# ---- Dependabot composer patch/minor exemption (ADR-0062 Update 2026-11-14) ----
+# Fixtures: PR #3848's base and head ibl5/composer.lock, trimmed to the changed
+# packages plus one unchanged package per section. The real changes are:
+#   phpmailer/phpmailer v7.1.1 -> v7.2.0 (library)
+#   infection/infection 0.35.9 -> 0.35.10 (library)
+#   sanmai/di-container 0.2 -> 0.2.2 (library)
+#   sanmai/duoclock 0.1.3 -> 0.1.4 (library)
+UCC="$REPO_ROOT/bin/lib/ui-change-classifier.sh"
+CFX="$REPO_ROOT/tools/test-fixtures/composer-signoff"
+CT=$(mktemp -d)
+printf '{"renderedCells":3,"changedCells":[],"newCells":[]}\n' > "$CT/g-clean.json"
+printf '{"renderedCells":3,"changedCells":[{"strict":false}],"newCells":[]}\n' > "$CT/g-diff.json"
+# cx_mk <name> [real|same]: base/head trees; "same" gives head the base lock.
+cx_mk() {
+    mkdir -p "$CT/$1/b/ibl5" "$CT/$1/h/ibl5"
+    cp "$CFX/pr3848-manifest.json" "$CT/$1/b/ibl5/composer.json"
+    cp "$CFX/pr3848-manifest.json" "$CT/$1/h/ibl5/composer.json"
+    cp "$CFX/pr3848-base-lock.json" "$CT/$1/b/ibl5/composer.lock"
+    if [ "${2:-same}" = real ]; then cp "$CFX/pr3848-head-lock.json" "$CT/$1/h/ibl5/composer.lock"
+    else cp "$CFX/pr3848-base-lock.json" "$CT/$1/h/ibl5/composer.lock"; fi
+}
+# cx_edit <name> <b|h> <lock|json> [jq args] <filter>: rewrite one side in place.
+cx_edit() {
+    local f="$CT/$1/$2/ibl5/composer.$3"; shift 3
+    jq "$@" "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+}
+# cx_ver <name> <b|h> <section> <version>: set section[0] to a library at version.
+cx_ver() { cx_edit "$1" "$2" lock --arg s "$3" --arg v "$4" '.[$s][0] |= (.type = "library" | .version = $v)'; }
+cx_patch() { cx_mk "$1"; cx_ver "$1" b packages 1.2.3; cx_ver "$1" h packages 1.2.4; }
+# cx_bump <name> <section> <base version> <head version>: cx_mk, then set both sides.
+cx_bump() { cx_mk "$1"; cx_ver "$1" b "$2" "$3"; cx_ver "$1" h "$2" "$4"; }
+# cx_json_caret <name> <base constraint> <head constraint>: a lock patch plus
+# an acme/x require constraint change in composer.json.
+cx_json_caret() {
+    cx_patch "$1"
+    cx_edit "$1" h lock '."content-hash" = "0"'
+    cx_edit "$1" b json --arg c "$2" '.require["acme/x"] = $c'
+    cx_edit "$1" h json --arg c "$3" '.require["acme/x"] = $c'
+}
+# cx_run <name> <author> <path>...: rc of the real ui_composer_exempt.
+cx_run() {
+    local n="$1" a="$2"; shift 2
+    printf '%s\n' "$@" > "$CT/$n/paths"
+    # shellcheck disable=SC2016  # $1..$3 expand inside the child bash
+    LAST_OUT=$(UI_BASE_DIR="${CX_BASE-$CT/$n/b}" UI_HEAD_DIR="${CX_HEAD-$CT/$n/h}" \
+        bash -c 'set -euo pipefail; source "$1"; ui_composer_exempt "$2" "$3"' _ "$UCC" "$CT/$n/paths" "$a" 2>&1)
+}
+# cx_verdict <name> <author> <gallery file or -> <path>...: real ui_workflow_verdict, stub fetch.
+cx_verdict() {
+    local n="$1" a="$2" g="$3"; shift 3
+    printf '%s\n' "$@" > "$CT/$n/paths"
+    # shellcheck disable=SC2016  # $1..$3 expand inside the child bash
+    LAST_OUT=$(UI_BASE_DIR="$CT/$n/b" UI_HEAD_DIR="$CT/$n/h" UI_VR_ATTEMPTS=1 UI_VR_SLEEP=0 CX_G="$g" \
+        bash -c 'set -euo pipefail; source "$1"
+        cx_fetch() { if [ "$CX_G" = - ]; then return 3; fi; cp "$CX_G" "$1"; }
+        ui_workflow_verdict "$2" "$3" cx_fetch || true' _ "$UCC" "$CT/$n/paths" "$a" 2>&1)
+}
+# cx_decide <paths file> <gallery> <composer flag>: real ui_decide with
+# renderable=1 and dev_patch=0.
+# shellcheck disable=SC2016  # $1..$4 expand inside the child bash
+cx_decide() { LAST_OUT=$(bash -c 'set -euo pipefail; source "$1"; ui_decide "$2" 1 "$3" 0 "$4" || true' _ "$UCC" "$@" 2>&1); }
+CXL=ibl5/composer.lock
+CXJ=ibl5/composer.json
+CXB='dependabot[bot]'
+
+cx_mk C01 real;                                  cx_run C01 "$CXB" "$CXL"; expect ui_composer_pr3848_replay_passes 0 "$?"
+cx_patch C02;                                    cx_run C02 "$CXB" "$CXL"; expect ui_composer_patch_passes 0 "$?"
+cx_bump C03 packages-dev v1.2.3 v1.3.0;          cx_run C03 "$CXB" "$CXL"; expect ui_composer_minor_passes 0 "$?"
+cx_bump C04 packages 0.3.1 0.3.2;                cx_run C04 "$CXB" "$CXL"; expect ui_composer_zero_patch_passes 0 "$?"
+cx_bump C05 packages 0.2 0.2.2;                  cx_run C05 "$CXB" "$CXL"; expect ui_composer_two_part_tag_passes 0 "$?"
+cx_bump C06 packages 1.2.3 2.0.0;                cx_run C06 "$CXB" "$CXL"; expect ui_composer_major_holds 1 "$?"
+cx_bump C07 packages 0.3.1 0.4.0;                cx_run C07 "$CXB" "$CXL"; expect ui_composer_zero_minor_holds 1 "$?"
+cx_bump C08 packages 1.2 2.0;                    cx_run C08 "$CXB" "$CXL"; expect ui_composer_two_part_major_holds 1 "$?"
+cx_patch C09; cx_ver C09 b packages-dev 1.2.3; cx_ver C09 h packages-dev 2.0.0
+cx_run C09 "$CXB" "$CXL"; expect ui_composer_group_one_major_holds 1 "$?"
+cx_bump C10 packages 1.2.3 1.2.2;                cx_run C10 "$CXB" "$CXL"; expect ui_composer_downgrade_holds 1 "$?"
+cx_bump C11 packages 1.2.3 1.2.4-beta1;          cx_run C11 "$CXB" "$CXL"; expect ui_composer_prerelease_holds 1 "$?"
+cx_bump C12 packages 1.2.3 dev-main;             cx_run C12 "$CXB" "$CXL"; expect ui_composer_dev_version_holds 1 "$?"
+cx_bump C13 packages 1.2.3 1.2.3.4;              cx_run C13 "$CXB" "$CXL"; expect ui_composer_four_part_holds 1 "$?"
+cx_bump C14 packages 1.2.3 V1.2.4;               cx_run C14 "$CXB" "$CXL"; expect ui_composer_uppercase_v_holds 1 "$?"
+cx_mk C15;                                       cx_run C15 "$CXB" "$CXL"; expect ui_composer_no_change_holds 1 "$?"
+cx_patch C16; cx_edit C16 h lock '.packages += [{"name":"acme/new","version":"1.0.0","type":"library"}]'
+cx_run C16 "$CXB" "$CXL"; expect ui_composer_added_package_holds 1 "$?"
+cx_bump C17 packages-dev 1.2.3 1.2.4; cx_edit C17 h lock 'del(.packages[0])'
+cx_run C17 "$CXB" "$CXL"; expect ui_composer_removed_package_holds 1 "$?"
+cx_patch C18; cx_edit C18 h lock '."packages-dev" += [.packages[0]] | del(.packages[0])'
+cx_run C18 "$CXB" "$CXL"; expect ui_composer_moved_section_holds 1 "$?"
+cx_patch C19; cx_edit C19 b lock '.packages[0].type = "composer-plugin"'; cx_edit C19 h lock '.packages[0].type = "composer-plugin"'
+cx_run C19 "$CXB" "$CXL"; expect ui_composer_plugin_type_holds 1 "$?"
+cx_patch C20
+cx_edit C20 b lock '.packages[0].dist = {"type":"zip","url":"https://api.github.com/repos/a/b/zipball/1"}'
+cx_edit C20 h lock '.packages[0].dist = {"type":"zip","url":"https://evil.example/b.zip"}'
+cx_run C20 "$CXB" "$CXL"; expect ui_composer_dist_host_holds 1 "$?"
+cx_patch C21; cx_edit C21 h lock '."minimum-stability" = "dev"'
+cx_run C21 "$CXB" "$CXL"; expect ui_composer_top_key_holds 1 "$?"
+cx_patch C22; cx_edit C22 h lock '."content-hash" = "0"'
+cx_run C22 "$CXB" "$CXL"; expect ui_composer_content_hash_lock_only_holds 1 "$?"
+cx_json_caret C23 '^1.2.3' '^1.2.4';             cx_run C23 "$CXB" "$CXJ" "$CXL"; expect ui_composer_json_caret_patch_passes 0 "$?"
+cx_json_caret C24 '^1.2' '^2.0';                 cx_run C24 "$CXB" "$CXJ" "$CXL"; expect ui_composer_json_major_holds 1 "$?"
+cx_patch C25; cx_edit C25 b json '.require.php = "^8.3"'; cx_edit C25 h json '.require.php = "^8.4"'
+cx_run C25 "$CXB" "$CXJ" "$CXL"; expect ui_composer_json_platform_holds 1 "$?"
+cx_patch C26; cx_edit C26 h json '.scripts = {"x": "y"}'
+cx_run C26 "$CXB" "$CXJ" "$CXL"; expect ui_composer_json_other_key_holds 1 "$?"
+cx_json_caret C27 '^1.2.3' '^1.2.3 || ^2.0';     cx_run C27 "$CXB" "$CXJ" "$CXL"; expect ui_composer_json_complex_constraint_holds 1 "$?"
+cx_patch C28; cx_edit C28 h json '.description = "x"'
+cx_run C28 "$CXB" "$CXL"; expect ui_composer_json_drift_holds 1 "$?"
+cx_json_caret C29 '^1.2.3' '^1.2.4';             cx_run C29 "$CXB" "$CXJ"; expect ui_composer_json_only_holds 1 "$?"
+cx_mk C30 real;                                  cx_run C30 a-jay85 "$CXL"; expect ui_composer_human_author_holds 1 "$?"
+cx_mk C31 real;                                  cx_run C31 dependabot "$CXL"; expect ui_composer_lookalike_author_holds 1 "$?"
+cx_mk C32 real;                                  cx_run C32 "$CXB" "$CXL" ibl5/design/x.css; expect ui_composer_ui_file_holds 1 "$?"
+cx_mk C33 real; cx_run C33 "$CXB" "$CXL" ibl5/package.json ibl5/bun.lock
+expect ui_composer_js_lock_holds 1 "$?"
+cx_mk C34 real; rm "$CT/C34/h/ibl5/composer.lock"
+cx_run C34 "$CXB" "$CXL"; expect ui_composer_missing_lock_holds 1 "$?"
+cx_mk C35 real; printf '{' > "$CT/C35/h/ibl5/composer.lock"
+cx_run C35 "$CXB" "$CXL"; expect ui_composer_unparsable_lock_holds 1 "$?"
+if [ "$(id -u)" = 0 ]; then
+    h_skip "ui_composer_unreadable_lock_holds (root reads mode 000 files)"
+else
+    cx_mk C36 real; chmod 000 "$CT/C36/h/ibl5/composer.lock"
+    cx_run C36 "$CXB" "$CXL"; expect ui_composer_unreadable_lock_holds 1 "$?"
+fi
+cx_mk C37 real; CX_BASE=""
+cx_run C37 "$CXB" "$CXL"; expect ui_composer_no_base_dir_holds 1 "$?"; unset CX_BASE CX_HEAD
+cx_mk C38 real; CX_HEAD="$CT/absent"
+cx_run C38 "$CXB" "$CXL"; expect ui_composer_no_head_dir_holds 1 "$?"; unset CX_BASE CX_HEAD
+cx_mk C39 real; mv "$CT/C39/h/ibl5/composer.lock" "$CT/C39/real.lock"
+ln -s "$CT/C39/real.lock" "$CT/C39/h/ibl5/composer.lock"
+cx_run C39 "$CXB" "$CXL"; expect ui_composer_symlink_lock_holds 1 "$?"
+cx_mk C40 real; rm "$CT/C40/h/ibl5/composer.lock"; mkdir "$CT/C40/h/ibl5/composer.lock"
+cx_run C40 "$CXB" "$CXL"; expect ui_composer_nonregular_lock_holds 1 "$?"
+
+printf 'ibl5/composer.lock\n' > "$CT/p1"
+cx_decide "$CT/p1" "$CT/g-clean.json" 1; h_eq ui_composer_decide_flag_clean_passes not-ui "$LAST_OUT"
+cx_decide "$CT/p1" "$CT/g-clean.json" 0; h_eq ui_composer_decide_no_flag_holds ui-paths "$LAST_OUT"
+printf 'ibl5/composer.lock\nibl5/design/x.css\n' > "$CT/p2"
+cx_decide "$CT/p2" "$CT/g-clean.json" 1; h_eq ui_composer_decide_flag_ui_hit_holds ui-paths "$LAST_OUT"
+cx_mk V1 real; cx_verdict V1 "$CXB" "$CT/g-clean.json" "$CXL"; h_eq ui_composer_verdict_clean_passes not-ui "$LAST_OUT"
+cx_mk V2 real; cx_verdict V2 "$CXB" "$CT/g-diff.json" "$CXL"; h_eq ui_composer_verdict_vr_change_holds ui-vr "$LAST_OUT"
+cx_mk V3 real; cx_verdict V3 "$CXB" - "$CXL"; h_eq ui_composer_verdict_no_gallery_holds vr-missing "$LAST_OUT"
+cx_mk V4 real; cx_verdict V4 a-jay85 "$CT/g-clean.json" "$CXL"; h_eq ui_composer_verdict_human_holds ui-paths "$LAST_OUT"
+LAST_OUT=$(bash "$UCC" --paths <<< 'ibl5/composer.lock'); expect ui_composer_paths_cli_still_ui 0 "$?"
+want ui_composer_paths_cli_prints_path "$LAST_OUT" 'ibl5/composer.lock'
+# The sibling dev-patch change exports both dirs on one line, so match each
+# assignment on its own and require both before the verdict call.
+# shellcheck disable=SC2016  # literal $GITHUB_WORKSPACE text in the workflow
+awk 'index($0, "export UI_BASE_DIR=\"$GITHUB_WORKSPACE/.hs-base\"") {b=NR}
+     index($0, "UI_HEAD_DIR=\"$GITHUB_WORKSPACE\"") {h=NR}
+     !v && index($0, "ui_workflow_verdict \"$PATHS\"") {v=NR}
+     END {exit !(b && h && v && b < v && h < v)}' "$REPO_ROOT/.github/workflows/human-signoff.yml"
+expect ui_composer_workflow_exports_dirs 0 "$?"
+chmod -R u+rwx "$CT" 2>/dev/null; rm -rf "$CT"
+
 # ---- pull_request entry gate (UI verdict from bin/lib/ui-change-classifier.sh) ----
 run_pr ui-paths "";                       expect "ui-paths: no label -> FAIL" 1 "$?"
 run_pr ui-paths "human-approved";         expect "ui-paths: + human-approved -> PASS" 0 "$?"

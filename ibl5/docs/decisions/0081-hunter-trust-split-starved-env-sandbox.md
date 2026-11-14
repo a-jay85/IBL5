@@ -1,6 +1,6 @@
 ---
 description: Why the bug-pipeline hunter runs injection-exposed with no ship authority in a credential-starved worktree, and the trusted cron alone opens a held PR.
-last_verified: 2026-09-14
+last_verified: 2026-11-13
 ---
 
 # ADR-0081: Hunter trust-split & credential-starved env sandbox

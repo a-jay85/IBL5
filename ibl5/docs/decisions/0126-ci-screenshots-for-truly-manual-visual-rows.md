@@ -1,6 +1,6 @@
 ---
 description: Truly-manual look-and-feel rows carry a `vr:` cell; CI reaches the state via test-state.php, publishes the PNG to the per-SHA Pages tree, and splices it under the matching Manual Testing bullet.
-last_verified: 2026-09-14
+last_verified: 2026-11-13
 ---
 
 # ADR-0126: CI screenshots for truly-manual visual rows

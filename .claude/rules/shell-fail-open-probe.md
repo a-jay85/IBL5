@@ -1,6 +1,6 @@
 ---
 description: Never use || echo <default> to swallow shell probe failure when the result gates a destructive action — convert probe errors into aborts, not into "resource absent".
-last_verified: 2026-09-14
+last_verified: 2026-11-13
 paths: "bin/**"
 ---
 

@@ -1,6 +1,6 @@
 ---
 description: When a shell probe's exit status gates a destructive action, never use || echo <default> to swallow failure — use an explicit abort instead.
-last_verified: 2026-09-14
+last_verified: 2026-11-13
 ---
 
 # ADR-0127: Shell fail-open probe convention

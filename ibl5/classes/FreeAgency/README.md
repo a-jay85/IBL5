@@ -1,6 +1,6 @@
 ---
 description: Free agency offer submission, market demand calculation, cap validation, and admin management.
-last_verified: 2026-09-14
+last_verified: 2026-11-13
 ---
 
 # FreeAgency

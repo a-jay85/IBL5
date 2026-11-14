@@ -7,11 +7,12 @@ namespace TradeSuggestions;
 /**
  * Stored per-team trade mode setting (ibl_team_info.trade_mode).
  *
- * These three backing values are the only strings that ever reach SQL.
+ * These four backing values are the only strings that ever reach SQL.
  */
 enum TeamModeSetting: string
 {
     case Auto = 'auto';
     case WinNow = 'win_now';
     case Rebuild = 'rebuild';
+    case Middle = 'middle';
 }

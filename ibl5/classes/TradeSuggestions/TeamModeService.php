@@ -22,8 +22,9 @@ class TeamModeService
      * Resolve a mode from already-loaded inputs. The GM's own team and every
      * partner go through here, so a team always gets the same guess.
      *
-     * $allowMiddle reaches the Auto arm only. A GM override is never Middle, so
-     * the override arms keep the two-way guess they always had.
+     * $allowMiddle reaches the Auto arm only. A GM override, Middle included,
+     * keeps the two-way guess, so the mode line can say what we would have
+     * picked.
      */
     public function resolveFromInputs(TeamModeSetting $s, ModeInputs $inputs, bool $allowMiddle = false): ResolvedTeamMode
     {
@@ -32,6 +33,7 @@ class TeamModeService
         return match ($s) {
             TeamModeSetting::WinNow => new ResolvedTeamMode(TeamMode::WinNow, $guess->mode, true, $guess),
             TeamModeSetting::Rebuild => new ResolvedTeamMode(TeamMode::Rebuild, $guess->mode, true, $guess),
+            TeamModeSetting::Middle => new ResolvedTeamMode(TeamMode::Middle, $guess->mode, true, $guess),
             TeamModeSetting::Auto => new ResolvedTeamMode($guess->mode, $guess->mode, false, $guess),
         };
     }

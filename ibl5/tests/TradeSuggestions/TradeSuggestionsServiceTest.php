@@ -4,352 +4,466 @@ declare(strict_types=1);
 
 namespace Tests\TradeSuggestions;
 
-use League\League;
 use PHPUnit\Framework\TestCase;
-use Tests\TradeSuggestions\Fixtures\RosterFactory;
 use ProjectedDraftOrder\Contracts\ProjectedDraftOrderServiceInterface;
 use Settings\Contracts\SettingsServiceInterface;
+use Tests\TradeSuggestions\Fixtures\LaughTestRows;
+use Tests\TradeSuggestions\LaughTest\Fixtures\LaughTestFactory;
 use Trading\Contracts\TradeFormRepositoryInterface;
 use Trading\Contracts\TradeValidatorInterface;
+use Trading\TradePrefillParser;
 use TradeSuggestions\Contracts\SuggestionAssetRepositoryInterface;
 use TradeSuggestions\Contracts\TeamModeRepositoryInterface;
-use TradeSuggestions\ModeInputs;
-use TradeSuggestions\NeedJudge;
-use TradeSuggestions\NeedPairMatcher;
-use TradeSuggestions\NeedsCardBuilder;
-use TradeSuggestions\PickValuer;
-use TradeSuggestions\RejectReason;
-use TradeSuggestions\ReasonBuilder;
-use TradeSuggestions\ResolvedTeamMode;
+use TradeSuggestions\Engine\AssetPool;
+use TradeSuggestions\Engine\CandidateGenerator;
+use TradeSuggestions\Engine\Contracts\LeagueSnapshotProviderInterface;
+use TradeSuggestions\Engine\DealRanker;
+use TradeSuggestions\Engine\LeagueSnapshot;
+use TradeSuggestions\Engine\ModeResolver;
+use TradeSuggestions\Engine\Shape\Contracts\DealShapeInterface;
 use TradeSuggestions\SuggestionPlayer;
-use TradeSuggestions\SuggestionRanker;
 use TradeSuggestions\SuggestionValidationFilter;
-use TradeSuggestions\TeamMode;
+use TradeSuggestions\TeamModeGuesser;
 use TradeSuggestions\TeamModeService;
 use TradeSuggestions\TeamModeSetting;
+use TradeSuggestions\TradeCandidate;
+use TradeSuggestions\TradeSuggestionsPanelData;
 use TradeSuggestions\TradeSuggestionsService;
+use TradeSuggestions\TradeSuggestionsView;
+use TradeSuggestions\Veto\VetoSet;
 use Validation\ValidationResult;
 use Validation\ValidationResultWithContext;
 
 /**
- * The needs engine (card builder, matcher, judge, reason builder), PickValuer and
- * SuggestionRanker are pure, so they run for real over crafted inputs. Every I/O
- * collaborator is a stub.
+ * The v3 engine runs for real over the laugh-test league. A scripted shape
+ * yields a fixed candidate list so the outcome does not hang on the real
+ * shapes' search. The snapshot provider, the repositories and the trade
+ * validator are fakes; the validation filter, ranker and reason writer are
+ * real.
+ *
+ * The scripted deals: user 900013 for partner 6's 604, and user 900011 for
+ * partner 25's 2504 or partner 26's 2608, each alone, with one user pick, or
+ * with both. Under key sim-2 with no vetoes nine of the twelve pass the
+ * ranker's fairness gates.
  */
 class TradeSuggestionsServiceTest extends TestCase
 {
-    private const USER_TID = 1;
+    private const int USER_TID = LaughTestRows::USER_TID;
+    private const string SIM_KEY = 'sim-2';
 
-    public function testReturnsNullWhenTradesClosed(): void
+    /** @var list<array{int, int, int}> partner tid, user pid, partner pid */
+    private const array PAIRS = [[6, 900013, 604], [25, 900011, 2504], [26, 900011, 2608]];
+
+    /** @var list<list<int>> */
+    private const array PICK_SETS = [[], [910001], [910002], [910001, 910002]];
+
+    private static ?LeagueSnapshot $league = null;
+
+    public function testTradesDisabledReturnsNull(): void
     {
-        $assetRepo = self::createMock(SuggestionAssetRepositoryInterface::class);
-        $assetRepo->expects($this->never())->method('getRostersForTeams');
         $formRepo = self::createMock(TradeFormRepositoryInterface::class);
         $formRepo->expects($this->never())->method('getAllTeamsWithCity');
 
-        $service = $this->buildService(tradesAllowed: false, assetRepo: $assetRepo, formRepo: $formRepo);
+        $service = $this->service(tradesAllowed: false, formRepo: $formRepo);
 
         self::assertNull($service->buildForTeam(self::USER_TID));
     }
 
     /**
-     * The GM's own mode and the mode partners see for that team come from one
-     * call path, so the panel header and the deals never disagree.
+     * Only partner 26's 2608 and the user's 900011 may be traded, so the
+     * validator refuses every partner-6 and partner-25 deal.
      */
-    public function testEveryTeamIncludingTheUserResolvesThroughTheSameInputs(): void
+    public function testEveryItemPassedTheValidatorCallback(): void
     {
-        $resolvedFor = [];
-        $teamModeService = self::createMock(TeamModeService::class);
-        $teamModeService->expects($this->exactly(3))->method('resolveFromInputs')->willReturnCallback(
-            static function (TeamModeSetting $s, ModeInputs $inputs) use (&$resolvedFor): ResolvedTeamMode {
-                // wins encode the tid (see the draft order below).
-                $resolvedFor[] = $inputs->wins;
+        $tradeable = [900011, 2608];
+        $panel = $this->build(tradeable: $tradeable);
 
-                return new ResolvedTeamMode(TeamMode::Rebuild, TeamMode::Rebuild, false);
-            },
-        );
-
-        $draftOrder = self::createStub(ProjectedDraftOrderServiceInterface::class);
-        $draftOrder->method('calculateDraftOrder')->willReturn([
-            'round1' => [$this->slot(1, 1, 1), $this->slot(2, 2, 2), $this->slot(3, 3, 3)],
-            'round2' => [],
-        ]);
-
-        $service = $this->buildService(
-            teams: [1 => 'Lakers', 2 => 'Heat', 3 => 'Bulls'],
-            teamModeService: $teamModeService,
-            draftOrder: $draftOrder,
-        );
-
-        $result = $service->buildForTeam(self::USER_TID);
-
-        self::assertNotNull($result);
-        sort($resolvedFor);
-        self::assertSame([1, 2, 3], $resolvedFor);
-        foreach ($result->items as $item) {
-            self::assertNotSame('Lakers', $item->partnerTeamName);
+        self::assertNotSame([], $panel->items);
+        self::assertGreaterThan(0, $panel->diagnostics?->validatorRejections[SuggestionValidationFilter::FAIL_PLAYER] ?? 0);
+        foreach ($panel->items as $item) {
+            self::assertSame('Team 26', $item->partnerTeamName);
+            $parsed = TradePrefillParser::parse(self::prefill($item->prefillUrl), $this->pageData(26));
+            self::assertNotNull($parsed, $item->prefillUrl);
+            foreach (array_keys($parsed['checkedItems']) as $key) {
+                [$type, $id] = explode(':', $key);
+                if ($type === '1') {
+                    self::assertContains((int) $id, $tradeable);
+                }
+            }
         }
-    }
-
-    public function testPartnerModeUsesStoredOverride(): void
-    {
-        $teamModeRepo = self::createStub(TeamModeRepositoryInterface::class);
-        $teamModeRepo->method('getAllStoredSettings')->willReturn([2 => TeamModeSetting::Rebuild]);
-
-        $settings = [];
-        $teamModeService = self::createStub(TeamModeService::class);
-        $teamModeService->method('resolveFromInputs')->willReturnCallback(
-            static function (TeamModeSetting $s, ModeInputs $inputs) use (&$settings): ResolvedTeamMode {
-                $settings[$inputs->wins] = $s;
-
-                return new ResolvedTeamMode(TeamMode::WinNow, TeamMode::WinNow, false);
-            },
-        );
-
-        $draftOrder = self::createStub(ProjectedDraftOrderServiceInterface::class);
-        $draftOrder->method('calculateDraftOrder')->willReturn([
-            'round1' => [$this->slot(1, 1, 40), $this->slot(2, 2, 6)],
-            'round2' => [],
-        ]);
-
-        $service = $this->buildService(
-            teams: [1 => 'Lakers', 2 => 'Heat'],
-            teamModeService: $teamModeService,
-            teamModeRepo: $teamModeRepo,
-            draftOrder: $draftOrder,
-        );
-
-        self::assertNotNull($service->buildForTeam(self::USER_TID));
-        self::assertSame([1 => TeamModeSetting::Auto, 2 => TeamModeSetting::Rebuild], $settings);
     }
 
     /**
-     * Every generated deal lands in exactly one bucket, so an empty panel can
-     * say which filter emptied it.
+     * Dupree and one pick for Laettner. The full laugh-test deal sends two
+     * picks, which is three user assets, so the generator drops it before
+     * scoring; one pick keeps the side at the two-asset limit. The deal fails
+     * the both-sides-positive gate before the veto gate sees it, so the drop
+     * shows under NOT_BOTH_POSITIVE. Key sim-27 lets partner 2 through the
+     * exposure filter.
      */
-    public function testDiagnosticsAccountForEveryCandidate(): void
+    public function testDupreeForLaettnerNeverAppearsInItems(): void
     {
-        $result = $this->buildService(rosters: self::rosters())->buildForTeam(self::USER_TID);
+        $panel = $this->build(
+            candidates: [new TradeCandidate(self::USER_TID, LaughTestRows::PARTNER_TID, [LaughTestRows::DUPREE_PID], [910002], [LaughTestRows::LAETTNER_PID], [])],
+            vetoes: VetoSet::standard(),
+            simKey: 'sim-27',
+        );
 
-        self::assertNotNull($result);
-        $d = $result->diagnostics;
-        self::assertNotNull($d);
-        self::assertGreaterThan(0, $d->generated);
-        self::assertSame($d->generated, array_sum($d->rejections) + $d->scored);
-        self::assertSame(count($result->items) + array_sum($d->validatorRejections), $d->validated);
-    }
-
-    public function testRejectionsListEveryReason(): void
-    {
-        $result = $this->buildService(rosters: self::rosters())->buildForTeam(self::USER_TID);
-
-        self::assertNotNull($result);
-        $d = $result->diagnostics;
-        self::assertNotNull($d);
-        foreach (RejectReason::cases() as $reason) {
-            self::assertArrayHasKey($reason->value, $d->rejections);
+        foreach ($panel->items as $item) {
+            $labels = [...$item->giveLabels, ...$item->getLabels];
+            self::assertFalse(in_array('Dupree', $labels, true) && in_array('Laettner', $labels, true));
         }
+        self::assertSame(1, $panel->diagnostics?->rejections['NOT_BOTH_POSITIVE'] ?? 0);
     }
 
-    public function testOverCapUserGetsDealsWithAReasonOnBothSides(): void
+    public function testItemsCapAtThree(): void
     {
-        $result = $this->buildService(rosters: self::rosters(), capTotal: 3000, userCapTotal: League::HARD_CAP_MAX + 653, picks: self::userPicks(), draftOrder: $this->draftOrderOf2())->buildForTeam(self::USER_TID);
+        $panel = $this->build();
 
-        self::assertNotNull($result);
-        self::assertNotSame([], $result->items);
-        foreach ($result->items as $item) {
-            self::assertSame('Heat', $item->partnerTeamName);
-            self::assertNotSame('', $item->userReason);
-            self::assertNotSame('', $item->partnerReason);
-            self::assertDoesNotMatchRegularExpression('/\b(ovr|rating)\b/i', $item->userReason . ' ' . $item->partnerReason);
-        }
+        self::assertCount(3, $panel->items);
     }
 
-    public function testEmptyUserRosterKeepsDiagnosticsBalanced(): void
+    public function testEmptyCandidateListGivesEmptyPanelNotNull(): void
     {
-        $rosters = self::rosters();
-        $rosters[1] = array_slice($rosters[1], 0, 0);
+        $panel = $this->build(candidates: []);
 
-        $result = $this->buildService(rosters: $rosters)->buildForTeam(self::USER_TID);
-
-        self::assertNotNull($result);
-        $d = $result->diagnostics;
-        self::assertNotNull($d);
-        self::assertSame($d->generated, array_sum($d->rejections) + $d->scored);
+        self::assertSame([], $panel->items);
+        self::assertStringContainsString('Mode: ', (new TradeSuggestionsView())->render($panel));
     }
 
-    public function testReturnsEmptyItemsWhenNothingPasses(): void
+    public function testPanelModeLineUsesTheUserMode(): void
     {
-        $validator = self::createStub(TradeValidatorInterface::class);
-        $validator->method('canPlayerBeTraded')->willReturn(false);
+        $panel = $this->build(records: [70, 12]);
 
-        $service = $this->buildService(rosters: self::rosters(), validator: $validator);
+        $html = (new TradeSuggestionsView())->render($panel);
 
-        $result = $service->buildForTeam(self::USER_TID);
+        self::assertStringContainsString('Mode: Win now', $html);
+        self::assertStringContainsString('(our guess)', $html);
+    }
 
-        self::assertNotNull($result);
-        self::assertSame([], $result->items);
-        self::assertSame(TeamMode::Rebuild, $result->mode->mode);
+    public function testPanelModeLineKeepsTheGuessForAnOverride(): void
+    {
+        $panel = $this->build(records: [70, 12], stored: TeamModeSetting::Rebuild);
+
+        $html = (new TradeSuggestionsView())->render($panel);
+
+        self::assertStringContainsString('Mode: Rebuild', $html);
+        self::assertStringContainsString('(your choice, we guessed Win now)', $html);
+    }
+
+    public function testPanelModeLineShowsMiddleForNearFiveHundredAutoTeam(): void
+    {
+        $panel = $this->build(records: [41, 41]);
+
+        $html = (new TradeSuggestionsView())->render($panel);
+
+        self::assertStringContainsString('Mode: Middle', $html);
+    }
+
+    public function testLabelsNamePlayersThenPicks(): void
+    {
+        $panel = $this->build(candidates: [new TradeCandidate(self::USER_TID, 26, [900011], [910002], [2608], [])]);
+
+        self::assertCount(1, $panel->items);
+        $player = self::league()->players[900011]->name;
+        self::assertSame([$player, '2028 Round 2 (Team 1)'], $panel->items[0]->giveLabels);
+        self::assertSame([self::league()->players[2608]->name], $panel->items[0]->getLabels);
     }
 
     /**
-     * @param array<int, string> $teams
-     * @param array<int, list<SuggestionPlayer>> $rosters
-     * @param array<int, list<array{pickid: int, owner_teamid: int, teampick_teamid: int, year: int, round: int}>> $picks
+     * @param list<TradeCandidate>|null $candidates null = the scripted twelve
+     * @param list<int>|null $tradeable null = every player may be traded
+     * @param array{int, int} $records the user's current wins and losses
      */
-    private function buildService(
+    private function build(
+        ?array $candidates = null,
+        ?VetoSet $vetoes = null,
+        ?array $tradeable = null,
+        array $records = [70, 12],
+        ?TeamModeSetting $stored = null,
+        string $simKey = self::SIM_KEY,
+    ): TradeSuggestionsPanelData {
+        $panel = $this->service(
+            candidates: $candidates ?? self::scripted(),
+            vetoes: $vetoes ?? new VetoSet([]),
+            tradeable: $tradeable,
+            records: $records,
+            stored: $stored,
+            simKey: $simKey,
+        )->buildForTeam(self::USER_TID);
+        self::assertNotNull($panel);
+
+        return $panel;
+    }
+
+    /**
+     * @param list<TradeCandidate> $candidates
+     * @param list<int>|null $tradeable
+     * @param array{int, int} $records
+     */
+    private function service(
         bool $tradesAllowed = true,
-        array $teams = [1 => 'Lakers', 2 => 'Heat'],
-        array $rosters = [],
-        ?TeamModeService $teamModeService = null,
-        ?TeamModeRepositoryInterface $teamModeRepo = null,
-        ?SuggestionAssetRepositoryInterface $assetRepo = null,
-        ?ProjectedDraftOrderServiceInterface $draftOrder = null,
         ?TradeFormRepositoryInterface $formRepo = null,
-        ?TradeValidatorInterface $validator = null,
-        int $capTotal = 5000,
-        ?int $userCapTotal = null,
-        array $picks = [],
+        array $candidates = [],
+        ?VetoSet $vetoes = null,
+        ?array $tradeable = null,
+        array $records = [70, 12],
+        ?TeamModeSetting $stored = null,
+        string $simKey = self::SIM_KEY,
     ): TradeSuggestionsService {
+        $league = self::league();
+        $formRepo ??= $this->formRepo($league);
+
         $settings = self::createStub(SettingsServiceInterface::class);
         $settings->method('isTradesAllowed')->willReturn($tradesAllowed);
 
-        if ($teamModeService === null) {
-            $teamModeService = self::createStub(TeamModeService::class);
-            $teamModeService->method('resolveFromInputs')->willReturn(new ResolvedTeamMode(TeamMode::Rebuild, TeamMode::Rebuild, false));
-        }
-
-        if ($teamModeRepo === null) {
-            $teamModeRepo = self::createStub(TeamModeRepositoryInterface::class);
-            $teamModeRepo->method('getAllStoredSettings')->willReturn([]);
-        }
-
-        if ($assetRepo === null) {
-            $assetRepo = self::createStub(SuggestionAssetRepositoryInterface::class);
-            $assetRepo->method('getRostersForTeams')->willReturn($rosters);
-            $assetRepo->method('getPicksForTeams')->willReturn($picks);
-        }
-
-        if ($draftOrder === null) {
-            $draftOrder = self::createStub(ProjectedDraftOrderServiceInterface::class);
-            $draftOrder->method('calculateDraftOrder')->willReturn(['round1' => [], 'round2' => []]);
-        }
-
-        if ($formRepo === null) {
-            $formRepo = self::createStub(TradeFormRepositoryInterface::class);
-            $rows = [];
-            foreach ($teams as $tid => $name) {
-                $rows[] = ['teamid' => $tid, 'team_name' => $name, 'team_city' => 'City', 'color1' => '000000', 'color2' => 'FFFFFF'];
-            }
-            $formRepo->method('getAllTeamsWithCity')->willReturn($rows);
-            $formRepo->method('getTeamPlayersForTrading')->willReturnCallback(
-                static fn (int $tid): array => array_map(
-                    static fn (SuggestionPlayer $p): array => ['pid' => $p->pid, 'cy' => 1, 'salary_yr1' => $p->currentSalary],
-                    $rosters[$tid] ?? [],
-                ),
-            );
-            $formRepo->method('getTeamDraftPicksForTrading')->willReturnCallback(
-                static fn (int $tid): array => array_map(
-                    static fn (array $row): array => ['pickid' => $row['pickid']],
-                    $picks[$tid] ?? [],
-                ),
-            );
-        }
-
-        if ($validator === null) {
-            $validator = self::createStub(TradeValidatorInterface::class);
-            $validator->method('validateSalaryCaps')->willReturn(ValidationResultWithContext::success(['userPostTradeCapTotal' => 0, 'partnerPostTradeCapTotal' => 0]));
-            $validator->method('validateRosterLimits')->willReturn(ValidationResult::success());
-            $validator->method('canPlayerBeTraded')->willReturn(true);
-        }
         $season = new \Tests\WideUnit\Mocks\Season(self::createStub(\mysqli::class));
         $season->endingYear = 2027;
 
-        $capCalculator = self::createStub(\Trading\TradeCapCalculator::class);
-        $capCalculator->method('calculateSalaryCapData')->willReturnCallback(
-            static fn (array $tradeData): array => [
-                'userCurrentSeasonCapTotal' => $userCapTotal !== null && $tradeData['offeringTeam'] === 'Lakers' ? $userCapTotal : $capTotal,
-                'partnerCurrentSeasonCapTotal' => $capTotal,
-                'userCapSentToPartner' => 0,
-                'partnerCapSentToUser' => 0,
-            ],
+        $modes = $this->modeResolver($records, $stored, $season);
+        $snapshots = new class ($league, $modes, $simKey) implements LeagueSnapshotProviderInterface {
+            private ?string $key = null;
+
+            public function __construct(
+                private readonly LeagueSnapshot $league,
+                private readonly ModeResolver $modes,
+                private readonly string $simKey,
+            ) {
+            }
+
+            public function snapshot(): LeagueSnapshot
+            {
+                $this->modes->resolveAll();
+                $this->key = $this->simKey;
+
+                return $this->league;
+            }
+
+            public function lastKey(): ?string
+            {
+                return $this->key;
+            }
+        };
+
+        $validator = self::createStub(TradeValidatorInterface::class);
+        $validator->method('validateSalaryCaps')->willReturn(ValidationResultWithContext::success(['userPostTradeCapTotal' => 0, 'partnerPostTradeCapTotal' => 0]));
+        $validator->method('validateRosterLimits')->willReturn(ValidationResult::success());
+        $validator->method('canPlayerBeTraded')->willReturnCallback(
+            static fn (int $pid): bool => $tradeable === null || in_array($pid, $tradeable, true),
         );
 
+        $capCalculator = self::createStub(\Trading\TradeCapCalculator::class);
+        $capCalculator->method('calculateSalaryCapData')->willReturn([
+            'userCurrentSeasonCapTotal' => 0,
+            'partnerCurrentSeasonCapTotal' => 0,
+            'userCapSentToPartner' => 0,
+            'partnerCapSentToUser' => 0,
+        ]);
+
         return new TradeSuggestionsService(
-            $teamModeService,
-            $teamModeRepo,
-            $assetRepo,
-            $draftOrder,
+            $snapshots,
+            new CandidateGenerator($candidates === [] ? [] : [self::shape($candidates)]),
+            $vetoes ?? new VetoSet([]),
+            new DealRanker(),
+            new SuggestionValidationFilter($validator, $capCalculator, $formRepo, $season),
             $formRepo,
             $settings,
-            $season,
-            new PickValuer(),
-            new NeedsCardBuilder(),
-            new NeedPairMatcher(),
-            new NeedJudge(),
-            new ReasonBuilder(),
-            new SuggestionValidationFilter($validator, $capCalculator, $formRepo, $season),
-            new SuggestionRanker(),
+            $modes,
         );
+    }
+
+    /**
+     * Teams, players and picks straight from the snapshot, in tid and pid order.
+     */
+    private function formRepo(LeagueSnapshot $league): TradeFormRepositoryInterface
+    {
+        $formRepo = self::createStub(TradeFormRepositoryInterface::class);
+        $rows = [];
+        foreach ($league->teamNames as $tid => $name) {
+            $rows[] = ['teamid' => $tid, 'team_name' => $name, 'team_city' => 'City', 'color1' => '000000', 'color2' => 'FFFFFF'];
+        }
+        $formRepo->method('getAllTeamsWithCity')->willReturn($rows);
+        $formRepo->method('getTeamPlayersForTrading')->willReturnCallback(
+            static fn (int $tid): array => array_map(
+                static fn (int $pid): array => ['pid' => $pid, 'cy' => 1, 'salary_yr1' => 100],
+                self::pidsOf($league, $tid),
+            ),
+        );
+        $formRepo->method('getTeamDraftPicksForTrading')->willReturnCallback(
+            static fn (int $tid): array => array_map(
+                static fn (int $pickId): array => ['pickid' => $pickId],
+                self::pickIdsOf($league, $tid),
+            ),
+        );
+
+        return $formRepo;
+    }
+
+    /**
+     * Teams 1 and 2 only; the panel reads just the user's resolution.
+     *
+     * @param array{int, int} $records
+     */
+    private function modeResolver(array $records, ?TeamModeSetting $stored, \Season\Season $season): ModeResolver
+    {
+        $rotation = [];
+        foreach ([1, 2] as $i) {
+            $rotation[] = new SuggestionPlayer(
+                pid: $i,
+                name: 'Player ' . $i,
+                pos: 'SF',
+                age: $i === 1 ? 26 : 27,
+                injured: false,
+                currentSalary: 1000,
+                yearsRemaining: $i === 1 ? 2 : 1,
+                futureSalary: 0,
+                dcMinutes: 30,
+            );
+        }
+        $assetRepo = self::createStub(SuggestionAssetRepositoryInterface::class);
+        $assetRepo->method('getRostersForTeams')->willReturn([1 => $rotation, 2 => $rotation]);
+        $assetRepo->method('getRegularSeasonRecords')->willReturn([]);
+
+        $draftOrder = self::createStub(ProjectedDraftOrderServiceInterface::class);
+        $draftOrder->method('calculateDraftOrder')->willReturn([
+            'round1' => [self::slot(1, $records[0], $records[1]), self::slot(2, 41, 41)],
+            'round2' => [],
+        ]);
+
+        $teamModeRepo = self::createStub(TeamModeRepositoryInterface::class);
+        $teamModeRepo->method('getAllStoredSettings')->willReturn($stored === null ? [] : [self::USER_TID => $stored]);
+
+        $modeFormRepo = self::createStub(TradeFormRepositoryInterface::class);
+        $modeFormRepo->method('getAllTeamsWithCity')->willReturn([
+            ['teamid' => 1, 'team_name' => 'Team 1', 'team_city' => 'A', 'color1' => '000000', 'color2' => 'FFFFFF'],
+            ['teamid' => 2, 'team_name' => 'Team 2', 'team_city' => 'B', 'color1' => '000000', 'color2' => 'FFFFFF'],
+        ]);
+
+        return new ModeResolver(
+            $assetRepo,
+            $draftOrder,
+            $teamModeRepo,
+            $modeFormRepo,
+            new TeamModeService(self::createStub(TeamModeRepositoryInterface::class), new TeamModeGuesser()),
+            $season,
+        );
+    }
+
+    /**
+     * A shape that yields, for each partner, the given candidates aimed at it.
+     *
+     * @param list<TradeCandidate> $candidates
+     */
+    private static function shape(array $candidates): DealShapeInterface
+    {
+        return new class ($candidates) implements DealShapeInterface {
+            /**
+             * @param list<TradeCandidate> $candidates
+             */
+            public function __construct(private readonly array $candidates)
+            {
+            }
+
+            public function id(): string
+            {
+                return 'SCRIPTED';
+            }
+
+            public function generate(LeagueSnapshot $s, int $userTid, int $partnerTid, AssetPool $pool): iterable
+            {
+                foreach ($this->candidates as $c) {
+                    if ($c->partnerTid === $partnerTid) {
+                        yield $c;
+                    }
+                }
+            }
+        };
+    }
+
+    /**
+     * @return list<TradeCandidate>
+     */
+    private static function scripted(): array
+    {
+        $out = [];
+        foreach (self::PAIRS as [$partner, $userPid, $partnerPid]) {
+            foreach (self::PICK_SETS as $picks) {
+                $out[] = new TradeCandidate(self::USER_TID, $partner, [$userPid], $picks, [$partnerPid], []);
+            }
+        }
+
+        return $out;
+    }
+
+    private static function league(): LeagueSnapshot
+    {
+        return self::$league ??= LaughTestFactory::league();
+    }
+
+    /**
+     * @return list<int>
+     */
+    private static function pidsOf(LeagueSnapshot $league, int $tid): array
+    {
+        $pids = array_keys(array_filter($league->teamOfPid, static fn (int $t): bool => $t === $tid));
+        sort($pids);
+
+        return $pids;
+    }
+
+    /**
+     * @return list<int>
+     */
+    private static function pickIdsOf(LeagueSnapshot $league, int $tid): array
+    {
+        $ids = [];
+        foreach ($league->picks as $id => $pick) {
+            if ($pick->ownerTid === $tid) {
+                $ids[] = $id;
+            }
+        }
+        sort($ids);
+
+        return $ids;
+    }
+
+    /**
+     * The form page data TradePrefillParser checks keys against.
+     *
+     * @return array<string, mixed>
+     */
+    private function pageData(int $partnerTid): array
+    {
+        $league = self::league();
+        $players = static fn (int $tid): array => array_map(static fn (int $pid): array => ['pid' => $pid], self::pidsOf($league, $tid));
+        $picks = static fn (int $tid): array => array_map(static fn (int $id): array => ['pickid' => $id], self::pickIdsOf($league, $tid));
+
+        return [
+            'partnerTeamId' => $partnerTid,
+            'userPlayers' => $players(self::USER_TID),
+            'partnerPlayers' => $players($partnerTid),
+            'userPicks' => $picks(self::USER_TID),
+            'partnerPicks' => $picks($partnerTid),
+        ];
+    }
+
+    private static function prefill(string $url): string
+    {
+        parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+        $prefill = $query['prefill'] ?? '';
+
+        return is_string($prefill) ? $prefill : '';
     }
 
     /**
      * @return array{pick: int, teamId: int, teamName: string, wins: int, losses: int, color1: string, color2: string, ownerId: int, ownerName: string, ownerColor1: string, ownerColor2: string, isTraded: bool, notes: string, movement: int|null, player: string}
      */
-    private function slot(int $teamId, int $wins, int $losses): array
+    private static function slot(int $teamId, int $wins, int $losses): array
     {
         return [
             'pick' => $teamId, 'teamId' => $teamId, 'teamName' => 'T' . $teamId, 'wins' => $wins, 'losses' => $losses,
             'color1' => '000000', 'color2' => 'FFFFFF', 'ownerId' => $teamId, 'ownerName' => 'T' . $teamId,
             'ownerColor1' => '000000', 'ownerColor2' => 'FFFFFF', 'isTraded' => false, 'notes' => '', 'movement' => null, 'player' => '',
         ];
-    }
-
-    /**
-     * Team 1 is over the hard cap with an old, expensive rotation. Team 2 has
-     * room and young players. Everyone has minutes and a points line.
-     *
-     * @return array<int, list<SuggestionPlayer>>
-     */
-    private static function rosters(): array
-    {
-        $positions = ['PG', 'SG', 'SF', 'PF', 'C', 'G', 'F', 'GF', 'C'];
-        $rosters = [];
-        foreach ([1, 2] as $tid) {
-            foreach ($positions as $i => $pos) {
-                $pid = $tid * 100 + $i;
-                $rosters[$tid][] = RosterFactory::player(
-                    $pid,
-                    $pos,
-                    age: $tid === 1 ? 31 : 22,
-                    salary: $tid === 1 ? 900 : 400,
-                    years: 1 + $i % 4,
-                    dcMinutes: $i < 5 ? 36 - 3 * $i : 0,
-                    points: 700 - 40 * $i - 20 * $tid,
-                    laterSalaries: $tid === 1 ? [900, 900] : [],
-                );
-            }
-        }
-
-        return $rosters;
-    }
-
-    /**
-     * @return array<int, list<array{pickid: int, owner_teamid: int, teampick_teamid: int, year: int, round: int}>>
-     */
-    private static function userPicks(): array
-    {
-        return [1 => [['pickid' => 900, 'owner_teamid' => 1, 'teampick_teamid' => 1, 'year' => 2027, 'round' => 1]]];
-    }
-
-    private function draftOrderOf2(): ProjectedDraftOrderServiceInterface
-    {
-        $draftOrder = self::createStub(ProjectedDraftOrderServiceInterface::class);
-        $draftOrder->method('calculateDraftOrder')->willReturn([
-            'round1' => [$this->slot(1, 20, 62), $this->slot(2, 40, 42)],
-            'round2' => [],
-        ]);
-
-        return $draftOrder;
     }
 }

@@ -54,11 +54,10 @@ class TeamModeRepositoryTest extends DatabaseTestCase
     }
 
     /**
-     * Migration 211 widens the enum, so a strict-mode UPDATE to 'middle' now
-     * succeeds. TeamModeSetting has no Middle case until unit 4, so the
-     * repository still reads the stored 'middle' as Auto.
+     * Migration 211 widens the enum, so a strict-mode UPDATE to 'middle'
+     * succeeds, and the repository reads it back as the Middle setting.
      */
-    public function testMigratedEnumStoresMiddleAndRepositoryReadsAuto(): void
+    public function testStoredMiddleReadsAsMiddleSetting(): void
     {
         $this->db->query("SET SESSION sql_mode = 'STRICT_ALL_TABLES'");
         $updated = $this->db->query("UPDATE ibl_team_info SET trade_mode = 'middle' WHERE teamid = 1");
@@ -68,8 +67,8 @@ class TeamModeRepositoryTest extends DatabaseTestCase
         self::assertInstanceOf(\mysqli_result::class, $stored);
         self::assertSame(['trade_mode' => 'middle'], $stored->fetch_assoc());
 
-        self::assertSame(TeamModeSetting::Auto, $this->repo->getStoredSetting(1));
-        self::assertSame(TeamModeSetting::Auto, $this->repo->getAllStoredSettings()[1] ?? TeamModeSetting::Auto);
+        self::assertSame(TeamModeSetting::Middle, $this->repo->getStoredSetting(1));
+        self::assertSame(TeamModeSetting::Middle, $this->repo->getAllStoredSettings()[1] ?? TeamModeSetting::Auto);
     }
 
     public function testMissingTeamReadsAsAuto(): void

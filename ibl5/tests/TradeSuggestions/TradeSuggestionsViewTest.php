@@ -131,8 +131,8 @@ class TradeSuggestionsViewTest extends TestCase
     }
 
     /**
-     * A Middle mode renders its label, but the picker still offers exactly Auto,
-     * Win now and Rebuild: Middle becomes GM-selectable only in unit 4.
+     * A Middle mode renders its label, and the picker offers Auto, Win now,
+     * Middle and Rebuild, in that order.
      */
     public function testMiddleModeRendersMiddleLabel(): void
     {
@@ -143,14 +143,19 @@ class TradeSuggestionsViewTest extends TestCase
 
         self::assertStringContainsString('Mode: Middle', $html);
         self::assertStringContainsString('(our guess)', $html);
-        self::assertSame(3, substr_count($html, '<option value='));
+        preg_match_all('/<option value="([a-z_]+)"/', $html, $m);
+        self::assertSame(['auto', 'win_now', 'middle', 'rebuild'], $m[1]);
         self::assertStringContainsString('<option value="auto" selected>', $html);
-        self::assertStringContainsString('<option value="win_now">', $html);
-        self::assertStringContainsString('<option value="rebuild">', $html);
-        self::assertStringNotContainsString('value="middle"', $html);
     }
 
-    public function testMiddleOverrideRendersWithAutoSelectedSinceNoMiddleOptionExists(): void
+    public function testModeFormOffersMiddle(): void
+    {
+        $html = $this->render(new TradeSuggestionsPanelData($this->autoMode(), []));
+
+        self::assertStringContainsString('<option value="middle">Middle</option>', $html);
+    }
+
+    public function testMiddleOverrideMarksMiddleSelected(): void
     {
         $html = $this->render(new TradeSuggestionsPanelData(
             new ResolvedTeamMode(TeamMode::Middle, TeamMode::WinNow, true),
@@ -159,7 +164,7 @@ class TradeSuggestionsViewTest extends TestCase
 
         self::assertStringContainsString('Mode: Middle', $html);
         self::assertStringContainsString('(your choice, we guessed Win now)', $html);
-        self::assertStringContainsString('<option value="auto" selected>', $html);
+        self::assertStringContainsString('<option value="middle" selected>', $html);
         self::assertSame(1, substr_count($html, ' selected>'));
     }
 

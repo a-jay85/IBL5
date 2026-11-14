@@ -85,16 +85,19 @@ final readonly class ProductionLine
         );
     }
 
+    /** Minutes a line needs before its numbers count. */
+    public const int MIN_SAMPLE_MINUTES = 400;
+
     /**
      * The sample rule: the current line once it has enough minutes, else last
      * season's line if that one does, else no production at all.
      */
     public static function choose(?self $current, ?self $lastSeason): ?self
     {
-        if ($current !== null && $current->minutes >= NeedThresholds::MIN_SAMPLE_MINUTES) {
+        if ($current !== null && $current->minutes >= self::MIN_SAMPLE_MINUTES) {
             return $current;
         }
-        if ($lastSeason !== null && $lastSeason->minutes >= NeedThresholds::MIN_SAMPLE_MINUTES) {
+        if ($lastSeason !== null && $lastSeason->minutes >= self::MIN_SAMPLE_MINUTES) {
             return $lastSeason;
         }
 

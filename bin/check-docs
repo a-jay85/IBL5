@@ -19,6 +19,9 @@ const IN_SCOPE_GLOBS = [
     'ibl5/docs/decisions/*.md',
     'ibl5/classes/*/README.md',
     'engine/.claude/rules/*.md',
+    // J27 port docs carry the frontmatter schema. Older engine docs predate it
+    // and stay out of scope until each one is re-verified.
+    'engine/docs/j27-*.md',
 ];
 
 const EXCLUDED_RELATIVE_FRAGMENTS = [

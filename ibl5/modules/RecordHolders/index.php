@@ -12,5 +12,5 @@ if (!defined('MODULE_FILE')) {
 
 $target = \Records\RecordsController::legacyRedirectUrl('RecordHolders', $_GET + $_POST)
     ?? 'modules.php?name=Records&tab=' . \Records\RecordsController::TAB_ALLTIME;
-(new \Api\Response\RedirectResponder())->redirect($target);
+\Module\ModuleRedirect::to($target);
 return;

@@ -48,4 +48,34 @@ final class LeagueStartersFactory implements \Module\Contracts\ModuleFactoryInte
         return new LeagueStartersView($moduleName);
     }
 
+    /**
+     * The factory supplies the handle; the entry point supplies the identity.
+     *
+     * @return \Closure(int|string): \Team\Team
+     */
+    public function teamResolver(): \Closure
+    {
+        $db = $this->services->db();
+
+        return static fn (int|string $identifier): \Team\Team => \Team\Team::initialize($db, $identifier);
+    }
+
+    /**
+     * Renders the page body with the request's database handle bound in.
+     *
+     * @return \Closure(LeagueStartersView, \Season\Season, array<string, array<int, \Player\Player>>, \Team\Team, string): string
+     */
+    public function viewRenderer(): \Closure
+    {
+        $db = $this->services->db();
+
+        return static fn (
+            LeagueStartersView $view,
+            \Season\Season $season,
+            array $startersByPosition,
+            \Team\Team $userTeam,
+            string $display
+        ): string => $view->render($db, $season, $startersByPosition, $userTeam, $display);
+    }
+
 }

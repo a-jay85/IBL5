@@ -26,5 +26,5 @@ if ($op === 'api') {
 
 $target = \Records\RecordsController::legacyRedirectUrl('FranchiseRecordBook', $_GET + $_POST)
     ?? 'modules.php?name=Records&tab=' . \Records\RecordsController::TAB_BYFRANCHISE;
-(new \Api\Response\RedirectResponder())->redirect($target);
+\Module\ModuleRedirect::to($target);
 return;

@@ -81,4 +81,11 @@ final class RecordsEntryPointTest extends ModuleEntryPointTestCase
         $this->assertStringContainsString('class="ibl-tab-panel" data-tab="thisseason"', $output);
         $this->assertStringNotContainsString("Players' 0 Highs", $output);
     }
+
+    public function testAllTimeTabQueriesRecordHolderData(): void
+    {
+        $this->runModule('Records', [], [], $this->dbGlobals());
+
+        $this->assertQueryExecuted('ibl_box_scores');
+    }
 }

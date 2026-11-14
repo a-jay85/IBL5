@@ -39,4 +39,17 @@ class NextSimEntryPointTest extends ModuleEntryPointTestCase
             $this->runModule('NextSim', [], [], ['user' => $GLOBALS['user']]);
         });
     }
+
+    public function testRendersNextSimScheduleQueriesSchedule(): void
+    {
+        $this->authenticateAs('testgm');
+        $this->mockDb->setMockTeamData([self::fullTeamData()]);
+        $this->mockDb->setMockData([]);
+
+        $this->runModule('NextSim', [], [], [
+            'user' => $GLOBALS['user'],
+        ]);
+
+        $this->assertQueryExecuted('ibl_schedule');
+    }
 }

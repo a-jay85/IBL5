@@ -83,6 +83,11 @@ def test_sql_delete_using_list_with_unregistered_second_target_fails_closed():
     _assert_one_way(SQL_DEL, "DELETE FROM ibl_hist, ibl_plr USING ibl_hist JOIN ibl_plr ON ibl_plr.pid = ibl_hist.pid;")
 
 
+def test_sql_modified_delete_using_list_fails_closed():
+    _assert_one_way(SQL_DEL, "DELETE LOW_PRIORITY FROM ibl_hist, ibl_plr USING ibl_hist "
+                    "JOIN ibl_plr ON ibl_plr.pid = ibl_hist.pid;")
+
+
 def test_on_delete_cascade_is_not_a_delete():
     _assert_two_way(SQL_DEL, "ALTER TABLE ibl_x ADD CONSTRAINT fk_x FOREIGN KEY (pid) "
                     "REFERENCES ibl_plr (pid) ON DELETE CASCADE;")

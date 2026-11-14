@@ -66,7 +66,8 @@ _PHP_MIGRATION_RE = re.compile(r"^ibl5/migrations/.*\.php$")
 _DIFF_HEADER_RE = re.compile(r"^diff --git a/.* b/(.*)$", re.MULTILINE)
 _RENAME_RE = re.compile(r"^rename from (.+)\nrename to (.+)$", re.MULTILINE)
 # `DELETE FROM t1, t2 USING ...` lists a second target after the first name (fails closed).
-_DELETE_LIST_RE = re.compile(r"\bDELETE\s+FROM\s+`?\w+`?\s*,", re.IGNORECASE)
+_DELETE_LIST_RE = re.compile(
+    r"\bDELETE\s+(?:(?:LOW_PRIORITY|QUICK|IGNORE)\s+)*FROM\s+`?\w+`?\s*,", re.IGNORECASE)
 # A DELETE statement in a migration: `DELETE [LOW_PRIORITY|QUICK|IGNORE] [t1[, t2]] FROM t`.
 # An FK's `ON DELETE CASCADE` and a trigger's `AFTER DELETE ON` have no FROM and never match.
 _DELETE_STMT_RE = re.compile(

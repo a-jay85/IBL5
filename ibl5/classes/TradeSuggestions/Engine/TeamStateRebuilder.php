@@ -48,6 +48,7 @@ final class TeamStateRebuilder
      */
     public static function beforeWithout(LeagueSnapshot $s, int $tid, int $offset, PairRecordMemo $memo, array $absentPids): TeamState
     {
+        /** @infection-ignore-all Equivalent: rebuild() reads only the roster's values, never its keys. array_values is there so PHPStan sees a list. */
         $roster = array_values(array_diff(array_keys($s->lineup($offset, $tid)->players), $absentPids));
 
         return self::rebuild($s, $offset, $memo, [$tid => $roster])[$tid];

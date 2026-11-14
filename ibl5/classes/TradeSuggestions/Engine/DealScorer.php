@@ -108,6 +108,7 @@ final class DealScorer
         $odds = [];
         foreach ($received as $pid) {
             $p = $s->players[$pid];
+            /** @infection-ignore-all Equivalent: a player with zero offset-0 salary is off the offset-0 roster, so he has no pool rank and ResignOdds gives walks false. A missing entry reads the same as walks false. */
             if ($p->salaryAt(0) <= 0) {
                 continue;
             }

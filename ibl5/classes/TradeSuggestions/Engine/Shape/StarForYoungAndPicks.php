@@ -78,19 +78,14 @@ final class StarForYoungAndPicks implements DealShapeInterface
      */
     private function youngest(LeagueSnapshot $s, array $pids): ?int
     {
-        $best = null;
-        $bestAge = self::MAX_YOUNG_AGE + 1;
+        $young = [];
         foreach ($pids as $pid) {
             $age = ($s->players[$pid] ?? null)?->age;
-            if ($age === null || $age > self::MAX_YOUNG_AGE) {
-                continue;
-            }
-            if ($age < $bestAge || ($age === $bestAge && $best !== null && $pid < $best)) {
-                $best = $pid;
-                $bestAge = $age;
+            if ($age !== null && $age <= self::MAX_YOUNG_AGE) {
+                $young[] = [$age, $pid];
             }
         }
 
-        return $best;
+        return $young === [] ? null : min($young)[1];
     }
 }

@@ -35,13 +35,10 @@ final class AfterPositionStrength
                     $playable++;
                 }
             }
-            $multiPosition = false;
-            foreach ($rotation as $pid) {
-                if (isset($lineup->players[$pid]) && count($lineup->players[$pid]->slots()) >= 2) {
-                    $multiPosition = true;
-                    break;
-                }
-            }
+            $multiPosition = array_any(
+                $rotation,
+                static fn (int $pid): bool => isset($lineup->players[$pid]) && count($lineup->players[$pid]->slots()) >= 2,
+            );
             $out[$slot] = new SlotStrength(
                 $slot,
                 $ranks->starterRank($slot, $tid),

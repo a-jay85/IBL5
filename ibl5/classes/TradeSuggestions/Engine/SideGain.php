@@ -201,6 +201,7 @@ final readonly class SideGain
     {
         $mask = [];
         foreach (Horizon::OFFSETS as $k) {
+            /** @infection-ignore-all Equivalent: RookieControl::assetPlaces skips any surplus <= 0, so a 0 or -1 here gives the same places. */
             $mask[$k] = $k === $offset ? ($surplusBySeason[$k] ?? 0) : 0;
         }
 

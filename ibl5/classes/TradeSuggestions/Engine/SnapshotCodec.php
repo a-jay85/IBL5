@@ -132,6 +132,7 @@ final class SnapshotCodec
                 $row = self::asArray($raw);
                 $per36 = [];
                 foreach (self::arr($row, 'per36') as $k => $v) {
+                    /** @infection-ignore-all Equivalent: PHP turns a numeric-string array key back into an int, so this (string) cast changes nothing at runtime. It is there for PHPStan. */
                     $per36[(string) $k] = self::num($v);
                 }
                 $projections[self::key($pid)][self::key($offset)] = new ProjectedSeason(
@@ -590,6 +591,7 @@ final class SnapshotCodec
     {
         $out = [];
         foreach ($raw as $k => $v) {
+            /** @infection-ignore-all Equivalent: PHP turns a numeric-string array key back into an int, so this (string) cast changes nothing at runtime. It is there for PHPStan. */
             $out[(string) $k] = $v;
         }
 
@@ -604,6 +606,7 @@ final class SnapshotCodec
     {
         $out = [];
         foreach ($raw as $k => $v) {
+            /** @infection-ignore-all Equivalent: PHP turns a numeric-string array key back into an int, so this (string) cast changes nothing at runtime. It is there for PHPStan. */
             $out[(string) $k] = is_int($v) ? $v : throw new \UnexpectedValueException('Map value is not an int');
         }
 

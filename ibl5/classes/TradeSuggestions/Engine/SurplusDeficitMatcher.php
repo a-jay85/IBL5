@@ -123,7 +123,7 @@ final class SurplusDeficitMatcher
             }
         }
         $values = [];
-        foreach (array_keys($pids) as $pid) {
+        foreach ($pids as $pid) {
             $values[$pid] = self::dimensionValue($s, $pid, $pair->offset, $pair->key);
         }
         $lowerIsBetter = ProfileDimension::lowerIsBetter($pair->key);
@@ -179,7 +179,7 @@ final class SurplusDeficitMatcher
             $receiver,
             $giverRank,
             $receiverRank,
-            RankUtility::gain($receiverRank, max(1, $receiverRank - 1)),
+            RankUtility::gain($receiverRank, $receiverRank - 1),
         );
     }
 

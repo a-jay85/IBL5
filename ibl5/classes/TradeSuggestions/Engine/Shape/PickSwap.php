@@ -42,7 +42,9 @@ final class PickSwap implements DealShapeInterface
                     continue;
                 }
                 yield new TradeCandidate($userTid, $partnerTid, [], [$userPick->pickId], [], [$partnerPick->pickId]);
-                if ($userPick->yearsAway < $partnerPick->yearsAway) {
+                /** @infection-ignore-all Equivalent: equal yearsAway already hit the continue above, so < and <= pick the same branch. */
+                $userPickIsSooner = $userPick->yearsAway < $partnerPick->yearsAway;
+                if ($userPickIsSooner) {
                     if ($userRound2 !== null) {
                         yield new TradeCandidate($userTid, $partnerTid, [], [$userPick->pickId, $userRound2], [], [$partnerPick->pickId]);
                     }

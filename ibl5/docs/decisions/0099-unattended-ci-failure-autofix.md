@@ -1,6 +1,6 @@
 ---
 description: Adds unattended CI-failure autofix to bug-pipeline-tick — detects settled red PRs, dispatches a sandboxed Claude agent to fix and commit, then pushes if the agent reports a fix.
-last_verified: 2026-09-14
+last_verified: 2026-11-13
 ---
 
 # ADR-0099: Unattended CI-Failure Autofix via bug-pipeline-tick

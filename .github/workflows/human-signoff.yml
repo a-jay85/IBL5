@@ -169,6 +169,7 @@ jobs:
           if [ "$(wc -l < "$PATHS")" -ge 3000 ]; then : > "$PATHS"; fi  # API cap: cannot tell
           # ui_dev_patch_exempt reads ibl5/package.json and ibl5/bun.lock from
           # both checkouts: the trusted base at .hs-base and the PR head at the root.
+          # ui_composer_exempt reads ibl5/composer.json and ibl5/composer.lock the same way.
           export UI_BASE_DIR="$GITHUB_WORKSPACE/.hs-base" UI_HEAD_DIR="$GITHUB_WORKSPACE"
           # The memo-hit gallery fallback reads the E2E memo coverage list from the
           # base ref, never from PR-head code. A missing list has no include

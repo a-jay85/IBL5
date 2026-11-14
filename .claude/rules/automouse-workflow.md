@@ -1,6 +1,6 @@
 ---
 description: Automouse autonomous workflow (formerly "nightly") — launchd fires claude -p on a recurring schedule, running two context-isolated agents per plan (implementation + post-plan) with time guards and incremental checkpoints.
-last_verified: 2026-11-10
+last_verified: 2026-11-13
 paths: "bin/automouse/**"
 ---
 
@@ -64,6 +64,10 @@ Each phase's cost is recorded in the markdown row in `reports/YYYY-MM-DD-costs.m
 
 Recomputed vs. harness cost, the Prov column, and `peak_ctx`: `.claude/rules/automouse-workflow-detail.md` § Cost ledger columns.
 
+### Effort trial for delegates
+
+`AUTOMOUSE_DELEGATE_EFFORT_TRIAL` is an opt-in knob (`low-first`, `control`, or `ab`; unset or empty = off) for `### Delegate` packets. Values, start, log fields and keep-or-revert: `.claude/rules/automouse-workflow-detail.md` § Effort trial for delegates.
+
 ### Startup archival
 
 At launch, `bin/automouse/run` moves any `logs/`, `reports/`, `done/`, or `skipped/` entry untouched for more than `NIGHTLY_ARCHIVE_AGE_DAYS` (default **7**) into `<dir>.archive/`. Symlinks are judged by their *own* mtime and still resolve after the move. `queue/` and `handoff/` are never touched. An archival error never aborts the run.
@@ -90,11 +94,7 @@ scans `skipped/`:
 - **Reap** — a symlink whose plan file left `~/claude-plans` is deleted with its sidecars and
   named in the output. Runs before the marker gate, so a dead entry is reaped whatever the
   skip reason, and never requeues.
-- **Orphan watchers.** A heartbeat watcher exits on its next tick once its run's pid is
-  gone. Older orphans are reaped only when user-owned, PPID 1, running `bin/automouse/run`
-  under bash, with a direct `sleep 60` child and no live `.heartbeat-<pid>-*` file naming
-  their pid or pgid. `SINGLE_PLAN` runs skip self-heal. Tests: `bin/test-automouse-env-breaker`,
-  `bin/test-automouse-self-heal`.
+- **Orphan watchers.** Reap rules: `.claude/rules/automouse-workflow-detail.md` § Orphan watcher reaping.
 
 `--dry-run` previews all three without acting; the summary counts healed / still-stale / reaped, and orphan watchers reaped / spared.
 

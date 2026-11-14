@@ -125,6 +125,23 @@ else
             h_pass "w3-byte-cap-boundary ($BYTES <= $FAILURE_TAIL_BYTES)"
         else
             h_fail "w3-byte-cap-boundary" "body is $BYTES bytes, cap is $FAILURE_TAIL_BYTES"
+            # Diagnostics: this case passes on macOS and in Linux containers but
+            # failed on the CI runner. Print each pipeline stage's size so the
+            # next CI log shows which stage dropped the cap.
+            {
+                printf 'w3-diag: type -a tail sed:\n'; type -a tail sed
+                printf 'w3-diag: tail version: %s\n' "$(tail --version 2>&1 | sed -n 1p)"
+                printf 'w3-diag: LOG bytes=%s\n' "$(wc -c < "$LOG")"
+                printf 'w3-diag: sed stage bytes=%s\n' "$(sed -n '1,$p' "$LOG" | wc -c)"
+                printf 'w3-diag: tail -n stage bytes=%s\n' \
+                    "$(sed -n '1,$p' "$LOG" | tail -n "$FAILURE_TAIL_LINES" | wc -c)"
+                printf 'w3-diag: tail -c stage bytes=%s\n' \
+                    "$(sed -n '1,$p' "$LOG" | tail -n "$FAILURE_TAIL_LINES" | tail -c "$FAILURE_TAIL_BYTES" | wc -c)"
+                printf 'w3-diag: FAILURE_TAIL_LINES=%s\n' "$FAILURE_TAIL_LINES"
+                printf 'w3-diag: function tail lines:\n'
+                declare -f write_failure_report | grep -E 'tail|sed'
+                printf 'w3-diag: sidecar head:\n'; sed -n 1,12p "$QUEUE_DIR/plan.failure"
+            } 2>&1
         fi
         FAILURE_TAIL_BYTES=20000   # restore for any later case
         rm -f "$LOG" "$BODY_FILE"
@@ -255,6 +272,165 @@ if grep -q 'claude -p "\$IMPL_PROMPT"' "$RUNNER"; then
     h_pass "wiring-impl-prompt-variable"
 else
     h_fail "wiring-impl-prompt-variable" "impl invocation does not pass \$IMPL_PROMPT"
+fi
+
+# ---------------------------------------------------------------------------
+# build_impl_prompt (bin/automouse/run) — byte-exact impl prompt assembly.
+#
+# Extracted from the runner like the cases above. Every render goes to a file
+# and is compared with `cmp -s`, so a stray trailing byte fails the case. The
+# fixture literals below are the captured bytes of master's inline assembly.
+# ---------------------------------------------------------------------------
+
+# extract_fn <name>: print one top-level function from the runner.
+extract_fn() {
+    awk -v pat="^$1\\\\(\\\\) \\\\{" '
+        $0 ~ pat { capture = 1 }
+        capture { print }
+        capture && /^\}/ { exit }
+    ' "$RUNNER"
+}
+
+BIP_SRC="$(extract_fn build_impl_prompt)"
+RTA_SRC="$(extract_fn resolve_delegate_trial_arm)"
+ITA_SRC="$(extract_fn impl_trial_addendum)"
+if [ -z "$SFFR_SRC" ] || [ -z "$BIP_SRC" ] || [ -z "$RTA_SRC" ] || [ -z "$ITA_SRC" ]; then
+    h_fail "could not extract build_impl_prompt and its helpers from $RUNNER"
+else
+    eval "$SFFR_SRC"
+    eval "$BIP_SRC"
+    eval "$RTA_SRC"
+    eval "$ITA_SRC"
+    BIP_TMP="$(mktemp -d)"
+    printf 'line one\nbudget={{IMPL_BUDGET_MINUTES}} min\nlast {{IMPL_BUDGET_MINUTES}}\n\n' > "$BIP_TMP/fixture-prompt-impl"
+
+    # assert_bytes <name> <expected-file> <actual-file>
+    assert_bytes() {
+        if cmp -s "$2" "$3"; then
+            h_pass "$1"
+        else
+            h_fail "$1" "render differs from expected bytes"
+            diff <(od -c "$2") <(od -c "$3") | head -20
+        fi
+    }
+
+    # No-feed render on the fixture template.
+    printf 'line one\nbudget=42 min\nlast 42\n\nPLAN_FILE=p.md' > "$BIP_TMP/expect-fixture"
+    build_impl_prompt "$BIP_TMP/fixture-prompt-impl" p.md 42 s s "$BIP_TMP/none" > "$BIP_TMP/got-fixture"
+    assert_bytes "impl-prompt-fixture-literal" "$BIP_TMP/expect-fixture" "$BIP_TMP/got-fixture"
+
+    # Feed render: escalated attempt plus a sidecar ends PRIOR_FAILURE_REPORT=<path>.
+    BIP_SIDECAR="$BIP_TMP/sidecar"
+    printf 'sidecar\n' > "$BIP_SIDECAR"
+    printf 'line one\nbudget=42 min\nlast 42\n\nPLAN_FILE=p.md\nPRIOR_FAILURE_REPORT=%s' \
+        "$BIP_SIDECAR" > "$BIP_TMP/expect-feed"
+    build_impl_prompt "$BIP_TMP/fixture-prompt-impl" p.md 42 s o "$BIP_SIDECAR" > "$BIP_TMP/got-feed"
+    assert_bytes "impl-prompt-feed-report-line" "$BIP_TMP/expect-feed" "$BIP_TMP/got-feed"
+
+    # Real template, knob unset: compare with an independent Python rendering.
+    python3 -c 'import sys; t=open(sys.argv[1]).read().rstrip("\n"); sys.stdout.write((t+"\n\nPLAN_FILE=p.md").replace("{{IMPL_BUDGET_MINUTES}}","42"))' \
+        "$SCRIPT_DIR/automouse/prompt-impl" > "$BIP_TMP/expect-real"
+    build_impl_prompt "$SCRIPT_DIR/automouse/prompt-impl" p.md 42 s s /nonexistent > "$BIP_TMP/got-real"
+    assert_bytes "impl-prompt-unset-matches-master-render" "$BIP_TMP/expect-real" "$BIP_TMP/got-real"
+
+    # --- resolve_delegate_trial_arm: the opt-in knob -------------------------
+    # wiring: the loop reads the var with a `:-` default, so unset is legal.
+    if grep -qF 'resolve_delegate_trial_arm "${AUTOMOUSE_DELEGATE_EFFORT_TRIAL:-}" "$PLAN_NAME"' "$RUNNER"; then
+        got=$(unset AUTOMOUSE_DELEGATE_EFFORT_TRIAL; set -u
+              resolve_delegate_trial_arm "${AUTOMOUSE_DELEGATE_EFFORT_TRIAL:-}" "p.md" 2>/dev/null; echo "rc=$?")
+        if [ "$got" = "rc=0" ]; then
+            h_pass "wiring-trial-arm-unset-safe"
+        else
+            h_fail "wiring-trial-arm-unset-safe" "unset var gave '$got', expected 'rc=0'"
+        fi
+    else
+        h_fail "wiring-trial-arm-unset-safe" "loop does not read the var with a :- default"
+    fi
+
+    got=$(resolve_delegate_trial_arm "" p.md 2>&1; echo "rc=$?")
+    if [ "$got" = "rc=0" ]; then
+        h_pass "trial-arm-empty-off"
+    else
+        h_fail "trial-arm-empty-off" "empty value gave '$got', expected 'rc=0'"
+    fi
+
+    typo_bad=""
+    for typo in "lowfirst" "LOW-FIRST" "low-first " "ab-test"; do
+        out=$(resolve_delegate_trial_arm "$typo" p.md 2>/dev/null); rc=$?
+        if [ "$rc" -ne 2 ] || [ -n "$out" ]; then
+            typo_bad="$typo_bad [$typo: rc=$rc out='$out']"
+        fi
+    done
+    if [ -z "$typo_bad" ]; then
+        h_pass "trial-arm-typo-rejected"
+    else
+        h_fail "trial-arm-typo-rejected" "$typo_bad"
+    fi
+
+    warn=$(resolve_delegate_trial_arm "lowfirst" p.md 2>&1 >/dev/null)
+    if grep -qF "AUTOMOUSE_DELEGATE_EFFORT_TRIAL='lowfirst'" <<< "$warn" \
+        && grep -qF "ignored, trial off" <<< "$warn"; then
+        h_pass "trial-typo-logged-loudly"
+    else
+        h_fail "trial-typo-logged-loudly" "stderr was '$warn'"
+    fi
+
+    got_lf=$(resolve_delegate_trial_arm "low-first" p.md)
+    got_ct=$(resolve_delegate_trial_arm "control" p.md)
+    if [ "$got_lf" = "low-first" ] && [ "$got_ct" = "control" ]; then
+        h_pass "trial-arm-passthrough"
+    else
+        h_fail "trial-arm-passthrough" "low-first -> '$got_lf', control -> '$got_ct'"
+    fi
+
+    # cksum CRCs (printf '%s' <name> | cksum): plan-a.md = 7719664 (even),
+    # plan-b.md = 3680658023 (odd).
+    got_even=$(resolve_delegate_trial_arm "ab" plan-a.md)
+    got_odd=$(resolve_delegate_trial_arm "ab" plan-b.md)
+    if [ "$got_even" = "low-first" ] && [ "$got_odd" = "control" ]; then
+        h_pass "trial-arm-ab-parity"
+    else
+        h_fail "trial-arm-ab-parity" "even -> '$got_even', odd -> '$got_odd'"
+    fi
+
+    # --- build_impl_prompt with a trial arm ----------------------------------
+    build_impl_prompt "$SCRIPT_DIR/automouse/prompt-impl" p.md 42 s s /nonexistent "" > "$BIP_TMP/got-empty-arm"
+    assert_bytes "impl-prompt-empty-arm-identical" "$BIP_TMP/got-real" "$BIP_TMP/got-empty-arm"
+
+    build_impl_prompt "$SCRIPT_DIR/automouse/prompt-impl" p.md 42 s s /nonexistent low-first > "$BIP_TMP/got-trial"
+    {
+        cat "$BIP_TMP/expect-real"
+        printf '\n\n'
+        printf '%s' "$(impl_trial_addendum)"
+        printf '\nDELEGATE_EFFORT_TRIAL=low-first'
+    } > "$BIP_TMP/expect-trial"
+    assert_bytes "impl-prompt-trial-adds-addendum" "$BIP_TMP/expect-trial" "$BIP_TMP/got-trial"
+    if [ "$(tail -n 1 "$BIP_TMP/got-trial")" = "DELEGATE_EFFORT_TRIAL=low-first" ]; then
+        h_pass "impl-prompt-trial-last-line"
+    else
+        h_fail "impl-prompt-trial-last-line" "last line is '$(tail -n 1 "$BIP_TMP/got-trial")'"
+    fi
+
+    # assert_trial_line <name> <literal>: the low-first render carries the line.
+    assert_trial_line() {
+        if grep -qF -- "$2" "$BIP_TMP/got-trial"; then
+            h_pass "$1"
+        else
+            h_fail "$1" "render lacks: $2"
+        fi
+    }
+    assert_trial_line "impl-prompt-addendum-fail-closed" "Unrunnable counts as failed."
+    assert_trial_line "impl-prompt-addendum-batch-wait" "Wait until every delegate launched in the same batch has reported."
+    assert_trial_line "impl-prompt-addendum-control-high" 'Arm control: spawn every first attempt with effort: "high".'
+    assert_trial_line "impl-prompt-addendum-single-retry" "Never spawn a third attempt"
+
+    if grep -qF '"$IMPL_MODEL" "$FAILURE_FILE" "$TRIAL_ARM")' "$RUNNER"; then
+        h_pass "wiring-trial-arm-into-build"
+    else
+        h_fail "wiring-trial-arm-into-build" "plan loop does not pass \"\$TRIAL_ARM\" to build_impl_prompt"
+    fi
+
+    rm -rf "$BIP_TMP"
 fi
 
 h_done

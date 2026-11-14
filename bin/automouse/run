@@ -36,6 +36,9 @@ Subcommands:
 
 Environment (key overrides):
   AUTOMOUSE_SKIP_CANARY=1     Skip the between-plans master health canary.
+  AUTOMOUSE_DELEGATE_EFFORT_TRIAL
+                              Opt-in delegate effort trial: low-first | control | ab.
+                              Unset or empty = off. Any other value is logged and ignored.
   AUTOMOUSE_LOGIN_PROBE_CMD   Test seam: command whose first stdout line
                               (ok | expired:<r> | unknown:<r>) replaces the
                               real login probe. Unset or empty = real probe.
@@ -2261,6 +2264,83 @@ should_feed_failure_report() {
     [ "$1" != "$2" ] && [ -f "$3" ]
 }
 
+# Map AUTOMOUSE_DELEGATE_EFFORT_TRIAL to this plan's trial arm.
+# Args: <raw_value> <plan_name>. Prints low-first, control, or nothing.
+# Unset or empty: prints nothing, rc 0, trial off, prompt byte-identical.
+# Any other value: warning on stderr, prints nothing, rc 2. It never acts as on.
+resolve_delegate_trial_arm() {
+    case "$1" in
+        "") return 0 ;;
+        low-first|control) printf '%s' "$1" ;;
+        ab)
+            if [ $(( $(printf '%s' "$2" | cksum | cut -d' ' -f1) % 2 )) -eq 0 ]; then
+                printf 'low-first'
+            else
+                printf 'control'
+            fi ;;
+        *)
+            echo "[$(date +%H:%M:%S)] WARNING: AUTOMOUSE_DELEGATE_EFFORT_TRIAL='$1' is not low-first, control or ab; ignored, trial off" >&2
+            return 2 ;;
+    esac
+}
+
+# Trial instructions appended to the impl prompt when an arm is set.
+impl_trial_addendum() {
+    cat <<'TRIAL_EOF'
+## Delegate effort trial
+
+DELEGATE_EFFORT_TRIAL (the last line of this prompt) puts this run in an opt-in trial. It changes how Step 6 handles `### Delegate` packets. Every other Step 6 rule still holds, including the rule against re-launching a packet because no summary came back. This trial text is the explicit instruction the Agent tool's `effort` param asks for.
+
+1. Spawn each packet once, at the tier Step 6 names, with the Agent `effort` param set by arm.
+   Arm low-first: spawn every first attempt with effort: "low".
+   Arm control: spawn every first attempt with effort: "high".
+2. If a spawn errors on the `effort` param, re-spawn that packet once without it and record its effort as inherited.
+3. Wait until every delegate launched in the same batch has reported. Run no packet check before then, because a repo-wide check can fail on a sibling's half-done edit.
+4. Then run each packet's `**Self-verify:**` command yourself, one packet at a time, in the FOREGROUND with `timeout: 600000`. Run it as written from the worktree root. If it cannot start there because a path or command is missing, run it once more from `ibl5/`.
+5. Exit 0 is pass. Any other exit is fail. A packet with no Self-verify command, or a command that cannot start in either directory (exit 126 or 127, or no such file), is unrunnable.
+   Unrunnable counts as failed.
+6. Record every attempt with one foreground call:
+   bin/measure-delegate-cost --record-attempt --plan <PLAN_FILE value> --packet <packet number: 1 for the plan's first ### Delegate packet, 2 for the second, and so on; two packets in one plan phase get two numbers> --arm <arm> --attempt <1|2> --effort <low|high|inherited> --check-result <pass|fail|unrunnable> --check-exit <exit code>
+   Leave out --check-exit for an unrunnable check. If the record call exits non-zero, note it in your handoff and carry on. The log never blocks the plan.
+7. Arm low-first only: for each packet whose first check was fail or unrunnable, spawn ONE fresh Agent with effort: "high" at the same tier. Never use SendMessage for a retry. Its prompt is the packet verbatim followed by this block:
+   RETRY (attempt 2 of 2, effort high). An earlier attempt at this packet left edits in the tree and its check failed.
+   Failing check: <the Self-verify command>
+   Result: <exit code, or unrunnable>
+   Last 80 lines of its output: <output>
+   Run `git diff` on this packet's Scope files first. Treat those edits as unverified and rewrite them to the Recipe until the Self-verify command exits 0. Leave files outside Scope alone.
+8. Wait for every retry in the batch to report, then run and record each retried packet's check again as attempt 2. Never spawn a third attempt and never move a packet to another model.
+9. Arm control: never retry. Record attempt 1 and carry on as Step 6 says.
+10. Never revert a failed attempt's diff. Step 6.5 onward, post-plan review and CI still run on the final tree.
+TRIAL_EOF
+}
+
+# Assemble the impl prompt. Extracted from the plan loop so
+# bin/test-automouse-escalation can render it. `cat` does not expand shell
+# syntax, so the template's budget slot is a literal {{IMPL_BUDGET_MINUTES}}
+# token substituted here. Keep the token spelled identically on both sides:
+# bin/test-automouse-impl-cap-timeout pins that pairing. Locals reuse the loop's
+# variable names so that pin still matches.
+# Args: <template> <plan_name> <budget_min> <base_model> <impl_model> <failure_file> [<trial_arm>]
+build_impl_prompt() {
+    local IMPL_PROMPT PLAN_NAME=$2 IMPL_BUDGET_MIN=$3 FAILURE_FILE=$6
+    local trial_arm=${7:-}
+    IMPL_PROMPT="$(cat "$1")
+
+PLAN_FILE=$PLAN_NAME"
+    IMPL_PROMPT="${IMPL_PROMPT//\{\{IMPL_BUDGET_MINUTES\}\}/$IMPL_BUDGET_MIN}"
+    if should_feed_failure_report "$4" "$5" "$FAILURE_FILE"; then
+        IMPL_PROMPT="$IMPL_PROMPT
+PRIOR_FAILURE_REPORT=$FAILURE_FILE"
+    fi
+    if [ -n "$trial_arm" ]; then
+        IMPL_PROMPT="$IMPL_PROMPT
+
+$(impl_trial_addendum)
+DELEGATE_EFFORT_TRIAL=$trial_arm"
+    fi
+    printf '%s' "$IMPL_PROMPT"
+}
+
 # Move entries in a automouse subdir untouched for $ARCHIVE_AGE_DAYS into a sibling
 # `<subdir>.archive/`, keeping the working dirs small without deleting history.
 # Matches regular files AND symlinks; `find` does not follow symlinks, so a
@@ -2712,19 +2792,12 @@ while true; do
         # second trailing context line (PRIOR_FAILURE_REPORT=<path>) in the same
         # style as PLAN_FILE — report-if-present, decoupled from the escalation
         # trigger (ADR-0085).
-        IMPL_PROMPT="$(cat "$SELF_DIR/prompt-impl")
-
-PLAN_FILE=$PLAN_NAME"
-        # `cat` does not expand shell syntax, so the template's budget slot is a
-        # literal {{IMPL_BUDGET_MINUTES}} token substituted here. Keep the token
-        # spelled identically on both sides — bin/test-automouse-impl-cap-timeout
-        # pins that pairing, because a one-sided rename would silently ship the
-        # raw placeholder to the agent.
         IMPL_BUDGET_MIN=$(( REMAINING_SECS / 60 ))
-        IMPL_PROMPT="${IMPL_PROMPT//\{\{IMPL_BUDGET_MINUTES\}\}/$IMPL_BUDGET_MIN}"
+        TRIAL_ARM=$(resolve_delegate_trial_arm "${AUTOMOUSE_DELEGATE_EFFORT_TRIAL:-}" "$PLAN_NAME" 2>>"$LOG") || TRIAL_ARM=""
+        [ -z "$TRIAL_ARM" ] || echo "[$(date +%H:%M:%S)] delegate effort trial arm=$TRIAL_ARM for $PLAN_NAME" >> "$LOG"
+        IMPL_PROMPT=$(build_impl_prompt "$SELF_DIR/prompt-impl" "$PLAN_NAME" \
+            "$IMPL_BUDGET_MIN" "$BASE_MODEL" "$IMPL_MODEL" "$FAILURE_FILE" "$TRIAL_ARM")
         if should_feed_failure_report "$BASE_MODEL" "$IMPL_MODEL" "$FAILURE_FILE"; then
-            IMPL_PROMPT="$IMPL_PROMPT
-PRIOR_FAILURE_REPORT=$FAILURE_FILE"
             echo "[$(date +%H:%M:%S)] feeding prior failure report to escalated retry: $FAILURE_FILE for $PLAN_NAME" >> "$LOG"
         fi
         # CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 disables the harness's background-task

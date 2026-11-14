@@ -1,6 +1,6 @@
 ---
 description: A weekly tool-less model run reads an aggregate digest of ibl_events through the SELECT-only credential and DMs recommendations to the owner. Raw URIs, user agents and identities never leave the database.
-last_verified: 2026-11-01
+last_verified: 2026-11-10
 ---
 
 # 0168. Weekly product-analytics review from ibl_events
@@ -61,3 +61,19 @@ A 4xx section reports, per human class, 4xx counts split into 404, 403, and othe
 `TrafficClassifier` now files an anonymous request with a missing or blank user agent as `crawler`, and recognizes more HTTP-library user agents (`go-http-client`, `axios`, `scrapy`, `httpclient`, `java/`, `okhttp`, `node-fetch`, `libwww`, `headless`). Existing rows keep their stored class. The human bucket the digest reads gets cleaner from the deploy date on.
 
 The privacy contract is unchanged. Every new statement is a SELECT under the same credential and selects neither `request_uri` nor `user_agent`. Usernames leave the database only as counts.
+
+## Addendum 2026-11-10: likely-bot and Sheets-import split
+
+Prod `ibl_events` for 2026-11-01 to 2026-11-07 showed most `anonymous-human` events coming from cookieless clients. 39,196 events carried a bare-origin Referer, each in its own session. Another 12,425 sessions with no Referer had one event each. Real anonymous readers follow links inside the site, about 2,000 to 3,000 events a week. The old week-over-week line compared two weeks that were mostly bots.
+
+`bin/events-review` now splits `anonymous-human` at report time into likely bot, Sheets import, and anonymous human. The rules live in the Stage A SQL and run the same way on both weeks. Every anonymous-human figure in the digest uses the cleaned group. The digest shows the other two groups as count lines and gives likely bot its own Referer mix with a `bare-origin` bucket.
+
+These options were rejected:
+
+- A per-request classifier rule for no cookie and no Referer. It would mislabel every real visitor's first page view, and the no-Referer traffic caused no 500s.
+- A bare-origin rule in `TrafficClassifier`. The edge block planned in a separate change and this report rule cover it.
+- A floor on Chrome version. It goes stale as browsers ship.
+- IP blocking. The traffic comes from a rotating residential proxy pool.
+- A rule keyed on alpha-sorted box-score URLs. It needs `request_uri`, which the report SQL never reads, and the one-event and bare-origin rules already catch that traffic.
+
+The SQL region check in `bin/test-events-review` now allows `user_agent` inside a `WHEN` test, the same way it already allowed `referer`. A `THEN` or `ELSE` value may not name either column, so only fixed labels leave the database. `request_uri` stays banned.

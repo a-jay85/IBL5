@@ -83,3 +83,14 @@ route4xx	anonymous-human	Wp-Login.php	1
 route	authenticated	team
 route	authenticated	team	12abc
 uri	x	y	5
+class	likely-bot	cur	140
+class	likely-bot	prev	120
+class	sheets-import	cur	12
+class	sheets-import	prev	9
+referer	anonymous-human	bare-origin	2
+referer	likely-bot	none	70
+referer	likely-bot	bare-origin	60
+referer	likely-bot	internal	4
+referer	likely-bot	external	6
+referer	sheets-import	none	12
+referer	likely-bot	zzbogus	1

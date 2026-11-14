@@ -365,7 +365,8 @@ preflight_select() {
 # Stage A: one aggregate, four TSV columns: section, key, subkey, value.
 # Raw request and agent strings are never selected; identities leave the DB only
 # as COUNT(DISTINCT ...) or inside the bucket derived table; the raw referer is
-# reduced to one of four literals.
+# reduced to one of five literals. The raw agent string only feeds CASE tests
+# that yield a fixed class label.
 fetch_tsv() {
     {
         printf 'SET @d := %s;\n' "$DAYS"
@@ -379,9 +380,11 @@ SELECT 'meta', 'window_end', DATE_FORMAT(@end, '%Y-%m-%d'), 0;
 SELECT 'meta', 'days', 'days', @d;
 SELECT 'class', COALESCE(traffic_class, 'unclassified'), 'cur', COUNT(*)
 FROM ibl_events WHERE created_at >= @start AND created_at < @end
+  AND COALESCE(traffic_class, 'unclassified') <> 'anonymous-human'
 GROUP BY 2;
 SELECT 'class', COALESCE(traffic_class, 'unclassified'), 'prev', COUNT(*)
 FROM ibl_events WHERE created_at >= @pstart AND created_at < @start
+  AND COALESCE(traffic_class, 'unclassified') <> 'anonymous-human'
 GROUP BY 2;
 SELECT 'gms', 'active', 'all', COUNT(DISTINCT username)
 FROM ibl_events
@@ -397,16 +400,11 @@ SELECT 'gms', 'bucket', b, COUNT(*) FROM (
 ) k GROUP BY b;
 SELECT 'sessions', traffic_class, 'all', COUNT(DISTINCT session_id)
 FROM ibl_events
-WHERE traffic_class IN ('authenticated', 'anonymous-human')
+WHERE traffic_class = 'authenticated'
   AND created_at >= @start AND created_at < @end
 GROUP BY 2;
 (SELECT 'route', 'authenticated', route_name, COUNT(*) FROM ibl_events
  WHERE traffic_class = 'authenticated' AND route_name IS NOT NULL
-   AND created_at >= @start AND created_at < @end
- GROUP BY 3 ORDER BY 4 DESC, 3 LIMIT 25)
-UNION ALL
-(SELECT 'route', 'anonymous-human', route_name, COUNT(*) FROM ibl_events
- WHERE traffic_class = 'anonymous-human' AND route_name IS NOT NULL
    AND created_at >= @start AND created_at < @end
  GROUP BY 3 ORDER BY 4 DESC, 3 LIMIT 25);
 SELECT 'routegms', 'authenticated', route_name, COUNT(DISTINCT username)
@@ -418,24 +416,18 @@ SELECT 'status4xx', traffic_class,
   CASE WHEN http_status = 404 THEN '404' WHEN http_status = 403 THEN '403' ELSE 'other4xx' END,
   COUNT(*)
 FROM ibl_events
-WHERE traffic_class IN ('authenticated', 'anonymous-human')
+WHERE traffic_class = 'authenticated'
   AND http_status BETWEEN 400 AND 499
   AND created_at >= @start AND created_at < @end
 GROUP BY 2, 3;
 SELECT 'route4xxn', traffic_class, 'all', COUNT(DISTINCT route_name)
 FROM ibl_events
-WHERE traffic_class IN ('authenticated', 'anonymous-human')
+WHERE traffic_class = 'authenticated'
   AND http_status BETWEEN 400 AND 499 AND route_name IS NOT NULL
   AND created_at >= @start AND created_at < @end
 GROUP BY 2;
 (SELECT 'route4xx', 'authenticated', route_name, COUNT(*) FROM ibl_events
  WHERE traffic_class = 'authenticated' AND route_name IS NOT NULL
-   AND http_status BETWEEN 400 AND 499
-   AND created_at >= @start AND created_at < @end
- GROUP BY 3 ORDER BY 4 DESC, 3 LIMIT 25)
-UNION ALL
-(SELECT 'route4xx', 'anonymous-human', route_name, COUNT(*) FROM ibl_events
- WHERE traffic_class = 'anonymous-human' AND route_name IS NOT NULL
    AND http_status BETWEEN 400 AND 499
    AND created_at >= @start AND created_at < @end
  GROUP BY 3 ORDER BY 4 DESC, 3 LIMIT 25);
@@ -445,23 +437,68 @@ WHERE action IS NOT NULL AND created_at >= @start AND created_at < @end
 GROUP BY 3;
 SELECT 'status', traffic_class, CONCAT(FLOOR(http_status / 100), 'xx'), COUNT(*)
 FROM ibl_events
-WHERE traffic_class IN ('authenticated', 'anonymous-human') AND http_status IS NOT NULL
+WHERE traffic_class = 'authenticated' AND http_status IS NOT NULL
   AND created_at >= @start AND created_at < @end
 GROUP BY 2, 3;
-SELECT 'referer', 'anonymous-human', r, COUNT(*) FROM (
-  SELECT
-    CASE WHEN referer IS NULL OR referer = '' THEN 'none'
-    WHEN referer LIKE '%iblhoops.net%' THEN 'internal'
-    WHEN referer REGEXP 'google\\.|bing\\.|duckduckgo\\.' THEN 'search'
-    ELSE 'external' END AS r
-  FROM ibl_events
-  WHERE traffic_class = 'anonymous-human' AND created_at >= @start AND created_at < @end
-) x GROUP BY r;
 SELECT 'day', traffic_class, DATE_FORMAT(created_at, '%Y-%m-%d'), COUNT(*)
 FROM ibl_events
-WHERE traffic_class IN ('authenticated', 'anonymous-human')
+WHERE traffic_class = 'authenticated'
   AND created_at >= @start AND created_at < @end
 GROUP BY 2, 3;
+WITH s AS (
+  SELECT session_id, IF(created_at >= @start, 'cur', 'prev') AS w, COUNT(*) AS hits
+  FROM ibl_events
+  WHERE traffic_class = 'anonymous-human' AND session_id IS NOT NULL AND session_id <> ''
+    AND created_at >= @pstart AND created_at < @end
+  GROUP BY session_id, w
+), a AS (
+  SELECT e.session_id, e.route_name, e.http_status, e.created_at,
+    IF(e.created_at >= @start, 'cur', 'prev') AS w,
+    CASE WHEN e.user_agent LIKE '%GoogleDocs; apps-spreadsheets%' THEN 'sheets-import'
+    WHEN e.user_agent LIKE '%MSIE%' OR e.user_agent LIKE '%Trident%' THEN 'likely-bot'
+    WHEN e.user_agent LIKE '%+http%' THEN 'likely-bot'
+    WHEN COALESCE(e.referer, '') REGEXP '(?i)^https?://(www[.])?iblhoops[.]net$' THEN 'likely-bot'
+    WHEN COALESCE(s.hits, 1) = 1 AND NOT (COALESCE(e.referer, '') REGEXP '(?i)^https?://(www[.])?iblhoops[.]net/') THEN 'likely-bot'
+    ELSE 'anonymous-human' END AS k,
+    CASE WHEN e.referer IS NULL OR e.referer = '' THEN 'none'
+    WHEN e.referer REGEXP '(?i)^https?://(www[.])?iblhoops[.]net$' THEN 'bare-origin'
+    WHEN e.referer REGEXP '(?i)^https?://(www[.])?iblhoops[.]net/' THEN 'internal'
+    WHEN e.referer REGEXP 'google\\.|bing\\.|duckduckgo\\.' THEN 'search'
+    ELSE 'external' END AS rb
+  FROM ibl_events e
+  LEFT JOIN s ON s.session_id = e.session_id AND s.w = IF(e.created_at >= @start, 'cur', 'prev')
+  WHERE e.traffic_class = 'anonymous-human' AND e.created_at >= @pstart AND e.created_at < @end
+)
+SELECT * FROM (
+  (SELECT 'class' AS c1, k AS c2, w AS c3, COUNT(*) AS c4 FROM a GROUP BY k, w)
+  UNION ALL
+  (SELECT 'sessions', 'anonymous-human', 'all', COUNT(DISTINCT session_id)
+   FROM a WHERE w = 'cur' AND k = 'anonymous-human')
+  UNION ALL
+  (SELECT 'route', 'anonymous-human', route_name, COUNT(*) FROM a
+   WHERE w = 'cur' AND k = 'anonymous-human' AND route_name IS NOT NULL
+   GROUP BY 3 ORDER BY 4 DESC, 3 LIMIT 25)
+  UNION ALL
+  (SELECT 'status4xx', 'anonymous-human',
+   CASE WHEN http_status = 404 THEN '404' WHEN http_status = 403 THEN '403' ELSE 'other4xx' END, COUNT(*) FROM a WHERE w = 'cur'
+   AND k = 'anonymous-human' AND http_status BETWEEN 400 AND 499 GROUP BY 3)
+  UNION ALL
+  (SELECT 'route4xxn', 'anonymous-human', 'all', COUNT(DISTINCT route_name) FROM a
+   WHERE w = 'cur' AND k = 'anonymous-human' AND http_status BETWEEN 400 AND 499 AND route_name IS NOT NULL)
+  UNION ALL
+  (SELECT 'route4xx', 'anonymous-human', route_name, COUNT(*) FROM a
+   WHERE w = 'cur' AND k = 'anonymous-human' AND route_name IS NOT NULL AND http_status BETWEEN 400 AND 499
+   GROUP BY 3 ORDER BY 4 DESC, 3 LIMIT 25)
+  UNION ALL
+  (SELECT 'status', 'anonymous-human', CONCAT(FLOOR(http_status / 100), 'xx'), COUNT(*) FROM a
+   WHERE w = 'cur' AND k = 'anonymous-human' AND http_status IS NOT NULL GROUP BY 3)
+  UNION ALL
+  (SELECT 'referer', k, rb, COUNT(*) FROM a
+   WHERE w = 'cur' AND k IN ('anonymous-human', 'likely-bot') GROUP BY k, rb)
+  UNION ALL
+  (SELECT 'day', 'anonymous-human', DATE_FORMAT(created_at, '%Y-%m-%d'), COUNT(*) FROM a
+   WHERE w = 'cur' AND k = 'anonymous-human' GROUP BY 3)
+) u;
 SQL
         # END EVENTS SQL
     } | run_mysql
@@ -483,10 +520,10 @@ function ok_action(a) { return (length(a) <= 48 && a ~ /^[a-z][a-z0-9_]*$/) }
 function ok_date(d) { return (d ~ /^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]$/) }
 function ok_human(c) { return (c == "authenticated" || c == "anonymous-human") }
 function ok_class(c) {
-    return (ok_human(c) || c == "crawler" || c == "spam" || c == "smoke-test" || c == "unclassified")
+    return (ok_human(c) || c == "likely-bot" || c == "sheets-import" || c == "crawler" || c == "spam" || c == "smoke-test" || c == "unclassified")
 }
 function ok_bucket(b) { return (b == "1-5" || b == "6-20" || b == "21-50" || b == "51+") }
-function ok_referer(r) { return (r == "none" || r == "internal" || r == "search" || r == "external") }
+function ok_referer(r) { return (r == "none" || r == "bare-origin" || r == "internal" || r == "search" || r == "external") }
 # Selection of the top "limit" entries by count desc, name asc. Fills on/oc.
 function top_n(n, names, counts, limit, on, oc,    p, i, bi, used, m) {
     split("", used)
@@ -551,7 +588,7 @@ function gm_suffix(c, r) {
         if (ok_human(k) && sk ~ /^[1-5]xx$/) st[k, sk] += v
         else dropped++
     } else if (s == "referer") {
-        if (k == "anonymous-human" && ok_referer(sk)) ref[sk] += v
+        if ((k == "anonymous-human" || k == "likely-bot") && ok_referer(sk)) ref[k, sk] += v
         else dropped++
     } else if (s == "day") {
         if (ok_human(k) && ok_date(sk)) {
@@ -593,6 +630,8 @@ END {
         c = hc[h]
         printf "  %s: %d (prev %d, %s)\n", c, cls[c, "cur"], cls[c, "prev"], delta(cls[c, "cur"], cls[c, "prev"])
     }
+    printf "Likely bot, set aside from anonymous-human (prev week): %d (%d)\n", cls["likely-bot", "cur"], cls["likely-bot", "prev"]
+    printf "Sheets import, set aside from anonymous-human (prev week): %d (%d)\n", cls["sheets-import", "cur"], cls["sheets-import", "prev"]
     printf "active GMs: %d\n", gms_active
     printf "  GMs by event count: 1-5: %d, 6-20: %d, 21-50: %d, 51+: %d\n", \
         bucket["1-5"], bucket["6-20"], bucket["21-50"], bucket["51+"]
@@ -655,12 +694,16 @@ END {
         for (i = 1; i <= pn; i++) { printf "  %d  %s\n", oc[i], on[i]; printed += oc[i] }
         if (r4total[c] - printed > 0) printf "  %d  other\n", r4total[c] - printed
     }
-    line = ""
-    split("none internal search external", rl, " ")
-    for (q = 1; q <= 4; q++) {
-        if (rl[q] in ref) line = line ((line == "") ? "" : ", ") sprintf("%s %d", rl[q], ref[rl[q]])
+    split("none bare-origin internal search external", rl, " ")
+    split("anonymous-human likely-bot", rk, " ")
+    split("anonymous-human|likely bot", rlab, "|")
+    for (h = 1; h <= 2; h++) {
+        line = ""
+        for (q = 1; q <= 5; q++) {
+            if ((rk[h], rl[q]) in ref) line = line ((line == "") ? "" : ", ") sprintf("%s %d", rl[q], ref[rk[h], rl[q]])
+        }
+        if (line != "") printf "Referer mix (%s): %s\n", rlab[h], line
     }
-    if (line != "") printf "Referer mix (anonymous-human): %s\n", line
     for (h = 1; h <= 2; h++) {
         c = hc[h]
         if (dn[c] == 0) continue

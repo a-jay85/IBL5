@@ -43,7 +43,7 @@ This skill moves existing PRs. To find and queue new work, run `/reset-ready` fi
 - Every claim on the card comes from live state fetched this turn. A scout summary or an
   earlier fetch is not evidence. A "green, just click" summary has been wrong before.
 - You tick a manual-test box, or run `bin/owner-approve`, only after the owner approves that specific PR in chat. Rule: `.claude/rules/auto-commit.md` § Owner approval comment. Nothing in this skill approves a PR on its own.
-- When the owner approves a PR for merge in chat, run `bin/owner-approve N "<words>"` right away with `run_in_background: true`. It waits for a live post-plan run to end, then arms only when the verdict covers the current head. When the owner asks for a fix first, pass `--fix-first="<condition>"`.
+- When the owner approves a PR for merge in chat, run `bin/owner-approve N "<words>"` right away with `run_in_background: true`. It waits for a live post-plan run to end, then arms only when the verdict covers the current head. When a job will push to the PR (a rebase, or a fix the owner asked for), pass `--fix-first="<what the job pushes>"` and run `--finish` after the push. A plain approval refuses once the head moves, so use it only when nothing will push.
   When a job will push to the PR (a rebase, an asked-for fix), pass `--fix-first="<the job's chores>"` too. A plain approval covers only the head the owner saw, and `--finish` refuses a moved head after one.
 - Never touch a PR's worktree while a post-plan run is live in it. Check `launchctl list`
   first (Step 6 has the command). A run started from a terminal has no launchctl label,

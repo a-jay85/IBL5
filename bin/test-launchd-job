@@ -144,6 +144,8 @@ pass_row() { H_PASS=$((H_PASS + 1)); printf 'ok %s\n' "$1"; }
 LIE_BIN="$T/lie"
 claim_file_lying_mkdir_stub "$LIE_BIN"
 fail() { h_fail "$1: $2"; }
+# fail_row: same as fail, plus a bare `FAIL <name>` line a matrix row can grep.
+fail_row() { fail "$1" "$2"; printf 'FAIL %s\n' "$1"; }
 
 # reset_ctl — clear per-test control state
 reset_ctl() {
@@ -964,7 +966,7 @@ WRR_N=0; [[ -f "$WRR_COUNT" ]] && WRR_N="$(wc -l < "$WRR_COUNT" | tr -d ' ')"
 if [[ "$WRR_N" == "1" && ! -e "${WRR_SCRIPT}.once" ]]; then
     pass_row "W_racing_wrappers_run_once"
 else
-    fail "W_racing_wrappers_run_once" "count=$WRR_N marker=$([ -e "${WRR_SCRIPT}.once" ] && echo present || echo gone)"
+    fail_row "W_racing_wrappers_run_once" "count=$WRR_N marker=$([ -e "${WRR_SCRIPT}.once" ] && echo present || echo gone)"
 fi
 
 # ---------------------------------------------------------------------------
@@ -990,7 +992,7 @@ WLD_N=0; [[ -f "$WLD_COUNT" ]] && WLD_N="$(wc -l < "$WLD_COUNT" | tr -d ' ')"
 if [[ $WLD_RC -eq 0 && "$WLD_N" == "0" && ! -e "${WLD_SCRIPT}.once" ]]; then
     pass_row "W_legacy_once_dir_held_and_removed"
 else
-    fail "W_legacy_once_dir_held_and_removed" "rc=$WLD_RC count=$WLD_N marker=$([ -e "${WLD_SCRIPT}.once" ] && echo present || echo gone)"
+    fail_row "W_legacy_once_dir_held_and_removed" "rc=$WLD_RC count=$WLD_N marker=$([ -e "${WLD_SCRIPT}.once" ] && echo present || echo gone)"
 fi
 
 # ---------------------------------------------------------------------------
@@ -1004,7 +1006,7 @@ ro_run "$RO_OTHER" >/dev/null 2>&1
 if [[ ! -e "$RO_SCRIPT" && ! -e "$RO_SCRIPT.once" ]]; then
     pass_row "RO_file_marker_reaped"
 else
-    fail "RO_file_marker_reaped" "script=$([ -e "$RO_SCRIPT" ] && echo present || echo gone) marker=$([ -e "$RO_SCRIPT.once" ] && echo present || echo gone)"
+    fail_row "RO_file_marker_reaped" "script=$([ -e "$RO_SCRIPT" ] && echo present || echo gone) marker=$([ -e "$RO_SCRIPT.once" ] && echo present || echo gone)"
 fi
 
 # ---------------------------------------------------------------------------
@@ -1201,7 +1203,7 @@ L5B_CAP="$(grep -c "cap reached under FAKE_DRY" "$SLOT/err" || true)"
 if [[ "$L5B_SUBMITS" == "1" && "$L5B_CAP" == "1" ]]; then
     pass_row "L5b_lying_mkdir_cap_1"
 else
-    fail "L5b_lying_mkdir_cap_1" "submits=$L5B_SUBMITS cap_reached=$L5B_CAP err=$(tr '\n' ' ' < "$SLOT/err" 2>/dev/null)"
+    fail_row "L5b_lying_mkdir_cap_1" "submits=$L5B_SUBMITS cap_reached=$L5B_CAP err=$(tr '\n' ' ' < "$SLOT/err" 2>/dev/null)"
 fi
 
 # L6 (lying mkdir): a live holder's lock holds while mkdir always succeeds. The loser
@@ -1227,7 +1229,7 @@ L6L_MSG=0; grep -qF "ERROR: slot lock busy" "$SLOT/l6l.err" && L6L_MSG=1
 if [[ $L6L_RC -eq 1 && $L6L_MSG -eq 1 ]]; then
     pass_row "L6_lying_mkdir_lost_claim_bounded"
 else
-    fail "L6_lying_mkdir_lost_claim_bounded" "rc=$L6L_RC msg=$L6L_MSG waited=${L6L_W}s"
+    fail_row "L6_lying_mkdir_lost_claim_bounded" "rc=$L6L_RC msg=$L6L_MSG waited=${L6L_W}s"
 fi
 
 # ---------------------------------------------------------------------------

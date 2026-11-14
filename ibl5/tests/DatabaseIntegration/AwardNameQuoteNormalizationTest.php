@@ -18,6 +18,7 @@ final class AwardNameQuoteNormalizationTest extends DatabaseTestCase
 {
     private const YEAR = 2008;
 
+    /** `AwaRepository::upsertAward` covers the `.awa` importer. */
     public function testAwaRepositoryUpsertStoresApostrophe(): void
     {
         $this->clearYear();
@@ -37,6 +38,7 @@ final class AwardNameQuoteNormalizationTest extends DatabaseTestCase
         self::assertSame(["Jermaine O'Neal"], $this->namesFor('Most Valuable Player (2nd)'));
     }
 
+    /** `AswRepository::insertAwardUnlessFamilyExists` returns 1 and stores the apostrophe name. */
     public function testAswInsertStoresApostrophe(): void
     {
         $this->clearYear();

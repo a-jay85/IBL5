@@ -88,6 +88,9 @@
 #                              Step-4.5 artifact). PRESENCE only — validity of the
 #                              rationale stays Opus judgment; this just catches a
 #                              hold declared with the challenge skipped entirely.
+#                              It also requires a non-empty line-1
+#                              `hold_trigger:` line whose every token is listed
+#                              in bin/lib/hold-trigger-tokens.txt.
 #   K  Autonomy contract    — a plan's optional `stop_condition:`/`evidence:`
 #                              line-1 frontmatter must be well-formed and PAIRED
 #                              (both or neither). Delegates the parse and the
@@ -872,6 +875,33 @@ done < <(awk '
     inf && /^---[[:space:]]*$/   { exit }
     inf                          { print }
 ' "$PLAN_FILE")
+
+# [H] hold_trigger: a held plan names each gate-14 trigger on its line-1
+# frontmatter from bin/lib/hold-trigger-tokens.txt (pinned to armable.py by
+# tools/postplan-harness/tests/test_hold_trigger_vocabulary.py). Parsing mirrors
+# planfile.frontmatter_hold_triggers: split on ',', trim, lower-case; empty
+# tokens (a trailing comma) are dropped.
+if [ "$FM_HOLD" -eq 1 ]; then # [H] hold_trigger gate
+    HT_VOCAB="$SCRIPT_DIR/lib/hold-trigger-tokens.txt"
+    HT_RAW=$(awk '
+        NR==1 && /^---[[:space:]]*$/ { inf=1; next }
+        inf && /^---[[:space:]]*$/   { exit }
+        inf && /^hold_trigger:/      { sub(/^hold_trigger:[[:space:]]*/, ""); print; exit }
+    ' "$PLAN_FILE")
+    HT_TOKENS=$(printf '%s\n' "$HT_RAW" | tr ',' '\n' | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' | tr '[:upper:]' '[:lower:]' | awk 'NF')
+    if [ ! -r "$HT_VOCAB" ]; then
+        viol "[H] hold_trigger vocabulary file unreadable: $HT_VOCAB"
+    elif [ -z "$HT_TOKENS" ]; then
+        viol "[H] plan declares auto_merge: false but its line-1 frontmatter has no non-empty hold_trigger: line; add hold_trigger: <token>[, <token>...] naming each gate-14 trigger (vocabulary: bin/lib/hold-trigger-tokens.txt)"
+    else
+        HT_KNOWN=$(awk '!/^#/ && NF==2 { print $2 }' "$HT_VOCAB")
+        while IFS= read -r ht_tok; do
+            if ! grep -qxF -- "$ht_tok" <<< "$HT_KNOWN"; then
+                viol "[H] hold_trigger token '$ht_tok' is not in bin/lib/hold-trigger-tokens.txt; use one of: $(tr '\n' ' ' <<< "$HT_KNOWN")"
+            fi
+        done <<< "$HT_TOKENS"
+    fi
+fi
 
 # Gate H(b): hold-justification content — first content judgment this gate makes.
 # Three things a future reader needs:

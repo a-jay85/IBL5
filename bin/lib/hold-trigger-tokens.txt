@@ -1,0 +1,20 @@
+# Hold-trigger vocabulary for the line-1 `hold_trigger:` frontmatter key.
+# bin/check-plan gate [H] rejects any token not listed here. Each set must equal
+# its frozenset in tools/postplan-harness/harness/armable.py; the pin test is
+# tools/postplan-harness/tests/test_hold_trigger_vocabulary.py.
+# <set> <token>
+clearable security-surface
+clearable gate-weakening
+clearable golden-snapshot
+clearable sql-equivalent
+owner-held ui
+owner-held truly-manual
+owner-held schema
+owner-held merge-rule
+owner-held gate-removal
+owner-held one-way
+owner-held unresolved-fork
+owner-held other
+owner-held bootstrap-hazard
+owner-held security-irreducible
+owner-held golden-new

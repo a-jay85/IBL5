@@ -121,9 +121,13 @@ def _deletes_destroy(diff_text: str) -> bool:
     """True when an added DELETE statement can lose rows no refresh step rebuilds: its target is
     outside rebuildable.REBUILDABLE_TABLES, or the harness cannot read the target (a multi-table
     DELETE, or an interpolated or schema-qualified name). Fail closed."""
-    for m in _DELETE_STMT_RE.finditer(_added_text(diff_text)):
+    text = _added_text(diff_text)
+    for m in _DELETE_STMT_RE.finditer(text):
         name = m.group("name")
         if m.group("multi") or name is None or name.lower() not in rebuildable.REBUILDABLE_TABLES:
+            return True
+        # `DELETE FROM t1, t2 USING ...` lists a second target after the first name.
+        if text[m.end():].lstrip().startswith(","):
             return True
     return False
 

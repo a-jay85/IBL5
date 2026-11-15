@@ -1,6 +1,6 @@
 ---
 description: The #merged digest @mentions the owner only for a manual or failed post-merge step, decided from pipeline job outputs.
-last_verified: 2026-10-21
+last_verified: 2026-11-15
 ---
 
 # ADR-0208: The merge digest pings the owner when a post-merge step needs them
@@ -37,6 +37,12 @@ ADR-0198 posts After-merge rows as a sticky PR comment plus a second #merged mes
 - Negative: the digest waits for the checklist job, up to its 5-minute timeout.
 - Negative: legacy untagged rows (the #3264 and #3286 shape) ping, because they are manual by definition.
 - Negative: `bin/test-discord-dm`'s call-site table drops from 17 to 16 sites, and its merge-digest row carries the computed ping.
+
+## Addendum: the merge digest no longer pings (2026-11-15)
+
+**Superseded by:** ADR-0254 (`0254-discord-errors-webhook.md`), for the owner ping only.
+
+The #merged digest no longer @mentions anyone. Its top block still names a manual row, a failed auto row, a bad count or a failed needed job, with the directions link first. `pmr_ping_decision` is now `pmr_needs_you_reasons` and sets only `PMR_NEEDS_YOU_REASONS`. The workflow's `ping:` input is gone. `bin/digest-dm-build --ping-out FILE` is replaced by the valueless `--after-merge` flag, which switches after-merge mode on. The row grammar, the sticky comment and the one-message digest in this ADR still stand.
 
 ## References
 

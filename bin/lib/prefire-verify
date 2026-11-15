@@ -7,6 +7,8 @@
 #      a row that row_runs_in_ci sends to the Plan checks CI job is skipped too)
 #   2. PHPUnit on the tests mapped to the branch's changed files (full suite when a
 #      shared test input changed or mapping failed; skipped when no PHPUnit-relevant file changed)
+# The shell stage runs the bin/test-* harness lines mapped by name to the changed bin/ files,
+# within a local time budget; every other harness, and every caller harness, is left to CI.
 # The Executable Mutations rows (bin/lib/plan-exec-mutations run) run in the Plan checks CI job.
 # The exec-mutations stage stays for an implementer who asks for it by name; "all" leaves it out.
 # Mutation score is gated by CI's required check "Infection PHP (per-PR diff)" (ADR-0237).
@@ -18,13 +20,13 @@
 # a row fails on the findings CI fails on and passes on the info notes CI ignores.
 # A row that sets SHELLCHECK_OPTS inline overrides it.
 #
-# Usage: bin/lib/prefire-verify [--plan <path>] [--stage matrix|phases|phpunit|pytest|exec-mutations|all]
+# Usage: bin/lib/prefire-verify [--plan <path>] [--stage matrix|phases|phpunit|pytest|shell|exec-mutations|all]
 #                               [--base <ref>] [--bypass <reason>] [--fire-point]
 #   --fire-point  exec-mutations only: use the larger limits (300 s per check run, 1800 s
 #                 total) instead of the implementer's 120 s / 300 s. The fire point's "all" run
 #                 skips that stage, so the flag matters only for a named exec-mutations run.
 #                 bin/post-plan-now passes it; a pass under either limit is the same record.
-#   --base        base ref for the phpunit and pytest stages' diff (default: git config
+#   --base        base ref for the phpunit, pytest and shell stages' diff (default: git config
 #                 branch.<name>.iblBase, else origin/master)
 # Exit codes:
 #   0  every requested stage passed (fresh run, or a valid pass record for this tree)
@@ -46,6 +48,7 @@
 # Environment:
 #   PREFIRE_PHPUNIT_FULL=1  run the full suite; 0, empty or unset maps files to tests and defers unmapped files to CI
 #                           and leaves tests under ibl5/tests/DatabaseIntegration/ to CI's db-integration job
+#   PREFIRE_SHELL_BUDGET=N  shell stage's local time budget in seconds, 1 to 9999; empty or unset means 300
 
 set -uo pipefail
 
@@ -86,13 +89,18 @@ while [ $# -gt 0 ]; do
 done
 
 case "$STAGE" in
-    matrix|phases|phpunit|pytest|exec-mutations|all) : ;;
+    matrix|phases|phpunit|pytest|shell|exec-mutations|all) : ;;
     infection) die 2 "--stage infection was removed; CI's required check \"Infection PHP (per-PR diff)\" covers mutation testing, so skip this call" ;;
-    *) die 2 "--stage must be matrix, phases, phpunit, pytest, exec-mutations, or all (got '$STAGE')" ;;
+    *) die 2 "--stage must be matrix, phases, phpunit, pytest, shell, exec-mutations, or all (got '$STAGE')" ;;
 esac
 case "${PREFIRE_PHPUNIT_FULL:-}" in
     ''|0|1) : ;;
     *) die 2 "PREFIRE_PHPUNIT_FULL must be 1, 0, or unset (got '${PREFIRE_PHPUNIT_FULL}')" ;;
+esac
+case "${PREFIRE_SHELL_BUDGET:-}" in
+    '') : ;;
+    [1-9]|[1-9][0-9]|[1-9][0-9][0-9]|[1-9][0-9][0-9][0-9]) : ;;
+    *) die 2 "PREFIRE_SHELL_BUDGET must be a whole number of seconds from 1 to 9999, or unset (got '${PREFIRE_SHELL_BUDGET}')" ;;
 esac
 if [ "$BYPASS_SET" -eq 1 ] && [ -z "$BYPASS_REASON" ]; then
     die 2 "--bypass needs a non-empty reason"
@@ -649,6 +657,174 @@ stage_pytest() {
     return 0
 }
 
+# --- shell harness selection ------------------------------------------------
+# prefire_shell_select <list-file> sets SHELL_MODE (subset|skip) and SHELL_REASON.
+# In subset mode it writes harness-legs.txt lines, minus the leg number, to <list-file>.
+# A changed bin/ file maps by name to one harness: test-NAME runs itself; NAME,
+# lib/NAME and lib/NAME.sh map to test-NAME; automouse/queue maps to
+# test-automouse-queue (all under bin/). The harness runs once per legs line (one line per shard).
+# Harnesses that source or call a changed file are left to CI, which runs every harness.
+SHELL_LEGS=".github/workflows/harness-legs.txt"
+SHELL_BUDGET_DEFAULT=300
+SHELL_EST_DEFAULT=120
+SHELL_ENV_RE='^[A-Za-z_][A-Za-z0-9_]*='
+SHELL_MODE=""
+SHELL_REASON=""
+SHELL_NOTES=""
+SHELL_NOTES_N=0
+SHELL_DURATIONS=""
+shell_note() { SHELL_NOTES="${SHELL_NOTES}$1"$'\n'; SHELL_NOTES_N=$((SHELL_NOTES_N + 1)); }
+shell_abort() { shell_note "deferred to CI: $1"; SHELL_MODE=skip; SHELL_REASON="deferred to CI: $1"; }
+shell_say_notes() {
+    local d
+    while IFS= read -r d; do
+        [ -n "$d" ] || continue
+        say "shell $d"
+    done <<< "$SHELL_NOTES"
+}
+
+shell_harness_for() { # <changed bin/ path>; prints the harness path it maps to
+    local rel="${1#bin/}"
+    case "$rel" in
+        test-*) case "$rel" in */*) ;; *) printf 'bin/%s' "$rel"; return 0 ;; esac ;;
+    esac
+    rel="${rel#lib/}"
+    rel="${rel%.sh}"
+    printf 'bin/test-%s' "${rel//\//-}"
+}
+
+shell_lookup() { # <harness> <changed path> <list-file>; appends the harness's legs lines
+    local line i n=0
+    local -a f
+    while IFS= read -r line || [ -n "$line" ]; do
+        read -r -a f <<< "$line"
+        [ "${#f[@]}" -ge 2 ] || continue
+        case "${f[0]}" in
+            exempt)
+                [ "${f[1]}" = "$1" ] || continue
+                shell_note "exempt, not run: $1 (${f[*]:2})"; return 0 ;;
+            *[!0-9]*) continue ;; # legs: not a leg number
+        esac
+        i=1
+        while [ "$i" -lt "${#f[@]}" ] && [[ ${f[$i]} =~ $SHELL_ENV_RE ]]; do i=$((i + 1)); done
+        [ "$i" -lt "${#f[@]}" ] || continue
+        [ "${f[$i]}" = "$1" ] || continue
+        printf '%s\n' "${f[*]:1}" >> "$3"
+        n=$((n + 1))
+    done < "$SHELL_LEGS"
+    [ "$n" -gt 0 ] || shell_note "deferred to CI: no $SHELL_LEGS line for $1 (changed: $2); CI runs it outside the legs matrix"
+}
+
+prefire_shell_select() { # <list-file>
+    local out="$1" base mb changed path h triggered=0
+    SHELL_MODE=""; SHELL_REASON=""; SHELL_NOTES=""; SHELL_NOTES_N=0
+    base=$(prefire_phpunit_base)
+    if ! git rev-parse --verify -q "$base^{commit}" >/dev/null 2>&1; then
+        if git rev-parse --verify -q "origin/$base^{commit}" >/dev/null 2>&1; then base="origin/$base"
+        else shell_abort "cannot resolve base '$base'"; return 0; fi
+    fi
+    mb=$(git merge-base "$base" HEAD 2>/dev/null) || { shell_abort "no merge-base between $base and HEAD"; return 0; }
+    changed=$(mktemp "${TMPDIR:-/tmp}/prefire-shchanged.XXXXXX") || { shell_abort "cannot create a temp file"; return 0; }
+    if ! git -c core.quotePath=false diff --name-only --no-renames "$mb" -- > "$changed" 2>/dev/null; then
+        rm -f "$changed"; shell_abort "cannot diff the tree against $base"; return 0
+    fi
+    if ! git -c core.quotePath=false ls-files --others --exclude-standard >> "$changed" 2>/dev/null; then
+        rm -f "$changed"; shell_abort "cannot list untracked files"; return 0
+    fi
+    while IFS= read -r path; do
+        case "$path" in
+            bin/*.md) continue ;;
+            bin/*) : ;; # shell trigger
+            *) continue ;;
+        esac
+        triggered=1
+        h=$(shell_harness_for "$path")
+        if [ ! -f "$h" ]; then shell_note "deferred to CI: no harness named $h for $path"; continue; fi
+        if [ ! -r "$SHELL_LEGS" ]; then shell_abort "cannot read $SHELL_LEGS"; break; fi
+        shell_lookup "$h" "$path" "$out"
+    done < "$changed"
+    rm -f "$changed"
+    if [ "$SHELL_MODE" = skip ]; then return 0; fi
+    if [ "$triggered" -eq 0 ]; then
+        SHELL_MODE=skip; SHELL_REASON="no bin/ path changed against $base"; return 0
+    fi
+    if [ ! -s "$out" ]; then
+        SHELL_MODE=skip; SHELL_REASON="no changed bin/ file has a local harness line (notes: $SHELL_NOTES_N)"; return 0
+    fi
+    sort -u "$out" -o "$out" || { shell_abort "cannot sort the harness list"; return 0; }
+    SHELL_MODE=subset
+}
+
+# --- shell stage ------------------------------------------------------------
+# Runs the selected legs lines serially from the repo root, each as `env [VAR=v ...] script [args]`
+# with stdin closed. Before each line it adds the line's estimate (its last measured duration in
+# $SHELL_DURATIONS, else SHELL_EST_DEFAULT) to the seconds already spent; a line that would pass
+# the budget is deferred to CI with a note. A started harness is never killed. The first red
+# line fails the stage.
+shell_estimate() { # <legs line>; prints the last measured seconds, else the default
+    local sec line est="$SHELL_EST_DEFAULT"
+    if [ -f "$SHELL_DURATIONS" ]; then
+        while IFS=$'\t' read -r sec line; do
+            if [ "$line" = "$1" ] && [[ $sec =~ ^[0-9]+$ ]]; then est="$sec"; fi
+        done < "$SHELL_DURATIONS"
+    fi
+    printf '%s' "$est"
+}
+
+stage_shell() {
+    local list log rc key="" line est start dur spent=0 ran=0 over=0
+    local budget="${PREFIRE_SHELL_BUDGET:-$SHELL_BUDGET_DEFAULT}"
+    local -a lines argv
+    lines=()
+    SHELL_DURATIONS="$STATE_DIR/shell-durations.tsv"
+    if list=$(mktemp "${TMPDIR:-/tmp}/prefire-shell.XXXXXX"); then
+        prefire_shell_select "$list"
+    else
+        list=""; shell_abort "cannot create the harness-list file"
+    fi
+    if [ "$SHELL_MODE" = subset ]; then
+        while IFS= read -r line; do lines[${#lines[@]}]="$line"; done < "$list"
+        key="subset-$(git hash-object "$list" | cut -c1-12)"
+    fi
+    [ -n "$list" ] && rm -f "$list"
+    if [ "$SHELL_MODE" != subset ] || [ "${#lines[@]}" -eq 0 ]; then
+        shell_say_notes
+        say "shell mode: skipped ($SHELL_REASON)"
+        return 0
+    fi
+    say "shell mode: subset (${#lines[@]} harness lines, budget ${budget} s)"
+    shell_say_notes
+    cache_hit shell "$key" && return 0
+    log="$STATE_DIR/$TREE.shell.log"
+    : > "$log"
+    for line in "${lines[@]}"; do
+        est=$(shell_estimate "$line")
+        if [ $((spent + est)) -gt "$budget" ]; then # shell-budget
+            say "shell deferred to CI: $line would pass the local budget (estimate ${est} s, spent ${spent} s of ${budget} s)"
+            over=$((over + 1)); continue
+        fi
+        read -r -a argv <<< "$line"
+        printf -- '--- %s\n' "$line" >> "$log"
+        start=$SECONDS
+        (env "${argv[@]}" </dev/null) >> "$log" 2>&1; rc=$?
+        dur=$((SECONDS - start)); spent=$((spent + dur)); ran=$((ran + 1))
+        printf '%s\t%s\n' "$dur" "$line" >> "$SHELL_DURATIONS"
+        if [ "$rc" -ne 0 ]; then # shell-red
+            say "FAIL shell: $line red (exit $rc); log: $log" >&2
+            tail -n 40 "$log" >&2
+            return 1
+        fi
+        say "shell ran $line (${dur} s)"
+    done
+    if [ "$ran" -eq 0 ]; then
+        say "shell mode: skipped (all ${#lines[@]} harness lines deferred over the ${budget} s budget)"
+        return 0
+    fi
+    write_record shell "$key"
+    say "shell passed ($ran harness lines run, $over deferred to CI over the budget)"
+    return 0
+}
+
 # --- exec-mutations stage ---------------------------------------------------
 # The short limits fit one 600 s foreground implementer Bash call (prompt-impl Step 6.9):
 # a row starts only inside the 300 s budget and can then take at most 120 s baseline + 120 s
@@ -780,7 +956,7 @@ stage_phases() {
 
 # --- run --------------------------------------------------------------------
 case "$STAGE" in
-    all) STAGES="phases matrix phpunit pytest" ;;
+    all) STAGES="phases matrix phpunit pytest shell" ;;
     *)   STAGES="$STAGE" ;;
 esac
 

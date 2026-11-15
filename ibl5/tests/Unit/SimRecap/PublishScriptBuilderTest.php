@@ -138,6 +138,10 @@ final class PublishScriptBuilderTest extends TestCase
         self::assertSame([], $steps[3]['mentionUsers']);
     }
 
+    /**
+     * Guards the id pattern. Widening `<@!?` to `<@[!&]?` would let the role id through,
+     * and widening `{17,20}` to `{2,20}` would let the 2-digit id `<@12>` through.
+     */
     public function testExtractUserIdsIgnoresRoleAndShortIds(): void
     {
         $content = '<@&793564717402554368> <@12> <@!123456789012345678> <@123456789012345679> <@123456789012345678>';

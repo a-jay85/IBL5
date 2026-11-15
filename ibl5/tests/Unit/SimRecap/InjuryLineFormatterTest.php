@@ -26,6 +26,9 @@ final class InjuryLineFormatterTest extends TestCase
         self::assertSame('-B.Portis, MIN - blateral patella tendinitis (13) <@123456789012345678>', $second);
     }
 
+    /**
+     * Guards the n/j/y date format: a switch to m/d/y would print 01/04/09.
+     */
     public function testHeaderDateHasNoZeroPadding(): void
     {
         self::assertSame('**1/4/09**', InjuryLineFormatter::formatHeader('2009-01-04'));

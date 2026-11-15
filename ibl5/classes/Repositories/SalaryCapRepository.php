@@ -83,26 +83,6 @@ class SalaryCapRepository extends \Database\BaseMysqliRepository implements Sala
         return (int) ($result['total_salary'] ?? 0);
     }
 
-    /**
-     * @return array{current: int, nextYear: int}
-     */
-    public function getTeamSalarySummary(string $teamName): array
-    {
-        /** @var array{current_salary: int|null, next_year_salary: int|null}|null $result */
-        $result = $this->fetchOne(
-            "SELECT SUM(current_salary) AS current_salary, SUM(next_year_salary) AS next_year_salary
-            FROM vw_current_salary
-            WHERE teamname = ?",
-            "s",
-            $teamName
-        );
-
-        return [
-            'current' => (int) ($result['current_salary'] ?? 0),
-            'nextYear' => (int) ($result['next_year_salary'] ?? 0),
-        ];
-    }
-
     public function getTeamCapSpaceNextSeason(string $teamName): int
     {
         return League::HARD_CAP_MAX - $this->getTeamNextYearSalary($teamName);

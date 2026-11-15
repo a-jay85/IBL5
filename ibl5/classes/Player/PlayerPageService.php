@@ -6,9 +6,6 @@ namespace Player;
 
 use League\League;
 use Player\Contracts\PlayerPageServiceInterface;
-use Player\Stats\PlayerStatsRepository;
-use Player\Views\PlayerViewFactory;
-use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Team\Team;
 use Season\Season;
 
@@ -17,37 +14,6 @@ use Season\Season;
  */
 class PlayerPageService implements PlayerPageServiceInterface
 {
-    private PlayerRepository $repository;
-    private PlayerStatsRepository $statsRepository;
-    private PlayerViewFactory $viewFactory;
-
-    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepo)
-    {
-        $this->repository = new PlayerRepository($db);
-        $this->statsRepository = new PlayerStatsRepository($db);
-        $this->viewFactory = new PlayerViewFactory($this->repository, $this->statsRepository, $commonRepo);
-    }
-
-    /**
-     * Get the view factory for creating view instances
-     * 
-     * @return PlayerViewFactory
-     */
-    public function getViewFactory(): PlayerViewFactory
-    {
-        return $this->viewFactory;
-    }
-
-    /**
-     * Get the player repository
-     * 
-     * @return PlayerRepository
-     */
-    public function getRepository(): PlayerRepository
-    {
-        return $this->repository;
-    }
-
     /**
      * @see PlayerPageServiceInterface::canShowRenegotiationButton()
      */

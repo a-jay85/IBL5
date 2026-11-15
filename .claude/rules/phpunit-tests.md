@@ -1,7 +1,7 @@
 ---
 description: PHPUnit testing rules: output parsing, behavior-focused patterns, PHPStan test-neon suppressions, integration test seeding. Long-form sections live in phpunit-tests-detail.md (Read on demand).
 paths: ibl5/tests/**/*.php
-last_verified: 2026-11-12
+last_verified: 2026-11-14
 ---
 
 # PHPUnit Testing Rules
@@ -133,7 +133,7 @@ Mutation testing (Infection): see `phpunit-tests-detail.md`.
 
 Before considering ANY PHP task complete:
 
-1. **Run the tests mapped to your changed files.** `bin/lib/prefire-verify --stage phpunit` picks them, and `bin/post-plan-now` runs the same stage before it ships (ADR-0241). Do not run the full suite locally. It takes about 3 minutes, and CI's `PHPUnit Tests` job runs it on every PR. A change to a shared base class, helper or PHPUnit config has no mapped tests, so it defers to CI. Set `PREFIRE_PHPUNIT_FULL=1` only when you need the full result before you push.
+1. **Run the tests mapped to your changed files.** `bin/lib/prefire-verify --stage phpunit` picks them, and `bin/post-plan-now` runs the same stage before it ships (ADR-0241). Do not run the full suite locally. It takes about 3 minutes, and CI's `PHPUnit Tests` job runs it on every PR. A change to a shared base class, helper or PHPUnit config has no mapped tests, so it defers to CI. Tests under ibl5/tests/DatabaseIntegration/ are always left to CI's db-integration job, and a subset run that executes no tests fails. Set `PREFIRE_PHPUNIT_FULL=1` only when you need the full result before you push.
 2. **DB-touching code.** `phpunit.xml` excludes the `database` group, so the stage above skips integration tests. Run the ones you touched with `vendor/bin/phpunit --group database <test file>` (needs Docker MariaDB and `DB_HOST`/`DB_USER`/`DB_PASS`/`DB_NAME`). CI's `Database Integration Tests` job runs the whole group.
 3. Final line must read `OK (X tests, Y assertions)`, with zero warnings, failures, errors, or skips. One skip is expected on the macOS host, so `OK, but some tests were skipped!` with `Skipped: 1` passes there. That test is `ShadowProcessLauncherTest::launchReturnsImmediatelyWhileChildRunsDetached`.
    It needs Linux `setsid`, which macOS lacks. It runs for real in CI and in the php container, and it fails in CI if `setsid` is missing. Don't investigate it. A second skip, or a skip anywhere in CI, is real and needs fixing.

@@ -1,6 +1,6 @@
 ---
-description: PHPStan/Infection tooling — always use composer scripts; baseline management; infection exclude staleness; local Infection via bin/mutation-diff; constant() false positives.
-last_verified: 2026-11-13
+description: PHPStan/Infection tooling — always use composer scripts; baseline management; infection exclude staleness; local Infection via bin/mutation-diff (refuses unless CI's check failed); constant() false positives.
+last_verified: 2026-11-14
 paths:
   - "**/*.php"
   - "ibl5/composer.json"
@@ -51,4 +51,6 @@ This also fails `Tests and Analysis` and `Infection PHP (per-PR diff)`. **Fix:**
 
 Don't run Infection locally by default. CI's required check `Infection PHP (per-PR diff)` scores every PR, so push and let CI run it. Run it locally only when CI's Infection check has failed on this PR and you are fixing the mutants it reported. Then run it once to confirm the fix before you push again. No prep job, burndown job, review, or plan phase runs it unless that condition holds.
 
-`bin/mutation-diff <base-ref>` runs from the worktree root. The base defaults to `origin/master`. It runs on the host, resets `ibl5_test` on the main-stack DB through `bin/db-test-up --no-run`, writes coverage, then runs Infection with the flags `.github/workflows/mutation-pr.yml` uses and the repo config's 4 threads. Exit 3 names the missing prerequisite (pcov, the `ibl5-mariadb` container, or `bin/db-test-up`). Exit 4 means another run holds the lock.
+`bin/mutation-diff` enforces this. Before any DB reset or coverage run it asks `gh` for the open PR on the current branch and reads the newest `Infection PHP (per-PR diff)` check run on that PR's head commit. It continues only when that run concluded `failure`. It refuses with exit 6 on a detached HEAD, a missing or failing `gh`, zero or several open PRs, no check run, a queued or in-progress run, or any other conclusion (`success`, `skipped`, `cancelled`, `neutral`, `timed_out`, `action_required`). A human who needs a run anyway passes `--force`. With `CLAUDE_HEADLESS` set to any non-empty value, `--force` exits 2, so an agent run cannot skip the check. Tests point `GH_BIN` at a stub.
+
+`bin/mutation-diff <base-ref>` runs from the worktree root. The base defaults to `origin/master`. It runs on the host, resets `ibl5_test` on the main-stack DB through `bin/db-test-up --no-run`, writes coverage, then runs Infection with the flags `.github/workflows/mutation-pr.yml` uses and the repo config's 4 threads. Exit 3 names the missing prerequisite (pcov, the `ibl5-mariadb` container, or `bin/db-test-up`). Exit 4 means another run holds the lock. Exit 6 is the CI-state refusal described above.

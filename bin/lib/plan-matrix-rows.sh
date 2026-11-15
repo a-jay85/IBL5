@@ -78,6 +78,20 @@ is_whole_suite_cmd() {
     return 1
 }
 
+# Exit 0 when the row only parses or lints files: one `bash -n`, `sh -n` or
+# `shellcheck` call with no `&`, `;`, `|`, `$(`, backtick, `<(` or `>(`. Such a row
+# can name bin/db-test-up without running it, so prefire-verify skips the DB
+# probe for it. Anything chained still probes (fail toward probing).
+is_parse_only_cmd() {
+    local c="$1"
+    c="${c#"${c%%[![:space:]]*}"}"
+    case "$c" in
+        *'&'*|*';'*|*'|'*|*'$('*|*'`'*|*'<('*|*'>('*) return 1 ;;
+        'bash -n '*|'sh -n '*|'shellcheck '*) return 0 ;;
+    esac
+    return 1
+}
+
 # DB-touching rows: prefire-verify probes the DB before the first one, and the
 # CI sorter keeps them local.
 PLAN_ROW_DB_RE='db-query|docker|--group[= ]database|DatabaseIntegration|db-test-up|run-migrations|mariadb'

@@ -29,7 +29,8 @@ TMP="$(mktemp -d)"
 trap 'rm -f "$TMP"/*.md 2>/dev/null; rmdir "$TMP" 2>/dev/null; h_cleanup' EXIT
 # Case filter: empty runs every case; `gate13` skips the cases outside gate 13;
 # `matrix-split` skips the cases outside gate XM; `gateSD` runs only the gate
-# [SD] cases and exits; `gateQ` runs only the gate [Q] seed-state cases and exits.
+# [SD] cases and exits; `gateQ` runs only the gate [Q] seed-state cases and exits;
+# `gateVsyntax` runs only the gate [V] parse-arm and bin/fixtures cases and exits.
 TCP_ONLY="${1:-}"
 h_shard_init "${CHECK_PLAN_SHARD:-}"
 
@@ -396,6 +397,59 @@ assert_msg "q_novr_class_unasserted_quiet" 0 "" "[Q-advisory]" "$FM_OPUS"'
 '
 fi
 [ "$TCP_ONLY" != gateQ ] || h_done
+
+# Gate [V] parse arm and bin/fixtures bare-path arm. TCP_ONLY=gateVsyntax runs
+# only these. The cells are single-quoted so the harness never expands them.
+if [ -z "$TCP_ONLY" ] || [ "$TCP_ONLY" = gateVsyntax ]; then
+_vs_run() {  # _vs_run <name> <location-cell>: check-plan output for a one-row matrix
+    f="$TMP/$1.md"
+    printf '%s\n' "$FM" "sonnet-recipe: gate-V syntax fixture; anchor not under test." "" \
+        "## Verification Matrix" "" \
+        "| # | What to verify | Test type | Timing | Test file / location |" \
+        "|---|---|---|---|---|" \
+        "| 1 | cell under test | CLI-executable | post-impl | $2 |" > "$f"
+    "$GUARD" "$f" 2>&1
+}
+_vs_reject() {  # _vs_reject <name> <cell> <needle>: passes when a [V] line holds needle
+    h_shard_take || return 0
+    if _vs_run "$1" "$2" | grep '^\[V\]' | grep -qF "$3"; then
+        h_pass "$1"
+    else
+        h_fail "$1" "no [V] line containing: $3"
+    fi
+}
+_vs_clean() {  # _vs_clean <name> <cell>: passes when gate V says nothing about row 1
+    h_shard_take || return 0
+    if _vs_run "$1" "$2" | grep -qF '[V] CLI-executable row (row 1)'; then
+        h_fail "$1" "clean cell fired [V]"
+    else
+        h_pass "$1"
+    fi
+}
+# vr-gallery row-14 shape: even backtick count, so the parity arm passes it;
+# the stray backtick pair leaves .sort() at top level and bash -n fails on '('.
+_vs_reject gate-V-bash-syntax-row14-shape \
+    '`bun run scripts/x.ts \| grep -qx ok`; red if `.sort()` is dropped from `files`' \
+    'does not parse as shell after Phase 5.0 strip'
+# Near-miss prose with no backticks at all: a parenthesized aside after a command.
+_vs_reject gate-V-bash-syntax-paren-prose \
+    'bin/test-check-plan (runs every case)' \
+    'does not parse as shell after Phase 5.0 strip'
+_vs_clean gate-V-bash-syntax-clean-pipeline \
+    'grep -c gatev_nonrunnable bin/check-plan \| sort -n'
+_vs_clean gate-V-bash-syntax-herestring-subst \
+    'grep -c x <<< "$(git diff --name-only)"'
+# The fix the message suggests (prose moved into a # comment) must pass.
+_vs_clean gate-V-bash-syntax-comment-form \
+    'bun test foo.test.ts # red if .sort() is dropped from files'
+_vs_reject gate-V-bare-fixtures-path \
+    'bin/fixtures/x.json' \
+    'a bare bin/fixtures/ file path'
+# Near-miss: the same path behind a command verb is a runnable command.
+_vs_clean gate-V-fixtures-path-with-verb \
+    'jq . bin/fixtures/x.json'
+fi
+[ "$TCP_ONLY" != gateVsyntax ] || h_done
 
 if [ "$TCP_ONLY" != matrix-split ]; then
 if [ "$TCP_ONLY" != gate13 ]; then
@@ -4778,7 +4832,9 @@ ${NMIN_HDR}
 # violations. Downgradeable set: [E] (packet assertion binding, a true positive
 # on historical plans), and [V] lines for the backtick-parity arm added in this
 # PR (also a true positive on historical plans), and the [F] absolute-path line
-# (plans authored before that check existed). Never edit the corpus plans
+# (plans authored before that check existed).
+# The [V] bash -n parse arm and the [V] bin/fixtures bare-path arm are downgraded for the same reason.
+# Never edit the corpus plans
 # themselves — that mutates historical artifacts and disarms the gate permanently.
 _corpus_guard_ok() {
     _cgo_out="$("$GUARD" "$1" 2>&1)"; _cgo_rc=$?
@@ -4794,11 +4850,11 @@ _corpus_guard_ok() {
     _cgo_other="$(printf '%s\n' "$_cgo_out" | awk '
         /^check-plan: violations in /{v=1; next}
         /^check-plan: /{v=0}
-        v && /^\[/ && !/^\[E\]/ && !/^\[AB\]/ && !/^\[CW\]/ && !/^\[V\].*unbalanced backtick after Phase 5\.0 strip/ && !/^\[F\] ## Critical Files entry has an absolute path/ && !/^\[H\].*no non-empty hold_trigger:/ {print}')"
+        v && /^\[/ && !/^\[E\]/ && !/^\[AB\]/ && !/^\[CW\]/ && !/^\[V\].*unbalanced backtick after Phase 5\.0 strip/ && !/^\[V\].*does not parse as shell after Phase 5\.0 strip/ && !/^\[V\].*a bare bin\/fixtures\/ file path/ && !/^\[F\] ## Critical Files entry has an absolute path/ && !/^\[H\].*no non-empty hold_trigger:/ {print}')"
     _cgo_dvio="$(printf '%s\n' "$_cgo_out" | awk '
         /^check-plan: violations in /{v=1; next}
         /^check-plan: /{v=0}
-        v && (/^\[E\]/ || /^\[AB\]/ || /^\[CW\]/ || /^\[V\].*unbalanced backtick after Phase 5\.0 strip/ || /^\[F\] ## Critical Files entry has an absolute path/ || /^\[H\].*no non-empty hold_trigger:/) {print}' | head -1)"
+        v && (/^\[E\]/ || /^\[AB\]/ || /^\[CW\]/ || /^\[V\].*unbalanced backtick after Phase 5\.0 strip/ || /^\[V\].*does not parse as shell after Phase 5\.0 strip/ || /^\[V\].*a bare bin\/fixtures\/ file path/ || /^\[F\] ## Critical Files entry has an absolute path/ || /^\[H\].*no non-empty hold_trigger:/) {print}' | head -1)"
     # Downgrade ONLY when: non-zero exit, zero non-downgradeable lines, and at
     # least one downgradeable line actually explains the failure. A non-zero exit
     # with no visible violation line still fails loudly instead of passing silently.
@@ -5188,11 +5244,17 @@ if ! "$GUARD" "$_j_f" 2>&1 | grep -q '\[J\]'; then
 else
     echo "ok: gate-J-new-class-no-coverage advisory confirmed"
 fi
+if "$GUARD" "$_j_f" 2>&1 | grep -q 'label-gated'; then
+    echo "FAIL: gate-J-advisory-text — stale label-gated text"
+    FAILED=1
+else
+    echo "ok: gate-J-advisory-text"
+fi
 fi
 rm -f "$_j_f"
 
-# Infection row present in VM — gate is silent ([J] must NOT appear).
-assert_viol gate-J-new-class-with-infection-clean 0 '[J]' "$FM_OPUS
+# Coverage row present in VM: gate is silent ([J] must NOT appear).
+assert_viol gate-J-new-class-with-coverage-clean 0 '[J]' "$FM_OPUS
 
 ## Phase 1
 
@@ -5200,7 +5262,7 @@ Create a new ibl5/classes/Foo/BarService.php implementing the baz interface.
 
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---|---|---|---|
-| 1 | mutation score | Infection | post-impl | cd ibl5 && vendor/bin/infection --filter=classes/Foo/BarService.php |"
+| 1 | line coverage | Coverage | post-impl | cd ibl5 && vendor/bin/phpunit --coverage-text tests/Foo/BarServiceTest.php |"
 
 # No creation verb — gate is silent ([J] must NOT appear).
 assert_viol gate-J-no-new-class-clean 0 '[J]' "$FM_OPUS
@@ -5209,6 +5271,72 @@ assert_viol gate-J-no-new-class-clean 0 '[J]' "$FM_OPUS
 
 Modify ibl5/classes/Foo/BarService.php to add a method.
 $CF_MATRIX"
+
+# ---------------------------------------------------------------------------
+# Gate [LI]: plan schedules a local Infection run (blocking)
+# ---------------------------------------------------------------------------
+_li_h='##'
+_li_f3='```'
+# Old Unit 5 step 7 wording, before its rewrite: blocks.
+assert_viol gate-LI-old-wording-blocks 1 '[LI]' "$FM_OPUS
+
+${_li_h} Phase 1
+
+7. Run the same diff-scoped run locally: bin/mutation-diff origin/master, before firing post-plan.
+$CF_MATRIX"
+# Current Unit 5 wording: a negated line, then a line conditioned on CI's failure. Clean.
+assert_viol gate-LI-ci-failed-allowed 0 '[LI]' "$FM_OPUS
+
+${_li_h} Phase 1
+
+7. Do not run Infection locally.
+8. If CI's check fails, fix the mutants it reports, then run bin/mutation-diff <base-ref> once to confirm before pushing again.
+$CF_MATRIX"
+# Near-miss: names CI without a failure. Blocks.
+assert_viol gate-LI-ci-passes-blocks 1 '[LI]' "$FM_OPUS
+
+${_li_h} Phase 1
+
+CI passes, then run bin/mutation-diff origin/master.
+$CF_MATRIX"
+# Near-miss: the runner as an edit target, no run verb. Clean.
+assert_viol gate-LI-edit-target-clean 0 '[LI]' "$FM_OPUS
+
+${_li_h} Phase 1
+
+Edit bin/mutation-diff to add the CI-state gate.
+$CF_MATRIX"
+# Fenced example: clean.
+assert_viol gate-LI-fenced-clean 0 '[LI]' "$FM_OPUS
+
+${_li_h} Phase 1
+
+${_li_f3}bash
+bin/mutation-diff origin/master   # run example
+${_li_f3}
+$CF_MATRIX"
+# Matrix location cell running the runner: blocks.
+assert_viol gate-LI-matrix-row-blocks 1 '[LI]' "$FM_OPUS
+
+${_li_h} Phase 1
+
+Edit the runner.
+
+${_li_h} Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | mutation score | CLI-executable | post-impl | bin/mutation-diff origin/master |"
+# Matrix location cell running the harness: no hit from the helper.
+if h_shard_primary; then
+_li_out="$(printf '%s\n' "${_li_h} Verification Matrix" '| 1 | a | CLI-executable | post-impl | bin/test-mutation-diff |' \
+    | awk -f "$(dirname "$GUARD")/lib/plan-local-infection.awk")"
+if [ -n "$_li_out" ]; then
+    echo "FAIL: gate-LI-test-harness-cell-clean — got: $_li_out"; FAILED=1
+else
+    echo "ok: gate-LI-test-harness-cell-clean"
+fi
+fi
 # --- Gate D (draft phase drift) ---
 # Fixture bodies are built with printf heading-token arguments to avoid
 # literal level-2 Phase headings being counted if gate D is ever pointed at

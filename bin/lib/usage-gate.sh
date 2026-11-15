@@ -40,8 +40,24 @@ usage_zone_pct() {  # <json>
     printf '%s' "${1:-}" | jq -r '.seven_day.utilization // 0'
 }
 
+# usage_zone <json>: normal, drain, or stop.
+# In the last 24 hours before seven_day.resets_at the zone is always normal: quota
+# left at reset is lost, so no runner pauses for usage then. A real limit hit is
+# still caught by the limit-hit predicates. A missing, unparseable, or past
+# resets_at keeps the percent thresholds.
 usage_zone() {  # <json>
-    local th d s
+    local th d s rs left
+    rs=$(usage_resets_epoch "${1:-}" seven_day)
+    case "$rs" in
+        ''|*[!0-9]*) ;;
+        *)
+            left=$(( rs - $(date +%s) ))
+            if [ "$left" -gt 0 ] && [ "$left" -le 86400 ]; then
+                echo normal
+                return 0
+            fi
+            ;;
+    esac
     th=$(usage_thresholds)
     d=${th%% *}
     s=${th##* }

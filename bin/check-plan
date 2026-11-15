@@ -485,7 +485,7 @@ _q_closed_by() {
 # not ONE runnable shell command, or nothing when it is. Shared by gate V and
 # gate [XM]'s check: override so both obey the same rules.
 gatev_nonrunnable() {
-    local MC_LOC="$1" _bad _probe _stripped _bt_ct
+    local MC_LOC="$1" _bad _probe _stripped _bt_ct _syn
     _bad=""
     # A `...` between two ref-ish tokens is a git range (origin/master...HEAD),
     # not an elision — mask ranges before testing. Corpus-verified: without this
@@ -512,6 +512,8 @@ gatev_nonrunnable() {
         _bad="an unbound <placeholder> — bind it with \$(…) or a \$VAR that has a stated default"
     elif printf '%s' "$MC_LOC" | grep -qE '^(ibl5|tests|engine|\.claude|\.github)/[^ ]+$'; then
         _bad="a bare file path with no command verb (reclassify the row, or run it)"
+    elif printf '%s' "$MC_LOC" | grep -qE '^bin/fixtures/[^ ]+$'; then
+        _bad="a bare bin/fixtures/ file path with no command verb (reclassify the row, or run it)"
     elif printf '%s' "$MC_LOC" | grep -qiE '^(SELECT|INSERT|UPDATE|DELETE|ALTER|CREATE[[:space:]]+TABLE|DROP)[[:space:]]'; then
         _bad="bare SQL — wrap it in bin/db-query"
     elif printf '%s' "$MC_LOC" | grep -qiE '^(same[[:space:]]|re-run)'; then
@@ -520,6 +522,13 @@ gatev_nonrunnable() {
         _bad="a /path/to placeholder — bind the real path with \$(git rev-parse --show-toplevel) or a \$VAR that has a stated default"
     elif [ "$(( _bt_ct % 2 ))" -ne 0 ]; then
         _bad="unbalanced backtick after Phase 5.0 strip — prose after the closing backtick causes bash -c to exit 2 (unexpected EOF); move description outside the backticks or into a shell comment inside them: \`cmd # description\`"
+    elif ! _syn=$(printf '%s\n' "$_stripped" | bash -n 2>&1); then
+        # Phase 5.0 hands the stripped cell to bash -c, which parses the whole
+        # string before running any of it, so a cell bash -n rejects can never
+        # run. bash -n only parses; the cell is never executed here. Keep the
+        # first error line and drop its "bash: " prefix.
+        _syn=$(printf '%s\n' "$_syn" | head -1 | sed 's/^bash: //')
+        _bad="does not parse as shell after Phase 5.0 strip (bash -n: ${_syn}); move prose out of the backticks, or into a shell comment inside them: \`cmd # description\`"
     fi
     printf '%s' "$_bad"
 }
@@ -665,7 +674,7 @@ while IFS= read -r row; do
     if printf '%s' "$low" | grep -qE 'cli[- ]executable' && matrix_split "$row"; then
         _bad=$(gatev_nonrunnable "$MC_LOC")
         if [ -n "$_bad" ]; then
-            viol "[V] CLI-executable row (row ${MC_NUM:-?}) has a non-runnable location cell: \"${MC_LOC}\" — ${_bad}. It must be a single shell command. Not accepted: 'Phase N' pointers, '...' ellipsis, '<placeholder>' tokens, bare file paths, bare SQL. Valid examples: bin/check-docs / grep -c 'FunctionName' ibl5/classes/Foo.php / python3 -c \"import sys; sys.exit(0)\""
+            viol "[V] CLI-executable row (row ${MC_NUM:-?}) has a non-runnable location cell: \"${MC_LOC}\" — ${_bad}. It must be a single shell command. Not accepted: 'Phase N' pointers, '...' ellipsis, '<placeholder>' tokens, bare file paths, bare SQL, cells that fail bash -n. Valid examples: bin/check-docs / grep -c 'FunctionName' ibl5/classes/Foo.php / python3 -c \"import sys; sys.exit(0)\""
         elif [ "$MHDR_PIPES" -gt 0 ] && [ "$MC_PIPES" -gt "$MHDR_PIPES" ]; then
             viol "[V] CLI-executable row (row ${MC_NUM:-?}) has ${MC_PIPES} structural pipes where the matrix header has ${MHDR_PIPES} — a pipe inside a cell must be written \\| or the cell parses truncated, and /post-plan Phase 5.0 then runs the truncated command: ${row}"
         fi
@@ -2860,10 +2869,10 @@ done < "$MATRIX_FILE"
 # ---------------------------------------------------------------------------
 # Gate [J]: Coverage advisory for new PHP classes (warn-only).
 # ---------------------------------------------------------------------------
-# A plan that introduces a new ibl5/classes/*.php file should include at
-# least one Infection/mutation or coverage VM row, so the new code's
-# mutation resistance is considered. Infection is label-gated (mutation-test)
-# so this is advisory only — it never blocks the plan.
+# A plan that introduces a new ibl5/classes/*.php file should name a
+# coverage row for it. CI's required "Infection PHP (per-PR diff)" check
+# scores mutants on every PR, so this advisory never asks for an Infection
+# row, and gate [LI] blocks a plan that schedules one. Warn-only.
 _j_new_class=0
 if grep -qiE '([Cc]reate|[Nn]ew file|[Aa]dd(s|ing)? (a )?new|[Ii]ntroduce|[Ss]caffold)' "$PLAN_FILE" \
    && grep -qE 'ibl5/classes/[^ ]+\.php' "$PLAN_FILE"; then
@@ -2873,9 +2882,29 @@ if grep -qiE '([Cc]reate|[Nn]ew file|[Aa]dd(s|ing)? (a )?new|[Ii]ntroduce|[Ss]ca
         | grep -cE 'ibl5/classes/[^ ]+\.php' || true)
 fi
 if [ "${_j_new_class:-0}" -gt 0 ]; then
-    if ! grep -qiE 'infection|mutation|coverage' "$MATRIX_FILE"; then
-        warn "[J] plan introduces a new ibl5/classes/*.php file but the VM has no Infection/mutation/coverage row — consider adding one (Infection is label-gated; suppress with a comment if deliberately omitted)"
+    if ! grep -qiE 'coverage' "$MATRIX_FILE"; then
+        warn "[J] plan introduces a new ibl5/classes/*.php file but the VM has no coverage row; consider adding one (CI's \"Infection PHP (per-PR diff)\" check scores mutants on every PR; suppress with a comment if deliberate)"
     fi
+fi
+
+# ---------------------------------------------------------------------------
+# Gate [LI]: plan schedules a local Infection run (hard-fail).
+# ---------------------------------------------------------------------------
+# CI's required check "Infection PHP (per-PR diff)" scores every PR, so a plan
+# never schedules a local run. A phase line may name the runner only when it
+# conditions the run on CI's Infection check having failed. Matrix rows run
+# unattended at post-plan Phase 5.0, so a matrix location cell never may.
+_li_awk="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/plan-local-infection.awk"
+if [ ! -f "$_li_awk" ]; then
+    viol "[LI] helper missing: $_li_awk"
+else
+    while IFS=$'\t' read -r _li_file _li_kind _li_where _li_text; do
+        if [ "$_li_kind" = M ]; then
+            viol "[LI] VM row $_li_where runs a local Infection command; CI's required check \"Infection PHP (per-PR diff)\" scores every PR and matrix rows run unattended: \"$_li_text\""
+        else
+            viol "[LI] line $_li_where schedules a local Infection run; CI's required check \"Infection PHP (per-PR diff)\" scores every PR. Drop the step, or condition it on that check having failed (\"if CI's Infection check fails, fix the mutants it reports, then run bin/mutation-diff <base-ref>\"): \"$_li_text\""
+        fi
+    done < <(awk -f "$_li_awk" "$PLAN_FILE")
 fi
 
 # ---------------------------------------------------------------------------

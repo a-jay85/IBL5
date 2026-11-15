@@ -191,7 +191,7 @@ If a plan matches a left-hand row, its Verification Matrix must carry a row asse
 | adds a `bin/test-*` shell harness that uses awk to delimit a code region | asserts the anchor is unique and on-target: copy the target file, inject a `continue`, `break`, or wrong-value at the exact insertion point the test is guarding, run the test against that copy, and confirm the test **fails**; unique comment strings (e.g., `# Terminal-disposition guard:`) are required as anchors; indent-level tokens (`fi`, `esac`, `done`, `}`) are forbidden as the primary anchor when the same token appears earlier in the file |
 | adds or modifies a function that accepts externally-supplied IDs and writes tombstone or state records keyed to those IDs | asserts that an unknown ID (present in the caller's payload, absent from the canonical store) produces **no write** — the backing file or database must be byte-for-byte unchanged |
 
-Rows in this table are almost always `CLI-executable`, meaning each is a one-shot command. `bin/check-plan` gate `[V]` enforces that such a row's "Test file / location" cell is a single runnable shell command that parses under `bash -n` once Phase 5.0 strips its outer backticks (escape any pipe as `\|`, and put any prose inside the backticks after a `#`), and `/post-plan` Phase 5.0 executes every `post-impl` one, so keep each cell fast and read-only.
+These rows are almost always one-shot `CLI-executable` commands. `bin/check-plan` gate `[V]` requires each row's "Test file / location" cell to be one command that passes `bash -n` minus its outer backticks. Escape pipes as `\|` and put prose after a `#`. `/post-plan` Phase 5.0 runs every `post-impl` one. Keep cells fast and read-only.
 
 ## Hot-file thresholds
 

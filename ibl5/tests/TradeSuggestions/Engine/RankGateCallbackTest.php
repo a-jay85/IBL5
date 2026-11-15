@@ -66,6 +66,32 @@ class RankGateCallbackTest extends TestCase
         self::assertNotSame('', $partnerReason);
     }
 
+    public function testPassesBothTeamNamesToTheTradeForm(): void
+    {
+        [$scored, $view] = self::quiet();
+        $c = $scored->candidate;
+        $filter = $this->createMock(SuggestionValidationFilter::class);
+        $filter->expects(self::once())->method('buildTradeFormData')
+            ->with('Lakers', 'Heat', $c->userTid, $c->partnerTid, $c)
+            ->willReturn(['check' => []]);
+        $filter->method('rejection')->willReturn(SuggestionValidationFilter::FAIL_FORM);
+
+        self::assertSame([RankGate::Validator, SuggestionValidationFilter::FAIL_FORM, null, null], RankGateCallback::make($filter, self::TEAM_NAMES)($scored, $view));
+    }
+
+    public function testMissingTeamNamesFallBackToEmpty(): void
+    {
+        [$scored, $view] = self::quiet();
+        $c = $scored->candidate;
+        $filter = $this->createMock(SuggestionValidationFilter::class);
+        $filter->expects(self::once())->method('buildTradeFormData')
+            ->with('', '', $c->userTid, $c->partnerTid, $c)
+            ->willReturn(['check' => []]);
+        $filter->method('rejection')->willReturn(SuggestionValidationFilter::FAIL_FORM);
+
+        RankGateCallback::make($filter, [])($scored, $view);
+    }
+
     /**
      * @return array{ScoredDeal, DealView}
      */

@@ -36,6 +36,15 @@ class ProductionLineTest extends TestCase
         self::assertSame(2000, $chosen->minutes);
     }
 
+    public function testChooseTakesLastSeasonAtExactlyMinimumSample(): void
+    {
+        $chosen = ProductionLine::choose(null, self::hist(ProductionLine::MIN_SAMPLE_MINUTES));
+
+        self::assertNotNull($chosen);
+        self::assertSame(ProductionSource::LastSeason, $chosen->source);
+        self::assertSame(ProductionLine::MIN_SAMPLE_MINUTES, $chosen->minutes);
+    }
+
     public function testChooseReturnsNullForRookieWithoutHistory(): void
     {
         self::assertNull(ProductionLine::choose(self::current(194), null));

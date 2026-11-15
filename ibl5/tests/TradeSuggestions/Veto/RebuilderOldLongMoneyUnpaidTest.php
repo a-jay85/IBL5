@@ -43,6 +43,24 @@ final class RebuilderOldLongMoneyUnpaidTest extends TestCase
         self::assertTrue((new RebuilderOldLongMoneyUnpaid())->fires($deal));
     }
 
+    public function testShortMoneyPlayerDoesNotHideALaterLongMoneyPlayer(): void
+    {
+        $deal = VetoDealFactory::deal(
+            [TeamMode::Rebuild, TeamMode::Middle],
+            [7 => ['age' => 32], 8 => ['age' => 32]],
+            [
+                7 => ['age' => 31, 'salary' => [1 => 1500]],
+                8 => ['age' => 31, 'salary' => [1 => 1500, 2 => 1500, 3 => 1500, 4 => 1500]],
+            ],
+            [VetoDealFactory::uid(7), VetoDealFactory::uid(8)],
+            [],
+            [VetoDealFactory::pid(2, 7), VetoDealFactory::pid(2, 8)],
+            [],
+        )['deal'];
+
+        self::assertTrue((new RebuilderOldLongMoneyUnpaid())->fires($deal));
+    }
+
     public function testPicksWorthExactlyTheBurdenDoNotFire(): void
     {
         $deal = VetoDealFactory::rebuilderOldLongMoney(partnerPick: true)['deal'];

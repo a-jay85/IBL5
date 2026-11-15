@@ -195,6 +195,114 @@ final class DealRankerTest extends TestCase
         self::assertSame(array_fill_keys(VetoSet::standard()->ids(), 0), $result->diagnostics->vetoedById);
     }
 
+    public function testEachEarlyGateSkipsOnlyItsDealAndKeepsScanning(): void
+    {
+        $s = self::league();
+        $simKey = self::simKey($s, self::USER, self::PARTNER);
+        $blocked = self::firstBlockedPartner($s, $simKey, self::USER);
+        $result = (new DealRanker())->select($s, $simKey, self::USER, [
+            self::scored(self::oneForOne(), 0.0, 4.0),
+            self::scored(self::oneForOne(), 5.0, 6.0),
+            self::scored(self::oneForOne(), 1.0, 9.0),
+            self::scored(self::oneForOne(), 5.0, 7.0),
+            self::scored(self::deal(self::USER, $blocked), 5.0, 5.0),
+            self::scored(self::oneForOne(), 5.0, 8.0),
+        ], new VetoSet([]), self::passAll());
+
+        self::assertSame([6.0, 7.0, 8.0], array_map(static fn ($r): float => $r->deal->partner->total(), $result->selected));
+        self::assertSame([1, 1, 1], [$result->diagnostics->notBothPositive, $result->diagnostics->lopsided, $result->diagnostics->exposure]);
+    }
+
+    public function testVetoedDealSkipsOnlyItselfAndCountsEachFiring(): void
+    {
+        $calls = 0;
+        $veto = new class ($calls) implements \TradeSuggestions\Veto\Contracts\VetoInterface {
+            public function __construct(private int &$calls)
+            {
+            }
+
+            public function id(): string
+            {
+                return 'FIRST_TWO';
+            }
+
+            public function fires(DealView $deal): bool
+            {
+                return ++$this->calls <= 2;
+            }
+        };
+        $result = self::rankWith(
+            [self::scored(self::oneForOne(), 5.0, 6.0), self::scored(self::oneForOne(), 5.0, 7.0), self::scored(self::oneForOne(), 5.0, 8.0)],
+            new VetoSet([$veto]),
+        );
+
+        self::assertSame([8.0], array_map(static fn ($r): float => $r->deal->partner->total(), $result->selected));
+        self::assertSame(2, $result->diagnostics->vetoed);
+        self::assertSame(['FIRST_TWO' => 2], $result->diagnostics->vetoedById);
+    }
+
+    public function testRejectedDealsDoNotStopLaterOnes(): void
+    {
+        $calls = 0;
+        $result = self::rank(
+            array_fill(0, 3, self::scored(self::oneForOne(), 5.0, 5.0)),
+            static function () use (&$calls): array {
+                $calls++;
+
+                return match ($calls) {
+                    1 => [RankGate::Validator, SuggestionValidationFilter::FAIL_CAP, null, null],
+                    2 => [RankGate::NoMotive, 'partner', null, null],
+                    default => [RankGate::Pass, '', 'u', 'p'],
+                };
+            },
+        );
+
+        self::assertCount(1, $result->selected);
+        self::assertSame(3, $result->diagnostics->validated);
+    }
+
+    /**
+     * @return iterable<string, array{TradeCandidate}>
+     */
+    public static function oneExtraAssetProvider(): iterable
+    {
+        yield 'user pick' => [new TradeCandidate(self::USER, self::PARTNER, [101], [11], [201], [])];
+        yield 'partner player' => [new TradeCandidate(self::USER, self::PARTNER, [101], [], [201, 202], [])];
+        yield 'partner pick' => [new TradeCandidate(self::USER, self::PARTNER, [101], [], [201], [21])];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('oneExtraAssetProvider')]
+    public function testTieBreakCountsEveryAssetKind(TradeCandidate $bigger): void
+    {
+        $result = self::rank([
+            self::scored($bigger, 5.0, 5.0),
+            self::scored(self::oneForOne(), 5.0, 5.0),
+        ]);
+
+        self::assertEquals([self::oneForOne(), $bigger], array_map(static fn ($r): TradeCandidate => $r->deal->candidate, $result->selected));
+    }
+
+    /**
+     * @param list<ScoredDeal> $deals
+     */
+    private static function rankWith(array $deals, VetoSet $vetoes): \TradeSuggestions\Engine\RankResult
+    {
+        $s = self::league();
+
+        return (new DealRanker())->select($s, self::simKey($s, self::USER, self::PARTNER), self::USER, $deals, $vetoes, self::passAll());
+    }
+
+    private static function firstBlockedPartner(LeagueSnapshot $s, string $simKey, int $userTid): int
+    {
+        $allowed = ExposureFilter::eligiblePartners($simKey, $userTid, $s->teamIds);
+        foreach ($s->teamIds as $tid) {
+            if ($tid !== $userTid && !in_array($tid, $allowed, true)) {
+                return $tid;
+            }
+        }
+        self::fail('every partner is open to the user');
+    }
+
     /**
      * @param list<ScoredDeal> $deals
      * @param (callable(ScoredDeal, DealView): array{0: RankGate, 1: string, 2: ?string, 3: ?string})|null $passes

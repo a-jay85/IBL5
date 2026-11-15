@@ -127,12 +127,11 @@ final class ReasonWriter
      * key.
      *
      * @param list<int> $offsets
-     * @return list<array{int, value-of<SideGain::KEYS>}>
+     * @return array<string, array{int, value-of<SideGain::KEYS>}> key => [offset, key]
      */
     private static function topComponents(SideView $side, array $offsets): array
     {
         $components = $side->gain->components();
-        $offsets = array_values(array_unique($offsets));
         $entries = [];
         foreach ($offsets as $offset) {
             foreach (SideGain::KEYS as $key) {
@@ -145,12 +144,8 @@ final class ReasonWriter
         usort($entries, static fn (array $a, array $b): int => $b['v'] <=> $a['v']);
 
         $out = [];
-        $seen = [];
         foreach ($entries as $e) {
-            if (!isset($seen[$e['key']])) {
-                $seen[$e['key']] = true;
-                $out[] = [$e['offset'], $e['key']];
-            }
+            $out[$e['key']] ??= [$e['offset'], $e['key']];
         }
 
         return $out;
@@ -163,14 +158,7 @@ final class ReasonWriter
      */
     private static function heaviestOffset(array $weights): int
     {
-        $best = 0;
-        foreach ($weights as $offset => $w) {
-            if ($w > ($weights[$best] ?? 0.0)) {
-                $best = $offset;
-            }
-        }
-
-        return $best;
+        return array_keys($weights, max([0.0, ...$weights]), true)[0];
     }
 
     /**
@@ -333,7 +321,7 @@ final class ReasonWriter
     {
         $under = null;
         foreach ($side->received as $p) {
-            $s = $side->surplusByPid[$p->pid][$o] ?? 0;
+            $s = self::surplus($side, $p, $o);
             if ($s > 0 && ($under === null || $s > $under[1])) {
                 $under = [$p, $s];
             }
@@ -344,7 +332,7 @@ final class ReasonWriter
 
         $over = null;
         foreach ($side->sent as $p) {
-            $s = $side->surplusByPid[$p->pid][$o] ?? 0;
+            $s = self::surplus($side, $p, $o);
             if ($s < 0 && ($over === null || $s < $over[1])) {
                 $over = [$p, $s];
             }
@@ -360,6 +348,12 @@ final class ReasonWriter
         }
 
         return null;
+    }
+
+    /** The player's contract surplus at the offset; a player with no entry has none. */
+    private static function surplus(SideView $side, ProjectionPlayer $p, int $o): int
+    {
+        return $side->surplusByPid[$p->pid][$o] ?? 0;
     }
 
     /**
@@ -383,7 +377,7 @@ final class ReasonWriter
     private static function seasonsLeft(ProjectionPlayer $p): int
     {
         $n = 0;
-        while ($n < 6 && $p->salaryAt($n) > 0) {
+        while ($p->salaryAt($n) > 0) {
             $n++;
         }
 

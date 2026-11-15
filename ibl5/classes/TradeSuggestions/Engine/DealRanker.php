@@ -61,7 +61,7 @@ final class DealRanker
             if ($report->fired()) {
                 $vetoed++;
                 foreach ($report->firedIds() as $id) {
-                    $vetoedById[$id] = ($vetoedById[$id] ?? 0) + 1;
+                    $vetoedById[$id]++;
                 }
                 continue;
             }
@@ -77,10 +77,9 @@ final class DealRanker
         $validated = 0;
         $validatorRejections = [];
         $noMotive = 0;
-        foreach ($survivors as $survivor) {
-            if ($validated >= self::MAX_VALIDATIONS || count($eligible) >= self::KEEP_TOP) {
-                break;
-            }
+        $budget = min(count($survivors), self::MAX_VALIDATIONS);
+        while ($validated < $budget && count($eligible) < self::KEEP_TOP) {
+            $survivor = $survivors[$validated];
             $validated++;
             [$gate, $detail, $userReason, $partnerReason] = $passes($survivor['deal'], $survivor['view']);
             if ($gate === RankGate::Validator) {

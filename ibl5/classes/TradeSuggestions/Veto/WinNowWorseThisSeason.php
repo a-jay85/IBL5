@@ -72,11 +72,11 @@ final class WinNowWorseThisSeason implements VetoInterface
         $pids = [];
         foreach ($state->lineup->rotation as $slotPids) {
             foreach ($slotPids as $pid) {
-                $pids[$pid] = true;
+                $pids[$pid] = $pid;
             }
         }
         $sum = 0.0;
-        foreach (array_keys($pids) as $pid) {
+        foreach ($pids as $pid) {
             $sum += $availability[$pid] ?? 1.0;
         }
 

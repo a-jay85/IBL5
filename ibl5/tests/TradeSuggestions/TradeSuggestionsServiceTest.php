@@ -20,6 +20,7 @@ use TradeSuggestions\Engine\Contracts\LeagueSnapshotProviderInterface;
 use TradeSuggestions\Engine\DealRanker;
 use TradeSuggestions\Engine\LeagueSnapshot;
 use TradeSuggestions\Engine\ModeResolver;
+use TradeSuggestions\Engine\RankDiagnostics;
 use TradeSuggestions\Engine\Shape\Contracts\DealShapeInterface;
 use TradeSuggestions\SuggestionPlayer;
 use TradeSuggestions\SuggestionValidationFilter;
@@ -114,6 +115,56 @@ class TradeSuggestionsServiceTest extends TestCase
             self::assertFalse(in_array('Dupree', $labels, true) && in_array('Laettner', $labels, true));
         }
         self::assertSame(1, $panel->diagnostics?->rejections['NOT_BOTH_POSITIVE'] ?? 0);
+    }
+
+    /**
+     * Key sim-2 generates nine deals; an empty key generates six. So the real
+     * key must reach the generator and the ranker.
+     */
+    public function testTheSnapshotKeyReachesTheEngine(): void
+    {
+        $panel = $this->build(vetoes: VetoSet::standard());
+
+        self::assertSame(9, $panel->diagnostics->generated);
+        self::assertSame(9, $panel->diagnostics->scored);
+        self::assertSame(
+            [
+                'NOT_BOTH_POSITIVE' => 0,
+                'LOPSIDED' => 0,
+                'EXPOSURE' => 0,
+                'VETO:YOUNGER_BETTER_CHEAPER_FOR_OLDER_WORSE' => 0,
+                'VETO:WIN_NOW_WORSE_THIS_SEASON' => 3,
+                'VETO:REBUILDER_OLD_LONG_MONEY_UNPAID' => 0,
+                'VETO:PICK_TO_NON_BURDEN_TAKER' => 4,
+                'VETO:ROSTER_OVER_MAX_AFTER' => 0,
+                'VETO:STRONG_FOR_WEAK_WITHOUT_NET_GAIN' => 0,
+                'NO_MOTIVE' => 0,
+            ],
+            $panel->diagnostics->rejections,
+        );
+    }
+
+    public function testItemsCarryBothReasons(): void
+    {
+        $panel = $this->build(vetoes: VetoSet::standard());
+
+        self::assertCount(2, $panel->items);
+        self::assertSame('Player 604, 34, 4 seasons left: PF starter rank 22 to 12; rebounds rank 27 to 1', $panel->items[0]->userReason);
+        self::assertSame('Filler 900013, 27, 2 seasons left: defensive rebounding rank 17 to 7; PF starter rank 15 to 8', $panel->items[0]->partnerReason);
+        self::assertSame('Player 2608, 32, 2 seasons left: no SF bench to best bench rank 1; Player 2608 266 under fair salary', $panel->items[1]->userReason);
+        self::assertSame('Filler 900011, 25, 2 seasons left: three-point attempt rate rank 26 to 3', $panel->items[1]->partnerReason);
+    }
+
+    public function testRejectionsKeepGateOrderVetoIdsAndDistinctCounts(): void
+    {
+        $diagnostics = new RankDiagnostics(20, 1, 2, 3, 9, ['VETO_A' => 4, 'VETO_B' => 5], 6, [], 7, 8);
+
+        $rejections = new \ReflectionMethod(TradeSuggestionsService::class, 'rejections');
+
+        self::assertSame(
+            ['NOT_BOTH_POSITIVE' => 1, 'LOPSIDED' => 2, 'EXPOSURE' => 3, 'VETO:VETO_A' => 4, 'VETO:VETO_B' => 5, 'NO_MOTIVE' => 7],
+            $rejections->invoke(null, $diagnostics),
+        );
     }
 
     public function testItemsCapAtThree(): void

@@ -4924,14 +4924,30 @@ def _dm(msg: str) -> bool:
     return proc.returncode == 0
 
 
+HOLD_REPEAT_PR_URL = "https://github.com/a-jay85/IBL5/pull/"
+
+
 def _send_hold_repeat_dm(slug, pr, obs) -> bool:
-    """DM the operator once per repeated structural hold. True only on exit 0."""
+    """DM the operator once per repeated structural hold. True only on exit 0.
+
+    When every named reason is one only a human clears (holdrepeat.HUMAN_ONLY_CONDITIONS),
+    the DM says the PR waits on the owner's approval and gives no --force advice.
+    """
     reasons = "; ".join(f"({n}) {reason}" for n, _name, reason in obs.reasons)
-    msg = (f"post-plan held twice on the same reason: {slug} PR #{pr if pr else 'none'}\n"
-           f"Repeated hold (run {obs.repeat_count}): {reasons}\n"
-           "The next re-run with the same plan, diff, and harness will be declined\n"
-           "before it spends tokens. Fix the reason, or re-fire with:\n"
-           "  bin/post-plan-now --force")
+    head = (f"post-plan held twice on the same reason: {slug} PR #{pr if pr else 'none'}\n"
+            f"Repeated hold (run {obs.repeat_count}): {reasons}\n")
+    nums = {n for n, _name, _reason in obs.reasons}
+    if nums and nums <= holdrepeat.HUMAN_ONLY_CONDITIONS:
+        link = f"{HOLD_REPEAT_PR_URL}{pr}" if pr else "no PR number recorded"
+        msg = (head
+               + "This PR is waiting on your approval. Only you can clear these reasons:\n"
+               + f"  {link}\n"
+               + "A re-run of post-plan will not clear them.")
+    else:
+        msg = (head
+               + "The next re-run with the same plan, diff, and harness will be declined\n"
+               + "before it spends tokens. Fix the reason, or re-fire with:\n"
+               + "  bin/post-plan-now --force")
     return _dm(msg)
 
 

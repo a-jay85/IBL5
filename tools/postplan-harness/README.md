@@ -232,6 +232,11 @@ BLOCKED-CHECK PR is exempt, so `bin/pr-cycle-tick` needs no filter: its retry ca
 a second rescue on an unchanged patch-id. A skipped PR stays in the your-turn DM under
 `**Skipped (K)**` with the condition names after `waiting on:`. The skip never arms a PR.
 
+The repeat DM changes wording for the same set. When a hold repeats and every reason the DM
+names is (3), (7) or (8), `_send_hold_repeat_dm` in `runner.py` says the PR is waiting on the
+owner's approval, links the PR, and gives no `--force` advice. A repeat that names (13) keeps
+the fix-or-force advice. The DM still fires once per recorded hold.
+
 ### Text-hold re-check on body edit
 
 A held sticky carries one audit-trail line, `<!-- pr-ready-holds: v1 diff=<patch-id> held=<n>[:<STATE>],... -->`,

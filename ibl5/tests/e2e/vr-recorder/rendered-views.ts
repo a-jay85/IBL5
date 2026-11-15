@@ -50,7 +50,9 @@ export function renderedViewFields(dir: string | null, titles: string[]): Record
 }
 
 export function galleryRenderedViewsError(gallery: unknown): string | null {
-  const g = gallery as { renderedViewFiles?: unknown };
+  const g = gallery as { renderedViewFiles?: unknown; renderedCells?: unknown };
+  // A run that took zero screenshots has nothing to record, so the field is absent by design.
+  if (g.renderedCells === 0) return null;
   if (!Array.isArray(g.renderedViewFiles)) return 'vr-gallery.json has no renderedViewFiles array';
   if (g.renderedViewFiles.length === 0) return 'vr-gallery.json renderedViewFiles is empty';
   return null;

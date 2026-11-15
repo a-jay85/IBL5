@@ -120,6 +120,8 @@ check('env-one-on', () => same([vrRecordingEnabled('1'), vrRecordingEnabled('tru
 
 check('gallery-missing-field', () =>
   galleryRenderedViewsError({ renderedCells: 1 }) === null ? 'expected an error message' : null);
+check('gallery-zero-cells-ok', () =>
+  galleryRenderedViewsError({ renderedCells: 0 }) === null ? null : 'expected null');
 check('gallery-empty-array', () =>
   galleryRenderedViewsError({ renderedViewFiles: [] }) === null ? 'expected an error message' : null);
 check('gallery-valid', () =>

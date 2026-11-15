@@ -332,7 +332,12 @@ case_shell_budget_deferral() {
     want_out "shell deferred to CI: bin/test-slow-b would pass the local budget (estimate 1 s, spent "
     last=$(grep -F "bin/test-slow-a" "$d/shell-durations.tsv" | tail -n 1 | cut -f1)
     [ "${last:-0}" -ge 3 ] || note "slow-a duration not recorded as 3 s or more (got '${last:-}')"
-    [ "$(pass_files '\.shell\.subset-' | wc -l | tr -d ' ')" -eq 1 ] || note "expected one shell subset pass file"
+    # A run that deferred a line writes no pass record, so a rerun with a bigger budget runs it.
+    [ "$(pass_files '\.shell\.subset-' | wc -l | tr -d ' ')" -eq 0 ] || note "expected no shell pass file after a deferral"
+    PREFIRE_SHELL_BUDGET=100 run_gate --stage shell
+    want_rc 0
+    want_runs "test-slow-a:" "test-slow-a:end" "test-slow-a:" "test-slow-a:end" "test-slow-b:"
+    [ "$(pass_files '\.shell\.subset-' | wc -l | tr -d ' ')" -eq 1 ] || note "expected one shell subset pass file after the full rerun"
 }
 
 case_shell_budget_default_estimate() {

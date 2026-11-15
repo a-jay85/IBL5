@@ -24,7 +24,7 @@ class AccountDeletionServiceTest extends TestCase
                 (new DataRetentionService($repo))->deleteAccount($userId, true);
             } catch (\InvalidArgumentException $e) {
                 $thrown = true;
-                self::assertStringContainsString('positive integer', $e->getMessage());
+                self::assertSame('User id must be a positive integer, got ' . $userId, $e->getMessage());
             }
             self::assertTrue($thrown, 'id ' . $userId . ' was accepted');
         }
@@ -39,7 +39,19 @@ class AccountDeletionServiceTest extends TestCase
         $repo->expects($this->never())->method('countAccountTarget');
 
         $this->expectException(UnknownAccountException::class);
+        $this->expectExceptionMessageIs('No auth_users row has id 42');
         (new DataRetentionService($repo))->deleteAccount(42, true);
+    }
+
+    public function testDeleteAccountAcceptsUserIdOne(): void
+    {
+        $repo = $this->createMock(DataRetentionRepositoryInterface::class);
+        $repo->expects($this->once())->method('findAuthUserById')->with(1)->willReturn(null);
+        $repo->expects($this->never())->method('runInTransaction');
+
+        $this->expectException(UnknownAccountException::class);
+        $this->expectExceptionMessageIs('No auth_users row has id 1');
+        (new DataRetentionService($repo))->deleteAccount(1, true);
     }
 
     public function testDeleteAccountDryRunNeverOpensTransaction(): void
@@ -119,7 +131,10 @@ class AccountDeletionServiceTest extends TestCase
             $thrown = $e;
         }
         self::assertNotNull($thrown, 'a missed auth_users row did not throw');
-        self::assertStringContainsString('rolled back', $thrown->getMessage());
+        self::assertSame(
+            'Expected to delete 1 auth_users row for id 7, deleted 0; rolled back',
+            $thrown->getMessage()
+        );
     }
 
     public function testDeleteAccountWithNullUsernameSkipsUsernameTargets(): void

@@ -2133,7 +2133,11 @@ for p in .github/workflows/e2e-tests.yml bin/vr-build-gallery ibl5/tests/e2e/vr-
     ibl5/package.json ibl5/bun.lock ibl5/bun.lockb ibl5/bunfig.toml ibl5/.npmrc \
     ibl5/composer.json ibl5/composer.lock ibl5/tsconfig.json \
     bin/vr-review-comment bin/vr-changed-coverage bin/playwright-image-tag \
-    ibl5/bin/run-migrations-ci docker-compose.ci.yml Dockerfile docker/entrypoint.sh; do
+    ibl5/bin/run-migrations-ci docker-compose.ci.yml Dockerfile docker/entrypoint.sh \
+    ibl5/tests/e2e/vr-recorder/functions.php ibl5/tests/e2e/vr-recorder/prepend.php \
+    ibl5/tests/e2e/vr-recorder/vr-recorder.ini ibl5/tests/e2e/vr-recorder/rendered-views.ts \
+    ibl5/tests/e2e/vr-recorder/collect.ts ibl5/tests/e2e/vr-recorder/rendered-views-selftest.ts \
+    ibl5/tests/e2e/vr-recorder/assert-gallery.ts; do
     UI_CLI_RC=0
     printf '%s\n' "$p" | bash "$UI_LIB" --paths > /dev/null 2>&1 || UI_CLI_RC=$?
     expect "ui-change-classifier.sh --paths: gallery producer $p exits 0" 0 "$UI_CLI_RC"
@@ -2142,7 +2146,8 @@ done
 # Near misses: files the VR job never runs stay off the producer list.
 ui_paths_rc ui_paths_producer_near_misses 1 ibl5/tests/e2e/flows/trade.spec.ts \
     ibl5/IBLbot/package.json bin/vr-refresh-targets docker-compose.yml ibl5/package-lock.json \
-    .github/actions/setup-php-env/action.yml .github/actions/notify-discord/action.yml
+    .github/actions/setup-php-env/action.yml .github/actions/notify-discord/action.yml \
+    ibl5/tests/e2e/vr-recorder.php ibl5/tests/e2e/smoke/vr-recorder/prepend.php
 # The e2e job runs only setup-docker-e2e from .github/actions. Each other local
 # action gets its own case so a regression names the path that broke.
 ui_paths_rc ui_paths_non_vr_action_setup_php_env 1 .github/actions/setup-php-env/action.yml

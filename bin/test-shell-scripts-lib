@@ -165,6 +165,7 @@ else
     # Wire up the helper so the pre-commit hook can find it
     mkdir -p "$TMP_REPO/bin/lib"
     ln -sf "$REPO_ROOT/bin/lib/shell-scripts.sh" "$TMP_REPO/bin/lib/shell-scripts.sh"
+    ln -sf "$REPO_ROOT/bin/lib/shell-lint-opts.sh" "$TMP_REPO/bin/lib/shell-lint-opts.sh"
 
     # ── case 11: pre-commit blocks staged shell file with warning ────────────
     DEFECT_FILE="$TMP_REPO/bad_script.sh"

@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-11-13
+last_verified: 2026-11-14
 ---
 
 # IBL5 Architecture Decision Records
@@ -113,6 +113,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0249](0249-prefire-pytest-stage.md) | Run only the harness tests tied to the branch's changed files in prefire-verify, and defer the rest to CI | Accepted | The prefire pytest stage runs the post-plan harness test files mapped to the changed files, serially, and defers every shared input, mapping error and selection over 25 files to CI instead of running the whole suite. |
 | [0251](0251-owner-approve-script.md) | Arm owner-approved PRs through `bin/owner-approve`, bound to the head's tree | Accepted | An owner's chat approval posts a comment, waits out a live post-plan run, and arms auto-merge only when a READY verdict covers the PR head's tree; every other outcome refuses and posts a reason. |
 | [0247](0247-second-reviewer-eval-corpus.md) | Score the second-reviewer seat on a corpus of past held PRs | Accepted | `bin/reviewer-eval second` replays the seat on hand-confirmed cases whose holds come from the sticky and whose labels come from the owner's outcome, writes verdicts under an `eval-<id>` key, and prints a score that gates nothing. |
+| [0253](0253-prefire-shell-harness-stage.md) | Run only the changed bin/ files' own harnesses before the fire | Accepted | `bin/lib/prefire-verify` gains a `shell` stage that maps each changed `bin/` file to its `bin/test-*` harness, runs it once per `harness-legs.txt` line within a 300 s budget, and leaves caller harnesses to CI. |
 
 ## When an ADR is Required
 

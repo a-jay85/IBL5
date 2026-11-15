@@ -49,6 +49,8 @@ UI_PATH_RE+='|^ibl5/tests/e2e/vr-[^/]*\.ts$|^ibl5/playwright[^/]*\.config\.ts$'
 UI_PATH_RE+='|^ibl5/tests/e2e/visual/'
 UI_PATH_RE+='|^ibl5/tests/e2e/.*visual-regression\.spec\.ts$|^ibl5/tests/e2e/.*manual-rows\.spec\.ts$'
 UI_PATH_RE+='|^ibl5/tests/e2e/(fixtures|helpers)/|^ibl5/tests/e2e/.*\.setup\.ts$'
+# VR rendered-View recorder (CI-only): PHP prepend + ini, Playwright cookie/assert, gallery merge.
+UI_PATH_RE+='|^ibl5/tests/e2e/vr-recorder/'
 UI_PATH_RE+='|^ibl5/package\.json$|^ibl5/bun\.lockb?$|^ibl5/bunfig\.toml$|^ibl5/\.npmrc$'
 UI_PATH_RE+='|^ibl5/composer\.(json|lock)$|^ibl5/tsconfig\.json$'
 UI_PATH_RE+='|^docker-compose\.ci\.yml$|^Dockerfile$|^docker/'

@@ -37,7 +37,22 @@ if [ "$1" = "-m" ]; then
 fi
 exit 0
 EOF
-chmod +x "$STUBS/docker" "$STUBS/php"
+cat >"$STUBS/gh" <<'EOF'
+#!/bin/sh
+echo "$*" >>"$LOG/gh.args"
+case "$1 $2" in
+    "pr list")
+        [ "${STUB_GH_PR_RC:-0}" = 0 ] || exit "$STUB_GH_PR_RC"
+        if [ -n "${STUB_GH_PRS-101 abc1234def}" ]; then printf '%s\n' "${STUB_GH_PRS-101 abc1234def}"; fi
+        exit 0 ;;
+    "api --method")
+        [ "${STUB_GH_API_RC:-0}" = 0 ] || exit "$STUB_GH_API_RC"
+        if [ -n "${STUB_GH_RUN-completed failure}" ]; then printf '%s\n' "${STUB_GH_RUN-completed failure}"; fi
+        exit 0 ;;
+esac
+exit 1
+EOF
+chmod +x "$STUBS/docker" "$STUBS/php" "$STUBS/gh"
 
 CASE_N=0
 REPO=""
@@ -162,6 +177,9 @@ h_contains "help exits 0 with usage" "$OUT" "Usage: bin/mutation-diff"
 h_contains "help lists exit 5 for an empty filter" "$OUT" "5  Infection matched no source files"
 h_contains "help lists the deletion-only skip under exit 0" "$OUT" "0  passed, or skipped (no changed classes, or class lines only deleted)"
 h_contains "help explains the deletion-only skip" "$OUT" "Also skips (exit 0) when the changed class files only"
+h_contains "help lists exit 6" "$OUT" "  6  refused: CI's Infection check has not failed on this branch's PR (see --force)"
+h_contains "help names --force" "$OUT" "--force skips this check (humans only)"
+h_eq "help makes no gh call" "<absent>" "$(logline "$LOG/gh.args")"
 
 # 2
 make_repo
@@ -424,5 +442,100 @@ make_repo
 printf '<?php\n\000\n' >"$REPO/ibl5/classes/Alpha/Foo.php"
 STUB_INFECTION_SAY=nosource run_md base
 h_eq "binary class change still reaches the empty-filter guard" 5 "$RC"
+
+# CI-state gate (28-): every case opens with make_repo and modify_class.
+# gate_refuses <label> <reason substring>: exit 6, the reason, the fix line,
+# and no docker call (the gate sits before the pcov and docker checks).
+gate_refuses() {
+    h_eq "$1: exit" 6 "$RC"
+    h_contains "$1: reason" "$ERR" "$2"
+    h_contains "$1: fix line" "$ERR" "Fix: push and let CI score the PR."
+    h_eq "$1: docker untouched" "<absent>" "$(logline "$LOG/docker.args")"
+}
+
+make_repo; modify_class
+STUB_GH_PRS="" run_md base
+gate_refuses "no PR" "has no open PR"
+make_repo; modify_class
+STUB_GH_PRS="$(printf '101 aaa\n102 bbb')" run_md base
+gate_refuses "two PRs" "has 2 open PRs; expected exactly one"
+make_repo; modify_class
+STUB_GH_RUN="" run_md base
+gate_refuses "no run" "check run yet"
+make_repo; modify_class
+STUB_GH_RUN="queued none" run_md base
+gate_refuses "queued" 'reports "queued none"'
+make_repo; modify_class
+STUB_GH_RUN="in_progress none" run_md base
+gate_refuses "in progress" 'reports "in_progress none"'
+make_repo; modify_class
+STUB_GH_RUN="completed success" run_md base
+gate_refuses "success" 'reports "completed success"'
+make_repo; modify_class
+STUB_GH_RUN="completed skipped" run_md base
+gate_refuses "skipped" 'reports "completed skipped"'
+make_repo; modify_class
+STUB_GH_RUN="completed cancelled" run_md base
+gate_refuses "cancelled" 'reports "completed cancelled"'
+make_repo; modify_class
+GH_BIN="$TMP/no-such-gh" run_md base
+gate_refuses "gh missing" "gh is not installed"
+make_repo; modify_class
+STUB_GH_PR_RC=4 run_md base
+gate_refuses "pr list error" "gh could not list PRs"
+make_repo; modify_class
+STUB_GH_API_RC=1 run_md base
+gate_refuses "api error" "gh could not read check runs"
+make_repo; modify_class
+git -C "$REPO" checkout -q --detach
+run_md base
+gate_refuses "detached" "HEAD is detached"
+
+# failure proceeds past the gate and queries the right branch and check
+make_repo; modify_class
+run_md base
+h_eq "failure proceeds: docker reached" 1 "$([ -f "$LOG/docker.args" ] && echo 1 || echo 0)"
+if [ "$RC" != 6 ]; then h_pass "failure proceeds: not refused"; else h_fail "failure proceeds: not refused" "exit 6"; fi
+h_contains "failure proceeds: --head" "$(logline "$LOG/gh.args")" "--head $(git -C "$REPO" symbolic-ref --short HEAD)"
+h_contains "failure proceeds: check_name" "$(logline "$LOG/gh.args")" "check_name=Infection PHP (per-PR diff)"
+# GH_BIN empty falls back to gh (the stub)
+make_repo; modify_class
+GH_BIN="" run_md base
+if [ "$RC" != 6 ]; then h_pass "GH_BIN empty: not refused"; else h_fail "GH_BIN empty: not refused" "exit 6"; fi
+h_contains "GH_BIN empty: gh stub was used" "$(logline "$LOG/gh.args")" "pr list"
+# --force with CLAUDE_HEADLESS unset: honoured, gh never called
+make_repo; modify_class
+_hl_saved="${CLAUDE_HEADLESS-}"; _hl_was_set="${CLAUDE_HEADLESS+1}"; unset CLAUDE_HEADLESS
+GH_BIN="$TMP/no-such-gh" run_md --force base
+[ -z "$_hl_was_set" ] || export CLAUDE_HEADLESS="$_hl_saved"
+if [ "$RC" != 6 ]; then h_pass "force unset headless: not refused"; else h_fail "force unset headless: not refused" "exit 6"; fi
+h_contains "force unset headless: warn" "$ERR" "WARN: --force skips the CI-state check"
+h_eq "force unset headless: no gh call" "<absent>" "$(logline "$LOG/gh.args")"
+# --force with CLAUDE_HEADLESS empty: honoured
+make_repo; modify_class
+CLAUDE_HEADLESS="" GH_BIN="$TMP/no-such-gh" run_md --force base
+if [ "$RC" != 6 ]; then h_pass "force empty headless: not refused"; else h_fail "force empty headless: not refused" "exit 6"; fi
+h_contains "force empty headless: warn" "$ERR" "WARN: --force skips the CI-state check"
+# a similarly named variable does not trigger the headless refusal
+make_repo; modify_class
+_hl_saved="${CLAUDE_HEADLESS-}"; _hl_was_set="${CLAUDE_HEADLESS+1}"; unset CLAUDE_HEADLESS
+CLAUDE_HEADLESS_OFF=1 GH_BIN="$TMP/no-such-gh" run_md --force base
+[ -z "$_hl_was_set" ] || export CLAUDE_HEADLESS="$_hl_saved"
+if [ "$RC" != 2 ] && [ "$RC" != 6 ]; then h_pass "CLAUDE_HEADLESS_OFF is not the headless marker"; else h_fail "CLAUDE_HEADLESS_OFF is not the headless marker" "exit $RC"; fi
+# --force with CLAUDE_HEADLESS=1: usage error, no docker call
+make_repo; modify_class
+CLAUDE_HEADLESS=1 run_md --force base
+h_eq "force headless: exit" 2 "$RC"
+h_contains "force headless: message" "$ERR" "--force is for humans"
+h_eq "force headless: docker untouched" "<absent>" "$(logline "$LOG/docker.args")"
+# rejected forms
+make_repo; modify_class
+run_md --forc base
+h_eq "--forc: exit" 2 "$RC"
+h_contains "--forc: message" "$ERR" "unknown option: --forc"
+make_repo; modify_class
+run_md --force=1 base
+h_eq "--force=1: exit" 2 "$RC"
+h_contains "--force=1: message" "$ERR" "unknown option: --force=1"
 
 h_done

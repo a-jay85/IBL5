@@ -33,6 +33,10 @@ final class RivalriesRepository extends \Database\BaseMysqliRepository implement
     // Pre-dedupe pair filter: lets unique_games group only this pair's rows. Binds 4 `i` params.
     private const FRANCHISE_PAIR_FILTER = ' AND ((b.visitor_teamid = ? AND b.home_teamid = ?) OR (b.visitor_teamid = ? AND b.home_teamid = ?))';
 
+    private const GM_SIDE_EXPR = 'IF(bs.teamid = g.visitor_teamid, g.v_gm, g.h_gm)';
+
+    private const TEAM_SIDE_EXPR = 'CAST(bs.teamid AS CHAR)';
+
     // One color of a side's retired identity (ADR-0136). The table holds no row for a
     // current identity, so a game under today's name gets NULL. Args: column, side prefix x3.
     private const ERA_COLOR_SUBQUERY = '(SELECT eb.%s FROM `ibl_franchise_era_branding` eb
@@ -42,6 +46,9 @@ final class RivalriesRepository extends \Database\BaseMysqliRepository implement
 
     private const GAME_COLUMNS = 'game_date, game_of_that_day, season_year, game_type, visitor_teamid, home_teamid,
     visitor_label, home_label, visitor_pts AS visitor_points, home_pts AS home_points';
+
+    /** @var array<string, list<array{game_date: string, game_of_that_day: int, visitor_teamid: int, home_teamid: int, v_gm: string, h_gm: string}>> */
+    private array $pairGameKeys = [];
 
     /**
      * The pair game list columns, plus each side's era colors.
@@ -131,7 +138,10 @@ FROM games
 WHERE (visitor_teamid = ? AND home_teamid = ?) OR (visitor_teamid = ? AND home_teamid = ?)
 ORDER BY game_date ASC, game_of_that_day ASC, visitor_teamid ASC';
 
-        return $this->mapGames($this->fetchAll($sql, 'iiiiiiii', $a, $b, $b, $a, $a, $b, $b, $a));
+        $rows = $this->fetchAll($sql, 'iiiiiiii', $a, $b, $b, $a, $a, $b, $b, $a);
+        $this->rememberPairGames('team|' . $a . '|' . $b, $rows);
+
+        return $this->mapGames($rows);
     }
 
     /**
@@ -139,19 +149,22 @@ ORDER BY game_date ASC, game_of_that_day ASC, visitor_teamid ASC';
      */
     public function getGmPairGames(string $a, string $b): array
     {
-        $filter = $this->pairTenureFilter($a, $b, 'b.visitor_teamid', 'b.home_teamid', 'b.season_year');
-        if ($filter === null) {
+        $resolution = $this->gmPairResolution($a, $b);
+        if ($resolution === null) {
             return [];
         }
 
-        $sql = $this->gmCte($filter['sql'])
+        $sql = $this->gmPairCte($resolution)
             // @phpstan-ignore ibl.orderByMissingTiebreaker (no doubleheaders: game_date + game_of_that_day + visitor_teamid is unique)
             . ' SELECT ' . self::gameListColumns() . ', v_gm AS visitor_side, h_gm AS home_side
 FROM gm_games
 WHERE v_gm <> h_gm AND ((v_gm = ? AND h_gm = ?) OR (v_gm = ? AND h_gm = ?))
 ORDER BY game_date ASC, game_of_that_day ASC, visitor_teamid ASC';
 
-        return $this->mapGames($this->fetchAll($sql, $filter['types'] . 'ssss', ...$filter['params'], ...[$a, $b, $b, $a]));
+        $rows = $this->fetchAll($sql, $resolution['types'] . 'ssss', ...$resolution['params'], ...[$a, $b, $b, $a]);
+        $this->rememberPairGames('gm|' . $a . '|' . $b, $rows);
+
+        return $this->mapGames($rows);
     }
 
     /**
@@ -208,13 +221,18 @@ ORDER BY year ASC, round ASC, winner_tid ASC, loser_tid ASC',
      */
     public function getFranchiseTopPerformers(int $a, int $b): array
     {
+        $memo = $this->memoTopPerformers('team|' . $a . '|' . $b, self::TEAM_SIDE_EXPR);
+        if ($memo !== null) {
+            return $memo;
+        }
+
         $pairCte = $this->gamesCte(self::FRANCHISE_PAIR_FILTER) . ',
 pair_games AS (
     SELECT * FROM games
     WHERE (visitor_teamid = ? AND home_teamid = ?) OR (visitor_teamid = ? AND home_teamid = ?)
 )';
 
-        return $this->topPerformers($pairCte, 'CAST(bs.teamid AS CHAR)', 'iiiiiiii', [$a, $b, $b, $a, $a, $b, $b, $a]);
+        return $this->topPerformers($pairCte, self::TEAM_SIDE_EXPR, 'iiiiiiii', [$a, $b, $b, $a, $a, $b, $b, $a]);
     }
 
     /**
@@ -222,23 +240,23 @@ pair_games AS (
      */
     public function getGmTopPerformers(string $a, string $b): array
     {
-        $filter = $this->pairTenureFilter($a, $b, 'b.visitor_teamid', 'b.home_teamid', 'b.season_year');
-        if ($filter === null) {
+        $memo = $this->memoTopPerformers('gm|' . $a . '|' . $b, self::GM_SIDE_EXPR);
+        if ($memo !== null) {
+            return $memo;
+        }
+
+        $resolution = $this->gmPairResolution($a, $b);
+        if ($resolution === null) {
             return ['totals' => [], 'highs' => []];
         }
 
-        $pairCte = $this->gmCte($filter['sql']) . ',
+        $pairCte = $this->gmPairCte($resolution) . ',
 pair_games AS (
     SELECT * FROM gm_games
     WHERE v_gm <> h_gm AND ((v_gm = ? AND h_gm = ?) OR (v_gm = ? AND h_gm = ?))
 )';
 
-        return $this->topPerformers(
-            $pairCte,
-            'IF(bs.teamid = g.visitor_teamid, g.v_gm, g.h_gm)',
-            $filter['types'] . 'ssss',
-            [...$filter['params'], $a, $b, $b, $a],
-        );
+        return $this->topPerformers($pairCte, self::GM_SIDE_EXPR, $resolution['types'] . 'ssss', [...$resolution['params'], $a, $b, $b, $a]);
     }
 
     /**
@@ -284,18 +302,19 @@ pair_games AS (
      * H2H `unique_games` + `games` CTEs, phase `all` (HEAT counts), plus dates and era labels.
      *
      * @param string $extraWhere Extra `AND ...` filter on `ibl_box_scores_teams b`, applied before the dedupe.
+     * @param string $indexHint Optional index hint for the dedupe scan, e.g. ` FORCE INDEX (`idx_visitor_team`)`.
      */
-    private function gamesCte(string $extraWhere = ''): string
+    private function gamesCte(string $extraWhere = '', string $indexHint = ''): string
     {
         $maxTid = League::MAX_REAL_TEAMID;
 
         return sprintf(
             'WITH unique_games AS (
     SELECT MIN(id) AS id
-    FROM `ibl_box_scores_teams` b
+    FROM `ibl_box_scores_teams` b%3$s
     WHERE b.game_type IN (1, 2, 3)
-      AND b.visitor_teamid BETWEEN 1 AND %d
-      AND b.home_teamid   BETWEEN 1 AND %d%s
+      AND b.visitor_teamid BETWEEN 1 AND %1$d
+      AND b.home_teamid   BETWEEN 1 AND %1$d%2$s
     GROUP BY b.game_date, b.visitor_teamid, b.home_teamid, b.game_of_that_day
 ),
 games AS (
@@ -316,8 +335,8 @@ games AS (
     LEFT JOIN `ibl_team_info` hti ON hti.teamid = b.home_teamid
 )',
             $maxTid,
-            $maxTid,
             $extraWhere,
+            $indexHint,
         );
     }
 
@@ -347,6 +366,96 @@ gm_games AS (
         ' . sprintf(self::TENURE_SUBQUERY, 'pr.loser_tid', 'pr.year') . ' AS l_gm
     FROM `ibl_playoff_series_results` pr
     WHERE pr.winner_tid BETWEEN 1 AND ? AND pr.loser_tid BETWEEN 1 AND ?' . $extraWhere . '
+)';
+    }
+
+    /**
+     * One GM pair's pre-filter and per-side GM resolution, from every tenure on the pair's franchises.
+     *
+     * The CASE branches follow the H2H order (start_season_year, then id), so the first true
+     * branch is the tenure TENURE_SUBQUERY picks. Null when either GM has no tenure, or when
+     * both GMs only ever ran one franchise, since no game can then pair them.
+     *
+     * @return array{filter: string, vCase: string, hCase: string, types: string, params: list<int|string>}|null
+     */
+    private function gmPairResolution(string $a, string $b): ?array
+    {
+        $rows = $this->fetchAll(
+            'SELECT t.gm_display_name, t.franchise_id, t.start_season_year + t.is_mid_season_start AS from_year,
+       COALESCE(t.end_season_year, 9999) AS to_year, t.gm_display_name IN (?, ?) AS is_pair
+FROM `ibl_gm_tenures` t
+WHERE t.franchise_id IN (SELECT p.franchise_id FROM `ibl_gm_tenures` p WHERE p.gm_display_name IN (?, ?))
+ORDER BY t.start_season_year ASC, t.id ASC',
+            'ssss', $a, $b, $a, $b,
+        );
+
+        $names = [];
+        $franchises = [];
+        $spans = [];
+        $spanParams = [];
+        $branches = [];
+        $caseParams = [];
+        foreach ($rows as $row) {
+            $name = self::str($row['gm_display_name'] ?? null);
+            $franchise = self::int($row['franchise_id'] ?? null);
+            $from = self::int($row['from_year'] ?? null);
+            $to = self::int($row['to_year'] ?? null);
+            $branches[] = 'WHEN %1$s = ? AND %2$s BETWEEN ? AND ? THEN ?';
+            array_push($caseParams, $franchise, $from, $to, $name);
+            if (self::int($row['is_pair'] ?? null) === 1) {
+                $names[$name] = $name;
+                $franchises[$franchise] = $franchise;
+                $spans[] = '(%1$s = ? AND %2$s BETWEEN ? AND ?)';
+                array_push($spanParams, $franchise, $from, $to);
+            }
+        }
+        if (!isset($names[$a], $names[$b])) {
+            return null;
+        }
+
+        $tuples = [];
+        $tupleParams = [];
+        foreach ($franchises as $one) {
+            foreach ($franchises as $two) {
+                if ($one !== $two) {
+                    $tuples[] = '(b.visitor_teamid = ? AND b.home_teamid = ?)';
+                    array_push($tupleParams, $one, $two);
+                }
+            }
+        }
+        if ($tuples === []) {
+            return null;
+        }
+
+        $any = '(' . implode(' OR ', $spans) . ')';
+        $case = 'CONVERT((CASE ' . implode(' ', $branches) . ' ELSE NULL END) USING utf8mb4) COLLATE utf8mb4_unicode_ci';
+
+        return [
+            'filter' => "\n      AND (" . implode(' OR ', $tuples) . ')'
+                . "\n      AND " . sprintf($any, 'b.visitor_teamid', 'b.season_year')
+                . "\n      AND " . sprintf($any, 'b.home_teamid', 'b.season_year'),
+            'vCase' => sprintf($case, 'g.visitor_teamid', 'g.season_year'),
+            'hCase' => sprintf($case, 'g.home_teamid', 'g.season_year'),
+            'types' => str_repeat('i', 2 * count($tuples) + 6 * count($spans)) . str_repeat('iiis', 2 * count($branches)),
+            'params' => [...$tupleParams, ...$spanParams, ...$spanParams, ...$caseParams, ...$caseParams],
+        ];
+    }
+
+    /**
+     * Games CTE for one GM pair, each side's GM resolved by the bound CASE from gmPairResolution().
+     *
+     * @param array{filter: string, vCase: string, hCase: string, types: string, params: list<int|string>} $resolution
+     */
+    private function gmPairCte(array $resolution): string
+    {
+        // Up to a dozen-plus franchise tuples make the planner pick a full scan of the 53K-row
+        // date index; the team index narrows the dedupe to the pair's franchises (33 ms -> 8 ms).
+        return $this->gamesCte($resolution['filter'], ' FORCE INDEX (`idx_visitor_team`)') . ',
+gm_games AS (
+    SELECT g.*,
+        ' . $resolution['vCase'] . ' AS v_gm,
+        ' . $resolution['hCase'] . ' AS h_gm
+    FROM games g
 )';
     }
 
@@ -393,6 +502,60 @@ ORDER BY id ASC',
             'types' => str_repeat('iii', 2 * count($spans)),
             'params' => [...$params, ...$params],
         ];
+    }
+
+    /**
+     * Keeps one pair's game keys for this request, so performers can skip the CTE chain.
+     * A row with a NULL game key column is never memoized, since NULL never joins.
+     *
+     * @param array<int, array<string, mixed>> $rows
+     */
+    private function rememberPairGames(string $key, array $rows): void
+    {
+        $games = [];
+        foreach ($rows as $row) {
+            if (($row['game_of_that_day'] ?? null) === null) {
+                return;
+            }
+            $games[] = [
+                'game_date' => self::str($row['game_date'] ?? null),
+                'game_of_that_day' => self::int($row['game_of_that_day']),
+                'visitor_teamid' => self::int($row['visitor_teamid'] ?? null),
+                'home_teamid' => self::int($row['home_teamid'] ?? null),
+                'v_gm' => self::str($row['visitor_side'] ?? null),
+                'h_gm' => self::str($row['home_side'] ?? null),
+            ];
+        }
+        $this->pairGameKeys[$key] = $games;
+    }
+
+    /**
+     * Top performers from memoized pair games; null when this pair's games were not fetched yet.
+     *
+     * @return array{totals: list<PerformerTotal>, highs: list<PerformerHigh>}|null
+     */
+    private function memoTopPerformers(string $key, string $sideExpr): ?array
+    {
+        if (!array_key_exists($key, $this->pairGameKeys)) {
+            return null;
+        }
+        if ($this->pairGameKeys[$key] === []) {
+            return ['totals' => [], 'highs' => []];
+        }
+
+        $selects = [];
+        $params = [];
+        foreach ($this->pairGameKeys[$key] as $game) {
+            $selects[] = 'SELECT CAST(? AS DATE) AS game_date, ? AS game_of_that_day, ? AS visitor_teamid, ? AS home_teamid, ? AS v_gm, ? AS h_gm';
+            array_push($params, $game['game_date'], $game['game_of_that_day'], $game['visitor_teamid'], $game['home_teamid'], $game['v_gm'], $game['h_gm']);
+        }
+
+        return $this->topPerformers(
+            "WITH pair_games AS (\n    " . implode("\n    UNION ALL ", $selects) . "\n)",
+            $sideExpr,
+            str_repeat('siiiss', count($selects)),
+            $params,
+        );
     }
 
     /**

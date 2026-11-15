@@ -7,6 +7,7 @@ namespace Tests\Player\Stats\Views;
 use PHPUnit\Framework\TestCase;
 use Player\Stats\PlayerStatsRepository;
 use Player\Stats\Views\PlayerRegularSeasonTotalsView;
+use Player\Stats\Views\PlayerSeasonTableRenderer;
 use Tests\Support\GoldenSnapshotTrait;
 
 /** @covers \Player\Stats\Views\PlayerRegularSeasonTotalsView */
@@ -20,7 +21,7 @@ class PlayerRegularSeasonTotalsViewTest extends TestCase
         $repository->method('getHistoricalStats')
             ->willReturn(RegularSeasonViewFixtures::seasonRows());
 
-        $view = new PlayerRegularSeasonTotalsView($repository);
+        $view = new PlayerRegularSeasonTotalsView($repository, new PlayerSeasonTableRenderer());
         $html = $view->renderTotals(42);
 
         $this->assertSnapshotMatches($html, 'PlayerRegularSeasonTotalsView.html');
@@ -32,7 +33,7 @@ class PlayerRegularSeasonTotalsViewTest extends TestCase
         $repository->method('getHistoricalStats')
             ->willReturn(RegularSeasonViewFixtures::seasonRows());
 
-        $view = new PlayerRegularSeasonTotalsView($repository);
+        $view = new PlayerRegularSeasonTotalsView($repository, new PlayerSeasonTableRenderer());
         $html = $view->renderTotals(42);
 
         // (2 * 899) + 465 + 198 = 2461 -- the recomputed career total.
@@ -47,7 +48,7 @@ class PlayerRegularSeasonTotalsViewTest extends TestCase
         $repository->method('getHistoricalStats')
             ->willReturn(RegularSeasonViewFixtures::seasonRows());
 
-        $view = new PlayerRegularSeasonTotalsView($repository);
+        $view = new PlayerRegularSeasonTotalsView($repository, new PlayerSeasonTableRenderer());
         $html = $view->renderTotals(42);
 
         // Season 2031 stores pts => 0; (2 * 187) + 94 + 41 = 509 is rendered instead.
@@ -59,7 +60,7 @@ class PlayerRegularSeasonTotalsViewTest extends TestCase
         $repository = self::createStub(PlayerStatsRepository::class);
         $repository->method('getHistoricalStats')->willReturn([]);
 
-        $view = new PlayerRegularSeasonTotalsView($repository);
+        $view = new PlayerRegularSeasonTotalsView($repository, new PlayerSeasonTableRenderer());
         $html = $view->renderTotals(42);
 
         $this->assertStringContainsString('Career', $html);
@@ -71,7 +72,7 @@ class PlayerRegularSeasonTotalsViewTest extends TestCase
     {
         $repository = self::createStub(PlayerStatsRepository::class);
 
-        $view = new PlayerRegularSeasonTotalsView($repository);
+        $view = new PlayerRegularSeasonTotalsView($repository, new PlayerSeasonTableRenderer());
 
         $this->assertSame('', $view->render());
     }

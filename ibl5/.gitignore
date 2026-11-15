@@ -35,6 +35,7 @@ test-results.json
 
 # Visual-review scratch dirs (per-run PR renders + generated change-driven gallery)
 vr-actuals/
+vr-rendered/
 vr-gallery/
 vr-pages-stage/
 vr-gallery.json

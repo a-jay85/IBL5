@@ -2327,6 +2327,26 @@ test_sc_opts_single_source() {
     # shellcheck disable=SC2016
     grep -qF '$IBL5_SC_OPTS' "$REPO/bin/lint-workflows" \
         || note "bin/lint-workflows does not read IBL5_SC_OPTS"
+    # Guard: no reader spells a shellcheck exclude out by hand.
+    local lit='--exclude=SC[0-9]' readers f
+    readers=".github/workflows/tests.yml bin/pre-commit-hook bin/lint-workflows bin/lib/prefire-verify"
+    # shellcheck disable=SC2086
+    hits=$(cd "$REPO" && grep -lE -- "$lit" $readers || true)
+    [ -z "$hits" ] || note "hand-written shellcheck exclude in: $hits"
+    for f in .github/workflows/tests.yml bin/pre-commit-hook; do
+        # shellcheck disable=SC2016
+        grep -qF '$IBL5_SC_OPTS' "$REPO/$f" || note "$f does not read IBL5_SC_OPTS"
+    done
+    # Planted-literal self-test: the same pattern must catch a planted literal,
+    # pass a clean copy of tests.yml, and pass a near-miss.
+    new_case
+    cp "$REPO/.github/workflows/tests.yml" "$D/clean.yml"
+    cp "$D/clean.yml" "$D/planted.yml"
+    printf '%s\n' '            | xargs shellcheck --exclude=SC2034 --shell=bash' >> "$D/planted.yml"
+    printf '%s\n' '# SC2034 and SC1090 are excluded by policy' '# the exclude flag lives in the lib' > "$D/nearmiss.yml"
+    grep -qE -- "$lit" "$D/planted.yml" || note "guard grep missed a planted --exclude literal"
+    if grep -qE -- "$lit" "$D/clean.yml"; then note "guard grep flagged the clean copy of tests.yml"; fi
+    if grep -qE -- "$lit" "$D/nearmiss.yml"; then note "guard grep flagged a near-miss line"; fi
 }
 
 # ---------------------------------------------------------------------------

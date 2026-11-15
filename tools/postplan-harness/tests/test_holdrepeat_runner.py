@@ -201,6 +201,85 @@ def test_dm_cmd_empty_env_uses_discord_dm(monkeypatch):
     assert "PR #none" in argv[-1]
 
 
+# --- repeat-DM wording: human-only vs mixed reasons ---
+
+def _capture_dm(monkeypatch):
+    sent = []
+    monkeypatch.setattr(runner, "_dm", lambda msg: sent.append(msg) or True)
+    return sent
+
+
+OLD_TAIL = ("The next re-run with the same plan, diff, and harness will be declined\n"
+            "before it spends tokens. Fix the reason, or re-fire with:\n"
+            "  bin/post-plan-now --force")
+
+
+def test_repeat_dm_mixed_reasons_keep_old_wording_byte_for_byte(monkeypatch):
+    sent = _capture_dm(monkeypatch)
+    obs = holdrepeat.Observation("repeat-dm", "7:x|13:y", 2, [
+        [7, "plan_auto_merge_false", "plan declares auto_merge: false"],
+        [13, "slug_drift", "plan adopted by slug drift"]])
+    assert runner._send_hold_repeat_dm(SLUG, 4242, obs) is True
+    assert sent == [
+        "post-plan held twice on the same reason: holdrepeat-synthetic PR #4242\n"
+        "Repeated hold (run 2): (7) plan declares auto_merge: false; (13) plan adopted by slug drift\n"
+        + OLD_TAIL]
+
+
+def test_repeat_dm_condition_13_alone_keeps_old_wording(monkeypatch):
+    sent = _capture_dm(monkeypatch)
+    obs = holdrepeat.Observation("repeat-dm", "13:y", 2, [
+        [13, "slug_drift", "plan adopted by slug drift"]])
+    assert runner._send_hold_repeat_dm(SLUG, 4242, obs) is True
+    assert sent == [
+        "post-plan held twice on the same reason: holdrepeat-synthetic PR #4242\n"
+        "Repeated hold (run 2): (13) plan adopted by slug drift\n" + OLD_TAIL]
+
+
+def test_repeat_dm_empty_reasons_keep_old_wording(monkeypatch):
+    sent = _capture_dm(monkeypatch)
+    obs = holdrepeat.Observation("repeat-dm", "", 2, [])
+    assert runner._send_hold_repeat_dm(SLUG, None, obs) is True
+    assert sent == [
+        "post-plan held twice on the same reason: holdrepeat-synthetic PR #none\n"
+        "Repeated hold (run 2): \n" + OLD_TAIL]
+
+
+def _hold_conds(*pairs):
+    return [{"number": n, "name": name, "blocked": True, "reason": reason}
+            for n, name, reason in pairs]
+
+
+HOLD_CONDS = {
+    "human_only_extra_19": _hold_conds(
+        (7, "plan_auto_merge_false", "plan declares auto_merge: false"),
+        (19, "other_gate", "some re-runnable gate")),
+    "mixed_13": _hold_conds(
+        (7, "plan_auto_merge_false", "plan declares auto_merge: false"),
+        (13, "slug_drift", "plan adopted by slug drift")),
+}
+
+
+def _repeat_calls(tmp_path, monkeypatch, conds):
+    monkeypatch.setattr(holdrepeat, "fingerprint", lambda *a, **k: "fp")
+    res = types.SimpleNamespace(plan=None, pr_number=4242)
+    decision = types.SimpleNamespace(armed=False, conditions=conds)
+    state = str(tmp_path / "state")
+    return [runner._record_hold_repeat(res, decision, SLUG, str(tmp_path), state, lambda s: None)
+            for _ in range(3)]
+
+
+@pytest.mark.parametrize("conds", HOLD_CONDS.values(), ids=HOLD_CONDS.keys())
+def test_record_hold_repeat_outcome_sequence_unchanged(tmp_path, monkeypatch, conds):
+    sent = _capture_dm(monkeypatch)
+    out1, out2, out3 = _repeat_calls(tmp_path, monkeypatch, conds)
+    assert (out1["action"], out1["repeat_count"]) == ("recorded", 1)
+    assert (out2["action"], out2["repeat_count"], out2["dm"]) == ("repeat-dm", 2, "sent")
+    assert (out3["action"], out3["repeat_count"], out3["dm"]) == ("repeat-silent", 3, "already-sent")
+    assert len(sent) == 1
+    assert (tmp_path / "state" / f"{SLUG}.holdrepeat.json").exists()
+
+
 # --- held-unfixable marker cleanup in _record_hold_repeat ------------------------------------
 
 MISSING_A = "MISSING: ibl5/tests/Cli/CheckE2eHygieneCliTest.php"

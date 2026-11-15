@@ -46,11 +46,12 @@ wtlock_write_pid() {
     printf '%s\n' "$2" > "$t" && mv -f "$t" "$1/pid"
 }
 
-# wtlock_pidless_old <dir>: rc 0 only when <dir> is a dir with no pid file whose mtime is
-# older than the grace. A stat failure reads as young (held), never as epoch 0.
+# wtlock_pidless_old <dir>: rc 0 only when <dir> is a dir with no pid file, or an empty one
+# (a pid write that failed after noclobber created the file), whose mtime is older than the
+# grace. A stat failure reads as young (held), never as epoch 0.
 wtlock_pidless_old() {
     local m now g="${WTLOCK_GRACE_SECS:-30}"
-    [ -d "$1" ] && [ ! -e "$1/pid" ] || return 1
+    [ -d "$1" ] && [ ! -s "$1/pid" ] || return 1
     m=$(stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null) || return 1
     [[ $m =~ ^[0-9]+$ ]] || return 1
     now=$(date +%s)
@@ -89,9 +90,10 @@ wtlock_stale() {
 wtlock_create() {
     mkdir "$1" 2>/dev/null || return 1
     claim_file "$1/pid" printf '%s\n' "$2" && return 0
-    # A lost claim leaves the winner's pid in place. A failed write (full disk) leaves an
-    # empty pid file after noclobber created it; clean up a dir whose pid never landed.
-    [ -s "$1/pid" ] || rm -rf "$1"
+    # A lost claim leaves the winner's pid file in place, even while it is still empty
+    # (the winner created it and has not written yet). Remove the dir only when no pid file
+    # exists. An empty pid left by a failed write ages out through wtlock_pidless_old.
+    [ -e "$1/pid" ] || rm -rf "$1"
     return 1
 }
 

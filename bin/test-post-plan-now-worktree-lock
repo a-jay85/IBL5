@@ -41,7 +41,7 @@ check_only_cases() {  # fail every --case name that matched no case
 
 h_tmp TMP
 
-sleep 300 & LIVE=$!; disown "$LIVE"
+sleep 300 >/dev/null 2>&1 & LIVE=$!; disown "$LIVE"
 OTHER=""
 cleanup() {
     kill "$LIVE" 2>/dev/null || true
@@ -135,12 +135,13 @@ if should_run lib-adopt; then
     RC=0; wtlock_adopt "$L" "$DEAD" "$LIVE" || RC=$?
     h_eq "lib-adopt: hand-off rc 0" "0" "$RC"
     h_eq "lib-adopt: pid rewritten to the run's pid" "$LIVE" "$(cat "$L/pid")"
-    sleep 300 & OTHER=$!; disown "$OTHER"
+    sleep 300 >/dev/null 2>&1 & OTHER=$!; disown "$OTHER"
     printf '%s\n' "$OTHER" > "$L/pid"
     RC=0; OUT=$(wtlock_adopt "$L" "$DEAD" "$LIVE") || RC=$?
     h_eq "lib-adopt: another live holder refuses (rc 1)" "1" "$RC"
     h_eq "lib-adopt: refusal prints the other holder" "$OTHER" "$OUT"
     h_eq "lib-adopt: other holder's pid left alone" "$OTHER" "$(cat "$L/pid")"
+    kill "$OTHER" 2>/dev/null || true; OTHER=""
     reset_lock
     RC=0; wtlock_adopt "$L" "$DEAD" "$LIVE" || RC=$?
     h_eq "lib-adopt: absent lock is created (rc 0)" "0" "$RC"
@@ -385,7 +386,7 @@ fail_row() { h_fail "$@"; printf 'FAIL %s\n' "$1"; }
 # exactly one of two acquirers wins. Distinct live pids: the same pid twice is a re-entrant win.
 if should_run wtlock_lying_mkdir_one_owner; then
     reset_lock
-    sleep 300 & OTHER=$!; disown "$OTHER"
+    sleep 300 >/dev/null 2>&1 & OTHER=$!; disown "$OTHER"
     # shellcheck source=bin/lib/claim-file.sh
     . "$REPO/bin/lib/claim-file.sh"
     claim_file_lying_mkdir_stub "$TMP/lie"

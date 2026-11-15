@@ -2860,10 +2860,10 @@ done < "$MATRIX_FILE"
 # ---------------------------------------------------------------------------
 # Gate [J]: Coverage advisory for new PHP classes (warn-only).
 # ---------------------------------------------------------------------------
-# A plan that introduces a new ibl5/classes/*.php file should include at
-# least one Infection/mutation or coverage VM row, so the new code's
-# mutation resistance is considered. Infection is label-gated (mutation-test)
-# so this is advisory only — it never blocks the plan.
+# A plan that introduces a new ibl5/classes/*.php file should name a
+# coverage row for it. CI's required "Infection PHP (per-PR diff)" check
+# scores mutants on every PR, so this advisory never asks for an Infection
+# row, and gate [LI] blocks a plan that schedules one. Warn-only.
 _j_new_class=0
 if grep -qiE '([Cc]reate|[Nn]ew file|[Aa]dd(s|ing)? (a )?new|[Ii]ntroduce|[Ss]caffold)' "$PLAN_FILE" \
    && grep -qE 'ibl5/classes/[^ ]+\.php' "$PLAN_FILE"; then
@@ -2873,9 +2873,29 @@ if grep -qiE '([Cc]reate|[Nn]ew file|[Aa]dd(s|ing)? (a )?new|[Ii]ntroduce|[Ss]ca
         | grep -cE 'ibl5/classes/[^ ]+\.php' || true)
 fi
 if [ "${_j_new_class:-0}" -gt 0 ]; then
-    if ! grep -qiE 'infection|mutation|coverage' "$MATRIX_FILE"; then
-        warn "[J] plan introduces a new ibl5/classes/*.php file but the VM has no Infection/mutation/coverage row — consider adding one (Infection is label-gated; suppress with a comment if deliberately omitted)"
+    if ! grep -qiE 'coverage' "$MATRIX_FILE"; then
+        warn "[J] plan introduces a new ibl5/classes/*.php file but the VM has no coverage row; consider adding one (CI's \"Infection PHP (per-PR diff)\" check scores mutants on every PR; suppress with a comment if deliberate)"
     fi
+fi
+
+# ---------------------------------------------------------------------------
+# Gate [LI]: plan schedules a local Infection run (hard-fail).
+# ---------------------------------------------------------------------------
+# CI's required check "Infection PHP (per-PR diff)" scores every PR, so a plan
+# never schedules a local run. A phase line may name the runner only when it
+# conditions the run on CI's Infection check having failed. Matrix rows run
+# unattended at post-plan Phase 5.0, so a matrix location cell never may.
+_li_awk="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/plan-local-infection.awk"
+if [ ! -f "$_li_awk" ]; then
+    viol "[LI] helper missing: $_li_awk"
+else
+    while IFS=$'\t' read -r _li_file _li_kind _li_where _li_text; do
+        if [ "$_li_kind" = M ]; then
+            viol "[LI] VM row $_li_where runs a local Infection command; CI's required check \"Infection PHP (per-PR diff)\" scores every PR and matrix rows run unattended: \"$_li_text\""
+        else
+            viol "[LI] line $_li_where schedules a local Infection run; CI's required check \"Infection PHP (per-PR diff)\" scores every PR. Drop the step, or condition it on that check having failed (\"if CI's Infection check fails, fix the mutants it reports, then run bin/mutation-diff <base-ref>\"): \"$_li_text\""
+        fi
+    done < <(awk -f "$_li_awk" "$PLAN_FILE")
 fi
 
 # ---------------------------------------------------------------------------

@@ -336,6 +336,34 @@ _ui_composer_hits_only() {
     ! grep -qvE '^ibl5/composer\.(json|lock)$' <<< "$hits"
 }
 
+# _ui_view_hits_only <hits>: rc 0 when <hits> is non-empty and every UI path
+# hit is an ibl5/classes/ View, Renderer or Formatter class file outside the
+# shared UI, PageLayout and Navigation directories.
+_ui_view_hits_only() {
+    local line re='^ibl5/classes/.+(View|Renderer|Formatter)\.php$'
+    [ -n "$1" ] || return 1
+    while IFS= read -r line; do
+        case "$line" in
+            ibl5/classes/UI/*|ibl5/classes/PageLayout/*|ibl5/classes/Navigation/*) return 1 ;;
+            *) [[ $line =~ $re ]] || return 1 ;;
+        esac
+    done <<< "$1"
+}
+
+# _ui_view_hits_rendered <hits> <gallery_json>: rc 0 when the gallery's
+# top-level renderedViewFiles is a non-empty array of single-line strings and
+# every hit is an exact member. bin/vr-build-gallery is meant to write the
+# list. A missing file, missing jq, absent field, or any other shape returns 1.
+_ui_view_hits_rendered() {
+    local listed line
+    if [ -z "$2" ] || ! _ui_regular_file "$2"; then return 1; fi
+    command -v jq >/dev/null 2>&1 || return 1
+    listed=$(jq -er '.renderedViewFiles | if type == "array" and length > 0 and all(.[]; type == "string" and (contains("\n") | not)) then .[] else error("renderedViewFiles shape") end' "$2" 2>/dev/null) || return 1
+    while IFS= read -r line; do
+        grep -qxF -- "$line" <<< "$listed" || return 1
+    done <<< "$1"
+}
+
 # ui_composer_exempt <paths_file> <pr_author>: rc 0 when a Dependabot PR changes
 # only ibl5/composer.lock (and maybe ibl5/composer.json) and every changed
 # locked package is a patch or minor upgrade. A grouped PR is judged per
@@ -370,18 +398,26 @@ ui_composer_exempt() {
         --argjson jc "$jc" "$_UI_COMPOSER_LOCK_JQ" >/dev/null 2>&1 || return 1
 }
 
-# ui_decide <paths_file> <renderable 0|1> <gallery_json or ""> [dev_patch 0|1] [composer 0|1]: prints the verdict.
+# ui_decide <paths_file> <renderable 0|1> <gallery_json or ""> [dev_patch 0|1] [composer 0|1] [view 0|1]: prints the verdict.
 # Verdicts: ui-unknown ui-paths vr-missing ui-vr (rc 1, hold) | not-ui (rc 0).
 # dev_patch=1 comes from ui_dev_patch_exempt. It skips the ui-paths verdict
 # only when every UI path is ibl5/package.json or ibl5/bun.lock. The
 # renderable and gallery checks below still run.
 # composer=1 (from ui_composer_exempt) skips the ui-paths hold only when every
 # UI path hit is a composer file; the renderable and gallery checks still run.
+# view=1 (from ui_workflow_verdict) skips the ui-paths hold only when VR is
+# expected to run, every UI path hit is a View, Renderer or Formatter class
+# file, and the gallery's renderedViewFiles lists each one. With no gallery it
+# holds as vr-missing. Any unreadable list holds as ui-paths.
 ui_decide() {
     local paths="$1" renderable="$2" gallery="$3" dev_patch="${4:-0}" rc=0 n hits
     hits=$(ui_paths_touch_ui < "$paths") || rc=$?
     if [ "$rc" = 2 ]; then echo ui-unknown; return 1; fi
     if [ "$rc" = 0 ] && [ "${5:-0}" = 1 ] && _ui_composer_hits_only "$paths"; then rc=1; fi
+    if [ "$rc" = 0 ] && [ "${6:-0}" = 1 ] && [ "$renderable" = 1 ] && _ui_view_hits_only "$hits"; then
+        if [ ! -s "$gallery" ]; then echo vr-missing; return 1; fi
+        if _ui_view_hits_rendered "$hits" "$gallery"; then rc=1; fi
+    fi
     if [ "$rc" = 0 ] && ! { [ "$dev_patch" = 1 ] && _ui_dev_patch_hits_only "$hits"; }; then echo ui-paths; return 1; fi
     if [ "$renderable" != 1 ]; then echo not-ui; return 0; fi
     if [ -z "$gallery" ] || [ ! -s "$gallery" ]; then echo vr-missing; return 1; fi
@@ -608,20 +644,23 @@ ui_approving_event() {
 # rc follows ui_decide (0 not-ui, 1 hold).
 # A Dependabot dev-dependency patch bump (ui_dev_patch_exempt) waits on the gallery like a non-UI PR.
 # A Dependabot composer patch or minor bump (ui_composer_exempt) also waits.
+# A PR whose UI path hits are all View, Renderer or Formatter class files also
+# waits, except on the approving run; ui_decide then checks renderedViewFiles.
 ui_workflow_verdict() {
     local UI_PR_PATHS="$1"
-    local paths="$1" author="$2" fetch="$3" renderable rc=0 gallery="" tmp dev_patch=0 composer=0
+    local paths="$1" author="$2" fetch="$3" renderable rc=0 gallery="" tmp dev_patch=0 composer=0 view=0 hits=""
     renderable=$(ui_renderable "$paths" "$author")
-    ui_paths_touch_ui < "$paths" >/dev/null || rc=$?
+    hits=$(ui_paths_touch_ui < "$paths") || rc=$?
     if [ "$rc" = 0 ] && ui_dev_patch_exempt "$paths" "$author"; then dev_patch=1; fi
     if [ "$rc" = 0 ] && ui_composer_exempt "$paths" "$author"; then composer=1; fi
-    if { [ "$rc" = 1 ] || [ "$dev_patch" = 1 ] || [ "$composer" = 1 ]; } && [ "$renderable" = 1 ] && ! ui_approving_event "${4:-}" "${5:-}"; then
+    if [ "$rc" = 0 ] && [ "$renderable" = 1 ] && ! ui_approving_event "${4:-}" "${5:-}" && _ui_view_hits_only "$hits"; then view=1; fi
+    if { [ "$rc" = 1 ] || [ "$dev_patch" = 1 ] || [ "$composer" = 1 ] || [ "$view" = 1 ]; } && [ "$renderable" = 1 ] && ! ui_approving_event "${4:-}" "${5:-}"; then
         tmp=$(mktemp) || tmp=""
         if [ -n "$tmp" ] && ui_await_gallery "${UI_VR_ATTEMPTS:-90}" "${UI_VR_SLEEP:-30}" "$fetch" "$tmp"; then
             gallery="$tmp"
         fi
     fi
-    ui_decide "$paths" "$renderable" "$gallery" "$dev_patch" "$composer"
+    ui_decide "$paths" "$renderable" "$gallery" "$dev_patch" "$composer" "$view"
 }
 
 # ui_fetch_pr_gh — the production fetch for ui_live_pr_state. Prints the live

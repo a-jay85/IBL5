@@ -12,11 +12,15 @@ final readonly class TradeSuggestionsPanelData
 {
     /**
      * @param list<SuggestionItem> $items At most three suggestions
+     * @param int $eligibleCount Ideas the refresh button pages through
+     * @param int $offset Where the shown window starts in that list
      */
     public function __construct(
         public ResolvedTeamMode $mode,
         public array $items,
         public ?SuggestionDiagnostics $diagnostics = null,
+        public int $eligibleCount = 0,
+        public int $offset = 0,
     ) {
     }
 }

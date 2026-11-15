@@ -13,8 +13,13 @@ use TradeSuggestions\Engine\DealRanker;
 use TradeSuggestions\Engine\DealScorer;
 use TradeSuggestions\Engine\LeagueSnapshot;
 use TradeSuggestions\Engine\ModeResolver;
+use TradeSuggestions\Engine\ProfileLines;
 use TradeSuggestions\Engine\RankDiagnostics;
 use TradeSuggestions\Engine\RankGateCallback;
+use TradeSuggestions\Feedback\Contracts\FeedbackRepositoryInterface;
+use TradeSuggestions\Feedback\DealKey;
+use TradeSuggestions\Feedback\HiddenDealFilter;
+use TradeSuggestions\Feedback\PanelSessionState;
 use TradeSuggestions\Veto\VetoSet;
 
 /**
@@ -38,6 +43,8 @@ class TradeSuggestionsService implements TradeSuggestionsServiceInterface
         private readonly TradeFormRepositoryInterface $formRepo,
         private readonly SettingsServiceInterface $settingsService,
         private readonly ModeResolver $modes,
+        private readonly FeedbackRepositoryInterface $feedback,
+        private readonly PanelSessionState $session,
     ) {
     }
 
@@ -64,29 +71,62 @@ class TradeSuggestionsService implements TradeSuggestionsServiceInterface
 
         $g = $this->generator->generate($s, $tid, $simKey);
         $scored = DealScorer::scoreAll($s, $g, $g->shapeIdByKey);
+        // Hidden ideas leave before the ranker, so they never use up a validation.
+        $split = HiddenDealFilter::apply($scored, $this->feedback->hiddenKeys($tid));
+        $scored = $split['kept'];
         $result = $this->ranker->select($s, $simKey, $tid, $scored, $this->vetoes, RankGateCallback::make($this->filter, $teamNames));
 
-        $items = [];
-        foreach ($result->selected as $ranked) {
+        $this->session->forSimKey($simKey);
+        $allItems = [];
+        $map = [];
+        foreach ($result->eligible as $ranked) {
             $c = $ranked->deal->candidate;
             $partnerName = $teamNames[$c->partnerTid] ?? '';
-            $items[] = new SuggestionItem(
+            $key = DealKey::forCandidate($c);
+            $item = new SuggestionItem(
                 partnerTeamName: $partnerName,
                 giveLabels: self::labels($s, $c->userPids, $c->userPickIds, $teamNames),
                 getLabels: self::labels($s, $c->partnerPids, $c->partnerPickIds, $teamNames),
                 userReason: $ranked->userReason ?? '',
                 partnerReason: $ranked->partnerReason ?? '',
                 prefillUrl: SuggestionLink::forCandidate($partnerName, $c),
+                dealKey: $key->deal,
+                coreKey: $key->core,
+                profileLines: ProfileLines::forUser($ranked->deal->userDelta),
             );
+            $allItems[] = $item;
+            $map[$key->deal] = [
+                'core' => $key->core,
+                'partnerTid' => $c->partnerTid,
+                'dealJson' => json_encode(
+                    ['give' => $item->giveLabels, 'get' => $item->getLabels, 'keys' => DealKey::assetKeys($c)],
+                    JSON_THROW_ON_ERROR
+                ),
+            ];
         }
+        $this->session->setEligible($map);
+        $offset = $this->session->offset();
+        $items = array_slice($allItems, $offset, TradeSuggestionsView::MAX_ITEMS);
 
         $d = $result->diagnostics;
 
         return new TradeSuggestionsPanelData(
             $userMode,
             $items,
-            new SuggestionDiagnostics($g->rawCount, count($scored), self::rejections($d), $d->validated, $d->validatorRejections),
+            new SuggestionDiagnostics($g->rawCount, count($scored), ['HIDDEN' => count($split['dropped'])] + self::rejections($d), $d->validated, $d->validatorRejections),
+            count($allItems),
+            $offset,
         );
+    }
+
+    /**
+     * @see TradeSuggestionsServiceInterface::hiddenNote()
+     *
+     * @return array{deal_key: string, reason_codes: string, free_text: ?string, created_at: string}|null
+     */
+    public function hiddenNote(int $tid): ?array
+    {
+        return $this->feedback->latestForTeam($tid);
     }
 
     /**

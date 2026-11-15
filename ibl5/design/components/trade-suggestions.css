@@ -121,4 +121,93 @@
     color: var(--gray-600);
 }
 
+/* Before/after league ranks for the GM's team */
+.trade-suggestions__profile-label {
+    display: block;
+    margin-top: var(--space-2);
+    font-size: 0.75rem;
+    font-weight: var(--font-weight-semibold);
+    text-transform: uppercase;
+    color: var(--gray-500);
+}
+
+.trade-suggestions__profile {
+    margin: 0 0 var(--space-2);
+    padding-left: var(--space-4);
+    font-size: 0.875rem;
+    color: var(--gray-700);
+}
+
+/* Hide-with-feedback form (one per card) */
+.trade-suggestions__hide {
+    margin-top: var(--space-2);
+    font-size: 0.875rem;
+}
+
+.trade-suggestions__hide-summary {
+    cursor: pointer;
+    color: var(--gray-600);
+}
+
+.trade-suggestions__hide-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+}
+
+.trade-suggestions__hide-reasons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin: 0;
+    padding: var(--space-2);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+}
+
+.trade-suggestions__hide-reasons legend {
+    font-weight: var(--font-weight-semibold);
+    color: var(--gray-700);
+}
+
+.trade-suggestions__hide-text {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    color: var(--gray-700);
+}
+
+.trade-suggestions__hide-text textarea {
+    width: 100%;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    font-family: var(--font-sans);
+}
+
+.trade-suggestions__hide-submit,
+.trade-suggestions__refresh {
+    align-self: flex-start;
+    padding: var(--space-1) var(--space-3);
+    border: 1px solid var(--navy-700);
+    border-radius: var(--radius-md);
+    background: var(--navy-800);
+    color: var(--white);
+    cursor: pointer;
+}
+
+.trade-suggestions__refresh-form {
+    margin-top: var(--space-3);
+}
+
+.trade-suggestions__hidden-note {
+    margin: 0 0 var(--space-2);
+    color: var(--gray-700);
+}
+
+.trade-suggestions__error {
+    margin: 0 0 var(--space-2);
+    color: var(--error-600);
+}
+
 }

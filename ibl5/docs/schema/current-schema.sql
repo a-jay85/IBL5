@@ -3949,6 +3949,27 @@ CREATE TABLE `ibl_trade_offers` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `ibl_trade_suggestion_feedback`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ibl_trade_suggestion_feedback` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `tid` int(11) NOT NULL COMMENT 'GM team from the session, never from POST',
+  `deal_key` char(40) NOT NULL COMMENT 'sha1(userTid|partnerTid|side-tagged sorted asset keys)',
+  `core_key` char(40) NOT NULL COMMENT 'same as deal_key with players only',
+  `partner_tid` int(11) NOT NULL,
+  `deal_json` text NOT NULL COMMENT 'asset keys and labels for the tuning page',
+  `reason_codes` varchar(80) NOT NULL COMMENT 'comma-joined closed set, see Feedback\\HideReason',
+  `free_text` varchar(500) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_tid_deal` (`tid`,`deal_key`),
+  KEY `idx_tid_core` (`tid`,`core_key`),
+  KEY `idx_partner_tid` (`partner_tid`),
+  CONSTRAINT `fk_tsf_partner_tid` FOREIGN KEY (`partner_tid`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE,
+  CONSTRAINT `fk_tsf_tid` FOREIGN KEY (`tid`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ibl_votes_ASG`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;

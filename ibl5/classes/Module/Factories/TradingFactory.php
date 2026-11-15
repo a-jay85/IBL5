@@ -71,4 +71,14 @@ final class TradingFactory implements ModuleFactoryInterface
             )
         );
     }
+
+    public function suggestionFeedbackController(): \TradeSuggestions\Feedback\SuggestionFeedbackController
+    {
+        return new \TradeSuggestions\Feedback\SuggestionFeedbackController(
+            $this->services->auth(),
+            $this->services->teamIdentity(),
+            new \TradeSuggestions\Feedback\FeedbackRepository($this->services->db()),
+            \TradeSuggestions\Feedback\PanelSessionState::current(),
+        );
+    }
 }

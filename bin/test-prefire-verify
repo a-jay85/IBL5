@@ -318,6 +318,17 @@ test_db_down_chained_parse_row_still_probes() {
     unset STUB_PROBE_RC
 }
 
+# A single `&` backgrounds the first call; the DB call still runs, so it probes.
+test_db_down_background_amp_row_still_probes() {
+    new_case
+    write_plan "$(row 1 "bash -n /dev/null & bin/db-query 'SELECT 1'")"
+    export STUB_PROBE_RC=3
+    run_gate --plan "$PLAN"
+    want_rc 3
+    want_out "DB unreachable; matrix row 1 needs it"
+    unset STUB_PROBE_RC
+}
+
 test_all_green_passes_and_records() {
     new_case
     green_plan
@@ -1963,6 +1974,7 @@ test_phpunit_red_refuses
 test_db_down_fails_closed_naming_row
 test_db_down_parse_only_row_skips_probe
 test_db_down_chained_parse_row_still_probes
+test_db_down_background_amp_row_still_probes
 test_all_green_passes_and_records
 test_cache_hit_skips_rerun
 test_tree_change_invalidates_cache

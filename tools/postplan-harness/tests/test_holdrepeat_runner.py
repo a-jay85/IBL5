@@ -103,7 +103,9 @@ def test_identical_hold_twice_sends_one_dm_and_result_note(tmp_path, dm):
     assert dm.count() == 1
     sent = dm.log.read_text()
     assert SLUG in sent and "PR #4242" in sent
-    assert "(7)" in sent and "bin/post-plan-now --force" in sent
+    assert "(7)" in sent and "waiting on your approval" in sent
+    assert "https://github.com/a-jay85/IBL5/pull/4242" in sent
+    assert "--force" not in sent
     assert "--quiet" in sent and "--no-fallback" in sent
     assert "hold-repeat=2x" in line2 and "dm=sent" in line2
     assert res2.hold_repeat["action"] == "repeat-dm"
@@ -278,6 +280,54 @@ def test_record_hold_repeat_outcome_sequence_unchanged(tmp_path, monkeypatch, co
     assert (out3["action"], out3["repeat_count"], out3["dm"]) == ("repeat-silent", 3, "already-sent")
     assert len(sent) == 1
     assert (tmp_path / "state" / f"{SLUG}.holdrepeat.json").exists()
+
+
+HUMAN_ONLY_CASES = {
+    "c7": [[7, "plan_auto_merge_false", "plan declares auto_merge: false"]],
+    "c8": [[8, "ui_review_floor", "UI-touching PR awaiting human-signoff"]],
+    "c3_8": [[3, "tests", "MISSING: ibl5/tests/X.php"],
+             [8, "ui_review_floor", "UI-touching PR awaiting human-signoff"]],
+}
+
+
+@pytest.mark.parametrize("reasons", HUMAN_ONLY_CASES.values(), ids=HUMAN_ONLY_CASES.keys())
+def test_repeat_dm_human_only_reasons_wait_on_approval(monkeypatch, reasons):
+    sent = _capture_dm(monkeypatch)
+    obs = holdrepeat.Observation("repeat-dm", "k", 2, reasons)
+    assert runner._send_hold_repeat_dm(SLUG, 4242, obs) is True
+    msg = sent[0]
+    assert msg.startswith("post-plan held twice on the same reason: holdrepeat-synthetic PR #4242\n")
+    assert "waiting on your approval" in msg
+    assert "https://github.com/a-jay85/IBL5/pull/4242" in msg
+    assert "--force" not in msg
+
+
+def test_repeat_dm_human_only_exact_text(monkeypatch):
+    sent = _capture_dm(monkeypatch)
+    obs = holdrepeat.Observation("repeat-dm", "k", 2, HUMAN_ONLY_CASES["c7"])
+    assert runner._send_hold_repeat_dm(SLUG, 4242, obs) is True
+    assert sent == [
+        "post-plan held twice on the same reason: holdrepeat-synthetic PR #4242\n"
+        "Repeated hold (run 2): (7) plan declares auto_merge: false\n"
+        "This PR is waiting on your approval. Only you can clear these reasons:\n"
+        "  https://github.com/a-jay85/IBL5/pull/4242\n"
+        "A re-run of post-plan will not clear them."]
+
+
+def test_repeat_dm_human_only_without_pr_has_no_link(monkeypatch):
+    sent = _capture_dm(monkeypatch)
+    obs = holdrepeat.Observation("repeat-dm", "k", 2, HUMAN_ONLY_CASES["c7"])
+    assert runner._send_hold_repeat_dm(SLUG, None, obs) is True
+    assert "PR #none" in sent[0] and "no PR number recorded" in sent[0]
+    assert "/pull/" not in sent[0]
+    assert "--force" not in sent[0]
+
+
+def test_record_hold_repeat_extra_non_human_condition_keeps_human_only_wording(tmp_path, monkeypatch):
+    sent = _capture_dm(monkeypatch)
+    _repeat_calls(tmp_path, monkeypatch, HOLD_CONDS["human_only_extra_19"])
+    assert "waiting on your approval" in sent[0]
+    assert "--force" not in sent[0]
 
 
 # --- held-unfixable marker cleanup in _record_hold_repeat ------------------------------------

@@ -337,6 +337,24 @@ prefire_phpunit_map_path_ref() { # <repo-relative path> <list-file>
     [ "$rc" -le 1 ]
 }
 
+# Database-group tests are every file under ibl5/tests/DatabaseIntegration/. They
+# leave the target list: phpunit.xml excludes the database group, so a local run
+# executes none of them, and CI's db-integration job runs them. Each one dropped
+# is recorded with phpunit_defer. Expects a deduplicated list.
+prefire_phpunit_drop_db_tests() { # <sorted list-file>
+    local out="$1" t kept
+    kept=$(mktemp "${TMPDIR:-/tmp}/prefire-kept.XXXXXX") || return 1
+    while IFS= read -r t; do
+        case "$t" in
+            tests/DatabaseIntegration/*)
+                phpunit_defer "database-group test left to the CI db-integration job: ibl5/$t" ;;
+            *) printf '%s\n' "$t" >> "$kept" ;;
+        esac
+    done < "$out"
+    cat "$kept" > "$out" || { rm -f "$kept"; return 1; }
+    rm -f "$kept"
+}
+
 prefire_phpunit_select() { # <list-file>
     local out="$1" base mb changed status path before after
     PHPUNIT_MODE=""; PHPUNIT_REASON=""; PHPUNIT_DEFERRED=""; PHPUNIT_DEFERRED_N=0
@@ -390,6 +408,8 @@ prefire_phpunit_select() { # <list-file>
     done < "$changed"
     rm -f "$changed"
     [ "$PHPUNIT_MODE" = full ] && return 0
+    sort -u "$out" -o "$out" || { phpunit_full "cannot sort the test list"; return 0; }
+    prefire_phpunit_drop_db_tests "$out" || { phpunit_full "cannot filter database tests from the test list"; return 0; }
     if [ ! -s "$out" ]; then
         PHPUNIT_MODE=skip
         if [ "$PHPUNIT_DEFERRED_N" -gt 0 ]; then
@@ -399,7 +419,6 @@ prefire_phpunit_select() { # <list-file>
         fi
         return 0
     fi
-    sort -u "$out" -o "$out" || { phpunit_full "cannot sort the test list"; return 0; }
     PHPUNIT_MODE=subset
 }
 
@@ -572,6 +591,11 @@ stage_phpunit() {
         else
             say "FAIL phpunit: full default suite red (exit $rc); log: $log" >&2
         fi
+        tail -n 40 "$log" >&2
+        return 1
+    fi
+    if [ "$PHPUNIT_MODE" = subset ] && grep -qF 'No tests executed!' "$log"; then # phpunit-zero
+        say "FAIL phpunit: subset of ${#targets[@]} test files ran no tests (PHPUnit reported No tests executed!); log: $log" >&2
         tail -n 40 "$log" >&2
         return 1
     fi

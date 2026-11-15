@@ -5188,11 +5188,17 @@ if ! "$GUARD" "$_j_f" 2>&1 | grep -q '\[J\]'; then
 else
     echo "ok: gate-J-new-class-no-coverage advisory confirmed"
 fi
+if "$GUARD" "$_j_f" 2>&1 | grep -q 'label-gated'; then
+    echo "FAIL: gate-J-advisory-text — stale label-gated text"
+    FAILED=1
+else
+    echo "ok: gate-J-advisory-text"
+fi
 fi
 rm -f "$_j_f"
 
-# Infection row present in VM — gate is silent ([J] must NOT appear).
-assert_viol gate-J-new-class-with-infection-clean 0 '[J]' "$FM_OPUS
+# Coverage row present in VM: gate is silent ([J] must NOT appear).
+assert_viol gate-J-new-class-with-coverage-clean 0 '[J]' "$FM_OPUS
 
 ## Phase 1
 
@@ -5200,7 +5206,7 @@ Create a new ibl5/classes/Foo/BarService.php implementing the baz interface.
 
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---|---|---|---|
-| 1 | mutation score | Infection | post-impl | cd ibl5 && vendor/bin/infection --filter=classes/Foo/BarService.php |"
+| 1 | line coverage | Coverage | post-impl | cd ibl5 && vendor/bin/phpunit --coverage-text tests/Foo/BarServiceTest.php |"
 
 # No creation verb — gate is silent ([J] must NOT appear).
 assert_viol gate-J-no-new-class-clean 0 '[J]' "$FM_OPUS
@@ -5209,6 +5215,72 @@ assert_viol gate-J-no-new-class-clean 0 '[J]' "$FM_OPUS
 
 Modify ibl5/classes/Foo/BarService.php to add a method.
 $CF_MATRIX"
+
+# ---------------------------------------------------------------------------
+# Gate [LI]: plan schedules a local Infection run (blocking)
+# ---------------------------------------------------------------------------
+_li_h='##'
+_li_f3='```'
+# Old Unit 5 step 7 wording, before its rewrite: blocks.
+assert_viol gate-LI-old-wording-blocks 1 '[LI]' "$FM_OPUS
+
+${_li_h} Phase 1
+
+7. Run the same diff-scoped run locally: bin/mutation-diff origin/master, before firing post-plan.
+$CF_MATRIX"
+# Current Unit 5 wording: a negated line, then a line conditioned on CI's failure. Clean.
+assert_viol gate-LI-ci-failed-allowed 0 '[LI]' "$FM_OPUS
+
+${_li_h} Phase 1
+
+7. Do not run Infection locally.
+8. If CI's check fails, fix the mutants it reports, then run bin/mutation-diff <base-ref> once to confirm before pushing again.
+$CF_MATRIX"
+# Near-miss: names CI without a failure. Blocks.
+assert_viol gate-LI-ci-passes-blocks 1 '[LI]' "$FM_OPUS
+
+${_li_h} Phase 1
+
+CI passes, then run bin/mutation-diff origin/master.
+$CF_MATRIX"
+# Near-miss: the runner as an edit target, no run verb. Clean.
+assert_viol gate-LI-edit-target-clean 0 '[LI]' "$FM_OPUS
+
+${_li_h} Phase 1
+
+Edit bin/mutation-diff to add the CI-state gate.
+$CF_MATRIX"
+# Fenced example: clean.
+assert_viol gate-LI-fenced-clean 0 '[LI]' "$FM_OPUS
+
+${_li_h} Phase 1
+
+${_li_f3}bash
+bin/mutation-diff origin/master   # run example
+${_li_f3}
+$CF_MATRIX"
+# Matrix location cell running the runner: blocks.
+assert_viol gate-LI-matrix-row-blocks 1 '[LI]' "$FM_OPUS
+
+${_li_h} Phase 1
+
+Edit the runner.
+
+${_li_h} Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | mutation score | CLI-executable | post-impl | bin/mutation-diff origin/master |"
+# Matrix location cell running the harness: no hit from the helper.
+if h_shard_primary; then
+_li_out="$(printf '%s\n' "${_li_h} Verification Matrix" '| 1 | a | CLI-executable | post-impl | bin/test-mutation-diff |' \
+    | awk -f "$(dirname "$GUARD")/lib/plan-local-infection.awk")"
+if [ -n "$_li_out" ]; then
+    echo "FAIL: gate-LI-test-harness-cell-clean — got: $_li_out"; FAILED=1
+else
+    echo "ok: gate-LI-test-harness-cell-clean"
+fi
+fi
 # --- Gate D (draft phase drift) ---
 # Fixture bodies are built with printf heading-token arguments to avoid
 # literal level-2 Phase headings being counted if gate D is ever pointed at

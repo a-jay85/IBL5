@@ -3,13 +3,13 @@
 # Runs the coverage step and the Infection step on the host, from ibl5/, with
 # CI's flags. diff.relative stays unset; see the comment above the Infection call.
 #
-# Usage: bin/mutation-diff [<base-ref>]
+# Usage: bin/mutation-diff [--force] [<base-ref>]
 
 set -euo pipefail
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     cat <<'EOF'
-Usage: bin/mutation-diff [<base-ref>]
+Usage: bin/mutation-diff [--force] [<base-ref>]
 
 Run the per-PR mutation gate locally. Runs the coverage and Infection steps
 of .github/workflows/mutation-pr.yml with the same flags, against the diff
@@ -29,6 +29,20 @@ files, as CI does. Also skips (exit 0) when the changed class files only
 lose lines, since Infection has no added line to mutate. Untracked new
 classes are marked intent-to-add so Infection sees them.
 
+Runs only after CI's required check "Infection PHP (per-PR diff)" has
+failed on the open PR for the current branch. CI scores every PR; this
+runner is for fixing the mutants that check reported. It refuses (exit 6)
+when:
+  - HEAD is detached
+  - gh is missing (GH_BIN overrides the gh path) or a gh call fails
+  - the branch has no open PR, or more than one
+  - the PR head has no run of that check
+  - the newest run is queued, in progress, or concluded anything other
+    than failure (success, skipped, cancelled, neutral, timed_out,
+    action_required)
+--force skips this check (humans only). With CLAUDE_HEADLESS set to any
+non-empty value, --force exits 2.
+
 A lock at /tmp/ibl5-mutation-diff.lock keeps two runs from sharing
 ibl5_test. Override the path with MUTATION_DIFF_LOCK_DIR.
 
@@ -38,6 +52,7 @@ Exit codes:
   3  prerequisite missing: pcov, docker, ibl5-mariadb, or bin/db-test-up failed
   4  lock held by another run
   5  Infection matched no source files although the diff adds classes/**/*.php lines
+  6  refused: CI's Infection check has not failed on this branch's PR (see --force)
   other  the phpunit or Infection exit code, passed through
 EOF
     exit 0
@@ -49,8 +64,10 @@ source "$REPO_ROOT/bin/lib/db-helpers.sh"
 
 BASE=""
 NPOS=0
+FORCE=0
 for arg in "$@"; do
     case "$arg" in
+        --force) FORCE=1 ;;
         -*)
             echo "Error: unknown option: $arg" >&2
             exit 2
@@ -66,6 +83,10 @@ for arg in "$@"; do
     esac
 done
 BASE="${BASE:-origin/master}"
+if [ "$FORCE" = 1 ] && [ -n "${CLAUDE_HEADLESS:-}" ]; then
+    echo "Error: --force is for humans; CLAUDE_HEADLESS is set, so this run cannot skip the CI-state check. Push and let CI's \"Infection PHP (per-PR diff)\" check score the PR." >&2
+    exit 2
+fi
 
 cd "$REPO_ROOT/ibl5"
 if ! git rev-parse --verify --quiet "$BASE^{commit}" >/dev/null; then
@@ -108,6 +129,42 @@ ADDED="$(awk -F'\t' '$1 == "-" { n++; next } { n += $1 } END { print n + 0 }' <<
 if [ "$ADDED" -eq 0 ]; then
     echo "SKIP: the diff vs $BASE only deletes lines from classes/**/*.php files, so nothing is mutable."
     exit 0
+fi
+
+# CI-state gate: CI's required check scores every PR, and a local run exists
+# only to fix mutants that check already reported. Sits after the SKIP exits
+# (nothing to mutate needs no gh call) and before pcov, docker and the lock.
+CHECK_NAME='Infection PHP (per-PR diff)'
+refuse_ci() {
+    echo "Refused: $1." >&2
+    echo "CI's required check \"$CHECK_NAME\" scores mutation testing on every PR; bin/mutation-diff works only after that check has failed on this branch's open PR." >&2
+    echo "Fix: push and let CI score the PR. If CI's check fails, fix the mutants it reports, then rerun bin/mutation-diff. A human can override with bin/mutation-diff --force [<base-ref>]." >&2
+    exit 6
+}
+if [ "$FORCE" = 1 ]; then
+    echo "WARN: --force skips the CI-state check; CI's \"$CHECK_NAME\" check still scores this PR." >&2
+else
+    : "${GH_BIN:=gh}"
+    command -v "$GH_BIN" >/dev/null 2>&1 || refuse_ci "gh is not installed or not on PATH (GH_BIN=$GH_BIN)"
+    BRANCH="$(git symbolic-ref --quiet --short HEAD)" || refuse_ci "HEAD is detached, so no branch names a PR"
+    PRS="$("$GH_BIN" pr list --head "$BRANCH" --state open --json number,headRefOid \
+        --jq '.[] | "\(.number) \(.headRefOid)"' 2>/dev/null)" \
+        || refuse_ci "gh could not list PRs for branch $BRANCH (not authenticated, or offline)"
+    NPRS="$(printf '%s\n' "$PRS" | grep -c '[^[:space:]]' || true)"
+    [ "$NPRS" -ge 1 ] || refuse_ci "branch $BRANCH has no open PR"
+    [ "$NPRS" -eq 1 ] || refuse_ci "branch $BRANCH has $NPRS open PRs; expected exactly one"
+    PR_NUM="${PRS%% *}"
+    PR_SHA="${PRS#* }"
+    RUN="$("$GH_BIN" api --method GET "repos/{owner}/{repo}/commits/$PR_SHA/check-runs" \
+        -f check_name="$CHECK_NAME" -f per_page=100 \
+        --jq '.check_runs | sort_by(.id) | last | if . == null then "" else "\(.status) \(.conclusion // "none")" end' 2>/dev/null)" \
+        || refuse_ci "gh could not read check runs for PR #$PR_NUM head $PR_SHA"
+    case "$RUN" in
+        "completed failure")
+            echo "CI's \"$CHECK_NAME\" check failed on PR #$PR_NUM; continuing so you can fix the reported mutants." >&2 ;;
+        "") refuse_ci "PR #$PR_NUM head $PR_SHA has no \"$CHECK_NAME\" check run yet" ;;
+        *) refuse_ci "\"$CHECK_NAME\" reports \"$RUN\" on PR #$PR_NUM" ;;
+    esac
 fi
 
 mods=""

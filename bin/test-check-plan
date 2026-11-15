@@ -29,7 +29,8 @@ TMP="$(mktemp -d)"
 trap 'rm -f "$TMP"/*.md 2>/dev/null; rmdir "$TMP" 2>/dev/null; h_cleanup' EXIT
 # Case filter: empty runs every case; `gate13` skips the cases outside gate 13;
 # `matrix-split` skips the cases outside gate XM; `gateSD` runs only the gate
-# [SD] cases and exits; `gateQ` runs only the gate [Q] seed-state cases and exits.
+# [SD] cases and exits; `gateQ` runs only the gate [Q] seed-state cases and exits;
+# `gateVsyntax` runs only the gate [V] parse-arm and bin/fixtures cases and exits.
 TCP_ONLY="${1:-}"
 h_shard_init "${CHECK_PLAN_SHARD:-}"
 
@@ -396,6 +397,59 @@ assert_msg "q_novr_class_unasserted_quiet" 0 "" "[Q-advisory]" "$FM_OPUS"'
 '
 fi
 [ "$TCP_ONLY" != gateQ ] || h_done
+
+# Gate [V] parse arm and bin/fixtures bare-path arm. TCP_ONLY=gateVsyntax runs
+# only these. The cells are single-quoted so the harness never expands them.
+if [ -z "$TCP_ONLY" ] || [ "$TCP_ONLY" = gateVsyntax ]; then
+_vs_run() {  # _vs_run <name> <location-cell>: check-plan output for a one-row matrix
+    f="$TMP/$1.md"
+    printf '%s\n' "$FM" "sonnet-recipe: gate-V syntax fixture; anchor not under test." "" \
+        "## Verification Matrix" "" \
+        "| # | What to verify | Test type | Timing | Test file / location |" \
+        "|---|---|---|---|---|" \
+        "| 1 | cell under test | CLI-executable | post-impl | $2 |" > "$f"
+    "$GUARD" "$f" 2>&1
+}
+_vs_reject() {  # _vs_reject <name> <cell> <needle>: passes when a [V] line holds needle
+    h_shard_take || return 0
+    if _vs_run "$1" "$2" | grep '^\[V\]' | grep -qF "$3"; then
+        h_pass "$1"
+    else
+        h_fail "$1" "no [V] line containing: $3"
+    fi
+}
+_vs_clean() {  # _vs_clean <name> <cell>: passes when gate V says nothing about row 1
+    h_shard_take || return 0
+    if _vs_run "$1" "$2" | grep -qF '[V] CLI-executable row (row 1)'; then
+        h_fail "$1" "clean cell fired [V]"
+    else
+        h_pass "$1"
+    fi
+}
+# vr-gallery row-14 shape: even backtick count, so the parity arm passes it;
+# the stray backtick pair leaves .sort() at top level and bash -n fails on '('.
+_vs_reject gate-V-bash-syntax-row14-shape \
+    '`bun run scripts/x.ts \| grep -qx ok`; red if `.sort()` is dropped from `files`' \
+    'does not parse as shell after Phase 5.0 strip'
+# Near-miss prose with no backticks at all: a parenthesized aside after a command.
+_vs_reject gate-V-bash-syntax-paren-prose \
+    'bin/test-check-plan (runs every case)' \
+    'does not parse as shell after Phase 5.0 strip'
+_vs_clean gate-V-bash-syntax-clean-pipeline \
+    'grep -c gatev_nonrunnable bin/check-plan \| sort -n'
+_vs_clean gate-V-bash-syntax-herestring-subst \
+    'grep -c x <<< "$(git diff --name-only)"'
+# The fix the message suggests (prose moved into a # comment) must pass.
+_vs_clean gate-V-bash-syntax-comment-form \
+    'bun test foo.test.ts # red if .sort() is dropped from files'
+_vs_reject gate-V-bare-fixtures-path \
+    'bin/fixtures/x.json' \
+    'a bare bin/fixtures/ file path'
+# Near-miss: the same path behind a command verb is a runnable command.
+_vs_clean gate-V-fixtures-path-with-verb \
+    'jq . bin/fixtures/x.json'
+fi
+[ "$TCP_ONLY" != gateVsyntax ] || h_done
 
 if [ "$TCP_ONLY" != matrix-split ]; then
 if [ "$TCP_ONLY" != gate13 ]; then
@@ -4778,7 +4832,9 @@ ${NMIN_HDR}
 # violations. Downgradeable set: [E] (packet assertion binding, a true positive
 # on historical plans), and [V] lines for the backtick-parity arm added in this
 # PR (also a true positive on historical plans), and the [F] absolute-path line
-# (plans authored before that check existed). Never edit the corpus plans
+# (plans authored before that check existed).
+# The [V] bash -n parse arm and the [V] bin/fixtures bare-path arm are downgraded for the same reason.
+# Never edit the corpus plans
 # themselves — that mutates historical artifacts and disarms the gate permanently.
 _corpus_guard_ok() {
     _cgo_out="$("$GUARD" "$1" 2>&1)"; _cgo_rc=$?
@@ -4794,11 +4850,11 @@ _corpus_guard_ok() {
     _cgo_other="$(printf '%s\n' "$_cgo_out" | awk '
         /^check-plan: violations in /{v=1; next}
         /^check-plan: /{v=0}
-        v && /^\[/ && !/^\[E\]/ && !/^\[AB\]/ && !/^\[CW\]/ && !/^\[V\].*unbalanced backtick after Phase 5\.0 strip/ && !/^\[F\] ## Critical Files entry has an absolute path/ && !/^\[H\].*no non-empty hold_trigger:/ {print}')"
+        v && /^\[/ && !/^\[E\]/ && !/^\[AB\]/ && !/^\[CW\]/ && !/^\[V\].*unbalanced backtick after Phase 5\.0 strip/ && !/^\[V\].*does not parse as shell after Phase 5\.0 strip/ && !/^\[V\].*a bare bin\/fixtures\/ file path/ && !/^\[F\] ## Critical Files entry has an absolute path/ && !/^\[H\].*no non-empty hold_trigger:/ {print}')"
     _cgo_dvio="$(printf '%s\n' "$_cgo_out" | awk '
         /^check-plan: violations in /{v=1; next}
         /^check-plan: /{v=0}
-        v && (/^\[E\]/ || /^\[AB\]/ || /^\[CW\]/ || /^\[V\].*unbalanced backtick after Phase 5\.0 strip/ || /^\[F\] ## Critical Files entry has an absolute path/ || /^\[H\].*no non-empty hold_trigger:/) {print}' | head -1)"
+        v && (/^\[E\]/ || /^\[AB\]/ || /^\[CW\]/ || /^\[V\].*unbalanced backtick after Phase 5\.0 strip/ || /^\[V\].*does not parse as shell after Phase 5\.0 strip/ || /^\[V\].*a bare bin\/fixtures\/ file path/ || /^\[F\] ## Critical Files entry has an absolute path/ || /^\[H\].*no non-empty hold_trigger:/) {print}' | head -1)"
     # Downgrade ONLY when: non-zero exit, zero non-downgradeable lines, and at
     # least one downgradeable line actually explains the failure. A non-zero exit
     # with no visible violation line still fails loudly instead of passing silently.

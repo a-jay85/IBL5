@@ -92,6 +92,20 @@ final class VrViewRecorderTest extends TestCase
         $this->assertSame([], $result);
     }
 
+    /**
+     * The filter suffix group must stay anchored to View, Renderer and Formatter. A file
+     * ending in Viewx.php is the near-miss a mutated suffix group such as `(Viewx)` would keep.
+     */
+    public function testFilterDropsViewxSuffixNearMiss(): void
+    {
+        $result = \ibl_vr_filter_view_files([
+            '/srv/ibl5/classes/A/AViewx.php',
+            '/srv/ibl5/classes/A/ARendererx.php',
+        ], '/srv/ibl5');
+
+        $this->assertSame([], $result);
+    }
+
     public function testWriteRecordCreatesOneJsonFile(): void
     {
         $dir = sys_get_temp_dir() . '/vr-rec-' . bin2hex(random_bytes(4));

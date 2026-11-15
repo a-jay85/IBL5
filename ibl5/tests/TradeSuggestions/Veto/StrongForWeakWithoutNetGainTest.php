@@ -6,6 +6,7 @@ namespace Tests\TradeSuggestions\Veto;
 
 use PHPUnit\Framework\TestCase;
 use Tests\TradeSuggestions\Veto\Fixtures\VetoDealFactory;
+use TradeSuggestions\Profile\SlotStrength;
 use TradeSuggestions\Valuation\GainWeights;
 use TradeSuggestions\Veto\DealView;
 use TradeSuggestions\Veto\StrongForWeakWithoutNetGain;
@@ -67,6 +68,29 @@ final class StrongForWeakWithoutNetGainTest extends TestCase
         self::assertTrue((new StrongForWeakWithoutNetGain())->fires($deal));
     }
 
+    public function testSlotSumOfOneSuppressesVeto(): void
+    {
+        // SF 1 -> 4 (-3), C 28 -> 24 (+4): the side gains one place overall.
+        $deal = self::tuned(VetoDealFactory::strongForWeak()['deal'], 4, 24);
+        $deal = VetoDealFactory::withGainTotal($deal, $deal->user, 0.0);
+
+        self::assertFalse((new StrongForWeakWithoutNetGain())->fires($deal));
+    }
+
+    public function testStarterAtTheStrongCutoffCountsAsStrong(): void
+    {
+        $deal = self::ranked(SlotStrength::STRONG_MAX_RANK, SlotStrength::STRONG_MAX_RANK + 3, 28, 27);
+
+        self::assertTrue((new StrongForWeakWithoutNetGain())->fires($deal));
+    }
+
+    public function testStarterAtTheWeakCutoffCountsAsWeak(): void
+    {
+        $deal = self::ranked(1, 4, SlotStrength::WEAK_MIN_RANK, SlotStrength::WEAK_MIN_RANK - 1);
+
+        self::assertTrue((new StrongForWeakWithoutNetGain())->fires($deal));
+    }
+
     public function testQuietFixtureDoesNotFire(): void
     {
         self::assertFalse((new StrongForWeakWithoutNetGain())->fires(VetoDealFactory::quiet()['deal']));
@@ -92,5 +116,23 @@ final class StrongForWeakWithoutNetGainTest extends TestCase
         $ranks['C'] = $cAfter;
 
         return VetoDealFactory::withAfterStarterRanks($deal, $deal->user, $ranks);
+    }
+
+    /**
+     * The strongForWeak deal with the user's SF and C ranks set before and
+     * after, every other slot unchanged, and no net gain.
+     */
+    private static function ranked(int $sfBefore, int $sfAfter, int $cBefore, int $cAfter): DealView
+    {
+        $deal = VetoDealFactory::strongForWeak()['deal'];
+        $before = $deal->user->before[0]->starterRank;
+        $before['SF'] = $sfBefore;
+        $before['C'] = $cBefore;
+        $after = $before;
+        $after['SF'] = $sfAfter;
+        $after['C'] = $cAfter;
+        $deal = VetoDealFactory::withStarterRanks($deal, $deal->user, $before, $after);
+
+        return VetoDealFactory::withGainTotal($deal, $deal->user, 0.0);
     }
 }

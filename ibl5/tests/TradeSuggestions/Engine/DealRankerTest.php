@@ -159,6 +159,27 @@ final class DealRankerTest extends TestCase
         self::assertSame([], $result->selected);
     }
 
+    /**
+     * The reason writer finds no motive for the top deal, so the second deal
+     * is shown in its place, ranked first, with its own reasons.
+     */
+    public function testNoMotiveDealIsSkippedForTheNextRanked(): void
+    {
+        $result = self::rank(
+            [self::scored(self::oneForOne(), 7.0, 8.0), self::scored(self::oneForOne(), 5.0, 6.0)],
+            static fn (ScoredDeal $deal): array => $deal->user->total() === 7.0
+                ? [RankGate::NoMotive, 'user', null, null]
+                : [RankGate::Pass, '', 'user reason', 'partner reason'],
+        );
+
+        self::assertCount(1, $result->selected);
+        self::assertSame(5.0, $result->selected[0]->deal->user->total());
+        self::assertSame(1, $result->selected[0]->rank);
+        self::assertSame('user reason', $result->selected[0]->userReason);
+        self::assertSame('partner reason', $result->selected[0]->partnerReason);
+        self::assertSame(1, $result->diagnostics->noMotive);
+    }
+
     public function testNoGateIsSkippedForLargeGains(): void
     {
         $fixture = VetoDealFactory::youngerBetterCheaper();

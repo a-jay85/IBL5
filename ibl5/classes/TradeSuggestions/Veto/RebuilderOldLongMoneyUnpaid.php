@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace TradeSuggestions\Veto;
 
 use TradeSuggestions\Engine\MoneyPlaces;
+use TradeSuggestions\Projection\Horizon;
 use TradeSuggestions\TeamMode;
 use TradeSuggestions\Valuation\ContractValue;
 use TradeSuggestions\Veto\Contracts\VetoInterface;
@@ -34,7 +35,7 @@ final class RebuilderOldLongMoneyUnpaid implements VetoInterface
             }
             foreach ($side->receivedPlayersAged(self::OLD_AGE) as $p) {
                 $future = 0;
-                foreach ([1, 2, 3] as $offset) {
+                foreach (array_slice(Horizon::OFFSETS, 1) as $offset) {
                     if ($p->salaryAt($offset) > 0) {
                         $future++;
                     }

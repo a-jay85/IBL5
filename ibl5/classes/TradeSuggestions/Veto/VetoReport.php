@@ -17,8 +17,8 @@ final readonly class VetoReport
      */
     public function __construct(array $firedIds)
     {
-        $ids = array_values(array_unique($firedIds));
-        sort($ids);
+        $ids = array_unique($firedIds);
+        sort($ids); // sort() renumbers the keys, so the result is a list
         $this->firedIds = $ids;
     }
 

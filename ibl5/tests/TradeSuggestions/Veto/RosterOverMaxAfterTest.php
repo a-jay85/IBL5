@@ -21,6 +21,30 @@ final class RosterOverMaxAfterTest extends TestCase
         self::assertTrue((new RosterOverMaxAfter())->fires($deal));
     }
 
+    /**
+     * The two players the partner takes in are on one-year deals, so it is
+     * over the max this season and back under it next season.
+     */
+    public function testOverMaxThisSeasonFiresEvenWhenNextSeasonFits(): void
+    {
+        $oneYear = ['salary' => [1 => 300]];
+        $deal = VetoDealFactory::deal(
+            [TeamMode::Middle, TeamMode::Middle],
+            [10 => $oneYear, 11 => $oneYear],
+            [],
+            [VetoDealFactory::uid(10), VetoDealFactory::uid(11)],
+            [],
+            [VetoDealFactory::pid(2, 12)],
+            [],
+            partnerRoster: 15,
+        )['deal'];
+
+        self::assertSame(16, $deal->partner->after[0]->rosterCount);
+        self::assertLessThanOrEqual(15, $deal->partner->after[1]->rosterCount);
+        self::assertLessThanOrEqual(15, $deal->user->after[1]->rosterCount);
+        self::assertTrue((new RosterOverMaxAfter())->fires($deal));
+    }
+
     public function testRosterFifteenDoesNotFire(): void
     {
         $deal = self::roster(userRoster: 14, partnerRoster: 14);

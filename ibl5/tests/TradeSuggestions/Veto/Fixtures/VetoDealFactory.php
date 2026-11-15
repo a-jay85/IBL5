@@ -294,9 +294,47 @@ final class VetoDealFactory
      */
     public static function withAfterStarterRanks(DealView $deal, SideView $side, array $starterRank): DealView
     {
-        $after = $side->after;
-        $state = $after[0];
-        $after[0] = new TeamState(
+        return self::withStarterRanks($deal, $side, $side->before[0]->starterRank, $starterRank);
+    }
+
+    /**
+     * The deal with one side's offset-0 before- and after-state starter ranks replaced.
+     *
+     * @param array<string, ?int> $before slot => rank
+     * @param array<string, ?int> $after slot => rank
+     */
+    public static function withStarterRanks(DealView $deal, SideView $side, array $before, array $after): DealView
+    {
+        $beforeStates = $side->before;
+        $beforeStates[0] = self::withRanks($beforeStates[0], $before);
+        $afterStates = $side->after;
+        $afterStates[0] = self::withRanks($afterStates[0], $after);
+
+        return self::replace($deal, $side, new SideView(
+            $side->tid,
+            $side->mode,
+            $side->sent,
+            $side->received,
+            $side->sentPicks,
+            $side->receivedPicks,
+            $beforeStates,
+            $afterStates,
+            $side->gain,
+            $side->situation,
+            $side->surplusByPid,
+            $side->delta,
+            $side->pickWorthById,
+            $side->availabilityByPid,
+            $side->injuryByPid,
+        ));
+    }
+
+    /**
+     * @param array<string, ?int> $starterRank slot => rank
+     */
+    private static function withRanks(TeamState $state, array $starterRank): TeamState
+    {
+        return new TeamState(
             $state->tid,
             $state->offset,
             $state->lineup,
@@ -308,24 +346,6 @@ final class VetoDealFactory
             $state->payrollRank,
             $state->rosterCount,
         );
-
-        return self::replace($deal, $side, new SideView(
-            $side->tid,
-            $side->mode,
-            $side->sent,
-            $side->received,
-            $side->sentPicks,
-            $side->receivedPicks,
-            $side->before,
-            $after,
-            $side->gain,
-            $side->situation,
-            $side->surplusByPid,
-            $side->delta,
-            $side->pickWorthById,
-            $side->availabilityByPid,
-            $side->injuryByPid,
-        ));
     }
 
     /**

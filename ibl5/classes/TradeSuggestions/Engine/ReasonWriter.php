@@ -158,7 +158,7 @@ final class ReasonWriter
      */
     private static function heaviestOffset(array $weights): int
     {
-        return array_keys($weights, max([0.0, ...$weights]), true)[0];
+        return array_keys($weights, max(0.0, ...$weights), true)[0];
     }
 
     /**

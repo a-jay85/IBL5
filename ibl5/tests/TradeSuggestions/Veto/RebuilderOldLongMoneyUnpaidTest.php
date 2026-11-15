@@ -76,6 +76,26 @@ final class RebuilderOldLongMoneyUnpaidTest extends TestCase
         self::assertTrue($veto->fires($short));
     }
 
+    /**
+     * The user is Middle and is checked first; the rebuilding partner takes
+     * the old long-money player, so the veto still fires on the second side.
+     */
+    public function testRebuildingPartnerIsCheckedAfterANonRebuildUser(): void
+    {
+        $deal = VetoDealFactory::deal(
+            [TeamMode::Middle, TeamMode::Rebuild],
+            [7 => ['age' => 31, 'salary' => [1 => 1500, 2 => 1500, 3 => 1500, 4 => 1500]]],
+            [7 => ['age' => 32]],
+            [VetoDealFactory::uid(7)],
+            [],
+            [VetoDealFactory::pid(2, 7)],
+            [],
+        )['deal'];
+
+        self::assertSame([$deal->user, $deal->partner], $deal->sides());
+        self::assertTrue((new RebuilderOldLongMoneyUnpaid())->fires($deal));
+    }
+
     public function testWinNowSideNeverFires(): void
     {
         $deal = VetoDealFactory::rebuilderOldLongMoney(userMode: TeamMode::WinNow)['deal'];

@@ -48,7 +48,7 @@ final readonly class DealView
             $afterPartner[$offset] = $pair['partner'];
         }
 
-        $availability = self::availability($s, $c, $afterUser[0], $afterPartner[0]);
+        $availability = self::availability($s, $c);
 
         return new self(
             self::side($s, $c->userTid, $c->userPids, $c->partnerPids, $c->userPickIds, $c->partnerPickIds, $afterUser, $d->user, $d->userDelta, $availability),
@@ -157,17 +157,16 @@ final readonly class DealView
 
     /**
      * Offset-0 availability for every player on either team before or after
-     * the deal. A player with no injury entry counts in full.
+     * the deal. Every after-deal player starts on one of the two rosters, so
+     * the before lineups cover both. A player with no injury entry counts in full.
      *
      * @return array<int, float>
      */
-    private static function availability(LeagueSnapshot $s, TradeCandidate $c, TeamState $afterUser, TeamState $afterPartner): array
+    private static function availability(LeagueSnapshot $s, TradeCandidate $c): array
     {
         $pids = [
             ...array_keys($s->lineup(0, $c->userTid)->players),
             ...array_keys($s->lineup(0, $c->partnerTid)->players),
-            ...array_keys($afterUser->lineup->players),
-            ...array_keys($afterPartner->lineup->players),
         ];
         $out = [];
         foreach ($pids as $pid) {

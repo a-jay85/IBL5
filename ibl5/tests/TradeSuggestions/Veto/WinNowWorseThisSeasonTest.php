@@ -135,6 +135,18 @@ final class WinNowWorseThisSeasonTest extends TestCase
         self::assertFalse((new WinNowWorseThisSeason())->fires($deal));
     }
 
+    /**
+     * A drop of exactly ROTATION_EPSILON is noise, so the rule is strictly
+     * less than: 1.0 - eps on both sides of the compare is the same float.
+     */
+    public function testRotationAtExactlyBeforeMinusEpsilonDoesNotFire(): void
+    {
+        $after = 1.0 - WinNowWorseThisSeason::ROTATION_EPSILON;
+        $deal = self::rotationDeal(['PG' => [1]], ['PG' => [2]], [1 => 1.0, 2 => $after]);
+
+        self::assertFalse((new WinNowWorseThisSeason())->fires($deal));
+    }
+
     public function testPidInTwoSlotsCountsOnce(): void
     {
         // Before: pids 1 and 2 (2.0), though 2 sits in two slots. After: 3 and 4 (2.0).

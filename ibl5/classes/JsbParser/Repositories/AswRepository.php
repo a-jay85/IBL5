@@ -127,6 +127,8 @@ class AswRepository extends \Database\BaseMysqliRepository
     /** Insert (year, award, name) unless that row or its family sibling exists. Returns 1 inserted, 0 skipped. */
     public function insertAwardUnlessFamilyExists(int $year, string $award, string $name, string $siblingAward): int
     {
+        $storedName = \JsbParser\PlayerNameNormalizer::normalize($name);
+
         return $this->execute(
             'INSERT INTO `ibl_awards` (year, award, name)
              SELECT ?, ?, ? FROM DUAL
@@ -137,9 +139,9 @@ class AswRepository extends \Database\BaseMysqliRepository
             'ississs',
             $year,
             $award,
-            $name,
+            $storedName,
             $year,
-            $name,
+            $storedName,
             $award,
             $siblingAward
         );

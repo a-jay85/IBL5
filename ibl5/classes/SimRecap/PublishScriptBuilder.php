@@ -110,9 +110,7 @@ final class PublishScriptBuilder
      */
     public static function extractUserIds(string $content): array
     {
-        if (preg_match_all('/<@!?(\d{17,20})>/', $content, $matches) === 0) {
-            return [];
-        }
+        preg_match_all('/<@!?(\d{17,20})>/', $content, $matches);
 
         return array_values(array_unique($matches[1]));
     }
@@ -176,7 +174,7 @@ final class PublishScriptBuilder
             $gamesByDay[$game['game_date']][] = $game;
         }
         ksort($gamesByDay);
-        $days = array_map('strval', array_keys($gamesByDay));
+        $days = array_keys($gamesByDay);
 
         $injuriesByDay = [];
         if ($days !== []) {
@@ -262,9 +260,6 @@ final class PublishScriptBuilder
      */
     private static function pack(string $text, array $separators): array
     {
-        if (mb_strlen($text) <= self::DISCORD_LIMIT) {
-            return $text === '' ? [] : [$text];
-        }
         if ($separators === []) {
             return self::hardCut($text);
         }

@@ -475,6 +475,32 @@ final class PublishScriptBuilderTest extends TestCase
     }
 
     /**
+     * The 2000 limit counts characters, so a multibyte text of exactly 2000
+     * characters is sent whole, leading blank line included.
+     */
+    public function testExactly2000MultibyteCharsStaysOneMessage(): void
+    {
+        $text = "\n\n" . str_repeat('é', 1998);
+
+        self::assertSame([$text], PublishScriptBuilder::splitForDiscord($text));
+    }
+
+    /**
+     * A paragraph of exactly 2000 characters fits in one message, so it is kept
+     * whole instead of being split further on its own newlines.
+     */
+    public function testParagraphOfExactly2000CharsIsKeptWhole(): void
+    {
+        $head = str_repeat('a', 10);
+        $paragraph = "\n" . str_repeat('x', 1999);
+
+        self::assertSame(
+            [$head, $paragraph],
+            PublishScriptBuilder::splitForDiscord($head . "\n\n" . $paragraph),
+        );
+    }
+
+    /**
      * An oversized paragraph splits on single newlines before spaces or a hard cut.
      */
     public function testOversizedParagraphSplitsOnNewlinesNext(): void

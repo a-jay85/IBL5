@@ -252,11 +252,12 @@ final class SimRecapContextRepository extends \Database\BaseMysqliRepository
         $dateExpr = LastSimRecapRepository::TRANSACTION_DATE_SQL;
 
         // season_year is the ending year: Sep-Dec dates belong to the next year.
-        $startSeason = (int) substr($start, 0, 4) + ((int) substr($start, 5, 2) >= 9 ? 1 : 0);
-        $endSeason = (int) substr($end, 0, 4) + ((int) substr($end, 5, 2) >= 9 ? 1 : 0);
+        $startSeason = PublishThreadTitle::seasonEndingYearForDate($start);
+        $endSeason = PublishThreadTitle::seasonEndingYearForDate($end);
 
         // $dateExpr is a fixed SQL fragment built from column refs and constants
         // (no user input); concatenate rather than interpolate.
+        /** @infection-ignore-all SQL text: a moved or dropped $dateExpr breaks the query or its window, which the findAllWindowInjuries tests in tests/DatabaseIntegration/SimRecap/SimRecapContextRepositoryTest.php catch against a real DB. The unit tests use MockDatabase, which never parses SQL. */
         $sql = "SELECT t.pid,
                        p.name,
                        " . $dateExpr . " AS injury_date,
@@ -308,8 +309,8 @@ final class SimRecapContextRepository extends \Database\BaseMysqliRepository
         // season_year is the ending year: Sep-Dec dates belong to the next year.
         // The season_year range is a sargable pre-filter (idx_season); the date
         // expression stays as the exact check.
-        $startSeason = (int) substr($start, 0, 4) + ((int) substr($start, 5, 2) >= 9 ? 1 : 0);
-        $endSeason = (int) substr($end, 0, 4) + ((int) substr($end, 5, 2) >= 9 ? 1 : 0);
+        $startSeason = PublishThreadTitle::seasonEndingYearForDate($start);
+        $endSeason = PublishThreadTitle::seasonEndingYearForDate($end);
 
         // $dateExpr is a fixed SQL fragment built from column refs and constants
         // (no user input); concatenate rather than interpolate.

@@ -15,7 +15,9 @@ final class PublishThreadTitle
      */
     public static function seasonEndingYearForDate(string $ymd): int
     {
+        /** @infection-ignore-all Equivalent: (int) stops at the first '-', so a longer substr, the whole date, or no cast (PHP adds and compares numeric strings as numbers) gives the same year. */
         $year = (int) substr($ymd, 0, 4);
+        /** @infection-ignore-all Equivalent: (int) stops at the second '-', and '09' >= 9 compares as a number, so a longer substr or no cast gives the same month test. */
         $month = (int) substr($ymd, 5, 2);
 
         return $year + ($month >= 9 ? 1 : 0);

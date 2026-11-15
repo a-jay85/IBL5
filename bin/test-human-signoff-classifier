@@ -241,6 +241,28 @@ vx_decide "$CT/vp-pair" 1 "$CT/gv-dot" 1; h_eq ui_view_list_dot_prefix_holds ui-
 vx_decide "$CT/vp-pair" 1 "$CT/gv-orig" 1; h_eq ui_view_list_suffixed_entry_holds ui-paths "$LAST_OUT"
 vx_decide "$CT/vp-ui" 1 "$CT/gv-ui" 1; h_eq ui_view_shared_ui_dir_holds ui-paths "$LAST_OUT"
 # --- end V pre-impl cases ---
+# --- V post-impl cases: the exemption clears only a fully listed, clean gallery ---
+vx_verdict V20 "$CT/gv-pair" synchronize '' "$VXV" "$VXR"; h_eq ui_view_listed_clean_gallery_passes not-ui "$LAST_OUT"
+vx_gallery gv-pair-diff "$VXPAIR" '[{"strict":false}]'
+vx_verdict V21 "$CT/gv-pair-diff" synchronize '' "$VXV" "$VXR"; h_eq ui_view_listed_changed_cell_holds_vr ui-vr "$LAST_OUT"
+vx_gallery gv-pair-new "$VXPAIR" '[]' '[{"title":"x"}]'
+vx_verdict V22 "$CT/gv-pair-new" synchronize '' "$VXV" "$VXR"; h_eq ui_view_listed_new_cell_holds_vr ui-vr "$LAST_OUT"
+vx_verdict V23 - synchronize '' "$VXV" "$VXR"; h_eq ui_view_gallery_missing_holds_vr_missing vr-missing "$LAST_OUT"
+jq -n --argjson v "$VXPAIR" '{renderedCells: 0, changedCells: [], newCells: [], renderedViewFiles: $v}' > "$CT/gv-none"
+vx_decide "$CT/vp-pair" 1 "$CT/gv-none" 1; h_eq ui_view_nothing_rendered_holds_vr_missing vr-missing "$LAST_OUT"
+vx_decide "$CT/vp-pair" 1 "$CT/gv-pair" 1; h_eq ui_view_decide_flag_listed_passes not-ui "$LAST_OUT"
+vx_decide "$CT/vp-pair" 1 "$CT/gv-pair" 0; h_eq ui_view_decide_no_flag_holds ui-paths "$LAST_OUT"
+vx_decide "$CT/vp-pair" 1 "" 1; h_eq ui_view_decide_flag_no_gallery_holds_vr_missing vr-missing "$LAST_OUT"
+# PR #3965 replay: a player regular-season View/Renderer refactor plus its tests.
+# Stand-in list (replace with the gh output per Step 3a when it qualifies):
+VX3965=(
+    ibl5/classes/Player/PlayerRegularSeasonView.php
+    ibl5/classes/Player/PlayerRegularSeasonRenderer.php
+    ibl5/tests/Player/PlayerRegularSeasonViewTest.php
+    ibl5/tests/Player/PlayerRegularSeasonRendererTest.php
+)
+vx_gallery gv-3965 "[\"ibl5/classes/Player/PlayerRegularSeasonView.php\",\"ibl5/classes/Player/PlayerRegularSeasonRenderer.php\"]"
+vx_verdict V27 "$CT/gv-3965" synchronize '' "${VX3965[@]}"; h_eq ui_view_pr3965_replay_passes not-ui "$LAST_OUT"
 cx_mk V1 real; cx_verdict V1 "$CXB" "$CT/g-clean.json" "$CXL"; h_eq ui_composer_verdict_clean_passes not-ui "$LAST_OUT"
 cx_mk V2 real; cx_verdict V2 "$CXB" "$CT/g-diff.json" "$CXL"; h_eq ui_composer_verdict_vr_change_holds ui-vr "$LAST_OUT"
 cx_mk V3 real; cx_verdict V3 "$CXB" - "$CXL"; h_eq ui_composer_verdict_no_gallery_holds vr-missing "$LAST_OUT"

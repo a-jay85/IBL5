@@ -34,7 +34,7 @@
     align-items: center;
     gap: var(--space-1);
     margin: 0 0 var(--space-4);
-    line-height: 1;
+    line-height: var(--leading-none);
 }
 
 /* Each banner links to its Team page inside a .team-banner-box: a banner-sized

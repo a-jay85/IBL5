@@ -1019,8 +1019,8 @@ span.nav-dropdown-item a:hover {
     display: block;
     margin-bottom: 0.5rem;
     font-size: var(--text-base);
-    line-height: 1.5;
-    font-weight: 600;
+    line-height: var(--leading-relaxed);
+    font-weight: var(--font-weight-semibold);
     letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--gray-400);

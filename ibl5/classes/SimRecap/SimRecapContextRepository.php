@@ -239,6 +239,62 @@ final class SimRecapContextRepository extends \Database\BaseMysqliRepository
     }
 
     /**
+     * Every injury dated inside [start, end], attributed to the team the player
+     * was on when hurt (from_teamid). Unlike getWindowInjuries() it is not tied
+     * to a box-score line, so it also lists players who never played in the window.
+     * ibl_team_info has no abbreviation column, so teamAbbrev is the franchise
+     * name, the short team label the site already uses. A missing team row yields ''.
+     *
+     * @return list<array{pid:int,name:string,date:string,injuryDescription:string,injuryGamesMissed:int,teamid:int,teamName:string,teamAbbrev:string}>
+     */
+    public function findAllWindowInjuries(string $start, string $end): array
+    {
+        $dateExpr = LastSimRecapRepository::TRANSACTION_DATE_SQL;
+
+        // season_year is the ending year: Sep-Dec dates belong to the next year.
+        $startSeason = (int) substr($start, 0, 4) + ((int) substr($start, 5, 2) >= 9 ? 1 : 0);
+        $endSeason = (int) substr($end, 0, 4) + ((int) substr($end, 5, 2) >= 9 ? 1 : 0);
+
+        // $dateExpr is a fixed SQL fragment built from column refs and constants
+        // (no user input); concatenate rather than interpolate.
+        $sql = "SELECT t.pid,
+                       p.name,
+                       " . $dateExpr . " AS injury_date,
+                       t.injury_description,
+                       t.injury_games_missed,
+                       t.from_teamid,
+                       ti.team_name
+                FROM `ibl_jsb_transactions` t
+                JOIN `ibl_plr` p ON p.pid = t.pid
+                LEFT JOIN `ibl_team_info` ti ON ti.teamid = t.from_teamid
+                WHERE t.transaction_type = 1
+                  AND t.injury_games_missed IS NOT NULL
+                  AND t.season_year BETWEEN ? AND ?
+                  AND " . $dateExpr . " BETWEEN ? AND ?
+                ORDER BY injury_date ASC, t.id ASC";
+
+        /** @var list<array{pid:int,name:string,injury_date:string,injury_description:string|null,injury_games_missed:int,from_teamid:int,team_name:string|null}> $rows */
+        $rows = $this->fetchAll($sql, "iiss", $startSeason, $endSeason, $start, $end);
+
+        $out = [];
+        foreach ($rows as $row) {
+            $teamName = $row['team_name'] ?? '';
+            $out[] = [
+                'pid'               => $row['pid'],
+                'name'              => $row['name'],
+                'date'              => $row['injury_date'],
+                'injuryDescription' => $row['injury_description'] ?? '',
+                'injuryGamesMissed' => $row['injury_games_missed'],
+                'teamid'            => $row['from_teamid'],
+                'teamName'          => $teamName,
+                'teamAbbrev'        => $teamName,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
      * Injuries dated inside [start, end], including ones already healed by the
      * window end. Feeds the per-game injury lists; active_injuries only holds
      * injuries still open at $end.

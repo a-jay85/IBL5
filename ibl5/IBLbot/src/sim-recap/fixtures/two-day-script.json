@@ -1,0 +1,114 @@
+{
+    "sim": 12,
+    "title": "2008-09, SIM #10",
+    "steps": [
+        {
+            "index": 0,
+            "kind": "thread_start",
+            "channel": "live_sims",
+            "content": "**2008-09, SIM #10**",
+            "mentionUsers": [],
+            "mentionRoles": [],
+            "delayBeforeMs": 0
+        },
+        {
+            "index": 1,
+            "kind": "thread_message",
+            "channel": "thread",
+            "content": "<@&793564717402554368> Let's do the darned thing!",
+            "mentionUsers": [],
+            "mentionRoles": [
+                "793564717402554368"
+            ],
+            "delayBeforeMs": 0
+        },
+        {
+            "index": 2,
+            "kind": "thread_message",
+            "channel": "thread",
+            "content": "Welcome to the sim.",
+            "mentionUsers": [],
+            "mentionRoles": [],
+            "delayBeforeMs": 30000
+        },
+        {
+            "index": 3,
+            "kind": "thread_message",
+            "channel": "thread",
+            "content": "**DAY 1**",
+            "mentionUsers": [],
+            "mentionRoles": [],
+            "delayBeforeMs": 30000
+        },
+        {
+            "index": 4,
+            "kind": "thread_message",
+            "channel": "thread",
+            "content": "Metros top Bulls 101-99, led by <@111111111111111111>.",
+            "mentionUsers": [
+                "111111111111111111"
+            ],
+            "mentionRoles": [],
+            "delayBeforeMs": 30000
+        },
+        {
+            "index": 5,
+            "kind": "thread_message",
+            "channel": "thread",
+            "content": "Stars beat Rockets 98-90.",
+            "mentionUsers": [],
+            "mentionRoles": [],
+            "delayBeforeMs": 30000
+        },
+        {
+            "index": 6,
+            "kind": "injuries",
+            "channel": "injuries",
+            "content": "**1/4/09**\n-B.Portis, MIN - left shoulder strain (4) <@123456789012345678>\n-Nene, DEN - sprained ankle (2)",
+            "mentionUsers": [
+                "123456789012345678"
+            ],
+            "mentionRoles": [],
+            "delayBeforeMs": 0
+        },
+        {
+            "index": 7,
+            "kind": "thread_message",
+            "channel": "thread",
+            "content": "**DAY 2**",
+            "mentionUsers": [],
+            "mentionRoles": [],
+            "delayBeforeMs": 120000
+        },
+        {
+            "index": 8,
+            "kind": "thread_message",
+            "channel": "thread",
+            "content": "Heat edge Jazz 88-87, thanks to <@222222222222222222>.",
+            "mentionUsers": [
+                "222222222222222222"
+            ],
+            "mentionRoles": [],
+            "delayBeforeMs": 30000
+        },
+        {
+            "index": 9,
+            "kind": "thread_message",
+            "channel": "thread",
+            "content": "================================================================================\n\n**WHERE THINGS STAND**\n\nStandings are in.",
+            "mentionUsers": [],
+            "mentionRoles": [],
+            "delayBeforeMs": 120000
+        },
+        {
+            "index": 10,
+            "kind": "gif",
+            "channel": "thread",
+            "content": "",
+            "mentionUsers": [],
+            "mentionRoles": [],
+            "delayBeforeMs": 30000,
+            "gifQuery": "game over"
+        }
+    ]
+}

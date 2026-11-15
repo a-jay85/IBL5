@@ -6,13 +6,18 @@ declare(strict_types=1);
  * CLI-only queue driver for the sim-recap pipeline.
  *
  * Usage: php ibl5/scripts/simRecapQueue.php <verb> [--sim=N] [--host=H] [--cause=C] [--reset=EPOCH] [--event=done]
+ *          [--title=TEXT] [--clear] [--retry]
  *   Verbs: claim-next --host=H | claim --sim=N --host=H | reclaim-stale
  *          | park --sim=N --host=H --cause=C [--reset=EPOCH]
  *          | notify --sim=N --host=H --event=done
  *          | find --sim=N | recent-themes | mention-map
+ *          | publish-enqueue --sim=N [--retry] | publish-title --sim=N (--title=TEXT | --clear)
+ *          | publish-script --sim=N
  *   H is mac|actions; C is flaky|usage_limit|auth|transport|prompt.
- *   One JSON object is emitted on stdout; bad argv writes
- *   "simRecapQueue: <message>" to stderr and exits 1 before any repo is built.
+ *   One JSON object is emitted on stdout (publish-script: the script, pretty-printed);
+ *   bad argv writes "simRecapQueue: <message>" to stderr and exits 1 before any repo is
+ *   built. The publish-* verbs exit 2 for bad argv instead, so a wrapper can tell a usage
+ *   error from a runtime failure.
  *
  * This is the queue half of the trust boundary (ADR-0093): the Mac-side tick
  * holds only a read-only MySQL credential and so cannot drive the queue over
@@ -63,6 +68,26 @@ function fail(string $msg): never
 {
     fwrite(STDERR, "simRecapQueue: {$msg}\n");
     exit(1);
+}
+
+/**
+ * Usage error from a publish-* verb: exit 2, so a wrapper tells it from a runtime failure.
+ */
+function failUsage(string $msg): never
+{
+    fwrite(STDERR, "simRecapQueue: {$msg}\n");
+    exit(2);
+}
+
+/**
+ * Reject a bad argument: exit 2 for the publish-* verbs, exit 1 for every other verb.
+ */
+function rejectArgument(?string $verb, string $msg): never
+{
+    if ($verb !== null && str_starts_with($verb, 'publish-')) {
+        failUsage($msg);
+    }
+    fail($msg);
 }
 
 /**
@@ -178,6 +203,9 @@ $host = null;
 $cause = null;
 $resetRaw = null;
 $event = null;
+$titleRaw = null;
+$clear = false;
+$retry = false;
 foreach (array_slice($argv ?? [], 1) as $arg) { // @phpstan-ignore ibl.unguardedArgvFlag (hand-guarded: fail() on unknown argument)
     if (!is_string($arg)) {
         continue;
@@ -192,26 +220,33 @@ foreach (array_slice($argv ?? [], 1) as $arg) { // @phpstan-ignore ibl.unguarded
         $resetRaw = substr($arg, 8);
     } elseif (str_starts_with($arg, '--event=')) {
         $event = substr($arg, 8);
+    } elseif (str_starts_with($arg, '--title=')) {
+        $titleRaw = substr($arg, 8);
+    } elseif ($arg === '--clear') {
+        $clear = true;
+    } elseif ($arg === '--retry') {
+        $retry = true;
     } elseif ($verb === null && !str_starts_with($arg, '--')) {
         $verb = $arg;
     } else {
-        fail("unexpected argument: {$arg}");
+        // A space-form value ("--title BRIDE") lands here as a second positional.
+        rejectArgument($verb, "unexpected argument: {$arg}");
     }
 }
 
 if ($verb === null) {
-    fail('a verb is required (claim-next|claim|reclaim-stale|park|notify|find|recent-themes|mention-map)');
+    fail('a verb is required (claim-next|claim|reclaim-stale|park|notify|find|recent-themes|mention-map|publish-enqueue|publish-title|publish-script)');
 }
 
 // Verbs that require --sim; parse and validate it once, here.
 $sim = null;
-if (in_array($verb, ['claim', 'park', 'notify', 'find'], true)) {
+if (in_array($verb, ['claim', 'park', 'notify', 'find', 'publish-enqueue', 'publish-title', 'publish-script'], true)) {
     if ($simRaw === null || !ctype_digit($simRaw)) {
-        fail("--sim=N (positive integer) is required for verb {$verb}");
+        rejectArgument($verb, "--sim=N (positive integer) is required for verb {$verb}");
     }
     $sim = (int) $simRaw;
     if ($sim < 1) {
-        fail('--sim must be >= 1');
+        rejectArgument($verb, '--sim must be >= 1');
     }
 }
 
@@ -249,10 +284,37 @@ if ($verb === 'notify') {
     fail("--event is not accepted for verb {$verb}");
 }
 
+// Publish verbs: --title, --clear and --retry belong to one verb each. All checks run
+// before any repository exists.
+$title = null;
+if ($verb === 'publish-title') {
+    if ($titleRaw !== null && $clear) {
+        failUsage('publish-title takes --title=TEXT or --clear, not both');
+    }
+    if ($titleRaw === null && !$clear) {
+        failUsage('publish-title needs --title=TEXT or --clear');
+    }
+    if ($titleRaw !== null) {
+        $title = trim($titleRaw);
+        if ($title === '') {
+            failUsage('publish-title: the title is blank');
+        }
+        if (mb_strlen($title) > 100) {
+            failUsage('publish-title: the title is longer than 100 characters');
+        }
+    }
+} elseif ($titleRaw !== null || $clear) {
+    rejectArgument($verb, 'the title and clear flags are accepted only for verb publish-title');
+}
+if ($retry && $verb !== 'publish-enqueue') {
+    rejectArgument($verb, 'the retry flag is accepted only for verb publish-enqueue');
+}
+
 // ── Dispatch ──────────────────────────────────────────────────────────────────
 \Discord\Discord::init(canonicalHost());
 $repo = new \SimRecap\SimSummaryRepository($db);
 $seasonQuery = new \Season\SeasonQueryRepository($db);
+$prettyOutput = false;
 
 switch ($verb) {
     case 'claim-next':
@@ -326,6 +388,16 @@ switch ($verb) {
         if ($row !== null && $row['status'] === 'done') {
             $prior = $row['notified_state'];
             $notified = postStatus($repo, $sim, $host, $prior, \SimRecap\ParkPolicy::notifyStateFor('done', $row['route'], $prior));
+            // Hand the finished sim to the Discord publisher. A failure here is logged and
+            // never changes the notify exit code or the admin-chat claim above.
+            try {
+                (new \SimRecap\PublishEnqueuer(
+                    new \SimRecap\SimPublishProgressRepository($db),
+                    \SimRecap\PublishEnqueuer::pokeIblbot(...)
+                ))->enqueue($sim, $seasonQuery->getSeasonPhase());
+            } catch (\Throwable $e) {
+                fwrite(STDERR, 'simRecapQueue: publish enqueue failed (' . get_class($e) . ")\n");
+            }
         }
         $out = ['ok' => true, 'cmd' => 'notify', 'sim' => $sim, 'notified' => $notified];
         break;
@@ -358,9 +430,55 @@ switch ($verb) {
         $out = ['ok' => true, 'cmd' => 'mention-map', 'teams' => $mentionMap->build()];
         break;
 
+    case 'publish-enqueue':
+        if (!is_int($sim)) {
+            fail('sim number is required for this verb');
+        }
+        $progress = new \SimRecap\SimPublishProgressRepository($db);
+        if ($retry) {
+            if (!$progress->resetForRetry($sim)) {
+                fail('not found or finished');
+            }
+            $result = 'reset';
+        } else {
+            $phase = $seasonQuery->getSeasonPhase();
+            $enqueuer = new \SimRecap\PublishEnqueuer($progress, \SimRecap\PublishEnqueuer::pokeIblbot(...));
+            $result = $enqueuer->enqueue($sim, $phase) ? 'enqueued' : 'skipped: phase ' . $phase;
+        }
+        $out = ['ok' => true, 'cmd' => 'publish-enqueue', 'sim' => $sim, 'result' => $result];
+        break;
+
+    case 'publish-title':
+        if (!is_int($sim)) {
+            fail('sim number is required for this verb');
+        }
+        (new \SimRecap\SimPublishProgressRepository($db))->setTitleOverride($sim, $title);
+        $out = ['ok' => true, 'cmd' => 'publish-title', 'sim' => $sim, 'title' => $title];
+        break;
+
+    case 'publish-script':
+        if (!is_int($sim)) {
+            fail('sim number is required for this verb');
+        }
+        // Read-only: builds and prints the script, claims nothing.
+        $saved = (new \SimRecap\SimPublishProgressRepository($db))->findForSim($sim);
+        $scriptBuilder = new \SimRecap\PublishScriptBuilder(
+            $repo,
+            new \SimRecap\SimRecapContextRepository($db),
+            new \SimRecap\MentionMapBuilder(new \Repositories\TeamIdentityRepository($db)),
+            $seasonQuery
+        );
+        try {
+            $out = $scriptBuilder->build($sim, $saved['title_override'] ?? null);
+        } catch (\SimRecap\PublishScriptUnavailable | \InvalidArgumentException $e) {
+            fail('no script for sim ' . $sim . ' (' . get_class($e) . ')');
+        }
+        $prettyOutput = true;
+        break;
+
     default:
         fail("unknown verb: {$verb}");
 }
 
-echo json_encode($out), "\n";
+echo json_encode($out, $prettyOutput ? JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES : 0), "\n";
 exit(0);

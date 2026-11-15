@@ -115,7 +115,7 @@ export async function runPublish(
             reconcilePending = false;
             const own = await deps.lastOwnMessage(channelId);
             if (own !== null) {
-                const same = step.kind === 'gif' ? own.content.startsWith('https://') : own.content === step.content;
+                const same = step.kind === 'gif' ? own.content.startsWith('https://') : own.content.trim() === step.content.trim();
                 if (same) alreadyPosted = own;
             }
         }

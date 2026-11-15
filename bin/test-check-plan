@@ -4850,11 +4850,11 @@ _corpus_guard_ok() {
     _cgo_other="$(printf '%s\n' "$_cgo_out" | awk '
         /^check-plan: violations in /{v=1; next}
         /^check-plan: /{v=0}
-        v && /^\[/ && !/^\[E\]/ && !/^\[AB\]/ && !/^\[CW\]/ && !/^\[V\].*unbalanced backtick after Phase 5\.0 strip/ && !/^\[V\].*does not parse as shell after Phase 5\.0 strip/ && !/^\[V\].*a bare bin\/fixtures\/ file path/ && !/^\[F\]## Critical Files entry has an absolute path/ && !/^\[H\].*no non-empty hold_trigger:/ {print}')"
+        v && /^\[/ && !/^\[E\]/ && !/^\[AB\]/ && !/^\[CW\]/ && !/^\[V\].*unbalanced backtick after Phase 5\.0 strip/ && !/^\[V\].*does not parse as shell after Phase 5\.0 strip/ && !/^\[V\].*a bare bin\/fixtures\/ file path/ && !/^\[F\] ## Critical Files entry has an absolute path/ && !/^\[H\].*no non-empty hold_trigger:/ {print}')"
     _cgo_dvio="$(printf '%s\n' "$_cgo_out" | awk '
         /^check-plan: violations in /{v=1; next}
         /^check-plan: /{v=0}
-        v && (/^\[E\]/ || /^\[AB\]/ || /^\[CW\]/ || /^\[V\].*unbalanced backtick after Phase 5\.0 strip/ || /^\[V\].*does not parse as shell after Phase 5\.0 strip/ || /^\[V\].*a bare bin\/fixtures\/ file path/ || /^\[F\]## Critical Files entry has an absolute path/ || /^\[H\].*no non-empty hold_trigger:/) {print}' | head -1)"
+        v && (/^\[E\]/ || /^\[AB\]/ || /^\[CW\]/ || /^\[V\].*unbalanced backtick after Phase 5\.0 strip/ || /^\[V\].*does not parse as shell after Phase 5\.0 strip/ || /^\[V\].*a bare bin\/fixtures\/ file path/ || /^\[F\] ## Critical Files entry has an absolute path/ || /^\[H\].*no non-empty hold_trigger:/) {print}' | head -1)"
     # Downgrade ONLY when: non-zero exit, zero non-downgradeable lines, and at
     # least one downgradeable line actually explains the failure. A non-zero exit
     # with no visible violation line still fails loudly instead of passing silently.

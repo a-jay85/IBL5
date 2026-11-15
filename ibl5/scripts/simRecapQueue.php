@@ -44,7 +44,7 @@ $_SERVER['SCRIPT_FILENAME'] = __FILE__;
 require_once __DIR__ . '/../vendor/autoload.php';
 
 // Worktree fix: vendor/ symlinks to the main repo, so PSR-4 resolves classes/
-// there; register the local classes/ dir so this worktree's code is used.
+// there; prepend the local classes/ loader so this worktree's code wins.
 $localClassesDir = realpath(__DIR__ . '/../classes');
 if ($localClassesDir !== false) {
     spl_autoload_register(static function (string $class) use ($localClassesDir): void {
@@ -52,7 +52,7 @@ if ($localClassesDir !== false) {
         if (file_exists($path)) {
             require_once $path;
         }
-    });
+    }, true, true);
 }
 
 require_once __DIR__ . '/../config.php';

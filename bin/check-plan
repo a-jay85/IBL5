@@ -485,7 +485,7 @@ _q_closed_by() {
 # not ONE runnable shell command, or nothing when it is. Shared by gate V and
 # gate [XM]'s check: override so both obey the same rules.
 gatev_nonrunnable() {
-    local MC_LOC="$1" _bad _probe _stripped _bt_ct
+    local MC_LOC="$1" _bad _probe _stripped _bt_ct _syn
     _bad=""
     # A `...` between two ref-ish tokens is a git range (origin/master...HEAD),
     # not an elision — mask ranges before testing. Corpus-verified: without this
@@ -512,6 +512,8 @@ gatev_nonrunnable() {
         _bad="an unbound <placeholder> — bind it with \$(…) or a \$VAR that has a stated default"
     elif printf '%s' "$MC_LOC" | grep -qE '^(ibl5|tests|engine|\.claude|\.github)/[^ ]+$'; then
         _bad="a bare file path with no command verb (reclassify the row, or run it)"
+    elif printf '%s' "$MC_LOC" | grep -qE '^bin/fixtures/[^ ]+$'; then
+        _bad="a bare bin/fixtures/ file path with no command verb (reclassify the row, or run it)"
     elif printf '%s' "$MC_LOC" | grep -qiE '^(SELECT|INSERT|UPDATE|DELETE|ALTER|CREATE[[:space:]]+TABLE|DROP)[[:space:]]'; then
         _bad="bare SQL — wrap it in bin/db-query"
     elif printf '%s' "$MC_LOC" | grep -qiE '^(same[[:space:]]|re-run)'; then
@@ -520,6 +522,13 @@ gatev_nonrunnable() {
         _bad="a /path/to placeholder — bind the real path with \$(git rev-parse --show-toplevel) or a \$VAR that has a stated default"
     elif [ "$(( _bt_ct % 2 ))" -ne 0 ]; then
         _bad="unbalanced backtick after Phase 5.0 strip — prose after the closing backtick causes bash -c to exit 2 (unexpected EOF); move description outside the backticks or into a shell comment inside them: \`cmd # description\`"
+    elif ! _syn=$(printf '%s\n' "$_stripped" | bash -n 2>&1); then
+        # Phase 5.0 hands the stripped cell to bash -c, which parses the whole
+        # string before running any of it, so a cell bash -n rejects can never
+        # run. bash -n only parses; the cell is never executed here. Keep the
+        # first error line and drop its "bash: " prefix.
+        _syn=$(printf '%s\n' "$_syn" | head -1 | sed 's/^bash: //')
+        _bad="does not parse as shell after Phase 5.0 strip (bash -n: ${_syn}); move prose out of the backticks, or into a shell comment inside them: \`cmd # description\`"
     fi
     printf '%s' "$_bad"
 }
@@ -665,7 +674,7 @@ while IFS= read -r row; do
     if printf '%s' "$low" | grep -qE 'cli[- ]executable' && matrix_split "$row"; then
         _bad=$(gatev_nonrunnable "$MC_LOC")
         if [ -n "$_bad" ]; then
-            viol "[V] CLI-executable row (row ${MC_NUM:-?}) has a non-runnable location cell: \"${MC_LOC}\" — ${_bad}. It must be a single shell command. Not accepted: 'Phase N' pointers, '...' ellipsis, '<placeholder>' tokens, bare file paths, bare SQL. Valid examples: bin/check-docs / grep -c 'FunctionName' ibl5/classes/Foo.php / python3 -c \"import sys; sys.exit(0)\""
+            viol "[V] CLI-executable row (row ${MC_NUM:-?}) has a non-runnable location cell: \"${MC_LOC}\" — ${_bad}. It must be a single shell command. Not accepted: 'Phase N' pointers, '...' ellipsis, '<placeholder>' tokens, bare file paths, bare SQL, cells that fail bash -n. Valid examples: bin/check-docs / grep -c 'FunctionName' ibl5/classes/Foo.php / python3 -c \"import sys; sys.exit(0)\""
         elif [ "$MHDR_PIPES" -gt 0 ] && [ "$MC_PIPES" -gt "$MHDR_PIPES" ]; then
             viol "[V] CLI-executable row (row ${MC_NUM:-?}) has ${MC_PIPES} structural pipes where the matrix header has ${MHDR_PIPES} — a pipe inside a cell must be written \\| or the cell parses truncated, and /post-plan Phase 5.0 then runs the truncated command: ${row}"
         fi

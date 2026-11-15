@@ -707,10 +707,10 @@ else
 fi
 
 _ARGV_D2="$(cat "$CASE/dm.argv" 2>/dev/null)"
-if grep -qF -- '--ping' <<< "$_ARGV_D2" && grep -qF -- '--chunk' <<< "$_ARGV_D2"; then
-    ok "D2b new-problem DM carries --ping and --chunk"
+if grep -qF -- '--error' <<< "$_ARGV_D2" && grep -qF -- '--chunk' <<< "$_ARGV_D2"; then
+    ok "D2b new-problem DM carries --error and --chunk"
 else
-    fail "D2b new-problem DM argv lacks --ping/--chunk: '$_ARGV_D2'"
+    fail "D2b new-problem DM argv lacks --error/--chunk: '$_ARGV_D2'"
 fi
 
 _run_d234 2026-09-28
@@ -1043,7 +1043,7 @@ bpc_set 1 'SIGNAL: botkey:missing — no active ibl_api_keys row' 'VERDICT: degr
 run_checker
 eq "B1 rc 1" 1 "$RC"
 eq "B1 one botkey:missing FAIL line" 1 "$(count_fail bug-pipeline:botkey:missing)"
-has "B1 dm argv" "$(cat "$CASE/dm.argv" 2>/dev/null)" "--ping --chunk -"
+has "B1 dm argv" "$(cat "$CASE/dm.argv" 2>/dev/null)" "--error --chunk -"
 has "B1 dm body" "$(cat "$CASE/dm.log" 2>/dev/null)" "bug pipeline botkey:missing — no active ibl_api_keys row"
 eq "B1 stamp holds today" 2026-09-28 "$(head -1 "$CASE/logs/stamps/bug-pipeline_botkey_missing" 2>/dev/null)"
 

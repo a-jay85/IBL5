@@ -8,7 +8,7 @@ paths:
 
 # Shell Portability
 
-## BSD vs GNU `date` — use `_date_ago()`
+## BSD vs GNU `date`: use `_date_ago()`
 
 macOS ships BSD `date`; Linux CI ships GNU `date`. Arithmetic date flags differ:
 
@@ -17,7 +17,7 @@ macOS ships BSD `date`; Linux CI ships GNU `date`. Arithmetic date flags differ:
 | `date -d '7 days ago'` | `date -v-7d` |
 | `date --date='...'` | no `--date` flag |
 
-**Fix:** use the `_date_ago <N>` helper in `bin/automouse/run` (N = number of days; days are hardcoded) — it detects the platform and emits a portable timestamp. Never write raw `date -d` or `date -v` in scripts that run on both.
+**Fix:** use the `_date_ago <N>` helper in `bin/automouse/run` (N = number of days; days are hardcoded). It detects the platform and emits a portable timestamp. Never write raw `date -d` or `date -v` in scripts that run on both.
 
 ## BSD vs GNU `stat`: GNU form first
 
@@ -49,7 +49,7 @@ No gate checks this. A text lint cannot tell a lock `mkdir` from a plain directo
 
 ## SSH commands must be single-line strings
 
-Never emit a bare `ssh host` followed by commands on separate lines — those subsequent lines run **locally** (or are eaten as ssh stdin), not on the remote:
+Never emit a bare `ssh host` followed by commands on separate lines. Those later lines run **locally** on the Mac, or ssh eats them as stdin:
 
 ```bash
 # WRONG — echo runs on the Mac, never reaches the server
@@ -70,11 +70,11 @@ Assume a narrow terminal (~80 chars). Any shell command exceeding ~80 characters
 
 ## Skill inline bash: each block is an isolated shell
 
-In `.claude/skills/**/*.md` skill files, every fenced `bash` block runs in a separate shell process — **variable assignments do not persist between blocks**. Do not set a variable in block 1 and read it in block 2. Either:
+In `.claude/skills/**/*.md` skill files, every fenced `bash` block runs in a separate shell process, so a variable set in one block is gone in the next. Do not set a variable in block 1 and read it in block 2. Either:
 - Use a single block for the whole sequence, or
 - Persist state to a temp file between blocks.
 
-**JSON output from skill bash:** use `printf` not `echo -e` for JSON strings — `echo -e` interprets escape sequences inconsistently across shells (`\n` in dash vs. bash). `printf '%s\n' "$json"` is safe everywhere.
+**JSON output from skill bash:** use `printf` instead of `echo -e` for JSON strings. `echo -e` interprets escape sequences inconsistently across shells (`\n` in dash vs. bash). `printf '%s\n' "$json"` is safe everywhere.
 
 ## Shellcheck only the scripts you changed
 

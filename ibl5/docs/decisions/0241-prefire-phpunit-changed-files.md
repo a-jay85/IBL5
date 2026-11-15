@@ -1,6 +1,6 @@
 ---
-description: bin/lib/prefire-verify runs only the PHPUnit tests mapped to the branch's changed files, falls back to the full suite on any shared input or mapping error, and skips when nothing PHPUnit-relevant changed. Partially supersedes ADR-0227.
-last_verified: 2026-11-11
+description: bin/lib/prefire-verify runs only the PHPUnit tests mapped to the branch's changed files, falls back to the full suite on any shared input or mapping error, and skips when nothing PHPUnit-relevant changed. Partially supersedes ADR-0227. A 2026-11-14 addendum leaves database-group tests to CI and fails a subset run that executes no tests.
+last_verified: 2026-11-14
 ---
 
 # ADR-0241: Run only the PHPUnit tests tied to the branch's changed files in prefire-verify
@@ -57,3 +57,18 @@ ADR-0227 ran the full default PHPUnit suite in the prefire phpunit stage. This A
 - `ibl5/docs/decisions/0227-prefire-verify-gate.md`
 - `ibl5/docs/decisions/0237-prefire-drop-local-infection.md`
 - `.claude/rules/workflow-continuity.md`
+
+## Addendum (2026-11-14): database-group tests are left to CI
+
+PHPUnit's default run excludes the `database` group (`ibl5/phpunit.xml`, `<groups><exclude>`). Every test file under `ibl5/tests/DatabaseIntegration/` carries that group at class level, so a subset run that targets one executes nothing. On 2026-11-14, a PHPUnit run on the single file `tests/DatabaseIntegration/ActivityTrackerRepositoryTest.php` printed `No tests executed!` and exited 0. A change whose only mapped test sat in that folder passed the stage with zero tests run.
+
+The stage changes in two ways.
+
+1. `prefire_phpunit_select` drops every target under `tests/DatabaseIntegration/` after it collects and deduplicates the list. Each dropped file is recorded as deferred, and the stage prints `phpunit deferred to CI: database-group test left to the CI db-integration job: <path>`. When the drop empties the list, the stage takes its existing skip path and runs no PHPUnit. CI's `db-integration` job in `.github/workflows/tests.yml` runs these tests with the database group enabled.
+2. A subset run whose log holds `No tests executed!` fails with exit 1 and writes no pass record. This catches any other filter that empties a run, such as a file whose methods all carry a method-level database group. Full-suite runs keep their old behavior.
+
+Detection keys on the path prefix and reads no file. Files outside that folder that tag single methods with `@group database` stay in the list, because their other methods still run.
+
+The owner decided on 2026-11-14 that prefire never runs database tests locally. The stage adds no local database run or seed load. `ibl5/phpunit.xml`, the full-suite run, the exit codes, and the tree-hash pass records keep their behavior. The DB probe (`PREFIRE_DB_PROBE_CMD`) stays, because the matrix-evidence stage uses it; the phpunit stage never called it.
+
+The skip line still reads `deferred to CI, which runs the full suite`. For a database test the per-file line names the job that runs it.

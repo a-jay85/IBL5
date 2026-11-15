@@ -1,5 +1,5 @@
 {
-  "captured": "2026-11-14",
+  "captured": "2026-11-15",
   "source": "every ibl5/migrations/*.sql up file (with its .down.sql) and *.php file, replayed as an added-file diff",
   "before_one_way": [
     "000_baseline_schema.sql",
@@ -84,7 +84,8 @@
     "188_retag_preseason_box_score_game_type.sql",
     "193_drop_trade_queue.sql",
     "210_asw_stale_rows_allstar_awards_backfill.sql",
-    "212_asw_2008_allstar_winners_mvps.sql"
+    "212_asw_2008_allstar_winners_mvps.sql",
+    "216_awards_double_quote_names.sql"
   ],
   "flips": {
     "067_add_trade_table_foreign_keys.sql": "DELETE FROM ibl_trade_info and ibl_trade_cash: trade tables are not in REBUILDABLE_TABLES",
@@ -103,6 +104,7 @@
     "175_repair_mistaken_waiver_moves.sql": "DELETE FROM nuke_stories: news rows are not in REBUILDABLE_TABLES",
     "185_delete_blank_slot_schedule_guard_rejects.sql": "DELETE FROM schedule_guard_rejects: not in REBUILDABLE_TABLES",
     "210_asw_stale_rows_allstar_awards_backfill.sql": "DELETE FROM ibl_jsb_allstar_rosters: not in REBUILDABLE_TABLES",
-    "212_asw_2008_allstar_winners_mvps.sql": "multi-table DELETE p FROM ibl_awards: target unreadable, fails closed"
+    "212_asw_2008_allstar_winners_mvps.sql": "multi-table DELETE p FROM ibl_awards: target unreadable, fails closed",
+    "216_awards_double_quote_names.sql": "multi-table DELETE q FROM ibl_awards: target unreadable, fails closed"
   }
 }

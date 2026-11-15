@@ -23,7 +23,8 @@
 //
 // Usage:
 //   bin/vr-build-gallery --base-sha=<sha> [--actuals=ibl5/vr-actuals] \
-//     [--out-dir=ibl5/vr-gallery] [--gallery-json=ibl5/vr-gallery.json]
+//     [--out-dir=ibl5/vr-gallery] [--gallery-json=ibl5/vr-gallery.json] \
+//     [--rendered-dir=ibl5/vr-rendered]
 import {
   readFileSync,
   writeFileSync,
@@ -36,6 +37,7 @@ import {
 import { resolve, dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { execFileSync } from 'child_process';
+import { renderedViewFields } from '../ibl5/tests/e2e/vr-recorder/rendered-views';
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dir, '..'); // bin/ is at repo root; .. == repo root
@@ -49,18 +51,23 @@ type Viewport = 'desktop' | 'mobile';
 type GalleryCell = { module: string; viewport: Viewport; title: string; verdict: string; isNew?: boolean; strict?: true };
 
 const USAGE =
-  'Usage: bin/vr-build-gallery --base-sha=SHA [--actuals=PATH] [--out-dir=PATH] [--gallery-json=PATH]';
+  'Usage: bin/vr-build-gallery --base-sha=SHA [--actuals=PATH] [--out-dir=PATH] [--gallery-json=PATH] [--rendered-dir=DIR]';
 
 let baseSha: string | null = null;
 let actualsDir = 'ibl5/vr-actuals';
 let outDir = 'ibl5/vr-gallery';
 let galleryJsonPath = 'ibl5/vr-gallery.json';
+let renderedDir: string | null = null;
 
 for (const arg of process.argv.slice(2)) {
   if (arg.startsWith('--base-sha=')) baseSha = arg.slice('--base-sha='.length);
   else if (arg.startsWith('--actuals=')) actualsDir = arg.slice('--actuals='.length);
   else if (arg.startsWith('--out-dir=')) outDir = arg.slice('--out-dir='.length);
   else if (arg.startsWith('--gallery-json=')) galleryJsonPath = arg.slice('--gallery-json='.length);
+  else if (arg.startsWith('--rendered-dir=')) {
+    renderedDir = arg.slice('--rendered-dir='.length);
+    if (renderedDir === '') { console.error('--rendered-dir= needs a directory'); process.exit(2); }
+  }
   else if (arg === '--help') {
     process.stdout.write(USAGE + '\n');
     process.exit(0);
@@ -280,6 +287,7 @@ writeFileSync(
       // Screens the VR run rendered. Zero means no actuals, so bin/vr-review-comment
       // keeps the PR-body block instead of clearing it.
       renderedCells: titles.length,
+      ...renderedViewFields(renderedDir === null ? null : resolve(repoRoot, renderedDir), titles),
     },
     null,
     2,

@@ -460,6 +460,7 @@ jobs:
         run: |
           bin/vr-build-gallery \
             --actuals=ibl5/vr-actuals \
+            --rendered-dir=ibl5/vr-rendered \
             --base-sha="$VRCTX_BASE_SHA" \
             --out-dir=ibl5/vr-gallery \
             --gallery-json=ibl5/vr-gallery.json
@@ -818,6 +819,12 @@ jobs:
       - name: Stop Docker containers
         if: always()
         run: docker compose -f docker-compose.ci.yml down
+
+      - name: Assert VR gallery lists rendered View files
+        if: always() && steps.vr-gallery.outcome == 'success'
+        run: |
+          bun ibl5/tests/e2e/vr-recorder/rendered-views-selftest.ts
+          bun ibl5/tests/e2e/vr-recorder/assert-gallery.ts ibl5/vr-gallery.json
 
   api-e2e:
     name: API E2E Tests (Vitest)

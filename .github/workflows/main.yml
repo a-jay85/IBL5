@@ -246,4 +246,4 @@ jobs:
       - name: Send Discord DM
         uses: ./.github/actions/notify-discord
         with:
-          webhook-url: ${{ secrets.DISCORD_DEV_WEBHOOK_URL }}
+          webhook-url: ${{ secrets.DISCORD_ERRORS_WEBHOOK_URL }}

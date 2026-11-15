@@ -507,6 +507,7 @@ run_wh() { # <statuses> ...dm-args  -> W_OUT / W_RC
     W_OUT=$(CURL_STATUSES="$st" DM_CAPTURE="$R_CAP" DISCORD_DM_TO="$OWNER_ID" \
         DISCORD_DM_CURL_BIN="$CURL_STUB" DISCORD_DM_SSH_BIN="$SSH_CODE" \
         DISCORD_DM_WEBHOOK_FILE="${WH_FILE:-$FAKE_WEBHOOK_FILE}" DISCORD_DM_SPOOL="$SPOOL" \
+        DISCORD_DM_ERRORS_WEBHOOK_FILE="${EWH_FILE:-$TMP/absent-errors-webhook-url}" \
         "$DM" --attempts 3 "$@" 2>&1); W_RC=$?
 }
 curl_calls() { grep -c '^ARGV:' "$CURL_CAP"; }
@@ -545,33 +546,11 @@ run_wh 200 "@everyone <@1> x"
 [ "$(body 1 | jq -r '.content | startswith("<@")')" = false ] \
     && ok "W5: no ping prefix by default" || fail "W5: content starts with a mention"
 
-# W6/W7: --ping mentions the owner on chunk 1 only; every body suppresses embeds.
-run_wh 200,200,200,200 --ping --chunk - < "$FIXTURE"
-[ "$(body 1 | jq -r '.content | startswith("<@283183467804491776> ")')" = true ] \
-    && ok "W6: chunk 1 carries the owner mention" || fail "W6: chunk 1 has no mention"
-[ "$(body 1 | jq -c '.allowed_mentions.users')" = '["283183467804491776"]' ] \
-    && ok "W6: chunk 1 allows only the owner ID (string)" || fail "W6: chunk 1 allowed_mentions.users wrong"
-[ "$(body 2 | jq -r '.content | startswith("(2/")')" = true ] \
-    && ok "W6: chunk 2 has no mention prefix" || fail "W6: chunk 2 content wrong"
-[ "$(body 2 | jq -c '.allowed_mentions.parse')" = '[]' ] \
-    && ok "W6: chunk 2 allows no mentions" || fail "W6: chunk 2 allowed_mentions wrong"
-W7_BAD=0
-while IFS= read -r line; do
-    jq -e '.flags == 4' <<< "$line" >/dev/null 2>&1 || W7_BAD=$(( W7_BAD + 1 ))
-done < <(sed -n 's/^BODY://p' "$CURL_CAP")
-[ "$W7_BAD" = 0 ] && ok "W7: every webhook body sets flags=4" || fail "W7: $W7_BAD bodies missing flags=4"
-
 # W8: the URL reaches curl only through the stdin config, never argv, never output.
 run_wh 200 "hi"
 want_not "W8: URL is not in curl argv" "$(grep '^ARGV:' "$CURL_CAP")" "example.invalid"
 want "W8: URL arrives via the -K - config" "$(grep '^CONF:' "$CURL_CAP")" "url = \"$FAKE_WEBHOOK_URL?wait=true\""
 want_not "W8: a failed send never echoes the URL" "$W4_LEAK" "example.invalid"
-
-# W9: --ping is rejected with --raw and in --flag=value form, before any send.
-run_wh 200 --ping --raw --route /discordPlanReviewDM - <<< '{}'
-[ "$W_RC" = 2 ] && [ "$(curl_calls)" = 0 ] && ok "W9: --ping --raw exits 2, no curl" || fail "W9: --ping --raw rc=$W_RC curl=$(curl_calls)"
-run_wh 200 --ping=1 "x"
-[ "$W_RC" = 2 ] && [ "$(curl_calls)" = 0 ] && ok "W9: --ping=1 exits 2, no curl" || fail "W9: --ping=1 rc=$W_RC curl=$(curl_calls)"
 
 # W10: a malformed webhook file falls back to the DM without echoing the URL.
 printf '%s\n' 'https://ex.invalid/a"b' > "$TMP/bad-webhook-url"
@@ -608,10 +587,94 @@ want "W11b: spool records the failed status" "$(cat "$SPOOL")" "http=000"
 want_not "W11b: no command-not-found" "$W11B_OUT" "command not found"
 rm -f "$HOME/.iblbot-dev-webhook-url"
 
-# W12: --ping adds nothing on the ssh fallback.
-WH_FILE="$TMP/absent-webhook-url" run_wh 200 --ping "hi"
-want_not "W12: ssh body carries no mention" "$(cat "$R_CAP")" "<@"
-[ "$(curl_calls)" = 0 ] && ok "W12: fallback never ran curl" || fail "W12: curl ran"
+# -- --error: failure notices go to the #errors webhook, then #dev, then the DM --
+FAKE_ERRORS_URL="https://discord.com/api/webhooks/2/errors-token"
+FAKE_ERRORS_FILE="$TMP/errors-webhook-url"
+printf '%s\n' "$FAKE_ERRORS_URL" > "$FAKE_ERRORS_FILE"
+
+# E1: --error with a valid errors file posts to the errors URL, not the dev URL.
+EWH_FILE="$FAKE_ERRORS_FILE" run_wh 200 --error "deploy broke"
+[ "$W_RC" = 0 ] && ok "E1: --error exits 0" || fail "E1: exit $W_RC"
+[ "$(curl_calls)" = 1 ] && ok "E1: one curl call" || fail "E1: $(curl_calls) curl calls"
+want "E1: config holds the errors URL" "$(grep '^CONF:' "$CURL_CAP")" "url = \"$FAKE_ERRORS_URL?wait=true\""
+want_not "E1: config does not hold the dev URL" "$(grep '^CONF:' "$CURL_CAP")" "example.invalid"
+
+# E2: --error with no errors file falls back to the #dev URL.
+EWH_FILE="$TMP/absent-errors-webhook-url" run_wh 200 --error "deploy broke"
+[ "$W_RC" = 0 ] && ok "E2: missing errors file still delivers" || fail "E2: exit $W_RC"
+want "E2: config holds the dev URL" "$(grep '^CONF:' "$CURL_CAP")" "url = \"$FAKE_WEBHOOK_URL?wait=true\""
+[ ! -s "$R_CAP" ] && ok "E2: ssh never ran" || fail "E2: ssh ran"
+
+# E3: a malformed errors file falls back to the #dev URL without echoing the bad value.
+printf '%s\n' 'http://bad' > "$TMP/bad-errors-url"
+EWH_FILE="$TMP/bad-errors-url" run_wh 200 --error "deploy broke"
+[ "$W_RC" = 0 ] && ok "E3: malformed errors file still delivers" || fail "E3: exit $W_RC"
+want "E3: config holds the dev URL" "$(grep '^CONF:' "$CURL_CAP")" "url = \"$FAKE_WEBHOOK_URL?wait=true\""
+want "E3: stderr names the malformed errors file" "$W_OUT" "errors webhook file malformed"
+want_not "E3: stderr omits the bad value" "$W_OUT" "http://bad"
+
+# E4: --error with neither webhook file reaches the IBLbot DM; curl never runs.
+EWH_FILE="$TMP/absent-errors-webhook-url" WH_FILE="$TMP/absent-webhook-url" run_wh 200 --error "deploy broke"
+[ "$W_RC" = 0 ] && ok "E4: no webhook files still delivers" || fail "E4: exit $W_RC"
+[ "$(curl_calls)" = 0 ] && ok "E4: curl never ran" || fail "E4: $(curl_calls) curl calls"
+want "E4: the ssh DM ran" "$(cat "$R_CAP")" "http://localhost:50000/discordDM"
+want_not "E4: ssh body carries no mention" "$(cat "$R_CAP")" "<@"
+
+# E5: a non-owner recipient stays on the DM path even with --error.
+: > "$CURL_CAP"; rm -f "$CURL_N"; : > "$R_CAP"
+DM_CAPTURE="$R_CAP" DISCORD_DM_TO="$FAKE_TO" DISCORD_DM_CURL_BIN="$CURL_STUB" \
+    DISCORD_DM_SSH_BIN="$SSH_CODE" DISCORD_DM_WEBHOOK_FILE="$FAKE_WEBHOOK_FILE" \
+    DISCORD_DM_ERRORS_WEBHOOK_FILE="$FAKE_ERRORS_FILE" DISCORD_DM_SPOOL="$SPOOL" \
+    "$DM" --quiet --error "note" >/dev/null 2>&1
+[ "$(curl_calls)" = 0 ] && ok "E5: non-owner --error never ran curl" || fail "E5: curl ran"
+want "E5: non-owner --error used the ssh DM" "$(cat "$R_CAP")" "http://localhost:50000/discordDM"
+
+# E6: --error with --raw is a usage error before any send.
+EWH_FILE="$FAKE_ERRORS_FILE" run_wh 200 --error --raw --route /x - <<< '{}'
+[ "$W_RC" = 2 ] && [ "$(curl_calls)" = 0 ] && [ ! -s "$R_CAP" ] \
+    && ok "E6: --error --raw exits 2, no send" || fail "E6: rc=$W_RC curl=$(curl_calls)"
+want "E6: names the exclusion" "$W_OUT" "--raw and --error are mutually exclusive"
+
+# E7: --error=1 is rejected as an unknown flag.
+EWH_FILE="$FAKE_ERRORS_FILE" run_wh 200 --error=1 "x"
+[ "$W_RC" = 2 ] && [ "$(curl_calls)" = 0 ] && [ ! -s "$R_CAP" ] \
+    && ok "E7: --error=1 exits 2, no send" || fail "E7: rc=$W_RC curl=$(curl_calls)"
+
+# E8: the removed --ping flag fails loudly.
+EWH_FILE="$FAKE_ERRORS_FILE" run_wh 200 --ping "x"
+[ "$W_RC" = 2 ] && [ "$(curl_calls)" = 0 ] && [ ! -s "$R_CAP" ] \
+    && ok "E8: --ping exits 2, no send" || fail "E8: rc=$W_RC curl=$(curl_calls)"
+
+# E9: unset and empty DISCORD_DM_ERRORS_WEBHOOK_FILE both use the $HOME default.
+# Mutation check: switching the default to ${VAR-…} (no colon) makes the empty case fail.
+printf '%s\n' "$FAKE_ERRORS_URL" > "$HOME/.iblbot-errors-webhook-url"
+: > "$CURL_CAP"; rm -f "$CURL_N"
+DISCORD_DM_ERRORS_WEBHOOK_FILE="" DISCORD_DM_WEBHOOK_FILE="$FAKE_WEBHOOK_FILE" DISCORD_DM_TO="$OWNER_ID" \
+    DISCORD_DM_CURL_BIN="$CURL_STUB" DISCORD_DM_SSH_BIN="$SSH_CODE" DISCORD_DM_SPOOL="$SPOOL" \
+    DM_CAPTURE="$R_CAP" "$DM" --quiet --error "hi" >/dev/null 2>&1
+want "E9: empty errors-file var uses the default path" "$(grep '^CONF:' "$CURL_CAP")" "$FAKE_ERRORS_URL"
+: > "$CURL_CAP"; rm -f "$CURL_N"
+env -u DISCORD_DM_ERRORS_WEBHOOK_FILE DISCORD_DM_WEBHOOK_FILE="$FAKE_WEBHOOK_FILE" DISCORD_DM_TO="$OWNER_ID" \
+    DISCORD_DM_CURL_BIN="$CURL_STUB" DISCORD_DM_SSH_BIN="$SSH_CODE" DISCORD_DM_SPOOL="$SPOOL" \
+    DM_CAPTURE="$R_CAP" "$DM" --quiet --error "hi" >/dev/null 2>&1
+want "E9: unset errors-file var uses the default path" "$(grep '^CONF:' "$CURL_CAP")" "$FAKE_ERRORS_URL"
+rm -f "$HOME/.iblbot-errors-webhook-url"
+
+# E10: every --error payload allows no mentions, suppresses embeds and has no <@.
+EWH_FILE="$FAKE_ERRORS_FILE" run_wh 200,200,200,200 --error --chunk - < "$FIXTURE"
+E10_N=0; E10_BAD=0
+while IFS= read -r line; do
+    E10_N=$(( E10_N + 1 ))
+    jq -e '.flags == 4 and .allowed_mentions == {"parse": []} and (.content | contains("<@") | not)' \
+        <<< "$line" >/dev/null 2>&1 || E10_BAD=$(( E10_BAD + 1 ))
+done < <(sed -n 's/^BODY://p' "$CURL_CAP")
+[ "$E10_N" -gt 1 ] && ok "E10: --error --chunk sent $E10_N bodies" || fail "E10: only $E10_N bodies"
+[ "$E10_BAD" = 0 ] && ok "E10: every body has flags=4, parse=[] and no <@" || fail "E10: $E10_BAD bad bodies"
+
+# E11: --help documents --error and no longer mentions --ping.
+E11_OUT=$("$DM" --help 2>&1)
+want "E11: help names --error" "$E11_OUT" "--error"
+want_not "E11: help omits --ping" "$E11_OUT" "--ping"
 
 # -- notify-discord action: send.sh with a stub curl ---------------------------
 SEND="$ROOT/.github/actions/notify-discord/send.sh"
@@ -676,24 +739,18 @@ ACT_URL='https://ex.invalid/a"b' run_act 200 true false "$ACT_MSG"
 [ "$A_RC" = 1 ] && [ "$(act_calls)" = 0 ] && ok "A7: malformed URL exits 1, no call" || fail "A7: rc=$A_RC calls=$(act_calls)"
 want_not "A7: malformed URL is not echoed" "$(grep -v '^::add-mask::' <<< "$A_OUT")" "ex.invalid"
 
-# A8: ping mentions the owner; no ping cannot mention anyone. Both suppress embeds.
+# A8: send.sh never mentions anyone, even with a stray PING=true in the env.
 run_act 200 true true "$ACT_MSG"
-[ "$(act_body 1 | jq -r '.content | startswith("<@283183467804491776> ")')" = true ] \
-    && ok "A8: ping content carries the owner mention" || fail "A8: ping content wrong"
-[ "$(act_body 1 | jq -c '.allowed_mentions.users')" = '["283183467804491776"]' ] \
-    && ok "A8: ping allows only the owner ID (string)" || fail "A8: ping allowed_mentions wrong"
-[ "$(act_body 1 | jq '.flags')" = 4 ] && ok "A8: ping body sets flags=4" || fail "A8: ping body flags wrong"
+[ "$(act_body 1 | jq -c '.allowed_mentions')" = '{"parse":[]}' ] \
+    && ok "A8: stray PING=true still allows no mentions" || fail "A8: allowed_mentions wrong"
+[ "$(act_body 1 | jq -r '.content | contains("<@")')" = false ] \
+    && ok "A8: stray PING=true content has no mention" || fail "A8: content has a mention"
+[ "$(act_body 1 | jq '.flags')" = 4 ] && ok "A8: body sets flags=4" || fail "A8: body flags wrong"
 run_act 200 true false "$ACT_MSG"
 [ "$(act_body 1 | jq -c '.allowed_mentions.parse')" = '[]' ] \
-    && ok "A8: no-ping allows no mentions" || fail "A8: no-ping allowed_mentions wrong"
+    && ok "A8: default allows no mentions" || fail "A8: default allowed_mentions wrong"
 [ "$(act_body 1 | jq -r '.content | startswith("<@")')" = false ] \
-    && ok "A8: no-ping content has no mention" || fail "A8: no-ping content has a mention"
-[ "$(act_body 1 | jq '.flags')" = 4 ] && ok "A8: no-ping body sets flags=4" || fail "A8: no-ping body flags wrong"
-
-# A9: a ping typo is an error, not a silent "false".
-run_act 200 true yes "$ACT_MSG"
-[ "$A_RC" = 1 ] && [ "$(act_calls)" = 0 ] && ok "A9: ping=yes exits 1, no call" || fail "A9: rc=$A_RC calls=$(act_calls)"
-want "A9: names the ping error" "$A_OUT" "::error::ping must be true or false"
+    && ok "A8: default content has no mention" || fail "A8: default content has a mention"
 
 # A10: the URL reaches curl only through the stdin config; the log masks it.
 run_act 200 true false "$ACT_MSG"

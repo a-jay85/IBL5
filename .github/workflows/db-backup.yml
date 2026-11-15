@@ -265,8 +265,7 @@ jobs:
         continue-on-error: true
         uses: ./.github/actions/notify-discord
         with:
-          webhook-url: ${{ secrets.DISCORD_DEV_WEBHOOK_URL }}
-          ping: 'true'
+          webhook-url: ${{ secrets.DISCORD_ERRORS_WEBHOOK_URL }}
 
       - name: Ship phase-snapshot tooling to prod
         if: ${{ !cancelled() }}
@@ -306,8 +305,7 @@ jobs:
         continue-on-error: true
         uses: ./.github/actions/notify-discord
         with:
-          webhook-url: ${{ secrets.DISCORD_DEV_WEBHOOK_URL }}
-          ping: 'true'
+          webhook-url: ${{ secrets.DISCORD_ERRORS_WEBHOOK_URL }}
           fail-on-delivery: 'false'
 
   notify-backup-failure:
@@ -331,8 +329,7 @@ jobs:
         continue-on-error: true
         uses: ./.github/actions/notify-discord
         with:
-          webhook-url: ${{ secrets.DISCORD_DEV_WEBHOOK_URL }}
-          ping: 'true'
+          webhook-url: ${{ secrets.DISCORD_ERRORS_WEBHOOK_URL }}
           fail-on-delivery: 'false'
 
   purge-audit-log:
@@ -384,6 +381,5 @@ jobs:
         continue-on-error: true
         uses: ./.github/actions/notify-discord
         with:
-          webhook-url: ${{ secrets.DISCORD_DEV_WEBHOOK_URL }}
-          ping: 'true'
+          webhook-url: ${{ secrets.DISCORD_ERRORS_WEBHOOK_URL }}
           fail-on-delivery: 'false'

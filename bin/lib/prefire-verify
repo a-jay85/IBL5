@@ -204,11 +204,13 @@ stage_matrix() {
         return 1
     fi
 
-    # DB probe, once, before the first DB-touching row.
+    # DB probe, once, before the first DB-touching row. A parse-only row
+    # (`bash -n bin/db-test-up`) names a DB script without running it.
     local db_re="$PLAN_ROW_DB_RE"
     local first_db_num="" first_db_cmd=""
     while IFS=$'\t' read -r num cmd; do
         [ -n "$num" ] || continue
+        is_parse_only_cmd "$cmd" && continue
         if grep -Eq -- "$db_re" <<< "$cmd"; then first_db_num="$num"; first_db_cmd="$cmd"; break; fi
     done <<< "$rows"
     if [ -n "$first_db_num" ]; then

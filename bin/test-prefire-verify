@@ -63,6 +63,7 @@ new_case() {
     mkdir -p "$R/ibl5/vendor/bin" "$R/tools/postplan-harness" "$CNT" "$D/stubs"
     export CNT
     unset STUB_PHPUNIT_RC STUB_PHPUNIT_OUT STUB_MUT_MODE STUB_PYTEST_RC STUB_PYTEST_PREREQ_RC
+    unset STUB_PHPUNIT_RC STUB_MUT_MODE STUB_PYTEST_RC STUB_PYTEST_PREREQ_RC PREFIRE_SHELL_BUDGET STUB_SLOW_A_SLEEP
     cat > "$R/ibl5/vendor/bin/phpunit" <<'EOF'
 #!/usr/bin/env bash
 echo run >> "$CNT/phpunit"
@@ -169,6 +170,257 @@ pytest_case() {
 want_pytest_args() { # <exact last argv line the pytest stub recorded>
     local got; got=$(tail -n 1 "$CNT/pytest_args" 2>/dev/null)
     [ "$got" = "$1" ] || note "pytest args expected '$1', got '$got'"
+}
+
+# shell_case: new_case plus a committed harness-legs.txt and stub harnesses on master, then branch feat.
+# Every stub appends "<name>:<SHELL_SHARD>" to $CNT/shell_runs; test-red exits 1;
+# test-slow-a sleeps STUB_SLOW_A_SLEEP seconds, then appends "test-slow-a:end".
+shell_case() {
+    new_case
+    (
+        cd "$R" || exit 1
+        mkdir -p bin/lib bin/automouse .github/workflows
+        cat > .github/workflows/harness-legs.txt <<'LEGS'
+# Legs fixture for the shell stage.
+#1 bin/test-commented
+0 SHELL_SHARD=0/2 bin/test-sharded
+1 SHELL_SHARD=1/2 bin/test-sharded
+0 bin/test-usage-gate
+0 bin/test-usage-gate-extra
+1 bin/test-caller
+1 bin/test-automouse-queue
+exempt bin/test-exempted needs a macOS run loop
+0 bin/test-slow-a
+1 bin/test-slow-b
+0 bin/test-red
+LEGS
+        cat > bin/test-caller <<'STUB'
+#!/usr/bin/env bash
+printf '%s:%s\n' "${0##*/}" "${SHELL_SHARD:-}" >> "$CNT/shell_runs"
+case "${0##*/}" in
+    test-slow-a) sleep "${STUB_SLOW_A_SLEEP:-0}"; printf 'test-slow-a:end\n' >> "$CNT/shell_runs" ;;
+    test-red) exit 1 ;;
+esac
+exit 0
+STUB
+        chmod +x bin/test-caller
+        for t in sharded usage-gate usage-gate-extra automouse-queue exempted slow-a slow-b commented named-step red; do
+            cp bin/test-caller "bin/test-$t"
+        done
+        for s in caller sharded slow-a slow-b red exempted commented named-step lonely; do
+            printf '#!/bin/sh\n' > "bin/$s"
+        done
+        printf '#!/bin/sh\n' > bin/lib/usage-gate.sh
+        printf '#!/bin/sh\n' > bin/automouse/queue
+        git add -A && git commit -q -m shell && git checkout -q -b feat
+    ) || { echo "HARNESS-SETUP: shell fixture failed" >&2; exit 2; }
+}
+want_runs() { # <expected shell_runs line>...; order-insensitive; no args means nothing ran
+    local got want=""
+    got=$(sort "$CNT/shell_runs" 2>/dev/null | tr '\n' ' ')
+    [ "$#" -eq 0 ] || want=$(printf '%s\n' "$@" | sort | tr '\n' ' ')
+    [ "$got" = "$want" ] || note "shell runs expected '$want', got '$got'"
+}
+edit_bin() { local p; for p in "$@"; do printf '# edit\n' >> "$R/$p"; done; }
+
+case_shell_name_mapping() {
+    shell_case
+    edit_bin bin/caller bin/automouse/queue
+    run_gate --stage shell
+    want_rc 0
+    want_runs "test-caller:" "test-automouse-queue:"
+    want_out "shell mode: subset (2 harness lines, budget 300 s)"
+}
+
+case_shell_lib_mapping() {
+    shell_case
+    edit_bin bin/lib/usage-gate.sh
+    run_gate --stage shell
+    want_rc 0
+    want_runs "test-usage-gate:"
+    want_out "shell mode: subset (1 harness lines, budget 300 s)"
+    want_out "shell passed (1 harness lines run, 0 deferred to CI over the budget)"
+}
+
+case_shell_self_mapping() {
+    shell_case
+    edit_bin bin/test-caller
+    run_gate --stage shell
+    want_rc 0
+    want_runs "test-caller:"
+}
+
+case_shell_dedupe() {
+    shell_case
+    edit_bin bin/caller bin/test-caller
+    run_gate --stage shell
+    want_rc 0
+    want_runs "test-caller:"
+    want_out "shell mode: subset (1 harness lines"
+}
+
+case_shell_unmapped_deferral() {
+    local passes
+    shell_case
+    edit_bin bin/lonely bin/named-step
+    run_gate --stage shell
+    want_rc 0
+    want_runs
+    want_out "shell deferred to CI: no harness named bin/test-lonely for bin/lonely"
+    want_out "shell deferred to CI: no .github/workflows/harness-legs.txt line for bin/test-named-step (changed: bin/named-step); CI runs it outside the legs matrix"
+    want_out "shell mode: skipped (no changed bin/ file has a local harness line (notes: 2))"
+    passes=$(pass_files '\.shell\..*\.pass$')
+    [ -z "$passes" ] || note "shell pass record written: $passes"
+}
+
+case_shell_near_misses() {
+    shell_case
+    edit_bin bin/commented bin/lib/usage-gate.shim
+    run_gate --stage shell
+    want_rc 0
+    want_runs
+    want_out "line for bin/test-commented"
+    want_out "no harness named bin/test-usage-gate.shim"
+    edit_bin bin/lib/usage-gate.sh
+    rm -f "$CNT/shell_runs"
+    run_gate --stage shell
+    want_rc 0
+    want_runs "test-usage-gate:"
+}
+
+case_shell_shard_lines() {
+    shell_case
+    edit_bin bin/sharded
+    run_gate --stage shell
+    want_rc 0
+    want_runs "test-sharded:0/2" "test-sharded:1/2"
+    want_out "shell mode: subset (2 harness lines"
+}
+
+case_shell_exempt_lines() {
+    shell_case
+    edit_bin bin/exempted
+    run_gate --stage shell
+    want_rc 0
+    want_runs
+    want_out "shell exempt, not run: bin/test-exempted (needs a macOS run loop)"
+}
+
+case_shell_no_bin_change_skips() {
+    local passes
+    shell_case
+    edit_bin ibl5/tracked.txt bin/README.md
+    run_gate --stage shell
+    want_rc 0
+    want_runs
+    want_out "shell mode: skipped (no bin/ path changed against master)"
+    passes=$(pass_files '\.shell\..*\.pass$')
+    [ -z "$passes" ] || note "shell pass record written: $passes"
+}
+
+case_shell_budget_deferral() {
+    local d last
+    shell_case
+    d=$(state_dir); mkdir -p "$d"
+    printf '1\tbin/test-slow-a\n1\tbin/test-slow-b\n' > "$d/shell-durations.tsv"
+    edit_bin bin/slow-a bin/slow-b
+    export PREFIRE_SHELL_BUDGET=2 STUB_SLOW_A_SLEEP=3
+    run_gate --stage shell
+    unset PREFIRE_SHELL_BUDGET STUB_SLOW_A_SLEEP
+    want_rc 0
+    want_runs "test-slow-a:" "test-slow-a:end"
+    want_out "shell deferred to CI: bin/test-slow-b would pass the local budget (estimate 1 s, spent "
+    last=$(grep -F "bin/test-slow-a" "$d/shell-durations.tsv" | tail -n 1 | cut -f1)
+    [ "${last:-0}" -ge 3 ] || note "slow-a duration not recorded as 3 s or more (got '${last:-}')"
+    # A run that deferred a line writes no pass record, so a rerun with a bigger budget runs it.
+    [ "$(pass_files '\.shell\.subset-' | wc -l | tr -d ' ')" -eq 0 ] || note "expected no shell pass file after a deferral"
+    PREFIRE_SHELL_BUDGET=100 run_gate --stage shell
+    want_rc 0
+    want_runs "test-slow-a:" "test-slow-a:end" "test-slow-a:" "test-slow-a:end" "test-slow-b:"
+    [ "$(pass_files '\.shell\.subset-' | wc -l | tr -d ' ')" -eq 1 ] || note "expected one shell subset pass file after the full rerun"
+}
+
+case_shell_budget_default_estimate() {
+    local passes
+    shell_case
+    edit_bin bin/caller
+    PREFIRE_SHELL_BUDGET=100 run_gate --stage shell
+    want_rc 0
+    want_runs
+    want_out "shell deferred to CI: bin/test-caller would pass the local budget (estimate 120 s, spent 0 s of 100 s)"
+    want_out "shell mode: skipped (all 1 harness lines deferred over the 100 s budget)"
+    passes=$(pass_files '\.shell\..*\.pass$')
+    [ -z "$passes" ] || note "shell pass record written: $passes"
+}
+
+case_shell_pass_record_reuse() {
+    local n st
+    shell_case
+    edit_bin bin/caller
+    run_gate --stage shell
+    want_rc 0
+    n=$(pass_files '\.shell\.subset-[0-9a-f]{12}\.pass$' | wc -l | tr -d ' ')
+    [ "$n" -eq 1 ] || note "expected one shell pass record, got $n"
+    run_gate --stage shell
+    want_rc 0
+    want_out "shell pass cached for tree"
+    want_runs "test-caller:"
+    st=$(git -C "$R" status --porcelain)
+    [ "$st" = " M bin/caller" ] || note "git status expected ' M bin/caller', got '$st'"
+    edit_bin bin/sharded
+    run_gate --stage shell
+    want_rc 0
+    want_runs "test-caller:" "test-caller:" "test-sharded:0/2" "test-sharded:1/2"
+}
+
+case_shell_red_fails_closed() {
+    local passes
+    shell_case
+    edit_bin bin/caller bin/red
+    run_gate --stage shell
+    want_rc 1
+    want_out "FAIL shell: bin/test-red red (exit 1)"
+    want_runs "test-caller:" "test-red:"
+    passes=$(pass_files '\.shell\..*\.pass$')
+    [ -z "$passes" ] || note "shell pass record written: $passes"
+}
+
+case_shell_budget_unset() {
+    shell_case
+    edit_bin bin/caller
+    run_gate --stage shell
+    want_rc 0
+    want_out "budget 300 s"
+}
+
+case_shell_budget_empty() {
+    shell_case
+    edit_bin bin/caller
+    export PREFIRE_SHELL_BUDGET=
+    run_gate --stage shell
+    unset PREFIRE_SHELL_BUDGET
+    want_rc 0
+    want_out "budget 300 s"
+}
+
+case_shell_budget_rejects_bad() {
+    local v
+    shell_case
+    edit_bin bin/caller
+    for v in abc 0 010 10000; do
+        rm -f "$CNT/shell_runs"
+        PREFIRE_SHELL_BUDGET="$v" run_gate --stage shell
+        want_rc 2
+        want_out "PREFIRE_SHELL_BUDGET must be a whole number of seconds from 1 to 9999"
+        want_runs
+    done
+}
+
+case_shell_stage_rejects_unknown() {
+    shell_case
+    run_gate --stage shells
+    want_rc 2
+    want_out "--stage must be matrix, phases, phpunit, pytest, shell, exec-mutations, or all (got 'shells')"
 }
 
 # write_plan <row-line>...  — each argument is a full table row.
@@ -436,7 +688,7 @@ test_all_never_invokes_infection() {
     chmod +x "$R/bin/mutation-diff" "$R/ibl5/bin/check-infection-excludes"
     run_gate --plan "$PLAN"
     want_rc 0
-    want_out "all requested stages passed (phases matrix phpunit pytest)"
+    want_out "all requested stages passed (phases matrix phpunit pytest shell)"
     want_cnt mutation 0
     want_cnt excludes 0
     [ ! -e "$D/mutation-diff-called" ] || note "bin/mutation-diff ran under --stage all"
@@ -866,7 +1118,7 @@ case_fire_point_skips_exec_mutations() {
     OUT=$(cd "$R" && PREFIRE_EXEC_MUTATIONS_LIB="$D/stubs/xmlib-sentinel" "$GATE" --base master --plan "$PLAN" --fire-point 2>&1); RC=$?
     want_rc 0
     refute_out "exec-mutations passed"
-    want_out "all requested stages passed (phases matrix phpunit pytest)"
+    want_out "all requested stages passed (phases matrix phpunit pytest shell)"
     [ ! -e "$D/xmlib-called" ] || note "plan-exec-mutations ran at the fire point"
 }
 
@@ -1190,7 +1442,7 @@ test_xm_bad_stage_rejected() {
     new_case
     run_gate --stage exec_mutations
     want_rc 2
-    want_out "--stage must be matrix, phases, phpunit, pytest, exec-mutations, or all"
+    want_out "--stage must be matrix, phases, phpunit, pytest, shell, exec-mutations, or all"
 }
 
 test_help_lists_exec_mutations() {
@@ -1866,7 +2118,7 @@ test_stage_rejects_unknown_name_lists_pytest() {
     new_case
     run_gate --stage pytests
     want_rc 2
-    want_out "--stage must be matrix, phases, phpunit, pytest, exec-mutations, or all (got 'pytests')"
+    want_out "--stage must be matrix, phases, phpunit, pytest, shell, exec-mutations, or all (got 'pytests')"
 }
 
 test_pytest_all_includes_pytest_stage() {
@@ -1875,7 +2127,7 @@ test_pytest_all_includes_pytest_stage() {
     touch_file tools/postplan-harness/tests/test_unrelated.py
     run_gate --plan "$PLAN"
     want_rc 0
-    want_out "all requested stages passed (phases matrix phpunit pytest)"
+    want_out "all requested stages passed (phases matrix phpunit pytest shell)"
     want_cnt pytest 1
 }
 
@@ -1951,7 +2203,7 @@ test_phases_all_order_runs_phases_first() {
     green_plan
     run_gate --plan "$PLAN"
     want_rc 0
-    want_out 'all requested stages passed (phases matrix phpunit pytest)'
+    want_out 'all requested stages passed (phases matrix phpunit pytest shell)'
 }
 
 # phases_real_case: new_case plus a tracked src/a.txt, the real harness symlinked
@@ -2148,6 +2400,23 @@ case_ci_row_skipped_locally
 case_unclear_row_runs_locally
 case_fire_point_skips_exec_mutations
 case_row_sorter_near_misses
+case_shell_name_mapping
+case_shell_lib_mapping
+case_shell_self_mapping
+case_shell_dedupe
+case_shell_unmapped_deferral
+case_shell_near_misses
+case_shell_shard_lines
+case_shell_exempt_lines
+case_shell_no_bin_change_skips
+case_shell_budget_deferral
+case_shell_budget_default_estimate
+case_shell_pass_record_reuse
+case_shell_red_fails_closed
+case_shell_budget_unset
+case_shell_budget_empty
+case_shell_budget_rejects_bad
+case_shell_stage_rejects_unknown
 test_base_without_value_exits_2
 test_phpunit_subset_runs_mapped_class_tests
 test_phpunit_root_class_maps_top_level_test

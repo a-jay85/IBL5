@@ -40,7 +40,7 @@ class PlayerPageControllerTest extends WideUnitTestCase
         return new PlayerPageController(
             $this->mockDb,
             $this->stubRepo,
-            new PlayerPageService($this->mockDb, $this->stubRepo),
+            new PlayerPageService(),
             $request ?? new HttpRequest(),
             null,
             $playerRepository,

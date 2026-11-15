@@ -15,7 +15,7 @@
 # sleep guarantees the two runners' phases overlap in wall-clock time, so this
 # exercises real concurrent claiming, not accidental serialization.
 #
-# Platform split: the log-isolation and day-reader blocks below are portable and
+# Platform split: the log-isolation, day-reader and lying-mkdir blocks below are portable and
 # run on Linux CI (tests.yml job harness-tests). Everything after the
 # `uname != Darwin` check (paused-held locks, the two-runner concurrent run,
 # assertions 1-9) is macOS-only, because automouse-run uses `caffeinate`,
@@ -115,56 +115,6 @@ out=$(day_logs "$DL" 2026-09-13); rc=$?
 rm -rf "$ISO"
 if [ "$H_FAIL" -ne 0 ]; then echo "RESULT: FAILED (log isolation)"; exit 1; fi
 
-if [ "$(uname)" != "Darwin" ]; then
-    echo "SKIP: test-automouse-concurrency is macOS-only (automouse-run depends on launchd/BSD tools). On Linux CI only the portable log-isolation block above ran."
-    exit 0
-fi
-
-# --- Paused-held locks (ADR-0143) -------------------------------------------
-# A claim lock whose owner pid is dead and whose mtime is past LOCK_TTL_SECS is normally
-# stolen. A `paused-held` breadcrumb naming a session that still has a pause marker
-# (or was cleared inside the TTL) keeps the lock: the usage gate will resume that session.
-PH="$(mktemp -d)"
-PH_SID="aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa"
-ph_probe() { # $1 = setup snippet; prints "claimed=<plan> rc=<n>"
-    (
-        set -u
-        export IBL5_USAGE_GATE_STATE_DIR="$PH/state"
-        rm -rf "$PH/state"
-        mkdir -p "$PH/state/markers" "$PH/state/cleared"
-        # These are read by the claim_next_plan body eval'd below.
-        # shellcheck disable=SC2034
-        QUEUE_DIR="$PH/queue"; LOG="$PH/log"; LOCK_TTL_SECS=60
-        # shellcheck disable=SC2034
-        CAP_DEFERRED=" "; DEPENDS_HELD=" "; SINGLE_PLAN=""; RESUME_PLAN=""; RESUME_SID=""
-        # shellcheck source=/dev/null
-        . "$GATE_LIB"
-        # claim_next_plan iterates queue_entries_ordered from lib-queue-order.
-        # shellcheck source=bin/automouse/lib-queue-order
-        . "$(dirname "$GATE_LIB")/../automouse/lib-queue-order"
-        eval "$(iso_region claim_next_plan)"
-        rm -rf "$QUEUE_DIR"; mkdir -p "$QUEUE_DIR"
-        : > "$QUEUE_DIR/held.md"
-        mkdir "$QUEUE_DIR/held.md.lock"
-        echo 999999 > "$QUEUE_DIR/held.md.lock/pid"
-        printf '%s\n' "$PH_SID" > "$QUEUE_DIR/held.md.lock/paused-held"
-        touch -t 202001010000 "$QUEUE_DIR/held.md.lock"
-        eval "$1"
-        out=$(claim_next_plan); rc=$?
-        printf 'claimed=%s rc=%s\n' "$(basename "$out")" "$rc"
-    )
-}
-out=$(ph_probe 'printf "{}" > "$IBL5_USAGE_GATE_STATE_DIR/markers/$PH_SID.json"')
-[ "$out" = "claimed= rc=1" ] && h_pass "paused-held lock with a live marker is not stolen" \
-    || { h_fail "paused-held + marker: got '$out'"; exit 1; }
-out=$(ph_probe 'date +%s > "$IBL5_USAGE_GATE_STATE_DIR/cleared/$PH_SID"')
-[ "$out" = "claimed= rc=1" ] && h_pass "paused-held lock cleared inside the TTL is not stolen" \
-    || { h_fail "paused-held + fresh cleared stamp: got '$out'"; exit 1; }
-out=$(ph_probe 'echo 1577836800 > "$IBL5_USAGE_GATE_STATE_DIR/cleared/$PH_SID"')
-[ "$out" = "claimed=held.md rc=0" ] && h_pass "paused-held lock cleared past the TTL is stolen" \
-    || { h_fail "paused-held + old cleared stamp: got '$out'"; exit 1; }
-rm -rf "$PH"
-
 # --- Lying-mkdir cases (uutils mkdir may report success to both racers) ------
 # The stub's mkdir always exits 0, so only the O_EXCL claim file can pick a winner.
 # A matrix row greps the bare line `ok <name>`; a failure prints `FAIL <name> ...`.
@@ -240,6 +190,56 @@ else
 fi
 rm -rf "$LM"
 if [ "$H_FAIL" -ne 0 ]; then echo "RESULT: FAILED (lying-mkdir cases)"; exit 1; fi
+
+if [ "$(uname)" != "Darwin" ]; then
+    echo "SKIP: test-automouse-concurrency is macOS-only (automouse-run depends on launchd/BSD tools). On Linux CI only the portable log-isolation and lying-mkdir blocks above ran."
+    exit 0
+fi
+
+# --- Paused-held locks (ADR-0143) -------------------------------------------
+# A claim lock whose owner pid is dead and whose mtime is past LOCK_TTL_SECS is normally
+# stolen. A `paused-held` breadcrumb naming a session that still has a pause marker
+# (or was cleared inside the TTL) keeps the lock: the usage gate will resume that session.
+PH="$(mktemp -d)"
+PH_SID="aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa"
+ph_probe() { # $1 = setup snippet; prints "claimed=<plan> rc=<n>"
+    (
+        set -u
+        export IBL5_USAGE_GATE_STATE_DIR="$PH/state"
+        rm -rf "$PH/state"
+        mkdir -p "$PH/state/markers" "$PH/state/cleared"
+        # These are read by the claim_next_plan body eval'd below.
+        # shellcheck disable=SC2034
+        QUEUE_DIR="$PH/queue"; LOG="$PH/log"; LOCK_TTL_SECS=60
+        # shellcheck disable=SC2034
+        CAP_DEFERRED=" "; DEPENDS_HELD=" "; SINGLE_PLAN=""; RESUME_PLAN=""; RESUME_SID=""
+        # shellcheck source=/dev/null
+        . "$GATE_LIB"
+        # claim_next_plan iterates queue_entries_ordered from lib-queue-order.
+        # shellcheck source=bin/automouse/lib-queue-order
+        . "$(dirname "$GATE_LIB")/../automouse/lib-queue-order"
+        eval "$(iso_region claim_next_plan)"
+        rm -rf "$QUEUE_DIR"; mkdir -p "$QUEUE_DIR"
+        : > "$QUEUE_DIR/held.md"
+        mkdir "$QUEUE_DIR/held.md.lock"
+        echo 999999 > "$QUEUE_DIR/held.md.lock/pid"
+        printf '%s\n' "$PH_SID" > "$QUEUE_DIR/held.md.lock/paused-held"
+        touch -t 202001010000 "$QUEUE_DIR/held.md.lock"
+        eval "$1"
+        out=$(claim_next_plan); rc=$?
+        printf 'claimed=%s rc=%s\n' "$(basename "$out")" "$rc"
+    )
+}
+out=$(ph_probe 'printf "{}" > "$IBL5_USAGE_GATE_STATE_DIR/markers/$PH_SID.json"')
+[ "$out" = "claimed= rc=1" ] && h_pass "paused-held lock with a live marker is not stolen" \
+    || { h_fail "paused-held + marker: got '$out'"; exit 1; }
+out=$(ph_probe 'date +%s > "$IBL5_USAGE_GATE_STATE_DIR/cleared/$PH_SID"')
+[ "$out" = "claimed= rc=1" ] && h_pass "paused-held lock cleared inside the TTL is not stolen" \
+    || { h_fail "paused-held + fresh cleared stamp: got '$out'"; exit 1; }
+out=$(ph_probe 'echo 1577836800 > "$IBL5_USAGE_GATE_STATE_DIR/cleared/$PH_SID"')
+[ "$out" = "claimed=held.md rc=0" ] && h_pass "paused-held lock cleared past the TTL is stolen" \
+    || { h_fail "paused-held + old cleared stamp: got '$out'"; exit 1; }
+rm -rf "$PH"
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 ROOT="$(mktemp -d)"

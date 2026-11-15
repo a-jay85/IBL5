@@ -57,7 +57,7 @@ function rejected(result: ReturnType<typeof collectRenderedViews>, reason: strin
 
 const playerRecords = (): CellRecord[] => [
   rec('player', 'player-desktop', [FLIP, BUTTONS]),
-  rec('player', 'player-mobile', [BUTTONS]),
+  rec('player', 'player-mobile', [FLIP, BUTTONS]),
 ];
 
 check('union-sorted-deduped', () => {

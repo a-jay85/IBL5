@@ -23,8 +23,9 @@ jobs:
   deploy:
     runs-on: ubuntu-26.04
     environment:
+      # environment.url takes the first attempt's page_url and falls back to the retry's.
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment-retry.outputs.page_url }}
     steps:
       - name: Checkout gh-pages (the durable per-SHA accumulator)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -68,8 +69,25 @@ jobs:
         with:
           path: pages
 
+      # First attempt. It may fail without ending the job, so the retry below can run.
+      # Runs 43577635637, 43572748971, 43116851679 and 42925648471 failed here with
+      # "No artifacts named github-pages were found" 0.5-1 s after the upload finalized.
+      # A failed step under continue-on-error reports conclusion=success, so the two
+      # steps below gate on outcome, which keeps the real result.
       - name: Deploy to GitHub Pages
         id: deployment
+        continue-on-error: true
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+
+      - name: Wait before retrying the Pages deploy
+        id: deploy-retry-wait
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 60
+
+      # Second and last attempt. It carries no continue-on-error, so a failure here fails the job.
+      - name: Retry the Pages deploy after a failed first attempt
+        id: deployment-retry
+        if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
 
       - name: Assert a per-SHA gallery serves HTTP 200
@@ -77,9 +95,10 @@ jobs:
         working-directory: pages
         env:
           ARTIFACT_BYTES: ${{ steps.size.outputs.bytes }}
+          PAGE_URL: ${{ steps.deployment.outputs.page_url || steps.deployment-retry.outputs.page_url }}
         run: |
           set -euo pipefail
-          base="${{ steps.deployment.outputs.page_url }}"
+          base="${PAGE_URL}"
           base="${base%/}"
           # newest committed <sha>/visual-review/ dir on the checked-out gh-pages tree
           newest=""

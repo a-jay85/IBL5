@@ -31,10 +31,5 @@ interface SalaryCapRepositoryInterface
 
     public function getPositionSalaryCommitmentNextYear(string $teamName, string $position, int $excludePlayerID): int;
 
-    /**
-     * @return array{current: int, nextYear: int}
-     */
-    public function getTeamSalarySummary(string $teamName): array;
-
     public function getTeamCapSpaceNextSeason(string $teamName): int;
 }

@@ -93,7 +93,7 @@ class PlayerViewFactory
      */
     public function createRegularSeasonTotalsView(): PlayerRegularSeasonTotalsView
     {
-        return new PlayerRegularSeasonTotalsView($this->statsRepository);
+        return new PlayerRegularSeasonTotalsView($this->statsRepository, $this->seasonTableRenderer);
     }
 
     /**
@@ -101,7 +101,7 @@ class PlayerViewFactory
      */
     public function createRegularSeasonAveragesView(): PlayerRegularSeasonAveragesView
     {
-        return new PlayerRegularSeasonAveragesView($this->statsRepository);
+        return new PlayerRegularSeasonAveragesView($this->statsRepository, $this->seasonTableRenderer);
     }
 
     /**

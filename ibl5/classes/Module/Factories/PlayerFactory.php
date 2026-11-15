@@ -48,7 +48,7 @@ final class PlayerFactory implements ModuleFactoryInterface
         return new \Player\PlayerPageController(
             $db,
             $commonRepo,
-            new \Player\PlayerPageService($db, $commonRepo),
+            new \Player\PlayerPageService(),
             $this->services->request()
         );
     }

@@ -85,7 +85,7 @@ try {
     exit(1);
 }
 
-// Only ids, counts, and table labels print. The account's name and address never do.
+// Only ids, counts, table labels, and vacated team names print. The account's name and address never do.
 echo "delete-account: user id {$report->userId}\n";
 echo $report->dryRun
     ? "DRY RUN: nothing changed; rerun with --confirm to delete.\n"

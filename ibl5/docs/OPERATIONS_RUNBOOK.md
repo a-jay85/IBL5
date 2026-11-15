@@ -541,7 +541,7 @@ Until the script reaches prod through promote-to-production, the nightly job pri
    php ibl5/bin/delete-account --user-id=7 --confirm
    ```
 
-Exit codes: 0 done, 1 failed and rolled back, 2 bad flags or no database, 3 unknown id. The output prints ids, counts, and table names only. It never prints the account's name or email address.
+Exit codes: 0 done, 1 failed and rolled back, 2 bad flags or no database, 3 unknown id. The output prints ids, counts, table names, and the name of each team left without a GM. It never prints the account's name or email address.
 
 The script deletes the account's rows in the auth tables (confirmations, OTPs, 2FA, remember-me tokens, password resets, audit log), `ibl_api_keys`, and `ibl_google_sheet_connections`. It sets `admin_id` to NULL on audit rows the account wrote about other users. It sets `ibl_events.username` and `ibl_team_info.gm_username` to NULL where they match the account's username. The `auth_users` row goes last.
 

@@ -31,6 +31,7 @@
 #   1  a check failed (the message names the matrix row or the stage)
 #      (an exec-mutations row that did not trip, or a mutation revert that failed)
 #      (a phases-stage MISSING-PHASE item: a plan phase whose cited files the diff never touched)
+#      (a phpunit subset run whose log reports No tests executed!)
 #   2  usage error, including --plan with an empty value (omit the flag when there is no plan)
 #   3  prerequisite missing: vendor/bin/phpunit, python3 -m pytest, docker, the DB container, gtimeout/timeout
 #   4  the checks changed the working tree, so no pass record was written
@@ -44,6 +45,7 @@
 #
 # Environment:
 #   PREFIRE_PHPUNIT_FULL=1  run the full suite; 0, empty or unset maps files to tests and defers unmapped files to CI
+#                           and leaves tests under ibl5/tests/DatabaseIntegration/ to CI's db-integration job
 
 set -uo pipefail
 

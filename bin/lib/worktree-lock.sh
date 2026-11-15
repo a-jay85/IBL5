@@ -89,8 +89,9 @@ wtlock_stale() {
 wtlock_create() {
     mkdir "$1" 2>/dev/null || return 1
     claim_file "$1/pid" printf '%s\n' "$2" && return 0
-    # A lost claim leaves the winner's pid in place; only clean up a dir whose pid never landed.
-    [ -e "$1/pid" ] || rm -rf "$1"
+    # A lost claim leaves the winner's pid in place. A failed write (full disk) leaves an
+    # empty pid file after noclobber created it; clean up a dir whose pid never landed.
+    [ -s "$1/pid" ] || rm -rf "$1"
     return 1
 }
 

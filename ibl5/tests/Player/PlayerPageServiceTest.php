@@ -7,19 +7,14 @@ namespace Tests\Player;
 use PHPUnit\Framework\TestCase;
 use Player\PlayerPageService;
 use Player\Player;
-use Repositories\Contracts\TeamIdentityRepositoryInterface;
-use Tests\WideUnit\Mocks\MockDatabase;
 
 class PlayerPageServiceTest extends TestCase
 {
-    private MockDatabase $db;
     private PlayerPageService $service;
 
     protected function setUp(): void
     {
-        // Mock database connection
-        $this->db = new MockDatabase();
-        $this->service = new PlayerPageService($this->db, self::createStub(TeamIdentityRepositoryInterface::class));
+        $this->service = new PlayerPageService();
     }
 
     public function testCanShowRenegotiationButtonReturnsTrueWhenAllConditionsMet(): void

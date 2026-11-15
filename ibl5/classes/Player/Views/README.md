@@ -11,10 +11,7 @@ All Player Views use centralized CSS defined in `design/components/player-views.
 ## Architecture
 
 ```
-PlayerPageService
-    ├── PlayerRepository (mysqli-ready)
-    ├── PlayerStatsRepository
-    └── PlayerViewFactory
+PlayerViewFactory
             ├── PlayerOverviewView
             ├── PlayerAwardsAndNewsView
             ├── PlayerSimStatsView
@@ -30,6 +27,8 @@ PlayerPageService
             └── PlayerOneOnOneView
 ```
 
+PlayerPageController builds PlayerStatsRepository and PlayerViewFactory itself, and PlayerPageService only answers renegotiation and rookie-option eligibility questions.
+
 ## Basic Usage
 
 ### Setup
@@ -38,13 +37,13 @@ PlayerPageService
 <?php
 // In your module (e.g., 2003olympics/modules/Player/index.php)
 
-use Player\PlayerPageService;
+use Player\PlayerRepository;
+use Player\Stats\PlayerStatsRepository;
+use Player\Views\PlayerViewFactory;
 
-// Initialize service (automatically creates repository and view factory)
-$playerService = new PlayerPageService($db);
-
-// Get view factory
-$viewFactory = $playerService->getViewFactory();
+$playerRepository = new PlayerRepository($db);
+$statsRepository = new PlayerStatsRepository($db);
+$viewFactory = new PlayerViewFactory($playerRepository, $statsRepository, $commonRepo);  // $commonRepo is a TeamIdentityRepositoryInterface
 ```
 
 ### Using Individual Views
@@ -127,14 +126,17 @@ echo $viewFactory->createOlympicAveragesView()->render($player->name);
 // modules/Player/index.php
 
 use Player\Player;
-use Player\PlayerPageService;
+use Player\PlayerRepository;
+use Player\Stats\PlayerStatsRepository;
+use Player\Views\PlayerViewFactory;
 
 // Initialize
 $playerID = (int) $_GET['pid'];
 $spec = (int) $_GET['spec'];
 
-$playerService = new PlayerPageService($db);
-$viewFactory = $playerService->getViewFactory();
+$playerRepository = new PlayerRepository($db);
+$statsRepository = new PlayerStatsRepository($db);
+$viewFactory = new PlayerViewFactory($playerRepository, $statsRepository, $commonRepo);  // $commonRepo is a TeamIdentityRepositoryInterface
 
 $player = Player::withPlayerID($db, $playerID);
 

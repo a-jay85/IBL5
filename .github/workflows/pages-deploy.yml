@@ -23,6 +23,7 @@ jobs:
   deploy:
     runs-on: ubuntu-26.04
     environment:
+      # environment.url takes the first attempt's page_url and falls back to the retry's.
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url || steps.deployment-retry.outputs.page_url }}
     steps:

@@ -766,15 +766,14 @@ run_act 200 true false "$TMP/act-big.txt"
 [ "$(act_body 1 | jq -r '.content | endswith("(truncated)")')" = true ] \
     && ok "A11: capped content ends with the marker" || fail "A11: no truncation marker"
 
-# A12/A13: the real digest builder piped through the real send.sh. PR text never pings or
-# mentions anyone; a manual After-merge row pings the owner and nobody else.
+# A12/A13: the real digest builder piped through the real send.sh. Nothing in the merge
+# notice ever mentions anyone, whether the PR text tries to or a manual row needs a person.
 OWNER_ID=283183467804491776
 bash "$ROOT/bin/digest-dm-build" --pr-number 7 --title "x <@$OWNER_ID> @everyone" \
-    --url https://github.com/a-jay85/IBL5/pull/7 --ping-out "$TMP/a12.ping" \
+    --url https://github.com/a-jay85/IBL5/pull/7 --after-merge \
     --manual-count 0 --auto-ci-count 0 --auto-mac-count 0 --auto-failed-count 0 \
     --job-result checklist=success < /dev/null > "$TMP/a12.txt" 2>/dev/null
-run_act 200 true "$(cat "$TMP/a12.ping")" "$TMP/a12.txt"
-[ "$(cat "$TMP/a12.ping")" = false ] && ok "A12: no rows and green jobs do not ping" || fail "A12: ping file is not false"
+run_act 200 true false "$TMP/a12.txt"
 [ "$(act_body 1 | jq -c '.allowed_mentions.parse')" = '[]' ] \
     && ok "A12: allowed_mentions.parse is empty" || fail "A12: allowed_mentions.parse is not []"
 [ "$(act_body 1 | jq -r ".content | contains(\"<@$OWNER_ID>\")")" = false ] \
@@ -783,20 +782,17 @@ run_act 200 true "$(cat "$TMP/a12.ping")" "$TMP/a12.txt"
     && ok "A12: a title @everyone is neutralized" || fail "A12: title carries a live @everyone"
 
 bash "$ROOT/bin/digest-dm-build" --pr-number 7 --title "x <@$OWNER_ID> @everyone" \
-    --url https://github.com/a-jay85/IBL5/pull/7 --ping-out "$TMP/a13.ping" \
+    --url https://github.com/a-jay85/IBL5/pull/7 --after-merge \
     --manual-count 1 --auto-ci-count 0 --auto-mac-count 0 --auto-failed-count 0 \
     --comment-url https://github.com/a-jay85/IBL5/pull/7#issuecomment-111 \
     --job-result checklist=success < /dev/null > "$TMP/a13.txt" 2>/dev/null
-run_act 200 true "$(cat "$TMP/a13.ping")" "$TMP/a13.txt"
-[ "$(cat "$TMP/a13.ping")" = true ] && ok "A13: a manual row pings" || fail "A13: ping file is not true"
-[ "$(act_body 1 | jq -r ".content | startswith(\"<@$OWNER_ID> \")")" = true ] \
-    && ok "A13: the owner mention leads the message" || fail "A13: owner mention is not first"
-[ "$(act_body 1 | jq -r "[.content | scan(\"<@$OWNER_ID>\")] | length")" = 1 ] \
-    && ok "A13: exactly one owner mention" || fail "A13: more than one owner mention"
-[ "$(act_body 1 | jq -c '.allowed_mentions.users')" = "[\"$OWNER_ID\"]" ] \
-    && ok "A13: allowed_mentions.users is the owner only" || fail "A13: allowed_mentions.users differs"
-[ "$(act_body 1 | jq -c '.allowed_mentions.parse')" = null ] \
-    && ok "A13: allowed_mentions.parse is absent" || fail "A13: allowed_mentions.parse is set"
+run_act 200 true false "$TMP/a13.txt"
+[ "$(act_body 1 | jq -r '[.content | scan("<@[0-9!&]")] | length')" = 0 ] \
+    && ok "A13: a manual row adds no live mention" || fail "A13: content carries a live mention"
+[ "$(act_body 1 | jq -c '.allowed_mentions')" = '{"parse":[]}' ] \
+    && ok "A13: allowed_mentions is parse-empty only" || fail "A13: allowed_mentions differs"
+[ "$(act_body 1 | jq -r '.content | contains("Action needed after merge")')" = true ] \
+    && ok "A13: the action line is in the message" || fail "A13: no action line"
 [ "$(act_body 1 | jq -r '.content | contains("Directions: <https://github.com/a-jay85/IBL5/pull/7#issuecomment-111>")')" = true ] \
     && ok "A13: the directions link is in the message" || fail "A13: no directions link"
 

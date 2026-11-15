@@ -124,7 +124,7 @@ while IFS= read -r line; do
             fi ;;
         auto:ci|auto:mac)
             # An auto row counts as automatic only once its executor is on this checkout.
-            # Until then nothing runs it, so it is a manual step and the digest pings.
+            # Until then nothing runs it, so it is a manual step and the digest lists the step on #merged.
             if ! pmr_executor_ready "$PMR_KIND"; then
                 MANUAL=$((MANUAL + 1))
                 LINES+=("- [ ] $PMR_LABEL $PMR_TEXT _(tagged \`$PMR_KIND $PMR_NAME\`, but nothing runs $PMR_KIND rows yet, so a person must do it)_")
@@ -133,7 +133,7 @@ while IFS= read -r line; do
                 LINES+=("- $PMR_LABEL $PMR_TEXT _(runs automatically in CI: \`$PMR_NAME\`)_")
             else
                 AUTO_MAC=$((AUTO_MAC + 1))
-                LINES+=("- $PMR_LABEL $PMR_TEXT _(runs automatically on the owner's Mac: \`$PMR_NAME\`; a failure pings in #dev)_")
+                LINES+=("- $PMR_LABEL $PMR_TEXT _(runs automatically on the owner's Mac: \`$PMR_NAME\`; a failure is reported on Discord)_")
             fi ;;
     esac
 done <<< "$ROWS_RAW"

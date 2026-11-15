@@ -38,6 +38,7 @@ fail() { h_fail "[$CASE] $1"; }
 want() { case "$2" in *"$3"*) ok ;; *) fail "$1: expected to contain <<$3>>, got <<$2>>" ;; esac; }
 wantnot() { case "$2" in *"$3"*) fail "$1: expected NOT to contain <<$3>>" ;; *) ok ;; esac; }
 eq()   { [ "$2" = "$3" ] && ok || fail "$1: want <<$3>>, got <<$2>>"; }
+neq()  { [ "$2" != "$3" ] && ok || fail "$1: want anything but <<$3>>"; }
 
 # run <stdin-file> [extra args...] -> OUT, RC
 run() {
@@ -488,23 +489,24 @@ run "$SCRATCH/f1" --pr-body-file /nonexistent
 eq "unreadable body file exits 2" "$RC" "2"
 
 # ---------------------------------------------------------------------------
-# After-merge mode (--ping-out). The ping decision is bin/lib/post-merge-rows.sh's
-# pmr_ping_decision; these cases pin how the driver wires it and what the top block says.
+# After-merge mode (--after-merge). The reason list is bin/lib/post-merge-rows.sh's
+# pmr_needs_you_reasons; these cases pin how the driver wires it and what the top block says.
+# REASONS is the driver's stderr `reasons=` value ("none" when nothing needs a person).
 # ---------------------------------------------------------------------------
 AM_URL='https://github.com/a-jay85/IBL5/pull/7'
 AM_CMT='https://github.com/a-jay85/IBL5/pull/7#issuecomment-99'
 AM_RUN='https://github.com/a-jay85/IBL5/actions/runs/123'
-PING_FILE="$SCRATCH/ping"
 
-# am <title> [flags...] -> OUT, RC, PING (file content, "<none>" when absent). Stdin is f1.
+# _reasons_from <errfile> -> the value of the driver's `reasons=` stderr line.
+_reasons_from() { sed -n 's/^reasons=//p' "$1" | sed -n 1p; }
+
+# am <title> [flags...] -> OUT, RC, REASONS. Stdin is f1.
 am() {
     local _title="$1"; shift
-    rm -f "$PING_FILE"
     OUT="$(bash "$DRIVER" --pr-number 7 --title "$_title" --url "$AM_URL" \
-            --ping-out "$PING_FILE" "$@" < "$SCRATCH/f1" 2>"$SCRATCH/err")"
+            --after-merge "$@" < "$SCRATCH/f1" 2>"$SCRATCH/err")"
     RC=$?
-    PING="<none>"
-    if [ -f "$PING_FILE" ]; then PING="$(cat "$PING_FILE")"; fi
+    REASONS="$(_reasons_from "$SCRATCH/err")"
 }
 _first_line() { printf '%s\n' "$1" | sed -n 1p; }
 
@@ -513,7 +515,7 @@ am T --manual-count 2 --auto-ci-count 0 --auto-mac-count 0 --auto-failed-count 0
     --comment-url "$AM_CMT" --run-url "$AM_RUN" \
     --job-result after-merge-checklist=success
 eq "exit 0" "$RC" "0"
-eq "ping true" "$PING" "true"
+neq "reason true" "$REASONS" "none"
 want "action line first" "$(_first_line "$OUT")" '**Action needed after merge:** 2 manual step(s).'
 want "directions is the sticky comment" "$(_first_line "$OUT")" "Directions: <$AM_CMT>"
 want "header still present" "$OUT" '**Merged [#7](<https://github.com/a-jay85/IBL5/pull/7>): T**'
@@ -523,7 +525,7 @@ begin_case "am-none"
 am T --manual-count 0 --auto-ci-count 0 --auto-mac-count 0 --auto-failed-count 0 \
     --comment-url '' --run-url "$AM_RUN" --job-result after-merge-checklist=success
 eq "exit 0" "$RC" "0"
-eq "ping false" "$PING" "false"
+eq "reason false" "$REASONS" "none"
 eq "output starts at the header" "$(_first_line "$OUT")" '**Merged [#7](<https://github.com/a-jay85/IBL5/pull/7>): T**'
 wantnot "no action line" "$OUT" 'Action needed'
 wantnot "no problem line" "$OUT" 'pipeline problem'
@@ -532,22 +534,22 @@ begin_case "am-auto-only"
 am T --manual-count 0 --auto-ci-count 1 --auto-mac-count 2 --auto-failed-count 0 \
     --comment-url "$AM_CMT" --run-url "$AM_RUN" --job-result after-merge-checklist=success
 eq "exit 0" "$RC" "0"
-eq "ping false" "$PING" "false"
-want "auto line" "$(_first_line "$OUT")" 'After merge: 1 CI and 2 Mac step(s) run automatically; Mac failures ping you in #dev.'
+eq "reason false" "$REASONS" "none"
+want "auto line" "$(_first_line "$OUT")" 'After merge: 1 CI and 2 Mac step(s) run automatically; Mac failures are reported on Discord.'
 wantnot "no action line" "$OUT" 'Action needed'
 
 begin_case "am-auto-failed"
 am T --manual-count 0 --auto-ci-count 1 --auto-mac-count 0 --auto-failed-count 1 \
     --comment-url "$AM_CMT" --run-url "$AM_RUN" --job-result after-merge-checklist=success
 eq "exit 0" "$RC" "0"
-eq "ping true" "$PING" "true"
+neq "reason true" "$REASONS" "none"
 want "failed line" "$OUT" '**Post-merge auto step failed:** 1. Run: <'"$AM_RUN"'>'
 
 begin_case "am-job-failed"
 am T --manual-count 0 --auto-ci-count 0 --auto-mac-count 0 --auto-failed-count 0 \
     --comment-url '' --run-url "$AM_RUN" --job-result after-merge-checklist=failure
 eq "exit 0" "$RC" "0"
-eq "ping true" "$PING" "true"
+neq "reason true" "$REASONS" "none"
 want "problem line first" "$(_first_line "$OUT")" '**Post-merge pipeline problem** (job:after-merge-checklist=failure).'
 want "run link" "$(_first_line "$OUT")" "Run: <$AM_RUN>"
 want "directions fall back to the PR" "$(_first_line "$OUT")" "Directions: <$AM_URL>"
@@ -556,35 +558,35 @@ begin_case "am-job-skipped"
 am T --manual-count '' --auto-ci-count '' --auto-mac-count '' --auto-failed-count 0 \
     --run-url "$AM_RUN" --job-result after-merge-checklist=skipped
 eq "exit 0" "$RC" "0"
-eq "ping true" "$PING" "true"
+neq "reason true" "$REASONS" "none"
 want "names the skipped job" "$OUT" 'job:after-merge-checklist=skipped'
 
 begin_case "am-job-cancelled"
 am T --manual-count 0 --auto-ci-count 0 --auto-mac-count 0 --auto-failed-count 0 \
     --run-url "$AM_RUN" --job-result after-merge-checklist=cancelled
 eq "exit 0" "$RC" "0"
-eq "ping true" "$PING" "true"
+neq "reason true" "$REASONS" "none"
 want "names the cancelled job" "$OUT" 'job:after-merge-checklist=cancelled'
 
 begin_case "am-bad-count"
 am T --manual-count x --auto-ci-count 0 --auto-mac-count 0 --auto-failed-count 0 \
     --run-url "$AM_RUN" --job-result after-merge-checklist=success
 eq "exit 0" "$RC" "0"
-eq "bad manual count pings" "$PING" "true"
+neq "bad manual count is named" "$REASONS" "none"
 want "names the bad count" "$OUT" 'bad-count:manual'
 am T --manual-count 0 --auto-ci-count x --auto-mac-count 0 --auto-failed-count 0 \
     --run-url "$AM_RUN" --job-result after-merge-checklist=success
 eq "exit 0 on bad auto count" "$RC" "0"
-eq "bad auto count pings" "$PING" "true"
+neq "bad auto count is named" "$REASONS" "none"
 want "names the bad auto count" "$OUT" 'auto_ci_count=invalid'
 am T --manual-count '2;rm' --auto-ci-count '2;rm' --auto-mac-count 0 --auto-failed-count '2;rm' \
     --run-url "$AM_RUN" --job-result after-merge-checklist=success
 eq "exit 0 on a shell-shaped count" "$RC" "0"
-eq "a shell-shaped count pings" "$PING" "true"
+neq "a shell-shaped count is named" "$REASONS" "none"
 wantnot "the raw count is never printed" "$OUT" '2;rm'
 am T --manual-count 0 --auto-ci-count 0 --auto-mac-count 0 --auto-failed-count 0 \
     --run-url "$AM_RUN" --job-result after-merge-checklist=success
-eq "all good does not ping" "$PING" "false"
+eq "all good does not reason" "$REASONS" "none"
 
 begin_case "am-mention-text"
 am '@everyone <@123> pwn' --manual-count 1 --auto-ci-count 0 --auto-mac-count 0 \
@@ -597,7 +599,7 @@ wantnot "no raw user mention" "$OUT" '<@123>'
 want "text survives with a zero-width space" "$OUT" "@$(printf '\342\200\213')everyone"
 
 begin_case "am-mention-text-what-watch"
-# Zero counts and no ping: no top block, so only the WHAT/WATCH substitution can neutralize
+# Zero counts and no reasons: no top block, so only the WHAT/WATCH substitution can neutralize
 # the mentions typed into the digest body. The `am` helper pins stdin to f1, so call the driver.
 {
     printf '### Merge digest\n'
@@ -607,19 +609,17 @@ begin_case "am-mention-text-what-watch"
     printf '**Touches:** t\n'
     printf '**Machine-authored fixes:** none\n'
 } > "$SCRATCH/f-mention"
-rm -f "$PING_FILE"
-OUT="$(bash "$DRIVER" --pr-number 7 --title T --url "$AM_URL" --ping-out "$PING_FILE" \
+OUT="$(bash "$DRIVER" --pr-number 7 --title T --url "$AM_URL" --after-merge \
         --manual-count 0 --auto-ci-count 0 --auto-mac-count 0 --auto-failed-count 0 \
         --comment-url "$AM_CMT" --run-url "$AM_RUN" \
-        --job-result after-merge-checklist=success < "$SCRATCH/f-mention" 2>/dev/null)"
+        --job-result after-merge-checklist=success < "$SCRATCH/f-mention" 2>"$SCRATCH/err")"
 RC=$?
-PING="<none>"
-if [ -f "$PING_FILE" ]; then PING="$(cat "$PING_FILE")"; fi
+REASONS="$(_reasons_from "$SCRATCH/err")"
 _zw="$(printf '\342\200\213')"
 _what_line="$(grep -F -- '**What changed:**' <<< "$OUT" || true)"
 _watch_line="$(grep -F -- '**Watch:**' <<< "$OUT" || true)"
 eq "exit 0" "$RC" "0"
-eq "no ping" "$PING" "false"
+eq "no reason" "$REASONS" "none"
 wantnot "no raw @everyone" "$OUT" '@everyone'
 wantnot "no raw @here" "$OUT" '@here'
 wantnot "no raw user mention" "$OUT" '<@123>'
@@ -641,19 +641,24 @@ am T --manual-count 1 --auto-ci-count 0 --auto-mac-count 0 --auto-failed-count 0
 want "insecure comment url falls back" "$(_first_line "$OUT")" "Directions: <$AM_URL>"
 want "bad run url reads unavailable" "$OUT" 'Run: (run link unavailable)'
 
-begin_case "am-ping-out-empty"
-OUT="$(bash "$DRIVER" --pr-number 7 --title T --url "$AM_URL" --ping-out '' < "$SCRATCH/f1" 2>/dev/null)"
+begin_case "am-ping-out-removed"
+# The --ping-out flag is gone: it hits the unknown-argument branch and writes nothing.
+rm -f "$SCRATCH/p"
+OUT="$(bash "$DRIVER" --pr-number 7 --title T --url "$AM_URL" --ping-out "$SCRATCH/p" \
+        --manual-count 1 < "$SCRATCH/f1" 2>"$SCRATCH/err")"
 RC=$?
-eq "empty --ping-out exits 2" "$RC" "2"
+eq "--ping-out exits 2" "$RC" "2"
+eq "--ping-out writes no file" "$([ -e "$SCRATCH/p" ] && echo present || echo absent)" "absent"
+want "--ping-out is an unknown argument" "$(cat "$SCRATCH/err")" "unknown argument: --ping-out"
 
-begin_case "am-no-ping-out-unchanged"
+begin_case "am-no-after-merge-unchanged"
 run "$SCRATCH/f1"
 _plain="$OUT"
 run "$SCRATCH/f1" --manual-count 3 --job-result after-merge-checklist=failure
-eq "after-merge flags without --ping-out change nothing" "$OUT" "$_plain"
+eq "after-merge flags without --after-merge change nothing" "$OUT" "$_plain"
 
 begin_case "am-top-survives-cut"
-# A digest with a huge What and Watch. The ping line and directions link sit first, so
+# A digest with a huge What and Watch. The action line and directions link sit first, so
 # the 1900-character cut in notify-discord's send.sh can never take them.
 {
     printf '### Merge digest\n'
@@ -663,9 +668,8 @@ begin_case "am-top-survives-cut"
     printf '**Touches:** t\n'
     printf '**Machine-authored fixes:** none\n'
 } > "$SCRATCH/f-huge"
-rm -f "$PING_FILE"
 OUT="$(bash "$DRIVER" --pr-number 7 --title "$(_rep T 200)" --url "$AM_URL" \
-        --branch "$(_rep b 200)" --ping-out "$PING_FILE" --manual-count 4 \
+        --branch "$(_rep b 200)" --after-merge --manual-count 4 \
         --auto-ci-count 1 --auto-mac-count 1 --auto-failed-count 1 \
         --comment-url "$AM_CMT" --run-url "$AM_RUN" \
         --job-result after-merge-checklist=failure < "$SCRATCH/f-huge" 2>/dev/null)"
@@ -679,7 +683,7 @@ want "what changed still present" "$OUT" '**What changed:**'
 
 # ---------------------------------------------------------------------------
 # workflow-contract — static assertions on merge-digest-notify.yml. The live event slice
-# cannot run before merge, so these pin the shape the ping decision depends on. Herestrings
+# cannot run before merge, so these pin the shape the after-merge block depends on. Herestrings
 # throughout (.claude/rules/shell-pipefail-grep.md).
 # ---------------------------------------------------------------------------
 WF_TEXT="$(cat "$WF_NOTIFY")"
@@ -692,8 +696,10 @@ begin_case "wf-always"
 _after_if="$(awk '/^  notify-merge-digest:/ {j=1} j && /^    if: >-$/ {getline; print; exit}' <<< "$WF_TEXT")"
 eq "first line of the digest if: is always()" "$_after_if" '      always() &&'
 
-begin_case "wf-ping-fail-closed"
-want "ping compares against false" "$WF_TEXT" "ping: \${{ steps.build.outputs.ping != 'false' }}"
+begin_case "wf-no-ping"
+eq "no ping: key in the workflow" "$(grep -cE '^[[:space:]]+ping:' <<< "$WF_TEXT" || true)" "0"
+eq "no --ping-out in the workflow" "$(_wf_count "--ping-out")" "0"
+want "the build passes --after-merge" "$WF_TEXT" "--after-merge"
 
 begin_case "wf-no-static-false"
 eq "no hard-coded ping: 'false'" "$(_wf_count "ping: 'false'")" "0"
@@ -717,7 +723,8 @@ begin_case "wf-default-branch"
 eq "both checkouts pin the default branch" \
     "$(_wf_count 'ref: ${{ github.event.repository.default_branch }}')" "2"
 
-begin_case "wf-no-mention-rule-gone"
-eq "the old no-mention comment is gone" "$(_wf_count 'never @'"mention")" "0"
+begin_case "wf-header-says-no-mention"
+# The header states the rule once: the merge notice never @mentions anyone.
+eq "the header states the no-mention rule once" "$(_wf_count 'never @'"mentions anyone")" "1"
 
 h_done

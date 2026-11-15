@@ -92,28 +92,169 @@ is_parse_only_cmd() {
     return 1
 }
 
-# DB-touching rows: prefire-verify probes the DB before the first one, and the
-# CI sorter keeps them local.
+# DB-touching rows. prefire-verify probes the DB only for a DB row that stays
+# local, and row_ci_needs uses this regex to decide the CI job starts the db stack.
 PLAN_ROW_DB_RE='db-query|docker|--group[= ]database|DatabaseIntegration|db-test-up|run-migrations|mariadb'
 
-# A row runs in CI only when it matches no local marker AND its first word
-# is on the allowlist. Anything else stays local (fail toward local).
-PLAN_ROW_LOCAL_RE="$PLAN_ROW_DB_RE"'|localhost|127\.0\.0\.1|curl|wget|playwright|npx|npm|(^|[^[:alnum:]_/-])gh[[:space:]]|bin/wt-|bin/automouse|bin/post-plan|bin/plan-now|bin/check-plan|launchctl|osascript|ssh|scp|rsync|~/|\$HOME|/Users/|/tmp/|claude-plans|PLAN|\.\./'
-row_runs_in_ci() {
-    local c="$1" first second
-    grep -Eq -- "$PLAN_ROW_LOCAL_RE" <<< "$c" && return 1
-    is_whole_suite_cmd "$c" && return 1
+# A row runs in CI only when it matches no Mac-only marker, uses docker only
+# in the PLAN_ROW_COMPOSE_PHP form, AND its first word is on the allowlist.
+# Anything else stays local (fail toward local). DB, web and compose rows run
+# in CI: the Plan checks job starts the stacks row_ci_needs names for them.
+PLAN_ROW_LOCAL_RE='(^|[^[:alnum:]_/-])gh[[:space:]]|playwright|npx|npm|wget|bin/wt-|bin/automouse|bin/post-plan|bin/plan-now|bin/check-plan|bin/db-query|bin/db-test-up|launchctl|osascript|ssh|scp|rsync|~/|\$HOME|/Users/|/tmp/|claude-plans|PLAN|\.\./'
+# The one docker form that may reach CI. The ci step sets COMPOSE_FILE to the
+# absolute path ${{ github.workspace }}/docker-compose.ci.yml, and
+# plan-checks-block ci pins any relative value to the repo root, so a
+# `cd ibl5 && docker compose exec -T php ...` row still reaches the CI php container.
+PLAN_ROW_COMPOSE_PHP='docker compose exec -T php '
+# Web rows: CI starts the web stack and ci_host_rewrite maps the host.
+PLAN_ROW_WEB_RE='localhost|127\.0\.0\.1|curl'
+
+# _row_first_word <cmd> — sets _RFW_FIRST and _RFW_SECOND: the first two words
+# after any leading `cd <dir> &&` hops and a leading `!`. Shared by
+# row_runs_in_ci and row_ci_needs, so the two never disagree on the first word.
+_row_first_word() {
+    local c="$1"
     c="${c#"${c%%[![:space:]]*}"}"
     while [[ "$c" =~ ^cd[[:space:]]+([A-Za-z0-9_./-]+)[[:space:]]*\&\&[[:space:]]*(.*)$ ]]; do
         c="${BASH_REMATCH[2]}"
     done
     c="${c#!}"; c="${c#"${c%%[![:space:]]*}"}"
-    first="${c%%[[:space:]]*}"; second="${c#"$first"}"; second="${second#"${second%%[![:space:]]*}"}"; second="${second%%[[:space:]]*}"
+    _RFW_FIRST="${c%%[[:space:]]*}"
+    _RFW_SECOND="${c#"$_RFW_FIRST"}"; _RFW_SECOND="${_RFW_SECOND#"${_RFW_SECOND%%[![:space:]]*}"}"; _RFW_SECOND="${_RFW_SECOND%%[[:space:]]*}"
+}
+
+row_runs_in_ci() {
+    local c="$1" first second
+    grep -Eq -- "$PLAN_ROW_LOCAL_RE" <<< "$c" && return 1
+    # A curl row aimed at a remote host stays local: ci_host_rewrite leaves
+    # such a URL alone, so CI would test production instead of the PR.
+    local url host i=0
+    _fetch_split "$c"
+    if [ "$_FS_N" -gt 0 ]; then
+        # The same guard covers php, bun and bunx rows: a remote URL in their
+        # arguments would run against production in CI.
+        while [ "$i" -lt "$_FS_N" ]; do
+            while IFS= read -r url; do
+                host="${url#*://}"; host="${host##*@}"; host="${host%%:*}"
+                case "$host" in
+                    localhost|127.0.0.1|*.localhost) ;;
+                    *) return 1 ;;
+                esac
+            done < <(grep -Eo -- 'https?://[A-Za-z0-9._%:@-]+' <<< "${_FS_SEG[$i]}")
+            # A curl call with no scheme:// URL stays local too. Its host may be
+            # remote (curl iblhoops.net/...), and ci_host_rewrite needs a scheme,
+            # so even curl localhost/x would miss the CI web stack.
+            if [ "${_FS_CURL[$i]}" = 1 ] \
+                && ! grep -Eq -- 'https?://[A-Za-z0-9]' <<< "${_FS_SEG[$i]}"; then
+                return 1
+            fi
+            i=$((i + 1))
+        done
+    fi
+    local nd="${c//"$PLAN_ROW_COMPOSE_PHP"/}"
+    grep -Eq -- '(^|[^[:alnum:]_-])docker([^[:alnum:]_-]|$)' <<< "$nd" && return 1
+    is_whole_suite_cmd "$c" && return 1
+    _row_first_word "$c"
+    first="$_RFW_FIRST"; second="$_RFW_SECOND"
     case "$first" in
         bin/test-*|bin/check-*|bin/lib/*|vendor/bin/phpunit|python3|shellcheck|grep|rg|jq) return 0 ;;
+        php|actionlint|test|\[|printf|seq|diff|curl|bun|bunx|bin/run-shell-harnesses|bin/generate-codebase-map) return 0 ;;
+        docker) [ "$second" = compose ] && return 0 ;;
         command) [ "$second" = grep ] && return 0 ;;
         git) case "$second" in grep|ls-files|check-ignore) return 0 ;; esac ;;
         bash) [ "$second" = -n ] && return 0 ;;
     esac
     return 1
+}
+
+# row_ci_needs <cmd> — prints the space-separated subset of `db web bun
+# actionlint` that the Plan checks job must start before this row runs.
+# Pass it only commands row_runs_in_ci accepted.
+#   db          the command matches PLAN_ROW_DB_RE
+#   web db      it matches PLAN_ROW_WEB_RE or holds PLAN_ROW_COMPOSE_PHP (the
+#               php container depends on mariadb, and the DB step seeds first)
+#   bun         bun or bunx is a command word anywhere in the row
+#   actionlint  actionlint is a command word anywhere in the row
+row_ci_needs() {
+    local c="$1" db=0 web=0 bun=0 al=0 out=""
+    grep -Eq -- "$PLAN_ROW_DB_RE" <<< "$c" && db=1
+    if grep -Eq -- "$PLAN_ROW_WEB_RE" <<< "$c" || [[ "$c" == *"$PLAN_ROW_COMPOSE_PHP"* ]]; then
+        web=1; db=1
+    fi
+    _row_first_word "$c"
+    case "$_RFW_FIRST" in
+        bun|bunx) bun=1 ;;
+        actionlint) al=1 ;;
+    esac
+    # bun, bunx or actionlint as a command word later in the row, such as
+    # test "$(bun ...)" = 1, needs the same stack as when it comes first.
+    local i=0 pre
+    _fetch_split "$c"
+    while [ "$i" -lt "$_FS_N" ]; do
+        pre="${_FS_PRE[$i]}"; pre="${pre%"${pre##*[![:space:]]}"}"
+        case "$pre" in *bun|*bunx) bun=1 ;; esac
+        i=$((i + 1))
+    done
+    grep -Eq -- '(^|\$\(|<\(|>\(|[|;&`!])[[:space:]]*actionlint([[:space:]]|$)' <<< "$c" && al=1
+    [ "$db" -eq 1 ] && out="db"
+    [ "$web" -eq 1 ] && out="${out:+$out }web"
+    [ "$bun" -eq 1 ] && out="${out:+$out }bun"
+    [ "$al" -eq 1 ] && out="${out:+$out }actionlint"
+    printf '%s\n' "$out"
+}
+
+# ci_host_rewrite <cmd> — the only place the CI host is rewritten. A worktree
+# slug host (http://<slug>.localhost) or a bare localhost / 127.0.0.1 URL maps
+# to the CI web stack on localhost:8080. The host ends at any character that
+# cannot be part of a host name: /, ?, #, a quote, a space, ) and so on. A
+# host with its own :port, or followed by @ (user info), is left as written.
+# Anything else is left as written too, so a miss fails red in CI.
+ci_host_rewrite() {
+    # Bare hosts go first. The slug expression then cannot turn a port-less
+    # result back into localhost:8080, so each expression is tested alone.
+    sed -E -e 's#(https?)://(localhost|127\.0\.0\.1)([^A-Za-z0-9._:@-]|$)#\1://localhost:8080\3#g' \
+           -e 's#(https?)://([A-Za-z0-9-]+\.)+localhost([^A-Za-z0-9._:@-]|$)#\1://localhost:8080\3#g' <<< "$1"
+}
+
+# Where the arguments of a fetching command start: curl as any word, or php,
+# bun or bunx as a command word (row start, or after $(, <(, >(, a backtick,
+# |, ; or &). A file name such as ibl5/index.php is not a command word.
+PLAN_ROW_FETCH_SEG_RE='(^|[[:space:]|;&`(])curl[[:space:]]|(^|\$\(|<\(|>\(|[|;&`])[[:space:]]*(php|bun|bunx)([[:space:]]|$)'
+
+# _fetch_split <cmd> — splits cmd at each fetching command. For segment i,
+# _FS_PRE[i] is the text before its arguments (ending with the command word)
+# and _FS_SEG[i] holds the arguments. A curl segment ends at the next | ; & )
+# < > or backtick. PHP code and bun scripts hold ; and ), so a php, bun or
+# bunx segment runs to the end of the row. _FS_CURL[i] is 1 for curl.
+# _FS_TAIL is the text after the last segment; _FS_N counts the segments.
+_fetch_split() {
+    local s="$1" m pre rest seg term='[|;&)<>`]*'
+    _FS_PRE=(); _FS_SEG=(); _FS_CURL=(); _FS_TAIL=""; _FS_N=0
+    while [[ "$s" =~ $PLAN_ROW_FETCH_SEG_RE ]]; do
+        m="${BASH_REMATCH[0]}"
+        pre="${s%%"$m"*}"
+        rest="${s:$(( ${#pre} + ${#m} ))}"
+        case "$m" in
+            *curl*) seg="${rest%%$term}"; _FS_CURL[_FS_N]=1 ;;
+            *) seg="$rest"; _FS_CURL[_FS_N]=0 ;;
+        esac
+        _FS_PRE[_FS_N]="$pre$m"; _FS_SEG[_FS_N]="$seg"
+        _FS_N=$((_FS_N + 1))
+        s="${rest:${#seg}}"
+    done
+    _FS_TAIL="$s"
+}
+
+# ci_row_rewrite <cmd> — what plan-checks-block ci runs on each row command and
+# mutation check field. It runs ci_host_rewrite only on the arguments of curl,
+# php, bun and bunx (see _fetch_split). All other text, such as a grep pattern
+# or an expected value in test "$(curl …)" = "<url>", stays byte-exact.
+ci_row_rewrite() {
+    local out="" i=0
+    _fetch_split "$1"
+    while [ "$i" -lt "$_FS_N" ]; do
+        out="$out${_FS_PRE[$i]}$(ci_host_rewrite "${_FS_SEG[$i]}")"
+        i=$((i + 1))
+    done
+    printf '%s\n' "$out$_FS_TAIL"
 }

@@ -5,16 +5,47 @@
 # codec the Plan checks CI job reads. Prints one `PASS <case>` or
 # `FAIL <case> — <why>` line per case. Exits 1 when any case fails.
 #
-# Usage: bin/test-plan-checks-block
+# Usage: bin/test-plan-checks-block [--live]
+# ---
+# --live  run real green and red blocks through `plan-checks-block ci` against
+#         the stacks the Plan checks job started (DB, web, bun). Outside CI
+#         (GITHUB_ACTIONS is not `true`) it prints a SKIP line and exits 0.
+#         Inside CI it fails when a stack's IBL_CI_*_READY marker is not 1.
 
 set -u
 export LC_ALL=C
+
+LIVE=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --live) LIVE=1; shift ;;
+        *) echo "test-plan-checks-block: unknown argument '$1'" >&2
+           echo "Usage: bin/test-plan-checks-block [--live]" >&2
+           exit 2 ;;
+    esac
+done
+if [ "$LIVE" -eq 1 ]; then
+    if [ "${GITHUB_ACTIONS:-}" != true ]; then
+        echo "SKIP: --live runs only inside the Plan checks job"
+        exit 0
+    fi
+    for _v in IBL_CI_DB_READY IBL_CI_WEB_READY IBL_CI_BUN_READY; do
+        if [ "${!_v:-}" != 1 ]; then
+            echo "FAIL --live: $_v is not 1; the needs step did not start the stack"
+            exit 1
+        fi
+    done
+fi
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 LIB="$REPO_ROOT/bin/lib/plan-checks-block"
 XM="$REPO_ROOT/bin/lib/plan-exec-mutations"
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/test-plan-checks-block.XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
+# The routing fixtures name usage-gated entry points (bin/plan-now, ...), so
+# point the usage gate at a tmp dir in case a row ever runs one.
+# shellcheck source=bin/lib/usage-test-isolation.sh
+. "$REPO_ROOT/bin/lib/usage-test-isolation.sh"; usage_test_isolate "$TMP/usage"
 FAILS=0
 F='```'
 
@@ -79,6 +110,63 @@ printf 'plan-checks\n' > "$TMP/labels"
 enc() { (cd "$R" && "$LIB" encode "$1"); }
 dec() { rm -rf "$2"; mkdir -p "$2"; (cd "$R" && "$LIB" decode "$1" "$2"); }
 ci() { (cd "$R" && "$LIB" ci --body-file "$1" --labels-file "$2" 2>&1); }
+
+# --- Live mode: real blocks against the stacks the Plan checks job started ---
+if [ "$LIVE" -eq 1 ]; then
+    SLUG_URL="http://plan-checks-ci-local-rows.localhost/ibl5/"
+    # live_ci <name> <rows...> — encode a plan of these rows and run the real
+    # ci driver from the repo root. Sets OUT and RC.
+    live_ci() {
+        local name="$1" lp="$TMP/live-$1.md" n=0 rows=()
+        shift
+        for c in "$@"; do n=$((n + 1)); rows+=("$(row "$n" "$c")"); done
+        mkplan "$lp" "${rows[@]}" -- ""
+        (cd "$REPO_ROOT" && "$LIB" encode "$lp") > "$TMP/live-$name.body"
+        OUT=$(cd "$REPO_ROOT" && "$LIB" ci --body-file "$TMP/live-$name.body" --labels-file "$TMP/nolabels" 2>&1); RC=$?
+    }
+    GREEN_DB='cd ibl5 && vendor/bin/phpunit --group database tests/DatabaseIntegration/RefreshHeadToHeadRecordsStepIntegrationTest.php'
+    GREEN_BUN='cd ibl5 && bunx vitest run tests/ts-unit/vr-pr-body.test.ts'
+    GREEN_CURL="curl -sf -o /dev/null $SLUG_URL"
+    GREEN_PHP="docker compose exec -T php php -r 'exit(mysqli_connect(\"mariadb\",\"root\",\"root\",\"ibl5\") ? 0 : 1);'"
+
+    start_case live_green_block
+    live_ci green "$GREEN_DB" "$GREEN_BUN" "$GREEN_CURL" "$GREEN_PHP"
+    chk "ci exits 0 (got $RC): $(tail -n 5 <<< "$OUT")" eq "$RC" 0
+    chk "PASS 4 rows" has "$OUT" "PASS plan-checks: 4 rows"
+    chk "slug host rewritten to localhost:8080" has "$OUT" "localhost:8080"
+    end_case
+
+    start_case live_red_db_block
+    live_ci reddb "docker compose exec -T php php -r 'exit(mysqli_connect(\"mariadb\",\"root\",\"wrong\",\"ibl5\") ? 0 : 1);'"
+    chk "ci exits 1 (got $RC)" eq "$RC" 1
+    chk "FAIL matrix row 1 exited" has "$OUT" "FAIL matrix row 1 exited"
+    end_case
+
+    start_case live_red_bun_block
+    live_ci redbun "cd ibl5 && bun -e 'process.exit(3)'"
+    chk "ci exits 1 (got $RC)" eq "$RC" 1
+    chk "FAIL matrix row 1 exited 3" has "$OUT" "FAIL matrix row 1 exited 3"
+    end_case
+
+    start_case live_red_curl_block
+    live_ci redcurl "curl -sf -o /dev/null ${SLUG_URL}no-such-page-xyz.php"
+    chk "ci exits 1 (got $RC)" eq "$RC" 1
+    chk "FAIL matrix row 1 exited" has "$OUT" "FAIL matrix row 1 exited"
+    end_case
+
+    start_case live_missing_marker_fails
+    OUT=$(cd "$REPO_ROOT" && env -u IBL_CI_WEB_READY "$LIB" ci --body-file "$TMP/live-green.body" --labels-file "$TMP/nolabels" 2>&1); RC=$?
+    chk "ci exits 1 (got $RC)" eq "$RC" 1
+    chk "names the missing web stack" has "$OUT" "needs web but the job did not start it"
+    end_case
+
+    if [ "$FAILS" -gt 0 ]; then
+        echo "test-plan-checks-block --live: $FAILS case(s) failed"
+        exit 1
+    fi
+    echo "test-plan-checks-block --live: all cases passed"
+    exit 0
+fi
 
 start_case case_round_trip_records_identical
 enc "$PLAN" > "$TMP/body"; RC=$?
@@ -205,9 +293,12 @@ rows = ["| %d | big | CLI-executable | post-impl | `bin/test-x %s` |" % (i, os.u
 head = "# Fixture plan\n\n## Verification Matrix\n\n| # | What to verify | Test type | Timing | Test file / location |\n|---|---|---|---|---|\n"
 open(sys.argv[1], "w").write(head + "\n".join(rows) + "\n")
 PY
-OUT=$(enc "$OP" 2>&1); RC=$?
+OUT=$(enc "$OP" 2> "$TMP/over-err"); RC=$?
 chk "encode exits 5 (got $RC)" eq "$RC" 5
-chk "names the cap" has "$OUT" "over the 32768 cap"
+chk "names the cap" has "$(cat "$TMP/over-err")" "over the 32768 cap"
+# Fail closed: an over-cap encode prints no block at all, so post-plan
+# cannot paste a truncated block into the PR body.
+chk "over-cap encode prints no block on stdout" eq "$OUT" ""
 end_case
 
 start_case case_ci_rejects_unknown_flag
@@ -238,6 +329,333 @@ chk "records.nul matches parse" cmp -s "$TMP/out-up/records.nul" "$TMP/up-parse.
 chk "records.nul is non-empty" test -s "$TMP/out-up/records.nul"
 upsert "$TMP/up-body1" "$TMP/up-block" > "$TMP/up-body2"
 chk "second upsert leaves body unchanged" cmp -s "$TMP/up-body1" "$TMP/up-body2"
+end_case
+
+# --- Routing slices: one case per matrix row ---------------------------------
+# route <cmd> prints "CI <needs>" or "LOCAL" using the real library.
+route() {
+    (
+        # shellcheck source=bin/lib/plan-matrix-rows.sh
+        source "$REPO_ROOT/bin/lib/plan-matrix-rows.sh"
+        if row_runs_in_ci "$1"; then printf 'CI %s\n' "$(row_ci_needs "$1")"; else echo LOCAL; fi
+    )
+}
+routes_ci() { case "$(route "$1")" in CI*) return 0 ;; esac; return 1; }
+routes_local() { [ "$(route "$1")" = LOCAL ]; }
+
+start_case case_new_first_words_route_ci
+for c in 'php -l x.php' 'actionlint x.yml' 'test -f x' "printf 'a\\n'" 'seq 3' 'diff a b' \
+    'bun test x.test.ts' 'bunx vitest run x.test.ts' 'bin/run-shell-harnesses --list' 'bin/generate-codebase-map'; do
+    chk "routes CI: $c" routes_ci "$c"
+done
+end_case
+
+start_case case_mac_only_rows_stay_local
+for c in 'grep -q x /tmp/foo.txt' 'grep -q x ~/foo.txt' 'grep -q x "$HOME/foo.txt"' 'grep -q x /Users/someone/foo.txt' \
+    'grep -q x claude-plans/foo.md' 'grep -q PLAN_FILE bin/foo' 'grep -q x ../foo.txt' 'launchctl list' \
+    "osascript -e 'beep'" 'ssh iblhoops.net true' 'scp a b:c' 'rsync -a a b' 'bin/wt-list' \
+    'bin/automouse/run --dry-run' 'bin/post-plan-now --auto' 'bin/plan-now x' 'bin/check-plan x.md' \
+    'bin/db-query "SELECT 1"' 'bin/db-test-up x' 'gh pr view 1' 'npx vitest run x.test.ts' 'wget x'; do
+    chk "stays LOCAL: $c" routes_local "$c"
+done
+end_case
+
+start_case case_near_miss_rows
+chk "compose exec without -T stays LOCAL" routes_local 'docker compose exec php php -v'
+chk "compose -f other.yml stays LOCAL" routes_local 'docker compose -f other.yml exec -T php php -v'
+chk "plain container exec stays LOCAL" routes_local 'docker exec php-base php -v'
+chk "compose exec into another service stays LOCAL" routes_local 'docker compose exec -T mariadb mariadb -e "SELECT 1"'
+chk "npx stays LOCAL" routes_local 'npx vitest run x.test.ts'
+chk "mutation-diff stays LOCAL" routes_local 'bin/mutation-diff master'
+chk "unknown first word stays LOCAL" routes_local 'make test'
+chk "whole-suite phpunit stays LOCAL" routes_local 'cd ibl5 && vendor/bin/phpunit'
+chk "bunx routes CI" routes_ci 'cd ibl5 && bunx vitest run tests/ts-unit/vr-pr-body.test.ts'
+chk "compose exec -T php routes CI" routes_ci 'docker compose exec -T php php -v'
+chk "slug curl routes CI" routes_ci 'curl -sf http://plan-checks-ci-local-rows.localhost/ibl5/'
+chk "DatabaseIntegration phpunit routes CI" routes_ci 'cd ibl5 && vendor/bin/phpunit tests/DatabaseIntegration/SomeTest.php'
+end_case
+
+start_case case_needs_column
+chk "web row also needs db" eq "$(route 'curl -sf http://localhost/ibl5/')" "CI db web"
+chk "container row also needs db" eq "$(route 'docker compose exec -T php php -v')" "CI db web"
+chk "DB test row needs db" eq "$(route 'cd ibl5 && vendor/bin/phpunit tests/DatabaseIntegration/XTest.php')" "CI db"
+chk "bun row" eq "$(route 'cd ibl5 && bun test x')" "CI bun"
+chk "bunx row" eq "$(route 'bunx vitest run x')" "CI bun"
+chk "actionlint row" eq "$(route 'actionlint .github/workflows/x.yml')" "CI actionlint"
+chk "plain row needs nothing" eq "$(route 'bin/test-x')" "CI "
+end_case
+
+# body_for <name> <rows...> — encode a fixture plan of these rows into a body file.
+body_for() {
+    local name="$1" bp="$TMP/nb-$1.md" n=0 rows=()
+    shift
+    for c in "$@"; do n=$((n + 1)); rows+=("$(row "$n" "$c")"); done
+    mkplan "$bp" "${rows[@]}" -- ""
+    enc "$bp" > "$TMP/nb-$name.body"
+}
+needs_of() { (cd "$R" && "$LIB" needs --body-file "$1" 2>&1); }
+ZEROS="$(printf 'db=0\nweb=0\nbun=0\nactionlint=0')"
+
+start_case case_needs_zeros
+body_for plain 'bin/test-alpha-fixture'
+OUT=$(needs_of "$TMP/nb-plain.body"); RC=$?
+chk "no-stack block exits 0 (got $RC)" eq "$RC" 0
+chk "no-stack block prints four zeros" eq "$OUT" "$ZEROS"
+OUT=$(needs_of "$TMP/hello"); RC=$?
+chk "absent block exits 0 (got $RC)" eq "$RC" 0
+chk "absent block prints four zeros" eq "$OUT" "$ZEROS"
+OUT=$(needs_of "$TMP/flip"); RC=$?
+chk "corrupt block exits 0 (got $RC)" eq "$RC" 0
+chk "corrupt block prints four zeros" eq "$OUT" "$ZEROS"
+body_for stacks 'curl -sf http://localhost/ibl5/' 'cd ibl5 && bun test x' 'actionlint x.yml'
+OUT=$(needs_of "$TMP/nb-stacks.body"); RC=$?
+chk "stack block exits 0 (got $RC)" eq "$RC" 0
+chk "stack block prints all ones" eq "$OUT" "$(printf 'db=1\nweb=1\nbun=1\nactionlint=1')"
+MP="$TMP/nb-mut.md"
+mkplan "$MP" "$(row 1 'bin/test-alpha-fixture')" -- \
+    "$(printf '%smutation\nrow: 1\nfile: target.txt\nmatch: ALPHA\nreplace: BETA\ncheck: cd ibl5 && bun test x\n%s\n' "$F" "$F")"
+enc "$MP" > "$TMP/nb-mut.body"
+chk "mutation check field feeds needs" has "$(needs_of "$TMP/nb-mut.body")" "bun=1"
+end_case
+
+start_case case_needs_flags
+"$LIB" needs --bogus "$TMP/hello" >/dev/null 2>&1; RC=$?
+chk "unknown flag exits 2 (got $RC)" eq "$RC" 2
+"$LIB" needs --body-file >/dev/null 2>&1; RC=$?
+chk "valueless --body-file exits 2 (got $RC)" eq "$RC" 2
+"$LIB" needs >/dev/null 2>&1; RC=$?
+chk "missing --body-file exits 2 (got $RC)" eq "$RC" 2
+end_case
+
+rewrite() {
+    (
+        # shellcheck source=bin/lib/plan-matrix-rows.sh
+        source "$REPO_ROOT/bin/lib/plan-matrix-rows.sh"
+        ci_host_rewrite "$1"
+    )
+}
+start_case case_host_rewrite
+chk "slug host" eq "$(rewrite 'curl -sf http://plan-checks-ci-local-rows.localhost/ibl5/')" 'curl -sf http://localhost:8080/ibl5/'
+chk "bare slug host at end" eq "$(rewrite 'curl http://x.localhost')" 'curl http://localhost:8080'
+chk "https slug host" eq "$(rewrite 'curl https://a.b.localhost/x')" 'curl https://localhost:8080/x'
+chk "bare localhost" eq "$(rewrite 'curl -sf http://localhost/ibl5/')" 'curl -sf http://localhost:8080/ibl5/'
+chk "127.0.0.1" eq "$(rewrite 'curl -sf http://127.0.0.1/ibl5/')" 'curl -sf http://localhost:8080/ibl5/'
+chk "port 8080 unchanged" eq "$(rewrite 'curl http://localhost:8080/ibl5/')" 'curl http://localhost:8080/ibl5/'
+chk "other port unchanged" eq "$(rewrite 'curl http://x.localhost:8081/ibl5/')" 'curl http://x.localhost:8081/ibl5/'
+chk "example.com unchanged" eq "$(rewrite 'curl http://localhost.example.com/')" 'curl http://localhost.example.com/'
+chk "scheme-less unchanged" eq "$(rewrite 'curl foo.localhost/')" 'curl foo.localhost/'
+# The host can end at any character that is not part of a host name.
+chk "slug host before )" eq "$(rewrite 'test "$(curl -s http://x.localhost)" = 200')" 'test "$(curl -s http://localhost:8080)" = 200'
+chk "localhost before ?" eq "$(rewrite 'curl http://localhost?x=1')" 'curl http://localhost:8080?x=1'
+chk "localhost before #" eq "$(rewrite 'curl http://localhost#top')" 'curl http://localhost:8080#top'
+chk "localhost before quote" eq "$(rewrite "curl 'http://localhost'")" "curl 'http://localhost:8080'"
+chk "slug host before space" eq "$(rewrite 'curl http://x.localhost -o out')" 'curl http://localhost:8080 -o out'
+chk "two hosts in a row" eq "$(rewrite 'curl http://localhost http://127.0.0.1')" 'curl http://localhost:8080 http://localhost:8080'
+chk "localhost userinfo unchanged" eq "$(rewrite 'curl http://localhost@example.com/')" 'curl http://localhost@example.com/'
+end_case
+
+start_case case_curl_without_scheme_stays_local
+chk "schemeless remote curl stays LOCAL" routes_local 'curl -sf iblhoops.net/ibl5/modules.php?name=X | grep -q Foo'
+chk "schemeless localhost curl stays LOCAL" routes_local 'curl -s localhost/foo'
+chk "remote curl after a pipe stays LOCAL" routes_local 'seq 3 | xargs -P 3 curl -s https://iblhoops.net/ibl5/'
+chk "remote host before ) stays LOCAL" routes_local 'test "$(curl -s https://iblhoops.net)" = 200'
+chk "slug host before ) routes CI" routes_ci 'test "$(curl -s -o /dev/null -w %{http_code} http://x.localhost)" = 200'
+end_case
+
+row_rewrite() {
+    (
+        # shellcheck source=bin/lib/plan-matrix-rows.sh
+        source "$REPO_ROOT/bin/lib/plan-matrix-rows.sh"
+        ci_row_rewrite "$1"
+    )
+}
+start_case case_row_rewrite_skip_list
+chk "grep pattern row unchanged" eq "$(row_rewrite 'grep -q "http://localhost/ibl5/" ibl5/docs/x.md')" 'grep -q "http://localhost/ibl5/" ibl5/docs/x.md'
+chk "test \$(curl) row rewritten" eq "$(row_rewrite 'test "$(curl -s -o /dev/null -w %{http_code} http://plan-checks-ci-local-rows.localhost/ibl5/)" = 200')" 'test "$(curl -s -o /dev/null -w %{http_code} http://localhost:8080/ibl5/)" = 200'
+chk "[ \$(php) ] row rewritten" eq "$(row_rewrite '[ "$(php -r "echo file_get_contents(\"http://localhost/ibl5/\");")" ]')" '[ "$(php -r "echo file_get_contents(\"http://localhost:8080/ibl5/\");")" ]'
+chk "cd then grep pattern row unchanged" eq "$(row_rewrite 'cd ibl5 && grep -q http://x.localhost/ README.md')" 'cd ibl5 && grep -q http://x.localhost/ README.md'
+chk "curl row rewritten" eq "$(row_rewrite 'curl -sf http://x.localhost/ibl5/')" 'curl -sf http://localhost:8080/ibl5/'
+# A .php file name is not the php command, so the grep pattern stays byte-exact.
+chk "grep row naming a .php file unchanged" eq "$(row_rewrite 'grep -q "http://localhost/ibl5/" ibl5/index.php')" 'grep -q "http://localhost/ibl5/" ibl5/index.php'
+chk "grep row naming php as a path word unchanged" eq "$(row_rewrite 'grep -q http://localhost/ ibl5/bin/php')" 'grep -q http://localhost/ ibl5/bin/php'
+chk "grep then curl rewritten" eq "$(row_rewrite 'grep -q x f && curl -sf http://localhost/ibl5/')" 'grep -q x f && curl -sf http://localhost:8080/ibl5/'
+chk "test with backtick curl rewritten" eq "$(row_rewrite 'test "`curl -s http://localhost/ibl5/`" = ok')" 'test "`curl -s http://localhost:8080/ibl5/`" = ok'
+# Only the arguments of curl (or php, bun, bunx) are rewritten.
+chk "grep pattern after curl unchanged" eq "$(row_rewrite "curl -s http://localhost/ | grep -q 'http://localhost/ibl5'")" "curl -s http://localhost:8080/ | grep -q 'http://localhost/ibl5'"
+chk "expected string after curl unchanged" eq "$(row_rewrite 'test "$(curl -s http://x.localhost/u)" = "http://x.localhost/ok"')" 'test "$(curl -s http://localhost:8080/u)" = "http://x.localhost/ok"'
+chk "diff <(curl) rewritten" eq "$(row_rewrite 'diff <(curl -s http://x.localhost/api) expected.json')" 'diff <(curl -s http://localhost:8080/api) expected.json'
+chk "xargs curl rewritten" eq "$(row_rewrite 'seq 3 | xargs -P 3 curl -s http://x.localhost/ibl5/')" 'seq 3 | xargs -P 3 curl -s http://localhost:8080/ibl5/'
+chk "php -r URL after ; rewritten" eq "$(row_rewrite "php -r '\$u=1; echo file_get_contents(\"http://localhost/\");'")" "php -r '\$u=1; echo file_get_contents(\"http://localhost:8080/\");'"
+chk "grep before curl unchanged" eq "$(row_rewrite 'grep -q http://localhost/ f && curl -sf http://localhost/ibl5/')" 'grep -q http://localhost/ f && curl -sf http://localhost:8080/ibl5/'
+end_case
+
+# A stub curl on PATH logs the arguments it got and exits 0, so ci can run
+# web rows offline.
+mkdir -p "$TMP/stubbin"
+printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >> "%s/curl.log"\nexit 0\n' "$TMP" > "$TMP/stubbin/curl"
+chmod +x "$TMP/stubbin/curl"
+# ci_env runs the ci driver with the CI stack markers and COMPOSE_FILE cleared,
+# so the offline cases mean the same inside the Plan checks job.
+ci_env() {
+    (cd "$R" && env -u IBL_CI_DB_READY -u IBL_CI_WEB_READY -u IBL_CI_BUN_READY -u COMPOSE_FILE \
+        PATH="$TMP/stubbin:$PATH" "$@" "$LIB" ci --body-file "$BODYF" --labels-file "$TMP/nolabels" 2>&1)
+}
+
+start_case case_check_field_only
+CP="$TMP/cf.md"
+printf 'see http://localhost/ibl5/\n' > "$R/url.txt"
+git -C "$R" add url.txt && git -C "$R" -c user.email=t@t -c user.name=t commit -qm url
+mkplan "$CP" "$(row 1 'bin/test-alpha-fixture')" -- \
+    "$(printf '%smutation\nrow: 1\nfile: url.txt\nmatch: see http://localhost/ibl5/\nreplace: gone http://localhost/ibl5/\ncheck: curl -sf http://x.localhost/ibl5/ && grep -q see url.txt\n%s\n' "$F" "$F")"
+enc "$CP" > "$TMP/cf.body"
+BODYF="$TMP/cf.body"
+: > "$TMP/curl.log"
+OUT=$(ci_env IBL_CI_DB_READY=1 IBL_CI_WEB_READY=1); RC=$?
+chk "ci exits 0 (got $RC): $(tail -n 3 <<< "$OUT")" eq "$RC" 0
+chk "mutation TRIPPED: the match text was not rewritten" has "$OUT" "1 mutation rows TRIPPED"
+chk "check field rewritten" has "$(cat "$TMP/curl.log")" "http://localhost:8080/ibl5/"
+chk "fixture tree clean" eq "$(git -C "$R" status --porcelain)" ""
+end_case
+
+start_case case_readiness_guard
+body_for guard 'curl -sf http://x.localhost/ibl5/'
+BODYF="$TMP/nb-guard.body"
+OUT=$(ci_env); RC=$?
+chk "marker unset: exits 1 (got $RC)" eq "$RC" 1
+chk "marker unset: names the stack" has "$OUT" "FAIL matrix row 1 needs db but the job did not start it (IBL_CI_DB_READY is not 1)"
+OUT=$(ci_env IBL_CI_DB_READY=1 IBL_CI_WEB_READY=); RC=$?
+chk "marker empty: exits 1 (got $RC)" eq "$RC" 1
+chk "marker empty: names the web stack" has "$OUT" "needs web but the job did not start it (IBL_CI_WEB_READY is not 1)"
+OUT=$(ci_env IBL_CI_DB_READY=1 IBL_CI_WEB_READY=yes); RC=$?
+chk "marker not 1: exits 1 (got $RC)" eq "$RC" 1
+: > "$TMP/curl.log"
+OUT=$(ci_env IBL_CI_DB_READY=1 IBL_CI_WEB_READY=1); RC=$?
+chk "marker 1: exits 0 (got $RC)" eq "$RC" 0
+chk "log line shows needs and the rewritten host" has "$OUT" "plan-checks: matrix row 1 [needs: db web]: curl -sf http://localhost:8080/ibl5/"
+chk "curl got the rewritten host" eq "$(cat "$TMP/curl.log")" "-sf http://localhost:8080/ibl5/"
+end_case
+
+# A relative COMPOSE_FILE is pinned to the repo root, so a row that cds into a
+# subfolder still names the CI compose file.
+start_case case_compose_file_pinned
+mkdir -p "$R/sub"
+body_for cfpin 'cd sub && test "$COMPOSE_FILE" = "$(git rev-parse --show-toplevel)/compose.x.yml"'
+BODYF="$TMP/nb-cfpin.body"
+OUT=$(ci_env COMPOSE_FILE=compose.x.yml); RC=$?
+chk "relative COMPOSE_FILE pinned: exits 0 (got $RC): $(tail -n 3 <<< "$OUT")" eq "$RC" 0
+chk "relative COMPOSE_FILE pinned: row ran" has "$OUT" "PASS plan-checks: 1 rows"
+end_case
+
+start_case case_offline_live_gating
+OUT=$(env -u GITHUB_ACTIONS "$0" --live 2>&1); RC=$?
+chk "outside CI: exits 0 (got $RC)" eq "$RC" 0
+chk "outside CI: SKIP line" has "$OUT" "SKIP: --live runs only inside the Plan checks job"
+OUT=$(env -u IBL_CI_DB_READY -u IBL_CI_WEB_READY -u IBL_CI_BUN_READY GITHUB_ACTIONS=true "$0" --live 2>&1); RC=$?
+chk "CI without markers: exits 1 (got $RC)" eq "$RC" 1
+chk "CI without markers: FAIL line" has "$OUT" "FAIL --live: IBL_CI_DB_READY is not 1"
+"$0" --bogus >/dev/null 2>&1; RC=$?
+chk "unknown flag exits 2 (got $RC)" eq "$RC" 2
+end_case
+
+# --- Routing table -----------------------------------------------------------
+# Frozen fixture: <verdict> TAB <needs> TAB <cmd>, one row per line. The LOCAL
+# commands come from the 2026-11-15 prefire-verify failure classification (some
+# are cut at a line break, kept byte-exact); the rest are synthetic near-misses.
+# Verdicts were captured by running row_runs_in_ci, never predicted from source;
+# the needs column (comma-joined row_ci_needs, `none` when empty, `-` for
+# LOCAL rows) was captured the same way.
+RT_FILE="$TMP/routing.tsv"
+cat > "$RT_FILE" <<'ROUTING_TABLE_EOF'
+CI	actionlint	actionlint .github/workflows/tests.yml
+CI	actionlint	actionlint .github/workflows/vr-refresh.yml .github/workflows/e2e-tests.yml
+LOCAL	-	bash -c '. bin/lib/launchd-job.sh && LAUNCHCTL_CMD=/usr/bin/true _ljob_submit_argv com.ibl5.plancheck /tmp/plancheck.log /bin/true' | awk '/set -C; : > /{c=1} /PATH=[^ ]*\/bin/{p=1} /HOME=( |$)/{b=1} /\$HOME/{b=1} END{exit !(c && p && !b)}'
+CI	none	bin/generate-codebase-map && bin/check-docs --since=trade-suggestions-needs-engine --no-staleness && bin/check-prose --since=trade-suggestions-needs-engine
+LOCAL	-	bin/lib/plan-matrix-assertions ~/claude-plans/trade-suggestions-engine-v3-4-vetoes-reasons-swap.md <(git diff --cached origin/master)` reports no `UNREALISED-ASSERTION # exit-ok: heredoc fixture text, never run
+LOCAL	-	bin/mutation-diff origin/master
+CI	none	bin/run-shell-harnesses --check-coverage .github/workflows/harness-legs.txt
+CI	bun	bun ibl5/tests/e2e/vr-recorder/rendered-views-selftest.ts | grep -qx 'ok union-sorted-deduped'`; red if `.sort()` is dropped from `files
+LOCAL	-	cd "$(git rev-parse --show-toplevel)" && bin/check-prose --since=master
+CI	bun	cd ibl5 && bun test tests/ts-unit/", "is_error": false}]
+CI	bun	cd ibl5 && bun test tests/ts-unit/".
+CI	bun	cd ibl5 && bun test tests/ts-unit/`
+CI	bun	cd ibl5 && bunx vitest run --config vitest.unit.config.ts tests/ts-unit/vr-build-gallery.test.ts -t strict # red
+CI	none	cd ibl5 && php -r 'require "vendor/autoload.php"; echo Module\ModuleRedirect::targetFor("League_Starters");' | grep -Fx 'modules.php?name=LeagueStarters'
+CI	none	cd ibl5 && php scripts/trade-suggestions-laugh-test.php # script NEW in this PR (Phase 9), prints VIOLATIONS=0", "is_error": false}]
+CI	db	cd ibl5 && vendor/bin/phpunit --filter testAwaRepositoryUpsertStoresApostrophe tests/DatabaseIntegration/AwardNameQuoteNormalizationTest.php
+LOCAL	-	cd ibl5 && vendor/bin/phpunit --list-tests tests/UpdateAllTheThings/PowerRankingsUpdaterTest.php > /tmp/rtd-after-PowerRankingsUpdaterTest.txt 2>&1 ; ! diff /tmp/rtd-before-PowerRankingsUpdaterTest.txt /tmp/rtd-after-PowerRankingsUpdaterTest.txt", "is_error": false}]
+LOCAL	-	cd tools/postplan-harness && python3 -m pytest -q && cd ../.. && bin/check-prose --since=master && bin/check-docs --since=master --no-staleness
+LOCAL	-	curl -s -o /dev/null -w '%{http_code} %{redirect_url}\
+CI	db,web	docker compose exec -T php php /var/www/html/ibl5/bin/delete-account --user-id=4294967295 2>&1; test $? -eq 3
+LOCAL	-	NS=OnThisDay XML_FROM=worktree bash /tmp/mut-measure.sh
+CI	none	printf '.github/actions/setup-php-env/action.yml\
+CI	none	seq 20 | xargs -P 8 -I{} sh -c 'bin/test-usage-gate >/dev/null 2>&1'
+CI	none	seq 200 | xargs -P 16 -I{} sh -c 'bin/test-usage-gate test_fetch_429_concurrent_one_call test_fetch_single_flight_parallel test_usage_log_concurrent_writers >/dev/null 2>&1'
+CI	none	test "$(command grep -l -E '^description: .{1,200}$' .claude/agents/automouse-delegate.md .claude/agents/pr-ready-phase6.md .claude/agents/pr-second-reviewer.md .claude/agents/plan-architect.md .claude/agents/plan-architect-sonnet.md .claude/agents/plan-architect-xhigh.md | wc -l)" -eq 6
+CI	none	test "$(git diff --name-only origin/master | sort | tr '\
+CI	none	test "$(grep -c -F 'When you cannot tell which, write' .claude/skills/plan/_validate-and-write.md)" = 0 && grep -q -F 'When a golden fits neither list, write' .claude/skills/plan/_validate-and-write.md
+LOCAL	-	docker exec php-base php -v
+LOCAL	-	docker compose exec php php -v
+LOCAL	-	docker compose -f other.yml exec -T php php -v
+CI	db,web	docker compose exec -T php php -v
+LOCAL	-	npx vitest run x.test.ts
+CI	bun	cd ibl5 && bunx vitest run tests/ts-unit/vr-pr-body.test.ts
+LOCAL	-	bin/mutation-diff master
+LOCAL	-	make test
+LOCAL	-	bin/db-query "SELECT 1"
+CI	db,web	curl -sf http://plan-checks-ci-local-rows.localhost/ibl5/
+CI	db,web	curl -sf http://localhost:8080/ibl5/
+CI	db	cd ibl5 && vendor/bin/phpunit tests/DatabaseIntegration/SomeTest.php
+LOCAL	-	grep -q x /tmp/foo.txt
+LOCAL	-	grep -q x ~/foo.txt
+LOCAL	-	grep -q x "$HOME/foo.txt"
+LOCAL	-	grep -q x /Users/someone/foo.txt
+LOCAL	-	grep -q x claude-plans/foo.md
+LOCAL	-	grep -q PLAN_FILE bin/foo
+LOCAL	-	grep -q x ../foo.txt
+LOCAL	-	launchctl list
+LOCAL	-	osascript -e 'beep'
+LOCAL	-	ssh iblhoops.net true
+LOCAL	-	scp a b:c
+LOCAL	-	rsync -a a b
+LOCAL	-	bin/wt-list
+LOCAL	-	bin/automouse/run --dry-run
+LOCAL	-	bin/post-plan-now --auto
+LOCAL	-	bin/plan-now x
+LOCAL	-	bin/check-plan x.md
+CI	none	jq -e . x.json
+CI	none	bin/test-foo-fixture
+CI	none	grep -q x file.txt
+CI	none	printf 'a\n'
+CI	none	php -l x.php
+CI	actionlint	actionlint x.yml
+CI	none	test -f x
+CI	none	seq 3
+CI	none	diff a b
+CI	bun	bun test x.test.ts
+CI	bun	bunx vitest run x.test.ts
+CI	none	bin/run-shell-harnesses --list
+CI	none	bin/generate-codebase-map
+ROUTING_TABLE_EOF
+
+start_case case_routing_table
+RT_OUT=$(
+    # shellcheck source=bin/lib/plan-matrix-rows.sh
+    source "$REPO_ROOT/bin/lib/plan-matrix-rows.sh"
+    while IFS=$'\t' read -r v n cmd; do
+        [ -n "$v" ] || continue
+        if row_runs_in_ci "$cmd"; then got=CI; else got=LOCAL; fi
+        if [ "$got" != "$v" ]; then echo "FAIL want $v got $got: $cmd"; continue; fi
+        if [ "$v" = CI ]; then
+            gn=$(row_ci_needs "$cmd"); gn="${gn// /,}"; [ -n "$gn" ] || gn=none
+            if [ "$gn" != "$n" ]; then echo "FAIL want needs $n got $gn: $cmd"; continue; fi
+        elif [ "$n" != - ]; then
+            echo "FAIL LOCAL row carries needs $n: $cmd"; continue
+        fi
+        echo "ok $v: $cmd"
+    done < "$RT_FILE"
+)
+chk "table rows: $(grep -c '' <<< "$RT_OUT") ran" test "$(grep -c '^ok ' <<< "$RT_OUT")" -ge 60
+chk "routing mismatch: $(grep -m1 '^FAIL' <<< "$RT_OUT")" lacks "$RT_OUT" "FAIL "
 end_case
 
 if [ "$FAILS" -gt 0 ]; then

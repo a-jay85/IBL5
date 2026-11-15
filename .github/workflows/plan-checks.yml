@@ -3,7 +3,7 @@ name: Plan checks
 # Emits the required status check `Plan checks` (ADR in
 # ibl5/docs/decisions/*-plan-checks-ci-from-pr-body.md). It must report on every
 # PR: no paths/branches filters, no labeled type, no job-level if:.
-# bin/check-composite-contracts P1-P5 enforce this.
+# bin/check-composite-contracts P1-P7 enforce this.
 on:
   pull_request:
     types: [opened, synchronize, reopened, edited]
@@ -55,8 +55,89 @@ jobs:
         jq -r '.body // ""' "$RUNNER_TEMP/pr.json" > "$RUNNER_TEMP/pr-body.txt"
         jq -r '.labels[].name' "$RUNNER_TEMP/pr.json" > "$RUNNER_TEMP/pr-labels.txt"
 
+    # Each stack starts only when a row in the block needs it (row_ci_needs),
+    # so a PR with no DB, web or bun rows starts nothing. The images pull
+    # anonymously, so the job holds no registry token. P6 in
+    # bin/check-composite-contracts keeps these steps gated and ordered.
+    - name: Decide which stacks the plan rows need
+      id: needs
+      run: |
+        set -euo pipefail
+        bin/lib/plan-checks-block needs --body-file "$RUNNER_TEMP/pr-body.txt" | tee -a "$GITHUB_OUTPUT"
+
+    - name: Start MariaDB for DB rows
+      if: steps.needs.outputs.db == '1'
+      timeout-minutes: 10
+      run: |
+        set -euo pipefail
+        docker compose -f docker-compose.ci.yml up -d --wait mariadb
+        (cd ibl5 && bin/run-migrations-ci -h 127.0.0.1 -u root -proot ibl5)
+        mysql -h 127.0.0.1 -u root -proot ibl5 < ibl5/tests/DatabaseIntegration/Fixtures/db-seed.sql
+        { echo DB_HOST=127.0.0.1; echo DB_USER=root; echo DB_PASS=root; echo DB_NAME=ibl5; echo IBL_CI_DB_READY=1; } >> "$GITHUB_ENV"
+        echo "plan-checks: MariaDB up, migrated, seeded from db-seed.sql"
+
+    # The config.php lines are copied from .github/actions/setup-docker-e2e.
+    - name: Start the web stack for web and container rows
+      if: steps.needs.outputs.web == '1'
+      timeout-minutes: 10
+      run: |
+        set -euo pipefail
+        cat > ibl5/config.php <<'PHPCFG'
+        <?php
+        if (realpath(__FILE__) === realpath($_SERVER['SCRIPT_FILENAME'])) {
+            header("Location: index.php");
+            exit();
+        }
+        $display_errors = true;
+        $dbhost = getenv('DB_HOST') ?: '127.0.0.1';
+        $dbuname = 'root';
+        $dbpass = 'root';
+        $dbname = 'ibl5';
+        $prefix = 'nuke';
+        $user_prefix = 'nuke';
+        $dbtype = 'MySQL';
+        $sitekey = 'ci-test-key-not-secret';
+        $subscription_url = '';
+        $admin_file = 'admin';
+        PHPCFG
+        docker compose -f docker-compose.ci.yml up -d --wait php
+        curl -sf -o /dev/null http://localhost:8080/ibl5/ || { docker compose -f docker-compose.ci.yml logs php; exit 1; }
+        echo IBL_CI_WEB_READY=1 >> "$GITHUB_ENV"
+        echo "plan-checks: web stack up on localhost:8080"
+
+    - name: Set up bun
+      if: steps.needs.outputs.bun == '1'
+      uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+    - name: Install bun dependencies
+      if: steps.needs.outputs.bun == '1'
+      working-directory: ibl5
+      run: |
+        set -euo pipefail
+        bun install
+        echo IBL_CI_BUN_READY=1 >> "$GITHUB_ENV"
+
+    # Same Go and actionlint pins as the Lint workflows job in tests.yml.
+    - name: Setup Go for actionlint
+      if: steps.needs.outputs.actionlint == '1'
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version: '1.26.3'
+        cache: false
+
+    - name: Install actionlint
+      if: steps.needs.outputs.actionlint == '1'
+      run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+
     - name: Run plan checks
+      env:
+        COMPOSE_FILE: ${{ github.workspace }}/docker-compose.ci.yml
       run: >-
         bin/lib/plan-checks-block ci
         --body-file "$RUNNER_TEMP/pr-body.txt"
         --labels-file "$RUNNER_TEMP/pr-labels.txt"
+
+    # A teardown error never turns the gate red.
+    - name: Stop the stacks
+      if: always() && (steps.needs.outputs.db == '1' || steps.needs.outputs.web == '1')
+      run: docker compose -f docker-compose.ci.yml down -v || true

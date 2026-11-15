@@ -55,4 +55,27 @@ final class InjuryLineFormatterTest extends TestCase
 
         self::assertSame('-Nene, DEN - sprained ankle (2)', $line);
     }
+
+    public function testTrimsPaddedNameBeforeShortening(): void
+    {
+        $line = InjuryLineFormatter::formatLine(
+            ['name' => '  Bobby Portis ', 'teamAbbrev' => 'Timberwolves', 'injuryDescription' => 'left shoulder strain', 'injuryGamesMissed' => 4],
+            null,
+        );
+
+        self::assertSame('-B.Portis, Timberwolves - left shoulder strain (4)', $line);
+    }
+
+    /**
+     * A multibyte first initial stays one whole character.
+     */
+    public function testMultibyteInitialKeptWhole(): void
+    {
+        $line = InjuryLineFormatter::formatLine(
+            ['name' => 'Ömer Aşık', 'teamAbbrev' => 'Bulls', 'injuryDescription' => 'sore knee', 'injuryGamesMissed' => 1],
+            null,
+        );
+
+        self::assertSame('-Ö.Aşık, Bulls - sore knee (1)', $line);
+    }
 }

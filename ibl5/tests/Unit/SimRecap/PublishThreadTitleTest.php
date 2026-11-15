@@ -41,5 +41,12 @@ final class PublishThreadTitleTest extends TestCase
         self::assertSame(2009, PublishThreadTitle::seasonEndingYearForDate('2008-09-01'));
         self::assertSame(2009, PublishThreadTitle::seasonEndingYearForDate('2009-08-31'));
         self::assertSame(2009, PublishThreadTitle::seasonEndingYearForDate('2009-06-30'));
+        self::assertSame(2009, PublishThreadTitle::seasonEndingYearForDate('2008-10-15'));
+        self::assertSame(2009, PublishThreadTitle::seasonEndingYearForDate('2008-12-31'));
+    }
+
+    public function testFirstSimOfSeasonBuildsTitle(): void
+    {
+        self::assertSame('2008-09, SIM #1', PublishThreadTitle::build(2009, 1, null));
     }
 }

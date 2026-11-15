@@ -202,13 +202,43 @@ class SimRecapPublishControllerTest extends TestCase
 
         $responder = $this->createMock(JsonResponder::class);
         $responder->expects($this->never())->method('error');
-        $responder->expects($this->once())->method('success');
+        $responder->expects($this->once())->method('success')->with(['sim' => 7, 'step' => 2]);
 
         (new SimRecapPublishProgressController($repo, self::keys()))->handle(
             [],
             [],
             $responder,
             ['sim' => 7, 'token' => self::TOKEN, 'step' => 2, 'threadId' => self::THREAD_ID]
+        );
+    }
+
+    /**
+     * @return array<string, array{int, int}>
+     */
+    public static function progressBoundaryProvider(): array
+    {
+        return [
+            'first sim'     => [1, 1],
+            'step zero'     => [7, 0],
+            'step at cap'   => [7, SimRecapPublishProgressController::MAX_STEP],
+        ];
+    }
+
+    #[DataProvider('progressBoundaryProvider')]
+    public function testProgressAcceptsBoundaryValues(int $sim, int $step): void
+    {
+        $repo = $this->createMock(SimPublishProgressRepository::class);
+        $repo->expects($this->once())->method('advance')->with($sim, self::TOKEN, $step, null)->willReturn(true);
+
+        $responder = $this->createMock(JsonResponder::class);
+        $responder->expects($this->never())->method('error');
+        $responder->expects($this->once())->method('success')->with(['sim' => $sim, 'step' => $step]);
+
+        (new SimRecapPublishProgressController($repo, self::keys()))->handle(
+            [],
+            [],
+            $responder,
+            ['sim' => $sim, 'token' => self::TOKEN, 'step' => $step, 'threadId' => null]
         );
     }
 
@@ -303,9 +333,21 @@ class SimRecapPublishControllerTest extends TestCase
 
         $responder = $this->createMock(JsonResponder::class);
         $responder->expects($this->never())->method('error');
-        $responder->expects($this->once())->method('success');
+        $responder->expects($this->once())->method('success')->with(['sim' => 7]);
 
         (new SimRecapPublishFinishController($repo, self::keys()))->handle([], [], $responder, ['sim' => 7, 'token' => self::TOKEN]);
+    }
+
+    public function testFinishAcceptsFirstSim(): void
+    {
+        $repo = $this->createMock(SimPublishProgressRepository::class);
+        $repo->expects($this->once())->method('finish')->with(1, self::TOKEN)->willReturn(true);
+
+        $responder = $this->createMock(JsonResponder::class);
+        $responder->expects($this->never())->method('error');
+        $responder->expects($this->once())->method('success')->with(['sim' => 1]);
+
+        (new SimRecapPublishFinishController($repo, self::keys()))->handle([], [], $responder, ['sim' => 1, 'token' => self::TOKEN]);
     }
 
     public function testFinishReturns409ForForeignToken(): void
@@ -329,6 +371,17 @@ class SimRecapPublishControllerTest extends TestCase
         $responder->expects($this->once())->method('error')->with(400, 'bad_request', self::anything());
 
         (new SimRecapPublishFinishController($repo, self::keys()))->handle([], [], $responder, ['sim' => 0, 'token' => self::TOKEN]);
+    }
+
+    public function testFinishRejectsMalformedStringToken(): void
+    {
+        $repo = $this->createMock(SimPublishProgressRepository::class);
+        $repo->expects($this->never())->method('finish');
+
+        $responder = $this->createMock(JsonResponder::class);
+        $responder->expects($this->once())->method('error')->with(400, 'bad_request', self::anything());
+
+        (new SimRecapPublishFinishController($repo, self::keys()))->handle([], [], $responder, ['sim' => 7, 'token' => 'nope']);
     }
 
     // ── service-key gate ───────────────────────────────────────────────────────

@@ -70,23 +70,23 @@ class AccountDeletionServiceTest extends TestCase
     {
         /** @var list<AccountFootprintTarget> $applied */
         $applied = [];
-        $inTransaction = false;
+        $tx = new class { public bool $open = false; };
 
         $repo = $this->createMock(DataRetentionRepositoryInterface::class);
         $repo->method('findAuthUserById')->willReturn(['id' => 7, 'username' => 'gm_seven']);
         $repo->method('findTeamsByGmUsername')->willReturn([]);
         $repo->expects($this->never())->method('countAccountTarget');
         $repo->expects($this->once())->method('runInTransaction')
-            ->willReturnCallback(static function (callable $work) use (&$inTransaction): mixed {
-                $inTransaction = true;
+            ->willReturnCallback(static function (callable $work) use ($tx): mixed {
+                $tx->open = true;
                 $result = $work();
-                $inTransaction = false;
+                $tx->open = false;
                 return $result;
             });
         $repo->expects($this->exactly(count(AccountFootprintTarget::cases())))
             ->method('applyAccountTarget')
-            ->willReturnCallback(static function (AccountFootprintTarget $target, int $userId, ?string $username) use (&$applied, &$inTransaction): int {
-                self::assertTrue($inTransaction, $target->name . ' ran outside the transaction');
+            ->willReturnCallback(static function (AccountFootprintTarget $target, int $userId, ?string $username) use (&$applied, $tx): int {
+                self::assertTrue($tx->open, $target->name . ' ran outside the transaction');
                 self::assertSame(7, $userId);
                 self::assertSame('gm_seven', $username);
                 $applied[] = $target;

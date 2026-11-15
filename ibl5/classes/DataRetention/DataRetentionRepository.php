@@ -60,7 +60,7 @@ final class DataRetentionRepository extends \Database\BaseMysqliRepository imple
         // Bare table name keeps the lookup on IBL; see AccountFootprintTarget::countSql().
         /** @var list<array{teamid: int, team_name: string}> $rows */
         $rows = $this->fetchAll(
-            'SELECT `teamid`, `team_name` FROM ibl_team_info WHERE `gm_username` = ? ORDER BY `teamid`',
+            'SELECT `teamid`, `team_name` FROM `ibl_team_info` WHERE `gm_username` = ? ORDER BY `teamid`',
             's',
             $username
         );

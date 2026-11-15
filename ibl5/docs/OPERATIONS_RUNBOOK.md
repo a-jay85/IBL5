@@ -1,6 +1,6 @@
 ---
-description: Production operations runbook covering deploy, rollback, DB restore, sim-file recovery, logs, secrets, sim recap hosting, the admin-only faprep.php report, and running the app without the Claude Code harness.
-last_verified: 2026-11-01
+description: Production operations runbook covering deploy, rollback, DB restore, sim-file recovery, logs, secrets, sim recap hosting, data retention and account deletion, the admin-only faprep.php report, and running the app without the Claude Code harness.
+last_verified: 2026-11-14
 ---
 
 # IBL5 Operations Runbook
@@ -501,7 +501,68 @@ This runs `launchctl bootout` (no-op if not loaded) followed by `launchctl boots
 
 `bin/sim-recap-tick` has no self-unload path. A manual run with `--dry-run` never touches the queue or the DB, and `--sim=N` skips the phase gate so a specific sim can be processed by hand.
 
-## 9. Free Agent Prep Report (faprep.php)
+## 9. Data Retention and Account Deletion
+
+The site stores IP addresses and account data only as long as it needs them (backlog#1258). This section lists what is kept, how the nightly purge runs, and how to delete one account by hand.
+
+### What is kept, and for how long
+
+| Data | Kept for | How it goes away |
+|------|----------|------------------|
+| `auth_users_audit_log` rows (login events, with IP) | 180 days (`DataRetentionService::AUDIT_LOG_RETENTION_DAYS`) | The `purge-audit-log` job in `.github/workflows/db-backup.yml` deletes older rows each night, after the verified dump. |
+| `nuke_stories.rating_ip` | Never stored now | Migration 219 reset every old value to `'0'`. |
+| `last_moderation_ip` | Never stored now | Migration 073 dropped the column. |
+| DB dumps | 14 days | The backup rotation deletes older dumps. A purged or deleted row survives in these dumps until they rotate out. |
+
+### Audit-log purge
+
+Run these from `www` on prod:
+
+```bash
+php ibl5/bin/purge-audit-log --dry-run            # count rows older than 180 days
+php ibl5/bin/purge-audit-log --days=365 --dry-run # count with a longer window
+php ibl5/bin/purge-audit-log                      # delete rows older than 180 days
+```
+
+Until the script reaches prod through promote-to-production, the nightly job prints `purge-audit-log: SKIP: script not on prod yet` and passes. When the purge fails, the `notify-purge-failure` job sends the owner a Discord DM. Tonight's verified dump is then the restore point.
+
+### Deleting an account
+
+`ibl5/bin/delete-account` removes one `auth_users` row and every row keyed to it, in one transaction. Without `--confirm` it only counts rows.
+
+1. Take a fresh dump first. The delete cannot be undone any other way.
+2. Find the account id: `SELECT id FROM auth_users WHERE username = '...'`.
+3. Run the dry run and read the per-table counts and any GM warnings:
+   ```bash
+   php ibl5/bin/delete-account --user-id=7
+   ```
+4. Delete for real:
+   ```bash
+   php ibl5/bin/delete-account --user-id=7 --confirm
+   ```
+
+Exit codes: 0 done, 1 failed and rolled back, 2 bad flags or no database, 3 unknown id. The output prints ids, counts, and table names only. It never prints the account's name or email address.
+
+The script deletes the account's rows in the auth tables (confirmations, OTPs, 2FA, remember-me tokens, password resets, audit log), `ibl_api_keys`, and `ibl_google_sheet_connections`. It sets `admin_id` to NULL on audit rows the account wrote about other users. It sets `ibl_events.username` and `ibl_team_info.gm_username` to NULL where they match the account's username. The `auth_users` row goes last.
+
+### What it does not touch
+
+- The team row, owner fields, and awards stay. A team the account managed has no GM afterward, and the dry run warns about each one.
+- Other `ibl_events` columns stay. Only `username` becomes NULL.
+- Saved depth charts keep the username. Those rows are team data.
+- Rows in `auth_users_throttling` expire on their own.
+- The DB dumps keep the account for 14 days.
+- An open login session ends when the auth library next re-reads the account, within 5 minutes by default.
+
+### Restoring purged audit rows
+
+Pull the table out of a dump, load it into a scratch database, then `INSERT ... SELECT` the range you need back into `auth_users_audit_log`:
+
+```bash
+zcat dump.sql.gz | sed -n '/^-- Table structure for table `auth_users_audit_log`/,/^-- Table structure for table `auth_users_confirmations`/p' > audit.sql
+```
+
+## 10. Free Agent Prep Report (faprep.php)
 
 `ibl5/faprep.php` is a standalone admin page. It renders one HTML table of every non-retired player (`ibl_plr` rows with `retired = 0`, ordered by `ordinal`), joined to `ibl_team_info` for the team name. The commissioner uses it to prepare the free agency period.
 

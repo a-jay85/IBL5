@@ -22,8 +22,8 @@ enum AccountFootprintTarget: string
     case AuditLogAdmin = 'auth_users_audit_log.admin_id';
     case ApiKeys = 'ibl_api_keys';
     case GoogleSheetConnections = 'ibl_google_sheet_connections';
-    case EventsUsername = 'ibl_events.username';
-    case TeamGmUsername = 'ibl_team_info.gm_username';
+    case EventsUsername = 'ibl_events';
+    case TeamGmUsername = 'ibl_team_info';
     case AuthUsers = 'auth_users';
 
     /**
@@ -31,8 +31,8 @@ enum AccountFootprintTarget: string
      */
     public function countSql(): string
     {
-        // ibl_team_info stays bare: a backticked name opts in to the Olympics table rewrite,
-        // and gm_username exists only on the IBL table (see BaseMysqliRepository::rewriteTableNames()).
+        // gm_username exists only on the IBL team table. The CLI never sets an Olympics
+        // league context, so BaseMysqliRepository::rewriteTableNames() leaves these names alone.
         return match ($this) {
             self::Confirmations => 'SELECT COUNT(*) AS n FROM `auth_users_confirmations` WHERE `user_id` = ?',
             self::Otps => 'SELECT COUNT(*) AS n FROM `auth_users_otps` WHERE `user_id` = ?',
@@ -44,7 +44,7 @@ enum AccountFootprintTarget: string
             self::ApiKeys => 'SELECT COUNT(*) AS n FROM `ibl_api_keys` WHERE `user_id` = ?',
             self::GoogleSheetConnections => 'SELECT COUNT(*) AS n FROM `ibl_google_sheet_connections` WHERE `user_id` = ?',
             self::EventsUsername => 'SELECT COUNT(*) AS n FROM `ibl_events` WHERE `username` = ?',
-            self::TeamGmUsername => 'SELECT COUNT(*) AS n FROM ibl_team_info WHERE `gm_username` = ?',
+            self::TeamGmUsername => 'SELECT COUNT(*) AS n FROM `ibl_team_info` WHERE `gm_username` = ?',
             self::AuthUsers => 'SELECT COUNT(*) AS n FROM `auth_users` WHERE `id` = ?',
         };
     }
@@ -65,7 +65,7 @@ enum AccountFootprintTarget: string
             self::ApiKeys => 'DELETE FROM `ibl_api_keys` WHERE `user_id` = ?',
             self::GoogleSheetConnections => 'DELETE FROM `ibl_google_sheet_connections` WHERE `user_id` = ?',
             self::EventsUsername => 'UPDATE `ibl_events` SET `username` = NULL WHERE `username` = ?',
-            self::TeamGmUsername => 'UPDATE ibl_team_info SET `gm_username` = NULL WHERE `gm_username` = ?',
+            self::TeamGmUsername => 'UPDATE `ibl_team_info` SET `gm_username` = NULL WHERE `gm_username` = ?',
             self::AuthUsers => 'DELETE FROM `auth_users` WHERE `id` = ?',
         };
     }

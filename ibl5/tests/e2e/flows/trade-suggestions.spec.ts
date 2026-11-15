@@ -231,20 +231,18 @@ test.describe('Trade suggestions panel (GM)', () => {
     await setState(request, { 'Allow Trades': 'No' });
   });
 
-  test('panel renders for GM when trades allowed', async ({ page }) => {
+  test('panel renders for GM when trades allowed', async ({ appState, page }) => {
+    await appState({ 'Current Season Phase': 'Free Agency' });
     await gotoWithRetry(page, 'index.php');
 
     const panel = page.locator(PANEL);
     await expect(panel).toBeVisible();
     await expect(page.locator('[data-testid="trade-mode-select"]')).toBeVisible();
 
-    // The CI seed may or may not yield a suggestion: assert the exclusive-or,
-    // never a count.
-    const items = await page.locator('[data-testid="trade-suggestion"]').count();
-    const emptyVisible = await page
-      .locator('[data-testid="trade-suggestions-empty"]')
-      .isVisible();
-    expect(items >= 1 !== emptyVisible).toBe(true);
+    // On the CI seed, franchise 1 in 'Free Agency' gets zero cards (see the
+    // feedback block below). The populated case is covered by the Stars tests.
+    await expect(page.locator('[data-testid="trade-suggestions-empty"]')).toBeVisible();
+    await expect(page.locator('[data-testid="trade-suggestion"]')).toHaveCount(0);
 
     // The only controls in the panel belong to the mode form.
     const modeFormControls = await panel

@@ -78,7 +78,7 @@ BACKEND_FILES = ["ibl5/classes/Trade/TradeService.php"]
 
 
 def test_ui_hold_css_change_holds():
-    assert ui_hold(["ibl5/design/input.css"], []) == "UI-touching PR awaiting human-signoff"
+    assert ui_hold(["ibl5/design/input.css"], []) == "UI-touching PR awaiting human-signoff: ibl5/design/input.css"
     d = evaluate(inputs(classification=Classification(files=["ibl5/design/input.css"])))
     c8 = next(c for c in d.conditions if c.number == 8)
     assert c8.name == "ui-review-floor" and c8.blocked
@@ -607,7 +607,7 @@ def test_feat_pr_with_clean_remediation_loop_still_holds():
     assert d.armed is False
     c8 = next(c for c in d.holds if c.number == 8)
     assert c8.blocked is True
-    assert c8.reason == "UI-touching PR awaiting human-signoff"
+    assert c8.reason == "UI-touching PR awaiting human-signoff: ibl5/design/input.css"
 
 
 def test_auto_merge_false_plan_with_clean_loop_still_holds():

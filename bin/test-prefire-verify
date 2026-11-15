@@ -294,6 +294,30 @@ test_db_down_fails_closed_naming_row() {
     unset STUB_PROBE_RC
 }
 
+# A parse-only row names bin/db-test-up without running it: no probe.
+test_db_down_parse_only_row_skips_probe() {
+    new_case
+    printf 'true\n' > "$CNT/db-test-up"
+    write_plan "$(row 1 "bash -n $CNT/db-test-up")" \
+               "$(row 2 "shellcheck --version >/dev/null # db-test-up")"
+    export STUB_PROBE_RC=3
+    run_gate --plan "$PLAN"
+    want_rc 0
+    refute_out "DB unreachable"
+    unset STUB_PROBE_RC
+}
+
+# A parse-only verb chained to a DB call still probes (fail toward probing).
+test_db_down_chained_parse_row_still_probes() {
+    new_case
+    write_plan "$(row 1 "bash -n /dev/null && bin/db-query 'SELECT 1'")"
+    export STUB_PROBE_RC=3
+    run_gate --plan "$PLAN"
+    want_rc 3
+    want_out "DB unreachable; matrix row 1 needs it"
+    unset STUB_PROBE_RC
+}
+
 test_all_green_passes_and_records() {
     new_case
     green_plan
@@ -1937,6 +1961,8 @@ test_plan_without_matrix_refuses
 test_relative_plan_from_subdir_runs_rows
 test_phpunit_red_refuses
 test_db_down_fails_closed_naming_row
+test_db_down_parse_only_row_skips_probe
+test_db_down_chained_parse_row_still_probes
 test_all_green_passes_and_records
 test_cache_hit_skips_rerun
 test_tree_change_invalidates_cache

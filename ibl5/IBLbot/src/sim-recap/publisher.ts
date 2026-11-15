@@ -106,6 +106,7 @@ export async function runPublish(
         await deps.sleep(step.delayBeforeMs);
 
         const channelId = channelIdFor(step, target, threadId);
+        const allowed = allowedMentionsFor(step, target.stripMentions);
         let alreadyPosted: { id: string; threadId: string | null } | null = null;
 
         // A crash between a Discord post and its progress call leaves last_step one behind.
@@ -126,7 +127,6 @@ export async function runPublish(
                 messageId = alreadyPosted.id;
                 foundThreadId = alreadyPosted.threadId;
             } else {
-                const allowed = allowedMentionsFor(step, target.stripMentions);
                 const msg = await withRateLimitRetry(() => deps.send(channelId, step.content, allowed), deps);
                 messageId = msg.id;
             }
@@ -142,12 +142,10 @@ export async function runPublish(
                 if (url === null) {
                     deps.log('sim-recap: gif skipped');
                 } else {
-                    const allowed = allowedMentionsFor(step, target.stripMentions);
                     await withRateLimitRetry(() => deps.send(channelId, url, allowed), deps);
                 }
             }
         } else if (alreadyPosted === null) {
-            const allowed = allowedMentionsFor(step, target.stripMentions);
             await withRateLimitRetry(() => deps.send(channelId, step.content, allowed), deps);
         }
 

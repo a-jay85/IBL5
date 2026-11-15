@@ -316,12 +316,14 @@ jobs:
           IBL_TEST_USER_REGULAR: ${{ secrets.IBL_TEST_USER_REGULAR || 'ci-e2e-regular' }}
           IBL_TEST_PASS_REGULAR: ${{ secrets.IBL_TEST_PASS_REGULAR || 'e2e-regular-pass' }}
         run: |
+          rm -rf ibl5/vr-rendered && mkdir -p ibl5/vr-rendered && chmod 0777 ibl5/vr-rendered
           docker run --rm \
             --network ibl5-e2e \
             --user "$(id -u):$(id -g)" \
             -v "${{ github.workspace }}/ibl5:/ibl5" \
             -w /ibl5 \
             -e "BASE_URL=http://php/ibl5/" \
+            -e "IBL_VR_RECORD_VIEWS=1" \
             -e "IBL_TEST_USER=$IBL_TEST_USER" \
             -e "IBL_TEST_PASS=$IBL_TEST_PASS" \
             -e "IBL_TEST_USER_REGULAR=$IBL_TEST_USER_REGULAR" \
@@ -458,6 +460,7 @@ jobs:
         run: |
           bin/vr-build-gallery \
             --actuals=ibl5/vr-actuals \
+            --rendered-dir=ibl5/vr-rendered \
             --base-sha="$VRCTX_BASE_SHA" \
             --out-dir=ibl5/vr-gallery \
             --gallery-json=ibl5/vr-gallery.json
@@ -816,6 +819,12 @@ jobs:
       - name: Stop Docker containers
         if: always()
         run: docker compose -f docker-compose.ci.yml down
+
+      - name: Assert VR gallery lists rendered View files
+        if: always() && steps.vr-gallery.outcome == 'success'
+        run: |
+          bun ibl5/tests/e2e/vr-recorder/rendered-views-selftest.ts
+          bun ibl5/tests/e2e/vr-recorder/assert-gallery.ts ibl5/vr-gallery.json
 
   api-e2e:
     name: API E2E Tests (Vitest)

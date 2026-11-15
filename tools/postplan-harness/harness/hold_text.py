@@ -272,6 +272,26 @@ def _removed_guards(reason: str) -> str:
     return "This PR removes safety checks, and " + "; and ".join(parts) + "."
 
 
+_UI_HOLD_PREFIX = "UI-touching PR awaiting human-signoff"
+_UI_FILES_SHOWN = 5
+
+
+def _ui_review_floor(r: str) -> str:
+    """Condition (8): say which changed files matched the UI path list."""
+    ask = "Add the `human-approved` label after you check it."
+    if r.startswith("ui classifier"):
+        return ("Post-plan could not run the check that finds files behind pages league GMs "
+                "see, so this PR waits for your OK. " + ask)
+    _, sep, rest = r.partition(": ")
+    ui_files = [f for f in rest.split(", ") if f] if sep and r.startswith(_UI_HOLD_PREFIX) else []
+    if not ui_files:
+        return "This PR changes files that build pages league GMs see, so it needs your OK. " + ask
+    ui_shown = ", ".join(ui_files[:_UI_FILES_SHOWN])
+    if len(ui_files) > _UI_FILES_SHOWN:
+        ui_shown += f" and {len(ui_files) - _UI_FILES_SHOWN} more"
+    return f"This PR changes files that build pages league GMs see ({ui_shown}), so it needs your OK. " + ask
+
+
 _BY_NUMBER = {
     1: _manual_testing,
     2: _review_findings,
@@ -281,8 +301,7 @@ _BY_NUMBER = {
                   "watching to confirm it was on purpose."),
     6: _depends_on,
     7: _plan_auto_merge,
-    8: lambda r: ("This PR adds something league GMs will notice, so it needs your OK. "
-                  "Add the `human-approved` label after you check it."),
+    8: _ui_review_floor,
     9: _safety,
     10: lambda r: "An automated pipeline wrote this PR, so a person has to merge it.",
     11: _threads,

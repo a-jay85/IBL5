@@ -9,7 +9,7 @@ import pytest
 
 from harness import fidelity, hold_text
 from harness import merge_danger as md
-from harness.armable import ArmInputs, evaluate
+from harness.armable import ArmInputs, evaluate, ui_hold
 from harness.state import Classification, ConditionResult, Finding
 
 REPO = pathlib.Path(__file__).resolve().parents[3]
@@ -235,3 +235,53 @@ def test_self_governing_hold_text_is_not_unreadable():
         words = hold_text.plain_hold(ConditionResult(18, "merge-danger", True, f"state={state}"))
         assert "auto-merge machinery itself" in words
         assert "could not be read" not in words
+
+
+UI_PREFIX = "UI-touching PR awaiting human-signoff"
+UI_ASK = "Add the `human-approved` label after you check it."
+UI_VIEW = "ibl5/classes/Player/PlayerRegularSeasonView.php"
+UI_RENDERER = "ibl5/classes/Player/PlayerRegularSeasonRenderer.php"
+
+
+def test_ui_review_floor_names_matched_files():
+    c = ConditionResult(8, "ui-review-floor", True,
+                        f"{UI_PREFIX}: {UI_VIEW}, ibl5/modules/Player/index.php")
+    assert hold_text.plain_hold(c) == (
+        "This PR changes files that build pages league GMs see "
+        f"({UI_VIEW}, ibl5/modules/Player/index.php), so it needs your OK. " + UI_ASK)
+
+
+def test_ui_review_floor_caps_file_list():
+    files = [f"ibl5/classes/M{i}/M{i}View.php" for i in range(7)]
+    c = ConditionResult(8, "ui-review-floor", True, f"{UI_PREFIX}: " + ", ".join(files))
+    assert hold_text.plain_hold(c) == (
+        "This PR changes files that build pages league GMs see ("
+        + ", ".join(files[:5]) + " and 2 more), so it needs your OK. " + UI_ASK)
+
+
+@pytest.mark.parametrize("reason", ["ui classifier error", "ui classifier unavailable"])
+def test_ui_review_floor_classifier_error_wording(reason):
+    c = ConditionResult(8, "ui-review-floor", True, reason)
+    assert hold_text.plain_hold(c) == (
+        "Post-plan could not run the check that finds files behind pages league GMs see, "
+        "so this PR waits for your OK. " + UI_ASK)
+
+
+def test_ui_review_floor_bare_reason_keeps_generic_wording():
+    c = ConditionResult(8, "ui-review-floor", True, UI_PREFIX)
+    text = hold_text.plain_hold(c)
+    assert text == ("This PR changes files that build pages league GMs see, so it needs "
+                    "your OK. " + UI_ASK)
+    assert "will notice" not in text
+
+
+def test_ui_hold_reason_carries_classifier_hits():
+    assert ui_hold([UI_VIEW, "README.md"], []) == f"{UI_PREFIX}: {UI_VIEW}"
+
+
+def test_ui_hold_view_only_still_holds_at_arming():
+    assert ui_hold([UI_VIEW, UI_RENDERER], []) == f"{UI_PREFIX}: {UI_VIEW}, {UI_RENDERER}"
+
+
+def test_ui_hold_approved_label_clears():
+    assert ui_hold([UI_VIEW, UI_RENDERER], ["human-approved"]) == ""

@@ -8,4 +8,5 @@ enum PlayerSeasonTableMode: string
 {
     case AVERAGES = 'averages';
     case TOTALS = 'totals';
+    case DETAILED_AVERAGES = 'detailed_averages';
 }

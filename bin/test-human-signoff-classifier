@@ -174,6 +174,95 @@ cx_decide "$CT/p1" "$CT/g-clean.json" 1; h_eq ui_composer_decide_flag_clean_pass
 cx_decide "$CT/p1" "$CT/g-clean.json" 0; h_eq ui_composer_decide_no_flag_holds ui-paths "$LAST_OUT"
 printf 'ibl5/composer.lock\nibl5/design/x.css\n' > "$CT/p2"
 cx_decide "$CT/p2" "$CT/g-clean.json" 1; h_eq ui_composer_decide_flag_ui_hit_holds ui-paths "$LAST_OUT"
+# --- Rendered View exemption (V cases): ui_decide arg 6 and renderedViewFiles ---
+VXV=ibl5/classes/Player/PlayerRegularSeasonView.php
+VXR=ibl5/classes/Player/PlayerRegularSeasonRenderer.php
+VXU=ibl5/classes/UI/TableRenderer.php
+VXA="a-jay85"
+VXPAIR="[\"$VXV\",\"$VXR\"]"
+# vx_gallery <name> <renderedViewFiles JSON or -> [changedCells JSON] [newCells JSON]:
+# writes $CT/<name> with renderedCells 3; "-" leaves renderedViewFiles out.
+vx_gallery() {
+    local f="$CT/$1" v="$2" c="${3:-[]}" w="${4:-[]}"
+    if [ "$v" = - ]; then
+        jq -n --argjson c "$c" --argjson w "$w" '{renderedCells: 3, changedCells: $c, newCells: $w}' > "$f"
+    else
+        jq -n --argjson v "$v" --argjson c "$c" --argjson w "$w" \
+            '{renderedCells: 3, changedCells: $c, newCells: $w, renderedViewFiles: $v}' > "$f"
+    fi
+}
+# vx_verdict <name> <gallery file or -> <action> <label> <path>...: real
+# ui_workflow_verdict with a stub fetch and the given event action and label.
+vx_verdict() {
+    local n="$1" g="$2" act="$3" lab="$4"; shift 4
+    mkdir -p "$CT/$n"
+    printf '%s\n' "$@" > "$CT/$n/paths"
+    # shellcheck disable=SC2016  # $1..$5 expand inside the child bash
+    LAST_OUT=$(UI_VR_ATTEMPTS=1 UI_VR_SLEEP=0 CX_G="$g" \
+        bash -c 'set -euo pipefail; source "$1"
+        cx_fetch() { if [ "$CX_G" = - ]; then return 3; fi; cp "$CX_G" "$1"; }
+        ui_workflow_verdict "$2" "$3" cx_fetch "$4" "$5" || true' _ "$UCC" "$CT/$n/paths" "$VXA" "$act" "$lab" 2>&1)
+}
+# vx_decide <paths file> <renderable> <gallery or ""> <view flag>: real
+# ui_decide with dev_patch=0 and composer=0.
+# shellcheck disable=SC2016  # $1..$5 expand inside the child bash
+vx_decide() { LAST_OUT=$(bash -c 'set -euo pipefail; source "$1"; ui_decide "$2" "$3" "$4" 0 0 "$5" || true' _ "$UCC" "$@" 2>&1); }
+printf '%s\n' "$VXV" "$VXR" > "$CT/vp-pair"
+printf '%s\n' "$VXU" > "$CT/vp-ui"
+vx_gallery gv-pair "$VXPAIR"
+vx_gallery gv-mod "[\"$VXV\",\"ibl5/modules/Player/index.php\"]"
+vx_gallery gv-e2e "[\"$VXV\",\".github/workflows/e2e-tests.yml\"]"
+vx_gallery gv-prod "[\"$VXV\",\"bin/vr-build-gallery\"]"
+vx_gallery gv-one "[\"$VXV\"]"
+vx_gallery gv-absent -
+vx_gallery gv-empty '[]'
+vx_gallery gv-string "\"$VXV\""
+vx_gallery gv-mixed "[\"$VXV\",\"$VXR\",5]"
+vx_gallery gv-forged '["x\nibl5/classes/Player/PlayerRegularSeasonView.php","x\nibl5/classes/Player/PlayerRegularSeasonRenderer.php"]'
+vx_gallery gv-dot "[\"./$VXV\",\"./$VXR\"]"
+vx_gallery gv-orig "[\"$VXV.orig\",\"$VXR.orig\"]"
+vx_gallery gv-ui "[\"$VXU\"]"
+printf '{not json\n' > "$CT/gv-bad"
+# Mixed hits: the list names the non-View hit too, so only the View-only check holds it.
+vx_verdict V01 "$CT/gv-mod" synchronize '' "$VXV" ibl5/modules/Player/index.php; h_eq ui_view_with_modules_hit_holds ui-paths "$LAST_OUT"
+vx_verdict V02 "$CT/gv-e2e" synchronize '' "$VXV" .github/workflows/e2e-tests.yml; h_eq ui_view_with_e2e_workflow_hit_holds ui-paths "$LAST_OUT"
+vx_verdict V03 "$CT/gv-prod" synchronize '' "$VXV" bin/vr-build-gallery; h_eq ui_view_with_gallery_producer_hit_holds ui-paths "$LAST_OUT"
+# The approving run never waits for the gallery and keeps today's verdict.
+vx_verdict V04 "$CT/gv-pair" labeled human-approved "$VXV" "$VXR"; h_eq ui_view_approving_event_holds_as_today ui-paths "$LAST_OUT"
+vx_decide "$CT/vp-pair" 0 "$CT/gv-pair" 1; h_eq ui_view_not_renderable_holds ui-paths "$LAST_OUT"
+vx_decide "$CT/vp-pair" 1 "$CT/gv-one" 1; h_eq ui_view_hit_not_listed_holds ui-paths "$LAST_OUT"
+vx_decide "$CT/vp-pair" 1 "$CT/gv-absent" 1; h_eq ui_view_list_absent_holds ui-paths "$LAST_OUT"
+vx_decide "$CT/vp-pair" 1 "$CT/gv-empty" 1; h_eq ui_view_list_empty_holds ui-paths "$LAST_OUT"
+vx_decide "$CT/vp-pair" 1 "$CT/gv-string" 1; h_eq ui_view_list_not_array_holds ui-paths "$LAST_OUT"
+vx_decide "$CT/vp-pair" 1 "$CT/gv-bad" 1; h_eq ui_view_gallery_malformed_holds ui-paths "$LAST_OUT"
+vx_decide "$CT/vp-pair" 1 "$CT/gv-mixed" 1; h_eq ui_view_list_non_string_holds ui-paths "$LAST_OUT"
+vx_decide "$CT/vp-pair" 1 "$CT/gv-forged" 1; h_eq ui_view_list_newline_forged_holds ui-paths "$LAST_OUT"
+vx_decide "$CT/vp-pair" 1 "$CT/gv-dot" 1; h_eq ui_view_list_dot_prefix_holds ui-paths "$LAST_OUT"
+vx_decide "$CT/vp-pair" 1 "$CT/gv-orig" 1; h_eq ui_view_list_suffixed_entry_holds ui-paths "$LAST_OUT"
+vx_decide "$CT/vp-ui" 1 "$CT/gv-ui" 1; h_eq ui_view_shared_ui_dir_holds ui-paths "$LAST_OUT"
+# --- end V pre-impl cases ---
+# --- V post-impl cases: the exemption clears only a fully listed, clean gallery ---
+vx_verdict V20 "$CT/gv-pair" synchronize '' "$VXV" "$VXR"; h_eq ui_view_listed_clean_gallery_passes not-ui "$LAST_OUT"
+vx_gallery gv-pair-diff "$VXPAIR" '[{"strict":false}]'
+vx_verdict V21 "$CT/gv-pair-diff" synchronize '' "$VXV" "$VXR"; h_eq ui_view_listed_changed_cell_holds_vr ui-vr "$LAST_OUT"
+vx_gallery gv-pair-new "$VXPAIR" '[]' '[{"title":"x"}]'
+vx_verdict V22 "$CT/gv-pair-new" synchronize '' "$VXV" "$VXR"; h_eq ui_view_listed_new_cell_holds_vr ui-vr "$LAST_OUT"
+vx_verdict V23 - synchronize '' "$VXV" "$VXR"; h_eq ui_view_gallery_missing_holds_vr_missing vr-missing "$LAST_OUT"
+jq -n --argjson v "$VXPAIR" '{renderedCells: 0, changedCells: [], newCells: [], renderedViewFiles: $v}' > "$CT/gv-none"
+vx_decide "$CT/vp-pair" 1 "$CT/gv-none" 1; h_eq ui_view_nothing_rendered_holds_vr_missing vr-missing "$LAST_OUT"
+vx_decide "$CT/vp-pair" 1 "$CT/gv-pair" 1; h_eq ui_view_decide_flag_listed_passes not-ui "$LAST_OUT"
+vx_decide "$CT/vp-pair" 1 "$CT/gv-pair" 0; h_eq ui_view_decide_no_flag_holds ui-paths "$LAST_OUT"
+vx_decide "$CT/vp-pair" 1 "" 1; h_eq ui_view_decide_flag_no_gallery_holds_vr_missing vr-missing "$LAST_OUT"
+# PR #3965 replay: a player regular-season View/Renderer refactor plus its tests.
+# Stand-in list (replace with the gh output per Step 3a when it qualifies):
+VX3965=(
+    ibl5/classes/Player/PlayerRegularSeasonView.php
+    ibl5/classes/Player/PlayerRegularSeasonRenderer.php
+    ibl5/tests/Player/PlayerRegularSeasonViewTest.php
+    ibl5/tests/Player/PlayerRegularSeasonRendererTest.php
+)
+vx_gallery gv-3965 "[\"ibl5/classes/Player/PlayerRegularSeasonView.php\",\"ibl5/classes/Player/PlayerRegularSeasonRenderer.php\"]"
+vx_verdict V27 "$CT/gv-3965" synchronize '' "${VX3965[@]}"; h_eq ui_view_pr3965_replay_passes not-ui "$LAST_OUT"
 cx_mk V1 real; cx_verdict V1 "$CXB" "$CT/g-clean.json" "$CXL"; h_eq ui_composer_verdict_clean_passes not-ui "$LAST_OUT"
 cx_mk V2 real; cx_verdict V2 "$CXB" "$CT/g-diff.json" "$CXL"; h_eq ui_composer_verdict_vr_change_holds ui-vr "$LAST_OUT"
 cx_mk V3 real; cx_verdict V3 "$CXB" - "$CXL"; h_eq ui_composer_verdict_no_gallery_holds vr-missing "$LAST_OUT"
@@ -2044,7 +2133,11 @@ for p in .github/workflows/e2e-tests.yml bin/vr-build-gallery ibl5/tests/e2e/vr-
     ibl5/package.json ibl5/bun.lock ibl5/bun.lockb ibl5/bunfig.toml ibl5/.npmrc \
     ibl5/composer.json ibl5/composer.lock ibl5/tsconfig.json \
     bin/vr-review-comment bin/vr-changed-coverage bin/playwright-image-tag \
-    ibl5/bin/run-migrations-ci docker-compose.ci.yml Dockerfile docker/entrypoint.sh; do
+    ibl5/bin/run-migrations-ci docker-compose.ci.yml Dockerfile docker/entrypoint.sh \
+    ibl5/tests/e2e/vr-recorder/functions.php ibl5/tests/e2e/vr-recorder/prepend.php \
+    ibl5/tests/e2e/vr-recorder/vr-recorder.ini ibl5/tests/e2e/vr-recorder/rendered-views.ts \
+    ibl5/tests/e2e/vr-recorder/collect.ts ibl5/tests/e2e/vr-recorder/rendered-views-selftest.ts \
+    ibl5/tests/e2e/vr-recorder/assert-gallery.ts; do
     UI_CLI_RC=0
     printf '%s\n' "$p" | bash "$UI_LIB" --paths > /dev/null 2>&1 || UI_CLI_RC=$?
     expect "ui-change-classifier.sh --paths: gallery producer $p exits 0" 0 "$UI_CLI_RC"
@@ -2053,7 +2146,8 @@ done
 # Near misses: files the VR job never runs stay off the producer list.
 ui_paths_rc ui_paths_producer_near_misses 1 ibl5/tests/e2e/flows/trade.spec.ts \
     ibl5/IBLbot/package.json bin/vr-refresh-targets docker-compose.yml ibl5/package-lock.json \
-    .github/actions/setup-php-env/action.yml .github/actions/notify-discord/action.yml
+    .github/actions/setup-php-env/action.yml .github/actions/notify-discord/action.yml \
+    ibl5/tests/e2e/vr-recorder.php ibl5/tests/e2e/smoke/vr-recorder/prepend.php
 # The e2e job runs only setup-docker-e2e from .github/actions. Each other local
 # action gets its own case so a regression names the path that broke.
 ui_paths_rc ui_paths_non_vr_action_setup_php_env 1 .github/actions/setup-php-env/action.yml

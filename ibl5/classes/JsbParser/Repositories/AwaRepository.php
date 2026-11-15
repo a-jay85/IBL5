@@ -22,7 +22,7 @@ class AwaRepository extends \Database\BaseMysqliRepository
             'iss',
             $year,
             $award,
-            $name
+            \JsbParser\PlayerNameNormalizer::normalize($name)
         );
     }
 

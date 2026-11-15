@@ -9,6 +9,7 @@ import { test as authRegularTest } from '../fixtures/auth-regular';
 import { expect } from '../fixtures/base';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 import { gotoWithRetry } from '../helpers/navigation';
+import { assertCellRecorded, recordingOn, setVrCellCookie } from '../vr-recorder/collect';
 import {
   VR_MANIFEST,
   DEFAULT_STATE,
@@ -113,6 +114,7 @@ async function captureSnapshot(
   const filename = snapshotFilename(row, state, viewport, tab);
   const title = filename.replace(/\.png$/, '');
   const anchor = page.locator(row.anchor).first();
+  if (recordingOn()) await setVrCellCookie(page, row.name, title);
 
   // Re-establish the same visual state after a (re)load: wait for the anchor,
   // and re-trigger the HTMX tab swap if any. Runs after both the initial
@@ -175,6 +177,7 @@ async function captureSnapshot(
   } catch {
     // A missing .b.png skips the self-stability check (gallery handles null B).
   }
+  if (recordingOn()) assertCellRecorded(row.name, title);
 
   // The pass/fail gate stays LAST and unchanged — this is what the
   // `update-baselines` regen workflow signs off and what the green/red check

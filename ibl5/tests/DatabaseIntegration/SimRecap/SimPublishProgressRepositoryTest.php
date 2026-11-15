@@ -71,6 +71,19 @@ final class SimPublishProgressRepositoryTest extends DatabaseTestCase
         self::assertNull($this->repo->claimNext(self::TOKEN_A));
     }
 
+    public function testClaimReturnsTheRowItClaimedNotAnOlderOneTheTokenOwns(): void
+    {
+        $this->repo->enqueue(999001);
+        $this->repo->enqueue(999002);
+        // Token A owns sim 999001, but that sim is past the attempts cap and no longer claimable.
+        $this->exec("UPDATE `ibl_sim_publish_progress` SET `attempts` = 5, `claim_token` = '" . self::TOKEN_A . "', `heartbeat_at` = NOW() WHERE `sim` = 999001");
+
+        $claimed = $this->repo->claimNext(self::TOKEN_A);
+
+        self::assertNotNull($claimed);
+        self::assertSame(999002, $claimed['sim']);
+    }
+
     public function testFinishedRowNotClaimable(): void
     {
         $this->repo->enqueue(999001);

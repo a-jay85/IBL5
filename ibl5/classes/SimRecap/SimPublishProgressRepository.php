@@ -24,6 +24,13 @@ class SimPublishProgressRepository extends \Database\BaseMysqliRepository
     /** An unstarted row enqueued longer ago than this is never claimed, so a sim enqueued while the publisher was off does not post later. */
     public const FRESH_SECONDS = 21600;
 
+    /** Claim predicate. Binds, in order: MAX_ATTEMPTS (i), token (s), STALE_SECONDS (i), 0 (i), FRESH_SECONDS (i). */
+    private const CLAIMABLE = "`enqueued_at` IS NOT NULL
+               AND `finished_at` IS NULL
+               AND `attempts` < ?
+               AND (`claim_token` IS NULL OR `claim_token` = ? OR `heartbeat_at` < NOW() - INTERVAL ? SECOND)
+               AND (`last_step` >= ? OR `enqueued_at` >= NOW() - INTERVAL ? SECOND)";
+
     /**
      * Mark $sim ready to publish. A repeat call never resets progress.
      */
@@ -60,18 +67,32 @@ class SimPublishProgressRepository extends \Database\BaseMysqliRepository
      */
     public function claimNext(string $token): ?array
     {
+        // Pick the candidate first. A token can still own an older unfinished sim that no longer
+        // passes the predicates, so the row to return must be the one this UPDATE touched.
+        $candidate = $this->fetchOne(
+            "SELECT `sim` FROM `ibl_sim_publish_progress`
+             WHERE " . self::CLAIMABLE . "
+             ORDER BY `sim` ASC
+             LIMIT 1",
+            'isiii',
+            self::MAX_ATTEMPTS,
+            $token,
+            self::STALE_SECONDS,
+            0,
+            self::FRESH_SECONDS
+        );
+        if ($candidate === null) {
+            return null;
+        }
+        $sim = self::scalarToInt($candidate['sim'] ?? null);
+
         $claimed = $this->execute(
             "UPDATE `ibl_sim_publish_progress`
              SET `attempts` = `attempts` + 1, `claim_token` = ?, `heartbeat_at` = NOW()
-             WHERE `enqueued_at` IS NOT NULL
-               AND `finished_at` IS NULL
-               AND `attempts` < ?
-               AND (`claim_token` IS NULL OR `claim_token` = ? OR `heartbeat_at` < NOW() - INTERVAL ? SECOND)
-               AND (`last_step` >= ? OR `enqueued_at` >= NOW() - INTERVAL ? SECOND)
-             ORDER BY `sim` ASC
-             LIMIT 1",
-            'sisiii',
+             WHERE `sim` = ? AND " . self::CLAIMABLE,
+            'siisiii',
             $token,
+            $sim,
             self::MAX_ATTEMPTS,
             $token,
             self::STALE_SECONDS,
@@ -85,10 +106,9 @@ class SimPublishProgressRepository extends \Database\BaseMysqliRepository
         $row = $this->fetchOne(
             "SELECT `sim`, `title_override`, `thread_id`, `last_step`
              FROM `ibl_sim_publish_progress`
-             WHERE `claim_token` = ? AND `finished_at` IS NULL
-             ORDER BY `sim` ASC
-             LIMIT 1",
-            's',
+             WHERE `sim` = ? AND `claim_token` = ? AND `finished_at` IS NULL",
+            'is',
+            $sim,
             $token
         );
         if ($row === null) {

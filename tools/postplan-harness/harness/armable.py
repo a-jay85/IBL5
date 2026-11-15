@@ -225,7 +225,10 @@ def ui_hold(files: list[str], labels: list[str]) -> str:
     except (OSError, subprocess.SubprocessError):
         return "ui classifier unavailable"
     if proc.returncode == 0:
-        return "UI-touching PR awaiting human-signoff"
+        hits = [p.strip() for p in proc.stdout.splitlines() if p.strip()]
+        if not hits:
+            return "UI-touching PR awaiting human-signoff"
+        return "UI-touching PR awaiting human-signoff: " + ", ".join(hits)
     if proc.returncode == 1:
         return ""
     return "ui classifier error"

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DataRetention\Contracts;
 
+use DataRetention\AccountDeletionReport;
 use DataRetention\AuditPurgeResult;
 
 /**
@@ -25,4 +26,20 @@ interface DataRetentionServiceInterface
      * @throws \RuntimeException When the table does not drain within the batch cap
      */
     public function purgeAuditLog(int $retentionDays, bool $dryRun, int $nowEpoch, int $batchSize = 1000): AuditPurgeResult;
+
+    /**
+     * Delete one account and every row that names it, or count those rows.
+     *
+     * With `$confirm`, every write runs in one transaction, in AccountFootprintTarget case
+     * order. Team rows stay with their GM slot emptied; `ibl_events` rows stay with the
+     * username unlinked.
+     *
+     * @param int $userId `auth_users.id`
+     * @param bool $confirm False counts rows and writes nothing
+     *
+     * @throws \InvalidArgumentException When $userId is below 1
+     * @throws \DataRetention\UnknownAccountException When no account has this id; nothing is written
+     * @throws \RuntimeException When the account row is not deleted exactly once; the transaction rolls back
+     */
+    public function deleteAccount(int $userId, bool $confirm): AccountDeletionReport;
 }

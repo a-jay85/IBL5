@@ -53,4 +53,49 @@ final class DataRetentionService implements DataRetentionServiceInterface
             'audit-log purge exceeded ' . $maxBatches . ' batches; rows are still being written below the cutoff'
         );
     }
+
+    /**
+     * @see DataRetentionServiceInterface::deleteAccount()
+     */
+    public function deleteAccount(int $userId, bool $confirm): AccountDeletionReport
+    {
+        if ($userId < 1) {
+            throw new \InvalidArgumentException('User id must be a positive integer, got ' . $userId);
+        }
+
+        $user = $this->repository->findAuthUserById($userId);
+        if ($user === null) {
+            throw new UnknownAccountException('No auth_users row has id ' . $userId);
+        }
+        $username = $user['username'];
+
+        $vacatedTeams = ($username !== null && $username !== '')
+            ? $this->repository->findTeamsByGmUsername($username)
+            : [];
+
+        if (!$confirm) {
+            $counts = [];
+            foreach (AccountFootprintTarget::cases() as $target) {
+                $counts[$target->value] = $this->repository->countAccountTarget($target, $userId, $username);
+            }
+            return new AccountDeletionReport($userId, $username, true, $counts, $vacatedTeams);
+        }
+
+        /** @var array<string, int> $affected */
+        $affected = $this->repository->runInTransaction(function () use ($userId, $username): array {
+            $written = [];
+            foreach (AccountFootprintTarget::cases() as $target) {
+                $written[$target->value] = $this->repository->applyAccountTarget($target, $userId, $username);
+            }
+            $authRows = $written[AccountFootprintTarget::AuthUsers->value];
+            if ($authRows !== 1) {
+                throw new \RuntimeException(
+                    'Expected to delete 1 auth_users row for id ' . $userId . ', deleted ' . $authRows . '; rolled back'
+                );
+            }
+            return $written;
+        });
+
+        return new AccountDeletionReport($userId, $username, false, $affected, $vacatedTeams);
+    }
 }

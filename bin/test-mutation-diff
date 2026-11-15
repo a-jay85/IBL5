@@ -516,6 +516,12 @@ make_repo; modify_class
 CLAUDE_HEADLESS="" GH_BIN="$TMP/no-such-gh" run_md --force base
 if [ "$RC" != 6 ]; then h_pass "force empty headless: not refused"; else h_fail "force empty headless: not refused" "exit 6"; fi
 h_contains "force empty headless: warn" "$ERR" "WARN: --force skips the CI-state check"
+# a similarly named variable does not trigger the headless refusal
+make_repo; modify_class
+_hl_saved="${CLAUDE_HEADLESS-}"; _hl_was_set="${CLAUDE_HEADLESS+1}"; unset CLAUDE_HEADLESS
+CLAUDE_HEADLESS_OFF=1 GH_BIN="$TMP/no-such-gh" run_md --force base
+[ -z "$_hl_was_set" ] || export CLAUDE_HEADLESS="$_hl_saved"
+if [ "$RC" != 2 ] && [ "$RC" != 6 ]; then h_pass "CLAUDE_HEADLESS_OFF is not the headless marker"; else h_fail "CLAUDE_HEADLESS_OFF is not the headless marker" "exit $RC"; fi
 # --force with CLAUDE_HEADLESS=1: usage error, no docker call
 make_repo; modify_class
 CLAUDE_HEADLESS=1 run_md --force base

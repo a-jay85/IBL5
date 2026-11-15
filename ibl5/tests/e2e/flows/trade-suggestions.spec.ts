@@ -368,27 +368,6 @@ test.describe('Trade suggestions panel (GM)', () => {
       await assertNoPhpErrors(page, `tampered prefill ${prefill.slice(0, 20)}`);
     }
   });
-
-  test('suggestion links target offer screen only', async ({ page }) => {
-    await gotoWithRetry(page, 'index.php');
-    await expect(page.locator(PANEL)).toBeVisible();
-
-    // The CI seed may yield zero links; the invariant holds for whatever renders.
-    // The worktree-stack pre-prod row exercises a populated panel.
-    const links = page.locator('[data-testid="trade-suggestion-open"]');
-    const count = await links.count();
-    if (count === 0) {
-      // No links means the panel must say so; an empty panel is a failure.
-      await expect(page.locator('[data-testid="trade-suggestions-empty"]')).toBeVisible();
-    }
-    const pattern =
-      /^modules\.php\?name=Trading&op=offertrade&partner=[^&]+&prefill=[01]%3A\d+(%2C[01]%3A\d+)*$/;
-    for (let i = 0; i < count; i++) {
-      const href = (await links.nth(i).getAttribute('href')) ?? '';
-      expect(href).toMatch(pattern);
-      expect(href).not.toContain('maketradeoffer');
-    }
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -453,6 +432,7 @@ test.describe('Trade suggestions feedback (GM as Stars)', () => {
       /^modules\.php\?name=Trading&op=offertrade&partner=[^&]+&prefill=[01]%3A\d+(%2C[01]%3A\d+)*$/;
     for (const href of await links.evaluateAll((els) => els.map((el) => el.getAttribute('href') ?? ''))) {
       expect(href).toMatch(pattern);
+      expect(href).not.toContain('maketradeoffer');
     }
     await assertNoPhpErrors(page, 'populated trade suggestions panel');
   });

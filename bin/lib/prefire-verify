@@ -820,7 +820,9 @@ stage_shell() {
         say "shell mode: skipped (all ${#lines[@]} harness lines deferred over the ${budget} s budget)"
         return 0
     fi
-    write_record shell "$key"
+    # A deferred line never ran, so a pass record keyed on the lines alone would hide it from a
+    # rerun with a bigger budget. Record only a full run.
+    if [ "$over" -eq 0 ]; then write_record shell "$key"; fi
     say "shell passed ($ran harness lines run, $over deferred to CI over the budget)"
     return 0
 }

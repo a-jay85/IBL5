@@ -1,5 +1,5 @@
 ---
-description: Read-on-demand only (no auto-attach trigger) — when Fable is justified over Opus, and how to use it, effort per surface, how the /plan architect tier is judged. No user approval needed; state the justification in one line and spawn. Parent agent-tiering.md carries the resident one-line summary.
+description: Read-on-demand only (no auto-attach trigger) — when Fable is justified over Opus, and how to use it, effort per surface, how the /plan architect tier is judged. Ask the owner before any Fable spawn; state the justification in one line. Parent agent-tiering.md carries the resident one-line summary.
 last_verified: 2026-11-16
 paths: ".claude/rules/agent-tiering-fable.md"
 ---
@@ -17,7 +17,7 @@ If Opus stalled at medium effort, rerun it at high first. On the 2026-10 review-
 
 If Opus at high still falls short, move to Fable at high. Do not raise Opus to `xhigh` or `max` first. Anthropic's model-choice guide (claude.dev, "Which Claude model should you build with") reports Fable 5.2 at `high` matching Opus 5.5 at `max` on FrontierCode 2.0 for about half the cost per task.
 
-When the test passes, use Fable. Do not ask the user. Say one line before the spawn: what the task is, and which trait makes Opus risky. Spawn with `model: "fable"`. Claude cannot switch its own session model, so Fable work is always a sub-agent.
+When the test passes, ask the owner before you spawn Fable. Name the task in one line and say which trait makes Opus risky. A headless run cannot ask, so it stays on Opus. Once the owner says yes, spawn with `model: "fable"`. Claude cannot switch its own session model, so Fable work is always a sub-agent.
 
 When the test fails, stay on Opus (or a lower tier). Most tasks fail it.
 
@@ -68,7 +68,7 @@ Total spend $14.03. Sonnet `medium` caught the same cases as Sonnet `high`. Opus
 
 ## Pinned agent defs
 
-A def whose frontmatter pins `model: fable` always runs on Fable. Today that is `plan-architect-xhigh` at high effort. The `/plan` architect tier is an Opus judgment that `bin/plan-tier-hint` makes with the test above. The orchestrator owns the final call (`/plan` Step 3).
+A def whose frontmatter pins `model: fable` always runs on Fable. Today that is `plan-architect-xhigh` at high effort. The `/plan` architect tier is an Opus judgment that `bin/plan-tier-hint` makes with the test above. The orchestrator follows that pick. It may move an xhigh pick down to Opus. It needs the owner's OK to move a pick up to xhigh, so a headless run never does (`/plan` Step 3).
 
 A human may route any task to either architect. When `bin/plan-now` sees a declared tier that disagrees with the hint and one side is xhigh, it exits 4, and `--tier-ok "<reason>"` records the override. Every verdict lands in `~/.claude/logs/plan-tier-hint.log` with its reason, so a tier pick that went wrong can be traced.
 

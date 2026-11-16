@@ -256,7 +256,7 @@ The three tiers:
   default planner. It plans almost every task here, including security,
   gate, and migration work. Answer default whenever you are unsure.
 - xhigh: plan-architect-xhigh on Fable at high effort. Fable costs about
-  2.5 times Opus 5.5 per token.
+  2 times Opus 5.5 per token.
 - sonnet: plan-architect-sonnet on Sonnet 5.5. Answer sonnet only when the
   task itself carries an explicit recipe plus a named existing pattern to
   copy, so writing the plan is mechanical composition.

@@ -337,6 +337,39 @@ done < f
 FIX
 expect c37-sudo-wrapper "$T/c37.sh" 1 3
 
+cat > "$T/c38.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  docker run -p 8080:80 -i img sh
+done < f
+FIX
+expect c38-docker-run-i-after-publish "$T/c38.sh" 1 3
+
+cat > "$T/c39.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  docker -H h exec -i c sh
+done < f
+FIX
+expect c39-docker-global-option-then-exec-i "$T/c39.sh" 1 3
+
+cat > "$T/c40.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  docker run --cpu-shares 512 -i img sh
+done < f
+FIX
+expect c40-docker-unknown-value-option-falls-back "$T/c40.sh" 1 3
+
+cat > "$T/c41.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  docker run --rm -p 80:80 img grep -i foo f
+  docker exec -u root c grep -i foo f
+done < f
+FIX
+expect c41-docker-inner-i-stays-safe "$T/c41.sh" 0
+
 echo ""
 echo "$PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

@@ -345,6 +345,90 @@ final class PriorSeasonEndOfSeasonImportStepTest extends TestCase
         self::assertFalse($result->skipped);
     }
 
+    /**
+     * A season with no retirees writes no rows, so the retiree table check can
+     * never pass. A fetched .ret that lists nobody must count as done.
+     */
+    public function testZeroRetireeRetFileCountsAsDone(): void
+    {
+        self::assertSame([], RetFileParser::parse(self::EMPTY_RET_DATA));
+
+        $files = $this->realFiles();
+        $files['ret'] = self::EMPTY_RET_DATA;
+
+        $service = $this->serviceMock();
+        $service->expects(self::never())->method('processRetData');
+
+        $result = $this->buildStep(
+            repo: $this->championRepo(),
+            service: $service,
+            resolver: $this->fileResolver($files),
+        )->execute();
+
+        $retLines = array_filter(
+            $result->messages,
+            static fn (string $message): bool => str_starts_with($message, 'RET:'),
+        );
+        self::assertSame([], array_values($retLines));
+    }
+
+    public function testStepSkipsWhenOnlyRemainingFileIsEmptyRet(): void
+    {
+        $files = $this->realFiles();
+        $files['ret'] = self::EMPTY_RET_DATA;
+
+        $service = $this->serviceMock();
+        $service->expects(self::never())->method('processRetData');
+
+        $result = $this->buildStep(
+            repo: $this->allImportedExceptRetRepo(),
+            service: $service,
+            resolver: $this->fileResolver($files),
+        )->execute();
+
+        self::assertTrue($result->skipped);
+        self::assertSame('Prior-season imports already ran for 2008', $result->detail);
+    }
+
+    public function testEmptyDraFileCountsAsDone(): void
+    {
+        self::assertSame([], DraFileParser::parse(self::EMPTY_DRA_DATA));
+
+        $files = $this->realFiles();
+        $files['dra'] = self::EMPTY_DRA_DATA;
+
+        $service = $this->serviceMock();
+        $service->expects(self::never())->method('processDraData');
+
+        $result = $this->buildStep(
+            repo: $this->allImportedRepo(),
+            service: $service,
+            resolver: $this->fileResolver($files),
+        )->execute();
+
+        self::assertTrue($result->skipped);
+    }
+
+    public function testEmptyHofFileCountsAsDone(): void
+    {
+        $emptyHof = str_repeat(' ', 8000);
+        self::assertSame([], HofFileParser::parse($emptyHof));
+
+        $files = $this->realFiles();
+        $files['hof'] = $emptyHof;
+
+        $service = $this->serviceMock();
+        $service->expects(self::never())->method('processHofData');
+
+        $result = $this->buildStep(
+            repo: $this->allImportedRepo(),
+            service: $service,
+            resolver: $this->fileResolver($files),
+        )->execute();
+
+        self::assertTrue($result->skipped);
+    }
+
     private function buildStep(
         ?JsbImportRepositoryInterface $repo = null,
         ?JsbImportService $service = null,

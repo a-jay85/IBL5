@@ -273,6 +273,10 @@ def test_split_rules_diffs_none_and_trailing_newline():
     sections = split_docs_refresh_rules_diffs(diff, files)
     assert list(sections) == [RULES_X]
     assert docs_refresh_rules_date_only(RULES_X, sections[RULES_X])
+    # A rules section that ends the diff must not keep the trailing empty element.
+    last = split_docs_refresh_rules_diffs(_rules_diff(RULES_X, BUMP_BODY), [RULES_X])
+    assert not last[RULES_X].endswith("\n")
+    assert docs_refresh_rules_date_only(RULES_X, last[RULES_X])
 
 
 # --- PR 3991 replay: five rules files with date-only bumps, three docs files ---------------

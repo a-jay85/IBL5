@@ -163,6 +163,24 @@ def test_verifier_rejects_true_claims_below_the_bar():
     assert "Vote not-real even when the claim is TRUE" in prompt
 
 
+def test_agent_d_prompt_names_its_pattern_sentence():
+    """Mutation: delete the 'Each finding must name which of the three patterns' sentence
+    from agent_d_prompt => Agent D findings stop saying which anti-pattern they hit."""
+    prompt = _prompts()["d"]
+    assert "Each finding must name which of the three patterns it is." in prompt
+    assert ("Any other test-strength concern (a test that cannot fail for another reason, "
+            "a weak fixture) is out of scope.") in prompt
+
+
+def test_verifier_carries_agent_d_exemption_sentence():
+    """Mutation: cut the clause after 'exempt from the bar' in verifier_prompt => the verifier
+    either rejects every Agent D finding or exempts them all."""
+    f = Finding(source="code-review", agent="D", path="ibl5/tests/e2e/a.spec.ts", line=1, body="b")
+    prompt = review.verifier_prompt([f], {})
+    assert ("A review-agent-d finding is exempt from the bar only when it names one of its "
+            "three E2E anti-patterns") in prompt
+
+
 def test_contract_example_validates():
     example = json.loads(review.OUTPUT_CONTRACT_EXAMPLE)
     schemas.validate_findings(example)

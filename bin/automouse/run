@@ -860,6 +860,31 @@ send_stop_dm() {
 }
 # End stop-DM sender.
 
+# Skip-error sender: every plan moved to skipped/ in this run goes to the #errors
+# channel in one post at run end. note_skip records the line (and the stderr
+# summary through note_failure); send_skip_errors runs once from cleanup_watcher,
+# after send_stop_dm. A skip needs a human, so it is an error, even when the run
+# itself finished cleanly. Never fails: output goes to $LOG, and discord-dm spools
+# an undeliverable post itself.
+note_skip() {
+    note_failure "$1"
+    SKIP_NOTES="${SKIP_NOTES:-}- $1
+"
+}
+
+send_skip_errors() {
+    local log="${LOG:-/dev/null}"
+    [ "${STOP_DM_ARMED:-0}" = 1 ] || return 0
+    [ -n "${SKIP_NOTES:-}" ] || return 0
+    printf 'Automouse run %s skipped plans:\n%sRequeue one with: bin/automouse/queue <slug>\n' \
+            "$$" "$SKIP_NOTES" \
+        | "$SELF_DIR/../discord-dm" - --error --attempts 2 --quiet >> "$log" 2>&1 \
+        || { echo "Skip error post undeliverable (spooled)." >> "$log"; } 2>/dev/null \
+        || true
+    return 0
+}
+# End skip-error sender.
+
 cleanup_watcher() {
     local stop_rc=$?
     if [ -n "$WATCHER_PID" ]; then
@@ -882,6 +907,7 @@ cleanup_watcher() {
     write_stop_file "$stop_rc"
     print_stop_reason "$stop_rc"
     send_stop_dm "$stop_rc"
+    send_skip_errors
 }
 STOP_DM_ARMED=0
 trap cleanup_watcher EXIT
@@ -2245,7 +2271,7 @@ hold_plan_judge() {
         printf '%s\n\n' "${final:-(no final message captured)}"
         printf 'Fix the branch, then run bin/automouse/queue requeue. The judge runs again before post-plan.\n'
     } > "$report"
-    note_failure "${plan_name%.md} was held by the Opus judge (verdict: $verdict) and moved to skipped/. Read $report" || true
+    note_skip "${plan_name%.md} was held by the Opus judge (verdict: $verdict) and moved to skipped/. Read $report" || true
 }
 
 # Write the skipped report for a plan stopped on a plan defect. Same path shape
@@ -2615,7 +2641,7 @@ while true; do
             tail -30 "$LOG"
             printf '\n```\n'
         } > "$REPORTS_DIR/$(date +%Y-%m-%d)-skipped-$SLUG.md"
-        note_failure "Plan $SLUG failed $ATTEMPTS times, so it was moved to skipped/. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-$SLUG.md"
+        note_skip "Plan $SLUG failed $ATTEMPTS times, so it was moved to skipped/. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-$SLUG.md"
         rm -rf "$CURRENT_LOCK" 2>/dev/null || true
         CURRENT_LOCK=""
         continue
@@ -2647,7 +2673,7 @@ while true; do
             printf '%s\n\n' "$BASE_MODEL"
             printf 'Fix the line-1 frontmatter to one of: opus, sonnet, haiku, claude-opus-5-5, claude-sonnet-5-5, claude-sonnet-4-6, claude-haiku-5-5, claude-haiku-4-5 — then `bin/automouse/queue add %s`.\n' "$SLUG"
         } > "$REPORTS_DIR/$(date +%Y-%m-%d)-skipped-$SLUG.md"
-        note_failure "Plan $SLUG names a model automouse does not know (impl_model:), so it was moved to skipped/. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-$SLUG.md"
+        note_skip "Plan $SLUG names a model automouse does not know (impl_model:), so it was moved to skipped/. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-$SLUG.md"
         rm -rf "$CURRENT_LOCK" 2>/dev/null || true
         CURRENT_LOCK=""
         continue
@@ -2807,7 +2833,7 @@ while true; do
                         rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE" "$PLAN_DEFECT_FILE"  # diverged skip: no attempt burned
                     fi
                     # reap-exempt: the diverged worktree holds work a human must resolve, so it stays.
-                    note_failure "The worktree for $SLUG has merge conflicts or unsaved changes ($WT_VERDICT), so it was skipped. Fix $IMPL_WT, then requeue it."
+                    note_skip "The worktree for $SLUG has merge conflicts or unsaved changes ($WT_VERDICT), so it was skipped. Fix $IMPL_WT, then requeue it."
                     rm -rf "$CURRENT_LOCK" 2>/dev/null || true
                     CURRENT_LOCK=""
                     continue ;;
@@ -3059,7 +3085,7 @@ while true; do
             echo "Impl made a deliberate disposition (plan left queue/, e.g. already-merged → done/ or a stale-plan skip) — not an environmental failure, continuing." >> "$LOG"
             if [ -e "$NIGHTLY_DIR/skipped/$PLAN_NAME" ]; then
                 reap_empty_worktree "${PLAN_NAME%.md}"
-                note_failure "The agent chose to skip ${PLAN_NAME%.md} and moved it to skipped/. Look in $NIGHTLY_DIR/reports/ for today's report on it."
+                note_skip "The agent chose to skip ${PLAN_NAME%.md} and moved it to skipped/. Look in $NIGHTLY_DIR/reports/ for today's report on it."
             fi
         elif [ "$IMPL_WT_FAIL" -eq 1 ]; then
             # bin/wt-new failed at prompt-impl Step 5 (e.g. git lock contention
@@ -3086,7 +3112,7 @@ while true; do
             dispose_entry "$PLAN_NAME" skipped
             touch -h "$NIGHTLY_DIR/skipped/$PLAN_NAME" 2>/dev/null || true
             write_plan_defect_report "$PLAN_NAME" "$PLAN_DEFECT_FILE" "$(( ATTEMPTS + 1 ))"
-            note_failure "${PLAN_NAME%.md} has a plan defect: its Verification Matrix could not be realised, so it was moved to skipped/ after one try. Fix the plan, then requeue. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-${PLAN_NAME%.md}.md"
+            note_skip "${PLAN_NAME%.md} has a plan defect: its Verification Matrix could not be realised, so it was moved to skipped/ after one try. Fix the plan, then requeue. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-${PLAN_NAME%.md}.md"
             rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE" "$PLAN_DEFECT_FILE"
             reap_empty_worktree "${PLAN_NAME%.md}"
         elif [ "$IMPL_CAP_REFUNDED" -eq 0 ]; then
@@ -3116,7 +3142,7 @@ while true; do
                 dispose_entry "$PLAN_NAME" skipped
                 touch -h "$NIGHTLY_DIR/skipped/$PLAN_NAME" 2>/dev/null || true
                 write_repeat_failure_report "$PLAN_NAME" "$NEW_FAILSIG" "${PREV_FAILATTEMPT:-?}" "$(( ATTEMPTS + 1 ))"
-                note_failure "${PLAN_NAME%.md} failed the same way twice in a row, so it was moved to skipped/ instead of trying again."
+                note_skip "${PLAN_NAME%.md} failed the same way twice in a row, so it was moved to skipped/ instead of trying again."
                 rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE" "$PLAN_DEFECT_FILE"
                 reap_empty_worktree "${PLAN_NAME%.md}"
             fi
@@ -3273,7 +3299,7 @@ while true; do
         if [ "$PP_STATUS" -eq 3 ]; then
             PP_TERMINAL=1
             dispose_plan_postplan_blocked "$PLAN_NAME" "$PLAN_SLUG" "$PP_LOG_BEFORE"
-            note_failure "Shipping $PLAN_SLUG was blocked, so no PR was opened. It was moved to skipped/. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-$PLAN_SLUG.md"
+            note_skip "Shipping $PLAN_SLUG was blocked, so no PR was opened. It was moved to skipped/. Read $NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-$PLAN_SLUG.md"
         fi
         # postplan-rc8-declined: begin
         # post-plan-now exit 8 = it declined a repeat hold (holdrepeat or held-unfixable

@@ -101,12 +101,19 @@ jobs:
 
     - name: Run Infection
       working-directory: ibl5
+      # The weekly bar is the full suite's real score. infection.json5 keeps 100
+      # for the per-PR diff job. Every weekly score before 2026-10-30 was fake:
+      # Infection's temp config could not find the old relative phpunit.xml
+      # baseline, so PHPUnit exited 1 and every mutant counted as killed.
+      # The first honest run (2026-11-16) scored 71.1%. Raise this as tests improve.
       run: |
         vendor/bin/infection \
           --configuration=infection.json5 \
           --coverage=coverage \
           --skip-initial-tests \
           --show-mutations \
+          --min-msi=71 \
+          --min-covered-msi=71 \
           --no-progress
 
     - name: Upload mutation reports

@@ -9,6 +9,7 @@ use JsbParser\DraFileParser;
 use JsbParser\HofFileParser;
 use JsbParser\JsbImportResult;
 use JsbParser\JsbImportService;
+use JsbParser\RetFileParser;
 use Updater\Contracts\JsbSourceResolverInterface;
 use Updater\Contracts\PipelineStepInterface;
 use Updater\SourceProvenance;
@@ -21,6 +22,8 @@ use Updater\StepResult;
  *
  * Each file has its own "already imported?" check against its own table, so a
  * file missing from the archive on one night is retried on a later night.
+ * An archived file that parses to no entries counts as imported, because
+ * importing it writes no rows and the table check could never pass for it.
  * Every import is an upsert, so a re-run writes no duplicate rows.
  */
 final class PriorSeasonEndOfSeasonImportStep implements PipelineStepInterface
@@ -70,7 +73,7 @@ final class PriorSeasonEndOfSeasonImportStep implements PipelineStepInterface
      * prior season's year, so the check keys on the newest year in the file.
      *
      * @param list<string> $messages
-     * @return bool True when the newest draft in the archive is already stored
+     * @return bool True when the newest draft in the archive is already stored, or the archived file lists no drafts
      */
     private function importDra(JsbImportResult $result, array &$messages): bool
     {
@@ -80,7 +83,7 @@ final class PriorSeasonEndOfSeasonImportStep implements PipelineStepInterface
         }
 
         $newestYear = self::newestYear(array_column(DraFileParser::parse($data), 'draft_year'));
-        if ($newestYear !== null && $this->jsbRepo->hasDraftResultsForYear($newestYear)) {
+        if ($newestYear === null || $this->jsbRepo->hasDraftResultsForYear($newestYear)) {
             return true;
         }
 
@@ -93,7 +96,7 @@ final class PriorSeasonEndOfSeasonImportStep implements PipelineStepInterface
 
     /**
      * @param list<string> $messages
-     * @return bool True when the prior season's retirees are already stored
+     * @return bool True when the prior season's retirees are already stored, or the archived file lists no retirees
      */
     private function importRet(JsbImportResult $result, array &$messages): bool
     {
@@ -104,6 +107,12 @@ final class PriorSeasonEndOfSeasonImportStep implements PipelineStepInterface
         $data = $this->fetchArchived('ret', $messages);
         if ($data === null) {
             return false;
+        }
+
+        // A season with no retirees writes no rows, so the table check above
+        // can never pass for it. An archived file that lists nobody is done.
+        if (RetFileParser::parse($data) === []) {
+            return true;
         }
 
         $retResult = $this->jsbService->processRetData($data, $this->priorYear);
@@ -118,7 +127,7 @@ final class PriorSeasonEndOfSeasonImportStep implements PipelineStepInterface
      * check keys on the newest induction year in the file.
      *
      * @param list<string> $messages
-     * @return bool True when the newest induction in the archive is already stored
+     * @return bool True when the newest induction in the archive is already stored, or the archived file lists no inductions
      */
     private function importHof(JsbImportResult $result, array &$messages): bool
     {
@@ -128,14 +137,17 @@ final class PriorSeasonEndOfSeasonImportStep implements PipelineStepInterface
         }
 
         try {
-            $newestYear = self::newestYear(array_column(HofFileParser::parse($data), 'induction_year'));
+            $inductionYears = array_column(HofFileParser::parse($data), 'induction_year');
         } catch (\RuntimeException) {
             // Unparseable: let processHofData run and report the parse error.
-            $newestYear = null;
+            $inductionYears = null;
         }
 
-        if ($newestYear !== null && $this->jsbRepo->hasHofInducteesForYear($newestYear)) {
-            return true;
+        if ($inductionYears !== null) {
+            $newestYear = self::newestYear($inductionYears);
+            if ($newestYear === null || $this->jsbRepo->hasHofInducteesForYear($newestYear)) {
+                return true;
+            }
         }
 
         $hofResult = $this->jsbService->processHofData($data);

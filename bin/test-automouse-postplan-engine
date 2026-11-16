@@ -177,6 +177,7 @@ eval "$ENV_ERR_FN"
 timeout() { local _s="$1"; shift; "$@"; }
 # The runner's plain-English stop notes are not under test here.
 note_failure() { :; }
+note_skip() { :; }
 note_stop() { :; }
 
 echo
@@ -898,7 +899,7 @@ assert_eq "$(cat "$RB/rc" 2>/dev/null)" "ok" "row 21a: wt-down failure is swallo
 assert_eq "$(tail -n 1 "$RB/order")" "wt-remove demo-slug --if-empty" "row 21b: wt-remove still runs"
 # --- Row 22: the 3-failed-attempts skip reaches the helper ---
 assert_eq "$(grep -c 'Plan \$PLAN_NAME failed \$ATTEMPTS times' "$RUN_FILE")" "1" "row 22a: attempt-cap anchor is unique"
-CAP_SPAN=$(awk '/Plan \$PLAN_NAME failed \$ATTEMPTS times/,/note_failure "Plan \$SLUG failed/' "$RUN_FILE")
+CAP_SPAN=$(awk '/Plan \$PLAN_NAME failed \$ATTEMPTS times/,/note_skip "Plan \$SLUG failed/' "$RUN_FILE")
 assert_eq "$(grep -cF 'reap_empty_worktree "${PLAN_NAME%.md}"' <<< "$CAP_SPAN")" "1" "row 22b: attempt-cap skip calls reap_empty_worktree"
 rm -rf "$RB"
 

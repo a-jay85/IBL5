@@ -292,9 +292,11 @@ func andOneBucketRaw(mq float64, p onCourt) float64 {
 
 // halfCourtAndOneWeight is the half-court and-one bucket weight: the HCA term
 // joins the raw weight first, then andOneBucketFloor applies to the sum
-// (FUN_004e1ba0 97165-97168: local_e90 inherits local_e88's +hca, floored after).
-func halfCourtAndOneWeight(mq float64, p onCourt, hcaScaled float64) float64 {
-	return max(andOneBucketRaw(mq, p)+hcaScaled, andOneBucketFloor)
+// (FUN_004e1ba0 97165-97168: local_e90 inherits local_e88's +hca, floored
+// after). andOneHalfCourtScale (J27 rate-port stand-in) scales only the raw
+// weight; the HCA term carries the home margin and stays unscaled.
+func halfCourtAndOneWeight(mq float64, bh onCourt, hcaScaled float64) float64 {
+	return max(andOneHalfCourtScale*andOneBucketRaw(mq, bh)+hcaScaled, andOneBucketFloor)
 }
 
 // foulBucketWeight is the faithful JSB 5.60 foul bucket: a symmetric two-arm BASE

@@ -1,6 +1,7 @@
 package sim
 
 import (
+	"math"
 	"testing"
 
 	"github.com/a-jay85/IBL5/engine/internal/result"
@@ -103,5 +104,33 @@ func TestAndOneAfterMadeTwo(t *testing.T) {
 	t.Logf("1-FT trips after a made 2 over %d seeds: %d (bucket-only base %d)", andOneSplitSeeds, got, andOneBucketOnlyCount)
 	if got <= andOneMadeTwoFloor {
 		t.Errorf("1-FT trips after a made 2 = %d, want above %d: the made-2pt roll added no and-ones", got, andOneMadeTwoFloor)
+	}
+}
+
+// TestScaledFoulWeight pins the J27 rate-port foul-only volume scale: a unit
+// weight comes back as foulBucketVolumeScale, and the scale raises volume.
+func TestScaledFoulWeight(t *testing.T) {
+	if got := scaledFoulWeight(1.0); got != foulBucketVolumeScale {
+		t.Errorf("scaledFoulWeight(1.0) = %v, want foulBucketVolumeScale %v", got, foulBucketVolumeScale)
+	}
+	if foulBucketVolumeScale <= 1 {
+		t.Errorf("foulBucketVolumeScale = %v, want > 1 (JSB fouls more than the unscaled bucket)", foulBucketVolumeScale)
+	}
+}
+
+// TestHalfCourtAndOneScaleBeforeFloor pins the order inside
+// halfCourtAndOneWeight: andOneHalfCourtScale scales the raw basis, the HCA
+// term joins unscaled, and only then does andOneBucketFloor apply. With no HCA,
+// a tiny raw basis lands on the floor, and a raw basis of 1.0 comes back as
+// andOneHalfCourtScale. mq sets the raw basis (andOneBucketRaw adds mq*0.25).
+func TestHalfCourtAndOneScaleBeforeFloor(t *testing.T) {
+	var p onCourt
+	c := andOneBucketRaw(0, p)
+	mqFor := func(raw float64) float64 { return (raw - c) / 0.25 }
+	if got := halfCourtAndOneWeight(mqFor(1e-4), p, 0); got != andOneBucketFloor {
+		t.Errorf("basis 1e-4: got %v, want the floor %v", got, andOneBucketFloor)
+	}
+	if got := halfCourtAndOneWeight(mqFor(1.0), p, 0); math.Abs(got-andOneHalfCourtScale) > 1e-12 {
+		t.Errorf("basis 1.0: got %v, want andOneHalfCourtScale %v", got, andOneHalfCourtScale)
 	}
 }

@@ -17,22 +17,28 @@ const (
 )
 
 // foulRateBands holds [lo, hi] PF per team-game for each foul site on the
-// fixture run. Each band is a value captured from one run of the tree, ±10%
-// with a floor of ±0.05. Re-capture them only on an intended output change.
+// fixture run. Each band is a value captured from one run of the tree after
+// the J27 rate port, ±10% with a floor of ±0.05. Re-capture them only on an
+// intended output change.
+//
+// The bucket and-one band is ±4%. andOneHalfCourtScale scales only the raw
+// and-one basis, and on this fixture the unscaled HCA term carries most of the
+// home and-one weight, so reverting the scale moves the rate by about 6%
+// (1.147 to 1.212). A ±10% band would not catch that revert.
 var foulRateBands = map[result.FoulSite][2]float64{
-	result.FoulSiteUnknown:          foulRateBand(0),
-	result.FoulSiteShootingTwo:      foulRateBand(2.188),
-	result.FoulSiteShootingThree:    foulRateBand(0.217),
-	result.FoulSiteAndOne:           foulRateBand(1.270),
-	result.FoulSiteNonShooting:      foulRateBand(1.915),
-	result.FoulSiteLateGame:         foulRateBand(0.025),
-	result.FoulSiteAndOneMadeTwo:    foulRateBand(1.790),
-	result.FoulSiteNonShootingBonus: foulRateBand(0.065),
+	result.FoulSiteUnknown:          foulRateBand(0, 0.10),
+	result.FoulSiteShootingTwo:      foulRateBand(4.232, 0.10),
+	result.FoulSiteShootingThree:    foulRateBand(0.220, 0.10),
+	result.FoulSiteAndOne:           foulRateBand(1.147, 0.04),
+	result.FoulSiteNonShooting:      foulRateBand(3.562, 0.10),
+	result.FoulSiteLateGame:         foulRateBand(0.025, 0.10),
+	result.FoulSiteAndOneMadeTwo:    foulRateBand(1.810, 0.10),
+	result.FoulSiteNonShootingBonus: foulRateBand(0.365, 0.10),
 }
 
-// foulRateBand widens a captured rate to ±10%, with a floor of ±0.05.
-func foulRateBand(v float64) [2]float64 {
-	d := max(0.1*v, 0.05)
+// foulRateBand widens a captured rate by frac of itself, with a floor of ±0.05.
+func foulRateBand(v, frac float64) [2]float64 {
+	d := max(frac*v, 0.05)
 	return [2]float64{v - d, v + d}
 }
 

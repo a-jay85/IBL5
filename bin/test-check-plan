@@ -212,6 +212,14 @@ assert_viol "gate-CR-near-miss-referenced-clean" 0 "[CR]" "$FM$CF_MATRIX"'
 ## Critical Files
 - `bin/check-plan` — referenced by gate [F]; reference implementation for the loop
 '
+assert_viol "gate-CR-hyphen-compound-clean" 0 "[CR]" "$FM$CF_MATRIX"'
+## Critical Files
+- `bin/check-plan` — reference-counted cache is edited
+'
+assert_viol "gate-CR-spaced-hyphen-fires" 1 "[CR]" "$FM$CF_MATRIX"'
+## Critical Files
+- `bin/check-plan` - reference - read for gate order
+'
 assert_viol "gate-CR-fenced-example-clean" 0 "[CR]" "$FM$CF_MATRIX"'
 ## Critical Files
 - `bin/check-plan` (reference)

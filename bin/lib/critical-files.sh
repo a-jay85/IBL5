@@ -120,7 +120,7 @@ cf_is_exempt() {
 # entries in 5 plans, every one a real defect. Fences are stripped by
 # cf_section. Reads only; never changes how an entry classifies.
 CF_BARE_STRIP_PATTERN='^[[:space:]]*-[[:space:]]*(—|–|:|-{1,2})?[[:space:]]*(.*)$'
-CF_BARE_LEAD_PATTERN='^(read-?only( reference)?|reference|verif(y|ication)|template|no[- ]edit|no[- ]change|unchanged|context|conditional)[[:space:]]*([:;,.]|—|–|-{1,2}|$)'
+CF_BARE_LEAD_PATTERN='^(read-?only( reference)?|reference|verif(y|ication)|template|no[- ]edit|no[- ]change|unchanged|context|conditional)([[:space:]]*([:;,.]|—|–|$)|[[:space:]]+-{1,2}([[:space:]]|$))'
 
 cf_bare_marker_entries() {
     local _cf_line _cf_ann _cf_path _cf_nc=0

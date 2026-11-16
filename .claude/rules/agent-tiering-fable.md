@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand only (no auto-attach trigger) — when Fable is justified over Opus, and how to use it, effort per surface, how the /plan architect tier is judged. No user approval needed; state the justification in one line and spawn. Parent agent-tiering.md carries the resident one-line summary.
-last_verified: 2026-11-10
+last_verified: 2026-11-16
 paths: ".claude/rules/agent-tiering-fable.md"
 ---
 
@@ -74,10 +74,6 @@ A human may route any task to either architect. When `bin/plan-now` sees a decla
 
 The judge reads the `/plan` task line, the full brief with its tier-routing lines removed, the paths the brief names, and signal lines for a `feat:` title, a stated `auto_merge: false`, and a `bin/plan-now --implement` run. Burndown passes the backlog issue body as the brief. A design the brief already resolves counts as a mitigation.
 
-## Asm-level static RE (JSB engine): Fable is the default
+## Asm-level static RE (JSB engine): no default tier
 
-Asm-level static reverse-engineering always passes the test. This covers argument-binding derivations, NaN/FPU-flag paths, and encoded operands (pinning a `FUN_*`/`+0xNNN` operand, or a faithful-vs-divergent port verdict from `objdump` or decompile). Opus has shipped provably false conclusions here. On 2026-07-23 it misread J24 putback-3pt because Ghidra mis-numbered params (`param_6` was a `double` using two stack slots). Undoing that took an ADR, a golden regen, and test rebaselines. On 2026-07-07 a Fable session overturned an Opus-era "requires live debugging" premise on the foul divisor. The 2026-10 measurement corpus holds no RE cases, so it gives no basis to move this default.
-
-- **Use Fable from the start** when the load-bearing step is the asm derivation.
-- **If Opus drafted the RE, have a Fable sub-agent verify** the faithful-vs-divergent or NOT-A-LEVER verdict before it lands in the backlog, an ADR, or a port. `advisor()` cannot be pointed at Fable, so this must be a spawned sub-agent.
-- **Measured work stays on Opus.** A/B sweeps, corpus statistics, and CI-floor construction are arithmetic. Fable's edge is reading asm. The exception covers only conclusions whose proof is a disassembly.
+Asm-level static reverse-engineering gets no tier of its own. It takes the same Fable test as any other task. For a `/plan` run, `bin/plan-tier-hint` picks the architect, and the orchestrator keeps its verdict. Do not move an RE plan to `plan-architect-xhigh` when the hint says default. Do not add a Fable verify pass to an Opus RE draft unless the Fable test above passes for that draft. The owner set this on 2026-11-16, after an RE plan ran on Fable over a default hint.

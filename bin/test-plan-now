@@ -1095,6 +1095,49 @@ run_preflight "$RECOVERY_PROMPT" --queue
 want "--dm: DM contains queue artifact path" "$(dm_all)" "$NDIR/queue/demo-slug.md"
 ndir_reset
 
+# 8b-8f. Overwrite intent: a prompt line that asks to replace an existing plan
+#    file in place declines (exit 3), even with no slug line and under
+#    --implement. The real incident line was
+#    "Rewrite `~/claude-plans/<slug>.md` in place". plans-write-guard denies
+#    that Write, so the headless run would stall on it.
+OVW_PROMPT="$TMP/overwrite-prompt.md"
+{
+    printf '/plan re-plan an old task\n'
+    printf -- '- Rewrite `~/claude-plans/old-plan.md` in place; the old copy is superseded.\n'
+} > "$OVW_PROMPT"
+touch "$PLANS/old-plan.md"
+run_preflight "$OVW_PROMPT" --queue
+[ "$PRE_RC" = 3 ] && ok "overwrite intent --queue: exits 3" || fail "overwrite intent --queue: exits 3 (got $PRE_RC)"
+want "overwrite intent: names the plan file" "$PRE_OUT" "$PLANS/old-plan.md"
+want "overwrite intent: recovery names a -v2 slug" "$PRE_OUT" "old-plan-v2"
+want_no "overwrite intent: runner not written on decline" "$PRE_OUT" "runner:"
+run_preflight "$OVW_PROMPT" --implement
+[ "$PRE_RC" = 3 ] && ok "overwrite intent --implement: exits 3" || fail "overwrite intent --implement: exits 3 (got $PRE_RC)"
+want "overwrite intent --implement: names the plan file" "$PRE_OUT" "$PLANS/old-plan.md"
+# 8d. A negated line is a warning, not an instruction → proceeds.
+{
+    printf '/plan re-plan an old task\n'
+    printf -- '- Never overwrite `~/claude-plans/old-plan.md`; write a new slug.\n'
+} > "$OVW_PROMPT"
+run_preflight "$OVW_PROMPT" --queue
+[ "$PRE_RC" = 0 ] && ok "overwrite negated: exits 0" || fail "overwrite negated: exits 0 (got $PRE_RC)"
+# 8e. A read-only pointer to an existing plan → proceeds.
+{
+    printf '/plan re-plan an old task\n'
+    printf -- '- `~/claude-plans/old-plan.md` is the old plan; read it for context.\n'
+} > "$OVW_PROMPT"
+run_preflight "$OVW_PROMPT" --queue
+[ "$PRE_RC" = 0 ] && ok "existing plan pointer: exits 0" || fail "existing plan pointer: exits 0 (got $PRE_RC)"
+# 8f. Rewrite wording on a plan file that does not exist yet → proceeds.
+rm -f "$PLANS/old-plan.md"
+{
+    printf '/plan re-plan an old task\n'
+    printf -- '- Rewrite `~/claude-plans/old-plan.md` in place.\n'
+} > "$OVW_PROMPT"
+run_preflight "$OVW_PROMPT" --queue
+[ "$PRE_RC" = 0 ] && ok "overwrite of absent plan: exits 0" || fail "overwrite of absent plan: exits 0 (got $PRE_RC)"
+ndir_reset
+
 # 9. PLAN_NOW_DUP_CHECK unset → plan-now falls back to the real repo script.
 #    The real script reads $NIGHTLY_DIR (exported) and $PLANS_DIR (exported), so
 #    it uses the test trees and declines exactly as the stub would.

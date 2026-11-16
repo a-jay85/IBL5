@@ -45,6 +45,37 @@ fi
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib/plan-resolve.sh"
 PLANS_DIR="$(plans_dir PLANS_DIR)"
 
+# Overwrite-intent check. A plan file is never overwritten, moved or deleted
+# (~/.claude/hooks/plans-write-guard.sh denies Write; bash-guard.sh denies
+# rm/mv). A prompt that tells the run to rewrite an existing plan "in place"
+# sends a headless run into a wall it cannot pass. Decline it here instead.
+# A line trips when it names an existing plan file under PLANS_DIR and also
+# carries rewrite/overwrite/replace/in-place wording without a negation.
+# Runs before slug derivation, so it fires even when no slug line is found.
+while IFS= read -r line; do
+    # The wording must target the plan file itself: a verb right before the
+    # path, or "in place" / "be overwritten" right after it. A line like
+    # "Implement ~/claude-plans/foo.md; replace the legacy parser" is not an
+    # overwrite request (this check also runs under --implement).
+    grep -qiE "(overwrit|rewrit|replac)[a-z]*[ ]+((the|this|that|an?|existing|old|current)[ ]+)*[\`'\"(]*[^ ]*claude-plans/[A-Za-z0-9._/-]+\.md|claude-plans/[A-Za-z0-9._/-]+\.md[\`'\")]*[ ]+(in[ -]place|((to|should|must|will)[ ]+)?be[ ]+(overwritten|rewritten|replaced))" <<< "$line" || continue
+    grep -qiE "never|do not|don't|must not|cannot|can't" <<< "$line" && continue
+    for p in $(grep -oE 'claude-plans/[A-Za-z0-9._/-]+\.md' <<< "$line" || true); do
+        rel=${p#claude-plans/}
+        if [ -f "$PLANS_DIR/$rel" ]; then
+            base=${rel%.md}
+            printf 'plan-now declined: the prompt asks to replace an existing plan file in place.\n'
+            printf '  Plan file: %s\n' "$PLANS_DIR/$rel"
+            printf '  Line: %s\n' "$line"
+            printf '  Plan files are never overwritten, moved or deleted (plans-write-guard, bash-guard).\n'
+            printf '  Recovery: give the new plan a new slug (e.g. %s-v2), point any depends_on at it,\n' "$base"
+            printf '            and add a SUPERSEDED note at the top of the old plan with the Edit tool.\n'
+            exit 3
+        fi
+    done
+done < "$PROMPT"
+
+[ "${PLAN_DUP_OVERWRITE_ONLY:-0}" = 1 ] && exit 0
+
 # Kept deliberately identical to run_slug() in the generated runner heredoc
 # inside bin/plan-now (search: "run_slug()"). If one changes, change both.
 # shellcheck disable=SC2016  # backticks in single-quote patterns are literal, not expansions

@@ -1,6 +1,6 @@
 ---
 description: Automouse workflow detail. The plan autonomy contract (stop_condition and evidence frontmatter), the cost ledger columns, and the delegate effort trial. Companion to automouse-workflow.md; attaches on the same paths.
-last_verified: 2026-11-13
+last_verified: 2026-11-16
 paths: "bin/automouse/**"
 ---
 
@@ -66,3 +66,7 @@ The check is the packet's own `**Self-verify:**` command. The impl session runs 
 **Log.** Each attempt is one row in `<nightly>/logs/<plan>.delegate-attempts.jsonl`, written by `bin/measure-delegate-cost --record-attempt`. The fields are `plan`, `phase`, `arm`, `attempt`, `effort`, `check_exit`, `check_result` and `ts`. The nightly dir sits outside the repo. `archive_stale logs` moves old files to `logs.archive/` with the cost ledger, and the reader reads both.
 
 **Keep or revert.** Run `bin/measure-delegate-cost --trial`, adding `--json` for machine output. It prints `INSUFFICIENT` until each arm has at least 30 plans and 100 packets. A plan with any `inherited` attempt is left out of its arm. Past that floor it prints `KEEP` only when the `low-first` final packet pass rate is at least the `control` rate and the `low-first` median cost per completed plan is lower. Otherwise it prints `REVERT`. On `REVERT`, unset the variable. On `KEEP`, flipping the default is a separate plan.
+
+## Post-plan cap-kill hold
+
+Post-plan uses `postplan_cap_timeout()` (classifies 124/137/143 against `REMAINING_SECS`) and `should_hold_postplan_disposal()`: a cap-killed OPEN PR whose Phase 5.5 verdict predates the run is held in `queue/`; `notify_postplan_hold()` DMs the PR URL. Locked by `bin/test-automouse-postplan-disposition`.

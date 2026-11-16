@@ -800,8 +800,10 @@ run_act 200 true false "$TMP/a13.txt"
 # Scans every `uses: ./.github/actions/notify-discord` step in <wf-dir>/*.yml
 # until the next step or a line indented 4 or fewer spaces. mode=sites prints one
 # summary per site; mode=lines prints every scanned line (trimmed). The webhook
-# token is errors, dev, merged, reviews or errors-on-failure (the promote form that
-# picks #errors on failure and #dev otherwise); any other value is UNKNOWN and a
+# token is errors (the #errors secret with a #dev fallback), errors-no-fallback
+# (the bare #errors secret, which no table row carries), dev, merged, reviews or
+# errors-on-failure (the promote form that picks #errors on failure and #dev
+# otherwise); any other value is UNKNOWN and a
 # missing webhook-url is 0. A `ping:` line in a site appends " stray=ping", which no
 # table row carries.
 notify_scan() { # <wf-dir> <mode>
@@ -824,7 +826,8 @@ notify_scan() { # <wf-dir> <mode>
                 if (mode == "lines") printf "%s#%d\t%s\n", file, ord, line
                 if (line ~ /^webhook-url:/) {
                     v = substr(line, 14)
-                    if (v == "${{ secrets.DISCORD_ERRORS_WEBHOOK_URL }}") wh = "errors"
+                    if (v == "${{ secrets.DISCORD_ERRORS_WEBHOOK_URL || secrets.DISCORD_DEV_WEBHOOK_URL }}") wh = "errors"
+                    else if (v == "${{ secrets.DISCORD_ERRORS_WEBHOOK_URL }}") wh = "errors-no-fallback"
                     else if (v == "${{ secrets.DISCORD_DEV_WEBHOOK_URL }}") wh = "dev"
                     else if (v == "${{ secrets.DISCORD_MERGED_WEBHOOK_URL }}") wh = "merged"
                     else if (v == "${{ secrets.DISCORD_REVIEWS_WEBHOOK_URL }}") wh = "reviews"
@@ -890,11 +893,21 @@ fi
 
 # G8: a failure step moved back to the #dev secret must fail G1's comparison.
 rm -rf "$TMP/wf"; mkdir -p "$TMP/wf"; cp "$ROOT"/.github/workflows/*.yml "$TMP/wf/"
-perl -0pi -e 's/DISCORD_ERRORS_WEBHOOK_URL/DISCORD_DEV_WEBHOOK_URL/' "$TMP/wf/db-backup.yml"
+perl -0pi -e 's/secrets\.DISCORD_ERRORS_WEBHOOK_URL \|\| //' "$TMP/wf/db-backup.yml"
 G8_GOT=$(notify_sites "$TMP/wf")
 [ "$G8_GOT" != "$NOTIFY_SITES_WANT" ] && ok "G8: a db-backup failure step on the #dev secret fails the table" \
     || fail "G8: a db-backup failure step on the #dev secret went unnoticed"
 want "G8: the swapped site is what differs" "$G8_GOT" "db-backup.yml#1 webhook=dev"
+
+# G9: an #errors step that drops its #dev fallback must fail G1's comparison.
+# Without the fallback, a missing or renamed DISCORD_ERRORS_WEBHOOK_URL secret
+# sends an empty webhook-url and the notify step fails the job.
+rm -rf "$TMP/wf"; mkdir -p "$TMP/wf"; cp "$ROOT"/.github/workflows/*.yml "$TMP/wf/"
+perl -0pi -e 's/ \|\| secrets\.DISCORD_DEV_WEBHOOK_URL//' "$TMP/wf/main.yml"
+G9_GOT=$(notify_sites "$TMP/wf")
+[ "$G9_GOT" != "$NOTIFY_SITES_WANT" ] && ok "G9: an #errors site with no #dev fallback fails the table" \
+    || fail "G9: an #errors site with no #dev fallback went unnoticed"
+want "G9: the site without a fallback is what differs" "$G9_GOT" "main.yml#1 webhook=errors-no-fallback"
 
 # -- no owner mention anywhere in .github/ or bin/ --
 # owner_mention_scan <root> reads repo-relative paths on stdin and prints

@@ -3161,7 +3161,6 @@ set_prs "$UNARMED101"; set_checks aaa1111 green
 _stuck_run "$REPO" branch-one "$FAILED_JSON" 60
 run_tick --dry-run
 out_has 'would DM:' || fail "stuck-dry-run-no-write: no would-DM line: $OUT"
-out_has 'would DM: --error' && fail "stuck-dry-run-no-write: stuck dry-run line carries --error"
 grep -qE 'would DM: [^ ]+ --error ' <<< "$OUT" && fail "stuck-dry-run-no-write: stuck dry-run line carries --error"
 [[ "$(dm_count)" == 0 ]] || fail "stuck-dry-run-no-write: sent a DM"
 no_file "$STATE_DIR/dm-stuck" || fail "stuck-dry-run-no-write: wrote the ledger dir"

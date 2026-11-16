@@ -904,13 +904,14 @@ jobs:
     if: needs.ci-memo-check.outputs.hit != 'true'
     runs-on: ubuntu-26.04
     timeout-minutes: 30
-    # Two legs on two runners halve the wall time. test-check-plan alone is about 507 s
-    # of CPU and runs as two shards. Leg membership lives in .github/workflows/harness-legs.txt;
-    # the guard step checks it against strategy.job-total, so the matrix and the file stay in step.
+    # Three legs on three runners cut the wall time to about a third. test-check-plan alone
+    # is about 512 s of CPU and runs as three shards. Leg membership lives in
+    # .github/workflows/harness-legs.txt; the guard step checks it against strategy.job-total,
+    # so the matrix and the file stay in step.
     strategy:
       fail-fast: false
       matrix:
-        leg: [0, 1]
+        leg: [0, 1, 2]
     env:
       IBL5_TEST_MARIADB_IMAGE: ghcr.io/a-jay85/mirror/mariadb:10.11
     # Each harness builds its own throwaway git repos under mktemp, so the

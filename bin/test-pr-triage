@@ -1119,4 +1119,46 @@ run_triage "$FIX" --card 316
 assert_status "K10 missing head tree exits 1" 1 "$ST"
 assert_match  "K10 verdict unknown"          '^verdict: unknown \(fetch failed\)$' "$OUT"
 
+# --- AM1..AM4: condition (7) body hold (HELD_AM_FALSE_RE) and the live-hold base ref ---
+# AM3 runs pr_owner_approval_live_hold for real: GIT_ALLOW_PROTOCOL=file makes its
+# https fetch fail at once (fail closed, no network), and a logging git wrapper
+# records the base ref pr-triage passed from .baseRefName.
+BODY_AM_FALSE="$(printf '%s\n\nauto_merge: false' "$BODY_CLEAR")"
+BODY_AM_FALSE_TIGHT="$(printf '%s\n\nauto_merge:false' "$BODY_CLEAR")"
+BODY_AM_TRUE="$(printf '%s\n\nauto_merge: true' "$BODY_CLEAR")"
+FIX="$(mktemp -d -p "$TMP")"
+for n in 80 81 82 83; do
+    checks_json success success success > "$FIX/checks-$(printf '%040d' "$n").json"
+done
+{
+    pr_json 80 BEHIND "$BODY_AM_FALSE"
+    pr_json 81 BEHIND "$BODY_AM_TRUE"
+    pr_json 82 BEHIND "$BODY_AM_FALSE" \
+        | jq '.labels = [{name: "human-approved"}] | .baseRefName = "fixture-base"'
+    pr_json 83 BEHIND "$BODY_AM_FALSE_TIGHT"
+} | jq -s . > "$FIX/prs.json"
+AM_REAL_GIT="$(command -v git)"
+mkdir -p "$TMP/gitlog-bin"
+cat > "$TMP/gitlog-bin/git" <<GITWRAP
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "\$FIX/git.log"
+exec "$AM_REAL_GIT" "\$@"
+GITWRAP
+chmod +x "$TMP/gitlog-bin/git"
+AM_SAVED_PATH="$PATH"
+PATH="$TMP/gitlog-bin:$PATH"
+export GIT_ALLOW_PROTOCOL=file
+run_triage "$FIX"
+unset GIT_ALLOW_PROTOCOL
+PATH="$AM_SAVED_PATH"
+assert_match  "AM1 unlabeled auto_merge: false is HELD"       '^HELD$'           "$(row_bucket "$OUT" 80)"
+assert_match  "AM1 unlabeled auto_merge: false body-hold"     '^#80 .*body-hold' "$OUT"
+assert_absent "AM2 auto_merge: true never body-holds"         '^#81 .*body-hold' "$OUT"
+assert_absent "AM2 auto_merge: true is not HELD"              '^HELD$'           "$(row_bucket "$OUT" 81)"
+assert_match  "AM3 labeled, fetch fails, still HELD"          '^HELD$'           "$(row_bucket "$OUT" 82)"
+assert_match  "AM3 labeled, fetch fails, body-hold"           '^#82 .*body-hold' "$OUT"
+assert_match  "AM3 live hold fetches the baseRefName ref" \
+    '\+refs/heads/fixture-base:refs/remotes/origin/fixture-base' "$(cat "$FIX/git.log" 2>/dev/null)"
+assert_match  "AM4 auto_merge:false with no space body-holds" '^#83 .*body-hold' "$OUT"
+
 h_done

@@ -285,6 +285,58 @@ done <<< "$rows"
 FIX
 expect c31-eval-assignment-with-expansion-in-name "$T/c31.sh" 0
 
+cat > "$T/c32.sh" <<'FIX'
+#!/bin/bash
+x=$((1<<n))
+while read -r l; do
+  ssh h
+done < f
+FIX
+expect c32-arithmetic-shift-is-not-heredoc "$T/c32.sh" 1 4
+
+cat > "$T/c33.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  ssh host grep -n foo file
+done < f
+FIX
+expect c33-remote-command-n-flag-not-ssh-n "$T/c33.sh" 1 3
+
+cat > "$T/c34.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  bash run.sh -n 5
+done < f
+FIX
+expect c34-script-n-flag-not-bash-n "$T/c34.sh" 1 3
+
+cat > "$T/c35.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  ssh -p 22 -n host true
+  docker exec c grep -i foo f
+done < f
+FIX
+expect c35-leading-options-stay-safe "$T/c35.sh" 0
+
+cat > "$T/c36.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  case $l in
+    a) ssh h ;;
+  esac
+done < f
+FIX
+expect c36-case-pattern-command "$T/c36.sh" 1 4
+
+cat > "$T/c37.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  sudo bash x.sh
+done < f
+FIX
+expect c37-sudo-wrapper "$T/c37.sh" 1 3
+
 echo ""
 echo "$PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

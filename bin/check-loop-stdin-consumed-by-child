@@ -24,8 +24,9 @@
 # Scope: loops fed on descriptor 0 (`done <`, `done <<<`, `done < <(...)`, or a pipe
 # into `while`), within one file. An unfed `while read` reads the script's own stdin
 # and is not flagged. Readers reached through a function call are not traced, and a
-# command substitution inside double quotes is not scanned. A backgrounded command is
-# flagged: only an explicit </dev/null is certain.
+# command substitution inside double quotes is not scanned. A reader behind a wrapper
+# other than sudo/time/exec/command/nohup (for example `timeout 5 bash x`) is missed.
+# A backgrounded command is flagged: only an explicit </dev/null is certain.
 #
 # A group that opens mid-line and closes with `) </dev/null` on a later line is a false
 # positive; the hit is loud and the marker silences it.
@@ -151,6 +152,7 @@ function heredoc_word(m, r,    p, q, pos, rest, w) {
         rest = substr(r, pos + 2)
         sub(/^-/, "", rest)
         sub(/^[ \t]+/, "", rest)
+        if (substr(m, 1, pos - 1) ~ /\(\([^)]*$/) { p = pos + 2; continue }   # arithmetic shift, not a heredoc
         if (rest !~ /^["'\\A-Za-z_]/) { p = pos + 2; continue }
         if (!match(rest, /^[^ \t;&|<>()]+/)) { p = pos + 2; continue }
         w = substr(rest, 1, RLENGTH)
@@ -209,6 +211,7 @@ function cmd_word(s, p,    w, bn) {
         if (w == "") { cw_end = p; return "" }
         if (w in KW) { p += length(w); continue }
         if (w ~ /^[A-Za-z_][A-Za-z0-9_]*=/) { p += length(w); continue }
+        if (w ~ /^[A-Za-z0-9_*.|-]+\)$/) { p += length(w); continue }   # case pattern: a) cmd ;;
         if (w == "env") { p += 3; continue }
         bn = w; sub(/^.*\//, "", bn)
         cw_end = p + length(w)
@@ -216,15 +219,34 @@ function cmd_word(s, p,    w, bn) {
     }
 }
 
+# lead_opt: 1 when a leading option of rr (the text after the command word) matches re.
+# Scanning stops at the first word that is not an option, so a -n or -i that belongs
+# to the remote or inner command does not count. argflags lists options that take a
+# separate value, as " -p -i ".
+function lead_opt(rr, re, argflags,    n, t, i) {
+    n = split(rr, t, /[ \t]+/)
+    for (i = 1; i <= n; i++) {
+        if (t[i] == "") continue
+        if (t[i] !~ /^-/) return 0
+        if (t[i] ~ re) return 1
+        if (index(argflags, " " t[i] " ") > 0) i++
+    }
+    return 0
+}
+
 # reader_is_safe: 1 when this use of a reader cannot read stdin.
-function reader_is_safe(word, seg, rr) {
-    if (word == "ssh") return (seg ~ /[[:space:]]-[A-Za-z]*n[A-Za-z]*([[:space:]]|$)/)
+function reader_is_safe(word, seg, rr,    d) {
+    if (word == "ssh") return lead_opt(rr, "^-[A-Za-z]*n[A-Za-z]*$", " -p -i -o -l -F -J -L -R -D -b -c -E -e -m -O -Q -S -W -w -B -I ")
     if (word == "mysql" || word == "mariadb") return (seg ~ /[[:space:]](-e|--execute)([[:space:]=]|$)/)
-    if (word == "bash" || word == "sh" || word == "zsh") return (seg ~ /[[:space:]]-n([[:space:]]|$)/)
+    if (word == "bash" || word == "sh" || word == "zsh") return lead_opt(rr, "^-n$", " -o -O ")
     if (word == "eval") return (rr ~ /^[[:space:]]*"?[A-Za-z_][A-Za-z0-9_${}]*=/)
     if (word == "docker") {
         if (seg ~ /[[:space:]]compose[[:space:]]+(exec|run)([[:space:]]|$)/) return 0
-        if (seg ~ /[[:space:]](exec|run)[[:space:]]/ && seg ~ /[[:space:]](-i|-it|-ti|--interactive)([[:space:]]|$)/) return 0
+        d = rr
+        if (d ~ /^[ \t]*(exec|run)[ \t]/) {
+            sub(/^[ \t]*(exec|run)[ \t]+/, "", d)
+            if (lead_opt(d, "^(-i|-it|-ti|--interactive)$", " -e -u -w -v --env --user --workdir --volume --name --network -l ")) return 0
+        }
         return 1
     }
     if (word == "docker-compose") return !(seg ~ /[[:space:]](exec|run)([[:space:]]|$)/)
@@ -310,7 +332,7 @@ BEGIN {
     ok_re = "# loop-stdin-ok: *[^ ]"
     n = split(readers, ra, " ")
     for (i = 1; i <= n; i++) rd[ra[i]] = 1
-    n = split("do then else elif if ! { ( time exec command nohup builtin", ka, " ")
+    n = split("do then else elif if ! { ( time exec command nohup builtin sudo", ka, " ")
     for (i = 1; i <= n; i++) KW[ka[i]] = 1
     XS = "x"; SPC = " "
     for (i = 0; i < 10; i++) { XS = XS XS; SPC = SPC SPC }

@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace Tests\Updater\Steps;
 
 use JsbParser\Contracts\JsbImportRepositoryInterface;
+use JsbParser\DraFileParser;
+use JsbParser\HofFileParser;
 use JsbParser\JsbImportResult;
 use JsbParser\JsbImportService;
+use JsbParser\RetFileParser;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Updater\Contracts\JsbSourceResolverInterface;
@@ -19,6 +22,9 @@ use Updater\Steps\PriorSeasonEndOfSeasonImportStep;
 final class PriorSeasonEndOfSeasonImportStepTest extends TestCase
 {
     private const PRIOR_YEAR = 2008;
+    private const RET_DATA = "Prior Ret 200000301\n";
+    private const EMPTY_RET_DATA = "0\r\n\r\n0\r\n";
+    private const EMPTY_DRA_DATA = "\r\n";
 
     private JsbImportRepositoryInterface $stubRepo;
     private JsbImportService $stubService;
@@ -52,7 +58,7 @@ final class PriorSeasonEndOfSeasonImportStepTest extends TestCase
         $service = $this->serviceMock();
         $service->expects(self::once())->method('processDraData');
 
-        $result = $this->buildStep(repo: $repo, service: $service, resolver: $this->archiveResolver(2008))->execute();
+        $result = $this->buildStep(repo: $repo, service: $service, resolver: $this->fileResolver($this->realFiles()))->execute();
 
         self::assertTrue($result->success);
         self::assertFalse($result->skipped);
@@ -168,7 +174,7 @@ final class PriorSeasonEndOfSeasonImportStepTest extends TestCase
     public function testForwardsPriorYearToRetAndAwaImports(): void
     {
         $service = $this->serviceMock();
-        $service->expects(self::once())->method('processRetData')->with('data', 2008);
+        $service->expects(self::once())->method('processRetData')->with(self::RET_DATA, 2008);
         $service->expects(self::once())->method('processAwaData')->with('data', 'data', 2008);
 
         $this->buildStep(
@@ -220,7 +226,7 @@ final class PriorSeasonEndOfSeasonImportStepTest extends TestCase
     public function testImportsArchiveWithUnparsedSeasonYear(): void
     {
         $service = $this->serviceMock();
-        $service->expects(self::once())->method('processRetData')->with('data', 2008);
+        $service->expects(self::once())->method('processRetData')->with(self::RET_DATA, 2008);
 
         $this->buildStep(
             repo: $this->championRepo(),
@@ -269,6 +275,76 @@ final class PriorSeasonEndOfSeasonImportStepTest extends TestCase
         self::assertSame(1, $result->messageErrorCount);
     }
 
+    /**
+     * A .ret missing from the archive is retried every night, even when the
+     * other three files are done.
+     */
+    public function testMissingRetFileKeepsRetryingWhileOtherFilesAreDone(): void
+    {
+        $files = $this->realFiles();
+        $files['ret'] = null;
+
+        $service = $this->serviceMock();
+        $service->expects(self::never())->method('processRetData');
+
+        $result = $this->buildStep(
+            repo: $this->allImportedExceptRetRepo(),
+            service: $service,
+            resolver: $this->fileResolver($files),
+        )->execute();
+
+        self::assertFalse($result->skipped);
+        self::assertContains('RET: not found in the 2008 archive, will retry next run', $result->messages);
+    }
+
+    /**
+     * A .ret that comes from the live disk file is rejected and retried every
+     * night, even when the other three files are done.
+     */
+    public function testRejectedRetSourceKeepsRetryingWhileOtherFilesAreDone(): void
+    {
+        $service = $this->serviceMock();
+        $service->expects(self::never())->method('processRetData');
+
+        $result = $this->buildStep(
+            repo: $this->allImportedExceptRetRepo(),
+            service: $service,
+            resolver: $this->retRejectingResolver($this->realFiles()),
+        )->execute();
+
+        self::assertFalse($result->skipped);
+        self::assertContains('RET: skipped, source is not the 2008 archive', $result->messages);
+    }
+
+    /**
+     * An unparseable .hof still reaches processHofData, so its parse error is
+     * reported.
+     */
+    public function testUnparseableHofFileStillRunsHofImport(): void
+    {
+        $threw = false;
+        try {
+            HofFileParser::parse('data');
+        } catch (\RuntimeException) {
+            $threw = true;
+        }
+        self::assertTrue($threw, 'fixture must make HofFileParser::parse throw');
+
+        $files = $this->realFiles();
+        $files['hof'] = 'data';
+
+        $service = $this->serviceMock();
+        $service->expects(self::once())->method('processHofData');
+
+        $result = $this->buildStep(
+            repo: $this->allImportedRepo(),
+            service: $service,
+            resolver: $this->fileResolver($files),
+        )->execute();
+
+        self::assertFalse($result->skipped);
+    }
+
     private function buildStep(
         ?JsbImportRepositoryInterface $repo = null,
         ?JsbImportService $service = null,
@@ -311,7 +387,9 @@ final class PriorSeasonEndOfSeasonImportStepTest extends TestCase
     private function archiveResolver(?int $declaredYear): JsbSourceResolverInterface
     {
         $resolver = self::createStub(JsbSourceResolverInterface::class);
-        $resolver->method('getContents')->willReturn('data');
+        $resolver->method('getContents')->willReturnCallback(
+            static fn (string $extension): string => $extension === 'ret' ? self::RET_DATA : 'data',
+        );
         $resolver->method('describeLastSource')->willReturn(new SourceProvenance(
             kind: SourceProvenance::KIND_ARCHIVE,
             name: 'IBL5-2007-08-finals.zip',
@@ -333,6 +411,52 @@ final class PriorSeasonEndOfSeasonImportStepTest extends TestCase
         return $repo;
     }
 
+    private function allImportedExceptRetRepo(): JsbImportRepositoryInterface
+    {
+        $repo = self::createStub(JsbImportRepositoryInterface::class);
+        $repo->method('hasChampionForSeason')->willReturn(true);
+        $repo->method('hasDraftResultsForYear')->willReturnMap([[2006, true]]);
+        $repo->method('hasRetiredPlayersForYear')->willReturn(false);
+        $repo->method('hasHofInducteesForYear')->willReturnMap([[2007, true]]);
+        $repo->method('hasStatLeaderAwardsForYear')->willReturn(true);
+
+        return $repo;
+    }
+
+    /**
+     * Resolver that serves every file from the archive except the .ret, which
+     * comes from the live disk file.
+     *
+     * @param array<string, ?string> $files
+     */
+    private function retRejectingResolver(array $files): JsbSourceResolverInterface
+    {
+        $last = '';
+        $resolver = self::createStub(JsbSourceResolverInterface::class);
+        $resolver->method('getContents')->willReturnCallback(
+            static function (string $extension) use (&$last, $files): ?string {
+                $last = $extension;
+
+                return $files[$extension] ?? null;
+            },
+        );
+        $resolver->method('describeLastSource')->willReturnCallback(
+            static function () use (&$last): SourceProvenance {
+                if ($last === 'ret') {
+                    return new SourceProvenance(kind: SourceProvenance::KIND_DISK, name: 'IBL5.ret');
+                }
+
+                return new SourceProvenance(
+                    kind: SourceProvenance::KIND_ARCHIVE,
+                    name: 'IBL5-2007-08-finals.zip',
+                    declaredSeasonEndingYear: 2008,
+                );
+            },
+        );
+
+        return $resolver;
+    }
+
     /**
      * Archive contents shaped like a real 2007-08 archive: the newest draft is
      * 2006 and the newest Hall of Fame induction is 2007.
@@ -345,7 +469,7 @@ final class PriorSeasonEndOfSeasonImportStepTest extends TestCase
             . "***** 2006 rookie draft *****\nRound 1 Pick 1\nCeltics: PG Jim Roe\n";
         $hof = str_pad("SF Grant Hill 614 2005 \r\n C Arvydas Sabonis 327 2007 \r\n", 8000);
 
-        return ['dra' => $dra, 'ret' => 'ret-data', 'hof' => $hof, 'awa' => 'awa-data', 'car' => 'car-data'];
+        return ['dra' => $dra, 'ret' => self::RET_DATA, 'hof' => $hof, 'awa' => 'awa-data', 'car' => 'car-data'];
     }
 
     /**

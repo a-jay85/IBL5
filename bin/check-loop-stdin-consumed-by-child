@@ -1,0 +1,363 @@
+#!/bin/bash
+#
+# bin/check-loop-stdin-consumed-by-child — keep stdin-reading commands out of fed
+# while-read loops.
+#
+# In `while read ...; do CMD; done < file` (or `<<<`, `< <(...)`, or a pipe into
+# `while`), the loop reads one line per pass from descriptor 0. Any CMD in the body
+# that also reads descriptor 0 (bash -c, ssh, mysql, docker exec -i, claude, ...)
+# inherits the loop's input and drains the remaining rows, so later passes never run.
+# PR #3702 shipped this twice in bin/lib/prefire-verify (the row runner and the DB
+# probe) and both were caught only in review. The fixed forms redirect the command's
+# own stdin: `bash -c "$cmd" </dev/null`.
+#
+# What the gate flags: a command from the reader list (bash sh zsh eval ssh docker
+# docker-compose mysql mariadb claude) inside a fed while/until-read loop.
+#
+# A command passes when:
+#   - its own segment redirects descriptor 0 (< file, 0<, <<<, <<, < <(...), <&N);
+#   - it follows a pipe (`x | ssh h` reads the pipe, not the loop);
+#   - it is a form that cannot read stdin: ssh -n, mysql -e, bash -n, an assignment
+#     eval, docker exec without -i;
+#   - its line ends with `# loop-stdin-ok: <reason>` (the reason must be non-empty).
+#
+# Scope: loops fed on descriptor 0 (`done <`, `done <<<`, `done < <(...)`, or a pipe
+# into `while`), within one file. An unfed `while read` reads the script's own stdin
+# and is not flagged. Readers reached through a function call are not traced, and a
+# command substitution inside double quotes is not scanned. A backgrounded command is
+# flagged: only an explicit </dev/null is certain.
+#
+# A group that opens mid-line and closes with `) </dev/null` on a later line is a false
+# positive; the hit is loud and the marker silences it.
+#
+# Scan: the whole tree. With no file arguments it reads every shell script under bin/
+# and every .github/workflows/*.yml. The awk scanner is POSIX only so BSD awk (macOS)
+# and mawk (Ubuntu) agree. See bin/lib/prefire-verify for the fixed forms and
+# bin/check-shell-portability for the sibling whole-tree gate.
+#
+# Usage: bin/check-loop-stdin-consumed-by-child [--stats] [file ...]
+#
+# Exit codes: 0 = clean, 1 = violation found, 2 = usage error.
+#
+# gate-backtest-argv:
+
+set -euo pipefail
+
+here="$(cd "$(dirname "$0")" && pwd)"
+
+die() { echo "check-loop-stdin-consumed-by-child: $*" >&2; exit 2; }
+
+usage() {
+    cat <<'EOF'
+Usage: bin/check-loop-stdin-consumed-by-child [--stats] [file ...]
+
+Flags a stdin-reading command (bash, sh, zsh, eval, ssh, docker, docker-compose,
+mysql, mariadb, claude) inside a while/until-read loop fed on descriptor 0. Such a
+command drains the loop's input, so the remaining rows never run.
+
+Fix: add </dev/null to the command, or end its line with
+# loop-stdin-ok: <reason>
+
+Arguments:
+  [file ...]   files to scan (default: shell scripts under bin/ and .github/workflows/*.yml)
+  --stats      print a one-line scan summary to stderr
+
+Exit codes: 0 = clean, 1 = violation found, 2 = usage error
+EOF
+}
+
+stats=0
+files=()
+for arg in "$@"; do
+    case "$arg" in
+        -h | --help) usage; exit 0 ;;
+        --stats) stats=1 ;;
+        -*) die "unknown option: $arg" ;;
+        *) files+=("$arg") ;;
+    esac
+done
+
+if [ "${#files[@]}" -gt 0 ]; then
+    for f in "${files[@]}"; do
+        [ -f "$f" ] || die "no such file: $f"
+    done
+else
+    cd "$(git rev-parse --show-toplevel)"
+    list=$({ git ls-files -- bin | "$here/lib/shell-scripts.sh" --filter; git ls-files -- '.github/workflows/*.yml'; })
+    while IFS= read -r f; do
+        if [ -f "$f" ]; then files+=("$f"); fi
+    done <<< "$list"
+fi
+
+if [ "${#files[@]}" -eq 0 ]; then
+    echo "check-loop-stdin-consumed-by-child: no files to scan" >&2
+    exit 0
+fi
+
+read -r -d '' AWK_PROG <<'AWK' || true
+function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
+function xs(k,    r) { r = ""; while (k > 1024) { r = r XS; k -= 1024 } return r substr(XS, 1, k) }
+function sp(k,    r) { r = ""; while (k > 1024) { r = r SPC; k -= 1024 } return r substr(SPC, 1, k) }
+function skip_ws(s, p) { while (substr(s, p, 1) == " " || substr(s, p, 1) == "\t") p++; return p }
+function word_at(s, p,    rest) {
+    rest = substr(s, p)
+    if (match(rest, /^[^ \t<>]+/)) return substr(rest, 1, RLENGTH)
+    return ""
+}
+
+# mask_line: same-length copy of s where everything inside quotes is x. Quote state qs
+# carries across physical lines: "" none, "s" single, "d" double, "a" dollar-single.
+function mask_line(s,    n, i, out, rest, c, j, prev) {
+    if (qs == "" && s !~ /["'#\\`]/) return s
+    n = length(s); out = ""; i = 1
+    while (i <= n) {
+        rest = substr(s, i)
+        if (qs == "s") {
+            j = index(rest, sq)
+            if (j == 0) { out = out xs(n - i + 1); i = n + 1 }
+            else { out = out xs(j - 1) sq; i += j; qs = "" }
+        } else if (qs == "a" || qs == "d") {
+            if (!match(rest, qs == "a" ? RE_A : RE_D)) { out = out xs(n - i + 1); i = n + 1; continue }
+            out = out xs(RSTART - 1); i += RSTART - 1
+            c = substr(s, i, 1)
+            if (c == "\\") { out = out (i == n ? "x" : "xx"); i += 2 }
+            else { out = out c; i++; qs = "" }
+        } else {
+            if (!match(rest, /["'#\\$]/)) { out = out rest; i = n + 1; continue }
+            out = out substr(rest, 1, RSTART - 1); i += RSTART - 1
+            c = substr(s, i, 1)
+            if (c == "\\") { out = out (i == n ? "\\" : "xx"); i += 2 }
+            else if (c == sq) { out = out sq; qs = "s"; i++ }
+            else if (c == "\"") { out = out c; qs = "d"; i++ }
+            else if (c == "$") {
+                if (substr(s, i + 1, 1) == sq) { out = out "$" sq; qs = "a"; i += 2 }
+                else { out = out "$"; i++ }
+            } else if (c == "#") {
+                prev = (i > 1) ? substr(s, i - 1, 1) : " "
+                if (prev == " " || prev == "\t") { out = out sp(n - i + 1); i = n + 1 }
+                else { out = out "#"; i++ }
+            } else { out = out c; i++ }
+        }
+    }
+    return out
+}
+
+# heredoc_word: the terminator word of a << heredoc on this logical line, or "".
+function heredoc_word(m, r,    p, q, pos, rest, w) {
+    p = 1
+    while ((q = index(substr(m, p), "<<")) > 0) {
+        pos = p + q - 1
+        if (substr(m, pos + 2, 1) == "<" || (pos > 1 && substr(m, pos - 1, 1) == "<")) { p = pos + 3; continue }
+        rest = substr(r, pos + 2)
+        sub(/^-/, "", rest)
+        sub(/^[ \t]+/, "", rest)
+        if (rest !~ /^["'\\A-Za-z_]/) { p = pos + 2; continue }
+        if (!match(rest, /^[^ \t;&|<>()]+/)) { p = pos + 2; continue }
+        w = substr(rest, 1, RLENGTH)
+        gsub(/["'\\]/, "", w)
+        return w
+    }
+    return ""
+}
+
+# seg_has_stdin_redirect: the segment feeds descriptor 0. Matches < file, 0<, <<<, <<,
+# < <(...) and <&N. A 3< style redirect and a bare <(...) argument do not match.
+function seg_has_stdin_redirect(s) {
+    return (s ~ /(^|[^0-9<])0?<[^(]/ || s ~ /(^|[^0-9<])0?<$/)
+}
+function done_feeds_stdin(s) { return seg_has_stdin_redirect(s) }
+
+function add_seg(m, r, from, to, sep) {
+    nseg++
+    sm[nseg] = substr(m, from, to - from + 1)
+    sr[nseg] = substr(r, from, to - from + 1)
+    sb[nseg] = sep
+}
+
+# split_segments: cut the masked logical line on command separators. sb[k] holds the
+# separator before segment k; "|" means the segment's stdin is a pipe.
+function split_segments(m, r,    n, i, c, nx, pv, start, sep, nsep, adv) {
+    nseg = 0; n = length(m); start = 1; sep = ""; i = 1
+    while (i <= n) {
+        c = substr(m, i, 1); nx = substr(m, i + 1, 1); pv = (i > 1) ? substr(m, i - 1, 1) : ""
+        adv = 0; nsep = ""
+        if (c == ";") { nsep = ";"; adv = 1 }
+        else if (c == "|") {
+            if (nx == "|") { nsep = "||"; adv = 2 }
+            else if (nx == "&") { nsep = "|"; adv = 2 }
+            else { nsep = "|"; adv = 1 }
+        } else if (c == "&") {
+            if (nx == "&") { nsep = "&&"; adv = 2 }
+            else if (pv != ">" && pv != "<" && nx != ">") { nsep = "&"; adv = 1 }
+        } else if (c == "`") { nsep = ";"; adv = 1 }
+        else if (c == "$" && nx == "(") { nsep = ";"; adv = 2 }
+        else if (c == "(") {
+            if (substr(m, start, i - start) ~ /^[ \t]*$/) { nsep = ";"; adv = 1 }
+        }
+        if (adv > 0) { add_seg(m, r, start, i - 1, sep); sep = nsep; start = i + adv; i += adv }
+        else i++
+    }
+    add_seg(m, r, start, n, sep)
+}
+
+# cmd_word: the command word of the segment from offset p, after keywords, assignments
+# and env. Sets cw_end to the offset just past that word.
+function cmd_word(s, p,    w, bn) {
+    for (;;) {
+        p = skip_ws(s, p)
+        w = word_at(s, p)
+        if (w == "") { cw_end = p; return "" }
+        if (w in KW) { p += length(w); continue }
+        if (w ~ /^[A-Za-z_][A-Za-z0-9_]*=/) { p += length(w); continue }
+        if (w == "env") { p += 3; continue }
+        bn = w; sub(/^.*\//, "", bn)
+        cw_end = p + length(w)
+        return bn
+    }
+}
+
+# reader_is_safe: 1 when this use of a reader cannot read stdin.
+function reader_is_safe(word, seg, rr) {
+    if (word == "ssh") return (seg ~ /[[:space:]]-[A-Za-z]*n[A-Za-z]*([[:space:]]|$)/)
+    if (word == "mysql" || word == "mariadb") return (seg ~ /[[:space:]](-e|--execute)([[:space:]=]|$)/)
+    if (word == "bash" || word == "sh" || word == "zsh") return (seg ~ /[[:space:]]-n([[:space:]]|$)/)
+    if (word == "eval") return (rr ~ /^[[:space:]]*"?[A-Za-z_][A-Za-z0-9_${}]*=/)
+    if (word == "docker") {
+        if (seg ~ /[[:space:]]compose[[:space:]]+(exec|run)([[:space:]]|$)/) return 0
+        if (seg ~ /[[:space:]](exec|run)[[:space:]]/ && seg ~ /[[:space:]](-i|-it|-ti|--interactive)([[:space:]]|$)/) return 0
+        return 1
+    }
+    if (word == "docker-compose") return !(seg ~ /[[:space:]](exec|run)([[:space:]]|$)/)
+    return 0
+}
+
+function emit(b, hdr,    arr, n, i) {
+    n = split(b, arr, "\n")
+    for (i = 1; i <= n; i++) {
+        printf "%s reads stdin inside the while-read loop at line %d; it drains the loop's input\n", arr[i], hdr
+        hits++
+    }
+}
+
+function push_frame(kind, hdr, piped) {
+    depth++
+    fkind[depth] = kind; fhdr[depth] = hdr; frame_piped[depth] = piped; fbuf[depth] = ""
+}
+
+# close_frame: pop the top frame. A fed read-loop emits its buffered hits; a frame whose
+# closing segment redirects descriptor 0 drops them; otherwise they move to the parent.
+function close_frame(fed, redir,    b) {
+    b = fbuf[depth]
+    if (fkind[depth] == "readloop" && fed) { nfed++; emit(b, fhdr[depth]); b = "" }
+    else if (redir) b = ""
+    depth--
+    if (b != "" && depth > 0) fbuf[depth] = (fbuf[depth] == "" ? b : fbuf[depth] "\n" b)
+}
+
+function process_line(m, r, ln,    t, c1, k, seg, rseg, p, fw, word, fed, redir, rr, entry) {
+    raw_line = r
+    t = trim(m)
+    if (t == "") return
+    if (depth == 0 && !pending && m !~ /(while|until|for|select|do|done)/) return
+    if (t == "(" || t == "{") { push_frame("group", ln, 0); return }
+    c1 = substr(t, 1, 1)
+    if ((c1 == ")" || c1 == "}") && depth > 0 && fkind[depth] == "group") {
+        close_frame(0, seg_has_stdin_redirect(t))
+        return
+    }
+    split_segments(m, r)
+    for (k = 1; k <= nseg; k++) {
+        seg = sm[k]; rseg = sr[k]
+        p = skip_ws(seg, 1)
+        fw = word_at(seg, p)
+        while (fw == "then" || fw == "else" || fw == "{") { p = skip_ws(seg, p + length(fw)); fw = word_at(seg, p) }
+        if (fw == "done") {
+            while (depth > 0 && fkind[depth] == "group") close_frame(0, 0)
+            if (depth > 0) {
+                fed = done_feeds_stdin(seg) || frame_piped[depth]
+                close_frame(fed, done_feeds_stdin(seg))
+            }
+            continue
+        }
+        if (fw == "for" || fw == "select") { pending = 1; hdr_kind = "for"; hdr_read = 0; hdr_line = ln; hdr_piped = 0; continue }
+        if (fw == "while" || fw == "until") {
+            pending = 1; hdr_kind = "while"; hdr_read = 0; hdr_line = ln; hdr_piped = (sb[k] == "|")
+            p += length(fw)
+        } else if (fw == "do") {
+            push_frame((pending && hdr_read && hdr_kind == "while") ? "readloop" : "loop", hdr_line, hdr_piped)
+            pending = 0
+            p += 2
+        }
+        word = cmd_word(seg, p)
+        if (pending && word == "read") hdr_read = 1
+        if (depth == 0) continue
+        if (sb[k] == "|") continue
+        if (seg_has_stdin_redirect(seg)) continue
+        if (raw_line ~ ok_re) continue
+        if (!(word in rd)) continue
+        rr = substr(rseg, cw_end)
+        if (reader_is_safe(word, seg, rr)) continue
+        entry = FILENAME ":" ln ": '" word "'"
+        fbuf[depth] = (fbuf[depth] == "" ? entry : fbuf[depth] "\n" entry)
+    }
+}
+
+BEGIN {
+    sq = sprintf("%c", 39)
+    RE_A = "[" sq "\\\\]"
+    RE_D = "[\"\\\\]"
+    readers = "bash sh zsh eval ssh docker docker-compose mysql mariadb claude"
+    ok_re = "# loop-stdin-ok: *[^ ]"
+    n = split(readers, ra, " ")
+    for (i = 1; i <= n; i++) rd[ra[i]] = 1
+    n = split("do then else elif if ! { ( time exec command nohup builtin", ka, " ")
+    for (i = 1; i <= n; i++) KW[ka[i]] = 1
+    XS = "x"; SPC = " "
+    for (i = 0; i < 10; i++) { XS = XS XS; SPC = SPC SPC }
+}
+
+{
+    raw = $0
+    if (FNR == 1) {
+        nfiles++
+        isyml = (FILENAME ~ /\.ya?ml$/)
+        depth = 0; qs = ""; in_heredoc = 0; pending = 0; lraw = ""; lmask = ""
+    }
+    if (in_heredoc) { if (trim(raw) == heredoc_end) in_heredoc = 0; next }
+    if (isyml && raw ~ /^[[:space:]]*(- )?[A-Za-z0-9_.-]+:/) { lraw = ""; lmask = ""; qs = ""; next }
+    phys = mask_line(raw)
+    rj = raw
+    cont = 0
+    if (qs == "" && substr(phys, length(phys), 1) == "\\") {
+        phys = substr(phys, 1, length(phys) - 1) " "
+        rj = substr(raw, 1, length(raw) - 1) " "
+        cont = 1
+    }
+    if (lraw == "") { lraw = rj; lmask = phys; lstart = FNR }
+    else { lraw = lraw " " rj; lmask = lmask " " phys }
+    if (qs != "" || cont) next
+    tail = phys; sub(/[ \t]+$/, "", tail)
+    if (tail ~ /(\||&&)$/) next
+    process_line(lmask, lraw, lstart)
+    hw = heredoc_word(lmask, lraw)
+    if (hw != "") { in_heredoc = 1; heredoc_end = hw }
+    lraw = ""; lmask = ""
+}
+
+END {
+    if (stats + 0 == 1) printf "check-loop-stdin-consumed-by-child: scanned %d files, %d fed read-loops, %d hits\n", nfiles, nfed, hits > "/dev/stderr"
+    exit (hits > 0 ? 1 : 0)
+}
+AWK
+
+rc=0
+awk -v stats="$stats" "$AWK_PROG" "${files[@]}" || rc=$?
+case "$rc" in
+    0) exit 0 ;;
+    1)
+        echo "check-loop-stdin-consumed-by-child: a stdin-reading command drains a fed while-read loop's input." >&2
+        echo "fix: add </dev/null to the flagged command, or end its line with # loop-stdin-ok: <reason>" >&2
+        exit 1
+        ;;
+    *) die "awk failed (exit $rc)" ;;
+esac

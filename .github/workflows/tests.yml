@@ -709,6 +709,15 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: ibl5
         run: bin/check-config-example
+      # loop-stdin: a stdin-reading command (bash -c, ssh, claude, mysql) inside a
+      # fed while-read loop drains the loop's input, so the remaining rows never
+      # run (PR #3702). Whole-tree scan of bin/ and workflows; the harness runs
+      # first so a broken matcher fails loudly.
+      - name: Check while-read loop bodies keep their stdin
+        if: ${{ !cancelled() }}
+        run: |
+          bin/test-check-loop-stdin-consumed-by-child
+          bin/check-loop-stdin-consumed-by-child --stats
       # th-aria-label: aria-label on <th> silently fails axe empty-table-header;
       # the correct fix is a sr-only span inside the th (PR postmortem, a11y audit).
       - name: Check th aria-label usage

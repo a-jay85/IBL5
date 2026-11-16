@@ -1,6 +1,6 @@
 ---
 description: Go/RE development context for the JSB native engine under engine/ — Makefile targets, the pinned-toolchain rationale, module layout, and where engine STATE vs runtime-behavior facts vs RE artifacts live. Fires on any engine/ file interaction.
-last_verified: 2026-09-16
+last_verified: 2026-11-15
 ---
 
 # Engine Development Context (Go / RE)

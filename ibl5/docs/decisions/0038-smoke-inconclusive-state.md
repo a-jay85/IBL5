@@ -1,6 +1,6 @@
 ---
 description: The production smoke test distinguishes an INCONCLUSIVE result (prober blocked by the WAF, or a docs-only deploy) from a real FAILURE, so transient prober-side issues no longer trigger an auto-rollback of healthy production.
-last_verified: 2026-09-16
+last_verified: 2026-11-15
 ---
 
 # ADR-0038: Smoke "Inconclusive" State Gates Auto-Rollback
@@ -34,6 +34,13 @@ The `smoke-prod.yml` IBL5 step captures the exit code: on `3` it sets an `ibl5_i
 ### B. Docs-only deploys never gate a revert (defense-in-depth)
 
 In `rollback-and-notify`'s "Check revert eligibility" step, after the existing `^Revert ` loop-guard, the deployed commit's changed files are diffed against its parent. If **every** changed path matches `(\.md$|^docs/|^ibl5/docs/)`, the revert is skipped (`skip_reason=docs-only`) and the owner is DM'd. Any single non-docs path (added, modified, or deleted) keeps the revert eligible; an empty diff is never treated as docs-only.
+
+## Addendum — IBL6 notifier removed (2026-11-15) <!-- slop-ok -->
+
+§ A above says the new job mirrors `notify-ibl6-degradation`, and the 2026-09-02 addendum below says
+that job still exists in `.github/workflows/smoke-prod.yml`. Today that file has no
+`notify-ibl6-degradation` job. Its jobs are `smoke`, `rollback-and-notify`, and `notify`. The IBL6
+app was decommissioned (commit `2c9a8d080`), which removed the IBL6 check and its notifier.
 
 ## Alternatives Considered
 

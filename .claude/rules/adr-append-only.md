@@ -1,6 +1,6 @@
 ---
 description: Decision records in ibl5/docs/decisions/ are append-only — frozen sections (Context, Decision, Rationale, Alternatives) must never be rewritten in place; corrections go in a dated Addendum section.
-last_verified: 2026-09-16
+last_verified: 2026-11-15
 paths: "ibl5/docs/decisions/**"
 ---
 

@@ -254,7 +254,7 @@ Launch a **single Plan agent** with a prompt containing ALL of the items listed 
 
    Before you decide, run `bin/plan-tier-hint --desc "<task description>"` (add `--files a,b,c` when Step 2 named the files). It makes one paid Opus 5.5 call, prints `xhigh`, `default`, or `sonnet`, and exits 0. `--explain` adds the judge's reason, which names what is at stake, how reversible it is, and which mitigations it counted. A reason starting `judge-failsafe:` means the judge failed and the hint fell back to `default`. Then use `plan-architect` unless the owner approves Fable. Every verdict is appended to `~/.claude/logs/plan-tier-hint.log`.
 
-   A plan you judge worth Fable stays on Fable even when it is also recipe-backed. The escalation outranks the downgrade in item 2.
+   A plan the hint puts on xhigh stays on xhigh even when it is also recipe-backed, unless you move it down under the rule above. The escalation outranks the downgrade in item 2.
 2. **`plan-architect-sonnet` (`model: claude-sonnet-5-5`).** Pick it when you did not pick xhigh **AND** the source task/backlog entry is *recipe-backed*: it carries an explicit recipe **plus** a named existing pattern to copy (the marker-swap / mechanical-sweep class). Composing a plan from a pre-resolved recipe is mechanical composition, so the cheaper Sonnet architect suffices. Pass `subagent_type: "plan-architect-sonnet"` (exactly; it must byte-match the def's `name:`).
 3. **`plan-architect` (`model: opus`, `effort: high`).** The default, and the answer whenever you are unsure.
 

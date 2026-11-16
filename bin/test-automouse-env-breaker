@@ -306,6 +306,7 @@ chmod +x "$E2_RUNNER"
 # set and otherwise runs the real script, so every other case keeps the real verdict.
 cat > "$E2_STUB/wt-sync-tick" <<EOF_WTSYNC
 #!/bin/sh
+if [ -n "\${STUB_WT_QDUMP:-}" ]; then { echo "CLAIM \$(basename "\$2")"; ls "$E2_NDIR/queue"; } >> "\$STUB_WT_QDUMP"; fi
 if [ -n "\${STUB_WT_VERDICT:-}" ]; then printf '%s\n' "\$STUB_WT_VERDICT"; exit 0; fi
 exec "$REPO_ROOT/bin/wt-sync-tick" "\$@"
 EOF_WTSYNC
@@ -1031,8 +1032,13 @@ echo "# D1: DIVERGED-CONFLICT → skipped/ after one claim, specific report, no 
 reset_e2
 write_e2_plan divconf
 mkdir -p "$E2_WTROOT/divconf"
+# A second plan makes the stub dump queue/ at its claim, after the first plan's skip.
+write_e2_plan divconfb
+mkdir -p "$E2_WTROOT/divconfb"
+D1_QDUMP="$E2_ROOT/d1-qdump"
+rm -f "$D1_QDUMP"
 D1_PRE="$(pgrep -f "$E2_RUNNER" | sort)"
-STUB_WT_VERDICT=DIVERGED-CONFLICT WORKTREES_ROOT="$E2_WTROOT" run_e2 > /dev/null 2>&1
+STUB_WT_QDUMP="$D1_QDUMP" STUB_WT_VERDICT=DIVERGED-CONFLICT WORKTREES_ROOT="$E2_WTROOT" run_e2 > /dev/null 2>&1
 D1_POST="$(pgrep -f "$E2_RUNNER" | sort)"
 D1_LOG="$(e2_logtxt)"
 D1_REPORT="$(cat "$E2_NDIR/reports/"*-skipped-divconf.md 2>/dev/null || true)"
@@ -1043,6 +1049,12 @@ want        "D1: report names the DIVERGED verdict" "$D1_REPORT" "worktree needs
 want_absent "D1: cap block did not overwrite the report" "$D1_REPORT" "failed attempts"
 assert_eq   "D1: queue/ holds no entry or attempt sidecar for the plan" \
             "$(find "$E2_NDIR/queue" -name '*divconf*' 2>/dev/null | wc -l | tr -d ' ')" "0"
+# Sidecars must be gone when the NEXT plan is claimed. The end-of-run sweep would
+# hide a leftover, so read the queue/ listing the stub took at the second claim.
+D1_FIRST="$(grep -m1 '^CLAIM ' "$D1_QDUMP" 2>/dev/null | awk '{print $2}')"
+D1_SECOND_LS="$(awk '/^CLAIM /{n++; next} n==2' "$D1_QDUMP" 2>/dev/null)"
+assert_eq   "D1: two plans were claimed" "$(grep -c '^CLAIM ' "$D1_QDUMP" 2>/dev/null || true)" "2"
+want_absent "D1: first plan's attempt sidecar gone before the next claim" "$D1_SECOND_LS" "${D1_FIRST:-no-first-claim}.md.attempts"
 want_absent "D1: worktree is reap-exempt (no wt-remove run)" "$D1_LOG" "nothing to remove"
 assert_eq   "D1: no heartbeat watcher outlives the run" \
             "$(comm -13 <(printf '%s\n' "$D1_PRE") <(printf '%s\n' "$D1_POST") | grep -c . || true)" "0"

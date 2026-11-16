@@ -1,6 +1,6 @@
 ---
 description: Ingests externally-generated sim recap documents and queues them for the sim recap pipeline; RecapPhasePolicy gates generation to HEAT and Regular Season; SimRecapContextRepository precomputes roster context for generation; MentionMapBuilder builds the Discord mention map for the queue script; the Discord publisher classes build and track the drip that IBLbot posts, gated to Regular Season by PublishPhasePolicy.
-last_verified: 2026-11-14
+last_verified: 2026-11-16
 ---
 
 # SimRecap
@@ -91,9 +91,9 @@ The script is a list of steps in this order. `delayBeforeMs` is the wait before 
 
 1. The thread title in bold, posted in `#live-sims`. IBLbot then starts a thread on that message. No delay.
 2. The `@IBL` role ping with "Let's do the darned thing!" in the thread. No delay.
-3. The intro, when there is one. 30 seconds.
+3. The intro, when there is one. 30 seconds. `cleanIntro` first drops its `=` rule lines and the writer's `Voice:` and `Format per game:` notes.
 4. For each game day, in date order: a `**DAY n**` header (30 seconds for day 1, 120 seconds after), then each game recap in `sort_order` with 30 seconds before each one, then that day's injuries in `#injuries` with no delay.
-5. The outro under a rule line and `**WHERE THINGS STAND**`, when there is one. 120 seconds.
+5. The outro, when there is one, under a short `==========` divider and `**WHERE THINGS STAND**`. `cleanOutro` first drops its own `=` rule lines, its plain `WHERE THINGS STAND` heading, and its `END - N games` footer. 120 seconds.
 6. A closing GIF from the search `game over`. 30 seconds.
 
 Text over 2000 characters is split on blank lines, then newlines, then spaces, with a hard cut for a single token past the limit. Each continuation chunk waits 1 second. Each step lists the user ids it mentions (`mentionUsers`) and the one role id for the ping (`mentionRoles`). IBLbot sends every message with `parse: []`, so only those ids can ping.

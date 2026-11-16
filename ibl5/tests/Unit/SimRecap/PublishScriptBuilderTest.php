@@ -87,7 +87,7 @@ final class PublishScriptBuilderTest extends TestCase
             [
                 'thread_message',
                 'thread',
-                str_repeat('=', 80) . "\n\n**WHERE THINGS STAND**\n\nStandings are in.",
+                '==========' . "\n\n**WHERE THINGS STAND**\n\nStandings are in.",
             ],
             ['gif', 'thread', ''],
         ];
@@ -347,7 +347,7 @@ final class PublishScriptBuilderTest extends TestCase
             '**DAY 2**',
             'Late game.',
             "**1/5/09**\n-Nene, DEN - sprained ankle (2)",
-            str_repeat('=', 80) . "\n\n**WHERE THINGS STAND**\n\nStandings paragraph.",
+            '==========' . "\n\n**WHERE THINGS STAND**\n\nStandings paragraph.",
             '',
         ], array_column($script['steps'], 'content'));
         self::assertSame([self::GM_PORTIS], $script['steps'][5]['mentionUsers']);
@@ -402,6 +402,64 @@ final class PublishScriptBuilderTest extends TestCase
 
         self::assertCount(1, $injurySteps);
         self::assertSame("**1/5/09**\n-Nene, DEN - sprained ankle (2)", $injurySteps[0]['content']);
+    }
+
+    public function testOutroDividerFitsOnOnePhoneLine(): void
+    {
+        $steps = PublishScriptBuilder::assemble(self::fixtureInput())['steps'];
+        $outroSteps = array_values(array_filter(
+            $steps,
+            static fn (array $step): bool => str_contains($step['content'], 'WHERE THINGS STAND'),
+        ));
+
+        self::assertCount(1, $outroSteps);
+        $firstLine = explode("\n", $outroSteps[0]['content'])[0];
+        self::assertSame('==========', $firstLine);
+        // A phone shows ~35 characters per line; the old 80-char rule wrapped to three.
+        self::assertLessThanOrEqual(20, mb_strlen($firstLine));
+    }
+
+    public function testStoredDocumentFramingIsStrippedFromIntroAndOutro(): void
+    {
+        $rule = str_repeat('=', 80);
+        $input = self::fixtureInput();
+        // The shape prod stores for sim 749 (2026-11-15).
+        $input['intro'] = "IBL SIM RECAPS - Jan 11 - Jan 17, 2009 (49 games)\n"
+            . "Voice: Bill Simmons. Records/standings are current post-sim.\n"
+            . "Format per game: score header, then GM Discord mentions (away · home).\n"
+            . $rule;
+        $input['outro'] = "{$rule}\n\nWHERE THINGS STAND\n\nThe Clippers are 34-2.\n\nSee you next sim.\n\n"
+            . "{$rule}\nEND - 49 games. Jan 11 - Jan 17, 2009.";
+
+        $steps = PublishScriptBuilder::assemble($input)['steps'];
+
+        self::assertSame('IBL SIM RECAPS - Jan 11 - Jan 17, 2009 (49 games)', $steps[2]['content']);
+        $outro = $steps[count($steps) - 2]['content'];
+        self::assertSame(
+            "==========\n\n**WHERE THINGS STAND**\n\nThe Clippers are 34-2.\n\nSee you next sim.",
+            $outro,
+        );
+        foreach ($steps as $step) {
+            self::assertStringNotContainsString($rule, $step['content']);
+        }
+    }
+
+    public function testIntroOfOnlyFramingIsOmitted(): void
+    {
+        $input = self::fixtureInput();
+        $input['intro'] = "Voice: Bill Simmons.\n" . str_repeat('=', 80);
+
+        $contents = array_column(PublishScriptBuilder::assemble($input)['steps'], 'content');
+
+        self::assertNotContains('', array_slice($contents, 0, -1));
+        self::assertSame('**DAY 1**', $contents[2]);
+    }
+
+    public function testCleanOutroKeepsProseThatMerelyMentionsTheHeading(): void
+    {
+        $text = "Nobody knows WHERE THINGS STAND in the West.\nThe END - of an era.";
+
+        self::assertSame($text, PublishScriptBuilder::cleanOutro($text));
     }
 
     public function testWhitespaceOnlyOutroIsOmitted(): void

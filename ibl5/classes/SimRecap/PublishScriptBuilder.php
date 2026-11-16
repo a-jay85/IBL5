@@ -27,6 +27,11 @@ final class PublishScriptBuilder
     public const CONTINUATION_DELAY_MS = 1000;
     public const DISCORD_LIMIT = 2000;
     public const GIF_QUERY = 'game over';
+    /** Short enough to stay on one line on a phone; Discord has no horizontal-rule markdown. */
+    public const OUTRO_DIVIDER = '==========';
+
+    /** A line of eight or more `=`: the recap document's section rule. */
+    private const RULE_LINE = '/^\s*={8,}\s*$/';
 
     private const CHANNEL_LIVE_SIMS = 'live_sims';
     private const CHANNEL_THREAD = 'thread';
@@ -164,8 +169,8 @@ final class PublishScriptBuilder
             self::IBL_ROLE_ID,
         );
 
-        $intro = $in['intro'];
-        if ($intro !== null && trim($intro) !== '') {
+        $intro = self::cleanIntro($in['intro']);
+        if ($intro !== '') {
             $add('thread_message', self::CHANNEL_THREAD, $intro, self::GAME_DELAY_MS);
         }
 
@@ -212,12 +217,12 @@ final class PublishScriptBuilder
             }
         }
 
-        $outro = $in['outro'];
-        if ($outro !== null && trim($outro) !== '') {
+        $outro = self::cleanOutro($in['outro']);
+        if ($outro !== '') {
             $add(
                 'thread_message',
                 self::CHANNEL_THREAD,
-                str_repeat('=', 80) . "\n\n**WHERE THINGS STAND**\n\n" . $outro,
+                self::OUTRO_DIVIDER . "\n\n**WHERE THINGS STAND**\n\n" . $outro,
                 self::DAY_DELAY_MS,
             );
         }
@@ -234,6 +239,48 @@ final class PublishScriptBuilder
         ];
 
         return ['sim' => $in['sim'], 'title' => $in['title'], 'steps' => $steps];
+    }
+
+    /**
+     * The stored intro is the head of the recap document. Its `=` rule lines and the
+     * writer's notes ("Voice: ...", "Format per game: ...") are document framing, so the
+     * Discord post drops them and keeps the rest verbatim.
+     */
+    public static function cleanIntro(?string $intro): string
+    {
+        return self::dropLines($intro ?? '', [self::RULE_LINE, '/^\s*(Voice|Format per game):/i']);
+    }
+
+    /**
+     * The stored outro carries its own rule lines, a plain "WHERE THINGS STAND" heading,
+     * and an "END - N games" footer. The builder adds the short divider and bold heading
+     * itself, so those three are dropped.
+     */
+    public static function cleanOutro(?string $outro): string
+    {
+        return self::dropLines($outro ?? '', [
+            self::RULE_LINE,
+            '/^\s*\**\s*WHERE THINGS STAND\s*\**\s*$/i',
+            '/^\s*END\s*[-\x{2013}\x{2014}]\s*\d+\s+games?\b/iu',
+        ]);
+    }
+
+    /**
+     * @param list<non-empty-string> $patterns
+     */
+    private static function dropLines(string $text, array $patterns): string
+    {
+        $kept = [];
+        foreach (explode("\n", str_replace("\r\n", "\n", $text)) as $line) {
+            foreach ($patterns as $pattern) {
+                if (preg_match($pattern, $line) === 1) {
+                    continue 2;
+                }
+            }
+            $kept[] = $line;
+        }
+
+        return trim((string) preg_replace("/\n{3,}/", "\n\n", implode("\n", $kept)));
     }
 
     /**

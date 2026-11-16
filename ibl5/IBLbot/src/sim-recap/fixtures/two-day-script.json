@@ -95,7 +95,7 @@
             "index": 9,
             "kind": "thread_message",
             "channel": "thread",
-            "content": "================================================================================\n\n**WHERE THINGS STAND**\n\nStandings are in.",
+            "content": "==========\n\n**WHERE THINGS STAND**\n\nStandings are in.",
             "mentionUsers": [],
             "mentionRoles": [],
             "delayBeforeMs": 120000

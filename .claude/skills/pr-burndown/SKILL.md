@@ -1,7 +1,7 @@
 ---
 name: pr-burndown
 description: "Burn down the open PRs that wait on the owner. Background headless jobs do the prep that needs no owner call (rebase, regenerate snapshots, write promised tests, fix review findings, re-fire post-plan). The owner sees only the decisions that are theirs: a status card per PR (CI on the current head, review threads, post-plan verdict, door and blast radius, conflicts, hold reasons, visual links) with a recommended option, answered in a batch."
-last_verified: 2026-11-14
+last_verified: 2026-11-16
 ---
 
 # /pr-burndown
@@ -163,9 +163,9 @@ Write the card in this shape:
 **State**
 - <✅/⚠️/❌/⏳> **CI:** <green / which real check failed>, on head `<sha>`.
 - <✅/⚠️/❌/⏳> **Review comments:** <open count; what each said; which commit fixed it>.
-- <✅/⚠️/❌/⏳/🚨> **post-plan verdict:** <verdict>. <Current or stale>. <Its notes, short>.
-- <✅/⚠️/❌/🚨> **Merge danger:** <one-way or two-way door, blast radius, what a revert does and doesn't undo>.
-- <✅/⚠️/🚨> **Conflicts:** <none / behind master, no clash / which files clash and with which PR; the job rebases>.
+- <✅/✅📝/⚠️/❌/⏳/🚨> **post-plan verdict:** <verdict>. <Current or stale>. <Its notes, short>.
+- <✅2️⃣/⚠️2️⃣/🚨1️⃣> **Merge danger:** <one-way or two-way door, blast radius, what a revert does and doesn't undo>.
+- <✅🔙/⚠️/🚨> **Conflicts:** <none / behind master, no clash / which files clash and with which PR; the job rebases>.
 - <✅/⚠️/❌/⏳> **Why it's held:** <each reason by number; mark stale ones as stale>.
 
 👉 **What's left for you:** <the one decision>.
@@ -190,15 +190,21 @@ line the owner must not miss: a one-way door, a data or prod risk, a stale verdi
 hides a change, or a conflict that needs the owner's call. Keep ✅ lines to a few words so the eye skips them. Spend words only on
 ⚠️, ❌, and 🚨 lines.
 
-A conflict or a `BEHIND` branch gets ⚠️ on the Conflicts line and on the
-"merge conflict (DIRTY)" hold reason. A `BEHIND` branch with no clash is ⚠️ too, never
-✅. Neither gets ❌. It never makes a "fix conflicts
-first" option or a recommendation to wait. The pick the owner makes (Ship, Fix X)
-already covers it. Step 6 rebases a `DIRTY` PR, and the merge line updates a `BEHIND` one
-once the PR is armed. When the clash is with another approved PR in this run, say on
-the Conflicts line that this PR rebases after that one merges. The one exception is a conflict that needs the
-owner's call to resolve, such as two PRs that change the same rule in opposite ways.
-Mark that one 🚨 and put the call in the options.
+Three emoji rules on the State lines. On **Merge danger**, put 2️⃣ right after the status
+emoji for a two-way door and 1️⃣ for a one-way door, as in `✅2️⃣` and `🚨1️⃣`. On
+**Conflicts**, a branch that is only behind master with no clash gets `✅🔙`. On
+**post-plan verdict**, a current READY WITH NOTES verdict gets `✅📝`. A stale verdict
+still follows the ⚠️ and 🚨 rules above when it hides a change.
+
+A real conflict (`DIRTY`) gets ⚠️ on the Conflicts line and on the "merge conflict
+(DIRTY)" hold reason. A plain `BEHIND` branch with no clash gets `✅🔙` on the Conflicts
+line and is not a hold reason. Neither gets ❌. Neither makes a "fix conflicts first"
+option or a recommendation to wait. The pick the owner makes (Ship, Fix X) already
+covers it. Step 6 rebases a `DIRTY` PR, and the merge line updates a `BEHIND` one once
+the PR is armed. When the clash is with another approved PR in this run, say on the
+Conflicts line that this PR rebases after that one merges. The one exception is a
+conflict that needs the owner's call to resolve, such as two PRs that change the same
+rule in opposite ways. Mark that one 🚨 and put the call in the options.
 
 Start every reply with a one-line status of each background job that has moved since the
 last card. Use the same emoji there: ✅ done or armed, ⏳ running, ❌ blocked.

@@ -277,11 +277,27 @@ function lead_seg(rr, argflags,    n, t, i, out) {
     return out " "
 }
 
+# ssh_has_n: 1 when a leading ssh option bundle carries -n. In a bundle such as -tn the
+# letters are flags only up to the first option that takes a value (-ladmin, -Jhost):
+# the rest of that word is the value, so its letters are not flags.
+function ssh_has_n(seg,    n, t, i, j, c) {
+    n = split(seg, t, /[ \t]+/)
+    for (i = 1; i <= n; i++) {
+        if (t[i] !~ /^-[A-Za-z]/) continue
+        for (j = 2; j <= length(t[i]); j++) {
+            c = substr(t[i], j, 1)
+            if (c == "n") return 1
+            if (index(SSH_VALUE_OPTS, c) > 0) break
+        }
+    }
+    return 0
+}
+
 # reader_is_safe: 1 when this use of a reader cannot read stdin.
 function reader_is_safe(word, seg, rr,    d) {
     if (word == "ssh") seg = lead_seg(rr, " -p -i -o -l -F -J -L -R -D -b -c -E -e -m -O -P -Q -S -W -w -B -I ")
     if (word == "bash" || word == "sh" || word == "zsh") seg = lead_seg(rr, " -o -O ")
-    if (word == "ssh") return (seg ~ /[[:space:]]-[A-Za-z]*n[A-Za-z]*([[:space:]]|$)/)
+    if (word == "ssh") return ssh_has_n(seg)
     if (word == "mysql" || word == "mariadb") return (seg ~ /[[:space:]](-e|--execute)([[:space:]=]|$)/)
     if (word == "bash" || word == "sh" || word == "zsh") return (seg ~ /[[:space:]]-n([[:space:]]|$)/)
     if (word == "eval") return (rr ~ /^[[:space:]]*"?[A-Za-z_][A-Za-z0-9_${}]*=/)
@@ -335,7 +351,8 @@ function process_line(m, r, ln,    t, c1, k, seg, rseg, p, fw, word, fed, redir,
         p = skip_ws(seg, 1)
         fw = word_at(seg, p)
         while (fw == "then" || fw == "else" || fw == "{") { p = skip_ws(seg, p + length(fw)); fw = word_at(seg, p) }
-        if (fw == "done") {
+        # done) / done} close the loop; a case label `done) cmd ;;` has a command after it.
+        if (fw ~ /^done([^A-Za-z0-9_]|$)/ && !(fw ~ /^done\)/ && substr(seg, skip_ws(seg, p + length(fw))) ~ /^[A-Za-z_$]/)) {
             while (depth > 0 && fkind[depth] == "group") close_frame(0, 0)
             if (depth > 0) {
                 fed = done_feeds_stdin(seg) || frame_piped[depth]
@@ -382,6 +399,7 @@ BEGIN {
     WRAP["exec"] = " -a "
     WRAP["command"] = " "
     WRAP["nohup"] = " "
+    SSH_VALUE_OPTS = "BbcDEeFIiJLlmOopPQRSWw"
     XS = "x"; SPC = " "
     for (i = 0; i < 10; i++) { XS = XS XS; SPC = SPC SPC }
 }
@@ -394,7 +412,12 @@ BEGIN {
         depth = 0; qs = ""; nest = 0; in_heredoc = 0; pending = 0; lraw = ""; lmask = ""
     }
     if (in_heredoc) { if (trim(raw) == heredoc_end) in_heredoc = 0; next }
-    if (isyml && raw ~ /^[[:space:]]*(- )?[A-Za-z0-9_.-]+:/) { lraw = ""; lmask = ""; qs = ""; nest = 0; next }
+    if (isyml && raw ~ /^[[:space:]]*(- )?[A-Za-z0-9_.-]+:/) {
+        lraw = ""; lmask = ""; qs = ""; nest = 0
+        # A one-line run: step carries its script on the key line; scan that value.
+        if (raw !~ /^[[:space:]]*(- )?run:[[:space:]]*[^|> \t]/) next
+        sub(/^[[:space:]]*(- )?run:[[:space:]]*/, "", raw)
+    }
     phys = mask_line(raw)
     rj = raw
     cont = 0

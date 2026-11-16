@@ -434,6 +434,84 @@ done < f
 FIX
 expect c47-ssh-P-value-option "$T/c47.sh" 0
 
+# Review thread loop-close-token-missed: a loop closed as done) / done} / done; still closes.
+cat > "$T/c48.sh" <<'FIX'
+#!/bin/bash
+out=$(git ls-files | while read -r f; do bash -c "$f"; done)
+FIX
+expect c48-done-paren-closes-piped-loop "$T/c48.sh" 1 2
+
+cat > "$T/c49.sh" <<'FIX'
+#!/bin/bash
+(while read -r f; do bash -c "$f"; done) < list
+FIX
+expect c49-done-paren-then-redirect "$T/c49.sh" 1 2
+
+cat > "$T/c50.sh" <<'FIX'
+#!/bin/bash
+x=$(while read -r f; do echo "$f"; done)
+for d in a; do ssh h true; done
+FIX
+expect c50-unfed-done-paren-stays-unfed "$T/c50.sh" 0
+
+# A case label named done) is not a loop close, so the later hit still counts.
+cat > "$T/c50b.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  case $l in
+    done) ssh h ;;
+  esac
+  ssh h true
+done < f
+FIX
+run_gate "$T/c50b.sh"
+case "$RC:$OUT" in
+    1:*"c50b.sh:4:"*"c50b.sh:6:"*) pass "c50b-case-label-done-not-loop-close" ;;
+    *) fail "c50b-case-label-done-not-loop-close (rc=$RC; output: $OUT)" ;;
+esac
+
+# Review thread yaml-inline-run-unscanned: a one-line run: step is scanned.
+cat > "$T/c51.yml" <<'FIX'
+jobs:
+  a:
+    steps:
+      - run: while read -r f; do bash -c "$f"; done < list
+      - name: fixed
+        run: while read -r f; do bash -c "$f" </dev/null; done < list
+      - run: |
+          echo ok
+FIX
+expect c51-yaml-inline-run "$T/c51.yml" 1 4
+case "$OUT" in
+    *"c51.yml:6:"*) fail "c51-yaml-inline-run-fixed-line-quiet (output: $OUT)" ;;
+    *) pass "c51-yaml-inline-run-fixed-line-quiet" ;;
+esac
+
+# Review thread safe-flag-false-match: a joined option value is not a bundled -n.
+cat > "$T/c52.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  ssh -ladmin host cmd
+  ssh -Jbastion host cmd
+done < f
+FIX
+run_gate "$T/c52.sh"
+case "$RC:$OUT" in
+    1:*"c52.sh:3:"*"c52.sh:4:"*) pass "c52-ssh-joined-value-not-n" ;;
+    *) fail "c52-ssh-joined-value-not-n (rc=$RC; output: $OUT)" ;;
+esac
+
+cat > "$T/c53.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  ssh -n host true
+  ssh -tn host true
+  ssh -nT host true
+  ssh -nlroot host true
+done < f
+FIX
+expect c53-ssh-bundled-n-stays-safe "$T/c53.sh" 0
+
 echo ""
 echo "$PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

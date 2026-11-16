@@ -32,7 +32,7 @@ if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     cat <<'HELP'
 Usage:
   bin/automouse/queue [add] <plan-slug-or-filename> [--force]
-                                                queue a plan; runs bin/check-plan first
+                                                queue a plan; runs bin/check-plan --require-must-preserve first
   bin/automouse/queue                           show current queue
   bin/automouse/queue requeue                   move all skipped plans back to queue
   bin/automouse/queue remove <plan-slug>        remove a plan from the queue
@@ -52,6 +52,8 @@ Arguments:
   --force                   queue even when bin/check-plan fails; logged to
                             queue/<plan>.md.force-override and force-overrides.log.
                             Never bypasses the impl_model gates.
+                            The only way to queue a plan that lacks a
+                            `## Must preserve` section.
 
 Env vars:
   NIGHTLY_DIR   automouse state directory (default: ~/.claude/projects/.../automouse)
@@ -666,12 +668,15 @@ fi
 # them. AUTOMOUSE_CHECK_PLAN is a test seam in bin/plan-now's
 # PLAN_NOW_AUTOMOUSE_QUEUE shape; `:-` makes an EMPTY value fall back to the
 # real gate, so a blank override can never disable it.
+# --require-must-preserve (backlog#1531): a plan without a `## Must preserve`
+# section is refused here like any other gate failure; `--force` is the only,
+# logged, way past it. `requeue` never reaches this call.
 CHECK_PLAN="${AUTOMOUSE_CHECK_PLAN:-${LIB_DIR%/lib}/check-plan}"
 CHECK_RC=0
 # check-plan prints nothing until it ends, often 30s or more. Say so first, so
 # the wait does not look like a hang.
 echo "Checking $FILENAME with bin/check-plan (this can take 30s or more)..." >&2
-CHECK_OUT=$("$CHECK_PLAN" "$SOURCE" 2>&1) || CHECK_RC=$?
+CHECK_OUT=$("$CHECK_PLAN" --require-must-preserve "$SOURCE" 2>&1) || CHECK_RC=$?
 FORCE_SIDECAR="$QUEUE_DIR/${FILENAME}.force-override"
 if [ "$CHECK_RC" -ne 0 ]; then
     if [ "$FORCE" -ne 1 ]; then

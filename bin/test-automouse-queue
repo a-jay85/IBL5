@@ -35,7 +35,8 @@ h_tmp TMP
 NDIR="$TMP/automouse"
 PDIR="$TMP/plans"
 HQ="$TMP/hq"   # bare helper-unit fixture dir (never a real NIGHTLY_DIR)
-# Case filter: empty runs every case; `judge` runs only judge-ok / judge-missing.
+# Case filter: empty runs every case; `judge` runs only judge-ok / judge-missing;
+# `mp` runs only the row-cp-mp-* / row-requeue-no-checkplan cases.
 AQ_ONLY="${1:-}"
 # Phase 3 seam: skip the real bin/check-plan; these fixtures carry no Verification Matrix.
 export AUTOMOUSE_CHECK_PLAN=/usr/bin/true
@@ -50,8 +51,33 @@ printf '#!/bin/bash\necho "OK (stub)"\nexit 0\n' > "$CP_PASS"
 CP_MANY="$TMP/cp-many"
 printf '#!/bin/bash\nfor n in $(seq 1 50); do echo "[X] stub gate $n"; done\nexit 1\n' > "$CP_MANY"
 CP_RECORD="$TMP/cp-record"
-printf '#!/bin/bash\necho "$1" >> "%s/cp-calls"\nexit 1\n' "$TMP" > "$CP_RECORD"
-chmod +x "$CP_FAIL" "$CP_USAGE" "$CP_PASS" "$CP_MANY" "$CP_RECORD"
+printf '#!/bin/bash\nfor a in "$@"; do last=$a; done\necho "$last" >> "%s/cp-calls"\nexit 1\n' "$TMP" > "$CP_RECORD"
+# CP_ARGV records ALL argv, one ARG: line per argument, and passes.
+export CP_ARGV_LOG="$TMP/cp-argv"
+CP_ARGV="$TMP/cp-argv-stub"
+cat > "$CP_ARGV" <<'STUB'
+#!/bin/bash
+for a in "$@"; do printf 'ARG:%s\n' "$a" >> "${CP_ARGV_LOG:?}"; done
+echo "OK (stub)"
+exit 0
+STUB
+# CP_MP is flag-sensitive: it refuses a plan lacking `## Must preserve` only
+# when --require-must-preserve is passed.
+CP_MP="$TMP/cp-mp"
+cat > "$CP_MP" <<'STUB'
+#!/bin/bash
+req=0; plan=
+for a in "$@"; do
+    case "$a" in --require-must-preserve) req=1 ;; *) plan=$a ;; esac
+done
+if [ "$req" -eq 1 ] && ! grep -q '^## Must preserve' "$plan" 2>/dev/null; then
+    echo "[MP] missing ## Must preserve section (stub)"
+    exit 1
+fi
+echo "OK (stub)"
+exit 0
+STUB
+chmod +x "$CP_FAIL" "$CP_USAGE" "$CP_PASS" "$CP_MANY" "$CP_RECORD" "$CP_ARGV" "$CP_MP"
 
 setup() {
     rm -rf "$NDIR"
@@ -92,6 +118,76 @@ enq() {
         run_queue "$s" >/dev/null 2>&1
     done
 }
+
+# ---------------------------------------------------------------------------
+# backlog#1531 — the add path passes --require-must-preserve to bin/check-plan
+# (`bin/test-automouse-queue mp` runs only these cases)
+# ---------------------------------------------------------------------------
+setup
+mkplan plan-argv.md
+rm -f "$CP_ARGV_LOG"
+RC=0
+AUTOMOUSE_CHECK_PLAN="$CP_ARGV" run_queue plan-argv >/dev/null 2>&1 || RC=$?
+if [ "$RC" -eq 0 ] && [ "$(head -n 1 "$CP_ARGV_LOG")" = "ARG:--require-must-preserve" ] \
+    && [ "$(grep '^ARG:' "$CP_ARGV_LOG" | tail -n 1 | sed -E 's/.*(plan-argv\.md)$/\1/')" = "plan-argv.md" ]; then
+    h_pass "row-cp-mp-argv"
+else
+    h_fail "row-cp-mp-argv (rc=$RC): $(cat "$CP_ARGV_LOG" 2>/dev/null)"
+fi
+
+setup
+mkplan plan-mp-legacy.md
+ln -s "$PDIR/plan-mp-legacy.md" "$NDIR/skipped/plan-mp-legacy.md"
+RC=0
+OUT=$(AUTOMOUSE_CHECK_PLAN="$CP_MP" run_queue plan-mp-legacy 2>&1) || RC=$?
+if [ "$RC" -eq 1 ] && grep -qF "fails bin/check-plan" <<< "$OUT" \
+    && grep -qF "[MP] missing ## Must preserve section (stub)" <<< "$OUT" \
+    && ! queue_entry_for_slug "$NDIR/queue" plan-mp-legacy >/dev/null \
+    && [ ! -e "$NDIR/queue/plan-mp-legacy.md.force-override" ] \
+    && [ -L "$NDIR/skipped/plan-mp-legacy.md" ]; then
+    h_pass "row-cp-mp-refuse"
+else
+    h_fail "row-cp-mp-refuse (rc=$RC): $OUT"
+fi
+
+setup
+mkplan plan-mp-ok.md
+printf '\n## Must preserve\n- none — fixture plan\n' >> "$PDIR/plan-mp-ok.md"
+RC=0
+OUT=$(AUTOMOUSE_CHECK_PLAN="$CP_MP" run_queue plan-mp-ok 2>&1) || RC=$?
+if [ "$RC" -eq 0 ] && queue_entry_for_slug "$NDIR/queue" plan-mp-ok >/dev/null \
+    && [ ! -e "$NDIR/queue/plan-mp-ok.md.force-override" ]; then
+    h_pass "row-cp-mp-present"
+else
+    h_fail "row-cp-mp-present (rc=$RC): $OUT"
+fi
+
+setup
+mkplan plan-mp-force.md
+RC=0
+OUT=$(AUTOMOUSE_CHECK_PLAN="$CP_MP" run_queue plan-mp-force --force 2>&1) || RC=$?
+SC="$NDIR/queue/plan-mp-force.md.force-override"
+if [ "$RC" -eq 0 ] && queue_entry_for_slug "$NDIR/queue" plan-mp-force >/dev/null && [ -f "$SC" ] \
+    && grep -qF "check_plan_exit: 1" "$SC" && grep -qF "[MP] missing" "$SC" \
+    && [ "$(wc -l < "$NDIR/force-overrides.log" | tr -d ' ')" = "1" ] \
+    && grep -qF "plan-mp-force.md" "$NDIR/force-overrides.log"; then
+    h_pass "row-cp-mp-force"
+else
+    h_fail "row-cp-mp-force (rc=$RC): $OUT"
+fi
+
+setup
+mkplan plan-rq.md
+ln -s "$PDIR/plan-rq.md" "$NDIR/skipped/plan-rq.md"
+rm -f "$CP_ARGV_LOG"
+RC=0
+OUT=$(AUTOMOUSE_CHECK_PLAN="$CP_ARGV" run_queue requeue 2>&1) || RC=$?
+if [ "$RC" -eq 0 ] && queue_entry_for_slug "$NDIR/queue" plan-rq >/dev/null && [ ! -e "$CP_ARGV_LOG" ]; then
+    h_pass "row-requeue-no-checkplan"
+else
+    h_fail "row-requeue-no-checkplan (rc=$RC): $OUT"
+fi
+[ "$AQ_ONLY" != mp ] || h_done
 
 assert_present() {
     local desc="$1" path="$2"
@@ -1584,7 +1680,7 @@ fi
 
 setup
 # Copy of the `clean-minimal` fixture in bin/test-check-plan.
-printf -- '---\nimpl_model: sonnet\n---\n\n# fixture plan realok\n\n| # | What to verify | Test type | Timing | Test file / location |\n|---|---------------|-----------|--------|---------------------|\n| 1 | cap rejects over-cap trade | E2E | pre-impl | `tests/e2e/trade.spec.ts` |\n| 2 | form submits and redirects | E2E | post-impl | `tests/e2e/trade.spec.ts` |\n' > "$PDIR/plan-realok.md"
+printf -- '---\nimpl_model: sonnet\n---\n\n# fixture plan realok\n\n| # | What to verify | Test type | Timing | Test file / location |\n|---|---------------|-----------|--------|---------------------|\n| 1 | cap rejects over-cap trade | E2E | pre-impl | `tests/e2e/trade.spec.ts` |\n| 2 | form submits and redirects | E2E | post-impl | `tests/e2e/trade.spec.ts` |\n\n## Must preserve\n\n- none — fixture plan with nothing to guard\n' > "$PDIR/plan-realok.md"
 out=$(env -u AUTOMOUSE_CHECK_PLAN NIGHTLY_DIR="$NDIR" PLANS_DIR="$PDIR" "$SCRIPT" plan-realok 2>&1); rc=$?
 if [ "$rc" -eq 0 ] && queue_entry_for_slug "$NDIR/queue" plan-realok >/dev/null; then
     h_pass "row-real-pass-unset"

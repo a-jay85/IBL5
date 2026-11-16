@@ -103,6 +103,7 @@ STATE="$SANDBOX/attempts.tsv"
 
 export SSH_CALLS="$SANDBOX/ssh-calls.log"
 export QUEUE_CALLS="$SANDBOX/queue-calls.log"
+export CHECKPLAN_CALLS="$SANDBOX/checkplan-calls.log"
 export DM_CALLS="$SANDBOX/dm-calls.log"
 export RESP_GET="$SANDBOX/resp-get.txt"
 export RESP_ACK="$SANDBOX/resp-ack.txt"
@@ -137,8 +138,15 @@ SSHSTUB
 
 cat > "$REPO_STUB/bin/check-plan" <<'CPSTUB'
 #!/usr/bin/env bash
-if grep -qF 'CHECKPLAN-FAILS' "$1" 2>/dev/null; then
+printf '%s\n' "$*" >> "${CHECKPLAN_CALLS:-/dev/null}"
+plan=
+for a in "$@"; do plan=$a; done
+if grep -qF 'CHECKPLAN-FAILS' "$plan" 2>/dev/null; then
     printf 'check-plan: FAILED — fixture is marked CHECKPLAN-FAILS\n'
+    exit 1
+fi
+if [ "${1:-}" = --require-must-preserve ] && grep -qF 'LACKS-MUST-PRESERVE' "$plan" 2>/dev/null; then
+    printf '[MP] missing ## Must preserve section (stub)\n'
     exit 1
 fi
 exit 0
@@ -168,6 +176,7 @@ DRAIN_RC=0
 run_drain() {
     : > "$SSH_CALLS"
     : > "$QUEUE_CALLS"
+    : > "$CHECKPLAN_CALLS"
     : > "$DM_CALLS"
     DRAIN_OUT="$(
         PLAN_REVIEW_SSH_BIN="$STUBS/ssh" \
@@ -371,6 +380,21 @@ seam_case_checkplan_gates_the_queue() {
     want "ADR-0096: the record is acked (unactionable)" "$(ack_body)" '"cp1"'
     want "ADR-0096: the DM names the slug" "$(cat "$DM_CALLS")" "bad-plan"
     want "ADR-0096: the DM carries the check-plan verdict" "$(cat "$DM_CALLS")" "check-plan: FAILED"
+}
+
+seam_case_checkplan_requires_must_preserve() {
+    reset_drain_state
+    printf '# legacy plan\nLACKS-MUST-PRESERVE\n' > "$PLANS/legacy-plan.md"
+    set_get '{"decisions":[{"id":"mp1","slug":"legacy-plan","action":"queue","actor":"u","ts":"t"}]}'
+    run_drain --drain
+    if [ -s "$QUEUE_CALLS" ]; then
+        seam_fail "backlog#1531: a plan lacking Must preserve reached bin/automouse/queue"
+    else
+        seam_ok "backlog#1531: a plan lacking Must preserve never reaches the queue"
+    fi
+    want "backlog#1531: drain passes the flag to check-plan" "$(cat "$CHECKPLAN_CALLS")" "require-must-preserve"
+    want "backlog#1531: the record is acked, not left pending" "$(ack_body)" '"mp1"'
+    want "backlog#1531: the DM carries the [MP] verdict" "$(cat "$DM_CALLS")" "[MP] missing"
 }
 
 seam_case_discard_moves() {
@@ -667,6 +691,7 @@ seam_case_same_slug_dedupe
 seam_case_dry_run
 seam_case_trust_boundary
 seam_case_checkplan_gates_the_queue
+seam_case_checkplan_requires_must_preserve
 seam_case_discard_moves
 seam_case_quiet_404
 seam_case_failure_buckets

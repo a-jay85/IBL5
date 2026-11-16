@@ -32,4 +32,11 @@ interface PlrExportRepositoryInterface
      * }> Keyed by pid
      */
     public function getAllPlayerChangeableFields(): array;
+
+    /**
+     * Get every player's GM depth chart from the dc_* columns.
+     *
+     * @return array<int, array{pid: int, teamid: int, dc_pg_depth: int, dc_sg_depth: int, dc_sf_depth: int, dc_pf_depth: int, dc_c_depth: int, dc_can_play_in_game: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}> Keyed by pid
+     */
+    public function getAllPlayerDepthCharts(): array;
 }

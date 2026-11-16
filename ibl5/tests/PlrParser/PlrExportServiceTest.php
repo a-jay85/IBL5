@@ -336,8 +336,10 @@ class PlrExportServiceTest extends TestCase
             $this->assertSame(1, $result->playersModified);
             $this->assertSame(5, $result->fieldsChanged);
             $this->assertSame([
+                'WARNING: no empty slot in team 12 block for pid 202; teamid written in place',
                 'Loaded 2 players from database',
                 'Found 3 player records in .plr file',
+                'Depth charts applied for 0 teams',
                 'Wrote ' . filesize($outputFile) . ' bytes to ' . $outputFile,
             ], $result->messages);
             $this->assertSame([

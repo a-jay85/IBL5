@@ -20,8 +20,8 @@ class PlrExportService implements PlrExportServiceInterface
     /**
      * Map of database field names to PlrFileWriter field names.
      *
-     * Depth chart fields (pg_depth–c_depth, dc_can_play_in_game) are intentionally excluded —
-     * those are managed by DepthChartEntry and not exported to the .plr file.
+     * Depth chart fields come from DEPTH_TO_PLR_FIELD_MAP, and only for teams that
+     * PlrDepthChartSelector marks as charted.
      *
      * @var array<string, string>
      */
@@ -37,6 +37,20 @@ class PlrExportService implements PlrExportServiceInterface
         'salary_yr5' => 'salary_yr5',
         'salary_yr6' => 'salary_yr6',
         'fa_signing_flag' => 'freeAgentSigningFlag',
+    ];
+
+    /**
+     * Map of GM depth-chart columns to PlrFileWriter field names.
+     *
+     * @var array<string, string>
+     */
+    private const DEPTH_TO_PLR_FIELD_MAP = [
+        'dc_pg_depth' => 'PGDepth',
+        'dc_sg_depth' => 'SGDepth',
+        'dc_sf_depth' => 'SFDepth',
+        'dc_pf_depth' => 'PFDepth',
+        'dc_c_depth' => 'CDepth',
+        'dc_can_play_in_game' => 'canPlayInGame',
     ];
 
     public function __construct(PlrExportRepositoryInterface $repository)
@@ -61,8 +75,29 @@ class PlrExportService implements PlrExportServiceInterface
 
         // Step 3: Query DB for all changeable fields
         $dbPlayers = $this->repository->getAllPlayerChangeableFields();
+
+        // Step 3b: Move traded players into their new team's slot block
+        $teamByPid = [];
+        foreach ($dbPlayers as $pid => $dbPlayer) {
+            $teamByPid[$pid] = $dbPlayer['teamid'];
+        }
+        $relocation = (new PlrTradeRelocator())->relocate(array_values($lines), $teamByPid);
+        $lines = $relocation->lines;
+        $playerIndex = PlrFileWriter::indexPlayerRecords($lines);
+        foreach ($relocation->warnings as $warning) {
+            $result->addMessage($warning);
+        }
+        foreach ($relocation->moves as $move) {
+            $result->addPlayerChanges($move['pid'], $move['name'], [
+                ['field' => 'ordinal', 'old' => $move['oldOrdinal'], 'new' => $move['newOrdinal']],
+                ['field' => 'teamid', 'old' => $move['oldTid'], 'new' => $move['newTid']],
+            ]);
+        }
         $result->addMessage('Loaded ' . count($dbPlayers) . ' players from database');
         $result->addMessage('Found ' . count($playerIndex) . ' player records in .plr file');
+
+        $charted = PlrDepthChartSelector::chartedByPid($this->repository->getAllPlayerDepthCharts());
+        $result->addMessage('Depth charts applied for ' . PlrDepthChartSelector::countTeams($charted) . ' teams');
 
         // Step 4: For each player, compare and build change set
         foreach ($playerIndex as $lineIndex => $pid) {
@@ -72,7 +107,7 @@ class PlrExportService implements PlrExportServiceInterface
 
             $dbPlayer = $dbPlayers[$pid];
             $line = $lines[$lineIndex];
-            $changes = $this->buildChangeSet($line, $dbPlayer);
+            $changes = $this->buildChangeSet($line, $dbPlayer) + $this->buildDepthChangeSet($line, $charted[$pid] ?? null);
 
             if ($changes === []) {
                 continue;
@@ -131,6 +166,38 @@ class PlrExportService implements PlrExportServiceInterface
             $fileValue = PlrFileWriter::readField($line, $plrField);
 
             if ($dbValue !== $fileValue) {
+                $changes[$plrField] = $dbValue;
+            }
+        }
+
+        return $changes;
+    }
+
+    /**
+     * Build the depth and active changes for a record of a charted team.
+     *
+     * Returns no changes when the record sits outside its DB team's slot block or
+     * its file teamid differs from the DB teamid (a trade with no free slot).
+     *
+     * @param array{pid: int, teamid: int, dc_pg_depth: int, dc_sg_depth: int, dc_sf_depth: int, dc_pf_depth: int, dc_c_depth: int, dc_can_play_in_game: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}|null $row
+     * @return array<string, int>
+     */
+    private function buildDepthChangeSet(string $line, ?array $row): array
+    {
+        if ($row === null) {
+            return [];
+        }
+
+        $ordinal = (int) trim(substr($line, PlrFileWriter::OFFSET_ORDINAL, PlrFileWriter::WIDTH_ORDINAL));
+        $blockTeam = intdiv($ordinal - 1, PlrTradeRelocator::SLOTS_PER_TEAM) + 1;
+        if ($blockTeam !== $row['teamid'] || PlrFileWriter::readField($line, 'teamid') !== $row['teamid']) {
+            return [];
+        }
+
+        $changes = [];
+        foreach (self::DEPTH_TO_PLR_FIELD_MAP as $dbField => $plrField) {
+            $dbValue = $row[$dbField];
+            if ($dbValue !== PlrFileWriter::readField($line, $plrField)) {
                 $changes[$plrField] = $dbValue;
             }
         }

@@ -129,6 +129,94 @@ class NewsControllerTest extends ModuleEntryPointTestCase
         $this->runMain($controller);
     }
 
+    public function testRendersTradeSuggestionsAfterSimRecapForGm(): void
+    {
+        $team = self::createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
+        $team->method('getTeamnameFromUsername')->willReturn('Lakers');
+        $team->method('getTidFromTeamname')->willReturn(5);
+
+        $recapService = self::createStub(\LastSimRecap\Contracts\LastSimRecapServiceInterface::class);
+        $recapService->method('buildSlateForTeam')->willReturn(
+            new \LastSimRecap\Dto\RecapSlate(5, 'Los Angeles', 'Lakers', 1, '2026-01-01', '2026-01-07', 3, 1, 10, '+5', '-2', 3, 1, []),
+        );
+        $recapView = self::createStub(\LastSimRecap\Contracts\LastSimRecapViewInterface::class);
+        $recapView->method('render')->willReturn('<section data-test="recap-card"></section>');
+
+        $panel = new \TradeSuggestions\TradeSuggestionsPanelData(
+            new \TradeSuggestions\ResolvedTeamMode(\TradeSuggestions\TeamMode::WinNow, \TradeSuggestions\TeamMode::WinNow, false),
+            [],
+        );
+        $suggestions = self::createMock(\TradeSuggestions\Contracts\TradeSuggestionsServiceInterface::class);
+        $suggestions->expects($this->once())->method('buildForTeam')->with(5)->willReturn($panel);
+        $suggestionsView = self::createStub(\TradeSuggestions\Contracts\TradeSuggestionsViewInterface::class);
+        $suggestionsView->method('render')->willReturn('<section data-test="trade-ideas"></section>');
+
+        $controller = $this->buildController(
+            auth: $this->authenticatedAs(['username' => 'gm1']),
+            team: $team,
+            recapService: $recapService,
+            recapView: $recapView,
+            suggestions: $suggestions,
+            suggestionsView: $suggestionsView,
+        );
+
+        $html = $this->runMain($controller);
+
+        $recapPos = strpos($html, '<section data-test="recap-card"></section>');
+        $ideasPos = strpos($html, '<section data-test="trade-ideas"></section>');
+        $this->assertIsInt($recapPos);
+        $this->assertIsInt($ideasPos);
+        $this->assertLessThan($ideasPos, $recapPos);
+    }
+
+    public function testTradeSuggestionsFailureStillRendersTheRecap(): void
+    {
+        $team = self::createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
+        $team->method('getTeamnameFromUsername')->willReturn('Lakers');
+        $team->method('getTidFromTeamname')->willReturn(5);
+
+        $recapService = self::createStub(\LastSimRecap\Contracts\LastSimRecapServiceInterface::class);
+        $recapService->method('buildSlateForTeam')->willReturn(
+            new \LastSimRecap\Dto\RecapSlate(5, 'Los Angeles', 'Lakers', 1, '2026-01-01', '2026-01-07', 3, 1, 10, '+5', '-2', 3, 1, []),
+        );
+        $recapView = self::createStub(\LastSimRecap\Contracts\LastSimRecapViewInterface::class);
+        $recapView->method('render')->willReturn('<section data-test="recap-card"></section>');
+
+        $suggestions = self::createStub(\TradeSuggestions\Contracts\TradeSuggestionsServiceInterface::class);
+        $suggestions->method('buildForTeam')->willThrowException(new \RuntimeException('db down'));
+
+        $controller = $this->buildController(
+            auth: $this->authenticatedAs(['username' => 'gm1']),
+            team: $team,
+            recapService: $recapService,
+            recapView: $recapView,
+            suggestions: $suggestions,
+            suggestionsView: self::createStub(\TradeSuggestions\Contracts\TradeSuggestionsViewInterface::class),
+        );
+
+        $html = $this->runMain($controller);
+
+        $this->assertStringContainsString('<section data-test="recap-card"></section>', $html);
+    }
+
+    public function testSkipsTradeSuggestionsForAnonymousAndFreeAgents(): void
+    {
+        $suggestionsView = self::createStub(\TradeSuggestions\Contracts\TradeSuggestionsViewInterface::class);
+
+        $anonSuggestions = self::createMock(\TradeSuggestions\Contracts\TradeSuggestionsServiceInterface::class);
+        $anonSuggestions->expects($this->never())->method('buildForTeam');
+        $this->runMain($this->buildController(suggestions: $anonSuggestions, suggestionsView: $suggestionsView));
+
+        $faSuggestions = self::createMock(\TradeSuggestions\Contracts\TradeSuggestionsServiceInterface::class);
+        $faSuggestions->expects($this->never())->method('buildForTeam');
+        $this->runMain($this->buildController(
+            auth: $this->authenticatedAs(['username' => 'gm1']),
+            team: $this->freeAgentTeam(),
+            suggestions: $faSuggestions,
+            suggestionsView: $suggestionsView,
+        ));
+    }
+
     public function testTopicWithNullTopicTextRendersNoInfoBranch(): void
     {
         $news = self::createMock(\Topics\News\Contracts\NewsServiceInterface::class);
@@ -696,6 +784,8 @@ class NewsControllerTest extends ModuleEntryPointTestCase
         ?\LastSimRecap\Contracts\LastSimRecapViewInterface $recapView = null,
         ?\Topics\News\Contracts\NewsServiceInterface $news = null,
         ?\Topics\News\Contracts\NewsViewInterface $view = null,
+        ?\TradeSuggestions\Contracts\TradeSuggestionsServiceInterface $suggestions = null,
+        ?\TradeSuggestions\Contracts\TradeSuggestionsViewInterface $suggestionsView = null,
     ): NewsController {
         return new NewsController(
             $config ?? $this->config,
@@ -705,6 +795,8 @@ class NewsControllerTest extends ModuleEntryPointTestCase
             $recapView ?? $this->recapViewStub,
             $news ?? $this->newsServiceStub,
             $this->withRealChrome($view ?? $this->newsViewStub),
+            tradeSuggestionsService: $suggestions,
+            tradeSuggestionsView: $suggestionsView,
         );
     }
 

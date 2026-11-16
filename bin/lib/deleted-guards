@@ -20,7 +20,11 @@
 #   exit 2  usage error or unreadable plan
 #
 # A guard key is <kind>@<path>#<first 8 hex of sha1(normalized line)>, so it
-# survives rebases. A removed guard cancels against an identical (normalized)
+# survives rebases. Every surviving removal gets its own row. The Nth copy
+# (N >= 2) of one kind and normalized line in one file hashes "<line>\n#<N>"
+# instead, so the first copy keeps the plain key and each repeat needs its own
+# justification. The count runs per file, in diff order, over the removals left
+# after cancellation. A removed guard cancels against an identical (normalized)
 # added line in the SAME file only: a re-indent is not flagged, a cross-file
 # move is. One or-true exception: a removed `cmd || true` also cancels against
 # an added one-line case arm `<pattern>) cmd || true ;;` in the same file when
@@ -277,15 +281,19 @@ def classify(lang, line):
     return None, False
 
 
-def guard_key(kind, path, norm):
+def guard_key(kind, path, norm, n=1):
+    # The Nth (N >= 2) surviving copy of one line in one file hashes the line
+    # plus "\n#N". A normalized diff line never holds a newline, so an ordinal
+    # input cannot equal any first-copy input.
+    h = norm if n == 1 else "%s\n#%d" % (norm, n)
     return "%s@%s#%s" % (kind, path,
-                         hashlib.sha1(norm.encode("utf-8")).hexdigest()[:8])
+                         hashlib.sha1(h.encode("utf-8")).hexdigest()[:8])
 
 
 def find_removed_guards(files):
-    """Ordered list of (key, path, kind, snippet, full) surviving cancellation."""
+    """Ordered list of (key, path, kind, snippet, full), one per surviving removal."""
     out = []
-    seen = set()
+    occ = {}  # (path, kind, norm) -> surviving removals counted so far
     for rec in files:
         path = rec["path"]
         if not path or skipped(path):
@@ -330,10 +338,10 @@ def find_removed_guards(files):
                     continue
                 if kind == "or-true" and cancel_unwrapped(added, norm):
                     continue
-                key = guard_key(kind, path, norm)
-                if key in seen:
-                    continue
-                seen.add(key)
+                okey = (path, kind, norm)
+                n = occ.get(okey, 0) + 1
+                occ[okey] = n
+                key = guard_key(kind, path, norm, n)
                 out.append((key, path, kind, norm[:120], norm))
     return out
 

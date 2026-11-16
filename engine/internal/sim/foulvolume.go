@@ -42,3 +42,20 @@ const andOneMadeTwoCut = 0.05
 
 // andOneMadeTwoFires reports whether the made-2pt and-one roll fires.
 func andOneMadeTwoFires(draw float64) bool { return draw < andOneMadeTwoCut }
+
+// foulBucketVolumeScale is a J27 rate-port stand-in. It scales the foul-only
+// bucket weight so the shooting-two and non-shooting sites reach JSB's
+// live-traced 6.29 and 6.27 PF per team-game. The shooting split stays on the
+// decompile literal shootingFoulDrawCut. Write-up:
+// engine/docs/j27-foul-volume-rate-port.md.
+const foulBucketVolumeScale = 2.10
+
+// scaledFoulWeight applies foulBucketVolumeScale to a foul-only bucket weight.
+func scaledFoulWeight(w float64) float64 { return w * foulBucketVolumeScale }
+
+// andOneHalfCourtScale is a J27 rate-port stand-in. It scales the raw basis of
+// the half-court and-one bucket weight before the HCA term joins and before
+// the floor, to cut the engine's and-one over-count (3.934 PF per team-game
+// against JSB's 2.25 for both and-one-flagged FT sites). The HCA term stays
+// unscaled because it carries the engine's home margin.
+const andOneHalfCourtScale = 0.053

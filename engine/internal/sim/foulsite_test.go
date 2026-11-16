@@ -67,3 +67,49 @@ func TestFoulSiteFor(t *testing.T) {
 		}
 	}
 }
+
+// TestFoulSiteTagsMadeTwoAndOne pins the J27 rate-port split of the two
+// and-one sites. A foul from the half-court made-2pt roll (andOneMadeTwoCut)
+// carries FoulSiteAndOneMadeTwo, and an outcome-bucket and-one keeps
+// FoulSiteAndOne. Transition shots carry OriginTransition, so a made-2 roll
+// and-one after a non-transition make can only come from the half-court call
+// in possession.go.
+func TestFoulSiteTagsMadeTwoAndOne(t *testing.T) {
+	in, err := os.ReadFile(filepath.Join("testdata", "bundle.json"))
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+	b, err := bundle.Decode(in)
+	if err != nil {
+		t.Fatalf("decode fixture: %v", err)
+	}
+	var halfCourtMadeTwo, bucket int
+	for i := uint64(0); i < 100; i++ {
+		for _, g := range Simulate(b, b.Seed+i).Games {
+			var lastMake *result.Event
+			for j := range g.Events {
+				e := &g.Events[j]
+				if e.Kind == result.EventShotMake {
+					lastMake = e
+				}
+				if e.Kind != result.EventFoul {
+					continue
+				}
+				switch e.FoulSite {
+				case result.FoulSiteAndOneMadeTwo:
+					if lastMake != nil && lastMake.Origin != result.OriginTransition {
+						halfCourtMadeTwo++
+					}
+				case result.FoulSiteAndOne:
+					bucket++
+				}
+			}
+		}
+	}
+	if halfCourtMadeTwo == 0 {
+		t.Errorf("no half-court made-2 roll and-one tagged %s over 100 seeds", result.FoulSiteAndOneMadeTwo)
+	}
+	if bucket == 0 {
+		t.Errorf("no outcome-bucket and-one tagged %s over 100 seeds", result.FoulSiteAndOne)
+	}
+}

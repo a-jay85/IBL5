@@ -320,6 +320,9 @@
         <testsuite name="OnThisDay Module Tests">
             <directory>tests/OnThisDay</directory>
         </testsuite>
+        <testsuite name="TradeSuggestions Module Tests">
+            <directory>tests/TradeSuggestions</directory>
+        </testsuite>
         <testsuite name="EngineBundle Module Tests">
             <directory>tests/EngineBundle</directory>
         </testsuite>

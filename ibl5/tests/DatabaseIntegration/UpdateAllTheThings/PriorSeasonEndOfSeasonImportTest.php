@@ -9,6 +9,7 @@ use BulkImport\Contracts\BackupArchiveLocatorInterface;
 use JsbParser\JsbImportRepository;
 use JsbParser\JsbImportService;
 use JsbParser\PlayerIdResolver;
+use JsbParser\RetFileParser;
 use PHPUnit\Framework\Attributes\Group;
 use Tests\DatabaseIntegration\DatabaseTestCase;
 use Updater\Contracts\JsbSourceResolverInterface;
@@ -24,6 +25,7 @@ use Updater\Steps\PriorSeasonEndOfSeasonImportStep;
 class PriorSeasonEndOfSeasonImportTest extends DatabaseTestCase
 {
     private const PRIOR_YEAR = 2095;
+    private const EMPTY_RET_DATA = "0\r\n\r\n0\r\n";
     private const JSB_PID = 200000301;
     private const RET_DATA = "Prior Ret 200000301\n";
 
@@ -127,6 +129,50 @@ class PriorSeasonEndOfSeasonImportTest extends DatabaseTestCase
         self::assertTrue($second->skipped);
         self::assertSame('Prior-season imports already ran for 2095', $second->detail);
         self::assertSame(1, $this->countRetiredRows(self::JSB_PID, self::PRIOR_YEAR));
+    }
+
+    /**
+     * A season with no retirees leaves ibl_jsb_retired_players empty, so the
+     * table check never passes. The empty .ret must still count as done and the
+     * second run must skip.
+     */
+    public function testZeroRetireeSeasonIsSkippedOnSecondRun(): void
+    {
+        $this->insertTestPlayer(self::JSB_PID, 'Prior Ret');
+        $this->insertChampion(self::PRIOR_YEAR);
+        $this->repo->upsertDraftResult([
+            'draft_year' => 2094,
+            'round' => 1,
+            'pick' => 1,
+            'team_name' => 'Prior Team',
+            'pos' => 'PG',
+            'player_name' => 'Prior Pick',
+            'pid' => null,
+        ]);
+        $this->repo->upsertHofInductee([
+            'jsb_pid' => 200000302,
+            'player_name' => 'Prior Inductee',
+            'pos' => 'C',
+            'induction_year' => 2094,
+            'pid' => null,
+        ]);
+        $this->repo->upsertAward(self::PRIOR_YEAR, 'Scoring Leader (1st)', 'Prior Scorer');
+
+        $resolver = $this->archiveResolver([
+            'ret' => self::EMPTY_RET_DATA,
+            'dra' => "***** 2094 rookie draft *****\nRound 1 Pick 1\nPrior Team: PG Prior Pick\n",
+            'hof' => str_pad(" C Prior Inductee 327 2094 \r\n", 7000),
+        ]);
+
+        self::assertSame([], RetFileParser::parse(self::EMPTY_RET_DATA));
+
+        $first = $this->buildStep($resolver)->execute();
+        $second = $this->buildStep($resolver)->execute();
+
+        self::assertSame([], self::retMessages($first->messages));
+        self::assertTrue($second->skipped);
+        self::assertSame('Prior-season imports already ran for 2095', $second->detail);
+        self::assertSame(0, $this->countRetiredRows(self::JSB_PID, self::PRIOR_YEAR));
     }
 
     public function testRealResolverDiskFallbackWritesNothing(): void

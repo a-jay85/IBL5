@@ -1,0 +1,219 @@
+#!/bin/bash
+set -euo pipefail
+
+# Test harness for bin/check-pipefail-assignment-guard (the pipefail abort-before-fallback gate).
+# Follows bin/test-check-pipefail-grep-q style.
+#
+# One fixture repo lives in a mktemp dir. Each case resets it to the base commit,
+# applies a change, and asserts the gate's exit code plus an output substring.
+# Nothing is written inside the IBL5 tree.
+#
+# Fixture lines are built from $PIPE, so this file holds no literal pipeline
+# assignment and the gate passes on its own PR.
+
+PASS=0
+FAIL=0
+SCRIPT="$(cd "$(dirname "$0")" && pwd)/check-pipefail-assignment-guard"
+
+pass() { echo "PASS: $1"; PASS=$((PASS + 1)); }
+fail() { echo "FAIL: $1"; FAIL=$((FAIL + 1)); }
+
+PIPE='|'
+A1="MAX_ORIGIN=\$(scan_origin_refs \"\$DIR\" \"\$ROOT\" $PIPE max_from_names)"
+A2="MAX_WTS=\$(scan_worktrees \"\$DIR\" \"\$ROOT\" $PIPE max_from_names)"
+A3="MAIN_WT=\"\${MAIN_WT:-\$(git -C \"\$ROOT\" worktree list --porcelain 2>/dev/null $PIPE awk '/^worktree / {print \$2; exit}')}\""
+A4="WT_ROOT=\$(git -C \"\$MAIN_ROOT\" worktree list --porcelain $PIPE awk -v want=\"\$B\" '/^branch / {if (\$2 == want) {print wt; exit}}')"
+A5="printf '%s\\n' \"\$OUT\" $PIPE grep '^UNREALISED-ASSERTION:'"
+A5C="N=\$(printf '%s\\n' \"\$x\" $PIPE grep -c y)"
+DF1="V=\"\${V:-\$(git ls-files $PIPE sort)}\""
+DF2=": \"\${V:=\$(git ls-files $PIPE sort)}\""
+DF3="V=\"\${V:+\$(git ls-files $PIPE sort)}\""
+E_HEAD="git ls-files $PIPE head -1"
+E_SED="git ls-files $PIPE sed -n '1p;q'"
+N_AWK="git ls-files $PIPE awk '{print \$1}'"
+N_AWKVAR="git ls-files $PIPE awk '{exit_code=1} END {print exit_code}'"
+N_EXITOR="X=\$(git ls-files $PIPE awk '{print \$1}') $PIPE$PIPE exit 1"
+N_SEDS="git ls-files $PIPE sed 's/q/r/'"
+N_HDR="git ls-files $PIPE header_fn"
+N_ECHO="X=\$(printf '%s' \"\$y\" $PIPE tr a b)"
+N_PECHO="printf '%s\\n' \"\$x\" $PIPE head -1"
+N_OR="X=\$(git ls-files $PIPE sort) $PIPE$PIPE X=''"
+N_AND="X=\$(git ls-files $PIPE sort) && y=1"
+N_LOCAL="local X=\$(git ls-files $PIPE sort)"
+N_IF="if git ls-files $PIPE grep x >/dev/null; then :; fi"
+N_ARG="echo \"\$(git ls-files $PIPE grep x)\""
+N_CONT1="X=\$(git ls-files $PIPE sort) \\"
+N_CONT2="    $PIPE$PIPE X=''"
+
+REPO=$(mktemp -d)
+NOREPO=$(mktemp -d)
+trap 'rm -rf "$REPO" "$NOREPO"' EXIT
+
+git -C "$REPO" init -q
+git -C "$REPO" config user.email "test@example.com"
+git -C "$REPO" config user.name "check-pipefail-assignment-guard test"
+git -C "$REPO" config commit.gpgsign false
+# No detached auto-gc/maintenance: it can still be writing .git when the
+# EXIT trap runs, and rm -rf then fails with "Directory not empty".
+git -C "$REPO" config gc.auto 0
+git -C "$REPO" config maintenance.auto false
+mkdir -p "$REPO/bin" "$REPO/scripts"
+cp "$SCRIPT" "$REPO/bin/check-pipefail-assignment-guard"
+chmod +x "$REPO/bin/check-pipefail-assignment-guard"
+
+printf '%s\n' '#!/bin/bash' 'set -euo pipefail' 'x=1' >"$REPO/bin/p.sh"
+printf '%s\n' '#!/bin/bash' 'set -eu' 'x=1' >"$REPO/bin/np.sh"
+printf '%s\n' '#!/bin/bash' 'set -uo pipefail' 'x=1' >"$REPO/bin/pf.sh"
+printf '%s\n' '#!/bin/bash' 'set -o errexit' 'set -o pipefail' 'x=1' >"$REPO/bin/lf.sh"
+printf '%s\n' '#!/bin/bash' 'set -euo pipefail' "$A1" >"$REPO/bin/old.sh"
+printf '%s\n' '#!/bin/bash' 'set -eu' "$A1" >"$REPO/bin/arm.sh"
+printf '%s\n' '#!/usr/bin/env python3' '# set -o pipefail' 'x = 1' >"$REPO/bin/tool.py"
+printf '%s\n' '#!/bin/bash' 'set -euo pipefail' 'x=1' >"$REPO/scripts/s.sh"
+git -C "$REPO" add -A
+git -C "$REPO" commit -q -m base
+BASE=$(git -C "$REPO" rev-parse HEAD)
+
+reset_repo() {
+    git -C "$REPO" reset -q --hard "$BASE"
+    git -C "$REPO" clean -qfd
+}
+
+commit_all() {
+    git -C "$REPO" add -A
+    git -C "$REPO" commit -q -m "case"
+}
+
+add() { printf '%s\n' "$2" >>"$REPO/$1"; } # add <path> <line>
+
+check_out() { # <label> <rc> <want_rc> <want_substring> <out>
+    local label="$1" rc="$2" want="$3" sub="$4" out="$5"
+    if [ "$rc" -ne "$want" ]; then
+        fail "$label: exit $rc, wanted $want"
+        echo "$out" | sed 's/^/    /'
+    elif [ -n "$sub" ] && ! grep -qF -- "$sub" <<< "$out"; then
+        fail "$label: output lacks '$sub'"
+        echo "$out" | sed 's/^/    /'
+    else
+        pass "$label"
+    fi
+}
+
+# expect <label> <want_rc> <want_substring> <gate args...>
+expect() {
+    local label="$1" want="$2" sub="$3" out rc=0
+    shift 3
+    out=$(cd "$REPO" && bin/check-pipefail-assignment-guard "$@" 2>&1) || rc=$?
+    check_out "$label" "$rc" "$want" "$sub" "$out"
+}
+
+# expect_env: same as expect, run under an empty environment.
+expect_env() {
+    local label="$1" want="$2" sub="$3" out rc=0
+    shift 3
+    out=$(cd "$REPO" && env -i PATH=/usr/bin:/bin /bin/bash -o pipefail bin/check-pipefail-assignment-guard "$@" 2>&1) || rc=$?
+    check_out "$label" "$rc" "$want" "$sub" "$out"
+}
+
+case_line() { # <label> <want_rc> <substr> <path> <line>
+    reset_repo
+    add "$4" "$5"
+    commit_all
+    expect "$1" "$2" "$3" --since="$BASE"
+}
+
+# ── Added-line checks ────────────────────────────────────────────────────────
+
+case_line occ1-pipeline-assign 1 'bin/p.sh:4: [pipeline-status]' bin/p.sh "$A1"
+case_line occ2-pipeline-assign 1 'bin/p.sh:4: [pipeline-status]' bin/p.sh "$A2"
+case_line occ3-default-form-early-exit 1 'bin/p.sh:4: [early-exit]' bin/p.sh "$A3"
+case_line occ4-early-exit-awk 1 'bin/p.sh:4: [early-exit]' bin/p.sh "$A4"
+case_line occ5-final-grep-statement 1 'bin/p.sh:4: [pipeline-status]' bin/p.sh "$A5"
+case_line final-grep-count-assign 1 '[pipeline-status]' bin/p.sh "$A5C"
+case_line default-form-plain 1 '[default-form]' bin/p.sh "$DF1"
+case_line default-assign-form 1 '[default-form]' bin/p.sh "$DF2"
+case_line default-alt-form-near-miss-passes 0 'OK' bin/p.sh "$DF3"
+case_line early-exit-head 1 '[early-exit]' bin/p.sh "$E_HEAD"
+case_line early-exit-sed-q 1 '[early-exit]' bin/p.sh "$E_SED"
+case_line occ4-or-true-still-flagged 1 '[early-exit]' bin/p.sh "$A4 $PIPE$PIPE true"
+case_line escape-hatch-passes 0 'OK' bin/p.sh "$A4 # pipefail-ok: list is two lines"
+case_line escape-empty-reason-flagged 1 '[early-exit]' bin/p.sh "$A4 # pipefail-ok:"
+case_line escape-no-colon-flagged 1 '[early-exit]' bin/p.sh "$A4 # pipefail-ok two lines"
+case_line awk-exit-var-near-miss-passes 0 'OK' bin/p.sh "$N_AWKVAR"
+case_line exit-after-or-near-miss-passes 0 'OK' bin/p.sh "$N_EXITOR"
+case_line sed-s-q-near-miss-passes 0 'OK' bin/p.sh "$N_SEDS"
+case_line head-prefix-near-miss-passes 0 'OK' bin/p.sh "$N_HDR"
+case_line awk-no-exit-passes 0 'OK' bin/p.sh "$N_AWK"
+case_line echo-producer-assign-passes 0 'OK' bin/p.sh "$N_ECHO"
+case_line echo-producer-early-exit-passes 0 'OK' bin/p.sh "$N_PECHO"
+case_line assign-with-or-passes 0 'OK' bin/p.sh "$N_OR"
+case_line and-list-passes 0 'OK' bin/p.sh "$N_AND"
+case_line local-masks-passes 0 'OK' bin/p.sh "$N_LOCAL"
+case_line if-grep-condition-passes 0 'OK' bin/p.sh "$N_IF"
+case_line substitution-argument-passes 0 'OK' bin/p.sh "$N_ARG"
+case_line comment-line-passes 0 'OK' bin/p.sh "# $A1"
+case_line errexit-only-file-passes 0 'OK' bin/np.sh "$A1"
+case_line pipefail-only-file-passes 0 'OK' bin/pf.sh "$A1"
+case_line long-form-armed-flagged 1 'bin/lf.sh:5: [pipeline-status]' bin/lf.sh "$A1"
+case_line old-site-not-flagged 0 'OK' bin/old.sh 'y=2'
+case_line outside-bin-passes 0 'OK' scripts/s.sh "$A1"
+case_line non-shell-passes 0 'OK' bin/tool.py "$A1"
+case_line fix-names-rule-doc 1 '.claude/rules/shell-pipefail-grep.md' bin/p.sh "$A1"
+
+reset_repo
+add bin/p.sh "$N_CONT1"
+add bin/p.sh "$N_CONT2"
+commit_all
+expect continuation-passes 0 'OK' --since="$BASE"
+
+reset_repo
+add bin/arm.sh 'set -o pipefail'
+commit_all
+expect newly-armed-full-scan 1 'bin/arm.sh:3: [pipeline-status]' --since="$BASE"
+
+reset_repo
+printf '%s\n' '#!/bin/bash' 'set -Eeuo pipefail' "$A1" >"$REPO/bin/old.sh"
+commit_all
+expect already-armed-edit-no-full-scan 0 'OK' --since="$BASE"
+
+reset_repo
+add bin/p.sh "$A1"
+commit_all
+P=$(git -C "$REPO" rev-parse HEAD)
+add bin/p.sh 'y=2'
+commit_all
+expect stacked-base-respected 0 'OK' --since="$P"
+expect stacked-full-range-flags 1 'bin/p.sh:4:' --since="$BASE"
+
+reset_repo
+add bin/p.sh "$A1"
+expect unstaged-change-seen 1 'bin/p.sh:4:' --since="$BASE"
+
+reset_repo
+expect empty-range 0 'OK' --since=HEAD
+
+# ── Usage and git errors ─────────────────────────────────────────────────────
+
+expect usage-no-args 2 'use --since'
+expect usage-empty-since 2 'use --since' --since=
+expect usage-space-form-since 2 '(the = form is required)' --since HEAD
+expect usage-unknown-flag 2 'unknown option' --bogus
+expect usage-bad-ref 2 'cannot resolve ref' --since=no-such-ref
+expect help-exits-0 0 'usage:' --help
+
+rc=0
+out=$(cd "$NOREPO" && "$SCRIPT" --since=HEAD 2>&1) || rc=$?
+check_out not-a-repo "$rc" 2 'not inside a git repository' "$out"
+
+# ── Empty environment ────────────────────────────────────────────────────────
+
+reset_repo
+add bin/p.sh "$A1"
+commit_all
+expect_env empty-env-bad 1 'bin/p.sh:4:' --since="$BASE"
+
+reset_repo
+expect_env empty-env-clean 0 'OK' --since="$BASE"
+
+echo ""
+echo "Results: $PASS passed, $FAIL failed"
+[ "$FAIL" -eq 0 ] || exit 1

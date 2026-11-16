@@ -179,7 +179,7 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 			// stays half-court-only for the ADR-0042 empty-FGA split).
 			made, _ := gs.shotAttempt(offense, defense, bh, sv2, result.ShotTwoPoint, result.OriginTransition, periodIdx)
 			if made && andOneMadeTwoFires(gs.rng.Float64()) { // JSB made-2pt roll: and-one
-				gs.resolveFoul(offense, defense, bh, def, 1, true, false, periodIdx)
+				gs.resolveFoulAt(offense, defense, bh, def, 1, true, false, false, periodIdx, result.FoulSiteAndOneMadeTwo)
 			}
 			if !made {
 				gs.creditBlock(offense, defense, bh, def)

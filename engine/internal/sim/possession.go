@@ -322,7 +322,7 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 		case outcome2pt:
 			made, _ := gs.shotAttempt(offense, defense, bh, sv2, result.ShotTwoPoint, origin, periodIdx)
 			if made && andOneMadeTwoFires(gs.rng.Float64()) { // JSB made-2pt roll: and-one
-				gs.resolveFoul(offense, defense, bh, def, 1, true, false, periodIdx)
+				gs.resolveFoulAt(offense, defense, bh, def, 1, true, false, false, periodIdx, result.FoulSiteAndOneMadeTwo)
 			}
 			if !made {
 				gs.creditBlock(offense, defense, bh, def)

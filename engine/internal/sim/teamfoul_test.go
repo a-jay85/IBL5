@@ -212,3 +212,77 @@ func TestResolveFoulShotThreePtShootsBelowBonus(t *testing.T) {
 		}
 	}
 }
+
+// nonShootingDrawSeed returns a seed whose first Float64 is at or under
+// shootingFoulDrawCut, so the next foul resolves as a non-shooting draw.
+func nonShootingDrawSeed(t *testing.T) uint64 {
+	t.Helper()
+	for s := uint64(1); s <= 200; s++ {
+		if rng.New(s).Float64() <= shootingFoulDrawCut {
+			return s
+		}
+	}
+	t.Fatal("no seed in 1..200 gives a first draw at or under the shooting cut")
+	return 0
+}
+
+// resolveNonShootingAt charges one non-shooting draw with the defense already
+// at priorTeamFouls, and returns the shoot verdict, the foul's site tag, and
+// the total free-throw attempts emitted.
+func resolveNonShootingAt(t *testing.T, priorTeamFouls int) (bool, result.FoulSite, int) {
+	t.Helper()
+	b := richBundle()
+	offense := newTeamState(b.Players, 7, false)
+	defense := newTeamState(b.Players, 3, true)
+	shooter, defender := offense.players[0], defense.players[0]
+	gs := &gameState{rng: rng.New(nonShootingDrawSeed(t)), period: 1, clock: 600}
+	defense.teamFouls = priorTeamFouls
+	shot := gs.resolveFoul(offense, defense, shooter, defender, 2, false, false, 0)
+	site := result.FoulSiteUnknown
+	fouls, fta := 0, 0
+	for _, e := range gs.events {
+		switch e.Kind {
+		case result.EventFoul:
+			fouls++
+			site = e.FoulSite
+		case result.EventFreeThrow:
+			fta += e.FTAttempts
+		}
+	}
+	if fouls != 1 {
+		t.Fatalf("priorTeamFouls=%d: %d EventFoul, want 1", priorTeamFouls, fouls)
+	}
+	return shot, site, fta
+}
+
+// TestNonShootingBonusTagBoundary pins the J27 rate-port bonus tag: the 5th
+// team foul of a period on a non-shooting draw shoots 2 FTs and is tagged
+// FoulSiteNonShootingBonus.
+func TestNonShootingBonusTagBoundary(t *testing.T) {
+	shot, site, fta := resolveNonShootingAt(t, teamFoulBonusThreshold)
+	if !shot {
+		t.Error("5th team foul: resolveFoul = false, want true (in the bonus)")
+	}
+	if site != result.FoulSiteNonShootingBonus {
+		t.Errorf("5th team foul: site = %s, want %s", site, result.FoulSiteNonShootingBonus)
+	}
+	if fta != 2 {
+		t.Errorf("5th team foul: FTA = %d, want 2", fta)
+	}
+}
+
+// TestNonShootingBelowBonusNoFT pins the other side of the boundary: the 4th
+// team foul on a non-shooting draw shoots nothing, keeps FoulSiteNonShooting,
+// and returns false so the offense keeps the ball.
+func TestNonShootingBelowBonusNoFT(t *testing.T) {
+	shot, site, fta := resolveNonShootingAt(t, teamFoulBonusThreshold-1)
+	if shot {
+		t.Error("4th team foul: resolveFoul = true, want false (below the bonus)")
+	}
+	if site != result.FoulSiteNonShooting {
+		t.Errorf("4th team foul: site = %s, want %s", site, result.FoulSiteNonShooting)
+	}
+	if fta != 0 {
+		t.Errorf("4th team foul: FTA = %d, want 0", fta)
+	}
+}

@@ -13,14 +13,14 @@ final class SnapshotTimingArgsTest extends TestCase
     {
         $parsed = SnapshotTimingArgs::parse([], ['DB_HOST' => 'db', 'DB_NAME' => 'league', 'DB_USER' => 'u', 'DB_PASS' => 'p']);
 
-        self::assertSame(['tid' => 1, 'repeat' => 3, 'host' => 'db', 'db' => 'league', 'user' => 'u', 'pass' => 'p'], $parsed);
-        self::assertSame(4, SnapshotTimingArgs::parse(['--tid=4', '--repeat=2'])['tid']);
+        self::assertSame(['teamid' => 1, 'repeat' => 3, 'host' => 'db', 'db' => 'league', 'user' => 'u', 'pass' => 'p'], $parsed);
+        self::assertSame(4, SnapshotTimingArgs::parse(['--teamid=4', '--repeat=2'])['teamid']);
     }
 
     public function testEqualsFormRequired(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        SnapshotTimingArgs::parse(['--tid', '4']);
+        SnapshotTimingArgs::parse(['--teamid', '4']);
     }
 
     public function testUnknownFlagRejected(): void
@@ -49,25 +49,25 @@ final class SnapshotTimingArgsTest extends TestCase
     public function testNonPositiveTidRejected(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        SnapshotTimingArgs::parse(['--tid=0']);
+        SnapshotTimingArgs::parse(['--teamid=0']);
     }
 
     public function testFlagMustStartAtTheBeginningOfTheArgument(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        SnapshotTimingArgs::parse(['x--tid=4']);
+        SnapshotTimingArgs::parse(['x--teamid=4']);
     }
 
     public function testFlagValueMustEndTheArgument(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        SnapshotTimingArgs::parse(["--tid=4\nzzz"]);
+        SnapshotTimingArgs::parse(["--teamid=4\nzzz"]);
     }
 
     public function testNumericValueWithTrailingJunkRejected(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        SnapshotTimingArgs::parse(['--tid=5x']);
+        SnapshotTimingArgs::parse(['--teamid=5x']);
     }
 
     public function testNumericValueWithLeadingJunkRejected(): void
@@ -79,6 +79,6 @@ final class SnapshotTimingArgsTest extends TestCase
     public function testValueWithADigitSuffixAfterJunkRejected(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        SnapshotTimingArgs::parse(['--tid=1x5']);
+        SnapshotTimingArgs::parse(['--teamid=1x5']);
     }
 }

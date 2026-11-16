@@ -25,7 +25,7 @@ final class SnapshotTimingCommand
     }
 
     /**
-     * @param array{tid: int, repeat: int, host: string, db: string, user: string, pass: string} $parsed
+     * @param array{teamid: int, repeat: int, host: string, db: string, user: string, pass: string} $parsed
      * @param resource $out
      */
     public function run(array $parsed, $out): int
@@ -56,7 +56,7 @@ final class SnapshotTimingCommand
             for ($i = 0; $i < $parsed['repeat']; $i++) {
                 $memo = new PairRecordMemo();
                 $start = hrtime(true);
-                $g = $this->generator->generate($s, $parsed['tid'], $simKey);
+                $g = $this->generator->generate($s, $parsed['teamid'], $simKey);
                 DealScorer::scoreAll($s, $g, $g->shapeIdByKey, $memo);
                 $best = min($best, self::seconds($start));
                 $raw = $g->rawCount;

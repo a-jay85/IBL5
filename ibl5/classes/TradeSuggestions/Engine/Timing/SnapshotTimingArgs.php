@@ -10,19 +10,19 @@ namespace TradeSuggestions\Engine\Timing;
  */
 final class SnapshotTimingArgs
 {
-    public const string USAGE = 'usage: php scripts/trade-suggestions-timing.php [--tid=N] [--repeat=N] [--host=HOST] [--db=NAME] [--user=USER] [--pass=PASS]';
+    public const string USAGE = 'usage: php scripts/trade-suggestions-timing.php [--teamid=N] [--repeat=N] [--host=HOST] [--db=NAME] [--user=USER] [--pass=PASS]';
 
-    private const array FLAGS = ['tid', 'repeat', 'host', 'db', 'user', 'pass'];
+    private const array FLAGS = ['teamid', 'repeat', 'host', 'db', 'user', 'pass'];
 
     /**
      * @param list<string> $argv the script's arguments without the script name
      * @param array<string, string> $env DB_HOST, DB_NAME, DB_USER and DB_PASS defaults
-     * @return array{tid: int, repeat: int, host: string, db: string, user: string, pass: string}
+     * @return array{teamid: int, repeat: int, host: string, db: string, user: string, pass: string}
      */
     public static function parse(array $argv, array $env = []): array
     {
         $values = [
-            'tid' => '1',
+            'teamid' => '1',
             'repeat' => '3',
             'host' => $env['DB_HOST'] ?? '',
             'db' => $env['DB_NAME'] ?? '',
@@ -37,7 +37,7 @@ final class SnapshotTimingArgs
         }
 
         return [
-            'tid' => self::positive('tid', $values['tid']),
+            'teamid' => self::positive('teamid', $values['teamid']),
             'repeat' => self::positive('repeat', $values['repeat']),
             'host' => $values['host'],
             'db' => $values['db'],

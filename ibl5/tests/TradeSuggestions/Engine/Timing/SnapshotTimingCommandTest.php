@@ -29,7 +29,7 @@ use TradeSuggestions\TeamModeService;
 
 final class SnapshotTimingCommandTest extends TestCase
 {
-    private const array PARSED = ['tid' => 1, 'repeat' => 2, 'host' => 'db', 'db' => 'league', 'user' => 'u', 'pass' => 'p'];
+    private const array PARSED = ['teamid' => 1, 'repeat' => 2, 'host' => 'db', 'db' => 'league', 'user' => 'u', 'pass' => 'p'];
 
     public function testOutputCarriesEveryEvidenceKey(): void
     {

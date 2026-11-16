@@ -348,6 +348,10 @@ final class PriorSeasonEndOfSeasonImportStepTest extends TestCase
     /**
      * A season with no retirees writes no rows, so the retiree table check can
      * never pass. A fetched .ret that lists nobody must count as done.
+     *
+     * Corpus scan of the real season archives (2026-11-16): 90-91 and 92-93 are
+     * the only seasons with zero retirees, so they were the only ones that
+     * were rerun-nightly before this gate.
      */
     public function testZeroRetireeRetFileCountsAsDone(): void
     {

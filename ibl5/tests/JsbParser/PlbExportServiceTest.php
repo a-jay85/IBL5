@@ -149,6 +149,25 @@ class PlbExportServiceTest extends TestCase
         self::assertNotSame($sourceLines[18], $outputLines[18]);
     }
 
+    public function testOutOfRangeChartValueAddsErrorAndWritesNothing(): void
+    {
+        [$srcPlr, $expPlr, $srcPlb, $outPlb] = $this->files(
+            [571 => ['pid' => 501, 'teamid' => 20]],
+            [571 => ['pid' => 501, 'teamid' => 20]],
+            self::sourcePlb(),
+        );
+        $charts = [501 => JsbExportFixtures::chartRow(501, 20, ['dc_minutes' => 100])];
+
+        $result = $this->service($charts)->exportPlbFile($srcPlr, $expPlr, $srcPlb, $outPlb);
+
+        self::assertSame(1, $result->errors);
+        self::assertSame(
+            ['ERROR: PLB write stopped: PLB value 100 for dc_minutes does not fit in two chars'],
+            $result->messages,
+        );
+        self::assertFileDoesNotExist($outPlb);
+    }
+
     public function testMissingSourcePlbAddsErrorAndWritesNothing(): void
     {
         [$srcPlr, $expPlr, , $outPlb] = $this->files([], [], self::sourcePlb());

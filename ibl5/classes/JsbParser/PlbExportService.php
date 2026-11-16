@@ -128,7 +128,13 @@ class PlbExportService implements PlbExportServiceInterface
             }
         }
 
-        $output = PlbFileWriter::applySlots($content, $writes);
+        try {
+            $output = PlbFileWriter::applySlots($content, $writes);
+        } catch (\InvalidArgumentException | \RuntimeException $e) {
+            $result->addError('PLB write stopped: ' . $e->getMessage());
+
+            return $result;
+        }
 
         foreach ($logByPid as $pid => $changes) {
             $result->addPlayerChanges($pid, $export['names'][$pid] ?? '', $changes);

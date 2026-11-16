@@ -56,4 +56,39 @@ class PlrDepthChartSelectorTest extends TestCase
 
         self::assertSame([], $charted);
     }
+
+    public function testTradedPlayerListedFirstDoesNotHideLaterChartedRows(): void
+    {
+        $rows = [
+            101 => JsbExportFixtures::chartRow(101, 3, ['dc_minutes' => 30]),
+            102 => JsbExportFixtures::chartRow(102, 3, ['dc_minutes' => 25]),
+        ];
+
+        $charted = PlrDepthChartSelector::chartedByPid($rows, [101 => 5, 102 => 3]);
+
+        self::assertSame([101, 102], array_keys($charted));
+    }
+
+    public function testFirstAndLastTeamsCanBeCharted(): void
+    {
+        $rows = [
+            11 => JsbExportFixtures::chartRow(11, 1, ['dc_minutes' => 30]),
+            321 => JsbExportFixtures::chartRow(321, 32, ['dc_pg_depth' => 1]),
+        ];
+
+        $charted = PlrDepthChartSelector::chartedByPid($rows);
+
+        self::assertSame([11, 321], array_keys($charted));
+        self::assertSame(2, PlrDepthChartSelector::countTeams($charted));
+    }
+
+    public function testSourceTeamByPidMapsEveryRecord(): void
+    {
+        $lines = JsbExportFixtures::lines(2, [
+            1 => ['pid' => 101, 'teamid' => 1],
+            31 => ['pid' => 201, 'teamid' => 2],
+        ]);
+
+        self::assertSame([101 => 1, 201 => 2], PlrDepthChartSelector::sourceTeamByPid($lines));
+    }
 }

@@ -50,11 +50,11 @@ class PlbExportServiceTest extends TestCase
      * @param array<int, array{pid: int, teamid: int}> $export ordinal => player
      * @return array{0: string, 1: string, 2: string, 3: string} source plr, export plr, source plb, output plb
      */
-    private function files(array $source, array $export, string $plb): array
+    private function files(array $source, array $export, string $plb, int $teams = 32): array
     {
         $paths = [$this->dir . '/IBL5.plr', $this->dir . '/IBL5_export.plr', $this->dir . '/IBL5.plb', $this->dir . '/IBL5_export.plb'];
-        file_put_contents($paths[0], JsbExportFixtures::content(32, $source));
-        file_put_contents($paths[1], JsbExportFixtures::content(32, $export));
+        file_put_contents($paths[0], JsbExportFixtures::content($teams, $source));
+        file_put_contents($paths[1], JsbExportFixtures::content($teams, $export));
         file_put_contents($paths[2], $plb);
 
         return $paths;
@@ -195,5 +195,218 @@ class PlbExportServiceTest extends TestCase
         $after = array_map(static fn (string $p): string => (string) hash_file('sha256', $p), [$srcPlr, $expPlr, $srcPlb]);
         self::assertSame($before, $after);
         self::assertFileExists($outPlb);
+    }
+
+    /**
+     * sourcePlb() with team line 19 cut short, so the parser skips it.
+     */
+    private static function sourcePlbWithShortLine19(): string
+    {
+        $lines = explode("\r\n", self::sourcePlb());
+        $lines[19] = substr($lines[19], 0, 200);
+
+        return implode("\r\n", $lines);
+    }
+
+    public function testExportOnlyPlayerIsIgnored(): void
+    {
+        [$srcPlr, $expPlr, $srcPlb, $outPlb] = $this->files(
+            [571 => ['pid' => 501, 'teamid' => 20]],
+            [571 => ['pid' => 501, 'teamid' => 20], 572 => ['pid' => 777, 'teamid' => 20]],
+            self::sourcePlb(),
+        );
+
+        $result = $this->service()->exportPlbFile($srcPlr, $expPlr, $srcPlb, $outPlb);
+
+        self::assertSame(0, $result->errors);
+        self::assertSame(self::sourcePlb(), file_get_contents($outPlb));
+    }
+
+    public function testPlayerMovedFromBeyondTeamBlocksCarriesNothing(): void
+    {
+        // Ordinal 1000 has no .plb slot, so nothing is carried to 604.
+        [$srcPlr, $expPlr, $srcPlb, $outPlb] = $this->files(
+            [1000 => ['pid' => 503, 'teamid' => 20]],
+            [604 => ['pid' => 503, 'teamid' => 21]],
+            self::sourcePlb(),
+            34,
+        );
+
+        $result = $this->service()->exportPlbFile($srcPlr, $expPlr, $srcPlb, $outPlb);
+
+        self::assertSame(0, $result->errors);
+        self::assertSame(self::sourcePlb(), file_get_contents($outPlb));
+    }
+
+    public function testPlayerMovedBeyondTeamBlocksOnlyVacatesSourceSlot(): void
+    {
+        [$srcPlr, $expPlr, $srcPlb, $outPlb] = $this->files(
+            [573 => ['pid' => 503, 'teamid' => 20]],
+            [1000 => ['pid' => 503, 'teamid' => 20]],
+            self::sourcePlb(),
+            34,
+        );
+
+        $result = $this->service()->exportPlbFile($srcPlr, $expPlr, $srcPlb, $outPlb);
+        $parsed = PlbFileParser::parse((string) file_get_contents($outPlb));
+
+        self::assertSame(0, $result->errors);
+        self::assertSame(['slot_index' => 2] + PlbExportService::VACATED_SLOT, $parsed[19][2]);
+        self::assertSame(20, $parsed[19][0]['dc_minutes']);
+    }
+
+    public function testPlayerMovedFromUnparsedTeamLineCarriesNothing(): void
+    {
+        [$srcPlr, $expPlr, $srcPlb, $outPlb] = $this->files(
+            [573 => ['pid' => 503, 'teamid' => 20]],
+            [604 => ['pid' => 503, 'teamid' => 21]],
+            self::sourcePlbWithShortLine19(),
+        );
+
+        $result = $this->service()->exportPlbFile($srcPlr, $expPlr, $srcPlb, $outPlb);
+
+        self::assertSame(0, $result->errors);
+        self::assertSame(self::sourcePlbWithShortLine19(), file_get_contents($outPlb));
+    }
+
+    public function testChartedTeamOnUnparsedTeamLineAddsError(): void
+    {
+        [$srcPlr, $expPlr, $srcPlb, $outPlb] = $this->files(
+            [571 => ['pid' => 501, 'teamid' => 20]],
+            [571 => ['pid' => 501, 'teamid' => 20]],
+            self::sourcePlbWithShortLine19(),
+        );
+        $charts = [501 => JsbExportFixtures::chartRow(501, 20, ['dc_minutes' => 40])];
+
+        $result = $this->service($charts)->exportPlbFile($srcPlr, $expPlr, $srcPlb, $outPlb);
+
+        self::assertSame(1, $result->errors);
+        self::assertSame(
+            ['ERROR: PLB write stopped: PLB team line 19 is shorter than 360 chars'],
+            $result->messages,
+        );
+        self::assertFileDoesNotExist($outPlb);
+    }
+
+    public function testChartedPlayerOutsideHisTeamBlockKeepsCarriedValues(): void
+    {
+        // pid 501 (DB team 20) sits at 541, team 19's block: only his carried slot is written.
+        [$srcPlr, $expPlr, $srcPlb, $outPlb] = $this->files(
+            [571 => ['pid' => 501, 'teamid' => 20]],
+            [541 => ['pid' => 501, 'teamid' => 20]],
+            self::sourcePlb(),
+        );
+        $charts = [501 => JsbExportFixtures::chartRow(501, 20, ['dc_minutes' => 40])];
+
+        $result = $this->service($charts)->exportPlbFile($srcPlr, $expPlr, $srcPlb, $outPlb);
+        $parsed = PlbFileParser::parse((string) file_get_contents($outPlb));
+
+        self::assertSame(0, $result->errors);
+        self::assertSame(20, $parsed[18][0]['dc_minutes']);
+        self::assertSame(0, $parsed[19][0]['dc_minutes']);
+    }
+
+    public function testChartedPlayerBeyondTeamBlocksIsSkipped(): void
+    {
+        [$srcPlr, $expPlr, $srcPlb, $outPlb] = $this->files(
+            [1000 => ['pid' => 501, 'teamid' => 20], 572 => ['pid' => 502, 'teamid' => 20]],
+            [1000 => ['pid' => 501, 'teamid' => 20], 572 => ['pid' => 502, 'teamid' => 20]],
+            self::sourcePlb(),
+            34,
+        );
+        $charts = [
+            501 => JsbExportFixtures::chartRow(501, 20, ['dc_minutes' => 40]),
+            502 => JsbExportFixtures::chartRow(502, 20, ['dc_minutes' => 15]),
+        ];
+
+        $result = $this->service($charts)->exportPlbFile($srcPlr, $expPlr, $srcPlb, $outPlb);
+        $parsed = PlbFileParser::parse((string) file_get_contents($outPlb));
+
+        self::assertSame(0, $result->errors);
+        self::assertSame(15, $parsed[19][1]['dc_minutes']);
+        self::assertSame(20, $parsed[19][0]['dc_minutes']);
+    }
+
+    public function testUnchangedSlotDoesNotStopLaterWrites(): void
+    {
+        // Slot (19, 0) already holds 20 minutes, so pid 501's row changes nothing.
+        [$srcPlr, $expPlr, $srcPlb, $outPlb] = $this->files(
+            [571 => ['pid' => 501, 'teamid' => 20], 572 => ['pid' => 502, 'teamid' => 20]],
+            [571 => ['pid' => 501, 'teamid' => 20], 572 => ['pid' => 502, 'teamid' => 20]],
+            self::sourcePlb(),
+        );
+        $charts = [
+            501 => JsbExportFixtures::chartRow(501, 20, ['dc_minutes' => 20]),
+            502 => JsbExportFixtures::chartRow(502, 20, ['dc_minutes' => 15]),
+        ];
+
+        $result = $this->service($charts)->exportPlbFile($srcPlr, $expPlr, $srcPlb, $outPlb);
+        $parsed = PlbFileParser::parse((string) file_get_contents($outPlb));
+
+        self::assertSame(15, $parsed[19][1]['dc_minutes']);
+        self::assertCount(1, $result->changeLog);
+        self::assertSame(502, $result->changeLog[0]['pid']);
+    }
+
+    public function testChartedPlayerAtOrdinalOneIsWritten(): void
+    {
+        [$srcPlr, $expPlr, $srcPlb, $outPlb] = $this->files(
+            [1 => ['pid' => 11, 'teamid' => 1]],
+            [1 => ['pid' => 11, 'teamid' => 1]],
+            self::sourcePlb(),
+        );
+        $charts = [11 => JsbExportFixtures::chartRow(11, 1, ['dc_minutes' => 33])];
+
+        $this->service($charts)->exportPlbFile($srcPlr, $expPlr, $srcPlb, $outPlb);
+        $parsed = PlbFileParser::parse((string) file_get_contents($outPlb));
+
+        self::assertSame(33, $parsed[0][0]['dc_minutes']);
+    }
+
+    public function testDuplicatePidInExportUsesFirstOrdinal(): void
+    {
+        [$srcPlr, $expPlr, $srcPlb, $outPlb] = $this->files(
+            [571 => ['pid' => 501, 'teamid' => 20]],
+            [571 => ['pid' => 501, 'teamid' => 20], 575 => ['pid' => 501, 'teamid' => 20]],
+            self::sourcePlb(),
+        );
+        $charts = [501 => JsbExportFixtures::chartRow(501, 20, ['dc_minutes' => 40])];
+
+        $this->service($charts)->exportPlbFile($srcPlr, $expPlr, $srcPlb, $outPlb);
+        $parsed = PlbFileParser::parse((string) file_get_contents($outPlb));
+
+        self::assertSame(40, $parsed[19][0]['dc_minutes']);
+        self::assertSame(0, $parsed[19][4]['dc_minutes']);
+    }
+
+    public function testSkippedMoverDoesNotStopLaterCarries(): void
+    {
+        // pid 499 (ordinal 1000 -> 560) has no source slot; pid 503 (573 -> 604) still carries.
+        [$srcPlr, $expPlr, $srcPlb, $outPlb] = $this->files(
+            [1000 => ['pid' => 499, 'teamid' => 19], 573 => ['pid' => 503, 'teamid' => 20]],
+            [560 => ['pid' => 499, 'teamid' => 19], 604 => ['pid' => 503, 'teamid' => 21]],
+            self::sourcePlb(),
+            34,
+        );
+
+        $this->service()->exportPlbFile($srcPlr, $expPlr, $srcPlb, $outPlb);
+        $parsed = PlbFileParser::parse((string) file_get_contents($outPlb));
+
+        self::assertSame(30, $parsed[20][3]['dc_minutes']);
+    }
+
+    public function testDuplicatePidDoesNotStopIndexingLaterRecords(): void
+    {
+        [$srcPlr, $expPlr, $srcPlb, $outPlb] = $this->files(
+            [571 => ['pid' => 501, 'teamid' => 20], 580 => ['pid' => 510, 'teamid' => 20]],
+            [571 => ['pid' => 501, 'teamid' => 20], 575 => ['pid' => 501, 'teamid' => 20], 580 => ['pid' => 510, 'teamid' => 20]],
+            self::sourcePlb(),
+        );
+        $charts = [510 => JsbExportFixtures::chartRow(510, 20, ['dc_minutes' => 22])];
+
+        $this->service($charts)->exportPlbFile($srcPlr, $expPlr, $srcPlb, $outPlb);
+        $parsed = PlbFileParser::parse((string) file_get_contents($outPlb));
+
+        self::assertSame(22, $parsed[19][9]['dc_minutes']);
     }
 }

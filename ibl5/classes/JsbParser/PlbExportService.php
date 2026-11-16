@@ -8,6 +8,7 @@ use JsbParser\Contracts\PlbExportServiceInterface;
 use PlrParser\Contracts\PlrExportRepositoryInterface;
 use PlrParser\PlrDepthChartSelector;
 use PlrParser\PlrFileWriter;
+use PlrParser\PlrTradeRelocator;
 use PlrParser\PlrWriteResult;
 
 /**
@@ -88,12 +89,12 @@ class PlbExportService implements PlbExportServiceInterface
             }
         }
         foreach ($moved as $pid => [$oldOrdinal, $newOrdinal]) {
-            $from = PlbFileWriter::ordinalToTeamSlot($oldOrdinal);
+            $carried = self::slotAt($current, $oldOrdinal);
             $to = PlbFileWriter::ordinalToTeamSlot($newOrdinal);
-            if ($from === null || $to === null || !isset($current[$from[0]][$from[1]])) {
+            if ($carried === null || $to === null) {
                 continue;
             }
-            $updates[$to[0]][$to[1]] = ['pid' => $pid, 'values' => self::slotValues($current[$from[0]][$from[1]])];
+            $updates[$to[0]][$to[1]] = ['pid' => $pid, 'values' => self::slotValues($carried)];
         }
 
         // (c) charted teams
@@ -159,7 +160,7 @@ class PlbExportService implements PlbExportServiceInterface
         $names = [];
         foreach (PlrFileWriter::indexPlayerRecords($lines) as $lineIndex => $pid) {
             $line = $lines[$lineIndex];
-            $ordinal = (int) trim(substr($line, PlrFileWriter::OFFSET_ORDINAL, PlrFileWriter::WIDTH_ORDINAL));
+            $ordinal = PlrTradeRelocator::readOrdinal($line);
             if ($ordinal < 1 || isset($ordinals[$pid])) {
                 continue;
             }
@@ -168,6 +169,20 @@ class PlbExportService implements PlbExportServiceInterface
         }
 
         return ['ordinals' => $ordinals, 'names' => $names];
+    }
+
+    /**
+     * The parsed .plb slot at a .plr ordinal, or null when the ordinal has no
+     * team slot or the .plb team line was too short to parse.
+     *
+     * @param array<int, list<array{slot_index: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}>> $current
+     * @return array{slot_index: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}|null
+     */
+    private static function slotAt(array $current, int $ordinal): ?array
+    {
+        $position = PlbFileWriter::ordinalToTeamSlot($ordinal);
+
+        return $position === null ? null : ($current[$position[0]][$position[1]] ?? null);
     }
 
     /**

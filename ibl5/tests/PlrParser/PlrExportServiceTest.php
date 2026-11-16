@@ -375,4 +375,33 @@ class PlrExportServiceTest extends TestCase
         $this->assertInstanceOf(\ReflectionNamedType::class, $type);
         $this->assertSame(PlrExportRepositoryInterface::class, $type->getName());
     }
+
+    public function testDepthWrittenForPlayerInLastSlotOfHisTeamBlock(): void
+    {
+        // Ordinal 600 is team 20's 30th slot.
+        $inputFile = $this->writeTmpFile(JsbExportFixtures::content(20, [600 => ['pid' => 601, 'teamid' => 20]]));
+        $outputFile = $inputFile . '.out';
+        $this->stubRepo->method('getAllPlayerChangeableFields')->willReturn([
+            601 => [
+                'pid' => 601, 'name' => 'Player 601', 'teamid' => 20, 'bird' => 0, 'cy' => 0, 'cyt' => 0,
+                'salary_yr1' => 0, 'salary_yr2' => 0, 'salary_yr3' => 0, 'salary_yr4' => 0, 'salary_yr5' => 0,
+                'salary_yr6' => 0, 'fa_signing_flag' => 0,
+            ],
+        ]);
+        $this->stubRepo->method('getAllPlayerDepthCharts')->willReturn([
+            601 => JsbExportFixtures::chartRow(601, 20, ['dc_pg_depth' => 1, 'dc_minutes' => 30]),
+        ]);
+
+        try {
+            $result = $this->makeService()->exportPlrFile($inputFile, $outputFile);
+            $line = PlrFileWriter::splitIntoLines((string) file_get_contents($outputFile))[600];
+            $this->assertSame('10000', substr($line, 132, 5));
+            $this->assertSame(0, $result->errors);
+        } finally {
+            unlink($inputFile);
+            if (file_exists($outputFile)) {
+                unlink($outputFile);
+            }
+        }
+    }
 }

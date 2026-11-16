@@ -6,6 +6,7 @@ namespace Tests\JsbParser;
 
 use JsbParser\PlbFileParser;
 use JsbParser\PlbFileWriter;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Tests\PlrParser\JsbExportFixtures;
 
@@ -75,6 +76,49 @@ class PlbFileWriterTest extends TestCase
         } catch (\RuntimeException $e) {
             self::assertStringContainsString('shorter than 360', $e->getMessage());
         }
+    }
+
+    public function testShortTeamLineErrorNamesTheLine(): void
+    {
+        $lines = explode("\r\n", JsbExportFixtures::plb());
+        $lines[3] = substr($lines[3], 0, 200);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/^PLB team line 3 is shorter than 360 chars$/');
+
+        PlbFileWriter::applySlots(implode("\r\n", $lines), [3 => [0 => self::slot(1)]]);
+    }
+
+    public function testLfOnlyContentKeepsLfSeparators(): void
+    {
+        $source = str_replace("\r\n", "\n", JsbExportFixtures::plb());
+
+        $output = PlbFileWriter::applySlots($source, [1 => [0 => self::slot(12)]]);
+
+        self::assertStringNotContainsString("\r", $output);
+        self::assertSame('12 0 0 0 0 0', substr(explode("\n", $output)[1], 0, 12));
+    }
+
+    /**
+     * @return array<string, array{0: int, 1: int, 2: string}>
+     */
+    public static function outOfRangePositionProvider(): array
+    {
+        return [
+            'team line -1' => [-1, 0, 'PLB team line out of range: -1'],
+            'team line 32' => [32, 0, 'PLB team line out of range: 32'],
+            'slot -1' => [0, -1, 'PLB slot out of range: -1'],
+            'slot 30' => [0, 30, 'PLB slot out of range: 30'],
+        ];
+    }
+
+    #[DataProvider('outOfRangePositionProvider')]
+    public function testRejectsOutOfRangePosition(int $teamLine, int $slot, string $message): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/^' . preg_quote($message, '/') . '$/');
+
+        PlbFileWriter::applySlots(JsbExportFixtures::plb(), [$teamLine => [$slot => self::slot(1)]]);
     }
 
     public function testOrdinalToTeamSlotBoundaries(): void

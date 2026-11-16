@@ -34,7 +34,7 @@ final class PlrDepthChartSelector
                 continue;
             }
             if (self::isRealTeam($row['teamid']) && self::hasChartValue($row)) {
-                $chartedTeams[$row['teamid']] = true;
+                $chartedTeams[$row['teamid']] = $row['teamid'];
             }
         }
 
@@ -51,7 +51,7 @@ final class PlrDepthChartSelector
     /**
      * Map pid => teamid from raw .plr lines.
      *
-     * @param list<string> $lines
+     * @param array<int, string> $lines
      * @return array<int, int>
      */
     public static function sourceTeamByPid(array $lines): array
@@ -71,12 +71,7 @@ final class PlrDepthChartSelector
      */
     public static function countTeams(array $charted): int
     {
-        $teams = [];
-        foreach ($charted as $row) {
-            $teams[$row['teamid']] = true;
-        }
-
-        return count($teams);
+        return count(array_unique(array_column($charted, 'teamid')));
     }
 
     private static function isRealTeam(int $teamid): bool

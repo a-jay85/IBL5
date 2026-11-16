@@ -22,7 +22,7 @@ final class PlrTradeRelocator
     public const MAX_TEAM_ID = 32;
 
     /**
-     * @param list<string> $lines .plr lines from PlrFileWriter::splitIntoLines()
+     * @param array<int, string> $lines .plr lines from PlrFileWriter::splitIntoLines()
      * @param array<int, int> $dbTeamByPid pid => current database teamid
      */
     public function relocate(array $lines, array $dbTeamByPid): PlrRelocationResult
@@ -61,20 +61,17 @@ final class PlrTradeRelocator
             ];
         }
 
-        return new PlrRelocationResult(array_values($lines), $moves, $warnings);
+        return new PlrRelocationResult($lines, $moves, $warnings);
     }
 
     /**
-     * @param list<string> $lines
+     * @param array<int, string> $lines
      * @return array<int, int> ordinal => line index, for ordinals 1..1440
      */
     private function mapOrdinals(array $lines): array
     {
         $map = [];
         foreach ($lines as $index => $line) {
-            if (strlen($line) < PlrFileWriter::WIDTH_ORDINAL) {
-                continue;
-            }
             $ordinal = self::readOrdinal($line);
             if ($ordinal >= 1 && $ordinal <= PlrFileWriter::MAX_PLAYER_ORDINAL && !isset($map[$ordinal])) {
                 $map[$ordinal] = $index;
@@ -85,7 +82,7 @@ final class PlrTradeRelocator
     }
 
     /**
-     * @param list<string> $lines
+     * @param array<int, string> $lines
      * @param array<int, int> $lineByOrdinal
      * @param array<int, int> $dbTeamByPid
      * @return list<array{ordinal: int, pid: int, oldTid: int, newTid: int}>
@@ -157,14 +154,17 @@ final class PlrTradeRelocator
         );
     }
 
-    private static function readOrdinal(string $line): int
+    /**
+     * Read a .plr line's ordinal. A line too short to hold one reads as 0.
+     */
+    public static function readOrdinal(string $line): int
     {
-        return (int) trim(substr($line, PlrFileWriter::OFFSET_ORDINAL, PlrFileWriter::WIDTH_ORDINAL));
+        return (int) substr($line, PlrFileWriter::OFFSET_ORDINAL, PlrFileWriter::WIDTH_ORDINAL);
     }
 
     private static function readPid(string $line): int
     {
-        return (int) trim(substr($line, PlrFileWriter::OFFSET_PID, PlrFileWriter::WIDTH_PID));
+        return (int) substr($line, PlrFileWriter::OFFSET_PID, PlrFileWriter::WIDTH_PID);
     }
 
     private static function isRealTeam(int $teamid): bool

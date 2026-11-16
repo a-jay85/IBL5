@@ -73,14 +73,14 @@ class PlrExportService implements PlrExportServiceInterface
         // Step 3: Query DB for all changeable fields
         $dbPlayers = $this->repository->getAllPlayerChangeableFields();
 
-        $sourceTeamByPid = PlrDepthChartSelector::sourceTeamByPid(array_values($lines));
+        $sourceTeamByPid = PlrDepthChartSelector::sourceTeamByPid($lines);
 
         // Step 3b: Move traded players into their new team's slot block
         $teamByPid = [];
         foreach ($dbPlayers as $pid => $dbPlayer) {
             $teamByPid[$pid] = $dbPlayer['teamid'];
         }
-        $relocation = (new PlrTradeRelocator())->relocate(array_values($lines), $teamByPid);
+        $relocation = (new PlrTradeRelocator())->relocate($lines, $teamByPid);
         $lines = $relocation->lines;
 
         // Step 2: Index player records (line index → pid), after relocation moved lines
@@ -189,7 +189,7 @@ class PlrExportService implements PlrExportServiceInterface
             return [];
         }
 
-        $ordinal = (int) trim(substr($line, PlrFileWriter::OFFSET_ORDINAL, PlrFileWriter::WIDTH_ORDINAL));
+        $ordinal = PlrTradeRelocator::readOrdinal($line);
         $blockTeam = intdiv($ordinal - 1, PlrTradeRelocator::SLOTS_PER_TEAM) + 1;
         if ($blockTeam !== $row['teamid'] || PlrFileWriter::readField($line, 'teamid') !== $row['teamid']) {
             return [];

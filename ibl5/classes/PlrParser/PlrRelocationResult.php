@@ -10,7 +10,7 @@ namespace PlrParser;
 final readonly class PlrRelocationResult
 {
     /**
-     * @param list<string> $lines The .plr lines after relocation
+     * @param array<int, string> $lines The .plr lines after relocation
      * @param list<array{pid: int, name: string, oldOrdinal: int, newOrdinal: int, oldTid: int, newTid: int}> $moves
      * @param list<string> $warnings
      */

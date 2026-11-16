@@ -624,12 +624,15 @@ def test_snapshot_regen_lost_non_snapshot_line_declines(tmp_path, key):
 
 
 def test_snapshot_regen_lost_non_snapshot_line_still_fails(tmp_path, key):
-    # The first-pass proof names only the snapshot, so regen runs and amends. The source
-    # file still lost a line, so the post-amend proof fails and the ladder must call the
-    # undo_all closure: the seam undo fires and the audit line is removed.
+    # The first-pass proof names the snapshot plus a generated file (not code), so regen
+    # runs and amends. The source file still lost a line, so the post-amend proof fails and
+    # the ladder must call the undo_all closure: the seam undo fires and the audit line is
+    # removed. The generated LOST path makes after_amend's seam call distinguish the
+    # verified snapshot paths from the full lost-path set.
     d, pre, master, merge = _snapshot_repo(tmp_path, drop_master_item=True)
     fake, seam = _FakeRunner(d, render=_MERGED_ITEMS), _Seam()
-    out = _run(d, key, pre, master, fake, seam)
+    proof_in = _lost_input() + "LOST: ibl5/phpstan-baseline.neon: +baseline\n"
+    out = _run(d, key, pre, master, fake, seam, proof_in=proof_in)
     assert out.rung == ""
     assert "regen: " in out.trail[0]
     assert "passed" not in out.trail[0], out.trail

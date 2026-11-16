@@ -595,7 +595,7 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
 
     # Condition (7), plan-time hold, four-way on the raw frontmatter value:
     #   absent / "true"     -> no hold
-    #   "false"             -> hold (unchanged meaning; the bool stays authoritative
+    #   "false"             -> hold (the bool stays authoritative
     #                          so callers that only set it keep their meaning)
     #                          "false" clears only when owner_approval == "match"
     #   DOCS_REFRESH_TOKEN  -> hold iff any docs-refresh clause fails on the REALIZED PR

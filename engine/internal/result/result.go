@@ -61,12 +61,14 @@ const (
 type FoulSite uint8
 
 const (
-	FoulSiteUnknown       FoulSite = iota // zero value; a tagged run never emits it
-	FoulSiteShootingTwo                   // shooting foul on a 2pt attempt
-	FoulSiteShootingThree                 // 1% fouled missed 3 (threeptfoul.go)
-	FoulSiteAndOne                        // foul on a made FG (and-one)
-	FoulSiteNonShooting                   // non-shooting foul from the foul-weight roll
-	FoulSiteLateGame                      // late-game forced foul (pass 1)
+	FoulSiteUnknown          FoulSite = iota // zero value; a tagged run never emits it
+	FoulSiteShootingTwo                      // shooting foul on a 2pt attempt
+	FoulSiteShootingThree                    // 1% fouled missed 3 (threeptfoul.go)
+	FoulSiteAndOne                           // foul on a made FG (and-one)
+	FoulSiteNonShooting                      // non-shooting foul from the foul-weight roll
+	FoulSiteLateGame                         // late-game forced foul (pass 1)
+	FoulSiteAndOneMadeTwo                    // and-one from the 5% made-2 roll (andOneMadeTwoCut)
+	FoulSiteNonShootingBonus                 // non-shooting foul that shot 2 FT in the team-foul bonus
 )
 
 // FoulSites lists every tagged site in declaration order, FoulSiteUnknown
@@ -74,6 +76,7 @@ const (
 var FoulSites = []FoulSite{
 	FoulSiteUnknown, FoulSiteShootingTwo, FoulSiteShootingThree,
 	FoulSiteAndOne, FoulSiteNonShooting, FoulSiteLateGame,
+	FoulSiteAndOneMadeTwo, FoulSiteNonShootingBonus,
 }
 
 // String returns the walk-log label for a foul site.
@@ -89,6 +92,10 @@ func (s FoulSite) String() string {
 		return "non-shooting"
 	case FoulSiteLateGame:
 		return "late-game"
+	case FoulSiteAndOneMadeTwo:
+		return "and-one-made-two"
+	case FoulSiteNonShootingBonus:
+		return "non-shooting-bonus"
 	default:
 		return "unknown"
 	}

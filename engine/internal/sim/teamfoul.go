@@ -65,11 +65,26 @@ func (gs *gameState) resolveFoul(offense, defense *teamState, shooter, defender 
 // 94148 for a fouled missed 3): it forces shooting at 93469-93480 and clears
 // the 93647 guard, so a fouled 3 always shoots.
 func (gs *gameState) resolveFoulShot(offense, defense *teamState, shooter, defender onCourt, n int, andOne, threePt, forced bool, periodIdx int) bool {
+	return gs.resolveFoulAt(offense, defense, shooter, defender, n, andOne, threePt, forced, periodIdx, result.FoulSiteUnknown)
+}
+
+// resolveFoulAt is resolveFoulShot with an explicit site tag. A caller that
+// knows its JSB site (the made-2pt and-one roll) passes it; FoulSiteUnknown
+// derives the site from the draw flags. A non-shooting foul that shoots in the
+// bonus is retagged FoulSiteNonShootingBonus. Tags never touch the RNG, so the
+// draw count and order match resolveFoulShot exactly.
+func (gs *gameState) resolveFoulAt(offense, defense *teamState, shooter, defender onCourt, n int, andOne, threePt, forced bool, periodIdx int, tag result.FoulSite) bool {
 	draw := gs.rng.Float64() // consumed on every foul, forced or not
 	shooting := isShootingFoul(draw, andOne, threePt, forced)
-	site := foulSiteFor(shooting, andOne, threePt, forced)
+	site := tag
+	if site == result.FoulSiteUnknown {
+		site = foulSiteFor(shooting, andOne, threePt, forced)
+	}
 	defense.teamFouls++
 	if foulAwardsFreeThrows(shooting, defense.teamFouls, andOne, threePt) {
+		if site == result.FoulSiteNonShooting {
+			site = result.FoulSiteNonShootingBonus
+		}
 		gs.freeThrows(offense, defense, shooter, defender, n, periodIdx, site)
 		return true
 	}

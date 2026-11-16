@@ -57,4 +57,4 @@ The same SIGPIPE hits any consumer that quits before its producer finishes: `awk
 
 To fix a hit, put the fallback on the statement (`v=$(cmd | filter) || v=''`), or capture first and apply the default after. When a site is safe, end the line with `# pipefail-ok: <reason>`. The reason must be non-empty.
 
-The gate reads only added lines, plus the whole file when the PR newly arms errexit and pipefail. It skips `local v=$(...)` and `if` or `while` conditions, because the shell ignores their status. The matcher does not parse quotes or join continued lines, so a gate pass does not prove a line is safe. `bin/test-check-pipefail-assignment-guard` holds a fixture for each review finding behind backlog issue 1645.
+The gate reads only added lines, plus the whole file when the PR newly arms errexit and pipefail. It skips `local v=$(...)`, `if` or `while` conditions, and `< <(...)` process substitutions, because the shell ignores their status. The matcher does not parse quotes or join continued lines, so a gate pass does not prove a line is safe. `bin/test-check-pipefail-assignment-guard` holds a fixture for each review finding behind backlog issue 1645.

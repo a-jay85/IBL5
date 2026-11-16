@@ -160,7 +160,7 @@ check_line() {
         return 0
     fi
     case "$code" in
-        *'$('*) return 0 ;;
+        *'$('*|*'<('*) return 0 ;;
     esac
     if [ "$lw" = grep ] || [ "$lw" = egrep ] || [ "$lw" = fgrep ]; then SHAPE=pipeline-status; fi
     return 0

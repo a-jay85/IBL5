@@ -40,14 +40,14 @@ final class SimRecapContextRepositoryInjuryWindowTest extends TestCase
         self::assertSame([$startSeason, $endSeason, $start, $end], $db->getLastBoundParams());
     }
 
-    public function testMapsEveryRowWithFranchiseNameAsLabel(): void
+    public function testMapsEveryRowWithRegistryAbbreviationAsLabel(): void
     {
         $db = new MockDatabase();
         $db->onQuery('ibl_jsb_transactions', [
             [
                 'pid' => 11, 'name' => 'Bobby Portis', 'injury_date' => '2032-01-04',
                 'injury_description' => 'left shoulder strain', 'injury_games_missed' => 4,
-                'from_teamid' => 16, 'team_name' => 'Timberwolves',
+                'from_teamid' => 14, 'team_name' => 'Timberwolves',
             ],
             [
                 'pid' => 12, 'name' => 'Nene', 'injury_date' => '2032-01-05',
@@ -60,7 +60,7 @@ final class SimRecapContextRepositoryInjuryWindowTest extends TestCase
             [
                 'pid' => 11, 'name' => 'Bobby Portis', 'date' => '2032-01-04',
                 'injuryDescription' => 'left shoulder strain', 'injuryGamesMissed' => 4,
-                'teamid' => 16, 'teamName' => 'Timberwolves', 'teamAbbrev' => 'Timberwolves',
+                'teamid' => 14, 'teamName' => 'Timberwolves', 'teamAbbrev' => 'MIN',
             ],
             [
                 'pid' => 12, 'name' => 'Nene', 'date' => '2032-01-05',

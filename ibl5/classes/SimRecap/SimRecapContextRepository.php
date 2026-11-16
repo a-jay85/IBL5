@@ -7,6 +7,7 @@ namespace SimRecap;
 use JsbParser\TrnFileParser;
 use LastSimRecap\LastSimRecapRepository;
 use League\LeagueContext;
+use RecordHolders\RecordFormatter;
 
 /**
  * Precomputes the played-only roster, active injuries, in-window trades,
@@ -242,8 +243,9 @@ final class SimRecapContextRepository extends \Database\BaseMysqliRepository
      * Every injury dated inside [start, end], attributed to the team the player
      * was on when hurt (from_teamid). Unlike getWindowInjuries() it is not tied
      * to a box-score line, so it also lists players who never played in the window.
-     * ibl_team_info has no abbreviation column, so teamAbbrev is the franchise
-     * name, the short team label the site already uses. A missing team row yields ''.
+     * ibl_team_info has no abbreviation column, so teamAbbrev is the upper-case
+     * abbreviation from RecordFormatter's team registry, keyed by from_teamid.
+     * An id the registry lacks yields ''.
      *
      * @return list<array{pid:int,name:string,date:string,injuryDescription:string,injuryGamesMissed:int,teamid:int,teamName:string,teamAbbrev:string}>
      */
@@ -288,7 +290,7 @@ final class SimRecapContextRepository extends \Database\BaseMysqliRepository
                 'injuryGamesMissed' => $row['injury_games_missed'],
                 'teamid'            => $row['from_teamid'],
                 'teamName'          => $teamName,
-                'teamAbbrev'        => $teamName,
+                'teamAbbrev'        => strtoupper(RecordFormatter::teamAbbreviation($row['from_teamid'])),
             ];
         }
 

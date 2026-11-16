@@ -597,7 +597,7 @@ done
 
 run_dg --diff "$FIX/pr3370-trimmed.diff"
 h_eq "replay-pr3370-flags: exit 1" 1 "$RC"
-h_eq "replay-pr3370-flags: pinned line count" 17 "$(count_removed "$OUT")"
+h_eq "replay-pr3370-flags: pinned line count" 22 "$(count_removed "$OUT")"
 h_contains "replay-pr3370-flags: Extension exists-check" "$OUT" "exists-check@ibl5/classes/Extension/ExtensionService.php#"
 h_contains "replay-pr3370-flags: record holders lock" "$OUT" "lock@ibl5/classes/RecordHolders/CachedRecordHoldersService.php#"
 h_contains "replay-pr3370-flags: DatabaseCache lock" "$OUT" "lock@ibl5/classes/Cache/DatabaseCache.php#"

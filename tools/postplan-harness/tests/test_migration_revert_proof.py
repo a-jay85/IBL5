@@ -95,6 +95,62 @@ def test_down_with_ddl_is_unproven():
     assert _reason(_pair(down=DOWN_SQL + ("DROP TABLE ibl_demo_backup_900;",))) == "down-not-dml"
 
 
+_RESTORES = "-- restores: ibl_demo"
+_COPY = "INSERT INTO ibl_demo SELECT * FROM ibl_demo_backup_900;"
+
+_TRUNCATE_DOWNS = {
+    "truncate-table": (_RESTORES, "TRUNCATE TABLE ibl_demo;", _COPY),
+    "truncate-bare-lower": (_RESTORES, "truncate ibl_demo;", _COPY),
+    "truncate-backtick": (_RESTORES, "TRUNCATE `ibl_demo`;", _COPY),
+}
+
+
+@pytest.mark.parametrize("down", list(_TRUNCATE_DOWNS.values()), ids=list(_TRUNCATE_DOWNS))
+def test_down_with_truncate_is_unproven(down):
+    """A down TRUNCATE is DDL in MariaDB and commits implicitly, which would break the rollback
+    isolation of MigrationDownSqlIntegrationTest, so the proof must keep rejecting it."""
+    assert _reason(_pair(down=down)) == "down-not-dml"
+
+
+_CORPUS = {
+    "delete-restore": (DOWN_SQL, "proven"),
+    **{case_id: (down, "down-not-dml") for case_id, down in _TRUNCATE_DOWNS.items()},
+    "truncate-in-comment": ((_RESTORES, "-- TRUNCATE TABLE ibl_demo", "DELETE FROM ibl_demo;", _COPY), "proven"),
+    "truncated-in-string": (DOWN_SQL + ("INSERT INTO ibl_demo (id, name) VALUES (2, 'truncated');",), "proven"),
+    "drop-extra": (DOWN_SQL + ("DROP TABLE ibl_demo_backup_900;",), "down-not-dml"),
+    "replace-only": ((_RESTORES, "REPLACE INTO ibl_demo SELECT * FROM ibl_demo_backup_900;"),
+                     "down-no-restore:ibl_demo"),
+    "insert-ignore": ((_RESTORES, "DELETE FROM ibl_demo;",
+                       "INSERT IGNORE INTO ibl_demo SELECT * FROM ibl_demo_backup_900;"),
+                      "down-no-restore:ibl_demo"),
+    "filtered-copy": ((_RESTORES, "DELETE FROM ibl_demo;",
+                       "INSERT INTO ibl_demo SELECT * FROM ibl_demo_backup_900 WHERE id > 0;"),
+                      "down-no-restore:ibl_demo"),
+    "no-empty": ((_RESTORES, _COPY), "down-no-restore:ibl_demo"),
+    "update-extra": (DOWN_SQL + ("UPDATE ibl_demo SET name = 'b';",), "proven"),
+    "set-statement-for": (DOWN_SQL + ("SET STATEMENT max_statement_time=1 FOR DELETE FROM ibl_plr;",),
+                          "down-unparseable"),
+}
+
+
+@pytest.mark.parametrize("down,expected", list(_CORPUS.values()), ids=list(_CORPUS))
+def test_down_corpus_reason_is_pinned(down, expected):
+    assert _reason(_pair(down=down)) == expected
+
+
+@pytest.mark.parametrize("sql", [
+    "TRUNCATE TABLE ibl_demo;\nINSERT INTO ibl_demo SELECT * FROM ibl_demo_backup_900;",
+    "TRUNCATE ibl_demo;\nINSERT INTO ibl_demo SELECT * FROM ibl_demo_backup_900;",
+], ids=["truncate-table", "truncate-bare"])
+def test_restores_from_ignores_truncate_empty(sql):
+    assert mrp._restores_from(sql, "ibl_demo", "ibl_demo_backup_900") is False
+
+
+def test_restores_from_accepts_delete_empty():
+    sql = "DELETE FROM ibl_demo;\nINSERT INTO ibl_demo SELECT * FROM ibl_demo_backup_900;"
+    assert mrp._restores_from(sql, "ibl_demo", "ibl_demo_backup_900") is True
+
+
 def test_restores_missing_written_table_is_unproven():
     diff = _pair(up=UP_SQL + ("INSERT INTO ibl_other VALUES (1);",))
     assert _reason(diff) == "restores-missing:ibl_other"

@@ -165,11 +165,11 @@ def _restores_from(down_sql: str, table: str, backup: str) -> bool:
     t, b = re.escape(table), re.escape(backup)
     # The restore must bring back the whole backup, every column and every row: an unfiltered
     # `SELECT *` (no column list, no WHERE or LIMIT after the backup name), copied in after the table
-    # is emptied by an unfiltered `DELETE FROM <table>` or `TRUNCATE`. A bare REPLACE never counts:
+    # is emptied by an unfiltered `DELETE FROM <table>`. A bare REPLACE never counts:
     # it overwrites rows whose keys are in the backup but leaves rows the up file added under new keys.
     # INSERT IGNORE never counts: it skips rows whose key still exists, so an UPDATE stays applied.
     copy = rf"SELECT\s+\*\s+FROM\s+`?{b}`?(?!\w)\s*(?:;|\Z)"
-    empty = rf"(?:\bDELETE\s+FROM\s+`?{t}`?|\bTRUNCATE\s+(?:TABLE\s+)?`?{t}`?)\s*;"
+    empty = rf"\bDELETE\s+FROM\s+`?{t}`?\s*;"
     empty_then_copy = (rf"{empty}(?:[^;]*;)*?\s*"
                        rf"(?:INSERT|REPLACE)\s+(?:INTO\s+)?`?{t}`?\s+{copy}")
     return re.search(empty_then_copy, down_sql, re.IGNORECASE | re.DOTALL) is not None
@@ -177,7 +177,8 @@ def _restores_from(down_sql: str, table: str, backup: str) -> bool:
 
 def _down_targets(down_sql: str) -> set[str] | None:
     """Every table a DML-only down file writes. None when a statement is not one plain
-    single-table INSERT, REPLACE, DELETE, UPDATE or TRUNCATE (fail closed)."""
+    single-table INSERT, REPLACE, DELETE or UPDATE (fail closed). A down TRUNCATE never
+    reaches here: prove_revertible rejects it first as down-not-dml."""
     stmts = _statements(down_sql)
     if stmts is None:
         return None

@@ -53,7 +53,11 @@ PLANS_DIR="$(plans_dir PLANS_DIR)"
 # carries rewrite/overwrite/replace/in-place wording without a negation.
 # Runs before slug derivation, so it fires even when no slug line is found.
 while IFS= read -r line; do
-    grep -qiE 'in[ -]place|overwrit|rewrit|replac' <<< "$line" || continue
+    # The wording must target the plan file itself: a verb right before the
+    # path, or "in place" / "be overwritten" right after it. A line like
+    # "Implement ~/claude-plans/foo.md; replace the legacy parser" is not an
+    # overwrite request (this check also runs under --implement).
+    grep -qiE "(overwrit|rewrit|replac)[a-z]*[ ]+((the|this|that|an?|existing|old|current)[ ]+)*[\`'\"(]*[^ ]*claude-plans/[A-Za-z0-9._/-]+\.md|claude-plans/[A-Za-z0-9._/-]+\.md[\`'\")]*[ ]+(in[ -]place|((to|should|must|will)[ ]+)?be[ ]+(overwritten|rewritten|replaced))" <<< "$line" || continue
     grep -qiE "never|do not|don't|must not|cannot|can't" <<< "$line" && continue
     for p in $(grep -oE 'claude-plans/[A-Za-z0-9._/-]+\.md' <<< "$line" || true); do
         rel=${p#claude-plans/}

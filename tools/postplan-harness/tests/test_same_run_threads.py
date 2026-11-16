@@ -1,8 +1,11 @@
 """Phase 4.5b same-run thread pass: candidates, this-run filter, one round, prune."""
 import ast
+import dataclasses
 import inspect
 import json
 import os
+import pathlib
+import re
 import sys
 import textwrap
 
@@ -378,3 +381,54 @@ def test_same_run_remote_unreachable_push_propagates(tmp_path):
     with pytest.raises(HarnessError) as ei:
         _run(tmp_path, gh, _llm(FIX), commit=lambda m: "abc123", push=_push)
     assert ei.value.kind == "remote-unreachable"
+
+
+def _posted_keys_for(f):
+    body = render_body(f, same_run_threads.POSTED_BODY_LIMIT)
+    return {same_run_threads._key(f.path, body)}
+
+
+def test_label_change_after_posting_misses_match_key():
+    """The key embeds the label marker, so a relabelled finding matches no earlier thread.
+
+    Mutation: make ``_key`` ignore the first two body lines => this turns red.
+    """
+    f = Finding(source="code-review", agent="A", path=PATH, line=41, body=BODY, score=85,
+                label=LABEL_NIT)
+    keys = _posted_keys_for(f)
+    relabelled = dataclasses.replace(f, label=LABEL_PREEXISTING)
+    kept, _ = prune_findings([relabelled], [], keys)
+    assert kept == [relabelled]
+    same, _ = prune_findings([f], [], keys)
+    assert same == []
+
+
+def test_score_change_after_posting_misses_match_key():
+    """The key embeds the score header, so a rescored finding matches no earlier thread.
+
+    Mutation: drop the score header from ``render_body`` in labels.py => this turns red.
+    """
+    f = Finding(source="code-review", agent="A", path=PATH, line=41, body=BODY, score=85)
+    keys = _posted_keys_for(f)
+    rescored = dataclasses.replace(f, score=90)
+    kept, _ = prune_findings([rescored], [], keys)
+    assert kept == [rescored]
+
+
+def _harness_sources():
+    root = pathlib.Path(__file__).resolve().parent.parent / "harness"
+    return {p: p.read_text() for p in root.rglob("*.py")}
+
+
+def test_no_literal_limit_at_render_body_call_sites():
+    """Mutation: restore ``render_body(f, 1000)`` in ghad.py => this turns red."""
+    pattern = re.compile(r"render_body\([^)]*\b1000\b")
+    hits = [str(p) for p, src in _harness_sources().items() if pattern.search(src)]
+    assert hits == []
+
+
+def test_posted_body_limit_has_one_definition():
+    """Mutation: restore ``POSTED_BODY_LIMIT = 1000`` in same_run_threads.py => red."""
+    pattern = re.compile(r"^POSTED_BODY_LIMIT\s*=", re.MULTILINE)
+    owners = [p.name for p, src in _harness_sources().items() if pattern.search(src)]
+    assert owners == ["labels.py"]

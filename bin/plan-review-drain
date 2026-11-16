@@ -354,7 +354,10 @@ while IFS= read -r record_line; do
         # ADR-0096: bin/plan-now:515-517 documents its check-plan arm as the ONLY
         # path to the queue. A Discord button reaching the queue around it would be
         # a second path and a gate weakening, so the REAL bin/check-plan runs first.
-        if ! verdict=$("$REPO/bin/check-plan" "$PLAN_PATH" 2>&1); then
+        # It passes --require-must-preserve, the flag bin/automouse/queue's add path
+        # passes (backlog#1531). Without it a plan lacking `## Must preserve` passes
+        # here, the queue refuses it, and mark_pending retries it on every pass.
+        if ! verdict=$("$REPO/bin/check-plan" --require-must-preserve "$PLAN_PATH" 2>&1); then
             log "check-plan FAILED for '$slug' — not queueing (ADR-0096). Record is unactionable; acking."
             dm "plan-review-drain refused a Queue press: \`$slug\` fails bin/check-plan, so it is not queueable.
 

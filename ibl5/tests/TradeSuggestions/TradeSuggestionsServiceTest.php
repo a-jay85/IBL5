@@ -135,6 +135,7 @@ class TradeSuggestionsServiceTest extends TestCase
         self::assertSame(9, $panel->diagnostics->scored);
         self::assertSame(
             [
+                'HIDDEN' => 0,
                 'NOT_BOTH_POSITIVE' => 0,
                 'LOPSIDED' => 0,
                 'EXPOSURE' => 0,

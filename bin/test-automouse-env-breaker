@@ -37,10 +37,10 @@ set -u
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
 
 # Case filter: empty runs every case; a judge case name skips the other run-loop cases.
-EB_ONLY="${1:-}"
+EB_ONLY="${1:-${EB_ONLY:-}}"
 case "$EB_ONLY" in
-    ''|judge-pass|judge-fail|judge-crash|judge-forged|judge-deferred|judge-stall|judge-limit|no-judge) ;;
-    *) echo "usage: bin/test-automouse-env-breaker [judge-pass|judge-fail|judge-crash|judge-forged|judge-deferred|judge-stall|judge-limit|no-judge]" >&2; exit 2 ;;
+    ''|diverged|judge-pass|judge-fail|judge-crash|judge-forged|judge-deferred|judge-stall|judge-limit|no-judge) ;;
+    *) echo "usage: bin/test-automouse-env-breaker [diverged|judge-pass|judge-fail|judge-crash|judge-forged|judge-deferred|judge-stall|judge-limit|no-judge]" >&2; exit 2 ;;
 esac
 eb_want() { [ -z "$EB_ONLY" ] || [ "$EB_ONLY" = "$1" ]; }
 
@@ -299,8 +299,19 @@ sed \
     -e "s#^NIGHTLY_DIR=.*#NIGHTLY_DIR=\"$E2_NDIR\"#" \
     -e "s#^REPO=.*#REPO=\"$REPO_ROOT\"#" \
     -e "s#^export PATH=.*#export PATH=\"$E2_STUB:/usr/local/bin:/opt/homebrew/bin:\$PATH\"#" \
+    -e 's#"\$REPO/bin/wt-sync-tick" --only#"'"$E2_STUB"'/wt-sync-tick" --only#' \
     "$REPO_ROOT/bin/automouse/run" > "$E2_RUNNER"
 chmod +x "$E2_RUNNER"
+# wt-sync-tick seam (D1, D1b, D2). The stub prints $STUB_WT_VERDICT when it is
+# set and otherwise runs the real script, so every other case keeps the real verdict.
+cat > "$E2_STUB/wt-sync-tick" <<EOF_WTSYNC
+#!/bin/sh
+if [ -n "\${STUB_WT_VERDICT:-}" ]; then printf '%s\n' "\$STUB_WT_VERDICT"; exit 0; fi
+exec "$REPO_ROOT/bin/wt-sync-tick" "\$@"
+EOF_WTSYNC
+chmod +x "$E2_STUB/wt-sync-tick"
+grep -qF "\"$E2_STUB/wt-sync-tick\" --only" "$E2_RUNNER" \
+    || { fail "setup: wt-sync-tick rewrite missed the runner call"; h_done; }
 
 E2_TRACE="$E2_ROOT/trace"
 : > "$E2_TRACE"
@@ -1010,6 +1021,68 @@ J_NJ="$(grep -c ' judge$' "$E2_ROOT/claude-calls.log" 2>/dev/null || true)"
 assert_eq      "e2-no-judge: zero judge spawns"             "$J_NJ" "0"
 assert_present "e2-no-judge: post-plan was called"          "$E2_ROOT/postplan.marker"
 assert_eq      "e2-no-judge: no judge ledger row"           "$(judge_ledger_rows)" "0"
+fi
+if eb_want diverged; then
+# ── D1: DIVERGED-CONFLICT on the impl resume (replay of the 2026-11-12 log) ──
+# merge-danger-rejudge-door was claimed 3 times in 26 s; each claim burned an
+# attempt and the cap block overwrote the specific report with the generic one.
+echo ""
+echo "# D1: DIVERGED-CONFLICT → skipped/ after one claim, specific report, no attempt burned"
+reset_e2
+write_e2_plan divconf
+mkdir -p "$E2_WTROOT/divconf"
+D1_PRE="$(pgrep -f "$E2_RUNNER" | sort)"
+STUB_WT_VERDICT=DIVERGED-CONFLICT WORKTREES_ROOT="$E2_WTROOT" run_e2 > /dev/null 2>&1
+D1_POST="$(pgrep -f "$E2_RUNNER" | sort)"
+D1_LOG="$(e2_logtxt)"
+D1_REPORT="$(cat "$E2_NDIR/reports/"*-skipped-divconf.md 2>/dev/null || true)"
+assert_eq   "D1: exactly one claim of the plan" \
+            "$(printf '%s\n' "$D1_LOG" | grep -c 'divconf SKIPPING: worktree needs manual resolution' || true)" "1"
+want_absent "D1: no second attempt started" "$D1_LOG" "divconf.md (attempt 2)"
+want        "D1: report names the DIVERGED verdict" "$D1_REPORT" "worktree needs manual resolution (DIVERGED-CONFLICT)"
+want_absent "D1: cap block did not overwrite the report" "$D1_REPORT" "failed attempts"
+assert_eq   "D1: queue/ holds no entry or attempt sidecar for the plan" \
+            "$(find "$E2_NDIR/queue" -name '*divconf*' 2>/dev/null | wc -l | tr -d ' ')" "0"
+want_absent "D1: worktree is reap-exempt (no wt-remove run)" "$D1_LOG" "nothing to remove"
+assert_eq   "D1: no heartbeat watcher outlives the run" \
+            "$(comm -13 <(printf '%s\n' "$D1_PRE") <(printf '%s\n' "$D1_POST") | grep -c . || true)" "0"
+
+# ── D1b: DIVERGED-DIRTY takes the same disposition ──
+echo ""
+echo "# D1b: DIVERGED-DIRTY → skipped/ after one claim"
+reset_e2
+write_e2_plan divdirty
+mkdir -p "$E2_WTROOT/divdirty"
+STUB_WT_VERDICT=DIVERGED-DIRTY WORKTREES_ROOT="$E2_WTROOT" run_e2 > /dev/null 2>&1
+D1B_LOG="$(e2_logtxt)"
+assert_eq "D1b: exactly one claim of the plan" \
+          "$(printf '%s\n' "$D1B_LOG" | grep -c 'divdirty SKIPPING: worktree needs manual resolution' || true)" "1"
+want      "D1b: report names the DIRTY verdict" \
+          "$(cat "$E2_NDIR/reports/"*-skipped-divdirty.md 2>/dev/null || true)" "worktree needs manual resolution (DIVERGED-DIRTY)"
+
+# ── D2: dispose_entry fails (queue lock held) → attempt stays counted, cap bounds it ──
+echo ""
+echo "# D2: failed disposal keeps the attempt counted, so MAX_ATTEMPTS still ends the re-claims"
+reset_e2
+write_e2_plan divlock
+mkdir -p "$E2_WTROOT/divlock"
+sed 's#if ! dispose_entry "\$PLAN_NAME" skipped; then#if ! false; then#' \
+    "$E2_RUNNER" > "$E2_ROOT/dispose-fail-run"
+chmod +x "$E2_ROOT/dispose-fail-run"
+if cmp -s "$E2_RUNNER" "$E2_ROOT/dispose-fail-run"; then
+    fail "D2 setup: the DIVERGED dispose_entry anchor is missing from the runner"
+fi
+NIGHTLY_DIR="$E2_NDIR" PLANS_DIR="$E2_PLANS" CLAUDE_HEADLESS=1 \
+CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
+STUB_WT_VERDICT=DIVERGED-CONFLICT WORKTREES_ROOT="$E2_WTROOT" \
+timeout 30 "$E2_ROOT/dispose-fail-run" > /dev/null 2>&1 || true
+D2_LOG="$(e2_logtxt)"
+want      "D2: log records the held-lock fallback" "$D2_LOG" \
+          "queue lock held, so the plan stays queued and the attempt stays counted"
+want      "D2: the attempt cap ends the re-claims" "$D2_LOG" "Plan divlock.md failed 3 times"
+assert_eq "D2: exactly MAX_ATTEMPTS claims" \
+          "$(printf '%s\n' "$D2_LOG" | grep -c 'divlock SKIPPING: worktree needs manual resolution' || true)" "3"
+reset_e2
 fi
 [ -z "$EB_ONLY" ] || h_done
 

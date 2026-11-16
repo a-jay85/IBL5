@@ -132,6 +132,7 @@ make_repo() {
                  check-pr-collisions check-model-pins test-check-model-pins test-text-hold-recheck \
                  check-engine-freeze test-check-engine-freeze \
                  check-pipefail-grep-q test-check-pipefail-grep-q check-exit-code-handling \
+                 check-pipefail-assignment-guard test-check-pipefail-assignment-guard \
                  check-shell-portability test-check-shell-portability \
                  check-reviewer-eval test-check-reviewer-eval reviewer-eval; do
         base="$(printf '%s' "$sname" | tr '-' '_')"
@@ -541,6 +542,8 @@ PASS  test-check-engine-freeze
 PASS  check-engine-freeze
 PASS  test-check-pipefail-grep-q
 PASS  check-pipefail-grep-q
+PASS  test-check-pipefail-assignment-guard
+PASS  check-pipefail-assignment-guard
 PASS  check-exit-code-handling
 PASS  test-check-shell-portability
 PASS  check-shell-portability
@@ -560,12 +563,12 @@ DEFER adr-check (deferred to post-pr for PR bypass check)
 DEFER refactor-flag (deferred to post-pr for PR bypass check)
 META-CHECK-DEFERRED: adr-check
 META-CHECK-DEFERRED: refactor-flag
-META-CHECKS: OK stage=pre-push hard=22 failed=0 warn=0 skip=3 defer=2'
+META-CHECKS: OK stage=pre-push hard=24 failed=0 warn=0 skip=3 defer=2'
 CONTRACT_FAIL_GOLDEN='FAIL  test-check-engine-freeze
 META-CHECK-FAILED: test-check-engine-freeze
 META-CHECK-DEFERRED: adr-check
 META-CHECK-DEFERRED: refactor-flag
-META-CHECKS: FAILED stage=pre-push hard=22 failed=1 warn=0 skip=3 defer=2'
+META-CHECKS: FAILED stage=pre-push hard=24 failed=1 warn=0 skip=3 defer=2'
 
 # contract_run <env-assignments...>: all-rc-0 stubs unless overridden; sets
 # _LAST_OUT and _LAST_RC from the pre-push stage on a throwaway fixture.
@@ -643,7 +646,7 @@ absent "parallel-28: no rendezvous timeout" "$_LAST_OUT" "no overlap"
 fi
 
 # ─── Cache group ─────────────────────────────────────────────────────────────
-CACHED_STEPS="test-check-model-pins test-check-engine-freeze test-check-pipefail-grep-q test-check-reviewer-eval reviewer-eval-validate"
+CACHED_STEPS="test-check-model-pins test-check-engine-freeze test-check-pipefail-grep-q test-check-pipefail-assignment-guard test-check-reviewer-eval reviewer-eval-validate"
 # Oracle lists typed here, never derived from the runner: every input a bust
 # must reach. The runner itself joins every set (row 14 covers that).
 ORACLE_REVIEWER_EVAL_VALIDATE="bin/reviewer-eval tools/postplan-harness/harness/reviewer_eval.py tools/postplan-harness/harness/state.py tools/postplan-harness/fixtures/reviewer-eval/corpus.json bin/run-meta-checks-local"
@@ -706,10 +709,10 @@ if want_group cache; then
     # variable keeps the cache on.
     cache_run "$CF" "$CT/c11"
     expect_ran "cache-11 cold run" test-check-model-pins
-    want "cache-11 cold run counts misses" "$_LAST_OUT" "CACHE hits=0 misses=5"
+    want "cache-11 cold run counts misses" "$_LAST_OUT" "CACHE hits=0 misses=6"
     cache_run "$CF" "$CT/c11"
     for st in $CACHED_STEPS; do expect_cached "cache-11 warm $st" "$st"; done
-    want "cache-11 warm run counts hits" "$_LAST_OUT" "CACHE hits=5 misses=0"
+    want "cache-11 warm run counts hits" "$_LAST_OUT" "CACHE hits=6 misses=0"
     [ "$_LAST_RC" -eq 0 ] && pass "cache-11 warm exits 0" || fail "cache-11 warm exits 0 (got $_LAST_RC)"
     cache_run "$CF" "$CT/c11" META_CHECKS_NO_CACHE=
     for st in $CACHED_STEPS; do expect_cached "cache-17 empty bypass keeps cache on $st" "$st"; done
@@ -790,14 +793,14 @@ if want_group cache; then
     run_check_both env -u META_CHECKS_NO_CACHE META_CHECKS_CACHE_DIR= XDG_CACHE_HOME= \
         HOME="$CT/home21" "$CF/bin/run-meta-checks-local" --self-test-hook "$CF" --base HEAD
     N21=$(count_pass "$CT/home21/.cache/ibl5-meta-checks")
-    [ "$N21" -eq 5 ] && pass "cache-21 empty dir falls back to HOME/.cache" \
+    [ "$N21" -eq 6 ] && pass "cache-21 empty dir falls back to HOME/.cache" \
                       || fail "cache-21 empty dir falls back to HOME/.cache (found $N21)"
     want "cache-21 CACHE line names the \$HOME/.cache/ibl5-meta-checks fallback" "$_LAST_OUT" \
         "dir=$CT/home21/.cache/ibl5-meta-checks"
     run_check_both env -u META_CHECKS_NO_CACHE -u META_CHECKS_CACHE_DIR -u XDG_CACHE_HOME \
         HOME="$CT/home21b" "$CF/bin/run-meta-checks-local" --self-test-hook "$CF" --base HEAD
     N21B=$(count_pass "$CT/home21b/.cache/ibl5-meta-checks")
-    [ "$N21B" -eq 5 ] && pass "cache-21 unset dir falls back to HOME/.cache" \
+    [ "$N21B" -eq 6 ] && pass "cache-21 unset dir falls back to HOME/.cache" \
                        || fail "cache-21 unset dir falls back to HOME/.cache (found $N21B)"
 
     # Row 22: a cache dir that cannot be created disables the cache, not the run.
@@ -822,8 +825,8 @@ if want_group cache; then
     [ "$STATUS_BEFORE" = "$STATUS_AFTER" ] && pass "cache-24 fixture status unchanged" \
         || fail "cache-24 fixture status unchanged (before='$STATUS_BEFORE' after='$STATUS_AFTER')"
     N24=$(count_pass "$CT/c24")
-    [ "$N24" -eq 5 ] && pass "cache-24 five sentinels under the cache dir" \
-                      || fail "cache-24 five sentinels under the cache dir (found $N24)"
+    [ "$N24" -eq 6 ] && pass "cache-24 six sentinels under the cache dir" \
+                      || fail "cache-24 six sentinels under the cache dir (found $N24)"
     N24R=$(find "$CF3" -path "$CF3/.git" -prune -o -name '*.pass' -print | wc -l | tr -d ' ')
     [ "$N24R" -eq 0 ] && pass "cache-24 no sentinel inside the repo" \
                        || fail "cache-24 no sentinel inside the repo (found $N24R)"

@@ -225,6 +225,17 @@ jobs:
           bin/test-check-pipefail-grep-q
           bin/check-pipefail-grep-q --since="$BASE_SHA"
 
+      # --- Exit-code-handling guard: no ADDED bin/ shell line or skill bash-fence
+      # line may hide a git capture's exit status behind process substitution or
+      # a missing check, or remove a marker after an unchecked teardown
+      # (ADR-0258). Diff-only, so existing sites never block. Its harness runs in
+      # tests.yml static-guards. Hard gate. ---
+      - name: Run bin/check-exit-code-handling (PR diff)
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: bin/check-exit-code-handling --since="$BASE_SHA"
+
       # --- Shell portability guard: no bin/ shell line may call BSD-only
       # stat -f without a GNU stat -c form earlier in the same statement
       # (see .claude/rules/shell-portability.md). Whole-tree scan, so it

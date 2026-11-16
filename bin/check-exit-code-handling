@@ -1,0 +1,238 @@
+#!/bin/bash
+#
+# bin/check-exit-code-handling — keep new lines that hide a git or teardown exit status out of bin/ and skill bash fences.
+#
+# Three rules, each backed by review threads on merged PRs:
+#
+#   git-procsub            Process substitution that reads a git diff, show, log,
+#                          ls-files or merge-base. The shell drops the exit status of
+#                          the substituted command and errexit never sees it, so a
+#                          failed git call reads as an empty list and the loop passes.
+#   git-capture-unchecked  A git diff or show whose stdout goes to a file with no status
+#                          check. It is fine when the statement holds || or &&, opens
+#                          with if/elif/while/until/!, has $? in the next 3 lines, or sits
+#                          in a bin/ shell file that sets errexit. A skill markdown fence
+#                          never counts as errexit. A stderr-only redirect never counts
+#                          as a capture.
+#   teardown-then-rm       launchctl or "$var" remove/bootout/unload, then ";", then
+#                          rm or rmdir on the same line. A failed teardown must keep the
+#                          marker, so the two need && between them.
+#
+# Eligible surfaces: bin/ and .claude/skills/ files with a bash/sh shebang or a .sh
+# name, plus lines inside fenced bash/sh/shell blocks of .claude/skills/**/*.md files.
+# Comment-only lines are skipped, so this header may describe the shapes.
+#
+# Escape: end the flagged physical line with "# exit-ok: <reason of 15+ chars>".
+#
+# The base is always passed in with --since=<ref> (CI passes the PR base sha), never
+# derived from repo state. Only lines this branch adds are read, so older sites never
+# block a PR. --all scans every tracked eligible line instead, for corpus runs.
+# Diffs compare the working tree against the merge-base, so staged and unstaged tracked
+# changes count. Untracked files do not.
+#
+# Fixtures in the harness are built by concatenation, so no line there holds a literal
+# rule shape.
+#
+# gate-backtest-argv: --since={base}
+#
+# Bash 3.2 safe (macOS /bin/bash): no mapfile, no associative arrays, no ${x,,}.
+#
+# Exit codes: 0 = pass, 1 = violation found, 2 = usage or git error.
+# Decision record: ibl5/docs/decisions/0258-exit-code-handling-gate.md (ADR-0258).
+
+set -euo pipefail
+
+usage() {
+    echo "usage: bin/check-exit-code-handling --since=<ref> | --all"
+}
+
+die() {
+    echo "check-exit-code-handling: $1" >&2
+    exit 2
+}
+
+since=""
+all=0
+if [ "$#" -eq 0 ]; then
+    usage >&2
+    die "use --since=<ref>"
+fi
+for arg in "$@"; do
+    case "$arg" in
+        -h|--help) usage; exit 0 ;;
+        --all) all=1 ;;
+        --since=?*) since="${arg#--since=}" ;;
+        --since=|--since) die "use --since=<ref>" ;;
+        -*) die "unknown option: $arg" ;;
+        *) die "use --since=<ref> (unexpected argument: $arg)" ;;
+    esac
+done
+[ -z "$since" ] || [ "$all" -eq 0 ] || die "use --since=<ref> or --all, not both"
+[ -n "$since" ] || [ "$all" -eq 1 ] || die "use --since=<ref>"
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) || die "not inside a git repository"
+cd "$root"
+
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
+gitdiff() {
+    git -c core.quotePath=false diff --no-color --no-ext-diff --no-textconv \
+        --src-prefix=a/ --dst-prefix=b/ "$@"
+}
+
+# Run a diff into a file. A non-zero git exit is a usage or git error, never a pass.
+diff_to() {
+    local out="$1"
+    shift
+    gitdiff "$@" >"$out" || die "git diff failed: $*"
+}
+
+SHEBANG_RE='^#!.*[/[:space:]](bash|sh)([[:space:]]|$)'
+HUNK_RE='^@@ -[0-9,]+ \+([0-9]+)'
+PREFILTER_RE='git|remove|bootout|unload'
+ERREXIT_RE='^[[:space:]]*set[[:space:]]+(-[A-Za-z]*e[A-Za-z]*|-o[[:space:]]+errexit)([[:space:]]|$)'
+GUARD_RE='^[[:space:]]*(if|elif|while|until|!)[[:space:]]'
+PROCSUB_RE='<[(][[:space:]]*git[[:space:]]+([^)|;&]*[[:space:]])?(diff|show|log|ls-files|merge-base)([[:space:]]|[)])'
+CAPTURE_RE='(^|[^[:alnum:]_.-])git[[:space:]]+([^|;&>]*[[:space:]])?(diff|show)([[:space:]]+[^|;&>]*[^0-9&>|;[:space:]])?[[:space:]]*>{1,2}[[:space:]]*[^&>[:space:]]'
+TEARDOWN_RE='(^|[^[:alnum:]_.-])(launchctl|[$][{]?[A-Za-z_][A-Za-z0-9_]*[}]?)[[:space:]]+(remove|bootout|unload)[[:space:]]([^;&|]|>&|&>)*;[[:space:]]*(rm|rmdir)([[:space:]]|$)'
+EXITOK_RE='#[[:space:]]*exit-ok:[[:space:]]*[^[:space:]].{14,}'
+# Prints the line numbers inside bash/sh/shell fences. \140 is a backtick, so
+# this source holds no literal fence.
+FENCE_AWK='
+{ s = $0; sub(/^[[:space:]]+/, "", s) }
+substr(s, 1, 3) == "\140\140\140" {
+    tag = substr(s, 4); sub(/[[:space:]]+$/, "", tag)
+    if (state != 0) state = 0
+    else if (tag == "bash" || tag == "sh" || tag == "shell") state = 1
+    else state = 2
+    next
+}
+state == 1 { print NR }'
+
+# Candidates file: one "path:line:text" per line, grouped by path.
+: >"$tmp/cand"
+if [ "$all" -eq 1 ]; then
+    rc=0
+    git grep -n -I -E "$PREFILTER_RE" -- bin/ .claude/skills/ >"$tmp/cand" || rc=$?
+    [ "$rc" -le 1 ] || die "git grep failed"
+else
+    git rev-parse --verify --quiet "${since}^{commit}" >/dev/null || die "cannot resolve ref: $since"
+    mb=$(git merge-base "$since" HEAD 2>/dev/null) || die "no merge-base (shallow clone?)"
+    diff_to "$tmp/full.diff" --no-renames -U0 "$mb" -- bin/ .claude/skills/
+    rc=0
+    grep -E '^(\+|@@ )' "$tmp/full.diff" >"$tmp/added.diff" || rc=$?
+    [ "$rc" -le 1 ] || die "grep failed on the diff"
+    dpath=""
+    dline=0
+    while IFS= read -r l; do
+        case "$l" in
+            '+++ /dev/null')
+                dpath=""
+                ;;
+            '+++ b/'*)
+                dpath="${l#+++ b/}"
+                ;;
+            '@@ '*)
+                if [[ $l =~ $HUNK_RE ]]; then
+                    dline=${BASH_REMATCH[1]}
+                fi
+                ;;
+            '+'*)
+                if [ -n "$dpath" ] && [[ ${l#+} =~ $PREFILTER_RE ]]; then
+                    echo "$dpath:$dline:${l#+}" >>"$tmp/cand"
+                fi
+                dline=$((dline + 1))
+                ;;
+        esac
+    done <"$tmp/added.diff"
+fi
+
+# Is the capture statement at path:n checked? Reads the working-tree file.
+capture_checked() {
+    local f="$root/$1" n="$2" stmt="" after="" x cont=1 nafter=0
+    sed -n "${n},$((n + 12))p" "$f" >"$tmp/ctx" || die "sed failed on $1"
+    while IFS= read -r x || [ -n "$x" ]; do
+        if [ "$cont" -eq 1 ]; then
+            stmt="$stmt $x"
+            [[ $x == *'\' ]] || cont=0
+        else
+            after="$after $x"
+            nafter=$((nafter + 1))
+            [ "$nafter" -ge 3 ] && break
+        fi
+    done <"$tmp/ctx"
+    [[ $stmt == *'||'* || $stmt == *'&&'* ]] && return 0
+    [[ $stmt =~ $GUARD_RE ]] && return 0
+    [[ $after == *'$?'* ]] && return 0
+    [ "$kind" = sh ] && [ "$errexit" -eq 1 ] && return 0
+    return 1
+}
+
+: >"$tmp/hits"
+prev=""
+kind=""
+errexit=0
+while IFS= read -r c || [ -n "$c" ]; do
+    path="${c%%:*}"
+    rest="${c#*:}"
+    n="${rest%%:*}"
+    text="${rest#*:}"
+    if [ "$path" != "$prev" ]; then
+        prev="$path"
+        kind=""
+        errexit=0
+        f="$root/$path"
+        if [ -f "$f" ]; then
+            case "$path" in
+                .claude/skills/*.md)
+                    kind=md
+                    awk "$FENCE_AWK" "$f" >"$tmp/fence" || die "awk failed on $path"
+                    ;;
+                bin/*|.claude/skills/*)
+                    first=""
+                    IFS= read -r first <"$f" || true
+                    if [[ $first =~ $SHEBANG_RE ]] || [[ $path == *.sh ]]; then
+                        kind="sh"
+                        while IFS= read -r x || [ -n "$x" ]; do
+                            [[ $x =~ ^[[:space:]]*# ]] && continue
+                            if [[ $x =~ $ERREXIT_RE ]]; then
+                                errexit=1
+                                break
+                            fi
+                        done <"$f"
+                    fi
+                    ;;
+            esac
+        fi
+    fi
+    [ -n "$kind" ] || continue
+    if [ "$kind" = md ]; then
+        grep -qx -- "$n" "$tmp/fence" || continue
+    fi
+    [[ $text =~ ^[[:space:]]*# ]] && continue
+    rule=""
+    if [[ $text =~ $PROCSUB_RE ]]; then
+        rule=git-procsub
+    elif [[ $text =~ $TEARDOWN_RE ]]; then
+        rule=teardown-then-rm
+    elif [[ $text =~ $CAPTURE_RE ]] && ! capture_checked "$path" "$n"; then
+        rule=git-capture-unchecked
+    fi
+    [ -n "$rule" ] || continue
+    [[ $text =~ $EXITOK_RE ]] && continue
+    note=""
+    [[ $text == *exit-ok* ]] && note=" [exit-ok marker malformed or reason under 15 characters]"
+    echo "$path:$n: $rule: ${text#"${text%%[![:space:]]*}"}$note" >>"$tmp/hits"
+done <"$tmp/cand"
+
+if [ -s "$tmp/hits" ]; then
+    sort -t: -k1,1 -k2,2n -u "$tmp/hits"
+    echo 'fix git-procsub: write the command output to a file under a checked status, then read the file'
+    echo 'fix git-capture-unchecked: add || die, wrap it in if !, or save rc=$? on the next line'
+    echo 'fix teardown-then-rm: join the teardown and the removal with && so a failed teardown keeps the marker'
+    echo 'escape: end the line with # exit-ok: <reason of 15 or more characters>'
+    exit 1
+fi
+
+echo "check-exit-code-handling: OK"

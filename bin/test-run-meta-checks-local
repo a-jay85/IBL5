@@ -131,7 +131,7 @@ make_repo() {
                  check-hot-files check-orphan-css adr-check refactor-flag \
                  check-pr-collisions check-model-pins test-check-model-pins test-text-hold-recheck \
                  check-engine-freeze test-check-engine-freeze \
-                 check-pipefail-grep-q test-check-pipefail-grep-q \
+                 check-pipefail-grep-q test-check-pipefail-grep-q check-exit-code-handling \
                  check-shell-portability test-check-shell-portability \
                  check-reviewer-eval test-check-reviewer-eval reviewer-eval; do
         base="$(printf '%s' "$sname" | tr '-' '_')"
@@ -541,6 +541,7 @@ PASS  test-check-engine-freeze
 PASS  check-engine-freeze
 PASS  test-check-pipefail-grep-q
 PASS  check-pipefail-grep-q
+PASS  check-exit-code-handling
 PASS  test-check-shell-portability
 PASS  check-shell-portability
 PASS  test-check-reviewer-eval
@@ -559,12 +560,12 @@ DEFER adr-check (deferred to post-pr for PR bypass check)
 DEFER refactor-flag (deferred to post-pr for PR bypass check)
 META-CHECK-DEFERRED: adr-check
 META-CHECK-DEFERRED: refactor-flag
-META-CHECKS: OK stage=pre-push hard=21 failed=0 warn=0 skip=3 defer=2'
+META-CHECKS: OK stage=pre-push hard=22 failed=0 warn=0 skip=3 defer=2'
 CONTRACT_FAIL_GOLDEN='FAIL  test-check-engine-freeze
 META-CHECK-FAILED: test-check-engine-freeze
 META-CHECK-DEFERRED: adr-check
 META-CHECK-DEFERRED: refactor-flag
-META-CHECKS: FAILED stage=pre-push hard=21 failed=1 warn=0 skip=3 defer=2'
+META-CHECKS: FAILED stage=pre-push hard=22 failed=1 warn=0 skip=3 defer=2'
 
 # contract_run <env-assignments...>: all-rc-0 stubs unless overridden; sets
 # _LAST_OUT and _LAST_RC from the pre-push stage on a throwaway fixture.

@@ -783,6 +783,83 @@ else
 fi
 
 # ===========================================================================
+# Case 16s — send_skip_errors posts every skipped plan to #errors, once
+# (portable: sources the sender extracted from the real runner, DM is a stub)
+# ===========================================================================
+echo "--- case 16s: send_skip_errors ---"
+SKIPS="$ROOT/skip-sender.sh"
+awk '/^# Skip-error sender:/,/^# End skip-error sender\./' "$RUNNER_SRC" > "$SKIPS"
+c16s_open=$(grep -c '^# Skip-error sender:' "$RUNNER_SRC")
+c16s_close=$(grep -c '^# End skip-error sender\.' "$RUNNER_SRC")
+if [ "$c16s_open" = 1 ] && [ "$c16s_close" = 1 ] \
+    && grep -qF 'send_skip_errors() {' "$SKIPS" && grep -qF 'note_skip() {' "$SKIPS"; then
+    h_pass "case16s sender anchors unique and extract defines note_skip and send_skip_errors"
+    C16S="$ROOT/c16s"
+    C16S_CALLS="$C16S/calls"
+    mkdir -p "$C16S/bin/automouse"
+    cat > "$C16S/bin/discord-dm" <<C16SSTUB
+#!/usr/bin/env bash
+printf 'ARGV: %s\n' "\$*" >> "$C16S_CALLS"
+cat >> "$C16S_CALLS"
+exit "\$(cat "$C16S/stub-rc" 2>/dev/null || echo 0)"
+C16SSTUB
+    chmod +x "$C16S/bin/discord-dm"
+    echo 0 > "$C16S/stub-rc"
+
+    # c16s_run <armed> <note>...: note_skip each note, then send. Prints RC and FAIL_NOTES count.
+    c16s_run() {
+        local armed="$1" n
+        shift
+        : > "$C16S_CALLS"
+        : > "$C16S/log"
+        (
+            set -euo pipefail
+            # shellcheck disable=SC2034
+            SELF_DIR="$C16S/bin/automouse"
+            # shellcheck disable=SC2034
+            LOG="$C16S/log"
+            # shellcheck disable=SC2034
+            STOP_DM_ARMED="$armed"
+            note_failure() { FAIL_NOTES="${FAIL_NOTES:-}  - $1
+"; }
+            # shellcheck disable=SC1090
+            . "$SKIPS"
+            for n in "$@"; do note_skip "$n"; done
+            send_skip_errors
+            echo "RC=$? FAILN=$(printf '%s' "${FAIL_NOTES:-}" | grep -c '^  - ' || true)"
+        ) 2>/dev/null | grep '^RC=' || echo "RC=aborted"
+    }
+
+    c16s_r=$(c16s_run 1 "Plan a was skipped." "Plan b was skipped.")
+    check "case16s two skips return 0 and keep the stderr notes" test "$c16s_r" = "RC=0 FAILN=2"
+    check "case16s one post, to #errors" test "$(grep -c '^ARGV: ' "$C16S_CALLS")" = 1
+    want "case16s post uses --error" "$(grep '^ARGV: ' "$C16S_CALLS")" "ARGV: - --error --attempts 2 --quiet"
+    want "case16s post names plan a" "$(cat "$C16S_CALLS")" "- Plan a was skipped."
+    want "case16s post names plan b" "$(cat "$C16S_CALLS")" "- Plan b was skipped."
+    want "case16s post says how to requeue" "$(cat "$C16S_CALLS")" "bin/automouse/queue <slug>"
+
+    c16s_r=$(c16s_run 1)
+    check "case16s no skips sends nothing" test "$(grep -c '^ARGV: ' "$C16S_CALLS" || true)" = 0
+    c16s_r=$(c16s_run 0 "Plan a was skipped.")
+    check "case16s unarmed run sends nothing" test "$(grep -c '^ARGV: ' "$C16S_CALLS" || true)" = 0
+
+    echo 1 > "$C16S/stub-rc"
+    c16s_r=$(c16s_run 1 "Plan a was skipped.")
+    check "case16s failing post still returns 0" test "$c16s_r" = "RC=0 FAILN=1"
+    want "case16s failing post is logged as spooled" "$(cat "$C16S/log")" "Skip error post undeliverable (spooled)."
+    echo 0 > "$C16S/stub-rc"
+
+    c16s_call_ln=$(grep -n '^    send_skip_errors$' "$RUNNER_SRC" | cut -d: -f1)
+    c16s_stop_ln=$(grep -n 'send_stop_dm "\$stop_rc"' "$RUNNER_SRC" | cut -d: -f1)
+    check "case16s send_skip_errors is called once, right after send_stop_dm" \
+        test "${c16s_call_ln:-0}" = "$(( ${c16s_stop_ln:-0} + 1 ))"
+    c16s_left=$(grep -c 'note_failure ".*skipped' "$RUNNER_SRC" || true)
+    check "case16s every skipped/ note goes through note_skip (left: $c16s_left)" test "$c16s_left" = 0
+else
+    h_fail "case16s sender anchors not unique or extract lacks note_skip/send_skip_errors (open=$c16s_open close=$c16s_close)"
+fi
+
+# ===========================================================================
 # macOS-only run-loop cases (1, 2, 3, 5, 17)
 # ===========================================================================
 if [ "$PLATFORM" != "Darwin" ]; then

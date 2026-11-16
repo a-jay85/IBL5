@@ -259,6 +259,16 @@ jobs:
           bin/test-check-shell-portability
           bin/check-shell-portability
 
+      # --- Design-system check: component CSS uses the bare token aliases
+      # (no var(--color-*), no numeric z-index or font-weight), and every
+      # ibl5/classes/UI class has a row in its README. Whole-tree scan, so it
+      # needs no base sha. Harness first. Hard gate. ---
+      - name: Run bin/check-design-system (harness + whole tree)
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        run: |
+          bin/test-check-design-system
+          bin/check-design-system
+
       # --- Hard gates (path-gated): a non-zero exit fails the job, same as the
       # former standalone workflows. `!cancelled()` makes each report
       # independently of an earlier step's failure (no sequential masking). ---

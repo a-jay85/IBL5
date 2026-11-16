@@ -148,20 +148,20 @@
 
 .trade-roster-preview tr.trade-incoming-row:nth-child(odd),
 .trade-roster-preview tr.trade-incoming-row:nth-child(even) {
-    background-color: var(--color-accent-100);
+    background-color: var(--accent-100);
 }
 
 .trade-roster-preview tr.trade-incoming-row:nth-child(odd):hover,
 .trade-roster-preview tr.trade-incoming-row:nth-child(even):hover {
-    background-color: var(--color-accent-200);
+    background-color: var(--accent-200);
 }
 
 .trade-roster-preview tr.trade-incoming-row td[class*="sticky-col"] {
-    background-color: var(--color-accent-100);
+    background-color: var(--accent-100);
 }
 
 .trade-roster-preview tr.trade-incoming-row:hover td[class*="sticky-col"] {
-    background-color: var(--color-accent-200);
+    background-color: var(--accent-200);
 }
 
 /* --- Outgoing (gray, desaturated) --- */
@@ -251,16 +251,16 @@
 
 /* Contracts tab: red text, light red background, red glow border */
 .trade-roster-preview__tabs .ibl-tab.cap-warning-tab {
-    color: var(--color-error-600);
+    color: var(--error-600);
     font-weight: var(--font-weight-bold);
-    background-color: var(--color-error-50);
+    background-color: var(--error-50);
     box-shadow: 0 0 10px 3px rgba(220, 38, 38, 0.5);
 }
 
 /* Cap Totals row inside Contracts table (roster preview): red background + outer glow.
    position/z-index elevate the glow above adjacent rows' backgrounds. */
 .trade-roster-preview .ibl-data-table tfoot td.cap-exceeded {
-    background-color: var(--color-error-50);
+    background-color: var(--error-50);
     box-shadow: 0 0 10px 3px rgba(220, 38, 38, 0.5);
     position: relative;
     z-index: var(--z-raised);

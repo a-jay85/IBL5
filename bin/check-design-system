@@ -1,0 +1,148 @@
+#!/bin/bash
+#
+# bin/check-design-system — keep component CSS on the design tokens and keep the
+# UI class catalog in step with the code.
+#
+# Part 1, CSS tokens. Every file matching ibl5/design/components/*.css is scanned for:
+#   - var(--color-...)       use the bare alias from design/tokens/tokens.css
+#                            (var(--accent-500), not var(--color-accent-500))
+#   - z-index: <number>      use var(--z-*)
+#   - font-weight: <number>  use var(--font-weight-*)
+# The fallback form var(--z-modal, 1000) passes, because the value starts with var(.
+# The rules live in .claude/rules/css-architecture.md § Token Naming.
+#
+# CSS block comments are stripped before matching, including ones that span lines,
+# so a comment may name a raw token.
+#
+# Allow marker: put a comment of the form /* design-ok: <reason> */ on the same line.
+# A marker with no reason does not count.
+#
+# Part 2, UI catalog. Every .php file under ibl5/classes/UI/ outside Contracts/ must
+# have its name, in backticks, in ibl5/classes/UI/README.md. A file at the top level
+# is listed as `Name`; a file in a subdirectory as `Sub\Name`.
+#
+# Scope: whole tree, no base ref. --root points the scan at another tree; the test
+# harness uses it.
+#
+# Bash 3.2 safe (macOS /bin/bash): no mapfile, no associative arrays, no ${x,,}.
+#
+# Exit codes: 0 = pass, 1 = violation found, 2 = usage error.
+#
+# gate-backtest-argv:
+
+set -euo pipefail
+
+usage() { echo "usage: bin/check-design-system [--root <dir>]"; }
+die() { echo "check-design-system: $*" >&2; exit 2; }
+
+ROOT=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --root)
+            [ $# -ge 2 ] || die "--root needs a directory"
+            ROOT="$2"
+            shift 2
+            ;;
+        -h | --help) usage; exit 0 ;;
+        *) usage >&2; exit 2 ;;
+    esac
+done
+
+if [ -z "$ROOT" ]; then ROOT="$(cd "$(dirname "$0")/.." && pwd)"; fi
+[ -d "$ROOT" ] || die "no such directory: $ROOT"
+
+CSS_DIR="$ROOT/ibl5/design/components"
+UI_DIR="$ROOT/ibl5/classes/UI"
+README="$UI_DIR/README.md"
+
+[ -d "$CSS_DIR" ] || die "no such directory: $CSS_DIR"
+[ -d "$UI_DIR" ] || die "no such directory: $UI_DIR"
+[ -f "$README" ] || die "no such file: $README"
+
+failed=0
+
+# --- Part 1: CSS tokens ---
+css_files=()
+while IFS= read -r f; do
+    css_files+=("$f")
+done < <(find "$CSS_DIR" -maxdepth 1 -type f -name '*.css' | LC_ALL=C sort)
+
+css_out=""
+if [ "${#css_files[@]}" -gt 0 ]; then
+    read -r -d '' AWK_PROG <<'AWK' || true
+FNR == 1 { incmt = 0 }
+{
+    raw = $0
+    marked = (raw ~ /\/\*[[:space:]]*design-ok:[[:space:]]*[^[:space:]*]/)
+    rest = raw
+    code = ""
+    while (length(rest) > 0) {
+        if (incmt) {
+            e = index(rest, "*/")
+            if (e == 0) { rest = ""; break }
+            rest = substr(rest, e + 2)
+            incmt = 0
+        } else {
+            s = index(rest, "/*")
+            if (s == 0) { code = code rest; rest = ""; break }
+            code = code substr(rest, 1, s - 1)
+            rest = substr(rest, s + 2)
+            incmt = 1
+        }
+    }
+    if (marked) next
+    name = FILENAME
+    sub(/.*\/ibl5\/design\//, "ibl5/design/", name)
+    text = raw
+    sub(/^[[:space:]]+/, "", text)
+    if (code ~ /var\([[:space:]]*--color-/) {
+        printf "%s:%d: %s\n  -> use the bare alias (var(--accent-500), not var(--color-accent-500))\n", name, FNR, text; hits++
+    }
+    if (code ~ /(^|[^-[:alnum:]])z-index[[:space:]]*:[[:space:]]*-?[0-9]/) {
+        printf "%s:%d: %s\n  -> use a var(--z-*) token\n", name, FNR, text; hits++
+    }
+    if (code ~ /(^|[^-[:alnum:]])font-weight[[:space:]]*:[[:space:]]*[0-9]/) {
+        printf "%s:%d: %s\n  -> use a var(--font-weight-*) token\n", name, FNR, text; hits++
+    }
+}
+END { exit (hits > 0 ? 1 : 0) }
+AWK
+    if css_out=$(awk "$AWK_PROG" "${css_files[@]}"); then rc=0; else rc=$?; fi
+    case "$rc" in
+        0) ;;
+        1) failed=1 ;;
+        *) echo "check-design-system: awk failed (exit $rc)" >&2; exit 2 ;;
+    esac
+fi
+
+# --- Part 2: UI catalog ---
+missing=""
+ui_count=0
+while IFS= read -r f; do
+    rel="${f#"$UI_DIR"/}"
+    case "$rel" in Contracts/*) continue ;; esac
+    ui_count=$((ui_count + 1))
+    name=$(printf '%s' "${rel%.php}" | tr '/' '\\')
+    if ! grep -qF -- "\`$name\`" "$README"; then
+        missing="${missing}  ${name} (ibl5/classes/UI/${rel})"$'\n'
+    fi
+done < <(find "$UI_DIR" -type f -name '*.php' | LC_ALL=C sort)
+
+if [ -n "$missing" ]; then failed=1; fi
+
+if [ "$failed" -eq 0 ]; then
+    echo "check-design-system: OK (${#css_files[@]} CSS files, $ui_count UI classes scanned)"
+    exit 0
+fi
+
+if [ -n "$css_out" ]; then
+    printf '%s\n' "$css_out"
+    echo "fix: use the tokens in ibl5/design/tokens/tokens.css; see .claude/rules/css-architecture.md § Token Naming"
+    echo "fix: or add /* design-ok: <reason> */ on the line when the raw value is deliberate"
+fi
+if [ -n "$missing" ]; then
+    echo "UI classes missing from ibl5/classes/UI/README.md:"
+    printf '%s' "$missing"
+    echo "fix: add a \`Name\` (or \`Sub\\Name\`) row to the README table"
+fi
+exit 1

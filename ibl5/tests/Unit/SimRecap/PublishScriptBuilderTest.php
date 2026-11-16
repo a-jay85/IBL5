@@ -462,6 +462,20 @@ final class PublishScriptBuilderTest extends TestCase
         self::assertSame($text, PublishScriptBuilder::cleanOutro($text));
     }
 
+    public function testCleanIntroDropsFramingAndKeepsProse(): void
+    {
+        $text = "========\nVoice: dry\nTonight the East flipped.\nFormat per game: short\nBig night.";
+
+        self::assertSame("Tonight the East flipped.\nBig night.", PublishScriptBuilder::cleanIntro($text));
+    }
+
+    public function testCleanIntroNormalizesWindowsLineEndings(): void
+    {
+        $text = "First line.\r\n========\r\nSecond line.";
+
+        self::assertSame("First line.\nSecond line.", PublishScriptBuilder::cleanIntro($text));
+    }
+
     public function testWhitespaceOnlyOutroIsOmitted(): void
     {
         $input = self::fixtureInput();

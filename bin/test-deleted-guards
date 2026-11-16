@@ -11,6 +11,7 @@
 # diffs are committed under bin/fixtures/deleted-guards/.
 #
 # Run: bin/test-deleted-guards  (exit 0 = all pass, 1 = a case failed)
+#      bin/test-deleted-guards --corpus-diff <ref> [N]  (old-vs-new detector over N commits, default 400)
 #
 # shellcheck disable=SC2016  # backticks in single-quoted fixtures are markdown
 
@@ -34,6 +35,75 @@ run_dg() {
 count_removed() {
     grep -c '^REMOVED-GUARD' <<< "$1" || true
 }
+
+# --- corpus-diff helper (backlog#1867) ---------------------------------------
+# corpus_compare <old-dg> <new-dg> <diff> <label>: run both detectors on one
+# diff and print CORPUS-FAIL lines. A failure is (a) an old row missing from the
+# new output, (b) differing exit codes, or (c) an added row whose path, kind and
+# snippet repeat no old row. Counts in CC_FAIL, CC_ADDED, CC_CHANGED.
+CC_FAIL=0
+CC_ADDED=0
+CC_CHANGED=0
+corpus_compare() {
+    local old="$1" new="$2" diff="$3" label="$4" rc_old=0 rc_new=0 lost added novel
+    "$old" --diff "$diff" > "$T/cc-old-raw" 2>/dev/null || rc_old=$?
+    "$new" --diff "$diff" > "$T/cc-new-raw" 2>/dev/null || rc_new=$?
+    LC_ALL=C sort "$T/cc-old-raw" > "$T/cc-old"
+    LC_ALL=C sort "$T/cc-new-raw" > "$T/cc-new"
+    if [ "$rc_old" != "$rc_new" ]; then
+        echo "CORPUS-FAIL exit $label old=$rc_old new=$rc_new"
+        CC_FAIL=$((CC_FAIL + 1))
+    fi
+    lost="$(LC_ALL=C comm -23 "$T/cc-old" "$T/cc-new")"
+    if [ -n "$lost" ]; then
+        printf 'CORPUS-FAIL lost %s\n%s\n' "$label" "$lost"
+        CC_FAIL=$((CC_FAIL + 1))
+    fi
+    added="$(LC_ALL=C comm -13 "$T/cc-old" "$T/cc-new")"
+    [ -n "$added" ] || return 0
+    CC_CHANGED=$((CC_CHANGED + 1))
+    CC_ADDED=$((CC_ADDED + $(grep -c . <<< "$added")))
+    cut -f1,3- <<< "$added" | LC_ALL=C sort -u > "$T/cc-added-rest"
+    cut -f1,3- "$T/cc-old" | LC_ALL=C sort -u > "$T/cc-old-rest"
+    novel="$(LC_ALL=C comm -23 "$T/cc-added-rest" "$T/cc-old-rest")"
+    if [ -n "$novel" ]; then
+        printf 'CORPUS-FAIL novel %s\n%s\n' "$label" "$novel"
+        CC_FAIL=$((CC_FAIL + 1))
+    fi
+}
+
+# corpus_diff <ref> <N>: compare <ref>'s detector with this tree's over the N
+# newest non-merge commits of <ref>. Exit 0 clean, 1 on any failure, 2 usage.
+corpus_diff() {
+    local ref="$1" n="$2" sha count=0
+    case "$n" in
+        ''|*[!0-9]*|0) echo "test-deleted-guards: N must be a positive integer" >&2; exit 2 ;;
+    esac
+    git -C "$ROOT" show "$ref:bin/lib/deleted-guards" > "$T/dg-old" 2>/dev/null \
+        || { echo "test-deleted-guards: cannot read bin/lib/deleted-guards at $ref" >&2; exit 2; }
+    chmod +x "$T/dg-old"
+    git -C "$ROOT" rev-list --no-merges -n "$n" "$ref" > "$T/cc-shas"
+    while read -r sha; do
+        git -C "$ROOT" show --format= "$sha" > "$T/cc.diff"
+        corpus_compare "$T/dg-old" "$DG" "$T/cc.diff" "$sha"
+        count=$((count + 1))
+    done < "$T/cc-shas"
+    echo "CORPUS: $count commits, $CC_CHANGED changed, $CC_ADDED rows added, $CC_FAIL failures"
+    [ "$CC_FAIL" -eq 0 ]
+}
+
+if [ "$#" -gt 0 ]; then
+    case "$1" in
+        --corpus-diff)
+            if [ "$#" -lt 2 ] || [ "$#" -gt 3 ]; then
+                echo "Usage: bin/test-deleted-guards [--corpus-diff <ref> [N]]" >&2; exit 2
+            fi
+            RC=0
+            corpus_diff "$2" "${3:-400}" || RC=$?
+            exit "$RC" ;;
+        *) echo "Usage: bin/test-deleted-guards [--corpus-diff <ref> [N]]" >&2; exit 2 ;;
+    esac
+fi
 
 # --- one removal per kind ---------------------------------------------------
 
@@ -582,6 +652,45 @@ run_dg --diff "$T/dup-two-hunk.diff" --plan "$T/plan-dup-intended.md"
 h_eq "dup-intended-suppresses-all: exit 0" 0 "$RC"
 h_eq "dup-intended-suppresses-all: no REMOVED-GUARD" 0 "$(count_removed "$OUT")"
 h_eq "dup-intended-suppresses-all: two INTENDED" 2 "$(grep -c '^INTENDED' <<< "$OUT" || true)"
+
+# --- corpus-diff helper cases -----------------------------------------------
+
+cc_run() {
+    CC_FAIL=0; CC_ADDED=0; CC_CHANGED=0
+    corpus_compare "$@" > "$T/cc-out"
+    CC_OUT="$(cat "$T/cc-out")"
+}
+# stub_dg <name> <row-file> <rc>: a fake detector that prints a file and exits.
+stub_dg() {
+    printf '#!/bin/sh\ncat "%s"\nexit %s\n' "$2" "$3" > "$T/$1"
+    chmod +x "$T/$1"
+}
+
+cc_run "$DG" "$DG" "$T/dup-two-hunk.diff" same
+h_eq "corpus-compare-identical: no failures" 0 "$CC_FAIL"
+h_eq "corpus-compare-identical: nothing added" 0 "$CC_ADDED"
+
+run_dg --diff "$T/dup-two-hunk.diff"
+grep -F '#4fd4bd77' <<< "$OUT" > "$T/cc-one-row"
+stub_dg dg-old-one "$T/cc-one-row" 1
+cc_run "$T/dg-old-one" "$DG" "$T/dup-two-hunk.diff" dup
+h_eq "corpus-compare-added-duplicate-ok: no failures" 0 "$CC_FAIL"
+h_eq "corpus-compare-added-duplicate-ok: one row added" 1 "$CC_ADDED"
+
+sed 's/hexdigest()\[:8\]/hexdigest()[1:9]/' "$DG" > "$T/dg-shifted"
+chmod +x "$T/dg-shifted"
+cc_run "$DG" "$T/dg-shifted" "$T/dup-two-hunk.diff" shifted
+h_contains "corpus-compare-lost-key" "$CC_OUT" "CORPUS-FAIL lost shifted"
+
+: > "$T/cc-empty"
+stub_dg dg-exit0 "$T/cc-empty" 0
+cc_run "$DG" "$T/dg-exit0" "$T/dup-two-hunk.diff" rc
+h_contains "corpus-compare-exit-mismatch" "$CC_OUT" "CORPUS-FAIL exit rc old=1 new=0"
+
+sed 's#bin/foo#bin/zzz#g' "$T/cc-one-row" > "$T/cc-zzz-row"
+stub_dg dg-old-zzz "$T/cc-zzz-row" 1
+cc_run "$T/dg-old-zzz" "$DG" "$T/dup-two-hunk.diff" other
+h_contains "corpus-compare-novel-row" "$CC_OUT" "CORPUS-FAIL novel other"
 
 # --- usage errors -----------------------------------------------------------
 

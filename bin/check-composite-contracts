@@ -12,13 +12,16 @@
 #                   pins the default only; it does NOT verify that no caller passes
 #                   fail-on-delivery: false on an alert path — that intent is not
 #                   mechanizable from the composite alone.)
-#   promote-to-production: ten invariants (P1-P10) that guard the unattended
+#   promote-to-production: eleven invariants (P1-P11) that guard the unattended
 #                   fast-forward push path — force-push flags, permissions, PAT
 #                   credential, kill-switch count, walkback setting, fork guard,
 #                   SKIP_CHECKS/job-name sync, merge-script parity, the workflow_run
 #                   branches filter (P9), and P10: the promote workflow env, the
 #                   promote script and the merge script each name `Aggregate check
 #                   status` in IGNORE_PENDING_CHECKS and IGNORE_FAILED_CHECKS.
+#                   P11: workflow_run.workflows equals the name of every workflow
+#                   whose push trigger fires on master, so no master SHA waits on a
+#                   workflow the promoter never hears finish.
 #   required PR workflows (R1): tests.yml, e2e-tests.yml, human-signoff.yml,
 #                   pr-meta-checks.yml and mutation.yml must keep a block-style
 #                   `on: pull_request:` trigger with no `paths:` or
@@ -397,6 +400,58 @@ else
   else
     echo "composite-contracts: promote-to-production (P10) — '$agg_name' is not named in:${p10_bad}; the settle workflow's check-run on master HEAD would make bin/check-master-ci-green report master as not green and stall promotion ($pp_file, $MERGE_SCRIPT, $PROMOTE_SCRIPT)" >&2
     fail=1
+  fi
+
+  # P11: trigger coverage (ADR-0112 addendum). workflow_run.workflows equals the
+  # names of every workflow whose push trigger fires on master. An unlisted one can
+  # finish last on a SHA and leave it unpromoted; a listed name that matches no
+  # workflow drops that workflow's events. An empty derived set fails the diff.
+  _p11_listed="$(awk '
+    { sub(/\r$/, "") }
+    /^    workflows:/ { inl=1; next }
+    inl && /^      -/ { v=$0; sub(/^      -[[:space:]]*/, "", v); sub(/[[:space:]]+#.*$/, "", v); gsub(/["'"'"']/, "", v); sub(/[[:space:]]+$/, "", v); print v; next }
+    inl && /^[[:space:]]*#/ { next }
+    inl { inl=0 }
+  ' "$pp_file" | LC_ALL=C sort)"
+  _p11_derived="$(for _wf in "$WORKFLOWS"/*.yml; do
+    [ -f "$_wf" ] || continue
+    [ "$_wf" = "$pp_file" ] && continue
+    awk '
+      function onmaster(b) { return b == "master" || b == "*" || b == "**" }
+      { sub(/\r$/, "") }
+      !nm && /^name:/ { v=$0; sub(/^name:[[:space:]]*/, "", v); sub(/[[:space:]]+#.*$/, "", v); gsub(/["'"'"']/, "", v); sub(/[[:space:]]+$/, "", v); nm=v }
+      /^on:/ { inon=1; if ($0 ~ /[[:space:],[]push([],[:space:]]|$)/) push=1; next }
+      inon && /^[A-Za-z]/ { inon=0; inp=0; inb=0 }
+      inon && /^  [A-Za-z_]/ { inp=0; inb=0 }
+      inon && /^  push:/ { push=1; inp=1; next }
+      inp && /^    [A-Za-z_]/ { inb=0 }
+      inp && /^    (branches-ignore|tags|tags-ignore):/ { odd=1 }
+      inp && /^    branches:/ {
+        hasb=1; v=$0; sub(/^    branches:[[:space:]]*/, "", v); sub(/[[:space:]]+#.*$/, "", v)
+        if (v ~ /^\[/) { gsub(/[[:space:]"'"'"']/, "", v); sub(/^\[/, "", v); sub(/\].*$/, "", v); n=split(v, a, ","); for (i=1; i<=n; i++) if (onmaster(a[i])) hit=1 }
+        else inb=1
+        next
+      }
+      inb && /^      -/ { v=$0; sub(/^      -[[:space:]]*/, "", v); sub(/[[:space:]]+#.*$/, "", v); gsub(/[[:space:]"'"'"']/, "", v); if (onmaster(v)) hit=1 }
+      END {
+        if (!push || nm == "") exit
+        if (odd && !hasb) { print "UNCLASSIFIED " nm; exit }
+        if (hit || !hasb) print nm
+      }
+    ' "$_wf"
+  done | LC_ALL=C sort)"
+  if grep -q '^UNCLASSIFIED ' <<< "$_p11_derived"; then
+    echo "composite-contracts: promote-to-production (P11) — a push trigger uses branches-ignore or tags without branches, so P11 cannot tell whether it fires on master: $(grep '^UNCLASSIFIED ' <<< "$_p11_derived" | sed 's/^UNCLASSIFIED //' | paste -sd, -)" >&2
+    fail=1
+  elif [ -z "$_p11_listed" ]; then
+    echo "composite-contracts: promote-to-production (P11) — workflow_run.workflows lists no workflow ($pp_file)" >&2
+    fail=1
+  elif ! _p11_diff="$(diff <(printf '%s\n' "$_p11_listed") <(printf '%s\n' "$_p11_derived"))"; then
+    echo "composite-contracts: promote-to-production (P11) — workflow_run.workflows (<) differs from the push-to-master workflow names (>); a SHA whose unlisted workflow finishes last is never promoted, and a listed name with no workflow drops its events ($pp_file):" >&2
+    printf '%s\n' "$_p11_diff" >&2
+    fail=1
+  else
+    echo "composite-contracts: promote-to-production workflow_run.workflows equals every push-to-master workflow name (P11)"
   fi
 
 fi  # end pp_file present

@@ -542,6 +542,8 @@ h_eq "test-paths-skipped: no lines" "" "$OUT"
 
 # bad_keys <out>: count REMOVED-GUARD keys that miss the consumer regex used by
 # tools/postplan-harness/harness/removed_guards.py and bin/lib/pr-armable.sh.
+# The consumer regex is ^[a-z-]+@[^#\s]+#[0-9a-f]{8}$; the grep below spells
+# \s as [:space:] because BSD grep -E has no \s.
 bad_keys() {
     grep '^REMOVED-GUARD' <<< "$1" | cut -f2 \
         | grep -cvE '^[a-z-]+@[^#[:space:]]+#[0-9a-f]{8}$' || true

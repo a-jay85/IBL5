@@ -7,7 +7,7 @@
    casing and letter-spacing stay in each feature file. */
 .ibl-chip {
     border-radius: var(--radius-sm);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
 }
 
 .ibl-chip--navy {

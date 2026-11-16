@@ -557,7 +557,7 @@
 .player-stats-card > .player-view-table__title {
     font-family: var(--font-numeric);
     font-variant-numeric: tabular-nums;
-    line-height: 1.5;
+    line-height: var(--leading-relaxed);
     white-space: nowrap;
 }
 

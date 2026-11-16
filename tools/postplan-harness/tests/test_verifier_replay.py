@@ -98,13 +98,17 @@ def _finding_dicts() -> list[dict]:
              "preexisting": f.line == 9} for f in _verifier_findings()]
 
 
-def _run() -> dict[int, str]:
+def _posted() -> dict[int, Finding]:
     llm, gh = _ReplayLlm(_canned(a=_finding_dicts())), _Gh()
     cls = _cls()
     cls.filtered_diff = DIFF
     cls.files = [PATH]
     review.ReviewPhase(llm, gh, worktree="/tmp/wt").run({}, cls, PlanInfo())
-    return {f.line: f.label for f in gh.findings.get("Code review", [])}
+    return {f.line: f for f in gh.findings.get("Code review", [])}
+
+
+def _run() -> dict[int, str]:
+    return {line: f.label for line, f in _posted().items()}
 
 
 def test_fixture_present_and_not_skipped():
@@ -122,7 +126,11 @@ def test_captured_verifier_reply_parses_through_contract():
 
 
 def test_preexisting_verdict_reaches_preexisting_label():
-    assert _run()[9] == "pre-existing"
+    """The captured preexisting: true entry sets Finding.scorer_preexisting, which classify reads."""
+    posted = _posted()
+    assert posted[9].scorer_preexisting is True
+    assert posted[9].label == "pre-existing"
+    assert posted[15].scorer_preexisting is False
 
 
 def test_changed_line_verdict_stays_important():

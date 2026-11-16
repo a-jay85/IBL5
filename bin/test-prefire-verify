@@ -1696,6 +1696,34 @@ test_phpunit_shared_base_change_defers_to_ci() {
     want_deferred_skip "shared base (abstract class, trait, interface, or extended class): ibl5/classes/Foo/Base.php" 1
 }
 
+test_phpunit_shared_trait_change_defers_to_ci() {
+    subset_case
+    printf '<?php\ntrait SharedBehavior {}\n' > "$R/ibl5/classes/Foo/SharedBehavior.php"
+    commit_all "trait"
+    touch_file ibl5/classes/Foo/SharedBehavior.php
+    run_gate --stage phpunit
+    want_deferred_skip "shared base (abstract class, trait, interface, or extended class): ibl5/classes/Foo/SharedBehavior.php" 1
+}
+
+test_phpunit_shared_interface_change_defers_to_ci() {
+    subset_case
+    printf '<?php\ninterface SharedContract {}\n' > "$R/ibl5/classes/Foo/SharedContract.php"
+    commit_all "interface"
+    touch_file ibl5/classes/Foo/SharedContract.php
+    run_gate --stage phpunit
+    want_deferred_skip "shared base (abstract class, trait, interface, or extended class): ibl5/classes/Foo/SharedContract.php" 1
+}
+
+test_phpunit_extended_class_change_defers_to_ci() {
+    subset_case
+    printf '<?php\nclass ExtendedParent {}\n' > "$R/ibl5/classes/Foo/ExtendedParent.php"
+    printf '<?php\nclass ExtendedChild extends ExtendedParent {}\n' > "$R/ibl5/classes/Foo/ExtendedChild.php"
+    commit_all "extended class and child"
+    touch_file ibl5/classes/Foo/ExtendedParent.php
+    run_gate --base HEAD --stage phpunit
+    want_deferred_skip "shared base (abstract class, trait, interface, or extended class): ibl5/classes/Foo/ExtendedParent.php" 1
+}
+
 test_phpunit_shared_input_plus_mapped_class_runs_subset() {
     subset_case
     touch_file ibl5/tests/bootstrap.php
@@ -2470,6 +2498,9 @@ test_phpunit_ibl5_bin_script_only_skips
 test_phpunit_other_unmapped_ibl5_file_skips
 test_phpunit_phpstan_fixture_change_defers_to_ci
 test_phpunit_shared_base_change_defers_to_ci
+test_phpunit_shared_trait_change_defers_to_ci
+test_phpunit_shared_interface_change_defers_to_ci
+test_phpunit_extended_class_change_defers_to_ci
 test_phpunit_shared_input_plus_mapped_class_runs_subset
 test_phpunit_deleted_test_only_skips
 test_phpunit_bad_base_with_unmapped_file_runs_full

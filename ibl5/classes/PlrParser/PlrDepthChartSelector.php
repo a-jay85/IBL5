@@ -45,7 +45,7 @@ final class PlrDepthChartSelector
     /**
      * Count the distinct teams present in a chartedByPid() result.
      *
-     * @param array<int, array{teamid: int}> $charted
+     * @param array<int, array{teamid: int, ...}> $charted
      */
     public static function countTeams(array $charted): int
     {
@@ -63,7 +63,7 @@ final class PlrDepthChartSelector
     }
 
     /**
-     * @param array{dc_pg_depth: int, dc_sg_depth: int, dc_sf_depth: int, dc_pf_depth: int, dc_c_depth: int, dc_minutes: int} $row
+     * @param array{dc_pg_depth: int, dc_sg_depth: int, dc_sf_depth: int, dc_pf_depth: int, dc_c_depth: int, dc_minutes: int, ...} $row
      */
     private static function hasChartValue(array $row): bool
     {

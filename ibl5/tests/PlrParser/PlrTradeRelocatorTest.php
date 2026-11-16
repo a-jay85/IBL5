@@ -58,7 +58,7 @@ class PlrTradeRelocatorTest extends TestCase
         $expected = substr_replace($emptyTarget, '   7', 0, 4);
         self::assertSame($expected, $result->lines[7]);
         self::assertSame(0, self::pidAt($result->lines[7]));
-        self::assertSame(count($lines), count($result->lines));
+        self::assertCount(count($lines), $result->lines);
         self::assertSame(strlen(implode("\r\n", $lines)), strlen(implode("\r\n", $result->lines)));
     }
 

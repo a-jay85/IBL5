@@ -162,7 +162,7 @@ class PlbExportService implements PlbExportServiceInterface
     }
 
     /**
-     * @param array{dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int} $row
+     * @param array{dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int, ...} $row
      * @return array{dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}
      */
     private static function slotValues(array $row): array

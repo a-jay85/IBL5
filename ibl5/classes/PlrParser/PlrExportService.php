@@ -70,9 +70,6 @@ class PlrExportService implements PlrExportServiceInterface
         $inputSize = strlen($content);
         $lines = PlrFileWriter::splitIntoLines($content);
 
-        // Step 2: Index player records (line index → pid)
-        $playerIndex = PlrFileWriter::indexPlayerRecords($lines);
-
         // Step 3: Query DB for all changeable fields
         $dbPlayers = $this->repository->getAllPlayerChangeableFields();
 
@@ -83,6 +80,8 @@ class PlrExportService implements PlrExportServiceInterface
         }
         $relocation = (new PlrTradeRelocator())->relocate(array_values($lines), $teamByPid);
         $lines = $relocation->lines;
+
+        // Step 2: Index player records (line index → pid), after relocation moved lines
         $playerIndex = PlrFileWriter::indexPlayerRecords($lines);
         foreach ($relocation->warnings as $warning) {
             $result->addMessage($warning);

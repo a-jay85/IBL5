@@ -22,11 +22,6 @@ final class PlrTradeRelocator
     public const MAX_TEAM_ID = 32;
 
     /**
-     * JSB kept previousTeamIndex on the sim08 to sim09 trade sample (F3).
-     */
-    public const PRESERVE_PREVIOUS_TEAM_INDEX = true;
-
-    /**
      * @param list<string> $lines .plr lines from PlrFileWriter::splitIntoLines()
      * @param array<int, int> $dbTeamByPid pid => current database teamid
      */
@@ -120,7 +115,7 @@ final class PlrTradeRelocator
     }
 
     /**
-     * @param list<string> $lines
+     * @param array<int, string> $lines
      * @param array<int, int> $lineByOrdinal
      */
     private function findEmptySlot(array $lines, array $lineByOrdinal, int $teamid): ?int
@@ -147,11 +142,9 @@ final class PlrTradeRelocator
         $moved = self::writeOrdinal($record, $targetOrdinal);
         $moved = PlrFileWriter::applyChangesToRecord($moved, ['teamid' => $newTid]);
 
-        if (self::PRESERVE_PREVIOUS_TEAM_INDEX) {
-            $moved = PlrFileWriter::applyChangesToRecord($moved, ['previousTeamIndex' => $previousTeamIndex]);
-        }
-
-        return $moved;
+        // applyChangesToRecord sets previousTeamIndex to oldTid-1. JSB kept the old value
+        // on the sim08 to sim09 trade sample (F3), so restore it.
+        return PlrFileWriter::applyChangesToRecord($moved, ['previousTeamIndex' => $previousTeamIndex]);
     }
 
     private static function writeOrdinal(string $line, int $ordinal): string

@@ -30,6 +30,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+source "$REPO_ROOT/bin/lib/claim-file.sh"
 DB_SYNC_PROD_BIN="${DB_SYNC_PROD_BIN:-$REPO_ROOT/bin/db-sync-prod}"
 DB_QUERY_BIN="${DB_QUERY_BIN:-$REPO_ROOT/ibl5/bin/db-query}"
 DB_SYNC_LOCK_DIR="${DB_SYNC_LOCK_DIR:-/tmp/ibl5-db-sync.lock}"
@@ -110,10 +111,13 @@ cleanup() {
 }
 
 # ── acquire_lock ──────────────────────────────────────────────────────────────
+# Ownership is the pid file that claim_file creates O_EXCL. mkdir only makes room
+# for it, because uutils mkdir can report success to two racing callers. The EXIT
+# trap that removes the lock is installed only after a successful claim, so a run
+# that lost the claim never deletes the owner's lock.
 acquire_lock() {
-    if mkdir "$DB_SYNC_LOCK_DIR" 2>/dev/null; then
-        trap 'cleanup' EXIT
-        printf '%s\n' "$$" > "$DB_SYNC_LOCK_DIR/pid"
+    if mkdir "$DB_SYNC_LOCK_DIR" 2>/dev/null && claim_file "$DB_SYNC_LOCK_DIR/pid" printf '%s\n' "$$"; then
+        trap 'cleanup' EXIT  # owner: fresh lock
         return 0
     fi
     # Lock exists — check if stale
@@ -126,20 +130,20 @@ acquire_lock() {
         dir_mtime="$(stat -c %Y "$DB_SYNC_LOCK_DIR" 2>/dev/null || stat -f %m "$DB_SYNC_LOCK_DIR" 2>/dev/null || echo 0)"
         dir_age=$(( $(date +%s) - dir_mtime ))
     fi
+    local reap_reason=""
     if [ -n "$existing_pid" ] && ! kill -0 "$existing_pid" 2>/dev/null; then
-        log "stale lock (pid $existing_pid) — reaping"
-        rm -rf "$DB_SYNC_LOCK_DIR"
-        mkdir "$DB_SYNC_LOCK_DIR"
-        trap 'cleanup' EXIT
-        printf '%s\n' "$$" > "$DB_SYNC_LOCK_DIR/pid"
-        return 0
+        reap_reason="pid $existing_pid"
+    elif [ "$dir_age" -gt 7200 ]; then
+        reap_reason="older than 2h"
     fi
-    if [ "$dir_age" -gt 7200 ]; then
-        log "stale lock (older than 2h) — reaping"
+    if [ -n "$reap_reason" ]; then
+        log "stale lock ($reap_reason) — reaping"
         rm -rf "$DB_SYNC_LOCK_DIR"
-        mkdir "$DB_SYNC_LOCK_DIR"
-        trap 'cleanup' EXIT
-        printf '%s\n' "$$" > "$DB_SYNC_LOCK_DIR/pid"
+        if ! { mkdir "$DB_SYNC_LOCK_DIR" 2>/dev/null && claim_file "$DB_SYNC_LOCK_DIR/pid" printf '%s\n' "$$"; }; then
+            log "skip: sync already running (another run took the lock after the reap)"
+            exit 0
+        fi
+        trap 'cleanup' EXIT  # owner: reaped lock
         return 0
     fi
     log "skip: sync already running (pid ${existing_pid:-unknown})"

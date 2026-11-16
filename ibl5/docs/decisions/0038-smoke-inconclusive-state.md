@@ -35,13 +35,6 @@ The `smoke-prod.yml` IBL5 step captures the exit code: on `3` it sets an `ibl5_i
 
 In `rollback-and-notify`'s "Check revert eligibility" step, after the existing `^Revert ` loop-guard, the deployed commit's changed files are diffed against its parent. If **every** changed path matches `(\.md$|^docs/|^ibl5/docs/)`, the revert is skipped (`skip_reason=docs-only`) and the owner is DM'd. Any single non-docs path (added, modified, or deleted) keeps the revert eligible; an empty diff is never treated as docs-only.
 
-## Addendum — IBL6 notifier removed (2026-11-15) <!-- slop-ok -->
-
-§ A above says the new job mirrors `notify-ibl6-degradation`, and the 2026-09-02 addendum below says
-that job still exists in `.github/workflows/smoke-prod.yml`. Today that file has no
-`notify-ibl6-degradation` job. Its jobs are `smoke`, `rollback-and-notify`, and `notify`. The IBL6
-app was decommissioned (commit `2c9a8d080`), which removed the IBL6 check and its notifier.
-
 ## Alternatives Considered
 
 - **Widen the retry/backoff in `bin/smoke-prod`.** Rejected: the existing retry is same-IP, and a per-IP WAF ban persists for the whole run window (the 10h-prior scheduled run had the identical `415`). More retries only delay the same false positive and risk masking a real slow-burn outage.
@@ -71,3 +64,10 @@ Both sentences had been overwritten in place by the nightly doc-freshness refres
 (commit `71b15038f`, PR #1776), which erased the decision-time record; they were restored
 byte-for-byte on 2026-09-02 and the current state moved here instead. See
 `.claude/rules/adr-append-only.md`.
+
+## Addendum — IBL6 notifier removed (2026-11-15) <!-- slop-ok -->
+
+§ A above says the new job mirrors `notify-ibl6-degradation`, and the 2026-09-02 addendum above says
+that job still exists in `.github/workflows/smoke-prod.yml`. Today that file has no
+`notify-ibl6-degradation` job. Its jobs are `smoke`, `rollback-and-notify`, and `notify`. The IBL6
+app was decommissioned (commit `2c9a8d080`), which removed the IBL6 check and its notifier.

@@ -5,7 +5,8 @@
 #
 # Pins the guard taxonomy (one removal per kind per language), the paired-exit
 # rule, the same-file moved-guard rule, intended-removal suppression, the skip
-# list, usage errors, the or-true case-arm unwrap rule, and three real PR
+# list, usage errors, the or-true case-arm unwrap rule, per-file keys for repeated
+# identical removals (backlog#1867), and three real PR
 # replays (#3370, #3371, #3821) whose trimmed
 # diffs are committed under bin/fixtures/deleted-guards/.
 #
@@ -466,6 +467,121 @@ done
 run_dg --diff "$T/skip.diff"
 h_eq "test-paths-skipped" 0 "$RC"
 h_eq "test-paths-skipped: no lines" "" "$OUT"
+
+# --- repeated identical removals (backlog#1867) ------------------------------
+
+# bad_keys <out>: count REMOVED-GUARD keys that miss the consumer regex used by
+# tools/postplan-harness/harness/removed_guards.py and bin/lib/pr-armable.sh.
+bad_keys() {
+    grep '^REMOVED-GUARD' <<< "$1" | cut -f2 \
+        | grep -cvE '^[a-z-]+@[^#[:space:]]+#[0-9a-f]{8}$' || true
+}
+# keys_of <out>: the REMOVED-GUARD keys in output order, space-joined.
+keys_of() {
+    grep '^REMOVED-GUARD' <<< "$1" | cut -f2 | tr '\n' ' ' || true
+}
+
+cat > "$T/dup-single.diff" <<'EOF'
+diff --git a/bin/foo b/bin/foo
+--- a/bin/foo
++++ b/bin/foo
+@@ -1,3 +1,2 @@
+ #!/usr/bin/env bash
+-set -e
+ echo one
+EOF
+run_dg --diff "$T/dup-single.diff"
+h_eq "dup-single-legacy-key: exit 1" 1 "$RC"
+h_eq "dup-single-legacy-key: key" "strict-mode@bin/foo#4fd4bd77 " "$(keys_of "$OUT")"
+
+cat > "$T/dup-two-hunk.diff" <<'EOF'
+diff --git a/bin/foo b/bin/foo
+--- a/bin/foo
++++ b/bin/foo
+@@ -1,3 +1,2 @@
+ #!/usr/bin/env bash
+-set -e
+ echo one
+@@ -20,3 +19,2 @@
+ echo two
+-set -e
+ echo three
+EOF
+run_dg --diff "$T/dup-two-hunk.diff"
+h_eq "dup-two-hunk-rows: exit 1" 1 "$RC"
+h_eq "dup-two-hunk-rows: two rows" 2 "$(count_removed "$OUT")"
+h_eq "dup-two-hunk-distinct-keys" "strict-mode@bin/foo#4fd4bd77 strict-mode@bin/foo#06c1dbf3 " "$(keys_of "$OUT")"
+h_eq "dup-key-shape-consumer-regex: two-hunk" 0 "$(bad_keys "$OUT")"
+
+cat > "$T/dup-same-hunk.diff" <<'EOF'
+diff --git a/bin/foo b/bin/foo
+--- a/bin/foo
++++ b/bin/foo
+@@ -1,6 +1,3 @@
+ #!/usr/bin/env bash
+-set -e
+ echo one
+-set -e
+ echo two
+-set -e
+EOF
+run_dg --diff "$T/dup-same-hunk.diff"
+h_eq "dup-same-hunk-distinct-keys" "strict-mode@bin/foo#4fd4bd77 strict-mode@bin/foo#06c1dbf3 strict-mode@bin/foo#f8133b43 " "$(keys_of "$OUT")"
+h_eq "dup-key-shape-consumer-regex: same-hunk" 0 "$(bad_keys "$OUT")"
+
+cat > "$T/dup-cross-file.diff" <<'EOF'
+diff --git a/bin/foo b/bin/foo
+--- a/bin/foo
++++ b/bin/foo
+@@ -1,3 +1,2 @@
+ #!/usr/bin/env bash
+-set -e
+ echo one
+diff --git a/bin/bar b/bin/bar
+--- a/bin/bar
++++ b/bin/bar
+@@ -1,3 +1,2 @@
+ #!/usr/bin/env bash
+-set -e
+ echo one
+EOF
+run_dg --diff "$T/dup-cross-file.diff"
+h_eq "dup-cross-file-legacy-keys" "strict-mode@bin/foo#4fd4bd77 strict-mode@bin/bar#4fd4bd77 " "$(keys_of "$OUT")"
+
+cat > "$T/dup-cancel.diff" <<'EOF'
+diff --git a/bin/foo b/bin/foo
+--- a/bin/foo
++++ b/bin/foo
+@@ -1,3 +1,3 @@
+ #!/usr/bin/env bash
+-set -e
++set -e
+ echo one
+@@ -20,3 +20,2 @@
+ echo two
+-set -e
+ echo three
+EOF
+run_dg --diff "$T/dup-cancel.diff"
+h_eq "dup-cancel-then-survivor-legacy-key" "strict-mode@bin/foo#4fd4bd77 " "$(keys_of "$OUT")"
+
+cat > "$T/plan-dup-intended.md" <<'PLAN'
+# Plan
+
+## Must preserve
+
+- `bin/foo` keeps every other guard in the file
+
+### Intended removals
+
+- `bin/foo` strict-mode: `set -e` — the script now runs under a strict-mode wrapper
+
+## Critical Files
+PLAN
+run_dg --diff "$T/dup-two-hunk.diff" --plan "$T/plan-dup-intended.md"
+h_eq "dup-intended-suppresses-all: exit 0" 0 "$RC"
+h_eq "dup-intended-suppresses-all: no REMOVED-GUARD" 0 "$(count_removed "$OUT")"
+h_eq "dup-intended-suppresses-all: two INTENDED" 2 "$(grep -c '^INTENDED' <<< "$OUT" || true)"
 
 # --- usage errors -----------------------------------------------------------
 

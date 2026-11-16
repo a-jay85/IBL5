@@ -512,6 +512,55 @@ done < f
 FIX
 expect c53-ssh-bundled-n-stays-safe "$T/c53.sh" 0
 
+# Review thread case-label-reader-missed: a quoted, bracket, or alternatives case
+# label does not hide the reader after it.
+cat > "$T/c54.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  case $l in
+    "a") ssh h ;;
+    'a b') ssh h ;;
+    [ab]) ssh h ;;
+    a|b) ssh h ;;
+    (c|"d") ssh h ;;
+  esac
+done < f
+FIX
+run_gate "$T/c54.sh"
+case "$RC:$OUT" in
+    1:*"c54.sh:4:"*"c54.sh:5:"*"c54.sh:6:"*"c54.sh:7:"*"c54.sh:8:"*) pass "c54-case-label-forms-flagged" ;;
+    *) fail "c54-case-label-forms-flagged (rc=$RC; output: $OUT)" ;;
+esac
+
+# A one-line case statement: the reader after the label is still checked.
+cat > "$T/c55.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  case $l in "a") ssh h ;; esac
+  case $l in a|b) ssh h ;; esac
+done < f
+FIX
+run_gate "$T/c55.sh"
+case "$RC:$OUT" in
+    1:*"c55.sh:3:"*"c55.sh:4:"*) pass "c55-one-line-case-flagged" ;;
+    *) fail "c55-one-line-case-flagged (rc=$RC; output: $OUT)" ;;
+esac
+
+# A real pipe still feeds the reader, with or without blanks, and after a label.
+cat > "$T/c56.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  echo "$l" | ssh h
+  echo "$l"|ssh h
+  printf x|ssh
+  case $l in
+    a|b) echo x | ssh h ;;
+    "c") echo x|ssh h ;;
+  esac
+done < f
+FIX
+expect c56-real-pipe-still-a-pipe "$T/c56.sh" 0
+
 echo ""
 echo "$PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

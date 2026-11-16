@@ -73,6 +73,8 @@ class PlrExportService implements PlrExportServiceInterface
         // Step 3: Query DB for all changeable fields
         $dbPlayers = $this->repository->getAllPlayerChangeableFields();
 
+        $sourceTeamByPid = PlrDepthChartSelector::sourceTeamByPid(array_values($lines));
+
         // Step 3b: Move traded players into their new team's slot block
         $teamByPid = [];
         foreach ($dbPlayers as $pid => $dbPlayer) {
@@ -95,7 +97,7 @@ class PlrExportService implements PlrExportServiceInterface
         $result->addMessage('Loaded ' . count($dbPlayers) . ' players from database');
         $result->addMessage('Found ' . count($playerIndex) . ' player records in .plr file');
 
-        $charted = PlrDepthChartSelector::chartedByPid($this->repository->getAllPlayerDepthCharts());
+        $charted = PlrDepthChartSelector::chartedByPid($this->repository->getAllPlayerDepthCharts(), $sourceTeamByPid);
         $result->addMessage('Depth charts applied for ' . PlrDepthChartSelector::countTeams($charted) . ' teams');
 
         // Step 4: For each player, compare and build change set

@@ -21,12 +21,18 @@ final class PlrDepthChartSelector
      * Return the pid-keyed rows of charted teams only.
      *
      * @param array<int, array{pid: int, teamid: int, dc_pg_depth: int, dc_sg_depth: int, dc_sf_depth: int, dc_pf_depth: int, dc_c_depth: int, dc_can_play_in_game: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}> $rows
+     * @param array<int, int>|null $sourceTeamByPid pid => teamid in the source .plr. When given, a player
+     *        only counts toward charting his team if his source team equals his DB team. A traded
+     *        player still carries his old team's dc_* values and must not chart his new team.
      * @return array<int, array{pid: int, teamid: int, dc_pg_depth: int, dc_sg_depth: int, dc_sf_depth: int, dc_pf_depth: int, dc_c_depth: int, dc_can_play_in_game: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}>
      */
-    public static function chartedByPid(array $rows): array
+    public static function chartedByPid(array $rows, ?array $sourceTeamByPid = null): array
     {
         $chartedTeams = [];
-        foreach ($rows as $row) {
+        foreach ($rows as $pid => $row) {
+            if ($sourceTeamByPid !== null && ($sourceTeamByPid[$pid] ?? null) !== $row['teamid']) {
+                continue;
+            }
             if (self::isRealTeam($row['teamid']) && self::hasChartValue($row)) {
                 $chartedTeams[$row['teamid']] = true;
             }
@@ -40,6 +46,22 @@ final class PlrDepthChartSelector
         }
 
         return $result;
+    }
+
+    /**
+     * Map pid => teamid from raw .plr lines.
+     *
+     * @param list<string> $lines
+     * @return array<int, int>
+     */
+    public static function sourceTeamByPid(array $lines): array
+    {
+        $map = [];
+        foreach (PlrFileWriter::indexPlayerRecords($lines) as $lineIndex => $pid) {
+            $map[$pid] = PlrFileWriter::readField($lines[$lineIndex], 'teamid');
+        }
+
+        return $map;
     }
 
     /**

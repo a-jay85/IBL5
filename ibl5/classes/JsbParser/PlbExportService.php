@@ -97,7 +97,10 @@ class PlbExportService implements PlbExportServiceInterface
         }
 
         // (c) charted teams
-        $charted = PlrDepthChartSelector::chartedByPid($this->repository->getAllPlayerDepthCharts());
+        $sourceTeamByPid = PlrDepthChartSelector::sourceTeamByPid(
+            PlrFileWriter::splitIntoLines(PlrFileWriter::readFile($sourcePlrPath))
+        );
+        $charted = PlrDepthChartSelector::chartedByPid($this->repository->getAllPlayerDepthCharts(), $sourceTeamByPid);
         foreach ($charted as $pid => $row) {
             $ordinal = $export['ordinals'][$pid] ?? null;
             if ($ordinal === null) {

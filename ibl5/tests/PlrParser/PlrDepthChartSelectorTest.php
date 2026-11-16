@@ -41,4 +41,19 @@ class PlrDepthChartSelectorTest extends TestCase
         self::assertSame([], $charted);
         self::assertSame(0, PlrDepthChartSelector::countTeams($charted));
     }
+
+    public function testTradedPlayerWithOldChartValuesDoesNotChartNewTeam(): void
+    {
+        $rows = [
+            101 => JsbExportFixtures::chartRow(101, 3, ['dc_minutes' => 30]),
+            102 => JsbExportFixtures::chartRow(102, 3),
+            201 => JsbExportFixtures::chartRow(201, 4),
+        ];
+        // 101 was on team 5 in the source .plr and was traded to team 3.
+        $sourceTeams = [101 => 5, 102 => 3, 201 => 4];
+
+        $charted = PlrDepthChartSelector::chartedByPid($rows, $sourceTeams);
+
+        self::assertSame([], $charted);
+    }
 }

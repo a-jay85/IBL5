@@ -1885,7 +1885,7 @@ else
     rm -f "$TMP/cp-stdin-ran"
     RC=0
     OUT=$(AUTOMOUSE_CHECK_PLAN="$CP_STDIN" NIGHTLY_DIR="$NDIR" PLANS_DIR="$PDIR" \
-        timeout 15 "$SCRIPT" add plan-stdin < <(sleep 60) 2>&1) || RC=$?
+        timeout 15 "$SCRIPT" add plan-stdin < <(exec sleep 60 2>/dev/null) 2>&1) || RC=$?
     h_eq "row50 add exits 0 with an open stdin pipe" "0" "$RC"
     assert_present "row50 check-plan stub ran to the end" "$TMP/cp-stdin-ran"
     assert_queued "row50 plan queued" plan-stdin.md
@@ -1980,6 +1980,25 @@ STUB
     L_LEAKS=$(grep -E '(^|[^0-9])[0-9]{3}-plan-leak' <<< "$L_ALL" | grep -vxF '040-plan-leak.md' || true)
     h_eq "row49 no NNN- prefix in a lock, sidecar, handoff, cost row or report name" "" "$L_LEAKS"
     h_pass "row49 — claimed plan identifiers never carry the NNN- prefix"
+fi
+
+# Lying-mkdir characterization: _queue_lock_take claims by its owner file, so two takers
+# that both see mkdir succeed still produce one owner. Green on master by design.
+# shellcheck source=bin/lib/claim-file.sh
+. "$SCRIPT_DIR/lib/claim-file.sh"
+if [ "$AQ_ONLY" != judge ]; then
+    QL_DIR="$TMP/qlock"; mkdir -p "$QL_DIR"
+    claim_file_lying_mkdir_stub "$QL_DIR/lie"
+    for _i in 1 2; do
+        ( PATH="$QL_DIR/lie:$PATH"; . "$LIB"; _queue_lock_take "$QL_DIR/x.lock" && echo won >> "$QL_DIR/wins" ) &
+    done
+    wait
+    QL_WINS=$(grep -c won "$QL_DIR/wins" 2>/dev/null || true)
+    if [ "$QL_WINS" = 1 ]; then
+        H_PASS=$((H_PASS + 1)); printf 'ok %s\n' queue_lock_lying_mkdir_one_owner
+    else
+        h_fail "queue_lock_lying_mkdir_one_owner" "wins=$QL_WINS"
+    fi
 fi
 
 h_done

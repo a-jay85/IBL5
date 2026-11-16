@@ -7,8 +7,12 @@
 # A lock is stale when its recorded pid is provably dead (kill -0 fails and ps -p finds
 # nothing), or when it has no pid file and is older than WTLOCK_GRACE_SECS (default 30): a
 # holder killed between mkdir and the pid write must not wedge the lock. Mtime is read only
-# for that pid-less case. An unreadable or non-numeric pid file reads as held.
+# for that pid-less case. An empty pid file counts as pid-less. An unreadable or
+# non-numeric pid file reads as held.
 # Every read uses a redirect or a here-string, never a pipe into grep -q (SIGPIPE-safe).
+
+# shellcheck source=bin/lib/claim-file.sh
+. "$(dirname "${BASH_SOURCE[0]}")/claim-file.sh"
 
 WTLOCK_SELF_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 
@@ -43,11 +47,12 @@ wtlock_write_pid() {
     printf '%s\n' "$2" > "$t" && mv -f "$t" "$1/pid"
 }
 
-# wtlock_pidless_old <dir>: rc 0 only when <dir> is a dir with no pid file whose mtime is
-# older than the grace. A stat failure reads as young (held), never as epoch 0.
+# wtlock_pidless_old <dir>: rc 0 only when <dir> is a dir with no pid file, or an empty one
+# (a pid write that failed after noclobber created the file), whose mtime is older than the
+# grace. A stat failure reads as young (held), never as epoch 0.
 wtlock_pidless_old() {
     local m now g="${WTLOCK_GRACE_SECS:-30}"
-    [ -d "$1" ] && [ ! -e "$1/pid" ] || return 1
+    [ -d "$1" ] && [ ! -s "$1/pid" ] || return 1
     m=$(stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null) || return 1
     [[ $m =~ ^[0-9]+$ ]] || return 1
     now=$(date +%s)
@@ -80,13 +85,17 @@ wtlock_stale() {
     wtlock_pidless_old "$1"
 }
 
-# wtlock_create <lockdir> <pid>: mkdir the lock and record <pid>; rc 1 when the dir already
-# exists. When the pid write fails it removes the dir it just made, so it never leaves a
-# pid-less lock behind.
+# wtlock_create <lockdir> <pid>: mkdir the lock and claim pid with noclobber; rc 1 when the
+# dir or pid already exists. When the claim fails and no pid file exists, it removes the dir.
+# A write that fails after the claim leaves an empty pid, which wtlock_pidless_old ages out.
 wtlock_create() {
     mkdir "$1" 2>/dev/null || return 1
-    wtlock_write_pid "$1" "$2" && return 0
-    rm -rf "$1"; return 1
+    claim_file "$1/pid" printf '%s\n' "$2" && return 0
+    # A lost claim leaves the winner's pid file in place, even while it is still empty
+    # (the winner created it and has not written yet). Remove the dir only when no pid file
+    # exists. An empty pid left by a failed write ages out through wtlock_pidless_old.
+    [ -e "$1/pid" ] || rm -rf "$1"
+    return 1
 }
 
 # wtlock_acquire <lockdir> <pid> [--steal]: rc 0 when <pid> now holds the lock; rc 1 and
@@ -104,20 +113,20 @@ wtlock_acquire() {
     fi
     # Stale or gone. A mutex older than the grace was left by a run killed mid-reclaim:
     # clear it and retry once.
-    if ! mkdir "$m" 2>/dev/null; then
-        if wtlock_pidless_old "$m" && rmdir "$m" 2>/dev/null && mkdir "$m" 2>/dev/null; then :
+    if ! { mkdir "$m" 2>/dev/null && claim_file "$m/owner" printf '%s\n' "$me"; }; then
+        if wtlock_pidless_old "$m" && rm -rf "$m" && mkdir "$m" 2>/dev/null && claim_file "$m/owner" printf '%s\n' "$me"; then :
         else echo unknown; return 1
         fi
     fi
     # Under the mutex, re-check: another run may have taken the lock since the probe above.
     if [ -e "$d" ] && ! wtlock_stale "$d"; then
-        rmdir "$m" 2>/dev/null
+        rm -rf "$m"
         h=$(wtlock_read_pid "$d") || h=unknown
         printf '%s\n' "$h"; return 1
     fi
     rm -rf "$d"
-    if wtlock_create "$d" "$me"; then rmdir "$m" 2>/dev/null; return 0; fi
-    rmdir "$m" 2>/dev/null
+    if wtlock_create "$d" "$me"; then rm -rf "$m"; return 0; fi
+    rm -rf "$m"
     h=$(wtlock_read_pid "$d") || h=unknown
     printf '%s\n' "$h"; return 1
 }

@@ -1,6 +1,6 @@
 ---
 description: Shell portability gotchas for bin/ scripts and skill inline bash — BSD vs GNU date and stat, SSH single-line commands, heredoc JSON, isolated bash blocks in skills, shellcheck only the scripts you changed.
-last_verified: 2026-11-11
+last_verified: 2026-11-13
 paths:
   - "bin/**"
   - ".claude/skills/**/*.md"
@@ -8,7 +8,7 @@ paths:
 
 # Shell Portability
 
-## BSD vs GNU `date` — use `_date_ago()`
+## BSD vs GNU `date`: use `_date_ago()`
 
 macOS ships BSD `date`; Linux CI ships GNU `date`. Arithmetic date flags differ:
 
@@ -17,7 +17,7 @@ macOS ships BSD `date`; Linux CI ships GNU `date`. Arithmetic date flags differ:
 | `date -d '7 days ago'` | `date -v-7d` |
 | `date --date='...'` | no `--date` flag |
 
-**Fix:** use the `_date_ago <N>` helper in `bin/automouse/run` (N = number of days; days are hardcoded) — it detects the platform and emits a portable timestamp. Never write raw `date -d` or `date -v` in scripts that run on both.
+**Fix:** use the `_date_ago <N>` helper in `bin/automouse/run` (N = number of days; days are hardcoded). It detects the platform and emits a portable timestamp. Never write raw `date -d` or `date -v` in scripts that run on both.
 
 ## BSD vs GNU `stat`: GNU form first
 
@@ -36,9 +36,20 @@ mtime=$(stat -c %Y "$f" 2>/dev/null || stat -f %m "$f" 2>/dev/null || echo 0)
 
 `bin/check-shell-portability` enforces this on every shell file under `bin/`, and CI runs it on each pull request. It flags a `stat -f` call with a format operand when no `stat -c` call comes earlier in the same statement. Backslash-continued lines count as one statement. When a site is correct for another reason, such as output validated before use or a GNU branch chosen by a probe, end the line with `# portability-ok: <reason>`. The reason must be non-empty.
 
+## Directory locks: own the lock by an O_EXCL file
+
+uutils mkdir, the default on Ubuntu 26.04, can report success to both of two racing `mkdir` calls on one path. A lock that counts `mkdir` success as ownership then has two owners. Every directory lock under `bin/` takes ownership by creating a file inside the lock dir with `claim_file` from `bin/lib/claim-file.sh`. The helper creates the file under noclobber, which bash opens with O_EXCL, and restores the caller's noclobber setting. `mkdir` only makes room for that file. A failed claim means the lock is held, and the script takes the same wait, reap, or refuse path that a failed `mkdir` takes.
+
+- Take a lock with `mkdir "$d" 2>/dev/null && claim_file "$d/pid" printf '%s\n' "$$"`.
+- Remove a lock dir with `rm -rf`. `rmdir` fails once the dir holds a claim file.
+- A launchd job string cannot source a repo file, so `ljob_submit_wrapper_text` claims its marker inline with `(set -C; : > "$marker")`.
+- Test a lock with `claim_file_lying_mkdir_stub`, which writes a `mkdir` that always exits 0. Put its dir first on PATH.
+
+No gate checks this. A text lint cannot tell a lock `mkdir` from a plain directory create, so review and each lock's harness case carry it.
+
 ## SSH commands must be single-line strings
 
-Never emit a bare `ssh host` followed by commands on separate lines — those subsequent lines run **locally** (or are eaten as ssh stdin), not on the remote:
+Never emit a bare `ssh host` followed by commands on separate lines. Those later lines run **locally** on the Mac, or ssh eats them as stdin:
 
 ```bash
 # WRONG — echo runs on the Mac, never reaches the server
@@ -59,11 +70,11 @@ Assume a narrow terminal (~80 chars). Any shell command exceeding ~80 characters
 
 ## Skill inline bash: each block is an isolated shell
 
-In `.claude/skills/**/*.md` skill files, every fenced `bash` block runs in a separate shell process — **variable assignments do not persist between blocks**. Do not set a variable in block 1 and read it in block 2. Either:
+In `.claude/skills/**/*.md` skill files, every fenced `bash` block runs in a separate shell process, so a variable set in one block is gone in the next. Do not set a variable in block 1 and read it in block 2. Either:
 - Use a single block for the whole sequence, or
 - Persist state to a temp file between blocks.
 
-**JSON output from skill bash:** use `printf` not `echo -e` for JSON strings — `echo -e` interprets escape sequences inconsistently across shells (`\n` in dash vs. bash). `printf '%s\n' "$json"` is safe everywhere.
+**JSON output from skill bash:** use `printf` instead of `echo -e` for JSON strings. `echo -e` interprets escape sequences inconsistently across shells (`\n` in dash vs. bash). `printf '%s\n' "$json"` is safe everywhere.
 
 ## Shellcheck only the scripts you changed
 

@@ -261,7 +261,7 @@ bl_lock_live_pid() {
 bl_lock_acquire() {
     local pid
     mkdir -p "$STATE"
-    if ! mkdir "$LOCK" 2>/dev/null; then
+    if ! { mkdir "$LOCK" 2>/dev/null && claim_file "$LOCK/pid" printf '%s\n' "$$"; }; then
         pid=$(bl_lock_live_pid)
         if [ -n "$pid" ]; then
             echo "burndown-loop: already running (pid $pid)" >&2
@@ -269,9 +269,9 @@ bl_lock_acquire() {
         fi
         bl_log "reclaimed stale lock pid=$(cat "$LOCK/pid" 2>/dev/null || echo none)"
         rm -rf "$LOCK"
-        mkdir "$LOCK" 2>/dev/null || { echo "burndown-loop: already running" >&2; exit 4; }
+        { mkdir "$LOCK" 2>/dev/null && claim_file "$LOCK/pid" printf '%s\n' "$$"; } \
+            || { echo "burndown-loop: already running" >&2; exit 4; }
     fi
-    echo "$$" > "$LOCK/pid"
     trap bl_cleanup EXIT
 }
 

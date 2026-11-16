@@ -332,6 +332,39 @@ case_lock_exclusive() {
     assert_eq "lock: main tree stays clean" "" "$(git -C "$base/IBL5" status --porcelain)"
 }
 
+# pass_row/fail_row: matrix rows grep `^ *ok <case>$` and `^ *FAIL <case>`.
+pass_row() { H_PASS=$((H_PASS + 1)); printf 'ok %s\n' "$1"; }
+fail_row() { h_fail "$@"; printf 'FAIL %s\n' "$1"; }
+
+# A mkdir that always reports success (uutils under a race) must still yield one lock owner:
+# the owner file is the claim. The winner stays alive so the loser reads a live, fresh lock.
+case_pool_lock_lying_mkdir_one_owner() {
+    local base lie n pid_a pid_b owner_pid wins=0 i
+    base="$(new_pool_env)"
+    lie="$base/lie"
+    # shellcheck source=bin/lib/claim-file.sh
+    . "$SCRIPT_DIR/lib/claim-file.sh"
+    claim_file_lying_mkdir_stub "$lie"
+    for i in 1 2; do
+        PATH="$lie:$PATH" pool_sh "$base" \
+            'pool_lock_acquire "$REPO_ROOT" && { echo "ACQUIRED $$"; sleep 2; }' \
+            > "$base/out.$i" &
+    done
+    wait
+    for i in 1 2; do
+        n="$(grep -c '^ACQUIRED ' "$base/out.$i" || true)"
+        wins=$((wins + n))
+    done
+    pid_a="$(sed -n 's/^ACQUIRED //p' "$base/out.1")"
+    pid_b="$(sed -n 's/^ACQUIRED //p' "$base/out.2")"
+    owner_pid="$(sed -n '1p' "$base/IBL5/.git/wt-pool.lock/owner" 2>/dev/null)"
+    if [ "$wins" = 1 ] && [ -n "$owner_pid" ] && { [ "$owner_pid" = "$pid_a" ] || [ "$owner_pid" = "$pid_b" ]; }; then
+        pass_row pool_lock_lying_mkdir_one_owner
+    else
+        fail_row pool_lock_lying_mkdir_one_owner "wins=$wins owner=$owner_pid a=$pid_a b=$pid_b"
+    fi
+}
+
 case_lock_stale_recovered() {
     local base dpid spid out
     base="$(new_pool_env)"
@@ -683,7 +716,7 @@ case_help_mentions_pool() {
 
 ALL_CASES="cold_postconditions cold_session_absent relink_trap css_fallback
 next_index_skips_collisions is_slot_rejects_nonslot lock_exclusive
-lock_stale_recovered ready_marker_head_bound refill_builds_ready_slot
+lock_stale_recovered pool_lock_lying_mkdir_one_owner ready_marker_head_bound refill_builds_ready_slot
 refill_reaps_half_built refill_full_and_busy refill_flag_rejected wt_pool_env
 claim_postconditions claim_css_rebuild_rule claim_bypass_no_side_effect
 claim_invalid_slot_falls_back kick_inline_refills kick_env_values

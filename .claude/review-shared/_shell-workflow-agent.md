@@ -1,6 +1,6 @@
 ---
 description: Shared shell / GitHub Actions / agent-prose reviewer (Agent E) used by /post-plan Phase 4B and /pr-review Step 3.
-last_verified: 2026-10-20
+last_verified: 2026-11-16
 ---
 
 # Agent E: Shell / Workflow / Agent-Prose Reviewer (Sonnet 5.5, `subagent_type: "sonnet-5-5"`, omit `model`)
@@ -31,6 +31,14 @@ One finding per issue, one line each:
 ```
 file:line — <what breaks> — <concrete failing input/state>
 ```
+
+Follow each finding line with one metadata line, the same fields agents A and B use in `_review-agents.md` § Per-finding fields:
+
+```
+severity: important|nit · pre-existing: yes|no · bug class: <kebab-case> · other instances: <path:line, path:line> | none
+```
+
+The field rules live in `_review-agents.md` § Per-finding fields. This file does not restate them.
 
 Findings are consumed unchanged by the Phase 4D scoring/filtering/posting pipeline. Therefore:
 

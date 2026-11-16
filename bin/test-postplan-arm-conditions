@@ -289,10 +289,26 @@ if [ -z "$B58F" ]; then
 fi
 
 # condition (11) label exception is documented in the shared predicate lib header
-if grep -qF 'Exception (2026-10)' "$REPO_ROOT/bin/lib/pr-armable.sh"; then
+if grep -qF 'Exception (2026-10): a thread whose FIRST comment begins with' "$REPO_ROOT/bin/lib/pr-armable.sh" \
+    && grep -qF 'author is trusted (a-jay85, a GitHub Bot, or a `[bot]` login) never holds.' "$REPO_ROOT/bin/lib/pr-armable.sh"; then
     echo "ok: c11_lib_header_exception"
 else
     echo "FAIL: c11_lib_header_exception — pr-armable.sh header lacks the label exception note"; FAILED=1
+fi
+
+# condition (11) label exception is documented in the shared posting procedure
+if grep -qF 'Threads whose first comment carries `<!-- label: nit -->` or `<!-- label: pre-existing -->` never hold condition (11) and are left open; do not resolve them to clear a hold, since there is none.' "$REPO_ROOT/.claude/review-shared/_posting-procedure.md"; then
+    echo "ok: c11_doc_label_exception"
+else
+    echo "FAIL: c11_doc_label_exception — _posting-procedure.md lacks the condition (11) label exception sentence"; FAILED=1
+fi
+
+# condition (2) holds on any label outside NON_HOLDING_LABELS: the armable.py comment states the rule
+if grep -qF 'Only labels.NON_HOLDING_LABELS (nit, pre-existing) clear. A missing, empty or unknown' "$REPO_ROOT/tools/postplan-harness/harness/armable.py" \
+    && grep -qF 'label such as "blocker" or "Nit" holds as Important (fail-closed), like prf_label.' "$REPO_ROOT/tools/postplan-harness/harness/armable.py"; then
+    echo "ok: c2_doc_important_only"
+else
+    echo "FAIL: c2_doc_important_only — armable.py lacks the condition (2) important-only comment"; FAILED=1
 fi
 
 # --- Critical Files parser: bin/lib/critical-files.sh vs planfile.py agreement ----

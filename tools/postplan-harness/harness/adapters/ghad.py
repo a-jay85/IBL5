@@ -23,7 +23,7 @@ import time
 from pathlib import Path
 
 from .. import followcap, netretry
-from ..labels import LABEL_IMPORTANT, marker, render_body, visible_right_lines
+from ..labels import LABEL_IMPORTANT, POSTED_BODY_LIMIT, marker, render_body, visible_right_lines
 from ..state import HarnessError
 
 # bin/lib/pr-sticky.sh in the harness's own checkout. Not under pr-ready/,
@@ -163,7 +163,8 @@ class RecordingGh:
 
     def post_review_findings(self, pr: int, head_sha: str, title: str, findings: list) -> None:
         self.record("pr_review_findings", pr=pr, head_sha=head_sha, title=title,
-                    findings=[{"path": f.path, "line": f.line, "body": render_body(f, 1000),
+                    findings=[{"path": f.path, "line": f.line,
+                               "body": render_body(f, POSTED_BODY_LIMIT),
                                "score": f.score, "label": f.label} for f in findings])
 
     def post_review_summary(self, pr: int, title: str, body: str) -> None:
@@ -656,7 +657,7 @@ class LiveGh(RecordingGh):
         if inline:
             payload = {"commit_id": head_sha, "event": "COMMENT", "body": title,
                        "comments": [{"path": f.path, "line": f.line, "side": "RIGHT",
-                                     "body": render_body(f, 1000)} for f in inline]}
+                                     "body": render_body(f, POSTED_BODY_LIMIT)} for f in inline]}
             try:
                 self._gh_landed(("api", f"repos/{self._repo()}/pulls/{pr}/reviews",
                                  "--method", "POST", "--input", "-"),
@@ -674,7 +675,8 @@ class LiveGh(RecordingGh):
                 pr, f"## {title}\n\nFound {len(summary)} issue(s) that could not be "
                     "anchored to a diff line:\n\n" + "\n".join(_summary_lines(summary)))
         self.record("pr_review_findings", pr=pr, head_sha=head_sha, title=title,
-                    findings=[{"path": f.path, "line": f.line, "body": render_body(f, 1000),
+                    findings=[{"path": f.path, "line": f.line,
+                               "body": render_body(f, POSTED_BODY_LIMIT),
                                "score": f.score, "label": f.label} for f in findings])
 
     def post_review_summary(self, pr: int, title: str, body: str) -> None:

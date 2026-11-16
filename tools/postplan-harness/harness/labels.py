@@ -132,7 +132,10 @@ def parse_label(body) -> Optional[str]:
     return m.group(1) if m else None
 
 
-def render_body(f, limit=1000) -> str:
+POSTED_BODY_LIMIT = 1000  # body cap for every posted finding; same_run_threads keys on it
+
+
+def render_body(f, limit=POSTED_BODY_LIMIT) -> str:
     """Marker + score + bold label header, then the body cut to fit `limit` in total."""
     header = (f"{marker(f.label or LABEL_IMPORTANT)}\n<!-- score: {f.score or 0} -->\n"
               f"{agent_marker(getattr(f, 'agent', None))}"

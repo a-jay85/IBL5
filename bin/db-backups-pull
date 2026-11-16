@@ -159,7 +159,7 @@ SSH_CMD="ssh"
 NOW="${DB_BACKUPS_PULL_NOW_EPOCH:-$(date +%s)}"
 
 send_dm() {
-  if printf '%s\n' "$1" | DM_CMD="$DISCORD_DM" dm_ping - --chunk; then
+  if printf '%s\n' "$1" | DM_CMD="$DISCORD_DM" dm_error - --chunk; then
     log "DM sent"
   else
     log "WARNING: DM send failed"

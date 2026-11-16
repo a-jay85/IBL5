@@ -179,7 +179,7 @@ _posted="$(cat "$SCRATCH/posted.md")"
 eq "only manual rows get a checkbox" "$(grep -c -- '^- \[ \] ' "$SCRATCH/posted.md" || true)" "2"
 want "auto:ci row says it runs automatically" "$_posted" 'runs automatically in CI: `check-301`'
 want "auto:mac row says it runs on the Mac" "$_posted" "runs automatically on the owner's Mac"
-want "auto:mac row names the #dev ping" "$_posted" "a failure pings in #dev"
+want "auto:mac row says failures are reported" "$_posted" "a failure is reported on Discord"
 
 # ---------------------------------------------------------------------------
 begin_case "auto-only"

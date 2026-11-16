@@ -81,7 +81,7 @@ LAUNCHCTL_CMD=${FAILDM_LAUNCHCTL:-${LAUNCHCTL_CMD:-launchctl}}
 LOG_DIR=${FAILDM_LOG_DIR:-$(dirname "$LOG")}
 
 send_dm() {
-    dm_ping "$1" --quiet --attempts 2 >/dev/null 2>&1 || true
+    dm_error "$1" --quiet --attempts 2 >/dev/null 2>&1 || true
 }
 
 # Prints 1 when a live session's repo is $ROOT, else nothing.

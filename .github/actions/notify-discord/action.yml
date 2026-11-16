@@ -1,18 +1,14 @@
 name: 'Notify Discord via channel webhook'
 description: >-
-  POST a pre-built message file to a Discord channel webhook (#dev, #merged or #reviews).
+  POST a pre-built message file to a Discord channel webhook (#errors, #dev, #merged or #reviews).
 inputs:
   message-file:
     description: 'Path to a file holding the already-built message body.'
     required: false
     default: '/tmp/discord-msg.txt'
   webhook-url:
-    description: 'The channel webhook URL. Pass secrets.DISCORD_DEV_WEBHOOK_URL (#dev), secrets.DISCORD_MERGED_WEBHOOK_URL (#merged, merge notices only) or secrets.DISCORD_REVIEWS_WEBHOOK_URL (#reviews, weekly review reports only).'
+    description: 'The channel webhook URL. Pass secrets.DISCORD_ERRORS_WEBHOOK_URL (#errors, failure notices), secrets.DISCORD_DEV_WEBHOOK_URL (#dev, routine notices), secrets.DISCORD_MERGED_WEBHOOK_URL (#merged, merge notices only) or secrets.DISCORD_REVIEWS_WEBHOOK_URL (#reviews, weekly review reports only). Messages never @mention anyone.'
     required: true
-  ping:
-    description: '"true" @mentions the owner on this message. Use it for failure notices, and on #merged only when merge-digest-notify.yml finds a post-merge step that needs the owner.'
-    required: false
-    default: 'false'
   fail-on-delivery:
     description: >-
       "true" (default): a message that cannot be delivered turns the job RED
@@ -27,6 +23,5 @@ runs:
       env:
         WEBHOOK_URL: ${{ inputs.webhook-url }}
         MSG_FILE: ${{ inputs.message-file }}
-        PING: ${{ inputs.ping }}
         FAIL_ON_DELIVERY: ${{ inputs.fail-on-delivery }}
       run: bash "$GITHUB_ACTION_PATH/send.sh"

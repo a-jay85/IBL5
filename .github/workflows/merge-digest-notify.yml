@@ -44,12 +44,11 @@ name: Merge digest notify
 #
 # One #merged message per merge. `notify-merge-digest` needs `after-merge-checklist`, runs
 # under `always()` (still behind the merged + same-repo guard), and sends even when the
-# checklist job failed. The owner is @mentioned only when the pipeline says a person is
-# needed: a manual After-merge row, a failed auto row, a non-numeric count, or a needed
-# job whose result is not `success`. The decision lives in bin/lib/post-merge-rows.sh
-# (pmr_ping_decision) and is computed by bin/digest-dm-build from job OUTPUTS, never from
-# PR text. The `ping:` input below compares against 'false', so an empty or garbled output
-# pings. Rationale: ADR-0198 and ADR-0208.
+# checklist job failed. The message never @mentions anyone. Its top block names what needs
+# a person: a manual After-merge row, a failed auto row, a non-numeric count, or a needed
+# job whose result is not `success`. bin/lib/post-merge-rows.sh (pmr_needs_you_reasons)
+# builds that list in bin/digest-dm-build from job OUTPUTS, never from PR text.
+# Rationale: ADR-0198, ADR-0208 and the errors-route ADR.
 
 on:
   pull_request:
@@ -69,7 +68,7 @@ jobs:
     # a fork's `pull_request` event gets no secrets, so `webhook-url` arrives empty and
     # `send.sh` exits 1 under `fail-on-delivery: 'true'`; the guard keeps every fork
     # merge from going red. `always()` lets the digest post when the checklist job failed
-    # or was cancelled, so that failure pings instead of silencing the merge notice.
+    # or was cancelled, so that failure is named instead of silencing the merge notice.
     needs: [after-merge-checklist]
     if: >-
       always() &&
@@ -137,7 +136,7 @@ jobs:
             --url "$PR_URL" \
             --branch "$PR_BRANCH" \
             --pr-body-file /tmp/pr-body.md \
-            --ping-out "$RUNNER_TEMP/ping" \
+            --after-merge \
             --manual-count "$AM_MANUAL" \
             --auto-ci-count "$AM_AUTO_CI" \
             --auto-mac-count "$AM_AUTO_MAC" \
@@ -148,8 +147,6 @@ jobs:
             < /tmp/verdict-body.md \
             > /tmp/discord-msg.txt
 
-          printf 'ping=%s\n' "$(cat "$RUNNER_TEMP/ping")" >> "$GITHUB_OUTPUT"
-
           # Visible in the run log, and a cheap tripwire if the 2000-char budget ever slips.
           printf 'message bytes: %s\n' "$(wc -c < /tmp/discord-msg.txt)"
 
@@ -159,9 +156,6 @@ jobs:
           # message-file defaults to /tmp/discord-msg.txt -- the path written above.
           # Merge notices go to #merged, not #dev (DISCORD_MERGED_WEBHOOK_URL).
           webhook-url: ${{ secrets.DISCORD_MERGED_WEBHOOK_URL }}
-          # Mention the owner only when a person is needed after the merge (see header).
-          # `!= 'false'` fails closed: an empty or garbled build output pings.
-          ping: ${{ steps.build.outputs.ping != 'false' }}
           # A silently-dropped merge notification is indistinguishable from "nothing merged",
           # which is the exact failure the ledger had. Fail the run instead.
           fail-on-delivery: 'true'
@@ -180,7 +174,7 @@ jobs:
       contents: read
       pull-requests: write   # gh pr comment; the ONLY write scope in this workflow
     # Structured result for the digest job. No Discord send here: the digest is the one
-    # #merged message, and it carries the ping and the directions link.
+    # #merged message, and it carries the action line and the directions link.
     outputs:
       status: ${{ steps.checklist.outputs.status }}
       manual_count: ${{ steps.checklist.outputs.manual_count }}

@@ -1,6 +1,6 @@
 ---
 description: Owner-bound notices post to a private #dev channel webhook, with an opt-in owner @mention for failures that need action.
-last_verified: 2026-10-20
+last_verified: 2026-11-15
 ---
 
 # ADR-0146: Route Owner-Bound Notices to a #dev Channel Webhook with an Opt-In Ping
@@ -59,6 +59,12 @@ The Decision above sends every action call site to `secrets.DISCORD_DEV_WEBHOOK_
 ## Addendum: weekly reviews move to #reviews (2026-10-20)
 
 `log-review.yml` and `flake-report.yml` now pass `secrets.DISCORD_REVIEWS_WEBHOOK_URL` and post to the #reviews channel. `bin/events-review` and `bin/automouse/comprehension-digest` send their review body through `bin/discord-dm` with `DISCORD_DM_WEBHOOK_FILE=~/.iblbot-reviews-webhook-url`; only the bare gh-failure line from `comprehension-digest` and the failure notices from `bin/events-review` keep the default #dev webhook. The call-site table in `bin/test-discord-dm` records these two sites as `webhook=reviews`.
+
+## Addendum: the owner ping is removed (2026-11-15)
+
+**Superseded by:** ADR-0254 (`0254-discord-errors-webhook.md`), for the opt-in owner ping only.
+
+Failure notices now post to a private #errors channel. Workflows pass `secrets.DISCORD_ERRORS_WEBHOOK_URL`, and host scripts pass `bin/discord-dm --error`. The `ping` action input, `--ping`, `dm_ping`, the owner ID in `send.sh` and `allowed_mentions.users` are gone. The #dev webhook route in this ADR still stands for routine and needs-you notices. The call-site table in `bin/test-discord-dm` no longer has a ping column.
 
 ## References
 

@@ -7,7 +7,7 @@
 # on master (the check is dormant there, but its logic must already be correct so it
 # is sound the moment the composites land). Also covers the mutation-pr.yml
 # invariants (M1-M4), the plan-checks.yml invariants (P1-P4), the P5 run: script lint and the all-checks-settled.yml invariants (A1-A7) against
-# mutated copies of the real workflows tree, the promote P9 branches filter, the P10 aggregate-ignore knobs, the
+# mutated copies of the real workflows tree, the promote P9 branches filter, the P10 aggregate-ignore knobs, the P11 trigger coverage, the
 # step-scoped DB env invariant (D1) with a throwaway setup-php-env composite,
 # with throwaway workflow + ADR fixtures, and the read-only --protection-readback
 # mode (R0-R4, default and --context=) with generated protection JSON fixtures.
@@ -103,7 +103,7 @@ put_nd() {
 
 # put_promote <dir> <variant>
 # Writes a minimal but structurally faithful promote-to-production.yml to <dir>.
-# The base ("good") satisfies all P1-P10 invariants; each variant mutates exactly
+# The base ("good") satisfies all P1-P11 invariants; each variant mutates exactly
 # one invariant so a failure names its own cause.
 # ${{ secrets.CI_PAT }} and "$SHA:..." are intentionally literal YAML, not expanded.
 put_promote() {
@@ -146,6 +146,9 @@ jobs:
       github.event.workflow_run.event == 'push' &&
       vars.AUTO_PROMOTE_PAUSED == '1'
 PPEOF
+  # P11: one push-to-master workflow whose name matches the stub's single listed
+  # name. Inline multi-branch form (engine.yml / tests.yml shape).
+  printf 'name: Tests and Analysis\non:\n  push:\n    branches: [ master, develop ]\n    paths:\n      - %s\n' "'**.php'" > "$1/p11-tests-stub.yml"
   case "${2:-good}" in
     good) ;;
     p1-force-flag-workflow)
@@ -199,6 +202,21 @@ PPEOF
       # Break the name in IGNORE_FAILED_CHECKS only; the pending knob stays intact.
       tmp="$(mktemp)"
       sed 's/^\( *IGNORE_FAILED_CHECKS: \).*$/\1Aggregate check statuz/' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    p11-unlisted)        # block branches list after paths (cache-dependencies.yml shape)
+      printf 'name: Doc Freshness Audit\non:\n  push:\n    paths: [%s]\n    branches:\n      - master\n' "'**.md'" > "$1/p11-docs-stub.yml" ;;
+    p11-dangling)        # listed name with no workflow (Auto-Rebase rename drift)
+      tmp="$(mktemp)"
+      awk '{ print } /^      - Tests and Analysis$/ { print "      - Auto-Rebase" }' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    p11-prod-only)       # main.yml shape: push to production only, must be excluded
+      printf 'name: Build and Deploy\non:\n  push:\n    branches:\n      - production\n' > "$1/p11-prod-stub.yml" ;;
+    p11-near-miss)       # branch name that only starts with master
+      printf 'name: Near Miss\non:\n  push:\n    branches: [master-backup]\n' > "$1/p11-near-stub.yml" ;;
+    p11-no-branches)     # push with paths only fires on every branch, so it counts
+      printf 'name: No Branch Filter\non:\n  push:\n    paths:\n      - %s\n' "'x/**'" > "$1/p11-nob-stub.yml" ;;
+    p11-branches-ignore) # unclassifiable form must fail loud
+      printf 'name: Ignore Filter\non:\n  push:\n    branches-ignore: [master]\n' > "$1/p11-ign-stub.yml" ;;
+    p11-empty-derived)   # no push workflow at all: the diff must fail
+      rm -f "$1/p11-tests-stub.yml" ;;
     *)
       echo "put_promote: unknown variant '${2:-}'" >&2; return 1 ;;
   esac
@@ -350,7 +368,7 @@ d="$(fresh_actions)"; put_nd "$d" false lead
 fi  # unfiltered
 
 # ---------------------------------------------------------------------------
-# promote-to-production invariants (P1-P8) — 18 cases
+# promote-to-production invariants (P1-P11) — 36 cases
 # ---------------------------------------------------------------------------
 
 # Permanent fixtures reused across promote-to-production cases
@@ -469,6 +487,37 @@ if grep -qF '(P10) —' <<< "$out"; then
   h_pass "P10 rejects a promote caller that does not ignore the aggregate check names P10"
 else
   h_fail "P10 rejects a promote caller that does not ignore the aggregate check names P10" "output: $out"
+fi
+
+# P11: an unlisted push-to-master workflow, a listed name with no workflow, an
+# unfiltered push and an empty derived set all exit 1 and name P11.
+for p11_variant in p11-unlisted p11-dangling p11-no-branches p11-empty-derived; do
+  d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" "$p11_variant"
+  out="$("$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" 2>&1)"; rc=$?
+  expect "$p11_variant" 1 "$rc"
+  if grep -qF '(P11) —' <<< "$out"; then
+    h_pass "$p11_variant names P11"
+  else
+    h_fail "$p11_variant names P11" "output: $out"
+  fi
+done
+
+# P11: a push-to-production-only workflow and a master-prefixed branch are not
+# push-to-master workflows, so the gate exits 0.
+for p11_variant in p11-prod-only p11-near-miss; do
+  d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" "$p11_variant"
+  "$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" >/dev/null 2>&1
+  expect "$p11_variant" 0 $?
+done
+
+# P11: a branches-ignore push filter cannot be classified and fails loud.
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" p11-branches-ignore
+out="$("$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" 2>&1)"; rc=$?
+expect "p11-branches-ignore" 1 "$rc"
+if grep -qF 'cannot tell whether it fires on master' <<< "$out"; then
+  h_pass "p11-branches-ignore names the unclassifiable filter"
+else
+  h_fail "p11-branches-ignore names the unclassifiable filter" "output: $out"
 fi
 
 # pp-absent-skips: no promote-to-production workflow → exit 0 with skip line

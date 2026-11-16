@@ -121,6 +121,7 @@ COMPLETED=()
 SKIPPED_PLANS=()
 FAILED=()
 PARKED=()
+RUNNING=()
 
 # Find completed plans
 if [ -d "$DONE_DIR" ]; then
@@ -166,8 +167,13 @@ if [ -d "$QUEUE_DIR" ]; then
     case "$COMPLETED_SET" in *":$(normalize_plan_name "$plan_file"):"*) continue ;; esac
     failure_file="$QUEUE_DIR/${plan_file}.failure"
     attempt_count="$(cat "$attempts_file" 2>/dev/null || echo 0)"
+    # A runner holds queue/<plan>.lock/pid while it works the plan. A live pid means the
+    # plan is mid-run (impl or post-plan) when the digest fires, so it is not parked.
+    lock_pid="$(cat "$QUEUE_DIR/${plan_file}.lock/pid" 2>/dev/null || true)"
     if [ -f "$failure_file" ]; then
       FAILED+=("${plan_file}|${attempt_count}")
+    elif [ -n "$lock_pid" ] && kill -0 "$lock_pid" 2>/dev/null; then
+      RUNNING+=("${plan_file}|${attempt_count}")
     else
       PARKED+=("${plan_file}|${attempt_count}")
     fi
@@ -191,7 +197,7 @@ for p in "${COMPLETED[@]:-}" "${SKIPPED_PLANS[@]:-}"; do
   [ -z "$p" ] && continue
   NIGHT_PLANS="${NIGHT_PLANS}:${p}:"
 done
-for entry in "${FAILED[@]:-}" "${PARKED[@]:-}"; do
+for entry in "${FAILED[@]:-}" "${PARKED[@]:-}" "${RUNNING[@]:-}"; do
   [ -z "$entry" ] && continue
   plan_file="${entry%|*}"
   NIGHT_PLANS="${NIGHT_PLANS}:$(normalize_plan_name "$plan_file"):"
@@ -267,7 +273,8 @@ n_completed=${#COMPLETED[@]}
 n_skipped=${#SKIPPED_PLANS[@]}
 n_failed=${#FAILED[@]}
 n_parked=${#PARKED[@]}
-total=$(( n_completed + n_skipped + n_failed + n_parked ))
+n_running=${#RUNNING[@]}
+total=$(( n_completed + n_skipped + n_failed + n_parked + n_running ))
 
 if [ $total -eq 0 ]; then
   BODY="🌙 Automouse — no plans ran last night (${D})."
@@ -287,6 +294,10 @@ else
     [ -n "$counts_line" ] && counts_line+=" · "
     counts_line+="🅿️ Parked ${n_parked}"
   fi
+  if [ $n_running -gt 0 ]; then
+    [ -n "$counts_line" ] && counts_line+=" · "
+    counts_line+="🔄 Running ${n_running}"
+  fi
 
   # Sort plans alphabetically within each bucket
   # completed
@@ -305,6 +316,10 @@ else
   sorted_parked=()
   if [ $n_parked -gt 0 ]; then
     while IFS= read -r line; do sorted_parked+=("$line"); done < <(printf '%s\n' "${PARKED[@]}" | sort)
+  fi
+  sorted_running=()
+  if [ $n_running -gt 0 ]; then
+    while IFS= read -r line; do sorted_running+=("$line"); done < <(printf '%s\n' "${RUNNING[@]}" | sort)
   fi
 
   # Link each slug to its PR. One `gh pr list` for the whole digest, matched on the
@@ -343,6 +358,12 @@ else
     plan_file="${entry%|*}"
     attempts="${entry#*|}"
     plan_lines+=$'\n'"🅿️ $(plan_link "${plan_file%.md}") (${attempts} attempt$([ "$attempts" -eq 1 ] || echo 's'))"
+  done
+  for entry in "${sorted_running[@]:-}"; do
+    [ -z "$entry" ] && continue
+    plan_file="${entry%|*}"
+    attempts="${entry#*|}"
+    plan_lines+=$'\n'"🔄 $(plan_link "${plan_file%.md}") (attempt ${attempts}, still running)"
   done
 
   BODY="🌙 Automouse digest — ${D}${counts_line:+
@@ -480,7 +501,4 @@ if [ $DRY_RUN -eq 1 ]; then
   exit 0
 fi
 
-# A skipped plan needs the owner to act, so @mention them; a quiet digest stays silent.
-PING_ARGS=()
-if [ "$n_skipped" -gt 0 ]; then PING_ARGS=(--ping); fi
-printf '%s\n' "$BODY" | "${DISCORD_DM_BIN:-$REPO_ROOT/bin/discord-dm}" --chunk ${PING_ARGS[@]+"${PING_ARGS[@]}"} -
+printf '%s\n' "$BODY" | "${DISCORD_DM_BIN:-$REPO_ROOT/bin/discord-dm}" --chunk -

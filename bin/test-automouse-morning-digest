@@ -190,6 +190,21 @@ assert_contains     "row9: beta failed"               "❌ beta"     "$body"
 assert_contains     "row9: gamma lonely-failure"      "❌ gamma"    "$body"
 assert_not_contains "row9: no sidecar filenames"      ".attempts"  "$body"
 h_pass "row9 — parked and failed"
+# --- row9b: a plan with a live claim lock shows as running, a dead lock stays parked ---
+setup
+printf '1' > "$NDIR/queue/live.md.attempts"
+printf '1' > "$NDIR/queue/dead.md.attempts"
+pin "$NDIR/queue/live.md.attempts" "$NDIR/queue/dead.md.attempts"
+mkdir -p "$NDIR/queue/live.md.lock" "$NDIR/queue/dead.md.lock"
+printf '%s\n' "$$" > "$NDIR/queue/live.md.lock/pid"
+sleep 0 & dead_pid=$!; wait "$dead_pid"
+printf '%s\n' "$dead_pid" > "$NDIR/queue/dead.md.lock/pid"
+body=$(run_digest --dry-run)
+assert_contains     "row9b: live lock shows running"   "🔄 live"      "$body"
+assert_contains     "row9b: running count"             "🔄 Running 1" "$body"
+assert_not_contains "row9b: live lock not parked"      "🅿️ live"      "$body"
+assert_contains     "row9b: dead lock stays parked"    "🅿️ dead"      "$body"
+h_pass "row9b — running vs parked"
 # --- row10: dedup done-queue ---
 setup
 pin "$NDIR/done/dedup.md"
@@ -567,13 +582,15 @@ shown=$(printf '%s\n' "$body" | grep -c '^• n' || true)
 assert_contains "row36: header counts every row" "Stale worktrees (80, as of 2026-10-22 08:26)" "$body"
 assert_contains "row36: hidden count"            "…and $((80 - shown)) more" "$body"
 h_pass "row36 — byte budget and hidden count"
-# --- row37: a skipped plan @mentions the owner; a night with none stays quiet ---
+# --- row37: the digest posts plain to #dev, skipped plan or not ---
 setup
 pin "$NDIR/skipped/plan-s.md"
 rm -f "$TMP/dm-calls.log"
 run_digest >/dev/null 2>&1
 calls=$(cat "$TMP/dm-calls.log" 2>/dev/null || true)
-assert_contains "row37: skip pings" "--ping" "$calls"
+assert_contains "row37: skip still sends" "CALLED" "$calls"
+assert_not_contains "row37: skip carries no --ping" "--ping" "$calls"
+assert_not_contains "row37: skip carries no --error" "--error" "$calls"
 setup
 pin "$NDIR/done/plan-a.md"
 rm -f "$TMP/dm-calls.log"
@@ -581,7 +598,8 @@ run_digest >/dev/null 2>&1
 calls=$(cat "$TMP/dm-calls.log" 2>/dev/null || true)
 assert_contains     "row37: quiet night still sends" "CALLED" "$calls"
 assert_not_contains "row37: quiet night no ping"     "--ping" "$calls"
-h_pass "row37 — ping only when a plan was skipped"
+assert_not_contains "row37: quiet night no error"    "--error" "$calls"
+h_pass "row37 — digest posts plain, with or without a skipped plan"
 # --- row38: Finder's .DS_Store in skipped/ or done/ is not a plan ---
 setup
 pin "$NDIR/skipped/.DS_Store" "$NDIR/done/.DS_Store" "$NDIR/done/plan-a.md"
@@ -593,5 +611,6 @@ assert_contains     "row38: real plan counted" "plan-a"     "$body"
 run_digest >/dev/null 2>&1
 calls=$(cat "$TMP/dm-calls.log" 2>/dev/null || true)
 assert_not_contains "row38: dotfile does not ping" "--ping" "$calls"
+assert_not_contains "row38: dotfile does not error" "--error" "$calls"
 h_pass "row38 — dotfiles in skipped/ and done/ are ignored"
 h_done

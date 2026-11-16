@@ -92,7 +92,7 @@ done
 |-------|---------|
 | Worktrees | `wt-new`, `wt-up`, `wt-down`, `wt-list`, `wt-rebase`, `wt-remove`, `wt-db-test`, `e2e-wt` (wt-new keeps one warm _pool-N spare via `bin/lib/wt-pool.sh`) |
 | Automouse automation | `automouse/run`, `automouse/queue`, `automouse/queue-reorder-ui`, `automouse/self-heal`, `automouse/prompt-impl`, `automouse/prompt-postplan`, `watch-automouse-plan` (wait for a queued plan's phase to finish, then DM) |
-| Notifications | `discord-dm` (owner notices post to the #dev webhook (opt-in `--ping` for failures); other recipients and `--raw --route` stay on the IBLbot DM; retries + spool; the sibling of `.github/actions/notify-discord`) |
+| Notifications | `discord-dm` (owner notices post to the #dev webhook; `--error` sends a failure notice to #errors, falling back to #dev, then the DM; other recipients and `--raw --route` stay on the IBLbot DM; retries + spool; the sibling of `.github/actions/notify-discord`) |
 | Quality gates (sample; see Who runs a script for what CI calls) | `adr-check`, `check-docs`, `check-prose`, `check-hot-files`, `check-master-ci-green`, `check-plan`, `check-plan-staleness`, `check-e2e-hygiene`, `check-e2e-fa-offers-owner`, `check-e2e-mutator-isolation`, `check-e2e-fixture-drift`, `check-destructive-migrations`, `check-old-code-compat`, `refactor-flag` |
 | Prod ops | `db-sync-prod`, `log-fetch-prod`, `promote-master-to-production` (the promotion primitive CI runs; `--dry-run` to rehearse), `merge-master-to-prod` (manual/emergency promotion), `smoke-prod` (SSH from host); `iblbot-healthcheck` (pm2 cron watchdog, runs on the prod box) |
 | Dev / Docker env | `dev-up`, `db-test-up`, `db-migrate` |

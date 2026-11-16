@@ -235,8 +235,7 @@ jobs:
       - name: Send Discord DM
         uses: ./.github/actions/notify-discord
         with:
-          webhook-url: ${{ secrets.DISCORD_DEV_WEBHOOK_URL }}
-          ping: 'true'
+          webhook-url: ${{ secrets.DISCORD_ERRORS_WEBHOOK_URL || secrets.DISCORD_DEV_WEBHOOK_URL }}
 
   notify:
     name: Notify Smoke Outcome
@@ -284,5 +283,4 @@ jobs:
       - name: Send Discord DM
         uses: ./.github/actions/notify-discord
         with:
-          webhook-url: ${{ secrets.DISCORD_DEV_WEBHOOK_URL }}
-          ping: 'true'
+          webhook-url: ${{ secrets.DISCORD_ERRORS_WEBHOOK_URL || secrets.DISCORD_DEV_WEBHOOK_URL }}

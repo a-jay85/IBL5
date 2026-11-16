@@ -31,9 +31,9 @@
 #                      verbatim, with no {content:{...}} envelope, no recipient
 #                      and no chunking/truncation. Implies a caller that knows
 #                      the route's schema. Requires --route.
-#   --ping             owner webhook only: @mention the owner on the first chunk.
-#                      No effect on the DM fallback (a DM already notifies);
-#                      a usage error with --raw.
+#   --error            owner webhook only: post to the #errors channel webhook
+#                      (~/.iblbot-errors-webhook-url). Falls back to the #dev
+#                      webhook, then the DM. A usage error with --raw.
 #   --chunk            split an over-cap message into ordered messages instead of
 #                      truncating it. Opt-in: the short verdict pings sent by
 #                      bin/plan-now and bin/watch-automouse-plan want truncation,
@@ -41,9 +41,10 @@
 #                      With --chunk, exit 0 means EVERY chunk was delivered.
 #
 # Routing: owner recipient + no --raw + readable webhook file → the #dev channel
-# webhook; anything else → the IBLbot DM path. Test seams: DISCORD_DM_SSH_BIN,
-# DISCORD_DM_OSASCRIPT_BIN,
-# DISCORD_DM_CURL_BIN, DISCORD_DM_WEBHOOK_FILE (default ~/.iblbot-dev-webhook-url).
+# webhook (#errors with --error); anything else → the IBLbot DM path. Test seams:
+# DISCORD_DM_SSH_BIN, DISCORD_DM_OSASCRIPT_BIN, DISCORD_DM_CURL_BIN,
+# DISCORD_DM_WEBHOOK_FILE (default ~/.iblbot-dev-webhook-url),
+# DISCORD_DM_ERRORS_WEBHOOK_FILE (default ~/.iblbot-errors-webhook-url).
 #
 # Exit: 0 delivered · 1 undeliverable (spooled) · 2 usage/config error.
 
@@ -67,8 +68,9 @@ OSASCRIPT_BIN="${DISCORD_DM_OSASCRIPT_BIN:-osascript}"
 # host file, never an env var: launchd jobs do not inherit the shell environment.
 CURL_BIN="${DISCORD_DM_CURL_BIN:-curl}"
 WEBHOOK_FILE="${DISCORD_DM_WEBHOOK_FILE:-$HOME/.iblbot-dev-webhook-url}"
+ERRORS_WEBHOOK_FILE="${DISCORD_DM_ERRORS_WEBHOOK_FILE:-$HOME/.iblbot-errors-webhook-url}"
 OWNER_ID="283183467804491776"
-PING=0
+ERROR=0
 SPOOL="${DISCORD_DM_SPOOL:-$HOME/.claude/discord-dm-spool.log}"
 ID_FILE="$HOME/.iblbot-dm-id"
 
@@ -88,8 +90,8 @@ while [ $# -gt 0 ]; do
         --chunk)       CHUNK=1; shift ;;
         --route)       ROUTE="${2:-}"; shift 2 ;;
         --raw)         RAW=1; shift ;;
-        --ping)        PING=1; shift ;;
-        -h|--help)     sed -n '2,47p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        --error)       ERROR=1; shift ;;
+        -h|--help)     sed -n '2,48p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         -)             MSG=$(cat); shift ;;
         --)            shift; MSG="$*"; break ;;
         -*)            echo "discord-dm: unknown option $1" >&2; exit 2 ;;
@@ -118,7 +120,7 @@ if [ "$RAW" = 1 ]; then
     # a raw body from being POSTed at /discordDM, which would 400 confusingly.
     [ "$ROUTE" != "/discordDM" ] || { echo "discord-dm: --raw requires --route" >&2; exit 2; }
     [ "$CHUNK" = 0 ] || { echo "discord-dm: --raw and --chunk are mutually exclusive" >&2; exit 2; }
-    [ "$PING" = 0 ] || { echo "discord-dm: --raw and --ping are mutually exclusive" >&2; exit 2; }
+    [ "$ERROR" = 0 ] || { echo "discord-dm: --raw and --error are mutually exclusive" >&2; exit 2; }
     jq -e . >/dev/null 2>&1 <<< "$MSG" || { echo "discord-dm: --raw payload is not valid JSON" >&2; exit 2; }
 fi
 
@@ -135,18 +137,33 @@ EOF
     exit 2
 fi
 
-# Route decision. The owner's own notices go to the #dev channel webhook; every
-# other recipient and every --raw body (plan-review buttons need the bot) stays on
-# the IBLbot DM path. A missing or malformed webhook file falls back to the DM.
-USE_WEBHOOK=0; WEBHOOK_URL=""
-if [ "$RAW" = 0 ] && [ "$TO" = "$OWNER_ID" ] && [ -s "$WEBHOOK_FILE" ]; then
-    WEBHOOK_URL=$(tr -d '[:space:]' < "$WEBHOOK_FILE")
-    case "$WEBHOOK_URL" in
-        https://*) case "$WEBHOOK_URL" in *[!A-Za-z0-9:/._-]*) WEBHOOK_URL="" ;; esac ;;
-        *) WEBHOOK_URL="" ;;
+# Route decision. The owner's own notices go to a channel webhook: --error picks
+# the #errors webhook, everything else the #dev webhook. Every other recipient and
+# every --raw body (plan-review buttons need the bot) stays on the IBLbot DM path.
+# A missing or malformed errors file falls back to #dev; a missing or malformed
+# #dev file falls back to the DM.
+
+# webhook_url_from <file>: print the file's URL when it passes the shape check, else nothing.
+webhook_url_from() {
+    local u
+    u=$(tr -d '[:space:]' < "$1")
+    case "$u" in
+        https://*) case "$u" in *[!A-Za-z0-9:/._-]*) return 0 ;; esac ;;
+        *) return 0 ;;
     esac
-    if [ -n "$WEBHOOK_URL" ]; then USE_WEBHOOK=1
-    else echo "discord-dm: webhook file malformed; using the DM path" >&2; fi
+    printf '%s' "$u"
+}
+USE_WEBHOOK=0; WEBHOOK_URL=""
+if [ "$RAW" = 0 ] && [ "$TO" = "$OWNER_ID" ]; then
+    if [ "$ERROR" = 1 ] && [ -s "$ERRORS_WEBHOOK_FILE" ]; then
+        WEBHOOK_URL=$(webhook_url_from "$ERRORS_WEBHOOK_FILE")
+        [ -n "$WEBHOOK_URL" ] || echo "discord-dm: errors webhook file malformed; using the #dev webhook" >&2
+    fi
+    if [ -z "$WEBHOOK_URL" ] && [ -s "$WEBHOOK_FILE" ]; then
+        WEBHOOK_URL=$(webhook_url_from "$WEBHOOK_FILE")
+        [ -n "$WEBHOOK_URL" ] || echo "discord-dm: webhook file malformed; using the DM path" >&2
+    fi
+    [ -z "$WEBHOOK_URL" ] || USE_WEBHOOK=1
 fi
 
 say() { [ "$QUIET" = 1 ] || printf 'discord-dm: %s\n' "$1" >&2; }
@@ -257,19 +274,14 @@ send_one() { # message
 WH_PAYLOAD=""
 trap 'rm -f "$WH_PAYLOAD"' EXIT
 
-# Deliver ONE message to the #dev webhook. Same contract as send_one (0 = delivered,
+# Deliver ONE message to the owner webhook (#errors or #dev). Same contract as send_one (0 = delivered,
 # 1 = not; `http` and LAST_ATTEMPTS stay global for the spool line). Differences:
 # any 2xx is success (a bare webhook POST answers 204), and 429 retries after the
 # server's retry_after instead of being treated as a permanent 4xx.
-send_webhook_one() { # message chunk-index
-    local msg="$1" idx="$2" content am out curl_rc n=1 ra
-    if [ "$PING" = 1 ] && [ "$idx" = 1 ]; then
-        content="<@$OWNER_ID> $msg"
-        am=$(jq -nc --arg id "$OWNER_ID" '{users: [$id]}')
-    else
-        content="$msg"
-        am='{"parse":[]}'
-    fi
+send_webhook_one() { # message
+    local msg="$1" content am out curl_rc n=1 ra
+    content="$msg"
+    am='{"parse":[]}'
     [ -n "$WH_PAYLOAD" ] || WH_PAYLOAD=$(mktemp "${TMPDIR:-/tmp}/discord-dm-wh.XXXXXX")
     jq -n --arg c "$content" --argjson am "$am" \
         '{content: $c, flags: 4, allowed_mentions: $am}' > "$WH_PAYLOAD" || exit 2
@@ -323,7 +335,7 @@ DELIVERED=1
 IDX=0
 for chunk in "${CHUNKS[@]}"; do
     IDX=$(( IDX + 1 ))
-    if [ "$USE_WEBHOOK" = 1 ]; then send_webhook_one "$chunk" "$IDX"; else send_one "$chunk"; fi
+    if [ "$USE_WEBHOOK" = 1 ]; then send_webhook_one "$chunk"; else send_one "$chunk"; fi
     rc=$?
     if [ "$rc" != 0 ]; then
         DELIVERED=0

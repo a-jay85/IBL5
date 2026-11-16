@@ -13,6 +13,7 @@
 #      bin/test-check-plan matrix-split  (only the gate XM block, whose verdicts need matrix_split)
 #      bin/test-check-plan gateSD  (only the gate [SD] block, for plan mutation checks)
 #      bin/test-check-plan gateQ  (only the gate [Q] seed-state block, for plan mutation checks)
+#      bin/test-check-plan gateCR  (only the gate [CR] bare-marker block, for plan mutation checks)
 #
 # shellcheck disable=SC2016  # backtick spans in the single-quoted plan fixtures
 # shellcheck disable=SC2034  # FAILED is read by h_done in bin/lib/harness.sh
@@ -30,6 +31,7 @@ trap 'rm -f "$TMP"/*.md 2>/dev/null; rmdir "$TMP" 2>/dev/null; h_cleanup' EXIT
 # Case filter: empty runs every case; `gate13` skips the cases outside gate 13;
 # `matrix-split` skips the cases outside gate XM; `gateSD` runs only the gate
 # [SD] cases and exits; `gateQ` runs only the gate [Q] seed-state cases and exits;
+# `gateCR` runs only the gate [CR] bare-marker cases and exits;
 # `gateVsyntax` runs only the gate [V] parse-arm and bin/fixtures cases and exits.
 TCP_ONLY="${1:-}"
 h_shard_init "${CHECK_PLAN_SHARD:-}"
@@ -170,6 +172,64 @@ CF_MATRIX='
 |---|---|---|---|---|
 | 1 | thing works | E2E | post-impl | `tests/X.spec.ts` |
 '
+
+# ---------------------------------------------------------------------------
+# Gate [CR]: a ## Critical Files annotation that LEADS with a bare exempt word
+# outside parentheses (a-jay85/IBL5-backlog#1830). Placed ahead of the gate13
+# guard so `bin/test-check-plan gateCR` runs these cases alone. Case 1 copies
+# the PR 3866 shape (`path`: reference.).
+# ---------------------------------------------------------------------------
+if [ -z "$TCP_ONLY" ] || [ "$TCP_ONLY" = gateCR ]; then
+assert_viol "gate-CR-issue-shape-reference-fires" 1 "[CR]" "$FM$CF_MATRIX"'
+## Critical Files
+- `bin/check-plan`: reference.
+'
+assert_viol "gate-CR-capitalized-read-only-reference-fires" 1 "[CR]" "$FM$CF_MATRIX"'
+## Critical Files
+- `bin/check-plan` — Read-only reference; consumed as-is
+'
+assert_viol "gate-CR-conditional-lead-fires" 1 "[CR]" "$FM$CF_MATRIX"'
+## Critical Files
+- `bin/check-plan` — conditional: only if the header block moves
+'
+assert_viol "gate-CR-no-edit-lead-fires" 1 "[CR]" "$FM$CF_MATRIX"'
+## Critical Files
+- `bin/check-plan` — no-edit; read for gate order
+'
+assert_viol "gate-CR-paren-reference-clean" 0 "[CR]" "$FM$CF_MATRIX"'
+## Critical Files
+- `bin/check-plan` (reference) — read for gate order
+'
+assert_viol "gate-CR-paren-exempt-lead-clean" 0 "[CR]" "$FM$CF_MATRIX"'
+## Critical Files
+- `bin/check-plan` — reference; read for gate order (read-only)
+'
+assert_viol "gate-CR-prose-unchanged-clean" 0 "[CR]" "$FM$CF_MATRIX"'
+## Critical Files
+- `bin/check-plan` — consumed unchanged; confirm the gate order
+'
+assert_viol "gate-CR-near-miss-referenced-clean" 0 "[CR]" "$FM$CF_MATRIX"'
+## Critical Files
+- `bin/check-plan` — referenced by gate [F]; reference implementation for the loop
+'
+assert_viol "gate-CR-fenced-example-clean" 0 "[CR]" "$FM$CF_MATRIX"'
+## Critical Files
+- `bin/check-plan` (reference)
+
+```text
+- `bin/test-check-plan` — reference: example only
+```
+'
+assert_msg "gate-CR-message-names-fix" 1 'Wrap the word in parentheses' '' "$FM$CF_MATRIX"'
+## Critical Files
+- `bin/check-plan`: reference.
+'
+assert_msg "gate-CR-message-names-path" 1 '[CR] ## Critical Files entry `bin/check-plan` leads' '' "$FM$CF_MATRIX"'
+## Critical Files
+- `bin/check-plan`: reference.
+'
+fi
+[ "$TCP_ONLY" != gateCR ] || h_done
 
 # ---------------------------------------------------------------------------
 # Gate [SD]: undeclared security deferral. Placed ahead of the gate13 guard so

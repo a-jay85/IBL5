@@ -18,15 +18,20 @@
 #   - its own segment redirects descriptor 0 (< file, 0<, <<<, <<, < <(...), <&N);
 #   - it follows a pipe (`x | ssh h` reads the pipe, not the loop);
 #   - it is a form that cannot read stdin: ssh -n, mysql -e, bash -n, an assignment
-#     eval, docker exec without -i;
+#     eval, docker with no exec/run plus -i/-it/-ti/--interactive in its segment;
 #   - its line ends with `# loop-stdin-ok: <reason>` (the reason must be non-empty).
 #
 # Scope: loops fed on descriptor 0 (`done <`, `done <<<`, `done < <(...)`, or a pipe
 # into `while`), within one file. An unfed `while read` reads the script's own stdin
 # and is not flagged. Readers reached through a function call are not traced, and a
-# command substitution inside double quotes is not scanned. A reader behind a wrapper
-# other than sudo/time/exec/command/nohup (for example `timeout 5 bash x`) is missed.
-# A backgrounded command is flagged: only an explicit </dev/null is certain.
+# command substitution inside double quotes is not scanned, though its quotes are
+# tracked so the scanner stays in sync after it. The options of sudo/env/time/exec/
+# command/nohup are skipped to reach the wrapped command; a reader behind any other
+# wrapper (for example `timeout 5 bash x`) is missed. A backgrounded command is
+# flagged: only an explicit </dev/null is certain.
+#
+# docker is checked over its whole segment, so an -i that belongs to the inner command
+# (`docker exec c grep -i x`) is a false positive; add </dev/null or the marker.
 #
 # A group that opens mid-line and closes with `) </dev/null` on a later line is a false
 # positive; the hit is loud and the marker silences it.
@@ -41,6 +46,7 @@
 # Exit codes: 0 = clean, 1 = violation found, 2 = usage error.
 #
 # gate-backtest-argv:
+# gate-backtest-reads: bin/* .github/workflows/*.yml
 
 set -euo pipefail
 
@@ -108,21 +114,43 @@ function word_at(s, p,    rest) {
 
 # mask_line: same-length copy of s where everything inside quotes is x. Quote state qs
 # carries across physical lines: "" none, "s" single, "d" double, "a" dollar-single.
+# A $( inside double quotes opens a nested level (nest > 0) where quotes start afresh;
+# its text stays masked, but its quotes are tracked so a " inside '...' in it cannot
+# flip the outer state. npar[nest] counts open parens; the matching ) returns to "d".
 function mask_line(s,    n, i, out, rest, c, j, prev) {
-    if (qs == "" && s !~ /["'#\\`]/) return s
+    if (qs == "" && nest == 0 && s !~ /["'#\\`]/) return s
     n = length(s); out = ""; i = 1
     while (i <= n) {
         rest = substr(s, i)
         if (qs == "s") {
             j = index(rest, sq)
             if (j == 0) { out = out xs(n - i + 1); i = n + 1 }
-            else { out = out xs(j - 1) sq; i += j; qs = "" }
+            else { out = out xs(j - 1) (nest > 0 ? "x" : sq); i += j; qs = "" }
         } else if (qs == "a" || qs == "d") {
             if (!match(rest, qs == "a" ? RE_A : RE_D)) { out = out xs(n - i + 1); i = n + 1; continue }
             out = out xs(RSTART - 1); i += RSTART - 1
             c = substr(s, i, 1)
             if (c == "\\") { out = out (i == n ? "x" : "xx"); i += 2 }
-            else { out = out c; i++; qs = "" }
+            else if (c == "$") {
+                if (qs == "d" && substr(s, i + 1, 1) == "(") { nest++; npar[nest] = 0; qs = ""; out = out "xx"; i += 2 }
+                else { out = out "x"; i++ }
+            }
+            else { out = out (nest > 0 ? "x" : c); i++; qs = "" }
+        } else if (nest > 0) {
+            if (!match(rest, /["'\\$()]/)) { out = out xs(n - i + 1); i = n + 1; continue }
+            out = out xs(RSTART - 1); i += RSTART - 1
+            c = substr(s, i, 1)
+            if (c == "\\") { out = out (i == n ? "x" : "xx"); i += 2 }
+            else if (c == sq) { qs = "s"; out = out "x"; i++ }
+            else if (c == "\"") { qs = "d"; out = out "x"; i++ }
+            else if (c == "$") {
+                if (substr(s, i + 1, 1) == sq) { qs = "a"; out = out "xx"; i += 2 }
+                else if (substr(s, i + 1, 1) == "(") { npar[nest]++; out = out "xx"; i += 2 }
+                else { out = out "x"; i++ }
+            }
+            else if (c == "(") { npar[nest]++; out = out "x"; i++ }
+            else if (npar[nest] > 0) { npar[nest]--; out = out "x"; i++ }
+            else { nest--; qs = "d"; out = out "x"; i++ }
         } else {
             if (!match(rest, /["'#\\$]/)) { out = out rest; i = n + 1; continue }
             out = out substr(rest, 1, RSTART - 1); i += RSTART - 1
@@ -203,8 +231,9 @@ function split_segments(m, r,    n, i, c, nx, pv, start, sep, nsep, adv) {
 }
 
 # cmd_word: the command word of the segment from offset p, after keywords, assignments
-# and env. Sets cw_end to the offset just past that word.
-function cmd_word(s, p,    w, bn) {
+# and wrappers (sudo env time exec command nohup) with their options. WRAP[w] lists the
+# wrapper's options that take a separate value. Sets cw_end to the offset just past that word.
+function cmd_word(s, p,    w, bn, o) {
     for (;;) {
         p = skip_ws(s, p)
         w = word_at(s, p)
@@ -212,7 +241,20 @@ function cmd_word(s, p,    w, bn) {
         if (w in KW) { p += length(w); continue }
         if (w ~ /^[A-Za-z_][A-Za-z0-9_]*=/) { p += length(w); continue }
         if (w ~ /^[A-Za-z0-9_*.|-]+\)$/) { p += length(w); continue }   # case pattern: a) cmd ;;
-        if (w == "env") { p += 3; continue }
+        if (w in WRAP) {
+            p += length(w)
+            for (;;) {
+                p = skip_ws(s, p)
+                o = word_at(s, p)
+                if (o !~ /^-/) break
+                p += length(o)
+                if (o == "--") break
+                # command -v/-V only looks a name up; it runs nothing.
+                if (w == "command" && o ~ /^-[A-Za-z]*[vV]/) { cw_end = p; return "command" }
+                if (index(WRAP[w], " " o " ") > 0) { p = skip_ws(s, p); p += length(word_at(s, p)) }
+            }
+            continue
+        }
         bn = w; sub(/^.*\//, "", bn)
         cw_end = p + length(w)
         return bn
@@ -237,7 +279,7 @@ function lead_seg(rr, argflags,    n, t, i, out) {
 
 # reader_is_safe: 1 when this use of a reader cannot read stdin.
 function reader_is_safe(word, seg, rr,    d) {
-    if (word == "ssh") seg = lead_seg(rr, " -p -i -o -l -F -J -L -R -D -b -c -E -e -m -O -Q -S -W -w -B -I ")
+    if (word == "ssh") seg = lead_seg(rr, " -p -i -o -l -F -J -L -R -D -b -c -E -e -m -O -P -Q -S -W -w -B -I ")
     if (word == "bash" || word == "sh" || word == "zsh") seg = lead_seg(rr, " -o -O ")
     if (word == "ssh") return (seg ~ /[[:space:]]-[A-Za-z]*n[A-Za-z]*([[:space:]]|$)/)
     if (word == "mysql" || word == "mariadb") return (seg ~ /[[:space:]](-e|--execute)([[:space:]=]|$)/)
@@ -245,12 +287,8 @@ function reader_is_safe(word, seg, rr,    d) {
     if (word == "eval") return (rr ~ /^[[:space:]]*"?[A-Za-z_][A-Za-z0-9_${}]*=/)
     if (word == "docker") {
         if (seg ~ /[[:space:]]compose[[:space:]]+(exec|run)([[:space:]]|$)/) return 0
-        d = rr
-        if (d ~ /^[ \t]*(exec|run)[ \t]/) {
-            sub(/^[ \t]*(exec|run)[ \t]+/, "", d)
-            d = lead_seg(d, " -e -u -w -v --env --user --workdir --volume --name --network -l ")
-            if (d ~ /[[:space:]](-i|-it|-ti|--interactive)([[:space:]]|$)/) return 0
-        }
+        # Whole segment, no option parsing: exec or run plus an interactive flag anywhere.
+        if (seg ~ /[[:space:]](exec|run)([[:space:]]|$)/ && seg ~ /[[:space:]](-i|-it|-ti|--interactive)([[:space:]]|$)/) return 0
         return 1
     }
     if (word == "docker-compose") return !(seg ~ /[[:space:]](exec|run)([[:space:]]|$)/)
@@ -331,13 +369,19 @@ function process_line(m, r, ln,    t, c1, k, seg, rseg, p, fw, word, fed, redir,
 BEGIN {
     sq = sprintf("%c", 39)
     RE_A = "[" sq "\\\\]"
-    RE_D = "[\"\\\\]"
+    RE_D = "[\"\\\\$]"
     readers = "bash sh zsh eval ssh docker docker-compose mysql mariadb claude"
     ok_re = "# loop-stdin-ok: *[^ ]"
     n = split(readers, ra, " ")
     for (i = 1; i <= n; i++) rd[ra[i]] = 1
-    n = split("do then else elif if ! { ( time exec command nohup builtin sudo", ka, " ")
+    n = split("do then else elif if ! { ( builtin", ka, " ")
     for (i = 1; i <= n; i++) KW[ka[i]] = 1
+    WRAP["sudo"] = " -u -g -h -p -C -D -r -t -T -U -R "
+    WRAP["env"] = " -u -C -S -P "
+    WRAP["time"] = " -f -o "
+    WRAP["exec"] = " -a "
+    WRAP["command"] = " "
+    WRAP["nohup"] = " "
     XS = "x"; SPC = " "
     for (i = 0; i < 10; i++) { XS = XS XS; SPC = SPC SPC }
 }
@@ -347,21 +391,21 @@ BEGIN {
     if (FNR == 1) {
         nfiles++
         isyml = (FILENAME ~ /\.ya?ml$/)
-        depth = 0; qs = ""; in_heredoc = 0; pending = 0; lraw = ""; lmask = ""
+        depth = 0; qs = ""; nest = 0; in_heredoc = 0; pending = 0; lraw = ""; lmask = ""
     }
     if (in_heredoc) { if (trim(raw) == heredoc_end) in_heredoc = 0; next }
-    if (isyml && raw ~ /^[[:space:]]*(- )?[A-Za-z0-9_.-]+:/) { lraw = ""; lmask = ""; qs = ""; next }
+    if (isyml && raw ~ /^[[:space:]]*(- )?[A-Za-z0-9_.-]+:/) { lraw = ""; lmask = ""; qs = ""; nest = 0; next }
     phys = mask_line(raw)
     rj = raw
     cont = 0
-    if (qs == "" && substr(phys, length(phys), 1) == "\\") {
+    if (qs == "" && nest == 0 && substr(phys, length(phys), 1) == "\\") {
         phys = substr(phys, 1, length(phys) - 1) " "
         rj = substr(raw, 1, length(raw) - 1) " "
         cont = 1
     }
     if (lraw == "") { lraw = rj; lmask = phys; lstart = FNR }
     else { lraw = lraw " " rj; lmask = lmask " " phys }
-    if (qs != "" || cont) next
+    if (qs != "" || nest > 0 || cont) next
     tail = phys; sub(/[ \t]+$/, "", tail)
     if (tail ~ /(\||&&)$/) next
     process_line(lmask, lraw, lstart)

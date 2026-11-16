@@ -314,7 +314,7 @@ cat > "$T/c35.sh" <<'FIX'
 #!/bin/bash
 while read -r l; do
   ssh -p 22 -n host true
-  docker exec c grep -i foo f
+  docker exec -u root c ls -l f
 done < f
 FIX
 expect c35-leading-options-stay-safe "$T/c35.sh" 0
@@ -368,7 +368,71 @@ while read -r l; do
   docker exec -u root c grep -i foo f
 done < f
 FIX
-expect c41-docker-inner-i-stays-safe "$T/c41.sh" 0
+# docker is checked over the whole segment (plan Phase 2 step 10), so an inner -i is a
+# known false positive. It is loud, and </dev/null or the marker silences it (c42).
+expect c41-docker-inner-i-is-flagged "$T/c41.sh" 1 3
+expect c41-docker-inner-i-second-line "$T/c41.sh" 1 4
+
+cat > "$T/c42.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  docker run --rm -p 80:80 img grep -i foo f </dev/null
+  docker exec -u root c grep -i foo f # loop-stdin-ok: grep reads f, not stdin
+done < f
+FIX
+expect c42-docker-inner-i-silenced "$T/c42.sh" 0
+
+# Review thread: a " inside '...' inside a double-quoted $(...) must not flip quote state.
+cat > "$T/c43.sh" <<'FIX'
+#!/bin/bash
+x="$(grep -oE 'a[^"]*' f)"
+while read -r l; do bash -c "$l"; done < f
+FIX
+expect c43-quote-in-nested-substitution "$T/c43.sh" 1 3
+
+# Nested $( ) and $(( )) inside "$(...)" keep the paren count; the hit after is still seen.
+cat > "$T/c44.sh" <<'FIX'
+#!/bin/bash
+y="$(echo "$(basename 'a"b')" $((1 + (2))) 'c"d')"
+while read -r l; do ssh h true; done < f
+FIX
+expect c44-nested-parens-in-substitution "$T/c44.sh" 1 3
+
+# Review thread: a wrapper's own options are skipped, so the wrapped reader is seen.
+cat > "$T/c45.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  sudo -u x ssh h
+  sudo -n bash x
+  time -p ssh h
+  env -i bash x
+  env -u V bash x
+done < f
+FIX
+expect c45-wrapper-options-line3 "$T/c45.sh" 1 3
+expect c45-wrapper-options-line4 "$T/c45.sh" 1 4
+expect c45-wrapper-options-line5 "$T/c45.sh" 1 5
+expect c45-wrapper-options-line6 "$T/c45.sh" 1 6
+expect c45-wrapper-options-line7 "$T/c45.sh" 1 7
+
+# command -v only looks a name up, so it is not a reader.
+cat > "$T/c46.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  command -v bash >/dev/null
+  command -V ssh
+done < f
+FIX
+expect c46-command-v-is-safe "$T/c46.sh" 0
+
+# Review thread: ssh -P takes a value, so a later leading -n is still seen.
+cat > "$T/c47.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  ssh -P tag -n h true
+done < f
+FIX
+expect c47-ssh-P-value-option "$T/c47.sh" 0
 
 echo ""
 echo "$PASS passed, $FAIL failed"

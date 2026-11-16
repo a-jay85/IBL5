@@ -134,6 +134,7 @@ make_repo() {
                  check-pipefail-grep-q test-check-pipefail-grep-q check-exit-code-handling \
                  check-pipefail-assignment-guard test-check-pipefail-assignment-guard \
                  check-shell-portability test-check-shell-portability \
+                 check-design-system test-check-design-system \
                  check-reviewer-eval test-check-reviewer-eval reviewer-eval; do
         base="$(printf '%s' "$sname" | tr '-' '_')"
         # Write stub using printf to avoid heredoc nesting issues.
@@ -547,6 +548,8 @@ PASS  check-pipefail-assignment-guard
 PASS  check-exit-code-handling
 PASS  test-check-shell-portability
 PASS  check-shell-portability
+PASS  test-check-design-system
+PASS  check-design-system
 PASS  test-check-reviewer-eval
 PASS  reviewer-eval-validate
 PASS  test-text-hold-recheck

@@ -522,6 +522,8 @@ if [ "$STAGE" = "pre-push" ]; then
     queue_step "check-exit-code-handling"      hard "$BIN/check-exit-code-handling" "--since=$BASE"
     queue_step "test-check-shell-portability"  hard "$BIN/test-check-shell-portability"
     queue_step "check-shell-portability"       hard "$BIN/check-shell-portability"
+    queue_step "test-check-design-system"      hard "$BIN/test-check-design-system"
+    queue_step "check-design-system"           hard "$BIN/check-design-system"
     queue_step "test-check-reviewer-eval"     hard "$BIN/test-check-reviewer-eval"
     queue_step "reviewer-eval-validate"        hard "$BIN/reviewer-eval" validate
     run_group_end

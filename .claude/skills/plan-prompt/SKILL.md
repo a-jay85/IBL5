@@ -1,7 +1,7 @@
 ---
 name: plan-prompt
 description: "Draft a /plan prompt distilled from the current conversation — ground-truth pointers, already-measured evidence, scope, constraints, verification, and the Step-3 architect tier — then, unless the Step-1.5 size triage says the work clears the ad-hoc bar, fire it as a detached headless Sonnet 5.5 run via bin/plan-now. Use after a design discussion when the planning run should be offloaded off the expensive session."
-last_verified: 2026-11-02
+last_verified: 2026-11-16
 ---
 
 # Draft a `/plan` handoff prompt and fire it headless
@@ -167,11 +167,14 @@ Write the tier directive, then let the hint check it. Step 5 item 1 runs
 `bin/plan-tier-hint` on the written block file with `--brief`, the way `bin/plan-now`
 will. The hint drops every `MUST route to` and `plan-architect` line before the judge
 reads the brief, so your directive cannot sway it. When the returned tier differs from
-your call, fix the directive in the file or keep it and pass --tier-ok. `bin/plan-now`
+your call, change the directive to match the hint. You may keep `plan-architect`
+over an `xhigh` hint and pass --tier-ok with the reason. You may keep
+`plan-architect-xhigh` over a lower hint only when the owner approved Fable in chat;
+cite that approval in --tier-ok. `bin/plan-now`
 cross-checks the declared tier against this hint and exits 4 on a mismatch involving xhigh.
 The hint is one open Opus 5.5 judge call with no trigger list. When its reason starts with
-judge-failsafe:, the judge failed and the hint printed default. Apply the Fable test yourself,
-and pass --tier-ok to bin/plan-now if you keep xhigh.
+judge-failsafe:, the judge failed and the hint printed default. Keep `plan-architect`
+unless the owner approves Fable.
 
 Also pick the orchestrator model — a single item → **Sonnet**; several items decomposed
 in one pass → **Opus** (`agent-tiering.md` § `/plan` orchestrator model) — and pass

@@ -219,33 +219,37 @@ function cmd_word(s, p,    w, bn) {
     }
 }
 
-# lead_opt: 1 when a leading option of rr (the text after the command word) matches re.
-# Scanning stops at the first word that is not an option, so a -n or -i that belongs
-# to the remote or inner command does not count. argflags lists options that take a
-# separate value, as " -p -i ".
-function lead_opt(rr, re, argflags,    n, t, i) {
+# lead_seg: the leading options of rr (the text after the command word), as one
+# space-led string. Scanning stops at the first word that is not an option, so a -n
+# or -i that belongs to the remote or inner command never reaches the safe-flag
+# tests. argflags lists options that take a separate value, as " -p -i ".
+function lead_seg(rr, argflags,    n, t, i, out) {
     n = split(rr, t, /[ \t]+/)
+    out = ""
     for (i = 1; i <= n; i++) {
         if (t[i] == "") continue
-        if (t[i] !~ /^-/) return 0
-        if (t[i] ~ re) return 1
-        if (index(argflags, " " t[i] " ") > 0) i++
+        if (t[i] !~ /^-/) break
+        out = out " " t[i]
+        if (index(argflags, " " t[i] " ") > 0 && i < n) { i++; out = out " " t[i] }
     }
-    return 0
+    return out " "
 }
 
 # reader_is_safe: 1 when this use of a reader cannot read stdin.
 function reader_is_safe(word, seg, rr,    d) {
-    if (word == "ssh") return lead_opt(rr, "^-[A-Za-z]*n[A-Za-z]*$", " -p -i -o -l -F -J -L -R -D -b -c -E -e -m -O -Q -S -W -w -B -I ")
+    if (word == "ssh") seg = lead_seg(rr, " -p -i -o -l -F -J -L -R -D -b -c -E -e -m -O -Q -S -W -w -B -I ")
+    if (word == "bash" || word == "sh" || word == "zsh") seg = lead_seg(rr, " -o -O ")
+    if (word == "ssh") return (seg ~ /[[:space:]]-[A-Za-z]*n[A-Za-z]*([[:space:]]|$)/)
     if (word == "mysql" || word == "mariadb") return (seg ~ /[[:space:]](-e|--execute)([[:space:]=]|$)/)
-    if (word == "bash" || word == "sh" || word == "zsh") return lead_opt(rr, "^-n$", " -o -O ")
+    if (word == "bash" || word == "sh" || word == "zsh") return (seg ~ /[[:space:]]-n([[:space:]]|$)/)
     if (word == "eval") return (rr ~ /^[[:space:]]*"?[A-Za-z_][A-Za-z0-9_${}]*=/)
     if (word == "docker") {
         if (seg ~ /[[:space:]]compose[[:space:]]+(exec|run)([[:space:]]|$)/) return 0
         d = rr
         if (d ~ /^[ \t]*(exec|run)[ \t]/) {
             sub(/^[ \t]*(exec|run)[ \t]+/, "", d)
-            if (lead_opt(d, "^(-i|-it|-ti|--interactive)$", " -e -u -w -v --env --user --workdir --volume --name --network -l ")) return 0
+            d = lead_seg(d, " -e -u -w -v --env --user --workdir --volume --name --network -l ")
+            if (d ~ /[[:space:]](-i|-it|-ti|--interactive)([[:space:]]|$)/) return 0
         }
         return 1
     }

@@ -1,6 +1,6 @@
 ---
 description: A mechanical gate blocks AI tell patterns (sycophant openers, em-dashes, buzzwords, etc.) in committed markdown and Claude's output, enforced by bin/check-prose on three surfaces.
-last_verified: 2026-09-16
+last_verified: 2026-11-15
 ---
 
 # ADR-0129: Prose slop gate

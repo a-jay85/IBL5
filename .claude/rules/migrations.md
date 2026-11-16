@@ -1,7 +1,7 @@
 ---
 description: Migration authoring rules — numbering via bin/next-migration, the Olympics schema-parity allowlist, how to read prod's applied-migration state, and the integration-test sweep a view→table materialization requires.
 paths: "ibl5/migrations/**"
-last_verified: 2026-09-16
+last_verified: 2026-11-15
 ---
 
 # Migration Rules

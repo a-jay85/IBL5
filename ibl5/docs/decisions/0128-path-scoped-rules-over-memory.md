@@ -1,6 +1,6 @@
 ---
 description: Directory-specific operational knowledge lives in path-scoped .claude/rules/*.md files, not in per-project memory; the always-loaded rule set is capped at 16000 B.
-last_verified: 2026-09-16
+last_verified: 2026-11-15
 ---
 
 # ADR-0128: Path-scoped rules over memory for directory-specific knowledge

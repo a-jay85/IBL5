@@ -1,6 +1,6 @@
 ---
 description: htmx gotchas: DOM-snapshot ordering freezes transient state into Back navigation; HX-Redirect triggers full reload; PageCache strips response headers.
-last_verified: 2026-09-16
+last_verified: 2026-11-15
 paths:
   - "ibl5/jslib/**"
   - "ibl5/themes/**"

@@ -1,6 +1,6 @@
 ---
 description: The production smoke test distinguishes an INCONCLUSIVE result (prober blocked by the WAF, or a docs-only deploy) from a real FAILURE, so transient prober-side issues no longer trigger an auto-rollback of healthy production.
-last_verified: 2026-09-16
+last_verified: 2026-11-15
 ---
 
 # ADR-0038: Smoke "Inconclusive" State Gates Auto-Rollback
@@ -64,3 +64,10 @@ Both sentences had been overwritten in place by the nightly doc-freshness refres
 (commit `71b15038f`, PR #1776), which erased the decision-time record; they were restored
 byte-for-byte on 2026-09-02 and the current state moved here instead. See
 `.claude/rules/adr-append-only.md`.
+
+## Addendum — IBL6 notifier removed (2026-11-15) <!-- slop-ok -->
+
+§ A above says the new job mirrors `notify-ibl6-degradation`, and the 2026-09-02 addendum above says
+that job still exists in `.github/workflows/smoke-prod.yml`. Today that file has no
+`notify-ibl6-degradation` job. Its jobs are `smoke`, `rollback-and-notify`, and `notify`. The IBL6
+app was decommissioned (commit `2c9a8d080`), which removed the IBL6 check and its notifier.

@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-dm-volume — harness for bin/dm-volume (fixture sent log -> expected counts).
+#
+# Run: bin/test-dm-volume  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+VOL="$ROOT/bin/dm-volume"
+h_tmp TMP
+
+ago() { date -v-"$1"d '+%Y-%m-%d' 2>/dev/null || date -d "$1 days ago" '+%Y-%m-%d'; }
+D0=$(ago 0); D1=$(ago 1); D20=$(ago 20)
+LOG="$TMP/sent.log"
+row() { printf '%sT10:00:00-0700\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" 10 "preview"; }
+{
+    row "$D0" dev alpha; row "$D0" dev alpha; row "$D0" errors beta
+    row "$D1" dm alpha;  row "$D1" dev gamma
+    row "$D20" dev old-caller
+} > "$LOG"
+
+out=$(DISCORD_DM_SENT_LOG="$LOG" "$VOL" 2>&1); rc=$?
+[ "$rc" = 0 ] && h_pass "default window exits 0" || h_fail "rc=$rc"
+case "$out" in *": 5"*) h_pass "total 5 (old row excluded)" ;; *) h_fail "total: $out" ;; esac
+case "$out" in *old-caller*) h_fail "old caller leaked: $out" ;; *) h_pass "out-of-window caller absent" ;; esac
+printf '%s\n' "$out" | grep -qE '^  3  alpha$' && h_pass "alpha=3" || h_fail "alpha count: $out"
+[ "$(printf '%s\n' "$out" | sed -n '/^By caller/,/^$/p' | sed -n '2p')" = "  3  alpha" ] && h_pass "callers sorted desc" || h_fail "sort: $out"
+printf '%s\n' "$out" | grep -qE '^  3  dev$' && printf '%s\n' "$out" | grep -qE '^  1  errors$' && printf '%s\n' "$out" | grep -qE '^  1  dm$' \
+    && h_pass "per-target counts" || h_fail "targets: $out"
+printf '%s\n' "$out" | grep -qE "^  3  $D0\$" && printf '%s\n' "$out" | grep -qE "^  2  $D1\$" \
+    && h_pass "per-day counts" || h_fail "days: $out"
+
+out=$(DISCORD_DM_SENT_LOG="$LOG" "$VOL" --days=30 2>&1)
+case "$out" in *": 6"*) h_pass "--days=30 includes the old row" ;; *) h_fail "30d: $out" ;; esac
+out=$(DISCORD_DM_SENT_LOG="$LOG" "$VOL" --days=1 2>&1)
+case "$out" in *": 3"*) h_pass "--days=1 is today only" ;; *) h_fail "1d: $out" ;; esac
+
+out=$(DISCORD_DM_SENT_LOG="$TMP/absent.log" "$VOL" 2>&1); rc=$?
+{ [ "$rc" = 0 ] && [ "$out" = "no sends logged yet" ]; } && h_pass "missing log: message, exit 0" || h_fail "missing: rc=$rc [$out]"
+
+DISCORD_DM_SENT_LOG="$LOG" "$VOL" --days 7 >/dev/null 2>&1; [ "$?" = 2 ] && h_pass "space form rejected (exit 2)" || h_fail "space form"
+DISCORD_DM_SENT_LOG="$LOG" "$VOL" --days=x >/dev/null 2>&1; [ "$?" = 2 ] && h_pass "non-numeric rejected" || h_fail "non-numeric"
+"$VOL" --help | grep -q '^Usage: bin/dm-volume' && h_pass "--help prints Usage" || h_fail "help"
+"$VOL" --help | grep -q '^set ' && h_fail "help overran header" || h_pass "help stops at the header"
+
+h_done

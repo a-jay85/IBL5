@@ -1060,5 +1060,72 @@ done
 out=$(env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" IBL5_USAGE_CLAUDE_PROJECTS="$IBL5_USAGE_CLAUDE_PROJECTS" IBL5_USAGE_GATE_TEST_MODE="$IBL5_USAGE_GATE_TEST_MODE" PATH=/usr/bin:/bin bash -c 'set -euo pipefail; a=$(set +o); . "$1"; b=$(set +o); [ "$a" = "$b" ] && echo same' _ "$DMLIB")
 [ "$out" = "same" ] && ok "D1k sourcing leaves shell options unchanged" || fail "D1k (out=$out)"
 
+# ── S1: sent log (one tab-separated line per delivered message) ───────────────
+printf '\n── S1: sent log ──\n'
+SENT="$TMP/sent.log"
+TAB=$(printf '\t')
+: > "$CAP"; rm -f "$SENT"
+printf 'tab\there\rcr first line that is much longer than sixty characters in total length\nsecond' > "$TMP/s1msg.txt"
+DM_CAPTURE="$CAP" DISCORD_DM_SSH_BIN="$SSH_OK" DISCORD_DM_SPOOL="$SPOOL" DISCORD_DM_SENT_LOG="$SENT" \
+    DISCORD_DM_CALLER=my-script "$DM" --to "$FAKE_TO" --attempts 1 --quiet - < "$TMP/s1msg.txt"
+s1_rc=$?
+[ "$s1_rc" = 0 ] && ok "S1a success exits 0" || fail "S1a exit $s1_rc"
+[ "$(wc -l < "$SENT" | tr -d ' ')" = 1 ] && ok "S1b exactly one line" || fail "S1b lines: $(cat "$SENT" 2>/dev/null)"
+IFS="$TAB" read -r s_ts s_kind s_caller s_len s_prev < "$SENT"
+case "$s_ts" in [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]*) ok "S1c ISO timestamp" ;; *) fail "S1c ts=$s_ts" ;; esac
+[ "$s_kind" = dm ] && ok "S1d kind dm" || fail "S1d kind=$s_kind"
+[ "$s_caller" = my-script ] && ok "S1e caller from env" || fail "S1e caller=$s_caller"
+[ "$s_len" = "$(wc -c < "$TMP/s1msg.txt" | tr -d ' ')" ] && ok "S1f byte length" || fail "S1f len=$s_len"
+[ "$s_prev" = "tab here cr first line that is much longer than sixty charac" ] && ok "S1g preview 60 chars, whitespace flattened" || fail "S1g prev=[$s_prev]"
+
+# Chunked send counts once.
+rm -f "$SENT"; : > "$CAP"
+DM_CAPTURE="$CAP" DISCORD_DM_SSH_BIN="$SSH_OK" DISCORD_DM_SPOOL="$SPOOL" DISCORD_DM_SENT_LOG="$SENT" \
+    "$DM" --to "$FAKE_TO" --attempts 1 --quiet --chunk - < "$FIXTURE"
+[ "$(wc -l < "$SENT" | tr -d ' ')" = 1 ] && ok "S1h chunked send logs once" || fail "S1h lines: $(wc -l < "$SENT")"
+
+# Webhook routes: dev, errors.
+rm -f "$SENT"
+DISCORD_DM_CURL_BIN="$CURL_NEVER" DISCORD_DM_WEBHOOK_FILE="$FAKE_WEBHOOK_FILE" DISCORD_DM_SPOOL="$SPOOL" \
+    DISCORD_DM_SENT_LOG="$SENT" "$DM" --to "$OWNER_ID" --attempts 1 --quiet "dev msg"
+DISCORD_DM_CURL_BIN="$CURL_NEVER" DISCORD_DM_WEBHOOK_FILE="$FAKE_WEBHOOK_FILE" DISCORD_DM_ERRORS_WEBHOOK_FILE="$FAKE_WEBHOOK_FILE" \
+    DISCORD_DM_SPOOL="$SPOOL" DISCORD_DM_SENT_LOG="$SENT" "$DM" --to "$OWNER_ID" --attempts 1 --quiet --error "err msg"
+[ "$(cut -f2 "$SENT" | tr '\n' ' ')" = "dev errors " ] && ok "S1i webhook kinds dev then errors" || fail "S1i kinds: $(cut -f2 "$SENT" | tr '\n' ' ')"
+
+# Raw route.
+rm -f "$SENT"; : > "$CAP"
+DM_CAPTURE="$CAP" DISCORD_DM_SSH_BIN="$SSH_OK" DISCORD_DM_SPOOL="$SPOOL" DISCORD_DM_SENT_LOG="$SENT" \
+    "$DM" --attempts 1 --quiet --raw --route /plan-review '{"a":1}'
+[ "$(cut -f2 "$SENT")" = "route:/plan-review" ] && ok "S1j raw route kind" || fail "S1j kind: $(cut -f2 "$SENT")"
+
+# Caller fallback with no env: never empty.
+rm -f "$SENT"; : > "$CAP"
+env -u DISCORD_DM_CALLER DM_CAPTURE="$CAP" DISCORD_DM_SSH_BIN="$SSH_OK" DISCORD_DM_SPOOL="$SPOOL" DISCORD_DM_SENT_LOG="$SENT" \
+    "$DM" --to "$FAKE_TO" --attempts 1 --quiet "x"
+[ "$(cut -f3 "$SENT")" = test-discord-dm ] && ok "S1k caller fallback is the parent script (test-discord-dm)" || fail "S1k empty caller"
+
+# Failure writes no sent-log line.
+rm -f "$SENT"; rm -f "$SPOOL"
+printf '#!/bin/bash\ncat >/dev/null\nprintf "\\nHTTP=400 curl_rc=0\\n"\n' > "$TMP/ssh-400"; chmod +x "$TMP/ssh-400"
+DISCORD_DM_SSH_BIN="$TMP/ssh-400" DISCORD_DM_SPOOL="$SPOOL" DISCORD_DM_SENT_LOG="$SENT" \
+    "$DM" --to "$FAKE_TO" --attempts 1 --quiet "will fail" 2>/dev/null
+s1_rc=$?
+{ [ "$s1_rc" = 1 ] && [ ! -s "$SENT" ]; } && ok "S1l failure: exit 1, no sent-log line" || fail "S1l rc=$s1_rc sent=$(cat "$SENT" 2>/dev/null)"
+
+# Unwritable sent-log path: exit code and output unchanged.
+: > "$CAP"
+printf 'x' > "$TMP/notadir"
+out_bad=$(DM_CAPTURE="$CAP" DISCORD_DM_SSH_BIN="$SSH_OK" DISCORD_DM_SPOOL="$SPOOL" DISCORD_DM_SENT_LOG="$TMP/notadir/sub/log" \
+    "$DM" --to "$FAKE_TO" --attempts 1 "unwritable" 2>&1)
+bad_rc=$?
+: > "$CAP"
+out_good=$(DM_CAPTURE="$CAP" DISCORD_DM_SSH_BIN="$SSH_OK" DISCORD_DM_SPOOL="$SPOOL" DISCORD_DM_SENT_LOG="$TMP/good.log" \
+    "$DM" --to "$FAKE_TO" --attempts 1 "unwritable" 2>&1)
+{ [ "$bad_rc" = 0 ] && [ "$out_bad" = "$out_good" ]; } && ok "S1m unwritable sent log: exit 0, same output" || fail "S1m rc=$bad_rc out=[$out_bad] vs [$out_good]"
+out=$(DM_CAPTURE="$CAP" DISCORD_DM_SSH_BIN="$SSH_OK" DISCORD_DM_SPOOL="$SPOOL" DISCORD_DM_SENT_LOG="$TMP/notadir/sub/log" \
+    "$DM" --to "$FAKE_TO" --attempts 1 --quiet "q" 2>&1)
+[ -z "$out" ] && ok "S1n --quiet stays quiet when logging fails" || fail "S1n out=[$out]"
+"$DM" --help | tail -1 | grep -q '^Exit:' && ok "S1o --help ends at the Exit line" || fail "S1o help tail: $("$DM" --help | tail -1)"
+
 # ── Summary ───────────────────────────────────────────────────────────────────
 h_done

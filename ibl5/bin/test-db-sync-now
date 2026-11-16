@@ -3,7 +3,7 @@
 #
 # ibl5/bin/test-db-sync-now — harness for ibl5/bin/db-sync-now and bin/db-sync-cron-setup.
 #
-# Stubs injected via env seams only — no PATH modification.
+# Stubs injected via env seams. The lying-mkdir cases (LM-*) also prepend a stub dir to PATH for the driver call.
 #
 # Run: ibl5/bin/test-db-sync-now  (exit 0 = all pass, 1 = failures)
 
@@ -13,6 +13,8 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 DRIVER="$SCRIPT_DIR/db-sync-now"
 CRON_SETUP="$REPO_ROOT/bin/db-sync-cron-setup"
+# claim_file_lying_mkdir_stub, for the LM-* cases.
+source "$REPO_ROOT/bin/lib/claim-file.sh"
 
 FAILED=0
 STUB=""
@@ -34,6 +36,9 @@ dsn_log_lacks() {
     if grep -qF -- "$2" "$STUB/out.log" 2>/dev/null; then dsn_fail "$1 — '$2' unexpectedly in out.log"
     else dsn_ok "$1"; fi
 }
+
+# dsn_lines <file>: print the number of non-blank lines (0 when the file is missing).
+dsn_lines() { awk 'NF' "$1" 2>/dev/null | wc -l | tr -d ' '; }
 
 # dsn_count <want> <file> — count non-blank lines
 dsn_count() {
@@ -314,6 +319,95 @@ if [ ! -d "$STUB/lock" ]; then
 else
     dsn_fail "14: lock dir still exists after exit 1"
 fi
+
+# ── Lying-mkdir cases (uutils mkdir, backlog#1856) ───────────────────────────
+# claim_file_lying_mkdir_stub writes a mkdir that makes the dir and always exits 0.
+# Each case puts it first on PATH for the driver call only. $$ is this harness,
+# a live pid that stands in for the lock's real owner.
+
+# ── Case LM-1: lying mkdir over a live owner's lock ───────────────────────────
+dsn_setup
+claim_file_lying_mkdir_stub "$STUB/lyingbin"
+mkdir "$STUB/lock"
+printf '%s\n' "$$" > "$STUB/lock/pid"
+rc="$(PATH="$STUB/lyingbin:$PATH" dsn_run)"
+dsn_expect_eq "LM-1: live owner, lying mkdir exits 0" "0" "$rc"
+dsn_log_has "LM-1: skip logged" "skip: sync already running"
+dsn_expect_eq "LM-1: sync never called" "0" "$(dsn_lines "$STUB/calls")"
+dsn_expect_eq "LM-1: owner pid file unchanged" "$$" "$(cat "$STUB/lock/pid" 2>/dev/null)"
+if [ -d "$STUB/lock" ]; then dsn_ok "LM-1: owner lock dir kept"
+else dsn_fail "LM-1: owner lock dir kept — the losing run removed it"; fi
+
+# ── Case LM-2: dead-pid reap under lying mkdir ends with one owner ────────────
+dsn_setup
+claim_file_lying_mkdir_stub "$STUB/lyingbin"
+mkdir "$STUB/lock"
+printf '999999\n' > "$STUB/lock/pid"
+# Wrap the sync stub so it records which pid owns the lock while the sync runs.
+mv "$STUB/db-sync-prod" "$STUB/db-sync-prod.real"
+cat > "$STUB/db-sync-prod" <<'SH'
+#!/bin/bash
+cat "$STUB/lock/pid" >> "$STUB/owner-pids" 2>/dev/null
+exec "$STUB/db-sync-prod.real" "$@"
+SH
+chmod +x "$STUB/db-sync-prod"
+rc="$(PATH="$STUB/lyingbin:$PATH" dsn_run)"
+dsn_expect_eq "LM-2: dead-pid reap under lying mkdir exits 0" "0" "$rc"
+dsn_log_has "LM-2: stale lock reaped" "stale lock (pid 999999)"
+dsn_expect_eq "LM-2: exactly one owner pid seen by the sync" "1" "$(dsn_lines "$STUB/owner-pids")"
+if grep -qx 999999 "$STUB/owner-pids" 2>/dev/null; then dsn_fail "LM-2: owner pid is not the dead pid — got 999999"
+else dsn_ok "LM-2: owner pid is not the dead pid"; fi
+if [ ! -d "$STUB/lock" ]; then dsn_ok "LM-2: reaped lock removed after run"
+else dsn_fail "LM-2: reaped lock removed after run — dir still exists"; fi
+
+# ── Case LM-3: older-than-2h reap under lying mkdir ───────────────────────────
+dsn_setup
+claim_file_lying_mkdir_stub "$STUB/lyingbin"
+mkdir "$STUB/lock"
+printf '%s\n' "$$" > "$STUB/lock/pid"
+touch -t 202001010000 "$STUB/lock"
+rc="$(PATH="$STUB/lyingbin:$PATH" dsn_run)"
+dsn_expect_eq "LM-3: 2h reap under lying mkdir exits 0" "0" "$rc"
+dsn_log_has "LM-3: 2h stale lock reaped" "stale lock (older than 2h)"
+dsn_expect_eq "LM-3: sync called once after the 2h reap" "1" "$(dsn_lines "$STUB/calls")"
+
+# ── Case LM-4: fresh lock under lying mkdir ───────────────────────────────────
+dsn_setup
+claim_file_lying_mkdir_stub "$STUB/lyingbin"
+rc="$(PATH="$STUB/lyingbin:$PATH" dsn_run)"
+dsn_expect_eq "LM-4: fresh lock under lying mkdir exits 0" "0" "$rc"
+dsn_expect_eq "LM-4: sync called once on a fresh lock" "1" "$(dsn_lines "$STUB/calls")"
+if [ ! -d "$STUB/lock" ]; then dsn_ok "LM-4: fresh lock removed after run"
+else dsn_fail "LM-4: fresh lock removed after run — dir still exists"; fi
+
+# ── Case LM-5: a rival claims the lock between the reap and our re-claim ──────
+# A stub rm removes the lock, then (once) re-plants it owned by this harness's
+# live pid, the way a second reaper would. Our re-claim must lose and skip.
+dsn_setup
+claim_file_lying_mkdir_stub "$STUB/lyingbin"
+mkdir "$STUB/lock"
+printf '999999\n' > "$STUB/lock/pid"
+cat > "$STUB/lyingbin/rm" <<SH
+#!/bin/bash
+/bin/rm "\$@"
+case " \$* " in
+    *" $STUB/lock "*)
+        if [ ! -e "$STUB/raced" ]; then
+            : > "$STUB/raced"
+            /bin/mkdir -p "$STUB/lock"
+            printf '%s\n' "$$" > "$STUB/lock/pid"
+        fi
+        ;;
+esac
+SH
+chmod +x "$STUB/lyingbin/rm"
+rc="$(PATH="$STUB/lyingbin:$PATH" dsn_run)"
+dsn_expect_eq "LM-5: rival claims after the reap, run exits 0" "0" "$rc"
+dsn_log_has "LM-5: skip logged after the reap" "another run took the lock after the reap"
+dsn_expect_eq "LM-5: sync never called after a lost reap" "0" "$(dsn_lines "$STUB/calls")"
+dsn_expect_eq "LM-5: rival pid file unchanged" "$$" "$(cat "$STUB/lock/pid" 2>/dev/null)"
+if [ -d "$STUB/lock" ]; then dsn_ok "LM-5: rival lock dir kept"
+else dsn_fail "LM-5: rival lock dir kept — the losing run removed it"; fi
 
 # ── --from-backup cases ────────────────────────────────────────────────────────
 

@@ -619,13 +619,18 @@ final class SimRecapContextRepositoryTest extends DatabaseTestCase
 
     /**
      * The team is the from_teamid of the injury row (team at injury time), with
-     * its name and label read from that team's ibl_team_info row.
+     * its name read from that team's ibl_team_info row and its abbreviation from
+     * the RecordFormatter team registry (team 14 is MIN there).
      */
     public function testAllWindowInjuriesUsesFromTeamAbbreviation(): void
     {
-        $this->seedTeam(999171, 'Ayes City', 'Ayes');
+        // Team 14 is in the CI seed; rename it inside this test's transaction so the name is known.
+        $rename = $this->db->prepare("UPDATE ibl_team_info SET team_name = 'Ayes' WHERE teamid = 14");
+        self::assertNotFalse($rename);
+        $rename->execute();
+        self::assertSame(1, $rename->affected_rows);
         $this->seedTeam(999172, 'Bees City', 'Bees');
-        // Player has since moved to team 999172; the injury happened on 999171.
+        // Player has since moved to team 999172; the injury happened on team 14.
         $this->insertTestPlayer(200000621, 'Moved Player', ['teamid' => 999172]);
         $this->insertRow('ibl_jsb_transactions', [
             'season_year'         => 2031,
@@ -633,7 +638,7 @@ final class SimRecapContextRepositoryTest extends DatabaseTestCase
             'transaction_day'     => 4,
             'transaction_type'    => TrnFileParser::TYPE_INJURY,
             'pid'                 => 200000621,
-            'from_teamid'         => 999171,
+            'from_teamid'         => 14,
             'injury_games_missed' => 5,
             'injury_description'  => 'Wrist',
         ]);
@@ -647,9 +652,9 @@ final class SimRecapContextRepositoryTest extends DatabaseTestCase
             }
         }
         self::assertNotNull($found);
-        self::assertSame(999171, $found['teamid']);
+        self::assertSame(14, $found['teamid']);
         self::assertSame('Ayes', $found['teamName']);
-        self::assertSame('Ayes', $found['teamAbbrev']);
+        self::assertSame('MIN', $found['teamAbbrev']);
         self::assertSame('Wrist', $found['injuryDescription']);
         self::assertSame(5, $found['injuryGamesMissed']);
         self::assertSame('2031-08-04', $found['date']);

@@ -323,12 +323,12 @@ final class PublishScriptBuilderTest extends TestCase
             [
                 'pid' => 1, 'name' => 'Bobby Portis', 'injury_date' => '2009-01-04',
                 'injury_description' => 'left shoulder strain', 'injury_games_missed' => 4,
-                'from_teamid' => 16, 'team_name' => 'Timberwolves',
+                'from_teamid' => 14, 'team_name' => 'Timberwolves',
             ],
             [
                 'pid' => 2, 'name' => 'Nene', 'injury_date' => '2009-01-05',
                 'injury_description' => 'sprained ankle', 'injury_games_missed' => 2,
-                'from_teamid' => 7, 'team_name' => 'Nuggets',
+                'from_teamid' => 15, 'team_name' => 'Nuggets',
             ],
         ];
         $db = new MockDatabase();
@@ -343,10 +343,10 @@ final class PublishScriptBuilderTest extends TestCase
             'Intro paragraph.',
             '**DAY 1**',
             'Early game.',
-            "**1/4/09**\n-B.Portis, Timberwolves - left shoulder strain (4) <@" . self::GM_PORTIS . '>',
+            "**1/4/09**\n-B.Portis, MIN - left shoulder strain (4) <@" . self::GM_PORTIS . '>',
             '**DAY 2**',
             'Late game.',
-            "**1/5/09**\n-Nene, Nuggets - sprained ankle (2)",
+            "**1/5/09**\n-Nene, DEN - sprained ankle (2)",
             str_repeat('=', 80) . "\n\n**WHERE THINGS STAND**\n\nStandings paragraph.",
             '',
         ], array_column($script['steps'], 'content'));
@@ -394,14 +394,14 @@ final class PublishScriptBuilderTest extends TestCase
             'injuryDescription' => 'sprained ankle',
             'injuryGamesMissed' => 2,
             'teamName' => 'Nuggets',
-            'teamAbbrev' => 'Nuggets',
+            'teamAbbrev' => 'DEN',
         ]];
 
         $steps = PublishScriptBuilder::assemble($input)['steps'];
         $injurySteps = array_values(array_filter($steps, static fn (array $s): bool => $s['kind'] === 'injuries'));
 
         self::assertCount(1, $injurySteps);
-        self::assertSame("**1/5/09**\n-Nene, Nuggets - sprained ankle (2)", $injurySteps[0]['content']);
+        self::assertSame("**1/5/09**\n-Nene, DEN - sprained ankle (2)", $injurySteps[0]['content']);
     }
 
     public function testWhitespaceOnlyOutroIsOmitted(): void

@@ -29,6 +29,7 @@
 # Exit codes: 0 = pass, 1 = violation found, 2 = usage error.
 #
 # gate-backtest-argv:
+# gate-backtest-reads: ibl5/design/components/*.css ibl5/classes/UI/*
 
 set -euo pipefail
 

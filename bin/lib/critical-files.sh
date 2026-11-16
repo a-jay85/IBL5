@@ -109,6 +109,40 @@ cf_is_exempt() {
     printf '%s\n' "$1" | grep -qiE "$CF_EXEMPT_PATTERN"
 }
 
+# Gate [CR] support (a-jay85/IBL5-backlog#1830). CF_EXEMPT_PATTERN honors a marker
+# only inside parentheses, so an entry written `path`: reference. parses
+# MUST_APPEAR, the PR rightly leaves the file alone, and Phase 5.0 holds arming
+# condition (3). cf_bare_marker_entries prints the primary path of each
+# MUST_APPEAR entry whose annotation LEADS with a bare exempt word followed by a
+# separator or end of line. Lead position only: a whole-word match anywhere
+# hit 184 entries on the 2026-11-16 corpus (2580 plans, 17610 entries), almost
+# all prose such as "consumed unchanged; confirm ...". The lead form hit 15
+# entries in 5 plans, every one a real defect. Fences are stripped by
+# cf_section. Reads only; never changes how an entry classifies.
+CF_BARE_STRIP_PATTERN='^[[:space:]]*-[[:space:]]*(—|–|:|-{1,2})?[[:space:]]*(.*)$'
+CF_BARE_LEAD_PATTERN='^(read-?only( reference)?|reference|verif(y|ication)|template|no[- ]edit|no[- ]change|unchanged|context|conditional)[[:space:]]*([:;,.]|—|–|-{1,2}|$)'
+
+cf_bare_marker_entries() {
+    local _cf_line _cf_ann _cf_path _cf_nc=0
+    shopt -q nocasematch && _cf_nc=1
+    shopt -s nocasematch
+    while IFS= read -r _cf_line; do
+        [[ $_cf_line =~ $CF_LINE_PATTERN ]] || continue
+        # Delete every backticked span, as cf_parse_section_raw does for `rest`.
+        _cf_ann=$_cf_line
+        while [[ $_cf_ann == *'`'*'`'* ]]; do
+            _cf_ann=${_cf_ann%%\`*}${_cf_ann#*\`*\`}
+        done
+        [[ $_cf_ann =~ $CF_BARE_STRIP_PATTERN ]] && _cf_ann=${BASH_REMATCH[2]}
+        [[ $_cf_ann =~ $CF_BARE_LEAD_PATTERN ]] || continue
+        cf_is_exempt "$_cf_ann" && continue
+        _cf_path=${_cf_line#*\`}
+        printf '%s\n' "${_cf_path%%\`*}"
+    done < <(cf_section "$1")
+    [ "$_cf_nc" -eq 1 ] || shopt -u nocasematch
+    return 0
+}
+
 # cf_table_detected <section-text> -> exit 0 when a markdown table row is present
 cf_table_detected() {
     printf '%s\n' "$1" | grep -qE '^[[:space:]]*\|'

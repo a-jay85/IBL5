@@ -105,8 +105,8 @@ def normalize(line):
 
 # A one-line shell case arm: `<pattern>) body` with an optional leading `(`.
 # The pattern may hold no parentheses, so `x=$(pwd) cmd || true` is never
-# read as an arm.
-CASE_ARM = re.compile(r"^\(?[^()]*\)\s+")
+# read as an arm. A leading `#` marks a comment, never an arm.
+CASE_ARM = re.compile(r"^(?!#)\(?[^()]*\)\s+")
 ARM_TAIL = re.compile(r"\s*;;$")
 
 

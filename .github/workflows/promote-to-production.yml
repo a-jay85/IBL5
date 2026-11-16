@@ -144,8 +144,7 @@ jobs:
         if: steps.promote.outputs.outcome == 'promoted' || failure()
         uses: ./.github/actions/notify-discord
         with:
-          webhook-url: ${{ secrets.DISCORD_DEV_WEBHOOK_URL }}
-          ping: ${{ job.status == 'failure' }}
+          webhook-url: ${{ job.status == 'failure' && secrets.DISCORD_ERRORS_WEBHOOK_URL || secrets.DISCORD_DEV_WEBHOOK_URL }}
 
   paused-notice:
     # Second and last job in this workflow. Also listed verbatim in SKIP_CHECKS

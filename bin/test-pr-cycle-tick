@@ -1014,6 +1014,10 @@ no_file "$STATE_DIR/attempts/112" || fail "holdrepeat-skip-no-attempt: a decline
 [[ "$(dm_count)" == "1" ]] || fail "holdrepeat-skip-no-attempt: want 1 DM, got $(dm_count)"
 grep -qF 'pr-cycle-watch: PR #112 on head bbb2222 was not rescued: post-plan holdrepeat declines it (held twice on the same reason, nothing changed). Skipping it until its diff changes.' "$SCRATCH/dm.log" \
     || fail "holdrepeat-skip-no-attempt: declined DM wording: $(cat "$SCRATCH/dm.log")"
+grep -qF -- '--error' "$SCRATCH/dm.log" && fail "holdrepeat-skip-no-attempt: declined DM carries --error"
+grep -qF -- 'pr-cycle-watch: PR #112 on head bbb2222 was not rescued' "$SCRATCH/dm.log" \
+    && [[ "$(head -c 14 "$SCRATCH/dm.log")" == "pr-cycle-watch" ]] \
+    || fail "holdrepeat-skip-no-attempt: declined DM is not a plain send: $(cat "$SCRATCH/dm.log")"
 [[ "$(pending_count)" == "0" ]] || fail "holdrepeat-skip-no-attempt: settled entry still pending"
 run_tick
 [[ "$(launch_count)" == "1" ]] || fail "holdrepeat-skip-no-attempt: relaunched a declined head"
@@ -1037,6 +1041,8 @@ run_tick
 [[ "$(dm_count)" == "1" ]] || fail "fleet-no-result-strike: want 1 cap DM on tick 3, got $(dm_count)"
 grep -qF 'pr-cycle-watch: PR #101 on head aaa1111: the rescue never reached post-plan 2 times (last: fired failed no-result). Skipping it until its diff changes.' "$SCRATCH/dm.log" \
     || fail "fleet-no-result-strike: cap DM wording: $(cat "$SCRATCH/dm.log")"
+grep -qF -- '--error pr-cycle-watch: PR #101 on head aaa1111: the rescue never reached' "$SCRATCH/dm.log" \
+    || fail "fleet-no-result-strike: cap DM is not routed --error: $(cat "$SCRATCH/dm.log")"
 [[ "$(launch_count)" == "2" ]] || fail "fleet-no-result-strike: relaunched at the cap"
 run_tick
 [[ "$(launch_count)" == "2" ]] || fail "fleet-no-result-strike: tick 4 launched past the cap"
@@ -1902,6 +1908,7 @@ run_tick
 [[ "$(launch_count)" == "1" ]] || fail "patchid-fallback-dm: a failed patch-id stranded the PR (launches: $(launch_count))"
 [[ "$(dm_count)" == "1" ]] || fail "patchid-fallback-dm: want 1 fallback DM, got $(dm_count)"
 grep -qF 'could not compute its patch-id' "$SCRATCH/dm.log" || fail "patchid-fallback-dm: DM wording: $(cat "$SCRATCH/dm.log" 2>/dev/null)"
+[[ "$(head -c 8 "$SCRATCH/dm.log")" == "--error " ]] || fail "patchid-fallback-dm: DM is not routed --error: $(cat "$SCRATCH/dm.log")"
 out_has 'patch-id unavailable; retry key falls back to head aaa1111' || fail "patchid-fallback-dm: no fallback log line: $OUT"
 [[ "$(cat "$STATE_DIR/dm-patchid/101" 2>/dev/null)" == "aaa1111" ]] \
     || fail "patchid-fallback-dm: dm-patchid/101 is '$(cat "$STATE_DIR/dm-patchid/101" 2>/dev/null)'"
@@ -1996,6 +2003,7 @@ E_PATCHID="$UNSET"
 set_prs "$RED101"; set_checks aaa1111 red
 run_tick --dry-run
 out_has 'would DM:' || fail "dry-run-patchid-inert: no 'would DM:' line: $OUT"
+grep -qE 'would DM: [^ ]+ --error ' <<< "$OUT" || fail "dry-run-patchid-inert: dry-run line lacks --error: $OUT"
 out_has 'could not compute its patch-id' || fail "dry-run-patchid-inert: the would-DM line lacks the patch-id text: $OUT"
 [[ "$(dm_count)" == "0" ]] || fail "dry-run-patchid-inert: sent a DM in dry-run"
 [[ "$(launch_count)" == "0" ]] || fail "dry-run-patchid-inert: launched in dry-run"
@@ -2761,6 +2769,8 @@ out_has "WARN PR 101: conflict probe unavailable (conflicted path is C-quoted); 
 [[ "$(probe_dm_count)" == "1" ]] || fail "conflict-cquoted-path-fallback-fired: probe DMs $(probe_dm_count), want 1"
 grep -qF 'could not run (conflicted path is C-quoted)' "$SCRATCH/dm.log" \
     || fail "conflict-cquoted-path-fallback-fired: DM text lacks the C-quoted reason"
+grep -qE -- '^--error .*the conflict probe could not run' "$SCRATCH/dm.log" \
+    || fail "conflict-cquoted-path-fallback-fired: probe DM is not routed --error: $(cat "$SCRATCH/dm.log")"
 [[ "$(cat "$STATE_DIR/dm-probe/101" 2>/dev/null)" == "$P_QBR" ]] \
     || fail "conflict-cquoted-path-fallback-fired: dm-probe/101 is '$(cat "$STATE_DIR/dm-probe/101" 2>/dev/null)'"
 end_case conflict-cquoted-path-fallback-fired
@@ -2787,6 +2797,7 @@ if should_run "conflict-probe-fallback-dry-run"; then
 conflict_prefix
 set_tip e0002; run_tick --dry-run
 out_has 'would DM: ' || fail "conflict-probe-fallback-dry-run: no would-DM line: $OUT"
+grep -qE 'would DM: [^ ]+ --error ' <<< "$OUT" || fail "conflict-probe-fallback-dry-run: dry-run line lacks --error: $OUT"
 out_has 'the conflict probe could not run' || fail "conflict-probe-fallback-dry-run: DM text missing: $OUT"
 [[ "$(probe_dm_count)" == "0" ]] || fail "conflict-probe-fallback-dry-run: dry run sent a probe DM"
 no_file "$STATE_DIR/dm-probe/101" || fail "conflict-probe-fallback-dry-run: dry run wrote dm-probe/101"
@@ -2954,6 +2965,7 @@ run_tick
 [[ "$(dm_count)" == 1 ]] || fail "stuck-armed-thread-dm-once: dm_count $(dm_count) after tick 1"
 grep -qF '#101' "$SCRATCH/dm.log" || fail "stuck-armed-thread-dm-once: DM does not name #101"
 grep -qF 'these PRs are stuck and need you.' "$SCRATCH/dm.log" || fail "stuck-armed-thread-dm-once: DM header"
+[[ "$(head -c 14 "$SCRATCH/dm.log")" == "pr-cycle-watch" ]] || fail "stuck-armed-thread-dm-once: stuck DM is not a plain send: $(cat "$SCRATCH/dm.log")"
 run_tick
 [[ "$(dm_count)" == 1 ]] || fail "stuck-armed-thread-dm-once: tick 2 re-DM'd (count $(dm_count))"
 end_case stuck-armed-thread-dm-once
@@ -3149,6 +3161,7 @@ set_prs "$UNARMED101"; set_checks aaa1111 green
 _stuck_run "$REPO" branch-one "$FAILED_JSON" 60
 run_tick --dry-run
 out_has 'would DM:' || fail "stuck-dry-run-no-write: no would-DM line: $OUT"
+grep -qE 'would DM: [^ ]+ --error ' <<< "$OUT" && fail "stuck-dry-run-no-write: stuck dry-run line carries --error"
 [[ "$(dm_count)" == 0 ]] || fail "stuck-dry-run-no-write: sent a DM"
 no_file "$STATE_DIR/dm-stuck" || fail "stuck-dry-run-no-write: wrote the ledger dir"
 end_case stuck-dry-run-no-write
@@ -3238,6 +3251,8 @@ grep -qF 'already ran on head' "$SCRATCH/dm.log" 2>/dev/null \
     || fail "retry-cap-dm-names-conflict-fix: DM lacks 'already ran on head': $(cat "$SCRATCH/dm.log" 2>/dev/null)"
 grep -qF 'Or paste this to have Claude fix it:' "$SCRATCH/dm.log" 2>/dev/null \
     || fail "retry-cap-dm-names-conflict-fix: DM lost the paste line"
+[[ "$(head -c 14 "$SCRATCH/dm.log")" == "pr-cycle-watch" ]] \
+    || fail "retry-cap-dm-names-conflict-fix: DM is not a plain send: $(cat "$SCRATCH/dm.log")"
 reset
 set_prs "$RED101"; set_checks aaa1111 red
 mkdir -p "$STATE_DIR/attempts"; echo aaa1111 > "$STATE_DIR/attempts/101"

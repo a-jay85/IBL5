@@ -1,6 +1,6 @@
 ---
 description: Production operations runbook covering deploy, rollback, DB restore, sim-file recovery, logs, secrets, sim recap hosting, data retention and account deletion, the admin-only faprep.php report, and running the app without the Claude Code harness.
-last_verified: 2026-11-14
+last_verified: 2026-11-15
 ---
 
 # IBL5 Operations Runbook
@@ -328,6 +328,8 @@ Each log entry is a JSON object. Fields include `level_name`, `message`, `contex
 ### Discord error alerts
 
 When `discord_webhook_url` is set in `ibl5/config/logging.config.php`, any log entry at `discord_alert_level` (default: `error`) or above is sent to that Discord channel via `Logging\DiscordWebhookHandler`.
+
+Point these alerts at the #errors channel. On the production server, set `discord_webhook_url` in `ibl5/config/logging.config.php` to the #errors webhook URL, the same URL as the `DISCORD_ERRORS_WEBHOOK_URL` repo secret. Leave the rest of the file alone. Host failure notices from `bin/discord-dm --error` read `~/.iblbot-errors-webhook-url` and fall back to `~/.iblbot-dev-webhook-url` (ADR-0254).
 
 **A Discord error alert means:** an uncaught exception or explicit `$logger->error(...)` call reached the `error` level. First-response steps:
 

@@ -222,7 +222,7 @@ fi
 prune_snapshots
 body="$body
 snapshot: $SNAP"
-if printf '%s\n' "$body" | "$DISCORD_DM" --ping --chunk -; then
+if printf '%s\n' "$body" | "$DISCORD_DM" --error --chunk -; then
     printf '%s\n' "$hash" >"$STATE_FILE.tmp"
     mv "$STATE_FILE.tmp" "$STATE_FILE"
     echo "main-checkout-guard: alerted ${hash:0:12}"

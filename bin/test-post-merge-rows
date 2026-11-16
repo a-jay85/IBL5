@@ -100,37 +100,44 @@ for _v in "" 1a -1 " 1" "1 " 1.0 $'1\n2'; do
     if pmr_is_count "$_v"; then h_fail "is-count rejects [$_v]" "accepted"; else h_pass "is-count rejects [$_v]"; fi
 done
 
-# --- 10: ping table -----------------------------------------------------------------
-_pt() {  # label want-ping want-reasons args...
-    local _lbl="$1" _wp="$2" _wr="$3"
-    shift 3
-    pmr_ping_decision "$@"
-    h_eq "ping-table $_lbl ping" "$_wp" "$PMR_PING"
-    h_eq "ping-table $_lbl reasons" "$_wr" "$PMR_PING_REASONS"
+# --- 10: needs-you reasons table ----------------------------------------------------
+_pt() {  # label want-reasons args...
+    local _lbl="$1" _wr="$2"
+    shift 2
+    unset PMR_PING PMR_PING_REASONS
+    pmr_needs_you_reasons "$@"
+    h_eq "reasons-table $_lbl reasons" "$_wr" "$PMR_NEEDS_YOU_REASONS"
+    h_eq "reasons-table $_lbl sets no PMR_PING" "unset" "${PMR_PING+set}${PMR_PING-unset}"
 }
-_pt all-clear false "" 0 0 checklist=success
-_pt manual true manual 1 0 checklist=success
-_pt auto-failed true auto-failed 0 1 checklist=success
-_pt job-failure true job:checklist=failure 0 0 checklist=failure
-_pt job-cancelled true job:checklist=cancelled 0 0 checklist=cancelled
-_pt job-skipped true job:checklist=skipped 0 0 checklist=skipped
-_pt job-empty true job:checklist= 0 0 checklist=
-_pt bad-manual true bad-count:manual abc 0
-_pt empty-manual true bad-count:manual "" 0
-_pt bad-failed true bad-count:auto_failed 0 x
-_pt no-jobs false "" 0 0
+_pt all-clear "" 0 0 checklist=success
+_pt manual manual 1 0 checklist=success
+_pt auto-failed auto-failed 0 1 checklist=success
+_pt job-failure job:checklist=failure 0 0 checklist=failure
+_pt job-cancelled job:checklist=cancelled 0 0 checklist=cancelled
+_pt job-skipped job:checklist=skipped 0 0 checklist=skipped
+_pt job-empty job:checklist= 0 0 checklist=
+_pt bad-manual bad-count:manual abc 0
+_pt empty-manual bad-count:manual "" 0
+_pt bad-failed bad-count:auto_failed 0 x
+_pt no-jobs "" 0 0
 
 _err="$SCRATCH/huge.err"
-pmr_ping_decision 99999999999999999999999 0 2> "$_err"
-h_eq "ping-table huge ping" true "$PMR_PING"
-h_eq "ping-table huge reasons" manual "$PMR_PING_REASONS"
-h_not_contains "ping-table huge no arithmetic error" "$(cat "$_err")" "integer expression"
+pmr_needs_you_reasons 99999999999999999999999 0 2> "$_err"
+h_eq "reasons-table huge reasons" manual "$PMR_NEEDS_YOU_REASONS"
+h_not_contains "reasons-table huge no arithmetic error" "$(cat "$_err")" "integer expression"
+
+# The old entry point is gone.
+if declare -F pmr_ping_decision >/dev/null; then
+    h_fail "pmr_ping_decision is removed" "still defined"
+else
+    h_pass "pmr_ping_decision is removed"
+fi
 
 # --- 11: no args under set -u -------------------------------------------------------
-_out="$(bash -c 'set -euo pipefail; . "$1"; pmr_ping_decision; printf "%s|%s" "$PMR_PING" "$PMR_PING_REASONS"' _ "$LIB")"
+_out="$(bash -c 'set -euo pipefail; . "$1"; pmr_needs_you_reasons; printf "%s" "$PMR_NEEDS_YOU_REASONS"' _ "$LIB")"
 _rc=$?
-h_eq "ping-no-args exit" 0 "$_rc"
-h_eq "ping-no-args result" "true|bad-count:manual bad-count:auto_failed" "$_out"
+h_eq "reasons-no-args exit" 0 "$_rc"
+h_eq "reasons-no-args result" "bad-count:manual bad-count:auto_failed" "$_out"
 
 # --- 12: executor lookup ------------------------------------------------------------
 # A scratch bin/ holding a copy of the lib: the lib finds executors next to itself.

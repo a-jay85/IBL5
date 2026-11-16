@@ -12,13 +12,12 @@
 #   SELF-GOVERNING sign-off line there instead, and any other two-way localized change
 #   compresses the What/Watch budgets. An unreadable path exits 2; a missing or malformed danger
 #   line leaves the output unchanged.
-#   After-merge mode: [--ping-out FILE] [--manual-count N] [--auto-ci-count N]
+#   After-merge mode: [--after-merge] [--manual-count N] [--auto-ci-count N]
 #   [--auto-mac-count N] [--auto-failed-count N] [--comment-url URL] [--run-url URL]
-#   [--job-result NAME=RESULT]...  --ping-out turns the mode on and receives `true` or
-#   `false`. The ping is true when manual or auto-failed rows exist, when any count is not
-#   all digits, or when any --job-result is not `success`. A bad count or a failed job
-#   writes `true` and still exits 0, so the merge is announced. `--ping-out ''` exits 2.
-#   The top of the message then carries the action line and the directions link.
+#   [--job-result NAME=RESULT]...  --after-merge turns the mode on. The top of the
+#   message then names manual or auto-failed rows, any count that is not all digits, and
+#   any --job-result that is not `success`, with the directions link. A bad count or a
+#   failed job still exits 0, so the merge is announced. The message never @mentions anyone.
 #
 # Consumed by .github/workflows/merge-digest-notify.yml, which pipes in the body of the
 # LAST comment carrying `<!-- pr-ready-verdict -->`.
@@ -76,8 +75,7 @@ TITLE=""
 URL=""
 BRANCH=""
 PR_BODY_FILE=""
-PING_OUT=""
-PING_OUT_SET=0
+AM_MODE=0
 AM_MANUAL=""
 AM_AUTO_CI=""
 AM_AUTO_MAC=""
@@ -92,7 +90,7 @@ while [ $# -gt 0 ]; do
         --url)       URL="${2-}";       shift 2 ;;
         --branch)    BRANCH="${2-}";    shift 2 ;;
         --pr-body-file) PR_BODY_FILE="${2-}"; shift 2 ;;
-        --ping-out)  PING_OUT="${2-}"; PING_OUT_SET=1; shift 2 ;;
+        --after-merge)       AM_MODE=1;              shift ;;
         --manual-count)      AM_MANUAL="${2-}";      shift 2 ;;
         --auto-ci-count)     AM_AUTO_CI="${2-}";     shift 2 ;;
         --auto-mac-count)    AM_AUTO_MAC="${2-}";    shift 2 ;;
@@ -117,10 +115,6 @@ case "$PR_NUMBER" in
         printf 'digest-dm-build: --pr-number must be digits, got: %s\n' "$PR_NUMBER" >&2
         exit 2 ;;
 esac
-if [ "$PING_OUT_SET" = 1 ] && [ -z "$PING_OUT" ]; then
-    printf 'digest-dm-build: --ping-out needs a value\n' >&2
-    exit 2
-fi
 
 # _digest_labels -- fold a `### Merge digest` block into "<label>\t<one-line value>" records.
 # Values spanning several lines are folded so each label yields exactly one record.
@@ -184,10 +178,9 @@ _label_value() {
 
 WHAT="$(_label_value 'What changed')"
 WATCH="$(_label_value 'Watch')"
-# A zero-width space after each `@` in PR-sourced text: it renders but never notifies. The
-# ping arms allowed_mentions.users=[owner] on some posts, so a `<@id>` or `@everyone` typed
-# into a title or digest must stay inert whatever the ping value. send.sh's own prepended
-# mention is added later and is never touched.
+# A zero-width space after each `@` in PR-sourced text: it renders but never notifies.
+# send.sh already posts with allowed_mentions {"parse":[]}; this keeps a `<@id>` or
+# `@everyone` typed into a title or digest inert even if a future sender forgets that.
 ZWSP="$(printf '\342\200\213')"
 TITLE="${TITLE//@/@$ZWSP}"
 WHAT="${WHAT//@/@$ZWSP}"
@@ -223,24 +216,23 @@ elif [ "$MD_DOOR" = two-way ]; then
 fi
 TITLE_T="$(_trunc "$TITLE_MAX" "$TITLE")"
 
-# After-merge mode (--ping-out): decide the ping and build the top block. A bad VALUE never
-# exits non-zero, since a failed build step would skip the send and silence the merge.
-# Bad values ping instead.
+# After-merge mode (--after-merge): build the top block. A bad VALUE never exits non-zero,
+# since a failed build step would skip the send and silence the merge. Bad values are
+# named in the top block instead.
 TOP=""
-if [ "$PING_OUT_SET" = 1 ]; then
+if [ "$AM_MODE" = 1 ]; then
     _results=(${JOB_RESULTS[@]+"${JOB_RESULTS[@]}"})
-    # The two auto counts are display-only. A pseudo-result makes a bad value ping too.
+    # The two auto counts are display-only. A pseudo-result names a bad value too.
     if ! pmr_is_count "$AM_AUTO_CI"; then _results+=("auto_ci_count=invalid"); fi
     if ! pmr_is_count "$AM_AUTO_MAC"; then _results+=("auto_mac_count=invalid"); fi
-    pmr_ping_decision "$AM_MANUAL" "$AM_FAILED" ${_results[@]+"${_results[@]}"}
-    printf '%s\n' "$PMR_PING" > "$PING_OUT"
-    printf 'ping=%s reasons=%s\n' "$PMR_PING" "${PMR_PING_REASONS:-none}" >&2
+    pmr_needs_you_reasons "$AM_MANUAL" "$AM_FAILED" ${_results[@]+"${_results[@]}"}
+    printf 'reasons=%s\n' "${PMR_NEEDS_YOU_REASONS:-none}" >&2
     _url_re='^https://[^[:space:]<>]+$'
     DIR_URL="$URL"
     if [[ "$AM_COMMENT_URL" =~ $_url_re ]]; then DIR_URL="$AM_COMMENT_URL"; fi
     RUN_REF='(run link unavailable)'
     if [[ "$RUN_URL" =~ $_url_re ]]; then RUN_REF="<$RUN_URL>"; fi
-    _reasons=" ${PMR_PING_REASONS//@/@$ZWSP} "
+    _reasons=" ${PMR_NEEDS_YOU_REASONS//@/@$ZWSP} "
     _nz='[1-9]'
     case "$_reasons" in
         *" bad-count:"*|*" job:"*)
@@ -257,7 +249,7 @@ if [ "$PING_OUT_SET" = 1 ]; then
     esac
     if pmr_is_count "$AM_AUTO_CI" && pmr_is_count "$AM_AUTO_MAC" \
             && { [[ "$AM_AUTO_CI" =~ $_nz ]] || [[ "$AM_AUTO_MAC" =~ $_nz ]]; }; then
-        TOP="${TOP:+$TOP$'\n'}After merge: $AM_AUTO_CI CI and $AM_AUTO_MAC Mac step(s) run automatically; Mac failures ping you in #dev."
+        TOP="${TOP:+$TOP$'\n'}After merge: $AM_AUTO_CI CI and $AM_AUTO_MAC Mac step(s) run automatically; Mac failures are reported on Discord."
     fi
     if [ -n "$TOP" ]; then
         WHAT_MAX=$((WHAT_MAX - ${#TOP} - 2))

@@ -128,7 +128,7 @@ dirty_a
 run_guard
 check "exit 0" [ "$RC" -eq 0 ]
 check "one DM call" [ "$(ncalls)" -eq 1 ]
-check "args are --ping --chunk -" [ "$(cat "$T/dm.calls")" = "--ping --chunk -" ]
+check "args are --error --chunk -" [ "$(cat "$T/dm.calls")" = "--error --chunk -" ]
 check "body names a.txt" has "$(cat "$T/dm.body.1")" "a.txt"
 check "state holds a 40-hex hash" grep -Eq '^[0-9a-f]{40}$' "$T/state/state"
 end_case

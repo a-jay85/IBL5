@@ -8,10 +8,13 @@
 #   non-empty seam it prints <bin-dir>/discord-dm. Returns 2 when <bin-dir> is
 #   missing or a seam name is not a shell identifier.
 #
-# dm_ping <msg> [flag ...]
-#   Runs "$DM_CMD" --ping [flag ...] <msg>. The message goes last, matching
-#   discord-dm's argument order. DM_CMD is the caller's resolved binary.
-#   Returns discord-dm's exit status. Callers keep their own gating and || true.
+# dm_send <msg> [flag ...]
+#   Runs "$DM_CMD" [flag ...] <msg>: a routine or needs-you notice (#dev).
+# dm_error <msg> [flag ...]
+#   Runs "$DM_CMD" --error [flag ...] <msg>: a failure notice (#errors).
+# Both return 2 on a missing <msg> or an unset DM_CMD. The message goes last,
+# matching discord-dm's argument order. DM_CMD is the caller's resolved binary.
+# Both return discord-dm's exit status. Callers keep their own gating and || true.
 
 [ -n "${_DM_SOURCED:-}" ] && return 0
 _DM_SOURCED=1
@@ -38,16 +41,21 @@ dm_bin() {
     printf '%s\n' "$dir/discord-dm"
 }
 
-dm_ping() {
-    if [ $# -lt 1 ]; then
-        printf '%s\n' "dm_ping: missing <msg>" >&2
-        return 2
-    fi
-    if [ -z "${DM_CMD:-}" ]; then
-        printf '%s\n' "dm_ping: DM_CMD is not set" >&2
-        return 2
-    fi
+_dm_check() { # <caller> <argc>
+    if [ "$2" -lt 1 ]; then printf '%s\n' "$1: missing <msg>" >&2; return 2; fi
+    if [ -z "${DM_CMD:-}" ]; then printf '%s\n' "$1: DM_CMD is not set" >&2; return 2; fi
+}
+
+dm_send() {
+    _dm_check dm_send $# || return 2
     local msg="$1"
     shift
-    "$DM_CMD" --ping "$@" "$msg"
+    "$DM_CMD" "$@" "$msg"
+}
+
+dm_error() {
+    _dm_check dm_error $# || return 2
+    local msg="$1"
+    shift
+    "$DM_CMD" --error "$@" "$msg"
 }

@@ -4,7 +4,7 @@ description: "Plan an implementation task: enforces a verification matrix, direc
 disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
-last_verified: 2026-11-13
+last_verified: 2026-11-16
 ---
 
 # /plan — Implementation Planning with Verification Matrix
@@ -243,18 +243,18 @@ Run this step once per PR-sized unit identified in Step 2.5. Each run plans exac
 
 The Plan agent auto-loads CLAUDE.md, all always-loaded rules (agent-tiering, core-coding, etc.), and user memory. Do NOT re-inject any of these into the prompt — only supply what the agent cannot get on its own.
 
-Launch a **single Plan agent** with a prompt containing ALL of the items listed below (1 to 5). **Choose the architect tier.** The tier is an Opus judgment. `bin/plan-tier-hint` makes it, and you own the final call. Default to `plan-architect` whenever you are unsure.
+Launch a **single Plan agent** with a prompt containing ALL of the items listed below (1 to 5). **Choose the architect tier.** The tier is an Opus judgment. `bin/plan-tier-hint` makes it, and you follow it. You may move an `xhigh` hint down to `plan-architect` when Opus can handle the plan; say why in one line. You may move a `default` or `sonnet` hint up to `plan-architect-xhigh` only when the owner approved Fable for this plan. A headless run has no owner to ask, so it keeps the hint, with one exception: when the brief carries a `plan-architect-xhigh` directive plus a `tier-ok:` line citing the owner's approval of Fable, keep xhigh. Default to `plan-architect` whenever you are unsure.
 
-1. **`plan-architect-xhigh` (`model: fable`, `effort: high`).** Pick it when you judge that Opus is likely to get this plan wrong **and** a wrong plan would be expensive: hard to notice before merge, hard to undo after, or harmful to league data, credentials, or access control. That is the Fable test in `.claude/rules/agent-tiering-fable.md`. Fable 5.2 costs 2 times Opus 5.5 per token, so both halves must hold. Things worth weighing, none of which decides the tier by itself: a security surface or trust boundary, a destructive migration, a change to what a gate rejects, and the mitigations the task already carries (`auto_merge: false`, a fail-closed hard constraint, characterization tests that pin today's output).
+1. **`plan-architect-xhigh` (`model: fable`, `effort: high`).** The hint picks it when it judges that Opus is likely to get this plan wrong **and** a wrong plan would be expensive: hard to notice before merge, hard to undo after, or harmful to league data, credentials, or access control. That is the Fable test in `.claude/rules/agent-tiering-fable.md`. Fable 5.2 costs 2 times Opus 5.5 per token, so both halves must hold. Things worth weighing, none of which decides the tier by itself: a security surface or trust boundary, a destructive migration, a change to what a gate rejects, and the mitigations the task already carries (`auto_merge: false`, a fail-closed hard constraint, characterization tests that pin today's output).
 
    **Hold-rule definitions.** Step 4 gate 14(e) and `_hold-and-remediation.md` apply these two definitions to the `auto_merge` hold. They set no tier.
 
    - **Gate removal or weakening.** The diff deletes, relaxes, or disables an **executable gate**. A gate is *executable* when it can reject: a hook that emits a deny, a `bin/check-*` failure condition, the tier/model logic under `bin/lib/plan-*`, or a `/post-plan` Phase 6.5 arming condition. The test is behavioural: after the change, some input that the gate previously rejected now passes. If no input changes verdict, it is no removal or weakening. Decision-procedure-preserving prose, an additive gate, a mechanism/plumbing refactor, and a non-gating skill step all fail that test, *whatever directory they sit in*. `.claude/skills`, `.claude/rules`, and `~/.claude/hooks` are where to **look** for an executable gate. The directory alone is never the test.
    - **Bootstrap hazard** — the diff edits the arming, escalation, or auto-merge rule that governs **its own merge**: a Phase 6.5 arming condition, the `feat:` human-signoff floor, or `auto_merge` handling in `/post-plan`. Rewriting routing that will govern some *later, unrelated* plan is **not** a bootstrap hazard.
 
-   Before you decide, run `bin/plan-tier-hint --desc "<task description>"` (add `--files a,b,c` when Step 2 named the files). It makes one paid Opus 5.5 call, prints `xhigh`, `default`, or `sonnet`, and exits 0. `--explain` adds the judge's reason, which names what is at stake, how reversible it is, and which mitigations it counted. A reason starting `judge-failsafe:` means the judge failed and the hint fell back to `default`. Then apply the Fable test yourself. Every verdict is appended to `~/.claude/logs/plan-tier-hint.log`.
+   Before you decide, run `bin/plan-tier-hint --desc "<task description>"` (add `--files a,b,c` when Step 2 named the files). It makes one paid Opus 5.5 call, prints `xhigh`, `default`, or `sonnet`, and exits 0. `--explain` adds the judge's reason, which names what is at stake, how reversible it is, and which mitigations it counted. A reason starting `judge-failsafe:` means the judge failed and the hint fell back to `default`. For that failsafe case only, use `plan-architect` unless the owner approves Fable. Any other verdict follows the tier rule above. Every verdict is appended to `~/.claude/logs/plan-tier-hint.log`.
 
-   A plan you judge worth Fable stays on Fable even when it is also recipe-backed. The escalation outranks the downgrade in item 2.
+   A plan the hint puts on xhigh stays on xhigh even when it is also recipe-backed, unless you move it down under the rule above. The escalation outranks the downgrade in item 2.
 2. **`plan-architect-sonnet` (`model: claude-sonnet-5-5`).** Pick it when you did not pick xhigh **AND** the source task/backlog entry is *recipe-backed*: it carries an explicit recipe **plus** a named existing pattern to copy (the marker-swap / mechanical-sweep class). Composing a plan from a pre-resolved recipe is mechanical composition, so the cheaper Sonnet architect suffices. Pass `subagent_type: "plan-architect-sonnet"` (exactly; it must byte-match the def's `name:`).
 3. **`plan-architect` (`model: opus`, `effort: high`).** The default, and the answer whenever you are unsure.
 

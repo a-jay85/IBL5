@@ -16,6 +16,7 @@ parameters:
         - bin/check-coverage-regression
         - bin/check-seed-id-uniqueness
         - bin/check-xml-class-refs
+        - bin/delete-account
         - bin/migrate
         - bin/migrate-seed
         - bin/purge-audit-log

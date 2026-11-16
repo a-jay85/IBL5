@@ -7,7 +7,8 @@
 # A lock is stale when its recorded pid is provably dead (kill -0 fails and ps -p finds
 # nothing), or when it has no pid file and is older than WTLOCK_GRACE_SECS (default 30): a
 # holder killed between mkdir and the pid write must not wedge the lock. Mtime is read only
-# for that pid-less case. An unreadable or non-numeric pid file reads as held.
+# for that pid-less case. An empty pid file counts as pid-less. An unreadable or
+# non-numeric pid file reads as held.
 # Every read uses a redirect or a here-string, never a pipe into grep -q (SIGPIPE-safe).
 
 # shellcheck source=bin/lib/claim-file.sh
@@ -85,8 +86,8 @@ wtlock_stale() {
 }
 
 # wtlock_create <lockdir> <pid>: mkdir the lock and claim pid with noclobber; rc 1 when the
-# dir or pid already exists. When the pid write fails it removes the dir it just made, so it
-# never leaves a pid-less lock behind.
+# dir or pid already exists. When the claim fails and no pid file exists, it removes the dir.
+# A write that fails after the claim leaves an empty pid, which wtlock_pidless_old ages out.
 wtlock_create() {
     mkdir "$1" 2>/dev/null || return 1
     claim_file "$1/pid" printf '%s\n' "$2" && return 0

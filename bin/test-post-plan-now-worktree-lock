@@ -185,6 +185,18 @@ if should_run lib-pidless; then
     h_eq "lib-pidless: young pid-less dir still refuses (rc 1)" "1" "$RC"
     h_absent "lib-pidless: young pid-less dir gets no pid" "$L/pid"
     reset_lock
+    # An empty pid file (claim made, write failed) ages out like a missing one.
+    mkdir "$L"; : > "$L/pid"; touch -t 200001010000 "$L"
+    RC=0; wtlock_live "$L" >/dev/null || RC=$?
+    h_eq "lib-pidless: old dir with empty pid reads free (rc 1)" "1" "$RC"
+    RC=0; wtlock_acquire "$L" "$LIVE" >/dev/null || RC=$?
+    h_eq "lib-pidless: old dir with empty pid is reclaimed (rc 0)" "0" "$RC"
+    h_eq "lib-pidless: reclaimed empty-pid lock holds the new pid" "$LIVE" "$(cat "$L/pid")"
+    reset_lock
+    mkdir "$L"; : > "$L/pid"
+    RC=0; OUT=$(wtlock_acquire "$L" "$LIVE") || RC=$?
+    h_eq "lib-pidless: young dir with empty pid still refuses (rc 1)" "1" "$RC"
+    reset_lock
 fi
 
 # Thread lock-reclaim-race: two runs reclaiming one dead lock. A run that finds another's

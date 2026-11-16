@@ -330,6 +330,19 @@ run_dg --diff "$T/arm-parens.diff"
 h_eq "arm-regex-refuses-parens-flags: exit 1" 1 "$RC"
 h_contains "arm-regex-refuses-parens-flags: key" "$OUT" "or-true@bin/lib/arm-demo.sh#"
 
+cat > "$T/arm-comment.diff" <<'EOF'
+diff --git a/bin/lib/arm-demo.sh b/bin/lib/arm-demo.sh
+--- a/bin/lib/arm-demo.sh
++++ b/bin/lib/arm-demo.sh
+@@ -10,3 +10,3 @@
+-    rm -f "$x" || true
++# x) rm -f "$x" || true
+ done
+EOF
+run_dg --diff "$T/arm-comment.diff"
+h_eq "arm-regex-refuses-comment-flags: exit 1" 1 "$RC"
+h_contains "arm-regex-refuses-comment-flags: key" "$OUT" "or-true@bin/lib/arm-demo.sh#"
+
 cat > "$T/arm-cross.diff" <<'EOF'
 diff --git a/bin/lib/arm-demo.sh b/bin/lib/arm-demo.sh
 --- a/bin/lib/arm-demo.sh

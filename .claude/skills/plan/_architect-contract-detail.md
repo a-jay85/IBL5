@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for _architect-contract.md — incident callbacks, counter-examples, procedure elaboration, and taxonomy rationale moved from the rules spine. The plan-architect never reads it; load only when editing the contract.
-last_verified: 2026-11-12
+last_verified: 2026-11-16
 ---
 
 Read-on-demand companion to `_architect-contract.md` (the plan-architect's output contract). This file holds the incident callbacks, counter-examples, procedure elaboration, and extended rationale for each operative rule in the spine. The plan-architect never reads it — the spine's pointer lines name the specific section to open when editing the contract.
@@ -71,6 +71,8 @@ The `(conditional)` marker exempts an entry from the MISSING-FILE check, but onl
 - `(conditional Phase 4 only)` → MUST_APPEAR (write the dash form to exempt)
 
 A keyword in surrounding prose does **not** exempt — only the parenthesized group signals "this is a marker, not a description." Canonical markers: `(reference)`, `(read-only)`, `(read-only reference)`, `(verify)`, `(verification)`, `(template)`, `(no-edit)`, `(no-change)`, `(unchanged)`, `(context)`, `(conditional)`. All tokens match as **whole words** — `(filename references the affected class)` and `(the referenced file is deleted)` are **not** exempt because `references`/`referenced` are not the token `reference`. An explanatory tail inside the same parens is allowed for the non-`conditional` tokens — e.g. `(reference — pattern to mirror)`.
+
+Gate `[CR]` in `bin/check-plan` hard-fails a must-appear entry whose annotation opens with a bare exempt word outside parentheses, such as `` `path`: reference. ``. Phase 5.0 exempts only a parenthesized marker, so that entry would hold post-plan with `MISSING-FILE:`. Wrap the word in parentheses: `` `path` (reference) `` (backlog#1830).
 
 A bare path OR a path you annotate with a change-description is still checked; only the reference marker exempts. The `## Critical Files` section must be in **list form** (`- \`path\` (annotation)`); a markdown-table section is rejected by `bin/check-plan` gate `[F]` because a table parses to zero entries and silently voids the whole conformance check.
 

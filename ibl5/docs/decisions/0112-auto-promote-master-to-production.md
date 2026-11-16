@@ -1,6 +1,6 @@
 ---
 description: master fast-forwards to production automatically on all-green CI, gated by the AUTO_PROMOTE_PAUSED repo variable; the push is FF-only and uses CI_PAT.
-last_verified: 2026-11-06
+last_verified: 2026-11-16
 ---
 
 # ADR-0112: Auto-promote master to production on green CI
@@ -78,3 +78,12 @@ A `workflow_run`-triggered workflow, `.github/workflows/promote-to-production.ym
 ## Addendum: Trigger list size (2026-11-06)
 
 The `## Decision` bullet "Trigger breadth" says all thirteen master-push workflows are listed. On 2026-11-06 a `push:` grep over `.github/workflows/` finds fourteen workflows that fire on a master push. `.github/workflows/promote-to-production.yml` lists twelve under `workflow_run.workflows`. `Doc Freshness Audit` and `Mirror CI images` fire on a master push and are outside that list. Whether either one can make the promoter look too early is unverified. A follow-up decides whether they belong in the list. The breadth principle in the original bullet stands.
+
+## Addendum: trigger list covers every master-push workflow (2026-11-16)
+
+The 2026-11-06 addendum counted 14 workflows that run on a master push and 12 names in `workflow_run.workflows`, and left the two unlisted ones to a follow-up. This addendum resolves it.
+
+- `Doc Freshness Audit` and `Mirror CI images` join the list. On a push that changes only Markdown, gitleaks and PR meta checks are the only listed workflows that run. Doc Freshness Audit ran for 16 to 143 seconds on master pushes, inside their range, so it could finish last. The promoter then saw a pending check and exited, and that SHA waited for the next master push. Mirror CI images overlaps the same way on its three paths.
+- The list now names all 14 master-push workflows: 2 unfiltered and 12 path-filtered. This count supersedes the figure of thirteen in the Trigger breadth bullet under Decision.
+- Both workflows also run on a schedule, Doc Freshness Audit nightly and Mirror CI images weekly. Each scheduled completion starts a promote run that the `workflow_run.event == 'push'` job guard skips. Update BEHIND PRs and Cache Dependencies already start skipped runs the same way, and the cost is one short skipped job per completion.
+- Invariant P11 in `bin/check-composite-contracts` now fails CI when the list differs from the set of workflows whose push trigger fires on master, in either direction. An unlisted workflow fails it, and so does a listed name that matches no workflow, which is how the Auto-Rebase rename drifted. `bin/test-check-composite-contracts` covers each trigger form the corpus uses.

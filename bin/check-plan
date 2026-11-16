@@ -259,6 +259,9 @@
 #                              baseline dir only on a screenshot diff, so an
 #                              unmarked entry holds post-plan forever
 #                              (backlog#1277). Fenced examples never count.
+#   CR Critical Files bare marker — a `## Critical Files` entry whose annotation
+#                              leads with a bare exempt word outside
+#                              parentheses (hard-fail; backlog#1830).
 #   BX bin/ path exists      — every bin/<path> a matrix row's location cell
 #                              runs must exist at the repo root or under ibl5/,
 #                              or be named in ## Critical Files. Covers
@@ -1449,6 +1452,26 @@ if ! cf_fence_unbalanced "$PLAN_FILE"; then
             viol "[VR] ## Critical Files entry \`$_vr_path\` carries vr-baseline-change but names CI regeneration (the update-baselines label). vr-baseline-change is must-appear, and CI commits regenerated PNGs only after the PR exists, so the pre-push diff can never carry them and post-plan hold (3) blocks forever. Mark it (conditional — only if VR baselines change); reserve (vr-baseline-change: <what>) for baselines the diff git rm's."
         fi
     done <<<"$_vr_paths"
+fi
+
+# ---------------------------------------------------------------------------
+# Gate [CR]: a Critical Files annotation that leads with a bare exempt word.
+# ---------------------------------------------------------------------------
+# `path`: reference. (no parentheses) parses MUST_APPEAR because
+# CF_EXEMPT_PATTERN honors only the parenthesized form, so post-plan Phase 5.0
+# reports MISSING-FILE and holds arming condition (3) on a PR that correctly
+# leaves the file alone (PR 3866, a-jay85/IBL5-backlog#1830). Detection lives in
+# cf_bare_marker_entries (bin/lib/critical-files.sh) so the corpus diff runs the
+# same code. Additive only: the lib parser and Phase 5.0 are unchanged. Lead
+# position only (the whole-word form is ~184 prose false positives). Skipped on
+# an unbalanced fence, which gate [F] already rejects. Measured 2026-11-16 on
+# the 2580-plan corpus: 15 entries in 5 plans, all shipped.
+if ! cf_fence_unbalanced "$PLAN_FILE"; then
+    _cr_paths=$(cf_bare_marker_entries "$PLAN_FILE")
+    while IFS= read -r _cr_path; do
+        [ -n "$_cr_path" ] || continue
+        viol "[CR] ## Critical Files entry \`$_cr_path\` leads its annotation with a bare exempt word (reference, read-only, no-edit, unchanged, verify, conditional, ...) outside parentheses. Post-plan Phase 5.0 honors only the parenthesized form, so this entry parses must-appear and holds post-plan arming condition (3) when the PR leaves the file untouched. Wrap the word in parentheses, e.g. \`$_cr_path\` (reference) or (conditional), or reword the annotation if the file is an edit target."
+    done <<<"$_cr_paths"
 fi
 
 # ---------------------------------------------------------------------------

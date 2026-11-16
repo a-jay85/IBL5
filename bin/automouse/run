@@ -547,8 +547,10 @@ export CLAUDE_HEADLESS=1
 # work, a _pool-* slot, or an in-use one prints one "kept" line and stays. A
 # plan skipped before Step 5 has no worktree; that prints "nothing to remove".
 # Never fails the run. Called at every terminal skipped/ disposal after an attempt,
-# including a plan the impl agent moved to skipped/ itself. The unusable-impl_model
-# skip runs before any attempt and is marked reap-exempt instead.
+# including a plan the impl agent moved to skipped/ itself. Two skips are marked
+# reap-exempt instead: the unusable-impl_model skip runs before any attempt, and
+# the DIVERGED-CONFLICT|DIVERGED-DIRTY worktree skip keeps a worktree that holds
+# work a human must resolve.
 reap_empty_worktree() {
     (cd "$REPO" && "$REPO/bin/wt-down" --stop "$1") >> "$LOG" 2>&1 || true
     (cd "$REPO" && "$REPO/bin/wt-remove" "$1" --if-empty) >> "$LOG" 2>&1 || true
@@ -2782,6 +2784,13 @@ while true; do
                 DIVERGED-CONFLICT|DIVERGED-DIRTY)
                     printf '[%s] %s SKIPPING: worktree needs manual resolution (%s)\n' \
                         "$(date +%H:%M:%S)" "$PLAN_SLUG" "$WT_VERDICT" >> "$LOG"
+                    # A diverged worktree cannot fix itself on a retry, so this verdict is
+                    # a deliberate disposition (IBL5-backlog#1836): stop this attempt's
+                    # watcher, move the plan to skipped/ after one claim, delete the attempt
+                    # sidecars so no attempt is burned, and keep the worktree.
+                    kill "$WATCHER_PID" 2>/dev/null || true; wait "$WATCHER_PID" 2>/dev/null || true  # diverged skip: stop this attempt's watcher
+                    WATCHER_PID=""
+                    rm -f "$HEARTBEAT_FILE" "$CMDPID_FILE"
                     SLUG=$(basename "$PLAN_SLUG")
                     mkdir -p "$NIGHTLY_DIR/reports"
                     {
@@ -2789,6 +2798,15 @@ while true; do
                             "$SLUG" "$WT_VERDICT"
                         printf 'Resolve conflicts in %s, then requeue.\n' "$IMPL_WT"
                     } > "$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-$SLUG.md"
+                    if ! dispose_entry "$PLAN_NAME" skipped; then
+                        # Queue lock held: nothing moved. Keep the attempt counted so
+                        # MAX_ATTEMPTS still bounds the re-claims (the pre-fix worst case).
+                        echo "DIVERGED skip of $PLAN_NAME: queue lock held, so the plan stays queued and the attempt stays counted." >> "$LOG"
+                    else
+                        touch -h "$NIGHTLY_DIR/skipped/$PLAN_NAME" 2>/dev/null || true
+                        rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE" "$PLAN_DEFECT_FILE"  # diverged skip: no attempt burned
+                    fi
+                    # reap-exempt: the diverged worktree holds work a human must resolve, so it stays.
                     note_failure "The worktree for $SLUG has merge conflicts or unsaved changes ($WT_VERDICT), so it was skipped. Fix $IMPL_WT, then requeue it."
                     rm -rf "$CURRENT_LOCK" 2>/dev/null || true
                     CURRENT_LOCK=""

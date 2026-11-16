@@ -190,6 +190,21 @@ assert_contains     "row9: beta failed"               "❌ beta"     "$body"
 assert_contains     "row9: gamma lonely-failure"      "❌ gamma"    "$body"
 assert_not_contains "row9: no sidecar filenames"      ".attempts"  "$body"
 h_pass "row9 — parked and failed"
+# --- row9b: a plan with a live claim lock shows as running, a dead lock stays parked ---
+setup
+printf '1' > "$NDIR/queue/live.md.attempts"
+printf '1' > "$NDIR/queue/dead.md.attempts"
+pin "$NDIR/queue/live.md.attempts" "$NDIR/queue/dead.md.attempts"
+mkdir -p "$NDIR/queue/live.md.lock" "$NDIR/queue/dead.md.lock"
+printf '%s\n' "$$" > "$NDIR/queue/live.md.lock/pid"
+sleep 0 & dead_pid=$!; wait "$dead_pid"
+printf '%s\n' "$dead_pid" > "$NDIR/queue/dead.md.lock/pid"
+body=$(run_digest --dry-run)
+assert_contains     "row9b: live lock shows running"   "🔄 live"      "$body"
+assert_contains     "row9b: running count"             "🔄 Running 1" "$body"
+assert_not_contains "row9b: live lock not parked"      "🅿️ live"      "$body"
+assert_contains     "row9b: dead lock stays parked"    "🅿️ dead"      "$body"
+h_pass "row9b — running vs parked"
 # --- row10: dedup done-queue ---
 setup
 pin "$NDIR/done/dedup.md"

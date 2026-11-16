@@ -448,6 +448,7 @@ def test_docs_refresh_holds_on_self_governing():
 
 
 def test_evaluate_docs_only_ready_rules_date_bump():
+    """Condition (7) reads ArmInputs.docs_refresh_rules_diffs: a bump passes, None holds."""
     files = [RULES_X]
     diffs = split_docs_refresh_rules_diffs(_rules_diff(RULES_X, BUMP_BODY), files)
     ok = _cond7(evaluate(_qualifying(classification=Classification(files=files),

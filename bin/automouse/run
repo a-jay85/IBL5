@@ -2787,8 +2787,7 @@ while true; do
                     # A diverged worktree cannot fix itself on a retry, so this verdict is
                     # a deliberate disposition (IBL5-backlog#1836): stop this attempt's
                     # watcher, move the plan to skipped/ after one claim, delete the attempt
-                    # sidecars so no attempt is burned, and keep the worktree. It is
-                    # reap-exempt because it holds the work a human must resolve.
+                    # sidecars so no attempt is burned, and keep the worktree.
                     kill "$WATCHER_PID" 2>/dev/null || true; wait "$WATCHER_PID" 2>/dev/null || true  # diverged skip: stop this attempt's watcher
                     WATCHER_PID=""
                     rm -f "$HEARTBEAT_FILE" "$CMDPID_FILE"
@@ -2807,6 +2806,7 @@ while true; do
                         touch -h "$NIGHTLY_DIR/skipped/$PLAN_NAME" 2>/dev/null || true
                         rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE" "$PLAN_DEFECT_FILE"  # diverged skip: no attempt burned
                     fi
+                    # reap-exempt: the diverged worktree holds work a human must resolve, so it stays.
                     note_failure "The worktree for $SLUG has merge conflicts or unsaved changes ($WT_VERDICT), so it was skipped. Fix $IMPL_WT, then requeue it."
                     rm -rf "$CURRENT_LOCK" 2>/dev/null || true
                     CURRENT_LOCK=""

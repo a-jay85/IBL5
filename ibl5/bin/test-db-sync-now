@@ -381,7 +381,7 @@ if [ ! -d "$STUB/lock" ]; then dsn_ok "LM-4: fresh lock removed after run"
 else dsn_fail "LM-4: fresh lock removed after run — dir still exists"; fi
 
 # ── Case LM-5: a rival claims the lock between the reap and our re-claim ──────
-# A stub rm removes the lock, then (once) re-plants it owned by this harness's
+# A stub rm removes the renamed-away stale lock, then (once) re-plants it owned by this harness's
 # live pid, the way a second reaper would. Our re-claim must lose and skip.
 dsn_setup
 claim_file_lying_mkdir_stub "$STUB/lyingbin"
@@ -391,7 +391,7 @@ cat > "$STUB/lyingbin/rm" <<SH
 #!/bin/bash
 /bin/rm "\$@"
 case " \$* " in
-    *" $STUB/lock "*)
+    *" $STUB/lock.reap."*)
         if [ ! -e "$STUB/raced" ]; then
             : > "$STUB/raced"
             /bin/mkdir -p "$STUB/lock"
@@ -408,6 +408,29 @@ dsn_expect_eq "LM-5: sync never called after a lost reap" "0" "$(dsn_lines "$STU
 dsn_expect_eq "LM-5: rival pid file unchanged" "$$" "$(cat "$STUB/lock/pid" 2>/dev/null)"
 if [ -d "$STUB/lock" ]; then dsn_ok "LM-5: rival lock dir kept"
 else dsn_fail "LM-5: rival lock dir kept — the losing run removed it"; fi
+
+# ── Case LM-6: a rival re-claims the lock after our stale verdict, before the rename ─
+# A stub mv plants a live rival lock (this harness's pid) just before the real
+# mv. We must not destroy it: put it back and skip.
+dsn_setup
+mkdir "$STUB/lock"
+printf '999999\n' > "$STUB/lock/pid"
+mkdir -p "$STUB/mvbin"
+cat > "$STUB/mvbin/mv" <<SH
+#!/bin/bash
+if [ ! -e "$STUB/raced" ]; then
+    : > "$STUB/raced"
+    /bin/rm -rf "$STUB/lock"
+    /bin/mkdir "$STUB/lock"
+    printf '%s\n' "$$" > "$STUB/lock/pid"
+fi
+exec /bin/mv "\$@"
+SH
+chmod +x "$STUB/mvbin/mv"
+rc="$(PATH="$STUB/mvbin:$PATH" dsn_run)"
+dsn_expect_eq "LM-6: rival re-claims before the rename, run exits 0" "0" "$rc"
+dsn_expect_eq "LM-6: sync never called" "0" "$(dsn_lines "$STUB/calls")"
+dsn_expect_eq "LM-6: rival pid file intact" "$$" "$(cat "$STUB/lock/pid" 2>/dev/null)"
 
 # ── --from-backup cases ────────────────────────────────────────────────────────
 

@@ -6,7 +6,7 @@ declare(strict_types=1);
  * Times the trade suggestions engine against a league database: a cold
  * snapshot, a warm snapshot, and one GM's generate-and-score pass.
  *
- *   php scripts/trade-suggestions-timing.php --tid=1 --repeat=3
+ *   php scripts/trade-suggestions-timing.php --teamid=1 --repeat=3
  *
  * Connection flags default to DB_HOST, DB_NAME, DB_USER and DB_PASS.
  */

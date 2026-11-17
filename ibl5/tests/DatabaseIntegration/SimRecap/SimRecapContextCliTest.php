@@ -19,6 +19,7 @@ use Tests\DatabaseIntegration\DatabaseTestCase;
  * is needed because no fixtures are committed for child visibility.
  */
 #[Group('database')]
+#[Group('mutation-unsafe')]
 final class SimRecapContextCliTest extends DatabaseTestCase
 {
     private string $scriptPath;

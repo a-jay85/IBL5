@@ -38,6 +38,14 @@ ENT_B='<directory>tests/B</directory>'
 ENT_S='<directory>tests/Support</directory>'
 ENT_C='<file>tests/C/OneTest.php</file>'
 
+# Groups block a valid phpunit-mutation.xml carries (check-xml-class-refs enforces it).
+groups_xml() {
+    local g out=''
+    for g in "$@"; do out+="<group>$g</group>"; done
+    printf '<groups><exclude>%s</exclude></groups>' "$out"
+}
+MUT_GROUPS=$(groups_xml discord-live mutation-unsafe)
+
 # Fresh case dir with the script copy and the fixture tree; echoes the path.
 new_case() {
     local d
@@ -72,7 +80,7 @@ run_case() {
 # parity-ok
 d=$(new_case)
 write_xml "$d/phpunit.xml" "$ENT_A $ENT_B $ENT_S $ENT_C"
-write_xml "$d/phpunit-mutation.xml" "$ENT_A $ENT_B $ENT_C"
+write_xml "$d/phpunit-mutation.xml" "$ENT_A $ENT_B $ENT_C" "$MUT_GROUPS"
 run_case "$d"
 want_rc parity-ok 0
 want parity-ok "$OUT" "OK: phpunit-mutation.xml lists every phpunit.xml testsuite entry (1 exempt)."
@@ -80,7 +88,7 @@ want parity-ok "$OUT" "OK: phpunit-mutation.xml lists every phpunit.xml testsuit
 # missing-directory
 d=$(new_case)
 write_xml "$d/phpunit.xml" "$ENT_A $ENT_B $ENT_S $ENT_C"
-write_xml "$d/phpunit-mutation.xml" "$ENT_A $ENT_C"
+write_xml "$d/phpunit-mutation.xml" "$ENT_A $ENT_C" "$MUT_GROUPS"
 run_case "$d"
 want_rc missing-directory 1
 want missing-directory "$OUT" "missing testsuite entry 'tests/B' listed in phpunit.xml"
@@ -88,7 +96,7 @@ want missing-directory "$OUT" "missing testsuite entry 'tests/B' listed in phpun
 # missing-file
 d=$(new_case)
 write_xml "$d/phpunit.xml" "$ENT_A $ENT_B $ENT_S $ENT_C"
-write_xml "$d/phpunit-mutation.xml" "$ENT_A $ENT_B"
+write_xml "$d/phpunit-mutation.xml" "$ENT_A $ENT_B" "$MUT_GROUPS"
 run_case "$d"
 want_rc missing-file 1
 want missing-file "$OUT" "missing testsuite entry 'tests/C/OneTest.php'"
@@ -96,7 +104,7 @@ want missing-file "$OUT" "missing testsuite entry 'tests/C/OneTest.php'"
 # exempt-honored
 d=$(new_case)
 write_xml "$d/phpunit.xml" "$ENT_A $ENT_B $ENT_S $ENT_C"
-write_xml "$d/phpunit-mutation.xml" "$ENT_A $ENT_B $ENT_C"
+write_xml "$d/phpunit-mutation.xml" "$ENT_A $ENT_B $ENT_C" "$MUT_GROUPS"
 run_case "$d"
 want_rc exempt-honored 0
 want_not exempt-honored "$OUT" "'tests/Support' listed in phpunit.xml"
@@ -104,7 +112,7 @@ want_not exempt-honored "$OUT" "'tests/Support' listed in phpunit.xml"
 # stale-exemption
 d=$(new_case)
 write_xml "$d/phpunit.xml" "$ENT_A $ENT_B $ENT_C"
-write_xml "$d/phpunit-mutation.xml" "$ENT_A $ENT_B $ENT_C"
+write_xml "$d/phpunit-mutation.xml" "$ENT_A $ENT_B $ENT_C" "$MUT_GROUPS"
 run_case "$d"
 want_rc stale-exemption 1
 want stale-exemption "$OUT" "stale parity exemption 'tests/Support'"
@@ -112,7 +120,7 @@ want stale-exemption "$OUT" "stale parity exemption 'tests/Support'"
 # short-reason
 d=$(new_case)
 write_xml "$d/phpunit.xml" "$ENT_A $ENT_B $ENT_S $ENT_C"
-write_xml "$d/phpunit-mutation.xml" "$ENT_A $ENT_B $ENT_C"
+write_xml "$d/phpunit-mutation.xml" "$ENT_A $ENT_B $ENT_C" "$MUT_GROUPS"
 sed -E "s/^(    'tests\/Support' => ).*/\1'x',/" "$SRC" > "$d/bin/check-xml-class-refs"
 if cmp -s "$SRC" "$d/bin/check-xml-class-refs"; then
     fail short-reason "sed anchor missed"
@@ -127,7 +135,7 @@ d=$(new_case)
 mkdir -p "$d/src/Legacy"
 SRC_BLOCK='<source><include><directory>src</directory></include><exclude><directory>src/Legacy</directory></exclude></source>'
 write_xml "$d/phpunit.xml" "$ENT_A $ENT_B $ENT_S $ENT_C" "$SRC_BLOCK"
-write_xml "$d/phpunit-mutation.xml" "$ENT_A $ENT_B $ENT_C"
+write_xml "$d/phpunit-mutation.xml" "$ENT_A $ENT_B $ENT_C" "$MUT_GROUPS"
 run_case "$d"
 want_rc source-exclude-ignored 0
 want source-exclude-ignored "$OUT" "(1 exempt)"
@@ -135,7 +143,7 @@ want source-exclude-ignored "$OUT" "(1 exempt)"
 # trailing-slash (near-miss)
 d=$(new_case)
 write_xml "$d/phpunit.xml" "<directory>tests/A/</directory> $ENT_B $ENT_S $ENT_C"
-write_xml "$d/phpunit-mutation.xml" "$ENT_A $ENT_B $ENT_C"
+write_xml "$d/phpunit-mutation.xml" "$ENT_A $ENT_B $ENT_C" "$MUT_GROUPS"
 run_case "$d"
 want_rc trailing-slash 0
 want trailing-slash "$OUT" "(1 exempt)"
@@ -144,7 +152,7 @@ want trailing-slash "$OUT" "(1 exempt)"
 d=$(new_case)
 mkdir -p "$d/tests/D"
 write_xml "$d/phpunit.xml" "$ENT_A $ENT_B $ENT_S $ENT_C"
-write_xml "$d/phpunit-mutation.xml" "$ENT_A $ENT_B $ENT_C <directory>tests/D</directory>"
+write_xml "$d/phpunit-mutation.xml" "$ENT_A $ENT_B $ENT_C <directory>tests/D</directory>" "$MUT_GROUPS"
 run_case "$d"
 want_rc mutation-only-extra 0
 want mutation-only-extra "$OUT" "(1 exempt)"
@@ -159,11 +167,43 @@ want mutation-config-absent "$OUT" "phpunit-mutation.xml not found next to phpun
 # stale-ref-preserved: the original stale-reference check still fires
 d=$(new_case)
 write_xml "$d/phpunit.xml" "$ENT_A $ENT_B $ENT_S $ENT_C <directory>tests/Gone</directory>"
-write_xml "$d/phpunit-mutation.xml" "$ENT_A $ENT_B $ENT_C <directory>tests/Gone</directory>"
+write_xml "$d/phpunit-mutation.xml" "$ENT_A $ENT_B $ENT_C <directory>tests/Gone</directory>" "$MUT_GROUPS"
 run_case "$d"
 want_rc stale-ref-preserved 1
 want stale-ref-preserved "$OUT" "stale <directory> reference"
 want stale-ref-preserved "$OUT" "'tests/Gone' does not exist"
+
+# mutation-groups-missing-discord-live
+d=$(new_case)
+write_xml "$d/phpunit.xml" "$ENT_A $ENT_B $ENT_S $ENT_C"
+write_xml "$d/phpunit-mutation.xml" "$ENT_A $ENT_B $ENT_C" "$(groups_xml mutation-unsafe)"
+run_case "$d"
+want_rc mutation-groups-missing-discord-live 1
+want mutation-groups-missing-discord-live "$OUT" "must exclude the 'discord-live' group"
+
+# mutation-groups-missing-mutation-unsafe
+d=$(new_case)
+write_xml "$d/phpunit.xml" "$ENT_A $ENT_B $ENT_S $ENT_C"
+write_xml "$d/phpunit-mutation.xml" "$ENT_A $ENT_B $ENT_C" "$(groups_xml discord-live)"
+run_case "$d"
+want_rc mutation-groups-missing-mutation-unsafe 1
+want mutation-groups-missing-mutation-unsafe "$OUT" "must exclude the 'mutation-unsafe' group"
+
+# mutation-groups-excludes-database
+d=$(new_case)
+write_xml "$d/phpunit.xml" "$ENT_A $ENT_B $ENT_S $ENT_C"
+write_xml "$d/phpunit-mutation.xml" "$ENT_A $ENT_B $ENT_C" "$(groups_xml database discord-live mutation-unsafe)"
+run_case "$d"
+want_rc mutation-groups-excludes-database 1
+want mutation-groups-excludes-database "$OUT" "excludes the 'database' group"
+
+# mutation-groups-near-miss: a group whose name only starts with a required one
+d=$(new_case)
+write_xml "$d/phpunit.xml" "$ENT_A $ENT_B $ENT_S $ENT_C"
+write_xml "$d/phpunit-mutation.xml" "$ENT_A $ENT_B $ENT_C" "$(groups_xml discord-live-extra mutation-unsafe)"
+run_case "$d"
+want_rc mutation-groups-near-miss 1
+want mutation-groups-near-miss "$OUT" "must exclude the 'discord-live' group"
 
 echo "$PASSES passed, $FAILS failed"
 [ "$FAILS" -eq 0 ]

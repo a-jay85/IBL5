@@ -21,6 +21,7 @@ use PHPUnit\Framework\TestCase;
  * are symlinks back to the real tree.
  */
 #[Group('database')]
+#[Group('mutation-unsafe')]
 final class ValidateSchemaScriptTest extends TestCase
 {
     private string $ibl5Dir;

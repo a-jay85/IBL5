@@ -12,6 +12,7 @@ use Trading\TradeProcessor;
 
 /** processTrade() commits internally — can't use DatabaseTestCase's outer-tx rollback; tearDown does manual cleanup. */
 #[Group('database')]
+#[Group('mutation-unsafe')]
 class TradeProcessorIntegrationTest extends DatabaseTestCase
 {
     private TradeProcessor $processor;

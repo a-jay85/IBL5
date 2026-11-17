@@ -30,6 +30,7 @@ use Updater\Steps\RefreshPlayoffSeriesResultsStep;
  * The phantom and NULL-ordinal tests call rebuildWithinCurrentTransaction() instead, so their writes roll back with the outer transaction.
  */
 #[Group('database')]
+#[Group('mutation-unsafe')]
 class RefreshPlayoffSeriesResultsDedupTest extends DatabaseTestCase
 {
     private const int FIXTURE_YEAR = 2099;

@@ -17,6 +17,7 @@ use Tests\Season\RealSeasonProcess;
  * rollback would not isolate the write; the child restores by hand instead.
  */
 #[Group('database')]
+#[Group('mutation-unsafe')]
 final class SharedSeasonWriteThenReadTest extends DatabaseTestCase
 {
     public function testSetSeasonPhaseRebuildsSharedSeason(): void

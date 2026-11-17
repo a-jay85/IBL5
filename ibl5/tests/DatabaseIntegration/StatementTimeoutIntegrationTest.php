@@ -15,6 +15,7 @@ use PHPUnit\Framework\Attributes\Group;
  * still drives both the web and CLI branches.
  */
 #[Group('database')]
+#[Group('mutation-unsafe')]
 class StatementTimeoutIntegrationTest extends DatabaseTestCase
 {
     /** @var list<\mysqli> */

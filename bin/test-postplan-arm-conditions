@@ -1900,7 +1900,7 @@ while IFS= read -r _rg_row; do
     _rg_keys=$(jq -r '.flagged_keys | join("\n")' <<< "$_rg_row")
     _rg_want=$(jq -r '.expected | join("\n")' <<< "$_rg_row")
     _rg_got=$(bash -c 'source "$1"; pr_removed_guards_hold "$2" "$3"' _ \
-        "$REPO_ROOT/bin/lib/pr-armable.sh" "$_rg_body" "$_rg_keys")
+        "$REPO_ROOT/bin/lib/pr-armable.sh" "$_rg_body" "$_rg_keys" </dev/null)
     if [ "$_rg_got" = "$_rg_want" ]; then
         _rg_pass=$((_rg_pass + 1))
     else

@@ -1,0 +1,566 @@
+#!/bin/bash
+set -euo pipefail
+
+# Test harness for bin/check-loop-stdin-consumed-by-child (the fed while-read stdin gate).
+# Follows bin/test-check-shell-portability style.
+#
+# Every fixture lives in a mktemp dir; nothing is written inside the IBL5 tree.
+# Fixtures are written with quoted heredocs. The gate skips heredoc bodies, so it
+# passes over this file.
+
+PASS=0
+FAIL=0
+
+pass() { echo "PASS: $1"; PASS=$((PASS + 1)); }
+fail() { echo "FAIL: $1"; FAIL=$((FAIL + 1)); }
+
+T=$(mktemp -d)
+trap 'rm -rf "$T"' EXIT
+
+SCRIPT="$(cd "$(dirname "$0")" && pwd)/check-loop-stdin-consumed-by-child"
+
+OUT=""
+RC=0
+run_gate() { set +e; OUT=$("$SCRIPT" "$@" 2>&1); RC=$?; set -e; }
+
+# expect NAME FILE WANT_RC [LINE]  -- scan FILE; a positive case also names FILE:LINE:
+expect() {
+    local name="$1" file="$2" want="$3" line="${4:-}"
+    run_gate "$file"
+    if [ "$RC" -ne "$want" ]; then
+        fail "$name (rc=$RC, want $want; output: $OUT)"
+        return 0
+    fi
+    if [ -n "$line" ]; then
+        case "$OUT" in
+            *"$(basename "$file"):$line:"*) ;;
+            *) fail "$name (output lacks $(basename "$file"):$line: ; output: $OUT)"; return 0 ;;
+        esac
+    fi
+    pass "$name"
+}
+
+cat > "$T/c1.sh" <<'FIX'
+#!/bin/bash
+while IFS=$'\t' read -r num cmd; do
+  bash -c "$cmd" >> "$log" 2>&1; rc=$?
+done <<< "$rows"
+FIX
+expect c1-row-runner-prefix "$T/c1.sh" 1 3
+
+cat > "$T/c2.sh" <<'FIX'
+#!/bin/bash
+while IFS=$'\t' read -r num cmd; do
+  bash -c "$PREFIRE_DB_PROBE_CMD" >/dev/null 2>&1; rc=$?
+done <<< "$rows"
+FIX
+expect c2-db-probe-prefix "$T/c2.sh" 1 3
+
+cat > "$T/c3.sh" <<'FIX'
+#!/bin/bash
+while IFS=$'\t' read -r num cmd; do
+  for prev in a b; do
+    :
+  done
+  ( if x; then export Y=1; fi
+    exec bash -c "$cmd" ) </dev/null >> "$log" 2>&1; rc=$?
+done <<< "$rows"
+FIX
+expect c3-fixed-row-runner "$T/c3.sh" 0
+
+cat > "$T/c4.sh" <<'FIX'
+#!/bin/bash
+while IFS=$'\t' read -r num cmd; do
+  bash -c "$P" </dev/null >/dev/null 2>&1
+done <<< "$rows"
+FIX
+expect c4-fixed-db-probe "$T/c4.sh" 0
+
+cat > "$T/c5.sh" <<'FIX'
+#!/bin/bash
+while IFS=$'\t' read -r num cmd; do
+  for prev in a b; do
+    :
+  done
+  ( if x; then export Y=1; fi
+    exec bash -c "$cmd" ) >> "$log" 2>&1; rc=$?
+done <<< "$rows"
+FIX
+expect c5-exec-inherits "$T/c5.sh" 1 7
+
+cat > "$T/c6.sh" <<'FIX'
+#!/bin/bash
+while read -r f; do ssh host "x"; done < "$list"
+FIX
+expect c6-one-liner "$T/c6.sh" 1 2
+
+cat > "$T/c7.sh" <<'FIX'
+#!/bin/bash
+printf 'a\n' | while read -r x; do claude -p "$x"; done
+FIX
+expect c7-pipe-fed "$T/c7.sh" 1 2
+
+cat > "$T/c8.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  for h in a b; do
+    ssh "$h" true
+  done
+done <<< "$x"
+FIX
+expect c8-hit-propagates-to-outer-loop "$T/c8.sh" 1 4
+
+cat > "$T/c9.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  for h in a b; do ssh "$h" true; done </dev/null
+done <<< "$x"
+FIX
+expect c9-inner-redirect-drops "$T/c9.sh" 0
+
+cat > "$T/c10.sh" <<'FIX'
+#!/bin/bash
+while read -r x; do ssh h true; done
+FIX
+expect c10-unfed-loop "$T/c10.sh" 0
+
+cat > "$T/c11.sh" <<'FIX'
+#!/bin/bash
+while read -r -u 3 x; do ssh h true; done 3< "$f"
+FIX
+expect c11-other-descriptor "$T/c11.sh" 0
+
+cat > "$T/c12.sh" <<'FIX'
+#!/bin/bash
+echo 'while read x; do ssh h; done <<< "$r"'
+FIX
+expect c12-single-quoted-text "$T/c12.sh" 0
+
+cat > "$T/c13.sh" <<'FIX'
+#!/bin/bash
+cat <<'EOS'
+while read -r x; do
+  ssh h
+done <<< "$r"
+EOS
+FIX
+expect c13-heredoc-body "$T/c13.sh" 0
+
+cat > "$T/c14.sh" <<'FIX'
+#!/bin/bash
+while read -r x; do ssh -n h true; done <<< "$r"
+FIX
+expect c14-ssh-n "$T/c14.sh" 0
+
+cat > "$T/c15.sh" <<'FIX'
+#!/bin/bash
+while read -r x; do mysql -e "SELECT 1"; done <<< "$r"
+FIX
+expect c15-mysql-e "$T/c15.sh" 0
+
+cat > "$T/c16.sh" <<'FIX'
+#!/bin/bash
+while read -r x; do mysql db; done <<< "$r"
+FIX
+expect c16-mysql-bare "$T/c16.sh" 1 2
+
+cat > "$T/c17.sh" <<'FIX'
+#!/bin/bash
+while read -r f; do
+  bash -n "$f"
+  eval "VAR=$x"
+  docker exec c ls
+done <<< "$r"
+FIX
+expect c17-non-reading-forms "$T/c17.sh" 0
+
+cat > "$T/c18.sh" <<'FIX'
+#!/bin/bash
+while read -r x; do
+  eval "$cmd"
+done <<< "$r"
+FIX
+expect c18-eval-command "$T/c18.sh" 1 3
+
+cat > "$T/c19.sh" <<'FIX'
+#!/bin/bash
+while read -r x; do
+  docker exec -i c sh
+done <<< "$r"
+FIX
+expect c19-docker-exec-i "$T/c19.sh" 1 3
+
+cat > "$T/c20.sh" <<'FIX'
+#!/bin/bash
+while read -r x; do
+  ssh h true # loop-stdin-ok: remote side never reads stdin
+done <<< "$r"
+FIX
+expect c20-marker-with-reason "$T/c20.sh" 0
+
+cat > "$T/c21.sh" <<'FIX'
+#!/bin/bash
+while read -r x; do
+  ssh h true # loop-stdin-ok:
+done <<< "$r"
+FIX
+expect c21-marker-empty-reason "$T/c21.sh" 1 3
+
+cat > "$T/c22.sh" <<'FIX'
+#!/bin/bash
+while read -r x; do
+  ssh h true &
+done <<< "$r"
+FIX
+expect c22-background "$T/c22.sh" 1 3
+
+cat > "$T/c23.sh" <<'FIX'
+#!/bin/bash
+while read -r x; do
+  ssh h c < /dev/null
+  bash -c "$c" <<< "$in"
+  bash -c "$c" <&3
+  printf x | bash
+done <<< "$r"
+FIX
+expect c23-own-redirect-forms "$T/c23.sh" 0
+
+cat > "$T/c24.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  awk '
+    while (i) {
+    do
+    done
+  ' "$f"
+  ssh h true
+done <<< "$x"
+FIX
+expect c24-multiline-quoted-awk "$T/c24.sh" 1 8
+
+cat > "$T/c25.yml" <<'FIX'
+jobs:
+  a:
+    steps:
+      - run: |
+          while IFS=$'\t' read -r num cmd; do
+            bash -c "$cmd"
+          done <<< "$rows"
+FIX
+expect c25-yaml-run-body "$T/c25.yml" 1 6
+
+cat > "$T/c26.yml" <<'FIX'
+jobs:
+  a:
+    steps:
+      - run: |
+          while IFS=$'\t' read -r num cmd; do
+            bash -c "$cmd" </dev/null
+          done <<< "$rows"
+FIX
+expect c26-yaml-run-body-fixed "$T/c26.yml" 0
+
+run_gate --bogus
+if [ "$RC" -eq 2 ]; then pass c27-unknown-option; else fail "c27-unknown-option (rc=$RC; output: $OUT)"; fi
+
+run_gate "$T/missing.sh"
+if [ "$RC" -eq 2 ]; then pass c28-missing-file; else fail "c28-missing-file (rc=$RC; output: $OUT)"; fi
+
+run_gate --help
+if [ "$RC" -eq 0 ]; then pass c29-help; else fail "c29-help (rc=$RC; output: $OUT)"; fi
+
+cat > "$T/c30.sh" <<'FIX'
+#!/bin/bash
+x='
+while read -r y; do ssh h true; done <<< "$r"
+'
+FIX
+expect c30-multiline-quoted-loop "$T/c30.sh" 0
+
+cat > "$T/c31.sh" <<'FIX'
+#!/bin/bash
+while IFS=$'\t' read -r name val; do
+  eval "FMAP_${name}=${val}"
+done <<< "$rows"
+FIX
+expect c31-eval-assignment-with-expansion-in-name "$T/c31.sh" 0
+
+cat > "$T/c32.sh" <<'FIX'
+#!/bin/bash
+x=$((1<<n))
+while read -r l; do
+  ssh h
+done < f
+FIX
+expect c32-arithmetic-shift-is-not-heredoc "$T/c32.sh" 1 4
+
+cat > "$T/c33.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  ssh host grep -n foo file
+done < f
+FIX
+expect c33-remote-command-n-flag-not-ssh-n "$T/c33.sh" 1 3
+
+cat > "$T/c34.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  bash run.sh -n 5
+done < f
+FIX
+expect c34-script-n-flag-not-bash-n "$T/c34.sh" 1 3
+
+cat > "$T/c35.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  ssh -p 22 -n host true
+  docker exec -u root c ls -l f
+done < f
+FIX
+expect c35-leading-options-stay-safe "$T/c35.sh" 0
+
+cat > "$T/c36.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  case $l in
+    a) ssh h ;;
+  esac
+done < f
+FIX
+expect c36-case-pattern-command "$T/c36.sh" 1 4
+
+cat > "$T/c37.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  sudo bash x.sh
+done < f
+FIX
+expect c37-sudo-wrapper "$T/c37.sh" 1 3
+
+cat > "$T/c38.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  docker run -p 8080:80 -i img sh
+done < f
+FIX
+expect c38-docker-run-i-after-publish "$T/c38.sh" 1 3
+
+cat > "$T/c39.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  docker -H h exec -i c sh
+done < f
+FIX
+expect c39-docker-global-option-then-exec-i "$T/c39.sh" 1 3
+
+cat > "$T/c40.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  docker run --cpu-shares 512 -i img sh
+done < f
+FIX
+expect c40-docker-unknown-value-option-falls-back "$T/c40.sh" 1 3
+
+cat > "$T/c41.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  docker run --rm -p 80:80 img grep -i foo f
+  docker exec -u root c grep -i foo f
+done < f
+FIX
+# docker is checked over the whole segment (plan Phase 2 step 10), so an inner -i is a
+# known false positive. It is loud, and </dev/null or the marker silences it (c42).
+expect c41-docker-inner-i-is-flagged "$T/c41.sh" 1 3
+expect c41-docker-inner-i-second-line "$T/c41.sh" 1 4
+
+cat > "$T/c42.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  docker run --rm -p 80:80 img grep -i foo f </dev/null
+  docker exec -u root c grep -i foo f # loop-stdin-ok: grep reads f, not stdin
+done < f
+FIX
+expect c42-docker-inner-i-silenced "$T/c42.sh" 0
+
+# Review thread: a " inside '...' inside a double-quoted $(...) must not flip quote state.
+cat > "$T/c43.sh" <<'FIX'
+#!/bin/bash
+x="$(grep -oE 'a[^"]*' f)"
+while read -r l; do bash -c "$l"; done < f
+FIX
+expect c43-quote-in-nested-substitution "$T/c43.sh" 1 3
+
+# Nested $( ) and $(( )) inside "$(...)" keep the paren count; the hit after is still seen.
+cat > "$T/c44.sh" <<'FIX'
+#!/bin/bash
+y="$(echo "$(basename 'a"b')" $((1 + (2))) 'c"d')"
+while read -r l; do ssh h true; done < f
+FIX
+expect c44-nested-parens-in-substitution "$T/c44.sh" 1 3
+
+# Review thread: a wrapper's own options are skipped, so the wrapped reader is seen.
+cat > "$T/c45.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  sudo -u x ssh h
+  sudo -n bash x
+  time -p ssh h
+  env -i bash x
+  env -u V bash x
+done < f
+FIX
+expect c45-wrapper-options-line3 "$T/c45.sh" 1 3
+expect c45-wrapper-options-line4 "$T/c45.sh" 1 4
+expect c45-wrapper-options-line5 "$T/c45.sh" 1 5
+expect c45-wrapper-options-line6 "$T/c45.sh" 1 6
+expect c45-wrapper-options-line7 "$T/c45.sh" 1 7
+
+# command -v only looks a name up, so it is not a reader.
+cat > "$T/c46.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  command -v bash >/dev/null
+  command -V ssh
+done < f
+FIX
+expect c46-command-v-is-safe "$T/c46.sh" 0
+
+# Review thread: ssh -P takes a value, so a later leading -n is still seen.
+cat > "$T/c47.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  ssh -P tag -n h true
+done < f
+FIX
+expect c47-ssh-P-value-option "$T/c47.sh" 0
+
+# Review thread loop-close-token-missed: a loop closed as done) / done} / done; still closes.
+cat > "$T/c48.sh" <<'FIX'
+#!/bin/bash
+out=$(git ls-files | while read -r f; do bash -c "$f"; done)
+FIX
+expect c48-done-paren-closes-piped-loop "$T/c48.sh" 1 2
+
+cat > "$T/c49.sh" <<'FIX'
+#!/bin/bash
+(while read -r f; do bash -c "$f"; done) < list
+FIX
+expect c49-done-paren-then-redirect "$T/c49.sh" 1 2
+
+cat > "$T/c50.sh" <<'FIX'
+#!/bin/bash
+x=$(while read -r f; do echo "$f"; done)
+for d in a; do ssh h true; done
+FIX
+expect c50-unfed-done-paren-stays-unfed "$T/c50.sh" 0
+
+# A case label named done) is not a loop close, so the later hit still counts.
+cat > "$T/c50b.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  case $l in
+    done) ssh h ;;
+  esac
+  ssh h true
+done < f
+FIX
+run_gate "$T/c50b.sh"
+case "$RC:$OUT" in
+    1:*"c50b.sh:4:"*"c50b.sh:6:"*) pass "c50b-case-label-done-not-loop-close" ;;
+    *) fail "c50b-case-label-done-not-loop-close (rc=$RC; output: $OUT)" ;;
+esac
+
+# Review thread yaml-inline-run-unscanned: a one-line run: step is scanned.
+cat > "$T/c51.yml" <<'FIX'
+jobs:
+  a:
+    steps:
+      - run: while read -r f; do bash -c "$f"; done < list
+      - name: fixed
+        run: while read -r f; do bash -c "$f" </dev/null; done < list
+      - run: |
+          echo ok
+FIX
+expect c51-yaml-inline-run "$T/c51.yml" 1 4
+case "$OUT" in
+    *"c51.yml:6:"*) fail "c51-yaml-inline-run-fixed-line-quiet (output: $OUT)" ;;
+    *) pass "c51-yaml-inline-run-fixed-line-quiet" ;;
+esac
+
+# Review thread safe-flag-false-match: a joined option value is not a bundled -n.
+cat > "$T/c52.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  ssh -ladmin host cmd
+  ssh -Jbastion host cmd
+done < f
+FIX
+run_gate "$T/c52.sh"
+case "$RC:$OUT" in
+    1:*"c52.sh:3:"*"c52.sh:4:"*) pass "c52-ssh-joined-value-not-n" ;;
+    *) fail "c52-ssh-joined-value-not-n (rc=$RC; output: $OUT)" ;;
+esac
+
+cat > "$T/c53.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  ssh -n host true
+  ssh -tn host true
+  ssh -nT host true
+  ssh -nlroot host true
+done < f
+FIX
+expect c53-ssh-bundled-n-stays-safe "$T/c53.sh" 0
+
+# Review thread case-label-reader-missed: a quoted, bracket, or alternatives case
+# label does not hide the reader after it.
+cat > "$T/c54.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  case $l in
+    "a") ssh h ;;
+    'a b') ssh h ;;
+    [ab]) ssh h ;;
+    a|b) ssh h ;;
+    (c|"d") ssh h ;;
+  esac
+done < f
+FIX
+run_gate "$T/c54.sh"
+case "$RC:$OUT" in
+    1:*"c54.sh:4:"*"c54.sh:5:"*"c54.sh:6:"*"c54.sh:7:"*"c54.sh:8:"*) pass "c54-case-label-forms-flagged" ;;
+    *) fail "c54-case-label-forms-flagged (rc=$RC; output: $OUT)" ;;
+esac
+
+# A one-line case statement: the reader after the label is still checked.
+cat > "$T/c55.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  case $l in "a") ssh h ;; esac
+  case $l in a|b) ssh h ;; esac
+done < f
+FIX
+run_gate "$T/c55.sh"
+case "$RC:$OUT" in
+    1:*"c55.sh:3:"*"c55.sh:4:"*) pass "c55-one-line-case-flagged" ;;
+    *) fail "c55-one-line-case-flagged (rc=$RC; output: $OUT)" ;;
+esac
+
+# A real pipe still feeds the reader, with or without blanks, and after a label.
+cat > "$T/c56.sh" <<'FIX'
+#!/bin/bash
+while read -r l; do
+  echo "$l" | ssh h
+  echo "$l"|ssh h
+  printf x|ssh
+  case $l in
+    a|b) echo x | ssh h ;;
+    "c") echo x|ssh h ;;
+  esac
+done < f
+FIX
+expect c56-real-pipe-still-a-pipe "$T/c56.sh" 0
+
+echo ""
+echo "$PASS passed, $FAIL failed"
+[ "$FAIL" -eq 0 ]

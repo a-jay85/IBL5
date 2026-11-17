@@ -79,6 +79,7 @@ class ReplayResult:
     attempt_secs: tuple[float, ...] = ()       # (first, retry) seconds; set only when the head replay was retried
     base_attempt_secs: tuple[float, ...] = ()  # same for the base replay
     fix_attempt_secs: tuple[float, ...] = ()   # same for the fix rerun
+    fix_flag_lines: tuple[str, ...] = ()       # fix-rerun stdout lines when fix_outcome == "flag"
 
 
 HEAD_OID_FIELD = "headRefOid"
@@ -533,15 +534,26 @@ def flag_lines(stdout: str) -> tuple[str, ...]:
     return tuple(seen)
 
 
-def new_flag_lines(r: ReplayResult) -> tuple[str, ...]:
-    """Head flag lines the base gate did not also print on the same tree."""
-    if (len(r.flag_lines) >= _FLAG_LINES_CAP
-            or len(r.base_flag_lines) >= _FLAG_LINES_CAP):
+def lines_not_in_base(head: tuple[str, ...], base: tuple[str, ...]) -> tuple[str, ...]:
+    """Lines of `head` that `base` lacks; every head line when either list is capped."""
+    if len(head) >= _FLAG_LINES_CAP or len(base) >= _FLAG_LINES_CAP:
         # A capped list is a cut-off window; comparing windows is unreliable.
         # Cannot tell, so treat every head line as new (never pre_existing).
-        return r.flag_lines
-    base = set(r.base_flag_lines)
-    return tuple(line for line in r.flag_lines if line not in base)
+        return head
+    seen = set(base)
+    return tuple(line for line in head if line not in seen)
+
+
+def new_flag_lines(r: ReplayResult) -> tuple[str, ...]:
+    """Head flag lines the base gate did not also print on the same tree."""
+    return lines_not_in_base(r.flag_lines, r.base_flag_lines)
+
+
+def fix_lines_pre_existing(r: ReplayResult) -> bool:
+    """True when the fix rerun flagged and every line it printed is a base flag line."""
+    if r.fix_outcome != "flag" or not r.fix_flag_lines:
+        return False
+    return not lines_not_in_base(r.fix_flag_lines, r.base_flag_lines)
 
 
 def _tally(gate_path: str, results, truth: dict[int, Truth]) -> GateTally:
@@ -567,7 +579,7 @@ def _tally(gate_path: str, results, truth: dict[int, Truth]) -> GateTally:
             elif state == "clean":
                 if r.base_outcome == "flag" and not new_flag_lines(r):
                     tally.pre_existing.append(r.pr)
-                elif r.fix_outcome == "pass":
+                elif r.fix_outcome == "pass" or fix_lines_pre_existing(r):
                     tally.fixed_by_pr.append(r.pr)
                 else:
                     tally.false_flags.append(r.pr)

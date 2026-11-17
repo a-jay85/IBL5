@@ -7,7 +7,15 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from harness.external_scope import external_send_change
+from harness.external_scope import (
+    _R_DM_FLOW,
+    _R_DM_REDIRECT,
+    _R_DM_TOKEN,
+    _R_DM_UNREADABLE,
+    _R_SEND,
+    _R_TRUNCATED,
+    external_send_change,
+)
 from test_merge_danger_external_replay import (
     ACTION_YML,
     ACTION_YML_BODY,
@@ -20,6 +28,7 @@ from test_merge_danger_external_replay import (
     PRESERVE_ASSIGN_BODY,
     REMOTE_DUMP_BODY,
     SYNC,
+    _load,
     _section,
 )
 
@@ -205,3 +214,119 @@ def test_line_inside_local_string_is_quiet():
         ' " 2> >(db_strip_warnings >&2) || true',
     ]
     assert external_send_change(SYNC, _section(SYNC, 523, body)) is None
+
+
+# bin/discord-dm: a changed line fires only when it can change who gets a message or what is sent.
+
+_DM_SEND_CONTEXT = '     if [ "$USE_WEBHOOK" = 1 ]; then send_webhook_one "$chunk" "$IDX"; else send_one "$chunk"; fi'
+
+
+def _dm(start, *changed):
+    """A discord-dm section whose changed lines sit between two context lines."""
+    return _section(DM, start, ['     say "sending"', *changed, " "])
+
+
+def test_dm_pr4009_fixture_is_quiet():
+    assert external_send_change(DM, _load("pr4009-discord-dm.diff")) is None
+
+
+def test_dm_webhook_file_default_change_is_one_way():
+    sec = _dm(70,
+              '-WEBHOOK_FILE="${DISCORD_DM_WEBHOOK_FILE:-$HOME/.iblbot-dev-webhook-url}"',
+              '+WEBHOOK_FILE="${DISCORD_DM_WEBHOOK_FILE:-$HOME/.iblbot-prod-webhook-url}"')
+    assert external_send_change(DM, sec) == _R_SEND
+
+
+def test_dm_route_arm_change_is_one_way():
+    sec = _dm(90,
+              '-        --route)       ROUTE="${2:-}"; shift 2 ;;',
+              '+        --route)       ROUTE="/discordDM"; shift 2 ;;')
+    assert external_send_change(DM, sec) == _R_SEND
+
+
+def test_dm_chunk_cap_change_is_one_way():
+    assert external_send_change(DM, _dm(182, "-CAP=1900", "+CAP=500")) == _R_SEND
+
+
+def test_dm_curl_in_new_log_function_is_one_way():
+    sec = _dm(350, "+log_sent() {", '+    curl -s -d "$FULL_MSG" "$LOG_URL" >/dev/null 2>&1', "+}")
+    assert external_send_change(DM, sec) == _R_DM_TOKEN
+
+
+def test_dm_eval_is_one_way():
+    assert external_send_change(DM, _dm(350, '+eval "$DISCORD_DM_EXTRA"')) == _R_DM_TOKEN
+
+
+def test_dm_dot_source_is_one_way():
+    assert external_send_change(DM, _dm(350, '+. "$HOME/.discord-dm-rc"')) == _R_SEND
+
+
+def test_dm_guarded_exit_deleted_is_one_way():
+    assert external_send_change(DM, _dm(350, '-[ "$DELIVERED" = 1 ] && exit 0')) == _R_DM_FLOW
+
+
+def test_dm_guarded_exit_test_changed_is_one_way():
+    sec = _dm(350, '-[ "$DELIVERED" = 1 ] && exit 0',
+              '+if [ "$DELIVERED" = 0 ]; then', "+    exit 0", "+fi")
+    assert external_send_change(DM, sec) == _R_DM_FLOW
+
+
+def test_dm_guarded_exit_rewrite_keeps_test_and_exit_is_quiet():
+    sec = _dm(350, '-[ "$DELIVERED" = 1 ] && exit 0',
+              '+if [ "$DELIVERED" = 1 ]; then', "+    exit 0", "+fi")
+    assert external_send_change(DM, sec) is None
+
+
+def test_dm_if_wrapping_context_send_is_one_way():
+    sec = _section(DM, 340, [" for chunk in \"${CHUNKS[@]}\"; do", "+    if false; then",
+                             _DM_SEND_CONTEXT, "+    fi", " done"])
+    assert external_send_change(DM, sec) == _R_DM_FLOW
+
+
+def test_dm_redirect_into_spool_is_one_way():
+    sec = _dm(350, """+    printf '%s\\n' "$FULL_MSG" >> "$SPOOL\"""")
+    assert external_send_change(DM, sec) == _R_DM_REDIRECT
+
+
+def test_dm_redirect_into_local_log_is_quiet():
+    sec = _dm(350, """+    printf '%s\\n' "$FULL_MSG" >> "$log\"""")
+    assert external_send_change(DM, sec) is None
+
+
+def test_dm_existing_send_function_call_is_one_way():
+    assert external_send_change(DM, _dm(350, '+chunk_message "$FULL_MSG"')) == _R_SEND
+
+
+def test_dm_redefine_existing_function_is_one_way():
+    sec = _dm(350, "+send_one() {", """+    printf '%s\\n' "$1\"""", "+}")
+    assert external_send_change(DM, sec) == _R_SEND
+
+
+def test_dm_send_var_prefix_name_is_quiet():
+    assert external_send_change(DM, _dm(350, '+    TO_LOG="$TO"')) is None
+
+
+def test_dm_quoted_send_word_fails_closed():
+    assert external_send_change(DM, _dm(350, '+    say "retry with curl later"')) == _R_DM_TOKEN
+
+
+def test_dm_unbalanced_quote_fails_closed():
+    sec = _dm(350, """+    printf '%s\\n' "unterminated""")
+    assert external_send_change(DM, sec) == _R_DM_UNREADABLE
+
+
+def test_dm_truncated_hunk_fails_closed():
+    sec = (_head(DM) + "@@ -170,4 +170,5 @@\n"
+           '     say "sending"\n+    TO_LOG="$TO"\n \n')
+    assert external_send_change(DM, sec) == _R_TRUNCATED
+
+
+@pytest.mark.parametrize("line", [
+    '+source "$HOME/x"',
+    "+v=`date`",
+    "+exec 3<>/dev/tcp/h/80",
+    '+wget -q "$u"',
+    "+cat <(printf x)",
+])
+def test_dm_deny_tokens_fire(line):
+    assert external_send_change(DM, _dm(350, line)) == _R_DM_TOKEN

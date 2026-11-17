@@ -1,5 +1,5 @@
 ---
-description: Production operations runbook covering deploy, rollback, DB restore, sim-file recovery, logs, secrets, sim recap hosting, data retention and account deletion, the admin-only faprep.php report, and running the app without the Claude Code harness.
+description: Production operations runbook covering deploy, rollback, DB restore, sim-file recovery, logs, secrets, sim recap hosting, the sim recap Discord publisher, data retention and account deletion, the admin-only faprep.php report, and running the app without the Claude Code harness.
 last_verified: 2026-11-15
 ---
 
@@ -563,6 +563,17 @@ Pull the table out of a dump, load it into a scratch database, then `INSERT ... 
 ```bash
 zcat dump.sql.gz | sed -n '/^-- Table structure for table `auth_users_audit_log`/,/^-- Table structure for table `auth_users_confirmations`/p' > audit.sql
 ```
+
+## Sim recap Discord publisher
+
+IBLbot posts each finished Regular Season sim into Discord as a slow drip. Prod enqueues the sim from the `notify` verb and pokes IBLbot. The PHP side is in `ibl5/classes/SimRecap/README.md` and the IBLbot side is in `ibl5/IBLbot/README.sim-recap.md`. The publisher stays off until `SIM_RECAP_PUBLISH_TARGET` is set.
+
+1. **Discord permissions for IBLbot.** In `#live-sims`: View Channel, Send Messages, Create Public Threads, Send Messages in Threads, Read Message History, and Embed Links. Add a channel-level grant of Mention @everyone, @here, and All Roles so the `@IBL` ping works. The bot sends with `allowed_mentions` set to `parse: []`, which still blocks `@everyone`. In `#injuries`: View Channel, Send Messages, and Read Message History.
+2. **Service-tier API key.** Issue a key for `SIM_RECAP_API_KEY` the way the bug-bot key is issued: a row in `ibl_api_keys` with a rate-limit tier of `elevated` or `unlimited`. A `standard` key gets a 403 from every publisher route. Put the key in IBLbot's environment file on the prod box.
+3. **Testing-guild dry run.** Do this before you enable prod. Run a local IBLbot with the test bot token. Set `API_BASE_URL` to a worktree stack, `SIM_RECAP_PUBLISH_TARGET=testing`, and `SIM_RECAP_TEST_CHANNEL_ID` to a channel in the testing guild. Then run `publish-enqueue --sim=N` against that worktree DB. The prod row stays untouched, and the testing target strips every mention.
+4. **Turning prod on.** Set `SIM_RECAP_PUBLISH_TARGET=prod` in IBLbot's environment file, then run `pm2 restart iblbot`. A sim that was enqueued more than 6 hours ago and has not started is never claimed, so nothing old posts when you switch the publisher on.
+5. **Title override.** Before a sim finishes, set its thread name with `php ibl5/scripts/simRecapQueue.php publish-title --sim=N --title="..."`. Use `--clear` in place of `--title` to remove it. The title must be 1 to 100 characters.
+6. **Recovery.** A row whose `attempts` reached 5 is never claimed again. Reset it with `php ibl5/scripts/simRecapQueue.php publish-enqueue --sim=N --retry`. It prints `not found or finished` and exits 1 for a missing or finished row. A reset row resumes after the last posted step. To see what a sim would post without posting it, run `publish-script --sim=N`.
 
 ## 10. Free Agent Prep Report (faprep.php)
 

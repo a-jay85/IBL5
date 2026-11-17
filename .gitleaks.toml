@@ -56,6 +56,11 @@ regexes = [
   '''123456789012345678''',
   '''999888777666555444''',
 
+  # Synthetic publish-progress token (a made-up UUID) in sim-recap test fixtures
+  # (tests/Api/Controller/SimRecapPublishControllerTest.php,
+  # tests/DatabaseIntegration/SimRecap/SimRecapQueuePublishCliTest.php).
+  '''0b6f3f0e-6f43-4f0c-9d1a-2c3b4d5e6f70''',
+
   # Owner's Discord user ID passed as the DM target in bin/test-events-review.
   # A public user ID (also hardcoded as OWNER_ID in bin/discord-dm), not a
   # credential; the DISCORD_DM_TO= prefix trips discord-client-id.

@@ -5,6 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
+    "sim-recap:dry-run": "node dist/sim-recap/dry-run.js",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "deploy-commands": "tsx src/deploy-commands.ts",

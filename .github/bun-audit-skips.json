@@ -1,0 +1,11 @@
+{
+  "skips": [
+    {
+      "ghsa": "GHSA-fc5q-39xc-vjpf",
+      "package": "picomatch",
+      "reason": "ReDoS in picomatch <=4.0.7 (npm advisory 1247710). 4.0.7 is the newest release, so no bump or override fixes it. picomatch runs only in dev/CI tooling (tailwind CSS build, vite/vitest); production PHP never loads it.",
+      "expires": "2026-12-17",
+      "decision": "Owner approved a 30-day skip in chat on 2026-11-17: https://github.com/a-jay85/IBL5/pulls?q=is%3Apr+head%3Abun-audit-expiring-skip"
+    }
+  ]
+}

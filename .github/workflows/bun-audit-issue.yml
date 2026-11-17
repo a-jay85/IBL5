@@ -46,7 +46,12 @@ jobs:
           TRIAGE_EXIT=$?
           set -e
           [ "$TRIAGE_EXIT" -le 1 ] || { echo "::error::bun-audit-triage usage error"; exit 1; }
-          echo "found=$([ "$TRIAGE_EXIT" -eq 1 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          if [ "$TRIAGE_EXIT" -eq 1 ] || grep -qE '^(ADVISORY|SKIPPED): ' "$RUNNER_TEMP/advisories.txt"; then
+            FOUND=true
+          else
+            FOUND=false
+          fi
+          echo "found=$FOUND" >> "$GITHUB_OUTPUT"
 
       - name: Resolve existing tracking issue
         id: resolve

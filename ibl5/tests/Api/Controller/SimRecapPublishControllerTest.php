@@ -167,6 +167,7 @@ class SimRecapPublishControllerTest extends TestCase
     }
 
     // ── enabled ────────────────────────────────────────────────────────────────
+    // The route replies {enabled:true} while the switch is On and {enabled:false} otherwise.
 
     public function testEnabledReportsTrueWhenPostingOn(): void
     {

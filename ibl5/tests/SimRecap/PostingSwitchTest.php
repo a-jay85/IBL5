@@ -9,6 +9,10 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use SimRecap\PostingSwitch;
 
+/**
+ * PostingSwitch::isOn() is true for exactly 'On' and fails closed for every other stored value,
+ * including a missing row.
+ */
 class PostingSwitchTest extends TestCase
 {
     public function testIsOnTrueWhenSettingIsOn(): void

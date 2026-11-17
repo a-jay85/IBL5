@@ -11,6 +11,7 @@ function makeApi(fetchFn: typeof fetch) {
     return createSimRecapApi({ baseUrl: BASE_URL, apiKey: 'secret-key', fetchFn });
 }
 
+// The server answers {enabled:true} or {enabled:false}; anything else, such as {enabled:'On'}, is malformed.
 describe('createSimRecapApi enabled()', () => {
     it('enabled() posts to the sim-recap-publish/enabled route with the API key', async () => {
         const fetchFn = vi.fn(async () => jsonResponse({ enabled: true }));

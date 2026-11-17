@@ -12,16 +12,27 @@
 #                            high     = high OR critical
 #                            critical = critical only
 #   --json                   Emit selected advisories as a JSON array instead of text.
+#   --skip-file=<path>       Read the skip list from <path> instead of the default
+#                            <repo>/.github/bun-audit-skips.json (used by the harness).
+#
+# Skip list: an advisory whose url ends in a GHSA id listed in the skip file, with
+# today (UTC) <= expires, leaves the failing set and prints a SKIPPED line. The skip
+# is live through its expires date inclusive. An expired entry is ignored and the
+# advisory fails again with a SKIP EXPIRED line. A malformed skip file exits 2 and
+# skips nothing. A missing default file means no skips.
 #
 # Text output (default): one line per advisory:
 #   ADVISORY: <package> <vulnerable_versions> <severity> <title>
+#   SKIPPED: <package> <ghsa> <severity> <title> (skip expires <date> UTC)
+#   SKIP EXPIRED: <ghsa> (<package>) skip ended <date> UTC; advisory fails again
 #
-# JSON output (--json): a JSON array of the matching advisory objects.
+# JSON output (--json): a JSON array of the failing advisory objects. The SKIPPED
+# and SKIP EXPIRED lines go to stderr, so stdout stays pure JSON.
 #
 # Exit codes:
 #   0 = clean (no advisories at or above the selected level)
 #   1 = one or more advisories found
-#   2 = usage error or malformed JSON input
+#   2 = usage error, malformed JSON input, or malformed skip file
 #
 # Reads from stdin unless a file argument is given. Empty stdin is treated as {}.
 #
@@ -34,7 +45,7 @@ set -u
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     cat <<'EOF'
-Usage: bun-audit-triage [--level=<high|critical>] [--json] [<file>]
+Usage: bun-audit-triage [--level=<high|critical>] [--json] [--skip-file=PATH] [<file>]
        bun audit --json | bun-audit-triage [--level=<high|critical>] [--json]
 
 Triage bun audit --json output, selecting high/critical advisories.
@@ -43,12 +54,13 @@ Options:
   --level=high      report high and critical advisories (default)
   --level=critical  report critical advisories only
   --json            emit advisories as JSON array instead of text lines
+  --skip-file=PATH  read the skip list from PATH
   <file>            read from file instead of stdin
 
 Exit codes:
   0  clean (no advisories at or above the selected level)
   1  one or more advisories found
-  2  usage error or malformed JSON input
+  2  usage error, malformed JSON input, or malformed skip file
 EOF
     exit 0
 fi
@@ -56,13 +68,79 @@ fi
 LEVEL="high"
 JSON_MODE=0
 INPUT_FILE=""
+SKIP_FILE_ARG=""
+REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+DEFAULT_SKIP_FILE="$REPO_DIR/.github/bun-audit-skips.json"
 
 usage() {
-    printf 'Usage: %s [--level=<high|critical>] [--json] [<file>]\n' "$(basename "$0")" >&2
+    printf 'Usage: %s [--level=<high|critical>] [--json] [--skip-file=PATH] [<file>]\n' "$(basename "$0")" >&2
     printf '  --level=high      report high and critical advisories (default)\n' >&2
     printf '  --level=critical  report critical advisories only\n' >&2
     printf '  --json            emit advisories as JSON array instead of text lines\n' >&2
-    printf 'Exit: 0=clean, 1=advisories found, 2=usage error or malformed JSON\n' >&2
+    printf '  --skip-file=PATH  read the skip list from PATH\n' >&2
+    printf 'Exit: 0=clean, 1=advisories found, 2=usage error, malformed JSON, or malformed skip file\n' >&2
+}
+
+# load_skips: print {"live":[...],"expired":[...]} for the skip file, or exit nonzero.
+# Fail closed: any defect in the file means an error, never a partial skip list.
+load_skips() {
+    if [ -z "$SKIP_FILE_ARG" ]; then
+        if [ ! -e "$DEFAULT_SKIP_FILE" ]; then
+            printf '{"live":[],"expired":[]}\n'
+            return 0
+        fi
+        set -- "$DEFAULT_SKIP_FILE"
+    else
+        if [ ! -f "$SKIP_FILE_ARG" ]; then
+            printf 'Error: skip file not found: %s\n' "$SKIP_FILE_ARG" >&2
+            return 1
+        fi
+        set -- "$SKIP_FILE_ARG"
+    fi
+    python3 - "$1" <<'PY'
+import datetime, json, re, sys
+path = sys.argv[1]
+GHSA_RE = re.compile(r'GHSA-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}')
+DATE_RE = re.compile(r'[0-9]{4}-[0-9]{2}-[0-9]{2}')
+REQUIRED = ('ghsa', 'package', 'reason', 'expires', 'decision')
+def die(msg):
+    sys.stderr.write('Error: skip file %s is malformed: %s\n' % (path, msg))
+    sys.exit(3)
+try:
+    with open(path) as fh:
+        doc = json.load(fh)
+except (OSError, ValueError) as exc:
+    die('cannot parse JSON (%s)' % exc)
+if not isinstance(doc, dict) or not isinstance(doc.get('skips'), list):
+    die('top level must be an object holding a "skips" array')
+today = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
+live, expired, seen = [], [], set()
+for i, e in enumerate(doc['skips']):
+    if not isinstance(e, dict):
+        die('entry %d is not an object' % i)
+    for key in REQUIRED:
+        if not isinstance(e.get(key), str) or not e.get(key).strip():
+            die('entry %d: missing or empty "%s"' % (i, key))
+    g = e['ghsa']
+    exp = e['expires']
+    if not GHSA_RE.fullmatch(g):
+        die('entry %d: "ghsa" %r is not a lowercase GHSA id' % (i, g))
+    if g in seen:
+        die('entry %d: duplicate ghsa %s' % (i, g))
+    seen.add(g)
+    if not DATE_RE.fullmatch(exp):
+        die('entry %d: "expires" %r is not YYYY-MM-DD' % (i, exp))
+    try:
+        datetime.date.fromisoformat(exp)
+    except ValueError:
+        die('entry %d: "expires" %r is not a real calendar date' % (i, exp))
+    item = {'ghsa': g, 'package': e['package'], 'expires': exp}
+    if today <= exp:
+        live.append(item)
+    else:
+        expired.append(item)
+print(json.dumps({'live': live, 'expired': expired}))
+PY
 }
 
 for arg in "$@"; do
@@ -75,6 +153,14 @@ for arg in "$@"; do
             ;;
         --json)
             JSON_MODE=1
+            ;;
+        --skip-file=*)
+            SKIP_FILE_ARG="${arg#--skip-file=}"
+            if [ -z "$SKIP_FILE_ARG" ]; then
+                printf 'Error: --skip-file needs a path\n' >&2
+                usage
+                exit 2
+            fi
             ;;
         --level=*)
             printf 'Error: unknown --level value: %s\n' "$arg" >&2
@@ -123,27 +209,44 @@ if ! python3 -c "import sys,json; json.load(open(sys.argv[1]))" "$TMP_INPUT" 2>/
     exit 2
 fi
 
-# Select advisories matching the requested level.
-# critical: critical only. high (default): high OR critical.
-# jq filter uses --arg lvl so no shell interpolation is needed.
+# Load the skip list. Fail closed: a defect exits 2 and skips nothing.
+if ! SKIPS_JSON=$(load_skips); then
+    printf 'Error: skip list rejected; nothing skipped\n' >&2
+    exit 2
+fi
+
+# Select advisories at the requested level (critical: critical only; high: high
+# OR critical), then partition them. A skip matches only the GHSA id taken from the
+# last path segment of the advisory url, never the package name.
+JQ_PARTITION='
+def ghsa_of: (if (.url | type) == "string" then (.url | split("/") | last) else "" end)
+  | if type == "string" and test("^GHSA-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}$") then . else "" end;
+def skip_for($g; $pk): if $g == "" then null else (first($s.live[] | select(.ghsa == $g)) // null) end;
+def expired_for($e): if $e == "" then null else (first($s.expired[] | select(.ghsa == $e)) // null) end;
+[to_entries[] | .key as $p | .value[]
+  | select(.severity == "critical" or ($lvl == "high" and .severity == "high"))
+  | ghsa_of as $g
+  | {adv: ., pkg: $p, ghsa: $g, skip: skip_for($g; $p), expired: expired_for($g)}]
+| {failing: [.[] | select(.skip == null)], skipped: [.[] | select(.skip != null)]}'
+
+if ! RESULT=$(jq -c --arg lvl "$LEVEL" --argjson s "$SKIPS_JSON" "$JQ_PARTITION" "$TMP_INPUT"); then
+    printf 'Error: could not read advisories from input\n' >&2
+    exit 2
+fi
+NOTES=$(jq -r '(.failing[] | select(.expired != null) | "SKIP EXPIRED: \(.ghsa) (\(.pkg)) skip ended \(.expired.expires) UTC; advisory fails again"), (.skipped[] | "SKIPPED: \(.pkg) \(.ghsa) \(.adv.severity) \(.adv.title) (skip expires \(.skip.expires) UTC)")' <<< "$RESULT")
+FAIL_COUNT=$(jq '.failing | length' <<< "$RESULT")
 
 if [ "$JSON_MODE" = "1" ]; then
-    OUTPUT=$(jq --arg lvl "$LEVEL" \
-        '[to_entries[] | .key as $p | .value[] | select(.severity == "critical" or ($lvl == "high" and .severity == "high"))]' \
-        "$TMP_INPUT")
-    printf '%s\n' "$OUTPUT"
-    COUNT=$(jq -n --argjson a "$OUTPUT" '$a | length')
-    if [ "$COUNT" -gt 0 ]; then
-        exit 1
-    fi
-    exit 0
+    NOTE_FD=2
+    jq '[.failing[].adv]' <<< "$RESULT"
 else
-    OUTPUT=$(jq -r --arg lvl "$LEVEL" \
-        '[to_entries[] | .key as $p | .value[] | select(.severity == "critical" or ($lvl == "high" and .severity == "high")) | "ADVISORY: \($p) \(.vulnerable_versions) \(.severity) \(.title)"] | .[]' \
-        "$TMP_INPUT")
-    if [ -n "$OUTPUT" ]; then
-        printf '%s\n' "$OUTPUT"
-        exit 1
-    fi
-    exit 0
+    NOTE_FD=1
+    jq -r '.failing[] | "ADVISORY: \(.pkg) \(.adv.vulnerable_versions) \(.adv.severity) \(.adv.title)"' <<< "$RESULT"
 fi
+if [ -n "$NOTES" ]; then
+    printf '%s\n' "$NOTES" >&"$NOTE_FD"
+fi
+if [ "$FAIL_COUNT" -gt 0 ]; then
+    exit 1
+fi
+exit 0

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace SimRecap;
 
+use Psr\Log\LoggerInterface;
+
 /**
  * Marks a sim ready for the Discord publisher and pokes IBLbot to sweep early.
  *
@@ -15,14 +17,19 @@ final class PublishEnqueuer
     /** @var callable(): void */
     private $poke;
 
+    private readonly LoggerInterface $logger;
+
     /**
      * @param callable(): void $poke Called after a successful enqueue; may throw.
+     * @param LoggerInterface|null $logger Defaults to the LoggerFactory sim-recap channel.
      */
     public function __construct(
         private readonly SimPublishProgressRepository $progress,
         callable $poke,
+        ?LoggerInterface $logger = null,
     ) {
         $this->poke = $poke;
+        $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('sim-recap');
     }
 
     /**
@@ -38,12 +45,44 @@ final class PublishEnqueuer
 
         try {
             ($this->poke)();
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
             // Fixed line only: the exception text can carry the URL.
             fwrite(STDERR, "sim-recap publish: poke failed\n");
+            self::logError($this->logger, 'sim-recap publish: poke failed', ['sim' => $sim, 'exception_class' => $e::class]);
         }
 
         return true;
+    }
+
+    /**
+     * The notify verb's hand-off. A failure writes the fixed STDERR line, logs at error
+     * level for #errors, and never escapes, so the notify exit code never changes.
+     *
+     * @param callable(): bool $enqueue
+     */
+    public static function guardedEnqueue(int $sim, callable $enqueue, ?LoggerInterface $logger = null): void
+    {
+        try {
+            $enqueue();
+        } catch (\Throwable $failure) {
+            fwrite(STDERR, 'simRecapQueue: publish enqueue failed (' . $failure::class . ")\n");
+            self::logError($logger ?? \Logging\LoggerFactory::getChannel('sim-recap'), 'simRecapQueue: publish enqueue failed', [
+                'sim' => $sim,
+                'exception_class' => $failure::class,
+            ]);
+        }
+    }
+
+    /**
+     * @param array<string, int|string> $context
+     */
+    private static function logError(LoggerInterface $logger, string $message, array $context): void
+    {
+        try {
+            $logger->error($message, $context);
+        } catch (\Throwable) {
+            // A broken log handler must never break the enqueue or the notify verb.
+        }
     }
 
     /**

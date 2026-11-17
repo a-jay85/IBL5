@@ -58,6 +58,14 @@ if ($localClassesDir !== false) {
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../db/db.php';
 
+// CLI runs skip ConfigBootstrap, and LoggerFactory::getChannel() falls back to a
+// NullHandler without this call. It routes error records to the #errors handler.
+try {
+    \Logging\LoggerFactory::fromConfig();
+} catch (\Throwable) {
+    fwrite(STDERR, "simRecapQueue: logger config failed; error logs go to STDERR only\n");
+}
+
 // db/db.php populates the untyped global $mysqli_db; narrow it once, here, so
 // every downstream call site is type-checked. (A @var directly above a function
 // declaration has no effect — that is why this needs its own statement.)
@@ -390,14 +398,10 @@ switch ($verb) {
             $notified = postStatus($repo, $sim, $host, $prior, \SimRecap\ParkPolicy::notifyStateFor('done', $row['route'], $prior));
             // Hand the finished sim to the Discord publisher. A failure here is logged and
             // never changes the notify exit code or the admin-chat claim above.
-            try {
-                (new \SimRecap\PublishEnqueuer(
-                    new \SimRecap\SimPublishProgressRepository($db),
-                    \SimRecap\PublishEnqueuer::pokeIblbot(...)
-                ))->enqueue($sim, $seasonQuery->getSeasonPhase());
-            } catch (\Throwable $e) {
-                fwrite(STDERR, 'simRecapQueue: publish enqueue failed (' . get_class($e) . ")\n");
-            }
+            \SimRecap\PublishEnqueuer::guardedEnqueue($sim, static fn (): bool => (new \SimRecap\PublishEnqueuer(
+                new \SimRecap\SimPublishProgressRepository($db),
+                \SimRecap\PublishEnqueuer::pokeIblbot(...)
+            ))->enqueue($sim, $seasonQuery->getSeasonPhase()));
         }
         $out = ['ok' => true, 'cmd' => 'notify', 'sim' => $sim, 'notified' => $notified];
         break;

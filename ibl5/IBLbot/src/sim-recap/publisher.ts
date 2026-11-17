@@ -185,6 +185,9 @@ async function publishSteps(
             await withRateLimitRetry(() => deps.send(channelId, step.content, allowed), deps);
         }
 
+        // The Discord post is done. A failure in the progress call is an API failure, not a
+        // Discord give-up, so it must not surface as a StepGaveUpError.
+        cursor.step = null;
         const accepted = await deps.progress(sim, step.index, threadId);
         if (!accepted) {
             deps.log(`sim-recap: claim lost at step ${step.index}`);

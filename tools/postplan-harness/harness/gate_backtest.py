@@ -70,7 +70,7 @@ class ReplayResult:
     detail: str      # first flagged stdout line, rc, or skip reason, max 160 chars
     base_outcome: str = ""   # "", flag, pass, absent, error, timeout
     base_detail: str = ""
-    fix_outcome: str = ""    # "", pass, flag, no-apply, partial-no-reads, partial-gate-read, error, timeout
+    fix_outcome: str = ""    # "", pass, flag, no-apply, partial-no-reads, partial-gate-read, partial-undeclared-read, partial-probe-failed, error, timeout
     fix_detail: str = ""
     fix_applied: tuple[str, ...] = ()   # paths the fix patch changed (fix rerun only)
     fix_skipped: tuple[str, ...] = ()   # paths whose chunk failed; non-empty = partial apply
@@ -709,8 +709,11 @@ def render_gate_backtest(verdict: Verdict, gates, results, truth: dict[int, Trut
     if false_flags:
         lines.append("- False flags: " + _numbers(false_flags))
         for r in partial_refused:
-            why = ("gate declares no gate-backtest-reads" if r.fix_outcome == "partial-no-reads"
-                   else "a skipped file is one the gate reads")
+            why = {"partial-no-reads": "gate declares no gate-backtest-reads",
+                   "partial-undeclared-read":
+                       "a skipped file the gate reads is missing from its gate-backtest-reads header",
+                   "partial-probe-failed": "the read probe could not finish",
+                   }.get(r.fix_outcome, "a skipped file is one the gate reads")
             lines.append(f"  - Partial apply refused #{r.pr} (`{_clean(r.gate)}`, {why}): "
                          f"applied {_file_list(r.fix_applied) or 'none'}; "
                          f"skipped {_file_list(r.fix_skipped)}")

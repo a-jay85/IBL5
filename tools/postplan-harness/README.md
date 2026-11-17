@@ -404,3 +404,14 @@ LPATH=$(plutil -extract EnvironmentVariables.PATH raw \
 env -i HOME="$HOME" PATH="$LPATH" sh -c \
   'command -v python3; python3 -c "import xdist; print(xdist.__version__)"'
 ```
+
+## Gate reads header for partial applies
+
+A gate may declare the repo files it reads with header lines such as `# gate-backtest-reads: config/* src/fx6.txt`. Each entry is an fnmatch glob relative to the repo root. The header matters only when a candidate fix PR's patch applies in part to an old tree. The replay credits the half-applied tree only when all four checks pass:
+
+1. The gate declares a reads header. A gate without one gets `partial-no-reads`.
+2. No skipped file matches a declared glob. A match gets `partial-gate-read`.
+3. The gate passes on the half-applied tree.
+4. The read probe finds no undeclared read. For each skipped file, the replay runs the gate again with the file absent and again with the file holding the bytes `gate-backtest-probe`. A verdict other than pass means the gate reads a file its header does not list, and the result is `partial-undeclared-read`. An error, a timeout, the total time cap, more than 8 skipped files, a symlink, or a path outside the tree gets `partial-probe-failed`. The replay restores each file after its probe.
+
+The probe cannot see a read whose verdict stays the same in both states. Keep the header complete.

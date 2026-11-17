@@ -914,9 +914,42 @@ jobs:
         if: ${{ !cancelled() }}
         run: bin/check-playwright-pinning
 
+  # Picks the shell harnesses a PR can affect, once, for every harness-tests leg and for
+  # harness-tests-isolated. bin/lib/harness-select.sh derives each harness's coverage from
+  # the paths its scripts name. Any shared path (bin/lib/, .github/, bin/run-shell-harnesses,
+  # a top-level file), an unclaimed path, a push, a re-run, or a failed diff runs every harness.
+  # The log lists each harness as run or skip with the reason.
+  harness-select:
+    name: Shell harness selection
+    needs: [ci-memo-check]
+    if: needs.ci-memo-check.outputs.hit != 'true'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    outputs:
+      names: ${{ steps.select.outputs.names }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+      - name: Selector self-test
+        run: bin/run-shell-harnesses --self-test
+      - name: Select affected harnesses
+        id: select
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          sel="$RUNNER_TEMP/selected.txt"
+          if ! bin/run-shell-harnesses --select-from-merge --event "$EVENT_NAME" --attempt "$RUN_ATTEMPT" --out "$sel"; then
+            echo "::warning::harness selection failed, so every harness runs"
+            echo ALL > "$sel"
+          fi
+          echo "names= $(cat "$sel") " >> "$GITHUB_OUTPUT"
+
   harness-tests:
     name: Shell harness regression tests (leg ${{ matrix.leg }})
-    needs: [ci-memo-check, mirror-ready]
+    needs: [ci-memo-check, mirror-ready, harness-select]
     if: needs.ci-memo-check.outputs.hit != 'true'
     runs-on: ubuntu-26.04
     timeout-minutes: 30
@@ -951,54 +984,69 @@ jobs:
           bin/run-shell-harnesses --check-coverage .github/workflows/harness-legs.txt
           --leg-count ${{ strategy.job-total }}
       # Parallel run: each script logs to its own ::group:: and the step fails if any fails.
+      # Only entries named by harness-select run; a leg with none selected exits 0 at once.
       - name: Shell harnesses (parallel)
-        run: bin/run-shell-harnesses --list .github/workflows/harness-legs.txt --leg ${{ matrix.leg }}
+        env:
+          HARNESS_SELECTED: ${{ needs.harness-select.outputs.names }}
+        run: bin/run-shell-harnesses --list .github/workflows/harness-legs.txt --leg ${{ matrix.leg }} --only "$HARNESS_SELECTED"
 
   harness-tests-isolated:
     name: Shell harness tests (isolated)
-    needs: [ci-memo-check, mirror-ready]
+    needs: [ci-memo-check, mirror-ready, harness-select]
     if: needs.ci-memo-check.outputs.hit != 'true'
     runs-on: ubuntu-26.04
     timeout-minutes: 15
     # Harnesses that cannot share a runner with bin/run-shell-harnesses: one
     # exercises a real lsof port guard and four need an env -i scrubbed shell.
     # Split out of harness-tests so they run beside its parallel batch.
-    # None of the seven reads IBL5_TEST_MARIADB_IMAGE, GHCR, or Bun, so the
+    # None of the eight reads IBL5_TEST_MARIADB_IMAGE, GHCR, or Bun, so the
     # only setup is the checkout.
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Harness selection for this job
+        env:
+          HARNESS_SELECTED: ${{ needs.harness-select.outputs.names }}
+        run: echo "selected:$HARNESS_SELECTED (steps whose harness is absent are skipped)"
       # Exercises a real lsof port guard, so it cannot share the runner.
       - name: bin/test-bug-pipeline-e2e
+        if: contains(needs.harness-select.outputs.names, ' ALL ') || contains(needs.harness-select.outputs.names, ' bin/test-bug-pipeline-e2e ')
         run: bin/test-bug-pipeline-e2e
       # Needs a scrubbed environment, so it cannot share the runner.
       - name: bin/test-gh-retry
+        if: contains(needs.harness-select.outputs.names, ' ALL ') || contains(needs.harness-select.outputs.names, ' bin/test-gh-retry ')
         run: env -i PATH=/usr/bin:/bin bash -c 'set -euo pipefail; bin/test-gh-retry'
       # Needs a scrubbed environment, so it cannot share the runner.
       - name: bin/test-burndown
+        if: contains(needs.harness-select.outputs.names, ' ALL ') || contains(needs.harness-select.outputs.names, ' bin/test-burndown ')
         run: env -i PATH=/usr/bin:/bin bash -c 'set -euo pipefail; bin/test-burndown'
       # Needs a scrubbed environment, so it cannot share the runner.
       - name: bin/test-burndown-loop
+        if: contains(needs.harness-select.outputs.names, ' ALL ') || contains(needs.harness-select.outputs.names, ' bin/test-burndown-loop ')
         run: env -i PATH=/usr/bin:/bin bash -c 'set -euo pipefail; bin/test-burndown-loop'
       # Needs a scrubbed environment, so it cannot share the runner.
       - name: bin/test-wt-pool
+        if: contains(needs.harness-select.outputs.names, ' ALL ') || contains(needs.harness-select.outputs.names, ' bin/test-wt-pool ')
         run: env -i PATH=/usr/bin:/bin bash -c 'set -euo pipefail; bin/test-wt-pool'
 
       - name: bin/test-claim-file
+        if: contains(needs.harness-select.outputs.names, ' ALL ') || contains(needs.harness-select.outputs.names, ' bin/test-claim-file ')
         run: env -i PATH=/usr/bin:/bin bash -c 'set -euo pipefail; bin/test-claim-file'
 
       # The batch list runs bin/test-architect-contract-split with no flag, so
       # this step covers the --self-test (h_rewind rewind-canary) path.
       - name: bin/test-architect-contract-split --self-test
+        if: contains(needs.harness-select.outputs.names, ' ALL ') || contains(needs.harness-select.outputs.names, ' bin/test-architect-contract-split ')
         run: bin/test-architect-contract-split --self-test
 
       - name: bin/test-restore-rowcount-compare
+        if: contains(needs.harness-select.outputs.names, ' ALL ') || contains(needs.harness-select.outputs.names, ' bin/test-restore-rowcount-compare ')
         run: bin/test-restore-rowcount-compare
 
   gate:
     name: Tests and Analysis
     if: always()
-    needs: [changes, ci-memo-check, test, audit-php, audit-js, ibl5-ts-unit, iblbot, db-integration, phpstan, shellcheck, update-baselines, regen-codebase-map, static-guards, harness-tests, harness-tests-isolated, mirror-ready]
+    needs: [changes, ci-memo-check, test, audit-php, audit-js, ibl5-ts-unit, iblbot, db-integration, phpstan, shellcheck, update-baselines, regen-codebase-map, static-guards, harness-tests, harness-tests-isolated, mirror-ready, harness-select]
     runs-on: ubuntu-26.04
     timeout-minutes: 20
     # The memo is written only here: after a clean aggregate, on a run that was a miss.

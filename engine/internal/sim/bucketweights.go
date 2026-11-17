@@ -41,8 +41,8 @@ import (
 //     dominates leg C by ~an order of magnitude, ratio ~0.91) — the home MARGIN is a
 //     scoring phenomenon (the 2pt +hcaScaled leg A and e88/e90 and-one leg D,
 //     possession.go), not a foul one.
-//     The result is multiplied by foulBucketScale (raw-5.60-units → Go-bucket-basis;
-//     see the const).
+//     The result is returned unscaled, on the raw 5.60 e80 basis that the
+//     index-3 and-one chain (bucket3Weight) shares.
 //
 // FAITHFULNESS / STAND-INS: the formula SHAPES (+0xD90 Branch-A, the 0.6 foul
 // floor + quality divisor, the per-lineup off/def sums, the ±0.2 HCA) are ported
@@ -129,42 +129,6 @@ const (
 	// paraphrase "1 − defQ·(5/6)/offQ" was a mis-transcription — the decompile at
 	// :97163 is INCREASING in defQ and league-baselined, not a decreasing raw ratio.
 	foulDivisorTeamDefCoef = 0.8333333333
-
-	// foulBucketScale is the bucket-basis conversion for the faithful symmetric foul
-	// bucket: the 5.60 e80 basis is in raw bucket units, while the Go engine's
-	// play-outcome basis is ~8× larger (2pt composite O(10s), ≈16.5 under default
-	// ratings). It is the SINGLE calibrated LEVEL dial — the defQ/offQ FORMS and the
-	// 5/6 coupling are DERIVED (guarded by faithful_scales_derivation_test.go), and
-	// the home/away symmetry (ratio ≈ 1.0) is STRUCTURAL, independent of this scale.
-	// Unscaled, the foul share collapses and the FTA level breaks against the .sco
-	// archive. This value is the ADR-0082-status corpus-calibrated level. Re-anchored
-	// a SECOND time (2026-07-12) after the J18 items 1+3 faithful bucket-basis changes
-	// (real 3GA/48 3pt bucket + 2PA-based d88 twoPtBucketWeight) shrank the competing
-	// 2pt/3pt bucket mass, which raised the foul bucket's normalized share and pushed
-	// engine FTA/g from 21.36 to 24.20 at the then-current 0.47 — breaking the anchor
-	// against the same 00-01 .sco target (FTA/g ≈ 21.32) without any change to this
-	// dial's own value. FTA saturates sub-linearly in this dial (foul-outs cap
-	// minutes), so it was re-found by 1-D search (0.39→20.99, 0.40→21.43, 0.41→21.81,
-	// 0.47→24.20), not a linear estimate. Re-anchored to 0.40 → engine FTA 21.43
-	// (gap +0.11). The level was re-tuned AFTER the Phase-5 margin lock
-	// (hcaSite2BasisScale 2.85, unchanged): the two dials remain only weakly coupled —
-	// moving this dial from 0.47 to 0.40 moved the gt=2 home margin gap from +0.459 to
-	// +0.470 (delta +0.011), i.e. WITHIN the ~±0.03 Monte-Carlo noise floor of the
-	// 20-run harness, so re-anchoring FTA a second time did not disturb the locked
-	// margin. (The gt=4 gap moved further, +1.284 → +1.752 — gt=4 was never part of
-	// the Phase-6 weak-coupling claim, which is scoped to gt=2; not re-litigated here.)
-	// See the J15 program / phase2-derivation.md and the Phase-6 (2026-07-11) history
-	// this supersedes for the first re-anchor's story (0.50→22.43, 0.45→20.67,
-	// 0.47→21.36). Re-anchored a THIRD time (2026-07-13) after J18 item 2 pinned
-	// d70LeagueScalar 1.0→0.6472 (a faithful basis change: it shrank the d70 FTA-rate
-	// term inside twoPtBucketWeight, lowering 2pt bucket mass and raising the foul
-	// share — combined-master FTA/g read 21.82 at the then-current 0.40). 1-D search
-	// on the combined basis: 0.39→21.36, 0.40→21.82 → re-anchored to 0.39 (gap +0.04
-	// vs the .sco 21.32 target). The gt=2 home-margin gap moved +0.498 (at 0.40) →
-	// +0.491 (at 0.39), delta −0.007, within the ~±0.03 noise floor — the dial stayed
-	// side-symmetric and did not disturb the Phase-5 margin lock, consistent with the
-	// weak-coupling claim above.
-	foulBucketScale = 0.39
 
 	// andOneBucketFloor is the verbatim JSB and-one floor (0.03). Ensures the
 	// and-one path cannot be zeroed by a negative matchup quality. Unchanged from
@@ -473,7 +437,7 @@ func halfCourtAndOneWeight(mq float64, bh onCourt, hcaScaled float64) float64 {
 //	factor  = 1 + (defQ − foulDivisorTeamDefCoef·defQualityCapTeamMult·leagueSTL48)/offQ  // :97163
 //	w       = base · factor · (1 − mq/(4·leagueTOV48))             // :97163 coupling, :97164 shrink
 //	if w <= 0 { w = rng.Float64()·foulFloor }                      // :97170 floor redraw ONLY
-//	return w · foulBucketScale
+//	return w
 //
 // HCA legs B/C use the RAW hca (±0.2) — offQ/base are on the faithful CEngine TOV48
 // basis (do NOT apply hcaSite2BasisScale, which is for the O(10s) 2pt bucket). Net
@@ -522,16 +486,16 @@ func foulBucketWeight(bh onCourt, offense, defenders []onCourt, hca, mq float64,
 	// :97164 net-advantage shrink (J18 item 6): straight-line in 5.60, so it applies
 	// on the defensive offQ ≤ 0 path too.
 	shrink := 1.0 - mq/(4.0*leagueTOV48)
-	if offQ <= 0 {
-		// divide-by-zero guard (unreachable: floor1 ⇒ offQ > 0); base only, no factor.
-		return base * shrink * foulBucketScale
+	// offQ ≤ 0 is a divide-by-zero guard (unreachable: floor1 ⇒ offQ > 0): base
+	// only, no factor, no redraw. Otherwise base takes the coupling factor, and
+	// a non-positive weight redraws. Both paths share the one unscaled return.
+	if offQ > 0 {
+		baseline := foulDivisorTeamDefCoef * defQualityCapTeamMult * leagueSTL48
+		base *= 1.0 + (defQuality(defenders)-baseline)/offQ // × factor (:97163)
+		if base*shrink <= 0 {
+			// faithful floor redraw (:97170) — reachable symmetrically.
+			return r.Float64() * foulFloor
+		}
 	}
-	baseline := foulDivisorTeamDefCoef * defQualityCapTeamMult * leagueSTL48
-	factor := 1.0 + (defQuality(defenders)-baseline)/offQ
-	w := base * factor * shrink
-	if w <= 0 {
-		// faithful floor redraw (:97170) — reachable symmetrically.
-		return r.Float64() * foulFloor * foulBucketScale
-	}
-	return w * foulBucketScale
+	return base * shrink
 }

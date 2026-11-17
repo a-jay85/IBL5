@@ -46,7 +46,7 @@ func assembleInputs(foulWeight, hca float64) outcomeInputs {
 // (home's larger 2pt denominator makes foul a marginally smaller share). This test
 // confirms home and away foul shares are NEAR-EQUAL — the property that yields a
 // ≈1.0 home/away FTA ratio, superseding the old home>away asymmetry (ADR-0082).
-// After the Phase-6 re-anchor (foulBucketScale=0.39), the foul share is again a
+// After the Phase-6 re-anchor (the 0.39 foul scale, since removed), the foul share is again a
 // 2pt-dominated realistic minority (~9%), so this test asserts BOTH the structural
 // side-symmetry AND the re-anchored LEVEL band (phase2-derivation.md).
 func TestBucketWeights_FoulPathMix(t *testing.T) {
@@ -64,7 +64,7 @@ func TestBucketWeights_FoulPathMix(t *testing.T) {
 	base := (foulBaseFatigueRef - bh.fatigue) * tovRate(bh)
 	baseline := foulDivisorTeamDefCoef * defQualityCapTeamMult * leagueSTL48
 	factor := 1.0 + (defQuality(def)-baseline)/offQuality(off)
-	meanFoul := base * factor * foulBucketScale
+	meanFoul := base * factor
 	homeIn := assembleInputs(meanFoul, hcaMagnitude)
 	awayIn := assembleInputs(meanFoul, -hcaMagnitude)
 
@@ -76,14 +76,14 @@ func TestBucketWeights_FoulPathMix(t *testing.T) {
 	t.Logf("assembled path mix (n=%d, seed %d): factor=%.4f meanFoul=%.4f", n, seed, factor, meanFoul)
 	t.Logf("  home foul-frac=%.4f  away foul-frac=%.4f  (home−away=%+.4f)", homeFoul, awayFoul, homeFoul-awayFoul)
 
-	// LEVEL (restored after the Phase-6 re-anchor of foulBucketScale to 0.50): at the
+	// LEVEL (restored after the Phase-6 re-anchor of the since-removed foul scale to 0.50): at the
 	// re-anchored scale the foul path is a realistic MINORITY share — observed home
 	// foul-frac ≈ 0.090 at this fixture (the 2pt composite 16.47 dominates foul 2.13).
 	// The band guards the LEVEL against scale drift: the pre-C2 8.6 gave a degenerate
 	// ~0.9 share; an unscaled bucket, ~0.01. A minority in [0.03, 0.15] is the faithful
 	// regime this dial was re-anchored to.
 	if homeFoul < 0.03 || homeFoul > 0.15 {
-		t.Errorf("home foul share = %.4f, want a realistic minority in [0.03, 0.15] (level re-anchored, foulBucketScale=0.39)", homeFoul)
+		t.Errorf("home foul share = %.4f, want a realistic minority in [0.03, 0.15] (level re-anchored, foul scale since removed)", homeFoul)
 	}
 	// Symmetry: home/away foul shares differ ONLY through the ±hca on the 2pt bucket,
 	// so they are near-equal (the discriminator property). NOT the old home>away arm.
@@ -113,7 +113,7 @@ func TestBucketWeights_TwoPtComposite(t *testing.T) {
 	}
 
 	// The foul weight matches the hand-recomputed faithful formula AND — restored after
-	// the Phase-6 re-anchor (foulBucketScale=0.39) — the 2pt composite DOMINATES it
+	// the Phase-6 re-anchor (the 0.39 foul scale, since removed) — the 2pt composite DOMINATES it
 	// (≈16.47 vs ≈2.13 at this fixture), the minority-foul-share invariant the original
 	// +0xD90 characterization pinned.
 	off := fiveStarters(3)
@@ -121,7 +121,7 @@ func TestBucketWeights_TwoPtComposite(t *testing.T) {
 	base := (foulBaseFatigueRef - p.fatigue) * tovRate(p)
 	baseline := foulDivisorTeamDefCoef * defQualityCapTeamMult * leagueSTL48
 	factor := 1.0 + (defQuality(def)-baseline)/offQuality(off)
-	wantFoul := base * factor * foulBucketScale
+	wantFoul := base * factor
 	foul := foulBucketWeight(p, off, def, 0, 0, rng.New(1))
 	if math.Abs(foul-wantFoul) > 1e-9 {
 		t.Errorf("foulBucketWeight = %.6f, want base·factor·scale = %.6f", foul, wantFoul)
@@ -154,7 +154,7 @@ func TestBucketWeights_FoulDivisor(t *testing.T) {
 	if factor <= 0 {
 		t.Fatalf("test setup: balanced-matchup factor %.4f should be > 0 (deterministic path, no redraw)", factor)
 	}
-	want := base * factor * foulBucketScale
+	want := base * factor
 	if got := foulBucketWeight(bh, off, def, 0, 0, rng.New(1)); math.Abs(got-want) > 1e-9 {
 		t.Errorf("foulBucketWeight = %.6f, want base·factor·scale = %.6f (factor=%.4f)", got, want, factor)
 	}
@@ -199,7 +199,7 @@ func TestBucketWeights_FoulDivisor(t *testing.T) {
 	if redrawFactor > 0 {
 		t.Fatalf("test setup: weak-STL/low-TOV factor %.4f should be ≤ 0 (redraw must be reachable)", redrawFactor)
 	}
-	ceil := foulFloor * foulBucketScale
+	ceil := foulFloor
 	rr := rng.New(5)
 	for i := 0; i < 1000; i++ {
 		got := foulBucketWeight(loOff[0], loOff, weakDef, 0, 0, rr)
@@ -247,14 +247,14 @@ func TestBucketWeights_FoulBucketHCALegs_DecompilePin(t *testing.T) {
 	//   base   = (2.0 − fatigue)·tovRate(bh) − s·hca              (:97126 + :97160 leg B)
 	//   offQ   = Σ (tovRate − s·hca)                              (:97159 leg C, param_5==1)
 	//   factor = 1 + (defQ − baseline)/offQ                       (:97163)
-	//   w      = base·factor·foulBucketScale
+	//   w      = base·factor
 	baseline := foulDivisorTeamDefCoef * defQualityCapTeamMult * leagueSTL48
 	defQ := defQuality(def)
 	wantE80 := func(h float64) float64 {
 		base := (foulBaseFatigueRef-bh.fatigue)*tovRate(bh) - h
 		offQ := offQualityWithHCA(off, h)
 		factor := 1.0 + (defQ-baseline)/offQ
-		return base * factor * foulBucketScale
+		return base * factor
 	}
 
 	// The port must reproduce the hand-computed e80 for each side (factor > 0 here,
@@ -285,9 +285,9 @@ func TestBucketWeights_FoulBucketHCALegs_DecompilePin(t *testing.T) {
 	base0 := (foulBaseFatigueRef - bh.fatigue) * tovRate(bh)
 	offQ0 := offQualityWithHCA(off, 0)
 	factor0 := 1.0 + (defQ-baseline)/offQ0
-	legBOnly := (base0-hca)*factor0*foulBucketScale - base0*factor0*foulBucketScale
+	legBOnly := (base0-hca)*factor0 - base0*factor0
 	factorCHome := 1.0 + (defQ-baseline)/offQualityWithHCA(off, hca)
-	legCOnly := base0*factorCHome*foulBucketScale - base0*factor0*foulBucketScale
+	legCOnly := base0*factorCHome - base0*factor0
 	ratio := math.Abs(legBOnly) / math.Abs(legCOnly)
 	t.Logf("HCA legs (home side): legB(base)=%+.5f legC(offQ)=%+.5f |B|/|C|=%.1f  net=wHome−wSym=%+.5f  ratio wHome/wAway=%.4f",
 		legBOnly, legCOnly, ratio, wHome-wSym, wHome/wAway)
@@ -336,7 +336,7 @@ func TestBucketWeights_FoulNetAdvantageShrink_DecompilePin(t *testing.T) {
 
 	// Past the threshold the shrink goes negative and the :97170 floor redraw fires:
 	// results are U[0, foulFloor)·scale, consuming the rng.
-	ceil := foulFloor * foulBucketScale
+	ceil := foulFloor
 	r := rng.New(5)
 	for i := 0; i < 1000; i++ {
 		got := foulBucketWeight(bh, off, def, 0, threshold+1.0, r)
@@ -663,5 +663,35 @@ func TestTwoPtBucketWeightUnchangedAfterTwoPARateExtraction(t *testing.T) {
 	})
 	if got := twoPARate(pCorrupt); got != 0 {
 		t.Errorf("twoPARate (corrupt: 3GA>FGA) = %v, want 0 (guard preserved)", got)
+	}
+}
+
+// TestFoulBucketWeight_UnscaledReturns: a positive weight returns base·factor·
+// shrink with no scale, and a w <= 0 input redraws U[0, 0.6) with exactly one
+// RNG draw.
+func TestFoulBucketWeight_UnscaledReturns(t *testing.T) {
+	off := fiveStarters(3)
+	def := fiveStarters(7)
+	bh := oc(slotPG, mkPlayer(1, 3, slotPG, 48))
+	const want = 4.1074195614560063 // base·factor·shrink at mq = 0.5, pasted from one run
+	if got := foulBucketWeight(bh, off, def, 0, 0.5, rng.New(1)); math.Abs(got-want) > 1e-12 {
+		t.Errorf("foulBucketWeight = %.17g, want unscaled %.17g", got, want)
+	}
+
+	weakDef := fiveStarters(7)
+	for i := range weakDef {
+		weakDef[i].STL = 1
+	}
+	loOff := fiveStarters(3)
+	for i := range loOff {
+		loOff[i].TVR = 1
+	}
+	r, twin := rng.New(5), rng.New(5)
+	got := foulBucketWeight(loOff[0], loOff, weakDef, 0, 0, r)
+	if w := twin.Float64() * foulFloor; got != w || got < 0 || got >= foulFloor {
+		t.Errorf("w <= 0 redraw = %.17g, want one draw ×0.6 = %.17g in [0, 0.6)", got, w)
+	}
+	if a, b := r.Float64(), twin.Float64(); a != b {
+		t.Error("w <= 0 redraw consumed other than exactly one draw")
 	}
 }

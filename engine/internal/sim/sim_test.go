@@ -230,7 +230,7 @@ func TestSimulate_SubstitutionsFire(t *testing.T) {
 // directly (self-referential: no assumed step), within a coarse sanity band.
 //
 // A player who DOES foul out (GamePF >= 6) leaves early and accrues fewer
-// minutes. The scaled faithful foul pair (foulBucketScale, ADR-0082) makes a
+// minutes. The unscaled faithful foul pair (foulBucketWeight, ADR-0082) makes a
 // foul-out reachable in this iron-man fixture, so the conservation assertion is
 // split: exact equality for everyone who finishes, and strictly-not-more for
 // anyone who fouls out (its exact short-minutes value is locked by

@@ -204,7 +204,7 @@ func TestAndOneAndFoulWeights_DrawOrder(t *testing.T) {
 	if want := twin.Float64() * andOneBucketFloor; andOneW != want {
 		t.Errorf("andOneW = %.17g, want first draw ×0.03 = %.17g", andOneW, want)
 	}
-	if want := twin.Float64() * foulFloor * foulBucketScale; foulW != want {
+	if want := twin.Float64() * foulFloor; foulW != want {
 		t.Errorf("foulW = %.17g, want second draw ×0.6 = %.17g", foulW, want)
 	}
 	if a, b := r.Float64(), twin.Float64(); a != b {

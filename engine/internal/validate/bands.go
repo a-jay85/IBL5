@@ -61,7 +61,7 @@ type Band struct {
 // │ This PR replaced the offQualityRatingScale=0.059 quality stand-in above    │
 // │ with the faithful CEngine per-48 basis (leagueTOV48=3.353143, teamquality  │
 // │ .go), and dropped team FTA from the ~37.8 legacy mean to the faithful ~21  │
-// │ (foulBucketScale=0.47, paired .sco 21.32). The band literals below are     │
+// │ (old foul scale 0.47, paired .sco 21.32). The band literals below are      │
 // │ UNCHANGED and remain #957-derived — a deliberate call, verified three ways:│
 // │   1. The bands self-scale: RelPct×engineMean recenters on the current mean,│
 // │      so they never froze to the 37.8 era; only AbsFloor is a fixed number. │

@@ -72,6 +72,16 @@ func TestPathShares_LiveMap(t *testing.T) {
 		s1, s2, s3, s4, n := pathShares(t, name, pathShareGames)
 		t.Logf("PATH_SHARES bundle=%s share1=%.4f%% share2=%.4f%% share3=%.4f%% share4=%.4f%% total=%d",
 			name, 100*s1, 100*s2, 100*s3, 100*s4, n)
+		if name != "bundle_reallife.json" {
+			continue
+		}
+		share3, share4 := s3, s4
+		if share3 < 0.079 || share3 > 0.109 {
+			t.Errorf("share3 = %.4f, want in [0.079, 0.109] (trace 610/6507)", share3)
+		}
+		if share4 < 0.095 || share4 > 0.125 {
+			t.Errorf("share4 = %.4f, want in [0.095, 0.125] (trace 717/6507)", share4)
+		}
 	}
 }
 

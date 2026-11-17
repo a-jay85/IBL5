@@ -1,25 +1,25 @@
 ---
 description: Triage work as ad-hoc vs /plan; ad-hoc bar, safety mirror, execution routing and its inline-edit trial, hook-enforced triggers.
-last_verified: 2026-11-12
+last_verified: 2026-11-17
 ---
 
 # Work Triage Rule
 
 ## Triage before non-trivial work
 
-Before starting **any non-trivial unit of work**, whether you proposed it or the user assigned it, decide: implement **ad-hoc** (just do it, then ship or hold per `workflow-continuity.md` § Post-Plan) or route through **`/plan`**. State the call and one line of why, then proceed.
+Before **any non-trivial unit of work**, yours or assigned, decide: implement **ad-hoc** (just do it, then ship or hold per `workflow-continuity.md` § Post-Plan) or route through **`/plan`**. State the call and one line of why, then proceed.
 
 ## The ad-hoc bar
 
 Ad-hoc-safe only when **all** hold:
-- **Known blast radius** — you can name every file/behavior it touches.
-- **An existing pattern to copy** — not novel infrastructure.
-- **No multi-phase reasoning** — a single coherent change, not a sequence with intermediate decisions.
-- **No unresolved design fork** — nothing where the codebase can't reveal the right choice.
+- **Known blast radius.** You can name every file/behavior it touches.
+- **An existing pattern to copy.** No novel infrastructure.
+- **No multi-phase reasoning.** One coherent change with no decisions midway.
+- **No unresolved design fork.** The codebase reveals the right choice.
 
 If any are open, it wants a `/plan`.
 
-**Resolve empirical unknowns first** (occurrences, false-positive risk) — the scan often collapses a design fork into ad-hoc.
+**Resolve empirical unknowns first** (occurrences, false-positive risk). The scan often settles a design fork as ad-hoc.
 
 ## Ad-hoc safety mirror
 
@@ -30,24 +30,24 @@ Even when the bar says ad-hoc, run a quick safety check. If the change touches a
 - a **gate removal or weakening** (input an executable gate, meaning a hook deny, a `bin/check-*` condition, or a Phase 6.5 arming condition, previously rejected now passes) or a **bootstrap hazard** (it rewrites the rule governing its own merge); prose that keeps the decision procedure, additive gates, and plumbing changes don't count, or
 - a property needing **subjective human judgment** to confirm,
 
-then prefer `/plan`, so the defense and its verification are designed up front. Which mechanisms count, and why the PR-time backstop isn't a substitute: `work-triage-detail.md` § Safety mirror backstop.
+then prefer `/plan` to design the defense and its check up front. Which mechanisms count, and why the PR-time backstop falls short: `work-triage-detail.md` § Safety mirror backstop.
 
 ## Execution routing: an ad-hoc verdict does not mean Opus edits inline
 
-The plan-vs-ad-hoc verdict decides *whether to plan*. Who executes the edits is a separate call.
+The verdict decides *whether to plan*. Who edits is a separate call.
 
-**Before making a chunk of edits, route the execution.** The chunk is **Sonnet-executable** when both hold — the same criterion as `/plan` Step 4 gate 13:
+**Route each chunk of edits before making it.** It is **Sonnet-executable** when both hold (same test as `/plan` Step 4 gate 13):
 
-- **Design resolved** — you could write the full recipe now (files, exact changes, order); no edit re-opens a judgment call.
-- **Machine-verifiable** — a test/linter/script exists (or ships with the chunk) that fails on a wrong edit.
+- **Design resolved.** You could write the full recipe now (files, exact changes, order). No edit re-opens a judgment call.
+- **Machine-verifiable.** A test/linter/script exists (or ships with the chunk) that fails on a wrong edit.
 
 **Inline-edit trial until 2026-11-23.** When both hold and the chunk touches **fewer than 5 distinct files**, Opus edits inline and runs the chunk's check. At 5 or more files, hand off by default to **one** Sonnet sub-agent without asking. State the routing call in one line. Packet format, review command, and limits: `work-triage-inline-trial.md`.
 
-A single sweep stays with one agent. For independent chunks, spawn one agent per chunk, all in the same message. A chunk of 5 or more files stays inline only when **entangled** with the design or **trivial** (`work-triage-detail.md` § Inline vs. delegated).
+One sweep goes to one agent. Independent chunks get one agent each, spawned in one message. A chunk of 5+ files stays inline only when **entangled** with the design or **trivial** (`work-triage-detail.md` § Inline vs. delegated).
 
 ### The hard trigger: ≥5 distinct files in one turn
 
-Hook-enforced by `~/.claude/hooks/plan-gate-edit.sh` § Check 1 — the deny message carries the routing instruction and escape hatch. Full gate properties and self-test: `work-triage-detail.md` § Hard trigger.
+Hook-enforced by `~/.claude/hooks/plan-gate-edit.sh` § Check 1. Its deny message gives the routing and escape hatch. Gate properties and self-test: `work-triage-detail.md` § Hard trigger.
 
 ## Execution routing: a `/plan` verdict routes to `bin/plan-now`, never inline
 
@@ -55,10 +55,12 @@ Hook-enforced by `~/.claude/hooks/skill-gate.sh`, which denies inline `Skill(pla
 
 ## Execution routing: repeat-polling is a spend bug
 
-Never poll on the main thread — a poll loop re-reads full context per call. Use `run_in_background: true` + Monitor, or ScheduleWakeup matched to expected completion time.
+Never poll on the main thread. Each poll re-reads the full context. Use `run_in_background: true` + Monitor, or a ScheduleWakeup timed to the expected finish.
+
+When the wait ends in an owner step (a sign-off card, a manual check), don't wake the session. A detached script follows up and DMs the owner. For a prep job, run `bin/pr-refire-after-job`. `~/.claude/hooks/wait-guard.py` blocks a Monitor or background Bash wait on a `/tmp/pr-burndown/` job file unless the command ends with `# wake-ok: <reason>`.
 
 Name the completion signal before writing the watcher. File mtime or size is never one. Valid signals: `work-triage-detail.md` § The readiness predicate.
 
 ## Calibration
 
-**Skip** for obviously trivial edits (typo, one-line fix). **Headless:** no-op under headless/automouse.
+**Skip** for trivial edits (typo, one-line fix). **Headless/automouse:** no-op.

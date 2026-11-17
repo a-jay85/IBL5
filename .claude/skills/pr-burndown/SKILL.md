@@ -1,7 +1,7 @@
 ---
 name: pr-burndown
 description: "Burn down the open PRs that wait on the owner. Background headless jobs do the prep that needs no owner call (rebase, regenerate snapshots, write promised tests, fix review findings, re-fire post-plan). The owner sees only the decisions that are theirs: a status card per PR (CI on the current head, review threads, post-plan verdict, door and blast radius, conflicts, hold reasons, visual links) with a recommended option, answered in a batch."
-last_verified: 2026-11-16
+last_verified: 2026-11-17
 ---
 
 # /pr-burndown
@@ -378,33 +378,30 @@ excerpts, this skill. Inside the one-hour cache window a wake is cheap. After it
 pays full price for everything. So hand each job's follow-up to the cheapest carrier that
 can do it, and stop any watcher this session started (`TaskStop`).
 
-- **Shell watcher, zero tokens.** Use it when the follow-up needs no judgment: wait for
-  the `.result`, then re-fire post-plan. Post-plan arms a Prep-only PR itself and DMs the
-  owner. Write `$D/jobs/wN.sh` and start it with `nohup bash $D/jobs/wN.sh >/dev/null 2>&1 &`.
-  The script:
-  1. Waits until `$D/jobs/pN.result` is non-empty or the job's pid is gone.
-  2. Fires only when the PR head moved off the pre-job SHA and the result does not start
-     with `blocked`. The job pushes only after every check passes, so a moved head is the
-     pass signal. Never grep the result for words like "stop" or "blocks", because a clean
-     result says "blocks: none".
-  3. Runs the live-run check, then `(cd <wt> && env -u CLAUDE_HEADLESS bin/post-plan-now --auto)`.
-  4. Logs each skip to `$D/jobs/wN.out`, then DMs the owner:
-     `<wt>/bin/discord-dm "PR #N: prep job ended, post-plan not fired (<skip reason>). See $D/jobs/wN.out"`.
-     A skip for a live post-plan run sends no DM, because that run DMs when it ends.
-     On 2026-11-14 a job on a `BEHIND` PR committed its fix but could not push. The watcher
-     logged "head did not move" and stopped, and the owner heard nothing.
-  5. DMs the owner when `post-plan-now` exits non-zero:
-     `<wt>/bin/discord-dm "PR #N: post-plan-now exited $rc. See $D/jobs/wN.out"`.
-     Exit 9 (a pre-fire check refused) and exit 10 (the check could not run) stop before
-     post-plan starts. They print to stdout and send no DM, so without this step the
-     watcher fails silently.
-- **New T3 thread.** Use it when the follow-up needs judgment, such as reading a new
-  verdict on a PR the owner has not approved yet, or building a sign-off card. Call
+- **Shell watcher, zero tokens.** The default. Use it when the follow-up is "wait for the
+  `.result`, then re-fire post-plan". That holds even when the step after post-plan is a
+  sign-off card or another owner call. Post-plan DMs the owner when it ends, and the next
+  `/pr-burndown` run builds the card when the owner sits down. Waking a session only
+  builds the card early. Post-plan arms a Prep-only PR itself. Start it with one call,
+  using the head SHA from before the job:
+
+  ```bash
+  bin/pr-refire-after-job N --pid <job pid> --result $D/jobs/pN.result --pre-sha <sha>
+  ```
+
+  It detaches, logs to `$D/jobs/wN.out`, and fires only when the head moved and the
+  result does not start with `blocked`. It DMs the owner on every skip but a live
+  post-plan run, and on a non-zero `post-plan-now` exit. The script header lists each
+  case. Never hand-write a waiter or wait with Monitor here.
+  `~/.claude/hooks/wait-guard.py` blocks a Monitor or background Bash wait on a
+  `$D/jobs/` file.
+- **New T3 thread.** Use it when the follow-up needs judgment and no owner call, such as
+  reading a new verdict to decide between a re-fire and a fix job. Call
   `t3_thread_launch` with a title like "PR #N: <goal>" and a `clientRequestId` like
   `prb-<run>-N`. The brief holds only what that PR needs: the goal, the owner's words and
   date, why it's held, the `.result` path and job pid, and numbered steps. The steps: wait
-  with its own background Monitor, re-fire post-plan, wait for its `RESULT:` line, then
-  run `bin/owner-approve N --finish` or build the card. For a card, the brief says to run `/pr-burndown N` from Step 3.
+  with its own background Monitor (end the command with `# wake-ok: thread follow-up`), re-fire post-plan, wait for its `RESULT:` line, then
+  run `bin/owner-approve N --finish` or start the fix job the verdict calls for.
   Name each thread by its `link` in your reply.
 - **This session.** Use it only while the owner is still answering cards and the job will
   land inside the hour.

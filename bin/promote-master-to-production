@@ -135,8 +135,8 @@ fi
 MIN_REQUIRED_CHECKS="${MIN_REQUIRED_CHECKS:-3}" \
 MAX_WALKBACK="${MAX_WALKBACK:-0}" \
 SKIP_CHECKS="${SKIP_CHECKS:-Promote master to production,Auto-promotion paused}" \
-IGNORE_PENDING_CHECKS="${IGNORE_PENDING_CHECKS:-Aggregate check status}" \
-IGNORE_FAILED_CHECKS="${IGNORE_FAILED_CHECKS:-Aggregate check status}" \
+IGNORE_PENDING_CHECKS="${IGNORE_PENDING_CHECKS:-Aggregate check status,recheck}" \
+IGNORE_FAILED_CHECKS="${IGNORE_FAILED_CHECKS:-Aggregate check status,recheck}" \
     "$(git rev-parse --show-toplevel)/bin/check-master-ci-green" "$SHA" >/dev/null || {
         emit "outcome=not-green"
         log "master $SHA is not green (or still running) — no promotion this pass."

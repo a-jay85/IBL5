@@ -119,12 +119,15 @@ class JsbExportRepository extends \Database\BaseMysqliRepository implements JsbE
     public function getCompletedTradeItems(string $seasonStartDate): array
     {
         $rows = $this->fetchAll(
-            'SELECT tradeofferid, itemid, itemtype,
-                    trade_from, trade_to, created_at
-             FROM `ibl_trade_info`
-             WHERE approval = ? AND created_at >= ?
-             ORDER BY tradeofferid, id',
-            'ss',
+            'SELECT t.tradeofferid, t.itemid, t.itemtype,
+                    t.trade_from, t.trade_to, t.created_at,
+                    dp.year AS pick_year, dp.round AS pick_round, dp.teampick_teamid AS pick_teamid
+             FROM `ibl_trade_info` t
+             LEFT JOIN `ibl_draft_picks` dp ON t.itemtype = ? AND dp.pickid = t.itemid
+             WHERE t.approval = ? AND t.created_at >= ?
+             ORDER BY t.tradeofferid, t.id',
+            'sss',
+            \Trading\TradeItemType::DraftPick->value,
             'completed',
             $seasonStartDate,
         );
@@ -138,6 +141,9 @@ class JsbExportRepository extends \Database\BaseMysqliRepository implements JsbE
                 'trade_from' => is_string($row['trade_from']) ? $row['trade_from'] : '',
                 'trade_to' => is_string($row['trade_to']) ? $row['trade_to'] : '',
                 'created_at' => is_string($row['created_at']) ? $row['created_at'] : '',
+                'pick_year' => is_int($row['pick_year']) ? $row['pick_year'] : null,
+                'pick_round' => is_int($row['pick_round']) ? $row['pick_round'] : null,
+                'pick_teamid' => is_int($row['pick_teamid']) ? $row['pick_teamid'] : null,
             ];
         }
 

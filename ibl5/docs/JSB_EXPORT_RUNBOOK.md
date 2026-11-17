@@ -1,11 +1,11 @@
 ---
-description: Commissioner runbook for replacing IBL5.plr and IBL5.plb with the site export, plus the JSB format findings behind it.
-last_verified: 2026-11-16
+description: Commissioner runbook for replacing IBL5.plr, IBL5.plb, and IBL5.trn with the site export, plus the JSB format findings behind it.
+last_verified: 2026-11-17
 ---
 
 # JSB Export Runbook
 
-The site export writes `IBL5_export.plr` and `IBL5_export.plb`. Both files carry the GMs' depth charts and the trades the site recorded. The commissioner copies them over `IBL5.plr` and `IBL5.plb` in the JSB league folder. JSB then loads the charts directly, so nobody enters trades in JSB or runs Game Plan > Import All.
+The site export writes `IBL5_export.plr`, `IBL5_export.plb`, and `IBL5_export.trn`. The first two carry the GMs' depth charts and the trades the site recorded. The third is JSB's own transaction log with the site's trades added. The commissioner copies all three over `IBL5.plr`, `IBL5.plb`, and `IBL5.trn` in the JSB league folder. JSB then loads the charts directly, so nobody enters trades in JSB or runs Game Plan > Import All.
 
 Format background lives in [JSB_FILE_FORMATS.md](JSB_FILE_FORMATS.md) (`ibl5/docs/JSB_FILE_FORMATS.md`) and [the JsbParser README](../classes/JsbParser/README.md) (`ibl5/classes/JsbParser/README.md`).
 
@@ -16,16 +16,16 @@ Run the export after the site has processed the trades and the GMs have submitte
 ## Steps
 
 1. Log in to the site as an admin and open `/ibl5/scripts/jsbExport.php`. Click Run Export.
-2. Read the PLR and PLB sections. Each lists its source file, its messages, and a change table. A line that starts with WARNING means a traded player found no empty slot on his new team. Fix that roster in JSB by hand before you sim.
-3. Download `IBL5_export.plr` and `IBL5_export.plb` from the site's `ibl5/` folder.
-4. Close JSB. Back up `C:\JSB\IBL5.plr` and `C:\JSB\IBL5.plb`.
-5. Rename the exports to `IBL5.plr` and `IBL5.plb` and copy them into `C:\JSB\`.
+2. Read the PLR, PLB, and TRN sections. Each lists its source file and its messages, and PLR and PLB add a change table. A WARNING line in PLR or PLB means a traded player found no empty slot on his new team. Fix that roster in JSB by hand before you sim. A WARNING line in TRN names a trade the export left out of the log. JSB's rosters do not read the log, so the sim still runs. Enter that trade in JSB by hand only if you want it in JSB's log.
+3. Download `IBL5_export.plr`, `IBL5_export.plb`, and `IBL5_export.trn` from the site's `ibl5/` folder.
+4. Close JSB. Back up `C:\JSB\IBL5.plr`, `C:\JSB\IBL5.plb`, and `C:\JSB\IBL5.trn`.
+5. Rename the exports to `IBL5.plr`, `IBL5.plb`, and `IBL5.trn` and copy them into `C:\JSB\`.
 6. Empty `C:\JSB\IBL5\imp\`, so Game Plan cannot import an old chart.
 7. Open IBL5 in JSB. Check both rosters of every trade, then sim.
 
 ## What changes
 
-The commissioner no longer enters trades in JSB. Game Plan > Import All is not needed when the export is used, because the depth and minutes are already in the files. The export writes only `IBL5.plr` and `IBL5.plb`. Every other league file stays JSB's own, including `IBL5.trn`. The 2026-11-16 VM acceptance run passed. A 2026-11-17 VM run settled F7 and F8 below.
+The commissioner no longer enters trades in JSB. Game Plan > Import All is not needed when the export is used, because the depth and minutes are already in the files. The export writes `IBL5.plr`, `IBL5.plb`, and `IBL5.trn`. Every other league file stays JSB's own. The .trn export starts from JSB's own `IBL5.trn` and keeps every record in it byte-identical. It appends the site's trades for the season that the file does not hold yet, and raises the header count. Each new record carries the day after the last sim as its date. The export skips a trade when the file already has records with the same season and items, in any order. So running it twice adds nothing the second time. The 2026-11-16 VM acceptance run passed. A 2026-11-17 VM run settled F7 and F8 below.
 
 ## Teams without a site chart
 
@@ -46,4 +46,4 @@ I measured these on the real saves `08-09_19_reg-sim08.zip` (before the Grizzlie
 - **F5.** The rule "ascending source ordinal, first pid-0 slot of the target block, vacate at once" puts Martin at 575 (matches JSB), Turner at 582 (JSB: 579), Kagami at 614 (JSB: 611), and Pittman at 615 (JSB: 613). JSB re-sorts the block, so no rule that moves only the traded players can match sim09 exactly. The default stays. The real-save test asserts each block's pid set, the movers' team fields, and the unmoved players' ordinals.
 - **F6.** No repo code writes `ibl5/IBL5.plr` (example) or `ibl5/IBL5.plb` (example) per sim. `ibl5/classes/Updater/JsbSourceResolver.php` reads `IBL5.<ext>` from the newest `backups/<season>/` archive and falls back to the disk file. The export page sources both inputs through it.
 - **F7.** A trade in the JSB GUI changes three files: IBL5.plr, IBL5.plb, and IBL5.trn. I loaded the stock sim08 save and traded Kagami and Pittman to the Lakers for Turner and Martin. Both teams accepted. JSB wrote nothing to disk at Attempt Trade, at OK, or at its "save the player transactions?" prompt. The trade lived in memory until Setup League > Save IBL5. That save rewrote 12 files (.arf, .bud, .dub, .frn, .fro, .lge, .own, .plb, .plr, .rcb, .sch, .trn), and only .plr, .plb, and .trn changed content. The other nine came back byte-identical. JSB's .plb matched sim09 on every changed byte. Of the 526 .plr lines JSB changed, 471 match sim09 exactly; sim09 also holds a simmed day. The export writes .plr and .plb, so the one file a JSB trade touches that the export leaves alone is .trn (see F8).
-- **F8.** JSB reads IBL5.trn on load, but the rosters do not depend on it. IBL5.trn is JSB's transaction log: a 16-byte header with a record count, then 128-byte records. Injuries are type 1 and trades are type 20. At load JSB read 9,872 bytes of it, the header plus all 77 sim08 records. On Save it kept those 77 records byte-identical and appended two type-20 records for the trade, which match sim09's records except the date. I then loaded the league with IBL5.trn deleted, and again with 64,000 bytes of junk in it. Both loaded with no error dialog and built the Grizzlies roster from .plr. With the file deleted, JSB wrote a new blank IBL5.trn. I found no JSB screen that shows these records. So the runbook keeps JSB's own IBL5.trn, and the site's `IBL5_export.trn` stays a site-side log. One effect: trades made on the site no longer reach JSB's own log, because the commissioner no longer enters them in JSB.
+- **F8.** JSB reads IBL5.trn on load, but the rosters do not depend on it. IBL5.trn is JSB's transaction log: a 16-byte header with a record count, then 128-byte records. Injuries are type 1 and trades are type 2. At load JSB read 9,872 bytes of it, the header plus all 77 sim08 records. On Save it kept those 77 records byte-identical and appended two type-20 records for the trade, which match sim09's records except the date. I then loaded the league with IBL5.trn deleted, and again with 64,000 bytes of junk in it. Both loaded with no error dialog and built the Grizzlies roster from .plr. With the file deleted, JSB wrote a new blank IBL5.trn. I found no JSB screen that shows these records. The owner decided on 2026-11-17 that site trades should still reach JSB's own log. So `IBL5_export.trn` is JSB's IBL5.trn with the site's trades appended in the layout JSB writes. JSB writes one record per team that gives something up. Players come first, then draft picks, at most five items per record. A pick item holds the draft year, the round, and the team whose pick it is. The export's records for the Kagami trade match sim09's records 80 and 81 byte for byte when dated Jan 5. That date is the day JSB simmed in sim09; the VM save stamped Jan 4. Those two sim09 records also hold a 2009 first-round pick of the Grizzlies, which the VM trade left out.

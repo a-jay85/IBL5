@@ -25,8 +25,11 @@ interface JsbExportRepositoryInterface extends PlrExportRepositoryInterface
      *     itemtype: string,
      *     trade_from: string,
      *     trade_to: string,
-     *     created_at: string
-     * }>
+     *     created_at: string,
+     *     pick_year: int|null,
+     *     pick_round: int|null,
+     *     pick_teamid: int|null
+     * }> The pick_* fields come from `ibl_draft_picks` for a draft pick item and are null otherwise
      */
     public function getCompletedTradeItems(string $seasonStartDate): array;
 }

@@ -76,7 +76,7 @@ if (!isset($_POST['confirmed'])) {
                     <b>PLR Export:</b> Reads <code>IBL5.plr</code>, applies contracts, trades (moved to the new team's slots), depth, and active flags,
                     writes to <code>IBL5_export.plr</code><br>
                     <b>PLB Export:</b> Writes <code>IBL5_export.plb</code> with minutes and OF/DF/OI/DI/BH for teams with a site depth chart<br>
-                    <b>TRN Export:</b> Generates <code>IBL5_export.trn</code> from trade data
+                    <b>TRN Export:</b> Reads <code>IBL5.trn</code>, appends the site trades it does not hold yet, writes to <code>IBL5_export.trn</code>
                 </p>
                 <p><em>Source files are never overwritten.</em></p>
                 <div class="modal-buttons">
@@ -119,7 +119,7 @@ $plrOutput = $basePath . '/IBL5_export.plr';
 $trnOutput = $basePath . '/IBL5_export.trn';
 $plbOutput = $basePath . '/IBL5_export.plb';
 
-// Sources: the newest backup archive for this season, else IBL5.plr / IBL5.plb on disk.
+// Sources: the newest backup archive for this season, else IBL5.plr / IBL5.plb / IBL5.trn on disk.
 // The bytes go to a private temp dir, so the files on disk are only ever read.
 $archiveExtractor = new \BulkImport\ArchiveExtractor();
 $sourceResolver = new \Updater\JsbSourceResolver(
@@ -133,6 +133,7 @@ $tmpDir = sys_get_temp_dir() . '/jsb_export_' . bin2hex(random_bytes(8));
 mkdir($tmpDir, 0700);
 $plrInput = $tmpDir . '/IBL5.plr';
 $plbInput = $tmpDir . '/IBL5.plb';
+$trnInput = $tmpDir . '/IBL5.trn';
 
 $renderResult = static function (PlrWriteResult $result): void {
     foreach ($result->messages as $msg) {
@@ -172,7 +173,7 @@ echo '<html><head><style>
 
 try {
     $sourceNotes = [];
-    foreach (['plr' => $plrInput, 'plb' => $plbInput] as $extension => $tmpPath) {
+    foreach (['plr' => $plrInput, 'plb' => $plbInput, 'trn' => $trnInput] as $extension => $tmpPath) {
         $bytes = $sourceResolver->getContents($extension);
         $source = $sourceResolver->describeLastSource();
         if ($bytes === null || $source === null) {
@@ -217,19 +218,25 @@ try {
 
     echo '<h2>TRN Export</h2>';
 
-    $seasonStartDate = $season->beginningYear . '-07-01';
-    $trnResult = $service->exportTrnFile($trnOutput, $seasonStartDate);
-
-    foreach ($trnResult->messages as $msg) {
-        $class = str_starts_with($msg, 'ERROR') ? 'error' : '';
-        echo '<p class="' . $class . '">' . HtmlSanitizer::safeHtmlOutput($msg) . '</p>';
+    // JSB stamps a trade with its league date, which is the day after the last sim.
+    $lastSimEnd = \DateTimeImmutable::createFromFormat('!Y-m-d', $season->lastSimEndDate);
+    if (!file_exists($trnInput)) {
+        echo '<p class="error">ERROR: IBL5.trn not found in the season backup archive or at ' . HtmlSanitizer::safeHtmlOutput($basePath . '/IBL5.trn') . '</p>';
+    } elseif ($lastSimEnd === false) {
+        echo '<p class="error">ERROR: TRN export skipped because the last sim end date is unknown</p>';
+    } else {
+        $renderResult($service->exportTrnFile(
+            $trnInput,
+            $trnOutput,
+            $season->beginningYear . '-07-01',
+            $season->beginningYear,
+            $lastSimEnd->modify('+1 day'),
+        ));
     }
-
-    echo '<p class="success"><b>' . HtmlSanitizer::safeHtmlOutput($trnResult->summary()) . '</b></p>';
 
     echo '</body></html>';
 } finally {
-    foreach ([$plrInput, $plbInput] as $tmpPath) {
+    foreach ([$plrInput, $plbInput, $trnInput] as $tmpPath) {
         if (is_file($tmpPath)) {
             unlink($tmpPath);
         }

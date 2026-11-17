@@ -191,6 +191,28 @@ class JsbExportRepositoryTest extends DatabaseTestCase
         }
     }
 
+    public function testGetCompletedTradeItemsJoinsDraftPickYearRoundAndOriginalTeam(): void
+    {
+        $pickId = $this->insertDraftPickRow(2, 1, 2031, 2);
+        $offerId = $this->insertTradeOfferRow();
+        $this->insertTradeInfoRow($offerId, $pickId, \Trading\TradeItemType::DraftPick->value, 'Team K', 'Team L', 'completed');
+        $this->insertTradeInfoRow($offerId, $pickId, \Trading\TradeItemType::Player->value, 'Team L', 'Team K', 'completed');
+
+        $rows = array_values(array_filter(
+            $this->repo->getCompletedTradeItems('2020-01-01'),
+            static fn (array $row): bool => $row['tradeofferid'] === $offerId,
+        ));
+
+        self::assertCount(2, $rows);
+        self::assertSame(2031, $rows[0]['pick_year']);
+        self::assertSame(2, $rows[0]['pick_round']);
+        self::assertSame(1, $rows[0]['pick_teamid']);
+        // A player item whose pid happens to equal a pickid must not pick up the pick's columns
+        self::assertNull($rows[1]['pick_year']);
+        self::assertNull($rows[1]['pick_round']);
+        self::assertNull($rows[1]['pick_teamid']);
+    }
+
     // ── getAllPlayerDepthCharts ──────────────────────────────────
 
     public function testGetAllPlayerDepthChartsReturnsDcColumnsKeyedByPid(): void

@@ -26,6 +26,12 @@ class TrnFileParser implements TrnFileParserInterface
     public const TRADE_ITEM_SIZE = 19;
     public const HEADER_AREA_SIZE = 17;
 
+    /**
+     * JSB's own header width. JSB writes the record count left-justified in bytes 0-15
+     * and stores record n at byte 16 + n * 128 (2026-11-17 VM run, runbook F8).
+     */
+    public const JSB_HEADER_SIZE = 16;
+
     // Transaction types
     public const TYPE_INJURY = 1;
     public const TYPE_TRADE = 2;

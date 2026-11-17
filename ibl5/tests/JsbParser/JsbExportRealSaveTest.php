@@ -24,6 +24,7 @@ use PlrParser\PlrTradeRelocator;
  * @covers \JsbParser\PlbFileWriter
  * @covers \JsbParser\PlbExportService
  * @covers \PlrParser\PlrTradeRelocator
+ * @covers \JsbParser\JsbExportService
  */
 class JsbExportRealSaveTest extends TestCase
 {
@@ -306,5 +307,74 @@ class JsbExportRealSaveTest extends TestCase
         self::assertSame(0, $plbResult->errors);
         self::assertSame(strlen($plr), filesize($plrOut));
         self::assertSame(strlen($plb), filesize($plbOut));
+    }
+
+    /**
+     * The sim08 IBL5.trn plus the site's copy of the trade must give the records JSB itself
+     * wrote in sim09 (80 and 81), keep every sim08 record byte-identical, and add nothing
+     * when the sim09 file already holds the trade.
+     */
+    public function testTrnExportMatchesTheTradeRecordsJsbWroteInSim09(): void
+    {
+        $sim08 = $this->member(self::SIM08_ZIP, 'IBL5.trn');
+        $sim09 = $this->member(self::SIM09_ZIP, 'IBL5.trn');
+        $sim08Count = (int) trim(substr($sim08, 0, 16));
+        self::assertSame(77, $sim08Count);
+
+        $row = static fn (int $itemId, string $type, string $from, string $to): array => [
+            'tradeofferid' => 7,
+            'itemid' => $itemId,
+            'itemtype' => $type,
+            'trade_from' => $from,
+            'trade_to' => $to,
+            'created_at' => '2026-11-10 12:00:00',
+            'pick_year' => null,
+            'pick_round' => null,
+            'pick_teamid' => null,
+        ];
+        $pick = ['pick_year' => 2009, 'pick_round' => 1, 'pick_teamid' => 20] + $row(1152, '0', 'Grizzlies', 'Lakers');
+        $trade = [
+            $row(2005, '1', 'Grizzlies', 'Lakers'),
+            $pick,
+            $row(6930, '1', 'Grizzlies', 'Lakers'),
+            $row(6363, '1', 'Lakers', 'Grizzlies'),
+            $row(4500, '1', 'Lakers', 'Grizzlies'),
+        ];
+        $repo = self::createStub(\JsbParser\Contracts\JsbExportRepositoryInterface::class);
+        $repo->method('getCompletedTradeItems')->willReturn($trade);
+        $service = new \JsbParser\JsbExportService($repo);
+
+        $tmp = sys_get_temp_dir() . '/jsb_realsave_trn_' . bin2hex(random_bytes(4));
+        mkdir($tmp);
+        try {
+            file_put_contents($tmp . '/sim08.trn', $sim08);
+            file_put_contents($tmp . '/sim09.trn', $sim09);
+            $jan5 = new \DateTimeImmutable('2009-01-05');
+            $fromSim08 = $service->exportTrnFile($tmp . '/sim08.trn', $tmp . '/out08.trn', '2008-07-01', 2008, $jan5);
+            $fromSim09 = $service->exportTrnFile($tmp . '/sim09.trn', $tmp . '/out09.trn', '2008-07-01', 2008, $jan5);
+            $out08 = file_get_contents($tmp . '/out08.trn');
+            $out09 = file_get_contents($tmp . '/out09.trn');
+        } finally {
+            foreach (['sim08', 'sim09', 'out08', 'out09'] as $name) {
+                if (is_file($tmp . '/' . $name . '.trn')) {
+                    unlink($tmp . '/' . $name . '.trn');
+                }
+            }
+            rmdir($tmp);
+        }
+
+        self::assertSame(0, $fromSim08->errors);
+        self::assertSame(0, $fromSim09->errors);
+        self::assertIsString($out08);
+        self::assertIsString($out09);
+
+        $records = 16 + $sim08Count * 128;
+        self::assertSame(str_pad('79', 16), substr($out08, 0, 16));
+        self::assertSame(substr($sim08, 16, $records - 16), substr($out08, 16, $records - 16));
+        self::assertSame(substr($sim09, 16 + 80 * 128, 128), substr($out08, $records, 128));
+        self::assertSame(substr($sim09, 16 + 81 * 128, 128), substr($out08, $records + 128, 128));
+        self::assertSame(substr($sim08, $records + 256), substr($out08, $records + 256));
+
+        self::assertSame($sim09, $out09);
     }
 }

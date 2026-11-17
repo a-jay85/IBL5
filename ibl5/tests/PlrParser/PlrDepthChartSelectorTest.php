@@ -57,7 +57,7 @@ class PlrDepthChartSelectorTest extends TestCase
         self::assertSame([], $charted);
     }
 
-    public function testTradedPlayerListedFirstDoesNotHideLaterChartedRows(): void
+    public function testTradedPlayerListedFirstIsDroppedButDoesNotHideLaterChartedRows(): void
     {
         $rows = [
             101 => JsbExportFixtures::chartRow(101, 3, ['dc_minutes' => 30]),
@@ -66,7 +66,7 @@ class PlrDepthChartSelectorTest extends TestCase
 
         $charted = PlrDepthChartSelector::chartedByPid($rows, [101 => 5, 102 => 3]);
 
-        self::assertSame([101, 102], array_keys($charted));
+        self::assertSame([102], array_keys($charted));
     }
 
     public function testFirstAndLastTeamsCanBeCharted(): void

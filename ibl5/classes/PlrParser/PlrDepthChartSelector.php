@@ -40,6 +40,9 @@ final class PlrDepthChartSelector
 
         $result = [];
         foreach ($rows as $pid => $row) {
+            if ($sourceTeamByPid !== null && ($sourceTeamByPid[$pid] ?? null) !== $row['teamid']) {
+                continue;
+            }
             if (isset($chartedTeams[$row['teamid']])) {
                 $result[$pid] = $row;
             }

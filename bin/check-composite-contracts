@@ -381,24 +381,25 @@ else
   # "master not green", so all three promote callers must ignore it in both
   # IGNORE_PENDING_CHECKS and IGNORE_FAILED_CHECKS. It stays out of SKIP_CHECKS
   # because P7 and P8 pin that list to the promote workflow's job names.
-  agg_name="Aggregate check status"
+  # `recheck` (text-hold-recheck-run.yml) is pinned in the same value for the same reason.
+  p10_val="Aggregate check status,recheck"
   p10_bad=""
   for var in IGNORE_PENDING_CHECKS IGNORE_FAILED_CHECKS; do
     wf_val="$(sed -n "s/^ *${var}: *//p" "$pp_file" | head -1 | sed 's/[[:space:]]*#.*$//' | tr -d "\"'" | sed 's/[[:space:]]*$//')"
-    [ "$wf_val" = "$agg_name" ] || p10_bad="$p10_bad workflow:$var"
+    [ "$wf_val" = "$p10_val" ] || p10_bad="$p10_bad workflow:$var"
     for pair in "merge:$MERGE_SCRIPT" "promote:$PROMOTE_SCRIPT"; do
       sc_label="${pair%%:*}"
       sc_file="${pair#*:}"
       [ -f "$sc_file" ] || continue
-      if ! grep -qE "^[[:space:]]*${var}=.*[-\"']${agg_name}[\"'}]*[[:space:]]*(\\\\)?$" "$sc_file"; then
+      if ! grep -qE "^[[:space:]]*${var}=.*[-\"']${p10_val}[\"'}]*[[:space:]]*(\\\\)?$" "$sc_file"; then
         p10_bad="$p10_bad ${sc_label}:$var"
       fi
     done
   done
   if [ -z "$p10_bad" ]; then
-    echo "composite-contracts: promote-to-production callers ignore '$agg_name' in IGNORE_PENDING_CHECKS and IGNORE_FAILED_CHECKS (P10)"
+    echo "composite-contracts: promote-to-production callers ignore '$p10_val' in IGNORE_PENDING_CHECKS and IGNORE_FAILED_CHECKS (P10)"
   else
-    echo "composite-contracts: promote-to-production (P10) — '$agg_name' is not named in:${p10_bad}; the settle workflow's check-run on master HEAD would make bin/check-master-ci-green report master as not green and stall promotion ($pp_file, $MERGE_SCRIPT, $PROMOTE_SCRIPT)" >&2
+    echo "composite-contracts: promote-to-production (P10) — '$p10_val' is not named in:${p10_bad}; the settle workflow's check-run on master HEAD would make bin/check-master-ci-green report master as not green and stall promotion ($pp_file, $MERGE_SCRIPT, $PROMOTE_SCRIPT)" >&2
     fail=1
   fi
 

@@ -135,8 +135,8 @@ jobs:
         env:
           MAX_WALKBACK: '0'
           SKIP_CHECKS: Promote master to production,Auto-promotion paused
-          IGNORE_PENDING_CHECKS: Aggregate check status
-          IGNORE_FAILED_CHECKS: Aggregate check status
+          IGNORE_PENDING_CHECKS: Aggregate check status,recheck
+          IGNORE_FAILED_CHECKS: Aggregate check status,recheck
         run: |
           git push origin "$SHA:refs/heads/production"
   paused:
@@ -202,6 +202,13 @@ PPEOF
       # Break the name in IGNORE_FAILED_CHECKS only; the pending knob stays intact.
       tmp="$(mktemp)"
       sed 's/^\( *IGNORE_FAILED_CHECKS: \).*$/\1Aggregate check statuz/' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    p10-no-recheck)
+      # Old pin: the aggregate name alone, without recheck.
+      tmp="$(mktemp)"
+      sed 's/^\( *IGNORE_FAILED_CHECKS: \).*$/\1Aggregate check status/' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    p10-recheck-near-miss)
+      tmp="$(mktemp)"
+      sed 's/^\( *IGNORE_FAILED_CHECKS: \).*$/\1Aggregate check status,recheck-foo/' "$f" > "$tmp" && mv "$tmp" "$f" ;;
     p11-unlisted)        # block branches list after paths (cache-dependencies.yml shape)
       printf 'name: Doc Freshness Audit\non:\n  push:\n    paths: [%s]\n    branches:\n      - master\n' "'**.md'" > "$1/p11-docs-stub.yml" ;;
     p11-dangling)        # listed name with no workflow (Auto-Rebase rename drift)
@@ -226,7 +233,7 @@ PPEOF
 # Writes a minimal merge-script stub whose SKIP_CHECKS matches <skip-list>.
 put_merge() {
   # shellcheck disable=SC2016
-  printf 'SKIP_CHECKS="%s" \\\nIGNORE_PENDING_CHECKS="Aggregate check status" \\\nIGNORE_FAILED_CHECKS="Aggregate check status" \\\n    bin/check-master-ci-green "$SHA"\n' "$2" > "$1"
+  printf 'SKIP_CHECKS="%s" \\\nIGNORE_PENDING_CHECKS="Aggregate check status,recheck" \\\nIGNORE_FAILED_CHECKS="Aggregate check status,recheck" \\\n    bin/check-master-ci-green "$SHA"\n' "$2" > "$1"
 }
 
 # put_mutation_pr <wf-dir> <variant>
@@ -373,7 +380,7 @@ fi  # unfiltered
 
 # Permanent fixtures reused across promote-to-production cases
 CLEAN_PROMOTE="$TMP/promote-clean"
-printf '#!/bin/bash\nIGNORE_PENDING_CHECKS="${IGNORE_PENDING_CHECKS:-Aggregate check status}" \\\nIGNORE_FAILED_CHECKS="${IGNORE_FAILED_CHECKS:-Aggregate check status}" \\\n    bin/check-master-ci-green "$SHA"\ngit push origin production\n' > "$CLEAN_PROMOTE"
+printf '#!/bin/bash\nIGNORE_PENDING_CHECKS="${IGNORE_PENDING_CHECKS:-Aggregate check status,recheck}" \\\nIGNORE_FAILED_CHECKS="${IGNORE_FAILED_CHECKS:-Aggregate check status,recheck}" \\\n    bin/check-master-ci-green "$SHA"\ngit push origin production\n' > "$CLEAN_PROMOTE"
 chmod +x "$CLEAN_PROMOTE"
 FORCE_PROMOTE="$TMP/promote-force"
 printf '#!/bin/bash\ngit push --force origin production\n' > "$FORCE_PROMOTE"
@@ -487,6 +494,24 @@ if grep -qF '(P10) —' <<< "$out"; then
   h_pass "P10 rejects a promote caller that does not ignore the aggregate check names P10"
 else
   h_fail "P10 rejects a promote caller that does not ignore the aggregate check names P10" "output: $out"
+fi
+
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" p10-no-recheck
+out="$("$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" 2>&1)"; rc=$?
+expect "P10 rejects a promote caller that does not ignore recheck" 1 "$rc"
+if grep -qF '(P10) —' <<< "$out"; then
+  h_pass "P10 rejects a promote caller that does not ignore recheck names P10"
+else
+  h_fail "P10 rejects a promote caller that does not ignore recheck names P10" "output: $out"
+fi
+
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" p10-recheck-near-miss
+out="$("$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" 2>&1)"; rc=$?
+expect "P10 rejects a near-miss recheck-foo value" 1 "$rc"
+if grep -qF '(P10) —' <<< "$out"; then
+  h_pass "P10 rejects a near-miss recheck-foo value names P10"
+else
+  h_fail "P10 rejects a near-miss recheck-foo value names P10" "output: $out"
 fi
 
 # P11: an unlisted push-to-master workflow, a listed name with no workflow, an

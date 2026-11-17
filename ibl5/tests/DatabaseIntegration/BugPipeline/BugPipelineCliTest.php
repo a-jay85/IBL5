@@ -22,6 +22,7 @@ use Tests\DatabaseIntegration\DatabaseTestCase;
  * test DB bin/db-test-up bootstrapped — not main.
  */
 #[Group('database')]
+#[Group('mutation-unsafe')]
 class BugPipelineCliTest extends DatabaseTestCase
 {
     /** Reserved fixture id range — never collides with seed rows. */

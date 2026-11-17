@@ -279,7 +279,8 @@ def test_truth_young_but_repaired_is_repaired():
 
 # --- verdict ------------------------------------------------------------------------------
 
-from harness.gate_backtest import (GATE_BACKTEST_BEGIN, GATE_BACKTEST_END, GateChange,  # noqa: E402
+from harness.gate_backtest import (_FLAG_LINES_CAP,  # noqa: E402
+                                   GATE_BACKTEST_BEGIN, GATE_BACKTEST_END, GateChange,
                                    ReplayResult, Truth, compute_verdict, parse_gate_backtest_state,
                                    render_gate_backtest, upsert_gate_backtest)
 
@@ -626,6 +627,72 @@ def _fixed_verdict(rows, truth=None):
     res = _results("bin/check-foo", _passes(1, 6)) + _fixed("bin/check-foo", rows)
     t = truth if truth is not None else _truth(clean=range(1, 12))
     return res, t, compute_verdict([_g()], res, t)
+
+
+P11 = "P11 master-only contract"
+P6 = "P6 missing config/required.txt"
+
+
+def _rerun(fix_lines, base_lines=(P11,), head_lines=(P11, P6), fix="flag"):
+    return ReplayResult(10, "bin/check-foo", "flag", P11, base_outcome="flag",
+                        fix_outcome=fix, flag_lines=head_lines,
+                        base_flag_lines=base_lines, fix_flag_lines=fix_lines)
+
+
+def _rerun_tally(r):
+    res = _results("bin/check-foo", _passes(1, 6)) + [r]
+    return compute_verdict([_g()], res, _truth(clean=range(1, 12))).per_gate["bin/check-foo"]
+
+
+def test_tally_fix_flag_only_base_lines_is_fixed_by_pr():
+    tally = _rerun_tally(_rerun((P11,)))
+    assert tally.fixed_by_pr == [10]
+    assert tally.false_flags == []
+    assert tally.pre_existing == []
+
+
+def test_tally_fix_flag_new_line_stays_false_flag():
+    tally = _rerun_tally(_rerun((P11, "P12 new line")))
+    assert tally.false_flags == [10]
+    assert tally.fixed_by_pr == []
+
+
+def test_tally_fix_flag_capped_lines_stays_false_flag():
+    base = tuple(f"L{i}" for i in range(_FLAG_LINES_CAP))
+    capped_base = _rerun_tally(_rerun(("L0",), base_lines=base, head_lines=("L0", P6)))
+    assert capped_base.false_flags == [10]
+    assert capped_base.fixed_by_pr == []
+    capped_fix = _rerun_tally(_rerun(base, base_lines=base, head_lines=base + (P6,)))
+    assert capped_fix.false_flags == [10]
+    assert capped_fix.fixed_by_pr == []
+
+
+def test_tally_fix_flag_empty_lines_stays_false_flag():
+    tally = _rerun_tally(_rerun(()))
+    assert tally.false_flags == [10]
+    assert tally.fixed_by_pr == []
+
+
+def test_tally_base_flag_no_new_lines_is_pre_existing():
+    tally = _rerun_tally(_rerun((), head_lines=(P11,), fix=""))
+    assert tally.pre_existing == [10]
+    assert tally.fixed_by_pr == []
+    assert tally.false_flags == []
+
+
+def test_render_fixed_by_pr_pre_existing_remainder_line():
+    res = (_results("bin/check-foo", _passes(1, 6)) + [_rerun((P11,)),
+           ReplayResult(11, "bin/check-foo", "flag", "", base_outcome="pass", fix_outcome="pass")])
+    t = _truth(clean=range(1, 12))
+    v = compute_verdict([_g()], res, t)
+    block = render_gate_backtest(v, [_g()], res, t, 30)
+    fixed = [ln for ln in block.splitlines() if ln.startswith("- Fixed by the candidate PR")]
+    assert len(fixed) == 1
+    assert "gate passes or prints only lines the base gate also prints" in fixed[0]
+    assert "#10, #11" in fixed[0]
+    assert ("  - Pre-existing remainder #10 (`bin/check-foo`): fix rerun still prints 1 line, "
+            "all printed by the base gate too") in block.splitlines()
+    assert "Pre-existing remainder #11" not in block
 
 
 def test_tally_head_flag_fix_pass_is_fixed_by_pr():

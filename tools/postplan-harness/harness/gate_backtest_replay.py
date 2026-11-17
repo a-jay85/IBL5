@@ -25,8 +25,8 @@ from datetime import datetime, timezone
 from harness.gate_backtest import (GATE_BACKTEST_BEGIN, GATE_BACKTEST_END, HEAD_OID_FIELD,
                                    GateChange, HistoricalPR, ReplayResult, Verdict, classify_exit,
                                    changes_from_unified_diff, classify_truth, compute_verdict,
-                                   detect_gate_changes, flag_lines, parse_head_oid,
-                                   expand_argv, expand_env, expand_stdin, is_check_script,
+                                   detect_gate_changes, flag_lines, lines_not_in_base,
+                                   parse_head_oid, expand_argv, expand_env, expand_stdin, is_check_script,
                                    render_gate_backtest, resolve_spec)
 
 REPO_SLUG = "a-jay85/IBL5"
@@ -592,7 +592,9 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
                     fix_applied: list[str] = []
                     fix_skipped: list[str] = []
                     fix_secs: tuple[float, ...] = ()
-                    if outcome == "flag" and base_outcome != "flag" and fix_patch is not None:
+                    fix_lines: tuple[str, ...] = ()
+                    if (outcome == "flag" and fix_patch is not None
+                            and (base_outcome != "flag" or lines_not_in_base(head_lines, base_lines))):
                         if clock() - start >= total_cap:
                             fix_outcome, fix_detail = "timeout", "total-cap"
                         else:
@@ -604,7 +606,7 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
                                     fix_outcome = "partial-no-reads" if not spec.reads else "partial-gate-read"
                                 else:
                                     scratch.overlay(overlay_files)
-                                    fix_outcome, fix_detail, _, fix_secs = execute(spec, ctx, gate.path)
+                                    fix_outcome, fix_detail, fix_lines, fix_secs = execute(spec, ctx, gate.path)
                                     if fix_skipped and fix_outcome == "pass":
                                         probed = probe_undeclared_reads(
                                             ctx["tree"], fix_skipped,
@@ -627,7 +629,8 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
                                                 base_flag_lines=base_lines,
                                                 attempt_secs=head_secs,
                                                 base_attempt_secs=base_secs,
-                                                fix_attempt_secs=fix_secs))
+                                                fix_attempt_secs=fix_secs,
+                                                fix_flag_lines=fix_lines))
     finally:
         shutil.rmtree(work, ignore_errors=True)
     return results

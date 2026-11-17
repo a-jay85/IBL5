@@ -16,6 +16,7 @@ use Trading\TradeOffer;
  * Pattern: createTradeOffer() commits internally; tearDown does manual FK-safe cleanup.
  */
 #[Group('database')]
+#[Group('mutation-unsafe')]
 class TradingEndpointMutationCharacterizationTest extends DatabaseTestCase
 {
     private TradeOffer $tradeOffer;

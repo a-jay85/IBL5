@@ -10,6 +10,7 @@ use PHPUnit\Framework\Attributes\Group;
 use Tests\DatabaseIntegration\DatabaseTestCase;
 
 #[Group('database')]
+#[Group('mutation-unsafe')]
 class BugReportRepositoryTest extends DatabaseTestCase
 {
     private BugReportRepository $repo;

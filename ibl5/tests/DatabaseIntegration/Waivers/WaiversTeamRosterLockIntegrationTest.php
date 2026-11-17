@@ -18,6 +18,7 @@ use Waivers\WaiversTeamLockRepository;
  * teams 1 and 2 and never insert into ibl_team_info.
  */
 #[Group('database')]
+#[Group('mutation-unsafe')]
 class WaiversTeamRosterLockIntegrationTest extends DatabaseTestCase
 {
     private const ER_LOCK_WAIT_TIMEOUT = 1205;

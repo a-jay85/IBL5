@@ -19,6 +19,7 @@ use Tests\DatabaseIntegration\DatabaseTestCase;
  * so Discord::postToChannel() short-circuits and no live POST can fire.
  */
 #[Group('database')]
+#[Group('mutation-unsafe')]
 final class SimRecapQueueClaimCliTest extends DatabaseTestCase
 {
     private const SIM_PENDING = 990101;

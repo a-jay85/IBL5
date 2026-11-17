@@ -27,7 +27,7 @@ abstract class DatabaseTestCase extends TestCase
         $host = $this->requireEnv('DB_HOST');
         $user = $this->requireEnv('DB_USER');
         $pass = $this->requireEnv('DB_PASS');
-        $name = $this->requireEnv('DB_NAME');
+        $name = DatabaseNameResolver::fromEnvironment($this->requireEnv('DB_NAME'));
 
         $this->db = new \mysqli();
         $this->db->options(MYSQLI_OPT_INT_AND_FLOAT_NATIVE, 1);
@@ -42,7 +42,9 @@ abstract class DatabaseTestCase extends TestCase
 
     protected function tearDown(): void
     {
+        $leak = null;
         if (isset($this->db)) {
+            $leak = TransactionLeakGuard::failureMessage($this->readInTransaction(), TransactionLeakGuard::isMutationUnsafe(static::class), static::class);
             try {
                 $this->db->rollback();
                 $this->db->close();
@@ -52,6 +54,28 @@ abstract class DatabaseTestCase extends TestCase
         }
 
         parent::tearDown();
+
+        if ($leak !== null) {
+            self::fail($leak);
+        }
+    }
+
+    protected function readInTransaction(): int|string|null
+    {
+        try {
+            $result = $this->db->query('SELECT @@in_transaction');
+        } catch (\mysqli_sql_exception | \Error) {
+            // \Error: a test that closed its own connection ("mysqli object is already closed")
+            return null;
+        }
+        if (!$result instanceof \mysqli_result) {
+            return null;
+        }
+        $row = $result->fetch_row();
+        $result->free();
+        $value = $row[0] ?? null;
+
+        return is_int($value) || is_string($value) ? $value : null;
     }
 
     /**

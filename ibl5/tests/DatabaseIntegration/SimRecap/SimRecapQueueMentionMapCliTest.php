@@ -16,6 +16,7 @@ use Tests\DatabaseIntegration\DatabaseTestCase;
  * DatabaseTestCase's begin/rollback isolation is enough; no fixtures are inserted.
  */
 #[Group('database')]
+#[Group('mutation-unsafe')]
 final class SimRecapQueueMentionMapCliTest extends DatabaseTestCase
 {
     private string $scriptPath;

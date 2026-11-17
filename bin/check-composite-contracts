@@ -1271,6 +1271,95 @@ else
   fi
 fi  # end D1
 
+# M6: Infection runs DB tests per thread. Both mutation workflows run Infection
+# with 4 threads against ibl5/phpunit.xml. Four things must hold in the Infection
+# step or every DB test silently misbehaves per mutant: the step copies
+# phpunit-mutation.xml over phpunit.xml before vendor/bin/infection, sets
+# INFECTION_PER_THREAD_DATABASE: '1', and passes no --threads (infection.json5
+# and the clone step both assume 4). A step named exactly
+# 'Clone per-thread test databases' must sit between 'Import seed data' and the
+# Infection step. Comment lines count on no side. Checked once per pair:
+# mutation.yml (job mutation, step Run Infection) and mutation-pr.yml (job
+# mutation-pr, step Run Infection on diff). Never run Infection locally; CI runs it.
+m6_cp_needle='cp phpunit-mutation.xml phpunit.xml'
+m6_clone_step='Clone per-thread test databases'
+m6_import_step='Import seed data'
+# _m6_scan <file> <job-key> <step-name> prints one code: ok, a, b, c, d or e.
+_m6_scan() {
+  awk -v jobkey="$2" -v want="$3" -v cp_needle="$m6_cp_needle" \
+      -v clone_name="$m6_clone_step" -v import_name="$m6_import_step" \
+      -v flag_line="INFECTION_PER_THREAD_DATABASE: '1'" '
+    function trim_name(v) {
+      sub(/^[^:]*:[[:space:]]*/, "", v); gsub(/["'"'"']/, "", v); sub(/[[:space:]]+$/, "", v)
+      return v
+    }
+    { sub(/\r$/, "") }
+    $0 == "  " jobkey ":" { inblk=1; next }
+    inblk && /^  [A-Za-z0-9_-]+:[[:space:]]*$/ { inblk=0 }
+    !inblk { next }
+    /^    - / { n++; names[n] = ""; lc[n] = 0 }
+    n == 0 { next }
+    /^    - name:/ { names[n] = trim_name($0) }
+    /^[[:space:]]*#/ { next }
+    { lc[n]++; ln[n, lc[n]] = $0 }
+    END {
+      inf = 0
+      for (i = 1; i <= n; i++) {
+        if (names[i] != want) continue
+        for (j = 1; j <= lc[i]; j++) if (index(ln[i, j], "vendor/bin/infection")) { inf = i; break }
+        if (inf) break
+      }
+      if (!inf) { print "a"; exit }
+      flag = 0; cpl = 0; infl = 0; thr = 0
+      for (j = 1; j <= lc[inf]; j++) {
+        l = ln[inf, j]
+        t = l; sub(/^[[:space:]]+/, "", t); sub(/[[:space:]]+$/, "", t)
+        if (t == flag_line) flag = 1
+        if (!cpl && index(l, cp_needle)) cpl = j
+        if (!infl && index(l, "vendor/bin/infection")) infl = j
+        if (index(l, "--threads")) thr = 1
+      }
+      if (!flag) { print "b"; exit }
+      if (!cpl || cpl > infl) { print "c"; exit }
+      if (thr) { print "d"; exit }
+      imp = 0
+      for (i = 1; i < inf; i++) if (names[i] == import_name) { imp = i; break }
+      ok = 0
+      if (imp) for (i = imp + 1; i < inf; i++) if (names[i] == clone_name) { ok = 1; break }
+      if (!ok) { print "e"; exit }
+      print "ok"
+    }
+  ' "$1"
+}
+for _m6_pair in "mutation.yml|mutation|Run Infection" "mutation-pr.yml|mutation-pr|Run Infection on diff"; do
+  IFS='|' read -r _m6_name _m6_job _m6_step <<< "$_m6_pair"
+  _m6_file="$WORKFLOWS/$_m6_name"
+  if [ ! -f "$_m6_file" ]; then
+    echo "composite-contracts: $_m6_name absent, skipping M6"
+    continue
+  fi
+  _m6_code="$(_m6_scan "$_m6_file" "$_m6_job" "$_m6_step")"
+  case "$_m6_code" in
+    ok)
+      echo "composite-contracts: $_m6_name runs DB tests per thread in its Infection step (M6)" ;;
+    a)
+      echo "composite-contracts: M6: $_m6_name has no '$_m6_step' step running vendor/bin/infection" >&2
+      fail=1 ;;
+    b)
+      echo "composite-contracts: M6: $_m6_name '$_m6_step' must set INFECTION_PER_THREAD_DATABASE: '1'" >&2
+      fail=1 ;;
+    c)
+      echo "composite-contracts: M6: $_m6_name '$_m6_step' must run $m6_cp_needle before vendor/bin/infection" >&2
+      fail=1 ;;
+    d)
+      echo "composite-contracts: M6: $_m6_name '$_m6_step' must not pass --threads; infection.json5 and the clone step both assume 4" >&2
+      fail=1 ;;
+    *)
+      echo "composite-contracts: M6: $_m6_name needs a '$m6_clone_step' step after '$m6_import_step' and before '$_m6_step'" >&2
+      fail=1 ;;
+  esac
+done
+
 # U1: no workflow may run on the floating ubuntu-latest label. GitHub moves it to
 # a new Ubuntu release in a staged rollout (actions/runner-images issue 14748), so
 # CI changes under open PRs with no related diff. Every workflow pins one explicit

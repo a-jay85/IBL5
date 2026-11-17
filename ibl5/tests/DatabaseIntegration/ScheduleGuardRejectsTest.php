@@ -9,6 +9,7 @@ use Boxscore\RejectedGame;
 use PHPUnit\Framework\Attributes\Group;
 
 #[Group('database')]
+#[Group('mutation-unsafe')]
 class ScheduleGuardRejectsTest extends DatabaseTestCase
 {
     private BoxscoreAuditRepository $repo;

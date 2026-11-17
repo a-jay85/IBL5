@@ -248,6 +248,11 @@ def test_dm_chunk_cap_change_is_one_way():
     assert external_send_change(DM, _dm(182, "-CAP=1900", "+CAP=500")) == _R_SEND
 
 
+def test_dm_guard_added_before_unchanged_send_assignment_is_one_way():
+    sec = _dm(120, '-USE_WEBHOOK=0; WEBHOOK_URL=""', '+false && USE_WEBHOOK=0; WEBHOOK_URL=""')
+    assert external_send_change(DM, sec) is not None
+
+
 def test_dm_curl_in_new_log_function_is_one_way():
     sec = _dm(350, "+log_sent() {", '+    curl -s -d "$FULL_MSG" "$LOG_URL" >/dev/null 2>&1', "+}")
     assert external_send_change(DM, sec) == _R_DM_TOKEN

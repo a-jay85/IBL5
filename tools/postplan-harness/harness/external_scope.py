@@ -569,13 +569,14 @@ def _dm_conserved(minus_stmts: list[_DmStmt], plus_stmts: list[_DmStmt]) -> bool
     return True
 
 
-def _dm_partner(body: list[str], idx: int, start: int) -> set[str]:
-    """The whitespace-collapsed statements of a paired block's partner line."""
+def _dm_partner(body: list[str], idx: int, start: int) -> set[tuple[str, str]]:
+    """The whitespace-collapsed statements of a paired block's partner line, each with the
+    connector that precedes it, so a new `&&`/`||`/pipe guard in front of one never matches."""
     joined = _dm_join(body, idx, start)
     if isinstance(joined, str):
         return set()
     stmts = _dm_split(joined[0])
-    return {" ".join(raw.split()) for raw, _m, _c in stmts or []}
+    return {(" ".join(raw.split()), stmts[k - 1][2] if k else "") for k, (raw, _m, _c) in enumerate(stmts or [])}
 
 
 _DM_LOG_VALUE_RE = re.compile(r'"\$\{DISCORD_DM_SENT_LOG:-[^}"$`\\]*(?:\$HOME[^}"$`\\]*)?\}"')
@@ -590,9 +591,9 @@ def _dm_log_assign_ok(raw: str, word: str | None) -> bool:
     return _DM_LOG_VALUE_RE.fullmatch(m.group(1)) is not None
 
 
-def _dm_stmt_reason(stmts: list[_DmStmt], allowed: frozenset[str], partner: set[str]) -> str | None:
+def _dm_stmt_reason(stmts: list[_DmStmt], allowed: frozenset[str], partner: set[tuple[str, str]]) -> str | None:
     """Rules R4 to R7 over one joined command's statements."""
-    for raw, masked, _conn in stmts:
+    for k, (raw, masked, _conn) in enumerate(stmts):
         _reserved, name, assigns, word, targets, _core = _dm_words(raw, masked)
         if name is not None:
             if name in _DM_EXISTING_FUNCS:
@@ -601,7 +602,7 @@ def _dm_stmt_reason(stmts: list[_DmStmt], allowed: frozenset[str], partner: set[
             if name in _DM_LOG_TARGETS and not _dm_log_assign_ok(raw, word):
                 return _R_SEND
             if name in _DM_SEND_VARS or name.startswith("DISCORD_DM_"):
-                if " ".join(raw.split()) not in partner:
+                if (" ".join(raw.split()), stmts[k - 1][2] if k else "") not in partner:
                     return _R_SEND
         if word is not None:
             if word not in allowed:

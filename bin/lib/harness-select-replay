@@ -29,7 +29,7 @@ gh_or_die() { # <out-file> <gh args...>; runs gh, exits 2 on failure
 }
 
 failed_names() { # <log-file>; prints each failed harness name, one per line
-    grep -oE 'bin/test-[A-Za-z0-9_-]+ \(rc=' "$1" | sed 's/ (rc=$//' || true
+    grep -oE '(^|[^A-Za-z0-9_./-])(ibl5/)?bin/test-[A-Za-z0-9_-]+ \(rc=' "$1" | grep -oE '(ibl5/)?bin/test-[A-Za-z0-9_-]+' || true
     awk -F'\t' '$1 ~ /isolated/ && $2 ~ /^bin\/test-/ { split($2, a, " "); print a[1] }' "$1"
 }
 

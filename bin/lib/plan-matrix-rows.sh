@@ -222,7 +222,7 @@ ci_host_rewrite() {
 # Where the arguments of a fetching command start: curl as any word, or php,
 # bun or bunx as a command word (row start, or after $(, <(, >(, a backtick,
 # |, ; or &). A file name such as ibl5/index.php is not a command word.
-PLAN_ROW_FETCH_SEG_RE='(^|[[:space:]|;&`(])curl[[:space:]]|(^|\$\(|<\(|>\(|[|;&`])[[:space:]]*(php|bun|bunx)([[:space:]]|$)'
+PLAN_ROW_FETCH_SEG_RE='(^|[[:space:]|;&`('"'"'"])curl[[:space:]]|(^|\$\(|<\(|>\(|[|;&`])[[:space:]]*(php|bun|bunx)([[:space:]]|$)|docker compose exec -T php[[:space:]]+(php|bun|bunx)([[:space:]]|$)'
 
 # _fetch_split <cmd> — splits cmd at each fetching command. For segment i,
 # _FS_PRE[i] is the text before its arguments (ending with the command word)

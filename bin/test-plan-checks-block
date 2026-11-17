@@ -463,6 +463,8 @@ chk "curl after php stays LOCAL" routes_local 'php -v; curl -sf iblhoops.net/x'
 chk "curl after php && stays LOCAL" routes_local 'cd ibl5 && php -l x.php && curl -sf iblhoops.net/ibl5/modules.php?name=X | grep -q Foo'
 chk "curl after \$(php) stays LOCAL" routes_local 'test "$(php -v)" = "$(curl -s iblhoops.net/x)"'
 chk "curl nested in php args stays LOCAL" routes_local 'php x.php $(curl -s iblhoops.net/x)'
+chk "curl right after a quote stays LOCAL" routes_local "seq 3 | xargs -P 3 sh -c 'curl -s https://iblhoops.net/'"
+chk "php after compose exec -T php stays LOCAL" routes_local "docker compose exec -T php php -r 'echo file_get_contents(\"https://iblhoops.net/\");'"
 chk "slug host before ) routes CI" routes_ci 'test "$(curl -s -o /dev/null -w %{http_code} http://x.localhost)" = 200'
 end_case
 

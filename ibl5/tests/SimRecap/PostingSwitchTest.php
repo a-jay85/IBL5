@@ -26,7 +26,7 @@ class PostingSwitchTest extends TestCase
     #[DataProvider('nonOnValueProvider')]
     public function testIsOnOnlyForExactOnValue(?string $stored): void
     {
-        $settings = $this->createStub(LeagueControlPanelRepositoryInterface::class);
+        $settings = self::createStub(LeagueControlPanelRepositoryInterface::class);
         $settings->method('getSetting')->willReturn($stored);
 
         $this->assertFalse((new PostingSwitch($settings))->isOn());

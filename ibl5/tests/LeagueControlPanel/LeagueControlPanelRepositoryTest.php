@@ -99,7 +99,7 @@ class LeagueControlPanelRepositoryTest extends TestCase
         $mockDb = $this->createMock(\mysqli::class);
         $mockDb->expects($this->once())
             ->method('prepare')
-            ->with($this->stringContains('UPDATE `ibl_settings` SET setting_value = ? WHERE setting_key = ?'))
+            ->with(self::stringContains('UPDATE `ibl_settings` SET setting_value = ? WHERE setting_key = ?'))
             ->willReturn($stubStmt);
 
         // mysqli_stmt::$affected_rows is virtual and cannot be mocked; override the seam.

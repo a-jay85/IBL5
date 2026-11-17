@@ -230,6 +230,64 @@ class LeagueControlPanelProcessorTest extends TestCase
         $this->assertStringContainsString('On', $result['message']);
     }
 
+    // --- Sim Recap Posting ---
+
+    public function testSetSimRecapPostingStoresOn(): void
+    {
+        $mock = $this->createMock(LeagueControlPanelRepositoryInterface::class);
+        $mock->expects($this->once())
+            ->method('setSimRecapPosting')
+            ->with('On');
+
+        $processor = new LeagueControlPanelProcessor($mock, self::createStub(LeagueControlPanelAwardGenerationServiceInterface::class));
+        $result = $processor->dispatch('set_sim_recap_posting', ['SimRecapPosting' => 'On']);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame('Sim recap Discord posting set to On.', $result['message']);
+    }
+
+    #[DataProvider('invalidSimRecapPostingProvider')]
+    public function testSetSimRecapPostingRejectsInvalidValue(mixed $value): void
+    {
+        $mock = $this->createMock(LeagueControlPanelRepositoryInterface::class);
+        $mock->expects($this->never())->method('setSimRecapPosting');
+
+        $processor = new LeagueControlPanelProcessor($mock, self::createStub(LeagueControlPanelAwardGenerationServiceInterface::class));
+        $result = $processor->dispatch('set_sim_recap_posting', ['SimRecapPosting' => $value]);
+
+        $this->assertFalse($result['success']);
+        $this->assertSame('Invalid sim recap posting value.', $result['message']);
+    }
+
+    /**
+     * @return list<array{mixed}>
+     */
+    public static function invalidSimRecapPostingProvider(): array
+    {
+        return [
+            ['Maybe'],
+            ['on'],
+            [''],
+            [null],
+        ];
+    }
+
+    public function testSetSimRecapPostingNotAvailableInOlympics(): void
+    {
+        $mock = $this->createMock(LeagueControlPanelRepositoryInterface::class);
+        $mock->expects($this->never())->method('setSimRecapPosting');
+
+        $processor = new LeagueControlPanelProcessor(
+            $mock,
+            self::createStub(LeagueControlPanelAwardGenerationServiceInterface::class),
+            LeagueContext::LEAGUE_OLYMPICS
+        );
+        $result = $processor->dispatch('set_sim_recap_posting', ['SimRecapPosting' => 'On']);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('not available', $result['message']);
+    }
+
     // --- Trivia ---
 
     public function testActivateTrivia(): void

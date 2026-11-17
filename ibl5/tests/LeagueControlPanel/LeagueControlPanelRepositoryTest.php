@@ -86,6 +86,33 @@ class LeagueControlPanelRepositoryTest extends TestCase
         $this->assertSame(3, $result);
     }
 
+    public function testSetSimRecapPostingUpdatesSetting(): void
+    {
+        $stubStmt = $this->createMock(\mysqli_stmt::class);
+        $stubStmt->expects($this->once())
+            ->method('bind_param')
+            ->with('sss', 'On', 'Sim Recap Discord Posting', 'ibl')
+            ->willReturn(true);
+        $stubStmt->method('execute')->willReturn(true);
+        $stubStmt->method('close')->willReturn(true);
+
+        $mockDb = $this->createMock(\mysqli::class);
+        $mockDb->expects($this->once())
+            ->method('prepare')
+            ->with($this->stringContains('UPDATE `ibl_settings` SET setting_value = ? WHERE setting_key = ?'))
+            ->willReturn($stubStmt);
+
+        // mysqli_stmt::$affected_rows is virtual and cannot be mocked; override the seam.
+        $repository = new class ($mockDb) extends LeagueControlPanelRepository {
+            protected function getAffectedRows(object $stmt): int
+            {
+                return 1;
+            }
+        };
+
+        $this->assertTrue($repository->setSimRecapPosting('On'));
+    }
+
     private function createMockDatabase(): \mysqli
     {
         return self::createStub(\mysqli::class);

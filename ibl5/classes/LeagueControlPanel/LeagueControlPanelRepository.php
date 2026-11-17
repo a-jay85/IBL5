@@ -260,6 +260,14 @@ class LeagueControlPanelRepository extends \Database\BaseMysqliRepository implem
     }
 
     /**
+     * @see LeagueControlPanelRepositoryInterface::setSimRecapPosting()
+     */
+    public function setSimRecapPosting(string $value): bool
+    {
+        return $this->updateSetting(\SimRecap\PostingSwitch::SETTING_KEY, $value);
+    }
+
+    /**
      * @see LeagueControlPanelRepositoryInterface::activateTriviaMode()
      */
     public function activateTriviaMode(): bool

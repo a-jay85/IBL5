@@ -42,6 +42,34 @@ class LeagueControlPanelServiceTest extends TestCase
         $this->assertSame(2026, $result['seasonEndingYear']);
     }
 
+    public function testPanelDataDefaultsSimRecapPostingToOff(): void
+    {
+        $stub = self::createStub(LeagueControlPanelRepositoryInterface::class);
+        $stub->method('getBulkSettings')->willReturn([
+            'Free Agency Notifications' => 'On',
+        ]);
+        $stub->method('getSimLengthInDays')->willReturn(3);
+
+        $service = new LeagueControlPanelService($stub);
+        $result = $service->getPanelData();
+
+        $this->assertSame('Off', $result['simRecapPosting']);
+    }
+
+    public function testPanelDataCarriesSimRecapPostingValue(): void
+    {
+        $stub = self::createStub(LeagueControlPanelRepositoryInterface::class);
+        $stub->method('getBulkSettings')->willReturn([
+            'Sim Recap Discord Posting' => 'On',
+        ]);
+        $stub->method('getSimLengthInDays')->willReturn(3);
+
+        $service = new LeagueControlPanelService($stub);
+        $result = $service->getPanelData();
+
+        $this->assertSame('On', $result['simRecapPosting']);
+    }
+
     public function testGetPanelDataDefaultsForMissingSettings(): void
     {
         $stub = self::createStub(LeagueControlPanelRepositoryInterface::class);

@@ -48,6 +48,11 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
             </div>
         </section>
 
+        <section class="updater-section">
+            <div class="updater-section__label">Discord Posting</div>
+            <?= HtmlSanitizer::trusted($this->renderSimRecapPostingSelect($panelData)) ?>
+        </section>
+
         <?= HtmlSanitizer::trusted($this->renderTriviaControls()) ?>
 <?php endif; ?>
     </form>
@@ -111,7 +116,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     }
 
     /**
-     * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
+     * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, simRecapPosting: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
      */
     private function renderSeasonPhaseControls(string $currentLeague, array $panelData): string
     {
@@ -139,7 +144,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     }
 
     /**
-     * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
+     * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, simRecapPosting: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
      */
     private function renderPhaseControls(string $currentLeague, array $panelData): string
     {
@@ -166,7 +171,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     }
 
     /**
-     * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
+     * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, simRecapPosting: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
      */
     private function renderPreseasonControls(string $currentLeague, array $panelData): string
     {
@@ -203,7 +208,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     }
 
     /**
-     * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
+     * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, simRecapPosting: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
      */
     private function renderHeatControls(array $panelData): string
     {
@@ -224,7 +229,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     }
 
     /**
-     * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
+     * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, simRecapPosting: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
      */
     private function renderRegularSeasonControls(string $currentLeague, array $panelData): string
     {
@@ -255,7 +260,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     }
 
     /**
-     * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
+     * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, simRecapPosting: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
      */
     private function renderPlayoffsControls(string $currentLeague, array $panelData): string
     {
@@ -287,7 +292,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     }
 
     /**
-     * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
+     * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, simRecapPosting: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
      */
     private function renderDraftControls(string $currentLeague, array $panelData): string
     {
@@ -308,7 +313,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     }
 
     /**
-     * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
+     * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, simRecapPosting: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
      */
     private function renderFreeAgencyControls(string $currentLeague, array $panelData): string
     {
@@ -422,7 +427,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     }
 
     /**
-     * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
+     * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, simRecapPosting: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
      */
     private function renderWaiversSelect(array $panelData): string
     {
@@ -440,7 +445,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     }
 
     /**
-     * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
+     * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, simRecapPosting: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
      */
     private function renderTradesSelect(array $panelData): string
     {
@@ -458,7 +463,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     }
 
     /**
-     * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
+     * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, simRecapPosting: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
      */
     private function renderDraftLinkSelect(array $panelData): string
     {
@@ -476,7 +481,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     }
 
     /**
-     * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
+     * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, simRecapPosting: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
      */
     private function renderFaNotificationsSelect(array $panelData): string
     {
@@ -494,7 +499,29 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     }
 
     /**
-     * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
+     * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, simRecapPosting: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
+     */
+    private function renderSimRecapPostingSelect(array $panelData): string
+    {
+        $onSelected = $panelData['simRecapPosting'] === 'On' ? ' selected' : '';
+        $offSelected = $panelData['simRecapPosting'] === 'Off' ? ' selected' : '';
+        ob_start();
+        ?>
+<div class="lcp-control-row" id="lcp-sim-recap-posting-row">
+    <label for="lcp-sim-recap-posting">Sim recap Discord posting</label>
+    <select name="SimRecapPosting" id="lcp-sim-recap-posting" class="ibl-select ibl-select--auto">
+        <option value="On"<?= HtmlSanitizer::e($onSelected) ?>>On</option>
+        <option value="Off"<?= HtmlSanitizer::e($offSelected) ?>>Off</option>
+    </select>
+    <span class="lcp-sim-recap-posting-state">Currently: <?= HtmlSanitizer::e($panelData['simRecapPosting']) ?></span>
+    <button type="submit" name="action" value="set_sim_recap_posting" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Set Sim recap Discord posting</button>
+</div>
+        <?php
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, simRecapPosting: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData
      */
     private function renderAwardsControls(array $panelData): string
     {

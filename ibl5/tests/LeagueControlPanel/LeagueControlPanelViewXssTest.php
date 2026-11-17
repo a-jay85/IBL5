@@ -30,6 +30,7 @@ final class LeagueControlPanelViewXssTest extends TestCase
                 'allowWaivers' => 'No',
                 'showDraftLink' => 'Off',
                 'freeAgencyNotifications' => 'Off',
+                'simRecapPosting' => 'Off',
                 'triviaMode' => 'Off',
                 'simLengthInDays' => 3,
                 'seasonEndingYear' => 2026,

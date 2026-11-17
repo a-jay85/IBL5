@@ -122,6 +122,14 @@ interface LeagueControlPanelRepositoryInterface
     public function setFreeAgencyNotifications(string $value): bool;
 
     /**
+     * Set the Sim Recap Discord Posting setting
+     *
+     * @param string $value 'On' or 'Off'
+     * @return bool True on success
+     */
+    public function setSimRecapPosting(string $value): bool;
+
+    /**
      * Activate Trivia Mode (hides Player and Season Leaders modules)
      *
      * @return bool True on success

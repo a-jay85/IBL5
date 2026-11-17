@@ -334,3 +334,50 @@ def test_dm_truncated_hunk_fails_closed():
 ])
 def test_dm_deny_tokens_fire(line):
     assert external_send_change(DM, _dm(350, line)) == _R_DM_TOKEN
+
+
+@pytest.mark.parametrize("line", [
+    '+    sed -i "s/.*/123/" "$HOME/.iblbot-dm-id"',
+    "+    sed -n 'w /tmp/x' \"$f\"",
+    "+    sed 'e' \"$f\"",
+    "+    sed 's/^/x/e'",
+    "+    sed -n 'p' \"$f\" sed 'p'",
+])
+def test_dm_sed_that_writes_or_runs_fires(line):
+    assert external_send_change(DM, _dm(350, line)) == _R_SEND
+
+
+@pytest.mark.parametrize("line", [
+    "+    sed -n '2,55p' \"$0\"",
+    "+    sed 's/^# \\{0,1\\}//'",
+    "+    sed '$d'",
+])
+def test_dm_read_only_sed_is_quiet(line):
+    assert external_send_change(DM, _dm(350, line)) is None
+
+
+@pytest.mark.parametrize("line", [
+    "+    echo $((TO=5))",
+    '+    echo "$((TO=5))"',
+    "+    echo ${arr[TO=5]}",
+    "+    x[TO=5]=1",
+    "+    : $((n++))",
+    '+    [[ 1 -eq TO=5 ]]',
+])
+def test_dm_arithmetic_assignment_fires(line):
+    assert external_send_change(DM, _dm(350, line)) == _R_SEND
+
+
+@pytest.mark.parametrize("old,new", [
+    ("-        i=$(( i + 1 ))", "+        i=$(( i + 2 ))"),
+    ("-    i=1", "+    i=2"),
+    ("-        n=$(( n + 1 ))", "+        n=$(( n + 5 ))"),
+    ("-    total=1", "+    total=5"),
+])
+def test_dm_counter_change_is_one_way(old, new):
+    assert external_send_change(DM, _dm(200, old, new)) == _R_SEND
+
+
+def test_dm_redirect_through_other_variable_fires():
+    sec = _dm(350, '+    f="$HOME/.iblbot-dm-id"', """+    printf '%s\\n' 1 > "$f\"""")
+    assert external_send_change(DM, sec) == _R_DM_REDIRECT

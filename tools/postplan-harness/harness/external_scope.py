@@ -37,7 +37,25 @@ _DM_SEND_VARS = frozenset((
     "CAP", "CHUNKS", "REMOTE_CMD", "http", "LAST_ATTEMPTS", "WH_PAYLOAD", "TOTAL", "DELIVERED",
     "IDX", "rc", "NOTE", "chunk", "msg", "payload", "content", "am", "out", "text", "piece",
     "cut", "u", "PATH", "IFS", "HOME", "BASH_ENV", "ENV", "PS4",
+    # The chunk prefix counters, the retry counter, and the exit codes the retry loop reads.
+    "i", "total", "n", "ra", "curl_rc", "ssh_rc",
 ))
+# The only variables a redirect may write through. `log_sent` appends to `$log`.
+_DM_LOG_TARGETS = frozenset(("log",))
+# An assignment bash makes while it evaluates arithmetic: `$((TO=5))`, `x[TO=5]`, `n++`.
+_DM_ARITH_SET_RE = re.compile(
+    r"(?:\(\(|\w\[)[^\]]*?(?:(?<![=!<>])=(?!=)|<<=|>>=|\+\+|--)"
+    r"|-(?:eq|ne|lt|le|gt|ge)\s+[^\s\]]*(?<![=!<>])=(?!=)"
+)
+# `sed` runs only as `sed [-n|-E|-r] '<script>' [file...]`. The script is one `p`/`d` with an
+# optional line address, or one `s` command whose flags cannot write a file or run a command.
+_DM_SED_RE = re.compile(
+    r"""\bsed((?:\s+-[nEr]+)*)\s+'([^']*)'(?:\s+(?:"\$\{?\w+\}?"|\$\{?\w+\}?))*\s*"""
+)
+_DM_SED_SCRIPT_RE = re.compile(
+    r"(?:(?:\d+|\$)(?:,(?:\d+|\$))?[pd])"
+    r"|s(?P<d>[/|#,])(?:\\.|(?!(?P=d)).)*(?P=d)(?:\\.|(?!(?P=d)).)*(?P=d)[gpI0-9]*"
+)
 _DM_EXISTING_FUNCS = frozenset(("webhook_url_from", "say", "chunk_message", "send_one", "send_webhook_one"))
 # Commands that run locally and cannot deliver a message. `say` prints to stderr only.
 _DM_SAFE_COMMANDS = frozenset((
@@ -459,7 +477,14 @@ def _dm_target_ok(target: str) -> bool:
     m = _DM_VAR_TARGET_RE.fullmatch(target)
     if m is None:
         return False
-    return next(g for g in m.groups() if g is not None) not in _DM_SEND_VARS
+    return next(g for g in m.groups() if g is not None) in _DM_LOG_TARGETS
+
+
+def _dm_sed_ok(raw: str) -> bool:
+    """True when a `sed` statement only reads input and prints."""
+    first = re.search(r"\bsed\b", raw)
+    m = _DM_SED_RE.match(raw, first.start()) if first is not None else None
+    return m is not None and m.end() == len(raw) and _DM_SED_SCRIPT_RE.fullmatch(m.group(2)) is not None
 
 
 def _dm_walk(stmts: list[_DmStmt]) -> list[bool] | None:
@@ -564,6 +589,8 @@ def _dm_stmt_reason(stmts: list[_DmStmt], allowed: frozenset[str], partner: set[
         if word is not None:
             if word not in allowed:
                 return _R_SEND
+            if word == "sed" and not _dm_sed_ok(raw.rstrip()):
+                return _R_SEND
         for target in targets:
             if not _dm_target_ok(target):
                 return _R_DM_REDIRECT
@@ -615,6 +642,8 @@ def _dm_reason(hunks: list[tuple[int, int, list[str]]]) -> str | None:
                     covered.update(members)
                     if _DM_DENY_RE.search(text):
                         return _R_DM_TOKEN
+                    if _DM_ARITH_SET_RE.search(text):
+                        return _R_SEND
                     stmts = _dm_split(text)
                     if stmts is None:
                         return _R_DM_UNREADABLE

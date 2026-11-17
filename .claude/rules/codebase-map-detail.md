@@ -83,7 +83,7 @@ SeasonLeaderboards -> BasketballStats Cache League Player Security UI
 SeasonRosterChanges -> Player UI
 Security -> Clock
 Settings -> Season
-SimRecap -> JsbParser LastSimRecap League PageLayout RecordHolders Repositories Season Security
+SimRecap -> JsbParser LastSimRecap League LeagueControlPanel PageLayout RecordHolders Repositories Season Security
 Standings -> League Security UI
 Team -> Auth BasketballStats Discord Extension Http League Player Repositories Rivalries Season Security Trading UI
 TeamOffDefStats -> BasketballStats League Season Security UI

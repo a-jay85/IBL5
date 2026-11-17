@@ -1,5 +1,5 @@
 ---
-description: CI runs only the bin/test-* harnesses whose derived coverage names a path the PR changed, picked once by the harness-select job in tests.yml, and falls back to every harness on any shared path, unclaimed path, push, re-run, or failed diff.
+description: CI runs only the bin/test-* harnesses whose derived coverage names a path the PR changed, picked once by the harness-select job in tests.yml, and falls back to every harness on any shared path, unclaimed path, push, "Re-run all jobs" run, or failed diff.
 last_verified: 2026-11-17
 ---
 
@@ -22,7 +22,7 @@ A new `harness-select` job in `.github/workflows/tests.yml` runs `bin/run-shell-
 - A harness whose scripts read a path the scan cannot see (a `git ls-files`, a glob, a `find`) is always-run.
 - `bin/lib/harness-covers.txt` holds widen-only overrides. An `inert` line names paths that select nothing when no harness claims them. A `bin/test-NAME` (example) line adds paths to one harness. No line can make a harness skip.
 - The changed paths come from `git diff HEAD^1 HEAD` on the merge checkout, so a stacked PR diffs against its own base.
-- Every harness runs when the event is not `pull_request`, the run attempt is above 1, HEAD is not a merge commit, the diff fails, the list is empty, or a changed path sits under `bin/lib/`, `.github/`, `bin/run-shell-harnesses`, or the repo top level. A changed path that no harness claims and no `inert` line covers also runs every harness.
+- Every harness runs when the event is not `pull_request`, the run attempt is above 1 (a "Re-run all jobs" run; "Re-run failed jobs" reuses the first attempt's selection because only `harness-select` reads the attempt), HEAD is not a merge commit, the diff fails, the list is empty, or a changed path sits under `bin/lib/`, `.github/`, `bin/run-shell-harnesses`, or the repo top level. A changed path that no harness claims and no `inert` line covers also runs every harness.
 - `bin/run-shell-harnesses --check-coverage` fails an override line that names a missing path, a missing harness, or a glob. The selector's fixture cases run first in the `harness-select` job as `--self-test`, and a failed selection falls back to every harness with a warning.
 
 ## Relation to ADR-0186

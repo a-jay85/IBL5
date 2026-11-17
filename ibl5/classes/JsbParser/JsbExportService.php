@@ -95,7 +95,9 @@ class JsbExportService implements JsbExportServiceInterface
         }
         $result->addMessage('IBL5.trn holds ' . $existingCount . ' records');
 
-        $knownKeys = self::existingTradeKeys($existing, $existingCount);
+        $fileCounts = self::existingTradeKeys($existing, $existingCount);
+        /** @var array<string, int> $siteSeen */
+        $siteSeen = [];
 
         $tradeItems = $this->repository->getCompletedTradeItems($seasonStartDate);
         $result->addMessage('Found ' . count($tradeItems) . ' trade items in database');
@@ -116,7 +118,20 @@ class JsbExportService implements JsbExportServiceInterface
                 static fn (array $chunk): string => self::tradeKey($seasonBeginningYear, $chunk),
                 $chunks,
             );
-            $present = array_filter($keys, static fn (string $key): bool => isset($knownKeys[$key]));
+            // The n-th site record with a key counts as present only when the file holds at least n
+            // records with that key. A player who is traded to the same team twice in one season
+            // therefore gets his second trade appended.
+            $present = [];
+            $tally = [];
+            foreach ($keys as $index => $key) {
+                $tally[$key] = ($tally[$key] ?? 0) + 1;
+                if (($fileCounts[$key] ?? 0) >= ($siteSeen[$key] ?? 0) + $tally[$key]) {
+                    $present[$index] = $key;
+                }
+            }
+            foreach ($tally as $key => $times) {
+                $siteSeen[$key] = ($siteSeen[$key] ?? 0) + $times;
+            }
             if (count($present) === count($keys)) {
                 $skippedTrades++;
                 continue;
@@ -128,9 +143,8 @@ class JsbExportService implements JsbExportServiceInterface
                 continue;
             }
 
-            foreach ($chunks as $index => $chunk) {
+            foreach ($chunks as $chunk) {
                 $records[] = TrnFileWriter::buildTradeRecord($month, $day, $seasonBeginningYear, $chunk);
-                $knownKeys[$keys[$index]] = true;
             }
             $appendedTrades++;
         }
@@ -260,7 +274,7 @@ class JsbExportService implements JsbExportServiceInterface
     /**
      * Keys of every trade record already in a JSB .trn file.
      *
-     * @return array<string, true>
+     * @return array<string, int> Number of records in the file for each key
      */
     private static function existingTradeKeys(string $data, int $count): array
     {
@@ -272,7 +286,8 @@ class JsbExportService implements JsbExportServiceInterface
                 TrnFileParser::RECORD_SIZE,
             );
             if (substr($jsbRecord, 10, 1) === (string) TrnFileParser::TYPE_TRADE) {
-                $keys[self::recordKey($jsbRecord)] = true;
+                $key = self::recordKey($jsbRecord);
+                $keys[$key] = ($keys[$key] ?? 0) + 1;
             }
         }
         return $keys;

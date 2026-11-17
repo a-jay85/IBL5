@@ -132,6 +132,28 @@ class JsbExportServiceTest extends TestCase
         $this->assertSame(str_pad('3', 16), substr($output, 0, 16));
     }
 
+    public function testRepeatTradeWithTheSameItemsIsAppendedWhenTheFileHoldsOnlyOneCopy(): void
+    {
+        $first = $this->kagamiTurnerTrade();
+        $repeat = array_map(
+            static fn (array $row): array => ['tradeofferid' => 8] + $row,
+            $first,
+        );
+        $this->stubRepo->method('getCompletedTradeItems')->willReturn(array_merge($first, $repeat));
+
+        [$result, $output] = $this->export(
+            $this->trnFile([
+                str_replace('  1 52008', '  1 42008', self::SIM09_REC_80),
+                self::SIM09_REC_81,
+            ]),
+            '2009-01-05',
+        );
+
+        $this->assertSame(0, $result->errors);
+        $this->assertSame(str_pad('4', 16), substr($output, 0, 16));
+        $this->assertContains('Skipped 1 trades already in IBL5.trn', $result->messages);
+    }
+
     public function testPartlyLoggedTradeWarnsAndIsNotAppended(): void
     {
         $existing = $this->trnFile([self::SIM09_REC_80]);

@@ -47,9 +47,12 @@ final class DatabaseNameResolverTest extends TestCase
 
     public function testThrowsWhenPerThreadEnabledAndTokenUnset(): void
     {
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('TEST_TOKEN is unset');
-        DatabaseNameResolver::resolve('ibl5', '1', false);
+        try {
+            DatabaseNameResolver::resolve('ibl5', '1', false);
+            self::fail('Expected RuntimeException');
+        } catch (\RuntimeException $e) {
+            self::assertStringContainsString('TEST_TOKEN is unset', $e->getMessage());
+        }
     }
 
     public function testThrowsWhenPerThreadEnabledAndTokenEmpty(): void

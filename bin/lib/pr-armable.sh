@@ -388,6 +388,79 @@ pr_docs_refresh_path_ok() {
     esac
 }
 
+# pr_docs_refresh_rules_date_only <repo-relative path> <diff_file>
+#   rc 0 only when <path> is a .md under .claude/rules/ or engine/.claude/rules/
+#   AND its section of the unified diff in <diff_file> is one strictly advancing
+#   `last_verified:` bump inside the YAML frontmatter. Mirrors harness/armable.py
+#   docs_refresh_rules_date_only; checks adapted from bin/docfix-check-veronly
+#   check_steering_date_only. Fail-closed (rc 1): empty or unreadable
+#   <diff_file>, no section, duplicate section, any header other than
+#   `index X..Y 100644` / `--- a/<p>` / `+++ b/<p>`, a hunk not starting at line 1,
+#   a second hunk, any non-` `/-/+ body line, a second changed line, a date line
+#   outside the frontmatter, a non-date line, an equal or backward date.
+pr_docs_refresh_rules_date_only() {
+    local path="$1" diff_file="$2" line tag text in_sec=0 seen=0 hunk=0 n=0
+    local minus=0 plus=0 prev="" old_line="" new_line="" have_new=0
+    local fm_open=0 fm_closed=0 in_fm=0 old_date new_date
+    local date_re='^last_verified: [0-9]{4}-[0-9]{2}-[0-9]{2}$'
+    local index_re='^index [0-9a-f]+\.\.[0-9a-f]+ 100644$'
+    local hunk_re='^@@ -1(,[0-9]+)? \+1(,[0-9]+)? @@'
+    case "$path" in
+        *.md) ;;
+        *) return 1 ;;
+    esac
+    case "$path" in
+        .claude/rules/*|engine/.claude/rules/*) ;;
+        *) return 1 ;;
+    esac
+    { [ -n "$diff_file" ] && [ -r "$diff_file" ]; } || return 1
+    while IFS= read -r line || [ -n "$line" ]; do
+        case "$line" in
+            "diff --git "*)
+                if [ "$line" = "diff --git a/$path b/$path" ]; then
+                    [ "$seen" -eq 1 ] && return 1
+                    in_sec=1; seen=1
+                else
+                    in_sec=0
+                fi
+                continue ;;
+        esac
+        [ "$in_sec" -eq 1 ] || continue
+        if [ "$hunk" -eq 0 ]; then
+            if [[ "$line" =~ $index_re ]] || [ "$line" = "--- a/$path" ] || [ "$line" = "+++ b/$path" ]; then
+                continue
+            fi
+            [[ "$line" =~ $hunk_re ]] || return 1
+            hunk=1; continue
+        fi
+        tag="${line:0:1}"; text="${line:1}"
+        case "$tag" in
+            " ")
+                if [ "$n" -eq 0 ] && [ "$text" = "---" ]; then fm_open=1
+                elif [ "$text" = "---" ]; then fm_closed=1; fi ;;
+            "-")
+                minus=$(( minus + 1 ))
+                if [ "$minus" -eq 1 ]; then
+                    old_line="$text"
+                    if [ "$fm_open" -eq 1 ] && [ "$fm_closed" -eq 0 ]; then in_fm=1; fi
+                fi ;;
+            "+")
+                plus=$(( plus + 1 ))
+                if [ "$prev" = "-" ] && [ "$have_new" -eq 0 ]; then new_line="$text"; have_new=1; fi ;;
+            *) return 1 ;;
+        esac
+        prev="$tag"; n=$(( n + 1 ))
+    done < "$diff_file"
+    { [ "$seen" -eq 1 ] && [ "$hunk" -eq 1 ]; } || return 1
+    if [ "$minus" -ne 1 ] || [ "$plus" -ne 1 ]; then return 1; fi
+    [ "$have_new" -eq 1 ] || return 1
+    [ "$in_fm" -eq 1 ] || return 1
+    { [[ "$old_line" =~ $date_re ]] && [[ "$new_line" =~ $date_re ]]; } || return 1
+    old_date="${old_line#last_verified: }"; new_date="${new_line#last_verified: }"
+    if [[ ! "$new_date" > "$old_date" ]]; then return 1; fi
+    return 0
+}
+
 # pr_docs_refresh_hold <head_ref> <files_json> <merge_danger_state> <verdict_word>
 #   Phase 6.5 condition (7) when the plan's frontmatter reads
 #   `auto_merge: docs-only-ready`. Mirrors harness/armable.py docs_refresh_holds.
@@ -399,12 +472,16 @@ pr_docs_refresh_path_ok() {
 #     docs-refresh:merge-danger:<STATE>    state is anything other than TWO-WAY
 #     docs-refresh:verdict:<word>          selected verdict is anything other than READY
 #   <files_json> is the `.files` array (same shape pr_golden_hold reads).
+#   <diff_file> (optional 5th arg) is a path to the PR's unified diff (any context
+#   width, e.g. `gh pr diff` output). A rules path passes the paths clause only
+#   when pr_docs_refresh_rules_date_only accepts it; absent, empty, or unreadable
+#   <diff_file> holds every rules path with the same docs-refresh:paths:<path>.
 #   <merge_danger_state> is TWO-WAY, or the suffix of pr_merge_danger_hold's
 #   output (ONE-WAY | MISSING | MALFORMED); an empty argument reads as MISSING.
 #   <verdict_word> is the SELECTED Phase 5.5 verdict (run-local state the caller
 #   supplies); READY WITH NOTES does not qualify, by decision. Empty reads as <none>.
 pr_docs_refresh_hold() {
-    local head_ref="$1" files_json="$2" md_state="$3" verdict="$4" paths p bad=""
+    local head_ref="$1" files_json="$2" md_state="$3" verdict="$4" diff_file="${5:-}" paths p bad=""
     case "$head_ref" in
         docs-stale-refresh-*) ;;
         *) echo "docs-refresh:branch:${head_ref:-<empty>}" ;;
@@ -416,7 +493,7 @@ pr_docs_refresh_hold() {
     else
         while IFS= read -r p; do
             [ -z "$p" ] && continue
-            if ! pr_docs_refresh_path_ok "$p"; then bad="$p"; break; fi
+            if ! pr_docs_refresh_path_ok "$p" && ! pr_docs_refresh_rules_date_only "$p" "$diff_file"; then bad="$p"; break; fi
         done <<< "$paths"
         [ -n "$bad" ] && echo "docs-refresh:paths:$bad"
     fi

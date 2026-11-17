@@ -220,4 +220,70 @@ final class PanelSessionStateTest extends TestCase
 
         self::assertSame([], (new PanelSessionState($store))->eligible());
     }
+
+    public function testFreshStoreHasZeroOffset(): void
+    {
+        $store = [];
+
+        self::assertSame(0, (new PanelSessionState($store))->offset());
+    }
+
+    public function testForSimKeyStoresZeroOffset(): void
+    {
+        $store = [];
+        (new PanelSessionState($store))->forSimKey('k');
+
+        self::assertIsArray($store['trade_suggestions_panel']);
+        self::assertSame(0, $store['trade_suggestions_panel']['offset']);
+    }
+
+    /**
+     * @return array<string, array{mixed, int}>
+     */
+    public static function storedOffsetProvider(): array
+    {
+        return [
+            'zero' => [0, 0],
+            'positive' => [4, 4],
+            'negative' => [-5, 0],
+            'numeric string' => ['5', 0],
+            'null' => [null, 0],
+        ];
+    }
+
+    #[DataProvider('storedOffsetProvider')]
+    public function testStoredOffsetIsSanitized(mixed $stored, int $expected): void
+    {
+        $store = ['trade_suggestions_panel' => ['simKey' => 'k', 'offset' => $stored, 'eligible' => []]];
+
+        self::assertSame($expected, (new PanelSessionState($store))->offset());
+    }
+
+    public function testSetEligibleResetsOffsetEqualToListSize(): void
+    {
+        $store = [];
+        $state = new PanelSessionState($store);
+        $state->forSimKey('k');
+        $state->setEligible(self::eligible(12));
+        $state->advance();
+        self::assertSame(3, $state->offset());
+
+        $state->setEligible(self::eligible(3));
+
+        self::assertIsArray($store['trade_suggestions_panel']);
+        self::assertSame(0, $store['trade_suggestions_panel']['offset']);
+    }
+
+    public function testSetEligibleKeepsOffsetBelowListSize(): void
+    {
+        $store = [];
+        $state = new PanelSessionState($store);
+        $state->forSimKey('k');
+        $state->setEligible(self::eligible(12));
+        $state->advance();
+
+        $state->setEligible(self::eligible(4));
+
+        self::assertSame(3, $state->offset());
+    }
 }

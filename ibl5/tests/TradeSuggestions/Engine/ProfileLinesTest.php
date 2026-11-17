@@ -42,7 +42,7 @@ final class ProfileLinesTest extends TestCase
     public static function ordinalProvider(): array
     {
         $cases = [];
-        foreach ([1 => '1st', 2 => '2nd', 3 => '3rd', 4 => '4th', 11 => '11th', 12 => '12th', 13 => '13th', 21 => '21st', 22 => '22nd', 23 => '23rd', 111 => '111th'] as $n => $text) {
+        foreach ([1 => '1st', 2 => '2nd', 3 => '3rd', 4 => '4th', 11 => '11th', 12 => '12th', 13 => '13th', 21 => '21st', 22 => '22nd', 23 => '23rd', 111 => '111th', 803 => '803rd'] as $n => $text) {
             $cases[$text] = [$n, $text];
         }
 
@@ -140,5 +140,34 @@ final class ProfileLinesTest extends TestCase
         $lines = ProfileLines::forUser([0 => self::delta(['r_drb' => ['before' => 8, 'after' => 15]])]);
 
         self::assertSame(['Defensive rebounding 8th -> 15th'], $lines);
+    }
+
+    public function testStarterMoveNeedsTwoPlaces(): void
+    {
+        $lines = ProfileLines::forUser([0 => self::delta([], [
+            'PG' => ['before' => 10, 'after' => 9],
+            'SG' => ['before' => 10, 'after' => 8],
+            'SF' => ['before' => 8, 'after' => 9],
+        ])]);
+
+        self::assertSame(['SG starter 10th -> 8th'], $lines);
+    }
+
+    public function testStarterLinesFillUpToMaxLines(): void
+    {
+        $lines = ProfileLines::forUser([0 => self::delta([], [
+            'PG' => ['before' => 20, 'after' => 5],
+            'SG' => ['before' => 20, 'after' => 6],
+            'SF' => ['before' => 20, 'after' => 7],
+            'PF' => ['before' => 20, 'after' => 8],
+            'C' => ['before' => 20, 'after' => 9],
+        ])]);
+
+        self::assertSame([
+            'PG starter 20th -> 5th',
+            'SG starter 20th -> 6th',
+            'SF starter 20th -> 7th',
+            'PF starter 20th -> 8th',
+        ], $lines);
     }
 }

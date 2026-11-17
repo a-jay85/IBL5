@@ -109,4 +109,13 @@ final class DealKeyTest extends TestCase
         self::assertSame(['P:0:600', 'P:1:20', 'U:0:500', 'U:1:10'], DealKey::assetKeys($c));
         self::assertSame(['P:1:20', 'U:1:10'], DealKey::playerKeys($c));
     }
+
+    public function testKeyFormatIsPinned(): void
+    {
+        // Stored hides are keyed by these hashes, so the format must not drift.
+        $key = DealKey::forCandidate(new TradeCandidate(1, 2, [10], [500], [20], [600]));
+
+        self::assertSame(sha1('1|2|P:0:600,P:1:20,U:0:500,U:1:10'), $key->deal);
+        self::assertSame(sha1('1|2|P:1:20,U:1:10'), $key->core);
+    }
 }

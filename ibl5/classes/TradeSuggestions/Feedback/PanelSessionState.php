@@ -51,9 +51,9 @@ final class PanelSessionState
 
     public function offset(): int
     {
-        $offset = $this->slot()['offset'] ?? 0;
+        $offset = $this->slot()['offset'] ?? null;
 
-        return is_int($offset) && $offset >= 0 ? $offset : 0;
+        return is_int($offset) ? max(0, $offset) : 0;
     }
 
     public function advance(int $step = self::STEP): void

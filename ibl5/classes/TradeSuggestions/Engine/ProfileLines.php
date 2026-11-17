@@ -36,9 +36,6 @@ final class ProfileLines
         }
 
         foreach (SlotMapper::SLOTS as $slot) {
-            if (count($lines) >= self::MAX_LINES) {
-                break;
-            }
             $before = $delta->starterRanks[$slot]['before'] ?? null;
             $after = $delta->starterRanks[$slot]['after'] ?? null;
             if ($before === null || $after === null || abs($after - $before) < self::MIN_PLACES) {
@@ -47,7 +44,7 @@ final class ProfileLines
             $lines[] = sprintf('%s starter %s -> %s', $slot, self::ordinal($before), self::ordinal($after));
         }
 
-        return $lines;
+        return array_slice($lines, 0, self::MAX_LINES);
     }
 
     private static function ordinal(int $n): string

@@ -70,8 +70,8 @@ func TestFoulSiteFor(t *testing.T) {
 
 // TestFoulSiteTagsMadeTwoAndOne pins the J27 rate-port split of the two
 // and-one sites. A foul from the half-court made-2pt roll (andOneMadeTwoCut)
-// carries FoulSiteAndOneMadeTwo, and an outcome-bucket and-one keeps
-// FoulSiteAndOne. Transition shots carry OriginTransition, so a made-2 roll
+// carries FoulSiteAndOneMadeTwo, and FoulSiteAndOne is left only for the made-3
+// four-point play (threePtShot). Transition shots carry OriginTransition, so a made-2 roll
 // and-one after a non-transition make can only come from the half-court call
 // in possession.go.
 func TestFoulSiteTagsMadeTwoAndOne(t *testing.T) {
@@ -101,7 +101,9 @@ func TestFoulSiteTagsMadeTwoAndOne(t *testing.T) {
 						halfCourtMadeTwo++
 					}
 				case result.FoulSiteAndOne:
-					bucket++
+					if lastMake == nil || lastMake.ShotType != result.ShotThree {
+						bucket++
+					}
 				}
 			}
 		}
@@ -109,9 +111,9 @@ func TestFoulSiteTagsMadeTwoAndOne(t *testing.T) {
 	if halfCourtMadeTwo == 0 {
 		t.Errorf("no half-court made-2 roll and-one tagged %s over 100 seeds", result.FoulSiteAndOneMadeTwo)
 	}
-	// The live map has no and-one bucket: code 3 is the foul handler, so an
-	// and-one comes only from the code-1 made-2 roll.
+	// The live map has no and-one bucket: code 3 is the foul handler, so a
+	// FoulSiteAndOne foul must follow a made 3 (the four-point play).
 	if bucket != 0 {
-		t.Errorf("%d fouls tagged %s over 100 seeds, want 0 (no and-one bucket in the live map)", bucket, result.FoulSiteAndOne)
+		t.Errorf("%d fouls tagged %s after a non-3 make over 100 seeds, want 0 (no and-one bucket in the live map)", bucket, result.FoulSiteAndOne)
 	}
 }

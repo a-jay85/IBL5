@@ -36,6 +36,7 @@ func (gs *gameState) threePtShot(offense, defense *teamState, shooter, defender 
 		gs.creditMadeFieldGoal(offense, shooter, result.ShotThree, origin, periodIdx)
 		if threePtFoulFires(gs.rng.Float64()) { // 94054-94060: four-point play
 			gs.resolveFoulShot(offense, defense, shooter, defender, 1, true, false, false, periodIdx)
+			observePathEnd(outcome3pt, pathEndAndOne)
 		}
 		return threePtMade
 	}

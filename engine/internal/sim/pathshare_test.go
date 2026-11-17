@@ -31,8 +31,8 @@ func loadPathShareBundle(t *testing.T, name string) bundle.Bundle {
 // loop: one game per Simulate, seed foulRateSeed+g) and tallies every path the
 // picker returns. A two-team bundle plays its own schedule. A bundle with more
 // teams plays game g as ids[(g+1)%n] at ids[g%n] over the sorted team IDs, so
-// every team plays. share3 is the and-one path (andOneWeight) and share4 the
-// foul-only path (foulOnlyWeight), as fractions of all picks.
+// every team plays. share3 is the foul path (foulWeight) and share4 the
+// turnover path (turnoverWeight), as fractions of all picks.
 func pathShares(t *testing.T, bundleName string, games int) (share1, share2, share3, share4 float64, total int) {
 	t.Helper()
 	b := loadPathShareBundle(t, bundleName)
@@ -75,24 +75,31 @@ func TestPathShares_LiveMap(t *testing.T) {
 	}
 }
 
-// TestPathObserver_DrawFree: one seeded game plays byte-identically with the
-// observer nil and with a counting observer, and the observer sees calls.
+// TestPathObserver_DrawFree: one seeded game plays byte-identically with both
+// observers (pathObserver, pathEndObserver) nil and with counting observers, and each sees calls.
 func TestPathObserver_DrawFree(t *testing.T) {
 	b := loadPathShareBundle(t, "bundle.json")
-	t.Cleanup(func() { pathObserver = nil })
+	t.Cleanup(func() {
+		pathObserver = nil
+		pathEndObserver = nil
+	})
 
-	pathObserver = nil
+	pathObserver, pathEndObserver = nil, nil
 	want := encode(t, Simulate(b, b.Seed))
 
-	calls := 0
+	calls, endCalls := 0, 0
 	pathObserver = func(outcomeCode, bool) { calls++ }
+	pathEndObserver = func(outcomeCode, pathEnd) { endCalls++ }
 	got := encode(t, Simulate(b, b.Seed))
-	pathObserver = nil
+	pathObserver, pathEndObserver = nil, nil
 
 	if !bytes.Equal(got, want) {
-		t.Error("game output differs with the path observer set; the observer must not draw")
+		t.Error("game output differs with the path observers set; the observers must not draw")
 	}
 	if calls == 0 {
 		t.Error("path observer saw no calls")
+	}
+	if endCalls == 0 {
+		t.Error("path-end observer saw no calls")
 	}
 }

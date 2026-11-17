@@ -14,7 +14,8 @@ type outcomeCode int
 // attempt, 2 = 3pt attempt, 3 = foul (every return goes to the foul handler at
 // 0x4d9ea2), 4 = turnover (10% offensive fouls, the rest split by the steal roll).
 // JSB's code 5 is a 0.08% override that makes no turnover; it is not ported.
-// And-ones come only from a fouled code-1 shot (FoulSiteAndOneMadeTwo).
+// And-ones come only from a fouled made shot: the code-1 made-2 roll
+// (FoulSiteAndOneMadeTwo) or the code-2 made-3 1% roll (FoulSiteAndOne).
 const (
 	outcome2pt      outcomeCode = 1 // 2-point attempt (make/miss rolled after)
 	outcome3pt      outcomeCode = 2 // 3-point attempt (make/miss rolled after)

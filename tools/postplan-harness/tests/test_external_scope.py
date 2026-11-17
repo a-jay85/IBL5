@@ -414,3 +414,19 @@ def test_dm_local_nameref_to_send_var_is_one_way():
 def test_dm_comment_trailing_backslash_does_not_hide_next_line():
     sec = _dm(350, "+    : # note \\", "+    TO=evil")
     assert external_send_change(DM, sec) is not None
+
+
+def test_dm_exit_in_new_function_is_one_way():
+    sec = _dm(150, "+early() {", "+    exit 0", "+}", "+early")
+    assert external_send_change(DM, sec) == _R_DM_FLOW
+
+
+def test_dm_break_in_new_function_without_own_loop_is_one_way():
+    sec = _dm(150, "+stop() {", "+    break", "+}")
+    assert external_send_change(DM, sec) == _R_DM_FLOW
+
+
+def test_dm_return_and_own_loop_break_in_new_function_are_quiet():
+    sec = _dm(150, "+h() {", "+    for w in a b; do", "+        break", "+    done",
+              "+    return 0", "+}", "+h")
+    assert external_send_change(DM, sec) is None

@@ -198,15 +198,11 @@ def _sync_reason(body: list[str], idx: int, start: int) -> str | None:
     pos = side.index(idx)
     lo = pos
     while lo > 0 and body[side[lo - 1]].rstrip().endswith("\\"):
-        if _dm_comment_cont(body[side[lo - 1]][1:]):
-            return _R_CONTINUATION
         lo -= 1
     if lo == 0 and start > 1:
         return _R_CONTINUATION
     hi = pos
     while body[side[hi]].rstrip().endswith("\\"):
-        if _dm_comment_cont(body[side[hi]][1:]):
-            return _R_CONTINUATION
         hi += 1
         if hi == len(side):
             return _R_CONTINUATION
@@ -514,11 +510,11 @@ def _dm_sed_ok(raw: str) -> bool:
     return m is not None and m.end() == len(raw) and _DM_SED_SCRIPT_RE.fullmatch(m.group(2)) is not None
 
 
-def _dm_walk(stmts: list[_DmStmt]) -> list[bool] | None:
-    """Per statement, whether it sits inside a function opened in `stmts`. None when a middle or
-    closer has no matching opener, or an opener is left open."""
+def _dm_walk(stmts: list[_DmStmt]) -> list[tuple[bool, bool]] | None:
+    """Per statement, (inside a function opened in `stmts`, inside a loop opened in that
+    function). None when a middle or closer has no matching opener, or an opener is left open."""
     stack: list[str] = []
-    in_func: list[bool] = []
+    in_func: list[tuple[bool, bool]] = []
     for raw, masked, _conn in stmts:
         for word in _dm_words(raw, masked)[0]:
             if word in ("func", "func-open"):
@@ -530,7 +526,9 @@ def _dm_walk(stmts: list[_DmStmt]) -> list[bool] | None:
                     return None
             elif word in _DM_MIDDLES and not stack:
                 return None
-        in_func.append("func" in stack)
+        inside = "func" in stack
+        top = len(stack) - 1 - stack[::-1].index("func") if inside else 0
+        in_func.append((inside, inside and "loop" in stack[top:]))
     return None if stack else in_func
 
 
@@ -585,8 +583,12 @@ def _dm_conserved(minus_stmts: list[_DmStmt], plus_stmts: list[_DmStmt]) -> bool
     in_func = _dm_walk(plus_stmts)
     if in_func is None:
         return False
-    for w, inside in zip(plus, in_func):
-        if w[3] in _DM_CONTROL and not inside:
+    for w, (inside, in_loop) in zip(plus, in_func):
+        # In a new function only `return`/`shift`, and `break`/`continue` under a loop that the
+        # function opens, stay local. `exit`, or a `break` that reaches the caller's loop, can
+        # skip a send wherever the function is called.
+        local = inside and (w[3] in ("return", "shift") or (in_loop and w[3] in ("break", "continue")))
+        if w[3] in _DM_CONTROL and not local:
             if removed_control.get(w[5], 0) <= 0:
                 return False
             removed_control[w[5]] -= 1

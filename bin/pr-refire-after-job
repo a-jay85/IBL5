@@ -1,0 +1,105 @@
+#!/bin/bash
+# pr-refire-after-job: wait for a headless prep job on a PR, then re-fire post-plan.
+# It uses no tokens and wakes no Claude session.
+#
+# Use it when the step after a prep job is a post-plan run whose result needs the
+# owner anyway (a sign-off card, a manual check). Waking the parent session for
+# that only builds the card early. The next /pr-burndown run builds it when the
+# owner sits down. Rule: .claude/rules/work-triage.md § repeat-polling.
+#
+# Usage:
+#   bin/pr-refire-after-job N --pid P --result FILE --pre-sha SHA [--wt PATH] [--log FILE]
+#
+#   N          PR number.
+#   --pid      the prep job's process id.
+#   --result   the file the job writes its outcome to.
+#   --pre-sha  the PR head before the job ran. The job pushes only after every
+#              check passes, so a moved head means it passed.
+#   --wt       the PR worktree (default: bin/pr-wt-resolve N).
+#   --log      log file (default: <dir of --result>/wN.out).
+#
+# It detaches itself and returns at once, printing the log path. Then it:
+#   1. waits until FILE is non-empty or the pid is gone, then 30s more;
+#   2. skips and DMs the owner if FILE starts with "blocked" or the head did not move;
+#   3. skips with no DM if a post-plan run is already live (that run DMs at its end);
+#   4. runs (cd WT && env -u CLAUDE_HEADLESS bin/post-plan-now --auto);
+#   5. DMs the owner if post-plan-now exits non-zero (exit 9 and 10 send no DM of their own).
+#
+# Exit codes (foreground call): 0 detached, 2 bad input.
+# Test knobs: PRRA_POLL (default 60) and PRRA_SETTLE (default 30) seconds,
+# PRRA_FOREGROUND=1 runs without detaching.
+set -u
+
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+  awk 'NR==1{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"
+  exit 0
+fi
+
+N="${1:-}"; shift || true
+PID=""; RESULT=""; PRE=""; WT=""; LOG=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --pid) PID="${2:-}"; shift 2 || exit 2 ;;
+    --result) RESULT="${2:-}"; shift 2 || exit 2 ;;
+    --pre-sha) PRE="${2:-}"; shift 2 || exit 2 ;;
+    --wt) WT="${2:-}"; shift 2 || exit 2 ;;
+    --log) LOG="${2:-}"; shift 2 || exit 2 ;;
+    *) echo "pr-refire-after-job: unknown arg: $1" >&2; exit 2 ;;
+  esac
+done
+case "$N" in ''|*[!0-9]*) echo "pr-refire-after-job: first arg must be a PR number" >&2; exit 2 ;; esac
+case "$PID" in ''|*[!0-9]*) echo "pr-refire-after-job: --pid must be a number" >&2; exit 2 ;; esac
+[ -n "$RESULT" ] || { echo "pr-refire-after-job: --result is required" >&2; exit 2; }
+[ -n "$PRE" ] || { echo "pr-refire-after-job: --pre-sha is required" >&2; exit 2; }
+case "$PRE" in *[!0-9a-fA-F]*) echo "pr-refire-after-job: --pre-sha must be hex" >&2; exit 2 ;; esac
+[ "${#PRE}" -ge 7 ] || { echo "pr-refire-after-job: --pre-sha needs at least 7 hex chars" >&2; exit 2; }
+if [ -z "$WT" ]; then
+  WT=$("$(dirname "$0")/pr-wt-resolve" "$N" 2>/dev/null) || WT=""
+fi
+[ -n "$WT" ] && [ -d "$WT" ] || { echo "pr-refire-after-job: no worktree for #$N (pass --wt)" >&2; exit 2; }
+[ -n "$LOG" ] || LOG="$(dirname "$RESULT")/w$N.out"
+
+if [ "${PRRA_FOREGROUND:-}" != 1 ] && [ "${PRRA_CHILD:-}" != 1 ]; then
+  PRRA_CHILD=1 nohup "$0" "$N" --pid "$PID" --result "$RESULT" --pre-sha "$PRE" --wt "$WT" --log "$LOG" >/dev/null 2>&1 &
+  echo "pr-refire-after-job: waiting on #$N (pid $!). Log: $LOG"
+  exit 0
+fi
+
+log() { echo "$(date '+%F %T') $1" >> "$LOG"; }
+dm() { "$WT/bin/discord-dm" "$1" >/dev/null 2>&1 || log "discord-dm failed"; }
+
+log "waiting for job pid $PID / $RESULT"
+while [ ! -s "$RESULT" ] && kill -0 "$PID" 2>/dev/null; do sleep "${PRRA_POLL:-60}"; done
+sleep "${PRRA_SETTLE:-30}"
+
+if head -c 7 "$RESULT" 2>/dev/null | grep -q '^blocked'; then
+  log "skip: job reported blocked"
+  dm "PR #$N: prep job ended, post-plan not fired (job blocked). See $LOG and $RESULT"
+  exit 0
+fi
+HEAD=$(gh pr view "$N" -R a-jay85/IBL5 --json headRefOid --jq .headRefOid 2>/dev/null)
+if [ -z "$HEAD" ]; then
+  log "skip: could not read the PR head"
+  dm "PR #$N: prep job ended, post-plan not fired (could not read the PR head). See $LOG"
+  exit 0
+fi
+# gh returns the full 40-char SHA; --pre-sha may be short, so match by prefix.
+HEAD_LC=$(printf %s "$HEAD" | tr 'A-F' 'a-f')
+PRE_LC=$(printf %s "$PRE" | tr 'A-F' 'a-f')
+if [ "${HEAD_LC#"$PRE_LC"}" != "$HEAD_LC" ]; then
+  log "skip: head did not move ($HEAD)"
+  dm "PR #$N: prep job ended, post-plan not fired (head did not move). See $LOG and $RESULT"
+  exit 0
+fi
+BRANCH=$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null | tr -cs 'A-Za-z0-9._-' '-')
+BRANCH="${BRANCH%-}"
+if launchctl list 2>/dev/null | grep -qE "com\.ibl5\.(postplan-now-${BRANCH}-|post-plan-fleet-${N}\$)"; then
+  log "skip: post-plan run live"
+  exit 0
+fi
+log "firing post-plan-now on head $HEAD"
+(cd "$WT" && env -u CLAUDE_HEADLESS bin/post-plan-now --auto) >> "$LOG" 2>&1
+rc=$?
+log "post-plan-now rc=$rc"
+[ "$rc" -ne 0 ] && dm "PR #$N: post-plan-now exited $rc. See $LOG"
+exit 0

@@ -459,6 +459,7 @@ chk "schemeless remote curl stays LOCAL" routes_local 'curl -sf iblhoops.net/ibl
 chk "schemeless localhost curl stays LOCAL" routes_local 'curl -s localhost/foo'
 chk "remote curl after a pipe stays LOCAL" routes_local 'seq 3 | xargs -P 3 curl -s https://iblhoops.net/ibl5/'
 chk "remote host before ) stays LOCAL" routes_local 'test "$(curl -s https://iblhoops.net)" = 200'
+chk "curl after php stays LOCAL" routes_local 'php -v; curl -sf iblhoops.net/x'
 chk "slug host before ) routes CI" routes_ci 'test "$(curl -s -o /dev/null -w %{http_code} http://x.localhost)" = 200'
 end_case
 

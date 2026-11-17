@@ -225,8 +225,31 @@ PLAN_ROW_FETCH_SEG_RE='(^|[[:space:]|;&`(])curl[[:space:]]|(^|\$\(|<\(|>\(|[|;&`
 # _FS_PRE[i] is the text before its arguments (ending with the command word)
 # and _FS_SEG[i] holds the arguments. A curl segment ends at the next | ; & )
 # < > or backtick. PHP code and bun scripts hold ; and ), so a php, bun or
-# bunx segment runs to the end of the row. _FS_CURL[i] is 1 for curl.
+# bunx segment ends only at an unquoted && || ; or | (see _unquoted_end).
+# _FS_CURL[i] is 1 for curl.
 # _FS_TAIL is the text after the last segment; _FS_N counts the segments.
+# _unquoted_end <text> — sets _UE_LEN to the length of the leading part of text
+# that stops at the first && || ; or | outside single and double quotes.
+_unquoted_end() {
+    local s="$1" i=0 n=${#1} q="" ch nx
+    while [ "$i" -lt "$n" ]; do
+        ch="${s:$i:1}"; nx="${s:$((i + 1)):1}"
+        if [ -n "$q" ]; then
+            if [ "$ch" = "\\" ] && [ "$q" = '"' ]; then i=$((i + 1))
+            elif [ "$ch" = "$q" ]; then q=""; fi
+        else
+            case "$ch" in
+                "'"|'"') q="$ch" ;;
+                "\\") i=$((i + 1)) ;;
+                ';'|'|') break ;;
+                '&') [ "$nx" = '&' ] && break ;;
+            esac
+        fi
+        i=$((i + 1))
+    done
+    _UE_LEN=$i
+}
+
 _fetch_split() {
     local s="$1" m pre rest seg term='[|;&)<>`]*'
     _FS_PRE=(); _FS_SEG=(); _FS_CURL=(); _FS_TAIL=""; _FS_N=0
@@ -236,7 +259,7 @@ _fetch_split() {
         rest="${s:$(( ${#pre} + ${#m} ))}"
         case "$m" in
             *curl*) seg="${rest%%$term}"; _FS_CURL[_FS_N]=1 ;;
-            *) seg="$rest"; _FS_CURL[_FS_N]=0 ;;
+            *) _unquoted_end "$rest"; seg="${rest:0:$_UE_LEN}"; _FS_CURL[_FS_N]=0 ;;
         esac
         _FS_PRE[_FS_N]="$pre$m"; _FS_SEG[_FS_N]="$seg"
         _FS_N=$((_FS_N + 1))

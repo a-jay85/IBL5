@@ -284,10 +284,17 @@ _fetch_split() {
 # php, bun and bunx (see _fetch_split). All other text, such as a grep pattern
 # or an expected value in test "$(curl …)" = "<url>", stays byte-exact.
 ci_row_rewrite() {
-    local out="" i=0
+    local out="" i=0 in_php_re='docker compose exec -T php[[:space:]]+(php|bun|bunx|curl)[[:space:]]*$'
     _fetch_split "$1"
     while [ "$i" -lt "$_FS_N" ]; do
-        out="$out${_FS_PRE[$i]}$(ci_host_rewrite "${_FS_SEG[$i]}")"
+        # A command run inside the php container reaches Apache on its own
+        # port 80. The 8080 mapping exists only on the CI host, so its URLs
+        # stay as written.
+        if [[ "${_FS_PRE[$i]}" =~ $in_php_re ]]; then
+            out="$out${_FS_PRE[$i]}${_FS_SEG[$i]}"
+        else
+            out="$out${_FS_PRE[$i]}$(ci_host_rewrite "${_FS_SEG[$i]}")"
+        fi
         i=$((i + 1))
     done
     printf '%s\n' "$out$_FS_TAIL"

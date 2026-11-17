@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import path from 'path';
-import { runPublish, type AllowedMentions, type PublishClaim, type PublisherDeps, type PublishTarget } from './publisher.js';
+import { runPublish, StepGaveUpError, type AllowedMentions, type PublishClaim, type PublisherDeps, type PublishTarget } from './publisher.js';
 
 const fixture = JSON.parse(
     fs.readFileSync(path.join(__dirname, 'fixtures', 'two-day-script.json'), 'utf8'),
@@ -247,5 +247,64 @@ describe('runPublish', () => {
         expect(f.sent).toHaveLength(fixture.steps.length);
         expect(f.progressCalls).toHaveLength(fixture.steps.length);
         expect(f.finishCalls).toEqual([fixture.sim]);
+    });
+
+    it('wraps a step failure in StepGaveUpError naming the sim and step', async () => {
+        const f = makeFakes();
+        const boom = new Error('Missing Access');
+        f.deps.send = async () => {
+            throw boom;
+        };
+        const firstStep = fixture.steps[0];
+
+        const error: unknown = await runPublish(claim(), PROD_TARGET, f.deps).catch((e: unknown) => e);
+
+        expect(error).toBeInstanceOf(StepGaveUpError);
+        const gaveUp = error as StepGaveUpError;
+        expect(gaveUp.sim).toBe(fixture.sim);
+        expect(gaveUp.stepIndex).toBe(firstStep?.index);
+        expect(gaveUp.stepKind).toBe(firstStep?.kind);
+        expect(gaveUp.message).toBe('Missing Access');
+        expect(gaveUp.original).toBe(boom);
+    });
+
+    it('gives up with StepGaveUpError after the rate-limit retries run out', async () => {
+        const f = makeFakes();
+        f.deps.send = async () => {
+            throw { status: 429, retryAfter: 1 };
+        };
+
+        const error: unknown = await runPublish(claim(), PROD_TARGET, f.deps).catch((e: unknown) => e);
+
+        expect(error).toBeInstanceOf(StepGaveUpError);
+        expect(((error as StepGaveUpError).original as { status: number }).status).toBe(429);
+        expect(f.sleeps.filter((ms) => ms === 1)).toHaveLength(3);
+    });
+
+    it('a 429 retried once and then accepted throws nothing', async () => {
+        const f = makeFakes();
+        let calls = 0;
+        const original = f.deps.send;
+        f.deps.send = async (channelId, content, allowed) => {
+            calls++;
+            if (calls === 1) {
+                throw { status: 429, retryAfter: 1 };
+            }
+            return original(channelId, content, allowed);
+        };
+
+        await expect(runPublish(claim(), PROD_TARGET, f.deps)).resolves.toBe('finished');
+    });
+
+    it('a finish failure is not a step failure', async () => {
+        const f = makeFakes();
+        f.deps.finish = async () => {
+            throw new Error('http 500');
+        };
+
+        const error: unknown = await runPublish(claim(), PROD_TARGET, f.deps).catch((e: unknown) => e);
+
+        expect(error).not.toBeInstanceOf(StepGaveUpError);
+        expect((error as Error).message).toBe('http 500');
     });
 });

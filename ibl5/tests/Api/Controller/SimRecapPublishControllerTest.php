@@ -5,15 +5,18 @@ declare(strict_types=1);
 namespace Tests\Api\Controller;
 
 use Api\Controller\SimRecapPublishClaimController;
+use Api\Controller\SimRecapPublishEnabledController;
 use Api\Controller\SimRecapPublishFinishController;
 use Api\Controller\SimRecapPublishProgressController;
 use Api\Repository\ApiKeyRepository;
 use Api\Response\JsonResponder;
 use PHPUnit\Framework\Attributes\DataProvider;
+use LeagueControlPanel\Contracts\LeagueControlPanelRepositoryInterface;
 use PHPUnit\Framework\TestCase;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Season\Contracts\SeasonQueryRepositoryInterface;
 use SimRecap\MentionMapBuilder;
+use SimRecap\PostingSwitch;
 use SimRecap\PublishScriptBuilder;
 use SimRecap\SimPublishProgressRepository;
 use SimRecap\SimRecapContextRepository;
@@ -92,9 +95,19 @@ class SimRecapPublishControllerTest extends TestCase
         ];
     }
 
-    private function claimController(SimPublishProgressRepository $repo, ?PublishScriptBuilder $builder = null, string $tier = 'unlimited'): SimRecapPublishClaimController
+    private static function postingSwitch(bool $on): PostingSwitch
     {
-        return new SimRecapPublishClaimController($repo, $builder ?? self::scriptBuilder(null), self::keys($tier));
+        $settings = self::createStub(LeagueControlPanelRepositoryInterface::class);
+        $settings->method('getSetting')->willReturnCallback(
+            static fn (string $name): ?string => $name === 'Sim Recap Discord Posting' ? ($on ? 'On' : 'Off') : null
+        );
+
+        return new PostingSwitch($settings);
+    }
+
+    private function claimController(SimPublishProgressRepository $repo, ?PublishScriptBuilder $builder = null, string $tier = 'unlimited', bool $postingOn = true): SimRecapPublishClaimController
+    {
+        return new SimRecapPublishClaimController($repo, $builder ?? self::scriptBuilder(null), self::keys($tier), self::postingSwitch($postingOn));
     }
 
     // ── claim-next ─────────────────────────────────────────────────────────────
@@ -138,6 +151,48 @@ class SimRecapPublishControllerTest extends TestCase
         $responder->expects($this->never())->method('error');
 
         $this->claimController($repo)->handle([], [], $responder, ['token' => self::TOKEN]);
+    }
+
+    public function testClaimNextReturns204WithoutClaimingWhenPostingOff(): void
+    {
+        $repo = $this->createMock(SimPublishProgressRepository::class);
+        $repo->expects($this->never())->method('claimNext');
+
+        $responder = $this->createMock(JsonResponder::class);
+        $responder->expects($this->once())->method('raw')->with([], 204);
+        $responder->expects($this->never())->method('success');
+        $responder->expects($this->never())->method('error');
+
+        $this->claimController($repo, null, 'unlimited', false)->handle([], [], $responder, ['token' => self::TOKEN]);
+    }
+
+    // ── enabled ────────────────────────────────────────────────────────────────
+
+    public function testEnabledReportsTrueWhenPostingOn(): void
+    {
+        $responder = $this->createMock(JsonResponder::class);
+        $responder->expects($this->once())->method('success')->with(['enabled' => true]);
+        $responder->expects($this->never())->method('error');
+
+        (new SimRecapPublishEnabledController(self::postingSwitch(true), self::keys()))->handle([], [], $responder, []);
+    }
+
+    public function testEnabledReportsFalseWhenPostingOff(): void
+    {
+        $responder = $this->createMock(JsonResponder::class);
+        $responder->expects($this->once())->method('success')->with(['enabled' => false]);
+        $responder->expects($this->never())->method('error');
+
+        (new SimRecapPublishEnabledController(self::postingSwitch(false), self::keys()))->handle([], [], $responder, []);
+    }
+
+    public function testEnabledRejectsNonServiceKey(): void
+    {
+        $responder = $this->createMock(JsonResponder::class);
+        $responder->expects($this->once())->method('error')->with(403, 'forbidden', self::anything());
+        $responder->expects($this->never())->method('success');
+
+        (new SimRecapPublishEnabledController(self::postingSwitch(true), self::keys('standard')))->handle([], [], $responder, []);
     }
 
     public function testClaimNextReturns422WhenScriptUnavailable(): void
@@ -395,9 +450,10 @@ class SimRecapPublishControllerTest extends TestCase
 
         $standard = self::keys('standard');
         $controllers = [
-            'claim-next' => [new SimRecapPublishClaimController($repo, self::scriptBuilder(null), $standard), ['token' => self::TOKEN]],
+            'claim-next' => [new SimRecapPublishClaimController($repo, self::scriptBuilder(null), $standard, self::postingSwitch(true)), ['token' => self::TOKEN]],
             'progress'   => [new SimRecapPublishProgressController($repo, $standard), ['sim' => 7, 'token' => self::TOKEN, 'step' => 1, 'threadId' => null]],
             'finish'     => [new SimRecapPublishFinishController($repo, $standard), ['sim' => 7, 'token' => self::TOKEN]],
+            'enabled'    => [new SimRecapPublishEnabledController(self::postingSwitch(true), $standard), []],
         ];
 
         foreach ($controllers as [$controller, $body]) {

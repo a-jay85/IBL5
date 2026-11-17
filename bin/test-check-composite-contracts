@@ -804,7 +804,8 @@ run_l_case "l2-near-miss-passes" 0 'names no required check (L2)' out "$d_wf"
 d_wf="$(fresh_workflows)"
 run_l_case "l2-absent-skips" 0 'update-baselines.yml absent — L2 skipped' out "$d_wf"
 
-if unfiltered; then  # --case skips every section below (closes before h_done)
+# The mutation-pr helpers sit outside the unfiltered blocks so the M6 cases can
+# run alone: run_mut and expect_mut_out skip a case that no --case named.
 
 # ---------------------------------------------------------------------------
 # mutation-pr invariants (M1-M4)
@@ -821,6 +822,7 @@ RUN_MUT_OUT=""
 run_mut() {
   local name="$1" want="$2" variant="$3" adr="${4:-$MUT_LITERAL}" weekly="${5:--none-}"
   local d_a d_wf d_dec rc
+  should_run "$name" || return 0
   d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; d_dec="$(fresh_decisions)"
   put_mutation_pr "$d_wf" "$variant"
   if [ "$weekly" != "-none-" ]; then put_mutation_weekly "$d_wf" "$weekly"; fi
@@ -833,6 +835,7 @@ run_mut() {
 # <count> times (default 1 or more).
 expect_mut_out() {
   local got
+  should_run "$1" || return 0
   got="$(grep -cF -- "$2" <<< "$RUN_MUT_OUT" || true)"
   if [ -n "${3:-}" ]; then
     if [ "$got" -eq "$3" ]; then h_pass "$1 output has '$2' x$3"; else h_fail "$1" "want '$2' x$3, got x$got; output: $RUN_MUT_OUT"; fi
@@ -842,6 +845,8 @@ expect_mut_out() {
     h_fail "$1" "output lacks '$2'; output: $RUN_MUT_OUT"
   fi
 }
+
+if unfiltered; then  # --case skips the M1-M5 cases (closes before M6)
 
 run_mut "mut-good" 0 good
 run_mut "mut-m1-paths" 1 m1-paths
@@ -862,6 +867,8 @@ run_mut "mut-m5-diff-relative" 1 m5-diff-relative
 run_mut "mut-m5-diff-relative-comment" 0 m5-diff-relative-comment
 run_mut "mut-m5-no-guard" 1 m5-no-guard
 run_mut "mut-m5-guard-commented" 1 m5-guard-commented
+
+fi  # unfiltered (M1-M5)
 
 # M6: Infection runs DB tests per thread. The base fixtures carry the wiring, so
 # mut-good above also proves M1-M5 stay green with it.
@@ -887,6 +894,8 @@ run_mut "m6-weekly-no-cp" 1 good "$MUT_LITERAL" m6-no-cp
 expect_mut_out "m6-weekly-no-cp" "M6: mutation.yml"
 run_mut "m6-weekly-absent" 0 good
 expect_mut_out "m6-weekly-absent" "absent, skipping M6"
+
+if unfiltered; then  # --case skips every section below (closes before h_done)
 
 # mut-m2-duplicate-name: a second workflow names a job with the same context
 d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; d_dec="$(fresh_decisions)"

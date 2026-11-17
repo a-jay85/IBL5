@@ -21,7 +21,7 @@ An assertion whose catching mutation you cannot state is vacuous: it survives a 
 
 **Non-compliant:** "asserts roster totals are correct" — no mutation named, so nothing distinguishes a real behavioral assertion from a static source grep that is green from birth and stays green through the exact regression it was written to catch.
 
-Write the mutation into the row's **How** cell as a clause on the command, so an implementer cannot substitute a text grep without leaving the stated mutation unmet, and a later reviewer inherits a stated predicate instead of having to re-derive the row's intent. If you cannot state the catching mutation, the row is not yet an assertion — rewrite it until you can.
+Write the mutation as a clause in the row's "What to verify" cell, ahead of any trailing tag, so an implementer cannot substitute a text grep without leaving the stated mutation unmet, and a later reviewer inherits a stated predicate instead of having to re-derive the row's intent. If you cannot state the catching mutation, the row is not yet an assertion. Rewrite it until you can.
 
 **Tool-output tokens after the closer.** The consequence after the `⇒` is scanned like any other cell text. Name a PHPStan identifier or any other tool-output string in prose outside backticks, and cite the test or the file the diff carries. `bin/check-plan` gate `[MU]` rejects a backticked identifier that no tracked file holds. A tool-output string the gate does not recognise still leaves the row UNREALISED at Step 6.7, so keep every tool-output string out of backticks. The same gate rejects a backticked directory token with no tracked file beneath it; cite a file the diff creates beneath it instead.
 
@@ -35,7 +35,7 @@ Write the mutation into the row's **How** cell as a clause on the command, so an
 
 **Compliant exemplar (extract and run).** `bin/test-automouse-postplan-engine` (lines 71 to 74) awk-extracts the real runner span and `eval`s it, so the test executes production text. Its row 12-neg is the mutation control.
 
-**Example mutation clause.** "delete the `--model` arm ⇒ this assertion fails" is the shape a **How** cell carries. <!-- slop-ok -->
+**Example mutation clause.** "delete the `--model` arm ⇒ this assertion fails" is the shape a mutation clause in the "What to verify" cell carries. <!-- slop-ok -->
 
 **Restating shapes that satisfy nothing.** A test seeds a state file instead of driving the loop N times, cancels before time advances, or asserts behind an `if` that can be false. Each passes with production reverted.
 

@@ -28,6 +28,10 @@
 #                              or a cell whose backtick count is odd after
 #                              stripping the outermost pair.
 #                              Silent when the plan has no CLI-executable row.
+#   HC No How column          — a Verification Matrix header cell whose first
+#                              word is "how", after the location column, is
+#                              rejected. The command belongs in the location
+#                              cell and the mutation clause in "What to verify".
 #   7  No unresolved decisions — any table row carrying DECIDE / TBD /
 #                              "subject to validation" / "subject to review" is a
 #                              deferred question the automouse agent cannot resolve.
@@ -590,6 +594,43 @@ awk '
     inm && /^[[:space:]]*\|/ { print; next }
     inm && !/^[[:space:]]*\|/ { inm=0 }
 ' "$GATEP_BODY" > "$GATEP_MATRIX"
+
+# Gate [HC]: a How column after the location column. The matrix format is
+# closed at five columns (.claude/review-shared/_plan-verification.md), and
+# matrix_split reads the runnable command from field 5. A sixth How column that
+# holds the real command leaves prefire running the location cell's prose.
+# A header cell whose first word is "how" fires: bare How, How (...), and
+# "How, and the mutation it catches" are one defect. The location column is
+# found by name (test file / location / command), as gate B does, so a How
+# column before it stays legal, and a trailing PR column never matches. Only a
+# line holding a "What to verify" header cell is a matrix header. Reads the
+# fence-stripped $GATEP_BODY, so a fenced example table never fires.
+while IFS= read -r hcviol; do
+    [ -n "$hcviol" ] && viol "$hcviol"
+done < <(awk '
+    BEGIN {
+        FS = "|"
+        MATRIXRE = "[|][[:space:]]*[Ww]hat to verify[[:space:]]*[|]"
+        LOCRE = "test file|location|command"
+        HOWRE = "^how([^a-z]|$)"
+    }
+    {
+        if ($0 !~ MATRIXRE) next
+        loc = 0
+        for (i = 2; i <= NF; i++) {
+            cell = $i; gsub(/^[ \t]+|[ \t]+$/, "", cell); cell = tolower(cell)
+            if (cell ~ LOCRE && cell !~ HOWRE) { loc = i; break }
+        }
+        if (!loc) next
+        for (j = loc + 1; j <= NF; j++) {
+            orig = $j; gsub(/^[ \t]+|[ \t]+$/, "", orig); cell = tolower(orig)
+            if (cell ~ HOWRE) {
+                print "[HC] Verification Matrix header has a \"" orig "\" column after the location column. The matrix is closed at five columns: put the runnable command in the location cell and the mutation clause in the \"What to verify\" cell."
+                break
+            }
+        }
+    }
+' "$GATEP_BODY")  # [HC] reads the fence-stripped body
 
 # The isolation awk consumes the header row, but gate V needs its column count to
 # tell an escaped pipe from a raw one. Grab it separately; 0 means "unknown, skip

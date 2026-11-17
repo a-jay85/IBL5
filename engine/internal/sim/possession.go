@@ -6,38 +6,6 @@ import "github.com/a-jay85/IBL5/engine/internal/result"
 // trip, guaranteeing the inner loop terminates even on a pathological roster.
 const maxOffensiveRebounds = 8
 
-// energyCeilingMin/Max are the JSB +0xDF8 clamp bounds [2,5]: the dc-minutes
-// energy parameter that feeds the INDEPENDENT turnover roll. Because it lands in
-// [2,5], rand(1,1793) ≤ sqrt(value) fires only ~0.1%/poss — the independent check
-// is negligible by design and the dominant turnover source is steal-driven
-// (steal.go). 00_MASTER_REFERENCE.md +0xDF8 / lines 9617-9623.
-const (
-	energyCeilingMin = 2.0
-	energyCeilingMax = 5.0
-)
-
-// energyCeiling is the per-player JSB +0xDF8 value fed to the independent turnover
-// roll: (48 − min(dc_minutes, 28)) × 0.03 × conditioning + 1, clamped [2,5], where
-// conditioning is the stamina rating normalized to ~[0,1]. It is derived from
-// existing bundle fields (no new field invented). The exact upstream conditioning
-// term is validation-phase; what matters for fidelity is that the value lands in
-// [2,5], keeping the independent check negligible (matching JSB).
-func energyCeiling(p onCourt) float64 {
-	dcMin := p.DCMinutes
-	if dcMin > 28 {
-		dcMin = 28
-	}
-	conditioning := float64(p.Stamina) / 100.0
-	v := float64(48-dcMin)*0.03*conditioning + 1.0
-	if v < energyCeilingMin {
-		return energyCeilingMin
-	}
-	if v > energyCeilingMax {
-		return energyCeilingMax
-	}
-	return v
-}
-
 // defenderAtSlot returns the defender sharing the ball-handler's slot, falling
 // back to the first defender when no exact match exists (short lineup).
 func defenderAtSlot(d *teamState, slot int) onCourt {
@@ -78,19 +46,20 @@ func threePtPropensity(p onCourt) float64 {
 // BranchB is an OFF-by-default diagnostic. When active it passes the foul weight
 // through branchBShrink; acceptable because BranchB is not exercised by any shipped
 // path, golden snapshot, or sign gate. BranchB and freeze arms are exclusive.
-func (gs *gameState) playBuckets(bh onCourt, offense, defense *teamState, hca, hcaScaled, mq float64, allow3pt, halfCourt bool) (twoPtW, threePtW, foulW, andOneW float64) {
+func (gs *gameState) playBuckets(bh onCourt, offense, defense *teamState, hca, hcaScaled, mq float64, allow3pt, halfCourt bool) (twoPtW, threePtW, tovW, foulW float64) {
 	raw3pt := 0.0
 	if allow3pt {
 		raw3pt = threePtBucketWeight(bh)
 	}
-	andOneW, foul := andOneAndFoulWeights(bh, offense.players, defense.players, defense.team, hca, hca, hcaScaled, mq, halfCourt, gs.rng)
+	// foulW is live code 3 (foul); tov is live code 4 (turnover, foulBucketWeight).
+	foulW, tov := andOneAndFoulWeights(bh, offense.players, defense.players, defense.team, hca, hca, hcaScaled, mq, halfCourt, gs.rng)
 	if !gs.freeze.BranchB {
-		foul = gs.recordFoulWeight(foul)
-		return twoPtBucketWeight(bh) + hcaScaled, raw3pt, foul, andOneW
+		tov = gs.recordFoulWeight(tov)
+		return twoPtBucketWeight(bh) + hcaScaled, raw3pt, tov, foulW
 	}
 	raw2pt := twoPtBucketWeight(bh)
-	s2, s3, sf := gs.branchBShrink(raw2pt, raw3pt, foul, offense.drbRate, offense.astRate, bh.TransOff)
-	return s2 + hcaScaled, s3, sf, andOneW
+	s2, s3, sf := gs.branchBShrink(raw2pt, raw3pt, tov, offense.drbRate, offense.astRate, bh.TransOff)
+	return s2 + hcaScaled, s3, sf, foulW
 }
 
 // possOutcome classifies how a possession ended, so the caller can route both
@@ -235,18 +204,6 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 			origin = result.OriginOffReb
 		}
 		retainedFoul = false
-		// Dominant, steal-driven turnover (ADR-0045): a successful steal IS the
-		// turnover and ends the trip, crediting the stealing defender and arming the
-		// defense's fast break. Rolled before the shot path; the negligible
-		// independent [2,5] check stays inside selectOutcome below.
-		if gs.stealTurnover(offense, defense, bh) {
-			return possSteal // steal → steal fast-break pending for the defense
-		}
-		// Independent (non-steal) turnover: carelessness only, no arming.
-		// Checked after the dominant steal path; returns possNormal (no fast break).
-		if gs.nonStealTurnover(offense, bh) {
-			return possNormal
-		}
 		scoreDiff := offense.score - defense.score
 		matched := defenderAtSlot(defense, bh.slot)
 		pt := selectShotType(bh, matched, gs.rng)
@@ -275,7 +232,7 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 		// across the O(10s) 2pt basis (hcaSite2BasisScale, gametype.go).
 		hca := hcaDelta(gs.gameType, offense.isHome)
 		hcaScaled := hca * hcaSite2BasisScale
-		twoPtW, threePtW, foulW, andOneW := gs.playBuckets(bh, offense, defense, hca, hcaScaled, mq, true, true)
+		twoPtW, threePtW, tovW, foulW := gs.playBuckets(bh, offense, defense, hca, hcaScaled, mq, true, true)
 		// Putback 3pt IS suppressed by default (JSB 5.60 faithful — ADJUDICATION
 		// 2026-07-23). FUN_004e1ba0's reject-retry clause: param_3 (= local_15c, the
 		// OReb continuation flag, pushed as edi at 0x4d8f7e) == '\x01' → reject
@@ -292,18 +249,17 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 			threePtW = 0
 		}
 		in := outcomeInputs{
-			twoPtWeight:      twoPtW,
-			threePtWeight:    threePtW,
-			andOneWeight:     andOneW, // JSB index 3: FUN_004e1ba0 e88 -> e90, rating path when DF0 or lineup D78 is undefined
-			foulOnlyWeight:   foulW,
-			turnoverDefValue: energyCeiling(bh),
+			twoPtWeight:    twoPtW,
+			threePtWeight:  threePtW,
+			foulWeight:     foulW, // JSB index 3: FUN_004e1ba0 e88 -> e90, rating path when DF0 or lineup D78 is undefined
+			turnoverWeight: tovW,
 		}
 		if gs.outcomeDiag != nil {
 			// eligible3pt is false exactly when the OReb-continuation suppression zeroed
 			// threePtW above — the faithful default (UnfaithfulPutback3pt=false); true only
 			// when UnfaithfulPutback3pt is set (the A/B arm).
 			elig := origin != result.OriginOffReb || gs.freeze.UnfaithfulPutback3pt
-			gs.outcomeDiag.Add(twoPtW, threePtW, foulW, in.andOneWeight, elig, false /*transition*/, bh.RealLifeMIN == 0)
+			gs.outcomeDiag.Add(twoPtW, threePtW, tovW, in.foulWeight, elig, false /*transition*/, bh.RealLifeMIN == 0)
 		}
 
 		fm, sc := gs.lateGameForcing(scoreDiff, bh)
@@ -316,6 +272,9 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 			// whatever outcome FUN_004e1ba0 drew, and 93478 clears the shooting
 			// flag. The trailing defense fouls on purpose: a non-shooting foul
 			// that shoots 2 FTs only in the bonus (foulvolume.go).
+			if path == outcomeFoul {
+				observePathEnd(path, pathEndFoul)
+			}
 			if !gs.resolveFoul(offense, defense, bh, def, 2, false, true, periodIdx) {
 				retainedFoul = true
 				trip--   // a retained foul does not spend the offensive-rebound budget
@@ -328,6 +287,7 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 			made, _ := gs.shotAttempt(offense, defense, bh, sv2, result.ShotTwoPoint, origin, periodIdx)
 			if made && andOneMadeTwoFires(gs.rng.Float64()) { // JSB made-2pt roll: and-one
 				gs.resolveFoulAt(offense, defense, bh, def, 1, true, false, false, periodIdx, result.FoulSiteAndOneMadeTwo)
+				observePathEnd(path, pathEndAndOne)
 			}
 			if !made {
 				gs.creditBlock(offense, defense, bh, def)
@@ -363,11 +323,9 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 				return possDRB // defensive rebound → DRB-push fast-break pending
 			}
 			return possNormal // made shot
-		case outcomeAndOne:
-			gs.madeFieldGoal(offense, bh, result.ShotTwoPoint, origin, periodIdx)
-			gs.resolveFoul(offense, defense, bh, def, 1, true, fm, periodIdx) // and-one always clears the guard
-			return possNormal
-		case outcomeFoulOnly:
+		case outcomeFoul:
+			// Live code 3: every return goes to the foul handler (0x4d9ea2).
+			observePathEnd(path, pathEndFoul)
 			if !gs.resolveFoul(offense, defense, bh, def, 2, false, fm, periodIdx) {
 				retainedFoul = true
 				trip--   // a retained foul does not spend the offensive-rebound budget
@@ -375,14 +333,10 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 			}
 			return possNormal
 		case outcomeTurnover:
-			// The negligible independent [2,5] check (energyCeiling): an UNFORCED
-			// change of possession — no stealer, no fast break (the dominant
-			// steal-driven turnover is handled by stealTurnover at the top of the trip).
-			gs.emit(result.Event{
-				Kind: result.EventTurnover, Period: gs.period, Clock: gs.clock,
-				TeamID: offense.teamID, PlayerID: bh.PID,
-			})
-			gs.maybeInjure(offense, bh) // per-turnover injury check on the committer
+			// Live code 4: offensive foul, steal, or plain turnover (steal.go).
+			if gs.resolveTurnoverPath(offense, defense, bh, path) {
+				return possSteal // steal → steal fast-break pending for the defense
+			}
 			return possNormal
 		}
 	}

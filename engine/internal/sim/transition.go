@@ -117,11 +117,6 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 	gs.transitions++
 	bh := selectBallHandler(offense, gs.rng)
 	for trip := 0; trip <= maxOffensiveRebounds; trip++ {
-		// Steal-driven turnover on the break too (ADR-0045), mirroring the half-court
-		// path so fast-break possessions use the same model.
-		if gs.stealTurnover(offense, defense, bh) {
-			return possSteal // steal → steal fast-break pending for the defense
-		}
 		scoreDiff := offense.score - defense.score
 		matched := defenderAtSlot(defense, bh.slot)
 		pt := selectShotType(bh, matched, gs.rng)
@@ -156,19 +151,18 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 		// half-court path.
 		// allow3pt=true: faithful JSB port — fast break can be a 3pt attempt.
 		// SuppressTransition3pt (FreezeConfig) zeroes threePtW for the A/B suppress arm.
-		twoPtW, threePtW, foulW, andOneW := gs.playBuckets(bh, offense, defense, 0, 0, mq, true, false) // param_5==0: transition fully symmetric, no HCA legs (J15 Phase 5); allow3pt=true: faithful JSB port
+		twoPtW, threePtW, tovW, foulW := gs.playBuckets(bh, offense, defense, 0, 0, mq, true, false) // param_5==0: transition fully symmetric, no HCA legs (J15 Phase 5); allow3pt=true: faithful JSB port
 		if gs.freeze.SuppressTransition3pt {
 			threePtW = 0 // A/B suppress arm: restores pre-port baseline for measurement
 		}
 		in := outcomeInputs{
-			twoPtWeight:      twoPtW,
-			threePtWeight:    threePtW,
-			andOneWeight:     andOneW,
-			foulOnlyWeight:   foulW,
-			turnoverDefValue: energyCeiling(bh),
+			twoPtWeight:    twoPtW,
+			threePtWeight:  threePtW,
+			foulWeight:     foulW,
+			turnoverWeight: tovW,
 		}
 		if gs.outcomeDiag != nil {
-			gs.outcomeDiag.Add(twoPtW, threePtW, foulW, in.andOneWeight, threePtW > 0 /*eligible3pt*/, true /*transition*/, bh.RealLifeMIN == 0)
+			gs.outcomeDiag.Add(twoPtW, threePtW, tovW, in.foulWeight, threePtW > 0 /*eligible3pt*/, true /*transition*/, bh.RealLifeMIN == 0)
 		}
 
 		tpath := selectOutcome(in, false, false, false, false, gs.rng)
@@ -184,6 +178,7 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 			made, _ := gs.shotAttempt(offense, defense, bh, sv2, result.ShotTwoPoint, result.OriginTransition, periodIdx)
 			if made && andOneMadeTwoFires(gs.rng.Float64()) { // JSB made-2pt roll: and-one
 				gs.resolveFoulAt(offense, defense, bh, def, 1, true, false, false, periodIdx, result.FoulSiteAndOneMadeTwo)
+				observePathEnd(tpath, pathEndAndOne)
 			}
 			if !made {
 				gs.creditBlock(offense, defense, bh, def)
@@ -214,24 +209,19 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 				return possDRB
 			}
 			return possNormal
-		case outcomeAndOne:
-			gs.madeFieldGoal(offense, bh, result.ShotTwoPoint, result.OriginTransition, periodIdx)
-			gs.resolveFoul(offense, defense, bh, def, 1, true, false, periodIdx) // and-one always clears the guard
-			return possNormal
-		case outcomeFoulOnly:
+		case outcomeFoul:
+			// Live code 3: every return goes to the foul handler (0x4d9ea2).
+			observePathEnd(tpath, pathEndFoul)
 			if !gs.resolveFoul(offense, defense, bh, def, 2, false, false, periodIdx) {
 				trip--   // a retained foul does not spend the offensive-rebound budget
 				continue // below the bonus: offense keeps the ball (transition)
 			}
 			return possNormal
 		case outcomeTurnover:
-			// Negligible independent [2,5] check: unforced change of possession, no
-			// stealer (steal-driven turnovers are rolled at the top of the trip).
-			gs.emit(result.Event{
-				Kind: result.EventTurnover, Period: gs.period, Clock: gs.clock,
-				TeamID: offense.teamID, PlayerID: bh.PID,
-			})
-			gs.maybeInjure(offense, bh) // per-turnover injury check on the committer
+			// Live code 4: offensive foul, steal, or plain turnover (steal.go).
+			if gs.resolveTurnoverPath(offense, defense, bh, tpath) {
+				return possSteal // steal → steal fast-break pending for the defense
+			}
 			return possNormal
 		}
 	}

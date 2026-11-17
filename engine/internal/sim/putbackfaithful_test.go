@@ -173,7 +173,7 @@ func TestPutbackFaithful_RNGConsumptionUnchanged(t *testing.T) {
 	for seed := uint64(1); seed <= 50; seed++ {
 		r1 := rng.New(seed)
 		r2 := rng.New(seed)
-		inWith := outcomeInputs{twoPtWeight: 10, threePtWeight: 5, andOneWeight: 1, foulOnlyWeight: 2, turnoverDefValue: 3}
+		inWith := outcomeInputs{twoPtWeight: 10, threePtWeight: 5, foulWeight: 1, turnoverWeight: 2}
 		inZero := inWith
 		inZero.threePtWeight = 0
 		selectOutcome(inWith, false, false, false, false, r1)

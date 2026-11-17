@@ -29,7 +29,7 @@ import (
 // engine.
 type FreezeConfig struct {
 	ORB  bool // freeze P(offensive rebound)             — orebProbability output
-	TVR  bool // freeze the steal-driven turnover prob.  — turnoverProb output
+	TVR  bool // inert since the live-outcome-map port (the steal-driven turnover prob. it froze is gone)
 	Foul bool // freeze the foul-only bucket weight      — foulBucketWeight output
 	Make bool // freeze the 2pt make-value               — shotValue2pt output (pre-clutch)
 
@@ -114,7 +114,7 @@ type FreezeConfig struct {
 // ACTUAL derived quantity at its call site, never an event-rate proxy:
 //   - OrebProb:   mean live ORB-continuation P (faithful sqrt gate1Probability by
 //     default; linear orebProbability under the UnfaithfulOreb hatch)
-//   - TurnProb:   mean per-possession steal-driven turnoverProb output ∈ [0, maxTurnoverProb]
+//   - TurnProb:   inert since the live-outcome-map port (no sample feeds it)
 //   - FoulWeight: mean foulBucketWeight output
 //   - MakeVal2pt: mean PRE-clutch shotValue2pt output (per-mille)
 //
@@ -546,10 +546,10 @@ type Options struct {
 	// work. See tempo.go and ADR-0085.
 	BaseTimeMid *float64
 
-	// StealTurnoverScale / NonStealTurnoverScale override the package consts
-	// stealTurnoverScale / nonStealTurnoverScale (steal.go) for the J14 research
-	// turnover-scale sweep. nil → use the const (a zero Options stays byte-identical
-	// to Simulate); non-nil → use the pointed-to value. Always a valid float when set.
+	// StealTurnoverScale / NonStealTurnoverScale are inert since the
+	// live-outcome-map port: the fitted steal and non-steal turnover scales they
+	// overrode are gone (steal.go now ports the code-4 path). They stay so the
+	// internal/calibrate J14 sweep seam still compiles.
 	StealTurnoverScale    *float64
 	NonStealTurnoverScale *float64
 
@@ -665,31 +665,6 @@ func (gs *gameState) accumulateGateCont(offTeamID int, off, def float64) {
 	t.sumProd += g1 * g2
 	t.sumOffStr += off
 	t.sumDefStr += def
-}
-
-// turnoverProb returns the per-possession steal-driven turnover probability from
-// offensive carelessness × defensive steal pressure (steal.go), scaled by
-// stealTurnoverScale and clamped to [0, maxTurnoverProb]. Frozen (TVR arm) → the
-// league-mean probability, making the turnover rate league-uniform so the freeze
-// lattice can measure how collapsing the STL→steal→fast-break coupling moves
-// Cov(lnFGA,lnPPS) (the ADR-0045 Cov re-run). The caller draws its gs.rng.Float64()
-// roll unconditionally, so live and frozen passes consume the RNG identically.
-func (gs *gameState) turnoverProb(careless, pressure float64) float64 {
-	p := gs.stealTurnoverScale * careless * pressure
-	if p < 0 {
-		p = 0
-	}
-	if p > maxTurnoverProb {
-		p = maxTurnoverProb
-	}
-	if gs.accum != nil {
-		gs.accum.turnSum += p
-		gs.accum.turnN++
-	}
-	if gs.freeze.TVR {
-		return gs.freeze.Means.TurnProb
-	}
-	return p
 }
 
 // foulWeight returns the foul-only bucket weight; frozen → the league-mean foul

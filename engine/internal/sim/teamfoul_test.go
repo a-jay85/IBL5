@@ -103,6 +103,9 @@ func TestTeamFoulBonusEventStream(t *testing.T) {
 			if perPeriod[key] >= 5 {
 				sawFivePlus = true
 			}
+			if e.FoulSite == result.FoulSiteOffensiveTurnover {
+				continue // an offensive foul counts as a team foul but never shoots FTs
+			}
 			shotFTs := i+1 < len(g.Events) && g.Events[i+1].Kind == result.EventFreeThrow
 			if shotFTs {
 				continue

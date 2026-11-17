@@ -5,117 +5,73 @@ import (
 	"github.com/a-jay85/IBL5/engine/internal/rng"
 )
 
-// Steal-driven turnover model (ADR-0045). JSB 5.60 turnovers are overwhelmingly
-// steal-driven (00_MASTER_REFERENCE.md "Steal Probability"): the independent
-// +0xDF8 roll is the [2,5] dc-minutes energy param so it fires only ~0.1%/poss
-// (see outcome.go / energyCeiling). The dominant source is a per-possession steal
-// roll weighted by OFFENSIVE carelessness (the ball-handler's TVR, oriented so a
-// higher rating = better ball security = fewer turnovers) × DEFENSIVE steal
-// pressure (the defenders' Σ STL, the JSB param×1.5 threshold side). A successful
-// steal IS the turnover: the victim keeps the GameTOV and the credited defender
-// gets the GameSTL.
-const (
-	// stealTurnoverScale converts carelessness × steal-pressure into a
-	// per-possession steal-driven turnover probability. Recalibrated from
-	// 2.75e-5 (which targeted total TOs ≈14.5/team) to target steal-only rate
-	// STL ≈ 8.9/team (17.8/g both teams); archive gate: 17.8±0.7/g.
-	// Starting value ≈ 1.69e-5 (≈ 2.75e-5 × 8.9/14.5); tune via the
-	// ending-mix archive test (Phase 8).
-	stealTurnoverScale = 1.69e-5
+// The live JSB 5.60 code-4 turnover path (live trace
+// ~/claude-plans/_reports/2026-11-16-jsb-tov-trace.md). A code-4 pick is always a
+// turnover. One draw decides whether it is an offensive foul. The rest go
+// through the steal split ported from FUN_004e2fc0 (00_MASTER_REFERENCE.md
+// "Steal Probability"), which splits turnovers into steals and plain turnovers
+// and never generates one.
 
-	// nonStealTurnoverScale is the per-possession independent (non-steal)
-	// turnover probability constant, driven by offensive carelessness only
-	// (no defensive steal-pressure factor — there is no stealer).
-	// Calibrated to produce non-steal TO ≈ 10.2/g both teams (≈5.1/team),
-	// minus the existing negligible [2,5] selectOutcome energyCeiling TOs
-	// (≈0.3/g both teams). Archive gate: non-steal TO endings 4.9±0.5% of
-	// possessions. Starting value: tune from ~0.001.
-	nonStealTurnoverScale = 0.00175
+// offensiveFoulOnTurnover is the share of code-4 turnovers that become offensive fouls.
+const offensiveFoulOnTurnover = 0.1 // const 0.1 at 0x4da7a0, live trace 2026-11-16
 
-	// carelessnessBase orients the ball-handler's TVR rating (0-99, higher = better
-	// ball security) into a carelessness weight: a max-rated handler is the least
-	// careless. Floored at 0 for an over-max rating.
-	carelessnessBase = 100.0
-
-	// maxTurnoverProb caps the per-possession turnover probability strictly below 1
-	// (a pathological careless×pressure product can never force a guaranteed
-	// turnover, which would let a roll of exactly 0 deadlock the level calibration).
-	maxTurnoverProb = 0.9
-)
-
-// turnoverCarelessness maps a ball-handler's TVR rating to offensive carelessness:
-// higher TVR → lower carelessness → fewer turnovers (the orientation the pre-0045
-// engine had backwards). Floored at 0 (a TVR over carelessnessBase is simply the
-// least careless, never negative).
-func turnoverCarelessness(tvr int) float64 {
-	c := carelessnessBase - float64(tvr)
-	if c < 0 {
-		return 0
-	}
-	return c
-}
-
-// teamStealPressure is the defense's aggregate steal pressure: Σ over defenders of
-// STL × fatigue (the JSB param×1.5 cap side). Higher-STL defenses force more
-// turnovers — the defensive-quality coupling the ADR-0042 audit found missing.
-// Zero when every defender is unrated (→ no steal-driven turnover and no
-// divide-by-zero downstream). fatigue is 1.0 under the current curve.
-func teamStealPressure(defense *teamState) float64 {
-	var p float64
+// stealPool is the defense's steal pool from FUN_004e2fc0: Σ over defenders of
+// stlRate (+0xDD0, STL/MIN×44) × fatigue, capped at
+// defQualityCapMultiplier·defQualityCapTeamMult·leagueSTL48 (the def_matchup_quality
+// ceiling, 0x4e3222).
+func stealPool(defense *teamState) float64 {
+	var total float64
 	for _, d := range defense.players {
-		if w := float64(d.STL) * d.fatigue; w > 0 {
-			p += w
-		}
+		total += stlRate(d) * d.fatigue
 	}
-	return p
+	ceiling := defQualityCapMultiplier * defQualityCapTeamMult * leagueSTL48
+	if total > ceiling {
+		return ceiling
+	}
+	return total
 }
 
-// stealTurnover rolls the dominant, steal-driven turnover for one trip. On a steal
-// it emits EventTurnover (the victim keeps GameTOV), runs the per-turnover injury
-// check, credits a defender via selectStealer (EventSteal → the stealer's GameSTL),
-// and returns true (turnover occurred; fast-break pending for the defense). The
-// probability routes through gs.turnoverProb so the freeze lattice can collapse its
-// cross-team variance (freeze.go, the TVR arm) for the ADR-0045 Cov re-run. The
-// gs.rng.Float64() roll is drawn unconditionally so live and frozen passes consume
-// the RNG identically.
-func (gs *gameState) stealTurnover(offense, defense *teamState, victim onCourt) bool {
-	prob := gs.turnoverProb(turnoverCarelessness(victim.TVR), teamStealPressure(defense))
-	if gs.rng.Float64() >= prob {
-		return false
+// turnoverPool is the offense's turnover pool from FUN_004e2fc0: Σ over the
+// offense of (2.0 − fatigue) × tovRate (TOV/MIN×48). It is the steal roll's range.
+func turnoverPool(offense *teamState) float64 {
+	var total float64
+	for _, p := range offense.players {
+		total += (foulBaseFatigueRef - p.fatigue) * tovRate(p)
 	}
+	return total
+}
+
+// resolveTurnoverPath runs the code-4 turnover path for ball handler bh and
+// reports whether it ended in a steal (which arms the defense's fast break).
+// Draw order: the offensive-foul draw, then the steal roll, then the stealer
+// pick on a steal. An offensive foul charges bh a turnover and a personal foul
+// tagged FoulSiteOffensiveTurnover (feeding foul-out like any other foul), counts
+// toward the offense's team fouls, and shoots no free throws. JSB picks the
+// stealer from the same steal roll; this port picks it with selectStealer.
+func (gs *gameState) resolveTurnoverPath(offense, defense *teamState, bh onCourt, code outcomeCode) bool {
 	gs.emit(result.Event{
 		Kind: result.EventTurnover, Period: gs.period, Clock: gs.clock,
-		TeamID: offense.teamID, PlayerID: victim.PID,
+		TeamID: offense.teamID, PlayerID: bh.PID,
 	})
-	gs.maybeInjure(offense, victim) // per-turnover injury check on the committer
+	offensiveFoul := gs.rng.Float64() < offensiveFoulOnTurnover
+	gs.maybeInjure(offense, bh) // per-turnover injury check on the committer
+	if offensiveFoul {
+		offense.teamFouls++
+		gs.chargeFoul(offense, bh, result.FoulSiteOffensiveTurnover)
+		observePathEnd(code, pathEndOffensiveFoul)
+		return false
+	}
+	roll := gs.rng.Float64() * turnoverPool(offense)
+	if roll >= stealPool(defense) {
+		observePathEnd(code, pathEndTurnover)
+		return false
+	}
 	stealer, _ := selectStealer(defense, gs.rng)
 	gs.emit(result.Event{
 		Kind: result.EventSteal, Period: gs.period, Clock: gs.clock,
-		TeamID: offense.teamID, PlayerID: victim.PID, DefenderID: stealer.PID,
+		TeamID: offense.teamID, PlayerID: bh.PID, DefenderID: stealer.PID,
 	})
-	return true
-}
-
-// nonStealTurnover rolls the independent (non-steal) turnover for one trip.
-// On a turnover it emits EventTurnover (the victim keeps GameTOV) and runs
-// the per-turnover injury check, but does NOT emit EventSteal — this turnover
-// is non-arming (returns possNormal to the caller, not possSteal). The
-// probability uses only offensive carelessness (no defensive steal pressure
-// since there is no stealer). A gs.rng.Float64() roll is drawn unconditionally
-// so the RNG stream is deterministic regardless of outcome.
-func (gs *gameState) nonStealTurnover(offense *teamState, victim onCourt) bool {
-	prob := gs.nonStealTurnoverScale * turnoverCarelessness(victim.TVR)
-	if prob > maxTurnoverProb {
-		prob = maxTurnoverProb
-	}
-	if gs.rng.Float64() >= prob {
-		return false
-	}
-	gs.emit(result.Event{
-		Kind: result.EventTurnover, Period: gs.period, Clock: gs.clock,
-		TeamID: offense.teamID, PlayerID: victim.PID,
-	})
-	gs.maybeInjure(offense, victim)
+	observePathEnd(code, pathEndSteal)
 	return true
 }
 

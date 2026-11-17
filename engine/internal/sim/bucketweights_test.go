@@ -30,11 +30,10 @@ func assembleInputs(foulWeight, hca float64) outcomeInputs {
 	defenders := fiveStarters(7)
 	mq := matchupQuality(bh, defenders, [6]float64{}, [6]bool{}, [6]bool{})
 	return outcomeInputs{
-		twoPtWeight:      twoPtBucketWeight(bh) + hca,
-		threePtWeight:    threePtBucketWeight(bh),
-		andOneWeight:     andOneBucketWeight(mq, bh),
-		foulOnlyWeight:   foulWeight,
-		turnoverDefValue: 0,
+		twoPtWeight:    twoPtBucketWeight(bh) + hca,
+		threePtWeight:  threePtBucketWeight(bh),
+		foulWeight:     andOneBucketWeight(mq, bh),
+		turnoverWeight: foulWeight,
 	}
 }
 
@@ -70,8 +69,8 @@ func TestBucketWeights_FoulPathMix(t *testing.T) {
 
 	homeCounts := pathCounts(homeIn, n, seed)
 	awayCounts := pathCounts(awayIn, n, seed)
-	homeFoul := float64(homeCounts[outcomeFoulOnly]) / n
-	awayFoul := float64(awayCounts[outcomeFoulOnly]) / n
+	homeFoul := float64(homeCounts[outcomeTurnover]) / n
+	awayFoul := float64(awayCounts[outcomeTurnover]) / n
 
 	t.Logf("assembled path mix (n=%d, seed %d): factor=%.4f meanFoul=%.4f", n, seed, factor, meanFoul)
 	t.Logf("  home foul-frac=%.4f  away foul-frac=%.4f  (home−away=%+.4f)", homeFoul, awayFoul, homeFoul-awayFoul)

@@ -62,7 +62,7 @@ func pathShares(t *testing.T, bundleName string, games int) (share1, share2, sha
 		t.Fatalf("%s: observer saw no paths", bundleName)
 	}
 	f := func(c outcomeCode) float64 { return float64(counts[c]) / float64(total) }
-	return f(outcome2pt), f(outcome3pt), f(outcomeAndOne), f(outcomeFoulOnly), total
+	return f(outcome2pt), f(outcome3pt), f(outcomeFoul), f(outcomeTurnover), total
 }
 
 // TestPathShares_LiveMap tallies the picker's path shares on the real-life

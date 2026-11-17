@@ -109,7 +109,9 @@ func TestFoulSiteTagsMadeTwoAndOne(t *testing.T) {
 	if halfCourtMadeTwo == 0 {
 		t.Errorf("no half-court made-2 roll and-one tagged %s over 100 seeds", result.FoulSiteAndOneMadeTwo)
 	}
-	if bucket == 0 {
-		t.Errorf("no outcome-bucket and-one tagged %s over 100 seeds", result.FoulSiteAndOne)
+	// The live map has no and-one bucket: code 3 is the foul handler, so an
+	// and-one comes only from the code-1 made-2 roll.
+	if bucket != 0 {
+		t.Errorf("%d fouls tagged %s over 100 seeds, want 0 (no and-one bucket in the live map)", bucket, result.FoulSiteAndOne)
 	}
 }

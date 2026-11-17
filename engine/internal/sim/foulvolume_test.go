@@ -73,7 +73,7 @@ func TestForcedFoulTrigger(t *testing.T) {
 
 // andOneBucketOnlyCount is the number of 1-FT trips right after a made 2pt over
 // andOneSplitSeeds fixture seeds on the master base (1cadb0416), where every
-// such trip came from the outcomeAndOne bucket. The scratch count in
+// such trip came from the outcomeFoul bucket. The scratch count in
 // engine/docs/j27-foul-volume-2-port.md (And-one frequency) recorded it.
 const andOneBucketOnlyCount = 1289
 

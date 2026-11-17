@@ -27,7 +27,7 @@ abstract class DatabaseTestCase extends TestCase
         $host = $this->requireEnv('DB_HOST');
         $user = $this->requireEnv('DB_USER');
         $pass = $this->requireEnv('DB_PASS');
-        $name = $this->requireEnv('DB_NAME');
+        $name = DatabaseNameResolver::fromEnvironment($this->requireEnv('DB_NAME'));
 
         $this->db = new \mysqli();
         $this->db->options(MYSQLI_OPT_INT_AND_FLOAT_NATIVE, 1);

@@ -1114,6 +1114,13 @@ Or paste this to have Claude fix it:
 ${fix_cmd}"
     fi
     ljob_dm_send post-plan-fleet "$msg"
+    # The held text DM above goes first and always. A button DM that fails never suppresses it.
+    local _ppf_approve
+    # This code runs from a /tmp runner file, so BASH_SOURCE points at /tmp. Use $ROOT.
+    _ppf_approve="$ROOT/bin/approve-click-tick"
+    if [ "$verdict" = "HELD" ] && [ -x "$_ppf_approve" ]; then
+        "$_ppf_approve" --send-button="$PR" >/dev/null 2>&1 || true
+    fi
 }
 # Derive outcome word for pr-cycle summary and write to LOG BEFORE releasing the
 # slot. pr-cycle --wait returns when the live label disappears; the LOG must be fully

@@ -1,0 +1,378 @@
+#!/usr/bin/env bash
+# approve-click-tick: turn a Discord Approve or Fix-first button press into a bin/owner-approve run.
+#
+# IBLbot records a press in a JSONL store on prod (ibl5/IBLbot/src/server/approve-click-store.ts).
+# This script pulls pending presses over the existing ssh tunnel, takes each one at most once,
+# re-checks the actor, the age and the PR head SHA, and starts a detached bin/owner-approve run.
+# It never reimplements an owner-approve check: the READY verdict and the post-plan wait stay there.
+#
+# Usage:
+#   bin/approve-click-tick --tick               one pass: reconcile, list, claim, check, start runs
+#   bin/approve-click-tick --dry-run            list pending presses and the planned action; claim nothing
+#   bin/approve-click-tick --run-one=<nonce>    internal: the detached runner for one claimed press
+#   bin/approve-click-tick --send-button=<pr>   DM the owner an Approve and Fix-first button for a held PR
+#
+# Exactly one argument, in the --flag=value form. Anything else exits 2.
+# --tick, --dry-run and --run-one exit 3 when CLAUDE_HEADLESS is set, even empty. --send-button arms
+# nothing, so it runs anyway.
+#
+# Env seams (unset uses the default; set but empty exits 2):
+#   APPROVE_CLICK_SSH_HOST   ssh host the bot runs on     (default iblhoops.net)
+#   APPROVE_CLICK_PORT       the bot's loopback port      (default 50000)
+#   APPROVE_CLICK_SSH_BIN    ssh binary                   (default ssh)
+#   APPROVE_CLICK_STATE_DIR  per-click ledger             (default $HOME/.local/state/approve-click)
+#   APPROVE_OA_BIN           owner-approve                (default <script dir>/owner-approve)
+#   APPROVE_DM_BIN           discord-dm                   (default <script dir>/discord-dm)
+#   APPROVE_GH_BIN           gh                           (default gh)
+#
+# At-most-once: the ledger dir holds one directory per press, with O_EXCL marker files in the order
+# claimed, bot claim, checks, started, owner-approve. A crash anywhere leaves the press consumed and
+# not run, and reconcile_local reports it by DM. Nothing re-runs a press.
+set -euo pipefail
+
+die_usage() { echo "approve-click-tick: $*" >&2; exit 2; }
+log() { printf 'approve-click-tick: %s\n' "$*" >&2; }
+
+usage() {
+    awk 'NR==1{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "${BASH_SOURCE[0]}"
+}
+
+# ---- mode: exactly one --flag=value argument --------------------------------
+MODE=""
+RUN_NONCE=""
+SEND_PR=""
+[ $# -eq 1 ] || die_usage "exactly one mode argument is required (--tick, --dry-run, --run-one=<nonce>, --send-button=<pr>)"
+case "$1" in
+    --tick) MODE=tick ;;
+    --dry-run) MODE=dry ;;
+    --run-one=?*) MODE=run; RUN_NONCE="${1#--run-one=}" ;;
+    --send-button=?*) MODE=send; SEND_PR="${1#--send-button=}" ;;
+    -h|--help) usage; exit 0 ;;
+    *) die_usage "unknown argument: $1" ;;
+esac
+
+# ---- headless guard: before any network call, set-but-empty counts as set ----
+guard_headless() {
+    if [ -n "${CLAUDE_HEADLESS+x}" ]; then
+        echo "approve-click-tick: CLAUDE_HEADLESS is set. An owner approval needs an interactive session. Nothing sent or run." >&2
+        exit 3
+    fi
+}
+if [ "$MODE" != "send" ]; then guard_headless; fi
+
+# ---- seams ------------------------------------------------------------------
+case "${APPROVE_CLICK_SSH_HOST-unset}" in '') die_usage "APPROVE_CLICK_SSH_HOST is set but empty" ;; esac
+case "${APPROVE_CLICK_PORT-unset}" in '') die_usage "APPROVE_CLICK_PORT is set but empty" ;; esac
+case "${APPROVE_CLICK_SSH_BIN-unset}" in '') die_usage "APPROVE_CLICK_SSH_BIN is set but empty" ;; esac
+case "${APPROVE_CLICK_STATE_DIR-unset}" in '') die_usage "APPROVE_CLICK_STATE_DIR is set but empty" ;; esac
+case "${APPROVE_OA_BIN-unset}" in '') die_usage "APPROVE_OA_BIN is set but empty" ;; esac
+case "${APPROVE_DM_BIN-unset}" in '') die_usage "APPROVE_DM_BIN is set but empty" ;; esac
+case "${APPROVE_GH_BIN-unset}" in '') die_usage "APPROVE_GH_BIN is set but empty" ;; esac
+
+SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(dirname "$SELF")"
+SSH_HOST="${APPROVE_CLICK_SSH_HOST:-iblhoops.net}"
+BOT_PORT="${APPROVE_CLICK_PORT:-50000}"
+SSH_BIN="${APPROVE_CLICK_SSH_BIN:-ssh}"
+if [ -n "${APPROVE_CLICK_STATE_DIR+x}" ]; then
+    STATE="$APPROVE_CLICK_STATE_DIR"
+else
+    [ -n "${HOME:-}" ] || die_usage "HOME is unset and APPROVE_CLICK_STATE_DIR is not set"
+    STATE="$HOME/.local/state/approve-click"
+fi
+OA_BIN="${APPROVE_OA_BIN:-$SCRIPT_DIR/owner-approve}"
+DM_BIN="${APPROVE_DM_BIN:-$SCRIPT_DIR/discord-dm}"
+GH_BIN="${APPROVE_GH_BIN:-gh}"
+REPO_SLUG="a-jay85/IBL5"
+
+# The owner's Discord id. Pinned equal to OWNER_ID in bin/discord-dm; bin/test-plan-review-seam asserts both.
+OWNER_DISCORD_ID="283183467804491776"
+CONDITION_MAX=300
+CLAIM_WINDOW_S=3600
+# A claimed press with no decision after this long is reported as lost.
+ORPHAN_AFTER_S=900
+
+command -v jq >/dev/null 2>&1 || die_usage "jq not found on PATH"
+
+# shellcheck source=bin/lib/claim-file.sh
+. "$SCRIPT_DIR/lib/claim-file.sh"
+
+dm() { "$DM_BIN" "$1" >/dev/null 2>&1 || log "DM failed: $1"; }
+
+# ---- transport (same recipe as bin/plan-review-drain) ------------------------
+HTTP=""
+BODY=""
+remote() { # verb route [body]
+    local verb="$1" route="$2" body="${3-}" cmd out
+    mkdir -p "$STATE"
+    if [ "$verb" = GET ]; then
+        cmd="curl -s -m 20 -w '\nHTTP=%{http_code}' http://localhost:${BOT_PORT}${route}; printf ' curl_rc=%s\n' \"\$?\""
+        out=$("$SSH_BIN" -o BatchMode=yes -o ConnectTimeout=10 "$SSH_HOST" "$cmd" </dev/null 2>"$STATE/last-ssh.err") || true
+    else
+        cmd="curl -s -m 20 -w '\nHTTP=%{http_code}' -X POST http://localhost:${BOT_PORT}${route} -H 'Content-Type: application/json' -d @-; printf ' curl_rc=%s\n' \"\$?\""
+        out=$(printf '%s' "$body" | "$SSH_BIN" -o BatchMode=yes -o ConnectTimeout=10 "$SSH_HOST" "$cmd" 2>"$STATE/last-ssh.err") || true
+    fi
+    HTTP=$(sed -n 's/.*HTTP=\([0-9][0-9]*\).*/\1/p' <<< "$out" | tail -1) || HTTP=''
+    # The trailer is always the last line, so drop only that line. A body that quotes HTTP=5 stays whole.
+    BODY=$(sed '$d' <<< "$out")
+    [ "$HTTP" = "200" ]
+}
+
+# ---- helpers ----------------------------------------------------------------
+label_for() { if [ "$1" = "fix" ]; then printf 'Fix first'; else printf 'Approve'; fi; }
+
+# outcome_message <cdir>: the DM text for a finished press, from record.json and outcome.
+outcome_message() {
+    local cdir="$1" pr cond rc="" result="" key val
+    pr=$(jq -r '.pr' "$cdir/record.json" 2>/dev/null || printf '?')
+    cond=$(jq -j '(.condition // "") + "x"' "$cdir/record.json" 2>/dev/null || printf 'x')
+    cond="${cond%x}"
+    while IFS='=' read -r key val; do
+        case "$key" in rc) rc="$val" ;; result) result="$val" ;; esac
+    done < "$cdir/outcome"
+    case "$rc" in
+        0) printf 'PR #%s approved from Discord and armed for merge.' "$pr" ;;
+        4) printf 'PR #%s approval recorded but NOT armed: the post-plan verdict is not READY. Check the PR.' "$pr" ;;
+        5) printf 'PR #%s approval recorded but NOT armed: post-plan was still running at the timeout. Run bin/owner-approve %s --finish when it is done.' "$pr" "$pr" ;;
+        6) printf 'PR #%s Fix-first recorded: %s. After the fix is pushed, run bin/owner-approve %s --finish on the Mac.' "$pr" "$cond" "$pr" ;;
+        refused) printf 'Discord approve click for PR #%s was NOT run: %s' "$pr" "$result" ;;
+        *) printf 'PR #%s owner-approve exited %s: %s' "$pr" "${rc:-unknown}" "${result:-no RESULT line}" ;;
+    esac
+}
+
+mark_reported() { claim_file "$1/reported" date +%s || true; }
+
+refuse_click() { # nonce reason
+    local n="$1" why="$2" cdir="$STATE/clicks/$1"
+    printf 'rc=refused\nresult=%s\n' "$why" > "$cdir/outcome"
+    dm "Discord approve click ${n:0:8} was NOT run: $why"
+    mark_reported "$cdir"
+}
+
+# pid_alive <cdir>: true when the runner's recorded pid is a live process.
+pid_alive() {
+    local pid=""
+    [ -s "$1/run.lock/pid" ] || return 1
+    read -r pid < "$1/run.lock/pid" || true
+    case "$pid" in ''|*[!0-9]*) return 1 ;; esac
+    kill -0 "$pid" 2>/dev/null
+}
+
+# reconcile_local: report presses whose runner died. Builtins only, no network, no gh.
+reconcile_local() {
+    local cdir pr claimed_at now
+    for cdir in "$STATE"/clicks/*/; do
+        cdir="${cdir%/}"
+        [ -d "$cdir" ] || continue
+        if [ -e "$cdir/reported" ]; then continue; fi
+        if pid_alive "$cdir"; then continue; fi
+        if [ -e "$cdir/outcome" ]; then
+            dm "$(outcome_message "$cdir")"
+            mark_reported "$cdir"
+        elif [ -e "$cdir/started" ]; then
+            pr=$(jq -r '.pr' "$cdir/record.json" 2>/dev/null || printf '?')
+            dm "owner-approve for PR #$pr started but recorded no outcome; check the PR comments and run bin/owner-approve by hand if it is not armed"
+            mark_reported "$cdir"
+        elif [ -s "$cdir/claimed" ]; then
+            claimed_at=""
+            read -r claimed_at < "$cdir/claimed" || true
+            case "$claimed_at" in ''|*[!0-9]*) continue ;; esac
+            now=$(date +%s)
+            if [ $((now - claimed_at)) -gt "$ORPHAN_AFTER_S" ]; then
+                dm "Discord approve click ${cdir##*/} was claimed but never ran (the tick stopped midway). Nothing was approved; run bin/owner-approve by hand if you still want it."
+                mark_reported "$cdir"
+            fi
+        fi
+    done
+}
+
+# send_button <pr>: mint a button DM for an open PR at its current head.
+send_button() {
+    local pr="$1" gh_out btn_state sha body
+    case "$pr" in ''|0*|*[!0-9]*) die_usage "--send-button needs a PR number" ;; esac
+    [ "${#pr}" -le 6 ] || die_usage "--send-button needs a PR number of at most 6 digits"
+    if ! gh_out=$("$GH_BIN" pr view "$pr" -R "$REPO_SLUG" --json headRefOid,state </dev/null 2>/dev/null); then
+        log "gh pr view $pr failed; no button sent"
+        return 1
+    fi
+    btn_state=$(jq -r '.state // ""' <<< "$gh_out" 2>/dev/null || printf '')
+    if [ "$btn_state" != "OPEN" ]; then
+        log "PR #$pr is ${btn_state:-unknown}; no button sent"
+        return 0
+    fi
+    sha=$(jq -r '.headRefOid // ""' <<< "$gh_out" 2>/dev/null || printf '')
+    case "$sha" in *[!0-9a-f]*|'') log "PR #$pr head SHA is not 40 hex; no button sent"; return 1 ;; esac
+    [ "${#sha}" -eq 40 ] || { log "PR #$pr head SHA is not 40 hex; no button sent"; return 1; }
+    body=$(jq -cn --argjson pr "$pr" --arg sha "$sha" '{pr: $pr, head_sha: $sha}')
+    "$DM_BIN" --raw --route /discordApproveDM "$body" >/dev/null
+}
+
+# run_one <nonce>: the detached runner. Runs owner-approve for one claimed press, once.
+run_one() {
+    local nonce="$1" cdir pr button actor clicked_at cond label words opt oa_out rc=0 result argv
+    case "$nonce" in *[!0-9a-f]*|'') die_usage "--run-one needs a 32-hex nonce" ;; esac
+    [ "${#nonce}" -eq 32 ] || die_usage "--run-one needs a 32-hex nonce"
+    cdir="$STATE/clicks/$nonce"
+    [ -s "$cdir/record.json" ] || { log "no record for $nonce"; exit 0; }
+
+    if ! { mkdir "$cdir/run.lock" 2>/dev/null && claim_file "$cdir/run.lock/pid" printf '%s\n' "$$"; }; then
+        exit 0
+    fi
+    if [ -e "$cdir/started" ]; then exit 0; fi
+    # The lock keeps two runners apart and the guard above stops a replay. The marker write is a
+    # record, so a failed write does not abort the run.
+    claim_file "$cdir/started" date +%s || true
+
+    pr=$(jq -r '.pr' "$cdir/record.json")
+    button=$(jq -r '.button' "$cdir/record.json")
+    actor=$(jq -r '.actor' "$cdir/record.json")
+    clicked_at=$(jq -r '.clicked_at' "$cdir/record.json")
+    cond=$(jq -j '(.condition // "") + "x"' "$cdir/record.json")
+    cond="${cond%x}"
+
+    # The words and the option are audit text: no condition text goes in them. The condition
+    # travels only as one array element, never through eval or a shell string.
+    label=$(label_for "$button")
+    words="Discord ${label} button pressed by Discord user ${actor} at ${clicked_at} (click ${nonce:0:8})"
+    opt="Discord button: ${label}"
+    argv=("$pr" "$words" "--option=$opt")
+    if [ "$button" = "fix" ]; then argv+=("--fix-first=$cond"); fi
+
+    oa_out=$("$OA_BIN" "${argv[@]}" </dev/null 2>>"$cdir/run.log") || rc=$?
+    result=$(sed -n 's/^RESULT: *//p' <<< "$oa_out" | tail -1) || result=''
+    printf 'rc=%s\nresult=%s\n' "$rc" "$result" > "$cdir/outcome"
+    dm "$(outcome_message "$cdir")"
+    mark_reported "$cdir"
+}
+
+# ---- modes ------------------------------------------------------------------
+if [ "$MODE" = "send" ]; then
+    send_button "$SEND_PR"
+    exit $?
+fi
+
+if [ "$MODE" = "run" ]; then
+    run_one "$RUN_NONCE"
+    exit 0
+fi
+
+if [ "$MODE" = "dry" ]; then
+    mkdir -p "$STATE"
+    if ! remote GET /approveClicks; then
+        log "bot not reachable (http=${HTTP:-none}); nothing listed"
+        exit 0
+    fi
+    jq -r '.clicks[]? | "would claim click \(.nonce) for PR #\(.pr) (\(.button))"' <<< "$BODY" \
+        | tr -d '\000-\010\013-\037\177' || true
+    exit 0
+fi
+
+# ---- --tick -----------------------------------------------------------------
+mkdir -p "$STATE/clicks"
+: > "$STATE/heartbeat"
+reconcile_local
+
+if ! remote GET /approveClicks; then
+    log "bot not reachable (http=${HTTP:-none}); next tick retries"
+    exit 0
+fi
+if ! nonces=$(jq -r 'if (.clicks | type) == "array" then .clicks[].nonce | strings else empty end' <<< "$BODY" 2>/dev/null); then
+    log "unparseable click list; next tick retries"
+    exit 0
+fi
+
+for nonce in $nonces; do
+    case "$nonce" in *[!0-9a-f]*|'') continue ;; esac
+    [ "${#nonce}" -eq 32 ] || continue
+    cdir="$STATE/clicks/$nonce"
+
+    if [ -e "$cdir/claimed" ]; then
+        if claim_file "$cdir/seen-again" date +%s; then
+            dm "Discord approve click ${nonce:0:8} is listed again after it was already taken. Not run again."
+        fi
+        continue
+    fi
+    mkdir -p "$cdir"
+    # Claim locally BEFORE the bot claim and before any run: a crash after this point leaves the
+    # press consumed and not run.
+    claim_file "$cdir/claimed" date +%s || continue
+
+    claim_http=""
+    remote POST /approveClicks/claim "$(jq -cn --arg n "$nonce" '{nonce: $n}')" || true
+    claim_http="$HTTP"
+    [ "$claim_http" = "200" ] || {
+        refuse_click "$nonce" "the bot answered HTTP ${claim_http:-none} to the claim"
+        continue
+    }
+    printf '%s\n' "$BODY" > "$cdir/record.json"
+
+    valid=$(jq -r --arg n "$nonce" '
+        (.nonce == $n)
+        and ((.pr | type) == "number") and ((.pr | floor) == .pr) and (.pr >= 1) and (.pr <= 999999)
+        and ((.head_sha | type) == "string") and (.head_sha | test("^[0-9a-f]{40}$"))
+        and ((.button == "ok") or (.button == "fix"))
+        and ((.actor | type) == "string")
+        and ((.clicked_at | type) == "string") and (.clicked_at | test("^[0-9T:.Z-]+$"))
+        and ((.clicked_at_epoch | type) == "number") and ((.clicked_at_epoch | floor) == .clicked_at_epoch)
+        and (((.condition | type) == "null") or ((.condition | type) == "string"))
+    ' "$cdir/record.json" 2>/dev/null || printf 'false')
+    if [ "$valid" != "true" ]; then
+        refuse_click "$nonce" "the claim record is malformed"
+        continue
+    fi
+
+    pr=$(jq -r '.pr' "$cdir/record.json")
+    head_sha=$(jq -r '.head_sha' "$cdir/record.json")
+    button=$(jq -r '.button' "$cdir/record.json")
+    actor=$(jq -r '.actor' "$cdir/record.json")
+    clicked_epoch=$(jq -r '.clicked_at_epoch' "$cdir/record.json")
+    # The sentinel keeps a trailing newline, which command substitution would otherwise strip.
+    cond=$(jq -j '(.condition // "") + "x"' "$cdir/record.json")
+    cond="${cond%x}"
+
+    if [ "$actor" != "$OWNER_DISCORD_ID" ]; then
+        refuse_click "$nonce" "the press was not from the owner"
+        continue
+    fi
+    now=$(date +%s)
+    if [ $((now - clicked_epoch)) -gt "$CLAIM_WINDOW_S" ]; then
+        refuse_click "$nonce" "the press is older than $((CLAIM_WINDOW_S / 60)) minutes"
+        continue
+    fi
+    if [ "$button" = "ok" ]; then
+        if [ -n "$cond" ]; then
+            refuse_click "$nonce" "an Approve press carried a condition"
+            continue
+        fi
+    else
+        if [ -z "$cond" ]; then
+            refuse_click "$nonce" "a Fix first press carried no condition"
+            continue
+        fi
+        if [ "${#cond}" -gt "$CONDITION_MAX" ]; then
+            refuse_click "$nonce" "condition is longer than $CONDITION_MAX characters"
+            continue
+        fi
+        case "$cond" in *[[:cntrl:]]*) refuse_click "$nonce" "condition has control characters"; continue ;; esac
+    fi
+
+    # Fail closed: a gh failure means the live head is unknown, so nothing runs.
+    if ! gh_out=$("$GH_BIN" pr view "$pr" -R "$REPO_SLUG" --json headRefOid,state </dev/null 2>/dev/null); then
+        refuse_click "$nonce" "gh could not read PR #$pr"
+        continue
+    fi
+    live_state=$(jq -r '.state // ""' <<< "$gh_out" 2>/dev/null || printf '')
+    live_sha=$(jq -r '.headRefOid // ""' <<< "$gh_out" 2>/dev/null || printf '')
+    if [ "$live_state" != "OPEN" ]; then
+        refuse_click "$nonce" "PR #$pr is ${live_state:-in an unknown state}, so nothing ran"
+        continue
+    fi
+    if [ "$live_sha" != "$head_sha" ]; then
+        refuse_click "$nonce" "the head of PR #$pr moved after the button was sent, so nothing ran. A fresh button follows"
+        send_button "$pr" || true
+        continue
+    fi
+
+    nohup "$SELF" --run-one="$nonce" </dev/null >"$cdir/run.log" 2>&1 &
+done
+exit 0

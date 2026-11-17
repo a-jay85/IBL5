@@ -286,12 +286,18 @@ _fetch_split() {
 # or an expected value in test "$(curl …)" = "<url>", stays byte-exact.
 ci_row_rewrite() {
     local out="" i=0 in_php_re='docker compose exec -T php[[:space:]]+(php|bun|bunx|curl)[[:space:]]*$'
+    local in_sh_sq_re="docker compose exec -T php[[:space:]]+(sh|bash)[[:space:]]+-l?c[[:space:]]+'[^']*\$"
+    local in_sh_dq_re='docker compose exec -T php[[:space:]]+(sh|bash)[[:space:]]+-l?c[[:space:]]+"[^"]*$'
     _fetch_split "$1"
     while [ "$i" -lt "$_FS_N" ]; do
         # A command run inside the php container reaches Apache on its own
         # port 80. The 8080 mapping exists only on the CI host, so its URLs
         # stay as written.
-        if [[ "${_FS_PRE[$i]}" =~ $in_php_re ]]; then
+        # A shell wrapper, as in exec -T php sh -c 'curl ...', also runs in the
+        # container while its quote is still open. Test all text so far.
+        if [[ "${_FS_PRE[$i]}" =~ $in_php_re ]] \
+            || [[ "$out${_FS_PRE[$i]}" =~ $in_sh_sq_re ]] \
+            || [[ "$out${_FS_PRE[$i]}" =~ $in_sh_dq_re ]]; then
             out="$out${_FS_PRE[$i]}${_FS_SEG[$i]}"
         else
             out="$out${_FS_PRE[$i]}$(ci_host_rewrite "${_FS_SEG[$i]}")"

@@ -27,6 +27,11 @@ type FTASide struct {
 	TOV       float64 `json:"tov"`
 	ORB       float64 `json:"orb"`
 	Points    float64 `json:"points"`
+	STL       float64 `json:"stl"`
+
+	// SitePF counts engine fouls per result.FoulSite name. The .sco side has no
+	// sites, so it stays nil there.
+	SitePF map[string]float64 `json:"site_pf,omitempty"`
 
 	HomeFTA   float64 `json:"home_fta"`
 	HomeGames float64 `json:"home_games"`
@@ -76,6 +81,17 @@ func (s *FTASide) AddTeamGame(fta, ftm, pf, fga, tov, orb, points float64, isHom
 	s.BucketGames[b]++
 }
 
+// AddSTL adds one team-game's steals. Call it once per AddTeamGame.
+func (s *FTASide) AddSTL(stl float64) { s.STL += stl }
+
+// AddSiteFoul counts one engine foul at a FoulSite name.
+func (s *FTASide) AddSiteFoul(site string) {
+	if s.SitePF == nil {
+		s.SitePF = map[string]float64{}
+	}
+	s.SitePF[site]++
+}
+
 // isDegenerateFTAGame reports whether a simulated game is an all-zero box
 // that must be excluded from the FTA decomposition: both teams scored 0
 // points AND both teams attempted 0 free throws. A real tie with points, or a
@@ -106,6 +122,8 @@ func marginBucket(absMargin int) int {
 type FTASummary struct {
 	FTAPerG       float64    `json:"fta_per_g"`
 	PFPerG        float64    `json:"pf_per_g"`
+	TOVPerG       float64    `json:"tov_per_g"`
+	STLPerG       float64    `json:"stl_per_g"`
 	FTAPerPF      float64    `json:"fta_per_pf"`
 	FTAPer100Poss float64    `json:"fta_per_100poss"`
 	PacePerG      float64    `json:"pace_per_g"`
@@ -114,6 +132,8 @@ type FTASummary struct {
 	WinnerFTAPerG float64    `json:"winner_fta_per_g"`
 	LoserFTAPerG  float64    `json:"loser_fta_per_g"`
 	BucketFTAPerG [3]float64 `json:"bucket_fta_per_g"`
+
+	SitePFPerG map[string]float64 `json:"site_pf_per_g,omitempty"`
 }
 
 // ratioOrZero returns num/den, or 0 when den is 0 (an empty bucket, no decided
@@ -144,6 +164,8 @@ func SummarizeFTASide(s FTASide) (FTASummary, error) {
 	out := FTASummary{
 		FTAPerG:       s.FTA / s.TeamGames,
 		PFPerG:        s.PF / s.TeamGames,
+		TOVPerG:       s.TOV / s.TeamGames,
+		STLPerG:       s.STL / s.TeamGames,
 		FTAPerPF:      s.FTA / s.PF,
 		FTAPer100Poss: 100 * ratioOrZero(s.FTA, poss),
 		PacePerG:      poss / s.TeamGames,
@@ -154,6 +176,12 @@ func SummarizeFTASide(s FTASide) (FTASummary, error) {
 	}
 	for i := range out.BucketFTAPerG {
 		out.BucketFTAPerG[i] = ratioOrZero(s.BucketFTA[i], s.BucketGames[i])
+	}
+	if s.SitePF != nil {
+		out.SitePFPerG = make(map[string]float64, len(s.SitePF))
+		for k, v := range s.SitePF {
+			out.SitePFPerG[k] = ratioOrZero(v, s.TeamGames)
+		}
 	}
 	return out, nil
 }

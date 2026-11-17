@@ -42,7 +42,7 @@ N_AND="X=\$(git ls-files $PIPE sort) && y=1"
 N_LOCAL="local X=\$(git ls-files $PIPE sort)"
 N_IF="if git ls-files $PIPE grep x >/dev/null; then :; fi"
 N_ARG="echo \"\$(git ls-files $PIPE grep x)\""
-N_PSUB="mapfile -t a < <(git ls-files $PIPE grep x)"
+N_PSUB="mapfile -t a < <(git ls-files $PIPE grep x)" # exit-ok: fixture text for the process-substitution skip case
 N_CONT1="X=\$(git ls-files $PIPE sort) \\"
 N_CONT2="    $PIPE$PIPE X=''"
 

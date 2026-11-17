@@ -278,7 +278,9 @@ harness_select() { # <changed-file> <event> <out-file>; sets the selection state
             bin/test-*|ibl5/bin/test-*) hs_claim_from_table "$p" && claimed=1
                [ -f "$p" ] && { hs_pick "$p" "own script changed"; claimed=1; } ;;
             *) hs_claim_from_table "$p" && claimed=1
-               h=$(shell_harness_for "$p"); case "$p" in bin/*) [ -x "$h" ] && { hs_pick "$h" "name map for $p"; claimed=1; } ;; esac ;;
+               # The name map picks the file's own harness but never claims the path: a
+               # caller that reaches the file through a variable dir is invisible to the scan.
+               h=$(shell_harness_for "$p"); case "$p" in bin/*) [ -x "$h" ] && hs_pick "$h" "name map for $p" ;; esac ;;
         esac
         [ "$claimed" -eq 1 ] || hs_inert "$p" || { hs_all "unclaimed path $p"; return 0; }
     done <"$changed"

@@ -33,7 +33,7 @@ The freeze TVR arm (`FreezeConfig.TVR`, `FreezeMeans.TurnProb`) froze the old st
 
 ## Before and after
 
-Fixture run: `engine/internal/sim/testdata/bundle.json`, 200 seeds from 20240601 (`foulRateSeed`), one game per seed. The command, run from `engine/`, copies a scratch test into `internal/sim`, runs `go test ./internal/sim -run "^(TestElompScratchAggregates|TestFoulRatesByTypeFixture)$" -count=1 -v`, then removes it. The real-life row is one run of the same scratch test on `bundle_reallife.json` after the port. No master run exists on that fixture. No `.sco` column appears, because `jsbcalibrate` needs the archive and no archive walk ran for this port.
+Fixture run: `engine/internal/sim/testdata/bundle.json`, 200 seeds from 20240601 (`foulRateSeed`), one game per seed. The command, run from `engine/`, copies a scratch test into `internal/sim`, runs `go test ./internal/sim -run "^(TestElompScratchAggregates|TestFoulRatesByTypeFixture)$" -count=1 -v`, then removes it. The real-life row is one run of the same scratch test on `bundle_reallife.json` after the port. No master run exists on that fixture. No `.sco` column appears, because `jsbcalibrate` needs the archive and no archive walk ran for this port. The plan asked for a `.sco` column. It stays open as a follow-up walk, and the owner's baseline decision rests on the sim BEFORE/AFTER rows only.
 
 Per team-game:
 

@@ -307,6 +307,7 @@ class RunResult:
     error_cmd: Optional[str] = None            # command that failed (HarnessError.cmd); omitted from result.json when unset
     error_output_tail: Optional[str] = None    # last 4000 chars of that command's output (HarnessError.output)
     block_cause: Optional[str] = None          # RebaseBlockCause.render() of a rebase-conflict block; omitted from result.json when unset
+    stacked_child_restart: Optional[str] = None   # adopted stacked child PRs that restarted this run
     conflict_rung: Optional[str] = None        # first-pass | regen | opus-retry | session | sonnet-fix | exhausted; omitted when no conflict
     conflict_fix_summary: Optional[str] = None   # "sonnet-fix: ..." trail entry when the rung ran and the ladder still failed
     sticky_comment_id: Optional[str] = None  # numeric id read back after the upsert; None = unconfirmed

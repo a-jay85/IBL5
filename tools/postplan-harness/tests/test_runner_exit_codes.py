@@ -365,7 +365,7 @@ def test_sigterm_handler_installed_in_main_source():
 def test_active_git_set_in_run_source():
     """run() must set _active_git = git when creating a LiveGit in isolated mode."""
     import inspect
-    src = inspect.getsource(runner.run)
+    src = inspect.getsource(runner._run_pass)
     assert "_active_git = git" in src or "_active_git=git" in src, (
         "run() must assign the LiveGit instance to _active_git for SIGTERM cleanup"
     )
@@ -488,7 +488,7 @@ def test_forced_commit_failure_names_command_and_error_end_to_end(monkeypatch, t
 
 
 def test_run_handler_records_failure_context():
-    assert "_record_failure_context(res, e)" in inspect.getsource(runner.run)
+    assert "_record_failure_context(res, e)" in inspect.getsource(runner._run_pass)
 
 
 def test_main_writes_no_blocked_ship_on_rc1(monkeypatch, tmp_path, capsys):

@@ -146,7 +146,7 @@ def test_fixture_seam_replaces_the_script_in_replay(monkeypatch):
 
 
 def test_seam_is_gated_on_not_live():
-    src = inspect.getsource(runner.run)
+    src = inspect.getsource(runner._run_pass)
     assert re.search(r'\.get\("review_owed"\)\s+if not live else None', src)
 
 

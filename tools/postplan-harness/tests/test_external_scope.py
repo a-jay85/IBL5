@@ -430,3 +430,32 @@ def test_dm_return_and_own_loop_break_in_new_function_are_quiet():
     sec = _dm(150, "+h() {", "+    for w in a b; do", "+        break", "+    done",
               "+    return 0", "+}", "+h")
     assert external_send_change(DM, sec) is None
+
+
+_DM_MSG_GUARD = '[ -n "$MSG" ] || { echo "discord-dm: no message" >&2; exit 2; }'
+
+
+def test_dm_or_flipped_to_and_before_braced_exit_is_one_way():
+    sec = _dm(108, "-" + _DM_MSG_GUARD, "+" + _DM_MSG_GUARD.replace("||", "&&"))
+    assert external_send_change(DM, sec) == _R_DM_FLOW
+
+
+def test_dm_braced_exit_guard_kept_is_quiet():
+    sec = _dm(108, "-" + _DM_MSG_GUARD, "+" + _DM_MSG_GUARD.replace("no message", "empty message"))
+    assert external_send_change(DM, sec) is None
+
+
+def test_dm_exit_moved_into_else_arm_is_one_way():
+    sec = _dm(350, '-[ "$DELIVERED" = 1 ] && exit 0',
+              '+if [ "$DELIVERED" = 1 ]; then :; else exit 0; fi')
+    assert external_send_change(DM, sec) == _R_DM_FLOW
+
+
+def test_dm_one_line_if_exit_split_from_its_test_is_one_way():
+    sec = _dm(350, '-if [ "$DELIVERED" = 1 ]; then exit 0; fi', '+[ "$DELIVERED" = 1 ]', "+exit 0")
+    assert external_send_change(DM, sec) == _R_DM_FLOW
+
+
+def test_dm_one_line_if_exit_kept_is_quiet():
+    sec = _dm(350, '-if [ "$DELIVERED" = 1 ]; then exit 0; fi', '+[ "$DELIVERED" = 1 ] && exit 0')
+    assert external_send_change(DM, sec) is None

@@ -539,20 +539,51 @@ def _dm_balanced(run: list[list[_DmStmt]]) -> bool:
     return _dm_walk([s for group in run for s in group]) is not None
 
 
+def _dm_then_controls(words: list[_DmWords], j: int) -> list[str]:
+    """The control cores held at the top level of the then-branch of the `if` at words[j]. The
+    scan stops at that `if`'s `else`, `elif` or `fi`."""
+    found: list[str] = []
+    depth = 1
+    for later in words[j + 1:]:
+        for word in later[0]:
+            if depth == 1 and word in ("else", "elif"):
+                return found
+            if word in _DM_OPENERS:
+                depth += 1
+            elif word in _DM_CLOSERS:
+                depth -= 1
+        if depth <= 0:
+            break
+        if depth == 1 and later[3] in _DM_CONTROL:
+            found.append(later[5])
+    return found
+
+
 def _dm_if_holds(plus: list[_DmWords], test: str, ctl: str) -> bool:
-    """True when an added `if <test>; then` holds `<ctl>` at its own level before its `fi`."""
-    for j, w in enumerate(plus):
-        if not w[0] or w[0][-1] != "if" or w[5] != test:
+    """True when an added `if <test>; then` holds `<ctl>` at its own level in its then-branch."""
+    return any(w[0] and w[0][-1] == "if" and w[5] == test and ctl in _dm_then_controls(plus, j)
+               for j, w in enumerate(plus))
+
+
+def _dm_guards(stmts: list[_DmStmt], words: list[_DmWords]) -> list[tuple[str, str, str]]:
+    """(test core, connector, control core) for each statement joined by `&&` or `||` to the first
+    control statement it guards. That control is the next statement, or the first one inside a
+    `{ ...; }` group that statement opens."""
+    out: list[tuple[str, str, str]] = []
+    for k in range(len(words) - 1):
+        conn = stmts[k][2]
+        if conn not in ("&&", "||"):
             continue
-        depth = 1
-        for later in plus[j + 1:]:
-            for word in later[0]:
-                depth += 1 if word == "if" else -1 if word == "fi" else 0
+        depth = 0
+        for m in range(k + 1, len(words)):
+            for word in words[m][0]:
+                depth += 1 if word in _DM_OPENERS else -1 if word in _DM_CLOSERS else 0
+            if words[m][3] in _DM_CONTROL:
+                out.append((words[k][5], conn, words[m][5]))
+                break
             if depth <= 0:
                 break
-            if depth == 1 and later[5] == ctl:
-                return True
-    return False
+    return out
 
 
 def _dm_conserved(minus_stmts: list[_DmStmt], plus_stmts: list[_DmStmt]) -> bool:
@@ -571,15 +602,18 @@ def _dm_conserved(minus_stmts: list[_DmStmt], plus_stmts: list[_DmStmt]) -> bool
             plus_cores[w[5]] -= 1
         if w[3] in _DM_CONTROL:
             removed_control[w[5]] = removed_control.get(w[5], 0) + 1
-    for k in range(len(minus) - 1):
-        conn = minus_stmts[k][2]
-        if conn not in ("&&", "||") or minus[k + 1][3] not in _DM_CONTROL:
-            continue
-        test, ctl = minus[k][5], minus[k + 1][5]
-        pair = any(plus_stmts[j][2] == conn and plus[j][5] == test and plus[j + 1][5] == ctl
-                   for j in range(len(plus) - 1))
-        if not pair and not (conn == "&&" and _dm_if_holds(plus, test, ctl)):
+    plus_guards = _dm_guards(plus_stmts, plus)
+    for guard in _dm_guards(minus_stmts, minus):
+        if guard in plus_guards:
+            plus_guards.remove(guard)
+        elif not (guard[1] == "&&" and _dm_if_holds(plus, guard[0], guard[2])):
             return False
+    for j, w in enumerate(minus):
+        if not w[0] or w[0][-1] != "if":
+            continue
+        for ctl in _dm_then_controls(minus, j):
+            if (w[5], "&&", ctl) not in plus_guards and not _dm_if_holds(plus, w[5], ctl):
+                return False
     in_func = _dm_walk(plus_stmts)
     if in_func is None:
         return False

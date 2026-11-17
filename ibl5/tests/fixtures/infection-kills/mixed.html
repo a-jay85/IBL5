@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html><body>
+<mutation-test-report-app></mutation-test-report-app>
+<script>
+document.getElementsByTagName('mutation-test-report-app').item(0).report = {
+ "schemaVersion": "1",
+ "thresholds": {
+  "high": 80,
+  "low": 60
+ },
+ "files": {
+  "classes/Fixture/Fixture.php": {
+   "language": "php",
+   "source": "<?php\n",
+   "mutants": [
+    {
+     "id": "4114ce8ec5cda202a0a322864a3a0701",
+     "mutatorName": "TrueValue",
+     "replacement": "false",
+     "description": "",
+     "location": {
+      "start": {
+       "line": 1,
+       "column": 1
+      },
+      "end": {
+       "line": 1,
+       "column": 2
+      }
+     },
+     "status": "Killed",
+     "statusReason": "PHPUnit 13.4.6 by Sebastian Bergmann and contributors.\n\nRuntime:       PHP 8.5.12\nConfiguration: /tmp/infection/phpunitConfiguration.4114ce8ec5cda202a0a322864a3a0701.infection.xml\n\nF\n\nTime: 00:00.005, Memory: 24.00 MB\n\nSetting Name (Tests\\Settings\\SettingName)\n ✘ Yes no settings\n   │\n   │ Failed asserting that false is true.\n   │\n   │ /home/runner/work/IBL5/IBL5/ibl5/tests/Settings/SettingNameTest.php:14\n   │\n\nFAILURES!\nTests: 1, Assertions: 1, Failures: 1.",
+     "coveredBy": [],
+     "killedBy": [],
+     "testsCompleted": 1
+    },
+    {
+     "id": "30f258119ef7b176df11635c52c11fe2",
+     "mutatorName": "TrueValue",
+     "replacement": "false",
+     "description": "",
+     "location": {
+      "start": {
+       "line": 1,
+       "column": 1
+      },
+      "end": {
+       "line": 1,
+       "column": 2
+      }
+     },
+     "status": "Killed",
+     "statusReason": "PHPUnit 13.4.6 by Sebastian Bergmann and contributors.\n\nRuntime:       PHP 8.5.12\nConfiguration: /tmp/infection/phpunitConfiguration.30f258119ef7b176df11635c52c11fe2.infection.xml\n\nE\n\nTime: 00:00.003, Memory: 22.00 MB\n\nCli Flag Guard (Tests\\Cli\\CliFlagGuard)\n ✘ Known exact flag passes\n   │\n   │ Error: Call to protected method Cli\\CliFlagGuard::assertKnown() from scope Tests\\Cli\\CliFlagGuardTest\n   │\n   │ /home/runner/work/IBL5/IBL5/ibl5/tests/Cli/CliFlagGuardTest.php:15\n   │\n\nERRORS!\nTests: 1, Assertions: 1, Errors: 1.",
+     "coveredBy": [],
+     "killedBy": [],
+     "testsCompleted": 1
+    },
+    {
+     "id": "39aef0f48c9d664cdc2965ad8596e4de",
+     "mutatorName": "TrueValue",
+     "replacement": "false",
+     "description": "",
+     "location": {
+      "start": {
+       "line": 1,
+       "column": 1
+      },
+      "end": {
+       "line": 1,
+       "column": 2
+      }
+     },
+     "status": "Killed",
+     "statusReason": "PHPUnit 13.4.6 by Sebastian Bergmann and contributors.\n\nRuntime:       PHP 8.5.12\nConfiguration: /tmp/infection/phpunitConfiguration.39aef0f48c9d664cdc2965ad8596e4de.infection.xml\n\nW\n\nTime: 00:00.002, Memory: 22.00 MB\n\nMoment (Tests\\OnThisDay\\Moment)\n ⚠ To array round trips through from array\n\n1 test triggered 1 PHP warning:\n\n1) /home/runner/work/IBL5/IBL5/ibl5/tests/OnThisDay/MomentTest.php:57\nUndefined array key \"statLabel\"\n\nOK, but there were issues!\nTests: 1, Assertions: 3, Warnings: 1.",
+     "coveredBy": [],
+     "killedBy": [],
+     "testsCompleted": 1
+    },
+    {
+     "id": "85320f4ae7b9f5d3db321a655b6d3575",
+     "mutatorName": "TrueValue",
+     "replacement": "false",
+     "description": "",
+     "location": {
+      "start": {
+       "line": 1,
+       "column": 1
+      },
+      "end": {
+       "line": 1,
+       "column": 2
+      }
+     },
+     "status": "Killed",
+     "statusReason": "PHPUnit 13.4.6 by Sebastian Bergmann and contributors.\n\nRuntime:       PHP 8.5.12\nConfiguration: /tmp/infection/phpunitConfiguration.85320f4ae7b9f5d3db321a655b6d3575.infection.xml\n\nFatal error: Premature end of PHP process when running Tests\\EngineRunner\\EngineRunnerTest::invokesCallbackPerGameAndReturnsCount.",
+     "coveredBy": [],
+     "killedBy": [],
+     "testsCompleted": 1
+    },
+    {
+     "id": "fx-survived-1",
+     "mutatorName": "TrueValue",
+     "replacement": "false",
+     "description": "",
+     "location": {
+      "start": {
+       "line": 1,
+       "column": 1
+      },
+      "end": {
+       "line": 1,
+       "column": 2
+      }
+     },
+     "status": "Survived",
+     "statusReason": "",
+     "coveredBy": [],
+     "killedBy": [],
+     "testsCompleted": 1
+    },
+    {
+     "id": "fx-timeout-1",
+     "mutatorName": "TrueValue",
+     "replacement": "false",
+     "description": "",
+     "location": {
+      "start": {
+       "line": 1,
+       "column": 1
+      },
+      "end": {
+       "line": 1,
+       "column": 2
+      }
+     },
+     "status": "Timeout",
+     "statusReason": "",
+     "coveredBy": [],
+     "killedBy": [],
+     "testsCompleted": 1
+    }
+   ]
+  }
+ },
+ "testFiles": {},
+ "framework": {
+  "name": "Infection"
+ }
+};
+</script>
+</body></html>

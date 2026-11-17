@@ -165,6 +165,17 @@ jobs:
         fi
         bin/check-infection-ran --log /tmp/infection.log --changed /tmp/changed-classes.txt
 
+    - name: Check mutation kills are real
+      if: always() && steps.changes.outputs.skip == 'false'
+      working-directory: ibl5
+      run: |
+        rc=0
+        bin/check-infection-ran --kills infection-report.html \
+          --log /tmp/infection.log > /tmp/kill-check.md || rc=$?
+        cat /tmp/kill-check.md
+        cat /tmp/kill-check.md >> "$GITHUB_STEP_SUMMARY"
+        exit "$rc"
+
     - name: Build mutation comment body
       if: always() && steps.changes.outputs.skip == 'false' && hashFiles('ibl5/infection-summary.log') != ''
       working-directory: ibl5

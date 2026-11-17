@@ -64,7 +64,7 @@ PF per team-game by foul site on bundle.json:
 |-----|----|-----|-----|-----|---------------|
 | .sco | 17.116 | 18.587 | 13.762 | 9.131 | 1.101 |
 | archive BEFORE | 18.089 | 19.983 | 14.662 | 7.203 | 1.104 |
-| archive AFTER | pending | pending | pending | pending | pending |
+| archive AFTER | 18.089 | 19.983 | 14.662 | 7.203 | 1.104 |
 
 ## Foul rates by type against the live trace
 
@@ -76,12 +76,12 @@ A type is `ported` when its share differs from the trace by 0.03 or more and its
 
 | Type | Trace share | BEFORE share | AFTER share | Decompile line | Verdict |
 |------|-------------|--------------|-------------|----------------|---------|
-| non-shooting | 0.386 | 0.396 | pending | jsb560_decompiled.c:93469-93480 | matched |
-| shooting-two | 0.388 | 0.387 | pending | jsb560_decompiled.c:93469-93480 | matched |
-| shooting-three | 0.006 | 0.005 | pending | jsb560_decompiled.c:93469-93480 | matched |
-| and-one | 0.115 | 0.124 | pending | jsb560_decompiled.c:93919-93926 | matched |
-| offensive-turnover | 0.081 | 0.088 | pending | jsb560_decompiled.c:94290-94293 | matched |
-| one-FT 0x4da427 | 0.024 | 0.000 | pending | jsb560_decompiled.c:93790-93828 | matched |
+| non-shooting | 0.386 | 0.396 | 0.396 | jsb560_decompiled.c:93469-93480 | matched |
+| shooting-two | 0.388 | 0.387 | 0.387 | jsb560_decompiled.c:93469-93480 | matched |
+| shooting-three | 0.006 | 0.005 | 0.005 | jsb560_decompiled.c:93469-93480 | matched |
+| and-one | 0.115 | 0.124 | 0.124 | jsb560_decompiled.c:93919-93926 | matched |
+| offensive-turnover | 0.081 | 0.088 | 0.088 | jsb560_decompiled.c:94290-94293 | matched |
+| one-FT 0x4da427 | 0.024 | 0.000 | 0.000 | jsb560_decompiled.c:93790-93828 | matched |
 
 Every gap is under 0.03, so this PR ports no foul rate. The largest gap is the one-FT trip at 0.024. JSB reaches it in the `else` branch of the made-shot test `FUN_004e2220()` at 93790-93828: the shot missed, `local_150 == 1` marks an and-one foul, and the FT call `FUN_004e9fc0` returns to `0x4da42c` with `piStack_114` (the made-shot result, 0 here) as its argument. The trace saw one FT on each of these trips. The engine has no path that charges this foul, so a port needs a site for it.
 

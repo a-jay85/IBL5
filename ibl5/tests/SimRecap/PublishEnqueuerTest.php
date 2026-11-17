@@ -114,6 +114,21 @@ final class PublishEnqueuerTest extends TestCase
         $this->assertRecordsOmitSecret($handler);
     }
 
+    public function testGuardedEnqueueRecordNeverHoldsFailureMessage(): void
+    {
+        $handler = new TestHandler();
+        $failure = new \RuntimeException(self::SECRET_MESSAGE);
+
+        PublishEnqueuer::guardedEnqueue(42, static function () use ($failure): bool {
+            throw $failure;
+        }, new Logger('sim-recap', [$handler]));
+
+        $encoded = json_encode(array_map(static fn ($record) => $record->toArray(), $handler->getRecords()));
+        $this->assertIsString($encoded);
+        // A context that logged $failure->getMessage() would carry this text.
+        $this->assertStringNotContainsString($failure->getMessage(), $encoded);
+    }
+
     public function testGuardedEnqueueSuccessLogsNothing(): void
     {
         $handler = new TestHandler();

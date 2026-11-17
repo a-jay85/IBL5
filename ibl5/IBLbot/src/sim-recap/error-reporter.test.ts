@@ -76,6 +76,9 @@ describe('error-reporter', () => {
         await createErrorReporter({ webhookUrl: WEBHOOK, fetchFn: failing, log }).report(gaveUp(1));
 
         const joined = log.mock.calls.map((c) => String(c[0])).join('\n');
+        // A failureLine that logged String(error) would carry the rejection text, URL included.
+        expect(joined).not.toContain(String(new Error('connect failed https://discord.com/api/webhooks/1/SECRETTOKEN')));
+        expect(joined).not.toContain('connect failed');
         expect(joined).not.toContain('SECRETTOKEN');
         expect(joined).not.toContain('api/webhooks');
         expect(joined).toContain('http 500');

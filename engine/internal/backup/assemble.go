@@ -546,6 +546,7 @@ func toBundlePlayer(p PlrPlayer, minutes map[int]int, leagueAST48Standin float64
 		RealLifeFGM: p.RealLifeFGM,
 		RealLife3GM: p.RealLife3GM,
 		RealLifeBLK: p.RealLifeBLK,
+		RealLifePF:  p.RealLifePF,
 		D80:         d80,
 		D60:         d60,
 		D64:         d64,

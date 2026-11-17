@@ -112,6 +112,9 @@ type Player struct {
 	// RealLifeSTL (STL/MIN×44) and RealLifeTVR (TOV/MIN×48) — the faithful per-player
 	// J22 wiring. PHP PlrParserService already emits rl_stl/rl_tvr; these JSON tags are
 	// the matching Go half. Zero MINUTES → rating stand-in fallback (RealLifeMIN==0 guard).
+	//
+	// RealLifePF (PF, .plr offset 108) feeds the per-team DF0 = ΣPF/D×48 defensive
+	// foul aggregate (bundle.Team.DF0) and the league PF/48 calibration.
 	RealLifeGP  int `json:"rl_gp"`
 	RealLifeMIN int `json:"rl_min"`
 	RealLifeFGA int `json:"rl_fga"`
@@ -124,6 +127,7 @@ type Player struct {
 	RealLife3GM int `json:"rl_3gm"`
 	RealLifeBLK int `json:"rl_blk"`
 	RealLifeAST int `json:"rl_ast"`
+	RealLifePF  int `json:"rl_pf"`
 
 	// Per-player derived make-rate composites computed at bundle-build time
 	// (backup/assemble.go toBundlePlayer). D80/D60/D64 are per-mille values;

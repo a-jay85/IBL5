@@ -283,3 +283,24 @@ func TestReadPlr_RealLifeBadField(t *testing.T) {
 		t.Errorf("error should name offset 64: %v", err)
 	}
 }
+
+// TestParsePlr_RealLifePF: PF reads from bytes 108-111 (PlrLineParser.php:82
+// substr(line,108,4)) and leaves BLK at 104-107 untouched. The PF literal 5 is
+// the second record's value (Magic Johnson) in the current-season IBL5.plr.
+func TestParsePlr_RealLifePF(t *testing.T) {
+	buf := []byte(newPlrRecord(1, 100, 1, 25, "Magic Johnson", "PG", 80, 6, 5))
+	plrField(buf, 104, itoaPad(19, 4)) // realLifeBLK
+	plrField(buf, 108, itoaPad(5, 4))  // realLifePF
+
+	players, err := ReadPlr(strings.NewReader(string(buf) + "\r\n"))
+	if err != nil {
+		t.Fatalf("ReadPlr: %v", err)
+	}
+	p := players[0]
+	if p.RealLifePF != 5 {
+		t.Errorf("RealLifePF = %d, want 5 (bytes 108-111)", p.RealLifePF)
+	}
+	if p.RealLifeBLK != 19 {
+		t.Errorf("RealLifeBLK = %d, want 19 (bytes 104-107 unaffected by PF)", p.RealLifeBLK)
+	}
+}

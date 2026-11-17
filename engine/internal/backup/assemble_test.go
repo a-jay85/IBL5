@@ -756,3 +756,21 @@ func TestComputeLeagueAST48ByPos(t *testing.T) {
 		t.Errorf("empty population = %+v, want all-zero", empty)
 	}
 }
+
+// TestToBundlePlayer_CopiesRealLifePF: toBundlePlayer copies PlrPlayer.RealLifePF
+// into bundle.Player, which serialises it under the rl_pf key.
+func TestToBundlePlayer_CopiesRealLifePF(t *testing.T) {
+	p := mkBaselinePlr(1, "Foul Prone", 70, 2400, 1000, 200)
+	p.RealLifePF = 37
+	bp := toBundlePlayer(p, nil, 0, nonMatchedLeagueParams{})
+	if bp.RealLifePF != 37 {
+		t.Fatalf("bundle RealLifePF = %d, want 37", bp.RealLifePF)
+	}
+	raw, err := json.Marshal(bp)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if !strings.Contains(string(raw), `"rl_pf":37`) {
+		t.Errorf("bundle JSON lacks \"rl_pf\":37: %s", raw)
+	}
+}

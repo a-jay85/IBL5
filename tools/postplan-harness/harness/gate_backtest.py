@@ -682,6 +682,7 @@ def render_gate_backtest(verdict: Verdict, gates, results, truth: dict[int, Trut
                         f"settled merged PRs that have one, found in the newest {depth} settled. ")
     by_key = {(r.gate, r.pr): r for r in (results or [])}
     partial_fixed: list = []
+    remainder_fixed: list = []
     partial_refused: list = []
     lines = [GATE_BACKTEST_BEGIN, f"<!-- gate-backtest-state: {verdict.state} -->",
              "### Gate backtest", "",
@@ -713,6 +714,8 @@ def render_gate_backtest(verdict: Verdict, gates, results, truth: dict[int, Trut
                 r = by_key.get((path, pr))
                 if r is not None and r.fix_skipped:
                     partial_fixed.append(r)
+                if r is not None and fix_lines_pre_existing(r):
+                    remainder_fixed.append(r)
             for pr in t.false_flags:
                 r = by_key.get((path, pr))
                 if r is not None and r.fix_skipped and r.fix_outcome.startswith("partial-"):
@@ -735,11 +738,16 @@ def render_gate_backtest(verdict: Verdict, gates, results, truth: dict[int, Trut
         lines.append("- Pre-existing flags (base gate also flags, excluded from the threshold): "
                      + _numbers(pre_existing))
     if fixed_by_pr:
-        lines.append("- Fixed by the candidate PR (head gate passes once this PR's own change "
-                     "is applied, excluded from the threshold): " + _numbers(fixed_by_pr))
+        lines.append("- Fixed by the candidate PR (once this PR's own change is applied, the head "
+                     "gate passes or prints only lines the base gate also prints; excluded from "
+                     "the threshold): " + _numbers(fixed_by_pr))
         for r in partial_fixed:
             lines.append(f"  - Partial apply #{r.pr} (`{_clean(r.gate)}`): "
                          f"applied {_file_list(r.fix_applied)}; skipped {_file_list(r.fix_skipped)}")
+        for r in remainder_fixed:
+            n = len(r.fix_flag_lines)
+            lines.append(f"  - Pre-existing remainder #{r.pr} (`{_clean(r.gate)}`): fix rerun still "
+                         f"prints {n} line{'s' if n != 1 else ''}, all printed by the base gate too")
     if unsettled:
         lines.append("- Unsettled flags: " + _numbers(unsettled))
     for label, state in (("Not replayable", "not-replayable"), ("Unspecified", "unspecified"),

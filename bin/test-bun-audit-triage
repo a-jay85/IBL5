@@ -40,7 +40,8 @@ expect_empty() { # name got-output
 expect_advisory_count() { # name want-count got-output
     ACTUAL=0
     if [ -n "$3" ]; then
-        ACTUAL=$(printf '%s\n' "$3" | grep -c 'ADVISORY:' || printf '0')
+        # grep -c prints 0 and exits 1 on no match, so a printf fallback would add a second 0.
+        ACTUAL=$(printf '%s\n' "$3" | grep -c 'ADVISORY:' || true)
     fi
     if [ "$ACTUAL" -eq "$2" ]; then
         h_pass "$1 (ADVISORY lines: $ACTUAL)"
@@ -153,6 +154,257 @@ printf '%s' "$HIGH_FIXTURE" > "$FIXTURE_FILE"
 RC=0; OUT=$("$SCRIPT" "$FIXTURE_FILE" 2>/dev/null) || RC=$?
 expect "file-arg mode: exit 1" 1 "$RC"
 expect_advisory_count "file-arg mode: one ADVISORY line" 1 "$OUT"
+
+# ===========================================================================
+# Skip list (--skip-file and the committed .github/bun-audit-skips.json).
+# Every case below passes --skip-file, so none depends on the committed entry's
+# expiry date, except Row 3, which reads the committed file's shape only.
+# ===========================================================================
+PICO='{"picomatch":[{"id":1247710,"url":"https://github.com/advisories/GHSA-fc5q-39xc-vjpf","title":"picomatch vulnerable to ReDoS through single-branch repeated extglobs","severity":"high","vulnerable_versions":"<=4.0.7"}]}'
+PICO_OTHER='{"picomatch":[{"id":1,"url":"https://github.com/advisories/GHSA-aaaa-bbbb-cccc","title":"other picomatch bug","severity":"high","vulnerable_versions":"<=4.0.7"}]}'
+PICO_PLUS_LODASH='{"picomatch":[{"id":1247710,"url":"https://github.com/advisories/GHSA-fc5q-39xc-vjpf","title":"picomatch vulnerable to ReDoS through single-branch repeated extglobs","severity":"high","vulnerable_versions":"<=4.0.7"}],"lodash":[{"id":2,"url":"https://github.com/advisories/GHSA-dddd-eeee-ffff","title":"lodash bug","severity":"high","vulnerable_versions":"<4.17.21"}]}'
+PICO_NO_URL='{"picomatch":[{"id":1247710,"title":"picomatch vulnerable to ReDoS through single-branch repeated extglobs","severity":"high","vulnerable_versions":"<=4.0.7"}]}'
+PICO_URL_EXTRA='{"picomatch":[{"id":1247710,"url":"https://github.com/advisories/GHSA-fc5q-39xc-vjpf/extra","title":"picomatch ReDoS","severity":"high","vulnerable_versions":"<=4.0.7"}]}'
+PICO_URL_QUERY='{"picomatch":[{"id":1247710,"url":"https://example.com/x?id=GHSA-fc5q-39xc-vjpf","title":"picomatch ReDoS","severity":"high","vulnerable_versions":"<=4.0.7"}]}'
+
+write_skip() { # file ghsa expires
+    printf '{"skips":[{"ghsa":"%s","package":"picomatch","reason":"test","expires":"%s","decision":"test"}]}\n' "$2" "$3" > "$1"
+}
+TODAY=$(python3 -c 'import datetime; print(datetime.datetime.now(datetime.timezone.utc).date().isoformat())')
+YESTERDAY=$(python3 -c 'import datetime; print((datetime.datetime.now(datetime.timezone.utc).date() - datetime.timedelta(days=1)).isoformat())')
+
+has() { # name haystack token
+    if grep -qF -- "$3" <<< "$2"; then
+        h_pass "$1"
+    else
+        h_fail "$1" "missing token: $3"
+        printf '%s\n' "$2" | sed 's/^/    /'
+    fi
+}
+
+line_count() { # prefix haystack -> prints count of lines starting with prefix
+    if [ -z "$2" ]; then
+        printf '0'
+        return
+    fi
+    grep -c -- "^$1" <<< "$2" || true
+}
+
+LIVE="$TMP/skip-live.json"
+write_skip "$LIVE" GHSA-fc5q-39xc-vjpf 2099-01-01
+
+# run_triage <stdin-json> <args...>: sets RC, OUT (stdout), ERR (stderr)
+run_triage() {
+    local input="$1"
+    shift
+    RC=0
+    OUT=$(printf '%s' "$input" | "$SCRIPT" "$@" 2>"$TMP/stderr.txt") || RC=$?
+    ERR=$(cat "$TMP/stderr.txt")
+}
+
+# Row 3: committed skip file shape + Case 1 still loads it.
+COMMITTED="$ROOT/.github/bun-audit-skips.json"
+if jq -e '.skips | length == 1' "$COMMITTED" >/dev/null 2>&1; then
+    h_pass "row 3: committed skip file holds exactly one entry"
+else
+    h_fail "row 3: committed skip file holds exactly one entry"
+fi
+if jq -e '.skips[0].ghsa == "GHSA-fc5q-39xc-vjpf"' "$COMMITTED" >/dev/null 2>&1; then
+    h_pass "row 3: committed entry ghsa is GHSA-fc5q-39xc-vjpf"
+else
+    h_fail "row 3: committed entry ghsa is GHSA-fc5q-39xc-vjpf"
+fi
+if jq -e '.skips[0].package == "picomatch"' "$COMMITTED" >/dev/null 2>&1; then
+    h_pass "row 3: committed entry package is picomatch"
+else
+    h_fail "row 3: committed entry package is picomatch"
+fi
+run_triage '{}'
+expect "row 3: {} with committed skip file loads cleanly" 0 "$RC"
+
+# Rows 4 and 5: live skip.
+run_triage "$PICO" --skip-file="$LIVE"
+expect "row 4: live skip: exit 0" 0 "$RC"
+expect_advisory_count "row 4: live skip: no ADVISORY lines" 0 "$OUT"
+has "row 5: live skip: SKIPPED line" "$OUT" "SKIPPED: picomatch GHSA-fc5q-39xc-vjpf high"
+has "row 5: live skip: expiry note" "$OUT" "(skip expires 2099-01-01 UTC)"
+
+# Rows 6 and 7: expired skip.
+EXPIRED="$TMP/skip-expired.json"
+write_skip "$EXPIRED" GHSA-fc5q-39xc-vjpf 2000-01-01
+run_triage "$PICO" --skip-file="$EXPIRED"
+expect "row 6: expired skip: exit 1" 1 "$RC"
+expect_advisory_count "row 6: expired skip: one ADVISORY line" 1 "$OUT"
+has "row 7: expired skip: SKIP EXPIRED line" "$OUT" "SKIP EXPIRED: GHSA-fc5q-39xc-vjpf (picomatch) skip ended 2000-01-01 UTC"
+
+# Rows 8 and 9: expiry boundary on the real UTC clock.
+write_skip "$TMP/skip-today.json" GHSA-fc5q-39xc-vjpf "$TODAY"
+run_triage "$PICO" --skip-file="$TMP/skip-today.json"
+expect "row 8: expires today (UTC): still skipped" 0 "$RC"
+write_skip "$TMP/skip-yesterday.json" GHSA-fc5q-39xc-vjpf "$YESTERDAY"
+run_triage "$PICO" --skip-file="$TMP/skip-yesterday.json"
+expect "row 9: expires yesterday (UTC): fails again" 1 "$RC"
+
+# Row 10: a different advisory on the same package is not skipped.
+run_triage "$PICO_OTHER" --skip-file="$LIVE"
+expect "row 10: other picomatch advisory: exit 1" 1 "$RC"
+expect_advisory_count "row 10: other picomatch advisory: one ADVISORY line" 1 "$OUT"
+
+# Row 11: unrelated advisory beside the skipped one still fails.
+run_triage "$PICO_PLUS_LODASH" --skip-file="$LIVE"
+expect "row 11: lodash beside skipped picomatch: exit 1" 1 "$RC"
+expect_advisory_count "row 11: one ADVISORY line" 1 "$OUT"
+has "row 11: ADVISORY line names lodash" "$(grep '^ADVISORY:' <<< "$OUT" || true)" "lodash"
+N=$(line_count "SKIPPED:" "$OUT")
+if [ "$N" -eq 1 ]; then
+    h_pass "row 11: exactly one SKIPPED line"
+else
+    h_fail "row 11: exactly one SKIPPED line" "got $N"
+fi
+has "row 11: SKIPPED line names picomatch" "$(grep '^SKIPPED:' <<< "$OUT" || true)" "picomatch"
+
+# Row 12: malformed skip file fails closed.
+printf 'not json' > "$TMP/skip-bad.json"
+run_triage "$PICO" --skip-file="$TMP/skip-bad.json"
+expect "row 12: non-JSON skip file: exit 2" 2 "$RC"
+has "row 12: stderr says nothing skipped" "$ERR" "skip list rejected; nothing skipped"
+
+# Row 13: entry without expires.
+printf '{"skips":[{"ghsa":"GHSA-fc5q-39xc-vjpf","package":"picomatch","reason":"test","decision":"test"}]}\n' > "$TMP/skip-noexp.json"
+run_triage "$PICO" --skip-file="$TMP/skip-noexp.json"
+expect "row 13: missing expires: exit 2" 2 "$RC"
+has "row 13: stderr names missing expires" "$ERR" 'missing or empty "expires"'
+
+# Row 14: impossible calendar date.
+write_skip "$TMP/skip-feb30.json" GHSA-fc5q-39xc-vjpf 2099-02-30
+run_triage "$PICO" --skip-file="$TMP/skip-feb30.json"
+expect "row 14: 2099-02-30: exit 2" 2 "$RC"
+has "row 14: stderr says not a real calendar date" "$ERR" "not a real calendar date"
+
+# Row 15: near-miss ghsa values.
+I=0
+for G in 'GHSA-FC5Q-39XC-VJPF' 'picomatch' 'GHSA-fc5q-39xc-vjpf\n'; do
+    I=$((I + 1))
+    write_skip "$TMP/skip-ghsa-$I.json" "$G" 2099-01-01
+    run_triage "$PICO" --skip-file="$TMP/skip-ghsa-$I.json"
+    expect "row 15: near-miss ghsa '$G': exit 2" 2 "$RC"
+done
+
+# Row 16: near-miss expires values.
+I=0
+for E in '2099-12-31T00:00' '20991231' '2099-12-31\n'; do
+    I=$((I + 1))
+    write_skip "$TMP/skip-exp-$I.json" GHSA-fc5q-39xc-vjpf "$E"
+    run_triage "$PICO" --skip-file="$TMP/skip-exp-$I.json"
+    expect "row 16: near-miss expires '$E': exit 2" 2 "$RC"
+done
+
+# Row 17: advisory without a url is never skipped and never crashes.
+run_triage "$PICO_NO_URL" --skip-file="$LIVE"
+expect "row 17: no url key: exit 1" 1 "$RC"
+
+# Row 18: url near-misses are not skipped.
+run_triage "$PICO_URL_EXTRA" --skip-file="$LIVE"
+expect "row 18: url with trailing segment: exit 1" 1 "$RC"
+run_triage "$PICO_URL_QUERY" --skip-file="$LIVE"
+expect "row 18: GHSA id inside a query string: exit 1" 1 "$RC"
+
+# Row 19: --json keeps stdout to failing advisories; notes go to stderr.
+run_triage "$PICO_PLUS_LODASH" --json --skip-file="$LIVE"
+expect "row 19: --json with one skipped: exit 1" 1 "$RC"
+JSON_LEN=$(jq 'length' <<< "$OUT" 2>/dev/null || printf -- '-1')
+if [ "$JSON_LEN" = "1" ]; then
+    h_pass "row 19: --json stdout array of length 1"
+else
+    h_fail "row 19: --json stdout array of length 1" "got $JSON_LEN"
+fi
+FIRST_URL=$(jq -r '.[0].url' <<< "$OUT" 2>/dev/null || true)
+case "$FIRST_URL" in
+    *GHSA-dddd-eeee-ffff) h_pass "row 19: remaining advisory is lodash (GHSA-dddd-eeee-ffff)" ;;
+    *) h_fail "row 19: remaining advisory is lodash (GHSA-dddd-eeee-ffff)" "got $FIRST_URL" ;;
+esac
+has "row 19: SKIPPED: picomatch on stderr" "$ERR" "SKIPPED: picomatch"
+
+# Row 20: --json with everything skipped.
+run_triage "$PICO" --json --skip-file="$LIVE"
+expect "row 20: --json all skipped: exit 0" 0 "$RC"
+COMPACT=$(jq -c . <<< "$OUT" 2>/dev/null || true)
+if [ "$COMPACT" = "[]" ]; then
+    h_pass "row 20: --json all skipped: stdout []"
+else
+    h_fail "row 20: --json all skipped: stdout []" "got $COMPACT"
+fi
+
+# Row 21: rejected --skip-file forms.
+run_triage "$PICO" --skip-file "$LIVE"
+expect "row 21: --skip-file PATH (space form): exit 2" 2 "$RC"
+has "row 21: space form says unknown flag" "$ERR" "unknown flag"
+run_triage "$PICO" --skip-file=
+expect "row 21: --skip-file= (empty): exit 2" 2 "$RC"
+has "row 21: empty form says needs a path" "$ERR" "needs a path"
+run_triage "$PICO" --skip-file="$TMP/nope.json"
+expect "row 21: missing skip file: exit 2" 2 "$RC"
+has "row 21: missing file says skip file not found" "$ERR" "skip file not found"
+
+# Row 22: the default path is <repo>/.github/bun-audit-skips.json; absent = no skips.
+mkdir -p "$TMP/repo/bin" "$TMP/repo/.github"
+cp "$SCRIPT" "$TMP/repo/bin/bun-audit-triage"
+write_skip "$TMP/repo/.github/bun-audit-skips.json" GHSA-fc5q-39xc-vjpf 2099-01-01
+RC=0; printf '%s' "$PICO" | "$TMP/repo/bin/bun-audit-triage" >/dev/null 2>&1 || RC=$?
+expect "row 22: default skip file at <repo>/.github is read" 0 "$RC"
+rm -f "$TMP/repo/.github/bun-audit-skips.json"
+RC=0; printf '%s' "$PICO" | "$TMP/repo/bin/bun-audit-triage" >/dev/null 2>&1 || RC=$?
+expect "row 22: absent default skip file skips nothing" 1 "$RC"
+
+# ===========================================================================
+# Rows 23 to 26: the real "Triage audit output" step of bun-audit-issue.yml,
+# extracted and run against the script with a fixture skip file.
+# ===========================================================================
+WF="$ROOT/.github/workflows/bun-audit-issue.yml"
+STEP_SRC="$TMP/triage-step.sh"
+awk '/- name: Triage audit output/{f=1; next} f && /- name: /{exit} f' "$WF" > "$TMP/step-raw.txt"
+# shellcheck disable=SC2016  # the $-names are meant literally in the sed output
+sed -e '1,/run: |/d' -e 's/^          //' \
+    -e 's#bin/bun-audit-triage --level=high#"$SCRIPT" --skip-file="$SKIPF" --level=high#' \
+    "$TMP/step-raw.txt" > "$STEP_SRC"
+
+# shellcheck disable=SC2016  # literal token, not an expansion
+N_SUB=$(grep -c -- '--skip-file="$SKIPF"' "$STEP_SRC" || true)
+N_OUT=$(grep -c 'GITHUB_OUTPUT' "$STEP_SRC" || true)
+if [ "$N_SUB" = "1" ] && [ "$N_OUT" -ge 1 ]; then
+    h_pass "workflow step extracted (triage call rewritten once, GITHUB_OUTPUT present)"
+else
+    h_fail "workflow step extracted" "skip-file rewrites: $N_SUB, GITHUB_OUTPUT lines: $N_OUT"
+    h_done
+fi
+
+run_step() { # fixture-json skip-file -> sets STEP_RC, STEP_OUT (found=...), STEP_TXT
+    RT="$TMP/rt"
+    rm -rf "$RT"
+    mkdir -p "$RT"
+    printf '%s' "$1" > "$RT/bun-audit.json"
+    STEP_RC=0
+    RUNNER_TEMP="$RT" GITHUB_OUTPUT="$RT/out" SCRIPT="$SCRIPT" SKIPF="$2" \
+        bash -e "$STEP_SRC" >/dev/null 2>&1 || STEP_RC=$?
+    STEP_OUT=$(cat "$RT/out" 2>/dev/null || true)
+    STEP_TXT=$(cat "$RT/advisories.txt" 2>/dev/null || true)
+}
+
+run_step "$PICO" "$LIVE"
+expect "row 23: workflow step, all advisories skipped: step exits 0" 0 "$STEP_RC"
+has "row 23: workflow step, all skipped: found=true" "$STEP_OUT" "found=true"
+has "row 25: workflow step: advisories.txt holds the SKIPPED line" "$STEP_TXT" "SKIPPED: picomatch GHSA-fc5q-39xc-vjpf"
+
+run_step '{}' "$LIVE"
+expect "row 24: workflow step, clean tree: step exits 0" 0 "$STEP_RC"
+has "row 24: workflow step, clean tree: found=false" "$STEP_OUT" "found=false"
+
+run_step "$PICO" "$TMP/skip-bad.json"
+if [ "$STEP_RC" -ne 0 ]; then
+    h_pass "row 26: workflow step, malformed skip file: step fails (exit $STEP_RC)"
+else
+    h_fail "row 26: workflow step, malformed skip file: step fails" "step exited 0"
+fi
 
 # ---------------------------------------------------------------------------
 h_done

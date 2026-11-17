@@ -381,3 +381,17 @@ def test_dm_counter_change_is_one_way(old, new):
 def test_dm_redirect_through_other_variable_fires():
     sec = _dm(350, '+    f="$HOME/.iblbot-dm-id"', """+    printf '%s\\n' 1 > "$f\"""")
     assert external_send_change(DM, sec) == _R_DM_REDIRECT
+
+
+def test_dm_negated_guarded_exit_is_one_way():
+    sec = _dm(350, '-[ "$DELIVERED" = 1 ] && exit 0', '+! [ "$DELIVERED" = 1 ] && exit 0')
+    assert external_send_change(DM, sec) == _R_DM_FLOW
+
+
+def test_dm_function_shadowing_builtin_is_one_way():
+    assert external_send_change(DM, _dm(350, "+exit() { :; }")) == _R_SEND
+
+
+def test_dm_log_alias_of_spool_is_one_way():
+    sec = _dm(350, '+    log="$SPOOL"', """+    printf '%s\\n' x >> "$log\"""")
+    assert external_send_change(DM, sec) == _R_SEND

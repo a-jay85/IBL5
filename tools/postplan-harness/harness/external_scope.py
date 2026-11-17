@@ -4,8 +4,8 @@
 shapes the table lists the dump reads. `bin/discord-dm` fires only when a changed line can change
 who gets a message or what is sent: an assignment to a send-shaping variable, a send command or
 token, a command outside a local allowlist, a call to or redefinition of an existing send
-function, an output redirect to anything but `/dev/null`, a standard stream or a non-send
-variable, or a removed test or exit that the same hunk does not re-add. `.github/actions/notify-discord/`
+function, an output redirect to anything but `/dev/null`, a standard stream or `$log`
+(the sent log), or a removed test or exit that the same hunk does not re-add. `.github/actions/notify-discord/`
 and `ibl5/classes/Mail/` fire on any changed code line. Comment, blank and indentation-only
 edits, and the pipefail-safe rewrite of `echo "$v" | grep ...` into `grep ... <<< "$v"`, stay
 quiet. Any shape the parser cannot read returns a reason, so the trigger fires (fail closed),
@@ -445,16 +445,19 @@ def _dm_words(raw: str, masked: str) -> _DmWords:
             k = 1
         else:
             reserved.append("func-open")
+    bang: int | None = None  # start of a trailing run of `!` words: a negation changes the test
     while k < len(words) and masked[words[k][0]:words[k][1]] in _DM_RESERVED:
         word = masked[words[k][0]:words[k][1]]
         reserved.append(word)
+        bang = (k if bang is None else bang) if word == "!" else None
         k += 1
         if word == "for":
             assigns += [masked[s:e] for s, e in words[k:k + 1]]
             k = len(words)
         elif word == "case":
             k = len(words)
-    core = " ".join(raw[words[k][0]:].split()) if k < len(words) else ""
+    core_k = k if bang is None else bang
+    core = " ".join(raw[words[core_k][0]:].split()) if k < len(words) else ""
     while k < len(words):
         am = _DM_ASSIGN_RE.match(masked[words[k][0]:words[k][1]])
         if am is None:
@@ -575,6 +578,18 @@ def _dm_partner(body: list[str], idx: int, start: int) -> set[str]:
     return {" ".join(raw.split()) for raw, _m, _c in stmts or []}
 
 
+_DM_LOG_VALUE_RE = re.compile(r'"\$\{DISCORD_DM_SENT_LOG:-[^}"$`\\]*(?:\$HOME[^}"$`\\]*)?\}"')
+
+
+def _dm_log_assign_ok(raw: str, word: str | None) -> bool:
+    """True for `local log` or an assignment of `log` from the DISCORD_DM_SENT_LOG default, so
+    `$log` stays the sent-log path and never aliases the spool or another send file."""
+    m = re.search(r"(?<![\w$])log=(\S*)", raw)
+    if m is None:
+        return word == "local"
+    return _DM_LOG_VALUE_RE.fullmatch(m.group(1)) is not None
+
+
 def _dm_stmt_reason(stmts: list[_DmStmt], allowed: frozenset[str], partner: set[str]) -> str | None:
     """Rules R4 to R7 over one joined command's statements."""
     for raw, masked, _conn in stmts:
@@ -583,6 +598,8 @@ def _dm_stmt_reason(stmts: list[_DmStmt], allowed: frozenset[str], partner: set[
             if name in _DM_EXISTING_FUNCS:
                 return _R_SEND
         for name in assigns:
+            if name in _DM_LOG_TARGETS and not _dm_log_assign_ok(raw, word):
+                return _R_SEND
             if name in _DM_SEND_VARS or name.startswith("DISCORD_DM_"):
                 if " ".join(raw.split()) not in partner:
                     return _R_SEND
@@ -604,6 +621,8 @@ def _dm_reason(hunks: list[tuple[int, int, list[str]]]) -> str | None:
         for ln in body:
             m = _DM_FUNC_RE.match(ln[1:]) if ln[:1] == "+" else None
             if m is not None and m.group(1) not in _DM_EXISTING_FUNCS:
+                if m.group(1) in _DM_SAFE_COMMANDS | _DM_CONTROL | _DM_TESTS:
+                    return _R_SEND  # a function named like a builtin changes what that builtin does
                 new_funcs.add(m.group(1))
     allowed = _DM_SAFE_COMMANDS | _DM_CONTROL | new_funcs
     for old_start, new_start, body in hunks:

@@ -57,6 +57,7 @@ class Router implements RouterInterface
         'sim-recap-publish/claim-next' => Controller\SimRecapPublishClaimController::class,
         'sim-recap-publish/progress'   => Controller\SimRecapPublishProgressController::class,
         'sim-recap-publish/finish'     => Controller\SimRecapPublishFinishController::class,
+        'sim-recap-publish/enabled'    => Controller\SimRecapPublishEnabledController::class,
     ];
 
     /**

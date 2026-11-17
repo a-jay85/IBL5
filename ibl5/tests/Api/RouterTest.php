@@ -278,6 +278,16 @@ class RouterTest extends TestCase
         }
     }
 
+    public function testMatchesSimRecapPublishEnabledPostRoute(): void
+    {
+        $result = $this->router->match('sim-recap-publish/enabled', 'POST');
+
+        $this->assertNotNull($result);
+        $this->assertSame('Api\Controller\SimRecapPublishEnabledController', $result['controller']);
+        $this->assertSame([], $result['params']);
+        $this->assertNull($this->router->match('sim-recap-publish/enabled', 'GET'));
+    }
+
     public function testReturnsNullForUnknownRoute(): void
     {
         $result = $this->router->match('nonexistent', 'GET');

@@ -148,6 +148,14 @@ $app->getContainer()->set('api.controllerFactory', static function (): \Closure 
                     new \SimRecap\MentionMapBuilder(new \Repositories\TeamIdentityRepository($db)),
                     new \Season\SeasonQueryRepository($db)
                 ),
+                new \Api\Repository\ApiKeyRepository($db),
+                new \SimRecap\PostingSwitch(new \LeagueControlPanel\LeagueControlPanelRepository($db))
+            );
+        }
+
+        if ($controllerClass === \Api\Controller\SimRecapPublishEnabledController::class) {
+            return new \Api\Controller\SimRecapPublishEnabledController(
+                new \SimRecap\PostingSwitch(new \LeagueControlPanel\LeagueControlPanelRepository($db)),
                 new \Api\Repository\ApiKeyRepository($db)
             );
         }

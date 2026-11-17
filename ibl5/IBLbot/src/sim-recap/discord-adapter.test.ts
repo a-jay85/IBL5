@@ -36,7 +36,7 @@ function makeDeps(channel: FakeChannel | null) {
         user: { id: 'BOT' },
         channels: { fetch: vi.fn(async () => channel) },
     } as unknown as Client;
-    const api = { progress: vi.fn(async () => true), finish: vi.fn(async () => true) };
+    const api = { progress: vi.fn(async () => true), finish: vi.fn(async () => true), enabled: vi.fn(async () => true) };
     const deps = createPublisherDeps({ client, settings: SETTINGS, api, token: 'tok', log: vi.fn() });
     return { deps, api };
 }

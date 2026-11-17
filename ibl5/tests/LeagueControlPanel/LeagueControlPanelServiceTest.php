@@ -42,6 +42,64 @@ class LeagueControlPanelServiceTest extends TestCase
         $this->assertSame(2026, $result['seasonEndingYear']);
     }
 
+    public function testGetPanelDataReadsOnlyRequestedSettings(): void
+    {
+        $stored = [
+            'Current Season Phase' => 'Playoffs',
+            'Allow Trades' => 'Yes',
+            'Allow Waiver Moves' => 'Yes',
+            'Show Draft Link' => 'On',
+            'Free Agency Notifications' => 'On',
+            'Sim Recap Discord Posting' => 'On',
+            'Trivia Mode' => 'On',
+            'Current Season Ending Year' => '2027',
+        ];
+        $stub = self::createStub(LeagueControlPanelRepositoryInterface::class);
+        $stub->method('getBulkSettings')->willReturnCallback(
+            static fn (array $names): array => array_intersect_key($stored, array_flip($names))
+        );
+        $stub->method('getSimLengthInDays')->willReturn(3);
+
+        $result = (new LeagueControlPanelService($stub))->getPanelData();
+
+        $this->assertSame('Playoffs', $result['phase']);
+        $this->assertSame('Yes', $result['allowTrades']);
+        $this->assertSame('Yes', $result['allowWaivers']);
+        $this->assertSame('On', $result['showDraftLink']);
+        $this->assertSame('On', $result['freeAgencyNotifications']);
+        $this->assertSame('On', $result['simRecapPosting']);
+        $this->assertSame('On', $result['triviaMode']);
+        $this->assertSame(2027, $result['seasonEndingYear']);
+    }
+
+    public function testPanelDataDefaultsSimRecapPostingToOff(): void
+    {
+        $stub = self::createStub(LeagueControlPanelRepositoryInterface::class);
+        $stub->method('getBulkSettings')->willReturn([
+            'Free Agency Notifications' => 'On',
+        ]);
+        $stub->method('getSimLengthInDays')->willReturn(3);
+
+        $service = new LeagueControlPanelService($stub);
+        $result = $service->getPanelData();
+
+        $this->assertSame('Off', $result['simRecapPosting']);
+    }
+
+    public function testPanelDataCarriesSimRecapPostingValue(): void
+    {
+        $stub = self::createStub(LeagueControlPanelRepositoryInterface::class);
+        $stub->method('getBulkSettings')->willReturn([
+            'Sim Recap Discord Posting' => 'On',
+        ]);
+        $stub->method('getSimLengthInDays')->willReturn(3);
+
+        $service = new LeagueControlPanelService($stub);
+        $result = $service->getPanelData();
+
+        $this->assertSame('On', $result['simRecapPosting']);
+    }
+
     public function testGetPanelDataDefaultsForMissingSettings(): void
     {
         $stub = self::createStub(LeagueControlPanelRepositoryInterface::class);

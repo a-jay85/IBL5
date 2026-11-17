@@ -49,6 +49,7 @@ INSERT INTO ibl_settings (setting_key, setting_value, league) VALUES
   ('Allow Waiver Moves',          'No',           'ibl'),
   ('Show Draft Link',             'Off',          'ibl'),
   ('Free Agency Notifications',   'Off',          'ibl'),
+  ('Sim Recap Discord Posting',   'Off',          'ibl'),
   ('Trivia Mode',                 'Off',          'ibl'),
   ('ASG Voting',                  'No',           'ibl'),
   ('EOY Voting',                  'No',           'ibl'),

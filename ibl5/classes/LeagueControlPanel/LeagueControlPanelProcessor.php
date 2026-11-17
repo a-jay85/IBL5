@@ -73,6 +73,7 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
             'set_allow_waivers' => $this->setAllowWaivers($postData),
             'set_show_draft_link' => $this->setShowDraftLink($postData),
             'toggle_fa_notifications' => $this->toggleFreeAgencyNotifications($postData),
+            'set_sim_recap_posting' => $this->setSimRecapPosting($postData),
             'activate_trivia' => $this->activateTrivia(),
             'deactivate_trivia' => $this->deactivateTrivia(),
             'delete_draft_placeholders' => $this->deleteDraftPlaceholders(),
@@ -187,6 +188,22 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
         $this->repository->setShowDraftLink($value);
 
         return ['success' => true, 'message' => 'Show Draft Link has been set to ' . $value . '.'];
+    }
+
+    /**
+     * @param array<string, mixed> $postData
+     * @return array{success: bool, message: string}
+     */
+    private function setSimRecapPosting(array $postData): array
+    {
+        $value = $postData['SimRecapPosting'] ?? null;
+        if (!is_string($value) || !in_array($value, self::VALID_ON_OFF, true)) {
+            return ['success' => false, 'message' => 'Invalid sim recap posting value.'];
+        }
+
+        $this->repository->setSimRecapPosting($value);
+
+        return ['success' => true, 'message' => 'Sim recap Discord posting set to ' . $value . '.'];
     }
 
     /**

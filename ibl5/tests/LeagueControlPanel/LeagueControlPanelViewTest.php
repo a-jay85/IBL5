@@ -609,7 +609,7 @@ class LeagueControlPanelViewTest extends TestCase
         $leagueConfig = $overrides['leagueConfig'] ?? ['short_name' => 'ibl', 'full_name' => 'Internet Basketball League'];
         /** @var string $currentLeague */
         $currentLeague = $overrides['currentLeague'] ?? 'ibl';
-        /** @var array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData */
+        /** @var array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, simRecapPosting: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData */
         $panelData = $overrides['panelData'] ?? self::createPanelData();
         /** @var string|null $resultMessage */
         $resultMessage = array_key_exists('resultMessage', $overrides) ? $overrides['resultMessage'] : null;
@@ -621,22 +621,41 @@ class LeagueControlPanelViewTest extends TestCase
 
     /**
      * @param array<string, mixed> $overrides
-     * @return array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool}
+     * @return array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, simRecapPosting: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool}
      */
     private static function createPanelData(array $overrides = []): array
     {
-        /** @var array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} */
+        /** @var array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, simRecapPosting: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} */
         return array_merge([
             'phase' => 'Regular Season',
             'allowTrades' => 'Yes',
             'allowWaivers' => 'No',
             'showDraftLink' => 'Off',
             'freeAgencyNotifications' => 'Off',
+            'simRecapPosting' => 'Off',
             'triviaMode' => 'Off',
             'simLengthInDays' => 3,
             'seasonEndingYear' => 2026,
             'hasFinalsMvp' => false,
         ], $overrides);
+    }
+
+    public function testSimRecapPostingSelectShowsCurrentState(): void
+    {
+        $on = $this->renderWithDefaults(['panelData' => self::createPanelData(['phase' => 'Regular Season', 'simRecapPosting' => 'On'])]);
+
+        $this->assertStringContainsString('id="lcp-sim-recap-posting-row"', $on);
+        $this->assertStringContainsString('<select name="SimRecapPosting" id="lcp-sim-recap-posting"', $on);
+        $this->assertStringContainsString('<option value="On" selected>On</option>', $on);
+        $this->assertStringContainsString('<option value="Off">Off</option>', $on);
+        $this->assertStringContainsString('<span class="lcp-sim-recap-posting-state">Currently: On</span>', $on);
+        $this->assertStringContainsString('value="set_sim_recap_posting"', $on);
+
+        $off = $this->renderWithDefaults(['panelData' => self::createPanelData(['phase' => 'Regular Season', 'simRecapPosting' => 'Off'])]);
+
+        $this->assertStringContainsString('<option value="On">On</option>', $off);
+        $this->assertStringContainsString('<option value="Off" selected>Off</option>', $off);
+        $this->assertStringContainsString('<span class="lcp-sim-recap-posting-state">Currently: Off</span>', $off);
     }
 
     public function testHeadContainsFontPreconnectLinksAndStylesheet(): void

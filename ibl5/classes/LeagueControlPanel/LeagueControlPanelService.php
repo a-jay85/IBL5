@@ -33,6 +33,7 @@ class LeagueControlPanelService implements LeagueControlPanelServiceInterface
             'Allow Waiver Moves',
             'Show Draft Link',
             'Free Agency Notifications',
+            'Sim Recap Discord Posting',
             'Trivia Mode',
             'Current Season Ending Year',
         ]);
@@ -49,6 +50,7 @@ class LeagueControlPanelService implements LeagueControlPanelServiceInterface
             'allowWaivers' => $settings['Allow Waiver Moves'] ?? 'No',
             'showDraftLink' => $settings['Show Draft Link'] ?? 'Off',
             'freeAgencyNotifications' => $settings['Free Agency Notifications'] ?? 'Off',
+            'simRecapPosting' => $settings['Sim Recap Discord Posting'] ?? 'Off',
             'triviaMode' => $settings['Trivia Mode'] ?? 'Off',
             'simLengthInDays' => $simLengthInDays,
             'seasonEndingYear' => $seasonEndingYear,

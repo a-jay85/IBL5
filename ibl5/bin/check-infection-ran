@@ -14,17 +14,139 @@ set -euo pipefail
 # Exit 0: Infection matched sources, or every changed class is excluded.
 # Exit 2: bad arguments or unreadable input (fails closed).
 # Exit 5: Infection mutated nothing, yet a changed class is not excluded.
+# ---
+# Kill mode: bin/check-infection-ran --kills <report.html> [--log <file>]
+#            [--min-kills N] [--soft-ratio PCT]
+# Reads Infection's html report and fails when mutants were killed by a runner
+# or setup error instead of a failing test.
+# --kills <file>    Infection's html report (logs.html in infection.json5).
+# --log <file>      Optional here. When the report is missing and this log shows
+#                   zero mutants, exit 0 (the --changed mode owns that case).
+# --min-kills N     The soft check applies only at N or more kills (default 50).
+# --soft-ratio PCT  Fail when warning-only plus fatal-only kills exceed PCT% of
+#                   all kills (default 10).
+# Exit 6: a hard signal in any kill, or the soft ratio is over the limit.
+# Exit 2 also covers a missing, unreadable, or unparseable report.
 #
 
 CONFIG="infection.json5"
 NO_SOURCE_RE='No source file found|Could not find any modified (files|lines)'
+NO_MUTANTS_RE="$NO_SOURCE_RE|(^|[^0-9])0 mutations were generated"
 
 usage() {
     sed -n '/^# Usage:/,/^#$/p' "$0" | sed 's/^# \{0,1\}//'
 }
 
+check_kills() {
+    if [ ! -f "$kills" ] || [ ! -r "$kills" ]; then
+        if [ -n "$log" ]; then
+            if [ ! -f "$log" ] || [ ! -r "$log" ]; then
+                echo "ERROR: cannot read $log" >&2
+                return 2
+            fi
+            if grep -qE -- "$NO_MUTANTS_RE" "$log"; then
+                echo "RESULT: SKIP (no report and Infection generated no mutants; the --changed mode owns this case)"
+                return 0
+            fi
+        fi
+        echo "ERROR: cannot read $kills" >&2
+        return 2
+    fi
+    local rc=0
+    python3 -I - "$kills" "$min_kills" "$soft_ratio" <<'PY' || rc=$?
+import json, re, sys
+
+path, min_kills, soft_ratio = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
+HARD = [
+    ("runner-warning", re.compile(r"There (was|were) [0-9]+ PHPUnit test runner warning")),
+    ("cannot-read-baseline", re.compile(r"Cannot read baseline")),
+    ("env-var-unset", re.compile(r"Environment variable [A-Z0-9_]+ is not set")),
+    ("db-connection-failed", re.compile(r"Database connection failed")),
+    ("no-tests-executed", re.compile(r"No tests executed")),
+]
+SOFT = ("warning-only", "fatal-only")
+
+def die(msg):
+    print(f"ERROR: {msg}", file=sys.stderr)
+    sys.exit(2)
+
+try:
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        text = fh.read()
+except OSError as exc:
+    die(f"cannot read {path}: {exc}")
+m = re.search(r'\.report\s*=\s*(\{)\s*"schemaVersion"', text)
+if m is None:
+    die(f"no Stryker report JSON in {path}")
+try:
+    report, _ = json.JSONDecoder().raw_decode(text, m.start(1))
+except ValueError as exc:
+    die(f"cannot parse report JSON in {path}: {exc}")
+files = report.get("files") if isinstance(report, dict) else None
+if not isinstance(files, dict):
+    die(f"report in {path} has no files map")
+
+def classify(reason):
+    for name, rx in HARD:
+        if rx.search(reason):
+            return name
+    if "FAILURES!" in reason or "ERRORS!" in reason:
+        return "real"
+    if "OK, but there were issues!" in reason:
+        return "warning-only"
+    return "fatal-only"
+
+counts = {name: 0 for name, _ in HARD}
+counts["real"] = 0
+for name in SOFT:
+    counts[name] = 0
+examples = {key: [] for key in counts}
+total = kills = 0
+for fname, entry in files.items():
+    mutants = entry.get("mutants") if isinstance(entry, dict) else None
+    if not isinstance(mutants, list):
+        die(f"{fname} in {path} has no mutants list")
+    for mut in mutants:
+        total += 1
+        if not isinstance(mut, dict) or mut.get("status") != "Killed":
+            continue
+        kills += 1
+        cls = classify(str(mut.get("statusReason") or ""))
+        counts[cls] += 1
+        if len(examples[cls]) < 3:
+            examples[cls].append(f"{mut.get('id', '?')} in {fname}")
+
+soft = counts["warning-only"] + counts["fatal-only"]
+pct = (100.0 * soft / kills) if kills else 0.0
+soft_over = kills > 0 and kills >= min_kills and soft * 100 > soft_ratio * kills
+hard_hit = [name for name, _ in HARD if counts[name]]
+
+print("### Mutation kill check")
+print(f"- kills: {kills} of {total} mutants")
+print(f"- real: {counts['real']}")
+for name in [n for n, _ in HARD] + list(SOFT):
+    label = "soft" if name in SOFT else "hard"
+    print(f"- {label} {name}: {counts[name]}")
+    for ex in examples[name]:
+        print(f"  - e.g. {ex}")
+print(f"- soft ratio: {pct:.1f}% (limit {soft_ratio}%, applies at {min_kills}+ kills)")
+if hard_hit:
+    print(f"RESULT: FAIL (hard signal: {', '.join(hard_hit)})")
+    sys.exit(6)
+if soft_over:
+    print(f"RESULT: FAIL (soft ratio {pct:.1f}% > {soft_ratio}% at {kills} kills)")
+    sys.exit(6)
+print("RESULT: PASS (no fake-kill signal)")
+PY
+    return "$rc"
+}
+
 log=""
 changed=""
+kills=""
+min_kills=50
+soft_ratio=10
+kill_tuning=""
 while [ $# -gt 0 ]; do
     case "$1" in
         -h|--help)
@@ -49,6 +171,51 @@ while [ $# -gt 0 ]; do
             changed="$2"
             shift 2
             ;;
+        --kills)
+            if [ $# -lt 2 ]; then
+                echo "ERROR: --kills needs a value" >&2
+                usage >&2
+                exit 2
+            fi
+            kills="$2"
+            shift 2
+            ;;
+        --min-kills)
+            if [ $# -lt 2 ]; then
+                echo "ERROR: --min-kills needs a value" >&2
+                usage >&2
+                exit 2
+            fi
+            case "$2" in
+                ''|*[!0-9]*)
+                    echo "ERROR: --min-kills needs a non-negative integer, got: $2" >&2
+                    exit 2
+                    ;;
+            esac
+            min_kills="$2"
+            kill_tuning=1
+            shift 2
+            ;;
+        --soft-ratio)
+            if [ $# -lt 2 ]; then
+                echo "ERROR: --soft-ratio needs a value" >&2
+                usage >&2
+                exit 2
+            fi
+            case "$2" in
+                ''|*[!0-9]*)
+                    echo "ERROR: --soft-ratio needs an integer from 0 to 100, got: $2" >&2
+                    exit 2
+                    ;;
+            esac
+            if [ "${#2}" -gt 3 ] || [ "$2" -gt 100 ]; then
+                echo "ERROR: --soft-ratio needs an integer from 0 to 100, got: $2" >&2
+                exit 2
+            fi
+            soft_ratio="$2"
+            kill_tuning=1
+            shift 2
+            ;;
         *)
             echo "ERROR: unknown argument: $1" >&2
             usage >&2
@@ -57,6 +224,21 @@ while [ $# -gt 0 ]; do
     esac
 done
 
+if [ -n "$kills" ]; then
+    if [ -n "$changed" ]; then
+        echo "ERROR: --kills cannot combine with --changed" >&2
+        usage >&2
+        exit 2
+    fi
+    rc=0
+    check_kills || rc=$?
+    exit "$rc"
+fi
+if [ -n "$kill_tuning" ]; then
+    echo "ERROR: --min-kills and --soft-ratio are only valid with --kills" >&2
+    usage >&2
+    exit 2
+fi
 if [ -z "$log" ] || [ -z "$changed" ]; then
     echo "ERROR: both --log and --changed are required" >&2
     usage >&2

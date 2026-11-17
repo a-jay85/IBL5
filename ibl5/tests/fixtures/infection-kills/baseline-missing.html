@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html><body>
+<mutation-test-report-app></mutation-test-report-app>
+<script>
+document.getElementsByTagName('mutation-test-report-app').item(0).report = {
+ "schemaVersion": "1",
+ "thresholds": {
+  "high": 80,
+  "low": 60
+ },
+ "files": {
+  "classes/Fixture/Fixture.php": {
+   "language": "php",
+   "source": "<?php\n",
+   "mutants": [
+    {
+     "id": "fx-baseline-1",
+     "mutatorName": "TrueValue",
+     "replacement": "false",
+     "description": "",
+     "location": {
+      "start": {
+       "line": 1,
+       "column": 1
+      },
+      "end": {
+       "line": 1,
+       "column": 2
+      }
+     },
+     "status": "Killed",
+     "statusReason": "PHPUnit 13.4.6 by Sebastian Bergmann and contributors.\n\nRuntime:       PHP 8.5.12\nConfiguration: /tmp/infection/phpunitConfiguration.fx-baseline-1.infection.xml\n\nW\n\nTime: 00:00.002, Memory: 22.00 MB\n\nThere was 1 PHPUnit test runner warning:\n\n1) Cannot read baseline /tmp/infection/phpunit-baseline.xml, file does not exist\n\nOK, but there were issues!\nTests: 1, Assertions: 1, PHPUnit Warnings: 1.",
+     "coveredBy": [],
+     "killedBy": [],
+     "testsCompleted": 1
+    },
+    {
+     "id": "fx-baseline-2",
+     "mutatorName": "TrueValue",
+     "replacement": "false",
+     "description": "",
+     "location": {
+      "start": {
+       "line": 1,
+       "column": 1
+      },
+      "end": {
+       "line": 1,
+       "column": 2
+      }
+     },
+     "status": "Killed",
+     "statusReason": "PHPUnit 13.4.6 by Sebastian Bergmann and contributors.\n\nRuntime:       PHP 8.5.12\nConfiguration: /tmp/infection/phpunitConfiguration.fx-baseline-2.infection.xml\n\nF\n\nTime: 00:00.002, Memory: 22.00 MB\n\n1) Cannot read baseline /tmp/infection/phpunit-baseline.xml\n\nFAILURES!\nTests: 1, Assertions: 1, Failures: 1.",
+     "coveredBy": [],
+     "killedBy": [],
+     "testsCompleted": 1
+    },
+    {
+     "id": "4114ce8ec5cda202a0a322864a3a0701",
+     "mutatorName": "TrueValue",
+     "replacement": "false",
+     "description": "",
+     "location": {
+      "start": {
+       "line": 1,
+       "column": 1
+      },
+      "end": {
+       "line": 1,
+       "column": 2
+      }
+     },
+     "status": "Killed",
+     "statusReason": "PHPUnit 13.4.6 by Sebastian Bergmann and contributors.\n\nRuntime:       PHP 8.5.12\nConfiguration: /tmp/infection/phpunitConfiguration.4114ce8ec5cda202a0a322864a3a0701.infection.xml\n\nF\n\nTime: 00:00.005, Memory: 24.00 MB\n\nSetting Name (Tests\\Settings\\SettingName)\n ✘ Yes no settings\n   │\n   │ Failed asserting that false is true.\n   │\n   │ /home/runner/work/IBL5/IBL5/ibl5/tests/Settings/SettingNameTest.php:14\n   │\n\nFAILURES!\nTests: 1, Assertions: 1, Failures: 1.",
+     "coveredBy": [],
+     "killedBy": [],
+     "testsCompleted": 1
+    }
+   ]
+  }
+ },
+ "testFiles": {},
+ "framework": {
+  "name": "Infection"
+ }
+};
+</script>
+</body></html>

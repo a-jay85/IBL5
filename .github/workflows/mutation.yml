@@ -116,6 +116,20 @@ jobs:
           --min-covered-msi=71 \
           --no-progress
 
+    - name: Check mutation kills are real
+      if: always()
+      working-directory: ibl5
+      # Fails when killed mutants show a runner or setup error instead of a
+      # failing test. A separate step keeps the Infection step's exit code as
+      # it was, and the upload step below still runs when this one fails.
+      run: |
+        rc=0
+        bin/check-infection-ran --kills infection-report.html \
+          > /tmp/kill-check.md || rc=$?
+        cat /tmp/kill-check.md
+        cat /tmp/kill-check.md >> "$GITHUB_STEP_SUMMARY"
+        exit "$rc"
+
     - name: Upload mutation reports
       if: always()
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

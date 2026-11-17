@@ -71,6 +71,7 @@ EOF
 }
 
 TEAM="ibl5/classes/Team/TeamView.php"
+FIX="$ROOT/ibl5/tests/fixtures/infection-kills"
 
 # c1: the live #3443 scenario, a mutable class with a no-source log.
 d=$(new_case)
@@ -186,6 +187,144 @@ write_3443_log "$d/log.txt"
 echo "ibl5/classes/Bootstrap/Kernel.php" > "$d/changed.txt"
 run_in "$ROOT/ibl5" --log "$d/log.txt" --changed "$d/changed.txt"
 want_rc c15-real-config 0
+
+# --- Kill mode (--kills) ----------------------------------------------------
+# Cases c1 to c11 above cover the --log/--changed mode and stay as they were.
+
+# c12: baseline-missing fails on runner-warning and cannot-read-baseline.
+d=$(new_case)
+run_in "$d" --kills "$FIX/baseline-missing.html"
+want_rc c12-baseline-missing 6
+want c12-baseline-missing "$OUT" "- hard runner-warning: 1"
+want c12-baseline-missing "$OUT" "- hard cannot-read-baseline: 1"
+want c12-baseline-missing "$OUT" "- real: 1"
+want c12-baseline-missing "$OUT" "e.g. fx-baseline-1 in classes/Fixture/Fixture.php"
+want c12-baseline-missing "$OUT" "RESULT: FAIL (hard signal: runner-warning, cannot-read-baseline)"
+
+# c13: missing-db-env fails on env-var-unset and db-connection-failed.
+d=$(new_case)
+run_in "$d" --kills "$FIX/missing-db-env.html"
+want_rc c13-missing-db-env 6
+want c13-missing-db-env "$OUT" "- hard env-var-unset: 1"
+want c13-missing-db-env "$OUT" "- hard db-connection-failed: 1"
+want c13-missing-db-env "$OUT" "e.g. fx-env-1"
+want c13-missing-db-env "$OUT" "e.g. fx-db-1"
+want c13-missing-db-env "$OUT" "- real: 0"
+
+# c14: no-tests fails on no-tests-executed.
+d=$(new_case)
+run_in "$d" --kills "$FIX/no-tests.html"
+want_rc c14-no-tests 6
+want c14-no-tests "$OUT" "- hard no-tests-executed: 1"
+want c14-no-tests "$OUT" "RESULT: FAIL (hard signal: no-tests-executed)"
+
+# c15: real FAILURES and ERRORS kills pass with no examples.
+d=$(new_case)
+run_in "$d" --kills "$FIX/real-kills.html"
+want_rc c15-real-kills 0
+want c15-real-kills "$OUT" "- kills: 2 of 3 mutants"
+want c15-real-kills "$OUT" "- real: 2"
+want c15-real-kills "$OUT" "RESULT: PASS (no fake-kill signal)"
+want_not c15-real-kills "$OUT" "e.g."
+
+# c16: mixed sample counts exactly; the PHP-warning near-miss stays soft; under
+# the default floor it passes.
+d=$(new_case)
+run_in "$d" --kills "$FIX/mixed.html"
+want_rc c16-mixed 0
+want c16-mixed "$OUT" "- kills: 4 of 6 mutants"
+want c16-mixed "$OUT" "- real: 2"
+want c16-mixed "$OUT" "- hard runner-warning: 0"
+want c16-mixed "$OUT" "- soft warning-only: 1"
+want c16-mixed "$OUT" "- soft fatal-only: 1"
+want c16-mixed "$OUT" "- soft ratio: 50.0% (limit 10%, applies at 50+ kills)"
+want c16-mixed "$OUT" "RESULT: PASS"
+
+# c17: mixed at min-kills 4 fails on the soft ratio.
+d=$(new_case)
+run_in "$d" --kills "$FIX/mixed.html" --min-kills 4
+want_rc c17-mixed-floor-4 6
+want c17-mixed-floor-4 "$OUT" "RESULT: FAIL (soft ratio 50.0% > 10% at 4 kills)"
+
+# c18: mixed at min-kills 5 passes (one under the floor).
+d=$(new_case)
+run_in "$d" --kills "$FIX/mixed.html" --min-kills 5
+want_rc c18-mixed-floor-5 0
+want c18-mixed-floor-5 "$OUT" "applies at 5+ kills"
+
+# c19: a ratio of exactly 10.0% passes.
+d=$(new_case)
+run_in "$d" --kills "$FIX/ratio-boundary.html" --min-kills 10
+want_rc c19-ratio-exact 0
+want c19-ratio-exact "$OUT" "- soft ratio: 10.0%"
+want c19-ratio-exact "$OUT" "- real: 9"
+
+# c20: a ratio of 10.0% fails at soft-ratio 9.
+d=$(new_case)
+run_in "$d" --kills "$FIX/ratio-boundary.html" --min-kills 10 --soft-ratio 9
+want_rc c20-ratio-over 6
+want c20-ratio-over "$OUT" "soft ratio 10.0% > 9% at 10 kills"
+
+# c21: a missing report with no log fails closed.
+d=$(new_case)
+run_in "$d" --kills "$d/absent.html"
+want_rc c21-missing-report 2
+want c21-missing-report "$ERR" "ERROR: cannot read $d/absent.html"
+
+# c22: a missing report with a no-source log skips.
+d=$(new_case)
+write_3443_log "$d/infection.log"
+run_in "$d" --kills "$d/absent.html" --log "$d/infection.log"
+want_rc c22-missing-nosource 0
+want c22-missing-nosource "$OUT" "RESULT: SKIP"
+want c22-missing-nosource "$OUT" "the --changed mode owns this case"
+
+# c23: a missing report with a log that generated mutants fails closed.
+d=$(new_case)
+printf '12 mutations were generated:\n' > "$d/infection.log"
+run_in "$d" --kills "$d/absent.html" --log "$d/infection.log"
+want_rc c23-missing-mutants 2
+want c23-missing-mutants "$ERR" "ERROR: cannot read $d/absent.html"
+want_not c23-missing-mutants "$OUT" "RESULT: SKIP"
+
+# c24: a report with no Stryker JSON fails closed.
+d=$(new_case)
+run_in "$d" --kills "$FIX/malformed.html"
+want_rc c24-no-json 2
+want c24-no-json "$ERR" "no Stryker report JSON"
+
+# c25: a truncated report fails closed.
+d=$(new_case)
+head -c 400 "$FIX/mixed.html" > "$d/trunc.html"
+run_in "$d" --kills "$d/trunc.html"
+want_rc c25-truncated 2
+want c25-truncated "$ERR" "cannot parse report JSON"
+
+# c26: rejected flag forms fail loudly.
+d=$(new_case)
+run_in "$d" "--kills=$FIX/mixed.html"
+want_rc c26a-equals-form 2
+want c26a-equals-form "$ERR" "unknown argument: --kills="
+run_in "$d" --kills "$FIX/mixed.html" --min-kills abc
+want_rc c26b-min-kills-nonint 2
+want c26b-min-kills-nonint "$ERR" "--min-kills needs a non-negative integer, got: abc"
+run_in "$d" --kills "$FIX/mixed.html" --soft-ratio 101
+want_rc c26c-ratio-101 2
+want c26c-ratio-101 "$ERR" "--soft-ratio needs an integer from 0 to 100, got: 101"
+run_in "$d" --min-kills 5 --log x --changed y
+want_rc c26d-tuning-alone 2
+want c26d-tuning-alone "$ERR" "only valid with --kills"
+run_in "$d" --kills "$FIX/mixed.html" --changed y
+want_rc c26e-kills-with-changed 2
+want c26e-kills-with-changed "$ERR" "--kills cannot combine with --changed"
+
+# c27: help shows the kill-mode text (the help span is intact).
+d=$(new_case)
+run_in "$d" --help
+want_rc c27-help 0
+want c27-help "$OUT" "Kill mode: bin/check-infection-ran --kills"
+want c27-help "$OUT" "Exit 6:"
+want c27-help "$OUT" "Exit 2 also covers"
 
 echo "passed=$PASSES failed=$FAILS"
 if [ "$FAILS" -ne 0 ]; then

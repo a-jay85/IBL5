@@ -97,6 +97,7 @@
 2 bin/test-fleet-status
 2 bin/test-postplan-fix
 2 bin/test-check-composite-contracts
+2 bin/test-mutation-weekly-dispatch
 2 bin/test-pr-review-now
 2 bin/test-finding-class-scan
 2 bin/test-automouse-queue

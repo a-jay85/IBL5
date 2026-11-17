@@ -1,0 +1,74 @@
+name: Mutation weekly dispatch
+# Starts the weekly full mutation run (mutation.yml) once per week, Sunday between 3am and
+# 9am America/Los_Angeles. GitHub fires schedule events on this public repo 5 to 10 hours
+# late and drops most dense ticks, so ticks start the evening before. When a tick fires
+# early, bin/mutation-weekly-dispatch waits until 3am Pacific. It skips when this week
+# already has a bot-dispatched run or a mutation run is live on master, and it keeps
+# starting catch-up runs until Sunday 8pm Pacific. A dispatch made with GITHUB_TOKEN starts
+# a run: workflow_dispatch is exempt from the GITHUB_TOKEN no-trigger rule.
+# bin/check-composite-contracts W1 pins this file. Run by hand:
+#   gh workflow run mutation-weekly-dispatch.yml
+
+on:
+  schedule:
+    - cron: '*/15 5-23 * * 0'  # Sun 05:00Z-23:45Z = Sat 9pm-Sun 3:45pm PST, Sat 10pm-Sun 4:45pm PDT
+    - cron: '*/15 0-3 * * 1'  # Mon 00:00Z-03:45Z = Sun 4pm-7:45pm PST, Sun 5pm-8:45pm PDT
+  workflow_dispatch:
+  workflow_run:
+    workflows: [Mutation Testing]
+    types: [completed]
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch:
+    name: Dispatch weekly mutation run
+    if: github.event_name != 'workflow_run'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 330
+    permissions:
+      contents: read
+      actions: write
+    concurrency:
+      group: mutation-weekly-dispatch
+      cancel-in-progress: false
+    steps:
+      - name: Checkout master (for bin/mutation-weekly-dispatch)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Dispatch mutation.yml unless this week already has a run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bin/mutation-weekly-dispatch --repo="$GITHUB_REPOSITORY"
+  alert-cancelled:
+    name: Alert on a cancelled weekly run
+    # notify-mutation-failure in mutation.yml alerts on cancelled only for schedule events.
+    # The weekly run now arrives as workflow_dispatch from this file, so this job sends the
+    # timeout alert for runs github-actions[bot] dispatched. No concurrency on this job: an
+    # alert must never queue behind a sleeping dispatch job or be replaced as a pending run.
+    if: >-
+      github.event_name == 'workflow_run'
+      && github.event.workflow_run.conclusion == 'cancelled'
+      && github.event.workflow_run.event == 'workflow_dispatch'
+      && github.event.workflow_run.triggering_actor.login == 'github-actions[bot]'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout master (for the notify-discord action)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build Discord message
+        env:
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        run: |
+          printf 'Weekly mutation testing was CANCELLED (dispatched weekly run).\n\nIt most likely hit a timeout-minutes cap before Infection finished. Check the run: %s' "$RUN_URL" > /tmp/discord-msg.txt
+      - name: Send Discord DM
+        uses: ./.github/actions/notify-discord
+        with:
+          webhook-url: ${{ secrets.DISCORD_ERRORS_WEBHOOK_URL || secrets.DISCORD_DEV_WEBHOOK_URL }}

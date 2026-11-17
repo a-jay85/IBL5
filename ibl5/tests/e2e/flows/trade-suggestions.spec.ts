@@ -468,15 +468,12 @@ test.describe('Trade suggestions feedback (GM as Stars)', () => {
     const hiddenCard = page.locator(`input[name="deal_key"][value="${key}"]`);
     await expect(hiddenCard).toHaveCount(0);
 
-    // A refreshed run never brings the hidden idea back.
-    await Promise.all([
-      page.waitForEvent('load'),
-      page.locator('[data-testid="trade-suggestions-refresh"]').click(),
-    ]);
+    // A fresh render never brings the hidden idea back. The seed yields one
+    // Stars idea, so hiding it leaves no refresh button to click.
+    await gotoWithRetry(page, 'index.php');
     await expect(page.locator(PANEL)).toBeVisible();
     await expect(hiddenCard).toHaveCount(0);
     await assertNoPhpErrors(page, 'after hiding a trade idea');
-    await rewindOffset(page);
   });
 
   test('hide POST without CSRF token is rejected', async ({ page, request }) => {

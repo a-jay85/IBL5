@@ -54,6 +54,9 @@ class Router implements RouterInterface
         'bug-pipeline/source-updated'  => Controller\SourceUpdatedController::class,
         'bug-pipeline/source-deleted'  => Controller\SourceDeletedController::class,
         'bug-pipeline/wake'            => Controller\WakeController::class,
+        'sim-recap-publish/claim-next' => Controller\SimRecapPublishClaimController::class,
+        'sim-recap-publish/progress'   => Controller\SimRecapPublishProgressController::class,
+        'sim-recap-publish/finish'     => Controller\SimRecapPublishFinishController::class,
     ];
 
     /**

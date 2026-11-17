@@ -95,6 +95,18 @@ final class SimRecapQueueGuardTest extends TestCase
         self::assertStringContainsString('Discord::init(canonicalHost())', $this->src);
     }
 
+    /**
+     * The publish-* verbs share the argv whitelist with the older verbs, so every
+     * verb still passes the same unknown-flag and space-form rejection.
+     */
+    public function testPublishVerbsJoinTheSharedVerbWhitelist(): void
+    {
+        self::assertMatchesRegularExpression(
+            "/in_array\(\\\$verb, \['claim', 'park', 'notify', 'find', 'publish-enqueue', 'publish-title', 'publish-script'\], true\)/",
+            $this->src
+        );
+    }
+
     public function testScriptNeverPrintsExceptionMessage(): void
     {
         self::assertFalse(str_contains($this->src, 'getMessage()'), 'Exception text can carry secrets; log the class only');

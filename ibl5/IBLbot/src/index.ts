@@ -6,7 +6,13 @@ import { handleTradeButton } from './interactions/trade-buttons.js';
 import { handlePlanReviewButton } from './interactions/plan-review-buttons.js';
 import { startStaleSweeper } from './server/stale-decision-sweeper.js';
 
+import { loadSimRecapSettings } from './sim-recap/settings.js';
+import { createDiscordSweeper } from './sim-recap/discord-adapter.js';
+import type { Sweeper } from './sim-recap/sweeper.js';
+
 let sweepHandle: NodeJS.Timeout | undefined;
+let simRecapHandle: NodeJS.Timeout | undefined;
+let simRecapSweeper: Sweeper | undefined;
 
 const client = new Client({
     intents: [GatewayIntentBits.Guilds],
@@ -18,6 +24,9 @@ client.once(Events.ClientReady, c => {
     console.log(`Serving ${commands.size} slash commands`);
     sweepHandle = startStaleSweeper(client);
     console.log('Stale plan-decision sweeper started');
+    // Starts last, after the existing startup order above.
+    simRecapSweeper = createDiscordSweeper(client, loadSimRecapSettings());
+    simRecapHandle = simRecapSweeper.start();
 });
 
 // Slash command handler
@@ -74,7 +83,7 @@ client.on(Events.InteractionCreate, async interaction => {
 client.login(config.discord.token);
 
 // Start Express server for /discordDM endpoint
-startExpressServer(client);
+startExpressServer(client, undefined, () => simRecapSweeper);
 
 // No shutdown handlers existed before the sweeper. The interval is the only thing
 // that keeps the event loop alive past a signal, so it is the only thing torn down
@@ -82,6 +91,7 @@ startExpressServer(client);
 for (const signal of ['SIGTERM', 'SIGINT'] as const) {
     process.on(signal, () => {
         if (sweepHandle) clearInterval(sweepHandle);
+        if (simRecapHandle) clearInterval(simRecapHandle);
         process.exit(0);
     });
 }

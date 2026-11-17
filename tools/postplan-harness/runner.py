@@ -48,7 +48,7 @@ from harness import armable as _armable_mod
 from harness import sql_equivalence
 from harness.armable import (AGGREGATOR_CONTEXT, ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
                              manual_testing_clearance, meta_checks_clearance, meta_checks_flag_path,
-                             resolve_owner_approval, select_fidelity_verdict)
+                             resolve_owner_approval, select_fidelity_verdict, split_docs_refresh_rules_diffs)
 
 # Directory of the pre-push meta-checks flag. Module-level so tests monkeypatch it
 # (`monkeypatch.setattr(runner, "META_CHECKS_TMP_DIR", str(tmp_path))`) and never
@@ -907,6 +907,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 pr_body=_arm_body, pr_title=meta.get("title", copy["title"]),
                 pr_labels=gh.pr_labels(), classification=cls, findings=res.findings,
                 ui_paths=git.conformance_files(),
+                docs_refresh_rules_diffs=split_docs_refresh_rules_diffs(git.diff_vs_base(), cls.files),
                 unresolved_conformance=unresolved, phase5_status=phase5,
                 exec_mutations_holding=(),
                 exec_mutations_tree_suspect=False,

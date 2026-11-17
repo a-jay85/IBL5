@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# bin/dm-volume — count the Discord messages bin/discord-dm delivered, to cut noise.
+#
+# Reads the sent log that bin/discord-dm appends to on every successful delivery
+# (${DISCORD_DM_SENT_LOG:-~/.claude/discord-dm-sent.log}; tab-separated: ISO time,
+# target, caller, byte length, preview) and prints, for the window: the total, a
+# count per caller (busiest first), per target (dev|errors|dm|route:<path>) and
+# per day. A missing log prints "no sends logged yet" and exits 0.
+#
+# Usage: bin/dm-volume [--days=N]
+#
+#   --days=N   window length in calendar days, today included (default 7).
+#              = form only; "--days 7" is rejected.
+#   --help     print this help and exit 0
+#
+# Exit: 0 ok · 2 usage error.
+
+set -uo pipefail
+
+DAYS=7
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -h|--help) sed -n '2,/^$/p' "$0" | sed '$d; s/^# \{0,1\}//'; exit 0 ;;
+        --days=*)  DAYS="${1#--days=}"; shift ;;
+        *)         echo "dm-volume: unknown argument '$1' (flags use the = form: --days=N)" >&2; exit 2 ;;
+    esac
+done
+case "$DAYS" in
+    ''|*[!0-9]*|0) echo "dm-volume: --days must be a positive integer (got '$DAYS')" >&2; exit 2 ;;
+esac
+
+LOG="${DISCORD_DM_SENT_LOG:-$HOME/.claude/discord-dm-sent.log}"
+if [ ! -s "$LOG" ]; then
+    echo "no sends logged yet"
+    exit 0
+fi
+
+# Cutoff = first day of the window (today minus N-1 days). BSD date first, GNU fallback.
+BACK=$(( DAYS - 1 ))
+CUTOFF=$(date -v-"${BACK}"d '+%Y-%m-%d' 2>/dev/null || date -d "$BACK days ago" '+%Y-%m-%d' 2>/dev/null) || {
+    echo "dm-volume: cannot compute the window start (no BSD or GNU date)" >&2
+    exit 1
+}
+
+awk -F '\t' -v cutoff="$CUTOFF" -v days="$DAYS" '
+    function section(title, arr, sortflag,    k, cmd) {
+        print ""
+        print title
+        cmd = sortflag == "count" ? "sort -t\"\t\" -k1,1nr -k2,2" : "sort -k2,2"
+        for (k in arr) printf "%d\t%s\n", arr[k], k | cmd
+        close(cmd)
+    }
+    NF >= 3 {
+        day = substr($1, 1, 10)
+        if (day < cutoff) next
+        total++; caller[$3]++; target[$2]++; perday[day]++
+    }
+    END {
+        printf "Discord sends, last %d day(s) (since %s): %d\n", days, cutoff, total + 0
+        if (total == 0) exit
+        section("By caller:", caller, "count")
+        section("By target:", target, "count")
+        section("By day:", perday, "day")
+    }
+' "$LOG" | sed 's/^\([0-9][0-9]*\)	/  \1  /'

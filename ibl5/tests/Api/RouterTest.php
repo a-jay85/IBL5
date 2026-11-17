@@ -262,6 +262,22 @@ class RouterTest extends TestCase
         $this->assertSame([], $wake['params']);
     }
 
+    public function testSimRecapPublishRoutesResolveToTheirControllers(): void
+    {
+        $expected = [
+            'sim-recap-publish/claim-next' => 'Api\Controller\SimRecapPublishClaimController',
+            'sim-recap-publish/progress'   => 'Api\Controller\SimRecapPublishProgressController',
+            'sim-recap-publish/finish'     => 'Api\Controller\SimRecapPublishFinishController',
+        ];
+        foreach ($expected as $path => $controller) {
+            $result = $this->router->match($path, 'POST');
+            $this->assertNotNull($result);
+            $this->assertSame($controller, $result['controller']);
+            $this->assertSame([], $result['params']);
+            $this->assertNull($this->router->match($path, 'GET'));
+        }
+    }
+
     public function testReturnsNullForUnknownRoute(): void
     {
         $result = $this->router->match('nonexistent', 'GET');

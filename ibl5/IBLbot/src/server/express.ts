@@ -11,7 +11,11 @@ import { handlePlanReviewDM, handleListDecisions, handleAckDecisions } from './p
  * returned so an integration spec can close the listener — `src/index.ts`
  * ignores it.
  */
-export function startExpressServer(client: Client, dir?: string): Server {
+export function startExpressServer(
+    client: Client,
+    dir?: string,
+    getSweeper?: () => { kick(): Promise<void> } | undefined,
+): Server {
     const app = express();
     app.use(express.json());
 
@@ -45,6 +49,13 @@ export function startExpressServer(client: Client, dir?: string): Server {
     app.post('/discordPlanReviewDM', handlePlanReviewDM(client));
     app.get('/planDecisions', handleListDecisions(dir));
     app.post('/planDecisions/ack', handleAckDecisions(client, dir));
+
+    // Localhost poke from the prod-side simRecapQueue notify. Unauthenticated by design:
+    // it reads nothing from the request, and its only effect is an early publisher sweep.
+    app.post('/simRecapPublish', (_req, res) => {
+        void getSweeper?.()?.kick();
+        res.status(202).end();
+    });
 
     app.get('/', (_req, res) => {
         res.send('ok');

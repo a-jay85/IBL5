@@ -370,7 +370,7 @@ class RecordFormatter implements RecordFormatterInterface
         return $category;
     }
 
-    private static function teamAbbreviation(int $teamId): string
+    public static function teamAbbreviation(int $teamId): string
     {
         return self::TEAM_REGISTRY[$teamId]['abbr'] ?? '';
     }

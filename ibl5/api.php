@@ -139,6 +139,29 @@ $app->getContainer()->set('api.controllerFactory', static function (): \Closure 
             );
         }
 
+        if ($controllerClass === \Api\Controller\SimRecapPublishClaimController::class) {
+            return new \Api\Controller\SimRecapPublishClaimController(
+                new \SimRecap\SimPublishProgressRepository($db),
+                new \SimRecap\PublishScriptBuilder(
+                    new \SimRecap\SimSummaryRepository($db),
+                    new \SimRecap\SimRecapContextRepository($db),
+                    new \SimRecap\MentionMapBuilder(new \Repositories\TeamIdentityRepository($db)),
+                    new \Season\SeasonQueryRepository($db)
+                ),
+                new \Api\Repository\ApiKeyRepository($db)
+            );
+        }
+
+        if (in_array($controllerClass, [
+            \Api\Controller\SimRecapPublishProgressController::class,
+            \Api\Controller\SimRecapPublishFinishController::class,
+        ], true)) {
+            return new $controllerClass(
+                new \SimRecap\SimPublishProgressRepository($db),
+                new \Api\Repository\ApiKeyRepository($db)
+            );
+        }
+
         $bugPipelineControllers = [
             \Api\Controller\ThreadReplyController::class,
             \Api\Controller\LastSeenController::class,

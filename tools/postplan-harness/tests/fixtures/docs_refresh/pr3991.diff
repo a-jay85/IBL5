@@ -1,0 +1,109 @@
+diff --git a/.claude/rules/adr-append-only.md b/.claude/rules/adr-append-only.md
+index 13ec64c38d..d8f346b8df 100644
+--- a/.claude/rules/adr-append-only.md
++++ b/.claude/rules/adr-append-only.md
+@@ -1,6 +1,6 @@
+ ---
+ description: Decision records in ibl5/docs/decisions/ are append-only — frozen sections (Context, Decision, Rationale, Alternatives) must never be rewritten in place; corrections go in a dated Addendum section.
+-last_verified: 2026-09-16
++last_verified: 2026-11-15
+ paths: "ibl5/docs/decisions/**"
+ ---
+ 
+diff --git a/.claude/rules/htmx-history-cache.md b/.claude/rules/htmx-history-cache.md
+index f038e3b343..d3cc09dfbe 100644
+--- a/.claude/rules/htmx-history-cache.md
++++ b/.claude/rules/htmx-history-cache.md
+@@ -1,6 +1,6 @@
+ ---
+ description: htmx gotchas: DOM-snapshot ordering freezes transient state into Back navigation; HX-Redirect triggers full reload; PageCache strips response headers.
+-last_verified: 2026-09-16
++last_verified: 2026-11-15
+ paths:
+   - "ibl5/jslib/**"
+   - "ibl5/themes/**"
+diff --git a/.claude/rules/migrations.md b/.claude/rules/migrations.md
+index e7b7aa09dd..210443483f 100644
+--- a/.claude/rules/migrations.md
++++ b/.claude/rules/migrations.md
+@@ -1,7 +1,7 @@
+ ---
+ description: Migration authoring rules — numbering via bin/next-migration, the Olympics schema-parity allowlist, how to read prod's applied-migration state, and the integration-test sweep a view→table materialization requires.
+ paths: "ibl5/migrations/**"
+-last_verified: 2026-09-16
++last_verified: 2026-11-15
+ ---
+ 
+ # Migration Rules
+diff --git a/.claude/rules/refactor-flag.md b/.claude/rules/refactor-flag.md
+index 657d06437a..637e14310a 100644
+--- a/.claude/rules/refactor-flag.md
++++ b/.claude/rules/refactor-flag.md
+@@ -1,7 +1,7 @@
+ ---
+ description: Refactor PRs that touch ibl5/classes/** without an accompanying test change are blocked by bin/refactor-flag (the refactor-flag check in workflow pr-meta-checks.yml).
+ paths: "ibl5/classes/**"
+-last_verified: 2026-09-16
++last_verified: 2026-11-15
+ ---
+ 
+ # Refactor PR Flag
+diff --git a/engine/.claude/rules/engine-context.md b/engine/.claude/rules/engine-context.md
+index a7a0ba6a44..a8865a6b6d 100644
+--- a/engine/.claude/rules/engine-context.md
++++ b/engine/.claude/rules/engine-context.md
+@@ -1,6 +1,6 @@
+ ---
+ description: Go/RE development context for the JSB native engine under engine/ — Makefile targets, the pinned-toolchain rationale, module layout, and where engine STATE vs runtime-behavior facts vs RE artifacts live. Fires on any engine/ file interaction.
+-last_verified: 2026-09-16
++last_verified: 2026-11-15
+ ---
+ 
+ # Engine Development Context (Go / RE)
+diff --git a/ibl5/docs/decisions/0038-smoke-inconclusive-state.md b/ibl5/docs/decisions/0038-smoke-inconclusive-state.md
+index d28646b35a..2e3fe3aa7d 100644
+--- a/ibl5/docs/decisions/0038-smoke-inconclusive-state.md
++++ b/ibl5/docs/decisions/0038-smoke-inconclusive-state.md
+@@ -1,6 +1,6 @@
+ ---
+ description: The production smoke test distinguishes an INCONCLUSIVE result (prober blocked by the WAF, or a docs-only deploy) from a real FAILURE, so transient prober-side issues no longer trigger an auto-rollback of healthy production.
+-last_verified: 2026-09-16
++last_verified: 2026-11-15
+ ---
+ 
+ # ADR-0038: Smoke "Inconclusive" State Gates Auto-Rollback
+@@ -64,3 +64,10 @@ Both sentences had been overwritten in place by the nightly doc-freshness refres
+ (commit `71b15038f`, PR #1776), which erased the decision-time record; they were restored
+ byte-for-byte on 2026-09-02 and the current state moved here instead. See
+ `.claude/rules/adr-append-only.md`.
++
++## Addendum — IBL6 notifier removed (2026-11-15) <!-- slop-ok -->
++
++§ A above says the new job mirrors `notify-ibl6-degradation`, and the 2026-09-02 addendum above says
++that job still exists in `.github/workflows/smoke-prod.yml`. Today that file has no
++`notify-ibl6-degradation` job. Its jobs are `smoke`, `rollback-and-notify`, and `notify`. The IBL6
++app was decommissioned (commit `2c9a8d080`), which removed the IBL6 check and its notifier.
+diff --git a/ibl5/docs/decisions/0128-path-scoped-rules-over-memory.md b/ibl5/docs/decisions/0128-path-scoped-rules-over-memory.md
+index d990dc09fd..111a13f512 100644
+--- a/ibl5/docs/decisions/0128-path-scoped-rules-over-memory.md
++++ b/ibl5/docs/decisions/0128-path-scoped-rules-over-memory.md
+@@ -1,6 +1,6 @@
+ ---
+ description: Directory-specific operational knowledge lives in path-scoped .claude/rules/*.md files, not in per-project memory; the always-loaded rule set is capped at 16000 B.
+-last_verified: 2026-09-16
++last_verified: 2026-11-15
+ ---
+ 
+ # ADR-0128: Path-scoped rules over memory for directory-specific knowledge
+diff --git a/ibl5/docs/decisions/0129-prose-slop-gate.md b/ibl5/docs/decisions/0129-prose-slop-gate.md
+index c228336ccf..59633386a5 100644
+--- a/ibl5/docs/decisions/0129-prose-slop-gate.md
++++ b/ibl5/docs/decisions/0129-prose-slop-gate.md
+@@ -1,6 +1,6 @@
+ ---
+ description: A mechanical gate blocks AI tell patterns (sycophant openers, em-dashes, buzzwords, etc.) in committed markdown and Claude's output, enforced by bin/check-prose on three surfaces.
+-last_verified: 2026-09-16
++last_verified: 2026-11-15
+ ---
+ 
+ # ADR-0129: Prose slop gate

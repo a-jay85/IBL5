@@ -138,6 +138,16 @@ class Discord
         return self::$bugPipelineApproverDiscordId;
     }
 
+    /**
+     * The IBLbot Express base URL from config, or '' if unconfigured.
+     * The sim-recap publisher poke uses it to reach IBLbot's local /simRecapPublish route.
+     */
+    public static function getIblbotUrl(): string
+    {
+        self::loadConfig();
+        return self::$iblbotUrl;
+    }
+
     public function getDiscordIDFromTeamname(string $teamname): string
     {
         return (string) ($this->commonRepo->getTeamDiscordID($teamname) ?? '');

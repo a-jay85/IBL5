@@ -585,6 +585,102 @@ final class SimRecapContextRepositoryTest extends DatabaseTestCase
         self::assertSame([], $ctx['standings']);
     }
 
+    /**
+     * An injury for a player with no box-score line in the window is listed by
+     * findAllWindowInjuries() but never reaches a game's injuries list.
+     */
+    public function testAllWindowInjuriesIncludesPlayerWithNoBoxScoreLine(): void
+    {
+        $this->seedTeam(999161, 'Ayes City', 'Ayes');
+        $this->seedTeam(999162, 'Bees City', 'Bees');
+        $this->seedSim(999161, '2031-08-01', '2031-08-07');
+        $this->insertScheduleRow(2031, '2031-08-03', 999161, 100, 999162, 90);
+        $this->insertTeamBoxscoreRow('2031-08-03', 'Ayes', 1, 999161, 999162);
+        $this->seedBoxLine('2031-08-03', 200000611, 'Played Player', 999161, 999162, 999161, 30, 6);
+        $this->insertTestPlayer(200000612, 'Bench Hurt', ['teamid' => 999161]);
+        $this->insertRow('ibl_jsb_transactions', [
+            'season_year'         => 2031,
+            'transaction_month'   => 8,
+            'transaction_day'     => 3,
+            'transaction_type'    => TrnFileParser::TYPE_INJURY,
+            'pid'                 => 200000612,
+            'from_teamid'         => 999161,
+            'injury_games_missed' => 12,
+            'injury_description'  => 'Ankle',
+        ]);
+
+        $all = $this->repo->findAllWindowInjuries('2031-08-01', '2031-08-07');
+
+        self::assertContains(200000612, array_column($all, 'pid'));
+        foreach ($this->repo->buildContext(999161)['games'] as $game) {
+            self::assertNotContains(200000612, array_column($game['injuries'], 'pid'));
+        }
+    }
+
+    /**
+     * The team is the from_teamid of the injury row (team at injury time), with
+     * its name read from that team's ibl_team_info row and its abbreviation from
+     * the RecordFormatter team registry (team 14 is MIN there).
+     */
+    public function testAllWindowInjuriesUsesFromTeamAbbreviation(): void
+    {
+        // Team 14 is in the CI seed; rename it inside this test's transaction so the name is known.
+        $rename = $this->db->prepare("UPDATE ibl_team_info SET team_name = 'Ayes' WHERE teamid = 14");
+        self::assertNotFalse($rename);
+        $rename->execute();
+        self::assertSame(1, $rename->affected_rows);
+        $this->seedTeam(999172, 'Bees City', 'Bees');
+        // Player has since moved to team 999172; the injury happened on team 14.
+        $this->insertTestPlayer(200000621, 'Moved Player', ['teamid' => 999172]);
+        $this->insertRow('ibl_jsb_transactions', [
+            'season_year'         => 2031,
+            'transaction_month'   => 8,
+            'transaction_day'     => 4,
+            'transaction_type'    => TrnFileParser::TYPE_INJURY,
+            'pid'                 => 200000621,
+            'from_teamid'         => 14,
+            'injury_games_missed' => 5,
+            'injury_description'  => 'Wrist',
+        ]);
+
+        $all = $this->repo->findAllWindowInjuries('2031-08-01', '2031-08-07');
+
+        $found = null;
+        foreach ($all as $row) {
+            if ($row['pid'] === 200000621) {
+                $found = $row;
+            }
+        }
+        self::assertNotNull($found);
+        self::assertSame(14, $found['teamid']);
+        self::assertSame('Ayes', $found['teamName']);
+        self::assertSame('MIN', $found['teamAbbrev']);
+        self::assertSame('Wrist', $found['injuryDescription']);
+        self::assertSame(5, $found['injuryGamesMissed']);
+        self::assertSame('2031-08-04', $found['date']);
+    }
+
+    /** An injury dated one day after the window end is excluded. */
+    public function testAllWindowInjuriesExcludesDatesOutsideWindow(): void
+    {
+        $this->seedTeam(999181, 'Ayes City', 'Ayes');
+        $this->insertTestPlayer(200000631, 'Late Player', ['teamid' => 999181]);
+        $this->insertRow('ibl_jsb_transactions', [
+            'season_year'         => 2031,
+            'transaction_month'   => 8,
+            'transaction_day'     => 8,
+            'transaction_type'    => TrnFileParser::TYPE_INJURY,
+            'pid'                 => 200000631,
+            'from_teamid'         => 999181,
+            'injury_games_missed' => 5,
+            'injury_description'  => 'Hand',
+        ]);
+
+        $all = $this->repo->findAllWindowInjuries('2031-08-01', '2031-08-07');
+
+        self::assertNotContains(200000631, array_column($all, 'pid'));
+    }
+
     // ── Seed helpers (game facts) ──────────────────────────────────────────────
 
     private function seedStanding(int $teamid, string $name, int $wins, int $losses): void

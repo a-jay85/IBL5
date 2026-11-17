@@ -26,19 +26,22 @@ final class ScriptsBaselineArgvExitPinTest extends TestCase
             ],
             'simRecapQueue' => [
                 'simRecapQueue.php',
-                ["'ThisscriptisCLI-only.'", '1', '0'],
+                ["'ThisscriptisCLI-only.'", '1', '2', '0'],
                 [
                     '--cause=',
                     '--cause=flaky|usage_limit|auth|transport|prompt is required for verb park',
+                    '--clear',
                     '--event=',
                     '--event=done is required for verb notify',
                     '--host=',
                     '--reset is accepted only with --cause=usage_limit',
                     '--reset must be a positive epoch',
                     '--reset=',
+                    '--retry',
                     '--sim and --host are required for verb notify',
                     '--sim must be >= 1',
                     '--sim=',
+                    '--title=',
                 ],
             ],
             'storeSimRecap' => [

@@ -375,7 +375,9 @@ if [ "$N_SUB" = "1" ] && [ "$N_OUT" -ge 1 ]; then
     h_pass "workflow step extracted (triage call rewritten once, GITHUB_OUTPUT present)"
 else
     h_fail "workflow step extracted" "skip-file rewrites: $N_SUB, GITHUB_OUTPUT lines: $N_OUT"
-    h_done
+    # Rows 23 to 26 cannot run without the step. The file keeps one h_done
+    # at its end (bin/test-harness-lib case_consumers_end_with_h_done).
+    exit 1
 fi
 
 run_step() { # fixture-json skip-file -> sets STEP_RC, STEP_OUT (found=...), STEP_TXT

@@ -756,3 +756,123 @@ func TestComputeLeagueAST48ByPos(t *testing.T) {
 		t.Errorf("empty population = %+v, want all-zero", empty)
 	}
 }
+
+// TestToBundlePlayer_CopiesRealLifePF: toBundlePlayer copies PlrPlayer.RealLifePF
+// into bundle.Player, which serialises it under the rl_pf key.
+func TestToBundlePlayer_CopiesRealLifePF(t *testing.T) {
+	p := mkBaselinePlr(1, "Foul Prone", 70, 2400, 1000, 200)
+	p.RealLifePF = 37
+	bp := toBundlePlayer(p, nil, 0, nonMatchedLeagueParams{})
+	if bp.RealLifePF != 37 {
+		t.Fatalf("bundle RealLifePF = %d, want 37", bp.RealLifePF)
+	}
+	raw, err := json.Marshal(bp)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if !strings.Contains(string(raw), `"rl_pf":37`) {
+		t.Errorf("bundle JSON lacks \"rl_pf\":37: %s", raw)
+	}
+}
+
+// TestComputeLeagueRate48_J18Filter: only j18Eligible players feed the league
+// per-48 rates. Record 960, MIN == 2×GP (strict > excludes it) and a blank
+// name are all excluded; an all-ineligible population returns nil.
+func TestComputeLeagueRate48_J18Filter(t *testing.T) {
+	mk := func(rec int, name string, gp, min, pf, tov, fta, fga int) PlrPlayer {
+		return PlrPlayer{
+			RecordIndex: rec, Name: name, RealLifeGP: gp, RealLifeMIN: min,
+			RealLifePF: pf, RealLifeTVR: tov, RealLifeFTA: fta, RealLifeFGA: fga,
+		}
+	}
+	eligible := mk(1, "Eligible", 70, 2400, 180, 140, 300, 1000)
+	players := []PlrPlayer{
+		eligible,
+		mk(960, "Past Scan", 70, 2400, 999, 999, 999, 999),
+		mk(2, "Boundary", 60, 120, 999, 999, 999, 999),
+		mk(3, "", 70, 2400, 999, 999, 999, 999),
+	}
+	got := computeLeagueRate48(players)
+	if got == nil {
+		t.Fatal("computeLeagueRate48 = nil, want the eligible player's rates")
+	}
+	want := func(sum int) float64 { return float64(sum) / float64(2400) * 48 }
+	if got.PF != want(180) || got.TOV != want(140) || got.FTA != want(300) || got.FGA != want(1000) {
+		t.Errorf("rates = %+v, want PF %v TOV %v FTA %v FGA %v",
+			*got, want(180), want(140), want(300), want(1000))
+	}
+	if r := computeLeagueRate48(players[1:]); r != nil {
+		t.Errorf("no eligible player: computeLeagueRate48 = %+v, want nil", *r)
+	}
+}
+
+// df0TestBundle assembles a one-game bundle from two rosters (team 18 and an
+// opponent, team 2) through ToBundle.
+func df0TestBundle(t *testing.T, home, away []PlrPlayer) bundle.Bundle {
+	t.Helper()
+	players := append(append([]PlrPlayer{}, home...), away...)
+	sched := []SchGame{{Month: 11, Day: 1, VisitorTeamID: 2, HomeTeamID: 18}}
+	b, err := ToBundle(players, sched, AssembleOptions{})
+	if err != nil {
+		t.Fatalf("ToBundle: %v", err)
+	}
+	return b
+}
+
+func df0Roster(tid int, pf, min []int) []PlrPlayer {
+	out := make([]PlrPlayer, len(pf))
+	for i := range pf {
+		out[i] = PlrPlayer{
+			Ordinal: tid*100 + i + 1, PID: tid*100 + i + 1, TeamID: tid,
+			Name: fmt.Sprintf("P%d-%d", tid, i), RealLifeGP: 70,
+			RealLifePF: pf[i], RealLifeMIN: min[i],
+		}
+	}
+	return out
+}
+
+func teamByID(t *testing.T, b bundle.Bundle, id int) bundle.Team {
+	t.Helper()
+	for _, tm := range b.Teams {
+		if tm.TeamID == id {
+			return tm
+		}
+	}
+	t.Fatalf("team %d missing from bundle", id)
+	return bundle.Team{}
+}
+
+// TestToBundle_TeamDF0: five players carrying team 18's real roster totals
+// (ΣPF 2094, ΣMIN 26154, ΣMIN % 5 == 4) give DF0 = ΣPF / (ΣMIN/5 truncated) × 48.
+func TestToBundle_TeamDF0(t *testing.T) {
+	home := df0Roster(18, []int{500, 450, 400, 400, 344}, []int{6000, 5500, 5200, 5000, 4454})
+	away := df0Roster(2, []int{100}, []int{2000})
+	b := df0TestBundle(t, home, away)
+	tm := teamByID(t, b, 18)
+	if tm.DF0 == nil {
+		t.Fatal("team 18 DF0 = nil, want ΣPF/D×48")
+	}
+	const want = 19.21835564053537 // 2094 / (26154 // 5) * 48
+	if *tm.DF0 != want {
+		t.Errorf("team 18 DF0 = %.17g, want %.17g (integer D = ΣMIN/5)", *tm.DF0, want)
+	}
+}
+
+// TestToBundle_TeamDF0_NilWhenNoMinutes: a roster with no real-life minutes
+// has D == 0, gets a nil DF0, and its JSON omits df0.
+func TestToBundle_TeamDF0_NilWhenNoMinutes(t *testing.T) {
+	home := df0Roster(18, []int{0, 0}, []int{0, 0})
+	away := df0Roster(2, []int{100}, []int{2000})
+	b := df0TestBundle(t, home, away)
+	tm := teamByID(t, b, 18)
+	if tm.DF0 != nil {
+		t.Fatalf("team 18 DF0 = %v, want nil with no minutes", *tm.DF0)
+	}
+	raw, err := json.Marshal(tm)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if strings.Contains(string(raw), "df0") {
+		t.Errorf("team JSON carries df0 with no minutes: %s", raw)
+	}
+}

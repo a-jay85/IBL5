@@ -36,19 +36,6 @@ func resolveBaseTimeMid(opts Options) float64 {
 	return baseTimeMid
 }
 
-func resolveStealTurnoverScale(opts Options) float64 {
-	if opts.StealTurnoverScale != nil {
-		return *opts.StealTurnoverScale
-	}
-	return stealTurnoverScale
-}
-func resolveNonStealTurnoverScale(opts Options) float64 {
-	if opts.NonStealTurnoverScale != nil {
-		return *opts.NonStealTurnoverScale
-	}
-	return nonStealTurnoverScale
-}
-
 // simGameWith is simGame plus the freeze/accumulation Options (freeze.go). A zero
 // Options leaves every possession decision byte-identical to simGame; a non-zero
 // Options either harvests league-mean derived values (opts.Accum) or substitutes a
@@ -61,6 +48,7 @@ func simGameWith(b bundle.Bundle, g bundle.Game, r *rng.RNG, opts Options) (resu
 	// Branch-B inert. Reading b.Teams here is the only place the loop touches it.
 	visitor.drbRate, visitor.astRate = teamRates(b, g.VisitorTeamID)
 	home.drbRate, home.astRate = teamRates(b, g.HomeTeamID)
+	visitor.team, home.team = teamOf(b, g.VisitorTeamID), teamOf(b, g.HomeTeamID)
 
 	gs := &gameState{rng: r, gameType: g.GameType, madeFG: map[int]int{}, freeze: opts.Freeze, accum: opts.Accum, branchB: opts.BranchBAccum, gateCont: opts.GateCont, fastClass: opts.FastClassAccum, threePtDiag: opts.ThreePtDiag, outcomeDiag: opts.OutcomeDiag}
 	// The L1 gate-1 baseline is league-constant, so resolve it ONCE per game. The live
@@ -95,8 +83,6 @@ func simGameWith(b bundle.Bundle, g bundle.Game, r *rng.RNG, opts Options) (resu
 	// DRB-push (Phase 4) fast classes widen the mix further, drawn off the
 	// PRIOR possession's outcome below.
 	baseTime := resolveBaseTimeMid(opts)
-	gs.stealTurnoverScale = resolveStealTurnoverScale(opts)
-	gs.nonStealTurnoverScale = resolveNonStealTurnoverScale(opts)
 
 	// Tip-off winner starts on offense; possessions strictly alternate.
 	offense, defense := visitor, home
@@ -241,6 +227,17 @@ func teamRates(b bundle.Bundle, teamID int) (drbRate, astRate float64) {
 		}
 	}
 	return 0, 0
+}
+
+// teamOf returns the team's b.Teams entry, or nil when the team is absent (the
+// bucket-3 chain then keeps the rating path).
+func teamOf(b bundle.Bundle, teamID int) *bundle.Team {
+	for i := range b.Teams {
+		if b.Teams[i].TeamID == teamID {
+			return &b.Teams[i]
+		}
+	}
+	return nil
 }
 
 // rosterMetaOf snapshots a team's roster metadata (identity, position, finalized

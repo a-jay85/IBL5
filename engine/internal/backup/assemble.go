@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strings"
 
 	"github.com/a-jay85/IBL5/engine/internal/bundle"
 )
@@ -49,6 +50,74 @@ func floor1AST(r int) float64 {
 // pin-20260712.md, exact-reproduction pin 19.78050919336985, n=376).
 const leagueShotBaselineMaxRecordIndex = 959
 
+// teamDF0 is the team +0xDF0 defensive-foul aggregate (asm 4d4c19-4d4c32):
+// ΣPF / D × 48, where D is the integer ΣMIN/5 (the 0x66666667 truncating
+// divide at 4d490b-4d4942) over the team's full roster with no MIN filter. The
+// per-player f projection is 1.00 at the default fields, so (2-f) and the
+// __ftol(PF·f) step are identities and drop out. D == 0 (no real-life minutes)
+// is undefined in JSB, so the team gets nil and the sim keeps its rating path.
+func teamDF0(sumPF, sumMIN int) *float64 {
+	d := sumMIN / 5
+	if d > 0 {
+		df0 := float64(sumPF) / float64(d) * 48
+		return &df0
+	}
+	return nil
+}
+
+// j18Eligible is the J18 league-table population filter shared by every
+// league rate assembled from raw .plr records: the record sits within the scan
+// (RecordIndex ≤ leagueShotBaselineMaxRecordIndex), carries a non-empty Name,
+// and has RealLifeMIN > 2×RealLifeGP (strict, so MIN == 2×GP is excluded).
+func j18Eligible(p PlrPlayer) bool {
+	return p.RecordIndex <= leagueShotBaselineMaxRecordIndex &&
+		strings.TrimSpace(p.Name) != "" &&
+		p.RealLifeMIN > 2*p.RealLifeGP
+}
+
+// computeLeagueRate48 assembles the league PF/TOV/FTA/FGA per-48-player-minute
+// rates over the j18Eligible population (C+0x6668 is total FGA/48, 3GA+2PA).
+// Sums stay integers; each rate is float64(sumX)/float64(sumMIN)*48 in that
+// order, which reproduces the J18 reader's pins to every digit. Returns nil
+// when no eligible player has minutes.
+func computeLeagueRate48(players []PlrPlayer) *bundle.LeagueRate48 {
+	r, _, _ := leagueRate48Stats(players)
+	return r
+}
+
+// leagueRate48Stats is computeLeagueRate48 plus the population size and ΣMIN
+// the calibration gate prints.
+func leagueRate48Stats(players []PlrPlayer) (*bundle.LeagueRate48, int, int) {
+	var n, sumPF, sumTOV, sumFTA, sumFGA, sumMIN int
+	for _, p := range players {
+		if !j18Eligible(p) {
+			continue
+		}
+		n++
+		sumPF += p.RealLifePF
+		sumTOV += p.RealLifeTVR
+		sumFTA += p.RealLifeFTA
+		sumFGA += p.RealLifeFGA
+		sumMIN += p.RealLifeMIN
+	}
+	if sumMIN == 0 {
+		return nil, n, sumMIN
+	}
+	rate := func(sum int) float64 { return float64(sum) / float64(sumMIN) * 48 }
+	return &bundle.LeagueRate48{
+		PF:  rate(sumPF),
+		TOV: rate(sumTOV),
+		FTA: rate(sumFTA),
+		FGA: rate(sumFGA),
+	}, n, sumMIN
+}
+
+// LeagueRate48Calibration exposes the league per-48 rates with the population
+// size and ΣMIN, for the cmd/reallife-fixture calibration gate.
+func LeagueRate48Calibration(players []PlrPlayer) (rate *bundle.LeagueRate48, n, sumMIN int) {
+	return leagueRate48Stats(players)
+}
+
 // computeLeagueShotBaseline is the faithful FUN_004385f0 league-table port
 // for the CEngine+0x6638 row: the league's 2-point attempts per 48 player-
 // minutes, (Σ2PA / ΣMIN) × 48 over qualifying RAW .plr records — deliberately
@@ -66,13 +135,7 @@ const leagueShotBaselineMaxRecordIndex = 959
 func computeLeagueShotBaseline(players []PlrPlayer) float64 {
 	var sum2PA, sumMIN float64
 	for _, p := range players {
-		if p.RecordIndex > leagueShotBaselineMaxRecordIndex {
-			continue
-		}
-		if p.Name == "" {
-			continue
-		}
-		if p.RealLifeMIN > 2*p.RealLifeGP {
+		if j18Eligible(p) {
 			sum2PA += float64(p.RealLifeFGA - p.RealLife3GA)
 			sumMIN += float64(p.RealLifeMIN)
 		}
@@ -91,13 +154,7 @@ func computeLeagueShotBaseline(players []PlrPlayer) float64 {
 func computeLeagueBlk48(players []PlrPlayer) float64 {
 	var sumBLK, sumMIN float64
 	for _, p := range players {
-		if p.RecordIndex > leagueShotBaselineMaxRecordIndex {
-			continue
-		}
-		if p.Name == "" {
-			continue
-		}
-		if p.RealLifeMIN > 2*p.RealLifeGP {
+		if j18Eligible(p) {
 			sumBLK += float64(p.RealLifeBLK)
 			sumMIN += float64(p.RealLifeMIN)
 		}
@@ -268,10 +325,7 @@ func computeLeagueAST48ByPos(players []PlrPlayer) [6]float64 {
 	var sum [6]float64
 	var n [6]int
 	for _, p := range players {
-		if p.RecordIndex > leagueShotBaselineMaxRecordIndex || p.Name == "" {
-			continue
-		}
-		if p.RealLifeMIN > 2*p.RealLifeGP && p.RealLifeMIN > 0 {
+		if j18Eligible(p) && p.RealLifeMIN > 0 {
 			pos := primaryDepthPos(p) // 1..5 from PGDepth==1 → 1, …, CDepth==1 → 5
 			if pos >= 1 && pos <= 5 {
 				sum[pos] += float64(p.RealLifeAST) / float64(p.RealLifeMIN) * 48.0
@@ -399,7 +453,7 @@ func ToBundle(players []PlrPlayer, sched []SchGame, opts AssembleOptions) (bundl
 	bundlePlayers := make([]bundle.Player, 0, len(players))
 	// Accumulate each team's Σ season GP/DRB/AST over its player rows — the faithful
 	// JSB team-rate inputs (see teamDRBRateBase). Keyed by TeamID.
-	type rateAcc struct{ gp, drb, ast int }
+	type rateAcc struct{ gp, drb, ast, pf, min int }
 	rates := make(map[int]*rateAcc, 32)
 	for _, p := range players {
 		rosterTeams[p.TeamID] = true
@@ -412,6 +466,8 @@ func ToBundle(players []PlrPlayer, sched []SchGame, opts AssembleOptions) (bundl
 		ra.gp += p.SeasonGP
 		ra.drb += p.SeasonDRB
 		ra.ast += p.SeasonAST
+		ra.pf += p.RealLifePF
+		ra.min += p.RealLifeMIN
 	}
 
 	scheduleTeams := make(map[int]bool, 32)
@@ -445,6 +501,9 @@ func ToBundle(players []PlrPlayer, sched []SchGame, opts AssembleOptions) (bundl
 			t.DRBRate = float64(ra.drb) / float64(ra.gp) * teamDRBRateBase
 			t.ASTRate = float64(ra.ast) / float64(ra.gp) * teamASTRateBase
 		}
+		if ra := rates[id]; ra != nil {
+			t.DF0 = teamDF0(ra.pf, ra.min)
+		}
 		teams = append(teams, t)
 	}
 
@@ -457,6 +516,7 @@ func ToBundle(players []PlrPlayer, sched []SchGame, opts AssembleOptions) (bundl
 		LeagueShotBaseline: computeLeagueShotBaseline(players),
 		LeagueBlk48:        computeLeagueBlk48(players),
 		LeagueAST48ByPos:   leagueAST48ByPos,
+		LeagueRate48:       computeLeagueRate48(players),
 	}, nil
 }
 
@@ -546,6 +606,7 @@ func toBundlePlayer(p PlrPlayer, minutes map[int]int, leagueAST48Standin float64
 		RealLifeFGM: p.RealLifeFGM,
 		RealLife3GM: p.RealLife3GM,
 		RealLifeBLK: p.RealLifeBLK,
+		RealLifePF:  p.RealLifePF,
 		D80:         d80,
 		D60:         d60,
 		D64:         d64,

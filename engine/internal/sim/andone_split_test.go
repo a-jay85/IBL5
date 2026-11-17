@@ -85,8 +85,8 @@ func TestAndOneHomeAwaySplit(t *testing.T) {
 }
 
 // TestAndOneWeightOrder pins the JSB order of the half-court and-one weight:
-// the HCA addend joins the raw weight (scaled by the J27 andOneHalfCourtScale
-// stand-in) first and the floor applies to the sum (FUN_004e1ba0 97158-97168).
+// the HCA addend joins the raw weight first and the floor applies to the sum
+// (FUN_004e1ba0 97158-97168).
 func TestAndOneWeightOrder(t *testing.T) {
 	var p onCourt
 	p.FGP = 50
@@ -99,8 +99,8 @@ func TestAndOneWeightOrder(t *testing.T) {
 		t.Errorf("below the floor: got %v, want exactly %v", got, andOneBucketFloor)
 	}
 	home := hcaMagnitude * hcaSite2BasisScale
-	if got, want := halfCourtAndOneWeight(0, p, home), andOneHalfCourtScale*raw+home; got != want {
-		t.Errorf("above the floor: got %v, want scaled raw plus HCA %v", got, want)
+	if got, want := halfCourtAndOneWeight(0, p, home), raw+home; got != want {
+		t.Errorf("above the floor: got %v, want raw plus HCA %v", got, want)
 	}
 	if got := andOneBucketWeight(0, p); got != raw {
 		t.Errorf("andOneBucketWeight above the floor: got %v, want raw %v", got, raw)

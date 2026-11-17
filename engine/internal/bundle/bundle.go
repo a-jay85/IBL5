@@ -64,6 +64,10 @@ type Team struct {
 	Name    string  `json:"name"`
 	DRBRate float64 `json:"drb_rate"`
 	ASTRate float64 `json:"ast_rate"`
+	// DF0 is the team +0xDF0 defensive-foul aggregate ΣPF/D×48 (D = integer
+	// ΣMIN/5 over the full roster, backup.teamDF0). nil when the roster has no
+	// real-life minutes; the sim then keeps the rating-path bucket-3 weight.
+	DF0 *float64 `json:"df0,omitempty"`
 }
 
 // Player carries the source-of-truth ratings from ibl_plr plus depth-chart
@@ -112,6 +116,9 @@ type Player struct {
 	// RealLifeSTL (STL/MIN×44) and RealLifeTVR (TOV/MIN×48) — the faithful per-player
 	// J22 wiring. PHP PlrParserService already emits rl_stl/rl_tvr; these JSON tags are
 	// the matching Go half. Zero MINUTES → rating stand-in fallback (RealLifeMIN==0 guard).
+	//
+	// RealLifePF (PF, .plr offset 108) feeds the per-team DF0 = ΣPF/D×48 defensive
+	// foul aggregate (bundle.Team.DF0) and the league PF/48 calibration.
 	RealLifeGP  int `json:"rl_gp"`
 	RealLifeMIN int `json:"rl_min"`
 	RealLifeFGA int `json:"rl_fga"`
@@ -124,6 +131,7 @@ type Player struct {
 	RealLife3GM int `json:"rl_3gm"`
 	RealLifeBLK int `json:"rl_blk"`
 	RealLifeAST int `json:"rl_ast"`
+	RealLifePF  int `json:"rl_pf"`
 
 	// Per-player derived make-rate composites computed at bundle-build time
 	// (backup/assemble.go toBundlePlayer). D80/D60/D64 are per-mille values;
@@ -222,6 +230,20 @@ type Bundle struct {
 	// zero entry (unwired bundle) makes the matched term reduce to DefAST48·0.8·
 	// fatigue — a graceful degrade, no divide-by-zero.
 	LeagueAST48ByPos [6]float64 `json:"league_ast48_by_pos"`
+	// LeagueRate48 carries the league PF/TOV/FTA/FGA per-48-player-minute rates
+	// over the same J18 population (backup.computeLeagueRate48). The sim reads
+	// static pins (sim/bucketweights.go); this field lets a committed real-life
+	// fixture re-prove those pins in CI. nil (and omitted) on rating-only bundles.
+	LeagueRate48 *LeagueRate48 `json:"league_rate48,omitempty"`
+}
+
+// LeagueRate48 is the league per-48-player-minute rate row set: PF/48, TOV/48,
+// FTA/48 and total FGA/48 (3GA+2PA, CEngine+0x6668).
+type LeagueRate48 struct {
+	PF  float64 `json:"pf48"`
+	TOV float64 `json:"tov48"`
+	FTA float64 `json:"fta48"`
+	FGA float64 `json:"fga48"`
 }
 
 // Validation errors surfaced at the contract boundary.

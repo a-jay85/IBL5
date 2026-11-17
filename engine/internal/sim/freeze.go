@@ -29,7 +29,7 @@ import (
 // engine.
 type FreezeConfig struct {
 	ORB  bool // freeze P(offensive rebound)             — orebProbability output
-	TVR  bool // freeze the steal-driven turnover prob.  — turnoverProb output
+	TVR  bool // inert since the live-outcome-map port (the steal-driven turnover prob. it froze is gone)
 	Foul bool // freeze the foul-only bucket weight      — foulBucketWeight output
 	Make bool // freeze the 2pt make-value               — shotValue2pt output (pre-clutch)
 
@@ -114,7 +114,7 @@ type FreezeConfig struct {
 // ACTUAL derived quantity at its call site, never an event-rate proxy:
 //   - OrebProb:   mean live ORB-continuation P (faithful sqrt gate1Probability by
 //     default; linear orebProbability under the UnfaithfulOreb hatch)
-//   - TurnProb:   mean per-possession steal-driven turnoverProb output ∈ [0, maxTurnoverProb]
+//   - TurnProb:   inert since the live-outcome-map port (no sample feeds it)
 //   - FoulWeight: mean foulBucketWeight output
 //   - MakeVal2pt: mean PRE-clutch shotValue2pt output (per-mille)
 //
@@ -438,8 +438,8 @@ type OutcomeDiagAccum struct {
 	// by construction and must not dilute the denominator-dilution ratio).
 	Sum2ptW           float64 // Σ twoPtWeight
 	Sum3ptW           float64 // Σ threePtWeight
-	SumFoulW          float64 // Σ foulOnlyWeight
-	SumAndOneW        float64 // Σ andOneWeight
+	SumFoulW          float64 // Σ code-4 turnoverWeight (foulBucketWeight; the field keeps its pre-port name)
+	SumAndOneW        float64 // Σ code-3 foulWeight (the field keeps its pre-port name)
 	SumThreeShare2    float64 // Σ threePtW / (twoPtW+threePtW)                      — 2-bucket ratio (candidate b)
 	SumThreeShareFull float64 // Σ threePtW / (twoPtW+threePtW+foulW+andOneW)        — full ratio (foul/andOne lever)
 }
@@ -546,10 +546,10 @@ type Options struct {
 	// work. See tempo.go and ADR-0085.
 	BaseTimeMid *float64
 
-	// StealTurnoverScale / NonStealTurnoverScale override the package consts
-	// stealTurnoverScale / nonStealTurnoverScale (steal.go) for the J14 research
-	// turnover-scale sweep. nil → use the const (a zero Options stays byte-identical
-	// to Simulate); non-nil → use the pointed-to value. Always a valid float when set.
+	// StealTurnoverScale / NonStealTurnoverScale are inert since the
+	// live-outcome-map port: the fitted steal and non-steal turnover scales they
+	// overrode are gone (steal.go now ports the code-4 path). They stay so the
+	// internal/calibrate J14 sweep seam still compiles.
 	StealTurnoverScale    *float64
 	NonStealTurnoverScale *float64
 
@@ -587,15 +587,13 @@ type Options struct {
 // validate rejects a config that freezes an arm with no precomputed (zero) mean — a
 // misconfiguration that would otherwise silently substitute 0, which is degenerate
 // for every arm (orebProb 0 disables offensive rebounds; makeVal 0 makes every shot
-// miss; foulWeight 0 removes the foul path; turnProb 0 removes steal-driven
-// turnovers). Every real derived value is strictly positive, so a zero frozen mean
-// can only mean "unset".
+// miss; foulWeight 0 removes the foul path). Every real derived value is strictly
+// positive, so a zero frozen mean can only mean "unset". TVR has no check: the
+// live-outcome-map port left it inert, and no sample feeds Means.TurnProb, so a
+// harvested TurnProb is always 0.
 func (o Options) validate() error {
 	if o.Freeze.ORB && o.Freeze.Means.OrebProb == 0 {
 		return fmt.Errorf("sim: freeze ORB requested but Means.OrebProb is unset (0)")
-	}
-	if o.Freeze.TVR && o.Freeze.Means.TurnProb == 0 {
-		return fmt.Errorf("sim: freeze TVR requested but Means.TurnProb is unset (0)")
 	}
 	if o.Freeze.Foul && o.Freeze.Means.FoulWeight == 0 {
 		return fmt.Errorf("sim: freeze Foul requested but Means.FoulWeight is unset (0)")
@@ -667,38 +665,18 @@ func (gs *gameState) accumulateGateCont(offTeamID int, off, def float64) {
 	t.sumDefStr += def
 }
 
-// turnoverProb returns the per-possession steal-driven turnover probability from
-// offensive carelessness × defensive steal pressure (steal.go), scaled by
-// stealTurnoverScale and clamped to [0, maxTurnoverProb]. Frozen (TVR arm) → the
-// league-mean probability, making the turnover rate league-uniform so the freeze
-// lattice can measure how collapsing the STL→steal→fast-break coupling moves
-// Cov(lnFGA,lnPPS) (the ADR-0045 Cov re-run). The caller draws its gs.rng.Float64()
-// roll unconditionally, so live and frozen passes consume the RNG identically.
-func (gs *gameState) turnoverProb(careless, pressure float64) float64 {
-	p := gs.stealTurnoverScale * careless * pressure
-	if p < 0 {
-		p = 0
-	}
-	if p > maxTurnoverProb {
-		p = maxTurnoverProb
-	}
-	if gs.accum != nil {
-		gs.accum.turnSum += p
-		gs.accum.turnN++
-	}
-	if gs.freeze.TVR {
-		return gs.freeze.Means.TurnProb
-	}
-	return p
-}
-
 // foulWeight returns the foul-only bucket weight; frozen → the league-mean foul
 // weight. It takes the ball handler, offense, and defense lineups plus the per-team
 // hca delta (raw ±0.2 half-court, 0 transition/ASG): the foul BASE (leg B) and offQ
 // (leg C) carry the RAW HCA — see foulBucketWeight. hca=0 recovers the symmetric path.
 // mq is the possession's matchupQuality, the :97164 shrink operand (J18 item 6).
 func (gs *gameState) foulWeight(bh onCourt, offense, defenders []onCourt, hca, mq float64) float64 {
-	w := foulBucketWeight(bh, offense, defenders, hca, mq, gs.rng)
+	return gs.recordFoulWeight(foulBucketWeight(bh, offense, defenders, hca, mq, gs.rng))
+}
+
+// recordFoulWeight is foulWeight's accumulate-then-freeze step for a raw foul
+// weight the caller already drew (playBuckets draws it after the and-one).
+func (gs *gameState) recordFoulWeight(w float64) float64 {
 	if gs.accum != nil {
 		gs.accum.foulSum += w
 		gs.accum.foulN++

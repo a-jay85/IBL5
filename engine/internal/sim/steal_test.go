@@ -1,7 +1,6 @@
 package sim
 
 import (
-	"math"
 	"testing"
 
 	"github.com/a-jay85/IBL5/engine/internal/bundle"
@@ -17,8 +16,8 @@ func twoTeams() (*teamState, *teamState) {
 }
 
 // stealLineupPlayers builds a 5-starter player slice for team `teamID`, overriding
-// every player's TVR (ball-handler carelessness) and STL (steal pressure) so the
-// steal-turnover orientation is controllable and not clamp-saturated.
+// every player's TVR (turnover rate stand-in) and STL (steal rate stand-in) so the
+// steal split is controllable.
 func stealLineupPlayers(teamID, tvr, stl int) []bundle.Player {
 	var players []bundle.Player
 	pid := teamID * 100
@@ -33,139 +32,105 @@ func stealLineupPlayers(teamID, tvr, stl int) []bundle.Player {
 }
 
 // stealLineups builds offense (team 7) and defense (team 3) 5-starter teams with a
-// given ball-handler TVR and defender STL. Returned via newTeamState so the live
+// given offense TVR and defender STL. Returned via newTeamState so the live
 // maps (injured, box) are initialized.
-func stealLineups(victimTVR, defenderSTL int) (*teamState, *teamState) {
-	players := append(stealLineupPlayers(7, victimTVR, 30), stealLineupPlayers(3, 40, defenderSTL)...)
+func stealLineups(offenseTVR, defenderSTL int) (*teamState, *teamState) {
+	players := append(stealLineupPlayers(7, offenseTVR, 30), stealLineupPlayers(3, 40, defenderSTL)...)
 	return newTeamState(players, 7, false), newTeamState(players, 3, true)
 }
 
-// countStealTurnovers runs `seeds` independent single steal-turnover rolls (one
-// fresh RNG per seed) and returns how many resolved to a turnover. count/seeds
-// approximates the per-possession steal-turnover probability.
-func countStealTurnovers(victimTVR, defenderSTL int, seeds uint64) int {
-	count := 0
+// turnoverPathTally runs `seeds` independent code-4 turnover paths (one fresh RNG
+// per seed) and counts the steals and offensive fouls among them.
+func turnoverPathTally(offenseTVR, defenderSTL int, seeds uint64) (steals, offFouls int) {
 	for s := uint64(1); s <= seeds; s++ {
-		off, def := stealLineups(victimTVR, defenderSTL)
-		gs := &gameState{rng: rng.New(s), period: 1, clock: 500, stealTurnoverScale: stealTurnoverScale, nonStealTurnoverScale: nonStealTurnoverScale}
-		if gs.stealTurnover(off, def, off.players[0]) {
-			count++
+		off, def := stealLineups(offenseTVR, defenderSTL)
+		gs := &gameState{rng: rng.New(s), period: 1, clock: 500}
+		if gs.resolveTurnoverPath(off, def, off.players[0], outcomeTurnover) {
+			steals++
+		}
+		if off.teamFouls > 0 {
+			offFouls++
 		}
 	}
-	return count
+	return steals, offFouls
 }
 
-// --- matrix #3: orientation — higher TVR → fewer TO; more STL → more TO --------
-
-func TestTurnoverCarelessness_Orientation(t *testing.T) {
-	// Higher TVR (better ball security) → lower carelessness → fewer turnovers.
-	if turnoverCarelessness(20) <= turnoverCarelessness(80) {
-		t.Errorf("carelessness must decrease with TVR: tvr20=%v tvr80=%v",
-			turnoverCarelessness(20), turnoverCarelessness(80))
+// The steal split is the defense's steal pool against the offense's turnover
+// pool (FUN_004e2fc0): a higher-STL defense steals more of the turnovers, and a
+// more turnover-prone offense (a bigger roll range) loses fewer of them to steals.
+func TestResolveTurnoverPath_StealSplitOrientation(t *testing.T) {
+	hiSTL, _ := turnoverPathTally(40, 60, 4000)
+	loSTL, _ := turnoverPathTally(40, 10, 4000)
+	if hiSTL <= loSTL {
+		t.Errorf("STL=60 defense steals %d, STL=10 steals %d; want more steals from the higher-STL defense", hiSTL, loSTL)
 	}
-	// Exact orientation: carelessnessBase − TVR.
-	if got := turnoverCarelessness(40); got != carelessnessBase-40 {
-		t.Errorf("carelessness(40) = %v, want %v", got, carelessnessBase-40)
-	}
-	// Floored at 0 for an over-base rating (never negative).
-	if got := turnoverCarelessness(150); got != 0 {
-		t.Errorf("carelessness(150) = %v, want 0 (floor)", got)
-	}
-}
-
-func TestStealTurnover_ScalesWithDefensiveSTL(t *testing.T) {
-	const seeds = 4000
-	// Same ball-handler carelessness (TVR 40); only defensive STL differs.
-	lowSTL := countStealTurnovers(40, 10, seeds)
-	highSTL := countStealTurnovers(40, 40, seeds)
-	if highSTL <= lowSTL {
-		t.Errorf("high-STL defense should force MORE turnovers than low-STL: high=%d low=%d (of %d)",
-			highSTL, lowSTL, seeds)
+	loTVR, _ := turnoverPathTally(20, 30, 4000)
+	hiTVR, _ := turnoverPathTally(80, 30, 4000)
+	if hiTVR >= loTVR {
+		t.Errorf("TVR=80 offense lost %d steals, TVR=20 lost %d; want fewer steals against the bigger turnover pool", hiTVR, loTVR)
 	}
 }
 
-func TestStealTurnover_HigherTVRFewerTurnovers(t *testing.T) {
-	const seeds = 4000
-	// Same defensive STL; only ball-handler TVR differs.
-	careless := countStealTurnovers(20, 25, seeds) // low TVR = careless
-	secure := countStealTurnovers(80, 25, seeds)   // high TVR = secure
-	if secure >= careless {
-		t.Errorf("a higher-TVR (more secure) handler should turn it over LESS: secure=%d careless=%d (of %d)",
-			secure, careless, seeds)
+// stealPool caps at defQualityCapMultiplier·defQualityCapTeamMult·leagueSTL48, the
+// same ceiling defQuality uses.
+func TestStealPool_CappedAtDefQualityCeiling(t *testing.T) {
+	_, def := stealLineups(40, 99)
+	for i := range def.players {
+		def.players[i].RealLifeMIN = 1
+		def.players[i].RealLifeSTL = 100 // 4400 per 44: far past the cap
+		def.players[i].fatigue = 1
+	}
+	want := defQualityCapMultiplier * defQualityCapTeamMult * leagueSTL48
+	if got := stealPool(def); got != want {
+		t.Errorf("stealPool = %v, want the cap %v", got, want)
 	}
 }
 
-func TestTeamStealPressure_ScalesWithSTL(t *testing.T) {
-	hi := teamStealPressure(newTeamState(stealLineupPlayers(3, 40, 40), 3, true))
-	lo := teamStealPressure(newTeamState(stealLineupPlayers(3, 40, 10), 3, true))
-	if !(hi > lo && lo > 0) {
-		t.Errorf("steal pressure must rise with STL and be positive: hi=%v lo=%v", hi, lo)
+// turnoverPool weights each offensive player's tovRate by (2.0 − fatigue).
+func TestTurnoverPool_FatigueWeighting(t *testing.T) {
+	off, _ := stealLineups(40, 30)
+	var want float64
+	for i := range off.players {
+		off.players[i].fatigue = 0.5
+		want += 1.5 * tovRate(off.players[i])
 	}
-	zero := teamStealPressure(newTeamState(stealLineupPlayers(3, 40, 0), 3, true))
-	if zero != 0 {
-		t.Errorf("all-zero-STL pressure = %v, want 0", zero)
-	}
-}
-
-// --- matrix #4: negative/boundary — zero STL, zero ratings ---------------------
-
-func TestStealTurnover_AllZeroSTLNoTurnover(t *testing.T) {
-	// An all-zero-STL defense has zero steal pressure → probability 0 → no
-	// steal-driven turnover, and no divide-by-zero / panic.
-	const seeds = 2000
-	if got := countStealTurnovers(40, 0, seeds); got != 0 {
-		t.Errorf("zero-STL defense produced %d steal turnovers, want 0", got)
+	if got := turnoverPool(off); got != want {
+		t.Errorf("turnoverPool = %v, want %v", got, want)
 	}
 }
 
-func TestTurnoverProb_NoNaNOnEmptyRatings(t *testing.T) {
-	// All-zero TVR (carelessness = base) and all-zero STL (pressure 0): the weight
-	// must be finite, never NaN/Inf, and exactly 0 (no pressure).
-	gs := &gameState{stealTurnoverScale: stealTurnoverScale, nonStealTurnoverScale: nonStealTurnoverScale}
-	pressure := teamStealPressure(newTeamState(stealLineupPlayers(3, 0, 0), 3, true))
-	p := gs.turnoverProb(turnoverCarelessness(0), pressure)
-	if math.IsNaN(p) || math.IsInf(p, 0) {
-		t.Errorf("turnoverProb on empty ratings = %v, want finite", p)
-	}
-	if p != 0 {
-		t.Errorf("zero steal pressure → prob %v, want 0", p)
-	}
-}
+// --- on a steal, the defender is credited STL and the ball handler keeps TOV ---
 
-// --- matrix #5: on a steal-driven TO, defender credited STL, victim keeps TOV --
-
-// On a steal-driven turnover stealTurnover emits EventTurnover (victim, → GameTOV)
+// On a steal resolveTurnoverPath emits EventTurnover (ball handler, → GameTOV)
 // AND EventSteal (DefenderID = stealer, → the stealer's GameSTL). aggregateBoxes
 // derives the box counters from those events; the helper writes no box rows.
 func TestStealTurnover_CreditsDefenderVictimKeepsTOV(t *testing.T) {
-	// A careless handler vs a high-STL defense almost always turns it over; find
-	// the first seed that does so (the probabilities cannot be forced exactly).
 	for seed := uint64(1); seed < 200; seed++ {
 		offense, defense := stealLineups(10, 45)
 		victim := offense.players[0]
-		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500, stealTurnoverScale: stealTurnoverScale, nonStealTurnoverScale: nonStealTurnoverScale}
-		if !gs.stealTurnover(offense, defense, victim) {
+		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500}
+		if !gs.resolveTurnoverPath(offense, defense, victim, outcomeTurnover) {
 			continue
 		}
 
-		var tos, steals []result.Event
+		var tos, steals, fouls []result.Event
 		for _, e := range gs.events {
 			switch e.Kind {
 			case result.EventTurnover:
 				tos = append(tos, e)
 			case result.EventSteal:
 				steals = append(steals, e)
+			case result.EventFoul:
+				fouls = append(fouls, e)
 			}
 		}
-		if len(tos) != 1 || len(steals) != 1 {
-			t.Fatalf("expected 1 turnover + 1 steal, got %d turnovers / %d steals", len(tos), len(steals))
+		if len(tos) != 1 || len(steals) != 1 || len(fouls) != 0 {
+			t.Fatalf("expected 1 turnover + 1 steal + 0 fouls, got %d / %d / %d", len(tos), len(steals), len(fouls))
 		}
-		// Turnover belongs to the victim (→ GameTOV).
 		if tos[0].PlayerID != victim.PID || tos[0].TeamID != offense.teamID {
 			t.Errorf("turnover PlayerID/TeamID = %d/%d, want victim %d / offense %d",
 				tos[0].PlayerID, tos[0].TeamID, victim.PID, offense.teamID)
 		}
-		// Steal credits a DEFENDER via DefenderID (→ GameSTL), never the victim.
 		st := steals[0]
 		if st.PlayerID != victim.PID {
 			t.Errorf("steal PlayerID = %d, want victim %d", st.PlayerID, victim.PID)
@@ -173,82 +138,57 @@ func TestStealTurnover_CreditsDefenderVictimKeepsTOV(t *testing.T) {
 		if defense.box(st.DefenderID) == nil {
 			t.Fatalf("DefenderID %d is not on the defending team", st.DefenderID)
 		}
-		if st.DefenderID == victim.PID {
-			t.Error("stealer must not be the victim")
-		}
-		// No box rows written here (the box is event-derived).
 		if defense.box(st.DefenderID).GameSTL != 0 {
-			t.Error("stealTurnover must not write GameSTL (box is event-derived)")
+			t.Error("resolveTurnoverPath must not write GameSTL (box is event-derived)")
 		}
 		return
 	}
-	t.Fatal("no seed in range produced a steal-driven turnover")
+	t.Fatal("no seed in range produced a steal")
 }
 
-// --- nonStealTurnover: rows 14, 15, 23 ----------------------------------------
-
-// countNonStealTurnovers runs `seeds` independent rolls with a ball-handler of the
-// given TVR and returns how many resolved to a nonStealTurnover.
-func countNonStealTurnovers(tvr int, seeds uint64) int {
-	count := 0
-	for s := uint64(1); s <= seeds; s++ {
-		off, _ := stealLineups(tvr, 30)
-		gs := &gameState{rng: rng.New(s), period: 1, clock: 500, stealTurnoverScale: stealTurnoverScale, nonStealTurnoverScale: nonStealTurnoverScale}
-		if gs.nonStealTurnover(off, off.players[0]) {
-			count++
-		}
-	}
-	return count
-}
-
-// Row 14: prob at TVR=99 (carelessness=1) equals nonStealTurnoverScale×1.
-func TestNonStealTurnover_ProbAtMaxSecurity(t *testing.T) {
-	got := nonStealTurnoverScale * turnoverCarelessness(99)
-	if got != nonStealTurnoverScale {
-		t.Errorf("TVR=99 prob=%v, want nonStealTurnoverScale=%v", got, nonStealTurnoverScale)
-	}
-	if got <= 0 || got >= 0.01 {
-		t.Errorf("TVR=99 prob=%v outside (0, 0.01)", got)
-	}
-}
-
-// Row 15: nonStealTurnover rate scales with carelessness (higher TVR → fewer TOs).
-func TestNonStealTurnover_RateScalesWithCarelessness(t *testing.T) {
-	const seeds = 4000
-	secure := countNonStealTurnovers(90, seeds)
-	careless := countNonStealTurnovers(20, seeds)
-	if secure >= careless {
-		t.Errorf("higher TVR should yield fewer nonSteal TOs: TVR=90 got %d >= TVR=20 got %d (of %d)", secure, careless, seeds)
-	}
-}
-
-// Row 23: nonStealTurnover emits EventTurnover but NOT EventSteal (non-arming).
-func TestNonStealTurnover_NoEventSteal(t *testing.T) {
-	offense, _ := stealLineups(0, 30) // TVR=0: max carelessness for high probability
-	victim := offense.players[0]
-	for seed := uint64(1); seed < 500; seed++ {
-		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500, stealTurnoverScale: stealTurnoverScale, nonStealTurnoverScale: nonStealTurnoverScale}
-		if !gs.nonStealTurnover(offense, victim) {
+// An offensive foul (10% of code-4 turnovers, 0x4da7a0) charges the ball handler
+// a turnover and a personal foul tagged FoulSiteOffensiveTurnover, adds one to the
+// offense's team fouls and the handler's foul tally, shoots no free throws, and
+// never credits a steal.
+func TestResolveTurnoverPath_OffensiveFoul(t *testing.T) {
+	for seed := uint64(1); seed < 400; seed++ {
+		offense, defense := stealLineups(40, 30)
+		bh := offense.players[0]
+		gs := &gameState{rng: rng.New(seed), period: 1, clock: 500}
+		steal := gs.resolveTurnoverPath(offense, defense, bh, outcomeTurnover)
+		if offense.teamFouls == 0 {
 			continue
 		}
-		var tos, steals int
+		if steal {
+			t.Fatal("an offensive foul must not end in a steal")
+		}
+		if offense.teamFouls != 1 || offense.fouls[bh.PID] != 1 || defense.teamFouls != 0 {
+			t.Errorf("team fouls off/def = %d/%d, handler fouls = %d; want 1/0/1",
+				offense.teamFouls, defense.teamFouls, offense.fouls[bh.PID])
+		}
+		var tos, fouls, fts, steals int
 		for _, e := range gs.events {
 			switch e.Kind {
 			case result.EventTurnover:
 				tos++
+			case result.EventFoul:
+				fouls++
+				if e.PlayerID != bh.PID || e.TeamID != offense.teamID || e.FoulSite != result.FoulSiteOffensiveTurnover {
+					t.Errorf("foul event = player %d team %d site %v; want handler %d, offense %d, offensive-turnover",
+						e.PlayerID, e.TeamID, e.FoulSite, bh.PID, offense.teamID)
+				}
+			case result.EventFreeThrow:
+				fts++
 			case result.EventSteal:
 				steals++
 			}
 		}
-		if tos != 1 {
-			t.Errorf("seed=%d: expected 1 EventTurnover, got %d", seed, tos)
-		}
-		if steals != 0 {
-			t.Errorf("seed=%d: nonStealTurnover emitted %d EventSteal(s), want 0 (non-arming)", seed, steals)
+		if tos != 1 || fouls != 1 || fts != 0 || steals != 0 {
+			t.Errorf("events: %d turnovers, %d fouls, %d FT, %d steals; want 1, 1, 0, 0", tos, fouls, fts, steals)
 		}
 		return
 	}
-	t.Fatal("no seed in range [1,500) triggered a nonStealTurnover")
+	t.Fatal("no seed in range produced an offensive foul")
 }
 
 // --- matrix #4: all-zero STL weights → players[0] fallback, no divide-by-zero --

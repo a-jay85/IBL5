@@ -30,8 +30,8 @@ package sim
 // bundle.Player.RealLifeSTL/RealLifeTVR (J22): stlRate = STL/MIN×44, tovRate = TOV/MIN×48.
 // The 0-99 STL/TVR ratings are retained as the RealLifeMIN==0 fallback (rookies, un-wired
 // bundles). Only the defQ/offQ RATIO drives the shrink (both scales cancel at a balanced
-// matchup — see faithful_scales_derivation_test.go); the foul LEVEL is set by the single
-// foulBucketScale dial (bucketweights.go).
+// matchup — see faithful_scales_derivation_test.go); foulBucketWeight returns the foul
+// LEVEL unscaled, on the faithful 5.60 e80 basis (bucketweights.go).
 
 const (
 	// leagueTOV48 is the real 5.60 league per-48 turnover mean (CEngine[+0x68D8],
@@ -45,7 +45,7 @@ const (
 	// the faithful coupling factor (foulBucketWeight, :97163): factor = 1 + (defQ −
 	// (5/6)·5·leagueSTL48)/offQ, which at a balanced matchup ≈ 1.091 (AMPLIFIES, not
 	// shrinks). Its ABSOLUTE value is not load-bearing (the cap below rarely binds; the
-	// RATIO drives the factor offset; the level is foulBucketScale) — the STL:TOV ratio
+	// RATIO drives the factor offset; the level is foulBucketWeight's unscaled return) — the STL:TOV ratio
 	// is the grounded input.
 	leagueSTL48 = 1.834
 

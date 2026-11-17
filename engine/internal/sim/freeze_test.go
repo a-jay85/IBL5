@@ -29,26 +29,19 @@ func TestFreeze_SubstitutesAndAccumulates(t *testing.T) {
 	acc := &FreezeAccum{}
 	// The faithful bucket is side-symmetric and stochastic (base draw), so seed a
 	// gameState rng and replay the SAME seed for wantFoul — foulWeight is the only rng
-	// consumer here (orebProb/turnoverProb/makeValue2pt are deterministic), so its
+	// consumer here (orebProb/makeValue2pt are deterministic), so its
 	// single first draw reproduces exactly.
 	const foulSeed = uint64(4242)
 	off := []onCourt{oc(slotPG, mkPlayer(9, 3, slotPG, 50))}
 	def := []onCourt{oc(slotPG, mkPlayer(2, 3, slotPG, 50))}
 	bh := off[0]
 	wantFoul := foulBucketWeight(bh, off, def, 0, 0, rng.New(foulSeed))
-	base := &gameState{accum: acc, rng: rng.New(foulSeed), stealTurnoverScale: stealTurnoverScale, nonStealTurnoverScale: nonStealTurnoverScale}
+	base := &gameState{accum: acc, rng: rng.New(foulSeed)}
 	wantOreb := gate1Probability(100, 100, base.gateBaseline) // live faithful gate-1 (base.gateBaseline is 0)
-	// float64 vars force runtime (not constant-folded) evaluation, matching the
-	// wrapper's accumulated rounding exactly.
-	careless, pressure := 60.0, 100.0
-	wantTurn := stealTurnoverScale * careless * pressure // below the clamp
 	wantMake := shotValue2pt(5, bh, 0, false, leagueBaselineFallback, 0, 0)
 
 	if got := base.orebProb(100, 100); got != wantOreb {
 		t.Errorf("baseline orebProb = %v, want live %v", got, wantOreb)
-	}
-	if got := base.turnoverProb(60, 100); got != wantTurn {
-		t.Errorf("baseline turnoverProb = %v, want live %v", got, wantTurn)
 	}
 	if got := base.makeValue2pt(5, bh, 0, result.OriginInitial, 0, 0); got != wantMake {
 		t.Errorf("baseline makeValue2pt = %v, want live %v", got, wantMake)
@@ -58,11 +51,11 @@ func TestFreeze_SubstitutesAndAccumulates(t *testing.T) {
 	}
 
 	m := acc.Means()
-	if m.OrebProb != wantOreb || m.TurnProb != wantTurn || m.MakeVal2pt != wantMake || m.FoulWeight != wantFoul {
-		t.Errorf("Means() = %+v, want {Oreb:%v Turn:%v Make:%v Foul:%v}", m, wantOreb, wantTurn, wantMake, wantFoul)
+	if m.OrebProb != wantOreb || m.MakeVal2pt != wantMake || m.FoulWeight != wantFoul {
+		t.Errorf("Means() = %+v, want {Oreb:%v Make:%v Foul:%v}", m, wantOreb, wantMake, wantFoul)
 	}
-	if acc.orebN != 1 || acc.turnN != 1 || acc.makeN != 1 || acc.foulN != 1 {
-		t.Errorf("accumulator counts = oreb:%d turn:%d make:%d foul:%d, want 1 each", acc.orebN, acc.turnN, acc.makeN, acc.foulN)
+	if acc.orebN != 1 || acc.makeN != 1 || acc.foulN != 1 {
+		t.Errorf("accumulator counts = oreb:%d make:%d foul:%d, want 1 each", acc.orebN, acc.makeN, acc.foulN)
 	}
 }
 
@@ -79,8 +72,6 @@ func TestFreeze_NoCrossConfound(t *testing.T) {
 	bh := off[0]
 
 	liveOreb := gate1Probability(120, 80, 0) // gs.gateBaseline is 0 in these cases
-	careless, pressure := 60.0, 100.0
-	liveTurn := stealTurnoverScale * careless * pressure // runtime eval, below the clamp
 	liveMake := shotValue2pt(5, bh, 0, false, leagueBaselineFallback, 0, 0)
 	// Symmetric bucket: this single-defender/single-offense fixture drives the
 	// coupling factor negative (defQ from one defender sits far below the 5-man-
@@ -96,25 +87,20 @@ func TestFreeze_NoCrossConfound(t *testing.T) {
 		cfg  FreezeConfig
 	}{
 		{"ORB-only", FreezeConfig{ORB: true, Means: means}},
-		{"TVR-only", FreezeConfig{TVR: true, Means: means}},
 		{"Foul-only", FreezeConfig{Foul: true, Means: means}},
 		{"Make-only", FreezeConfig{Make: true, Means: means}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			gs := &gameState{freeze: c.cfg, rng: rng.New(foulSeed), stealTurnoverScale: stealTurnoverScale, nonStealTurnoverScale: nonStealTurnoverScale}
+			gs := &gameState{freeze: c.cfg, rng: rng.New(foulSeed)}
 			gotOreb := gs.orebProb(120, 80)
-			gotTurn := gs.turnoverProb(60, 100)
 			gotMake := gs.makeValue2pt(5, bh, 0, result.OriginInitial, 0, 0)
 			gotFoul := gs.foulWeight(bh, off, def, 0, 0)
 
 			// The frozen arm returns the sentinel; every OTHER arm returns live.
-			wantOreb, wantTurn, wantMake, wantFoul := liveOreb, liveTurn, liveMake, liveFoul
+			wantOreb, wantMake, wantFoul := liveOreb, liveMake, liveFoul
 			if c.cfg.ORB {
 				wantOreb = means.OrebProb
-			}
-			if c.cfg.TVR {
-				wantTurn = means.TurnProb
 			}
 			if c.cfg.Make {
 				wantMake = means.MakeVal2pt
@@ -124,9 +110,6 @@ func TestFreeze_NoCrossConfound(t *testing.T) {
 			}
 			if gotOreb != wantOreb {
 				t.Errorf("orebProb = %v, want %v", gotOreb, wantOreb)
-			}
-			if gotTurn != wantTurn {
-				t.Errorf("turnoverProb = %v, want %v", gotTurn, wantTurn)
 			}
 			if gotMake != wantMake {
 				t.Errorf("makeValue2pt = %v, want %v", gotMake, wantMake)
@@ -141,8 +124,9 @@ func TestFreeze_NoCrossConfound(t *testing.T) {
 // matrix #5 — misconfig (FAILURE).
 //
 // Freezing an arm whose precomputed mean is unset (zero) must return an explicit
-// error, never silently substitute 0 (degenerate for every arm). A valid config
-// returns nil.
+// error, never silently substitute 0 (degenerate for every arm). TVR is inert
+// since the live-outcome-map port and no sample feeds Means.TurnProb, so TVR
+// frozen with a zero mean runs. A valid config returns nil.
 func TestFreeze_MisconfigErrors(t *testing.T) {
 	b := richBundle()
 	bad := []struct {
@@ -150,7 +134,6 @@ func TestFreeze_MisconfigErrors(t *testing.T) {
 		cfg  FreezeConfig
 	}{
 		{"ORB", FreezeConfig{ORB: true}},
-		{"TVR", FreezeConfig{TVR: true}},
 		{"Foul", FreezeConfig{Foul: true}},
 		{"Make", FreezeConfig{Make: true}},
 	}
@@ -158,6 +141,9 @@ func TestFreeze_MisconfigErrors(t *testing.T) {
 		if _, err := SimulateWith(b, 1, Options{Freeze: c.cfg}); err == nil {
 			t.Errorf("SimulateWith with %s frozen but unset mean: got nil error, want an error", c.name)
 		}
+	}
+	if _, err := SimulateWith(b, 1, Options{Freeze: FreezeConfig{TVR: true}}); err != nil {
+		t.Errorf("SimulateWith with the inert TVR arm frozen at a zero mean: got %v, want nil", err)
 	}
 
 	// A fully-specified config validates and runs.
@@ -193,7 +179,7 @@ func TestFreeze_SuppressW4RescaleNeedsNoMeans(t *testing.T) {
 // the identical code sequence with the flag true and false when shotClock=false —
 // so a later reader need not re-derive that transition.go is unaffected.
 func TestFreeze_SuppressW4RescaleInertWhenNotShotClock(t *testing.T) {
-	in := outcomeInputs{twoPtWeight: 8, threePtWeight: 3, andOneWeight: 1, foulOnlyWeight: 2, turnoverDefValue: 4}
+	in := outcomeInputs{twoPtWeight: 8, threePtWeight: 3, foulWeight: 1, turnoverWeight: 2}
 	rOff := rng.New(4242)
 	rOn := rng.New(4242)
 	for i := 0; i < 5000; i++ {

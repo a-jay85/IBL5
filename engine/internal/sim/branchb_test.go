@@ -111,14 +111,14 @@ func TestBranchBShrink_OverShrinkClampedByWeight(t *testing.T) {
 	if s2 >= 0 {
 		t.Fatalf("expected over-shrink to drive the 2pt weight negative, got %v", s2)
 	}
-	in := outcomeInputs{twoPtWeight: s2, threePtWeight: s3, andOneWeight: 0.03, foulOnlyWeight: sf, turnoverDefValue: 0}
+	in := outcomeInputs{twoPtWeight: s2, threePtWeight: s3, foulWeight: 0.03, turnoverWeight: sf}
 	if w := in.weight(outcome2pt); w != 0 {
 		t.Errorf("weight() did not clamp negative 2pt to 0: %v", w)
 	}
 	// selectOutcome must not panic and must return a valid path (and-one survives).
 	got := selectOutcome(in, false, false, false, false, rng.New(1))
-	if got != outcomeAndOne {
-		t.Errorf("with only and-one positive, expected outcomeAndOne, got %v", got)
+	if got != outcomeFoul {
+		t.Errorf("with only and-one positive, expected outcomeFoul, got %v", got)
 	}
 }
 
@@ -141,12 +141,12 @@ func TestPlayBuckets_HCADeltaInvariantToBranchB(t *testing.T) {
 
 	// BranchB OFF: home 2pt = raw2pt + hca, home foul = det_home.
 	gsOff := &gameState{rng: rng.New(42)}
-	offH2, _, offHF := gsOff.playBuckets(bh, offense, defense, hcaHome, hcaScaled, 0, true)
+	offH2, _, offHF, _ := gsOff.playBuckets(bh, offense, defense, hcaHome, hcaScaled, 0, true, true)
 
 	// BranchB ON: home 2pt = s*raw2pt + hca, home foul = s*det_home (s < 1).
 	gsOn := &gameState{rng: rng.New(42)}
 	gsOn.freeze.BranchB = true
-	onH2, _, onHF := gsOn.playBuckets(bh, offense, defense, hcaHome, hcaScaled, 0, true)
+	onH2, _, onHF, _ := gsOn.playBuckets(bh, offense, defense, hcaHome, hcaScaled, 0, true, true)
 
 	// (a) BranchB shrinks the home 2pt weight (s < 1 with realistic rates).
 	if onH2 >= offH2 {

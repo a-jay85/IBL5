@@ -88,6 +88,10 @@ type teamState struct {
 	// them 0, so Branch-B is inert (Branch-A cold-start) there. Set in simGameWith.
 	drbRate float64
 	astRate float64
+
+	// team is this team's bundle.Teams entry (nil when absent). The bucket-3
+	// e88 chain reads the defending team's DF0 from it. Set in simGameWith.
+	team *bundle.Team
 }
 
 // addPeriodPoints credits n points to the team in the current 0-based period
@@ -114,12 +118,6 @@ type gameState struct {
 	// live like the score, NOT part of the output contract. The box score's
 	// Game2GM/Game3GM are now derived from the event stream by aggregateBoxes.
 	madeFG map[int]int
-
-	// stealTurnoverScale / nonStealTurnoverScale are the per-possession turnover
-	// scales for THIS run: the package const on a live run, or the Options override
-	// (J14 research sweep). Populated once per game in simGameWith.
-	stealTurnoverScale    float64
-	nonStealTurnoverScale float64
 
 	// transitionShotRate is the Stage-3 decaying team shot-rate threshold for
 	// fast-break steal-success (00_MASTER_REFERENCE.md L900-914). It is seeded

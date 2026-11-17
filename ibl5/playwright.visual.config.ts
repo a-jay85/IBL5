@@ -73,6 +73,12 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         viewport: { width: 1280, height: 900 },
         storageState: 'playwright/.auth/user.json',
+        // One raster thread makes downscaled images resample the same way on
+        // every load. With Chromium's default thread pool, each small logo
+        // (e.g. head-to-head row headers, 250px source drawn at 24px) picked
+        // one of two resample looks per page load, and no in-page wait
+        // changed it: the look is locked when the tiles first raster.
+        launchOptions: { args: ['--num-raster-threads=1'] },
       },
       dependencies: ['setup'],
       testIgnore: /auth(-regular)?\.setup\.ts$/,

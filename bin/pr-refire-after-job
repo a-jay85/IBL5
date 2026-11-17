@@ -46,6 +46,8 @@ case "$N" in ''|*[!0-9]*) echo "pr-refire-after-job: first arg must be a PR numb
 case "$PID" in ''|*[!0-9]*) echo "pr-refire-after-job: --pid must be a number" >&2; exit 2 ;; esac
 [ -n "$RESULT" ] || { echo "pr-refire-after-job: --result is required" >&2; exit 2; }
 [ -n "$PRE" ] || { echo "pr-refire-after-job: --pre-sha is required" >&2; exit 2; }
+case "$PRE" in *[!0-9a-fA-F]*) echo "pr-refire-after-job: --pre-sha must be hex" >&2; exit 2 ;; esac
+[ "${#PRE}" -ge 7 ] || { echo "pr-refire-after-job: --pre-sha needs at least 7 hex chars" >&2; exit 2; }
 if [ -z "$WT" ]; then
   WT=$("$(dirname "$0")/pr-wt-resolve" "$N" 2>/dev/null) || WT=""
 fi
@@ -76,7 +78,10 @@ if [ -z "$HEAD" ]; then
   dm "PR #$N: prep job ended, post-plan not fired (could not read the PR head). See $LOG"
   exit 0
 fi
-if [ "$HEAD" = "$PRE" ]; then
+# gh returns the full 40-char SHA; --pre-sha may be short, so match by prefix.
+HEAD_LC=$(printf %s "$HEAD" | tr 'A-F' 'a-f')
+PRE_LC=$(printf %s "$PRE" | tr 'A-F' 'a-f')
+if [ "${HEAD_LC#"$PRE_LC"}" != "$HEAD_LC" ]; then
   log "skip: head did not move ($HEAD)"
   dm "PR #$N: prep job ended, post-plan not fired (head did not move). See $LOG and $RESULT"
   exit 0

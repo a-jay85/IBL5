@@ -125,7 +125,6 @@ REPLAY_SPECS: dict[str, ReplaySpec | str] = {
     "bin/check-ci-image-registry": _TREE,
     "bin/check-claude-dir-placement": _TREE,
     "bin/check-composite-contracts": _TREE,
-    "bin/check-design-system": _TREE,
     "bin/check-digest-prose": _TREE,
     "bin/check-e2e-fa-offers-owner": _TREE,
     "bin/check-e2e-mutator-isolation": _TREE,

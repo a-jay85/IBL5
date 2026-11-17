@@ -152,6 +152,37 @@ if ($failures !== [] || $parityFailures !== []) {
     exit(1);
 }
 
+// Infection copies phpunit-mutation.xml over phpunit.xml for every mutant run
+// (both mutation workflows). It must run the database group and must exclude
+// discord-live and mutation-unsafe.
+$mutationGroupsChecked = false;
+if (is_file($root . '/phpunit-mutation.xml')) {
+    $mutationXml = simplexml_load_file($root . '/phpunit-mutation.xml');
+    $mutationExcludedGroups = [];
+    if ($mutationXml !== false) {
+        foreach ($mutationXml->xpath('/phpunit/groups/exclude/group') ?: [] as $groupNode) {
+            $mutationExcludedGroups[] = trim((string) $groupNode);
+        }
+    }
+    $groupErrors = [];
+    if (in_array('database', $mutationExcludedGroups, true)) {
+        $groupErrors[] = "phpunit-mutation.xml excludes the 'database' group, so per-mutant runs would skip every DB integration test";
+    }
+    foreach (['discord-live', 'mutation-unsafe'] as $requiredExclude) {
+        if (!in_array($requiredExclude, $mutationExcludedGroups, true)) {
+            $groupErrors[] = "phpunit-mutation.xml must exclude the '{$requiredExclude}' group under <groups><exclude>";
+        }
+    }
+    if ($groupErrors !== []) {
+        foreach ($groupErrors as $groupError) {
+            echo "FAIL: {$groupError}\n";
+        }
+        exit(1);
+    }
+    $mutationGroupsChecked = true;
+}
+
 echo 'OK: all phpunit XML file/directory references resolve.' . "\n";
 echo 'OK: phpunit-mutation.xml lists every phpunit.xml testsuite entry (' . count(MUTATION_PARITY_EXEMPT) . ' exempt).' . "\n";
+if ($mutationGroupsChecked) { echo 'OK: phpunit-mutation.xml runs the database group and excludes discord-live and mutation-unsafe.' . "\n"; }
 exit(0);

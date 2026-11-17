@@ -110,4 +110,34 @@ final class FeedbackRepositoryTest extends TestCase
             $this->repo->latestForTeam(1),
         );
     }
+
+    public function testLatestForTeamKeepsAStringNote(): void
+    {
+        $this->mockDb->onQuery('ibl_trade_suggestion_feedback', [[
+            'deal_key' => 'd1',
+            'reason_codes' => 'OTHER',
+            'free_text' => 'too old',
+            'created_at' => '2026-11-01 10:00:00',
+        ]]);
+
+        $row = $this->repo->latestForTeam(1);
+
+        self::assertNotNull($row);
+        self::assertSame('too old', $row['free_text']);
+    }
+
+    public function testLatestForTeamDropsANonStringNote(): void
+    {
+        $this->mockDb->onQuery('ibl_trade_suggestion_feedback', [[
+            'deal_key' => 'd1',
+            'reason_codes' => 'OTHER',
+            'free_text' => 42,
+            'created_at' => '2026-11-01 10:00:00',
+        ]]);
+
+        $row = $this->repo->latestForTeam(1);
+
+        self::assertNotNull($row);
+        self::assertNull($row['free_text']);
+    }
 }

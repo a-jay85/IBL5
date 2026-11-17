@@ -39,7 +39,7 @@ enum HideReason: string
             if ($reason === null) {
                 return null;
             }
-            $picked[$reason->value] = true;
+            $picked[$reason->value] = $reason;
         }
 
         return array_values(array_filter(

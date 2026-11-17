@@ -49,11 +49,11 @@ class FeedbackRepository extends \Database\BaseMysqliRepository implements Feedb
     public function record(int $tid, int $partnerTid, DealKey $key, string $dealJson, string $reasonCodes, string $freeText): void
     {
         $this->execute(
-            "INSERT INTO `ibl_trade_suggestion_feedback`"
-            . " (tid, deal_key, core_key, partner_tid, deal_json, reason_codes, free_text)"
-            . " VALUES (?, ?, ?, ?, ?, ?, NULLIF(?, ''))"
-            . " ON DUPLICATE KEY UPDATE reason_codes = VALUES(reason_codes), free_text = VALUES(free_text),"
-            . " deal_json = VALUES(deal_json), created_at = CURRENT_TIMESTAMP",
+            "INSERT INTO `ibl_trade_suggestion_feedback`
+                (tid, deal_key, core_key, partner_tid, deal_json, reason_codes, free_text)
+                VALUES (?, ?, ?, ?, ?, ?, NULLIF(?, ''))
+                ON DUPLICATE KEY UPDATE reason_codes = VALUES(reason_codes), free_text = VALUES(free_text),
+                deal_json = VALUES(deal_json), created_at = CURRENT_TIMESTAMP",
             "ississs",
             $tid,
             $key->deal,
@@ -73,8 +73,8 @@ class FeedbackRepository extends \Database\BaseMysqliRepository implements Feedb
     public function latestForTeam(int $tid): ?array
     {
         $row = $this->fetchOne(
-            "SELECT deal_key, reason_codes, free_text, created_at FROM `ibl_trade_suggestion_feedback`"
-            . " WHERE tid = ? ORDER BY created_at DESC, id DESC LIMIT 1",
+            "SELECT deal_key, reason_codes, free_text, created_at FROM `ibl_trade_suggestion_feedback`
+                WHERE tid = ? ORDER BY created_at DESC, id DESC LIMIT 1",
             "i",
             $tid
         );

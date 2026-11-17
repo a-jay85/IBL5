@@ -152,6 +152,84 @@ final class SuggestionFeedbackControllerTest extends TestCase
         self::assertSame(1, $repo->records[0]['tid']);
     }
 
+    public function testLowercaseMethodIsAccepted(): void
+    {
+        $repo = $this->recordingRepo();
+        $post = $this->withValidToken($this->hidePost());
+
+        $url = $this->controller($repo)->handle('post', $post);
+
+        self::assertSame(SuggestionFeedbackController::HOME . '?trade_suggestion_hidden=1#trade-suggestions', $url);
+        self::assertCount(1, $repo->records);
+    }
+
+    public function testDealKeyWithPrefixIsRejectedEvenWhenOffered(): void
+    {
+        $this->dealKey = 'g' . str_repeat('a', 40);
+        $repo = $this->recordingRepo();
+        $post = $this->withValidToken($this->hidePost());
+
+        $url = $this->controller($repo)->handle('POST', $post);
+
+        self::assertSame(SuggestionFeedbackController::HOME . '?trade_suggestion_error=stale', $url);
+        self::assertSame([], $repo->records);
+    }
+
+    public function testDealKeyWithSuffixIsRejectedEvenWhenOffered(): void
+    {
+        $this->dealKey = str_repeat('a', 40) . 'g';
+        $repo = $this->recordingRepo();
+        $post = $this->withValidToken($this->hidePost());
+
+        $url = $this->controller($repo)->handle('POST', $post);
+
+        self::assertSame(SuggestionFeedbackController::HOME . '?trade_suggestion_error=stale', $url);
+        self::assertSame([], $repo->records);
+    }
+
+    public function testNonStringDealKeyIsStale(): void
+    {
+        $repo = $this->recordingRepo();
+        $post = $this->withValidToken($this->hidePost(['deal_key' => [$this->dealKey]]));
+
+        $url = $this->controller($repo)->handle('POST', $post);
+
+        self::assertSame(SuggestionFeedbackController::HOME . '?trade_suggestion_error=stale', $url);
+        self::assertSame([], $repo->records);
+    }
+
+    public function testFreeAgentsUserNeverLooksUpTid(): void
+    {
+        $repo = $this->recordingRepo();
+        $post = $this->withValidToken($this->hidePost());
+        $auth = self::createStub(AuthServiceInterface::class);
+        $auth->method('getUsername')->willReturn('fagm');
+        $identity = self::createMock(TeamIdentityRepositoryInterface::class);
+        $identity->method('getTeamnameFromUsername')->willReturn(League::FREE_AGENTS_TEAM_NAME);
+        $identity->expects(self::never())->method('getTidFromTeamname');
+        $controller = new SuggestionFeedbackController($auth, $identity, $repo, $this->state());
+
+        $url = $controller->handle('POST', $post);
+
+        self::assertSame(SuggestionFeedbackController::HOME . '?trade_suggestion_error=auth', $url);
+    }
+
+    public function testUnknownTeamNeverLooksUpTid(): void
+    {
+        $repo = $this->recordingRepo();
+        $post = $this->withValidToken($this->hidePost());
+        $auth = self::createStub(AuthServiceInterface::class);
+        $auth->method('getUsername')->willReturn('ghost');
+        $identity = self::createMock(TeamIdentityRepositoryInterface::class);
+        $identity->method('getTeamnameFromUsername')->willReturn(null);
+        $identity->expects(self::never())->method('getTidFromTeamname');
+        $controller = new SuggestionFeedbackController($auth, $identity, $repo, $this->state());
+
+        $url = $controller->handle('POST', $post);
+
+        self::assertSame(SuggestionFeedbackController::HOME . '?trade_suggestion_error=auth', $url);
+    }
+
     public function testUnknownActionRejected(): void
     {
         $repo = $this->recordingRepo();

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\TradeSuggestions\Feedback;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use TradeSuggestions\Feedback\PanelSessionState;
 use TradeSuggestions\TradeSuggestionsView;
@@ -125,6 +126,75 @@ final class PanelSessionStateTest extends TestCase
 
         self::assertIsArray($_SESSION['trade_suggestions_panel']);
         self::assertSame('k', $_SESSION['trade_suggestions_panel']['simKey']);
+    }
+
+    public function testCurrentCreatesSessionWhenUnset(): void
+    {
+        unset($_SESSION);
+
+        PanelSessionState::current()->forSimKey('fresh');
+
+        self::assertIsArray($_SESSION);
+        self::assertIsArray($_SESSION['trade_suggestions_panel']);
+        self::assertSame('fresh', $_SESSION['trade_suggestions_panel']['simKey']);
+    }
+
+    public function testCurrentKeepsExistingSessionData(): void
+    {
+        $_SESSION = ['other_module' => ['x' => 1]];
+
+        PanelSessionState::current()->forSimKey('k');
+
+        self::assertSame(['x' => 1], $_SESSION['other_module']);
+        self::assertSame('k', $_SESSION['trade_suggestions_panel']['simKey']);
+    }
+
+    public function testAdvanceStoresZeroOffsetWhenWrapping(): void
+    {
+        $store = [];
+        $state = new PanelSessionState($store);
+        $state->forSimKey('k');
+        $state->setEligible(self::eligible(3));
+
+        $state->advance();
+
+        self::assertIsArray($store['trade_suggestions_panel']);
+        self::assertSame(0, $store['trade_suggestions_panel']['offset']);
+    }
+
+    /**
+     * @return array<string, array{array<mixed>}>
+     */
+    public static function singleFieldMalformedEntryProvider(): array
+    {
+        $valid = ['core' => 'c', 'partnerTid' => 2, 'dealJson' => '{}'];
+
+        return [
+            'integer deal key' => [[5 => $valid]],
+            'non-array entry' => [['k' => 'not an array']],
+            'missing core' => [['k' => ['partnerTid' => 2, 'dealJson' => '{}']]],
+            'non-string core' => [['k' => ['core' => 7] + $valid]],
+            'non-int partnerTid' => [['k' => ['partnerTid' => '2'] + $valid]],
+            'missing partnerTid' => [['k' => ['core' => 'c', 'dealJson' => '{}']]],
+            'non-string dealJson' => [['k' => ['dealJson' => 9] + $valid]],
+            'missing dealJson' => [['k' => ['core' => 'c', 'partnerTid' => 2]]],
+        ];
+    }
+
+    /**
+     * @param array<mixed> $malformed
+     */
+    #[DataProvider('singleFieldMalformedEntryProvider')]
+    public function testEntryWithExactlyOneBadFieldIsDroppedWhileValidOnesStay(array $malformed): void
+    {
+        $valid = ['core' => 'good', 'partnerTid' => 4, 'dealJson' => '{"a":1}'];
+        $store = ['trade_suggestions_panel' => [
+            'simKey' => 'k',
+            'offset' => 0,
+            'eligible' => $malformed + ['keep' => $valid],
+        ]];
+
+        self::assertSame(['keep' => $valid], (new PanelSessionState($store))->eligible());
     }
 
     public function testStepEqualsViewMaxItems(): void

@@ -340,6 +340,122 @@ class TradeSuggestionsViewTest extends TestCase
         self::assertStringNotContainsString('<img>', $html);
     }
 
+    public function testModeErrorIsOffByDefault(): void
+    {
+        $html = (new TradeSuggestionsView())->render(new TradeSuggestionsPanelData($this->autoMode(), []));
+
+        self::assertStringNotContainsString('trade-mode-error', $html);
+        self::assertStringNotContainsString('Could not change mode', $html);
+    }
+
+    public function testFeedbackErrorParagraphFollowsTitleWithoutDroppingEarlierMarkup(): void
+    {
+        $html = $this->render(new TradeSuggestionsPanelData($this->autoMode(), []), feedbackError: 'reason');
+
+        self::assertStringStartsWith('<section id="trade-suggestions" class="trade-suggestions" data-component="trade-suggestions">', $html);
+        self::assertStringContainsString(
+            '<h2 class="trade-suggestions__title">Trade ideas</h2>'
+            . '<p class="trade-suggestions__error" data-testid="trade-suggestion-error">Pick at least one reason.</p>',
+            $html,
+        );
+    }
+
+    public function testHiddenNoteWithTextFollowsTitleAndEndsWithEscapedNote(): void
+    {
+        $html = $this->render(
+            new TradeSuggestionsPanelData($this->autoMode(), []),
+            hiddenNote: $this->note('Too <b>old</b>'),
+        );
+
+        self::assertStringStartsWith('<section id="trade-suggestions"', $html);
+        self::assertStringContainsString(
+            '<h2 class="trade-suggestions__title">Trade ideas</h2>'
+            . '<p class="trade-suggestions__hidden-note" data-testid="trade-suggestion-hidden-note">'
+            . 'Idea hidden. Your note: Too &lt;b&gt;old&lt;/b&gt;</p>',
+            $html,
+        );
+    }
+
+    public function testHiddenNoteWithoutTextRendersBareParagraph(): void
+    {
+        $html = $this->render(new TradeSuggestionsPanelData($this->autoMode(), []), hiddenNote: $this->note(''));
+
+        self::assertStringContainsString(
+            '<p class="trade-suggestions__hidden-note" data-testid="trade-suggestion-hidden-note">Idea hidden.</p>',
+            $html,
+        );
+    }
+
+    public function testProfileBlockRendersLabelListAndItemsInOrder(): void
+    {
+        $html = $this->render(new TradeSuggestionsPanelData(
+            $this->autoMode(),
+            [$this->itemWith(profileLines: ['First line', 'Second <i>line</i>'])],
+        ));
+
+        self::assertStringContainsString(
+            '<article class="trade-suggestions__item" data-testid="trade-suggestion"><h3 class="trade-suggestions__partner">With Heat</h3>',
+            $html,
+        );
+        self::assertStringContainsString(
+            '</ul></div></div>'
+            . '<p class="trade-suggestions__profile-label">Your team after:</p>'
+            . '<ul class="trade-suggestions__profile" data-testid="trade-suggestion-profile">'
+            . '<li>First line</li><li>Second &lt;i&gt;line&lt;/i&gt;</li></ul>'
+            . '<p class="trade-suggestions__reason"><strong>Why you:</strong>',
+            $html,
+        );
+    }
+
+    public function testHideFormOpensWithSummaryThenFormAfterOpenLink(): void
+    {
+        $html = $this->render(new TradeSuggestionsPanelData($this->autoMode(), [$this->itemWith()]));
+
+        self::assertStringContainsString(
+            '>Open in Trading</a>'
+            . '<details class="trade-suggestions__hide" data-testid="trade-suggestion-hide">'
+            . '<summary class="trade-suggestions__hide-summary">Hide this idea</summary>'
+            . '<form class="trade-suggestions__hide-form" method="post" hx-boost="false" '
+            . 'action="modules.php?name=Trading&amp;op=trade-suggestion-action">',
+            $html,
+        );
+    }
+
+    public function testHideCheckboxIdsUseLowercaseReasonAndFirstEightKeyChars(): void
+    {
+        $key = 'abcdef01' . str_repeat('9', 32);
+
+        $html = $this->render(new TradeSuggestionsPanelData($this->autoMode(), [$this->itemWith(dealKey: $key)]));
+
+        foreach (HideReason::cases() as $reason) {
+            $id = 'hide-' . strtolower($reason->value) . '-abcdef01';
+            self::assertStringContainsString(
+                '<label for="' . $id . '"><input type="checkbox" id="' . $id . '" name="reasons[]" value="'
+                . $reason->value . '"> ' . $reason->label() . '</label>',
+                $html,
+            );
+        }
+        self::assertStringContainsString('id="hide-too_old-abcdef01"', $html);
+        self::assertStringContainsString('id="hide-weakens_team-abcdef01"', $html);
+        self::assertStringNotContainsString('id="hide-too_old-' . $key, $html);
+        self::assertStringNotContainsString('-bcdef019"', $html);
+        self::assertStringNotContainsString('-abcdef0"', $html);
+        self::assertStringNotContainsString('-abcdef019"', $html);
+        self::assertStringNotContainsString('id="hide-TOO_OLD', $html);
+    }
+
+    public function testHideFormFreeTextLabelWrapsTextareaAndPrecedesSubmit(): void
+    {
+        $html = $this->render(new TradeSuggestionsPanelData($this->autoMode(), [$this->itemWith()]));
+
+        self::assertStringContainsString(
+            '</fieldset><label class="trade-suggestions__hide-text">Anything else? '
+            . '<textarea name="free_text" maxlength="500" rows="2"></textarea></label>'
+            . '<button type="submit" class="trade-suggestions__hide-submit"',
+            $html,
+        );
+    }
+
     public function testFormsTargetTheTradingActionRoute(): void
     {
         $html = $this->render(new TradeSuggestionsPanelData($this->autoMode(), [$this->itemWith()], null, 4, 0));

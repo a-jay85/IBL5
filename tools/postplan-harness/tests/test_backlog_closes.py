@@ -334,6 +334,34 @@ def test_check_backlog_closes_swallows_gh_error():
     assert any("self-check skipped" in l for l in logged)
 
 
+class _RefsGh:
+    def pr_closing_refs(self, pr):
+        return ("master", [])
+
+
+def test_check_backlog_closes_logs_verdict_inside_guard():
+    import runner
+
+    plan = PlanInfo(found=True, backlog_issues=[("closes", 11)])
+    logged = []
+    runner._check_backlog_closes(_RefsGh(), 1, plan, logged.append)
+    assert logged == [backlog_closes_mismatch([11], "master", [])]
+
+
+def test_check_backlog_closes_swallows_mismatch_error(monkeypatch):
+    import runner
+
+    def boom(closes, base, refs):
+        raise RuntimeError("bad refs")
+
+    monkeypatch.setattr(runner, "backlog_closes_mismatch", boom)
+    plan = PlanInfo(found=True, backlog_issues=[("closes", 11)])
+    logged = []
+    assert runner._check_backlog_closes(_RefsGh(), 1, plan, logged.append) is None
+    assert len(logged) == 1
+    assert "backlog-closes self-check skipped (bad refs)" in logged[0]
+
+
 def test_check_backlog_closes_noop_without_closes():
     import runner
 

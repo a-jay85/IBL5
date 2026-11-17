@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import os
 import re
+import subprocess
 import sys
+import types
 from pathlib import Path
 
 import pytest
@@ -321,3 +323,87 @@ def test_push_sites_use_gate_fix_wrapper():
     # Includes the Phase 4.5b same-run pass, the Phase 5.0-pre fixer and the in-run fix round.
     # Those pushes go through the wrapper like every other.
     assert len(fix) == 8
+
+
+class _BodyGh:
+    def __init__(self):
+        self.edits = []
+
+    def pr_body_fresh(self):
+        return ""
+
+    def pr_edit_body(self, pr, body):
+        self.edits.append((pr, body))
+
+
+def test_publish_gate_fix_empty_block_skips_edit(monkeypatch):
+    monkeypatch.setattr(runner, "render_gate_fix", lambda gf: "")
+    gh, logs = _BodyGh(), []
+    runner._publish_gate_fix(gh, 7, types.SimpleNamespace(gate_fix={"k": 1}), logs.append)
+    assert gh.edits == []
+    assert logs == []
+
+
+def test_publish_gate_fix_swallows_render_error(monkeypatch):
+    def boom(gf):
+        raise ValueError("render boom")
+    monkeypatch.setattr(runner, "render_gate_fix", boom)
+    gh, logs = _BodyGh(), []
+    runner._publish_gate_fix(gh, 7, types.SimpleNamespace(gate_fix={"k": 1}), logs.append)
+    assert gh.edits == []
+    assert any("gatefix: PR body record failed: render boom" in m for m in logs)
+
+
+class _StageGit:
+    def __init__(self, exc=None):
+        self.staged, self.exc = 0, exc
+
+    def stage_all(self):
+        if self.exc:
+            raise self.exc
+        self.staged += 1
+
+
+def _run_fake(diff_out="", diff_exc=None):
+    def fake(argv, **kw):
+        if argv[:1] == ["git"] and "diff" in argv:
+            if diff_exc:
+                raise diff_exc
+            return subprocess.CompletedProcess(argv, 0, diff_out, "")
+        return subprocess.CompletedProcess(argv, 1, "", "")
+    return fake
+
+
+def test_remediate_doc_staleness_counts_bumped_docs(monkeypatch, tmp_path):
+    monkeypatch.setattr(runner, "_doc_gate_base", lambda wt: "abc123def456")
+    monkeypatch.setattr(runner.subprocess, "run", _run_fake("a.md\nb.md\n"))
+    git, logs = _StageGit(), []
+    assert runner._remediate_doc_staleness(str(tmp_path), git, logs.append) == 2
+    assert git.staged == 1
+
+
+def test_remediate_doc_staleness_merge_base_oserror_returns_minus_one(monkeypatch, tmp_path):
+    def fake(argv, **kw):
+        raise FileNotFoundError("git not found")
+    monkeypatch.setattr(runner.subprocess, "run", fake)
+    git, logs = _StageGit(), []
+    assert runner._remediate_doc_staleness(str(tmp_path), git, logs.append) == -1
+    assert git.staged == 0
+    assert any("git merge-base: git not found" in m for m in logs)
+
+
+def test_remediate_doc_staleness_git_diff_oserror_returns_minus_one(monkeypatch, tmp_path):
+    monkeypatch.setattr(runner, "_doc_gate_base", lambda wt: "abc123def456")
+    monkeypatch.setattr(runner.subprocess, "run", _run_fake(diff_exc=OSError("git gone")))
+    git, logs = _StageGit(), []
+    assert runner._remediate_doc_staleness(str(tmp_path), git, logs.append) == -1
+    assert git.staged == 0
+    assert any("git diff: git gone" in m for m in logs)
+
+
+def test_remediate_doc_staleness_stage_all_error_returns_minus_one(monkeypatch, tmp_path):
+    monkeypatch.setattr(runner, "_doc_gate_base", lambda wt: "abc123def456")
+    monkeypatch.setattr(runner.subprocess, "run", _run_fake("a.md\n"))
+    git, logs = _StageGit(exc=RuntimeError("index.lock exists")), []
+    assert runner._remediate_doc_staleness(str(tmp_path), git, logs.append) == -1
+    assert any("stage_all: index.lock exists" in m for m in logs)

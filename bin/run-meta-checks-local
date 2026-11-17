@@ -516,6 +516,7 @@ if [ "$STAGE" = "pre-push" ]; then
     queue_step "check-engine-freeze"           hard "$BIN/check-engine-freeze" "--since=$BASE"
     queue_step "test-check-pipefail-grep-q"    hard "$BIN/test-check-pipefail-grep-q"
     queue_step "check-pipefail-grep-q"         hard "$BIN/check-pipefail-grep-q" "--since=$BASE"
+    queue_step "check-exit-code-handling"      hard "$BIN/check-exit-code-handling" "--since=$BASE"
     queue_step "test-check-shell-portability"  hard "$BIN/test-check-shell-portability"
     queue_step "check-shell-portability"       hard "$BIN/check-shell-portability"
     queue_step "test-check-reviewer-eval"     hard "$BIN/test-check-reviewer-eval"

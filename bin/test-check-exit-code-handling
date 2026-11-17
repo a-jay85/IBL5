@@ -1,0 +1,250 @@
+#!/bin/bash
+set -euo pipefail
+
+# Test harness for bin/check-exit-code-handling (git-procsub, git-capture-unchecked,
+# teardown-then-rm). Follows bin/test-check-pipefail-grep-q style.
+#
+# One fixture repo lives in a mktemp dir. Each case resets it to the base commit,
+# applies a change, and asserts the gate's exit code plus output substrings.
+# Nothing is written inside the IBL5 tree.
+#
+# Fixture lines are built by concatenation, so this file holds no literal rule
+# shape and the gate passes on its own PR.
+
+PASS=0
+FAIL=0
+SCRIPT="$(cd "$(dirname "$0")" && pwd)/check-exit-code-handling"
+
+pass() { echo "PASS: $1"; PASS=$((PASS + 1)); }
+fail() { echo "FAIL: $1"; FAIL=$((FAIL + 1)); }
+
+G='gi''t'
+LT='<'
+OP='('
+RM='r''m'
+LC='launch''ctl'
+F=$(printf '\140\140\140')
+PROCSUB="done $LT $LT${OP}$G diff --name-only \"\$b\")"
+SKILLSUB="bin/x --diff $LT${OP}$G diff origin/master...HEAD)"
+CAPTURE="$G diff origin/master...HEAD >\"\$PD_DIFF\""
+TD1="$LC remove \"\$l\"; ${RM}dir \"\$m\""
+TD2="\$c remove \$l; ${RM} -rf \$m"
+TDAND="\$c remove \$l && ${RM} -rf \$m"
+
+REPO=$(mktemp -d)
+NOREPO=$(mktemp -d)
+trap 'rm -rf "$REPO" "$NOREPO"' EXIT
+
+git -C "$REPO" init -q
+git -C "$REPO" config user.email "test@example.com"
+git -C "$REPO" config user.name "check-exit-code-handling test"
+git -C "$REPO" config commit.gpgsign false
+# No detached auto-gc/maintenance: it can still be writing .git when the
+# EXIT trap runs, and rm -rf then fails with "Directory not empty".
+git -C "$REPO" config gc.auto 0
+git -C "$REPO" config maintenance.auto false
+mkdir -p "$REPO/bin" "$REPO/.claude/skills/s"
+cp "$SCRIPT" "$REPO/bin/check-exit-code-handling"
+chmod +x "$REPO/bin/check-exit-code-handling"
+
+SKILL="$REPO/.claude/skills/s/SKILL.md"
+
+# write_skill <bash-fence-body> <prose-line> <text-fence-body>
+write_skill() {
+    printf '%s\n' '---' 'name: s' 'description: example' '---' \
+        "$2" "${F}bash" "$1" "${F}" "${F}text" "$3" "${F}" >"$SKILL"
+}
+
+printf '%s\n' '#!/bin/bash' 'x=1' >"$REPO/bin/a.sh"
+printf '%s\n' '#!/bin/bash' 'set -euo pipefail' 'x=1' >"$REPO/bin/e.sh"
+write_skill 'x=1' 'a prose line' 'y=1'
+git -C "$REPO" add -A
+git -C "$REPO" commit -q -m base
+BASE=$(git -C "$REPO" rev-parse HEAD)
+
+reset_repo() {
+    git -C "$REPO" reset -q --hard "$BASE"
+    git -C "$REPO" clean -qfd
+}
+
+commit_all() {
+    git -C "$REPO" add -A
+    git -C "$REPO" commit -q -m "case"
+}
+
+add() { printf '%s\n' "$2" >>"$REPO/$1"; } # add <path> <line>
+
+out=""
+rc=0
+run_gate() {
+    rc=0
+    out=$(cd "$REPO" && bin/check-exit-code-handling "$@" 2>&1) || rc=$?
+}
+
+# expect <label> <want_rc> [want_substring...]: reads $out and $rc from run_gate.
+expect() {
+    local label="$1" want="$2" sub bad=""
+    shift 2
+    if [ "$rc" -ne "$want" ]; then
+        bad="exit $rc, wanted $want"
+    else
+        for sub in "$@"; do
+            if ! grep -qF -- "$sub" <<< "$out"; then
+                bad="output lacks '$sub'"
+                break
+            fi
+        done
+    fi
+    if [ -z "$bad" ]; then
+        pass "$label"
+    else
+        fail "$label: $bad"
+        echo "$out" | sed 's/^/    /'
+    fi
+}
+
+# Run the gate against the base commit, then check.
+expect_since() { # <label> <want_rc> [want_substring...]
+    local label="$1" want="$2"
+    shift 2
+    run_gate --since="$BASE"
+    expect "$label" "$want" "$@"
+}
+
+# ── git-procsub ──────────────────────────────────────────────────────────────
+
+reset_repo
+add bin/a.sh "$PROCSUB"
+commit_all
+expect_since 'procsub in bin shell is flagged' 1 'bin/a.sh:3: git-procsub'
+
+reset_repo
+write_skill "$SKILLSUB" 'a prose line' 'y=1'
+commit_all
+expect_since 'procsub in skill bash fence is flagged' 1 'git-procsub'
+
+reset_repo
+write_skill 'x=1' "$SKILLSUB" "$SKILLSUB"
+commit_all
+expect_since 'procsub in skill prose or text fence is not flagged' 0
+
+# ── git-capture-unchecked ────────────────────────────────────────────────────
+
+reset_repo
+add bin/a.sh "$CAPTURE"
+add bin/a.sh 'x=2'
+commit_all
+expect_since 'unchecked capture without errexit is flagged' 1 'git-capture-unchecked'
+
+reset_repo
+add bin/a.sh "$CAPTURE || rc=\$?"
+commit_all
+expect_since 'capture checked by or-rc passes' 0
+
+reset_repo
+add bin/a.sh "if ! $CAPTURE; then exit 1; fi"
+commit_all
+expect_since 'capture checked by if-not passes' 0
+
+reset_repo
+add bin/a.sh "$CAPTURE"
+add bin/a.sh 'rc=$?'
+commit_all
+expect_since 'capture checked by rc on next line passes' 0
+
+reset_repo
+add bin/e.sh "$CAPTURE"
+commit_all
+expect_since 'capture in errexit file passes' 0
+
+reset_repo
+write_skill "$G show \"\$sha\":x > /tmp/d.sh \\
+  && test -s /tmp/d.sh" 'a prose line' 'y=1'
+commit_all
+expect_since 'continued capture joined by and passes' 0
+
+reset_repo
+add bin/a.sh "$G diff --quiet 2>/dev/null"
+commit_all
+expect_since 'stderr-only redirect is not flagged' 0
+
+# ── teardown-then-rm ─────────────────────────────────────────────────────────
+
+reset_repo
+add bin/a.sh "$TD1"
+add bin/a.sh "$TD2"
+commit_all
+expect_since 'teardown then rm is flagged' 1 \
+    'bin/a.sh:3: teardown-then-rm' 'bin/a.sh:4: teardown-then-rm'
+
+reset_repo
+add bin/a.sh "$TDAND"
+add bin/a.sh "${RM} -f \"\$f\"; ${RM} -rf \"\$f.once\""
+commit_all
+expect_since 'teardown joined by and passes' 0
+
+# ── exit-ok marker ───────────────────────────────────────────────────────────
+
+reset_repo
+add bin/a.sh "$PROCSUB # exit-ok: loop input checked by caller"
+commit_all
+expect_since 'exit-ok with long reason passes' 0
+
+reset_repo
+add bin/a.sh "$PROCSUB # exit-ok: too short"
+commit_all
+expect_since 'exit-ok with short reason is flagged' 1 'exit-ok marker malformed'
+
+reset_repo
+add bin/a.sh "$PROCSUB # exit-okay: a long enough reason here"
+commit_all
+expect_since 'exit-okay near-miss is flagged' 1 'git-procsub'
+
+# ── Comments, range, modes ───────────────────────────────────────────────────
+
+reset_repo
+add bin/a.sh "# $PROCSUB"
+commit_all
+expect_since 'comment line is not flagged' 0
+
+reset_repo
+add bin/a.sh "$PROCSUB"
+commit_all
+OLD=$(git -C "$REPO" rev-parse HEAD)
+add bin/a.sh 'x=3'
+commit_all
+run_gate --since="$OLD"
+expect 'old site outside range is not flagged' 0
+
+run_gate --all
+expect 'all mode flags old site' 1 'bin/a.sh:3: git-procsub'
+
+reset_repo
+run_gate --since=HEAD
+expect 'empty range passes' 0 'check-exit-code-handling: OK'
+
+# ── Stacked base ─────────────────────────────────────────────────────────────
+
+reset_repo
+git -C "$REPO" checkout -q -b parent
+add bin/a.sh "$PROCSUB"
+commit_all
+git -C "$REPO" checkout -q -b child
+add bin/a.sh 'x=4'
+commit_all
+git -C "$REPO" config branch.child.iblBase parent
+run_gate --since=parent
+first_rc=$rc
+first_out=$out
+run_gate --since="$BASE"
+if [ "$first_rc" -eq 0 ] && [ "$rc" -eq 1 ]; then
+    pass 'stacked base via declared parent passes'
+else
+    fail "stacked base via declared parent passes: rc $first_rc then $rc, wanted 0 then 1"
+    echo "$first_out" | sed 's/^/    /'
+    echo "$out" | sed 's/^/    /'
+fi
+
+echo ""
+echo "$PASS passed, $FAIL failed"
+[ "$FAIL" -eq 0 ]

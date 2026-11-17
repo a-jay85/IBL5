@@ -135,7 +135,7 @@ want_rc c8-modified-files 5
 
 # c9: "modified lines" variant of the no-op message.
 d=$(new_case)
-echo 'Could not find any modified lines for the git filter "AM" and the base "origin/master". The diff got was blank.' > "$d/log.txt"
+echo 'Could not find any modified lines for the git filter "AM" and the base "origin/master". The diff got was blank.' > "$d/log.txt" # exit-ok: echo of fixture text, not a git call
 echo "$TEAM" > "$d/changed.txt"
 run_in "$d" --log log.txt --changed changed.txt
 want_rc c9-modified-lines 5

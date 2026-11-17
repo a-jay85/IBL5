@@ -398,7 +398,7 @@ if grep -qxF -- '--dangerously-skip-permissions' "$BASE_TMP/argv"; then
 else
     h_pass "J13 no --dangerously-skip-permissions"
 fi
-for t in 'would a wrong plan be expensive?' '2.5 times Opus 5.5 per token' \
+for t in 'would a wrong plan be expensive?' '2 times Opus 5.5 per token' \
     'plan-architect-sonnet' 'output format, answer default.' \
     'a design the brief already resolves'; do
     if grep -qF -- "$t" "$BASE_TMP/argv"; then

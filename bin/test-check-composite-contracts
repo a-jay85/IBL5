@@ -1064,6 +1064,7 @@ LD="$TMP/libdrift"
 mkdir -p "$LD/bin/lib" "$LD/tools/postplan-harness/harness"
 cp "$CHECK" "$LD/bin/check-composite-contracts"
 cp "$SCRIPT_DIR/check-pr-checks-green" "$LD/bin/check-pr-checks-green"  # A7 reads GHOST_GRACE beside the check
+cp "$SCRIPT_DIR/mutation-weekly-dispatch" "$LD/bin/mutation-weekly-dispatch"  # W1 runs the dispatcher beside the check
 printf "PR_ARMABLE_AGGREGATOR_CONTEXT='All checks'\n" > "$LD/bin/lib/pr-armable.sh"
 printf 'AGGREGATOR_CONTEXT = "All checks settled"\n' > "$LD/tools/postplan-harness/harness/armable.py"
 out="$("$LD/bin/check-composite-contracts" "$REAL_ACT" "$REAL_WF" "$REAL_MERGE" "$REAL_PROMOTE" "$REAL_DEC" 2>&1)"; rc=$?

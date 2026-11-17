@@ -26,6 +26,10 @@
 #                   pr-meta-checks.yml and mutation.yml must keep a block-style
 #                   `on: pull_request:` trigger with no `paths:` or
 #                   `paths-ignore:` under it. push.paths stays legal.
+#   mutation weekly dispatch (W1): bin/mutation-weekly-dispatch --check-workflows
+#                   pins mutation-weekly-dispatch.yml (triggers, one write scope,
+#                   job-level serialized ticks, timeout above the sleep cap, Sunday
+#                   cron coverage in PST and PDT) and keeps mutation.yml schedule-free.
 #   mutation-pr:    five invariants (M1-M5) that keep the required check
 #                   `Infection PHP (per-PR diff)` reporting on every PR: M1 always
 #                   starts (no filters, no `labeled`), M2 exact context shared with
@@ -1165,6 +1169,18 @@ else
   fi
 
 fi  # end agg_file present
+
+# W1: the weekly mutation dispatcher. bin/mutation-weekly-dispatch owns the checks so its
+# harness can feed it broken copies.
+w1_file="$WORKFLOWS/mutation-weekly-dispatch.yml"
+if [ ! -f "$w1_file" ]; then
+  echo "composite-contracts: mutation-weekly-dispatch.yml absent - W1 skipped"
+elif w1_err="$(python3 "$(dirname "$0")/mutation-weekly-dispatch" --check-workflows="$WORKFLOWS" 2>&1 >/dev/null)"; then
+  echo "composite-contracts: mutation-weekly-dispatch keeps its Sunday window, one write scope and serialized ticks; mutation.yml has no schedule (W1)"
+else
+  echo "composite-contracts: mutation-weekly-dispatch (W1): $w1_err ($w1_file)" >&2
+  fail=1
+fi
 
 # D1: step-scoped DB_* env must equal the setup-php-env config.local.php
 # defaults. The composite's "Create config.php" step reads JOB-level env only,

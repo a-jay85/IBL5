@@ -280,6 +280,98 @@ case_gh_api_failure_fails_closed() {
     pass "${FUNCNAME[0]}"
 }
 
+# wf_copy <case>: copy both workflow files into $TMP/wf-<case>/ and print that dir
+wf_copy() {
+    local dir="$TMP/wf-$1"
+    mkdir -p "$dir"
+    cp "$ROOT/.github/workflows/mutation-weekly-dispatch.yml" "$ROOT/.github/workflows/mutation.yml" "$dir/"
+    printf '%s\n' "$dir"
+}
+
+# run_check <dir>: run the workflow checker, fill OUT, ERR, RC
+run_check() {
+    OUT=$(python3 "$ROOT/bin/mutation-weekly-dispatch" --check-workflows="$1" 2> "$TMP/check.err")
+    RC=$?
+    ERR=$(cat "$TMP/check.err")
+}
+
+case_schedule_table() {
+    run_check "$ROOT/.github/workflows"
+    if [ "$RC" != 0 ]; then
+        fail "${FUNCNAME[0]}" "real workflows rc=$RC err='$ERR'"
+        return
+    fi
+    local row
+    for row in \
+        'PST 2026-11-15T11:00Z 03:00 dispatch' \
+        'PST 2026-11-15T10:45Z 02:45 wait' \
+        'PDT 2026-06-14T10:00Z 03:00 dispatch' \
+        'PDT 2026-06-15T03:00Z 20:00 skip-outside'; do
+        if ! grep -qxF "$row" <<< "$OUT"; then
+            fail "${FUNCNAME[0]}" "table lacks '$row'"
+            return
+        fi
+    done
+    pass "${FUNCNAME[0]}"
+}
+
+case_schedule_rejects_unsupported_field() {
+    local dir bad
+    for bad in SUN 7; do
+        dir=$(wf_copy "field-$bad")
+        sed "s|cron: '\*/15 5-23 \* \* 0'|cron: '0 11 * * $bad'|" "$dir/mutation-weekly-dispatch.yml" > "$dir/edited.yml"
+        mv "$dir/edited.yml" "$dir/mutation-weekly-dispatch.yml"
+        run_check "$dir"
+        if [ "$RC" != 2 ] || ! grep -qF 'cron-field' <<< "$ERR"; then
+            fail "${FUNCNAME[0]}" "day field $bad: rc=$RC err='$ERR'"
+            return
+        fi
+    done
+    pass "${FUNCNAME[0]}"
+}
+
+# expect_broken <case> <dir> <id>: the checker must exit 1 naming <id>
+expect_broken() {
+    run_check "$2"
+    if [ "$RC" != 1 ] || ! grep -qF "$3" <<< "$ERR"; then
+        fail "$1" "wanted rc=1 naming $3, got rc=$RC err='$ERR'"
+        return 1
+    fi
+}
+
+case_rejects_broken_copies() {
+    local dir
+    dir=$(wf_copy cancel)
+    sed 's/cancel-in-progress: false/cancel-in-progress: true/' "$dir/mutation-weekly-dispatch.yml" > "$dir/edited.yml"
+    mv "$dir/edited.yml" "$dir/mutation-weekly-dispatch.yml"
+    expect_broken "${FUNCNAME[0]}" "$dir" dispatch-concurrency || return
+
+    dir=$(wf_copy schedule)
+    awk '{print} /^on:$/ {print "  schedule:"}' "$dir/mutation.yml" > "$dir/edited.yml"
+    mv "$dir/edited.yml" "$dir/mutation.yml"
+    expect_broken "${FUNCNAME[0]}" "$dir" mutation-schedule || return
+
+    dir=$(wf_copy timeout)
+    sed 's/timeout-minutes: 330/timeout-minutes: 300/' "$dir/mutation-weekly-dispatch.yml" > "$dir/edited.yml"
+    mv "$dir/edited.yml" "$dir/mutation-weekly-dispatch.yml"
+    expect_broken "${FUNCNAME[0]}" "$dir" timeout || return
+
+    dir=$(wf_copy runname)
+    sed 's/workflows: \[Mutation Testing\]/workflows: [Mutation Tests]/' "$dir/mutation-weekly-dispatch.yml" > "$dir/edited.yml"
+    mv "$dir/edited.yml" "$dir/mutation-weekly-dispatch.yml"
+    expect_broken "${FUNCNAME[0]}" "$dir" workflow-run-name || return
+    pass "${FUNCNAME[0]}"
+}
+
+case_rejects_alert_concurrency() {
+    local dir
+    dir=$(wf_copy alertconc)
+    awk '{print} /^  alert-cancelled:$/ {print "    concurrency: x"}' "$dir/mutation-weekly-dispatch.yml" > "$dir/edited.yml"
+    mv "$dir/edited.yml" "$dir/mutation-weekly-dispatch.yml"
+    expect_broken "${FUNCNAME[0]}" "$dir" alert-filter || return
+    pass "${FUNCNAME[0]}"
+}
+
 ALL_CASES=$(declare -F | awk '$3 ~ /^case_/ {print $3}')
 
 if [ $# -gt 0 ]; then

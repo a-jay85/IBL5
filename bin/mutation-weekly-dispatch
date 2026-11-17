@@ -25,7 +25,7 @@ Decisions:
 Flags: --repo=OWNER/NAME (required), --dry-run (decide, never dispatch or sleep),
 --check-workflows=DIR (validate the workflow files, see check_workflows).
 """
-import json, math, os, subprocess, sys, time
+import json, math, os, re, subprocess, sys, time
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -131,8 +131,206 @@ def dispatch_and_confirm(repo, clock):
     die(1, "dispatched run did not appear within 120s")
 
 
+def read_lines(path):
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return fh.read().splitlines()
+    except OSError:
+        return None
+
+
+def block_after(lines, start_re, end_re):
+    """Lines after the first line matching start_re, up to (excluding) the next line matching end_re."""
+    out, inside = [], False
+    for line in lines:
+        if not inside:
+            inside = re.match(start_re, line) is not None
+            continue
+        if re.match(end_re, line):
+            break
+        out.append(line)
+    return out if inside else None
+
+
+def on_block(lines):
+    return block_after(lines, r"on:\s*$", r"[^\s#]")
+
+
+def job_block(lines, job):
+    return block_after(lines, rf"  {re.escape(job)}:\s*$", r" {0,2}[^\s#]")
+
+
+def parse_field(field, lo, hi, expr, star_only=False):
+    """Expand one cron field to a set of ints: *, */N, N, A-B and comma lists."""
+    values, bad = set(), False
+    for part in field.split(","):
+        m = re.fullmatch(r"\*(?:/(\d+))?|(\d+)(?:-(\d+))?", part)
+        if m is None or (star_only and part != "*"):
+            bad = True
+            break
+        if part.startswith("*"):
+            step = int(m.group(1)) if m.group(1) else 1
+            if step < 1:
+                bad = True
+                break
+            values.update(range(lo, hi + 1, step))
+        else:
+            a = int(m.group(2))
+            b = int(m.group(3)) if m.group(3) is not None else a
+            if not lo <= a <= b <= hi:
+                bad = True
+                break
+            values.update(range(a, b + 1))
+    if bad:
+        die(2, f"cron-field: unsupported field {field!r} in {expr!r}")
+    return values
+
+
+def expand_cron(expr):
+    fields = expr.split()
+    if len(fields) != 5:
+        die(2, f"cron-field: unsupported field {expr!r} in {expr!r}")
+    minutes = parse_field(fields[0], 0, 59, expr)
+    hours = parse_field(fields[1], 0, 23, expr)
+    parse_field(fields[2], 1, 31, expr, star_only=True)
+    parse_field(fields[3], 1, 12, expr, star_only=True)
+    days = parse_field(fields[4], 0, 6, expr)
+    return minutes, hours, days
+
+
+def sample_ticks(exprs, sunday):
+    """Nominal UTC ticks on the UTC Saturday, Sunday and Monday around `sunday` (a date)."""
+    ticks = set()
+    for offset in (-1, 0, 1):
+        day = sunday + timedelta(days=offset)
+        cron_dow = (day.weekday() + 1) % 7
+        for minutes, hours, days in exprs:
+            if cron_dow not in days:
+                continue
+            for h in hours:
+                for m in minutes:
+                    ticks.add(datetime(day.year, day.month, day.day, h, m, tzinfo=UTC))
+    return sorted(ticks)
+
+
+def check_cron_coverage(disp_lines, errors):
+    exprs = []
+    for line in disp_lines:
+        m = re.match(r"\s*-\s*cron:\s*['\"]([^'\"]+)['\"]", line)
+        if m:
+            exprs.append(expand_cron(m.group(1)))
+    if not exprs:
+        errors.append("cron-coverage: no cron lines found")
+        return
+    for zone, sunday in (("PST", datetime(2026, 11, 15).date()), ("PDT", datetime(2026, 6, 14).date())):
+        rows = []
+        for tick in sample_ticks(exprs, sunday):
+            action = decide(tick, [])[0]
+            pacific = tick.astimezone(LA)
+            rows.append((tick, pacific, action))
+            print(f"{zone} {tick:%Y-%m-%dT%H:%MZ} {pacific:%H:%M} {action}")
+        primary = [r for r in rows if r[2] == "dispatch" and (3, 0) <= (r[1].hour, r[1].minute) <= (7, 0)]
+        waits = [r for r in rows if r[2] == "wait"]
+        dispatches = [r for r in rows if r[2] == "dispatch"]
+        if len(primary) < 16:
+            errors.append(f"cron-coverage: {zone} has {len(primary)} dispatch ticks from 03:00 to 07:00 Pacific, need 16")
+        if len(waits) < 16:
+            errors.append(f"cron-coverage: {zone} has {len(waits)} wait ticks, need 16")
+        if not waits or not dispatches:
+            continue
+        first_wait, last_dispatch = waits[0][0], dispatches[-1][0]
+        span = [r[0] for r in rows if first_wait <= r[0] <= last_dispatch]
+        for prev, cur in zip(span, span[1:]):
+            if cur - prev > timedelta(minutes=15):
+                errors.append(f"cron-coverage: {zone} gap above 15 minutes between {prev:%H:%MZ} and {cur:%H:%MZ}")
+        if dispatches[-1][1].hour < 19:
+            errors.append(f"cron-coverage: {zone} last dispatch tick is {dispatches[-1][1]:%H:%M} Pacific, need 19:00 or later")
+        for tick, pacific, _ in dispatches:
+            if pacific.hour < OPEN_HOUR:
+                errors.append(f"cron-coverage: {zone} dispatch tick {tick:%H:%MZ} is before 03:00 Pacific")
+
+
+def check_run_expressions(lines):
+    """True when a run: line or a run: block scalar body contains ${{ ."""
+    i = 0
+    while i < len(lines):
+        m = re.match(r"(\s*)(?:-\s+)?run:\s*(.*)$", lines[i])
+        i += 1
+        if not m:
+            continue
+        base = len(m.group(1))
+        if "${{" in m.group(2):
+            return True
+        if m.group(2).startswith(("|", ">")):
+            while i < len(lines):
+                body = lines[i]
+                if body.strip() and len(body) - len(body.lstrip()) <= base:
+                    break
+                if "${{" in body:
+                    return True
+                i += 1
+    return False
+
+
 def check_workflows(d):
-    die(2, "check-workflows lands in Phase 2")
+    """Validate the dispatcher and mutation.yml under directory d. Returns 0 clean, 1 on any failed check."""
+    disp = read_lines(os.path.join(d, "mutation-weekly-dispatch.yml"))
+    mut = read_lines(os.path.join(d, "mutation.yml"))
+    errors = []
+    if disp is None:
+        die(1, f"triggers: {d}/mutation-weekly-dispatch.yml is missing")
+    if mut is None:
+        errors.append("mutation-schedule: mutation.yml is missing")
+    on = on_block(disp) or []
+    keys = {m.group(1) for m in (re.match(r"  ([A-Za-z_][\w-]*):", ln) for ln in on) if m}
+    if keys != {"schedule", "workflow_dispatch", "workflow_run"}:
+        errors.append(f"triggers: on: keys are {sorted(keys)}, want schedule, workflow_dispatch, workflow_run")
+    if "    workflows: [Mutation Testing]" not in disp:
+        errors.append("workflow-run-name: dispatcher lacks 'workflows: [Mutation Testing]'")
+    if mut is not None and not any(re.match(r"name: Mutation Testing\s*$", ln) for ln in mut):
+        errors.append("workflow-run-name: mutation.yml is not named 'Mutation Testing'")
+    if mut is not None and any(re.match(r"  schedule:", ln) for ln in (on_block(mut) or [])):
+        errors.append("mutation-schedule: mutation.yml still has an on.schedule trigger")
+    if any(re.match(r"concurrency:", ln) for ln in disp):
+        errors.append("top-concurrency: the dispatcher has a top-level concurrency block")
+    dispatch = job_block(disp, "dispatch")
+    if dispatch is None:
+        errors.append("dispatch-concurrency: dispatch job is missing")
+        dispatch = []
+    text = "\n".join(dispatch)
+    if "group: mutation-weekly-dispatch" not in text or "cancel-in-progress: false" not in text:
+        errors.append("dispatch-concurrency: dispatch needs group mutation-weekly-dispatch and cancel-in-progress: false")
+    writes = [ln.strip() for ln in disp if re.match(r"\s*[A-Za-z][\w-]*:\s*write\s*$", ln)]
+    if writes != ["actions: write"] or not any(ln.strip() == "actions: write" for ln in dispatch):
+        errors.append(f"write-scopes: want exactly one 'actions: write' inside dispatch, found {writes}")
+    m = re.search(r"timeout-minutes:\s*(\d+)", text)
+    if not m or not (int(m.group(1)) * 60 >= MAX_SLEEP_SECONDS + 900 and int(m.group(1)) <= 360):
+        errors.append(f"timeout: dispatch timeout-minutes must cover {MAX_SLEEP_SECONDS}s plus 900s and stay at or below 360")
+    if check_run_expressions(disp):
+        errors.append("run-expression: a run: step interpolates ${{ }}; pass it through env:")
+    alert = job_block(disp, "alert-cancelled")
+    if alert is None:
+        errors.append("alert-filter: alert-cancelled job is missing")
+    else:
+        cond, grab = [], False
+        for ln in alert:
+            if re.match(r"    if:", ln):
+                grab = True
+                cond.append(ln)
+            elif grab and ln.strip() and len(ln) - len(ln.lstrip()) > 4:
+                cond.append(ln)
+            elif grab:
+                break
+        cond_text = "\n".join(cond)
+        for literal in ("conclusion == 'cancelled'", "event == 'workflow_dispatch'", "triggering_actor.login == 'github-actions[bot]'"):
+            if literal not in cond_text:
+                errors.append(f"alert-filter: alert-cancelled if: lacks {literal}")
+        if any(re.match(r"\s+concurrency:", ln) for ln in alert):
+            errors.append("alert-filter: alert-cancelled must not carry a concurrency: block")
+    check_cron_coverage(disp, errors)
+    for err in errors:
+        print(err, file=sys.stderr)
+    return 1 if errors else 0
 
 
 def parse_args(argv):

@@ -84,6 +84,7 @@ Each was re-pinned from one run of this tree.
 | `foulRateBands` offensive-turnover | (none) | 1.357 |
 | `TestBucketWeights_FoulPathMix` home share band | [0.03, 0.15] | [0.1056, 0.2256] (0.1656 ±0.06) |
 | `engine/internal/sim/testdata/golden.json` | master snapshot | regenerated with `-update` |
+| `engine/internal/sim/testdata/golden_seeds.sha256` | (none) | new. `TestGolden` hashes 30 more seeds, because one golden game missed a 0.1 → 0.11 change to `offensiveFoulOnTurnover`. |
 | `engine/internal/validate/bands.go` literals | unchanged | unchanged (the validate tests pass as they stand) |
 
 The `foulRateBands` width rule stays at ±10% with a floor of ±0.05. The path-mix band keeps the ±0.06 half-width the old band held around its 0.090 capture.

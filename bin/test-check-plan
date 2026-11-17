@@ -13,6 +13,7 @@
 #      bin/test-check-plan matrix-split  (only the gate XM block, whose verdicts need matrix_split)
 #      bin/test-check-plan gateSD  (only the gate [SD] block, for plan mutation checks)
 #      bin/test-check-plan gateQ  (only the gate [Q] seed-state block, for plan mutation checks)
+#      bin/test-check-plan gateHC  (only the gate [HC] How-column block, for plan mutation checks)
 #      bin/test-check-plan gateCR  (only the gate [CR] bare-marker block, for plan mutation checks)
 #
 # shellcheck disable=SC2016  # backtick spans in the single-quoted plan fixtures
@@ -238,6 +239,105 @@ assert_msg "gate-CR-message-names-path" 1 '[CR] ## Critical Files entry `bin/che
 '
 fi
 [ "$TCP_ONLY" != gateCR ] || h_done
+
+# ---------------------------------------------------------------------------
+# Gate [HC]: How column after the location column. Placed ahead of the gate13
+# guard so `bin/test-check-plan gateHC` runs these cases alone.
+# ---------------------------------------------------------------------------
+if [ -z "$TCP_ONLY" ] || [ "$TCP_ONLY" = gateHC ]; then
+# Gate [HC]: a How column after the location column. The matrix is closed at
+# five columns, and matrix_split reads the command from field 5, so a sixth
+# How column hides the real command. A header cell whose first word is "how"
+# after the location column fires; a How before it, a trailing PR column, and
+# tables with no "What to verify" header cell stay clean.
+
+# Clean: the closed five-column header.
+assert_viol "gateHC-five-col-clean" 0 "[HC]" "$FM"'
+<!-- no-test-methods: gate-HC fixture, method names irrelevant here -->
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | Foo holds no DB handle | PHPUnit | pre-impl | `tests/Trade/TradeValidatorTest.php` |
+'
+
+# Fires: the real 6-col shape from jsb-plr-plb-export (bare How after Location).
+assert_viol "gateHC-six-col-bare-how-fires" 1 "[HC]" "$FM"'
+<!-- no-test-methods: gate-HC fixture, method names irrelevant here -->
+| # | What to verify | Test type | Timing | Location | How |
+|---|---|---|---|---|---|
+| 1 | Foo holds no DB handle | PHPUnit | post-impl | CI | composer test |
+'
+
+# Fires: a parenthetical How variant. Discriminates first-word match from exact match.
+assert_viol "gateHC-how-parenthetical-fires" 1 "[HC]" "$FM"'
+<!-- no-test-methods: gate-HC fixture, method names irrelevant here -->
+| # | What to verify | Test type | Timing | Test file / location | How (catching mutation) |
+|---|---|---|---|---|---|
+| 1 | Foo holds no DB handle | PHPUnit | post-impl | CI | composer test |
+'
+
+# Fires: lowercase how after a column named Command.
+assert_viol "gateHC-how-after-command-fires" 1 "[HC]" "$FM"'
+<!-- no-test-methods: gate-HC fixture, method names irrelevant here -->
+| # | What to verify | Test type | Timing | Command | how, and the mutation it catches |
+|---|---|---|---|---|---|
+| 1 | Foo holds no DB handle | PHPUnit | post-impl | CI | composer test |
+'
+
+# Clean: a trailing PR column after the location column stays legal.
+assert_viol "gateHC-trailing-pr-column-clean" 0 "[HC]" "$FM"'
+<!-- no-test-methods: gate-HC fixture, method names irrelevant here -->
+| # | What to verify | Test type | Timing | Test file / location | PR |
+|---|---|---|---|---|---|
+| 1 | Foo holds no DB handle | PHPUnit | pre-impl | `tests/Trade/TradeValidatorTest.php` | n/a |
+'
+
+# Clean: a trailing column whose first word only starts with "how" (However).
+assert_viol "gateHC-however-column-clean" 0 "[HC]" "$FM"'
+<!-- no-test-methods: gate-HC fixture, method names irrelevant here -->
+| # | What to verify | Test type | Timing | Test file / location | However noted |
+|---|---|---|---|---|---|
+| 1 | Foo holds no DB handle | PHPUnit | pre-impl | `tests/Trade/TradeValidatorTest.php` | n/a |
+'
+
+# Clean: How BEFORE the location column (2 corpus plans use this shape).
+assert_viol "gateHC-how-before-location-clean" 0 "[HC]" "$FM"'
+<!-- no-test-methods: gate-HC fixture, method names irrelevant here -->
+| Step | What to verify | How | Test file / location |
+|---|---|---|---|
+| 1 | Foo holds no DB handle | grep | `tests/Trade/TradeValidatorTest.php` |
+'
+
+# Clean: a fenced 6-col example never fires; only the real 5-col matrix counts.
+assert_viol "gateHC-fenced-example-clean" 0 "[HC]" "$FM"'
+<!-- no-test-methods: gate-HC fixture, method names irrelevant here -->
+```text
+| # | What to verify | Test type | Timing | Location | How |
+```
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | Foo holds no DB handle | PHPUnit | pre-impl | `tests/Trade/TradeValidatorTest.php` |
+'
+
+# Clean: non-matrix tables with How columns. The first is the near-miss from
+# _plan-verification.md; the second has a Command column followed by a How
+# column, so only the "What to verify" header filter keeps it quiet.
+assert_viol "gateHC-non-matrix-how-tables-clean" 0 "[HC]" "$FM"'
+<!-- no-test-methods: gate-HC fixture, method names irrelevant here -->
+| # | Environment | How to reach it | What it exercises |
+|---|---|---|---|
+| 1 | Worktree Docker stack | slug.localhost | pages |
+
+| # | Command | How it helps |
+|---|---|---|
+| 1 | bin/check-docs | finds dead paths |
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | Foo holds no DB handle | PHPUnit | pre-impl | `tests/Trade/TradeValidatorTest.php` |
+'
+fi
+[ "$TCP_ONLY" != gateHC ] || h_done
 
 # ---------------------------------------------------------------------------
 # Gate [SD]: undeclared security deferral. Placed ahead of the gate13 guard so

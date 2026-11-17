@@ -1,6 +1,6 @@
 ---
 description: J27 third foul-volume pass. Covers the decompile sweep for PF and team-foul writes outside FUN_004d8570 (zero PORT sites), the per-site foul tags and walk tallies, and the backlog#1841 blocked-miss verdict (undetermined statically, guard kept). Engine PF per team-game stays 10.473 against sco 17.116, a measured residual of 6.643, so backlog#265 stays open.
-last_verified: 2026-11-13
+last_verified: 2026-11-16
 ---
 
 # J27: third foul-volume pass
@@ -103,3 +103,5 @@ Master base f1737fae7549a6615f096d4be488774b09dee4db. The walk command, run from
 | home/away FTA ratio | 1.082 | 1.082 | 1.101 |
 
 Engine-only counters, the same in both walks: possessions 1363876, and-one sequences 52264, fouls 139122, FTA 148601. The AFTER gap is outside the 5% close bar, so backlog#265 stays open.
+
+2026-11-16: the per-type rate port moved FTA/g to 18.741 and PF/g to 16.180. See `engine/docs/j27-foul-volume-rate-port.md`.

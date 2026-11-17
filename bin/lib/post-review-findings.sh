@@ -320,6 +320,8 @@ prf_review_threads() {
 # list_open_review_findings PR_NUMBER
 #   Human/agent-readable TSV of every UNRESOLVED review thread on the PR:
 #     COMMENT_ID <TAB> SCORE <TAB> path:line <TAB> first line of the finding
+#   Column 4 is the first line that is not blank and not a `<!-- ... -->` marker,
+#   cut to 100 chars.
 #   Empty output = every thread is dispositioned.  Feed COMMENT_ID straight into
 #   resolve_review_finding.  Threads whose sole comment was deleted have no
 #   COMMENT_ID to reply to, so they are skipped rather than listed as "null".
@@ -330,7 +332,7 @@ list_open_review_findings() {
                  | [ (.commentId|tostring),
                      (if .score == null then "-" else (.score|tostring) end),
                      ((.path // "?") + ":" + (if .line == null then "?" else (.line|tostring) end)),
-                     (.body | split("\n")[0] | .[0:100]) ]
+                     (.body | split("\n") | map(select(test("^\\s*(<!--.*-->)?\\s*$") | not)) | (.[0] // "") | .[0:100]) ]
                  | @tsv'
 }
 

@@ -1,6 +1,6 @@
 ---
 description: Feature PRs (conventional-commit `feat:`) cannot merge until a human applies the `human-approved` label — a required CI check, not a convention, blocks auto-merge.
-last_verified: 2026-11-14
+last_verified: 2026-11-16
 ---
 
 # ADR-0062: Human sign-off gate for feature PRs
@@ -137,3 +137,9 @@ The owner decided that a Dependabot composer patch or minor bump needs no sign-o
 - A `composer.json` change edits only package constraints in `require` and `require-dev`, in the shapes `^a.b.c`, `^a.b`, `~a.b.c` and `a.b.c`. Platform keys such as `php` and `ext-*` stay equal.
 
 The classifier judges a grouped PR per member, so one major member holds the whole group. A missing file, a symlink, a parse error, or any other shape holds. The PR still waits for its VR gallery and holds as `ui-vr` or `vr-missing` as before. Post-plan arming condition (8) runs the `--paths` CLI, which still lists both composer files as UI. Human PRs that touch either file still hold.
+
+## Update 2026-11-16: a non-UI PR labeled before the fingerprint rollout drops its label once
+
+[#3858](https://github.com/a-jay85/IBL5/pull/3858) made the workflow record and drop fingerprints for non-UI PRs too. A non-UI PR that already carried `human-approved` when that change landed had no recorded fingerprint. On its next event, `hs_eval_approval` in `bin/lib/human-signoff-classifier.sh` finds no record and removes the label once. The check stays green, because a non-UI PR needs no sign-off to merge. If post-plan condition (7) still holds that PR, the owner applies the label again and the workflow records a fresh fingerprint.
+
+The classifier keeps this one-time drop. Skipping it for a PR with no record would add an rc-0 path that never passes `hs_pr_cleared`, and the header of `hs_eval_approval` allows only tightening on its rc-0 paths. No open PR carried the label on 2026-11-10, so the drop had no live case.

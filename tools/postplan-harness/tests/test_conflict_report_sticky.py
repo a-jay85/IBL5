@@ -594,6 +594,16 @@ def test_branch_lookup_failure_stays_inside_the_report_guard():
     assert runner._conflict_report_section(_BrokenGit(), ".", None) == FAILURE_BLOCK
 
 
+def test_conflict_report_section_survives_branch_raise():
+    class _DetachedGit:
+        def branch(self):
+            raise RuntimeError("detached HEAD")
+
+    section = runner._conflict_report_section(_DetachedGit(), ".", None)
+    assert isinstance(section, str)
+    assert section
+
+
 def test_clean_replay_rebinds_record_to_new_sha(tmp_path):
     repo = _small_repo(tmp_path)
     old = "9" * 40

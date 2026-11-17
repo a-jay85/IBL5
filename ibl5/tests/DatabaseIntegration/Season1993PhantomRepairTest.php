@@ -31,6 +31,7 @@ use PHPUnit\Framework\Attributes\Group;
  * @see Season1993PhantomRepair The class under test
  */
 #[Group('database')]
+#[Group('mutation-unsafe')]
 final class Season1993PhantomRepairTest extends DatabaseTestCase
 {
     /** Number of phantom player rows seeded by the fixture (12 per team). */

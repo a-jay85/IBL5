@@ -20,6 +20,7 @@ use PHPUnit\Framework\TestCase;
  * connection through config.php, and the gate has to observe that exact database.
  */
 #[Group('database')]
+#[Group('mutation-unsafe')]
 final class RollbackPhantomRepairRunAbortTest extends TestCase
 {
     private const BACKUP_TABLES = [

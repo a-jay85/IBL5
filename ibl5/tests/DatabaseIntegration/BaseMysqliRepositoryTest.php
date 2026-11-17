@@ -11,6 +11,7 @@ use PHPUnit\Framework\Attributes\Group;
 use Psr\Log\LoggerInterface;
 
 #[Group('database')]
+#[Group('mutation-unsafe')]
 class BaseMysqliRepositoryTest extends DatabaseTestCase
 {
     private TestableBaseMysqliRepository $repo;

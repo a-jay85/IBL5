@@ -28,6 +28,7 @@ use Tests\DatabaseIntegration\DatabaseTestCase;
  * 'iblhoops.net' is never used as a host — 'example.test' is the only test host.
  */
 #[Group('database')]
+#[Group('mutation-unsafe')]
 final class StoreSimRecapCliTest extends DatabaseTestCase
 {
     private const SIM = 9001;

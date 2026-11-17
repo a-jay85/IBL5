@@ -7,6 +7,7 @@ namespace Tests\DatabaseIntegration\UpdateAllTheThings;
 use PHPUnit\Framework\Attributes\Group;
 
 #[Group('database')]
+#[Group('mutation-unsafe')]
 class PreseasonTransitionPipelineTest extends PipelineIntegrationTestCase
 {
     public function testFirstHeatSimCleansPreseasonData(): void

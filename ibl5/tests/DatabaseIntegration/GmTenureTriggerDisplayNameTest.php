@@ -23,6 +23,7 @@ use PHPUnit\Framework\Attributes\Group;
  *      carries the wrong name. This is the named residual and is not tested.
  */
 #[Group('database')]
+#[Group('mutation-unsafe')]
 class GmTenureTriggerDisplayNameTest extends DatabaseTestCase
 {
     public function testGmChangeOpensTenureUnderOwnerName(): void

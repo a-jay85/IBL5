@@ -355,6 +355,7 @@ class ArmInputs:
     # default) means the step did not run and holds, so a forgotten field fails closed.
     plan_checks_holding: Optional[tuple[str, ...]] = None
     ui_paths: Optional[list[str]] = None  # git.conformance_files(): lists a rename's source too; None = classification.files
+    docs_refresh_rules_diffs: Optional[dict[str, str]] = None  # split_docs_refresh_rules_diffs(); None = never captured -> rules paths hold
     llm_safety_holds: list[str] = field(default_factory=list)  # bounded-LLM ADDed holds
     fidelity_verdict: Optional[str] = None    # Phase 5.5 verdict word; None = never ran (blocks)
     degraded_agents: list[str] = field(default_factory=list)   # unparseable review agents
@@ -399,6 +400,104 @@ def select_fidelity_verdict(v1, v2, tree2, current_tree):
     return v1, "verdict-1"
 
 
+DOCS_REFRESH_RULES_PREFIXES = (".claude/rules/", "engine/.claude/rules/")
+_RULES_DATE_RE = re.compile(r"last_verified: [0-9]{4}-[0-9]{2}-[0-9]{2}")
+_RULES_INDEX_RE = re.compile(r"index [0-9a-f]+\.\.[0-9a-f]+ 100644")
+_RULES_HUNK_RE = re.compile(r"@@ -1(,[0-9]+)? \+1(,[0-9]+)? @@")
+
+
+def docs_refresh_rules_path(path: str) -> bool:
+    """A `.md` file under .claude/rules/ or engine/.claude/rules/, any depth."""
+    return path.endswith(".md") and path.startswith(DOCS_REFRESH_RULES_PREFIXES)
+
+
+def split_docs_refresh_rules_diffs(diff: Optional[str],
+                                   files: Sequence[str]) -> Optional[dict[str, str]]:
+    """Per-path sections of a unified diff, for rules paths in `files` only.
+
+    None in means the diff was never captured, and None comes back out (every
+    rules path then holds). A section starts at the exact line
+    `diff --git a/<p> b/<p>`; a quoted or renamed header matches nothing, so
+    that path has no section and holds. A path appearing twice gets both
+    sections joined, and the second `diff --git` line fails the predicate.
+    """
+    if diff is None:
+        return None
+    lines = diff.split("\n")
+    if lines and lines[-1] == "":  # a diff ends in a newline
+        lines.pop()
+    wanted = {f"diff --git a/{p} b/{p}": p for p in files if docs_refresh_rules_path(p)}
+    out: dict[str, list[str]] = {}
+    cur: Optional[str] = None
+    for ln in lines:
+        if ln.startswith("diff --git "):
+            cur = wanted.get(ln)
+        if cur is not None:
+            out.setdefault(cur, []).append(ln)
+    return {p: "\n".join(ls) for p, ls in out.items()}
+
+
+def docs_refresh_rules_date_only(path: str, section: Optional[str]) -> bool:
+    """Shell twin: pr_docs_refresh_rules_date_only. True only when `section` is a
+    lone, strictly advancing `last_verified:` bump inside the YAML frontmatter.
+
+    Fail-closed: no section, a mode/rename/new/deleted/binary header, a hunk not
+    starting at line 1, a second hunk, a `\\ No newline` line, a blank line with
+    no leading space, a frontmatter `---` not visible in context, or any second
+    changed line returns False.
+    """
+    if not docs_refresh_rules_path(path) or section is None:
+        return False
+    lines = section.split("\n")
+    if lines[0] != f"diff --git a/{path} b/{path}":
+        return False
+    i = 1
+    while i < len(lines) and not lines[i].startswith("@@"):
+        ln = lines[i]
+        if not (_RULES_INDEX_RE.fullmatch(ln) or ln in (f"--- a/{path}", f"+++ b/{path}")):
+            return False
+        i += 1
+    if i >= len(lines) or not _RULES_HUNK_RE.match(lines[i]):
+        return False
+    minus = plus = 0
+    old_line: Optional[str] = None
+    new_line: Optional[str] = None
+    prev = ""
+    fm_open = fm_closed = in_fm = False
+    for n, ln in enumerate(lines[i + 1:]):
+        tag, text = ln[:1], ln[1:]
+        if tag == " ":
+            if n == 0 and text == "---":
+                fm_open = True
+            elif text == "---":
+                fm_closed = True
+        elif tag == "-":
+            minus += 1
+            if minus == 1:
+                old_line = text
+                in_fm = fm_open and not fm_closed
+        elif tag == "+":
+            plus += 1
+            if prev == "-" and new_line is None:
+                new_line = text
+        else:
+            return False
+        prev = tag
+    if minus != 1 or plus != 1:
+        return False
+    if old_line is None or new_line is None:
+        return False
+    if not in_fm:
+        return False
+    if not (_RULES_DATE_RE.fullmatch(old_line) and _RULES_DATE_RE.fullmatch(new_line)):
+        return False
+    old_date = old_line.removeprefix("last_verified: ")
+    new_date = new_line.removeprefix("last_verified: ")
+    if not new_date > old_date:
+        return False
+    return True
+
+
 def docs_refresh_path_ok(path: str) -> bool:
     """Shell twin: pr_docs_refresh_path_ok. Default-deny docs allowlist.
 
@@ -414,9 +513,13 @@ def docs_refresh_path_ok(path: str) -> bool:
 
 
 def docs_refresh_holds(head_ref: Optional[str], files: Sequence[str],
-                       merge_danger_state: Optional[str], verdict: Optional[str]) -> list[str]:
+                       merge_danger_state: Optional[str], verdict: Optional[str],
+                       rules_diffs: Optional[dict[str, str]] = None) -> list[str]:
     """Shell twin: pr_docs_refresh_hold. One `docs-refresh:<clause>` string per
     FAILED clause, in the shell's fixed order; empty list = every clause passed.
+    A rules path passes only when `docs_refresh_rules_date_only` accepts its
+    section from `rules_diffs`; None or a missing entry holds with the same
+    `docs-refresh:paths:<path>` token.
     """
     holds: list[str] = []
     ref = head_ref or ""
@@ -426,7 +529,9 @@ def docs_refresh_holds(head_ref: Optional[str], files: Sequence[str],
     if not paths:
         holds.append("docs-refresh:paths:empty")
     else:
-        bad = next((p for p in paths if not docs_refresh_path_ok(p)), None)
+        def _ok(p: str) -> bool:
+            return docs_refresh_path_ok(p) or docs_refresh_rules_date_only(p, (rules_diffs or {}).get(p))
+        bad = next((p for p in paths if not _ok(p)), None)
         if bad is not None:
             holds.append(f"docs-refresh:paths:{bad}")
     md = merge_danger_state or "MISSING"
@@ -615,7 +720,7 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
         sel7, src7 = select_fidelity_verdict(inp.fidelity_verdict, inp.fidelity_verdict_2,
                                              inp.fidelity_tree_2, inp.current_tree)
         holds7 = docs_refresh_holds(inp.branch, inp.classification.files,
-                                    inp.merge_danger_state, sel7)
+                                    inp.merge_danger_state, sel7, rules_diffs=inp.docs_refresh_rules_diffs)
         c7_blocked = bool(holds7)
         c7_reason = (f"auto_merge: {DOCS_REFRESH_TOKEN} failed: " + ", ".join(holds7)
                      + f" (verdict source: {src7})") if holds7 else ""

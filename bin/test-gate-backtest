@@ -202,6 +202,22 @@ if [ ! -f config/required.txt ]; then
 fi
 exit 0
 '
+# Declares only config/* but also reads src/fx6.txt, so its reads header lists too few files.
+READS_CONFIG_UNDECLARED_FX6_GATE="${HEADER_GATE_HEAD}"'# gate-backtest-reads: config/*
+if [ ! -f config/required.txt ]; then
+    echo "missing config/required.txt"
+    exit 1
+fi
+if [ -f src/fx6.txt ]; then
+    marked=0
+    while IFS= read -r line; do [ "$line" = "candidate marker" ] && marked=1; done < src/fx6.txt
+    if [ "$marked" -eq 0 ]; then
+        echo "src/fx6.txt lacks the candidate marker"
+        exit 1
+    fi
+fi
+exit 0
+'
 
 # Six settled clean PRs, each touching only its own src/fx<N>.txt; none creates
 # config/required.txt.
@@ -235,6 +251,8 @@ candidate marker
         "$READS_CONFIG_AND_FX6_GATE"
     fx_partial_candidate cand-fix-partial-noreads bin/check-needs-required-noreads \
         "$NEEDS_REQUIRED_GATE"
+    fx_partial_candidate cand-fix-partial-undeclared bin/check-reads-config-undeclared \
+        "$READS_CONFIG_UNDECLARED_FX6_GATE"
     git -C "$FX" checkout -q master
 }
 
@@ -536,6 +554,24 @@ case_fixed_by_pr_partial_no_reads_holds() {
     fi
 }
 
+# The gate header omits src/fx6.txt but the gate reads it, so the half-applied pass is
+# not credited: the read probe writes src/fx6.txt without the candidate marker and the
+# gate flags.
+case_fixed_by_pr_partial_undeclared_read_holds() {
+    setup_fx
+    run_fx cand-fix-partial-undeclared
+    local states
+    states=$(grep -c 'gate-backtest-state:' <<< "$OUT")
+    if [ "$RC" -eq 1 ] && has "$OUT" "gate-backtest-state: HELD" && has "$OUT" "flagged 5 clean PRs" \
+        && has "$OUT" "- False flags: #5, #4, #3, #2, #1" \
+        && has "$OUT" "- Fixed by the candidate PR" && has "$OUT" "#6" && [ "$states" -eq 1 ] \
+        && has "$OUT" "  - Partial apply refused #1 (\`bin/check-reads-config-undeclared\`, a skipped file the gate reads is missing from its gate-backtest-reads header): applied \`config/required.txt\`; skipped \`src/fx6.txt\`"; then
+        ok "fixed-by-pr-partial-undeclared-read-holds"
+    else
+        fail "fixed-by-pr-partial-undeclared-read-holds (rc=$RC, states=$states, out=$OUT, err=$ERR)"
+    fi
+}
+
 case_fixed_by_pr_armable_mirror() {
     setup_fx
     local cleared held m1 m2
@@ -786,7 +822,7 @@ case_destructive_bypass_body_replay() {
     fi
 }
 
-CASES="noisy-gate-holds fixed-by-pr-base-predates-fix fixed-by-pr-patch-conflict-holds fixed-by-pr-partial-gate-file-applied fixed-by-pr-partial-gate-file-failed fixed-by-pr-partial-no-reads-holds fixed-by-pr-armable-mirror quiet-gate-clears non-gate-zero-cost timeout-unknown unspecified-holds unknown-flag space-form-rejected stacked-base minimal-env cleanup gate-flag-space-form gate-flag-bad-rev gate-flag-replays-old-version pma-2506-noisy-holds pma-2520-good-clears manual-testing-body-replay-holds post-merge-recipe-body-replay-clears phpunit-hygiene-base-seam-holds e2e-hygiene-base-seam-holds destructive-bypass-body-replay"
+CASES="noisy-gate-holds fixed-by-pr-base-predates-fix fixed-by-pr-patch-conflict-holds fixed-by-pr-partial-gate-file-applied fixed-by-pr-partial-gate-file-failed fixed-by-pr-partial-no-reads-holds fixed-by-pr-partial-undeclared-read-holds fixed-by-pr-armable-mirror quiet-gate-clears non-gate-zero-cost timeout-unknown unspecified-holds unknown-flag space-form-rejected stacked-base minimal-env cleanup gate-flag-space-form gate-flag-bad-rev gate-flag-replays-old-version pma-2506-noisy-holds pma-2520-good-clears manual-testing-body-replay-holds post-merge-recipe-body-replay-clears phpunit-hygiene-base-seam-holds e2e-hygiene-base-seam-holds destructive-bypass-body-replay"
 
 run_case() {
     case "$1" in
@@ -796,6 +832,7 @@ run_case() {
         fixed-by-pr-partial-gate-file-applied) case_fixed_by_pr_partial_gate_file_applied ;;
         fixed-by-pr-partial-gate-file-failed) case_fixed_by_pr_partial_gate_file_failed ;;
         fixed-by-pr-partial-no-reads-holds) case_fixed_by_pr_partial_no_reads_holds ;;
+        fixed-by-pr-partial-undeclared-read-holds) case_fixed_by_pr_partial_undeclared_read_holds ;;
         fixed-by-pr-armable-mirror) case_fixed_by_pr_armable_mirror ;;
         quiet-gate-clears) case_quiet_gate_clears ;;
         non-gate-zero-cost) case_non_gate_zero_cost ;;

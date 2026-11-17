@@ -15,7 +15,8 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness.armable import (ArmInputs, DOCS_REFRESH_TOKEN, docs_refresh_holds,
-                             docs_refresh_path_ok, evaluate)
+                             docs_refresh_path_ok, docs_refresh_rules_date_only, evaluate,
+                             split_docs_refresh_rules_diffs)
 from harness.planfile import frontmatter_auto_merge_false, frontmatter_auto_merge_value
 from harness.state import Classification
 from tests.test_armable import BODY_CLEARED
@@ -41,8 +42,8 @@ CASES = [
      ["docs-refresh:branch:<empty>"]),
     ("paths-empty", REFRESH_BRANCH, [], "TWO-WAY", "READY",
      ["docs-refresh:paths:empty"]),
-    ("paths-claude-rules", REFRESH_BRANCH, ["ibl5/docs/a.md", ".claude/rules/x.md"],
-     "TWO-WAY", "READY", ["docs-refresh:paths:.claude/rules/x.md"]),
+    ("paths-claude-rules-no-diff", REFRESH_BRANCH, ["ibl5/docs/a.md", ".claude/rules/x.md"],
+     "TWO-WAY", "READY", ["docs-refresh:paths:.claude/rules/x.md"]),  # no diff supplied: a rules path fails closed
     ("paths-claude-skill", REFRESH_BRANCH, [".claude/skills/post-plan/SKILL.md"],
      "TWO-WAY", "READY", ["docs-refresh:paths:.claude/skills/post-plan/SKILL.md"]),
     ("paths-bin", REFRESH_BRANCH, ["bin/docfix-run"], "TWO-WAY", "READY",
@@ -84,12 +85,15 @@ CASES = [
 CASE_IDS = [c[0] for c in CASES]
 
 
-def _shell(head_ref, files, md_state, verdict):
+def _shell(head_ref, files, md_state, verdict, diff_file=None):
     if shutil.which("jq") is None:
         raise RuntimeError("jq is required: pr_docs_refresh_hold is dead without it")
+    args = [head_ref, json.dumps([{"path": p} for p in files]), md_state, verdict]
+    if diff_file is not None:
+        args.append(str(diff_file))
     proc = subprocess.run(
         ["bash", "-c", 'source "$1"; shift; pr_docs_refresh_hold "$@"', "_", str(PR_ARMABLE),
-         head_ref, json.dumps([{"path": p} for p in files]), md_state, verdict],
+         *args],
         capture_output=True, text=True, check=True,
     )
     return proc.stdout.splitlines()
@@ -157,6 +161,157 @@ def test_docs_refresh_shell_parity(name, head, files, md, verdict, expected):
     shell = _shell(head, files, md, verdict)
     assert shell == expected
     assert shell == docs_refresh_holds(head, files, md, verdict)
+
+
+# --- Rules files: a date-only `last_verified:` bump passes ----------------------------------
+
+def _rules_diff(path, body, header=None):
+    """One unified-diff section for `path`. body=None omits the hunk entirely."""
+    if header is None:
+        header = ["index 1111111..2222222 100644", f"--- a/{path}", f"+++ b/{path}"]
+    lines = [f"diff --git a/{path} b/{path}", *header]
+    if body is not None:
+        lines.append("@@ -1,6 +1,6 @@")
+        lines.extend(body)
+    return "\n".join(lines) + "\n"
+
+
+RULES_X = ".claude/rules/x.md"
+DOCS_FILE = "ibl5/docs/decisions/0038-smoke-inconclusive-state.md"
+BUMP_BODY = [" ---", " description: X.", "-last_verified: 2026-09-16",
+             "+last_verified: 2026-11-15", " ---", " ", " # X"]
+DOCS_SECTION = _rules_diff(DOCS_FILE, [" ---", "-description: Old.", "+description: New."])
+
+
+def _hold(path):
+    return [f"docs-refresh:paths:{path}"]
+
+
+# (id, files, diff text or None, expected holds)
+RULES_CASES = [
+    ("rules_date_bump", [RULES_X, DOCS_FILE], _rules_diff(RULES_X, BUMP_BODY) + DOCS_SECTION, []),
+    ("rules_engine_date_bump", ["engine/.claude/rules/y.md"],
+     _rules_diff("engine/.claude/rules/y.md", BUMP_BODY), []),
+    ("rules_text_change", [RULES_X],
+     _rules_diff(RULES_X, [" ---", "-description: Alpha.", "+description: Beta.",
+                           " last_verified: 2026-11-15", " ---", " ", " # X"]),
+     _hold(RULES_X)),
+    ("rules_date_backward", [RULES_X],
+     _rules_diff(RULES_X, [" ---", " description: X.", "-last_verified: 2026-11-15",
+                           "+last_verified: 2026-09-16", " ---", " ", " # X"]),
+     _hold(RULES_X)),
+    ("rules_date_same", [RULES_X],
+     _rules_diff(RULES_X, [" ---", " description: X.", "-last_verified: 2026-11-15",
+                           "+last_verified: 2026-11-15", " ---", " ", " # X"]),
+     _hold(RULES_X)),
+    ("rules_date_plus_extra_line", [RULES_X],
+     _rules_diff(RULES_X, [" ---", " description: X.", "-last_verified: 2026-09-16",
+                           "+last_verified: 2026-11-15", "+owner: someone", " ---", " ", " # X"]),
+     _hold(RULES_X)),
+    ("rules_date_outside_frontmatter", [RULES_X],
+     _rules_diff(RULES_X, [" ---", " description: X.", " ---", "-last_verified: 2026-09-16",
+                           "+last_verified: 2026-11-15", " "]),
+     _hold(RULES_X)),
+    ("rules_date_trailing_comment", [RULES_X],
+     _rules_diff(RULES_X, [" ---", " description: X.", "-last_verified: 2026-09-16",
+                           "+last_verified: 2026-11-15 # bumped", " ---", " ", " # X"]),
+     _hold(RULES_X)),
+    ("rules_mode_change", [RULES_X],
+     _rules_diff(RULES_X, BUMP_BODY,
+                 header=["old mode 100644", "new mode 100755", "index 1111111..2222222",
+                         f"--- a/{RULES_X}", f"+++ b/{RULES_X}"]),
+     _hold(RULES_X)),
+    ("rules_binary", [RULES_X],
+     _rules_diff(RULES_X, None,
+                 header=["index 1111111..2222222 100644",
+                         f"Binary files a/{RULES_X} and b/{RULES_X} differ"]),
+     _hold(RULES_X)),
+    ("rules_second_hunk", [RULES_X],
+     _rules_diff(RULES_X, BUMP_BODY + ["@@ -40,3 +40,3 @@", " a", " b", " c"]),
+     _hold(RULES_X)),
+    ("rules_section_missing", [RULES_X, DOCS_FILE], DOCS_SECTION, _hold(RULES_X)),
+    ("rules_non_md", [".claude/rules/x.txt"], _rules_diff(".claude/rules/x.txt", BUMP_BODY),
+     _hold(".claude/rules/x.txt")),
+]
+
+RULES_CASE_IDS = [c[0] for c in RULES_CASES]
+
+
+@pytest.mark.parametrize("name,files,diff,expected", RULES_CASES, ids=RULES_CASE_IDS)
+def test_rules_case_python(name, files, diff, expected):
+    got = docs_refresh_holds(REFRESH_BRANCH, files, "TWO-WAY", "READY",
+                             rules_diffs=split_docs_refresh_rules_diffs(diff, files))
+    assert got == expected
+
+
+@pytest.mark.parametrize("name,files,diff,expected", RULES_CASES, ids=RULES_CASE_IDS)
+def test_rules_case_shell_parity(name, files, diff, expected, tmp_path):
+    diff_file = None
+    if diff is not None:
+        diff_file = tmp_path / "pr.diff"
+        diff_file.write_text(diff)
+    shell = _shell(REFRESH_BRANCH, files, "TWO-WAY", "READY", diff_file=diff_file)
+    assert shell == expected
+    assert shell == docs_refresh_holds(REFRESH_BRANCH, files, "TWO-WAY", "READY",
+                                       rules_diffs=split_docs_refresh_rules_diffs(diff, files))
+
+
+def test_shell_unreadable_diff_file_holds(tmp_path):
+    expected = _hold(RULES_X)
+    assert _shell(REFRESH_BRANCH, [RULES_X], "TWO-WAY", "READY",
+                  diff_file=tmp_path / "absent.diff") == expected
+    empty = tmp_path / "empty.diff"
+    empty.write_text("")
+    assert _shell(REFRESH_BRANCH, [RULES_X], "TWO-WAY", "READY", diff_file=empty) == expected
+
+
+def test_split_rules_diffs_none_and_trailing_newline():
+    files = [RULES_X, DOCS_FILE]
+    assert split_docs_refresh_rules_diffs(None, files) is None
+    diff = _rules_diff(RULES_X, BUMP_BODY) + DOCS_SECTION
+    assert diff.endswith("\n")
+    sections = split_docs_refresh_rules_diffs(diff, files)
+    assert list(sections) == [RULES_X]
+    assert docs_refresh_rules_date_only(RULES_X, sections[RULES_X])
+    # A rules section that ends the diff must not keep the trailing empty element.
+    last = split_docs_refresh_rules_diffs(_rules_diff(RULES_X, BUMP_BODY), [RULES_X])
+    assert not last[RULES_X].endswith("\n")
+    assert docs_refresh_rules_date_only(RULES_X, last[RULES_X])
+
+
+# --- PR 3991 replay: five rules files with date-only bumps, three docs files ---------------
+
+PR3991 = Path(__file__).parent / "fixtures" / "docs_refresh" / "pr3991.diff"
+PR3991_RULES = [
+    ".claude/rules/adr-append-only.md",
+    ".claude/rules/htmx-history-cache.md",
+    ".claude/rules/migrations.md",
+    ".claude/rules/refactor-flag.md",
+    "engine/.claude/rules/engine-context.md",
+]
+
+
+def _pr3991_files(text):
+    out = []
+    for ln in text.split("\n"):
+        if ln.startswith("diff --git a/"):
+            out.append(ln.split(" b/", 1)[1])
+    return out
+
+
+def test_pr3991_fixture_python():
+    text = PR3991.read_text()
+    files = _pr3991_files(text)
+    assert set(PR3991_RULES) <= set(files)
+    got = docs_refresh_holds(REFRESH_BRANCH, files, "TWO-WAY", "READY",
+                             rules_diffs=split_docs_refresh_rules_diffs(text, files))
+    assert got == []
+
+
+def test_pr3991_fixture_shell():
+    files = _pr3991_files(PR3991.read_text())
+    assert set(PR3991_RULES) <= set(files)
+    assert _shell(REFRESH_BRANCH, files, "TWO-WAY", "READY", diff_file=PR3991) == []
 
 
 # --- Condition (7) through evaluate() ---------------------------------------------------
@@ -294,3 +449,17 @@ def test_cond7_token_never_releases_other_conditions():
 def test_docs_refresh_holds_on_self_governing():
     assert docs_refresh_holds(REFRESH_BRANCH, QUALIFYING_FILES, "SELF-GOVERNING", "READY") == \
         ["docs-refresh:merge-danger:SELF-GOVERNING"]
+
+
+def test_evaluate_docs_only_ready_rules_date_bump():
+    """Condition (7) reads ArmInputs.docs_refresh_rules_diffs: a bump passes, None holds."""
+    files = [RULES_X]
+    diffs = split_docs_refresh_rules_diffs(_rules_diff(RULES_X, BUMP_BODY), files)
+    ok = _cond7(evaluate(_qualifying(classification=Classification(files=files),
+                                     docs_refresh_rules_diffs=diffs)))
+    assert not ok.blocked
+    assert "docs-refresh:paths" not in ok.reason
+    held = _cond7(evaluate(_qualifying(classification=Classification(files=files),
+                                       docs_refresh_rules_diffs=None)))
+    assert held.blocked
+    assert "docs-refresh:paths:.claude/rules/x.md" in held.reason

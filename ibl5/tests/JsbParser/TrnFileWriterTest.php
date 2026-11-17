@@ -6,6 +6,7 @@ namespace Tests\JsbParser;
 
 use JsbParser\TrnFileParser;
 use JsbParser\TrnFileWriter;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -191,6 +192,36 @@ class TrnFileWriterTest extends TestCase
         $this->assertSame(77, TrnFileWriter::readJsbRecordCount(str_pad('77', 16)));
         $this->expectException(\RuntimeException::class);
         TrnFileWriter::readJsbRecordCount(str_repeat('Z', 16));
+    }
+
+    #[DataProvider('partlyNumericHeaderProvider')]
+    public function testReadJsbRecordCountRejectsAHeaderThatIsOnlyPartlyDigits(string $header): void
+    {
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/^The \.trn header does not hold a record count$/');
+        TrnFileWriter::readJsbRecordCount(str_pad($header, 16));
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function partlyNumericHeaderProvider(): array
+    {
+        return [
+            'digits then junk' => ['12x'],
+            'junk then digits' => ['x12'],
+        ];
+    }
+
+    public function testTradeItemWithoutTeamOrPickFieldsWritesZeros(): void
+    {
+        $record = TrnFileWriter::buildTradeRecord(1, 5, 2008, [
+            ['marker' => TrnFileParser::TRADE_MARKER_PLAYER, 'player_id' => 77],
+            ['marker' => TrnFileParser::TRADE_MARKER_DRAFT_PICK, 'draft_year' => 2009],
+        ]);
+
+        $this->assertSame('0     0     0    77', substr($record, 27, TrnFileParser::TRADE_ITEM_SIZE));
+        $this->assertSame('1  2009     0     0', substr($record, 27 + TrnFileParser::TRADE_ITEM_SIZE, TrnFileParser::TRADE_ITEM_SIZE));
     }
 
     public function testWaiverClaimRoundTrip(): void

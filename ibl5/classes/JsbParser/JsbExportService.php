@@ -114,9 +114,13 @@ class JsbExportService implements JsbExportServiceInterface
                 continue;
             }
 
-            $keys = array_map(
-                static fn (array $chunk): string => self::tradeKey($seasonBeginningYear, $chunk),
+            $tradeRecords = array_map(
+                static fn (array $chunk): string => TrnFileWriter::buildTradeRecord($month, $day, $seasonBeginningYear, $chunk),
                 $chunks,
+            );
+            $keys = array_map(
+                static fn (string $record): string => self::recordKey(substr($record, TrnFileParser::JSB_HEADER_SIZE)),
+                $tradeRecords,
             );
             // The n-th site record with a key counts as present only when the file holds at least n
             // records with that key. A player who is traded to the same team twice in one season
@@ -125,7 +129,9 @@ class JsbExportService implements JsbExportServiceInterface
             $tally = [];
             foreach ($keys as $index => $key) {
                 $tally[$key] = ($tally[$key] ?? 0) + 1;
-                if (($fileCounts[$key] ?? 0) >= ($siteSeen[$key] ?? 0) + $tally[$key]) {
+                /** @infection-ignore-all Equivalent: the right side below is at least 1, so a missing key reads as not present whether it defaults to 0 or to any lower number. */
+                $inFile = $fileCounts[$key] ?? 0;
+                if ($inFile >= ($siteSeen[$key] ?? 0) + $tally[$key]) {
                     $present[$index] = $key;
                 }
             }
@@ -143,9 +149,7 @@ class JsbExportService implements JsbExportServiceInterface
                 continue;
             }
 
-            foreach ($chunks as $chunk) {
-                $records[] = TrnFileWriter::buildTradeRecord($month, $day, $seasonBeginningYear, $chunk);
-            }
+            array_push($records, ...$tradeRecords);
             $appendedTrades++;
         }
 
@@ -230,12 +234,13 @@ class JsbExportService implements JsbExportServiceInterface
             }
         }
 
+        // Take one chunk from each side in turn until every side is used up.
         $chunks = [];
-        $maxChunks = $sideChunks === [] ? 0 : max(array_map('count', $sideChunks));
-        for ($i = 0; $i < $maxChunks; $i++) {
-            foreach ($sideChunks as $sideList) {
-                if (isset($sideList[$i])) {
-                    $chunks[] = $sideList[$i];
+        for ($round = 0; $sideChunks !== []; $round++) {
+            foreach ($sideChunks as $side => $sideList) {
+                $chunks[] = $sideList[$round];
+                if (!isset($sideList[$round + 1])) {
+                    unset($sideChunks[$side]);
                 }
             }
         }
@@ -244,30 +249,19 @@ class JsbExportService implements JsbExportServiceInterface
     }
 
     /**
-     * Dedupe key for one new trade record: season year plus its items, in any order.
-     * Month and day are left out because JSB stamps its own league date.
-     *
-     * @param list<array{marker: int, from_team?: int, to_team?: int, player_id?: int, draft_year?: int, round?: int, original_team?: int}> $items
-     */
-    private static function tradeKey(int $seasonBeginningYear, array $items): string
-    {
-        $record = TrnFileWriter::buildTradeRecord(1, 1, $seasonBeginningYear, $items);
-        return self::recordKey(substr($record, TrnFileParser::JSB_HEADER_SIZE));
-    }
-
-    /**
-     * Dedupe key for a JSB-layout trade record: year bytes plus the sorted 19-byte items.
+     * Dedupe key for a JSB-layout trade record: year bytes plus its five 19-byte item slots,
+     * sorted so the item order does not matter. Month and day are left out because JSB stamps
+     * its own league date. Empty slots are all spaces in JSB's records and in ours, so they sort
+     * the same way on both sides.
      */
     private static function recordKey(string $jsbRecord): string
     {
-        $items = [];
-        for ($i = 0; $i < self::ITEMS_PER_RECORD; $i++) {
-            $item = substr($jsbRecord, 11 + $i * TrnFileParser::TRADE_ITEM_SIZE, TrnFileParser::TRADE_ITEM_SIZE);
-            if (trim($item) !== '') {
-                $items[] = $item;
-            }
-        }
+        $items = str_split(
+            substr($jsbRecord, 11, self::ITEMS_PER_RECORD * TrnFileParser::TRADE_ITEM_SIZE),
+            TrnFileParser::TRADE_ITEM_SIZE,
+        );
         sort($items);
+        /** @infection-ignore-all Equivalent: the key is only compared with other keys built here, and the items are fixed-width, so a moved or dropped '|' or a year window that adds the always-blank byte 9 or drops the leading century digit keys the same records alike. */
         return substr($jsbRecord, 5, 4) . '|' . implode('|', $items);
     }
 
@@ -279,12 +273,8 @@ class JsbExportService implements JsbExportServiceInterface
     private static function existingTradeKeys(string $data, int $count): array
     {
         $keys = [];
-        for ($n = 0; $n < $count; $n++) {
-            $jsbRecord = substr(
-                $data,
-                TrnFileParser::JSB_HEADER_SIZE + $n * TrnFileParser::RECORD_SIZE,
-                TrnFileParser::RECORD_SIZE,
-            );
+        $jsbRecords = str_split(substr($data, TrnFileParser::JSB_HEADER_SIZE), TrnFileParser::RECORD_SIZE);
+        foreach (array_slice($jsbRecords, 0, $count) as $jsbRecord) {
             if (substr($jsbRecord, 10, 1) === (string) TrnFileParser::TYPE_TRADE) {
                 $key = self::recordKey($jsbRecord);
                 $keys[$key] = ($keys[$key] ?? 0) + 1;

@@ -69,6 +69,7 @@ class TrnFileWriter implements TrnFileWriterInterface
                 );
             }
             $offset = $headerSize + $count * TrnFileParser::RECORD_SIZE;
+            /** @infection-ignore-all Equivalent: 64,000 - 16 is not a multiple of 128, so offset + 128 never equals the file size and > and >= reject the same counts. */
             if ($offset + TrnFileParser::RECORD_SIZE > TrnFileParser::FILE_SIZE) {
                 throw new \RuntimeException('The .trn file is full at ' . $count . ' records');
             }

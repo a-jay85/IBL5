@@ -7,6 +7,7 @@ namespace Tests\JsbParser;
 use JsbParser\Contracts\JsbExportRepositoryInterface;
 use JsbParser\JsbExportService;
 use JsbParser\TrnFileParser;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -257,7 +258,157 @@ class JsbExportServiceTest extends TestCase
         );
 
         $this->assertSame(1, $result->errors);
+        $this->assertSame(['ERROR: IBL5.trn could not be read from /nonexistent/IBL5.trn'], $result->messages);
         $this->assertFileDoesNotExist($outputFile);
+    }
+
+    public function testJunkHeaderErrorNamesTheFile(): void
+    {
+        [$result] = $this->export(str_repeat('Z', TrnFileParser::FILE_SIZE), '2009-01-05');
+
+        $this->assertSame(['ERROR: IBL5.trn: The .trn header does not hold a record count'], $result->messages);
+    }
+
+    public function testMessagesReportTheCountsAndTheJsbDate(): void
+    {
+        $this->stubRepo->method('getCompletedTradeItems')->willReturn($this->kagamiTurnerTrade());
+
+        [$result] = $this->export($this->sim08Source(), '2009-01-05');
+
+        $this->assertContains('IBL5.trn holds 4 records', $result->messages);
+        $this->assertContains(
+            'Appended 2 trade records for 1 trades, dated 2009-01-05; IBL5.trn now holds 6 records',
+            $result->messages,
+        );
+    }
+
+    public function testUnknownReceivingTeamWarnsWithBothTeamNames(): void
+    {
+        $this->stubRepo->method('getCompletedTradeItems')->willReturn([
+            $this->row(4, 100, '1', 'Heat', 'Expansion'),
+        ]);
+
+        [$result, $output] = $this->export($this->trnFile([]), '2009-01-05');
+
+        $this->assertSame(str_pad('0', 16), substr($output, 0, 16));
+        $this->assertContains(
+            'WARNING: trade offer 4 names a team JSB does not know (Heat to Expansion), so it was not appended',
+            $result->messages,
+        );
+    }
+
+    public function testTradesAfterOnesThatAreLeftOutStillGetAppended(): void
+    {
+        $this->stubRepo->method('getCompletedTradeItems')->willReturn(array_merge(
+            [$this->row(1, 100, '1', 'Expansion', 'Heat')],
+            [$this->row(2, 0, 'cash', 'Lakers', 'Celtics')],
+            $this->kagamiTurnerTrade(),
+            [$this->row(9, 100, '1', 'Celtics', 'Lakers')],
+        ));
+
+        [$result, $output] = $this->export($this->trnFile([self::SIM09_REC_80]), '2009-01-05');
+
+        $this->assertSame(str_pad('2', 16), substr($output, 0, 16));
+        $this->assertSame('  1 52008 20     1    21   100', rtrim(substr($output, 16 + 128, 128)));
+        $this->assertContains(
+            'Appended 1 trade records for 1 trades, dated 2009-01-05; IBL5.trn now holds 2 records',
+            $result->messages,
+        );
+    }
+
+    public function testTwoRecordsWithTheSameItemsInOneTradeNeedTwoCopiesInTheFile(): void
+    {
+        // Each side gives the other the same pick, so both records hold the same item.
+        $give = $this->row(5, 900, '0', 'Celtics', 'Lakers');
+        $give['pick_year'] = 2009;
+        $give['pick_round'] = 1;
+        $give['pick_teamid'] = 1;
+        $back = $give;
+        $back['trade_from'] = 'Lakers';
+        $back['trade_to'] = 'Celtics';
+        $this->stubRepo->method('getCompletedTradeItems')->willReturn([$give, $back]);
+
+        [$result, $output] = $this->export($this->trnFile(['  1 42008 21  2009     1     1']), '2009-01-05');
+
+        $this->assertSame(str_pad('1', 16), substr($output, 0, 16));
+        $this->assertContains(
+            'WARNING: trade offer 5 is only partly in IBL5.trn, so it was not appended. Check it in JSB by hand.',
+            $result->messages,
+        );
+    }
+
+    public function testEachRepeatOfATradeUsesUpOneCopyInTheFile(): void
+    {
+        $this->stubRepo->method('getCompletedTradeItems')->willReturn([
+            $this->row(1, 100, '1', 'Celtics', 'Lakers'),
+            $this->row(2, 100, '1', 'Celtics', 'Lakers'),
+            $this->row(3, 100, '1', 'Celtics', 'Lakers'),
+        ]);
+        $copy = '  1 42008 20     1    21   100';
+
+        [$result, $output] = $this->export($this->trnFile([$copy, $copy]), '2009-01-05');
+
+        $this->assertSame(str_pad('3', 16), substr($output, 0, 16));
+        $this->assertContains('Skipped 2 trades already in IBL5.trn', $result->messages);
+    }
+
+    public function testRecordPastTheHeaderCountDoesNotCountAsLogged(): void
+    {
+        $this->stubRepo->method('getCompletedTradeItems')->willReturn([
+            $this->row(1, 100, '1', 'Celtics', 'Lakers'),
+        ]);
+        $stale = substr_replace($this->trnFile(['  1 42008 20     1    21   100']), str_pad('0', 16), 0, 16);
+
+        [, $output] = $this->export($stale, '2009-01-05');
+
+        $this->assertSame(str_pad('1', 16), substr($output, 0, 16));
+        $this->assertSame('  1 52008 20     1    21   100', rtrim(substr($output, 16, 128)));
+    }
+
+    public function testThreeTeamTradeWritesOneRecordPerGivingAndReceivingPair(): void
+    {
+        $this->stubRepo->method('getCompletedTradeItems')->willReturn([
+            $this->row(6, 100, '1', 'Celtics', 'Lakers'),
+            $this->row(6, 101, '1', 'Raptors', 'Celtics'),
+            $this->row(6, 102, '1', 'Raptors', 'Lakers'),
+        ]);
+
+        [, $output] = $this->export($this->trnFile([]), '2009-01-05');
+
+        $this->assertSame(str_pad('3', 16), substr($output, 0, 16));
+        $this->assertSame('  1 52008 20     1    21   100', rtrim(substr($output, 16, 128)));
+        $this->assertSame('  1 52008 20    12     1   101', rtrim(substr($output, 16 + 128, 128)));
+        $this->assertSame('  1 52008 20    12    21   102', rtrim(substr($output, 16 + 256, 128)));
+    }
+
+    /**
+     * @param array{pick_year: int|null, pick_round: int|null, pick_teamid: int|null} $pick
+     */
+    #[DataProvider('partialPickProvider')]
+    public function testPickMissingAnyFieldWarnsAndIsNotAppended(array $pick): void
+    {
+        $this->stubRepo->method('getCompletedTradeItems')->willReturn([
+            array_merge($this->row(3, 555, '0', 'Lakers', 'Celtics'), $pick),
+        ]);
+
+        [$result, $output] = $this->export($this->trnFile([]), '2009-01-05');
+
+        $this->assertSame(str_pad('0', 16), substr($output, 0, 16));
+        $this->assertContains(
+            'WARNING: trade offer 3 has draft pick 555 with no ibl_draft_picks row, so it was not appended',
+            $result->messages,
+        );
+    }
+
+    /**
+     * @return array<string, array{array{pick_year: int|null, pick_round: int|null, pick_teamid: int|null}}>
+     */
+    public static function partialPickProvider(): array
+    {
+        return [
+            'no year' => [['pick_year' => null, 'pick_round' => 1, 'pick_teamid' => 21]],
+            'no round' => [['pick_year' => 2009, 'pick_round' => null, 'pick_teamid' => 21]],
+        ];
     }
 
     // ── helpers ──────────────────────────────────────────────────

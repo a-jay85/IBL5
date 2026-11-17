@@ -1,6 +1,6 @@
 ---
 description: Changed ship-pipeline gates are replayed against recent merged PRs, and Phase 6.5 condition (17) holds auto-merge when the replay flags clean PRs.
-last_verified: 2026-11-08
+last_verified: 2026-11-17
 ---
 
 # ADR-0161: Backtest changed gates before they merge
@@ -71,3 +71,9 @@ A clean-PR flag counts as pre-existing only when every flagged stdout line of th
 Replays of `bin/check-docs` pass the merged PR's pre-squash head as `CHECK_DOCS_EDIT_DATE_REF`, so the edit-date check reads the branch commit dates that CI saw. The squash commit carries the merge-day author date, which used to fail a doc whose branch edit had the earlier `last_verified`. CI never sets the variable. An unknown or absent head falls back to `base..HEAD`. The harness makes one best-effort, time-bounded fetch of pull heads missing from the local object store, and a failed fetch leaves the earlier behavior.
 
 The fix rerun still runs only when the base gate passes. A PR with new lines against a flagging base lands in the false-flag list and never in the fixed-by-candidate list.
+
+## Addendum 2026-11-17: fix rerun on a flagging base
+
+PR [#4036](https://github.com/a-jay85/IBL5/pull/4036) replaces the last paragraph of the addendum above. The fix rerun now also runs when the base gate flags, as long as the head gate prints at least one line the base gate does not print on the same tree. A head flag whose lines all appear in the base output stays pre-existing and gets no rerun.
+
+A clean PR counts as "fixed by the candidate PR" when the fix rerun passes, or when it flags and every line it prints is also a base-gate line. Those PRs stay out of the false-flag threshold. The rendered block lists each PR in the second group on its own line with the count of lines left over. The 500-line cap still applies. When the fix rerun or the base output reaches 500 distinct lines, every fix-rerun line counts as new, so a flagging fix rerun stays a false flag.

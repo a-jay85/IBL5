@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness import gate_backtest_replay as gbr
 from harness.gate_backtest import (GateChange, HistoricalPR, ReplaySpec, Truth, classify_exit,
-                                   compute_verdict)
+                                   compute_verdict, fix_lines_pre_existing)
 from harness.gate_backtest_replay import (ScratchTree, _fix_patch, ensure_pr_heads, fetch_history,
                                           make_git, resolve_plan, run_backtest)
 
@@ -419,6 +419,16 @@ NEEDS_FILE_GATE = ("#!/bin/sh\n# gate-backtest-argv:\n"
                    "    echo 'missing config/required.txt'\n    exit 1\nfi\nexit 0\n")
 
 
+P11_LINE = "P11 master-only contract"
+P6_LINE = "P6 missing config/required.txt"
+HEAD_P11_P6_GATE = ("#!/bin/sh\n# gate-backtest-argv:\n"
+                    f"echo '{P11_LINE}'\n"
+                    "if [ ! -f config/required.txt ]; then\n"
+                    f"    echo '{P6_LINE}'\nfi\nexit 1\n")
+BASE_P11_GATE = ("#!/bin/sh\n# gate-backtest-argv:\n"
+                 f"echo '{P11_LINE}'\nexit 1\n")
+
+
 def _patch_from_master(repo, rel, content):
     """The binary diff of one commit on a side branch off master; the repo is left on master."""
     sh(repo, "checkout", "-q", "-b", "patch-src", "master")
@@ -455,6 +465,38 @@ def test_fix_overlay_skipped_when_base_flags(tmp_path):
     assert results[0].outcome == "flag"
     assert results[0].base_outcome == "flag"
     assert results[0].fix_outcome == ""
+
+
+def test_fix_rerun_runs_when_base_flags_and_head_adds_lines(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    patch = _patch_from_master(repo, "config/required.txt", "required\n")
+    results = run(repo, [shas[0]], tmp_path, script=HEAD_P11_P6_GATE, fix_patch=patch,
+                  base_overlay=base(BASE_P11_GATE))
+    assert results[0].outcome == "flag"
+    assert results[0].base_outcome == "flag"
+    assert results[0].fix_outcome == "flag"
+    assert results[0].fix_flag_lines == (P11_LINE,)
+    assert fix_lines_pre_existing(results[0]) is True
+
+
+def test_fix_rerun_keeps_line_the_patch_leaves(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    patch = _patch_from_master(repo, "config/other.txt", "x\n")
+    results = run(repo, [shas[0]], tmp_path, script=HEAD_P11_P6_GATE, fix_patch=patch,
+                  base_overlay=base(BASE_P11_GATE))
+    assert results[0].fix_outcome == "flag"
+    assert P6_LINE in results[0].fix_flag_lines
+    assert fix_lines_pre_existing(results[0]) is False
+
+
+def test_fix_rerun_skipped_when_head_adds_no_lines(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    patch = _patch_from_master(repo, "config/required.txt", "required\n")
+    results = run(repo, [shas[0]], tmp_path, script=BASE_P11_GATE, fix_patch=patch,
+                  base_overlay=base(BASE_P11_GATE))
+    assert results[0].base_outcome == "flag"
+    assert results[0].fix_outcome == ""
+    assert results[0].fix_flag_lines == ()
 
 
 def test_fix_overlay_skipped_without_patch(tmp_path):

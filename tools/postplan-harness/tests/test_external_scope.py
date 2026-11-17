@@ -281,6 +281,10 @@ def test_dm_if_wrapping_context_send_is_one_way():
     sec = _section(DM, 340, [" for chunk in \"${CHUNKS[@]}\"; do", "+    if false; then",
                              _DM_SEND_CONTEXT, "+    fi", " done"])
     assert external_send_change(DM, sec) == _R_DM_FLOW
+    # Unwrapping a send runs it again. Only the removed-side balance walk sees this split `if`.
+    unwrap = _section(DM, 340, [" for chunk in \"${CHUNKS[@]}\"; do", "-    if false; then",
+                                _DM_SEND_CONTEXT, "-    fi", " done"])
+    assert external_send_change(DM, unwrap) == _R_DM_FLOW
 
 
 def test_dm_redirect_into_spool_is_one_way():

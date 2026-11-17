@@ -33,7 +33,7 @@ The freeze TVR arm (`FreezeConfig.TVR`, `FreezeMeans.TurnProb`) froze the old st
 
 ## Before and after
 
-Fixture run: `engine/internal/sim/testdata/bundle.json`, 200 seeds from 20240601 (`foulRateSeed`), one game per seed. The command, run from `engine/`, copies a scratch test into `internal/sim`, runs `go test ./internal/sim -run "^(TestElompScratchAggregates|TestFoulRatesByTypeFixture)$" -count=1 -v`, then removes it. The real-life row is one run of the same scratch test on `bundle_reallife.json` after the port. No master run exists on that fixture. No `.sco` column appears, because `jsbcalibrate` needs the archive and no archive walk ran for this port. The plan asked for a `.sco` column. It stays open as a follow-up walk, and the owner's baseline decision rests on the sim BEFORE/AFTER rows only.
+Fixture run: `engine/internal/sim/testdata/bundle.json`, 200 seeds from 20240601 (`foulRateSeed`), one game per seed. The command, run from `engine/`, copies a scratch test into `internal/sim`, runs `go test ./internal/sim -run "^(TestElompScratchAggregates|TestFoulRatesByTypeFixture)$" -count=1 -v`, then removes it. The real-life row is one run of the same scratch test on `bundle_reallife.json` after the port. No master run exists on that fixture. These fixture rows carry no `.sco` column. The archive walk in the next section supplies the `.sco` comparison.
 
 Per team-game:
 
@@ -55,6 +55,35 @@ PF per team-game by foul site on bundle.json:
 | and-one-made-two | 1.810 | 2.330 |
 | non-shooting-bonus | 0.365 | 0.018 |
 | offensive-turnover | (no site) | 1.357 |
+
+## Archive walk against .sco
+
+`TestRealArchive_FTADecomp` (build tag `archive`) produced these rows on 2026-11-17. The command, run from `engine/` with `JSB_ARCHIVE_DIR` at the backup archive, was `JSB_ARCHIVE_RUNS=20 JSB_ARCHIVE_STRIDE=1 JSB_FTA_PHASE=before go test -tags archive -run '^TestRealArchive_FTADecomp$' -count=1 -v ./internal/calibrate`, and the AFTER row used `JSB_FTA_PHASE=after`. The test reads neither `JSB_ARCHIVE_RUNS` nor `JSB_ARCHIVE_STRIDE`. Its own settings stayed at their defaults: 60 games per snapshot (`JSB_FTA_GAMES`), every snapshot (`JSB_FTA_SNAP_STRIDE=1`), and seed 20240601 (`JSB_FTA_SEED`). Each walk read 112 recent-era (05-08) snapshots, which gave 13,284 engine team-games and 12,056 `.sco` team-games after the test dropped 78 all-zero engine games. Values come from the `WALK side=` lines, per team-game.
+
+| Run | PF | FTA | TOV | STL | home/away FTA |
+|-----|----|-----|-----|-----|---------------|
+| .sco | 17.116 | 18.587 | 13.762 | 9.131 | 1.101 |
+| archive BEFORE | 18.089 | 19.983 | 14.662 | 7.203 | 1.104 |
+| archive AFTER | pending | pending | pending | pending | pending |
+
+## Foul rates by type against the live trace
+
+Each share is that type's PF divided by total PF. The trace shares come from the 1524 fouls of the 47-game main run in `~/claude-plans/_reports/2026-11-16-jsb-foul-trace-q2.md`. The BEFORE and AFTER shares come from the `WALK site_pf` lines of the archive walk above. The trace and the walk cover different seasons, so this table compares the mix of foul types and leaves raw rates out.
+
+Engine sites map to trace types this way. Non-shooting is `non-shooting` + `non-shooting-bonus` + `late-game`. And-one is `and-one` + `and-one-made-two`. Shooting-two, shooting-three, and offensive-turnover map to the site of the same name. The engine has no site for the one-FT trip at `0x4da427`, so its engine share is 0.
+
+A type is `ported` when its share differs from the trace by 0.03 or more and its cause sits at a cited decompile line that the engine ports differently. It is `residual` when the gap is there and the cause is not located. It is `matched` when the gap is under 0.03.
+
+| Type | Trace share | BEFORE share | AFTER share | Decompile line | Verdict |
+|------|-------------|--------------|-------------|----------------|---------|
+| non-shooting | 0.386 | 0.396 | pending | jsb560_decompiled.c:93469-93480 | matched |
+| shooting-two | 0.388 | 0.387 | pending | jsb560_decompiled.c:93469-93480 | matched |
+| shooting-three | 0.006 | 0.005 | pending | jsb560_decompiled.c:93469-93480 | matched |
+| and-one | 0.115 | 0.124 | pending | jsb560_decompiled.c:93919-93926 | matched |
+| offensive-turnover | 0.081 | 0.088 | pending | jsb560_decompiled.c:94290-94293 | matched |
+| one-FT 0x4da427 | 0.024 | 0.000 | pending | jsb560_decompiled.c:93790-93828 | matched |
+
+Every gap is under 0.03, so this PR ports no foul rate. The largest gap is the one-FT trip at 0.024. JSB reaches it in the `else` branch of the made-shot test `FUN_004e2220()` at 93790-93828: the shot missed, `local_150 == 1` marks an and-one foul, and the FT call `FUN_004e9fc0` returns to `0x4da42c` with `piStack_114` (the made-shot result, 0 here) as its argument. The trace saw one FT on each of these trips. The engine has no path that charges this foul, so a port needs a site for it.
 
 ## Path shares against the trace
 

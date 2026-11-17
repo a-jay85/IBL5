@@ -18,8 +18,9 @@ interface JsbExportServiceInterface
      *
      * Every record already in the input stays byte-identical. Each new trade becomes one
      * type-2 record per giving team, appended after the existing records, and the header
-     * count goes up by the number appended. A trade already in the file (matched on season
-     * year and items, in any order) is skipped. A trade that cannot be written, such as one
+     * count goes up by the number appended. Trades match on season year and items, in any
+     * order. The n-th site trade with a given match is skipped only when the file holds at
+     * least n matching records, so a repeat of the same trade is still appended. A trade that cannot be written, such as one
      * naming an unknown team or a pick with no `ibl_draft_picks` row, gets a WARNING line.
      *
      * @param string $inputPath JSB's current IBL5.trn

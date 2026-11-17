@@ -160,7 +160,8 @@ if (is_file($root . '/phpunit-mutation.xml')) {
     $mutationXml = simplexml_load_file($root . '/phpunit-mutation.xml');
     $mutationExcludedGroups = [];
     if ($mutationXml !== false) {
-        foreach ($mutationXml->xpath('/phpunit/groups/exclude/group') ?: [] as $groupNode) {
+        $groupNodes = $mutationXml->xpath('/phpunit/groups/exclude/group');
+        foreach (is_array($groupNodes) ? $groupNodes : [] as $groupNode) {
             $mutationExcludedGroups[] = trim((string) $groupNode);
         }
     }

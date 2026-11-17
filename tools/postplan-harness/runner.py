@@ -1806,10 +1806,10 @@ _GATE_FIX_PUSH_SUBJECT = "chore: auto-fix local pre-push gate denial"
 def _publish_gate_fix(gh, pr, res, log) -> None:
     """Upsert the gate-fix block into the live PR body. Never raises: the fix and the
     push already succeeded, and the record is still in result.json and audit.log."""
-    block = render_gate_fix(res.gate_fix)
-    if not block:
-        return
     try:
+        block = render_gate_fix(res.gate_fix)
+        if not block:
+            return
         gh.pr_edit_body(pr, upsert_gate_fix(gh.pr_body_fresh() or "", block))
         log(f"gatefix: recorded in PR #{pr} body")
     except Exception as exc:  # noqa: BLE001 - the record is best-effort here
@@ -2584,8 +2584,12 @@ def _doc_gate_base(worktree: str) -> str:
 
 def _remediate_doc_staleness(worktree: str, git, log) -> int:
     """Run the on-touch date bump the hook asked for, stage it, return how many docs
-    moved. Returns 0 when nothing changed and -1 when remediation could not run."""
-    base = _doc_gate_base(worktree)
+    moved. Never raises: returns 0 when nothing changed and -1 when remediation could not run."""
+    try:
+        base = _doc_gate_base(worktree)
+    except OSError as exc:
+        log(f"phase2: cannot remediate doc-staleness - git merge-base: {exc}")
+        return -1
     if not base:
         log("phase2: cannot remediate doc-staleness - no merge-base with origin/master")
         return -1
@@ -2603,14 +2607,22 @@ def _remediate_doc_staleness(worktree: str, git, log) -> int:
     # `add -A` ran before the hook refused), so the tree was clean against
     # the index; every path --fix-dates rewrote is now an UNSTAGED change. That is an
     # exact count with no parsing of the script's prose.
-    out = subprocess.run(["git", "-C", worktree, "diff", "--name-only", "--", "*.md"],
-                         capture_output=True, text=True, errors="replace").stdout
+    try:
+        out = subprocess.run(["git", "-C", worktree, "diff", "--name-only", "--", "*.md"],
+                             capture_output=True, text=True, errors="replace").stdout
+    except OSError as exc:
+        log(f"phase2: cannot remediate doc-staleness - git diff: {exc}")
+        return -1
     n = len([p for p in out.splitlines() if p.strip()])
     if n == 0:
         log(f"phase2: {_DOC_FIX_SCRIPT} {_DOC_FIX_FLAG} bumped nothing "
             f"(exit {proc.returncode}) - failing closed")
         return 0
-    git.stage_all()
+    try:
+        git.stage_all()
+    except Exception as exc:  # noqa: BLE001 - the contract is -1, never a raise
+        log(f"phase2: cannot remediate doc-staleness - stage_all: {exc}")
+        return -1
     log(f"phase2: auto-remediated doc-staleness - bumped last_verified in {n} docs "
         f"(base: {base[:12]})")
     return n
@@ -2725,11 +2737,10 @@ def _check_backlog_closes(gh, pr, plan, log) -> None:
         return
     try:
         base, refs = gh.pr_closing_refs(pr)
+        log(backlog_closes_mismatch(closes, base, refs))
     except Exception as e:
         log(f"phase2: backlog-closes self-check skipped ({str(e)[:120]})")
         return
-    msg = backlog_closes_mismatch(closes, base, refs)
-    log(msg)
 
 
 def _sweep_out_of_scope(gh, pr, plan, slug, log) -> list[int]:

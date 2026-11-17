@@ -7,6 +7,7 @@ names) is ever shell-parsed.
 from __future__ import annotations
 
 import fnmatch
+import functools
 import hashlib
 import json
 import os
@@ -179,6 +180,66 @@ def partial_fix_allowed(reads: tuple[str, ...], skipped: list[str]) -> bool:
         return False
     return not any(p == _UNKNOWN_PATH or any(fnmatch.fnmatchcase(p, g) for g in reads)
                    for p in skipped)
+
+
+_PROBE_MARKER = b"gate-backtest-probe\n"
+_PROBE_MAX_PATHS = 8
+
+
+def probe_undeclared_reads(tree: str, skipped: list[str], run, clock, deadline: float
+                           ) -> tuple[str, str]:
+    """Re-run a gate that passed on a half-applied tree, once per state of each skipped file.
+
+    Each skipped file is probed absent (only when it exists) and present with marker bytes.
+    A verdict other than pass proves the gate reads a file its reads header does not list.
+    Returns ("", "") when every probe still passes, else (fix_outcome, detail). A probe that
+    cannot finish refuses the credit. Each file is restored before the next is probed.
+    run() returns execute()'s tuple; only its outcome is read.
+    """
+    if len(skipped) > _PROBE_MAX_PATHS:
+        return "partial-probe-failed", f"probe: {len(skipped)} skipped files over cap {_PROBE_MAX_PATHS}"
+    root = os.path.realpath(tree)
+    for rel in skipped:
+        path = os.path.join(root, rel)
+        if os.path.isabs(rel) or not os.path.realpath(path).startswith(root + os.sep):
+            return "partial-probe-failed", f"probe: path outside tree {rel}"
+        if os.path.islink(path) or (os.path.lexists(path) and not os.path.isfile(path)):
+            return "partial-probe-failed", f"probe: not a regular file {rel}"
+        saved = None
+        if os.path.lexists(path):
+            with open(path, "rb") as fh:
+                saved = (fh.read(), os.stat(path).st_mode & 0o7777)
+        top = None
+        parent = os.path.dirname(path)
+        while not os.path.exists(parent):
+            top, parent = parent, os.path.dirname(parent)
+        try:
+            for label in ("absent", "marker"):
+                if label == "absent" and saved is None:
+                    continue
+                if clock() >= deadline:
+                    return "partial-probe-failed", "probe: total-cap"
+                if label == "absent":
+                    os.remove(path)
+                else:
+                    os.makedirs(os.path.dirname(path), exist_ok=True)
+                    with open(path, "wb") as fh:
+                        fh.write(_PROBE_MARKER)
+                outcome = run()[0]
+                if outcome in ("error", "timeout"):
+                    return "partial-probe-failed", f"probe: {rel} {label} -> {outcome}"
+                if outcome != "pass":
+                    return "partial-undeclared-read", f"probe: {rel} {label} -> {outcome}"
+        finally:
+            if saved is not None:
+                with open(path, "wb") as fh:
+                    fh.write(saved[0])
+                os.chmod(path, saved[1])
+            elif os.path.lexists(path):
+                os.unlink(path)
+            if top is not None:
+                shutil.rmtree(top, ignore_errors=True)
+    return "", ""
 
 
 def ensure_pr_heads(repo: str, prs, timeout: float = 60.0) -> int:
@@ -544,6 +605,13 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
                                 else:
                                     scratch.overlay(overlay_files)
                                     fix_outcome, fix_detail, _, fix_secs = execute(spec, ctx, gate.path)
+                                    if fix_skipped and fix_outcome == "pass":
+                                        probed = probe_undeclared_reads(
+                                            ctx["tree"], fix_skipped,
+                                            functools.partial(execute, spec, ctx, gate.path),
+                                            clock, start + total_cap)
+                                        if probed[0]:
+                                            fix_outcome, fix_detail = probed
                             except OSError as exc:
                                 fix_outcome = "error"
                                 fix_detail = re.sub(r"\s+", " ", f"fix-overlay: {exc}")[:160]

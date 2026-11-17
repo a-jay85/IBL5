@@ -26,7 +26,9 @@
 #                                           #   exact command. All queue-path gates stay.
 #   Pre-flight duplicate gate (--queue only): if the prompt's branch slug already has a
 #   planning artifact on disk (queue, plans dir, done, or skipped), plan-now declines
-#   before spending a model run and exits 3. --implement always bypasses the gate.
+#   before spending a model run and exits 3. --implement skips the artifact checks but
+#   still runs the overwrite-intent check: a prompt line that names an existing plan
+#   file with rewrite/overwrite/replace/in-place wording declines with exit 3.
 #   Pre-flight tier gate (all dispositions): compares the declared tier in the prompt
 #   against bin/plan-tier-hint. Exits 4 when the declared and hinted tiers differ AND
 #   at least one is xhigh. Gate is advisory — always overridable with --tier-ok "reason".
@@ -285,12 +287,17 @@ if [ -n "$RESUME_ID" ]; then
     echo "plan-now: resuming run $RESUME_ID (session $RESUME_SESSION, model $MODEL, disposition $DISPOSITION)."
 fi
 
-# --- pre-flight duplicate gate (--queue only; --implement and --resume always proceed) ---
-if [ -z "$RESUME_ID" ] && [ "$DISPOSITION" = "queue" ] && [ -n "$PROMPT_SRC" ] && [ -f "$PROMPT_SRC" ]; then
+# --- pre-flight duplicate gate (--resume always proceeds) ---
+# --queue runs the full check. --implement runs only the overwrite-intent check
+# (PLAN_DUP_OVERWRITE_ONLY=1): a prompt that asks to replace an existing plan
+# file in place hits plans-write-guard whatever the disposition.
+if [ -z "$RESUME_ID" ] && [ -n "$PROMPT_SRC" ] && [ -f "$PROMPT_SRC" ]; then
     DUP_CHECK="${PLAN_NOW_DUP_CHECK:-$ROOT/bin/plan-dup-check}"
+    DUP_ONLY=0; [ "$DISPOSITION" = "queue" ] || DUP_ONLY=1
     if [ -x "$DUP_CHECK" ]; then
         DUP_RC=0
-        DUP_OUT=$(PLANS_DIR="$PLANS_DIR" "$DUP_CHECK" "$PROMPT_SRC" 2>&1) || DUP_RC=$?
+        DUP_OUT=$(PLAN_DUP_OVERWRITE_ONLY="$DUP_ONLY" PLANS_DIR="$PLANS_DIR" \
+            "$DUP_CHECK" "$PROMPT_SRC" 2>&1) || DUP_RC=$?
         if [ "$DUP_RC" = 3 ]; then
             echo "$DUP_OUT"
             echo "plan-now: declined before spending a model run (exit 3)."

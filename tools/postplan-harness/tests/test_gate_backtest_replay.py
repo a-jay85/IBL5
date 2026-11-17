@@ -716,7 +716,7 @@ def test_total_cap_default_is_1200():
 # --- partial apply of the fix patch ---------------------------------------------------------
 
 from harness.gate_backtest_replay import (_UNKNOWN_PATH, _split_patch,  # noqa: E402
-                                          partial_fix_allowed)
+                                          partial_fix_allowed, probe_undeclared_reads)
 
 RENAME_BODY = "".join(f"line {i}\n" for i in range(1, 21))
 
@@ -761,6 +761,118 @@ def test_partial_fix_allowed_fail_closed():
     assert partial_fix_allowed(("config/*",), ["config/a.txt"]) is False
     assert partial_fix_allowed(("config/*",), ["?"]) is False
     assert partial_fix_allowed(("config/*",), ["docs/x.md"]) is True
+
+
+# --- behavioural probe for undeclared reads --------------------------------------------------
+
+def _probe_run(outcome_for, calls):
+    def run():
+        calls.append(1)
+        return (outcome_for(), "", (), ())
+    return run
+
+
+def _always(outcome):
+    return lambda: outcome
+
+
+def _probe(tree, skipped, run, clock=lambda: 0.0, deadline=100.0):
+    return probe_undeclared_reads(str(tree), skipped, run, clock, deadline)
+
+
+def test_probe_flags_created_file_as_undeclared_read(tmp_path):
+    tree = tmp_path / "tree"
+    tree.mkdir()
+    calls = []
+    run = _probe_run(lambda: "flag" if (tree / "src" / "fx6.txt").exists() else "pass", calls)
+    assert _probe(tree, ["src/fx6.txt"], run) == (
+        "partial-undeclared-read", "probe: src/fx6.txt marker -> flag")
+    assert len(calls) == 1
+    assert not (tree / "src").exists()
+
+
+def test_probe_flags_deleted_file_as_undeclared_read(tmp_path):
+    tree = tmp_path / "tree"
+    (tree / "config").mkdir(parents=True)
+    target = tree / "config" / "x.txt"
+    target.write_bytes(b"orig\n")
+    calls = []
+    run = _probe_run(lambda: "pass" if target.exists() else "flag", calls)
+    assert _probe(tree, ["config/x.txt"], run) == (
+        "partial-undeclared-read", "probe: config/x.txt absent -> flag")
+    assert target.read_bytes() == b"orig\n"
+
+
+def test_probe_clean_restores_tree(tmp_path):
+    tree = tmp_path / "tree"
+    (tree / "config").mkdir(parents=True)
+    a = tree / "config" / "a.txt"
+    a.write_bytes(b"x\n")
+    a.chmod(0o755)
+    calls = []
+    run = _probe_run(_always("pass"), calls)
+    assert _probe(tree, ["config/a.txt", "src/new.txt"], run) == ("", "")
+    assert len(calls) == 3
+    assert a.read_bytes() == b"x\n"
+    assert (a.stat().st_mode & 0o7777) == 0o755
+    assert not (tree / "src").exists()
+
+
+@pytest.mark.parametrize("outcome", ["error", "timeout"])
+def test_probe_fails_closed_on_error_outcome(tmp_path, outcome):
+    tree = tmp_path / "tree"
+    tree.mkdir()
+    result = _probe(tree, ["src/new.txt"], _probe_run(_always(outcome), []))
+    assert result[0] == "partial-probe-failed"
+
+
+def test_probe_fails_closed_over_path_cap(tmp_path):
+    tree = tmp_path / "tree"
+    tree.mkdir()
+    calls = []
+    run = _probe_run(_always("pass"), calls)
+    assert _probe(tree, [f"d/f{i}.txt" for i in range(9)], run)[0] == "partial-probe-failed"
+    assert calls == []
+    assert _probe(tree, [f"d/f{i}.txt" for i in range(8)], run) == ("", "")
+
+
+@pytest.mark.parametrize("bad", ["../escape.txt", "ABS"])
+def test_probe_rejects_path_outside_tree(tmp_path, bad):
+    tree = tmp_path / "tree"
+    tree.mkdir()
+    if bad == "ABS":
+        bad = str(tmp_path / "outside.txt")
+    calls = []
+    run = _probe_run(_always("pass"), calls)
+    assert _probe(tree, [bad], run)[0] == "partial-probe-failed"
+    assert calls == []
+    assert not (tmp_path / "outside.txt").exists()
+    assert not (tmp_path / "escape.txt").exists()
+    # Near-miss: a path that resolves inside the tree is probed normally.
+    assert _probe(tree, ["a/../b.txt"], run) == ("", "")
+
+
+def test_probe_fails_closed_on_symlink(tmp_path):
+    tree = tmp_path / "tree"
+    tree.mkdir()
+    (tree / "real.txt").write_bytes(b"r\n")
+    (tree / "link.txt").symlink_to(tree / "real.txt")
+    calls = []
+    result = _probe(tree, ["link.txt"], _probe_run(_always("pass"), calls))
+    assert result[0] == "partial-probe-failed"
+    assert calls == []
+    assert (tree / "link.txt").is_symlink()
+    assert (tree / "real.txt").read_bytes() == b"r\n"
+
+
+def test_probe_fails_closed_on_deadline(tmp_path):
+    tree = tmp_path / "tree"
+    tree.mkdir()
+    calls = []
+    result = _probe(tree, ["src/new.txt"], _probe_run(_always("pass"), calls),
+                    clock=lambda: 10.0, deadline=5.0)
+    assert result == ("partial-probe-failed", "probe: total-cap")
+    assert calls == []
 
 
 def _two_file_tree(tmp_path):

@@ -58,3 +58,21 @@ def test_kept_paths_stay_unplanned_for_phase50(tmp_path, wrapper):
 def test_declared_scope_path_still_declared(tmp_path):
     body = f"## Declared scope\n- `{KEPT}`\n- `{DECLARED}`\n\n{_kept_block(KEPT)}\n"
     assert _lines_for(_run(tmp_path, body), KEPT) == []
+
+
+def test_kept_block_upsert_survives_empty_body():
+    import runner
+
+    class _EmptyBodyGh:
+        def __init__(self):
+            self.edits = []
+
+        def pr_body_fresh(self):
+            return ""
+
+        def pr_edit_body(self, pr, body):
+            self.edits.append((pr, body))
+
+    gh, logs = _EmptyBodyGh(), []
+    assert runner._declare_kept([], None, gh, "", 7, logs.append) is None
+    assert logs == []

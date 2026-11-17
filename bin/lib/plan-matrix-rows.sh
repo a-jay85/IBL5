@@ -143,8 +143,11 @@ row_runs_in_ci() {
             done < <(grep -Eo -- 'https?://[A-Za-z0-9._%:@-]+' <<< "${_FS_SEG[$i]}")
             # A curl call with no scheme:// URL stays local too. Its host may be
             # remote (curl iblhoops.net/...), and ci_host_rewrite needs a scheme,
-            # so even curl localhost/x would miss the CI web stack.
-            if [ "${_FS_CURL[$i]}" = 1 ] \
+            # so even curl localhost/x would miss the CI web stack. A php, bun or
+            # bunx segment that holds a curl word, as in php x $(curl host/y),
+            # gets the same check, so a nested curl cannot skip it.
+            if { [ "${_FS_CURL[$i]}" = 1 ] \
+                    || grep -Eq -- '(^|[^[:alnum:]_./-])curl([[:space:]]|$)' <<< "${_FS_SEG[$i]}"; } \
                 && ! grep -Eq -- 'https?://[A-Za-z0-9]' <<< "${_FS_SEG[$i]}"; then
                 return 1
             fi
@@ -230,8 +233,11 @@ PLAN_ROW_FETCH_SEG_RE='(^|[[:space:]|;&`(])curl[[:space:]]|(^|\$\(|<\(|>\(|[|;&`
 # _FS_TAIL is the text after the last segment; _FS_N counts the segments.
 # _unquoted_end <text> — sets _UE_LEN to the length of the leading part of text
 # that stops at the first && || ; or | outside single and double quotes.
+# With a second argument `paren` (the command opened with $(, <( or >( ), it
+# also stops at the unquoted ) that closes that substitution, so an expected
+# value after it, as in test "$(php -v)" = "<url>", stays byte-exact.
 _unquoted_end() {
-    local s="$1" i=0 n=${#1} q="" ch nx
+    local s="$1" i=0 n=${#1} q="" ch nx depth=0 paren="${2:-}"
     while [ "$i" -lt "$n" ]; do
         ch="${s:$i:1}"; nx="${s:$((i + 1)):1}"
         if [ -n "$q" ]; then
@@ -243,6 +249,10 @@ _unquoted_end() {
                 "\\") i=$((i + 1)) ;;
                 ';'|'|') break ;;
                 '&') [ "$nx" = '&' ] && break ;;
+                '(') depth=$((depth + 1)) ;;
+                ')')
+                    if [ "$depth" -gt 0 ]; then depth=$((depth - 1))
+                    elif [ "$paren" = paren ]; then break; fi ;;
             esac
         fi
         i=$((i + 1))
@@ -259,6 +269,7 @@ _fetch_split() {
         rest="${s:$(( ${#pre} + ${#m} ))}"
         case "$m" in
             *curl*) seg="${rest%%$term}"; _FS_CURL[_FS_N]=1 ;;
+            *'('*) _unquoted_end "$rest" paren; seg="${rest:0:$_UE_LEN}"; _FS_CURL[_FS_N]=0 ;;
             *) _unquoted_end "$rest"; seg="${rest:0:$_UE_LEN}"; _FS_CURL[_FS_N]=0 ;;
         esac
         _FS_PRE[_FS_N]="$pre$m"; _FS_SEG[_FS_N]="$seg"

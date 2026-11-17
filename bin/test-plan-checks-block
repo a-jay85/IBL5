@@ -460,6 +460,9 @@ chk "schemeless localhost curl stays LOCAL" routes_local 'curl -s localhost/foo'
 chk "remote curl after a pipe stays LOCAL" routes_local 'seq 3 | xargs -P 3 curl -s https://iblhoops.net/ibl5/'
 chk "remote host before ) stays LOCAL" routes_local 'test "$(curl -s https://iblhoops.net)" = 200'
 chk "curl after php stays LOCAL" routes_local 'php -v; curl -sf iblhoops.net/x'
+chk "curl after php && stays LOCAL" routes_local 'cd ibl5 && php -l x.php && curl -sf iblhoops.net/ibl5/modules.php?name=X | grep -q Foo'
+chk "curl after \$(php) stays LOCAL" routes_local 'test "$(php -v)" = "$(curl -s iblhoops.net/x)"'
+chk "curl nested in php args stays LOCAL" routes_local 'php x.php $(curl -s iblhoops.net/x)'
 chk "slug host before ) routes CI" routes_ci 'test "$(curl -s -o /dev/null -w %{http_code} http://x.localhost)" = 200'
 end_case
 
@@ -487,6 +490,8 @@ chk "expected string after curl unchanged" eq "$(row_rewrite 'test "$(curl -s ht
 chk "diff <(curl) rewritten" eq "$(row_rewrite 'diff <(curl -s http://x.localhost/api) expected.json')" 'diff <(curl -s http://localhost:8080/api) expected.json'
 chk "xargs curl rewritten" eq "$(row_rewrite 'seq 3 | xargs -P 3 curl -s http://x.localhost/ibl5/')" 'seq 3 | xargs -P 3 curl -s http://localhost:8080/ibl5/'
 chk "php -r URL after ; rewritten" eq "$(row_rewrite "php -r '\$u=1; echo file_get_contents(\"http://localhost/\");'")" "php -r '\$u=1; echo file_get_contents(\"http://localhost:8080/\");'"
+chk "expected URL after \$(php) unchanged" eq "$(row_rewrite 'test "$(php -v)" = "http://localhost/ok"')" 'test "$(php -v)" = "http://localhost/ok"'
+chk "php URL inside \$(php) still rewritten" eq "$(row_rewrite 'test "$(php -r "echo f(\"http://localhost/u\");")" = "http://localhost/ok"')" 'test "$(php -r "echo f(\"http://localhost:8080/u\");")" = "http://localhost/ok"'
 chk "grep before curl unchanged" eq "$(row_rewrite 'grep -q http://localhost/ f && curl -sf http://localhost/ibl5/')" 'grep -q http://localhost/ f && curl -sf http://localhost:8080/ibl5/'
 end_case
 

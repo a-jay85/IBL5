@@ -306,6 +306,9 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 
 		fm, sc := gs.lateGameForcing(scoreDiff, bh)
 		path := selectOutcome(in, fm, sc, false, gs.freeze.SuppressW4Rescale, gs.rng)
+		if pathObserver != nil {
+			pathObserver(path, false)
+		}
 		if fm {
 			// JSB 93458: local_15e == 1 jumps to the foul handler (LAB_004d9d4d)
 			// whatever outcome FUN_004e1ba0 drew, and 93478 clears the shooting

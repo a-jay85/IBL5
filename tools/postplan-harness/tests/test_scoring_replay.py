@@ -59,7 +59,7 @@ def _findings(preexisting_hint):
 
 def _run(preexisting_hint):
     # Only the capture's `preexisting` flags are replayed: each becomes a unanimous real vote
-    # from three verifiers, which scores every finding above its threshold.
+    # from the verifier seats, which scores every finding above its threshold.
     verdicts = [{"n": s["n"], "real_votes": 3, "preexisting": s["preexisting"]}
                 for s in _captured()]
     llm, gh = _Llm(_canned(a=_findings(preexisting_hint), verdicts=verdicts)), _Gh()

@@ -346,7 +346,7 @@ _THREE_FINDINGS = {
 
 
 def test_verifiers_overlap_in_time(tmp_path):
-    """The three verifier seats run concurrently: every pair of (start, end) windows overlaps."""
+    """The verifier seats run concurrently: every pair of (start, end) windows overlaps."""
     canned = _make_canned({"A": [{"path": "ibl5/a.php", "line": 1, "body": "a"}]})
     llm = _SleepingLlm(UsageLedger(), canned, sleep=AGENT_SLEEP)
 
@@ -391,5 +391,5 @@ def test_verifier_failure_does_not_stop_other_seats(tmp_path):
 
     assert {p for p, *_ in llm.tooled_log} == set(VERIFIER_PURPOSES)
     assert len(surviving) == 1
-    assert surviving[0].score == 93      # 80 + round(20 * 2 / 3): two valid real votes remain
-    assert scored[0]["score"] == 93
+    assert surviving[0].score == 90      # 80 + round(20 * 1 / 2): one valid real vote remains
+    assert scored[0]["score"] == 90

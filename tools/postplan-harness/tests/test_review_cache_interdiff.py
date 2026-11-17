@@ -128,7 +128,7 @@ def _interdiff_drive(monkeypatch, tmp_path, *, name, canned, arm=None, record_ke
 
 
 def _fresh_a_canned(findings, verdicts=None):
-    """`verdicts` is the raw reply all three verifier seats return; default is all-real."""
+    """`verdicts` is the raw reply all verifier seats return; default is all-real."""
     canned = dict(CANNED_FINDINGS)
     canned["review-agent-a"] = findings
     reply = verdicts if verdicts is not None else _all_real(len(findings))
@@ -163,7 +163,7 @@ def test_interdiff_merges_reused_findings_by_path(monkeypatch, tmp_path):
     by_body = {f.body: f for f in res.findings}
     reused = by_body["cached unchanged-file finding"]
     assert reused.path == ALPHA and reused.score == 90
-    assert by_body["fresh delta-file finding"].score == 100   # three real votes
+    assert by_body["fresh delta-file finding"].score == 100   # every seat votes real
     assert "stale delta-file finding" not in by_body
     assert [f.body for f in res.findings] == ["cached unchanged-file finding",
                                               "fresh delta-file finding"]

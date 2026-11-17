@@ -100,7 +100,7 @@ ONE_REAL = '[{"n": 1, "verdict": "real", "reason": "unbounded fetchAll confirmed
 CANNED = {
     "review-agent-a": [{"path": "ibl5/classes/TeamRepository.php", "line": 88, "body": "unbounded fetchAll"}],
     "security-audit": [],
-    "verify-findings-1": ONE_REAL, "verify-findings-2": ONE_REAL, "verify-findings-3": ONE_REAL,
+    "verify-findings-1": ONE_REAL, "verify-findings-2": ONE_REAL,
 }
 
 
@@ -116,7 +116,7 @@ def _reply(*votes):
 
 
 def _seats(reply, **override):
-    """The same raw reply for all three seats; `override` maps a seat number (as `s2=`) to another reply."""
+    """The same raw reply for all seats; `override` maps a seat number (as `s2=`) to another reply."""
     out = {p: reply for p in VERIFIER_PURPOSES}
     for k, v in override.items():
         out[f"verify-findings-{k[1:]}"] = v
@@ -262,31 +262,31 @@ def _sv(verdict, errors=None):
 
 
 def test_aggregate_unanimous_not_real_drops():
-    rec, = aggregate_votes([_f()], [_sv("not-real"), _sv("not-real"), _sv("not-real")])
+    rec, = aggregate_votes([_f()], [_sv("not-real"), _sv("not-real")])
     assert rec["kept"] is False
     assert rec["score"] == 0
-    assert (rec["valid_real"], rec["valid_not_real"], rec["abstain"]) == (0, 3, 0)
+    assert (rec["valid_real"], rec["valid_not_real"], rec["abstain"]) == (0, 2, 0)
     assert rec["fallback"] is False
 
 
-def test_aggregate_two_not_real_one_real_keeps_at_87():
-    rec, = aggregate_votes([_f()], [_sv("not-real"), _sv("real"), _sv("not-real")])
+def test_aggregate_one_not_real_one_real_keeps_at_90():
+    rec, = aggregate_votes([_f()], [_sv("not-real"), _sv("real")])
     assert rec["kept"] is True
-    assert rec["score"] == 87                 # 80 + round(20 * 1 / 3)
-    assert (rec["valid_real"], rec["valid_not_real"]) == (1, 2)
+    assert rec["score"] == 90                 # 80 + round(20 * 1 / 2)
+    assert (rec["valid_real"], rec["valid_not_real"]) == (1, 1)
 
 
+# security 1 real: 75 + round(25 * 1 / 2) = 75 + round(12.5) = 87 (Python rounds half to even).
 SCORE_TABLE = [
-    ("code-review", 3, 100), ("code-review", 2, 93), ("code-review", 1, 87), ("code-review", 0, 80),
-    ("security-audit", 3, 100), ("security-audit", 2, 92), ("security-audit", 1, 83),
-    ("security-audit", 0, 75),
+    ("code-review", 2, 100), ("code-review", 1, 90), ("code-review", 0, 80),
+    ("security-audit", 2, 100), ("security-audit", 1, 87), ("security-audit", 0, 75),
 ]
 
 
 def test_aggregate_score_table_code_and_security():
     for source, real, expected in SCORE_TABLE:
         # `real` seats vote real; the remaining seats vote not-real, except that zero real votes
-        # uses two not-real and one abstention (three not-real would drop the finding).
+        # uses one not-real and one abstention (all not-real would drop the finding).
         seats = [_sv("real")] * real + [_sv("not-real")] * (VERIFIER_COUNT - real)
         if real == 0:
             seats[-1] = _sv(None)
@@ -298,13 +298,13 @@ def test_aggregate_score_table_code_and_security():
 
 
 def test_aggregate_all_abstain_keeps_with_fallback_flag():
-    rec, = aggregate_votes([_f()], [_sv(None), _sv(None, errors={0: "llm-timeout"}), _sv(None)])
+    rec, = aggregate_votes([_f()], [_sv(None), _sv(None, errors={0: "llm-timeout"})])
     assert rec["kept"] is True
     assert rec["fallback"] is True
     assert rec["score"] == CODE_THRESHOLD
-    assert rec["abstain"] == 3
-    assert [v["verdict"] for v in rec["votes"]] == ["abstain"] * 3
-    assert [v["error"] for v in rec["votes"]] == ["missing-vote", "llm-timeout", "missing-vote"]
+    assert rec["abstain"] == 2
+    assert [v["verdict"] for v in rec["votes"]] == ["abstain"] * 2
+    assert [v["error"] for v in rec["votes"]] == ["missing-vote", "llm-timeout"]
 
 
 # ---------------------------------------------------------------------------
@@ -322,7 +322,7 @@ def test_verifier_error_counts_as_abstain_and_keeps(tmp_path):
     assert len(surviving) == 1                          # a verifier outage never drops a finding
     assert scored[0]["score"] == CODE_THRESHOLD
     rec = phase.last_votes[0]
-    assert rec["fallback"] is True and rec["abstain"] == 3
+    assert rec["fallback"] is True and rec["abstain"] == 2
     assert {v["error"] for v in rec["votes"]} == {"llm-timeout"}
 
 
@@ -341,18 +341,18 @@ def test_missing_n_in_reply_is_abstain_not_drop(tmp_path):
     phase, (surviving, _g, scored, _d), _llm, _gh = _phase_run(tmp_path, canned)
     first, second = phase.last_votes
     assert first["kept"] is False and first["score"] == 0
-    assert second["kept"] is True and second["abstain"] == 3 and second["fallback"] is True
+    assert second["kept"] is True and second["abstain"] == 2 and second["fallback"] is True
     assert [f.body for f in surviving] == ["second issue"]
     assert [r["score"] for r in scored] == [0, CODE_THRESHOLD]
 
 
 def test_unparseable_reply_is_abstain(tmp_path):
     prose = "I could not read the file, so I have no verdict."
-    canned = _canned(a=[A_FINDING], **_seats(prose, s3=_reply(_vote(1, "not-real"))))
+    canned = _canned(a=[A_FINDING], **_seats(prose, s2=_reply(_vote(1, "not-real"))))
     phase, (surviving, _g, _s, _d), _llm, _gh = _phase_run(tmp_path, canned)
-    assert len(surviving) == 1                          # abstentions plus one not-real never drop
+    assert len(surviving) == 1                          # an abstention plus one not-real never drops
     rec = phase.last_votes[0]
-    assert (rec["valid_real"], rec["valid_not_real"], rec["abstain"]) == (0, 1, 2)
+    assert (rec["valid_real"], rec["valid_not_real"], rec["abstain"]) == (0, 1, 1)
     assert rec["votes"][0]["error"].startswith("unparseable")
     assert rec["score"] == CODE_THRESHOLD and rec["fallback"] is True
 
@@ -362,7 +362,7 @@ def test_envelope_wrapped_verdicts_counted(tmp_path):
     canned = _canned(a=[A_FINDING], **_seats(wrapped))
     phase, (surviving, _g, scored, _d), _llm, _gh = _phase_run(tmp_path, canned)
     rec = phase.last_votes[0]
-    assert rec["valid_not_real"] == 3 and rec["abstain"] == 0     # the envelope was unwrapped
+    assert rec["valid_not_real"] == 2 and rec["abstain"] == 0     # the envelope was unwrapped
     assert surviving == []
     assert scored[0]["score"] == 0
 
@@ -372,12 +372,12 @@ def test_unknown_envelope_abstains_and_no_false_safety_summary(tmp_path):
     # finding here so a "No issues found" summary could only come from a wrongly dropped finding.
     canned = _canned(a=[A_FINDING], security=[("ibl5/s.php", 3, "idor on trade id")],
                      **_seats('{"a": [], "b": []}',
-                              s3=_reply(_vote(1, "not-real"), _vote(2, "not-real"))))
+                              s2=_reply(_vote(1, "not-real"), _vote(2, "not-real"))))
     phase, (surviving, _g, scored, _d), _llm, gh = _phase_run(tmp_path, canned)
     code_rec, sec_rec = phase.last_votes
     assert code_rec["kept"] and code_rec["score"] == 80 and code_rec["fallback"] is True
     assert sec_rec["kept"] and sec_rec["score"] == 75 and sec_rec["fallback"] is True
-    assert {v["error"] for v in code_rec["votes"][:2]} == {"schema"}
+    assert {v["error"] for v in code_rec["votes"][:1]} == {"schema"}
     assert len(surviving) == 2
     texts = [text for (_pr, _title, text) in gh.summary_posts]
     assert not [t for t in texts if t.startswith(("No issues found", "No security issues found"))]
@@ -389,7 +389,7 @@ def test_out_of_range_n_is_ignored(tmp_path):
                                                      _vote(2, "not-real"))))
     phase, (surviving, _g, scored, _d), _llm, _gh = _phase_run(tmp_path, canned)
     rec = phase.last_votes[0]
-    assert (rec["valid_real"], rec["valid_not_real"], rec["abstain"]) == (3, 0, 0)
+    assert (rec["valid_real"], rec["valid_not_real"], rec["abstain"]) == (2, 0, 0)
     assert scored[0]["score"] == 100
     assert len(surviving) == 1 and len(phase.last_votes) == 1
 
@@ -450,7 +450,7 @@ def test_chunking_respects_packet_budget(tmp_path):
     assert len(llm.tooled_calls) == VERIFIER_COUNT * len(chunks)
     assert len(surviving) == n
     assert [r["score"] for r in scored] == [100] * n
-    assert all(rec["valid_real"] == 3 for rec in phase.last_votes)
+    assert all(rec["valid_real"] == VERIFIER_COUNT for rec in phase.last_votes)
 
 
 def test_no_worktree_keeps_all_with_fallback(tmp_path):
@@ -460,7 +460,7 @@ def test_no_worktree_keeps_all_with_fallback(tmp_path):
     assert len(surviving) == 1
     assert scored[0]["score"] == CODE_THRESHOLD
     rec = phase.last_votes[0]
-    assert rec["fallback"] is True and rec["abstain"] == 3
+    assert rec["fallback"] is True and rec["abstain"] == 2
     assert {v["error"] for v in rec["votes"]} == {"no-worktree"}
     assert any("no worktree" in ln for ln in lines)
     assert gh.findings_posts
@@ -472,7 +472,7 @@ def test_no_worktree_keeps_all_with_fallback(tmp_path):
 
 
 def test_security_rejected_scores_zero_and_kept_scores_75_base(tmp_path):
-    # Finding 1 is rejected by all three seats; finding 2 is never mentioned (three abstentions).
+    # Finding 1 is rejected by every seat; finding 2 is never mentioned (all seats abstain).
     canned = _canned(security=[("ibl5/s.php", 3, "rejected claim"), ("ibl5/t.php", 4, "unjudged claim")],
                      **_seats(_reply(_vote(1, "not-real"))))
     phase, (surviving, _g, scored, _d), _llm, gh = _phase_run(tmp_path, canned)
@@ -494,18 +494,18 @@ def test_votes_file_written_with_one_record_per_finding(tmp_path):
         assert set(rec) == {"n", "source", "agent", "path", "line", "body_head", "votes",
                             "valid_real", "valid_not_real", "abstain", "kept", "score", "fallback",
                             "preexisting"}
-        assert len(rec["votes"]) == 3
+        assert len(rec["votes"]) == VERIFIER_COUNT
     assert [r["n"] for r in doc["records"]] == [1, 2]
 
 
 def test_rejected_security_finding_is_logged_with_reasons(tmp_path):
     lines = []
     canned = _canned(security=[("ibl5/s.php", 3, "claimed sqli")],
-                     **{f"verify-findings-{k}": _reply(_vote(1, "not-real", f"r{k}")) for k in (1, 2, 3)})
+                     **{f"verify-findings-{k}": _reply(_vote(1, "not-real", f"r{k}")) for k in (1, 2)})
     _phase, (surviving, *_rest), _llm, gh = _phase_run(tmp_path, canned, lines=lines)
     dropped = [ln for ln in lines if ln.startswith("phase4d verifier: DROPPED security finding ")]
     assert len(dropped) == 1
-    assert all(r in dropped[0] for r in ("r1", "r2", "r3")) and "ibl5/s.php:3" in dropped[0]
+    assert all(r in dropped[0] for r in ("r1", "r2")) and "ibl5/s.php:3" in dropped[0]
     assert surviving == []
     assert "Security audit" not in [title for (_pr, _sha, title, _fs) in gh.findings_posts]
 

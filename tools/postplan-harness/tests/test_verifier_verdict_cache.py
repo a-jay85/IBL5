@@ -2,7 +2,7 @@
 that must never reuse (dirty tree, new commit, changed prompt, errored or partial seats).
 
 `BASELINE_SPAWNS` is the cost of two passes over the same findings on the same clean git tree
-before reuse existed: one chunk times three seats times two passes.
+before reuse existed: one chunk times two seats times two passes.
 """
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from harness import verdictcache
 from harness.review import ReviewPhase
 from tests.test_review_verifiers import _DualLlm, _RecordingGh, _f, _reply, _vote
 
-BASELINE_SPAWNS = 6
+BASELINE_SPAWNS = review_mod.VERIFIER_COUNT * 2  # one chunk, two passes
 
 DIFF = (
     "diff --git a/ibl5/a.php b/ibl5/a.php\n"
@@ -45,7 +45,6 @@ FINDINGS = [
 SEAT_REPLIES = {
     "verify-findings-1": _reply(_vote(1, "real"), _vote(2, "not-real"), _vote(3, "real")),
     "verify-findings-2": _reply(_vote(1, "real"), _vote(2, "not-real"), _vote(3, "not-real")),
-    "verify-findings-3": _reply(_vote(1, "not-real"), _vote(2, "not-real"), _vote(3, "real")),
 }
 
 
@@ -153,7 +152,7 @@ def test_errored_seat_is_never_cached(tmp_path, monkeypatch):
 def test_partial_seat_reply_is_never_cached(tmp_path, monkeypatch):
     monkeypatch.setenv("POSTPLAN_VERDICT_CACHE", "1")
     canned = dict(SEAT_REPLIES)
-    canned["verify-findings-3"] = _reply(_vote(1, "not-real"), _vote(3, "real"))
+    canned["verify-findings-2"] = _reply(_vote(1, "not-real"), _vote(3, "real"))
     llm, phase, wt = _phase(tmp_path, canned)
     phase.verify_findings(FINDINGS, DIFF)
     assert _cache_files(wt) == []
@@ -169,13 +168,13 @@ def test_corrupt_cache_file_is_a_miss(tmp_path, monkeypatch):
     assert files
     for f in files:
         with open(f, "w") as fh:
-            json.dump({"schema_version": 1, "seats": [{}, {}, {}]}, fh)
+            json.dump({"schema_version": 1, "seats": [{}, {}]}, fh)
     second = phase.verify_findings(FINDINGS, DIFF)
     assert len(llm.tooled_calls) == BASELINE_SPAWNS
     assert second == first
 
 
-def test_reused_drop_still_needs_all_three_seats(tmp_path, monkeypatch):
+def test_reused_drop_still_needs_all_seats(tmp_path, monkeypatch):
     monkeypatch.setenv("POSTPLAN_VERDICT_CACHE", "1")
     llm, phase, wt = _phase(tmp_path)
     phase.verify_findings(FINDINGS, DIFF)

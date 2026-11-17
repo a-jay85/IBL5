@@ -556,7 +556,7 @@ from harness.state import HarnessError  # noqa: E402
 FOO = "ibl5/classes/Foo.php"
 
 
-VERIFIERS = ("verify-findings-1", "verify-findings-2", "verify-findings-3")
+VERIFIERS = ("verify-findings-1", "verify-findings-2")
 
 
 def _canned(path, line, verdict):
@@ -671,7 +671,7 @@ def test_run_verifiers_read_checkout_of_case_commit(tmp_path):
     intro = subprocess.run(["git", "-C", str(r["root"]), "show", f"{r['intro']}:{FOO}"],
                            capture_output=True, text=True, check=True).stdout
     assert seen and all(s == intro for s in seen)
-    assert len(stub.tooled_cwds) == 3 and all(ok for _, ok in stub.tooled_cwds)
+    assert len(stub.tooled_cwds) == len(VERIFIERS) and all(ok for _, ok in stub.tooled_cwds)
     assert not any(Path(cwd).exists() for cwd, _ in stub.tooled_cwds)
 
 

@@ -1,9 +1,11 @@
 ---
 description: J27 per-type foul rate port. Scales the foul-only bucket by 2.10 and the raw half-court and-one basis by 0.053 toward the JSB live-trace rates, maps the two and-one FT call sites, keeps the offensive foul residual, and lists the residuals. FTA/g moves from 11.186 to 18.741 against sco 18.587.
-last_verified: 2026-11-16
+last_verified: 2026-11-17
 ---
 
 # J27: per-type foul rate port
+
+The live-outcome-map port removed both scales below. Its write-up is `engine/docs/j27-live-outcome-map-port.md`. This page stays as history.
 
 This doc records the retune of the engine's foul rates by foul type toward the rates the live JSB trace measured (`engine/docs/j27-foul-volume-3-port.md`). It closes the FTA gap of a-jay85/IBL5-backlog#265 to within 1%. The decompile literals stay as they are: `shootingFoulDrawCut`, `andOneMadeTwoCut`, `teamFoulBonusThreshold`, and `threePtFoulCut`.
 

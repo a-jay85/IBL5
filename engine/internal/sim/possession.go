@@ -86,10 +86,10 @@ func (gs *gameState) playBuckets(bh onCourt, offense, defense *teamState, hca, h
 	andOneW, foul := andOneAndFoulWeights(bh, offense.players, defense.players, defense.team, hca, hca, hcaScaled, mq, halfCourt, gs.rng)
 	if !gs.freeze.BranchB {
 		foul = gs.recordFoulWeight(foul)
-		return twoPtBucketWeight(bh) + hcaScaled, raw3pt, scaledFoulWeight(foul), andOneW
+		return twoPtBucketWeight(bh) + hcaScaled, raw3pt, foul, andOneW
 	}
 	raw2pt := twoPtBucketWeight(bh)
-	s2, s3, sf := gs.branchBShrink(raw2pt, raw3pt, scaledFoulWeight(foul), offense.drbRate, offense.astRate, bh.TransOff)
+	s2, s3, sf := gs.branchBShrink(raw2pt, raw3pt, foul, offense.drbRate, offense.astRate, bh.TransOff)
 	return s2 + hcaScaled, s3, sf, andOneW
 }
 

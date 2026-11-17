@@ -98,8 +98,12 @@ jobs:
           # The settle workflow (all-checks-settled.yml) leaves an `Aggregate check
           # status` check-run on master HEAD. Its own state says nothing about
           # master's health, so a pending or failed run of it must not block promotion.
-          IGNORE_PENDING_CHECKS: Aggregate check status
-          IGNORE_FAILED_CHECKS: Aggregate check status
+          # The same holds for `recheck` (text-hold-recheck-run.yml): PR body
+          # edits dispatch it on master and cancel superseded runs. This
+          # workflow's workflow_run list does not include it, so a stuck
+          # pending or cancelled run would block the SHA for good.
+          IGNORE_PENDING_CHECKS: Aggregate check status,recheck
+          IGNORE_FAILED_CHECKS: Aggregate check status,recheck
         shell: bash
         run: bin/promote-master-to-production "$PROMOTE_SHA" | tee -a "$GITHUB_OUTPUT"
 

@@ -68,6 +68,7 @@
 1 bin/test-check-numbering
 1 bin/test-harness-lib
 1 bin/test-discord-dm
+1 bin/test-dm-volume
 1 bin/test-bug-pipeline-tick
 1 bin/test-post-plan-now-pr-creates-worktree
 1 bin/test-check-e2e-hygiene

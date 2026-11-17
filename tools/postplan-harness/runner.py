@@ -302,10 +302,50 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         plans_dir: str | None = None, live: bool = False,
         explicit_path: str | None = None,
         probe=None, state_dir: str | None = None, rebase_only: bool = False) -> RunResult:
+    """One pass, plus at most one re-run when a merged stacked child PR moved the
+    branch after review. The re-run repeats review, CI and every arming condition
+    on the adopted tree; a second move there fails closed as remote-head-diverged."""
+    kw = dict(mode=mode, worktree=worktree, headless=headless, plans_dir=plans_dir,
+              live=live, explicit_path=explicit_path, probe=probe,
+              state_dir=state_dir, rebase_only=rebase_only)
+    res = _run_pass(fixture, out_dir, llm, stacked_restarts=0, defer_llm_close=True, **kw)
+    if res.error_kind != "stacked-child-restart":  # no stacked child adopted
+        return res
+    adopted = res.stacked_child_restart
+    res2 = _run_pass(fixture, out_dir, llm, stacked_restarts=1,
+                     prior_audit=_read_audit(out_dir), **kw)
+    if res2.error_kind == "stacked-child-restart":
+        res2.error_kind = "remote-head-diverged"  # second move after the one restart
+        res2.error = "remote-head-diverged: remote moved again after one stacked-child restart"
+    res2.stacked_child_restart = adopted
+    return res2
+
+
+def _should_close_llm(defer_llm_close: bool, res: RunResult) -> bool:
+    """False only for a first pass that ends in a stacked-child restart."""
+    return not (defer_llm_close and res.error_kind == "stacked-child-restart")
+
+
+def _read_audit(out_dir: str) -> list[str]:
+    try:
+        with open(os.path.join(out_dir, "audit.log")) as fh:
+            return fh.read().splitlines()
+    except OSError:
+        return []
+
+
+def _run_pass(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
+              worktree: str | None = None, headless: bool = True,
+              plans_dir: str | None = None, live: bool = False,
+              explicit_path: str | None = None,
+              probe=None, state_dir: str | None = None, rebase_only: bool = False,
+              stacked_restarts: int = 0,
+              prior_audit: list[str] | None = None,
+              defer_llm_close: bool = False) -> RunResult:
     os.makedirs(out_dir, exist_ok=True)
     run_started = time.time()
     ledger = llm.ledger
-    audit: list[str] = []
+    audit: list[str] = list(prior_audit or [])
 
     # audit.log is the ONLY mid-run progress signal bin/fleet-status can read for a
     # harness run. The other two sources it tries both come up empty here: the harness
@@ -320,7 +360,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
     # out_dir can never serve the previous run's tail as this run's progress.
     audit_path: str | None = os.path.join(out_dir, "audit.log")
     try:
-        open(audit_path, "w").close()
+        with open(audit_path, "w") as fh:
+            fh.write("".join(line + "\n" for line in audit))
     except OSError:
         audit_path = None
 
@@ -605,6 +646,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             restored = reviewcache.restore_review(cache_rec.get("review"), cur_gates)
         interdiff = None if (restored is not None or key_hit) else \
             _interdiff_eligibility(cache_rec, cache_key, cache_files, cur_gates, cls)
+        restored, interdiff = _review_reuse(restored, interdiff, stacked_restarts)
         if restored is not None:
             res.reused_from["review"] = cache_rec["review"].get("run_id") or cache_rec["run_id"]
             log(f"reviewcache: review reused from {res.reused_from['review']} "
@@ -862,7 +904,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             # fresh probe is therefore always run in addition to the background result.
             if live and pr and sha and worktree and os.path.isdir(worktree):
                 sha, bg_ci = _reconcile_before_arm(git, log, gh, worktree, pr, sha,
-                                                   bg_ci, out_dir)
+                                                   bg_ci, out_dir,
+                                                   stacked_restarts=stacked_restarts)
             _failed_checks: list[str] = []
             if live and pr:
                 try:
@@ -1306,7 +1349,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                                         run_started=run_started,
                                         md_state_dir=(_state_dir(out_dir, live, state_dir)
                                                       if (live or state_dir is not None) else None),
-                                        slug=slug)
+                                        slug=slug,
+                                        stacked_restarts=stacked_restarts)
             res.ci_head = sha or None
             res.ci_outcome = {0: "green", 8: "failed"}.get(outcome.exit_code,
                                                            "indeterminate")
@@ -1324,7 +1368,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         if _should_resolve_behind(live, pr, decision, outcome):
             sha, outcome = _resolve_behind(git, gh, log, res, worktree, pr, sha,
                                            outcome, out_dir,
-                                           run_started=run_started)
+                                           run_started=run_started,
+                                           stacked_restarts=stacked_restarts)
             res.ci_head = sha or None
             res.ci_outcome = {0: "green", 8: "failed"}.get(outcome.exit_code,
                                                            "indeterminate")
@@ -1357,6 +1402,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
 
         # ---- Phase 10: preview environment ------------------------------
         log("phase10: preview environment skipped — headless harness")
+    except StackedChildAdopted as sc:
+        _record_stacked_child(res, sc)
     except HarnessError as e:
         merged = _already_shipped(e, git, gh, log)
         if merged is not None:
@@ -1388,7 +1435,10 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             except (Exception, usage_pause.UsagePause) as e:  # noqa: BLE001
                 log(f"phase4: background review failed after the run failed ({e!r})")
         state.checkpoint("terminal", res)
-        _phase11_cleanup(llm, log)
+        # llm.close() removes the adapter's temp cwd; the restart pass reuses the same
+        # adapter, so a pass that is about to restart must leave it in place.
+        if _should_close_llm(defer_llm_close, res):
+            _phase11_cleanup(llm, log)
         ciwatch.reap_background_watch(bg_ci)
     return _finish(res, out_dir)
 
@@ -1668,7 +1718,8 @@ def _push_with_lease_retry(git, log, phase: str, *, pr=None, worktree=None,
         expected = gitutil.tracking_sha(branch, worktree, run_git=run_git)
         if expected:
             r = gitutil.reconcile_remote_head(pr, expected, git.head(), branch, worktree,
-                                              gh_cmd=gh_cmd, run_git=run_git)
+                                              gh_cmd=gh_cmd, run_git=run_git,
+                                              allow_stacked_child=False)  # pre-push site never adopts a stacked child
             if r.action == "diverged":
                 log(f"{phase}: ERROR {r.evidence}; refusing to push over it")
                 raise HarnessError("remote-head-diverged", f"{phase}: {r.evidence}")
@@ -1853,6 +1904,62 @@ def _push_with_gate_fix(git, log, phase, *, llm, worktree, out_dir, res, pr=None
         return pushed
 
 
+class StackedChildAdopted(Exception):
+    """A merged stacked child PR moved the remote head after review. Deliberately
+    outside the HarnessError tree, so no inner `except HarnessError` can swallow it;
+    only run()'s outer handler catches it."""
+
+    def __init__(self, phase, remote_sha, child_prs, evidence):
+        super().__init__(evidence)
+        self.phase, self.remote_sha, self.child_prs = phase, remote_sha, tuple(child_prs)
+
+
+def _restart_for_stacked_child(gh, log, pr, phase, r, *, bg_ci=None):
+    """Disarm, stop the old-tree CI watch, drop the old-tree verdict, then raise."""
+    if pr:
+        gh.pr_disable_auto_merge(pr)  # stacked child: disarm before restart
+    if bg_ci is not None:
+        ciwatch.reap_background_watch(bg_ci)  # stacked child: stop the old-tree CI watch
+    if pr:
+        try:
+            os.remove(fidelity.verdict_path(pr))  # stale old-tree verdict must not arm
+        except OSError:
+            pass
+    prs = ", ".join(f"#{n}" for n in r.child_prs)
+    log(f"{phase}: stacked child PR(s) {prs} merged into this branch; auto-merge "
+        f"disarmed; restarting review, CI and arming on {r.remote_sha[:8]}")
+    raise StackedChildAdopted(phase, r.remote_sha, r.child_prs, r.evidence)
+
+
+def _reconcile_or_restart(git, gh, log, pr, sha, worktree, phase, *, stacked_restarts,
+                          bg_ci=None, gh_cmd=None, run_git=None):
+    """reconcile_remote_head for a post-review site. The stacked-child case is
+    allowed only on the first pass; on the restart pass it comes back diverged."""
+    r = gitutil.reconcile_remote_head(pr, sha, git.head(), git.branch(), worktree,
+                                      gh_cmd=gh_cmd, run_git=run_git,
+                                      allow_stacked_child=(stacked_restarts == 0))
+    if r.action == "stacked-child":
+        _restart_for_stacked_child(gh, log, pr, phase, r, bg_ci=bg_ci)
+    return r
+
+
+def _record_stacked_child(res, sc) -> None:
+    """Pass-1 result after a stacked child adoption. FAILED, so any caller that
+    does not re-run fails closed."""
+    res.terminal = TerminalState.FAILED
+    res.error_kind = "stacked-child-restart"
+    res.error = f"stacked-child-restart: {sc}"
+    res.stacked_child_restart = (", ".join(f"#{n}" for n in sc.child_prs)
+                                 + f" merged into this branch at {sc.remote_sha[:8]} ({sc.phase})")
+
+
+def _review_reuse(restored, interdiff, stacked_restarts):
+    """The restart pass reviews the whole adopted tree: no cached or interdiff review."""
+    if stacked_restarts:  # restart pass reviews the whole tree
+        return None, None
+    return restored, interdiff
+
+
 def _fail_closed_on_divergence(gh, log, pr, phase: str, evidence: str, *,
                                disarm: bool, deleted_lease: str = "") -> None:
     """Remote PR head was rewritten with different content. Never push over it.
@@ -1867,10 +1974,11 @@ def _fail_closed_on_divergence(gh, log, pr, phase: str, evidence: str, *,
 
 
 def _reconcile_before_arm(git, log, gh, worktree, pr, sha, bg_ci, out_dir, *,
-                          gh_cmd=None, run_git=None):
+                          gh_cmd=None, run_git=None, stacked_restarts=0):
     """Pre-arm remote-head check. Returns (sha, bg_ci); raises on divergence."""
-    r = gitutil.reconcile_remote_head(pr, sha, git.head(), git.branch(), worktree,
-                                      gh_cmd=gh_cmd, run_git=run_git)
+    r = _reconcile_or_restart(git, gh, log, pr, sha, worktree, "phase6.5",
+                              stacked_restarts=stacked_restarts, bg_ci=bg_ci,
+                              gh_cmd=gh_cmd, run_git=run_git)  # pre-arm site
     if r.action == "diverged":
         ciwatch.reap_background_watch(bg_ci)
         _fail_closed_on_divergence(gh, log, pr, "phase6.5", r.evidence, disarm=False)
@@ -1883,7 +1991,7 @@ def _reconcile_before_arm(git, log, gh, worktree, pr, sha, bg_ci, out_dir, *,
 
 
 def _resolve_behind(git, gh, log, res, worktree, pr, sha, outcome, out_dir,
-                    *, run_started=None):
+                    *, run_started=None, stacked_restarts=0):
     """Bounded BEHIND resolution. Returns (sha, outcome). When the cap is spent
     and the branch is still BEHIND, auto-merge stays armed and the PR is handed
     to .github/workflows/update-behind-prs.yml (ADR-0081); retry_cap is never
@@ -1915,7 +2023,7 @@ def _resolve_behind(git, gh, log, res, worktree, pr, sha, outcome, out_dir,
         pass_started = time.time()
         log(f"phase7: BEHIND (re-rebase {attempt}/{_MAX_BEHIND_RETRIES})")
         if worktree and os.path.isdir(worktree):
-            r = gitutil.reconcile_remote_head(pr, sha, git.head(), git.branch(), worktree)
+            r = _reconcile_or_restart(git, gh, log, pr, sha, worktree, "phase7", stacked_restarts=stacked_restarts)  # BEHIND loop
             if r.action == "diverged":
                 _fail_closed_on_divergence(gh, log, pr, "phase7", r.evidence, disarm=True)
             if r.action == "synced":
@@ -2093,7 +2201,8 @@ def _meta_check_skip(gh, pr, res, names, out_dir) -> list[str]:
 
 
 def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
-                 mode, fixture, run_started, md_state_dir=None, slug=""):
+                 mode, fixture, run_started, md_state_dir=None, slug="",
+                 stacked_restarts=0):
     """Phase 7 CI fix loop — attempts to fix red CI with Opus.
 
     Returns (sha, outcome) where outcome reflects the post-fix CI state.
@@ -2253,7 +2362,7 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
 
         # Sync to remote head (live only)
         if mode != "replay":
-            r = gitutil.reconcile_remote_head(pr, sha, git.head(), git.branch(), worktree)
+            r = _reconcile_or_restart(git, gh, log, pr, sha, worktree, "phase7", stacked_restarts=stacked_restarts)  # ci-fix loop
             if r.action == "diverged":
                 _fail_closed_on_divergence(gh, log, pr, "phase7", r.evidence, disarm=True)
             if r.action == "synced":
@@ -4584,6 +4693,8 @@ def human_block(res: RunResult, rc: int, worktree: str, log_path: str) -> str:
     detail: list[str] = []
     if key in ("unknown", "remote-head-diverged"):
         detail.append(f"Stopped during: {_stage_of(res)}")
+    if res.stacked_child_restart:
+        detail.append(f"Stacked child: {res.stacked_child_restart}")
     if key in ("unknown", "gate-unknown", "remote-head-diverged"):
         if cmd:
             detail.append(f"Command: {cmd}")
@@ -5021,6 +5132,14 @@ def _prose_hold_note(res: RunResult) -> str:
 
 
 def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
+    """The RESULT line, plus the adopted stacked child PRs when a restart ran."""
+    line = _base_verdict_line(res, rc, pull_base)
+    if res.stacked_child_restart:  # name adopted child PRs in the RESULT line
+        line += " Stacked child: " + " ".join(res.stacked_child_restart.split()) + "."
+    return line
+
+
+def _base_verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
     """The one line a watcher greps for — printed FIRST, before the stats lines.
 
     Every terminal branch produces one, and every branch names its outcome in the

@@ -1,6 +1,6 @@
 ---
 description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made. Lazy companion to workflow-continuity.md; loads only when a post-plan surface is in play.
-last_verified: 2026-11-13
+last_verified: 2026-11-17
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
@@ -34,45 +34,45 @@ branch; it survives you closing Claude Code. Engine selection:
   on GitHub), a **local gate denial** (a `bin/pre-commit-hook` or `bin/pre-push-adr-hook`
   refusal), a **usage limit** (`llm-usage-limit`),
   an **expired login** (`llm-auth-expired`), and a **hung step**: `subprocess-timeout` (a
-  bounded step, including every git call made through `_run`, `_run_out` and `_run_bytes`, past its timeout) or `precommit-hang`
+  bounded step past its timeout, git calls included) or `precommit-hang`
   (`bin/pre-commit-hook` past 300 s). The `RESULT:` line names the step. When
   `bin/post-plan-fleet`'s 90-minute timeout fires, its DM names the last step started.
   A skill re-run would hit the same wall, so the run stops for a human. After a usage limit,
-  re-run `bin/post-plan-now` once it resets. After an expired login, run `claude`, `/login`,
-  then re-run it.
+  re-run `bin/post-plan-now` once it resets. After an expired login, run `claude`, `/login`, then re-run.
+  A remote head that only adds merged stacked child PRs is adopted after the phase 6 review. The harness disarms, then reviews, runs CI and arms once more. A second move is `remote-head-diverged`.
   A conflict on a generated file flagged `regen_on_conflict` in the ladder's `GENERATED_FILES`
   registry skips the LLM resolver. Two entries carry the flag: `ibl5/phpstan-baseline.neon` and
   the glob `ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots/*.png` (that one directory
   only). For a VR PNG both sides modified, the harness takes master's copy with no generator run;
   a modify/delete conflict still goes to the resolver. The branch's screenshot is dropped on
   purpose. Visual Regression stays red until a human applies the `update-baselines` label, which
-  regenerates it in CI. The harness never adds that label. For the baseline,
-  once every other conflicted file resolves, the harness takes master's copy, runs
+  regenerates it in CI. The harness never adds that label. For the baseline, once every other
+  conflicted file resolves, the harness takes master's copy, runs
   `bin/regen-baselines` on the merged tree and commits the output in the replay. It then
   rewrites that file's section of the lost-work pre-patch to the master-to-merged diff, so the
   proof checks every other file unchanged. A generator that fails, times out or writes a file
-  outside its registry outputs declines with `resolver declined: <path>`, the same exit-3 reason
-  as before. `conflict_rung` reads `regen` when no file needed the resolver.
+  outside its registry outputs declines with `resolver declined: <path>` (exit 3).
+  `conflict_rung` reads `regen` when no file needed the resolver.
   `ibl5/bun.lock` and `ibl5/composer.lock` are rebuilt when both sides changed them
-  (`tools/postplan-harness/harness/lockfile_regen.py`). The resolver takes the manifest first.
+  (`tools/postplan-harness/harness/lockfile_regen.py`). The manifest resolves first.
   The harness then checks out master's lockfile, runs the registered bun or composer command
-  with scripts off under a 600-second bound, stages the result, and logs
+  with scripts off (600 s bound), stages the result, and logs
   `phase2: lockfile regenerated: <path> via <cmd>`. The proof treats the lockfile like the
   baseline. A failed regen exits 3 with `lockfile: <path> (regen failed: <cmd> ...)`. Other
-  lockfiles and the stacked `--onto` path still exit 3 with `lockfile: <path>`.
-  Before a rebase conflict reaches exit 3, a first resolution that fails the lost-work proof
-  goes through the four-rung conflict ladder (rung 1 also rebuilds conflicted golden snapshots):
+  lockfiles and the stacked `--onto` path exit 3 with `lockfile: <path>`.
+  A first resolution that fails the lost-work proof goes through the four-rung conflict ladder
+  before exit 3 (rung 1 also rebuilds conflicted golden snapshots):
   `tools/postplan-harness/README.md` § Conflict ladder.
   The arming hold for an auto-resolved conflict, condition (14), reads a marker file the
   harness binds to the resolving commit. At each rebase start the harness drops the marker
   when that commit has left the branch history (a squash or rebase) and logs
   `postplan: conflict flag dropped as stale`. A marker whose commit is still in history
-  keeps the hold until a `CONFLICT-REVIEW=CLEAN` verdict exists for the current head.
+  keeps the hold until a `CONFLICT-REVIEW=CLEAN` verdict covers the current head.
   Detail and the empty-marker rule: `tools/postplan-harness/README.md` § Safety model.
-  On exit 3 the harness writes a plain-words block to `blocked-ship.txt` in its run dir: what stopped the ship, the offending paths when the hook output names them, and numbered copy-paste fix commands ending in `bin/post-plan-now`. `bin/post-plan-now` prints that block between `=== post-plan blocked ship ===` marker lines and prints a plain block of the same shape when the file is missing. The DM below carries the same block. `bin/automouse/run` copies the block into the skip report. When a command failed, the one-line `RESULT:` verdict and the block name it and quote the last few lines of its error, with credentials redacted. When none failed, they name the stage where the run stopped. The block ends with a paste line, `<main checkout>/bin/postplan-fix <PR|slug>`, which opens an interactive Claude session in the worktree with the failing stage, the error text, and the log paths in its opening prompt. It does not ship. With `--headless` it instead fetches, rebases onto `origin/master`, runs one Sonnet 5.5 session with the rung's denied-tool list to resolve the markers and fix tests, leaves the rebased commit locally, and prints the `bin/post-plan-now` paste line. It never pushes. `--headless --dry-run` prints the argv and prompt without touching git. The post-plan-fleet failure DMs and the pr-cycle-tick retry-cap DM end with the same line.
-  `bin/post-plan-fail-dm` sends the DM. With no live interactive Claude session in the
-  worktree it DMs at once. Headless `claude -p` sessions do not count. With an interactive
-  one, it holds the DM 15 min and sends it only if nobody re-fired the branch.
+  On exit 3 the harness writes a plain-words block to `blocked-ship.txt` in its run dir: what stopped the ship, the offending paths when the hook output names them, and numbered copy-paste fix commands ending in `bin/post-plan-now`. `bin/post-plan-now` prints that block between `=== post-plan blocked ship ===` marker lines, or a plain block of the same shape when the file is missing. The DM below and the `bin/automouse/run` skip report carry the same block. When a command failed, the one-line `RESULT:` verdict and the block name it and quote the last few lines of its error, with credentials redacted. Otherwise they name the stage where the run stopped. The block ends with a paste line, `<main checkout>/bin/postplan-fix <PR|slug>`, which opens an interactive Claude session in the worktree with the failing stage, the error text, and the log paths in its opening prompt. It does not ship. With `--headless` it instead fetches, rebases onto `origin/master`, runs one Sonnet 5.5 session with the rung's denied-tool list to resolve the markers and fix tests, leaves the rebased commit locally (it never pushes), and prints the `bin/post-plan-now` paste line. `--headless --dry-run` prints the argv and prompt without touching git. The post-plan-fleet failure DMs and the pr-cycle-tick retry-cap DM end with the same line.
+  `bin/post-plan-fail-dm` sends the DM at once when no live interactive Claude session
+  (headless `claude -p` does not count) is in the worktree. Otherwise it holds the DM 15 min
+  and sends it only if nobody re-fired the branch.
 
 On the commit path that detection is structural: any non-zero `git commit` is treated as a
 gate denial, so a hook message nobody enumerated in `_LOCAL_GATE_MARKERS` is still caught.

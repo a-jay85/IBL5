@@ -1,0 +1,14 @@
+# Widen-only overrides for the shell harness selection in bin/lib/harness-select.sh.
+# The scan derives each harness's coverage from the paths its scripts name, so most
+# harnesses need no line here. Every line can only make CI run more harnesses.
+# Line format, one entry per line; `#` comments and blank lines are ignored:
+#   inert <path> [<path> ...]
+#       Paths no harness reads unless its derived coverage names them. A changed path
+#       under one selects nothing when no harness claims it; a harness that names it
+#       still runs.
+#   bin/test-NAME <path> [<path> ...]
+#       Extra paths this harness reads that the scan cannot see.
+# Each <path> is a plain repo-relative file or directory that exists; a directory means
+# its whole subtree. bin/run-shell-harnesses --check-coverage fails a missing path, a
+# missing harness, a second line for one harness, and any glob or $ character.
+inert ibl5/classes ibl5/modules ibl5/tests ibl5/migrations

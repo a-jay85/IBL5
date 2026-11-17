@@ -86,4 +86,4 @@ jobs:
             --line-dispatch=update-behind-prs.yml \
             --self='Aggregate check status,All checks settled' \
             --anchor='Tests and Analysis,E2E Tests,Meta checks,Infection PHP (per-PR diff)' \
-            --ignore='human-signoff,needs-a-human label,human-approved fingerprint,auto-mergeable label,Enable auto-merge,notify-merge-digest,notify-fixed,Dispatch hotfix pass,Infection PHP,Notify Mutation Failure'
+            --ignore='human-signoff,needs-a-human label,human-approved fingerprint,auto-mergeable label,Enable auto-merge,notify-merge-digest,notify-fixed,Dispatch hotfix pass,Infection PHP,Plan mutation shards,Mutation coverage,Aggregate MSI,Infection PHP s01,Infection PHP s02,Infection PHP s03,Infection PHP s04,Infection PHP s05,Infection PHP s06,Infection PHP s07,Infection PHP s08,Infection PHP s09,Infection PHP s10,Notify Mutation Failure'

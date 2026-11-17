@@ -1,0 +1,203 @@
+#!/usr/bin/env bash
+# Usage: infection-shards check [--root=<dir>]
+#        infection-shards matrix [--root=<dir>] [--module=<name>]
+#        infection-shards aggregate --dir=<dir> --expect=<s01,s02,...>
+#            --min-msi=<n> --min-covered-msi=<n> [--report-only]
+# check      Verify every classes/ entry sits in exactly one shard of
+#            infection-shards.json (or in "excluded").
+# matrix     Print the GitHub Actions matrix as compact JSON. --module=<name>
+#            narrows it to one shard member.
+# aggregate  Sum each shard's infection-summary.log, print a markdown table and
+#            a verdict line. Exit 1 below either bar, 3 on malformed results.
+# Flags take --name=value only. <root> defaults to the current directory.
+set -uo pipefail
+
+if ! command -v jq >/dev/null 2>&1; then
+    echo "infection-shards: jq required" >&2
+    exit 2
+fi
+
+sub=${1:-}
+if [ $# -gt 0 ]; then shift; fi
+case "$sub" in
+    check | matrix | aggregate) ;;
+    *) printf 'infection-shards: usage: infection-shards check|matrix|aggregate [flags]\n' >&2; exit 2 ;;
+esac
+
+root=.
+dir=
+expect=
+min_msi=
+min_cmsi=
+module=
+module_set=0
+report_only=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --root=*) root=${1#*=} ;;
+        --dir=*) dir=${1#*=} ;;
+        --expect=*) expect=${1#*=} ;;
+        --min-msi=*) min_msi=${1#*=} ;;
+        --min-covered-msi=*) min_cmsi=${1#*=} ;;
+        --module=*) module=${1#*=}; module_set=1 ;;
+        --report-only) report_only=1 ;;
+        --dir|--expect|--min-msi|--min-covered-msi|--root|--module) # space-form
+            printf 'infection-shards: %s takes --name=value form\n' "$1" >&2; exit 2 ;;
+        --*) printf 'infection-shards: unknown flag %s\n' "$1" >&2; exit 2 ;; # unknown-flag
+        *) printf 'infection-shards: unexpected argument %s\n' "$1" >&2; exit 2 ;;
+    esac
+    shift
+done
+
+map="$root/infection-shards.json"
+if [ "$sub" != "aggregate" ] && [ ! -f "$map" ]; then
+    printf 'infection-shards: %s not found\n' "$map" >&2
+    exit 2
+fi
+
+if [ "$sub" = "matrix" ]; then
+    if [ "$module_set" = 1 ]; then
+        if ! jq -e --arg m "$module" '[.shards[].members[]] | index($m) != null' "$map" >/dev/null 2>&1; then
+            printf 'infection-shards: --module=%s names no shard member\n' "$module" >&2
+            exit 2 # module-not-member
+        fi
+        jq -c --arg m "$module" '
+            (if ($m | endswith(".php")) then "classes/" + $m else "classes/" + $m + "/" end) as $f
+            | [{shard: ("module-" + $m), filter: $f}]' "$map"
+    else
+        jq -c '[.shards[] | {shard: .shard, filter: (.members
+            | map(if endswith(".php") then "classes/" + . else "classes/" + . + "/" end)
+            | join(","))}]' "$map"
+    fi
+    exit $?
+fi
+
+if [ "$sub" = "aggregate" ]; then
+    if [ -z "$dir" ] || [ -z "$expect" ] || [ -z "$min_msi" ] || [ -z "$min_cmsi" ]; then
+        printf 'infection-shards: aggregate needs --dir, --expect, --min-msi and --min-covered-msi\n' >&2
+        exit 2
+    fi
+    num='^[0-9]+([.][0-9]+)?$'
+    if ! [[ "$min_msi" =~ $num ]] || ! [[ "$min_cmsi" =~ $num ]]; then
+        printf 'infection-shards: --min-msi and --min-covered-msi must be numbers\n' >&2
+        exit 2
+    fi
+    IFS=, read -r -a names <<< "$expect"
+    rows='[]'
+    for name in "${names[@]}"; do
+        log="$dir/mutation-shard-$name/infection-summary.log"
+        if [ ! -f "$log" ]; then
+            printf 'infection-shards: shard %s reported no results\n' "$name" >&2
+            exit 3 # shard-missing
+        fi
+        parsed=$(jq -Rn '
+            def key: {
+              "Total": "total", "Killed by Test Framework": "killed_tf", "Killed": "killed_tf",
+              "Killed by Static Analysis": "killed_sa", "Errored": "errored",
+              "Syntax Errors": "syntax", "Escaped": "escaped", "Timed Out": "timed_out",
+              "Skipped": "skipped", "Ignored": "ignored", "Not Covered": "not_covered"
+            };
+            [inputs | capture("^(?<k>[A-Za-z ]+): (?<v>[0-9]+)$")?] as $kv
+            | ($kv | map(select(key[.k] == null) | .k) | .[0]) as $unknown
+            | ($kv | map(select(.k == "Total")) | length) as $has_total
+            | (reduce ($kv[] | select(key[.k] != null)) as $e
+                ({total: 0, killed_tf: 0, killed_sa: 0, errored: 0, syntax: 0, escaped: 0,
+                  timed_out: 0, skipped: 0, ignored: 0, not_covered: 0};
+                 .[key[$e.k]] += ($e.v | tonumber))) as $n
+            | $n + {unknown: $unknown, has_total: $has_total}' "$log") || {
+            printf 'infection-shards: shard %s: unreadable summary\n' "$name" >&2
+            exit 3
+        }
+        unknown=$(jq -r '.unknown // empty' <<< "$parsed")
+        if [ -n "$unknown" ]; then
+            printf 'infection-shards: shard %s: unknown summary label %s\n' "$name" "$unknown" >&2
+            exit 3 # unknown-label
+        fi
+        if [ "$(jq -r '.has_total' <<< "$parsed")" = 0 ]; then
+            printf 'infection-shards: shard %s: no Total line\n' "$name" >&2
+            exit 3 # no-total
+        fi
+        eff=$(jq -r '(.killed_tf + .killed_sa + .errored + .syntax + .escaped + .timed_out + .not_covered) as $eff | $eff' <<< "$parsed")
+        if [ "$eff" = 0 ]; then
+            printf 'infection-shards: shard %s: mutated zero mutants (filter matched no source)\n' "$name" >&2
+            exit 3 # zero-mutants
+        fi
+        if ! jq -e --argjson eff "$eff" '.total == $eff or .total == ($eff + .skipped + .ignored)' <<< "$parsed" >/dev/null; then
+            printf 'infection-shards: shard %s: summary drift: Total %s vs components %s\n' \
+                "$name" "$(jq -r '.total' <<< "$parsed")" "$eff" >&2
+            exit 3 # total-drift
+        fi
+        rows=$(jq -c --arg n "$name" --argjson eff "$eff" --argjson parsed "$parsed" \
+            '. + [($parsed | .shard = $n | .eff = $eff)]' <<< "$rows")
+    done
+    agg_prog='
+        def total(k): map(.[k]) | add;
+        def detected: .killed_tf + .killed_sa + .errored + .syntax + .timed_out;
+        def msi: if .eff == 0 then 100 else 100 * (. | detected) / .eff end;
+        def cmsi: (.eff - .not_covered) as $d | if $d == 0 then 100 else 100 * (. | detected) / $d end;
+        def fl: (. * 100 | floor) / 100;
+        . as $rows
+        | ({eff: ($rows | total("eff")), not_covered: ($rows | total("not_covered")),
+            killed_tf: ($rows | total("killed_tf")), killed_sa: ($rows | total("killed_sa")),
+            errored: ($rows | total("errored")), syntax: ($rows | total("syntax")),
+            timed_out: ($rows | total("timed_out")), escaped: ($rows | total("escaped"))}) as $base
+        | ($base + {msi: ($base | msi), cmsi: ($base | cmsi)}) as $agg
+        | $agg.msi as $m | $agg.cmsi as $c'
+    # --argjson rejects a leading-zero number such as 071; fail closed, never PASS.
+    if ! below=$(jq -r --argjson min_msi "$min_msi" --argjson min_cmsi "$min_cmsi" "$agg_prog"'
+        | (($agg.msi < $min_msi) or ($agg.cmsi < $min_cmsi))' <<< "$rows"); then
+        printf 'infection-shards: --min-msi and --min-covered-msi must be plain numbers\n' >&2
+        exit 2
+    fi
+    word=PASS
+    if [ "$below" = "true" ]; then word=FAIL; fi
+    if [ "$report_only" = 1 ]; then word=REPORT-ONLY; fi
+    jq -r --arg bar "$min_msi" --arg cbar "$min_cmsi" --arg word "$word" "$agg_prog"'
+        | def row($label; $o): "| \($label) | \($o.eff) | \($o | detected) | \($o.escaped) | \($o.not_covered) | \($o | msi | fl)% | \($o | cmsi | fl)% |";
+        "| shard | mutants | detected | escaped | not covered | MSI | covered MSI |",
+        "|---|---|---|---|---|---|---|",
+        ($rows[] | row(.shard; .)),
+        row("aggregate"; $agg),
+        "",
+        "infection-shards: \($agg.eff) mutants, aggregate MSI \($m | fl)% (bar \($bar)%), covered MSI \($c | fl)% (bar \($cbar)%): \($word)"' <<< "$rows"
+    if [ "$word" = "FAIL" ]; then exit 1; fi
+    exit 0
+fi
+
+# check
+fail=0
+union=$(jq -r '.excluded[], .shards[].members[]' "$map")
+for p in "$root"/classes/*; do
+    e=${p##*/}
+    n=$(grep -cxF -- "$e" <<< "$union")
+    if [ "$n" -eq 0 ]; then
+        printf 'infection-shards: %s is in no shard; add it to the members of one shard in infection-shards.json\n' "$e" >&2
+        fail=1 # unmapped-entry
+    elif [ "$n" -gt 1 ]; then
+        printf 'infection-shards: %s is in %s shards\n' "$e" "$n" >&2
+        fail=1 # duplicate-entry
+    fi
+done
+while IFS= read -r name; do
+    [ -z "$name" ] && continue
+    if [ ! -e "$root/classes/$name" ]; then
+        printf 'infection-shards: %s names a missing entry\n' "$name" >&2
+        fail=1 # missing-member
+    fi
+done <<< "$union"
+for name in $(jq -r '.excluded[]' "$map"); do
+    if ! grep -qF -- "\"$name\"" "$root/infection.json5" 2>/dev/null; then
+        printf 'infection-shards: excluded %s is absent from infection.json5 source.excludes\n' "$name" >&2
+        fail=1 # exclude-not-in-config
+    fi
+done
+for dup in $(jq -r '.shards[].shard' "$map" | sort | uniq -d); do
+    printf 'infection-shards: duplicate shard name %s\n' "$dup" >&2
+    fail=1
+done
+if [ "$fail" -eq 0 ]; then
+    entries=$(find "$root/classes" -mindepth 1 -maxdepth 1 | wc -l | tr -d ' ')
+    shards=$(jq -r '.shards | length' "$map")
+    printf 'infection-shards: %s entries across %s shards OK\n' "$entries" "$shards"
+fi
+exit "$fail" # check-verdict

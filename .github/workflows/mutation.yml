@@ -5,6 +5,12 @@ on:
   # between 3am and 9am America/Los_Angeles, at most once per week
   # (bin/mutation-weekly-dispatch decides).
   workflow_dispatch:
+    inputs:
+      module:
+        description: 'One ibl5/classes entry to mutate alone (e.g. ActivityTracker). Reports its MSI without enforcing the bar. Empty runs every shard.'
+        required: false
+        default: ''
+        type: string
   pull_request:
     types: [labeled]  # per-PR diff job (required check) lives in mutation-pr.yml
 
@@ -12,11 +18,21 @@ permissions:
   contents: read
   packages: read
 
+env:
+  # The weekly bar is the full suite's real score, summed over every shard by the
+  # aggregate job. infection.json5 keeps 100 for the per-PR diff job. Every weekly
+  # score before 2026-10-30 was fake: Infection's temp config could not find the old
+  # relative phpunit.xml baseline, so PHPUnit exited 1 and every mutant counted as
+  # killed. The first honest run (2026-11-16) scored 71.1%. Raise these as tests improve.
+  MUTATION_MIN_MSI: '71'
+  MUTATION_MIN_COVERED_MSI: '71'
+
 concurrency:
   # A labeled event for any label other than mutation-test gets its own group, so it never
   # cancels a real mutation-test run on the same ref. post-plan-running and hotfix are the
   # usual ones. The jobs below still skip on those events (same pattern as e2e-tests.yml).
-  group: ${{ github.workflow }}-${{ github.ref }}${{ (github.event.action == 'labeled' && github.event.label.name != 'mutation-test') && format('-label-{0}', github.run_id) || '' }}
+  # A one-module dispatch gets its own group, so it never cancels a full run on the same ref.
+  group: ${{ github.workflow }}-${{ github.ref }}${{ (github.event.action == 'labeled' && github.event.label.name != 'mutation-test') && format('-label-{0}', github.run_id) || '' }}${{ (github.event_name == 'workflow_dispatch' && inputs.module != '') && format('-module-{0}', inputs.module) || '' }}
   cancel-in-progress: true
 
 jobs:
@@ -33,17 +49,50 @@ jobs:
     with:
       only-missing: true
 
-  mutation:
-    name: Infection PHP
-    needs: [mirror-ready]
+  shards:
+    name: Plan mutation shards
     runs-on: ubuntu-26.04
     if: >
       github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'pull_request' && github.event.label.name == 'mutation-test')
-    # The full suite took 40-56 min through 2026-10-26, then hit a 60-min cap on
-    # 2026-11-02 and 2026-11-09. 120 leaves room while sharding is tracked in backlog.
-    timeout-minutes: 120
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      expect: ${{ steps.plan.outputs.expect }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+    - name: Check infection excludes
+      working-directory: ibl5
+      run: bin/check-infection-excludes
+
+    - name: Check shard coverage
+      working-directory: ibl5
+      run: bin/infection-shards check
+
+    - name: Build shard matrix
+      id: plan
+      working-directory: ibl5
+      env:
+        MODULE: ${{ github.event_name == 'workflow_dispatch' && inputs.module || '' }}
+      run: |
+        if [ -n "$MODULE" ]; then
+          matrix=$(bin/infection-shards matrix --module="$MODULE")
+        else
+          matrix=$(bin/infection-shards matrix)
+        fi
+        expect=$(jq -r 'map(.shard) | join(",")' <<< "$matrix")
+        printf 'matrix=%s\nexpect=%s\n' "$matrix" "$expect" >> "$GITHUB_OUTPUT"
+
+  coverage:
+    name: Mutation coverage
+    needs: [mirror-ready, shards]
+    runs-on: ubuntu-26.04
+    # One PHPUnit + pcov run feeds every shard through the mutation-coverage artifact.
+    timeout-minutes: 30
 
     services:
       mariadb:
@@ -66,9 +115,75 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-    - name: Check infection excludes
+    - name: Setup PHP environment
+      uses: ./.github/actions/setup-php-env
+      with:
+        extensions: mbstring, intl, mysqli, pcov
+        coverage: pcov
+
+    - name: Apply migrations
       working-directory: ibl5
-      run: bin/check-infection-excludes
+      run: bin/run-migrations-ci -h 127.0.0.1 -u root -proot ibl5
+
+    - name: Import seed data
+      working-directory: ibl5
+      run: mysql -h 127.0.0.1 -u root -proot ibl5 < tests/DatabaseIntegration/Fixtures/db-seed.sql
+
+    - name: Generate coverage for Infection
+      working-directory: ibl5
+      env:
+        DB_HOST: 127.0.0.1
+        DB_USER: root
+        DB_PASS: root
+        DB_NAME: ibl5
+      run: |
+        mkdir -p coverage
+        vendor/bin/phpunit \
+          --configuration=phpunit-mutation.xml \
+          --coverage-clover coverage/clover.xml \
+          --coverage-xml coverage/coverage-xml \
+          --log-junit coverage/junit.xml \
+          --no-progress
+
+    - name: Upload coverage for shards
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: mutation-coverage
+        path: ibl5/coverage
+        retention-days: 1
+
+  mutation:
+    name: Infection PHP ${{ matrix.shard }}
+    needs: [mirror-ready, shards, coverage]
+    runs-on: ubuntu-26.04
+    # 2026-11-16's 52-minute run over 10 shards is about 5 minutes each (an estimate).
+    # 120 leaves room for the per-mutant DB tests a sibling plan adds.
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.shards.outputs.matrix) }}
+
+    services:
+      mariadb:
+        image: ghcr.io/a-jay85/mirror/mariadb:10.11
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: ibl5
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=10
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
     - name: Setup PHP environment
       uses: ./.github/actions/setup-php-env
@@ -89,6 +204,7 @@ jobs:
       # exports TEST_TOKEN=1..4 to each mutant process. With
       # INFECTION_PER_THREAD_DATABASE set, DatabaseNameResolver sends thread N
       # to ibl5_tN, so threads never share rows, locks or committed fixtures.
+      # Each shard job has its own MariaDB service, so every shard clones its own.
       # The dump runs inside the service container, so client and server
       # versions always match.
       run: |
@@ -103,35 +219,24 @@ jobs:
           if [ "$got" != "$want" ]; then echo "::error::ibl5_t$t has $got tables, want $want"; exit 1; fi
         done
 
-    - name: Generate coverage for Infection
-      working-directory: ibl5
-      env:
-        DB_HOST: 127.0.0.1
-        DB_USER: root
-        DB_PASS: root
-        DB_NAME: ibl5
-      run: |
-        mkdir -p coverage
-        vendor/bin/phpunit \
-          --configuration=phpunit-mutation.xml \
-          --coverage-clover coverage/clover.xml \
-          --coverage-xml coverage/coverage-xml \
-          --log-junit coverage/junit.xml \
-          --no-progress
+    - name: Download coverage
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        name: mutation-coverage
+        path: ibl5/coverage
 
     - name: Run Infection
       working-directory: ibl5
+      # Each shard mutates only its slice of classes/ and never fails on score.
+      # The aggregate job sums every shard and enforces MUTATION_MIN_MSI once.
+      # infection.json5 keeps 100 for the per-PR diff job, so 0 overrides it here.
       env:
         DB_HOST: 127.0.0.1
         DB_USER: root
         DB_PASS: root
         DB_NAME: ibl5
         INFECTION_PER_THREAD_DATABASE: '1'
-      # The weekly bar is the full suite's real score. infection.json5 keeps 100
-      # for the per-PR diff job. Every weekly score before 2026-10-30 was fake:
-      # Infection's temp config could not find the old relative phpunit.xml
-      # baseline, so PHPUnit exited 1 and every mutant counted as killed.
-      # The first honest run (2026-11-16) scored 71.1%. Raise this as tests improve.
+        SHARD_FILTER: ${{ matrix.filter }}
       run: |
         # Infection builds every per-mutant config from ibl5/phpunit.xml and
         # ignores --configuration in testFrameworkOptions. Copy the mutation
@@ -143,8 +248,9 @@ jobs:
           --coverage=coverage \
           --skip-initial-tests \
           --show-mutations \
-          --min-msi=71 \
-          --min-covered-msi=71 \
+          --filter="$SHARD_FILTER" \
+          --min-msi=0 \
+          --min-covered-msi=0 \
           --no-progress
 
     - name: Check mutation kills are real
@@ -165,7 +271,7 @@ jobs:
       if: always()
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
-        name: mutation-reports
+        name: mutation-shard-${{ matrix.shard }}
         path: |
           ibl5/infection.log
           ibl5/infection-report.html
@@ -177,26 +283,67 @@ jobs:
       working-directory: ibl5
       run: |
         if [ -f infection-summary.log ]; then
-          echo "## Mutation Testing Results" >> $GITHUB_STEP_SUMMARY
+          echo "## Mutation Testing Results (${{ matrix.shard }})" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           cat infection-summary.log >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
         fi
 
+  aggregate:
+    name: Aggregate MSI
+    runs-on: ubuntu-26.04
+    needs: [shards, coverage, mutation]
+    # Runs after a shard fails or times out too, so the summary still shows every shard that finished.
+    if: ${{ always() && needs.shards.result == 'success' && needs.coverage.result == 'success' }}
+    timeout-minutes: 10
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+    - name: Download shard reports
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        pattern: mutation-shard-*
+        path: ${{ runner.temp }}/shard-results
+
+    - name: Enforce the aggregate bar
+      working-directory: ibl5
+      env:
+        EXPECT: ${{ needs.shards.outputs.expect }}
+        MODULE_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.module != '' }}
+      run: |
+        report_only=
+        if [ "$MODULE_RUN" = "true" ]; then report_only=--report-only; fi
+        rc=0
+        bin/infection-shards aggregate \
+          --dir="$RUNNER_TEMP/shard-results" \
+          --expect="$EXPECT" \
+          --min-msi="$MUTATION_MIN_MSI" \
+          --min-covered-msi="$MUTATION_MIN_COVERED_MSI" \
+          $report_only > "$RUNNER_TEMP/aggregate.md" || rc=$?
+        cat "$RUNNER_TEMP/aggregate.md"
+        cat "$RUNNER_TEMP/aggregate.md" >> "$GITHUB_STEP_SUMMARY"
+        exit "$rc"
+
   notify-mutation-failure:
     name: Notify Mutation Failure
     runs-on: ubuntu-26.04
-    needs: [mirror-ready, mutation]
+    needs: [mirror-ready, shards, coverage, mutation, aggregate]
     # A job that hits timeout-minutes ends 'cancelled', not 'failure'. The scheduled run
     # alerts on cancelled too, so a timeout can't go silent (it did on 2026-11-02 and
     # 2026-11-09). Label and dispatch runs stay failure-only: a newer run cancels those.
-    # If mirror-ready times out it ends 'cancelled' and mutation ends 'skipped', so the
-    # scheduled run checks mirror-ready's cancel too.
+    # If mirror-ready or coverage times out, later jobs end 'skipped', so the scheduled run checks each job's cancel.
     if: >-
-      ${{ always() && (needs.mutation.result == 'failure'
-          || needs.mirror-ready.result == 'failure'
-          || (github.event_name == 'schedule' && (needs.mutation.result == 'cancelled'
-              || needs.mirror-ready.result == 'cancelled'))) }}
+      ${{ always() && (needs.mirror-ready.result == 'failure'
+          || needs.shards.result == 'failure'
+          || needs.coverage.result == 'failure'
+          || needs.mutation.result == 'failure'
+          || needs.aggregate.result == 'failure'
+          || (github.event_name == 'schedule' && (needs.mirror-ready.result == 'cancelled'
+              || needs.coverage.result == 'cancelled'
+              || needs.mutation.result == 'cancelled'
+              || needs.aggregate.result == 'cancelled'))) }}
     timeout-minutes: 5
 
     steps:
@@ -206,16 +353,25 @@ jobs:
         env:
           MIRROR_RESULT: ${{ needs.mirror-ready.result }}
           MUTATION_RESULT: ${{ needs.mutation.result }}
+          SHARDS_RESULT: ${{ needs.shards.result }}
+          COVERAGE_RESULT: ${{ needs.coverage.result }}
+          AGGREGATE_RESULT: ${{ needs.aggregate.result }}
         run: |
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           if [ "$MIRROR_RESULT" = "cancelled" ]; then
             MSG=$(printf 'Weekly mutation testing never ran (%s trigger).\n\nThe CI image mirror job (mirror-ready) was CANCELLED, most likely by its timeout-minutes cap, so the DB mirror never got ready and Infection was skipped. Check the run: %s' "${{ github.event_name }}" "$RUN_URL")
           elif [ "$MIRROR_RESULT" = "failure" ]; then
             MSG=$(printf 'Weekly mutation testing never ran (%s trigger).\n\nThe CI image mirror job (mirror-ready) FAILED, so the DB mirror never got ready and Infection was skipped. Check the run: %s' "${{ github.event_name }}" "$RUN_URL")
-          elif [ "$MUTATION_RESULT" = "cancelled" ]; then
-            MSG=$(printf 'Weekly mutation testing was CANCELLED (%s trigger).\n\nIt most likely hit the job timeout-minutes cap before Infection finished. Check the run: %s' "${{ github.event_name }}" "$RUN_URL")
+          elif [ "$SHARDS_RESULT" = "failure" ]; then
+            MSG=$(printf 'Weekly mutation testing never ran (%s trigger).\n\nThe shard plan job FAILED: an ibl5/classes entry is missing from ibl5/infection-shards.json, or the module input names no shard member. Check the run: %s' "${{ github.event_name }}" "$RUN_URL")
+          elif [ "$COVERAGE_RESULT" != "success" ]; then
+            MSG=$(printf 'Weekly mutation testing never ran (%s trigger).\n\nThe coverage job ended %s, so no shard ran. Check the run: %s' "${{ github.event_name }}" "$COVERAGE_RESULT" "$RUN_URL")
+          elif [ "$MUTATION_RESULT" = "cancelled" ] || [ "$AGGREGATE_RESULT" = "cancelled" ]; then
+            MSG=$(printf 'Weekly mutation testing was CANCELLED (%s trigger).\n\nA shard or the aggregate job most likely hit its timeout-minutes cap. Check the run: %s' "${{ github.event_name }}" "$RUN_URL")
+          elif [ "$MUTATION_RESULT" = "failure" ]; then
+            MSG=$(printf 'Weekly mutation testing FAILED (%s trigger).\n\nA shard'"'"'s Infection run crashed. Shards never fail on score, so this is an error. Check the run: %s' "${{ github.event_name }}" "$RUN_URL")
           else
-            MSG=$(printf 'Weekly mutation testing FAILED (%s trigger).\n\nMSI dropped below 100%% — an escaped mutant or coverage regression. Check the run: %s' "${{ github.event_name }}" "$RUN_URL")
+            MSG=$(printf 'Weekly mutation testing FAILED (%s trigger).\n\nThe aggregate MSI across all shards fell below the %s%% bar, or a shard reported no results. Check the run: %s' "${{ github.event_name }}" "$MUTATION_MIN_MSI" "$RUN_URL")
           fi
           printf '%s' "$MSG" > /tmp/discord-msg.txt
 

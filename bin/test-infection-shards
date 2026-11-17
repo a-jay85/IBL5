@@ -1,0 +1,366 @@
+#!/usr/bin/env bash
+# Harness for ibl5/bin/infection-shards. Builds a hermetic fixture tree and
+# summary logs under a temp dir, runs the script, and asserts exit codes plus
+# one substring per token. The workflow_* and settle_ignore cases grep the real
+# workflow files.
+# Usage: bin/test-infection-shards [case ...]
+# Prints PASS <case> / FAIL <case>: <why>, then "<n> passed, <m> failed".
+# ---
+# An unknown case name exits 2; any failed case exits 1.
+set -uo pipefail
+
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+TOOL="$ROOT/ibl5/bin/infection-shards"
+WF="$ROOT/.github/workflows/mutation.yml"
+SETTLED="$ROOT/.github/workflows/all-checks-settled.yml"
+BASE=$(mktemp -d)
+trap 'rm -rf "$BASE"' EXIT
+
+PASSES=0
+FAILS=0
+RC=0
+OUT=""
+ERR=""
+FAILED_WHY=""
+
+note() { FAILED_WHY="${FAILED_WHY}${FAILED_WHY:+; }$1"; }
+
+# run <args...>: capture RC, OUT (stdout), ERR (stderr).
+run() {
+    local o e
+    o=$(mktemp "$BASE/o.XXXXXX")
+    e=$(mktemp "$BASE/e.XXXXXX")
+    "$TOOL" "$@" > "$o" 2> "$e"
+    RC=$?
+    OUT=$(cat "$o")
+    ERR=$(cat "$e")
+}
+
+want_rc() {
+    if [ "$RC" -ne "$1" ]; then note "rc=$RC, wanted $1 (stderr: $ERR)"; fi
+}
+want_out() {
+    if ! grep -qF -- "$1" <<< "$OUT"; then note "stdout missing: $1"; fi
+}
+want_err() {
+    if ! grep -qF -- "$1" <<< "$ERR"; then note "stderr missing: $1"; fi
+}
+want_eq() {
+    if [ "$OUT" != "$1" ]; then note "stdout was: $OUT"; fi
+}
+
+# Fixture tree: classes/{Alpha,Beta,Bootstrap}/X.php, classes/Top.php.
+mk_tree() {
+    local d=$1
+    mkdir -p "$d/classes/Alpha" "$d/classes/Beta" "$d/classes/Bootstrap"
+    : > "$d/classes/Alpha/X.php"
+    : > "$d/classes/Beta/X.php"
+    : > "$d/classes/Bootstrap/X.php"
+    : > "$d/classes/Top.php"
+    printf '{ "source": { "excludes": ["Bootstrap"] } }\n' > "$d/infection.json5"
+    cat > "$d/infection-shards.json" <<'JSON'
+{
+  "excluded": ["Bootstrap"],
+  "shards": [
+    {"shard": "s01", "members": ["Alpha", "Top.php"]},
+    {"shard": "s02", "members": ["Beta"]}
+  ]
+}
+JSON
+}
+
+new_tree() {
+    local d
+    d=$(mktemp -d "$BASE/tree.XXXXXX")
+    mk_tree "$d"
+    printf '%s' "$d"
+}
+
+# Summary fixtures.
+sum_p1() { printf 'Total: 100\n\nKilled by Test Framework: 70\nEscaped: 20\nNot Covered: 10\n'; }
+sum_p2() { printf 'Total: 100\n\nKilled by Test Framework: 75\nEscaped: 15\nNot Covered: 10\n'; }
+sum_f1() { printf 'Total: 100\n\nKilled by Test Framework: 60\nEscaped: 30\nNot Covered: 10\n'; }
+sum_f2() { printf 'Total: 100\n\nKilled by Test Framework: 70\nEscaped: 20\nNot Covered: 10\n'; }
+
+# put_summary <dir> <shard> : summary on stdin.
+put_summary() {
+    mkdir -p "$1/mutation-shard-$2"
+    cat > "$1/mutation-shard-$2/infection-summary.log"
+}
+
+agg_dir() { mktemp -d "$BASE/agg.XXXXXX"; }
+
+# agg <dir> <expect> [extra flags]
+agg() {
+    local d=$1 ex=$2
+    shift 2
+    run aggregate --dir="$d" --expect="$ex" --min-msi=71 --min-covered-msi=71 "$@"
+}
+
+case_check_clean() {
+    local t; t=$(new_tree)
+    run check --root="$t"
+    want_rc 0
+    want_out "4 entries across 2 shards OK"
+}
+
+case_check_missing_entry() {
+    local t; t=$(new_tree)
+    mkdir -p "$t/classes/Gamma"
+    run check --root="$t"
+    want_rc 1
+    want_err "Gamma is in no shard"
+}
+
+case_check_duplicate_entry() {
+    local t; t=$(new_tree)
+    cat > "$t/infection-shards.json" <<'JSON'
+{
+  "excluded": ["Bootstrap"],
+  "shards": [
+    {"shard": "s01", "members": ["Alpha", "Top.php"]},
+    {"shard": "s02", "members": ["Beta", "Alpha"]}
+  ]
+}
+JSON
+    run check --root="$t"
+    want_rc 1
+    want_err "Alpha is in 2 shards"
+}
+
+case_check_stale_member() {
+    local t; t=$(new_tree)
+    cat > "$t/infection-shards.json" <<'JSON'
+{
+  "excluded": ["Bootstrap"],
+  "shards": [
+    {"shard": "s01", "members": ["Alpha", "Top.php", "Gone"]},
+    {"shard": "s02", "members": ["Beta"]}
+  ]
+}
+JSON
+    run check --root="$t"
+    want_rc 1
+    want_err "Gone names a missing entry"
+}
+
+case_check_excluded_not_in_config() {
+    local t; t=$(new_tree)
+    printf '{ "source": { "excludes": [] } }\n' > "$t/infection.json5"
+    run check --root="$t"
+    want_rc 1
+    want_err "excluded Bootstrap is absent"
+}
+
+case_check_real_tree() {
+    run check --root="$ROOT/ibl5"
+    want_rc 0
+    want_out "entries across"
+}
+
+case_matrix_full() {
+    local t; t=$(new_tree)
+    run matrix --root="$t"
+    want_rc 0
+    want_eq '[{"shard":"s01","filter":"classes/Alpha/,classes/Top.php"},{"shard":"s02","filter":"classes/Beta/"}]'
+}
+
+case_matrix_module() {
+    local t; t=$(new_tree)
+    run matrix --root="$t" --module=Alpha
+    want_rc 0
+    want_eq '[{"shard":"module-Alpha","filter":"classes/Alpha/"}]'
+}
+
+case_matrix_module_rejects() {
+    local t m; t=$(new_tree)
+    for m in Bootstrap Nope ../classes ''; do
+        run matrix --root="$t" "--module=$m"
+        if [ "$RC" -ne 2 ]; then note "--module='$m' rc=$RC, wanted 2"; fi
+        if ! grep -qF -- "names no shard member" <<< "$ERR"; then note "--module='$m' stderr missing token"; fi
+    done
+}
+
+case_aggregate_pass() {
+    local d; d=$(agg_dir)
+    sum_p1 | put_summary "$d" s01
+    sum_p2 | put_summary "$d" s02
+    agg "$d" s01,s02
+    want_rc 0
+    want_out "200 mutants, aggregate MSI 72.5%"
+    want_out ": PASS"
+}
+
+case_aggregate_fail_below_bar() {
+    local d; d=$(agg_dir)
+    sum_f1 | put_summary "$d" s01
+    sum_f2 | put_summary "$d" s02
+    agg "$d" s01,s02
+    want_rc 1
+    want_out "aggregate MSI 65%"
+    want_out "covered MSI 72.22%"
+    want_out ": FAIL"
+}
+
+case_aggregate_covered_bar() {
+    local d; d=$(agg_dir)
+    sum_p1 | put_summary "$d" s01
+    sum_p2 | put_summary "$d" s02
+    run aggregate --dir="$d" --expect=s01,s02 --min-msi=71 --min-covered-msi=90
+    want_rc 1
+    want_out ": FAIL"
+}
+
+case_aggregate_missing_shard() {
+    local d; d=$(agg_dir)
+    sum_p1 | put_summary "$d" s01
+    agg "$d" s01,s02
+    want_rc 3
+    want_err "shard s02 reported no results"
+    # The missing-shard exit must come from its own branch, not the unreadable-summary fallback.
+    if grep -qF -- "unreadable summary" <<< "$ERR"; then note "fell through to the unreadable-summary branch"; fi
+}
+
+case_aggregate_zero_mutants() {
+    local d; d=$(agg_dir)
+    printf 'Total: 0\n' | put_summary "$d" s01
+    agg "$d" s01
+    want_rc 3
+    want_err "mutated zero mutants"
+}
+
+case_aggregate_total_drift() {
+    local d; d=$(agg_dir)
+    printf 'Total: 90\n\nKilled by Test Framework: 70\nEscaped: 20\nNot Covered: 10\n' | put_summary "$d" s01
+    agg "$d" s01
+    want_rc 3
+    want_err "summary drift"
+}
+
+case_aggregate_unknown_label() {
+    local d; d=$(agg_dir)
+    { sum_p1; printf 'Frobnicated: 3\n'; } | put_summary "$d" s01
+    agg "$d" s01
+    want_rc 3
+    want_err "unknown summary label Frobnicated"
+}
+
+case_aggregate_near_miss_total() {
+    local d; d=$(agg_dir)
+    printf 'Total: 100 mutants\n\nKilled by Test Framework: 70\nEscaped: 20\nNot Covered: 10\n' | put_summary "$d" s01
+    agg "$d" s01
+    want_rc 3
+    want_err "no Total line"
+}
+
+case_aggregate_report_only() {
+    local d; d=$(agg_dir)
+    sum_f1 | put_summary "$d" s01
+    sum_f2 | put_summary "$d" s02
+    agg "$d" s01,s02 --report-only
+    want_rc 0
+    want_out ": REPORT-ONLY"
+}
+
+case_aggregate_skipped_ignored() {
+    local d; d=$(agg_dir)
+    printf 'Total: 105\n\nKilled by Test Framework: 70\nEscaped: 20\nNot Covered: 10\nSkipped: 5\n' | put_summary "$d" s01
+    run aggregate --dir="$d" --expect=s01 --min-msi=60 --min-covered-msi=60
+    want_rc 0
+    want_out "100 mutants, aggregate MSI 70%"
+}
+
+case_flags_space_form() {
+    run aggregate --dir x --expect=s01 --min-msi=71 --min-covered-msi=71
+    want_rc 2
+    want_err "takes --name=value form"
+}
+
+case_flags_unknown() {
+    run aggregate --bogus=1
+    want_rc 2
+    want_err "unknown flag --bogus=1"
+}
+
+# Workflow cases grep the real files; they go green once the workflow edits land.
+wf_has() {
+    if ! grep -qF -- "$1" "$WF"; then note "mutation.yml missing: $1"; fi
+}
+wf_lacks() {
+    if grep -qF -- "$1" "$WF"; then note "mutation.yml still has: $1"; fi
+}
+
+case_workflow_matrix() {
+    wf_has 'fromJSON(needs.shards.outputs.matrix)'
+    wf_has 'fail-fast: false'
+}
+
+case_workflow_shard_step() {
+    wf_has '--filter="$SHARD_FILTER"'
+    wf_has '--min-msi=0'
+    wf_has '--min-covered-msi=0'
+    wf_lacks '--min-msi=71'
+}
+
+case_workflow_aggregate() {
+    wf_has "MUTATION_MIN_MSI: '71'"
+    wf_has '--min-msi="$MUTATION_MIN_MSI"'
+}
+
+case_workflow_notify() {
+    wf_has 'needs: [mirror-ready, shards, coverage, mutation, aggregate]'
+}
+
+case_workflow_dm_bar() {
+    wf_has 'fell below the %s%% bar'
+    wf_lacks 'MSI dropped below 100'
+}
+
+case_settle_ignore() {
+    local ignore_lines t s
+    ignore_lines=$(grep -e '--ignore' "$SETTLED" || true)
+    for t in 'Infection PHP' 'Aggregate MSI' 'Mutation coverage' 'Plan mutation shards'; do
+        if ! grep -qF -- "$t" <<< "$ignore_lines"; then note "all-checks-settled.yml ignore list missing: $t"; fi
+    done
+    for s in $(grep -oE '"shard": "[^"]+"' "$ROOT/ibl5/infection-shards.json" | sed -E 's/.*: "([^"]+)"/\1/'); do
+        if ! grep -qF -- "Infection PHP $s" <<< "$ignore_lines"; then note "all-checks-settled.yml ignore list missing: Infection PHP $s"; fi
+    done
+}
+
+ALL_CASES="case_check_clean case_check_missing_entry case_check_duplicate_entry
+case_check_stale_member case_check_excluded_not_in_config case_check_real_tree
+case_matrix_full case_matrix_module case_matrix_module_rejects
+case_aggregate_pass case_aggregate_fail_below_bar case_aggregate_covered_bar
+case_aggregate_missing_shard case_aggregate_zero_mutants case_aggregate_total_drift
+case_aggregate_unknown_label case_aggregate_near_miss_total case_aggregate_report_only
+case_aggregate_skipped_ignored case_flags_space_form case_flags_unknown
+case_workflow_matrix case_workflow_shard_step case_workflow_aggregate
+case_workflow_notify case_workflow_dm_bar case_settle_ignore"
+
+if [ $# -gt 0 ]; then
+    for c in "$@"; do
+        if ! grep -qwF -- "$c" <<< "$ALL_CASES"; then
+            printf 'test-infection-shards: unknown case %s\n' "$c" >&2
+            exit 2
+        fi
+    done
+    selected="$*"
+else
+    selected="$ALL_CASES"
+fi
+
+for c in $selected; do
+    FAILED_WHY=""
+    "$c"
+    if [ -z "$FAILED_WHY" ]; then
+        printf 'PASS %s\n' "$c"
+        PASSES=$((PASSES + 1))
+    else
+        printf 'FAIL %s: %s\n' "$c" "$FAILED_WHY"
+        FAILS=$((FAILS + 1))
+    fi
+done
+
+printf '%s passed, %s failed\n' "$PASSES" "$FAILS"
+if [ "$FAILS" -gt 0 ]; then exit 1; fi
+exit 0

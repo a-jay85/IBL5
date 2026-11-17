@@ -138,6 +138,7 @@
 2 bin/test-pr-overlap
 2 bin/test-plan-index
 2 bin/test-check-infection-ran
+2 bin/test-infection-shards
 2 bin/test-sigpipe-grep-q-guard
 2 bin/test-check-e2e-mutator-isolation
 2 bin/test-vr-apply-baselines

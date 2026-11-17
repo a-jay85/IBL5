@@ -21,9 +21,13 @@ final class PlrDepthChartSelector
      * Return the pid-keyed rows of charted teams only.
      *
      * @param array<int, array{pid: int, teamid: int, dc_pg_depth: int, dc_sg_depth: int, dc_sf_depth: int, dc_pf_depth: int, dc_c_depth: int, dc_can_play_in_game: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}> $rows
+     * A charted team's rows are all written, including traded players, because the DB row holds the
+     * new team's chart once that GM submits one.
+     *
      * @param array<int, int>|null $sourceTeamByPid pid => teamid in the source .plr. When given, a player
      *        only counts toward charting his team if his source team equals his DB team. A traded
-     *        player still carries his old team's dc_* values and must not chart his new team.
+     *        player alone does not mark his new team charted, because until that GM submits a chart
+     *        his dc_* values are still his old team's.
      * @return array<int, array{pid: int, teamid: int, dc_pg_depth: int, dc_sg_depth: int, dc_sf_depth: int, dc_pf_depth: int, dc_c_depth: int, dc_can_play_in_game: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}>
      */
     public static function chartedByPid(array $rows, ?array $sourceTeamByPid = null): array
@@ -40,9 +44,6 @@ final class PlrDepthChartSelector
 
         $result = [];
         foreach ($rows as $pid => $row) {
-            if ($sourceTeamByPid !== null && ($sourceTeamByPid[$pid] ?? null) !== $row['teamid']) {
-                continue;
-            }
             if (isset($chartedTeams[$row['teamid']])) {
                 $result[$pid] = $row;
             }

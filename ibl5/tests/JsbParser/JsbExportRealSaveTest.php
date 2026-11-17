@@ -192,6 +192,52 @@ class JsbExportRealSaveTest extends TestCase
             self::markTestSkipped('JSB_VM_EXPORT_DIR not set');
         }
 
+        $this->writeAcceptanceExport($outDir);
+    }
+
+    public function testTradedPlayersGetNewTeamDepthInAcceptanceExport(): void
+    {
+        $outDir = sys_get_temp_dir() . '/jsb_vm_out_' . bin2hex(random_bytes(6));
+        mkdir($outDir);
+        try {
+            $this->writeAcceptanceExport($outDir);
+            $plrLines = PlrFileWriter::splitIntoLines((string) file_get_contents($outDir . '/IBL5_export.plr'));
+            $plbSlots = PlbFileParser::parse((string) file_get_contents($outDir . '/IBL5_export.plb'));
+        } finally {
+            foreach (['IBL5_export.plr', 'IBL5_export.plb'] as $file) {
+                if (is_file($outDir . '/' . $file)) {
+                    unlink($outDir . '/' . $file);
+                }
+            }
+            rmdir($outDir);
+        }
+
+        $ordinals = self::ordinalsByPid($plrLines);
+        $expected = [4500 => [[0, 0, 0, 0, 1, 1], 40], 6363 => [[0, 0, 0, 0, 0, 0], 1]];
+        foreach ($expected as $pid => [$depth, $minutes]) {
+            $line = $plrLines[$ordinals[$pid]];
+            self::assertSame(20, PlrFileWriter::readField($line, 'teamid'), 'pid ' . $pid . ' teamid');
+            $actual = [];
+            foreach (['PGDepth', 'SGDepth', 'SFDepth', 'PFDepth', 'CDepth', 'canPlayInGame'] as $field) {
+                $actual[] = PlrFileWriter::readField($line, $field);
+            }
+            self::assertSame($depth, $actual, 'pid ' . $pid . ' PG,SG,SF,PF,C,canPlayInGame');
+
+            $position = PlbFileWriter::ordinalToTeamSlot($ordinals[$pid]);
+            self::assertNotNull($position);
+            $slot = null;
+            foreach ($plbSlots[$position[0]] ?? [] as $candidate) {
+                if ($candidate['slot_index'] === $position[1]) {
+                    $slot = $candidate;
+                }
+            }
+            self::assertNotNull($slot, 'pid ' . $pid . ' .plb slot');
+            self::assertSame($minutes, $slot['dc_minutes'], 'pid ' . $pid . ' .plb minutes');
+        }
+    }
+
+    private function writeAcceptanceExport(string $outDir): void
+    {
         $plr = $this->member(self::SIM08_ZIP, 'IBL5.plr');
         $plb = $this->member(self::SIM08_ZIP, 'IBL5.plb');
         $tmp = sys_get_temp_dir() . '/jsb_vm_' . bin2hex(random_bytes(6));

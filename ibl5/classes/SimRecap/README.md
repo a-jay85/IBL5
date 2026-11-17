@@ -67,13 +67,16 @@ Rules in `SimPublishProgressRepository`. Each one is a conditional `UPDATE` that
 
 ### API routes
 
-All three are POST routes under `/api/v1/sim-recap-publish/`, registered in `ibl5/classes/Api/Router.php`. Each one rejects a standard-tier key with 403 before it reads the body (`ServiceKeyGuard`).
+All four are POST routes under `/api/v1/sim-recap-publish/`, registered in `ibl5/classes/Api/Router.php`. Each one rejects a standard-tier key with 403 before it reads the body (`ServiceKeyGuard`).
 
 | Route | Body | Reply |
 |---|---|---|
-| `claim-next` (`SimRecapPublishClaimController`) | `token`, a UUID | 200 with `sim`, `threadId`, `lastStep`, and `script`; 204 when nothing is claimable; 400 for a bad token; 422 `script_unavailable` when the claimed sim has nothing to publish |
+| `claim-next` (`SimRecapPublishClaimController`) | `token`, a UUID | 200 with `sim`, `threadId`, `lastStep`, and `script`; 204 when nothing is claimable or the commissioner switch is off (checked before the claim, so no attempt is spent); 400 for a bad token; 422 `script_unavailable` when the claimed sim has nothing to publish |
 | `progress` (`SimRecapPublishProgressController`) | `sim`, `token`, `step`, `threadId` | 200 when recorded; 409 when the step is out of order, the token is foreign, or the row is finished; 400 for bad input |
 | `finish` (`SimRecapPublishFinishController`) | `sim`, `token` | 200 when finished; 409 for a foreign token or an already finished row; 400 for bad input |
+| `enabled` (`SimRecapPublishEnabledController`) | none | 200 with `enabled` (boolean); 403 for a non-service key |
+
+`PostingSwitch` reads the League Control Panel setting `Sim Recap Discord Posting` and is true only for the exact value `On`. Both `claim-next` and `enabled` use it.
 
 ### Queue script verbs
 

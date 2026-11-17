@@ -1,6 +1,6 @@
 ---
 description: Production operations runbook covering deploy, rollback, DB restore, sim-file recovery, logs, secrets, sim recap hosting, the sim recap Discord publisher, data retention and account deletion, the admin-only faprep.php report, and running the app without the Claude Code harness.
-last_verified: 2026-11-15
+last_verified: 2026-11-16
 ---
 
 # IBL5 Operations Runbook
@@ -572,8 +572,9 @@ IBLbot posts each finished Regular Season sim into Discord as a slow drip. Prod 
 2. **Service-tier API key.** Issue a key for `SIM_RECAP_API_KEY` the way the bug-bot key is issued: a row in `ibl_api_keys` with a rate-limit tier of `elevated` or `unlimited`. A `standard` key gets a 403 from every publisher route. Put the key in IBLbot's environment file on the prod box.
 3. **Testing-guild dry run.** Do this before you enable prod. Run a local IBLbot with the test bot token. Set `API_BASE_URL` to a worktree stack, `SIM_RECAP_PUBLISH_TARGET=testing`, and `SIM_RECAP_TEST_CHANNEL_ID` to a channel in the testing guild. Then run `publish-enqueue --sim=N` against that worktree DB. The prod row stays untouched, and the testing target strips every mention.
 4. **Turning prod on.** Set `SIM_RECAP_PUBLISH_TARGET=prod` in IBLbot's environment file, then run `pm2 restart iblbot`. A sim that was enqueued more than 6 hours ago and has not started is never claimed, so nothing old posts when you switch the publisher on.
-5. **Title override.** Before a sim finishes, set its thread name with `php ibl5/scripts/simRecapQueue.php publish-title --sim=N --title="..."`. Use `--clear` in place of `--title` to remove it. The title must be 1 to 100 characters.
-6. **Recovery.** A row whose `attempts` reached 5 is never claimed again. Reset it with `php ibl5/scripts/simRecapQueue.php publish-enqueue --sim=N --retry`. It prints `not found or finished` and exits 1 for a missing or finished row. A reset row resumes after the last posted step. To see what a sim would post without posting it, run `publish-script --sim=N`.
+5. **Commissioner switch.** After the deploy that added the switch, auto-posting is paused even though prod has `SIM_RECAP_PUBLISH_TARGET=prod`. The League Control Panel setting "Sim recap Discord posting" starts at Off. The commissioner opens the League Control Panel, sets it to On, and submits. While it is Off, `claim-next` answers 204 and the bot claims nothing. A sim enqueued while the switch is off is posted once it goes On, as long as it is no more than 6 hours old and has not started. An older sim that never started is skipped, so a long pause never floods the channel. Switching Off in the middle of a post stops before the next message. Switching On again resumes at the next unposted message, so no message repeats. Each off-then-on cycle during a post costs that sim one claim attempt, and a row stops being claimed at 5 attempts.
+6. **Title override.** Before a sim finishes, set its thread name with `php ibl5/scripts/simRecapQueue.php publish-title --sim=N --title="..."`. Use `--clear` in place of `--title` to remove it. The title must be 1 to 100 characters.
+7. **Recovery.** A row whose `attempts` reached 5 is never claimed again. Reset it with `php ibl5/scripts/simRecapQueue.php publish-enqueue --sim=N --retry`. It prints `not found or finished` and exits 1 for a missing or finished row. A reset row resumes after the last posted step. To see what a sim would post without posting it, run `publish-script --sim=N`.
 
 ## 10. Free Agent Prep Report (faprep.php)
 

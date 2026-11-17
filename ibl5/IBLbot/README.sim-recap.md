@@ -21,6 +21,17 @@ Two directions of I/O:
 
 Whitespace around a value is trimmed, so a variable holding only spaces counts as empty.
 
+## Commissioner switch
+
+Two switches must both be on before anything posts:
+
+1. `SIM_RECAP_PUBLISH_TARGET`, the deploy-level setting in IBLbot's environment file.
+2. The League Control Panel setting "Sim recap Discord posting" (`ibl_settings` key `Sim Recap Discord Posting`, default Off).
+
+The sweeper calls `POST sim-recap-publish/enabled` before each claim, and the publisher calls it before each step. Any failure to read the answer counts as off: a non-2xx status, a malformed body, or a network error. Switching posting off in the middle of a sim stops the run before the next message, and the message already sent keeps its progress row. Switching it back on resumes at `last_step + 1`.
+
+The server applies the same switch inside `claim-next`, which answers 204 and spends no attempt while the switch is off. The bot-side check covers a PHP deploy that has not shipped the `enabled` route yet: the read gets a 404 and the bot stays silent.
+
 ## Sweeper and poke
 
 `createSweeper` in `src/sim-recap/sweeper.ts` runs one sweep at startup and then every 300 seconds (`SWEEP_INTERVAL_MS`). A sweep asks `claim-next` for a sim, posts it, and asks again until the API answers 204. Only one sweep runs at a time. A sweep that overlaps another returns at once.

@@ -123,6 +123,26 @@ jobs:
       working-directory: ibl5
       run: mysql -h 127.0.0.1 -u root -proot ibl5 < tests/DatabaseIntegration/Fixtures/db-seed.sql
 
+    - name: Clone per-thread test databases
+      if: steps.changes.outputs.skip == 'false'
+      # Infection runs 4 threads ("threads": 4 in ibl5/infection.json5) and
+      # exports TEST_TOKEN=1..4 to each mutant process. With
+      # INFECTION_PER_THREAD_DATABASE set, DatabaseNameResolver sends thread N
+      # to ibl5_tN, so threads never share rows, locks or committed fixtures.
+      # The dump runs inside the service container, so client and server
+      # versions always match.
+      run: |
+        set -euo pipefail
+        docker exec "${{ job.services.mariadb.id }}" mariadb-dump -uroot -proot --routines --triggers --events ibl5 > /tmp/ibl5-seeded.sql
+        want=$(mysql -h 127.0.0.1 -u root -proot -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='ibl5'")
+        if [ "$want" -eq 0 ]; then echo "::error::seeded ibl5 has no tables to clone"; exit 1; fi
+        for t in 1 2 3 4; do
+          mysql -h 127.0.0.1 -u root -proot -e "DROP DATABASE IF EXISTS ibl5_t$t; CREATE DATABASE ibl5_t$t"
+          docker exec -i "${{ job.services.mariadb.id }}" mariadb -uroot -proot "ibl5_t$t" < /tmp/ibl5-seeded.sql
+          got=$(mysql -h 127.0.0.1 -u root -proot -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='ibl5_t$t'")
+          if [ "$got" != "$want" ]; then echo "::error::ibl5_t$t has $got tables, want $want"; exit 1; fi
+        done
+
     - name: Generate coverage
       if: steps.changes.outputs.skip == 'false'
       working-directory: ibl5
@@ -143,10 +163,21 @@ jobs:
     - name: Run Infection on diff
       if: steps.changes.outputs.skip == 'false'
       working-directory: ibl5
+      env:
+        DB_HOST: 127.0.0.1
+        DB_USER: root
+        DB_PASS: root
+        DB_NAME: ibl5
+        INFECTION_PER_THREAD_DATABASE: '1'
       run: |
         # Do not set git config for diff paths here: a relative diff makes
         # Infection match no source file and pass with zero mutants (M5 in
         # bin/check-composite-contracts; ADR-0145 addendum).
+        # Infection builds every per-mutant config from ibl5/phpunit.xml and
+        # ignores --configuration in testFrameworkOptions. Copy the mutation
+        # config over it so mutant runs execute the database group and skip
+        # discord-live and mutation-unsafe. Runner-local overwrite only.
+        cp phpunit-mutation.xml phpunit.xml
         vendor/bin/infection \
           --configuration=infection.json5 \
           --coverage=coverage \

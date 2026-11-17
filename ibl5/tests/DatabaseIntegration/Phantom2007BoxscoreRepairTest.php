@@ -31,6 +31,7 @@ use PHPUnit\Framework\Attributes\Group;
  * @see Phantom2007BoxscoreRepair The class under test
  */
 #[Group('database')]
+#[Group('mutation-unsafe')]
 final class Phantom2007BoxscoreRepairTest extends DatabaseTestCase
 {
     /** Sim ID for ibl_sim_game_recaps; FK-constrained to ibl_sim_summaries. */

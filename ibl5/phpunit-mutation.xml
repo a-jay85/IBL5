@@ -16,7 +16,13 @@
     3. Its <testsuites> list every phpunit.xml testsuite path except the
        MUTATION_PARITY_EXEMPT entries in bin/check-xml-class-refs, which fails CI
        when a path is missing here. <source> parity is not checked (see 2).
-  Used only by the CI mutation workflow's coverage-generation step.
+  Used by both mutation workflows. The coverage step passes it with
+  the configuration flag. Each Infection step copies it over phpunit.xml first,
+  because Infection builds every per-mutant config from
+  <phpUnit.configDir>/phpunit.xml (TestFrameworkConfigLocator) and ignores
+  the configuration flag in testFrameworkOptions. Excludes discord-live and
+  mutation-unsafe; ibl5/bin/check-xml-class-refs enforces both and fails
+  if the database group is ever excluded here.
 -->
 <phpunit bootstrap="tests/bootstrap.php"
          colors="true"
@@ -339,7 +345,17 @@
             <directory>tests/Http</directory>
         </testsuite>
     </testsuites>
-    <!-- No <groups><exclude> — DB integration tests run for repository coverage -->
+    <!-- Runs the database group. Both Infection steps copy this file over
+         phpunit.xml for every mutant run, so these excludes apply there too. -->
+    <groups>
+        <exclude>
+            <!-- Really posts to Discord. Must never run under Infection. -->
+            <group>discord-live</group>
+            <!-- Commits or opens its own connection; a repeat run in one
+                 per-thread database would fail and fake-kill mutants. -->
+            <group>mutation-unsafe</group>
+        </exclude>
+    </groups>
     <source>
         <include>
             <directory>classes</directory>

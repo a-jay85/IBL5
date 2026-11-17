@@ -24,6 +24,7 @@ use Waivers\WaiversTeamLockRepository;
  * is empty again.
  */
 #[Group('database')]
+#[Group('mutation-unsafe')]
 class WaiversTwoConnectionSubmitRaceTest extends DatabaseTestCase
 {
     private const TEST_PID_BASE = 200070300;

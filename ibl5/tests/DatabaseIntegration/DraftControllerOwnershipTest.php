@@ -23,6 +23,7 @@ use Tests\Clock\FixedClock;
  * a GM can land a pick only for a slot their team currently owns.
  */
 #[Group('database')]
+#[Group('mutation-unsafe')]
 class DraftControllerOwnershipTest extends DatabaseTestCase
 {
     private const YEAR = 2098;

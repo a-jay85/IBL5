@@ -17,6 +17,7 @@ use PHPUnit\Framework\Attributes\Group;
  * together with its rows in the migration's backup table.
  */
 #[Group('database')]
+#[Group('mutation-unsafe')]
 final class BoxScoreTeamNameBackfillMigrationTest extends DatabaseTestCase
 {
     private const SEASON = 1950;

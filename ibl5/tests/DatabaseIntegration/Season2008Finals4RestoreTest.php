@@ -22,6 +22,7 @@ use PHPUnit\Framework\Attributes\Group;
  * @see Season2008Finals4Restore The class under test
  */
 #[Group('database')]
+#[Group('mutation-unsafe')]
 final class Season2008Finals4RestoreTest extends DatabaseTestCase
 {
     private const EXPECTED_TEAM_ROWS   = 2;

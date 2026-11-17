@@ -1,6 +1,6 @@
 ---
 description: A SKILL.md quotes `$ARGUMENTS` exactly once, in a `<user_request>` block near the top, and refers to it as "the request" elsewhere; enforced by `bin/check-skill-arguments`.
-last_verified: 2026-09-17
+last_verified: 2026-11-17
 ---
 
 # ADR-0130: SKILL.md quotes `$ARGUMENTS` exactly once

@@ -25,6 +25,7 @@ use Season\Season;
  * uses manual tearDown cleanup like TradeProcessorIntegrationTest.
  */
 #[Group('database')]
+#[Group('mutation-unsafe')]
 class TradeExecutionServiceIntegrationTest extends DatabaseTestCase
 {
     private TradeExecutionService $service;

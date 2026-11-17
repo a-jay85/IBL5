@@ -28,6 +28,7 @@ use Updater\Steps\RefreshTeamSeasonRecordsStep;
  * intentional for the empty-source boundary tests.
  */
 #[Group('database')]
+#[Group('mutation-unsafe')]
 class RefreshMaterializedRecordsStepTest extends DatabaseTestCase
 {
     // -------------------------------------------------------------------------

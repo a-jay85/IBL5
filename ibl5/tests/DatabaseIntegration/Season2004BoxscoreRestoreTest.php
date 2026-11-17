@@ -40,6 +40,7 @@ use PHPUnit\Framework\Attributes\Group;
  * @see PhantomBoxscoreRepairTest Sister test for the 2008 phantom repair
  */
 #[Group('database')]
+#[Group('mutation-unsafe')]
 final class Season2004BoxscoreRestoreTest extends DatabaseTestCase
 {
     /** Number of phantom player rows seeded by the fixture (scaled down from production 24). */

@@ -18,12 +18,24 @@ export interface EnabledSimRecapSettings {
     apiBaseUrl: string;
     apiKey: string;
     giphyKey: string;
+    /** #errors webhook for failure alerts. Absent means alerts are logged only. Never log it. */
+    errorsWebhookUrl?: string;
 }
 
 export type SimRecapSettings = { enabled: false } | EnabledSimRecapSettings;
 
 function read(env: NodeJS.ProcessEnv, key: string): string {
     return (env[key] ?? '').trim();
+}
+
+function readErrorsWebhookUrl(env: NodeJS.ProcessEnv, warn: (line: string) => void): { errorsWebhookUrl?: string } {
+    const value = read(env, 'SIM_RECAP_ERRORS_WEBHOOK_URL');
+    if (value === '') return {};
+    if (!value.startsWith('https://')) {
+        warn('sim-recap: SIM_RECAP_ERRORS_WEBHOOK_URL is not an https URL; failure alerts are logged only');
+        return {};
+    }
+    return { errorsWebhookUrl: value };
 }
 
 export function loadSimRecapSettings(
@@ -82,5 +94,6 @@ export function loadSimRecapSettings(
         apiBaseUrl,
         apiKey,
         giphyKey: read(env, 'GIPHY_API_KEY'),
+        ...readErrorsWebhookUrl(env, warn),
     };
 }

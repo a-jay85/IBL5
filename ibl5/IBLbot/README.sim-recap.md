@@ -15,6 +15,7 @@ Two directions of I/O:
 | `SIM_RECAP_PUBLISH_TARGET` | Publisher disabled | `prod` posts to the prod guild and the fixed `#live-sims` and `#injuries` channels, with mentions live. `testing` posts to the testing guild and strips every mention. Any other value logs a warning and disables the publisher |
 | `SIM_RECAP_TEST_CHANNEL_ID` | Ignored for `prod`. With `testing`, logs a warning and disables the publisher | The one channel that receives both the `#live-sims` and `#injuries` posts when the target is `testing` |
 | `SIM_RECAP_API_KEY` | Logs a warning and disables the publisher | A service-tier `ibl_api_keys` key (any tier other than `standard`). A standard key gets a 403 from every route |
+| `SIM_RECAP_ERRORS_WEBHOOK_URL` | Failure alerts go to the bot log only, and the bot logs one line saying so at startup | The #errors channel webhook. The publisher posts one alert per sim and failure kind: a sweep crash, a step that gave up after its retries, or a sim stuck at the same step for three sweeps. A value that does not start with `https://` logs a warning and is ignored. The bot never logs this URL |
 | `GIPHY_API_KEY` | The closing GIF is skipped and the log says `GIPHY_API_KEY unset; skipping GIF`. The drip still finishes | Used for the GIF search. A failed or empty search also skips the GIF |
 
 `API_BASE_URL` is shared with the rest of IBLbot and is the base for the three routes. An empty value disables the publisher. IBLbot's own `src/config.ts` also requires it, so IBLbot does not start without it.
@@ -47,6 +48,10 @@ Each process makes one UUID at startup and uses it as the claim token. A restart
 A crash between a Discord post and its `progress` call leaves `lastStep` one behind. Before it posts the first pending step, the publisher reads the bot's own latest message in the target channel. When that message matches the step (the same text, or any `https://` link for the GIF step), it counts the step as posted and does not send it again. For the thread-start step it also reuses a thread that already exists on that message. Only the first pending step is checked.
 
 The thread name is cut to 100 characters. Every message goes out with `parse: []`, so only the user ids and the one role id listed on the step can ping.
+
+## Failure alerts
+
+The bot keeps its alert history in memory. A restart clears it, so a failure that is still live alerts once more after a restart. Alerts never mention anyone (ADR-0254). A failed webhook post is logged by error class or HTTP status and never stops publishing. On the PHP side, a failed enqueue in the `notify` verb and a failed poke both log at error level, and the existing #errors handler posts them.
 
 ## Dry run
 

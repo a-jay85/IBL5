@@ -81,4 +81,56 @@ describe('loadSimRecapSettings', () => {
             giphyKey: '',
         });
     });
+
+    describe('errors webhook', () => {
+        const PROD = { SIM_RECAP_PUBLISH_TARGET: 'prod', SIM_RECAP_API_KEY: 'k', API_BASE_URL: 'https://api.test' };
+
+        it('errors webhook unset keeps the publisher enabled with no warning', () => {
+            const warn = vi.fn();
+
+            const settings = loadSimRecapSettings({ ...PROD }, warn);
+
+            expect(settings.enabled).toBe(true);
+            expect('errorsWebhookUrl' in settings).toBe(false);
+            expect(warn).not.toHaveBeenCalled();
+        });
+
+        it('errors webhook empty or blank keeps the publisher enabled with no warning', () => {
+            for (const value of ['', '   ']) {
+                const warn = vi.fn();
+
+                const settings = loadSimRecapSettings({ ...PROD, SIM_RECAP_ERRORS_WEBHOOK_URL: value }, warn);
+
+                expect(settings.enabled).toBe(true);
+                expect('errorsWebhookUrl' in settings).toBe(false);
+                expect(warn).not.toHaveBeenCalled();
+            }
+        });
+
+        it('errors webhook without https warns without echoing the value', () => {
+            for (const value of ['http://discord.com/api/webhooks/1/abc', 'discord.com/api/webhooks/1/abc']) {
+                const warn = vi.fn();
+
+                const settings = loadSimRecapSettings({ ...PROD, SIM_RECAP_ERRORS_WEBHOOK_URL: value }, warn);
+
+                expect(settings.enabled).toBe(true);
+                expect('errorsWebhookUrl' in settings).toBe(false);
+                expect(warn).toHaveBeenCalledTimes(1);
+                expect(String(warn.mock.calls[0]?.[0])).not.toContain('api/webhooks');
+            }
+        });
+
+        it('errors webhook https value is returned on enabled settings', () => {
+            const warn = vi.fn();
+
+            const settings = loadSimRecapSettings(
+                { ...PROD, SIM_RECAP_ERRORS_WEBHOOK_URL: 'https://discord.com/api/webhooks/1/abc' },
+                warn,
+            );
+
+            expect(settings.enabled).toBe(true);
+            expect(settings.enabled && settings.errorsWebhookUrl).toBe('https://discord.com/api/webhooks/1/abc');
+            expect(warn).not.toHaveBeenCalled();
+        });
+    });
 });

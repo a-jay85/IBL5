@@ -1,6 +1,6 @@
 ---
 description: Production operations runbook covering deploy, rollback, DB restore, sim-file recovery, logs, secrets, sim recap hosting, the sim recap Discord publisher, data retention and account deletion, the admin-only faprep.php report, and running the app without the Claude Code harness.
-last_verified: 2026-11-16
+last_verified: 2026-11-17
 ---
 
 # IBL5 Operations Runbook
@@ -567,6 +567,15 @@ zcat dump.sql.gz | sed -n '/^-- Table structure for table `auth_users_audit_log`
 ## Sim recap Discord publisher
 
 IBLbot posts each finished Regular Season sim into Discord as a slow drip. Prod enqueues the sim from the `notify` verb and pokes IBLbot. The PHP side is in `ibl5/classes/SimRecap/README.md` and the IBLbot side is in `ibl5/IBLbot/README.sim-recap.md`. The publisher stays off until `SIM_RECAP_PUBLISH_TARGET` is set.
+
+Publisher failures go to #errors. To turn on the bot's alerts after this change deploys:
+
+1. On the prod box, open the prod `logging.config.php` and copy the #errors webhook URL the error handler already uses. Never paste it into chat, a ticket, or a commit.
+2. Add `SIM_RECAP_ERRORS_WEBHOOK_URL=<that URL>` to the prod IBLbot `.env`.
+3. Restart the bot with `pm2 restart <name>`, using the IBLbot name that `pm2 list` shows.
+4. Read the bot's startup log. The line `SIM_RECAP_ERRORS_WEBHOOK_URL is not set` must be absent.
+
+Without the key the bot logs failures only, as before.
 
 1. **Discord permissions for IBLbot.** In `#live-sims`: View Channel, Send Messages, Create Public Threads, Send Messages in Threads, Read Message History, and Embed Links. Add a channel-level grant of Mention @everyone, @here, and All Roles so the `@IBL` ping works. The bot sends with `allowed_mentions` set to `parse: []`, which still blocks `@everyone`. In `#injuries`: View Channel, Send Messages, and Read Message History.
 2. **Service-tier API key.** Issue a key for `SIM_RECAP_API_KEY` the way the bug-bot key is issued: a row in `ibl_api_keys` with a rate-limit tier of `elevated` or `unlimited`. A `standard` key gets a 403 from every publisher route. Put the key in IBLbot's environment file on the prod box.

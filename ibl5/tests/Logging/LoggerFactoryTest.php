@@ -9,6 +9,7 @@ use Logging\LoggerFactory;
 use Logging\PiiRedactionProcessor;
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\RotatingFileHandler;
+use Monolog\Handler\StreamHandler;
 use Monolog\Handler\TestHandler;
 use Monolog\Logger;
 use PHPUnit\Framework\TestCase;
@@ -210,6 +211,34 @@ class LoggerFactoryTest extends TestCase
         );
 
         $this->assertCount(0, $discordHandlers);
+    }
+
+    public function testFromConfigCliEchoDefaultsToStdout(): void
+    {
+        $this->assertSame(['php://stdout'], $this->cliStreamUrls(LoggerFactory::fromConfig()));
+    }
+
+    public function testFromConfigCliEchoUsesGivenStream(): void
+    {
+        $this->assertSame(['php://stderr'], $this->cliStreamUrls(LoggerFactory::fromConfig('php://stderr')));
+    }
+
+    /**
+     * @return list<string|null>
+     */
+    private function cliStreamUrls(LoggerFactory $factory): array
+    {
+        /** @var Logger $logger */
+        $logger = $factory->channel('app');
+
+        $urls = [];
+        foreach ($logger->getHandlers() as $handler) {
+            if ($handler instanceof StreamHandler && !$handler instanceof RotatingFileHandler) {
+                $urls[] = $handler->getUrl();
+            }
+        }
+
+        return $urls;
     }
 
     public function testFromConfigIncludesPiiRedactionProcessor(): void

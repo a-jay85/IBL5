@@ -49,6 +49,27 @@ const MAX_RATE_LIMIT_RETRIES = 3;
 const DEFAULT_RETRY_AFTER_MS = 5000;
 const THREAD_NAME_LIMIT = 100;
 
+/** A step failed for good: a non-429 error, or a 429 after MAX_RATE_LIMIT_RETRIES retries. */
+export class StepGaveUpError extends Error {
+    readonly sim: number;
+    readonly stepIndex: number;
+    readonly stepKind: PublishStep['kind'];
+    readonly original: unknown;
+
+    constructor(sim: number, step: PublishStep, original: unknown) {
+        super(original instanceof Error ? original.message : 'unknown error');
+        this.name = 'StepGaveUpError';
+        this.sim = sim;
+        this.stepIndex = step.index;
+        this.stepKind = step.kind;
+        this.original = original;
+    }
+}
+
+interface StepCursor {
+    step: PublishStep | null;
+}
+
 function isRateLimited(error: unknown): boolean {
     return typeof error === 'object' && error !== null && (error as { status?: unknown }).status === 429;
 }
@@ -97,10 +118,11 @@ async function postingAllowed(deps: PublisherDeps): Promise<boolean> {
     return deps.postingEnabled().then((on) => on === true, () => false);
 }
 
-export async function runPublish(
+async function publishSteps(
     claim: PublishClaim,
     target: PublishTarget,
     deps: PublisherDeps,
+    cursor: StepCursor,
 ): Promise<'finished' | 'lost-claim' | 'stopped'> {
     const { sim, script } = claim;
     let threadId = claim.threadId;
@@ -108,6 +130,7 @@ export async function runPublish(
 
     for (const step of script.steps) {
         if (step.index <= claim.lastStep) continue;
+        cursor.step = step;
 
         await deps.sleep(step.delayBeforeMs);
 
@@ -162,6 +185,9 @@ export async function runPublish(
             await withRateLimitRetry(() => deps.send(channelId, step.content, allowed), deps);
         }
 
+        // The Discord post is done. A failure in the progress call is an API failure, not a
+        // Discord give-up, so it must not surface as a StepGaveUpError.
+        cursor.step = null;
         const accepted = await deps.progress(sim, step.index, threadId);
         if (!accepted) {
             deps.log(`sim-recap: claim lost at step ${step.index}`);
@@ -169,9 +195,24 @@ export async function runPublish(
         }
     }
 
+    cursor.step = null;
     const finished = await deps.finish(sim);
     if (!finished) {
         deps.log('sim-recap: finish refused');
     }
     return 'finished';
+}
+
+export async function runPublish(
+    claim: PublishClaim,
+    target: PublishTarget,
+    deps: PublisherDeps,
+): Promise<'finished' | 'lost-claim' | 'stopped'> {
+    const cursor: StepCursor = { step: null };
+    try {
+        return await publishSteps(claim, target, deps, cursor);
+    } catch (error) {
+        if (cursor.step === null) throw error;
+        throw new StepGaveUpError(claim.sim, cursor.step, error);
+    }
 }

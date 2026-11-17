@@ -61,6 +61,10 @@ regexes = [
   # tests/DatabaseIntegration/SimRecap/SimRecapQueuePublishCliTest.php).
   '''0b6f3f0e-6f43-4f0c-9d1a-2c3b4d5e6f70''',
 
+  # Fake poke-failure message in tests/SimRecap/PublishEnqueuerTest.php. The
+  # .invalid TLD never resolves; the test asserts this text never reaches a log.
+  '''http://secret-host\.invalid:9999/simRecapPublish''',
+
   # Owner's Discord user ID passed as the DM target in bin/test-events-review.
   # A public user ID (also hardcoded as OWNER_ID in bin/discord-dm), not a
   # credential; the DISCORD_DM_TO= prefix trips discord-client-id.

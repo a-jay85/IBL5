@@ -774,3 +774,34 @@ func TestToBundlePlayer_CopiesRealLifePF(t *testing.T) {
 		t.Errorf("bundle JSON lacks \"rl_pf\":37: %s", raw)
 	}
 }
+
+// TestComputeLeagueRate48_J18Filter: only j18Eligible players feed the league
+// per-48 rates. Record 960, MIN == 2×GP (strict > excludes it) and a blank
+// name are all excluded; an all-ineligible population returns nil.
+func TestComputeLeagueRate48_J18Filter(t *testing.T) {
+	mk := func(rec int, name string, gp, min, pf, tov, fta, fga int) PlrPlayer {
+		return PlrPlayer{
+			RecordIndex: rec, Name: name, RealLifeGP: gp, RealLifeMIN: min,
+			RealLifePF: pf, RealLifeTVR: tov, RealLifeFTA: fta, RealLifeFGA: fga,
+		}
+	}
+	eligible := mk(1, "Eligible", 70, 2400, 180, 140, 300, 1000)
+	players := []PlrPlayer{
+		eligible,
+		mk(960, "Past Scan", 70, 2400, 999, 999, 999, 999),
+		mk(2, "Boundary", 60, 120, 999, 999, 999, 999),
+		mk(3, "", 70, 2400, 999, 999, 999, 999),
+	}
+	got := computeLeagueRate48(players)
+	if got == nil {
+		t.Fatal("computeLeagueRate48 = nil, want the eligible player's rates")
+	}
+	want := func(sum int) float64 { return float64(sum) / float64(2400) * 48 }
+	if got.PF != want(180) || got.TOV != want(140) || got.FTA != want(300) || got.FGA != want(1000) {
+		t.Errorf("rates = %+v, want PF %v TOV %v FTA %v FGA %v",
+			*got, want(180), want(140), want(300), want(1000))
+	}
+	if r := computeLeagueRate48(players[1:]); r != nil {
+		t.Errorf("no eligible player: computeLeagueRate48 = %+v, want nil", *r)
+	}
+}

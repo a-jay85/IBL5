@@ -226,6 +226,20 @@ type Bundle struct {
 	// zero entry (unwired bundle) makes the matched term reduce to DefAST48·0.8·
 	// fatigue — a graceful degrade, no divide-by-zero.
 	LeagueAST48ByPos [6]float64 `json:"league_ast48_by_pos"`
+	// LeagueRate48 carries the league PF/TOV/FTA/FGA per-48-player-minute rates
+	// over the same J18 population (backup.computeLeagueRate48). The sim reads
+	// static pins (sim/bucketweights.go); this field lets a committed real-life
+	// fixture re-prove those pins in CI. nil (and omitted) on rating-only bundles.
+	LeagueRate48 *LeagueRate48 `json:"league_rate48,omitempty"`
+}
+
+// LeagueRate48 is the league per-48-player-minute rate row set: PF/48, TOV/48,
+// FTA/48 and total FGA/48 (3GA+2PA, CEngine+0x6668).
+type LeagueRate48 struct {
+	PF  float64 `json:"pf48"`
+	TOV float64 `json:"tov48"`
+	FTA float64 `json:"fta48"`
+	FGA float64 `json:"fga48"`
 }
 
 // Validation errors surfaced at the contract boundary.

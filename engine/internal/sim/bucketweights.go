@@ -93,6 +93,9 @@ const (
 	// dynamic league table is a tracked follow-up, not this change.
 	d70LeagueScalar = 0.6472241372826754
 
+	// C+0x6668: league FGA/48 (3GA+2PA), J18 filter, current-season .plr; proven by TestRealLifeFixture_LeagueCalibration
+	leagueFGA48 = 25.035101086336688
+
 	// +0xD90 Branch-A pinned constants (COMPOSITE_DOUBLES_TRACE.md §5): the 0.5
 	// (_DAT_00669ef0) and 0.25 (_DAT_00669f58) factors in the make-share weighting.
 	d90MakeShareHalf    = 0.5

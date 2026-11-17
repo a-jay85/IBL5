@@ -162,6 +162,12 @@ const (
 	// the faithful #952 basis.
 	andOneBucketFloor = 0.03
 
+	// D78 block memory operands (asm 4d45ff-4d4640). 0x669ef0 (0.5) and
+	// 0x669f58 (0.25) reuse d90MakeShareHalf and d90MakeShareQuarter.
+	dat66be10 = 0.001 // _DAT_0066be10 = 0.001 (PE read, 0x66d318 = 0.2 calibrated)
+	dat66c7d8 = 0.05  // _DAT_0066c7d8 = 0.05 (PE read, 0x66d318 = 0.2 calibrated)
+	dat669ae8 = 0.02  // _DAT_00669ae8 = 0.02 (PE read, 0x66d318 = 0.2 calibrated)
+
 	// andOneMadeRateScale maps the player's FGP rating to a made-rate proxy for the
 	// and-one stand-in (a small minority of scoring plays). Unchanged from #952.
 	andOneMadeRateScale = 0.0008
@@ -183,6 +189,51 @@ const (
 // evidence and the open decompile-identity caveat. Callers guard minutes > 0.
 func per48Min(stat, minutes int) float64 {
 	return float64(stat) / float64(minutes) * 48.0
+}
+
+// db8Rate is the +0xDB8 per-48 offensive-rebound rate, extracted from
+// twoPtBucketWeight: ORB/MIN×48 with real-life minutes, else the rating stand-in.
+func db8Rate(p onCourt) float64 {
+	if p.RealLifeMIN > 0 {
+		return per48Min(p.RealLifeORB, p.RealLifeMIN)
+	}
+	return floor1(p.ORB) * orbRateScale
+}
+
+// d70Rate is the +0xD70 FTA-weighted rate, extracted from twoPtBucketWeight:
+// FTA/MIN×48 × d70LeagueScalar with real-life minutes, else the rating stand-in.
+func d70Rate(p onCourt) float64 {
+	if p.RealLifeMIN > 0 {
+		return per48Min(p.RealLifeFTA, p.RealLifeMIN) * d70LeagueScalar
+	}
+	return floor1(p.FTA) * ftaRateScale
+}
+
+// d78Composite is player +0xD78 (asm 4d45af-4d4662):
+//
+//	d70 − (d70/d90)·db8·(0.5·d88/(db8+d88) + 0.25) − (2P‰·0.001·d88·0.05 + da8·0.02)
+//
+// with d90 = twoPtBucketWeight and da8 = threePtBucketWeight. Both guards
+// (db8+d88 > 0 at 4d45da, d90 > 0 at 4d45eb-4d45fd) send ≤0 or NaN to the
+// else-0 store. Rookies (RealLifeMIN == 0) take JSB's else-0 branch: their
+// divides yield NaN and fail both guards. When d88+d70 <= 0, JSB skips the
+// +0xD90 store and keeps a prior value the trace could not confirm; this port
+// returns 0 there.
+func d78Composite(p onCourt) float64 {
+	if p.RealLifeMIN <= 0 {
+		return 0
+	}
+	d88, db8, d70 := twoPARate(p), db8Rate(p), d70Rate(p)
+	if d88+d70 <= 0 {
+		return 0 // JSB skips the +0xD90 store here; see the doc comment
+	}
+	d90 := twoPtBucketWeight(p)
+	if !(db8+d88 > 0) || !(d90 > 0) {
+		return 0
+	}
+	m := d88/(db8+d88)*d90MakeShareHalf + d90MakeShareQuarter
+	t := float64(p.D60)*dat66be10*d88*dat66c7d8 + threePtBucketWeight(p)*dat669ae8
+	return d70 - (d70/d90)*db8*m - t
 }
 
 // twoPARate is the +0xD88 per-48 two-point-attempt rate (2PA = FGA − 3GA),
@@ -230,15 +281,7 @@ func twoPARate(p onCourt) float64 {
 // 0.6-floored foul bucket a realistic minority share and field-goal attempts the
 // majority path.
 func twoPtBucketWeight(p onCourt) float64 {
-	d88 := twoPARate(p)
-	var db8, d70 float64
-	if p.RealLifeMIN > 0 {
-		db8 = per48Min(p.RealLifeORB, p.RealLifeMIN)
-		d70 = per48Min(p.RealLifeFTA, p.RealLifeMIN) * d70LeagueScalar
-	} else {
-		db8 = floor1(p.ORB) * orbRateScale
-		d70 = floor1(p.FTA) * ftaRateScale
-	}
+	d88, db8, d70 := twoPARate(p), db8Rate(p), d70Rate(p)
 	// Guard both composite divisions. The real-rate path can yield d88 == 0 (a
 	// player who took no FGs) where the stand-in's floor1 always made d88 > 0; with
 	// d88 == 0 the faithful composite limit is d88 (the subtracted term carries d88

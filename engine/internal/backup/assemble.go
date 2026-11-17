@@ -50,6 +50,21 @@ func floor1AST(r int) float64 {
 // pin-20260712.md, exact-reproduction pin 19.78050919336985, n=376).
 const leagueShotBaselineMaxRecordIndex = 959
 
+// teamDF0 is the team +0xDF0 defensive-foul aggregate (asm 4d4c19-4d4c32):
+// ΣPF / D × 48, where D is the integer ΣMIN/5 (the 0x66666667 truncating
+// divide at 4d490b-4d4942) over the team's full roster with no MIN filter. The
+// per-player f projection is 1.00 at the default fields, so (2-f) and the
+// __ftol(PF·f) step are identities and drop out. D == 0 (no real-life minutes)
+// is undefined in JSB, so the team gets nil and the sim keeps its rating path.
+func teamDF0(sumPF, sumMIN int) *float64 {
+	d := sumMIN / 5
+	if d > 0 {
+		df0 := float64(sumPF) / float64(d) * 48
+		return &df0
+	}
+	return nil
+}
+
 // j18Eligible is the J18 league-table population filter shared by every
 // league rate assembled from raw .plr records: the record sits within the scan
 // (RecordIndex ≤ leagueShotBaselineMaxRecordIndex), carries a non-empty Name,
@@ -438,7 +453,7 @@ func ToBundle(players []PlrPlayer, sched []SchGame, opts AssembleOptions) (bundl
 	bundlePlayers := make([]bundle.Player, 0, len(players))
 	// Accumulate each team's Σ season GP/DRB/AST over its player rows — the faithful
 	// JSB team-rate inputs (see teamDRBRateBase). Keyed by TeamID.
-	type rateAcc struct{ gp, drb, ast int }
+	type rateAcc struct{ gp, drb, ast, pf, min int }
 	rates := make(map[int]*rateAcc, 32)
 	for _, p := range players {
 		rosterTeams[p.TeamID] = true
@@ -451,6 +466,8 @@ func ToBundle(players []PlrPlayer, sched []SchGame, opts AssembleOptions) (bundl
 		ra.gp += p.SeasonGP
 		ra.drb += p.SeasonDRB
 		ra.ast += p.SeasonAST
+		ra.pf += p.RealLifePF
+		ra.min += p.RealLifeMIN
 	}
 
 	scheduleTeams := make(map[int]bool, 32)
@@ -483,6 +500,9 @@ func ToBundle(players []PlrPlayer, sched []SchGame, opts AssembleOptions) (bundl
 		if ra := rates[id]; ra != nil && ra.gp > 0 {
 			t.DRBRate = float64(ra.drb) / float64(ra.gp) * teamDRBRateBase
 			t.ASTRate = float64(ra.ast) / float64(ra.gp) * teamASTRateBase
+		}
+		if ra := rates[id]; ra != nil {
+			t.DF0 = teamDF0(ra.pf, ra.min)
 		}
 		teams = append(teams, t)
 	}

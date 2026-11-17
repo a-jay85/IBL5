@@ -64,6 +64,10 @@ type Team struct {
 	Name    string  `json:"name"`
 	DRBRate float64 `json:"drb_rate"`
 	ASTRate float64 `json:"ast_rate"`
+	// DF0 is the team +0xDF0 defensive-foul aggregate ΣPF/D×48 (D = integer
+	// ΣMIN/5 over the full roster, backup.teamDF0). nil when the roster has no
+	// real-life minutes; the sim then keeps the rating-path bucket-3 weight.
+	DF0 *float64 `json:"df0,omitempty"`
 }
 
 // Player carries the source-of-truth ratings from ibl_plr plus depth-chart

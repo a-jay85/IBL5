@@ -56,7 +56,11 @@ class LoggerFactory implements LoggerFactoryInterface
         self::$instance = $this;
     }
 
-    public static function fromConfig(): self
+    /**
+     * @param string $cliStream Where CLI runs echo Info+ records. A script whose stdout
+     *                          is a machine-read contract (JSON) passes 'php://stderr'.
+     */
+    public static function fromConfig(string $cliStream = 'php://stdout'): self
     {
         $configPath = AppPaths::configDir() . '/logging.config.php';
         $examplePath = AppPaths::configDir() . '/logging.config.example.php';
@@ -94,7 +98,7 @@ class LoggerFactory implements LoggerFactoryInterface
         $handlers = [$handler];
 
         if (PHP_SAPI === 'cli') {
-            $cliHandler = new StreamHandler('php://stdout', Level::Info);
+            $cliHandler = new StreamHandler($cliStream, Level::Info);
             $handlers[] = $cliHandler;
         }
 

@@ -60,8 +60,9 @@ require_once __DIR__ . '/../db/db.php';
 
 // CLI runs skip ConfigBootstrap, and LoggerFactory::getChannel() falls back to a
 // NullHandler without this call. It routes error records to the #errors handler.
+// The CLI echo goes to STDERR: stdout carries the verb's JSON result.
 try {
-    \Logging\LoggerFactory::fromConfig();
+    \Logging\LoggerFactory::fromConfig('php://stderr');
 } catch (\Throwable) {
     fwrite(STDERR, "simRecapQueue: logger config failed; error logs go to STDERR only\n");
 }

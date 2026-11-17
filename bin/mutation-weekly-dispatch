@@ -1,0 +1,175 @@
+#!/usr/bin/env python3
+"""Gate for the weekly mutation dispatcher (.github/workflows/mutation-weekly-dispatch.yml).
+
+Runs on each dispatcher tick and decides whether to start this week's
+mutation.yml run on master.
+
+Decisions:
+  Window    Sunday 03:00 Pacific is the earliest start. A tick that fires earlier
+            waits until exactly 03:00 when that is at most 5 hours away, then
+            re-queries. A start from 03:00 to 07:00 is the primary run. A start
+            from 07:00 to 20:00 is a catch-up run. From 20:00 Pacific on, the
+            tick skips. All time math uses zoneinfo America/Los_Angeles, so PST
+            and PDT need no second cron set.
+  Dedupe    The week is the Pacific Sunday on or after now, from 00:00 Pacific.
+            A tick skips while any mutation.yml run on master is live, because a
+            dispatch would cancel it (cancel-in-progress: true). A tick also
+            skips when the week already holds a schedule-event run or a run that
+            github-actions[bot] dispatched, under any conclusion. A completed
+            run that a human dispatched does not suppress the week.
+  MWD_NOW   Unset uses the real clock. Set but empty exits 2. When set, it is
+            the fake clock, and sleep() advances it instead of blocking.
+  Exit      0 decided, 1 gh failure or a dispatch that never became visible
+            (fail closed), 2 usage error.
+
+Flags: --repo=OWNER/NAME (required), --dry-run (decide, never dispatch or sleep),
+--check-workflows=DIR (validate the workflow files, see check_workflows).
+"""
+import json, math, os, subprocess, sys, time
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
+
+LA = ZoneInfo("America/Los_Angeles")
+UTC = timezone.utc
+OPEN_HOUR = 3  # earliest start, Sunday Pacific
+PRIMARY_END_HOUR = 7  # last start that still finishes a 2h run by 9am
+CUTOFF_HOUR = 20  # catch-up starts stop at Sunday 8pm Pacific
+MAX_SLEEP_SECONDS = 18000  # 5h; W1 pins timeout-minutes*60 >= this + 900
+BOT_LOGIN = "github-actions[bot]"
+LIVE_STATUSES = ("queued", "in_progress", "waiting", "pending", "requested")
+VISIBLE_POLL_SECONDS = 10
+VISIBLE_TIMEOUT_SECONDS = 120
+
+
+def die(code, msg):
+    print(f"mutation-weekly-dispatch: {msg}", file=sys.stderr)
+    sys.exit(code)
+
+
+def parse_iso(s):
+    try:
+        return datetime.fromisoformat(s.replace("Z", "+00:00")).astimezone(UTC)
+    except ValueError:
+        die(2, f"bad timestamp {s!r}")
+
+
+class Clock:
+    """Real clock, or a fake one from MWD_NOW that sleep() advances instead of blocking."""
+
+    def __init__(self):
+        raw = os.environ.get("MWD_NOW")
+        if raw is not None and raw == "":
+            die(2, "MWD_NOW is set but empty; unset it for the real clock")
+        self.fake = parse_iso(raw) if raw is not None else None
+
+    def now(self):
+        return self.fake if self.fake is not None else datetime.now(UTC)
+
+    def sleep(self, seconds):
+        if self.fake is not None:
+            self.fake += timedelta(seconds=seconds)
+        else:
+            time.sleep(seconds)
+
+
+def window(now_utc):
+    """(week_start, open, cutoff) in UTC for the Pacific Sunday on or after now."""
+    now_la = now_utc.astimezone(LA)
+    sunday = now_la.date() + timedelta(days=(6 - now_la.weekday()) % 7)
+    week_start = datetime(sunday.year, sunday.month, sunday.day, tzinfo=LA)
+    open_la = week_start.replace(hour=OPEN_HOUR)
+    cutoff_la = week_start.replace(hour=CUTOFF_HOUR)
+    return week_start.astimezone(UTC), open_la.astimezone(UTC), cutoff_la.astimezone(UTC)
+
+
+def is_bot_dispatch(run):
+    return run.get("event") == "workflow_dispatch" and (run.get("triggering_actor") or {}).get("login") == BOT_LOGIN
+
+
+def decide(now_utc, runs):
+    week_start, open_utc, cutoff_utc = window(now_utc)
+    if now_utc < open_utc:
+        wait = math.ceil((open_utc - now_utc).total_seconds())
+        return ("wait", wait) if wait <= MAX_SLEEP_SECONDS else ("skip-outside", 0)
+    if now_utc >= cutoff_utc:
+        return ("skip-outside", 0)
+    for run in runs:
+        if run.get("status") in LIVE_STATUSES:
+            return ("skip-live", run["id"])
+    for run in runs:
+        created = parse_iso(run["created_at"])
+        if created < week_start:
+            continue
+        if run.get("event") == "schedule" or is_bot_dispatch(run):
+            return ("skip-done", run["id"])
+    return ("dispatch", 0)
+
+
+def gh(args):
+    proc = subprocess.run(["gh", *args], capture_output=True, text=True, check=False)
+    if proc.returncode != 0:
+        die(1, f"gh {args[0]} failed: {proc.stderr.strip()}")
+    return proc.stdout
+
+
+def fetch_runs(repo):
+    out = gh(["api", f"repos/{repo}/actions/workflows/mutation.yml/runs?branch=master&per_page=30"])
+    return json.loads(out)["workflow_runs"]
+
+
+def dispatch_and_confirm(repo, clock):
+    started = clock.now()
+    gh(["workflow", "run", "mutation.yml", "--ref", "master", "--repo", repo])
+    waited = 0
+    while waited <= VISIBLE_TIMEOUT_SECONDS:
+        for run in fetch_runs(repo):
+            if is_bot_dispatch(run) and parse_iso(run["created_at"]) >= started - timedelta(seconds=30):
+                print(f"dispatched {run['id']}")
+                return 0
+        clock.sleep(VISIBLE_POLL_SECONDS)
+        waited += VISIBLE_POLL_SECONDS
+    die(1, "dispatched run did not appear within 120s")
+
+
+def check_workflows(d):
+    die(2, "check-workflows lands in Phase 2")
+
+
+def parse_args(argv):
+    repo, dry_run, workflows_dir = None, False, None
+    for arg in argv:
+        if arg.startswith("--repo="):
+            repo = arg[len("--repo="):]
+        elif arg == "--repo":
+            die(2, "use --repo=OWNER/NAME (the = form)")
+        elif arg == "--dry-run":
+            dry_run = True
+        elif arg.startswith("--check-workflows="):
+            workflows_dir = arg[len("--check-workflows="):]
+        else:
+            die(2, f"unknown argument: {arg}")
+    return repo, dry_run, workflows_dir
+
+
+def main(argv):
+    repo, dry_run, workflows_dir = parse_args(argv)
+    if workflows_dir is not None:
+        return check_workflows(workflows_dir)
+    if not repo:
+        die(2, "--repo=OWNER/NAME is required")
+    clock = Clock()
+    for _ in range(2):
+        action, value = decide(clock.now(), fetch_runs(repo))
+        print(f"{action} {value}" if value else action, flush=True)
+        if action != "wait" or dry_run:
+            break
+        clock.sleep(value)
+    if action == "wait" and not dry_run:
+        die(1, "still before the window after sleeping")
+    if action != "dispatch" or dry_run:
+        return 0
+    return dispatch_and_confirm(repo, clock)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

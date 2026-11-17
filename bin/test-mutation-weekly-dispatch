@@ -1,0 +1,293 @@
+#!/usr/bin/env bash
+# Offline harness for bin/mutation-weekly-dispatch. A fake `gh` on PATH records
+# its calls and serves canned run history; MWD_NOW fakes the clock.
+#
+# Usage: bin/test-mutation-weekly-dispatch [case_name]
+set -u
+
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+TMP=$(mktemp -d)
+trap 'rm -rf "$TMP"' EXIT
+
+mkdir -p "$TMP/shim"
+cat > "$TMP/shim/gh" <<'SHIM'
+#!/usr/bin/env bash
+echo "$*" >> "$FAKE_GH_DIR/calls.log"
+case "$1" in
+    api)
+        if [ "${FAKE_GH_FAIL_API:-}" = 1 ]; then
+            echo "HTTP 502" >&2
+            exit 1
+        fi
+        if [ -f "$FAKE_GH_DIR/dispatched" ] && [ -f "$FAKE_GH_DIR/runs-after.json" ]; then
+            cat "$FAKE_GH_DIR/runs-after.json"
+        else
+            cat "$FAKE_GH_DIR/runs.json"
+        fi
+        ;;
+    workflow)
+        if [ "${2:-}" = run ]; then
+            touch "$FAKE_GH_DIR/dispatched"
+            exit 0
+        fi
+        exit 64
+        ;;
+    *) exit 64 ;;
+esac
+SHIM
+chmod +x "$TMP/shim/gh"
+
+FAILS=0
+CASE_N=0
+FAKE_GH_DIR=""
+OUT="" ERR="" RC=0
+BOT='github-actions[bot]'
+
+new_case() {
+    CASE_N=$((CASE_N + 1))
+    FAKE_GH_DIR="$TMP/case$CASE_N"
+    mkdir -p "$FAKE_GH_DIR"
+    : > "$FAKE_GH_DIR/calls.log"
+    printf '{"workflow_runs":[]}\n' > "$FAKE_GH_DIR/runs.json"
+}
+
+# run <id> <status> <conclusion> <event> <created_at> <login>
+run_json() {
+    printf '{"id":%s,"status":"%s","conclusion":"%s","event":"%s","created_at":"%s","triggering_actor":{"login":"%s"}}' \
+        "$1" "$2" "$3" "$4" "$5" "$6"
+}
+
+# set_runs <file-name> <run-json>...
+set_runs() {
+    local name=$1 joined="" sep="" r
+    shift
+    for r in "$@"; do
+        joined="$joined$sep$r"
+        sep=","
+    done
+    printf '{"workflow_runs":[%s]}\n' "$joined" > "$FAKE_GH_DIR/$name"
+}
+
+# run_sut <MWD_NOW or -> args...   ("-" runs with MWD_NOW unset)
+run_sut() {
+    local now=$1
+    shift
+    if [ "$now" = "-" ]; then
+        OUT=$(env -u MWD_NOW PATH="$TMP/shim:$PATH" FAKE_GH_DIR="$FAKE_GH_DIR" \
+            python3 "$ROOT/bin/mutation-weekly-dispatch" "$@" 2> "$FAKE_GH_DIR/err")
+    else
+        OUT=$(env MWD_NOW="$now" PATH="$TMP/shim:$PATH" FAKE_GH_DIR="$FAKE_GH_DIR" \
+            python3 "$ROOT/bin/mutation-weekly-dispatch" "$@" 2> "$FAKE_GH_DIR/err")
+    fi
+    RC=$?
+    ERR=$(cat "$FAKE_GH_DIR/err")
+}
+
+last_line() { printf '%s\n' "$OUT" | tail -n 1; }
+
+pass() { echo "PASS $1"; }
+fail() {
+    echo "FAIL $1: $2"
+    FAILS=$((FAILS + 1))
+}
+
+# expect_last <case> <now> <expected last stdout line>  (dry-run, empty runs unless set)
+expect_last() {
+    run_sut "$2" --repo=example/repo --dry-run
+    if [ "$RC" = 0 ] && [ "$(last_line)" = "$3" ]; then
+        return 0
+    fi
+    fail "$1" "at $2 wanted '$3', got rc=$RC out='$(last_line)' err='$ERR'"
+    return 1
+}
+
+case_before_open_waits() {
+    new_case
+    expect_last "${FUNCNAME[0]}" 2026-11-15T10:59:00Z "wait 60" && pass "${FUNCNAME[0]}"
+}
+
+case_at_open_dispatches() {
+    new_case
+    expect_last "${FUNCNAME[0]}" 2026-11-15T11:00:00Z "dispatch" || return
+    if grep -q '^workflow run' "$FAKE_GH_DIR/calls.log"; then
+        fail "${FUNCNAME[0]}" "dry-run called workflow run"
+        return
+    fi
+    pass "${FUNCNAME[0]}"
+}
+
+case_max_sleep_boundary() {
+    new_case
+    expect_last "${FUNCNAME[0]}" 2026-11-15T06:00:00Z "wait 18000" || return
+    expect_last "${FUNCNAME[0]}" 2026-11-15T05:59:00Z "skip-outside" || return
+    pass "${FUNCNAME[0]}"
+}
+
+case_cutoff_boundary() {
+    new_case
+    expect_last "${FUNCNAME[0]}" 2026-11-16T03:59:00Z "dispatch" || return
+    expect_last "${FUNCNAME[0]}" 2026-11-16T04:00:00Z "skip-outside" || return
+    pass "${FUNCNAME[0]}"
+}
+
+case_dst_end_sleep() {
+    new_case
+    expect_last "${FUNCNAME[0]}" 2026-11-01T08:00:00Z "wait 10800" && pass "${FUNCNAME[0]}"
+}
+
+case_dst_start_sleep() {
+    new_case
+    expect_last "${FUNCNAME[0]}" 2027-03-14T08:00:00Z "wait 7200" && pass "${FUNCNAME[0]}"
+}
+
+case_bot_run_this_week_skips() {
+    new_case
+    set_runs runs.json "$(run_json 11 completed cancelled workflow_dispatch 2026-11-15T11:01:00Z "$BOT")"
+    expect_last "${FUNCNAME[0]}" 2026-11-15T12:00:00Z "skip-done 11" && pass "${FUNCNAME[0]}"
+}
+
+case_bot_run_last_week_ignored() {
+    new_case
+    set_runs runs.json "$(run_json 11 completed cancelled workflow_dispatch 2026-11-08T11:01:00Z "$BOT")"
+    expect_last "${FUNCNAME[0]}" 2026-11-15T12:00:00Z "dispatch" && pass "${FUNCNAME[0]}"
+}
+
+case_human_completed_run_ignored() {
+    new_case
+    set_runs runs.json "$(run_json 13 completed success workflow_dispatch 2026-11-15T11:30:00Z ajay-example)"
+    expect_last "${FUNCNAME[0]}" 2026-11-15T12:00:00Z "dispatch" && pass "${FUNCNAME[0]}"
+}
+
+case_live_human_run_skips() {
+    new_case
+    set_runs runs.json "$(run_json 12 in_progress "" workflow_dispatch 2026-11-14T20:00:00Z ajay-example)"
+    expect_last "${FUNCNAME[0]}" 2026-11-15T12:00:00Z "skip-live 12" && pass "${FUNCNAME[0]}"
+}
+
+case_second_trigger_same_week() {
+    new_case
+    set_runs runs-after.json "$(run_json 900 completed success workflow_dispatch 2026-11-15T11:00:00Z "$BOT")"
+    run_sut 2026-11-15T11:00:00Z --repo=example/repo
+    if [ "$RC" != 0 ] || [ "$(printf '%s\n' "$OUT" | sed -n 1p)" != "dispatch" ] || [ "$(last_line)" != "dispatched 900" ]; then
+        fail "${FUNCNAME[0]}" "run 1 rc=$RC out='$OUT' err='$ERR'"
+        return
+    fi
+    run_sut 2026-11-15T11:15:00Z --repo=example/repo
+    if [ "$RC" != 0 ] || [ "$(last_line)" != "skip-done 900" ]; then
+        fail "${FUNCNAME[0]}" "run 2 rc=$RC out='$OUT' err='$ERR'"
+        return
+    fi
+    local n
+    n=$(grep -c '^workflow run' "$FAKE_GH_DIR/calls.log")
+    if [ "$n" != 1 ]; then
+        fail "${FUNCNAME[0]}" "workflow run count was $n, wanted 1"
+        return
+    fi
+    pass "${FUNCNAME[0]}"
+}
+
+case_dispatch_targets_master() {
+    new_case
+    set_runs runs-after.json "$(run_json 900 completed success workflow_dispatch 2026-11-15T11:00:00Z "$BOT")"
+    run_sut 2026-11-15T11:00:00Z --repo=example/repo
+    if ! grep -qxF 'workflow run mutation.yml --ref master --repo example/repo' "$FAKE_GH_DIR/calls.log"; then
+        fail "${FUNCNAME[0]}" "calls.log lacks the master dispatch line: $(tr '\n' '|' < "$FAKE_GH_DIR/calls.log")"
+        return
+    fi
+    pass "${FUNCNAME[0]}"
+}
+
+case_wait_then_requery() {
+    new_case
+    set_runs runs-after.json "$(run_json 901 completed success workflow_dispatch 2026-11-15T11:00:00Z "$BOT")"
+    run_sut 2026-11-15T10:59:00Z --repo=example/repo
+    local want
+    want=$(printf 'wait 60\ndispatch\ndispatched 901')
+    if [ "$RC" != 0 ] || [ "$OUT" != "$want" ]; then
+        fail "${FUNCNAME[0]}" "rc=$RC out='$OUT' err='$ERR'"
+        return
+    fi
+    local before_run
+    before_run=$(sed -n '/^workflow run/q;p' "$FAKE_GH_DIR/calls.log" | grep -c '^api')
+    if [ "$before_run" != 2 ]; then
+        fail "${FUNCNAME[0]}" "api calls before workflow run was $before_run, wanted 2"
+        return
+    fi
+    pass "${FUNCNAME[0]}"
+}
+
+case_dispatch_never_visible_fails() {
+    new_case
+    run_sut 2026-11-15T11:00:00Z --repo=example/repo
+    if [ "$RC" != 1 ] || ! grep -qF 'did not appear' <<< "$ERR"; then
+        fail "${FUNCNAME[0]}" "rc=$RC err='$ERR'"
+        return
+    fi
+    pass "${FUNCNAME[0]}"
+}
+
+case_mwd_now_empty_rejected() {
+    new_case
+    run_sut "" --repo=example/repo --dry-run
+    if [ "$RC" != 2 ] || ! grep -qF 'set but empty' <<< "$ERR"; then
+        fail "${FUNCNAME[0]}" "rc=$RC err='$ERR'"
+        return
+    fi
+    pass "${FUNCNAME[0]}"
+}
+
+case_mwd_now_unset_uses_real_clock() {
+    new_case
+    run_sut - --repo=example/repo --dry-run
+    if [ "$RC" != 0 ] || ! grep -qE '^(wait [0-9]+|dispatch|skip-outside|skip-live [0-9]+|skip-done [0-9]+)$' <<< "$(last_line)"; then
+        fail "${FUNCNAME[0]}" "rc=$RC out='$OUT' err='$ERR'"
+        return
+    fi
+    pass "${FUNCNAME[0]}"
+}
+
+case_unknown_flag_rejected() {
+    new_case
+    run_sut 2026-11-15T11:00:00Z --repo=example/repo --bogus
+    if [ "$RC" != 2 ] || ! grep -qF 'unknown argument: --bogus' <<< "$ERR"; then
+        fail "${FUNCNAME[0]}" "rc=$RC err='$ERR'"
+        return
+    fi
+    pass "${FUNCNAME[0]}"
+}
+
+case_repo_space_form_rejected() {
+    new_case
+    run_sut 2026-11-15T11:00:00Z --repo example/repo
+    if [ "$RC" != 2 ] || ! grep -qF 'use --repo=OWNER/NAME' <<< "$ERR"; then
+        fail "${FUNCNAME[0]}" "rc=$RC err='$ERR'"
+        return
+    fi
+    pass "${FUNCNAME[0]}"
+}
+
+case_gh_api_failure_fails_closed() {
+    new_case
+    FAKE_GH_FAIL_API=1 run_sut 2026-11-15T11:00:00Z --repo=example/repo
+    if [ "$RC" != 1 ] || ! grep -qF 'gh api failed' <<< "$ERR"; then
+        fail "${FUNCNAME[0]}" "rc=$RC err='$ERR'"
+        return
+    fi
+    if grep -q '^workflow run' "$FAKE_GH_DIR/calls.log"; then
+        fail "${FUNCNAME[0]}" "dispatched despite gh api failure"
+        return
+    fi
+    pass "${FUNCNAME[0]}"
+}
+
+ALL_CASES=$(declare -F | awk '$3 ~ /^case_/ {print $3}')
+
+if [ $# -gt 0 ]; then
+    "$1"
+else
+    for c in $ALL_CASES; do
+        "$c"
+    done
+fi
+
+[ "$FAILS" -eq 0 ] || exit 1

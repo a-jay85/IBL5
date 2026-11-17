@@ -336,6 +336,11 @@ def check_workflows(d):
 def parse_args(argv):
     repo, dry_run, workflows_dir = None, False, None
     for arg in argv:
+        if arg in ("-h", "--help"):
+            print("Usage: bin/mutation-weekly-dispatch --repo=OWNER/NAME [--dry-run]")
+            print("       bin/mutation-weekly-dispatch --check-workflows=DIR")
+            print(__doc__)
+            sys.exit(0)
         if arg.startswith("--repo="):
             repo = arg[len("--repo="):]
         elif arg == "--repo":

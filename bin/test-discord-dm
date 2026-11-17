@@ -854,6 +854,7 @@ flake-report.yml#1 webhook=reviews
 log-review.yml#1 webhook=reviews
 main.yml#1 webhook=errors
 merge-digest-notify.yml#1 webhook=merged
+mutation-weekly-dispatch.yml#1 webhook=errors
 mutation.yml#1 webhook=errors
 promote-to-production.yml#1 webhook=errors-on-failure
 promote-to-production.yml#2 webhook=dev
@@ -867,7 +868,7 @@ printf '\n-- notify-discord call sites --\n'
 # G1: the live workflows match the table.
 G1_GOT=$(notify_sites "$ROOT/.github/workflows")
 if [ "$G1_GOT" = "$NOTIFY_SITES_WANT" ]; then
-    ok "G1: 16 sites pass the expected webhook-url and none pings"
+    ok "G1: 17 sites pass the expected webhook-url and none pings"
 else
     fail "G1: call sites differ from the table"
     diff <(printf '%s\n' "$NOTIFY_SITES_WANT") <(printf '%s\n' "$G1_GOT") | sed 's/^/       /'

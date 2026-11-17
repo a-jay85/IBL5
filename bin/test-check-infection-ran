@@ -189,6 +189,7 @@ run_in "$ROOT/ibl5" --log "$d/log.txt" --changed "$d/changed.txt"
 want_rc c15-real-config 0
 
 # --- Kill mode (--kills) ----------------------------------------------------
+# Cases c1 to c11 above cover the --log/--changed mode and stay as they were.
 
 # c12: baseline-missing fails on runner-warning and cannot-read-baseline.
 d=$(new_case)

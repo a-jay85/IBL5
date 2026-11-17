@@ -97,6 +97,7 @@ final class DatabaseNameResolverTest extends TestCase
         foreach (['mutation.yml', 'mutation-pr.yml'] as $workflow) {
             $path = dirname(__DIR__, 3) . '/.github/workflows/' . $workflow;
             if (!is_file($path)) {
+                // phpunit-hygiene-allow: workflow files are absent when only ibl5/ is mounted in the test container; CI runs from the repo root
                 self::markTestSkipped($workflow . ' is not present (only ibl5/ is mounted in the test container)');
             }
             $contents = file_get_contents($path);

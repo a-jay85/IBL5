@@ -34,11 +34,11 @@ N="${1:-}"; shift || true
 PID=""; RESULT=""; PRE=""; WT=""; LOG=""
 while [ $# -gt 0 ]; do
   case "$1" in
-    --pid) PID="${2:-}"; shift 2 ;;
-    --result) RESULT="${2:-}"; shift 2 ;;
-    --pre-sha) PRE="${2:-}"; shift 2 ;;
-    --wt) WT="${2:-}"; shift 2 ;;
-    --log) LOG="${2:-}"; shift 2 ;;
+    --pid) PID="${2:-}"; shift 2 || exit 2 ;;
+    --result) RESULT="${2:-}"; shift 2 || exit 2 ;;
+    --pre-sha) PRE="${2:-}"; shift 2 || exit 2 ;;
+    --wt) WT="${2:-}"; shift 2 || exit 2 ;;
+    --log) LOG="${2:-}"; shift 2 || exit 2 ;;
     *) echo "pr-refire-after-job: unknown arg: $1" >&2; exit 2 ;;
   esac
 done

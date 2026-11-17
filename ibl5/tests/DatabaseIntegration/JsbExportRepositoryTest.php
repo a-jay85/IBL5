@@ -10,7 +10,7 @@ use JsbParser\JsbExportRepository;
 
 /**
  * Tests JsbExportRepository against real MariaDB —
- * player changeable fields and completed trade items for JSB file export.
+ * player changeable fields, depth charts, and completed trade items for JSB file export.
  */
 #[Group('database')]
 class JsbExportRepositoryTest extends DatabaseTestCase
@@ -189,5 +189,68 @@ class JsbExportRepositoryTest extends DatabaseTestCase
         if (count($offerIds) >= 2) {
             self::assertLessThanOrEqual($offerIds[1], $offerIds[0]);
         }
+    }
+
+    // ── getAllPlayerDepthCharts ──────────────────────────────────
+
+    public function testGetAllPlayerDepthChartsReturnsDcColumnsKeyedByPid(): void
+    {
+        $this->insertTestPlayer(200000070, 'DB Test Depth Chart', [
+            'teamid' => 20,
+            'ordinal' => 579,
+            'dc_pg_depth' => 0,
+            'dc_sg_depth' => 0,
+            'dc_sf_depth' => 0,
+            'dc_pf_depth' => 0,
+            'dc_c_depth' => 1,
+            'dc_can_play_in_game' => 1,
+            'dc_minutes' => 40,
+            'dc_of' => 0,
+            'dc_df' => 0,
+            'dc_oi' => 2,
+            'dc_di' => 0,
+            'dc_bh' => 0,
+        ]);
+
+        $result = $this->repo->getAllPlayerDepthCharts();
+
+        self::assertArrayHasKey(200000070, $result);
+        self::assertSame([
+            'pid' => 200000070,
+            'teamid' => 20,
+            'dc_pg_depth' => 0,
+            'dc_sg_depth' => 0,
+            'dc_sf_depth' => 0,
+            'dc_pf_depth' => 0,
+            'dc_c_depth' => 1,
+            'dc_can_play_in_game' => 1,
+            'dc_minutes' => 40,
+            'dc_of' => 0,
+            'dc_df' => 0,
+            'dc_oi' => 2,
+            'dc_di' => 0,
+            'dc_bh' => 0,
+        ], $result[200000070]);
+    }
+
+    public function testGetAllPlayerDepthChartsExcludesZeroPidRows(): void
+    {
+        $existing = $this->db->query('SELECT COUNT(*) AS n FROM ibl_plr WHERE pid = 0');
+        self::assertInstanceOf(\mysqli_result::class, $existing);
+        $row = $existing->fetch_assoc();
+        if (!is_array($row) || (int) $row['n'] === 0) {
+            $this->insertTestPlayer(0, 'DB Test Empty Slot', [
+                'teamid' => 20,
+                'ordinal' => 583,
+                'dc_minutes' => 30,
+                'uuid' => 'test-000000000-0000-000000000099',
+            ]);
+        }
+        $this->insertTestPlayer(200000071, 'DB Test Real Player', ['teamid' => 20, 'ordinal' => 580]);
+
+        $result = $this->repo->getAllPlayerDepthCharts();
+
+        self::assertArrayNotHasKey(0, $result);
+        self::assertArrayHasKey(200000071, $result);
     }
 }

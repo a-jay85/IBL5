@@ -83,4 +83,20 @@ final class DatabaseNameResolverTest extends TestCase
 
         self::assertSame('ibl5_t4', DatabaseNameResolver::fromEnvironment('ibl5'));
     }
+
+    public function testInfectionThreadCountMatchesClonedDatabases(): void
+    {
+        $config = file_get_contents(dirname(__DIR__, 2) . '/infection.json5');
+        self::assertNotFalse($config);
+        self::assertSame(1, preg_match('/"threads":\s*(\d+)/', $config, $match));
+
+        $expectedLoop = 'for t in ' . implode(' ', range(1, (int) $match[1])) . '; do';
+        foreach (['mutation.yml', 'mutation-pr.yml'] as $workflow) {
+            $path = dirname(__DIR__, 3) . '/.github/workflows/' . $workflow;
+            self::assertFileExists($path);
+            $contents = file_get_contents($path);
+            self::assertNotFalse($contents);
+            self::assertStringContainsString($expectedLoop, $contents, $workflow . ' must clone one database per Infection thread');
+        }
+    }
 }

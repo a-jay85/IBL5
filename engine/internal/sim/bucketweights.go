@@ -1,6 +1,9 @@
 package sim
 
-import "github.com/a-jay85/IBL5/engine/internal/rng"
+import (
+	"github.com/a-jay85/IBL5/engine/internal/bundle"
+	"github.com/a-jay85/IBL5/engine/internal/rng"
+)
 
 // Play-outcome bucket-weight helpers — the faithful JSB 5.60 basis recovered in
 // COMPOSITE_DOUBLES_TRACE.md (2nd-pass RESOLUTION) and 00_MASTER_REFERENCE.md
@@ -399,6 +402,47 @@ func bucket3Weight(e88, mq, hcaRaw float64, halfCourt bool, r *rng.RNG) float64 
 		return r.Float64() * andOneBucketFloor // FUN_005c6100(0.03)
 	}
 	return e90
+}
+
+// bucket3InputsFor assembles the FUN_004e1ba0 inputs from the offense five and
+// the defending team. It returns false when the defending team carries no DF0
+// (a team absent from bundle.Teams, or one with no real-life minutes). Every
+// lineup term is a per-player composite; the caller's 3pt weight never enters,
+// because the OReb path zeroes it.
+func bucket3InputsFor(bh onCourt, offense []onCourt, def *bundle.Team) (bucket3Inputs, bool) {
+	if def == nil || def.DF0 == nil {
+		return bucket3Inputs{}, false
+	}
+	in := bucket3Inputs{energy: float64(bh.energy), bhD78: d78Composite(bh), defDF0: *def.DF0}
+	for _, p := range offense {
+		in.lineupD78 += d78Composite(p)
+		in.lineupSum3 += tovRate(p) + threePtBucketWeight(p) + twoPtBucketWeight(p) // +0xDE0 + +0xDB0 + +0xD90
+	}
+	return in, true
+}
+
+// andOneAndFoulWeights computes JSB index 3 (and-one) and then index 4 (foul),
+// the FUN_004e1ba0 draw order: each may redraw once from r. Index 3 takes the
+// ported e88-e90 chain when the defending team's DF0 and the lineup D78 sum are
+// both defined. Otherwise it keeps the rating path (halfCourtAndOneWeight on a
+// half-court trip, andOneBucketWeight on transition), which never draws.
+func andOneAndFoulWeights(bh onCourt, offense, defenders []onCourt, def *bundle.Team, hca, hcaRaw, hcaScaled, mq float64, halfCourt bool, r *rng.RNG) (andOneW, foulW float64) {
+	ported := false
+	if in, ok := bucket3InputsFor(bh, offense, def); ok {
+		if e88, ok := bucket3E88(in); ok {
+			andOneW = bucket3Weight(e88, mq, hcaRaw, halfCourt, r)
+			ported = true
+		}
+	}
+	switch {
+	case ported:
+	case halfCourt:
+		andOneW = halfCourtAndOneWeight(mq, bh, hcaScaled)
+	default:
+		andOneW = andOneBucketWeight(mq, bh)
+	}
+	foulW = foulBucketWeight(bh, offense, defenders, hca, mq, r)
+	return andOneW, foulW
 }
 
 // andOneBucketRaw is the unfloored and-one stand-in. The half-court caller adds

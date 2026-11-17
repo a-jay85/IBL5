@@ -68,27 +68,29 @@ func threePtPropensity(p onCourt) float64 {
 //     carry the raw delta on the faithful CEngine TOV48 basis — see foulBucketWeight.
 //
 // Callers pass 0 for both on the transition path (param_5==0, fully symmetric) and
-// for ASG (hcaDelta returns 0). The and-one leg D (e90 inherits e88's +hca) is added
-// by the caller to andOneWeight, since that bucket is assembled outside playBuckets.
+// for ASG (hcaDelta returns 0). andOneW is JSB index 3, drawn before the index-4
+// foul weight (andOneAndFoulWeights). hca doubles as hcaRaw for the bucket-3 leg D:
+// hcaDelta returns the raw ±hcaMagnitude, JSB's (2·team−3)·C+0x18b58. halfCourt is
+// false on transition, so leg D adds nothing there.
 //
 // allow3pt is false on a fast break (3pt path excluded).
 //
 // BranchB is an OFF-by-default diagnostic. When active it passes the foul weight
 // through branchBShrink; acceptable because BranchB is not exercised by any shipped
 // path, golden snapshot, or sign gate. BranchB and freeze arms are exclusive.
-func (gs *gameState) playBuckets(bh onCourt, offense, defense *teamState, hca, hcaScaled, mq float64, allow3pt bool) (twoPtW, threePtW, foulW float64) {
+func (gs *gameState) playBuckets(bh onCourt, offense, defense *teamState, hca, hcaScaled, mq float64, allow3pt, halfCourt bool) (twoPtW, threePtW, foulW, andOneW float64) {
 	raw3pt := 0.0
 	if allow3pt {
 		raw3pt = threePtBucketWeight(bh)
 	}
+	andOneW, foul := andOneAndFoulWeights(bh, offense.players, defense.players, defense.team, hca, hca, hcaScaled, mq, halfCourt, gs.rng)
 	if !gs.freeze.BranchB {
-		foul := gs.foulWeight(bh, offense.players, defense.players, hca, mq)
-		return twoPtBucketWeight(bh) + hcaScaled, raw3pt, scaledFoulWeight(foul)
+		foul = gs.recordFoulWeight(foul)
+		return twoPtBucketWeight(bh) + hcaScaled, raw3pt, scaledFoulWeight(foul), andOneW
 	}
 	raw2pt := twoPtBucketWeight(bh)
-	foul := foulBucketWeight(bh, offense.players, defense.players, hca, mq, gs.rng)
 	s2, s3, sf := gs.branchBShrink(raw2pt, raw3pt, scaledFoulWeight(foul), offense.drbRate, offense.astRate, bh.TransOff)
-	return s2 + hcaScaled, s3, sf
+	return s2 + hcaScaled, s3, sf, andOneW
 }
 
 // possOutcome classifies how a possession ended, so the caller can route both
@@ -273,7 +275,7 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 		// across the O(10s) 2pt basis (hcaSite2BasisScale, gametype.go).
 		hca := hcaDelta(gs.gameType, offense.isHome)
 		hcaScaled := hca * hcaSite2BasisScale
-		twoPtW, threePtW, foulW := gs.playBuckets(bh, offense, defense, hca, hcaScaled, mq, true)
+		twoPtW, threePtW, foulW, andOneW := gs.playBuckets(bh, offense, defense, hca, hcaScaled, mq, true, true)
 		// Putback 3pt IS suppressed by default (JSB 5.60 faithful — ADJUDICATION
 		// 2026-07-23). FUN_004e1ba0's reject-retry clause: param_3 (= local_15c, the
 		// OReb continuation flag, pushed as edi at 0x4d8f7e) == '\x01' → reject
@@ -292,7 +294,7 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 		in := outcomeInputs{
 			twoPtWeight:      twoPtW,
 			threePtWeight:    threePtW,
-			andOneWeight:     halfCourtAndOneWeight(mq, bh, hcaScaled), // leg D: e90 inherits e88's +hca, floored after (FUN_004e1ba0 97165-97168)
+			andOneWeight:     andOneW, // JSB index 3: FUN_004e1ba0 e88 -> e90, rating path when DF0 or lineup D78 is undefined
 			foulOnlyWeight:   foulW,
 			turnoverDefValue: energyCeiling(bh),
 		}

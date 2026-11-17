@@ -698,7 +698,12 @@ func (gs *gameState) turnoverProb(careless, pressure float64) float64 {
 // (leg C) carry the RAW HCA — see foulBucketWeight. hca=0 recovers the symmetric path.
 // mq is the possession's matchupQuality, the :97164 shrink operand (J18 item 6).
 func (gs *gameState) foulWeight(bh onCourt, offense, defenders []onCourt, hca, mq float64) float64 {
-	w := foulBucketWeight(bh, offense, defenders, hca, mq, gs.rng)
+	return gs.recordFoulWeight(foulBucketWeight(bh, offense, defenders, hca, mq, gs.rng))
+}
+
+// recordFoulWeight is foulWeight's accumulate-then-freeze step for a raw foul
+// weight the caller already drew (playBuckets draws it after the and-one).
+func (gs *gameState) recordFoulWeight(w float64) float64 {
 	if gs.accum != nil {
 		gs.accum.foulSum += w
 		gs.accum.foulN++

@@ -59,13 +59,14 @@ final class PublishEnqueuer
      * level for #errors, and never escapes, so the notify exit code never changes.
      *
      * @param callable(): bool $enqueue
+     * @param resource $stderr Where the fixed failure line goes; tests pass a memory stream.
      */
-    public static function guardedEnqueue(int $sim, callable $enqueue, ?LoggerInterface $logger = null): void
+    public static function guardedEnqueue(int $sim, callable $enqueue, ?LoggerInterface $logger = null, mixed $stderr = STDERR): void
     {
         try {
             $enqueue();
         } catch (\Throwable $failure) {
-            fwrite(STDERR, 'simRecapQueue: publish enqueue failed (' . $failure::class . ")\n");
+            fwrite($stderr,'simRecapQueue: publish enqueue failed (' . $failure::class . ")\n");
             self::logError($logger ?? \Logging\LoggerFactory::getChannel('sim-recap'), 'simRecapQueue: publish enqueue failed', [
                 'sim' => $sim,
                 'exception_class' => $failure::class,

@@ -105,6 +105,30 @@ final class PublishEnqueuerTest extends TestCase
         $this->assertSame(42, $records[0]->context['sim']);
     }
 
+    public function testGuardedEnqueueWritesFixedStderrLineWithExceptionClass(): void
+    {
+        $stream = fopen('php://memory', 'w+');
+        $this->assertIsResource($stream);
+
+        PublishEnqueuer::guardedEnqueue(42, self::throwingEnqueue(), new Logger('sim-recap', [new TestHandler()]), $stream);
+
+        rewind($stream);
+        $this->assertSame("simRecapQueue: publish enqueue failed (RuntimeException)\n", stream_get_contents($stream));
+        fclose($stream);
+    }
+
+    public function testGuardedEnqueueSuccessWritesNothingToStderr(): void
+    {
+        $stream = fopen('php://memory', 'w+');
+        $this->assertIsResource($stream);
+
+        PublishEnqueuer::guardedEnqueue(42, static fn (): bool => true, new Logger('sim-recap', [new TestHandler()]), $stream);
+
+        rewind($stream);
+        $this->assertSame('', stream_get_contents($stream));
+        fclose($stream);
+    }
+
     public function testGuardedEnqueueLogOmitsExceptionText(): void
     {
         $handler = new TestHandler();

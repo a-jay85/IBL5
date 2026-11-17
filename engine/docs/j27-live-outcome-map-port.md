@@ -1,5 +1,5 @@
 ---
-description: J27 live outcome-map port. The Go engine now reads play-outcome codes 1-4 the way live JSB 5.60 does. Code 3 is the foul handler, and code 4 is the turnover path with a 10% offensive foul and the FUN_004e2fc0 steal split. Lists the removed scales, before/after aggregates, re-pinned test literals, and the open residuals.
+description: J27 live outcome-map port. The Go engine now reads play-outcome codes 1-4 the way live JSB 5.60 does. Code 3 is the foul handler, and code 4 is the turnover path with a 10% offensive foul and the FUN_004e2fc0 steal split. Lists the removed scales, before/after aggregates, re-pinned test literals, the open residuals, an archive walk against .sco and a per-type foul table against the live trace.
 last_verified: 2026-11-17
 ---
 
@@ -123,11 +123,11 @@ The `foulRateBands` width rule stays at ±10% with a floor of ±0.05. The path-m
 These stay open. This doc sets no target and proposes no scale.
 
 - Code 5 is not ported. Live JSB fires it on 0.08% of picks and makes no turnover there.
-- The engine picks the stealer with `selectStealer`, which draws its own roll. JSB reuses the steal-split roll to pick the stealer.
-- `leagueSTL48` is 1.834 in the engine. The live value is 2.043, so the steal-pool cap sits lower than live.
+- The engine picks the stealer with `selectStealer`, which draws its own roll. JSB reuses the steal-split roll to pick the stealer. Moved to the steal follow-up item, [backlog#1923](https://github.com/a-jay85/IBL5-backlog/issues/1923).
+- `leagueSTL48` is 1.834 in the engine. The live value is 2.043, so the steal-pool cap sits lower than live. Moved to the steal follow-up item, [backlog#1923](https://github.com/a-jay85/IBL5-backlog/issues/1923).
 - The offensive foul counts as a team foul, which can push the offense toward the bonus. The trace does not show whether JSB counts it.
-- The steal split is 56.6% in the engine against 84.2% observed and 74.5% predicted by the trace.
+- The steal split is 56.6% in the engine against 84.2% observed and 74.5% predicted by the trace. Moved to the steal follow-up item, [backlog#1923](https://github.com/a-jay85/IBL5-backlog/issues/1923).
 - Code 2 made 29 four-point plays over 200 real-life games. They carry `FoulSiteAndOne`, the tag the old and-one bucket used.
 - On bundle.json the home/away FTA ratio is 2.03. That fixture runs the rating fallback path. On bundle_reallife.json the ratio is 1.105.
 - The calibrate stand-ins `steal_turnover_scale` and `non_steal_turnover_scale` no longer drive anything. The archive-tagged research test that varies them would see no change.
-- On bundle.json, FTA fell from 12.828 to 4.577 and TOV from 29.930 to 13.568 per team-game. No archive walk has compared the new aggregates to `.sco`.
+- The archive walk puts the engine above `.sco` on PF (18.089 against 17.116 per team-game, BEFORE and AFTER alike) and on FTA (19.983 against 18.587). STL runs low (7.203 against 9.131) and TOV high (14.662 against 13.762). The walk table under `## Archive walk against .sco` holds the rows. The foul mix matches the trace, so the PF excess points at the overall foul volume, which no single foul type explains.

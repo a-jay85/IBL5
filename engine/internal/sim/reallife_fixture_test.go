@@ -31,18 +31,16 @@ func loadRealLifeFixture(t *testing.T) bundle.Bundle {
 // carries real-life PF.
 func TestRealLifeFixture_LeagueCalibration(t *testing.T) {
 	const (
-		pinPF48  = 4.294130331651356
-		pinTOV48 = 3.3531432843116113
-		pinFTA48 = 6.116607485995505
+		pinTOV48 = 3.3531432843116113 // full precision; teamquality.go leagueTOV48 rounds it
 	)
 	b := loadRealLifeFixture(t)
 	r := b.LeagueRate48
 	if r == nil {
 		t.Fatal("fixture league_rate48 is missing")
 	}
-	if r.PF != pinPF48 || r.TOV != pinTOV48 || r.FTA != pinFTA48 {
+	if r.PF != leaguePF48 || r.TOV != pinTOV48 || r.FTA != leagueFTA48 {
 		t.Errorf("fixture PF/TOV/FTA per 48 = %.17g/%.17g/%.17g, want %.17g/%.17g/%.17g",
-			r.PF, r.TOV, r.FTA, pinPF48, pinTOV48, pinFTA48)
+			r.PF, r.TOV, r.FTA, leaguePF48, pinTOV48, leagueFTA48)
 	}
 	if r.FGA != leagueFGA48 {
 		t.Errorf("fixture FGA/48 = %.17g, want leagueFGA48 %.17g", r.FGA, leagueFGA48)

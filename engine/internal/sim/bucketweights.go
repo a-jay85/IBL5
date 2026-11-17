@@ -96,6 +96,12 @@ const (
 	// C+0x6668: league FGA/48 (3GA+2PA), J18 filter, current-season .plr; proven by TestRealLifeFixture_LeagueCalibration
 	leagueFGA48 = 25.035101086336688
 
+	// C+0x6938 and C+0x6728: league PF/48 and FTA/48, the J18 pins the
+	// d70LeagueScalar comment records at full precision. The bucket-3 chain
+	// (FUN_004e1ba0) reads them with leagueFGA48 and leagueTOV48.
+	leaguePF48  = 4.294130331651356
+	leagueFTA48 = 6.116607485995505
+
 	// +0xD90 Branch-A pinned constants (COMPOSITE_DOUBLES_TRACE.md §5): the 0.5
 	// (_DAT_00669ef0) and 0.25 (_DAT_00669f58) factors in the make-share weighting.
 	d90MakeShareHalf    = 0.5
@@ -167,6 +173,15 @@ const (
 	dat66be10 = 0.001 // _DAT_0066be10 = 0.001 (PE read, 0x66d318 = 0.2 calibrated)
 	dat66c7d8 = 0.05  // _DAT_0066c7d8 = 0.05 (PE read, 0x66d318 = 0.2 calibrated)
 	dat669ae8 = 0.02  // _DAT_00669ae8 = 0.02 (PE read, 0x66d318 = 0.2 calibrated)
+
+	// FUN_004e1ba0 bucket-3 literals with no named engine twin. The first four
+	// are the fatigueFactor (state.go) /30, +100, ×0.01 and 1.0-cap slots; the
+	// last is the function-local matchup matchedWeight (matchup.go).
+	dat66d3a8 = 0.03333333333333333 // _DAT_0066d3a8 = 1/30 (PE read, 0x66d318 = 0.2 calibrated)
+	dat669f40 = 100.0               // _DAT_00669f40 = 100.0 (PE read, 0x66d318 = 0.2 calibrated)
+	dat669e80 = 0.01                // _DAT_00669e80 = 0.01 (PE read, 0x66d318 = 0.2 calibrated)
+	dat669ed8 = 1.0                 // _DAT_00669ed8 = 1.0 (PE read, 0x66d318 = 0.2 calibrated)
+	dat669e78 = 0.8                 // _DAT_00669e78 = 0.8 (PE read, 0x66d318 = 0.2 calibrated)
 
 	// andOneMadeRateScale maps the player's FGP rating to a made-rate proxy for the
 	// and-one stand-in (a small minority of scoring plays). Unchanged from #952.
@@ -326,6 +341,64 @@ func threePtBucketWeight(p onCourt) float64 {
 // carries the bucket above the floor. Unchanged from the faithful #952 basis.
 func andOneBucketWeight(mq float64, p onCourt) float64 {
 	return max(andOneBucketRaw(mq, p), andOneBucketFloor)
+}
+
+// bucket3Inputs carries the traced FUN_004e1ba0 inputs.
+type bucket3Inputs struct {
+	energy     float64 // bh record +0x24
+	bhD78      float64 // local_e78 = bh +0xD78
+	lineupD78  float64 // dVar5: sum of +0xD78 over the offense five
+	lineupSum3 float64 // sum of +0xDE0 + +0xDB0 + +0xD90 over the offense five
+	defDF0     float64 // defending team +0xDF0
+}
+
+// bucket3E88Initial: min((energy/30 + 100) * 0.01, 1.0). JSB does not clamp
+// negative energy, so this does not call fatigueFactor.
+func bucket3E88Initial(energy float64) float64 {
+	e := (energy*dat66d3a8 + dat669f40) * dat669e80 // _DAT_0066d3a8, _DAT_00669f40, _DAT_00669e80
+	if dat669ed8 < e {                              // _DAT_00669ed8
+		return dat669ed8
+	}
+	return e
+}
+
+// bucket3Clamp is the one-sided clamp at asm 4e1d90-4e1dc4. A value below the
+// anchor drops to anchor − 1.0; a value above anchor + 1.0 is capped there.
+func bucket3Clamp(v, anchor float64) float64 {
+	if v < anchor {
+		return anchor - dat669ed8 // _DAT_00669ed8
+	}
+	if v > anchor+dat669ed8 { // _DAT_00669ed8
+		return anchor + dat669ed8
+	}
+	return v
+}
+
+// bucket3E88 returns ok=false when lineupD78 is not positive (or NaN); JSB
+// divides unguarded there (FUN_004e1ba0 :97157), so the caller keeps the
+// rating path.
+func bucket3E88(in bucket3Inputs) (float64, bool) {
+	if !(in.lineupD78 > 0) {
+		return 0, false
+	}
+	// _DAT_0066d318 (branchBTeamScale), _DAT_00669e78 (dat669e78)
+	dVar7 := in.lineupSum3 * branchBTeamScale / ((leagueFTA48 + leagueFGA48 + leagueTOV48) * dat669e78)
+	// _DAT_00669e78 (dat669e78), _DAT_00669ea0 (defQualityCapTeamMult)
+	v := bucket3Clamp(in.defDF0*dat669e78*dVar7, leaguePF48*dat669e78*dVar7*defQualityCapTeamMult)
+	return (v / in.lineupD78) * in.bhD78 * bucket3E88Initial(in.energy), true
+}
+
+// bucket3Weight: half-court adds the raw signed hca, then e90 = mq*0.25 + e88,
+// redrawn U[0, 0.03) when e90 is not positive (asm 4e1e47-4e1e69).
+func bucket3Weight(e88, mq, hcaRaw float64, halfCourt bool, r *rng.RNG) float64 {
+	if halfCourt {
+		e88 += hcaRaw
+	}
+	e90 := mq*d90MakeShareQuarter + e88 // _DAT_00669f58
+	if e90 <= 0 {                       // _DAT_00669f00 = 0.0
+		return r.Float64() * andOneBucketFloor // FUN_005c6100(0.03)
+	}
+	return e90
 }
 
 // andOneBucketRaw is the unfloored and-one stand-in. The half-court caller adds

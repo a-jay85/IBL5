@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createSweeper } from './sweeper.js';
-import type { EnabledSimRecapSettings } from './settings.js';
+import type { EnabledSimRecapSettings, SimRecapSettings } from './settings.js';
+import { createErrorReporter, type ErrorReporter, type FailureReport } from './error-reporter.js';
 import type { PublishClaim, PublisherDeps } from './publisher.js';
 
 const ENABLED: EnabledSimRecapSettings = {
@@ -173,5 +174,138 @@ describe('createSweeper', () => {
         await vi.advanceTimersByTimeAsync(300000);
         expect(claimNext).toHaveBeenCalledTimes(2);
         if (handle) clearInterval(handle);
+    });
+});
+
+describe('createSweeper failure alerts', () => {
+    function mockReporter() {
+        return { report: vi.fn(async (_failure: FailureReport) => undefined), resolve: vi.fn() };
+    }
+
+    function realReporter() {
+        const fetchFn = vi.fn(async (..._args: Parameters<typeof fetch>) => new Response(null, { status: 204 }));
+        const reporter = createErrorReporter({ webhookUrl: 'https://discord.com/api/webhooks/1/abc', fetchFn, log: vi.fn() });
+        return { reporter, fetchFn };
+    }
+
+    const throwing = async (): Promise<PublishClaim | null> => { throw new Error('http 500'); };
+
+    function build(
+        claimNext: () => Promise<PublishClaim | null>,
+        reporter: ErrorReporter,
+        deps: PublisherDeps = makeDeps(),
+        settings: SimRecapSettings = ENABLED,
+        log: (line: string) => void = vi.fn(),
+    ) {
+        return createSweeper({ settings, api: { claimNext, enabled: async () => true }, depsFactory: () => deps, log, reporter });
+    }
+
+    it('alerts once on a sweep crash', async () => {
+        const reporter = mockReporter();
+
+        await build(throwing, reporter).kick();
+
+        expect(reporter.report).toHaveBeenCalledTimes(1);
+        const failure = reporter.report.mock.calls[0]?.[0];
+        expect(failure?.kind).toBe('sweep-crash');
+        expect(failure?.sim).toBeNull();
+    });
+
+    it('sends no second alert when the same crash repeats next sweep', async () => {
+        const { reporter, fetchFn } = realReporter();
+        const sweeper = build(throwing, reporter);
+
+        await sweeper.kick();
+        await sweeper.kick();
+
+        expect(fetchFn).toHaveBeenCalledTimes(1);
+    });
+
+    it('alerts a step that gave up with its sim and step', async () => {
+        const reporter = mockReporter();
+        const log = vi.fn();
+        const claim: PublishClaim = {
+            sim: 7,
+            threadId: 'TH',
+            lastStep: -1,
+            script: {
+                sim: 7,
+                title: 'T',
+                steps: [{ index: 0, kind: 'thread_message', channel: 'thread', content: 'x', mentionUsers: [], mentionRoles: [], delayBeforeMs: 0 }],
+            },
+        };
+        const deps = makeDeps({ send: vi.fn(async () => { throw new Error('Missing Access'); }) });
+
+        await build(async () => claim, reporter, deps, ENABLED, log).kick();
+
+        expect(reporter.report).toHaveBeenCalledTimes(1);
+        const failure = reporter.report.mock.calls[0]?.[0];
+        expect(failure?.kind).toBe('step-gave-up');
+        expect(failure?.sim).toBe(7);
+        expect(failure?.step).toEqual({ index: 0, kind: 'thread_message' });
+        expect(log).toHaveBeenCalledWith('sim-recap: sweep stopped: Missing Access');
+    });
+
+    function stuckKinds(reporter: ReturnType<typeof mockReporter>): string[] {
+        return reporter.report.mock.calls.map((call) => String(call[0].kind)).filter((kind) => kind === 'stuck');
+    }
+
+    async function kickStuck(times: number) {
+        const reporter = mockReporter();
+        const deps = makeDeps({ finish: vi.fn(async () => { throw new Error('http 500'); }) });
+        const sweeper = build(async () => emptyClaim(9), reporter, deps);
+        for (let i = 0; i < times; i++) await sweeper.kick();
+        return reporter;
+    }
+
+    it('alerts a sim stuck at the same step for three sweeps', async () => {
+        const reporter = await kickStuck(3);
+
+        expect(stuckKinds(reporter)).toHaveLength(1);
+        const stuck = reporter.report.mock.calls.map((call) => call[0]).find((f) => f.kind === 'stuck');
+        expect(stuck?.sim).toBe(9);
+    });
+
+    it('does not alert stuck after only two sweeps', async () => {
+        const reporter = await kickStuck(2);
+
+        expect(stuckKinds(reporter)).toHaveLength(0);
+    });
+
+    it('a failing reporter never stops publishing', async () => {
+        const reporter = { report: vi.fn(async () => { throw new Error('webhook down'); }), resolve: vi.fn() };
+        const deps = makeDeps();
+
+        await expect(build(throwing, reporter, deps).kick()).resolves.toBeUndefined();
+
+        const claims: Array<PublishClaim | null> = [emptyClaim(5), null];
+        await build(async () => claims.shift() ?? null, reporter, deps).kick();
+
+        expect(deps.finish).toHaveBeenCalledWith(5);
+    });
+
+    it('sends no alert when the publisher is disabled', async () => {
+        const reporter = mockReporter();
+
+        await build(throwing, reporter, makeDeps(), { enabled: false }).kick();
+
+        expect(reporter.report).not.toHaveBeenCalled();
+    });
+
+    it('a clean sweep re-arms the sweep-crash alert', async () => {
+        const { reporter, fetchFn } = realReporter();
+        let mode: 'crash' | 'clean' = 'crash';
+        const sweeper = build(async () => {
+            if (mode === 'crash') throw new Error('http 500');
+            return null;
+        }, reporter);
+
+        await sweeper.kick();
+        mode = 'clean';
+        await sweeper.kick();
+        mode = 'crash';
+        await sweeper.kick();
+
+        expect(fetchFn).toHaveBeenCalledTimes(2);
     });
 });

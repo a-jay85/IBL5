@@ -5,6 +5,7 @@ import { createSimRecapApi } from './api.js';
 import { searchGif } from './giphy.js';
 import { createSweeper, type Sweeper } from './sweeper.js';
 import type { PublisherDeps } from './publisher.js';
+import { createErrorReporter, type ErrorReporter } from './error-reporter.js';
 
 export class GuildMismatchError extends Error {
     constructor() {
@@ -92,6 +93,12 @@ export function createPublisherDeps(options: AdapterOptions): PublisherDeps {
     };
 }
 
+/** Failure alerts exist only for an enabled publisher; a disabled one never alerts. */
+export function reporterFor(settings: SimRecapSettings): ErrorReporter | undefined {
+    if (!settings.enabled) return undefined;
+    return createErrorReporter({ webhookUrl: settings.errorsWebhookUrl });
+}
+
 /** Production wiring: one sweeper whose per-process token backs every claim and progress call. */
 export function createDiscordSweeper(client: Client, settings: SimRecapSettings): Sweeper {
     if (!settings.enabled) {
@@ -106,5 +113,6 @@ export function createDiscordSweeper(client: Client, settings: SimRecapSettings)
         settings,
         api,
         depsFactory: token => createPublisherDeps({ client, settings, api, token }),
+        reporter: reporterFor(settings),
     });
 }

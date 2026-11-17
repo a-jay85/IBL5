@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { Client } from 'discord.js';
-import { createPublisherDeps, GuildMismatchError } from './discord-adapter.js';
+import { createPublisherDeps, GuildMismatchError, reporterFor } from './discord-adapter.js';
 import type { EnabledSimRecapSettings } from './settings.js';
 
 const SETTINGS: EnabledSimRecapSettings = {
@@ -104,5 +104,20 @@ describe('createPublisherDeps', () => {
 
         expect(api.progress).toHaveBeenCalledWith(12, 'tok', 4, 'TH');
         expect(api.finish).toHaveBeenCalledWith(12, 'tok');
+    });
+});
+
+describe('reporterFor', () => {
+    it('reporterFor returns no reporter when the publisher is disabled', () => {
+        const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+        try {
+            expect(reporterFor({ enabled: false })).toBeUndefined();
+
+            const reporter = reporterFor({ ...SETTINGS, errorsWebhookUrl: 'https://discord.com/api/webhooks/1/abc' });
+
+            expect(typeof reporter?.report).toBe('function');
+        } finally {
+            spy.mockRestore();
+        }
     });
 });

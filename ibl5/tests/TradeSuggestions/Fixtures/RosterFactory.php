@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\TradeSuggestions\Fixtures;
 
 use League\League;
-use TradeSuggestions\LeagueStarterRanks;
 use TradeSuggestions\ProductionLine;
 use TradeSuggestions\ProductionSource;
 use TradeSuggestions\SlotMapper;
@@ -35,6 +34,7 @@ final class RosterFactory
         ?int $points = null,
         array $laterSalaries = [],
         int $futureSalary = 0,
+        ?string $name = null,
     ): SuggestionPlayer {
         $production = $points === null
             ? null
@@ -42,7 +42,7 @@ final class RosterFactory
 
         return new SuggestionPlayer(
             pid: $pid,
-            name: 'Player ' . $pid,
+            name: $name ?? 'Player ' . $pid,
             pos: $pos,
             age: $age,
             injured: false,
@@ -77,29 +77,5 @@ final class RosterFactory
         }
 
         return new TeamDepth($full, true);
-    }
-
-    /**
-     * League ranks at one slot: the given starter plus one rival starter per
-     * entry in $rivalPoints, each on its own team.
-     *
-     * @param list<int> $rivalPoints
-     */
-    public static function ranks(string $slot, ?SuggestionPlayer $starter, array $rivalPoints): LeagueStarterRanks
-    {
-        $depths = [];
-        if ($starter !== null) {
-            $depths[] = self::depth([$slot => $starter]);
-        }
-        foreach ($rivalPoints as $i => $points) {
-            $depths[] = self::depth([$slot => self::player(90000 + $i, $slot, points: $points)]);
-        }
-
-        return LeagueStarterRanks::build($depths);
-    }
-
-    public static function emptyRanks(): LeagueStarterRanks
-    {
-        return LeagueStarterRanks::build([]);
     }
 }

@@ -86,6 +86,18 @@ class TeamModeServiceTest extends TestCase
         self::assertSame(TeamMode::WinNow, $rebuild->guessed);
     }
 
+    /** @see TeamModeService::resolveFromInputs() Middle arm */
+    public function testMiddleOverrideResolvesMiddleWithGuess(): void
+    {
+        $winning = new ModeInputs(30, 10, 62, 20, 27.0, 0.6);
+
+        $resolved = $this->service()->resolveFromInputs(TeamModeSetting::Middle, $winning, true);
+
+        self::assertSame(TeamMode::Middle, $resolved->mode);
+        self::assertSame(TeamMode::WinNow, $resolved->guessed);
+        self::assertTrue($resolved->isOverride);
+    }
+
     private function service(): TeamModeService
     {
         return new TeamModeService(self::createStub(TeamModeRepositoryInterface::class), new TeamModeGuesser());

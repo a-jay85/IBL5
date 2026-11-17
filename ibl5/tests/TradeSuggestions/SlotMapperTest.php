@@ -107,6 +107,37 @@ final class SlotMapperTest extends TestCase
     }
 
     /**
+     * A real rotation role starts at 15 depth-chart minutes: 15 and 16 are
+     * in, 14 is out. Literal numbers, so a changed constant fails here.
+     */
+    public function testRealMinutesConstantIs15(): void
+    {
+        $players = [
+            self::player(1, 'PG', [], dcMinutes: 16),
+            self::player(2, 'PG', [], dcMinutes: 15),
+            self::player(3, 'PG', [], dcMinutes: 14),
+            self::player(4, 'PG', [], dcMinutes: 0),
+        ];
+
+        $rotation = SlotMapper::rotationAt($players, 'PG');
+
+        self::assertSame([1, 2], array_map(static fn (SuggestionPlayer $p): int => $p->pid, $rotation));
+    }
+
+    public function testRotationIsAListWhenAnEarlierPlayerIsFilteredOut(): void
+    {
+        $players = [
+            self::player(1, 'PG', [], dcMinutes: 0),
+            self::player(2, 'PG', [], dcMinutes: 30),
+        ];
+
+        $rotation = SlotMapper::rotationAt($players, 'PG');
+
+        self::assertSame([0], array_keys($rotation));
+        self::assertSame(2, $rotation[0]->pid);
+    }
+
+    /**
      * @param array<string, int> $depth
      */
     private static function player(int $pid, string $pos, array $depth, int $dcMinutes = 0): SuggestionPlayer

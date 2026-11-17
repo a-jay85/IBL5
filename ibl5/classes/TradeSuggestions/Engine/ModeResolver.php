@@ -9,6 +9,7 @@ use Season\Season;
 use Trading\Contracts\TradeFormRepositoryInterface;
 use TradeSuggestions\Contracts\SuggestionAssetRepositoryInterface;
 use TradeSuggestions\Contracts\TeamModeRepositoryInterface;
+use TradeSuggestions\ResolvedTeamMode;
 use TradeSuggestions\TeamAssets;
 use TradeSuggestions\TeamMode;
 use TradeSuggestions\TeamModeGuesser;
@@ -23,9 +24,17 @@ use TradeSuggestions\TeamModeSetting;
  * The steps copy `TradeSuggestionsService` (team list, rosters, current W/L
  * from the draft order, prior W/L, guesser inputs, stored overrides) and add
  * `allowMiddle: true`, so an Auto team near .500 resolves to Middle.
+ *
+ * The full results of the latest `resolveAll()` call stay readable through
+ * `lastResolved()`, so the panel's mode line keeps the guess behind an
+ * override without a second roster load. Nothing is memoized: every
+ * `resolveAll()` call re-reads the stored settings.
  */
 final class ModeResolver
 {
+    /** @var array<int, ResolvedTeamMode> */
+    private array $lastResolved = [];
+
     public function __construct(
         private readonly SuggestionAssetRepositoryInterface $assetRepo,
         private readonly ProjectedDraftOrderServiceInterface $draftOrderService,
@@ -65,15 +74,29 @@ final class ModeResolver
         $inputs = TeamModeGuesser::inputsForLeague($assets, $current, $prior);
         $stored = $this->teamModeRepo->getAllStoredSettings();
 
+        $resolved = [];
         $modes = [];
         foreach ($allTids as $tid) {
-            $modes[$tid] = $this->teamModeService->resolveFromInputs(
+            $resolved[$tid] = $this->teamModeService->resolveFromInputs(
                 $stored[$tid] ?? TeamModeSetting::Auto,
                 $inputs[$tid],
                 allowMiddle: true,
-            )->mode;
+            );
+            $modes[$tid] = $resolved[$tid]->mode;
         }
+        $this->lastResolved = $resolved;
 
         return $modes;
+    }
+
+    /**
+     * Every team's full resolution from the latest `resolveAll()` call; empty
+     * before the first call.
+     *
+     * @return array<int, ResolvedTeamMode> Keyed by tid
+     */
+    public function lastResolved(): array
+    {
+        return $this->lastResolved;
     }
 }

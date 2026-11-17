@@ -36,6 +36,26 @@ class ProductionLineTest extends TestCase
         self::assertSame(2000, $chosen->minutes);
     }
 
+    /**
+     * The sample bar is 400 minutes on both lines: 400 counts and 399 does
+     * not. Literal numbers, so a changed constant fails here.
+     */
+    public function testMinSampleMinutesConstantIs400(): void
+    {
+        self::assertSame(ProductionSource::CurrentSeason, ProductionLine::choose(self::current(400), self::hist(400))?->source);
+        self::assertSame(ProductionSource::LastSeason, ProductionLine::choose(self::current(399), self::hist(400))?->source);
+        self::assertNull(ProductionLine::choose(self::current(399), self::hist(399)));
+    }
+
+    public function testChooseTakesLastSeasonAtExactlyMinimumSample(): void
+    {
+        $chosen = ProductionLine::choose(null, self::hist(ProductionLine::MIN_SAMPLE_MINUTES));
+
+        self::assertNotNull($chosen);
+        self::assertSame(ProductionSource::LastSeason, $chosen->source);
+        self::assertSame(ProductionLine::MIN_SAMPLE_MINUTES, $chosen->minutes);
+    }
+
     public function testChooseReturnsNullForRookieWithoutHistory(): void
     {
         self::assertNull(ProductionLine::choose(self::current(194), null));

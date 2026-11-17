@@ -39,19 +39,49 @@ final class NewsFactory implements ModuleFactoryInterface
         $tradeValidator = new \Trading\TradeValidator($db, $season);
         $teamModeRepo = new \TradeSuggestions\TeamModeRepository($db);
 
-        $tradeSuggestionsService = new \TradeSuggestions\TradeSuggestionsService(
-            new \TradeSuggestions\TeamModeService($teamModeRepo, new \TradeSuggestions\TeamModeGuesser()),
+        $assetRepo = new \TradeSuggestions\SuggestionAssetRepository($db);
+        $draftOrder = new \ProjectedDraftOrder\ProjectedDraftOrderService(new \ProjectedDraftOrder\ProjectedDraftOrderRepository($db));
+        // One resolver for the loader, the provider and the service, so the
+        // panel's mode line reads the run the provider just made.
+        $modeResolver = new \TradeSuggestions\Engine\ModeResolver(
+            $assetRepo,
+            $draftOrder,
             $teamModeRepo,
-            new \TradeSuggestions\SuggestionAssetRepository($db),
-            new \ProjectedDraftOrder\ProjectedDraftOrderService(new \ProjectedDraftOrder\ProjectedDraftOrderRepository($db)),
             $tradeFormRepo,
-            new \Settings\SettingsService($season),
+            new \TradeSuggestions\TeamModeService($teamModeRepo, new \TradeSuggestions\TeamModeGuesser()),
             $season,
-            new \TradeSuggestions\PickValuer(),
-            new \TradeSuggestions\NeedsCardBuilder(),
-            new \TradeSuggestions\NeedPairMatcher(),
-            new \TradeSuggestions\NeedJudge(),
-            new \TradeSuggestions\ReasonBuilder(),
+        );
+        $snapshots = new \TradeSuggestions\Engine\CachedLeagueSnapshotProvider(
+            new \TradeSuggestions\Engine\LeagueSnapshotLoader(
+                new \TradeSuggestions\Projection\ProjectionPlayerRepository($db),
+                new \TradeSuggestions\Valuation\ValuationTeamFactorsRepository($db),
+                new \Standings\StandingsRepository($db),
+                $draftOrder,
+                $assetRepo,
+                $tradeFormRepo,
+                $modeResolver,
+                $season,
+            ),
+            new \Cache\DatabaseCache($db),
+            new \TradeSuggestions\Engine\SnapshotKeyRepository($db),
+            $modeResolver,
+            $season,
+        );
+
+        $tradeSuggestionsService = new \TradeSuggestions\TradeSuggestionsService(
+            $snapshots,
+            new \TradeSuggestions\Engine\CandidateGenerator([
+                new \TradeSuggestions\Engine\Shape\OneForOne(),
+                new \TradeSuggestions\Engine\Shape\TwoForOne(),
+                new \TradeSuggestions\Engine\Shape\OneForTwo(),
+                new \TradeSuggestions\Engine\Shape\StarForYoungAndPicks(),
+                new \TradeSuggestions\Engine\Shape\DumpPaidWithPick(),
+                new \TradeSuggestions\Engine\Shape\ExpiringForLong(),
+                new \TradeSuggestions\Engine\Shape\PickSwap(),
+                new \TradeSuggestions\Engine\Shape\ChangeOfScenery(),
+            ]),
+            \TradeSuggestions\Veto\VetoSet::standard(),
+            new \TradeSuggestions\Engine\DealRanker(),
             new \TradeSuggestions\SuggestionValidationFilter(
                 $tradeValidator,
                 new \Trading\TradeCapCalculator(
@@ -63,7 +93,9 @@ final class NewsFactory implements ModuleFactoryInterface
                 $tradeFormRepo,
                 $season,
             ),
-            new \TradeSuggestions\SuggestionRanker(),
+            $tradeFormRepo,
+            new \Settings\SettingsService($season),
+            $modeResolver,
         );
 
         return new \Topics\News\NewsController(

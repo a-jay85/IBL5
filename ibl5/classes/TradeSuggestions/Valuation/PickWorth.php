@@ -13,7 +13,7 @@ use TradeSuggestions\TeamMode;
  * - The first overall pick is worth four bottom-tier places (a starter-grade
  *   upgrade at one slot) and a late first is worth one. A second is worth a fifth
  *   to four-fifths of a place (a rotation body). The ratios mirror the v2
- *   `PickValuer` spread, rescaled into rank places.
+ *   pick spread, rescaled into rank places.
  * - `UNKNOWN_SLOT_T`: a pick whose team is not in the projection, or a pick more
  *   than zero years away, prices at the league middle.
  * - `YEARS_AWAY_WEIGHTS`: rebuilders want near picks, because prospects arrive

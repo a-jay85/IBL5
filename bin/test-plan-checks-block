@@ -466,6 +466,15 @@ chk "curl nested in php args stays LOCAL" routes_local 'php x.php $(curl -s iblh
 chk "slug host before ) routes CI" routes_ci 'test "$(curl -s -o /dev/null -w %{http_code} http://x.localhost)" = 200'
 end_case
 
+start_case case_remote_url_in_php_bun_bunx_stays_local
+chk "php with a remote URL stays LOCAL" routes_local 'php ibl5/scripts/x.php https://iblhoops.net/ibl5/'
+chk "bun with a remote URL stays LOCAL" routes_local 'bun run x.ts https://iblhoops.net/ibl5/'
+chk "bunx with a remote URL stays LOCAL" routes_local 'bunx tsx x.ts --url=https://iblhoops.net/ibl5/'
+chk "php with a localhost URL routes CI" routes_ci 'php ibl5/scripts/x.php http://localhost/ibl5/'
+chk "bun with a slug URL routes CI" routes_ci 'bun run x.ts http://x.localhost/ibl5/'
+chk "bunx with a 127.0.0.1 URL routes CI" routes_ci 'bunx tsx x.ts --url=http://127.0.0.1/ibl5/'
+end_case
+
 row_rewrite() {
     (
         # shellcheck source=bin/lib/plan-matrix-rows.sh

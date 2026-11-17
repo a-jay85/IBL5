@@ -9,6 +9,7 @@ rebased onto newer master". Both must fail closed.
 """
 from __future__ import annotations
 
+import json
 import logging
 import re
 import subprocess
@@ -232,8 +233,75 @@ def update_branch_merge_equivalent(expected_sha, remote_sha, worktree, *, run_gi
         return False
 
 
+# Longest run of merged stacked child PRs stacked_child_merge_equivalent walks from
+# expected_sha to remote_sha. A longer run fails closed (stays diverged).
+STACKED_CHILD_CHAIN_CAP = 10
+
+
+def _merged_child_pr(sha, branch, worktree, *, gh_cmd=None):
+    """Number of the one PR whose merge commit is sha and whose base is branch.
+    None on any doubt: gh error, timeout, non-JSON, no PR, open PR, other base."""
+    argv = list(gh_cmd or ["gh"]) + ["api", f"repos/{{owner}}/{{repo}}/commits/{sha}/pulls"]
+    try:
+        r = subprocess.run(argv, cwd=worktree, capture_output=True, text=True,
+                           timeout=GH_TIMEOUT)
+        if r.returncode != 0 or not r.stdout.strip():  # gh error or empty answer
+            return None
+        pulls = json.loads(r.stdout)
+    except (subprocess.TimeoutExpired, OSError, ValueError):  # gh timeout or non-JSON
+        return None
+    if not isinstance(pulls, list):
+        return None
+    hits = [p for p in pulls
+            if isinstance(p, dict)
+            and p.get("merge_commit_sha") == sha
+            and p.get("merged_at")
+            and isinstance(p.get("base"), dict)
+            and p["base"].get("ref") == branch
+            and isinstance(p.get("number"), int)]
+    if len(hits) != 1:
+        return None
+    return hits[0]["number"]
+
+
+def stacked_child_merge_equivalent(expected_sha, local_sha, remote_sha, branch, worktree, *,
+                                   run_git=None, gh_cmd=None) -> tuple[int, ...]:
+    """PR numbers when remote_sha is expected_sha plus 1..STACKED_CHILD_CHAIN_CAP
+    commits, each the merge commit of a MERGED PR whose base is branch (a stacked
+    child PR merged into this PR's branch). Empty tuple = not this case.
+    Every arm fails closed: local_sha != expected_sha (unpushed local work that a
+    reset would drop), git fetch rc != 0, expected_sha not an ancestor of
+    remote_sha, an empty or over-cap range, any git timeout or OSError, and any
+    commit _merged_child_pr cannot tie to exactly one merged child PR."""
+    if not expected_sha or not remote_sha or not branch or local_sha != expected_sha:
+        return ()
+    _run = run_git or _default_run_git
+    try:
+        if netretry.call_rc(lambda: _run(["fetch", "origin"], worktree),
+                            label="git fetch origin").returncode != 0:
+            log.warning("stacked_child_merge_equivalent: git fetch failed — treating as not equivalent")
+            return ()
+        if _run(["merge-base", "--is-ancestor", expected_sha, remote_sha], worktree).returncode != 0:
+            return ()
+        rl = _run(["rev-list", "--reverse", f"{expected_sha}..{remote_sha}"], worktree)
+        if rl.returncode != 0:
+            return ()
+        commits = rl.stdout.split()
+        if not commits or len(commits) > STACKED_CHILD_CHAIN_CAP:
+            return ()
+    except (subprocess.TimeoutExpired, OSError):
+        return ()
+    prs = []
+    for c in commits:
+        n = _merged_child_pr(c, branch, worktree, gh_cmd=gh_cmd)
+        if n is None:  # not a merged child PR of this branch
+            return ()
+        prs.append(n)
+    return tuple(prs)  # every commit is a merged child PR
+
+
 def sync_to_remote(branch, worktree, *, run_git=None) -> str:
-    """Reset the worktree HEAD to origin/<branch>. Precondition: content_equivalent, patch_series_equivalent or update_branch_merge_equivalent is True."""
+    """Reset the worktree HEAD to origin/<branch>. Precondition: content_equivalent, patch_series_equivalent, update_branch_merge_equivalent or stacked_child_merge_equivalent is True."""
     _run = run_git or _default_run_git
     try:
         netretry.call_rc(lambda: _run(["fetch", "origin"], worktree), label="git fetch origin")
@@ -354,17 +422,20 @@ def restore_tracking_ref(remote, branch, lease_sha, worktree, *, run_git=None) -
 
 @dataclass
 class Reconcile:
-    action: str          # "match" | "synced" | "diverged"
+    action: str          # "match" | "synced" | "stacked-child" | "diverged"
     remote_sha: str
     evidence: str
+    child_prs: tuple[int, ...] = ()   # merged stacked child PRs; set only for "stacked-child"
 
 
 def reconcile_remote_head(pr, expected_sha, local_sha, branch, worktree, *,
-                          gh_cmd=None, run_git=None, sleep=None) -> Reconcile:
+                          gh_cmd=None, run_git=None, sleep=None,
+                          allow_stacked_child=False) -> Reconcile:
     """Single decision function. Every guarded site calls this one function.
 
     match   — remote head equals expected_sha; no mutation.
     synced  — remote moved but is tree-equivalent, is the same patch series rebased onto newer master, or is a GitHub "Update branch" merge of master onto expected_sha; worktree reset to remote head.
+    stacked-child — opt-in (allow_stacked_child=True): remote is expected_sha plus merged stacked child PR commits; worktree reset to remote head; the caller must restart review before arming.
     diverged — remote head has different content; caller must fail closed.
     """
     ok, remote = remote_head_matches(pr, expected_sha, gh_cmd=gh_cmd, sleep=sleep)
@@ -411,6 +482,19 @@ def reconcile_remote_head(pr, expected_sha, local_sha, branch, worktree, *,
         log.info("reconcile_remote_head: remote %s is an update-branch merge of master onto "
                  "%s; adopting", remote[:8], expected_sha[:8])
         return _adopt("update-branch merge of master")
+    if allow_stacked_child:  # opt-in: only post-review call sites restart on this
+        child_prs = stacked_child_merge_equivalent(expected_sha, local_sha, remote, _branch,
+                                                   worktree, run_git=run_git, gh_cmd=gh_cmd)
+        if child_prs:
+            child_sha = sync_to_remote(_branch, worktree, run_git=run_git)
+            if child_sha == remote:
+                names = ", ".join(f"#{n}" for n in child_prs)
+                log.info("reconcile_remote_head: remote %s adds merged stacked child PR(s) %s "
+                         "onto %s; adopting for re-review", remote[:8], names, expected_sha[:8])
+                return Reconcile(
+                    "stacked-child", child_sha,
+                    f"remote head moved {expected_sha[:8]} -> {remote[:8]}; merged stacked "
+                    f"child PR(s) {names}; synced", child_prs=child_prs)
     log.error(
         "reconcile_remote_head: remote head %s diverged from %s with different content",
         remote[:8] if remote else "?", expected_sha[:8] if expected_sha else "?"

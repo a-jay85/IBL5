@@ -4,6 +4,7 @@ type FetchFn = typeof fetch;
 
 export interface SimRecapApi {
     claimNext(token: string): Promise<PublishClaim | null>;
+    enabled(): Promise<boolean>;
     progress(sim: number, token: string, step: number, threadId: string | null): Promise<boolean>;
     finish(sim: number, token: string): Promise<boolean>;
 }
@@ -37,6 +38,20 @@ export function createSimRecapApi(options: SimRecapApiOptions): SimRecapApi {
     }
 
     return {
+        async enabled() {
+            const response = await post('enabled', {});
+            if (!response.ok) throw failure('enabled', response);
+            const raw = await response.json() as { status?: unknown; data?: unknown } | null;
+            // The IBL API wraps successes as {status:'success', data:{...}}; accept a bare payload too.
+            const body: unknown = raw !== null && typeof raw === 'object' && raw.status === 'success' && raw.data !== undefined
+                ? raw.data
+                : raw;
+            if (typeof body !== 'object' || body === null || typeof (body as { enabled?: unknown }).enabled !== 'boolean') {
+                throw new Error('sim-recap api enabled failed: malformed body');
+            }
+            return (body as { enabled: boolean }).enabled;
+        },
+
         async claimNext(token) {
             const response = await post('claim-next', { token });
             if (response.status === 204) return null;

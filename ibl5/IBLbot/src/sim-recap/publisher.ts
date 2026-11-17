@@ -40,6 +40,7 @@ export interface PublisherDeps {
     searchGif(query: string): Promise<string | null>;
     progress(sim: number, step: number, threadId: string | null): Promise<boolean>;
     finish(sim: number): Promise<boolean>;
+    postingEnabled(): Promise<boolean>;
     sleep(ms: number): Promise<void>;
     log(line: string): void;
 }
@@ -91,11 +92,16 @@ function channelIdFor(step: PublishStep, target: PublishTarget, threadId: string
     return threadId;
 }
 
+/** Fail closed: a false, a throw, or a rejected read all mean "posting is off". */
+async function postingAllowed(deps: PublisherDeps): Promise<boolean> {
+    return deps.postingEnabled().then((on) => on === true, () => false);
+}
+
 export async function runPublish(
     claim: PublishClaim,
     target: PublishTarget,
     deps: PublisherDeps,
-): Promise<'finished' | 'lost-claim'> {
+): Promise<'finished' | 'lost-claim' | 'stopped'> {
     const { sim, script } = claim;
     let threadId = claim.threadId;
     let reconcilePending = true;
@@ -104,6 +110,13 @@ export async function runPublish(
         if (step.index <= claim.lastStep) continue;
 
         await deps.sleep(step.delayBeforeMs);
+
+        // Checked only between steps, never between a send and its progress call, so last_step
+        // always equals the last posted message when the run stops.
+        if (!(await postingAllowed(deps))) {
+            deps.log(`sim-recap: sim ${sim} posting switched off; stopping before step ${step.index}`);
+            return 'stopped';
+        }
 
         const channelId = channelIdFor(step, target, threadId);
         const allowed = allowedMentionsFor(step, target.stripMentions);

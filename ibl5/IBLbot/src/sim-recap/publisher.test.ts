@@ -56,6 +56,9 @@ function makeFakes(overrides: Partial<PublisherDeps> = {}): Fakes {
             finishCalls.push(sim);
             return true;
         },
+        async postingEnabled() {
+            return true;
+        },
         async sleep(ms) {
             sleeps.push(ms);
         },
@@ -208,5 +211,41 @@ describe('runPublish', () => {
         expect(f.progressCalls.map(p => p.step)).toContain(gifStep?.index);
         expect(f.finishCalls).toEqual([fixture.sim]);
         expect(f.logs).toContain('sim-recap: gif skipped');
+    });
+
+    it('stops before the next step when posting is switched off', async () => {
+        const answers = [true, false];
+        const f = makeFakes({ postingEnabled: async () => answers.shift() ?? false });
+        const script = { sim: 5, title: 'T', steps: fixture.steps.slice(0, 3) };
+
+        const result = await runPublish({ sim: 5, threadId: null, lastStep: -1, script }, PROD_TARGET, f.deps);
+
+        expect(result).toBe('stopped');
+        expect(f.sent).toHaveLength(1);
+        expect(f.progressCalls).toHaveLength(1);
+        expect(f.progressCalls[0]?.step).toBe(script.steps[0]?.index);
+        expect(f.finishCalls).toEqual([]);
+    });
+
+    it('posts nothing when the enabled read throws', async () => {
+        const f = makeFakes({ postingEnabled: async () => { throw new Error('http 500'); } });
+
+        const result = await runPublish(claim(), PROD_TARGET, f.deps);
+
+        expect(result).toBe('stopped');
+        expect(f.sent).toHaveLength(0);
+        expect(f.progressCalls).toHaveLength(0);
+        expect(f.finishCalls).toEqual([]);
+    });
+
+    it('posts every step while posting stays on', async () => {
+        const f = makeFakes({ postingEnabled: async () => true });
+
+        const result = await runPublish(claim(), PROD_TARGET, f.deps);
+
+        expect(result).toBe('finished');
+        expect(f.sent).toHaveLength(fixture.steps.length);
+        expect(f.progressCalls).toHaveLength(fixture.steps.length);
+        expect(f.finishCalls).toEqual([fixture.sim]);
     });
 });

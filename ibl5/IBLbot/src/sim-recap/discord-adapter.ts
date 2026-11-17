@@ -16,7 +16,7 @@ export class GuildMismatchError extends Error {
 export interface AdapterOptions {
     client: Client;
     settings: EnabledSimRecapSettings;
-    api: Pick<SimRecapApi, 'progress' | 'finish'>;
+    api: Pick<SimRecapApi, 'progress' | 'finish' | 'enabled'>;
     token: string;
     log?: (line: string) => void;
     sleep?: (ms: number) => Promise<void>;
@@ -83,6 +83,10 @@ export function createPublisherDeps(options: AdapterOptions): PublisherDeps {
             return api.finish(sim, token);
         },
 
+        postingEnabled() {
+            return api.enabled();
+        },
+
         sleep,
         log,
     };
@@ -93,7 +97,7 @@ export function createDiscordSweeper(client: Client, settings: SimRecapSettings)
     if (!settings.enabled) {
         return createSweeper({
             settings,
-            api: { claimNext: async () => null },
+            api: { claimNext: async () => null, enabled: async () => false },
             depsFactory: () => { throw new Error('sim-recap publisher disabled'); },
         });
     }

@@ -27,6 +27,7 @@ function makeDeps(overrides: Partial<PublisherDeps> = {}): PublisherDeps {
         searchGif: vi.fn(async () => null),
         progress: vi.fn(async () => true),
         finish: vi.fn(async () => true),
+        postingEnabled: vi.fn(async () => true),
         sleep: vi.fn(async () => undefined),
         log: vi.fn(),
         ...overrides,
@@ -42,7 +43,7 @@ describe('createSweeper', () => {
         const claims: Array<PublishClaim | null> = [emptyClaim(1), emptyClaim(2), null];
         const claimNext = vi.fn(async () => claims.shift() ?? null);
         const deps = makeDeps();
-        const sweeper = createSweeper({ settings: ENABLED, api: { claimNext }, depsFactory: () => deps, log: vi.fn() });
+        const sweeper = createSweeper({ settings: ENABLED, api: { claimNext, enabled: async () => true }, depsFactory: () => deps, log: vi.fn() });
 
         await sweeper.kick();
 
@@ -66,7 +67,7 @@ describe('createSweeper', () => {
         };
         const claimNext = vi.fn(async () => lostClaim);
         const deps = makeDeps({ progress: vi.fn(async () => false) });
-        const sweeper = createSweeper({ settings: ENABLED, api: { claimNext }, depsFactory: () => deps, log });
+        const sweeper = createSweeper({ settings: ENABLED, api: { claimNext, enabled: async () => true }, depsFactory: () => deps, log });
 
         await sweeper.kick();
 
@@ -74,16 +75,61 @@ describe('createSweeper', () => {
         expect(deps.finish).not.toHaveBeenCalled();
 
         const throwingClaim = vi.fn(async () => { throw new Error('http 500'); });
-        const sweeper2 = createSweeper({ settings: ENABLED, api: { claimNext: throwingClaim }, depsFactory: () => deps, log });
+        const sweeper2 = createSweeper({ settings: ENABLED, api: { claimNext: throwingClaim, enabled: async () => true }, depsFactory: () => deps, log });
         await sweeper2.kick();
         expect(throwingClaim).toHaveBeenCalledTimes(1);
         expect(log).toHaveBeenCalledWith('sim-recap: sweep stopped: http 500');
     });
 
+    it('does not claim when posting is switched off', async () => {
+        const log = vi.fn();
+        const claimNext = vi.fn(async () => emptyClaim(1));
+        const sweeper = createSweeper({ settings: ENABLED, api: { claimNext, enabled: async () => false }, depsFactory: () => makeDeps(), log });
+
+        await sweeper.kick();
+
+        expect(claimNext).not.toHaveBeenCalled();
+        expect(log).toHaveBeenCalledWith('sim-recap: posting is switched off in the League Control Panel; not claiming');
+    });
+
+    it('does not claim when the enabled read throws', async () => {
+        const log = vi.fn();
+        const claimNext = vi.fn(async () => emptyClaim(1));
+        const enabled = vi.fn(async (): Promise<boolean> => { throw new Error('sim-recap api enabled failed: http 500'); });
+        const sweeper = createSweeper({ settings: ENABLED, api: { claimNext, enabled }, depsFactory: () => makeDeps(), log });
+
+        await sweeper.kick();
+
+        expect(claimNext).not.toHaveBeenCalled();
+        expect(log).toHaveBeenCalledWith('sim-recap: sweep stopped: sim-recap api enabled failed: http 500');
+    });
+
+    it('ends the sweep after a stopped outcome without re-claiming', async () => {
+        const claim: PublishClaim = {
+            sim: 9,
+            threadId: null,
+            lastStep: -1,
+            script: {
+                sim: 9,
+                title: 'T',
+                steps: [{ index: 0, kind: 'thread_start', channel: 'live_sims', content: 'x', mentionUsers: [], mentionRoles: [], delayBeforeMs: 0 }],
+            },
+        };
+        const claimNext = vi.fn(async () => claim);
+        const deps = makeDeps({ postingEnabled: vi.fn(async () => false) });
+        const sweeper = createSweeper({ settings: ENABLED, api: { claimNext, enabled: async () => true }, depsFactory: () => deps, log: vi.fn() });
+
+        await sweeper.kick();
+
+        expect(claimNext).toHaveBeenCalledTimes(1);
+        expect(deps.send).not.toHaveBeenCalled();
+        expect(deps.finish).not.toHaveBeenCalled();
+    });
+
     it('kick is single-flight', async () => {
         let release: (claim: PublishClaim | null) => void = () => undefined;
         const claimNext = vi.fn(() => new Promise<PublishClaim | null>(resolve => { release = resolve; }));
-        const sweeper = createSweeper({ settings: ENABLED, api: { claimNext }, depsFactory: () => makeDeps(), log: vi.fn() });
+        const sweeper = createSweeper({ settings: ENABLED, api: { claimNext, enabled: async () => true }, depsFactory: () => makeDeps(), log: vi.fn() });
 
         const first = sweeper.kick();
         const second = sweeper.kick();
@@ -94,7 +140,8 @@ describe('createSweeper', () => {
         await first;
 
         const third = sweeper.kick();
-        expect(claimNext).toHaveBeenCalledTimes(2);
+        // The enabled() read runs before claimNext, so claimNext is reached a tick later.
+        await vi.waitFor(() => expect(claimNext).toHaveBeenCalledTimes(2));
         release(null);
         await third;
     });
@@ -103,7 +150,7 @@ describe('createSweeper', () => {
         vi.useFakeTimers();
         const log = vi.fn();
         const claimNext = vi.fn(async () => null);
-        const sweeper = createSweeper({ settings: { enabled: false }, api: { claimNext }, depsFactory: () => makeDeps(), log });
+        const sweeper = createSweeper({ settings: { enabled: false }, api: { claimNext, enabled: async () => true }, depsFactory: () => makeDeps(), log });
 
         const handle = sweeper.start();
         await vi.advanceTimersByTimeAsync(600000);
@@ -117,7 +164,7 @@ describe('createSweeper', () => {
     it('start kicks once and then on the interval when enabled', async () => {
         vi.useFakeTimers();
         const claimNext = vi.fn(async () => null);
-        const sweeper = createSweeper({ settings: ENABLED, api: { claimNext }, depsFactory: () => makeDeps(), intervalMs: 300000, log: vi.fn() });
+        const sweeper = createSweeper({ settings: ENABLED, api: { claimNext, enabled: async () => true }, depsFactory: () => makeDeps(), intervalMs: 300000, log: vi.fn() });
 
         const handle = sweeper.start();
         await vi.advanceTimersByTimeAsync(0);

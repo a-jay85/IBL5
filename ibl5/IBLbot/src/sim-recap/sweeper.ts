@@ -5,7 +5,7 @@ import { runPublish, type PublisherDeps, type PublishTarget } from './publisher.
 
 export interface SweeperOptions {
     settings: SimRecapSettings;
-    api: Pick<SimRecapApi, 'claimNext'>;
+    api: Pick<SimRecapApi, 'claimNext' | 'enabled'>;
     /** Builds the Discord/API-backed deps for one claim token. */
     depsFactory: (token: string) => PublisherDeps;
     intervalMs?: number;
@@ -39,11 +39,19 @@ export function createSweeper(options: SweeperOptions): Sweeper {
             };
             const deps = depsFactory(token);
             for (;;) {
+                if (!(await api.enabled())) {
+                    log('sim-recap: posting is switched off in the League Control Panel; not claiming');
+                    return;
+                }
                 const claim = await api.claimNext(token);
                 if (claim === null) return;
                 const outcome = await runPublish(claim, target, deps);
                 if (outcome === 'lost-claim') {
                     log(`sim-recap: sim ${claim.sim} claim lost; stopping this sweep`);
+                    return;
+                }
+                if (outcome === 'stopped') {
+                    log(`sim-recap: sim ${claim.sim} stopped by the posting switch; ending this sweep`);
                     return;
                 }
             }

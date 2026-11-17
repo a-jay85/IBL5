@@ -25,7 +25,7 @@ Run the export after the site has processed the trades and the GMs have submitte
 
 ## What changes
 
-The commissioner no longer enters trades in JSB. Game Plan > Import All is not needed when the export is used, because the depth and minutes are already in the files. The export writes only `IBL5.plr` and `IBL5.plb`. Every other league file stays JSB's own, including `IBL5.trn`. F7 and F8 below were not checked on the VM yet, so the first real use doubles as that check.
+The commissioner no longer enters trades in JSB. Game Plan > Import All is not needed when the export is used, because the depth and minutes are already in the files. The export writes only `IBL5.plr` and `IBL5.plb`. Every other league file stays JSB's own, including `IBL5.trn`. The 2026-11-16 VM acceptance run passed. F7 and F8 below are still partly undetermined, and the first real use adds evidence for both.
 
 ## Teams without a site chart
 
@@ -37,7 +37,7 @@ The per-team depth chart .txt files still work as before. `DepthChartProcessor::
 
 ## Research findings (2026-11-16)
 
-I measured these on the real saves `08-09_19_reg-sim08.zip` (before the Grizzlies-Lakers trade) and `08-09_20_reg-sim09.zip` (after JSB applied it). The VM checks for F7 and F8 did not run in this pass. Each of those keeps the plan's default and says so.
+I measured these on the real saves `08-09_19_reg-sim08.zip` (before the Grizzlies-Lakers trade) and `08-09_20_reg-sim09.zip` (after JSB applied it). The 2026-11-16 VM acceptance run passed every step. F7 and F8 stay partly undetermined after it, and each keeps the plan's default and says so.
 
 - **F1.** The .plr file is CRLF-separated. Line 0 is a 607-char header, and the record for ordinal N sits at line index N. Ordinals 1-1440 are player slots, followed by 164 other lines and a trailing empty segment. Every empty slot is a full 607-char line whose pid field (offset 38, width 6) trims to 0. Empty lines are not all identical: sim08 has 21 distinct empty-line bodies after the ordinal field, though neighbours in one team block match (583 and 584 are identical). The relocator finds lines by reading the ordinal field and treats pid 0 as empty.
 - **F2.** JSB does not leave a hole when a player leaves. It re-packs the whole team block. After the trade Marcus Camby moved 579 to 580, Ricky Davis 610 to 605, Bruno Fernando 611 to 609, and Gani Lawal 613 to 612. No block in either save has an empty slot before a filled slot. So sim09 has no vacated slot to compare against, and the slots 582, 605, 608 hold shifted players. The export keeps the plan's swap rule: a vacated slot takes the target empty line's bytes with the vacated ordinal. This leaves holes JSB itself never writes. The 2026-11-16 VM run showed JSB accepts them: after the Turner and Martin trade it loaded the export, listed Lakers rows 605 and 608 as blank, and simmed a day.

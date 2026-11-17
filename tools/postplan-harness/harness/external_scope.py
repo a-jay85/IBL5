@@ -69,7 +69,7 @@ _DM_SAFE_TARGETS = ("/dev/null", "1", "2", "-")
 _DM_DENY_RE = re.compile(
     r"\b(?:curl|wget|nc|ncat|socat|ssh|scp|sftp|rsync|osascript|telnet|jq|eval|exec|source|xargs"
     r"|env|command|builtin|nohup|sudo|bash|sh|zsh|python3?|perl|ruby|node|php|awk)\b"
-    r"|/dev/(?:tcp|udp)\b|https?://|`|[<>]\(|\bprintf\s+-v\b|\$\{\w+:?="
+    r"|/dev/(?:tcp|udp)\b|https?://|`|[<>]\(|\bprintf\s+-v|\$\{\w+:?="
 )
 # Same-length mask characters for quoted text, `${...}`, and `$(...)` / `$((...))`.
 _DM_Q, _DM_V, _DM_S = "\x01", "\x02", "\x03"
@@ -198,11 +198,15 @@ def _sync_reason(body: list[str], idx: int, start: int) -> str | None:
     pos = side.index(idx)
     lo = pos
     while lo > 0 and body[side[lo - 1]].rstrip().endswith("\\"):
+        if _dm_comment_cont(body[side[lo - 1]][1:]):
+            return _R_CONTINUATION
         lo -= 1
     if lo == 0 and start > 1:
         return _R_CONTINUATION
     hi = pos
     while body[side[hi]].rstrip().endswith("\\"):
+        if _dm_comment_cont(body[side[hi]][1:]):
+            return _R_CONTINUATION
         hi += 1
         if hi == len(side):
             return _R_CONTINUATION
@@ -243,6 +247,18 @@ _DmStmt = tuple[str, str, str]  # (raw, masked, connector after it)
 _DmWords = tuple[list[str], "str | None", list[str], "str | None", list[str], str]
 
 
+def _dm_comment_cont(line: str) -> bool:
+    """True when a line ends in `\\` that sits inside an unquoted `#` comment. Bash does not
+    continue such a line."""
+    if not line.rstrip().endswith("\\"):
+        return False
+    masked = _dm_mask(line)
+    if masked is None:
+        return False
+    return any(c == "#" and o == " " and (i == 0 or line[i - 1] in " \t;&|(")
+               for i, (c, o) in enumerate(zip(line, masked[0])))
+
+
 def _dm_join(body: list[str], idx: int, start: int) -> str | tuple[str, list[int]]:
     """The backslash-continued command holding body[idx] and the body indexes it spans, joined
     over its own side of the hunk. Same walk as `_sync_reason`, so it returns `_R_CONTINUATION`
@@ -252,11 +268,15 @@ def _dm_join(body: list[str], idx: int, start: int) -> str | tuple[str, list[int
     pos = side.index(idx)
     lo = pos
     while lo > 0 and body[side[lo - 1]].rstrip().endswith("\\"):
+        if _dm_comment_cont(body[side[lo - 1]][1:]):
+            return _R_CONTINUATION
         lo -= 1
     if lo == 0 and start > 1:
         return _R_CONTINUATION
     hi = pos
     while body[side[hi]].rstrip().endswith("\\"):
+        if _dm_comment_cont(body[side[hi]][1:]):
+            return _R_CONTINUATION
         hi += 1
         if hi == len(side):
             return _R_CONTINUATION
@@ -468,7 +488,11 @@ def _dm_words(raw: str, masked: str) -> _DmWords:
         s, e = words[k]
         command = raw[s:e] if raw[s:e] == masked[s:e] else masked[s:e]
         if command == "local":
-            assigns += [masked[s2:e2].split("=", 1)[0] for s2, e2 in words[k + 1:]]
+            lwords = [masked[s2:e2] for s2, e2 in words[k + 1:]]
+            assigns += [w.split("=", 1)[0] for w in lwords]
+            if any(w.startswith("-") and "n" in w for w in lwords):
+                # `local -n r=TO` makes `r` a nameref: a later `r=...` writes `TO`.
+                assigns += [w.split("=", 1)[1] for w in lwords if "=" in w]
     return reserved, func, assigns, command, targets, core
 
 

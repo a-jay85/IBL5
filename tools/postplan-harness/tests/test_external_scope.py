@@ -400,3 +400,17 @@ def test_dm_function_shadowing_builtin_is_one_way():
 def test_dm_log_alias_of_spool_is_one_way():
     sec = _dm(350, '+    log="$SPOOL"', """+    printf '%s\\n' x >> "$log\"""")
     assert external_send_change(DM, sec) == _R_SEND
+
+
+def test_dm_printf_attached_v_flag_is_one_way():
+    assert external_send_change(DM, _dm(350, "+    printf -vTO '%s' 123")) is not None
+
+
+def test_dm_local_nameref_to_send_var_is_one_way():
+    sec = _dm(350, "+    local -n r=TO", '+    r="$OTHER"')
+    assert external_send_change(DM, sec) is not None
+
+
+def test_dm_comment_trailing_backslash_does_not_hide_next_line():
+    sec = _dm(350, "+    : # note \\", "+    TO=evil")
+    assert external_send_change(DM, sec) is not None

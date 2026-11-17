@@ -44,6 +44,28 @@ final class ModeResolverTest extends TestCase
         self::assertSame(TeamMode::Rebuild, $modes[2]);
     }
 
+    /** @see ModeResolver::lastResolved() */
+    public function testLastResolvedKeepsGuessForOverride(): void
+    {
+        $assetRepo = $this->assetRepo([1 => ['wins' => 72, 'losses' => 10], 2 => ['wins' => 72, 'losses' => 10]]);
+        $draftOrder = $this->draftOrder([self::slot(1, 70, 12), self::slot(2, 70, 12)]);
+        $resolver = $this->resolver($assetRepo, $draftOrder, [1 => TeamModeSetting::Rebuild]);
+
+        $resolver->resolveAll();
+        $user = $resolver->lastResolved()[1];
+
+        self::assertSame(TeamMode::Rebuild, $user->mode);
+        self::assertSame(TeamMode::WinNow, $user->guessed);
+        self::assertTrue($user->isOverride);
+    }
+
+    public function testLastResolvedEmptyBeforeFirstCall(): void
+    {
+        $resolver = $this->resolver($this->assetRepo([]), $this->draftOrder([]), []);
+
+        self::assertSame([], $resolver->lastResolved());
+    }
+
     public function testRostersReadWithSeasonPhaseAndLastSeasonYear(): void
     {
         $assetRepo = self::createMock(SuggestionAssetRepositoryInterface::class);

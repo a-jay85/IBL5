@@ -135,6 +135,17 @@ class TeamModeControllerTest extends TestCase
         self::assertSame([['tid' => 1, 'setting' => TeamModeSetting::WinNow]], $repo->saves);
     }
 
+    public function testWritesMiddleModeAndRedirectsToPanel(): void
+    {
+        $repo = $this->recordingRepo();
+        $post = $this->withValidCsrfToken(['trade_mode' => 'middle']);
+
+        $url = $this->controller($repo, 'gm1', 'Team One', 1)->handleSetMode('POST', $post);
+
+        self::assertSame(TeamModeController::HOME . '#trade-suggestions', $url);
+        self::assertSame([['tid' => 1, 'setting' => TeamModeSetting::Middle]], $repo->saves);
+    }
+
     /**
      * Mint a valid trade_mode CSRF token and place it in both $_POST (read by
      * CsrfGuard) and the returned post array (passed to the controller).

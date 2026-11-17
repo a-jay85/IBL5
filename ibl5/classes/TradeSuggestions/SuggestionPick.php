@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace TradeSuggestions;
 
 /**
- * A draft pick owned by a team, valued by PickValuer.
+ * A draft pick owned by a team.
  */
 final readonly class SuggestionPick
 {
@@ -15,7 +15,6 @@ final readonly class SuggestionPick
         public int $year,
         public int $round,
         public float $value,
-        public ?PickTier $tier = null,
     ) {
     }
 }

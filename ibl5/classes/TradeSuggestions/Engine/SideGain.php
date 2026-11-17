@@ -253,7 +253,7 @@ final readonly class SideGain
         return $sum;
     }
 
-    private static function pickWorth(LeagueSnapshot $s, PickAsset $pick, TeamMode $mode, int $open, int $ordinal): float
+    public static function pickWorth(LeagueSnapshot $s, PickAsset $pick, TeamMode $mode, int $open, int $ordinal): float
     {
         return PickWorth::worth($pick->round, $pick->yearsAway, $pick->originalTid, $s->draftIndex, $mode, $open, $ordinal);
     }

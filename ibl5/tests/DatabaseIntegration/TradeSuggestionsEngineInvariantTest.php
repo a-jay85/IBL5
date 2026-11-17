@@ -4,35 +4,61 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use Cache\DatabaseCache;
 use League\League;
 use PHPUnit\Framework\Attributes\Group;
 use ProjectedDraftOrder\ProjectedDraftOrderRepository;
 use ProjectedDraftOrder\ProjectedDraftOrderService;
 use Repositories\TeamIdentityRepository;
 use Settings\SettingsService;
+use Standings\StandingsRepository;
+use Tests\TradeSuggestions\Fixtures\LaughTestRows;
+use Tests\TradeSuggestions\LaughTest\Fixtures\LaughTestFactory;
 use Tests\WideUnit\Mocks\Season;
-use TradeSuggestions\NeedJudge;
-use TradeSuggestions\NeedPairMatcher;
-use TradeSuggestions\NeedsCardBuilder;
-use TradeSuggestions\PickValuer;
-use TradeSuggestions\ReasonBuilder;
+use TradeSuggestions\Contracts\TradeSuggestionsServiceInterface;
+use TradeSuggestions\Engine\CachedLeagueSnapshotProvider;
+use TradeSuggestions\Engine\CandidateGenerator;
+use TradeSuggestions\Engine\Contracts\LeagueSnapshotProviderInterface;
+use TradeSuggestions\Engine\DealRanker;
+use TradeSuggestions\Engine\LeagueSnapshot;
+use TradeSuggestions\Engine\LeagueSnapshotLoader;
+use TradeSuggestions\Engine\ModeResolver;
+use TradeSuggestions\Engine\Shape\ChangeOfScenery;
+use TradeSuggestions\Engine\Shape\DumpPaidWithPick;
+use TradeSuggestions\Engine\Shape\ExpiringForLong;
+use TradeSuggestions\Engine\Shape\OneForOne;
+use TradeSuggestions\Engine\Shape\OneForTwo;
+use TradeSuggestions\Engine\Shape\PickSwap;
+use TradeSuggestions\Engine\Shape\StarForYoungAndPicks;
+use TradeSuggestions\Engine\Shape\TwoForOne;
+use TradeSuggestions\Engine\SnapshotKeyRepository;
+use TradeSuggestions\Engine\Sweep\LeagueSweepArgs;
+use TradeSuggestions\Engine\Sweep\LeagueSweepCommand;
+use TradeSuggestions\Projection\ProjectionPlayerRepository;
+use TradeSuggestions\ResolvedTeamMode;
 use TradeSuggestions\SuggestionAssetRepository;
+use TradeSuggestions\SuggestionDiagnostics;
 use TradeSuggestions\SuggestionItem;
-use TradeSuggestions\SuggestionRanker;
+use TradeSuggestions\SuggestionLink;
 use TradeSuggestions\SuggestionValidationFilter;
+use TradeSuggestions\TeamMode;
 use TradeSuggestions\TeamModeGuesser;
 use TradeSuggestions\TeamModeRepository;
 use TradeSuggestions\TeamModeService;
 use TradeSuggestions\TradeCandidate;
+use TradeSuggestions\TradeSuggestionsPanelData;
 use TradeSuggestions\TradeSuggestionsService;
+use TradeSuggestions\Valuation\ValuationTeamFactorsRepository;
+use TradeSuggestions\Veto\VetoSet;
+use Trading\BuyoutLedgerRepository;
+use Trading\Contracts\TradeFormRepositoryInterface;
 use Trading\TradeCapCalculator;
 use Trading\TradeFormRepository;
 use Trading\TradeValidator;
 
 /**
- * Runs the whole need-based engine over the database, with the real
- * TradeValidator, cap calculator and repositories wired as the News module
- * wires them.
+ * Runs the whole v3 engine over the database, with the real TradeValidator,
+ * cap calculator and repositories wired as NewsFactory wires them.
  *
  * Staged rows (inside the test transaction): a bench player on team 1 whose
  * salary puts team 1's effective payroll at 7100, team 2 set to rebuild, and
@@ -44,10 +70,13 @@ class TradeSuggestionsEngineInvariantTest extends DatabaseTestCase
     private const int USER_TID = 1;
     private const int REBUILD_TID = 2;
     private const int STAGED_PAYROLL = 7100;
-    private const int DUMP_PID = 200000201;
+    private const int DUMP_PID = 200201;
 
     private Season $season;
     private TradeSuggestionsService $service;
+    private CachedLeagueSnapshotProvider $snapshots;
+    private TradeFormRepository $formRepo;
+    private VetoSet $vetoes;
 
     /** @var array<int, string> */
     private array $teamNames = [];
@@ -70,27 +99,58 @@ class TradeSuggestionsEngineInvariantTest extends DatabaseTestCase
                 $this->season->phase = $value;
             }
         }
-        $formRepo = new TradeFormRepository($this->db);
+        $this->formRepo = new TradeFormRepository($this->db);
         $teamModeRepo = new TeamModeRepository($this->db);
+        $assetRepo = new SuggestionAssetRepository($this->db);
+        $draftOrder = new ProjectedDraftOrderService(new ProjectedDraftOrderRepository($this->db));
 
-        $this->service = new TradeSuggestionsService(
-            new TeamModeService($teamModeRepo, new TeamModeGuesser()),
+        // One resolver for the loader, the provider and the service, as in NewsFactory.
+        $modes = new ModeResolver(
+            $assetRepo,
+            $draftOrder,
             $teamModeRepo,
-            new SuggestionAssetRepository($this->db),
-            new ProjectedDraftOrderService(new ProjectedDraftOrderRepository($this->db)),
-            $formRepo,
-            new SettingsService($this->season),
+            $this->formRepo,
+            new TeamModeService($teamModeRepo, new TeamModeGuesser()),
             $this->season,
-            new PickValuer(),
-            new NeedsCardBuilder(),
-            new NeedPairMatcher(),
-            new NeedJudge(),
-            new ReasonBuilder(),
+        );
+        $this->snapshots = new CachedLeagueSnapshotProvider(
+            new LeagueSnapshotLoader(
+                new ProjectionPlayerRepository($this->db),
+                new ValuationTeamFactorsRepository($this->db),
+                new StandingsRepository($this->db),
+                $draftOrder,
+                $assetRepo,
+                $this->formRepo,
+                $modes,
+                $this->season,
+            ),
+            new DatabaseCache($this->db),
+            new SnapshotKeyRepository($this->db),
+            $modes,
+            $this->season,
+        );
+        $this->vetoes = VetoSet::standard();
+        $this->service = new TradeSuggestionsService(
+            $this->snapshots,
+            new CandidateGenerator([
+                new OneForOne(),
+                new TwoForOne(),
+                new OneForTwo(),
+                new StarForYoungAndPicks(),
+                new DumpPaidWithPick(),
+                new ExpiringForLong(),
+                new PickSwap(),
+                new ChangeOfScenery(),
+            ]),
+            $this->vetoes,
+            new DealRanker(),
             $this->newFilter(),
-            new SuggestionRanker(),
+            $this->formRepo,
+            new SettingsService($this->season),
+            $modes,
         );
 
-        foreach ($formRepo->getAllTeamsWithCity() as $team) {
+        foreach ($this->formRepo->getAllTeamsWithCity() as $team) {
             $this->teamNames[$team['teamid']] = $team['team_name'];
         }
     }
@@ -201,6 +261,110 @@ class TradeSuggestionsEngineInvariantTest extends DatabaseTestCase
         $this->assertGreaterThan(0, $teams);
     }
 
+    public function testLeagueSweepHasZeroVetoViolations(): void
+    {
+        $this->stageOverCapUser();
+        $out = fopen('php://memory', 'w+');
+        $this->assertIsResource($out);
+
+        $code = (new LeagueSweepCommand($this->service, $this->snapshots, $this->vetoes, $this->formRepo))
+            ->run(League::MAX_REAL_TEAMID, $out);
+
+        rewind($out);
+        $lines = explode(PHP_EOL, trim((string) stream_get_contents($out)));
+        $last = end($lines);
+        $this->assertIsString($last);
+        $this->assertMatchesRegularExpression('/^TEAMS=[1-9][0-9]* IDEAS=\d+ VETOED=\d+ SHOWN=[1-9][0-9]* VIOLATIONS=0$/', $last);
+        $this->assertSame(0, $code, implode("\n", $lines));
+    }
+
+    public function testStagedDupreeShapeIsNeverShown(): void
+    {
+        $this->stageLaughTestPlayer(LaughTestRows::dupree(), self::USER_TID);
+        $this->stageLaughTestPlayer(LaughTestRows::laettner(), self::REBUILD_TID);
+
+        $panel = $this->service->buildForTeam(self::USER_TID);
+
+        $this->assertNotNull($panel);
+        foreach ($panel->items as $item) {
+            $labels = [...$item->giveLabels, ...$item->getLabels];
+            $this->assertFalse(
+                in_array('Dupree', $labels, true) && in_array('Laettner', $labels, true),
+                'Dupree-for-Laettner shown: ' . $item->prefillUrl,
+            );
+        }
+    }
+
+    public function testSweepCommandRejectsSpaceFormFlag(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        LeagueSweepArgs::parse(['x', '--max-teams', '4']);
+    }
+
+    public function testSweepExitsOneOnViolation(): void
+    {
+        // The unit laugh-test league, where Dupree for Laettner straight up
+        // fires a veto. The service double shows exactly that deal.
+        $league = LaughTestFactory::league();
+        $deal = new TradeCandidate(
+            LaughTestRows::USER_TID,
+            LaughTestRows::PARTNER_TID,
+            [LaughTestRows::DUPREE_PID],
+            [],
+            [LaughTestRows::LAETTNER_PID],
+            [],
+        );
+        $partnerName = $league->teamNames[LaughTestRows::PARTNER_TID];
+        $item = new SuggestionItem($partnerName, ['Dupree'], ['Laettner'], 'u', 'p', SuggestionLink::forCandidate($partnerName, $deal));
+        $panel = new TradeSuggestionsPanelData(
+            new ResolvedTeamMode(TeamMode::WinNow, TeamMode::WinNow, false),
+            [$item],
+            new SuggestionDiagnostics(1, 1, [], 1, []),
+        );
+
+        $service = self::createStub(TradeSuggestionsServiceInterface::class);
+        $service->method('buildForTeam')->willReturnCallback(
+            static fn (int $tid): ?TradeSuggestionsPanelData => $tid === LaughTestRows::USER_TID ? $panel : null,
+        );
+        $snapshots = self::createStub(LeagueSnapshotProviderInterface::class);
+        $snapshots->method('snapshot')->willReturn($league);
+        $formRepo = self::createStub(TradeFormRepositoryInterface::class);
+        $formRepo->method('getAllTeamsWithCity')->willReturn(self::teamRows($league));
+        $out = fopen('php://memory', 'w+');
+        $this->assertIsResource($out);
+
+        $code = (new LeagueSweepCommand($service, $snapshots, VetoSet::standard(), $formRepo))->run(2, $out);
+
+        rewind($out);
+        $text = (string) stream_get_contents($out);
+        $this->assertSame(1, $code, $text);
+        $this->assertStringContainsString('VIOLATIONS=1', $text);
+    }
+
+    /**
+     * @return list<array{teamid: int, team_name: string, team_city: string, color1: string, color2: string}>
+     */
+    private static function teamRows(LeagueSnapshot $league): array
+    {
+        $rows = [];
+        foreach ($league->teamNames as $tid => $name) {
+            $rows[] = ['teamid' => $tid, 'team_name' => $name, 'team_city' => '', 'color1' => '', 'color2' => ''];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @param array{pid: int, name: string, pos: string, age: int, cy: int, salaries: list<int>, ratings: array<string, int>, injured: int, statsPts: int, minutes: int} $spec
+     */
+    private function stageLaughTestPlayer(array $spec, int $tid): void
+    {
+        $row = LaughTestRows::asPlrRow($spec, $tid);
+        unset($row['pid'], $row['name']);
+        $this->insertTestPlayer($spec['pid'], $spec['name'], $row);
+    }
+
     private function stageOverCapUser(): void
     {
         $payroll = $this->payroll(self::USER_TID);
@@ -238,7 +402,7 @@ class TradeSuggestionsEngineInvariantTest extends DatabaseTestCase
 
         return new SuggestionValidationFilter(
             $validator,
-            new TradeCapCalculator(new TeamIdentityRepository($this->db), null, $this->season, $validator, $this->db),
+            new TradeCapCalculator(new TeamIdentityRepository($this->db), new BuyoutLedgerRepository($this->db), $this->season, $validator),
             new TradeFormRepository($this->db),
             $this->season,
         );
@@ -278,42 +442,25 @@ class TradeSuggestionsEngineInvariantTest extends DatabaseTestCase
     }
 
     /**
-     * Rebuilds the deal from the item's prefill link (`1:<pid>` and `0:<pickid>`
-     * keys), assigning each asset to the side that owns it in the database.
+     * The sweep command's parser, checked against the database's owners.
      */
     private function candidateFromPrefill(int $tid, SuggestionItem $item): TradeCandidate
     {
-        $partnerTid = array_search($item->partnerTeamName, $this->teamNames, true);
-        $this->assertIsInt($partnerTid);
-
-        $query = parse_url($item->prefillUrl, PHP_URL_QUERY);
-        $this->assertIsString($query);
-        parse_str($query, $params);
-        $prefill = $params['prefill'] ?? '';
-        $this->assertIsString($prefill);
-
-        $userPids = [];
-        $partnerPids = [];
-        $userPicks = [];
-        $partnerPicks = [];
-        foreach (explode(',', $prefill) as $key) {
-            [$type, $id] = array_map('intval', explode(':', $key));
-            $owner = $type === 1
-                ? $this->ownerOf('SELECT teamid AS owner FROM ibl_plr WHERE pid = ' . $id)
-                : $this->ownerOf('SELECT owner_teamid AS owner FROM ibl_draft_picks WHERE pickid = ' . $id);
-            $this->assertContains($owner, [$tid, $partnerTid], 'Prefill key ' . $key . ' belongs to neither side');
-            if ($type === 1 && $owner === $tid) {
-                $userPids[] = $id;
-            } elseif ($type === 1) {
-                $partnerPids[] = $id;
-            } elseif ($owner === $tid) {
-                $userPicks[] = $id;
-            } else {
-                $partnerPicks[] = $id;
-            }
+        $candidate = LeagueSweepCommand::candidateFromPrefill($tid, $item, array_flip($this->teamNames), $this->snapshots->snapshot());
+        foreach ($candidate->userPids as $pid) {
+            $this->assertSame($tid, $this->ownerOf('SELECT teamid AS owner FROM ibl_plr WHERE pid = ' . $pid));
+        }
+        foreach ($candidate->partnerPids as $pid) {
+            $this->assertSame($candidate->partnerTid, $this->ownerOf('SELECT teamid AS owner FROM ibl_plr WHERE pid = ' . $pid));
+        }
+        foreach ($candidate->userPickIds as $pickId) {
+            $this->assertSame($tid, $this->ownerOf('SELECT owner_teamid AS owner FROM ibl_draft_picks WHERE pickid = ' . $pickId));
+        }
+        foreach ($candidate->partnerPickIds as $pickId) {
+            $this->assertSame($candidate->partnerTid, $this->ownerOf('SELECT owner_teamid AS owner FROM ibl_draft_picks WHERE pickid = ' . $pickId));
         }
 
-        return new TradeCandidate($tid, $partnerTid, $userPids, $userPicks, $partnerPids, $partnerPicks);
+        return $candidate;
     }
 
     private function ownerOf(string $sql): int

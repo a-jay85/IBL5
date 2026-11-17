@@ -91,20 +91,23 @@ final class ProjectionFactory
         int $dcMinutes = 0,
         int $productionFouls = 50,
         bool $tradeable = true,
+        ?string $name = null,
+        int $exp = 4,
+        int $draftRound = 1,
     ): ProjectionPlayer {
         $slots = ['PG' => 0, 'SG' => 0, 'SF' => 0, 'PF' => 0, 'C' => 0];
 
         return new ProjectionPlayer(
             pid: $pid,
-            name: 'Player ' . $pid,
+            name: $name ?? 'Player ' . $pid,
             pos: $pos,
             tid: $tid,
             age: $age,
             injuredDays: $injuredDays,
-            exp: 4,
+            exp: $exp,
             talent: $talent,
             bird: 1,
-            draftRound: 1,
+            draftRound: $draftRound,
             draftYear: 2020,
             draftPickNo: 10,
             prefs: ['loyalty' => 0, 'winner' => 0, 'tradition' => 0, 'security' => 0, 'playing_time' => 0],

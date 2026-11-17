@@ -12,6 +12,9 @@ final class SlotMapper
 {
     public const array SLOTS = ['PG', 'SG', 'SF', 'PF', 'C'];
 
+    /** Depth-chart minutes a player needs to count as a real option at a slot. */
+    public const int REAL_MINUTES = 15;
+
     /**
      * G covers PG and SG, F covers SF and PF, GF covers SG and SF. An empty
      * position covers nothing.
@@ -96,7 +99,7 @@ final class SlotMapper
     {
         return array_values(array_filter(
             $players,
-            static fn (SuggestionPlayer $p): bool => $p->dcMinutes >= NeedThresholds::REAL_MINUTES && self::eligible($p, $slot),
+            static fn (SuggestionPlayer $p): bool => $p->dcMinutes >= self::REAL_MINUTES && self::eligible($p, $slot),
         ));
     }
 

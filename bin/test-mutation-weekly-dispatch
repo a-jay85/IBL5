@@ -74,10 +74,10 @@ run_sut() {
     shift
     if [ "$now" = "-" ]; then
         OUT=$(env -u MWD_NOW PATH="$TMP/shim:$PATH" FAKE_GH_DIR="$FAKE_GH_DIR" \
-            python3 "$ROOT/bin/mutation-weekly-dispatch" "$@" 2> "$FAKE_GH_DIR/err")
+            python3 "${SUT:-$ROOT/bin/mutation-weekly-dispatch}" "$@" 2> "$FAKE_GH_DIR/err")
     else
         OUT=$(env MWD_NOW="$now" PATH="$TMP/shim:$PATH" FAKE_GH_DIR="$FAKE_GH_DIR" \
-            python3 "$ROOT/bin/mutation-weekly-dispatch" "$@" 2> "$FAKE_GH_DIR/err")
+            python3 "${SUT:-$ROOT/bin/mutation-weekly-dispatch}" "$@" 2> "$FAKE_GH_DIR/err")
     fi
     RC=$?
     ERR=$(cat "$FAKE_GH_DIR/err")
@@ -223,6 +223,15 @@ case_dispatch_never_visible_fails() {
         fail "${FUNCNAME[0]}" "rc=$RC err='$ERR'"
         return
     fi
+    # Mutation guard: with die(1 turned into die(0 the assertion above must trip.
+    local mutant="$TMP/mutant-never-visible"
+    sed 's/die(1, "dispatched run did not appear/die(0, "dispatched run did not appear/' \
+        "$ROOT/bin/mutation-weekly-dispatch" > "$mutant"
+    SUT="$mutant" run_sut 2026-11-15T11:00:00Z --repo=example/repo
+    if [ "$RC" = 1 ]; then
+        fail "${FUNCNAME[0]}" "the die(0 mutant still exits 1, so this case cannot catch it"
+        return
+    fi
     pass "${FUNCNAME[0]}"
 }
 
@@ -251,6 +260,15 @@ case_unknown_flag_rejected() {
     run_sut 2026-11-15T11:00:00Z --repo=example/repo --bogus
     if [ "$RC" != 2 ] || ! grep -qF 'unknown argument: --bogus' <<< "$ERR"; then
         fail "${FUNCNAME[0]}" "rc=$RC err='$ERR'"
+        return
+    fi
+    # Mutation guard: with die(2 turned into die(0 the assertion above must trip.
+    local mutant="$TMP/mutant-unknown-flag"
+    sed 's/die(2, f"unknown argument: {arg}")/die(0, f"unknown argument: {arg}")/' \
+        "$ROOT/bin/mutation-weekly-dispatch" > "$mutant"
+    SUT="$mutant" run_sut 2026-11-15T11:00:00Z --repo=example/repo --bogus
+    if [ "$RC" = 2 ]; then
+        fail "${FUNCNAME[0]}" "the die(0 mutant still exits 2, so this case cannot catch it"
         return
     fi
     pass "${FUNCNAME[0]}"

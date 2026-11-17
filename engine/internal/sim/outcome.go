@@ -86,6 +86,11 @@ func allowedPaths(forcedMake, shotClock, stealPlay bool) []outcomeCode {
 
 // selectOutcome picks the shot path by weighted random over the allowed buckets,
 // then applies the independent turnover override (suppressed under forced_make).
+// pathObserver, when non-nil, receives every path the picker returns and
+// whether the trip is a transition trip. Tests set it; production leaves it nil.
+// It must never draw from the RNG.
+var pathObserver func(code outcomeCode, transition bool)
+
 func selectOutcome(in outcomeInputs, forcedMake, shotClock, stealPlay, suppressW4Rescale bool, r *rng.RNG) outcomeCode {
 	allowed := allowedPaths(forcedMake, shotClock, stealPlay)
 

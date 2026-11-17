@@ -88,6 +88,10 @@ type teamState struct {
 	// them 0, so Branch-B is inert (Branch-A cold-start) there. Set in simGameWith.
 	drbRate float64
 	astRate float64
+
+	// team is this team's bundle.Teams entry (nil when absent). The bucket-3
+	// e88 chain reads the defending team's DF0 from it. Set in simGameWith.
+	team *bundle.Team
 }
 
 // addPeriodPoints credits n points to the team in the current 0-based period

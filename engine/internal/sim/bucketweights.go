@@ -1,6 +1,9 @@
 package sim
 
-import "github.com/a-jay85/IBL5/engine/internal/rng"
+import (
+	"github.com/a-jay85/IBL5/engine/internal/bundle"
+	"github.com/a-jay85/IBL5/engine/internal/rng"
+)
 
 // Play-outcome bucket-weight helpers — the faithful JSB 5.60 basis recovered in
 // COMPOSITE_DOUBLES_TRACE.md (2nd-pass RESOLUTION) and 00_MASTER_REFERENCE.md
@@ -93,6 +96,15 @@ const (
 	// dynamic league table is a tracked follow-up, not this change.
 	d70LeagueScalar = 0.6472241372826754
 
+	// C+0x6668: league FGA/48 (3GA+2PA), J18 filter, current-season .plr; proven by TestRealLifeFixture_LeagueCalibration
+	leagueFGA48 = 25.035101086336688
+
+	// C+0x6938 and C+0x6728: league PF/48 and FTA/48, the J18 pins the
+	// d70LeagueScalar comment records at full precision. The bucket-3 chain
+	// (FUN_004e1ba0) reads them with leagueFGA48 and leagueTOV48.
+	leaguePF48  = 4.294130331651356
+	leagueFTA48 = 6.116607485995505
+
 	// +0xD90 Branch-A pinned constants (COMPOSITE_DOUBLES_TRACE.md §5): the 0.5
 	// (_DAT_00669ef0) and 0.25 (_DAT_00669f58) factors in the make-share weighting.
 	d90MakeShareHalf    = 0.5
@@ -159,6 +171,21 @@ const (
 	// the faithful #952 basis.
 	andOneBucketFloor = 0.03
 
+	// D78 block memory operands (asm 4d45ff-4d4640). 0x669ef0 (0.5) and
+	// 0x669f58 (0.25) reuse d90MakeShareHalf and d90MakeShareQuarter.
+	dat66be10 = 0.001 // _DAT_0066be10 = 0.001 (PE read, 0x66d318 = 0.2 calibrated)
+	dat66c7d8 = 0.05  // _DAT_0066c7d8 = 0.05 (PE read, 0x66d318 = 0.2 calibrated)
+	dat669ae8 = 0.02  // _DAT_00669ae8 = 0.02 (PE read, 0x66d318 = 0.2 calibrated)
+
+	// FUN_004e1ba0 bucket-3 literals with no named engine twin. The first four
+	// are the fatigueFactor (state.go) /30, +100, ×0.01 and 1.0-cap slots; the
+	// last is the function-local matchup matchedWeight (matchup.go).
+	dat66d3a8 = 0.03333333333333333 // _DAT_0066d3a8 = 1/30 (PE read, 0x66d318 = 0.2 calibrated)
+	dat669f40 = 100.0               // _DAT_00669f40 = 100.0 (PE read, 0x66d318 = 0.2 calibrated)
+	dat669e80 = 0.01                // _DAT_00669e80 = 0.01 (PE read, 0x66d318 = 0.2 calibrated)
+	dat669ed8 = 1.0                 // _DAT_00669ed8 = 1.0 (PE read, 0x66d318 = 0.2 calibrated)
+	dat669e78 = 0.8                 // _DAT_00669e78 = 0.8 (PE read, 0x66d318 = 0.2 calibrated)
+
 	// andOneMadeRateScale maps the player's FGP rating to a made-rate proxy for the
 	// and-one stand-in (a small minority of scoring plays). Unchanged from #952.
 	andOneMadeRateScale = 0.0008
@@ -180,6 +207,51 @@ const (
 // evidence and the open decompile-identity caveat. Callers guard minutes > 0.
 func per48Min(stat, minutes int) float64 {
 	return float64(stat) / float64(minutes) * 48.0
+}
+
+// db8Rate is the +0xDB8 per-48 offensive-rebound rate, extracted from
+// twoPtBucketWeight: ORB/MIN×48 with real-life minutes, else the rating stand-in.
+func db8Rate(p onCourt) float64 {
+	if p.RealLifeMIN > 0 {
+		return per48Min(p.RealLifeORB, p.RealLifeMIN)
+	}
+	return floor1(p.ORB) * orbRateScale
+}
+
+// d70Rate is the +0xD70 FTA-weighted rate, extracted from twoPtBucketWeight:
+// FTA/MIN×48 × d70LeagueScalar with real-life minutes, else the rating stand-in.
+func d70Rate(p onCourt) float64 {
+	if p.RealLifeMIN > 0 {
+		return per48Min(p.RealLifeFTA, p.RealLifeMIN) * d70LeagueScalar
+	}
+	return floor1(p.FTA) * ftaRateScale
+}
+
+// d78Composite is player +0xD78 (asm 4d45af-4d4662):
+//
+//	d70 − (d70/d90)·db8·(0.5·d88/(db8+d88) + 0.25) − (2P‰·0.001·d88·0.05 + da8·0.02)
+//
+// with d90 = twoPtBucketWeight and da8 = threePtBucketWeight. Both guards
+// (db8+d88 > 0 at 4d45da, d90 > 0 at 4d45eb-4d45fd) send ≤0 or NaN to the
+// else-0 store. Rookies (RealLifeMIN == 0) take JSB's else-0 branch: their
+// divides yield NaN and fail both guards. When d88+d70 <= 0, JSB skips the
+// +0xD90 store and keeps a prior value the trace could not confirm; this port
+// returns 0 there.
+func d78Composite(p onCourt) float64 {
+	if p.RealLifeMIN <= 0 {
+		return 0
+	}
+	d88, db8, d70 := twoPARate(p), db8Rate(p), d70Rate(p)
+	if d88+d70 <= 0 {
+		return 0 // JSB skips the +0xD90 store here; see the doc comment
+	}
+	d90 := twoPtBucketWeight(p)
+	if !(db8+d88 > 0) || !(d90 > 0) {
+		return 0
+	}
+	m := d88/(db8+d88)*d90MakeShareHalf + d90MakeShareQuarter
+	t := float64(p.D60)*dat66be10*d88*dat66c7d8 + threePtBucketWeight(p)*dat669ae8
+	return d70 - (d70/d90)*db8*m - t
 }
 
 // twoPARate is the +0xD88 per-48 two-point-attempt rate (2PA = FGA − 3GA),
@@ -227,15 +299,7 @@ func twoPARate(p onCourt) float64 {
 // 0.6-floored foul bucket a realistic minority share and field-goal attempts the
 // majority path.
 func twoPtBucketWeight(p onCourt) float64 {
-	d88 := twoPARate(p)
-	var db8, d70 float64
-	if p.RealLifeMIN > 0 {
-		db8 = per48Min(p.RealLifeORB, p.RealLifeMIN)
-		d70 = per48Min(p.RealLifeFTA, p.RealLifeMIN) * d70LeagueScalar
-	} else {
-		db8 = floor1(p.ORB) * orbRateScale
-		d70 = floor1(p.FTA) * ftaRateScale
-	}
+	d88, db8, d70 := twoPARate(p), db8Rate(p), d70Rate(p)
 	// Guard both composite divisions. The real-rate path can yield d88 == 0 (a
 	// player who took no FGs) where the stand-in's floor1 always made d88 > 0; with
 	// d88 == 0 the faithful composite limit is d88 (the subtracted term carries d88
@@ -280,6 +344,105 @@ func threePtBucketWeight(p onCourt) float64 {
 // carries the bucket above the floor. Unchanged from the faithful #952 basis.
 func andOneBucketWeight(mq float64, p onCourt) float64 {
 	return max(andOneBucketRaw(mq, p), andOneBucketFloor)
+}
+
+// bucket3Inputs carries the traced FUN_004e1ba0 inputs.
+type bucket3Inputs struct {
+	energy     float64 // bh record +0x24
+	bhD78      float64 // local_e78 = bh +0xD78
+	lineupD78  float64 // dVar5: sum of +0xD78 over the offense five
+	lineupSum3 float64 // sum of +0xDE0 + +0xDB0 + +0xD90 over the offense five
+	defDF0     float64 // defending team +0xDF0
+}
+
+// bucket3E88Initial: min((energy/30 + 100) * 0.01, 1.0). JSB does not clamp
+// negative energy, so this does not call fatigueFactor.
+func bucket3E88Initial(energy float64) float64 {
+	e := (energy*dat66d3a8 + dat669f40) * dat669e80 // _DAT_0066d3a8, _DAT_00669f40, _DAT_00669e80
+	if dat669ed8 < e {                              // _DAT_00669ed8
+		return dat669ed8
+	}
+	return e
+}
+
+// bucket3Clamp is the one-sided clamp at asm 4e1d90-4e1dc4. A value below the
+// anchor drops to anchor − 1.0; a value above anchor + 1.0 is capped there.
+func bucket3Clamp(v, anchor float64) float64 {
+	if v < anchor {
+		return anchor - dat669ed8 // _DAT_00669ed8
+	}
+	if v > anchor+dat669ed8 { // _DAT_00669ed8
+		return anchor + dat669ed8
+	}
+	return v
+}
+
+// bucket3E88 returns ok=false when lineupD78 is not positive (or NaN); JSB
+// divides unguarded there (FUN_004e1ba0 :97157), so the caller keeps the
+// rating path.
+func bucket3E88(in bucket3Inputs) (float64, bool) {
+	if !(in.lineupD78 > 0) {
+		return 0, false
+	}
+	// _DAT_0066d318 (branchBTeamScale), _DAT_00669e78 (dat669e78)
+	dVar7 := in.lineupSum3 * branchBTeamScale / ((leagueFTA48 + leagueFGA48 + leagueTOV48) * dat669e78)
+	// _DAT_00669e78 (dat669e78), _DAT_00669ea0 (defQualityCapTeamMult)
+	v := bucket3Clamp(in.defDF0*dat669e78*dVar7, leaguePF48*dat669e78*dVar7*defQualityCapTeamMult)
+	return (v / in.lineupD78) * in.bhD78 * bucket3E88Initial(in.energy), true
+}
+
+// bucket3Weight: half-court adds the raw signed hca, then e90 = mq*0.25 + e88,
+// redrawn U[0, 0.03) when e90 is not positive (asm 4e1e47-4e1e69).
+func bucket3Weight(e88, mq, hcaRaw float64, halfCourt bool, r *rng.RNG) float64 {
+	if halfCourt {
+		e88 += hcaRaw
+	}
+	e90 := mq*d90MakeShareQuarter + e88 // _DAT_00669f58
+	if e90 <= 0 {                       // _DAT_00669f00 = 0.0
+		return r.Float64() * andOneBucketFloor // FUN_005c6100(0.03)
+	}
+	return e90
+}
+
+// bucket3InputsFor assembles the FUN_004e1ba0 inputs from the offense five and
+// the defending team. It returns false when the defending team carries no DF0
+// (a team absent from bundle.Teams, or one with no real-life minutes). Every
+// lineup term is a per-player composite; the caller's 3pt weight never enters,
+// because the OReb path zeroes it.
+func bucket3InputsFor(bh onCourt, offense []onCourt, def *bundle.Team) (bucket3Inputs, bool) {
+	if def == nil || def.DF0 == nil {
+		return bucket3Inputs{}, false
+	}
+	in := bucket3Inputs{energy: float64(bh.energy), bhD78: d78Composite(bh), defDF0: *def.DF0}
+	for _, p := range offense {
+		in.lineupD78 += d78Composite(p)
+		in.lineupSum3 += tovRate(p) + threePtBucketWeight(p) + twoPtBucketWeight(p) // +0xDE0 + +0xDB0 + +0xD90
+	}
+	return in, true
+}
+
+// andOneAndFoulWeights computes JSB index 3 (and-one) and then index 4 (foul),
+// the FUN_004e1ba0 draw order: each may redraw once from r. Index 3 takes the
+// ported e88-e90 chain when the defending team's DF0 and the lineup D78 sum are
+// both defined. Otherwise it keeps the rating path (halfCourtAndOneWeight on a
+// half-court trip, andOneBucketWeight on transition), which never draws.
+func andOneAndFoulWeights(bh onCourt, offense, defenders []onCourt, def *bundle.Team, hca, hcaRaw, hcaScaled, mq float64, halfCourt bool, r *rng.RNG) (andOneW, foulW float64) {
+	ported := false
+	if in, ok := bucket3InputsFor(bh, offense, def); ok {
+		if e88, ok := bucket3E88(in); ok {
+			andOneW = bucket3Weight(e88, mq, hcaRaw, halfCourt, r)
+			ported = true
+		}
+	}
+	switch {
+	case ported:
+	case halfCourt:
+		andOneW = halfCourtAndOneWeight(mq, bh, hcaScaled)
+	default:
+		andOneW = andOneBucketWeight(mq, bh)
+	}
+	foulW = foulBucketWeight(bh, offense, defenders, hca, mq, r)
+	return andOneW, foulW
 }
 
 // andOneBucketRaw is the unfloored and-one stand-in. The half-court caller adds

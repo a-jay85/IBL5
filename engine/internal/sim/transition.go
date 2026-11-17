@@ -156,14 +156,14 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 		// half-court path.
 		// allow3pt=true: faithful JSB port — fast break can be a 3pt attempt.
 		// SuppressTransition3pt (FreezeConfig) zeroes threePtW for the A/B suppress arm.
-		twoPtW, threePtW, foulW := gs.playBuckets(bh, offense, defense, 0, 0, mq, true) // param_5==0: transition fully symmetric, no HCA legs (J15 Phase 5); allow3pt=true: faithful JSB port
+		twoPtW, threePtW, foulW, andOneW := gs.playBuckets(bh, offense, defense, 0, 0, mq, true, false) // param_5==0: transition fully symmetric, no HCA legs (J15 Phase 5); allow3pt=true: faithful JSB port
 		if gs.freeze.SuppressTransition3pt {
 			threePtW = 0 // A/B suppress arm: restores pre-port baseline for measurement
 		}
 		in := outcomeInputs{
 			twoPtWeight:      twoPtW,
 			threePtWeight:    threePtW,
-			andOneWeight:     andOneBucketWeight(mq, bh),
+			andOneWeight:     andOneW,
 			foulOnlyWeight:   foulW,
 			turnoverDefValue: energyCeiling(bh),
 		}
@@ -171,7 +171,11 @@ func (gs *gameState) runTransitionPossession(offense, defense *teamState, period
 			gs.outcomeDiag.Add(twoPtW, threePtW, foulW, in.andOneWeight, threePtW > 0 /*eligible3pt*/, true /*transition*/, bh.RealLifeMIN == 0)
 		}
 
-		switch selectOutcome(in, false, false, false, false, gs.rng) {
+		tpath := selectOutcome(in, false, false, false, false, gs.rng)
+		if pathObserver != nil {
+			pathObserver(tpath, true)
+		}
+		switch tpath {
 		case outcome2pt:
 			// Every shot on a fired fast break is tagged transition — including a
 			// putback after an offensive rebound within the break (the possession

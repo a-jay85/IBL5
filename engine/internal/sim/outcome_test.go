@@ -121,9 +121,9 @@ func TestSelectOutcome_ShotClockRescale_DegenerateWeights(t *testing.T) {
 	if three, foul, n := counts(outcomeInputs{twoPtWeight: 0, threePtWeight: 1, turnoverWeight: 1}, 21); three == 0 || foul == 0 || float64(three)/float64(n) < 0.47 || float64(three)/float64(n) > 0.53 {
 		t.Errorf("w1=0: 3pt=%d foul=%d/%d, want split ≈ 0.50 with both codes (rescale must not fire)", three, foul, n)
 	}
-	// 2. w2=0: matches 5.60's own w2>0 gate; rescale must not fire, foulOnlyWeight
-	// unchanged. 3pt bucket weight is 0 → ≈100% foul-only. If the rescale WRONGLY
-	// fired it would zero foulOnly → total 0 → 100% 3pt, the opposite extreme.
+	// 2. w2=0: matches 5.60's own w2>0 gate; rescale must not fire, turnoverWeight
+	// unchanged. 3pt bucket weight is 0 → ≈100% code 4. If the rescale WRONGLY
+	// fired it would zero turnoverWeight → total 0 → 100% 3pt, the opposite extreme.
 	if three, foul, n := counts(outcomeInputs{twoPtWeight: 4, threePtWeight: 0, turnoverWeight: 1}, 22); float64(three)/float64(n) > 0.02 || foul == 0 {
 		t.Errorf("w2=0: 3pt=%d foul=%d/%d, want ≈0%% 3pt (rescale must not fire)", three, foul, n)
 	}

@@ -438,8 +438,8 @@ type OutcomeDiagAccum struct {
 	// by construction and must not dilute the denominator-dilution ratio).
 	Sum2ptW           float64 // Σ twoPtWeight
 	Sum3ptW           float64 // Σ threePtWeight
-	SumFoulW          float64 // Σ foulOnlyWeight
-	SumAndOneW        float64 // Σ andOneWeight
+	SumFoulW          float64 // Σ code-4 turnoverWeight (foulBucketWeight; the field keeps its pre-port name)
+	SumAndOneW        float64 // Σ code-3 foulWeight (the field keeps its pre-port name)
 	SumThreeShare2    float64 // Σ threePtW / (twoPtW+threePtW)                      — 2-bucket ratio (candidate b)
 	SumThreeShareFull float64 // Σ threePtW / (twoPtW+threePtW+foulW+andOneW)        — full ratio (foul/andOne lever)
 }

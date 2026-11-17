@@ -26,7 +26,9 @@ func StandInRegistry() []StandIn {
 		{
 			ID:   "steal_turnover_scale",
 			Term: "steal_share",
-			Justification: "stealTurnoverScale (steal.go) is the dominant per-possession steal " +
+			Justification: "Inert since the live-outcome-map port (engine/docs/j27-live-outcome-map-port.md): " +
+				"no engine code reads Options.StealTurnoverScale. Before the port, " +
+				"stealTurnoverScale (steal.go) was the dominant per-possession steal " +
 				"probability coefficient. Calibrated from the J3 corpus target (8.9 steals/team " +
 				"→ 1.69e-5) but plausibly off by ±15%: the archive gate is 17.8±0.7/g (both " +
 				"teams) and the ending-mix steal-share gate is [8.0%, 9.0%]. Perturbable as a " +
@@ -38,7 +40,9 @@ func StandInRegistry() []StandIn {
 		{
 			ID:   "non_steal_turnover_scale",
 			Term: "non_steal_to_share",
-			Justification: "nonStealTurnoverScale (steal.go) drives independent (non-steal) " +
+			Justification: "Inert since the live-outcome-map port (engine/docs/j27-live-outcome-map-port.md): " +
+				"no engine code reads Options.NonStealTurnoverScale. Before the port, " +
+				"nonStealTurnoverScale (steal.go) drove independent (non-steal) " +
 				"turnovers. Calibrated to 0.00175 to target non-steal TO endings ≈ 4.9±0.5% of " +
 				"possessions, but the independent-TO rate is harder to measure from the J3 corpus " +
 				"(it conflates offensive fouls). Perturbable as a research lever — the harness " +

@@ -30,6 +30,11 @@
 # PRRA_FOREGROUND=1 runs without detaching.
 set -u
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+  awk 'NR==1{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"
+  exit 0
+fi
+
 N="${1:-}"; shift || true
 PID=""; RESULT=""; PRE=""; WT=""; LOG=""
 while [ $# -gt 0 ]; do

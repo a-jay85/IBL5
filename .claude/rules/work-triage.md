@@ -7,7 +7,7 @@ last_verified: 2026-11-17
 
 ## Triage before non-trivial work
 
-Before **any non-trivial unit of work**, yours or assigned, decide: implement **ad-hoc** (just do it, then ship or hold per `workflow-continuity.md` § Post-Plan) or route through **`/plan`**. State the call and one line of why, then proceed.
+Before **any non-trivial unit of work**, yours or assigned, decide: implement **ad-hoc** (do it, then ship or hold per `workflow-continuity.md` § Post-Plan) or route through **`/plan`**. State the call and one line of why, then proceed.
 
 ## The ad-hoc bar
 
@@ -30,7 +30,7 @@ Even when the bar says ad-hoc, run a quick safety check. If the change touches a
 - a **gate removal or weakening** (input an executable gate, meaning a hook deny, a `bin/check-*` condition, or a Phase 6.5 arming condition, previously rejected now passes) or a **bootstrap hazard** (it rewrites the rule governing its own merge); prose that keeps the decision procedure, additive gates, and plumbing changes don't count, or
 - a property needing **subjective human judgment** to confirm,
 
-then prefer `/plan` to design the defense and its check up front. Which mechanisms count, and why the PR-time backstop falls short: `work-triage-detail.md` § Safety mirror backstop.
+then prefer `/plan` to design the defense and its check up front. What counts, and why the PR-time backstop falls short: `work-triage-detail.md` § Safety mirror backstop.
 
 ## Execution routing: an ad-hoc verdict does not mean Opus edits inline
 
@@ -41,13 +41,13 @@ The verdict decides *whether to plan*. Who edits is a separate call.
 - **Design resolved.** You could write the full recipe now (files, exact changes, order). No edit re-opens a judgment call.
 - **Machine-verifiable.** A test/linter/script exists (or ships with the chunk) that fails on a wrong edit.
 
-**Inline-edit trial until 2026-11-23.** When both hold and the chunk touches **fewer than 5 distinct files**, Opus edits inline and runs the chunk's check. At 5 or more files, hand off by default to **one** Sonnet sub-agent without asking. State the routing call in one line. Packet format, review command, and limits: `work-triage-inline-trial.md`.
+**Inline-edit trial until 2026-11-23.** When both hold and the chunk touches **under 5 distinct files**, Opus edits inline and runs its check. At 5+ files, hand off by default to **one** Sonnet sub-agent without asking. State the routing call in one line. Packet format, review command, and limits: `work-triage-inline-trial.md`.
 
-One sweep goes to one agent. Independent chunks get one agent each, spawned in one message. A chunk of 5+ files stays inline only when **entangled** with the design or **trivial** (`work-triage-detail.md` § Inline vs. delegated).
+One sweep, one agent. Independent chunks get one agent each, in one message. A chunk of 5+ files stays inline only when **entangled** with the design or **trivial** (`work-triage-detail.md` § Inline vs. delegated).
 
 ### The hard trigger: ≥5 distinct files in one turn
 
-Hook-enforced by `~/.claude/hooks/plan-gate-edit.sh` § Check 1. Its deny message gives the routing and escape hatch. Gate properties and self-test: `work-triage-detail.md` § Hard trigger.
+Hook-enforced by `~/.claude/hooks/plan-gate-edit.sh` § Check 1. Its deny message gives routing and the escape hatch. Details: `work-triage-detail.md` § Hard trigger.
 
 ## Execution routing: a `/plan` verdict routes to `bin/plan-now`, never inline
 
@@ -55,9 +55,9 @@ Hook-enforced by `~/.claude/hooks/skill-gate.sh`, which denies inline `Skill(pla
 
 ## Execution routing: repeat-polling is a spend bug
 
-Never poll on the main thread. Each poll re-reads the full context. Use `run_in_background: true` + Monitor, or a ScheduleWakeup timed to the expected finish.
+Never poll on the main thread; each poll re-reads the full context. Use `run_in_background: true` + Monitor, or a ScheduleWakeup timed to the finish.
 
-When the wait ends in an owner step (a sign-off card, a manual check), don't wake the session. A detached script follows up and DMs the owner. For a prep job, run `bin/pr-refire-after-job`. `~/.claude/hooks/wait-guard.py` blocks a Monitor or background Bash wait on a `/tmp/pr-burndown/` job file unless the command ends with `# wake-ok: <reason>`.
+When the wait ends in an owner step (sign-off card, manual check), don't wake the session. A detached script follows up and DMs the owner. For a prep job, run `bin/pr-refire-after-job`. `~/.claude/hooks/wait-guard.py` blocks a Monitor or background Bash wait on a `/tmp/pr-burndown/` job file unless the command ends with `# wake-ok: <reason>`.
 
 Name the completion signal before writing the watcher. File mtime or size is never one. Valid signals: `work-triage-detail.md` § The readiness predicate.
 

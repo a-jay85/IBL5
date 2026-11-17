@@ -104,7 +104,8 @@ def test_agent_def_pins_opus_and_has_no_fixer_framing():
     assert "model: claude-opus-5-5" in head
     denied = re.search(r"^disallowedTools: (.*)$", head, re.M).group(1).split(", ")
     assert {"Agent", "Edit", "Write", "NotebookEdit", "Skill"} <= set(denied)
-    assert not second_review.FIXER_FRAMING_RE.search(body)
+    # The body names the blocking-findings block, so it is held to the history-only pattern.
+    assert not second_review._HISTORY_RE.search(body)
     assert not second_review.FIXER_FRAMING_RE.search(head)
 
 
@@ -416,3 +417,139 @@ def test_gate_edit_only_counts_unmarked_bullet_under_not_ready(tmp_path):
     tagged = _write(tmp_path, "## FINDINGS\n\n- [BLOCKING] [GATE-EDIT] edits a gate\n"
                               "- [GATE-EDIT] edits another gate\n\nNOT READY\n", "tagged.md")
     assert fidelity.gate_edit_only(tagged) is True
+
+
+# ---- golden prompt bytes (captured before the owner-request and findings blocks existed)
+
+GOLDEN = os.path.join(os.path.dirname(__file__), "fixtures", "second_review_prompt_golden.txt")
+GOLDEN_TITLE = "chore: tighten the seat"
+GOLDEN_BODY = ("## Summary\n\nAdds a read-only tool to the seat.\n"
+               "Addressed in fix round 2.\n\n## Test plan\n\n- [x] ran it\n")
+GOLDEN_DIFF = ("diff --git a/x.py b/x.py\n--- a/x.py\n+++ b/x.py\n@@ -1 +1 @@\n"
+               "-old = 1\n+new = '``'\n")
+GOLDEN_HOLDS = {7: "plan auto_merge false", 12: "plan-fidelity finding NOT READY"}
+
+
+def _golden_prompt():
+    return second_review.build_prompt(
+        GOLDEN_DIFF, second_review.reason_text(None, GOLDEN_TITLE, GOLDEN_BODY), GOLDEN_HOLDS)
+
+
+def _golden():
+    with open(GOLDEN, encoding="utf-8") as fh:
+        return fh.read()
+
+
+def test_prompt_matches_pre_change_golden():
+    assert _golden_prompt() == _golden()
+
+
+# ---- owner request and blocking findings in the seat prompt
+
+OWNER_BLOCK = "## Owner request\n\nMessage at T:\n\n```text\nplease fix the seat\n```"
+FINDING = "[BLOCKING] Phase 3 drops the hold-notice check"
+
+
+@pytest.fixture
+def _no_intent_home(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    return home
+
+
+def _seat_prompts(monkeypatch, inp, holds):
+    """Run review_pass with `holds` as the candidates; return the prompts the seat got."""
+    monkeypatch.setattr(second_review.armable, "evaluate",
+                        lambda _inp: types.SimpleNamespace(second_review_candidates=dict(holds)))
+    prompts = []
+
+    def spawn(agent, prompt):
+        prompts.append(prompt)
+        return CLEAN_REPLY
+    second_review.review_pass(inp, PR, lambda: TREE_A, lambda: GOLDEN_DIFF, None,
+                              lambda _m: None, spawn)
+    return prompts
+
+
+def test_reason_owner_request_plan_blind_only():
+    blind = second_review.reason_text(None, GOLDEN_TITLE, GOLDEN_BODY, OWNER_BLOCK)
+    assert blind.endswith("\n\n" + OWNER_BLOCK)
+    assert "please fix the seat" in blind          # owner text skips the framing filter
+    plan = "# P\n\n## Approach\nStated approach line.\n"
+    driven = second_review.reason_text(plan, GOLDEN_TITLE, GOLDEN_BODY, OWNER_BLOCK)
+    assert "## Owner request" not in driven
+    assert driven == second_review.reason_text(plan, GOLDEN_TITLE, GOLDEN_BODY)
+    assert second_review.reason_text(None, GOLDEN_TITLE, GOLDEN_BODY, "") == \
+        second_review.reason_text(None, GOLDEN_TITLE, GOLDEN_BODY)
+
+
+def test_missing_intent_prompt_identical(monkeypatch, _no_intent_home):
+    inp = inputs(current_tree=TREE_A, pr_title=GOLDEN_TITLE, pr_body=GOLDEN_BODY,
+                 branch="some-branch")
+    prompts = _seat_prompts(monkeypatch, inp, GOLDEN_HOLDS)
+    assert prompts == [_golden()]
+
+
+def test_review_pass_feeds_hold12_findings(monkeypatch, _no_intent_home):
+    inp = inputs(current_tree=TREE_A, pr_title=GOLDEN_TITLE, pr_body=GOLDEN_BODY,
+                 branch="some-branch", fidelity_blocking_findings=(FINDING,))
+    prompt = _seat_prompts(monkeypatch, inp, GOLDEN_HOLDS)[0]
+    head = _outside_fence(prompt)
+    assert "## Blocking findings" in head
+    assert "### (12) plan-fidelity-verdict" in head
+    assert FINDING in head
+    assert head.index("## Holds") < head.index("## Blocking findings")
+    os.unlink(second_review.verdict_path(PR))
+    prompt = _seat_prompts(monkeypatch, inp, {7: "plan auto_merge false"})[0]
+    assert "## Blocking findings" not in prompt
+    assert FINDING not in prompt
+
+
+def test_findings_over_cap_omitted():
+    reason = "chore: x"
+    holds = {12: "plan-fidelity finding NOT READY"}
+    big = "x" * (second_review.FINDINGS_CAP + 1)
+    prompt = second_review.build_prompt(GOLDEN_DIFF, reason, holds, {12: (big,)})
+    assert prompt is not None
+    assert "## Blocking findings" not in prompt
+    assert GOLDEN_DIFF in prompt
+    at_cap = "y" * second_review.FINDINGS_CAP
+    prompt = second_review.build_prompt(GOLDEN_DIFF, reason, holds, {12: (at_cap,)})
+    assert "## Blocking findings" in prompt and at_cap in prompt
+
+
+def test_history_filter_keeps_finding_lines():
+    holds = {12: "plan-fidelity finding NOT READY"}
+    item = "Finding: check 3 fires on SKILL.md\naddressed in fix round 2"
+    prompt = second_review.build_prompt(GOLDEN_DIFF, "r", holds, {12: (item,)})
+    block = _outside_fence(prompt)
+    assert "Finding: check 3 fires on SKILL.md" in block
+    assert "addressed in fix round 2" not in block
+    prompt = second_review.build_prompt(GOLDEN_DIFF, "r", holds,
+                                        {12: ("addressed in fix round 2",)})
+    assert "## Blocking findings" not in prompt
+
+
+def test_history_filter_keeps_words_that_only_contain_history_terms():
+    holds = {12: "plan-fidelity finding NOT READY"}
+    item = ("[BLOCKING] bin/x:10 - guard removed, unaddressed\n"
+            "remediation: restore the guard at bin/x:10")
+    prompt = second_review.build_prompt(GOLDEN_DIFF, "r", holds, {12: (item,)})
+    block = _outside_fence(prompt)
+    assert "unaddressed" in block
+    assert "remediation: restore the guard at bin/x:10" in block
+
+
+def test_selected_blocking_findings(tmp_path, monkeypatch):
+    held = _write(tmp_path, f"## FINDINGS\n\n- {FINDING}\n- [NOTE] a side remark\n\nNOT READY\n",
+                  "held.md")
+    ready = _write(tmp_path, "## FINDINGS\n\n- nothing blocks\n\nREADY\n", "ready.md")
+    fid = {"verdict_1": "NOT READY"}
+    monkeypatch.setattr(fidelity, "verdict_path", lambda _pr: held)
+    got = second_review.selected_blocking_findings(fid, PR, TREE_A)
+    assert len(got) == 1 and FINDING in got[0]
+    monkeypatch.setattr(fidelity, "verdict_path", lambda _pr: ready)
+    assert second_review.selected_blocking_findings({"verdict_1": "READY"}, PR, TREE_A) == ()
+    monkeypatch.setattr(fidelity, "verdict_path", lambda _pr: str(tmp_path / "missing.md"))
+    assert second_review.selected_blocking_findings(fid, PR, TREE_A) == ()

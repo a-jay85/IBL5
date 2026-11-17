@@ -34,7 +34,7 @@ if _FANOUT_PURPOSES != REVIEW_AGENTS:
 CODE_THRESHOLD = 80     # drop findings scored below (rubric Thresholds table)
 SEC_THRESHOLD = 75
 
-VERIFIER_COUNT = 3                     # odd, smallest N > 1 that makes "all reject" meaningful
+VERIFIER_COUNT = 2                     # smallest N > 1 that makes "all reject" meaningful (3 -> 2: 2026-11-17 cost review of #3667)
 # reviewcache.MODEL_PINS pins the verifier purpose/model literal pair assigned below.
 # call_tooled's allowlist is {"opus","sonnet"}; Haiku cannot read code here.
 _VERIFIER_PURPOSE_STEM, VERIFIER_MODEL = "verify-findings", "opus"

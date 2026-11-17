@@ -78,6 +78,7 @@ from harness import savedline
 from harness.merge_danger import parse_merge_danger, render_merge_danger
 from harness import removed_guards
 from harness import removed_guard_fix
+from harness import owner_intent
 from harness import second_review
 from harness import unplanned_scope
 from harness.gate_backtest_replay import gate_backtest_result
@@ -536,6 +537,8 @@ def _run_pass(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             create_body = copy["summary_md"] or ""
             create_body = _apply_backlog_closes(create_body, plan, log)
             create_body = _upsert_no_adr_markers(create_body, plan)
+            _owner = "" if plan.found else owner_intent.pr_section(res.slug)
+            create_body = owner_intent.upsert_owner_request(create_body, _owner)
             create_body = upsert_gate_fix(create_body, render_gate_fix(res.gate_fix))
             # A stacked branch opens against its declared parent, so its diff stays its own.
             pr_base = _merge_target(git).removeprefix("origin/")
@@ -783,6 +786,8 @@ def _run_pass(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         if _gate_fix_block:   # never strips a block an earlier run published
             body = upsert_gate_fix(body, _gate_fix_block)
         _md_sd = _state_dir(out_dir, live, state_dir) if (live or state_dir is not None) else None
+        _owner = "" if plan.found else owner_intent.pr_section(res.slug)
+        body = owner_intent.upsert_owner_request(body, _owner)
         body = _merge_danger_body(body, worktree, diff, log, "phase6", state_dir=_md_sd, slug=slug)
         gh.pr_edit_body(pr, body)
         _check_backlog_closes(gh, pr, plan, log)
@@ -963,6 +968,8 @@ def _run_pass(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 sql_equivalence_evidence=sql_equivalence.arm_input_value(
                     getattr(plan, "hold_triggers", ()), worktree, git.branch(), cls.files),
                 fidelity_gate_edit_only=second_review.selected_gate_edit_only(
+                    res.fidelity or {}, pr, git.head_tree()),
+                fidelity_blocking_findings=second_review.selected_blocking_findings(
                     res.fidelity or {}, pr, git.head_tree()),
                 branch=git.branch(),
                 dep_state_lookup=lambda n: gh.pr_state(n),
@@ -2615,6 +2622,8 @@ def _rearm_after_ci_fix(git, gh, llm, log, res, state, inputs, decision, outcome
         gate_backtest_status=gb.status, gate_backtest_reason=gb.reason,
         fidelity_gate_edit_only=second_review.selected_gate_edit_only(res.fidelity or {}, pr,
                                                                       cur_tree),
+        fidelity_blocking_findings=second_review.selected_blocking_findings(
+            res.fidelity or {}, pr, cur_tree),
         llm_safety_holds=[])
     # Before the preview, so a cleared PR still reaches the add-only safety verdict.
     new = second_review.review_pass(new, pr, git.head_tree, git.diff_vs_base, plan, log,

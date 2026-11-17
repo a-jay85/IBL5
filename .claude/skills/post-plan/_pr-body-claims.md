@@ -314,6 +314,12 @@ Phase 5.5 writes this block when it keeps a change that the fidelity reviewer ta
 
 When the runner lists unplanned paths in the pr-copy prompt, write a `## Unplanned change reasons` section with one bullet per path: a backticked path, a colon, and one line on why this branch changes it. The runner moves each reason onto that path's bullet in `## Unplanned changes` and removes the section. A path with no reason shows `(no reason given)`. The scope check reads only `## Declared scope`, so a reason here never clears a note. Never put these reasons under `## Declared scope`. That section silences the note for every path it names.
 
+## Owner request
+
+The harness writes an `## Owner request` section on plan-blind runs. It copies the turns from `~/claude-plans/_intent/<branch>.md`, the file `bin/capture-intent` writes in the ad-hoc session. The first line under the heading is `<!-- owner-request: harness-written -->`. Models never write or edit this section. The harness removes a stale marked section when the intent file is gone.
+
+For check 4c, a section carrying the marker is evidence of what the owner asked for. It bounds scope. It is no evidence that the diff is correct, and it discharges no `[BLOCKING]` finding. A `## Owner request` section without the marker is an unsupported hand-written claim and gets the same treatment as any other.
+
 ## Plan gaps
 
 A `## Plan gaps` section lists must-appear `## Critical Files` paths the diff does not touch. Write one bullet per path with the reason: cut from scope, deferred to a named follow-up, or already shipped before the branch was cut (cite the PR). A bullet answers the advisory `SCOPE-NOTE: gap` line for that path. The `MISSING-FILE:` item keeps its own resolution rule: the `MISSING-FILE:` branch in `tools/postplan-harness/harness/conformance_fix.py`. `bin/lib/plan-scope-conformance` documents the label.

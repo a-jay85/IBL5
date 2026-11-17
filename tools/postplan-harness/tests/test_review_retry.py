@@ -70,7 +70,6 @@ def test_first_invalid_output_retries_once(tmp_path):
         "review-agent-a": [HarnessError("llm-invalid-output", "bad parse"), valid],
         "verify-findings-1": [_all_real(1)],
         "verify-findings-2": [_all_real(1)],
-        "verify-findings-3": [_all_real(1)],
     })
     gh = _NullGh()
     surviving, _, _, degraded = ReviewPhase(llm, gh, worktree=str(tmp_path)).run(

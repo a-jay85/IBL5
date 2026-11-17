@@ -556,7 +556,7 @@ from harness.state import HarnessError  # noqa: E402
 FOO = "ibl5/classes/Foo.php"
 
 
-VERIFIERS = ("verify-findings-1", "verify-findings-2")
+from harness.review import VERIFIER_PURPOSES as VERIFIERS  # noqa: E402
 
 
 def _canned(path, line, verdict):

@@ -506,6 +506,17 @@ chk "php URL inside \$(php) still rewritten" eq "$(row_rewrite 'test "$(php -r "
 chk "grep before curl unchanged" eq "$(row_rewrite 'grep -q http://localhost/ f && curl -sf http://localhost/ibl5/')" 'grep -q http://localhost/ f && curl -sf http://localhost:8080/ibl5/'
 end_case
 
+# A leading ! does not hide php, bun or bunx from the remote-URL guard, the
+# bun stack check or the CI host rewrite.
+start_case case_negated_command_word
+chk "! php with a remote URL stays LOCAL" routes_local "! php -r 'echo file_get_contents(\"https://iblhoops.net/\");'"
+chk "cd && ! php with a remote URL stays LOCAL" routes_local 'cd ibl5 && ! php x.php https://iblhoops.net/ibl5/'
+chk "! bun with a remote URL stays LOCAL" routes_local '! bun run x.ts https://iblhoops.net/ibl5/'
+chk "test && ! bunx needs bun" eq "$(route 'test -f x && ! bunx tsx x.ts')" 'CI bun'
+chk "! php localhost URL rewritten" eq "$(row_rewrite '! php x.php http://localhost/api')" '! php x.php http://localhost:8080/api'
+chk "cd && ! php localhost URL rewritten" eq "$(row_rewrite 'cd ibl5 && ! php x.php http://localhost/api')" 'cd ibl5 && ! php x.php http://localhost:8080/api'
+end_case
+
 # A stub curl on PATH logs the arguments it got and exits 0, so ci can run
 # web rows offline.
 mkdir -p "$TMP/stubbin"

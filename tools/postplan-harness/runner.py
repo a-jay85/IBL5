@@ -308,7 +308,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
     kw = dict(mode=mode, worktree=worktree, headless=headless, plans_dir=plans_dir,
               live=live, explicit_path=explicit_path, probe=probe,
               state_dir=state_dir, rebase_only=rebase_only)
-    res = _run_pass(fixture, out_dir, llm, stacked_restarts=0, **kw)
+    res = _run_pass(fixture, out_dir, llm, stacked_restarts=0, defer_llm_close=True, **kw)
     if res.error_kind != "stacked-child-restart":  # no stacked child adopted
         return res
     adopted = res.stacked_child_restart
@@ -319,6 +319,11 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         res2.error = "remote-head-diverged: remote moved again after one stacked-child restart"
     res2.stacked_child_restart = adopted
     return res2
+
+
+def _should_close_llm(defer_llm_close: bool, res: RunResult) -> bool:
+    """False only for a first pass that ends in a stacked-child restart."""
+    return not (defer_llm_close and res.error_kind == "stacked-child-restart")
 
 
 def _read_audit(out_dir: str) -> list[str]:
@@ -335,7 +340,8 @@ def _run_pass(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
               explicit_path: str | None = None,
               probe=None, state_dir: str | None = None, rebase_only: bool = False,
               stacked_restarts: int = 0,
-              prior_audit: list[str] | None = None) -> RunResult:
+              prior_audit: list[str] | None = None,
+              defer_llm_close: bool = False) -> RunResult:
     os.makedirs(out_dir, exist_ok=True)
     run_started = time.time()
     ledger = llm.ledger
@@ -1429,7 +1435,10 @@ def _run_pass(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             except (Exception, usage_pause.UsagePause) as e:  # noqa: BLE001
                 log(f"phase4: background review failed after the run failed ({e!r})")
         state.checkpoint("terminal", res)
-        _phase11_cleanup(llm, log)
+        # llm.close() removes the adapter's temp cwd; the restart pass reuses the same
+        # adapter, so a pass that is about to restart must leave it in place.
+        if _should_close_llm(defer_llm_close, res):
+            _phase11_cleanup(llm, log)
         ciwatch.reap_background_watch(bg_ci)
     return _finish(res, out_dir)
 

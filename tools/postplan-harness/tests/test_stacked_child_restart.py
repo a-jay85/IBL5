@@ -234,3 +234,17 @@ def test_verdict_line_names_child_prs():
     line = runner.verdict_line(r, 0, "https://github.com/o/r/pull")
     assert "Stacked child: #41" in line
     assert "\n" not in line
+
+
+def test_restart_pass_keeps_llm_workdir(monkeypatch, tmp_path):
+    """Pass 1 must not close the adapter that pass 2 reuses (close() removes its temp cwd)."""
+    pass2 = types.SimpleNamespace(error_kind=None, stacked_child_restart=None)
+    calls = _patch_passes(monkeypatch, [_restart_res(), pass2])
+    runner.run(None, str(tmp_path), types.SimpleNamespace(ledger=None))
+    assert calls[0]["defer_llm_close"] is True
+    assert "defer_llm_close" not in calls[1]
+    restart = types.SimpleNamespace(error_kind="stacked-child-restart")
+    done = types.SimpleNamespace(error_kind=None)
+    assert runner._should_close_llm(True, restart) is False
+    assert runner._should_close_llm(True, done) is True
+    assert runner._should_close_llm(False, restart) is True

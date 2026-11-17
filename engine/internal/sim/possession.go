@@ -366,16 +366,6 @@ func (gs *gameState) shotAttempt(offense, defense *teamState, shooter onCourt, s
 	return false, true
 }
 
-// madeFieldGoal records a guaranteed made 2pt (the and-one basket): it emits the
-// attempt event then credits the make.
-func (gs *gameState) madeFieldGoal(offense *teamState, shooter onCourt, st result.ShotType, origin result.ShotOrigin, periodIdx int) {
-	gs.emit(result.Event{
-		Kind: result.EventShotAttempt, Period: gs.period, Clock: gs.clock,
-		TeamID: offense.teamID, PlayerID: shooter.PID, ShotType: st, Origin: origin,
-	})
-	gs.creditMadeFieldGoal(offense, shooter, st, origin, periodIdx)
-}
-
 // creditMadeFieldGoal scores the points (live score, read for clutch/OT), bumps
 // the live per-shooter made-FG tally (read by the block-probability penalty),
 // and emits the make event. The box-score Game2GM/Game3GM counters are derived

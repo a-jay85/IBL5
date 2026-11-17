@@ -18,17 +18,19 @@ const (
 
 // foulRateBands holds [lo, hi] PF per team-game for each foul site on the
 // fixture run. Each band is a value captured from one run of the tree after
-// the J27 rate port, ±10% with a floor of ±0.05. Re-capture them only on an
+// the live-outcome-map port (engine/docs/j27-live-outcome-map-port.md), ±10%
+// with a floor of ±0.05. Re-capture them only on an
 // intended output change.
 var foulRateBands = map[result.FoulSite][2]float64{
-	result.FoulSiteUnknown:          foulRateBand(0, 0.10),
-	result.FoulSiteShootingTwo:      foulRateBand(4.232, 0.10),
-	result.FoulSiteShootingThree:    foulRateBand(0.220, 0.10),
-	result.FoulSiteAndOne:           foulRateBand(1.147, 0.10),
-	result.FoulSiteNonShooting:      foulRateBand(3.562, 0.10),
-	result.FoulSiteLateGame:         foulRateBand(0.025, 0.10),
-	result.FoulSiteAndOneMadeTwo:    foulRateBand(1.810, 0.10),
-	result.FoulSiteNonShootingBonus: foulRateBand(0.365, 0.10),
+	result.FoulSiteUnknown:           foulRateBand(0, 0.10),
+	result.FoulSiteShootingTwo:       foulRateBand(0.755, 0.10),
+	result.FoulSiteShootingThree:     foulRateBand(0.233, 0.10),
+	result.FoulSiteAndOne:            foulRateBand(0, 0.10),
+	result.FoulSiteNonShooting:       foulRateBand(0.797, 0.10),
+	result.FoulSiteLateGame:          foulRateBand(0.025, 0.10),
+	result.FoulSiteAndOneMadeTwo:     foulRateBand(2.330, 0.10),
+	result.FoulSiteNonShootingBonus:  foulRateBand(0.018, 0.10),
+	result.FoulSiteOffensiveTurnover: foulRateBand(1.357, 0.10),
 }
 
 // foulRateBand widens a captured rate by frac of itself, with a floor of ±0.05.

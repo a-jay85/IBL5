@@ -124,8 +124,9 @@ func TestFreeze_NoCrossConfound(t *testing.T) {
 // matrix #5 — misconfig (FAILURE).
 //
 // Freezing an arm whose precomputed mean is unset (zero) must return an explicit
-// error, never silently substitute 0 (degenerate for every arm). A valid config
-// returns nil.
+// error, never silently substitute 0 (degenerate for every arm). TVR is inert
+// since the live-outcome-map port and no sample feeds Means.TurnProb, so TVR
+// frozen with a zero mean runs. A valid config returns nil.
 func TestFreeze_MisconfigErrors(t *testing.T) {
 	b := richBundle()
 	bad := []struct {
@@ -133,7 +134,6 @@ func TestFreeze_MisconfigErrors(t *testing.T) {
 		cfg  FreezeConfig
 	}{
 		{"ORB", FreezeConfig{ORB: true}},
-		{"TVR", FreezeConfig{TVR: true}},
 		{"Foul", FreezeConfig{Foul: true}},
 		{"Make", FreezeConfig{Make: true}},
 	}
@@ -141,6 +141,9 @@ func TestFreeze_MisconfigErrors(t *testing.T) {
 		if _, err := SimulateWith(b, 1, Options{Freeze: c.cfg}); err == nil {
 			t.Errorf("SimulateWith with %s frozen but unset mean: got nil error, want an error", c.name)
 		}
+	}
+	if _, err := SimulateWith(b, 1, Options{Freeze: FreezeConfig{TVR: true}}); err != nil {
+		t.Errorf("SimulateWith with the inert TVR arm frozen at a zero mean: got %v, want nil", err)
 	}
 
 	// A fully-specified config validates and runs.

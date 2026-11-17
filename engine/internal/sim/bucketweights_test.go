@@ -75,14 +75,13 @@ func TestBucketWeights_FoulPathMix(t *testing.T) {
 	t.Logf("assembled path mix (n=%d, seed %d): factor=%.4f meanFoul=%.4f", n, seed, factor, meanFoul)
 	t.Logf("  home foul-frac=%.4f  away foul-frac=%.4f  (home−away=%+.4f)", homeFoul, awayFoul, homeFoul-awayFoul)
 
-	// LEVEL (restored after the Phase-6 re-anchor of the since-removed foul scale to 0.50): at the
-	// re-anchored scale the foul path is a realistic MINORITY share — observed home
-	// foul-frac ≈ 0.090 at this fixture (the 2pt composite 16.47 dominates foul 2.13).
-	// The band guards the LEVEL against scale drift: the pre-C2 8.6 gave a degenerate
-	// ~0.9 share; an unscaled bucket, ~0.01. A minority in [0.03, 0.15] is the faithful
-	// regime this dial was re-anchored to.
-	if homeFoul < 0.03 || homeFoul > 0.15 {
-		t.Errorf("home foul share = %.4f, want a realistic minority in [0.03, 0.15] (level re-anchored, foul scale since removed)", homeFoul)
+	// LEVEL: under the live map this bucket is code 4, the turnover path, and it is
+	// unscaled. One run after the live-outcome-map port gave home share 0.1656 at
+	// this fixture; the band is that value ±0.06, the half-width the old
+	// [0.03, 0.15] band kept around its 0.090 capture. A scale put back on the
+	// bucket moves the share out of band.
+	if homeFoul < 0.1056 || homeFoul > 0.2256 {
+		t.Errorf("home code-4 share = %.4f, want in [0.1056, 0.2256] (one-run capture 0.1656 ±0.06)", homeFoul)
 	}
 	// Symmetry: home/away foul shares differ ONLY through the ±hca on the 2pt bucket,
 	// so they are near-equal (the discriminator property). NOT the old home>away arm.

@@ -587,15 +587,13 @@ type Options struct {
 // validate rejects a config that freezes an arm with no precomputed (zero) mean — a
 // misconfiguration that would otherwise silently substitute 0, which is degenerate
 // for every arm (orebProb 0 disables offensive rebounds; makeVal 0 makes every shot
-// miss; foulWeight 0 removes the foul path; turnProb 0 removes steal-driven
-// turnovers). Every real derived value is strictly positive, so a zero frozen mean
-// can only mean "unset".
+// miss; foulWeight 0 removes the foul path). Every real derived value is strictly
+// positive, so a zero frozen mean can only mean "unset". TVR has no check: the
+// live-outcome-map port left it inert, and no sample feeds Means.TurnProb, so a
+// harvested TurnProb is always 0.
 func (o Options) validate() error {
 	if o.Freeze.ORB && o.Freeze.Means.OrebProb == 0 {
 		return fmt.Errorf("sim: freeze ORB requested but Means.OrebProb is unset (0)")
-	}
-	if o.Freeze.TVR && o.Freeze.Means.TurnProb == 0 {
-		return fmt.Errorf("sim: freeze TVR requested but Means.TurnProb is unset (0)")
 	}
 	if o.Freeze.Foul && o.Freeze.Means.FoulWeight == 0 {
 		return fmt.Errorf("sim: freeze Foul requested but Means.FoulWeight is unset (0)")

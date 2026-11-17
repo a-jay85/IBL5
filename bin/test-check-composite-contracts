@@ -262,8 +262,15 @@ jobs:
       id: changes
       if: github.event_name == 'pull_request'
       run: echo skip=false
+    - name: Import seed data
+      run: mysql -h 127.0.0.1 -u root -proot ibl5 < db-seed.sql
+    - name: Clone per-thread test databases
+      run: echo clone
     - name: Run Infection on diff
+      env:
+        INFECTION_PER_THREAD_DATABASE: '1'
       run: |
+        cp phpunit-mutation.xml phpunit.xml
         vendor/bin/infection \
           --min-msi=100 \
           --ignore-msi-with-no-mutations
@@ -316,8 +323,84 @@ MPEOF
     m5-guard-commented)
       tmp="$(mktemp)"
       sed 's|^        bin/check-infection-ran|        # bin/check-infection-ran|' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    m6-no-flag)
+      tmp="$(mktemp)"
+      sed '/INFECTION_PER_THREAD_DATABASE/d' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    m6-flag-zero)
+      tmp="$(mktemp)"
+      sed "s/INFECTION_PER_THREAD_DATABASE: '1'/INFECTION_PER_THREAD_DATABASE: '0'/" "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    m6-no-cp)
+      tmp="$(mktemp)"
+      sed '/cp phpunit-mutation.xml phpunit.xml/d' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    m6-cp-after-infection)
+      tmp="$(mktemp)"
+      awk '/cp phpunit-mutation.xml phpunit.xml/ {next} {print} /^        vendor\/bin\/infection \\$/ {print "        cp phpunit-mutation.xml phpunit.xml"}' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    m6-no-clone-step)
+      tmp="$(mktemp)"
+      awk '/^    - / {skip = ($0 == "    - name: Clone per-thread test databases")} !skip {print}' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    m6-clone-after-infection)
+      tmp="$(mktemp)"
+      awk '
+        /^    - / {mode = ($0 == "    - name: Clone per-thread test databases") ? 1 : 0}
+        /^    - name: Post sticky mutation comment$/ {printf "%s", held}
+        mode == 1 {held = held $0 "\n"; next}
+        {print}
+      ' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    m6-threads-flag)
+      tmp="$(mktemp)"
+      awk '{print} /^        vendor\/bin\/infection \\$/ {print "          --threads=8 \\"}' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    m6-near-miss-step-name)
+      tmp="$(mktemp)"
+      sed 's/^    - name: Clone per-thread test databases$/    - name: Clone per-thread test databases (old)/' "$f" > "$tmp" && mv "$tmp" "$f" ;;
     *)
       echo "put_mutation_pr: unknown variant '${2:-}'" >&2; return 1 ;;
+  esac
+}
+
+# put_mutation_weekly <wf-dir> [good|m6-no-cp]
+# Writes a minimal mutation.yml (the weekly full-suite workflow) to <wf-dir>.
+# It carries the same M6 wiring as the per-PR fixture. It names its job
+# 'Infection PHP' so M2's duplicate-context scan stays quiet.
+put_mutation_weekly() {
+  mkdir -p "$1"
+  local f="$1/mutation.yml"
+  local tmp
+  # shellcheck disable=SC2016
+  cat > "$f" << 'MWEOF'
+name: Mutation Testing
+on:
+  schedule:
+    - cron: '0 11 * * 1'
+  workflow_dispatch:
+  pull_request:
+    types: [labeled]
+permissions:
+  contents: read
+jobs:
+  mutation:
+    name: Infection PHP
+    runs-on: ubuntu-26.04
+    timeout-minutes: 120
+    steps:
+    - name: Import seed data
+      run: mysql -h 127.0.0.1 -u root -proot ibl5 < db-seed.sql
+    - name: Clone per-thread test databases
+      run: echo clone
+    - name: Run Infection
+      env:
+        INFECTION_PER_THREAD_DATABASE: '1'
+      run: |
+        cp phpunit-mutation.xml phpunit.xml
+        vendor/bin/infection \
+          --min-msi=71
+MWEOF
+  case "${2:-good}" in
+    good) ;;
+    m6-no-cp)
+      tmp="$(mktemp)"
+      sed '/cp phpunit-mutation.xml phpunit.xml/d' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    *)
+      echo "put_mutation_weekly: unknown variant '${2:-}'" >&2; return 1 ;;
   esac
 }
 
@@ -731,14 +814,33 @@ MUT_LITERAL='Infection PHP (per-PR diff)'
 
 # run_mut <case-name> <want-exit> <variant> [adr-literal|-none-]
 # Fresh actions/workflows/decisions dirs, one mutation-pr.yml variant, one ADR.
+# The 5th argument names a mutation.yml fixture variant (good|m6-no-cp), or
+# -none- (the default) to write no weekly fixture. The check's combined output
+# lands in RUN_MUT_OUT for the M6 cases that assert on it.
+RUN_MUT_OUT=""
 run_mut() {
-  local name="$1" want="$2" variant="$3" adr="${4:-$MUT_LITERAL}"
-  local d_a d_wf d_dec
+  local name="$1" want="$2" variant="$3" adr="${4:-$MUT_LITERAL}" weekly="${5:--none-}"
+  local d_a d_wf d_dec rc
   d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; d_dec="$(fresh_decisions)"
   put_mutation_pr "$d_wf" "$variant"
+  if [ "$weekly" != "-none-" ]; then put_mutation_weekly "$d_wf" "$weekly"; fi
   if [ "$adr" != "-none-" ]; then put_mut_adr "$d_dec" "$adr"; fi
-  "$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" "$d_dec" >/dev/null 2>&1
-  expect "$name" "$want" $?
+  RUN_MUT_OUT="$("$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" "$d_dec" 2>&1)"; rc=$?
+  expect "$name" "$want" "$rc"
+}
+
+# expect_mut_out <case-name> <token> [count]: RUN_MUT_OUT holds the token
+# <count> times (default 1 or more).
+expect_mut_out() {
+  local got
+  got="$(grep -cF -- "$2" <<< "$RUN_MUT_OUT" || true)"
+  if [ -n "${3:-}" ]; then
+    if [ "$got" -eq "$3" ]; then h_pass "$1 output has '$2' x$3"; else h_fail "$1" "want '$2' x$3, got x$got; output: $RUN_MUT_OUT"; fi
+  elif [ "$got" -ge 1 ]; then
+    h_pass "$1 output has '$2'"
+  else
+    h_fail "$1" "output lacks '$2'; output: $RUN_MUT_OUT"
+  fi
 }
 
 run_mut "mut-good" 0 good
@@ -760,6 +862,31 @@ run_mut "mut-m5-diff-relative" 1 m5-diff-relative
 run_mut "mut-m5-diff-relative-comment" 0 m5-diff-relative-comment
 run_mut "mut-m5-no-guard" 1 m5-no-guard
 run_mut "mut-m5-guard-commented" 1 m5-guard-commented
+
+# M6: Infection runs DB tests per thread. The base fixtures carry the wiring, so
+# mut-good above also proves M1-M5 stay green with it.
+run_mut "m6-clean" 0 good "$MUT_LITERAL" good
+expect_mut_out "m6-clean" "(M6)" 2
+run_mut "m6-no-flag" 1 m6-no-flag
+expect_mut_out "m6-no-flag" "M6: mutation-pr.yml 'Run Infection on diff' must set INFECTION_PER_THREAD_DATABASE"
+run_mut "m6-flag-zero" 1 m6-flag-zero
+expect_mut_out "m6-flag-zero" "must set INFECTION_PER_THREAD_DATABASE: '1'"
+run_mut "m6-no-cp" 1 m6-no-cp
+expect_mut_out "m6-no-cp" "must run cp phpunit-mutation.xml phpunit.xml before vendor/bin/infection"
+run_mut "m6-cp-after-infection" 1 m6-cp-after-infection
+expect_mut_out "m6-cp-after-infection" "must run cp phpunit-mutation.xml phpunit.xml before vendor/bin/infection"
+run_mut "m6-no-clone-step" 1 m6-no-clone-step
+expect_mut_out "m6-no-clone-step" "needs a 'Clone per-thread test databases' step"
+run_mut "m6-clone-after-infection" 1 m6-clone-after-infection
+expect_mut_out "m6-clone-after-infection" "needs a 'Clone per-thread test databases' step"
+run_mut "m6-threads-flag" 1 m6-threads-flag
+expect_mut_out "m6-threads-flag" "must not pass --threads"
+run_mut "m6-near-miss-step-name" 1 m6-near-miss-step-name
+expect_mut_out "m6-near-miss-step-name" "needs a 'Clone per-thread test databases' step"
+run_mut "m6-weekly-no-cp" 1 good "$MUT_LITERAL" m6-no-cp
+expect_mut_out "m6-weekly-no-cp" "M6: mutation.yml"
+run_mut "m6-weekly-absent" 0 good
+expect_mut_out "m6-weekly-absent" "absent, skipping M6"
 
 # mut-m2-duplicate-name: a second workflow names a job with the same context
 d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; d_dec="$(fresh_decisions)"
@@ -1107,7 +1234,8 @@ db_env_step() {
 }
 
 # put_db_wf <wf-dir> <file> <host> <user> <pass> <name> [plain|quoted|crlf|joblevel]
-# mutation-pr.yml is built on put_mutation_pr's passing base so M1-M4 stay green.
+# mutation-pr.yml and mutation.yml are built on the put_mutation_pr and
+# put_mutation_weekly passing bases so M1-M6 stay green.
 # joblevel adds job-level DB_* env and service-container DB_* env that differ
 # from the defaults; D1 must ignore both. crlf rewrites every line ending to \r\n.
 put_db_wf() {
@@ -1116,6 +1244,9 @@ put_db_wf() {
   [ "$mode" = quoted ] && q=quoted
   if [ "$2" = mutation-pr.yml ]; then
     put_mutation_pr "$1" good
+    db_env_step "$3" "$4" "$5" "$6" "$q" >> "$f"
+  elif [ "$2" = mutation.yml ]; then
+    put_mutation_weekly "$1" good
     db_env_step "$3" "$4" "$5" "$6" "$q" >> "$f"
   else
     {

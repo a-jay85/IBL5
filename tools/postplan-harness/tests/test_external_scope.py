@@ -469,3 +469,8 @@ def test_dm_one_line_if_exit_split_from_its_test_is_one_way():
 def test_dm_one_line_if_exit_kept_is_quiet():
     sec = _dm(350, '-if [ "$DELIVERED" = 1 ]; then exit 0; fi', '+[ "$DELIVERED" = 1 ] && exit 0')
     assert external_send_change(DM, sec) is None
+
+
+@pytest.mark.parametrize("line", ['+    local "msg=x"', "+    local msg\\=x", "+    local 'TO=5'"])
+def test_dm_quoted_local_assignment_fires(line):
+    assert external_send_change(DM, _dm(350, line)) == _R_SEND

@@ -663,6 +663,8 @@ def _dm_stmt_reason(stmts: list[_DmStmt], allowed: frozenset[str], partner: set[
             if name in _DM_EXISTING_FUNCS:
                 return _R_SEND
         for name in assigns:
+            if any(c in name for c in (_DM_Q, _DM_V, _DM_S)):
+                return _R_SEND  # a quoted or escaped `local` name hides the variable
             if name in _DM_LOG_TARGETS and not _dm_log_assign_ok(raw, word):
                 return _R_SEND
             if name in _DM_SEND_VARS or name.startswith("DISCORD_DM_"):

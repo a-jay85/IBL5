@@ -612,6 +612,24 @@ if grep -qF '(P10) —' <<< "$out"; then
 else
   h_fail "P10 rejects a promote caller that does not ignore recap names P10" "output: $out"
 fi
+if grep -qF 'workflow:IGNORE_FAILED_CHECKS' <<< "$out"; then
+  h_pass "P10 names workflow:IGNORE_FAILED_CHECKS when the workflow list lacks recap"
+else
+  h_fail "P10 names workflow:IGNORE_FAILED_CHECKS when the workflow list lacks recap" "output: $out"
+fi
+
+# P10: merge script whose lists lack recap -> exit 1, names merge:IGNORE_FAILED_CHECKS
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" good
+merge_no_recap="$TMP/merge-no-recap"
+# shellcheck disable=SC2016
+printf 'SKIP_CHECKS="Promote master to production,Auto-promotion paused" \\\nIGNORE_PENDING_CHECKS="Aggregate check status,recheck,recap" \\\nIGNORE_FAILED_CHECKS="Aggregate check status,recheck" \\\n    bin/check-master-ci-green "$SHA"\n' > "$merge_no_recap"
+out="$("$CHECK" "$d_a" "$d_wf" "$merge_no_recap" "$CLEAN_PROMOTE" 2>&1)"; rc=$?
+expect "P10 rejects a merge script whose failed list lacks recap" 1 "$rc"
+if grep -qF 'merge:IGNORE_FAILED_CHECKS' <<< "$out"; then
+  h_pass "P10 names merge:IGNORE_FAILED_CHECKS when the merge script lacks recap"
+else
+  h_fail "P10 names merge:IGNORE_FAILED_CHECKS when the merge script lacks recap" "output: $out"
+fi
 
 d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" p10-recap-near-miss
 out="$("$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" 2>&1)"; rc=$?

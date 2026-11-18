@@ -56,6 +56,24 @@ seam_case_contract_drift() {
         fi
     done
 
+    # Approve-button routes (discord-approve-buttons) — same TS-quoted form.
+    for token in "'/discordApproveDM'" "'/approveClicks'" "'/approveClicks/claim'"; do
+        if ! grep -qF -- "$token" <<< "$express_src"; then
+            seam_fail "contract-drift: route $token absent from express.ts"
+            missing=$(( missing + 1 ))
+        fi
+    done
+
+    # Owner-id drift: the Mac poller and bin/discord-dm must name the same owner.
+    if ! grep -qF 'OWNER_DISCORD_ID="283183467804491776"' "$HERE/approve-click-tick"; then
+        seam_fail "contract-drift: OWNER_DISCORD_ID in bin/approve-click-tick no longer matches the pinned owner id"
+        missing=$(( missing + 1 ))
+    fi
+    if ! grep -qF 'OWNER_ID="283183467804491776"' "$HERE/discord-dm"; then
+        seam_fail "contract-drift: OWNER_ID in bin/discord-dm no longer matches the pinned owner id"
+        missing=$(( missing + 1 ))
+    fi
+
     # Response field names the drain consumes + ack body field — must exist in plan-review-dm.ts
     for token in 'decisions' 'slug' 'action' 'ids' 'outcomes' 'PLAN_SLUG_RE'; do
         if ! grep -qF -- "$token" <<< "$dm_src"; then
@@ -680,6 +698,324 @@ seam_case_ack_outcomes() {
     want "ack outcomes: FORCED-earlier-skip → \"rejected\" in outcomes on second pass" "$body" '"ao6":"rejected"'
 }
 
+# ── approve-click — bin/approve-click-tick against stub ssh, gh, owner-approve and discord-dm ──
+AP_TICK="$HERE/approve-click-tick"
+AP_NONCE="0123456789abcdef0123456789abcdef"
+AP_SHA="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+AP_SHA2="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+AP_OWNER_JSON='"283183467804491776"'
+AP_BIN="$SANDBOX/approve-bin"
+AP_LOGS="$SANDBOX/approve-logs"
+AP_STATE="$SANDBOX/approve-state"
+AP_OUT=""
+AP_RC=0
+
+ap_setup() {
+    mkdir -p "$AP_BIN" "$AP_LOGS"
+    cat > "$AP_BIN/fake-ssh" <<'APSSH'
+#!/usr/bin/env bash
+cmd=""
+for a in "$@"; do cmd="$a"; done
+printf 'CALL %s\n' "$cmd" >> "$AP_LOGS/ssh.log"
+case "$cmd" in
+    *approveClicks/claim*) cat > /dev/null; printf '%s\nHTTP=%s curl_rc=0\n' "$FAKE_CLAIM_BODY" "${FAKE_CLAIM_HTTP:-200}" ;;
+    *approveClicks*)       printf '%s\nHTTP=200 curl_rc=0\n' "$FAKE_LIST_BODY" ;;
+    *)                     printf '\nHTTP=404 curl_rc=0\n' ;;
+esac
+APSSH
+    cat > "$AP_BIN/fake-gh" <<'APGH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$AP_LOGS/gh.log"
+printf '%s\n' "$FAKE_GH_JSON"
+APGH
+    cat > "$AP_BIN/fake-oa" <<'APOA'
+#!/usr/bin/env bash
+printf '%s\n' "$#" > "$AP_LOGS/oa.argc"
+printf '[%s]\n' "$@" >> "$AP_LOGS/oa.log"
+echo "RESULT: ${FAKE_OA_RESULT:-armed}"
+exit "${FAKE_OA_RC:-0}"
+APOA
+    cat > "$AP_BIN/fake-dm" <<'APDM'
+#!/usr/bin/env bash
+printf '[%s]\n' "$@" >> "$AP_LOGS/dm.log"
+APDM
+    chmod +x "$AP_BIN/fake-ssh" "$AP_BIN/fake-gh" "$AP_BIN/fake-oa" "$AP_BIN/fake-dm"
+    export AP_LOGS FAKE_LIST_BODY FAKE_CLAIM_BODY FAKE_CLAIM_HTTP FAKE_GH_JSON FAKE_OA_RC FAKE_OA_RESULT SENTINEL
+    export APPROVE_CLICK_SSH_BIN="$AP_BIN/fake-ssh"
+    export APPROVE_CLICK_SSH_HOST=stub-host
+    export APPROVE_CLICK_PORT=50000
+    export APPROVE_CLICK_STATE_DIR="$AP_STATE"
+    export APPROVE_OA_BIN="$AP_BIN/fake-oa"
+    export APPROVE_DM_BIN="$AP_BIN/fake-dm"
+    export APPROVE_GH_BIN="$AP_BIN/fake-gh"
+    SENTINEL="$SANDBOX/approve-sentinel"
+}
+
+ap_claim_body() { # button condition [actor-json]
+    jq -cn --arg nonce "$AP_NONCE" --arg sha "$AP_SHA" --arg btn "$1" --arg cond "$2" \
+        --argjson actor "${3:-$AP_OWNER_JSON}" --argjson epoch "$(date +%s)" \
+        '{nonce: $nonce, pr: 4242, head_sha: $sha, button: $btn,
+          condition: (if $cond == "" then null else $cond end), actor: $actor,
+          clicked_at: "2026-11-16T12:00:00.000Z", clicked_at_epoch: $epoch}'
+}
+
+ap_reset() {
+    rm -rf "$AP_STATE" "$SENTINEL"
+    mkdir -p "$AP_STATE"
+    rm -f "$AP_LOGS"/*
+    : > "$AP_LOGS/ssh.log"; : > "$AP_LOGS/gh.log"; : > "$AP_LOGS/oa.log"; : > "$AP_LOGS/dm.log"
+    FAKE_LIST_BODY="$(jq -cn --arg n "$AP_NONCE" '{clicks: [{nonce: $n, pr: 4242, button: "ok"}]}')"
+    FAKE_CLAIM_BODY="$(ap_claim_body ok "")"
+    FAKE_CLAIM_HTTP=200
+    FAKE_GH_JSON="$(jq -cn --arg s "$AP_SHA" '{headRefOid: $s, state: "OPEN"}')"
+    FAKE_OA_RC=0
+    FAKE_OA_RESULT=armed
+}
+
+ap_run() { : > "$AP_LOGS/ssh.log"; AP_OUT="$("$@" 2>&1)"; AP_RC=$?; }
+ap_tick() { ap_run env -u CLAUDE_HEADLESS "$AP_TICK" --tick; }
+
+# The runner is detached, so wait for its `reported` marker (written after the outcome DM).
+ap_wait_reported() {
+    local i=0
+    while [ ! -e "$AP_STATE/clicks/$AP_NONCE/reported" ] && [ "$i" -lt 100 ]; do
+        sleep 0.1
+        i=$(( i + 1 ))
+    done
+}
+
+ap_eq() { if [ "$2" = "$3" ]; then seam_ok "$1"; else seam_fail "$1 (got: $2)"; fi; }
+ap_count() { grep -cF -- "$2" "$1" || true; }
+
+seam_case_approve_valid() {
+    local want_argv
+    ap_reset
+    ap_tick
+    ap_wait_reported
+    ap_eq "approve-valid: tick exits 0" "$AP_RC" "0"
+    want_argv=$'[4242]\n[Discord Approve button pressed by Discord user 283183467804491776 at 2026-11-16T12:00:00.000Z (click 01234567)]\n[--option=Discord button: Approve]'
+    ap_eq "approve-valid: owner-approve gets exactly the 3 pinned argv elements" "$(cat "$AP_LOGS/oa.log")" "$want_argv"
+    ap_eq "approve-valid: argc is 3" "$(cat "$AP_LOGS/oa.argc" 2>/dev/null)" "3"
+    want "approve-valid: outcome DM says armed" "$(cat "$AP_LOGS/dm.log")" "armed for merge"
+}
+
+seam_case_approve_stale() {
+    ap_reset
+    FAKE_GH_JSON="$(jq -cn --arg s "$AP_SHA2" '{headRefOid: $s, state: "OPEN"}')"
+    ap_tick
+    ap_wait_reported
+    ap_eq "approve-stale: owner-approve never ran" "$(cat "$AP_LOGS/oa.log")" ""
+    want "approve-stale: a fresh button is requested on the discordApproveDM route" "$(cat "$AP_LOGS/dm.log")" "/discordApproveDM"
+    want "approve-stale: the fresh button body holds the new head SHA" "$(cat "$AP_LOGS/dm.log")" "$AP_SHA2"
+}
+
+seam_case_approve_dup() {
+    ap_reset
+    ap_tick
+    ap_wait_reported
+    ap_tick
+    ap_tick
+    ap_eq "approve-dup: owner-approve ran once across three ticks" "$(ap_count "$AP_LOGS/oa.log" '[4242]')" "1"
+    ap_eq "approve-dup: exactly one seen-again DM" "$(ap_count "$AP_LOGS/dm.log" 'listed again')" "1"
+}
+
+seam_case_approve_metachar() {
+    local cond
+    cond='a b; $(touch "$SENTINEL") | rm -rf x & `id` * '\''q'\'' "d"'
+    ap_reset
+    FAKE_CLAIM_BODY="$(ap_claim_body fix "$cond")"
+    ap_tick
+    ap_wait_reported
+    ap_eq "approve-metachar: owner-approve argc is 4" "$(cat "$AP_LOGS/oa.argc" 2>/dev/null)" "4"
+    ap_eq "approve-metachar: the condition is one literal argv element" "$(sed -n 4p "$AP_LOGS/oa.log")" "[--fix-first=$cond]"
+    if [ -e "$SENTINEL" ]; then seam_fail "approve-metachar: the sentinel file was created"; else seam_ok "approve-metachar: the sentinel file was never created"; fi
+}
+
+seam_case_approve_headless() {
+    ap_reset
+    ap_run env CLAUDE_HEADLESS=1 "$AP_TICK" --tick
+    ap_eq "approve-headless: CLAUDE_HEADLESS=1 exits 3" "$AP_RC" "3"
+    ap_eq "approve-headless: no ssh call on CLAUDE_HEADLESS=1" "$(wc -c < "$AP_LOGS/ssh.log" | tr -d ' ')" "0"
+    ap_run env CLAUDE_HEADLESS= "$AP_TICK" --tick
+    ap_eq "approve-headless: CLAUDE_HEADLESS set but empty exits 3" "$AP_RC" "3"
+    ap_eq "approve-headless: no ssh call on an empty CLAUDE_HEADLESS" "$(wc -c < "$AP_LOGS/ssh.log" | tr -d ' ')" "0"
+    FAKE_LIST_BODY='{"clicks":[]}'
+    ap_tick
+    ap_eq "approve-headless: unset runs and exits 0" "$AP_RC" "0"
+}
+
+seam_case_approve_empty_tick() {
+    ap_reset
+    FAKE_LIST_BODY='{"clicks":[]}'
+    ap_tick
+    ap_eq "approve-empty-tick: exit 0" "$AP_RC" "0"
+    ap_eq "approve-empty-tick: one ssh call" "$(wc -l < "$AP_LOGS/ssh.log" | tr -d ' ')" "1"
+    ap_eq "approve-empty-tick: no gh call" "$(wc -c < "$AP_LOGS/gh.log" | tr -d ' ')" "0"
+    ap_eq "approve-empty-tick: no owner-approve call" "$(wc -c < "$AP_LOGS/oa.log" | tr -d ' ')" "0"
+    ap_eq "approve-empty-tick: no discord-dm call" "$(wc -c < "$AP_LOGS/dm.log" | tr -d ' ')" "0"
+}
+
+seam_case_approve_run_twice() {
+    ap_reset
+    ap_tick
+    ap_wait_reported
+    # Invocation 2 of the runner after the lock dir is gone: only the started marker stands in the way.
+    rm -rf "$AP_STATE/clicks/$AP_NONCE/run.lock"
+    ap_run env -u CLAUDE_HEADLESS "$AP_TICK" --run-one="$AP_NONCE"
+    rm -rf "$AP_STATE/clicks/$AP_NONCE/run.lock"
+    ap_run env -u CLAUDE_HEADLESS "$AP_TICK" --run-one="$AP_NONCE"
+    ap_eq "approve-run-twice: owner-approve ran once" "$(ap_count "$AP_LOGS/oa.log" '[4242]')" "1"
+}
+
+seam_case_approve_fix_first() {
+    ap_reset
+    FAKE_CLAIM_BODY="$(ap_claim_body fix "rebase first HTTP=500")"
+    FAKE_OA_RC=6
+    FAKE_OA_RESULT="fix-first recorded"
+    ap_tick
+    ap_wait_reported
+    want "approve-fix-first: passes --fix-first" "$(cat "$AP_LOGS/oa.log")" "[--fix-first=rebase first HTTP=500]"
+    want "approve-fix-first: passes the Fix first option" "$(cat "$AP_LOGS/oa.log")" "[--option=Discord button: Fix first]"
+    want "approve-fix-first: the DM names the finish command" "$(cat "$AP_LOGS/dm.log")" "bin/owner-approve 4242 --finish"
+}
+
+seam_case_approve_crash() {
+    local d
+    ap_reset
+    FAKE_LIST_BODY='{"clicks":[]}'
+    d="$AP_STATE/clicks/$AP_NONCE"
+    mkdir -p "$d"
+    date +%s > "$d/claimed"
+    date +%s > "$d/started"
+    ap_claim_body ok "" > "$d/record.json"
+    ap_tick
+    ap_tick
+    ap_eq "approve-crash: one loud DM across two ticks" "$(ap_count "$AP_LOGS/dm.log" 'started but recorded no outcome')" "1"
+    ap_eq "approve-crash: owner-approve never re-ran" "$(wc -c < "$AP_LOGS/oa.log" | tr -d ' ')" "0"
+}
+
+seam_case_approve_cap() {
+    local over exact
+    over="$(printf '%0301d' 0 | tr 0 x)"
+    exact="$(printf '%0300d' 0 | tr 0 x)"
+    ap_reset
+    FAKE_CLAIM_BODY="$(ap_claim_body fix "$over")"
+    ap_tick
+    ap_wait_reported
+    ap_eq "approve-cap: a 301-char condition runs nothing" "$(wc -c < "$AP_LOGS/oa.log" | tr -d ' ')" "0"
+    want "approve-cap: the refusal names the cap" "$(cat "$AP_LOGS/dm.log")" "longer than 300"
+    ap_reset
+    FAKE_CLAIM_BODY="$(ap_claim_body fix "$exact")"
+    ap_tick
+    ap_wait_reported
+    ap_eq "approve-cap: a 300-char condition runs" "$(sed -n 4p "$AP_LOGS/oa.log")" "[--fix-first=$exact]"
+}
+
+seam_case_approve_cntrl() {
+    local bad
+    for bad in $'a\tb' $'a\nb'; do
+        ap_reset
+        FAKE_CLAIM_BODY="$(ap_claim_body fix "$bad")"
+        ap_tick
+        ap_wait_reported
+        ap_eq "approve-cntrl: a condition with a control character runs nothing" "$(wc -c < "$AP_LOGS/oa.log" | tr -d ' ')" "0"
+        want "approve-cntrl: the refusal names the cause" "$(cat "$AP_LOGS/dm.log")" "control characters"
+    done
+}
+
+seam_case_approve_actor() {
+    ap_reset
+    FAKE_CLAIM_BODY="$(ap_claim_body ok "" 283183467804491776)"
+    ap_tick
+    ap_wait_reported
+    ap_eq "approve-actor: a numeric actor runs nothing" "$(wc -c < "$AP_LOGS/oa.log" | tr -d ' ')" "0"
+    ap_reset
+    FAKE_CLAIM_BODY="$(ap_claim_body ok "" '"1"')"
+    ap_tick
+    ap_wait_reported
+    ap_eq "approve-actor: a different actor runs nothing" "$(wc -c < "$AP_LOGS/oa.log" | tr -d ' ')" "0"
+    want "approve-actor: the refusal names the owner check" "$(cat "$AP_LOGS/dm.log")" "not from the owner"
+}
+
+seam_case_approve_claim_409() {
+    ap_reset
+    FAKE_CLAIM_HTTP=409
+    FAKE_CLAIM_BODY='{"error":"already-claimed"}'
+    ap_tick
+    ap_wait_reported
+    ap_eq "approve-claim-409: nothing ran" "$(wc -c < "$AP_LOGS/oa.log" | tr -d ' ')" "0"
+    want "approve-claim-409: the refusal names the HTTP status" "$(cat "$AP_LOGS/dm.log")" "HTTP 409"
+}
+
+seam_case_approve_send_closed() {
+    ap_reset
+    FAKE_GH_JSON="$(jq -cn --arg s "$AP_SHA" '{headRefOid: $s, state: "CLOSED"}')"
+    ap_run env CLAUDE_HEADLESS=1 "$AP_TICK" --send-button=4242
+    ap_eq "approve-send-closed: a CLOSED PR exits 0" "$AP_RC" "0"
+    ap_eq "approve-send-closed: a CLOSED PR makes no discordApproveDM call" "$(wc -c < "$AP_LOGS/dm.log" | tr -d ' ')" "0"
+    FAKE_GH_JSON="$(jq -cn --arg s "$AP_SHA" '{headRefOid: $s, state: "OPEN"}')"
+    ap_run env CLAUDE_HEADLESS=1 "$AP_TICK" --send-button=4242
+    want "approve-send-closed: an OPEN PR posts to discordApproveDM even under CLAUDE_HEADLESS" "$(cat "$AP_LOGS/dm.log")" "/discordApproveDM"
+    want "approve-send-closed: the body holds the head SHA" "$(cat "$AP_LOGS/dm.log")" "$AP_SHA"
+}
+
+seam_case_approve_schedule() {
+    local plist path_line
+    plist="$("$HERE/approve-click-cron-setup" --print-schedule 2>&1)"
+    path_line="$(grep -A1 '<key>PATH</key>' <<< "$plist" | tail -1)"
+    want "approve-schedule: PATH has /opt/homebrew/bin" "$path_line" "/opt/homebrew/bin"
+    want "approve-schedule: PATH has /usr/bin" "$path_line" "/usr/bin"
+    want_not "approve-schedule: no unexpanded dollar sign" "$plist" '$'
+    want_not "approve-schedule: no empty string element" "$plist" '<string></string>'
+    want "approve-schedule: StartInterval is 180" "$plist" '<integer>180</integer>'
+    want "approve-schedule: AbandonProcessGroup is true" "$(grep -A1 '<key>AbandonProcessGroup</key>' <<< "$plist")" '<true/>'
+    want "approve-schedule: the program takes --tick" "$plist" '<string>--tick</string>'
+}
+
+seam_case_approve_cron_flag() {
+    "$HERE/approve-click-cron-setup" --bogus > /dev/null 2>&1
+    ap_eq "approve-cron-flag: an unknown flag exits 2" "$?" "2"
+    "$HERE/approve-click-cron-setup" > /dev/null 2>&1
+    ap_eq "approve-cron-flag: no flag exits 2" "$?" "2"
+}
+
+seam_case_approve_fleet_wiring() {
+    local dm_line btn_line
+    dm_line="$(grep -nF 'ljob_dm_send post-plan-fleet "$msg"' "$HERE/post-plan-fleet" | tail -1 | cut -d: -f1)"
+    btn_line="$(grep -nF '"$_ppf_approve" --send-button="$PR" >/dev/null 2>&1 || true' "$HERE/post-plan-fleet" | tail -1 | cut -d: -f1)"
+    if [ -z "$dm_line" ] || [ -z "$btn_line" ]; then
+        seam_fail "approve-fleet-wiring: the held DM line or the send-button line is missing from post-plan-fleet"
+    elif ! grep -qF '_ppf_approve="$ROOT/bin/approve-click-tick"' "$HERE/post-plan-fleet"; then
+        seam_fail "approve-fleet-wiring: the runner must build the button path from \$ROOT, not BASH_SOURCE (the runner runs from /tmp)"
+    elif [ "$btn_line" -gt "$dm_line" ]; then
+        seam_ok "approve-fleet-wiring: the send-button line follows the held DM line and ends in or-true"
+    else
+        seam_fail "approve-fleet-wiring: the send-button line must come after the held DM line"
+    fi
+}
+
+seam_case_approve_all() {
+    ap_setup
+    seam_case_approve_valid
+    seam_case_approve_stale
+    seam_case_approve_dup
+    seam_case_approve_metachar
+    seam_case_approve_headless
+    seam_case_approve_empty_tick
+    seam_case_approve_run_twice
+    seam_case_approve_fix_first
+    seam_case_approve_crash
+    seam_case_approve_cap
+    seam_case_approve_cntrl
+    seam_case_approve_actor
+    seam_case_approve_claim_409
+    seam_case_approve_send_closed
+    seam_case_approve_schedule
+    seam_case_approve_cron_flag
+    seam_case_approve_fleet_wiring
+}
+# ── END approve-click ──
+
 if ! command -v jq > /dev/null 2>&1; then
     seam_fail "jq is not on PATH — bin/plan-review-drain cannot parse the decision sink without it"
 fi
@@ -700,6 +1036,7 @@ seam_case_runner_hook
 seam_case_tick_hook
 seam_case_queue_end_to_end
 seam_case_ack_outcomes
+seam_case_approve_all
 
 # Completion token. A harness that asserts nothing reads as passing, so the count
 # is printed and an independently wired harness (bin/test-plan-now) asserts it is

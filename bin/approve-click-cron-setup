@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# One-time setup for the Discord approve-click poller (ADR-0262).
+#
+# Installs a Mac-local launchd LaunchAgent (com.ibl5.approve-click-tick) that runs
+# bin/approve-click-tick --tick every 180s. The plist points at the durable MAIN
+# checkout, never a worktree, which gets torn down. AbandonProcessGroup keeps launchd
+# from killing the detached owner-approve runner when the tick exits.
+#
+# Usage:
+#   bin/approve-click-cron-setup --print-schedule   # emit the plist to stdout (no side effect)
+#   bin/approve-click-cron-setup --install          # write the plist and load the LaunchAgent
+#   bin/approve-click-cron-setup --uninstall        # unload and remove the LaunchAgent
+#
+# Run --install once on the Mac, from the main checkout, after the PR that adds this
+# script has merged. Exactly one flag is required. Anything else exits 2.
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=bin/lib/launchd-sched.sh
+. "$REPO_ROOT/bin/lib/launchd-sched.sh"
+
+die_usage() { echo "approve-click-cron-setup: $*" >&2; exit 2; }
+
+ACTION=""
+[ $# -eq 1 ] || die_usage "exactly one flag is required (--install, --uninstall, --print-schedule)"
+case "$1" in
+  --install) ACTION="install" ;;
+  --uninstall) ACTION="uninstall" ;;
+  --print-schedule) ACTION="print" ;;
+  -h|--help) awk 'NR==1{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"; exit 0 ;;
+  *) die_usage "unknown flag: $1" ;;
+esac
+
+[ -n "${HOME:-}" ] || die_usage "HOME is unset"
+
+# Program and WorkingDirectory MUST point at the main checkout (ADR-0080 topology).
+MAIN_WT="$(lsched_main_wt "$REPO_ROOT")"
+
+PLIST_LABEL="com.ibl5.approve-click-tick"
+PLIST_PATH="$HOME/Library/LaunchAgents/${PLIST_LABEL}.plist"
+LOG_FILE="$HOME/Library/Logs/approve-click-tick.log"
+PROGRAM="$MAIN_WT/bin/approve-click-tick"
+
+# Single source of truth for the plist, used by --print-schedule and --install.
+plist_body() {
+  lsched_key_string Label "$PLIST_LABEL"
+  lsched_program_arguments "$PROGRAM" --tick
+  lsched_key_integer StartInterval 180
+  lsched_key_bool AbandonProcessGroup true
+  lsched_key_string WorkingDirectory "$MAIN_WT"
+  lsched_env_open
+  # launchd agents start with a minimal PATH. gh and jq live in /opt/homebrew/bin, ssh and
+  # nohup in /usr/bin. HOME interpolates here, at generation time, because launchd does not
+  # expand variables in EnvironmentVariables.
+  lsched_key_string PATH "/opt/homebrew/opt/mariadb/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${HOME}/.local/bin" 2
+  # launchd sets no locale, and the 300-character condition cap counts characters, not bytes.
+  lsched_key_string LANG en_US.UTF-8 2
+  lsched_env_close
+  lsched_key_string StandardOutPath "$LOG_FILE"
+  lsched_key_string StandardErrorPath "$LOG_FILE"
+}
+
+case "$ACTION" in
+  print)
+    lsched_plist plist_body
+    ;;
+  install)
+    [ -x "$PROGRAM" ] || die_usage "missing $PROGRAM. Merge the PR first, then run this from the main checkout."
+    lsched_install "$PLIST_LABEL" "$PLIST_PATH" plist_body "$HOME/Library/Logs"
+    echo "Installed ${PLIST_LABEL} (StartInterval 180s). Program: $PROGRAM --tick"
+    ;;
+  uninstall)
+    lsched_uninstall "$PLIST_LABEL" "$PLIST_PATH"
+    echo "Uninstalled ${PLIST_LABEL}."
+    ;;
+esac

@@ -4,6 +4,7 @@ import { MessageFlags, type Client } from 'discord.js';
 import { config } from '../config.js';
 import { handleTradeDM } from './trade-dm.js';
 import { handlePlanReviewDM, handleListDecisions, handleAckDecisions } from './plan-review-dm.js';
+import { handleApproveDM, handleListClicks, handleClaimClick } from './approve-dm.js';
 
 /**
  * `dir` is the decision-store test seam (see `decision-store.ts`); production
@@ -49,6 +50,9 @@ export function startExpressServer(
     app.post('/discordPlanReviewDM', handlePlanReviewDM(client));
     app.get('/planDecisions', handleListDecisions(dir));
     app.post('/planDecisions/ack', handleAckDecisions(client, dir));
+    app.post('/discordApproveDM', handleApproveDM(client, dir));
+    app.get('/approveClicks', handleListClicks(dir));
+    app.post('/approveClicks/claim', handleClaimClick(dir));
 
     // Localhost poke from the prod-side simRecapQueue notify. Unauthenticated by design:
     // it reads nothing from the request, and its only effect is an early publisher sweep.

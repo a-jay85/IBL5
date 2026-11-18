@@ -274,6 +274,17 @@ h_eq "live_rerun_resumes_from_state: the first transfer is #10" "issue transfer 
 h_eq "live_rerun_resumes_from_state: no repeat transfer of #9" 0 "$(grep -c 'issue transfer 9 ' "$STUB/calls.log")"
 h_eq "live_rerun_resumes_from_state: the map has 29 entries" 29 "$(jq 'length' "$STUB"/mig/bug-issues-map-*.json)"
 
+# ── live_rerun_resumes_from_state: an issue moved before the state write ──────
+# A run died after GitHub moved #5 but before the state file recorded it.
+# The repo now answers #5 with a URL in the new repo, so the run must read the number and not move it again.
+make_stubs
+printf '5 105\n' > "$STUB/xfer.map"
+run_mig "$CONFIRM" --live
+h_eq "live_rerun_resumes_from_state: moved issue run exits 0" 0 "$RC"
+h_eq "live_rerun_resumes_from_state: already-moved #5 is not transferred again" 0 "$(grep -c 'issue transfer 5 ' "$STUB/calls.log")"
+h_eq "live_rerun_resumes_from_state: the other 28 are transferred" 28 "$(grep -c 'issue transfer' "$STUB/calls.log")"
+h_eq "live_rerun_resumes_from_state: the map has #5 -> #105" 105 "$(jq -r '.[] | select(.old == 5) | .new' "$STUB"/mig/bug-issues-map-*.json)"
+
 # ── live_resume_with_old_still_public_restores_private ────────────────────────
 # A prior run died with OLD public: the state file says flip_public is done, the repo says PUBLIC.
 # Step 3 is skipped on the resume, and a failure later must still make OLD private again.

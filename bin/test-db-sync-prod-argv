@@ -97,12 +97,12 @@ run_sync() {   # usage: run_sync [VAR=value ...] — extra env assignments for a
 assert_default_argv() {  # <label>
     local l="$1"
     assert_eq "$l exit 0" "0" "$RC"
-    assert_eq "$l probe argv x6" "6" \
+    assert_eq "$l probe argv x7" "7" \
         "$(count_in 'exec ibl5-mariadb mariadb -uroot -proot -N -B -e SELECT COUNT(*) FROM information_schema.tables' "$LOG")"
     assert_eq "$l probe schema literal" "1" \
         "$(count_in "WHERE table_schema='iblhoops_ibl5' AND table_name='ibl_bug_reports'" "$LOG")"
     assert_eq "$l dump argv" "1" \
-        "$(count_in 'exec ibl5-mariadb mariadb-dump -uroot -proot --single-transaction --skip-lock-tables iblhoops_ibl5 ibl_api_keys ibl_bug_reports ibl_bug_report_attachments ibl_bug_reporter_profile ibl_bug_pipeline_state ibl_bug_report_operator_context' "$LOG")"
+        "$(count_in 'exec ibl5-mariadb mariadb-dump -uroot -proot --single-transaction --skip-lock-tables iblhoops_ibl5 ibl_api_keys ibl_bug_reports ibl_bug_report_attachments ibl_bug_reporter_profile ibl_bug_pipeline_state ibl_bug_report_operator_context ibl_bug_issue_notices' "$LOG")"
     assert_eq "$l import argv x2" "2" \
         "$(count_in 'exec -i ibl5-mariadb mariadb --force -uroot -proot iblhoops_ibl5' "$LOG")"
     assert_eq "$l backfill argv" "1" \
@@ -112,7 +112,7 @@ assert_default_argv() {  # <label>
     # The pre-sync read shares the `-N -B -e` form with the row-count call, so the count is 2.
     assert_eq "$l rowcount argv" "2" \
         "$(count_in 'exec ibl5-mariadb mariadb -uroot -proot iblhoops_ibl5 -N -B -e ' "$LOG")"
-    assert_eq "$l exec total" "12" "$(grep -c '^exec ' <<<"$LOG" || true)"
+    assert_eq "$l exec total" "13" "$(grep -c '^exec ' <<<"$LOG" || true)"
     assert_eq "$l two-token form absent" "0" "$(count_in '-u root' "$LOG")"
     assert_eq "$l password not echoed" "0" "$(grep -c proot <<<"$OUT$ERR" || true)"
     assert_match "$l snapshot banner" "Source: snapshot file" "$OUT"
@@ -125,9 +125,9 @@ assert_default_argv "D1"
 # O1: env override changes every argv. Distinctive values make a leak greppable.
 run_sync DB_ROOT_USER=u1 DB_ROOT_PASS=sekret99 DB_DEFAULT_NAME=altdb
 assert_eq "O1 exit 0" "0" "$RC"
-assert_eq "O1 probe argv x6" "6" \
+assert_eq "O1 probe argv x7" "7" \
     "$(count_in 'exec ibl5-mariadb mariadb -uu1 -psekret99 -N -B -e SELECT COUNT(*)' "$LOG")"
-assert_eq "O1 probe schema altdb x6" "6" "$(count_in "table_schema='altdb'" "$LOG")"
+assert_eq "O1 probe schema altdb x7" "7" "$(count_in "table_schema='altdb'" "$LOG")"
 assert_eq "O1 dump argv" "1" \
     "$(count_in 'exec ibl5-mariadb mariadb-dump -uu1 -psekret99 --single-transaction --skip-lock-tables altdb ibl_api_keys' "$LOG")"
 assert_eq "O1 import argv x2" "2" \
@@ -248,7 +248,7 @@ for t in $P_TABLES; do
     assert_match "P1 $t preserved" " $t " " $P_LIST "
 done
 assert_eq "P2 keep-list names and order" \
-    "ibl_api_keys ibl_bug_reports ibl_bug_report_attachments ibl_bug_reporter_profile ibl_bug_pipeline_state ibl_bug_report_operator_context" \
+    "ibl_api_keys ibl_bug_reports ibl_bug_report_attachments ibl_bug_reporter_profile ibl_bug_pipeline_state ibl_bug_report_operator_context ibl_bug_issue_notices" \
     "$P_LIST"
 SYNC_SRC=$(cat "$REPO_ROOT/bin/db-sync-prod")
 assert_eq "P3 no inline keep-list literal" "0" "$(count_in 'PRESERVE_TABLES="ibl_' "$SYNC_SRC")"
@@ -292,7 +292,7 @@ printf '%s' "$(grep -v '^#' "$KEEP_SRC")" > "$KEEP_DST"
 run_sync
 cp "$KEEP_SRC" "$KEEP_DST"
 assert_eq "K10 no-trailing-newline list runs" "0" "$RC"
-assert_match "K10 last name still probed" "ibl_bug_report_operator_context" "$LOG"
+assert_match "K10 last name still probed" "ibl_bug_issue_notices" "$LOG"
 
 # R1-R9: preserved-table migration replay (Phase 4 helpers in bin/lib/db-helpers.sh).
 # shellcheck source=/dev/null

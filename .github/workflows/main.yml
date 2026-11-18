@@ -196,10 +196,29 @@ jobs:
     # pre-flight failure → build-and-deploy is 'skipped', not 'failure'
     needs: [pre-flight, build-and-deploy]
     if: ${{ always() && (needs.build-and-deploy.result == 'failure' || needs.pre-flight.result == 'failure' || needs.pre-flight.result == 'cancelled') }}
-    timeout-minutes: 5
+    # 10, not 5: worst case is the keyscan retries (~240s) plus the state-read
+    # ssh retries (~185s), about 7 min, before the alert step even runs.
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read   # read this run's job steps to name the real failed step
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The server-side /tmp/ibl5-last-deploy-step file only updates when ssh
+      # connects. If the deploy never reached the box, it still holds the last
+      # step of the PREVIOUS deploy (run 44396293952 reported "Purge page cache"
+      # for an ssh timeout in step 1). GitHub's own step record is the truth.
+      - name: Find failed deploy step from GitHub
+        id: failed
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          STEP=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}/jobs" \
+            --jq '[.jobs[] | select(.name == "Build and Deploy") | .steps[] | select(.conclusion == "failure") | .name] | first // empty')
+          echo "STEP_NAME=${STEP}" >> "$GITHUB_OUTPUT"
 
       - name: Setup SSH
         uses: ./.github/actions/setup-ssh
@@ -224,19 +243,26 @@ jobs:
       - name: Build Discord message
         env:
           PREFLIGHT_RESULT: ${{ needs.pre-flight.result }}
-          STEP_NAME: ${{ steps.state.outputs.STEP_NAME }}
+          GH_STEP_NAME: ${{ steps.failed.outputs.STEP_NAME }}
+          SERVER_STEP_NAME: ${{ steps.state.outputs.STEP_NAME }}
           LAST_MIGRATION: ${{ steps.state.outputs.LAST_MIGRATION }}
           DEPLOYED_SHA: ${{ steps.state.outputs.DEPLOYED_SHA }}
         run: |
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           SHORT_SHA="${{ github.sha }}"
           SHORT_SHA="${SHORT_SHA:0:7}"
-          STEP_NAME="${STEP_NAME:-unknown}"
+          # Prefer GitHub's record; fall back to the server file.
+          STEP_NAME="${GH_STEP_NAME:-${SERVER_STEP_NAME:-unknown}}"
           LAST_MIGRATION="${LAST_MIGRATION:-unknown}"
           DEPLOYED_SHA="${DEPLOYED_SHA:-unknown}"
           if [ "$PREFLIGHT_RESULT" = "failure" ] || [ "$PREFLIGHT_RESULT" = "cancelled" ]; then
             MSG=$(printf 'Production deploy BLOCKED — pre-flight rehearsal %s for commit %s. Deploy did not start.\n\nCurrently live: SHA %s, last applied migration: %s\n\nRun: %s' \
               "${PREFLIGHT_RESULT^^}" "$SHORT_SHA" "$DEPLOYED_SHA" "$LAST_MIGRATION" "$RUN_URL")
+          elif [ "$STEP_NAME" = "Fetch latest code on server" ]; then
+            # Step 1 only runs `git fetch`. Failing here (almost always an ssh
+            # timeout) changes nothing on the server, so say so plainly.
+            MSG=$(printf 'Production deploy did not start for commit %s: could not reach the server (Fetch latest code on server). Nothing changed. Prod is still on SHA %s, last applied migration: %s.\n\nRetry: gh run rerun %s --failed -R %s\nRun: %s' \
+              "$SHORT_SHA" "$DEPLOYED_SHA" "$LAST_MIGRATION" "${{ github.run_id }}" "${{ github.repository }}" "$RUN_URL")
           else
             MSG=$(printf 'Production deploy FAILED at step: %s\n\nCommit: %s\nLast applied migration: %s\nDeployed SHA on box: %s\n\nRun: %s' \
               "$STEP_NAME" "$SHORT_SHA" "$LAST_MIGRATION" "$DEPLOYED_SHA" "$RUN_URL")

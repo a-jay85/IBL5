@@ -872,8 +872,13 @@ def _pointer_prompt(packet_dir: str, pr_number: int | str) -> str:
     )
 
 
+def _owner_suffix(section: str) -> str:
+    return f"\n\n{section}" if section else ""
+
+
 def review(llm, out_dir: str, worktree: str, packet_dir: str,
-           pr_number: int | str, reviewed_tree: str | None = None) -> tuple[str | None, str]:
+           pr_number: int | str, reviewed_tree: str | None = None,
+           owner_section: str = "") -> tuple[str | None, str]:
     """Run the review. Returns (verdict_word_or_None, error_kind_or_'').
 
     A `HarnessError` from the adapter is an *indeterminate* verdict: condition (12)
@@ -882,7 +887,8 @@ def review(llm, out_dir: str, worktree: str, packet_dir: str,
     """
     try:
         text = llm.call_tooled(
-            "plan-fidelity-review", "opus", _pointer_prompt(packet_dir, pr_number),
+            "plan-fidelity-review", "opus",
+            _pointer_prompt(packet_dir, pr_number) + _owner_suffix(owner_section),
             cwd=worktree, agent="pr-ready-phase6",
             allowed_tools=REVIEW_ALLOWED_TOOLS, denied_tools=REVIEW_DENIED_TOOLS,
             add_dirs=(packet_dir,), append_system_prompt=OVERRIDE,
@@ -1089,7 +1095,7 @@ def re_review(llm, gitad, out_dir: str, worktree: str, plan, master_sha: str,
               pr_body: str, pr_number: int | str, remediation_sha: str | None,
               verdict1_path: str, phase4b_ran: bool = False, *,
               round_num: int = 1, shadow_request: bool = False,
-              log=None) -> tuple[str | None, str | None, str | None]:
+              log=None, owner_section: str = "") -> tuple[str | None, str | None, str | None]:
     """One review per remediation round. Returns (verdict, reviewed_tree, verdict_path).
 
     A failure here is "no re-review happened" for this round: the prior verdict stands
@@ -1117,7 +1123,7 @@ def re_review(llm, gitad, out_dir: str, worktree: str, plan, master_sha: str,
                               extra_context=extra, shadow_request=shadow_request)
         text = llm.call_tooled(
             f"plan-fidelity-re-review-{round_num + 1}", "opus",
-            _pointer_prompt(packet, pr_number),
+            _pointer_prompt(packet, pr_number) + _owner_suffix(owner_section),
             cwd=worktree, agent="pr-ready-phase6",
             allowed_tools=REVIEW_ALLOWED_TOOLS, denied_tools=REVIEW_DENIED_TOOLS,
             add_dirs=(packet,), append_system_prompt=OVERRIDE,

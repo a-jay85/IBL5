@@ -2,7 +2,7 @@
 name: pr-ready-phase6
 description: Opus 5.5 plan-fidelity reviewer for /pr-ready Phase 6. Spawned once per run by name. It writes a verdict file and never edits repo files.
 model: claude-opus-5-5
-last_verified: 2026-11-05
+last_verified: 2026-11-18
 disallowedTools: Agent, Edit, NotebookEdit, EnterWorktree, ExitWorktree, Skill, EnterPlanMode, ExitPlanMode
 ---
 
@@ -112,7 +112,10 @@ in this review.
    written in upper case right after the bullet dash: `- [BLOCKING] ` for a finding that
    matched a blocking clause in 6d, `- [NOTE] ` for a finding that matched none. A
    check-3 (Scope creep) finding also carries the class tag `[unplanned-scope]` after its
-   severity marker, as `_plan-fidelity-review.md` check 3 specifies. The
+   severity marker, as `_plan-fidelity-review.md` check 3 specifies. When the
+   `## Owner request` section asked for that change, the finding also carries
+   `owner: "<verbatim words>"`, and each bug in that code is its own untagged `[BLOCKING]`
+   bullet, as `_plan-fidelity-review.md` check 3a specifies. The
    marker sits on the top-level bullet line only. A nested bullet, a `####` sub-heading,
    or a `**Finding N:**` continuation under that bullet inherits its marker and carries
    none of its own. The marker and the verdict word must agree: `NOT READY` has at least

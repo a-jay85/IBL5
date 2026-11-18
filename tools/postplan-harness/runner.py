@@ -3787,7 +3787,8 @@ def _repin_fidelity_after_same_run(llm, git, gh, out_dir, worktree, plan, master
     v, tree, path = fidelity.re_review(
         llm, git, out_dir, worktree or ".", plan, master_sha, gh.pr_body_fresh() or body, pr,
         fix_sha, res.fidelity.get("verdict_path") or fidelity.verdict_path(pr),
-        round_num=fidelity.MAX_FIDELITY_ROUNDS + 1, log=log)
+        round_num=fidelity.MAX_FIDELITY_ROUNDS + 1, log=log,
+        owner_section=owner_intent.seat_section(getattr(res, "slug", "") or ""))
     if v is None:
         log("phase4.5b: fidelity re-pin indeterminate; condition (12) falls back to verdict 1")
         return
@@ -4041,7 +4042,8 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         review_findings=review_findings)
     if delta_hit is None:
         verdict, err = fidelity.review(llm, out_dir, worktree or ".", packet, pr,
-                                       reviewed_tree=reviewed_tree)
+                                       reviewed_tree=reviewed_tree,
+                                       owner_section=owner_intent.seat_section(getattr(res, "slug", "") or ""))
         delta_info = {}
     else:
         verdict, err, delta_info = delta_hit
@@ -4283,7 +4285,8 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         for rr_attempt in range(_MAX_ROUND_RETRIES + 1 if v_n is None else 0):
             v_n, tree_n, path_n = fidelity.re_review(
                 llm, git, out_dir, worktree or ".", plan, master_sha, body, pr, sha,
-                current_verdict_path, round_num=round_num, shadow_request=True, log=log)
+                current_verdict_path, round_num=round_num, shadow_request=True, log=log,
+                owner_section=owner_intent.seat_section(getattr(res, "slug", "") or ""))
             if v_n is not None:
                 break
             # Count the extra attempt, never the first one, so retries stays the

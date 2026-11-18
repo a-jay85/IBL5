@@ -2014,7 +2014,7 @@ run_between_plans_canary() {
     # errors, and GitHub drops its next cron run for hours, so its red sticks.
     # Only a completed non-passing run is ignored; a pending one still reads
     # "checks still running". Exact names. PR merge gating never sets it.
-    # bin/merge-master-to-prod sets it to "Aggregate check status,recheck".
+    # bin/merge-master-to-prod sets it to "Aggregate check status,recheck,recap".
     # "Aggregate check status" (the settle job of
     # .github/workflows/all-checks-settled.yml) is in BOTH lists. It summarizes
     # other check-runs and tests no code; its concurrency group cancels a
@@ -2031,8 +2031,17 @@ run_between_plans_canary() {
     # reason the post-merge jobs sit in IGNORE_PENDING_CHECKS. The promote
     # callers ignore the same exact name. Exact names: a red "recheck-foo"
     # still parks.
-    ci_out=$(IGNORE_PENDING_CHECKS="deploy,Promote master to production,Aggregate check status,recheck" \
-        IGNORE_FAILED_CHECKS="Keep the merge-line head current,Aggregate check status,recheck" \
+    # "recap" (the only job of .github/workflows/sim-recap.yml) is in BOTH
+    # lists too. Its cron runs on master every 10 minutes, so its check-run
+    # lands on master HEAD. It SSHes to prod and tests no code. A transient
+    # prod SSH timeout fails it (run 44285527922, 2026-11-18), and GitHub
+    # then drops later cron runs, so the red sticks for hours and parked the
+    # queue. Its own ops-webhook alert covers a real recap failure. It is
+    # often in flight, and a pending run would return 4 and skip the smoke
+    # check below. The promote callers ignore the same exact name. Exact
+    # names: a red "recap-foo" still parks.
+    ci_out=$(IGNORE_PENDING_CHECKS="deploy,Promote master to production,Aggregate check status,recheck,recap" \
+        IGNORE_FAILED_CHECKS="Keep the merge-line head current,Aggregate check status,recheck,recap" \
         "$REPO/bin/check-master-ci-green" 2>&1) || ci_rc=$?
     CANARY_DETAIL="$ci_out"
     printf '%s\n' "$ci_out" >> "$LOG"

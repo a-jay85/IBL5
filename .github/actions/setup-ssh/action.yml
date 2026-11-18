@@ -22,6 +22,13 @@ inputs:
       When "true", fail loud if PORT/HOST/USERNAME/PRIVATE_KEY are empty.
     required: false
     default: 'false'
+  fail-on-unreachable:
+    description: >-
+      When "true", fail this step if every keyscan try comes back empty. When
+      "false", only print an error annotation and pass, so a caller whose next
+      step reports the outage (for example a failure alert) still runs.
+    required: false
+    default: 'false'
 runs:
   using: 'composite'
   steps:
@@ -33,6 +40,7 @@ runs:
         USERNAME: ${{ inputs.username }}
         DEPLOY_KEY: ${{ inputs.private-key }}
         REQUIRE_SECRETS: ${{ inputs.require-secrets }}
+        FAIL_ON_UNREACHABLE: ${{ inputs.fail-on-unreachable }}
       run: |
         set -euo pipefail
         if [ "$REQUIRE_SECRETS" = "true" ]; then
@@ -61,6 +69,7 @@ runs:
         chmod 600 ~/.ssh/config
         # Retry the keyscan too: an empty known_hosts makes every later ssh fail.
         # ssh-keyscan exits 0 even when it gets no keys, so check its output.
+        KEYS=''
         for _ in 1 2 3 4 5 6; do
           KEYS=$(ssh-keyscan -T 30 -p "$PORT" "$HOST" 2>/dev/null || true)
           if [ -n "$KEYS" ]; then
@@ -69,3 +78,12 @@ runs:
           fi
           sleep 10
         done
+        # Without this check an empty scan passed silently, and the next ssh call
+        # failed later with a confusing "Host key verification failed".
+        # Run 44411988785 hit that after the host blocked one runner for ~7 min.
+        if [ -z "$KEYS" ]; then
+          echo "::error title=Prod SSH unreachable::ssh-keyscan got no host keys after 6 tries over ~4 min. This runner could not reach the SSH host. Other runners may still reach it, so a rerun (new runner, new IP) often passes."
+          if [ "$FAIL_ON_UNREACHABLE" = "true" ]; then
+            exit 1
+          fi
+        fi

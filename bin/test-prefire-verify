@@ -1122,6 +1122,68 @@ case_fire_point_skips_exec_mutations() {
     [ ! -e "$D/xmlib-called" ] || note "plan-exec-mutations ran at the fire point"
 }
 
+# The local gate and the CI block split one plan's rows with no gap and no
+# overlap: the gate skips exactly the rows plan-checks-block encodes, and runs
+# the rest on the Mac. Both sides read row_runs_in_ci.
+case_ci_local_partition() {
+    new_case
+    mkdir -p "$R/bin"
+    printf '#!/usr/bin/env bash\necho run >> "$CNT/dbq"\nexit 0\n' > "$R/bin/db-query"
+    chmod +x "$R/bin/db-query"
+    write_plan "$(row 1 'printf a')" \
+               "$(row 2 'test -n b')" \
+               "$(row 3 'cd ibl5 && php -v')" \
+               "$(row 4 'true # ~/ marker')" \
+               "$(row 5 'true # PLAN marker')" \
+               "$(row 6 'bin/db-query "SELECT 1"')"
+    run_gate --plan "$PLAN" --stage matrix
+    want_rc 0
+    local gate_ci="" gate_local="" block_ci="" n mlog
+    mlog=$(matrix_log)
+    for n in 1 2 3 4 5 6; do
+        if grep -qF "matrix row $n: runs in CI (Plan checks), skipped locally" <<< "$OUT"; then
+            gate_ci="$gate_ci $n"
+        fi
+        if grep -qE "^### row $n: " <<< "$mlog" \
+            && ! grep -qF "### row $n: runs in CI (Plan checks)" <<< "$mlog"; then
+            gate_local="$gate_local $n"
+        fi
+    done
+    "$REPO/bin/lib/plan-checks-block" encode "$PLAN" > "$D/block.txt" 2>/dev/null \
+        || note "plan-checks-block encode failed"
+    mkdir -p "$D/decoded"
+    "$REPO/bin/lib/plan-checks-block" decode "$D/block.txt" "$D/decoded" \
+        || note "plan-checks-block decode failed"
+    block_ci=$(cut -f1 "$D/decoded/rows.tsv" 2>/dev/null | sort -n | tr '\n' ' ')
+    [ "$gate_ci" = " 1 2 3" ] || note "gate CI rows: want ' 1 2 3', got '$gate_ci'"
+    [ "$gate_local" = " 4 5 6" ] || note "gate local rows: want ' 4 5 6', got '$gate_local'"
+    [ "$block_ci" = "1 2 3 " ] || note "block rows: want '1 2 3 ', got '$block_ci'"
+    want_cnt dbq 1
+}
+
+# A DB row the Plan checks job runs does not trip the local DB probe.
+case_db_down_ci_db_row_skips_probe() {
+    new_case
+    write_plan "$(row 1 'cd ibl5 && vendor/bin/phpunit tests/DatabaseIntegration/XTest.php')"
+    export STUB_PROBE_RC=3
+    run_gate --plan "$PLAN" --stage matrix
+    unset STUB_PROBE_RC
+    want_rc 0
+    refute_out "DB unreachable"
+    want_out "matrix row 1: runs in CI (Plan checks), skipped locally"
+}
+
+# A DB row that stays local still probes, and a down DB still exits 3.
+case_db_down_local_db_row_still_probes() {
+    new_case
+    write_plan "$(row 1 'bin/db-query "SELECT 1"')"
+    export STUB_PROBE_RC=3
+    run_gate --plan "$PLAN" --stage matrix
+    unset STUB_PROBE_RC
+    want_rc 3
+    want_out "DB unreachable; matrix row 1 needs it"
+}
+
 case_row_sorter_near_misses() {
     local verdicts
     verdicts=$(
@@ -1140,8 +1202,8 @@ case_row_sorter_near_misses() {
     local want
     for want in \
         'LOCAL	bin/testing-thing' \
-        'LOCAL	cd ibl5 && vendor/bin/phpunit --group database' \
-        'LOCAL	grep -n localhost file.txt' \
+        'CI	cd ibl5 && vendor/bin/phpunit --group database' \
+        'CI	grep -n localhost file.txt' \
         'CI	cd tools/postplan-harness && python3 -m pytest tests/test_x.py' \
         'CI	! git grep -n foo' \
         'LOCAL	git log -1' \
@@ -2448,6 +2510,9 @@ case_ci_row_skipped_locally
 case_unclear_row_runs_locally
 case_fire_point_skips_exec_mutations
 case_row_sorter_near_misses
+case_ci_local_partition
+case_db_down_ci_db_row_skips_probe
+case_db_down_local_db_row_still_probes
 case_shell_name_mapping
 case_shell_lib_mapping
 case_shell_self_mapping

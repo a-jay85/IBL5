@@ -8,6 +8,7 @@
 #
 # Usage: bin/lib/plan-checks-block encode <plan>
 #        bin/lib/plan-checks-block decode <body-file> <outdir>
+#        bin/lib/plan-checks-block needs --body-file F
 #        bin/lib/plan-checks-block ci --body-file F --labels-file L
 # ---
 # encode  print the block on stdout. Rows: the plan's matrix rows that
@@ -17,18 +18,26 @@
 #         block is over 32768 bytes.
 # decode  write <outdir>/rows.tsv (num TAB cmd) and <outdir>/records.nul (the
 #         exact parse byte format). Exit 0 ok; 4 no begin marker; 3 corrupt.
+# needs   print db=, web=, bun=, actionlint= lines (0 or 1): the stacks the
+#         block's rows need (row_ci_needs). The workflow gates its stack steps
+#         on them. An absent or corrupt block prints four =0 lines. Exit 0.
 # ci      the CI driver. The PR is plan-driven when the labels file has a line
-#         exactly `plan-checks`. Exit 0 pass; 1 fail.
-# All three exit 2 on a usage error.
+#         exactly `plan-checks`. Rewrites localhost URLs (ci_host_rewrite) and
+#         fails a row whose stack's IBL_CI_<DB|WEB|BUN>_READY is not 1.
+#         Exit 0 pass; 1 fail.
+# All four exit 2 on a usage error.
 
 set -uo pipefail
 
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CAP=32768
+# shellcheck source=bin/lib/plan-matrix-rows.sh
+source "$SELF_DIR/plan-matrix-rows.sh"
 
 usage() {
     echo "Usage: bin/lib/plan-checks-block encode <plan>" >&2
     echo "       bin/lib/plan-checks-block decode <body-file> <outdir>" >&2
+    echo "       bin/lib/plan-checks-block needs --body-file F" >&2
     echo "       bin/lib/plan-checks-block ci --body-file F --labels-file L" >&2
     exit 2
 }
@@ -176,8 +185,6 @@ sys.exit(decode(sys.argv[2], sys.argv[3]))
 
 do_encode() {
     local plan="$1" rows rows_rc num cmd tmp recs_rc prev dup
-    # shellcheck source=bin/lib/plan-matrix-rows.sh
-    source "$SELF_DIR/plan-matrix-rows.sh"
     rows=$(plan_matrix_rows "$plan"); rows_rc=$?
     if [ "$rows_rc" -eq 2 ]; then
         echo "FAIL plan has no Verification Matrix" >&2
@@ -217,6 +224,57 @@ do_encode() {
     return "$rc"
 }
 
+# ci_stacks_ready <what> <needs tokens> — the readiness guard. Each db, web or
+# bun token needs IBL_CI_DB_READY, IBL_CI_WEB_READY or IBL_CI_BUN_READY set to
+# exactly 1 by the workflow step that started that stack. Unset or empty fails,
+# so a row whose stack the job skipped fails red instead of passing by luck.
+# (The names avoid the PLAN substring, which PLAN_ROW_LOCAL_RE matches.)
+ci_stacks_ready() {
+    local what="$1" tok var val
+    for tok in $2; do
+        case "$tok" in
+            db) var=IBL_CI_DB_READY ;;
+            web) var=IBL_CI_WEB_READY ;;
+            bun) var=IBL_CI_BUN_READY ;;
+            *) continue ;;
+        esac
+        val="${!var:-}"
+        if [ "$val" != 1 ]; then
+            echo "FAIL $what needs $tok but the job did not start it ($var is not 1)"
+            return 1
+        fi
+    done
+    return 0
+}
+
+# do_needs <body-file> — print db=, web=, bun=, actionlint= (0 or 1), the union
+# of row_ci_needs over the block's rows and mutation check fields. An absent
+# or corrupt block prints four =0 lines and exits 0: the ci step reports the
+# real failure, and a corrupt block must not start containers.
+do_needs() {
+    local body="$1" tmp db=0 web=0 bun=0 al=0 n c tok
+    local rrow rfile rcheck rmatch rrepl
+    tmp=$(mktemp -d "${TMPDIR:-/tmp}/plan-checks.XXXXXX") || return 1
+    if codec decode "$body" "$tmp" >/dev/null 2>&1; then
+        while IFS=$'\t' read -r n c; do
+            [ -n "$n" ] || continue
+            for tok in $(row_ci_needs "$c"); do
+                case "$tok" in db) db=1 ;; web) web=1 ;; bun) bun=1 ;; actionlint) al=1 ;; esac
+            done
+        done < "$tmp/rows.tsv"
+        while IFS= read -r -d '' rrow <&3 \
+            && IFS= read -r -d '' rfile <&3 && IFS= read -r -d '' rcheck <&3 \
+            && IFS= read -r -d '' rmatch <&3 && IFS= read -r rrepl <&3; do
+            for tok in $(row_ci_needs "$rcheck"); do
+                case "$tok" in db) db=1 ;; web) web=1 ;; bun) bun=1 ;; actionlint) al=1 ;; esac
+            done
+        done 3< "$tmp/records.nul"
+    fi
+    rm -rf "$tmp"
+    printf 'db=%s\nweb=%s\nbun=%s\nactionlint=%s\n' "$db" "$web" "$bun" "$al"
+    return 0
+}
+
 do_ci() {
     local body="$1" labels="$2" out drc reason labelled=0 nrows=0 nmut=0 num cmd log rc root
     grep -qxF 'plan-checks' "$labels" && labelled=1
@@ -238,11 +296,37 @@ do_ci() {
     fi
     root=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "FAIL plan-checks ci must run inside the repo"; rm -rf "$out"; return 1; }
     cd "$root" || { rm -rf "$out"; return 1; }
+    # COMPOSE_FILE resolves against each row's cwd, so a row that starts with
+    # `cd ibl5 &&` would miss a relative path. Pin it to an absolute path.
+    if [ -n "${COMPOSE_FILE:-}" ]; then
+        case "$COMPOSE_FILE" in /*) ;; *) COMPOSE_FILE="$root/$COMPOSE_FILE" ;; esac
+        export COMPOSE_FILE
+    fi
+    # Host rewrite before any row runs: the row commands and only the check
+    # field of each mutation record. match:/replace: hold source text and
+    # stay byte-exact. A miss leaves the original host and the row fails red.
+    : > "$out/rows.ci.tsv"
+    while IFS=$'\t' read -r num cmd; do
+        [ -n "$num" ] || continue
+        printf '%s\t%s\n' "$num" "$(ci_row_rewrite "$cmd")" >> "$out/rows.ci.tsv"
+    done < "$out/rows.tsv"
+    : > "$out/records.ci.nul"
+    local rrow rfile rcheck rmatch rrepl allchecks=""
+    while IFS= read -r -d '' rrow <&3 \
+        && IFS= read -r -d '' rfile <&3 && IFS= read -r -d '' rcheck <&3 \
+        && IFS= read -r -d '' rmatch <&3 && IFS= read -r rrepl <&3; do
+        rcheck=$(ci_row_rewrite "$rcheck")
+        allchecks="$allchecks $(row_ci_needs "$rcheck")"
+        printf '%s\0%s\0%s\0%s\0%s\n' "$rrow" "$rfile" "$rcheck" "$rmatch" "$rrepl" >> "$out/records.ci.nul"
+    done 3< "$out/records.nul"
     log="$out/row.log"
+    local needs compose_php="$PLAN_ROW_COMPOSE_PHP"
     while IFS=$'\t' read -r num cmd; do
         [ -n "$num" ] || continue
         nrows=$((nrows + 1))
-        echo "plan-checks: matrix row $num: $cmd"
+        needs=$(row_ci_needs "$cmd")
+        echo "plan-checks: matrix row $num [needs: ${needs:-none}]: $cmd"
+        if ! ci_stacks_ready "matrix row $num" "$needs"; then rm -rf "$out"; return 1; fi
         timeout 900 bash -c "$cmd" </dev/null > "$log" 2>&1; rc=$?
         if [ "$rc" -ne 0 ]; then
             echo "FAIL matrix row $num exited $rc: $cmd"
@@ -250,18 +334,30 @@ do_ci() {
             rm -rf "$out"
             return 1
         fi
-    done < "$out/rows.tsv"
-    if [ -s "$out/records.nul" ]; then
+        if [[ "$cmd" == *"$compose_php"* ]]; then
+            # The container runs as root; hand its new files back to the
+            # runner user so later git-based rows do not trip on them.
+            if ! docker compose exec -T php find /var/www/html/ibl5 -xdev -user 0 -not -path '*/vendor/*' \
+                -exec chown "$(id -u):$(id -g)" {} + </dev/null >> "$log" 2>&1; then
+                echo "FAIL chown after matrix row $num"
+                tail -n 30 "$log"
+                rm -rf "$out"
+                return 1
+            fi
+        fi
+    done < "$out/rows.ci.tsv"
+    if [ -s "$out/records.ci.nul" ]; then
+        if ! ci_stacks_ready "mutation rows" "$allchecks"; then rm -rf "$out"; return 1; fi
         # Count newline-terminated records. GNU grep treats the NUL field
         # separators as line ends and overcounts, so use wc -l.
-        nmut=$(( $(wc -l < "$out/records.nul") ))
+        nmut=$(( $(wc -l < "$out/records.ci.nul") ))
         bin/lib/plan-exec-mutations recover; rc=$?
         if [ "$rc" -ne 0 ]; then
             echo "FAIL plan-checks mutation recover exited $rc"
             rm -rf "$out"
             return 1
         fi
-        bin/lib/plan-exec-mutations run --records "$out/records.nul" --timeout 30 --max-timeout 300 --scale 2 --budget 1800; rc=$?
+        bin/lib/plan-exec-mutations run --records "$out/records.ci.nul" --timeout 30 --max-timeout 300 --scale 2 --budget 1800; rc=$?
         if [ "$rc" -ne 0 ]; then
             echo "FAIL plan-checks mutation run exited $rc"
             rm -rf "$out"
@@ -283,6 +379,17 @@ case "$MODE" in
     decode)
         [ $# -eq 2 ] && [ -r "$1" ] && [ -d "$2" ] || usage
         codec decode "$1" "$2"; exit $?
+        ;;
+    needs)
+        BODY=""
+        while [ $# -gt 0 ]; do
+            case "$1" in
+                --body-file) [ $# -ge 2 ] || usage; BODY="$2"; shift 2 ;;
+                *) echo "plan-checks-block: unknown argument '$1'" >&2; usage ;;
+            esac
+        done
+        [ -n "$BODY" ] && [ -r "$BODY" ] || usage
+        do_needs "$BODY"; exit $?
         ;;
     ci)
         BODY="" LABELS=""

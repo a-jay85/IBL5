@@ -6,7 +6,7 @@
 # skip/active behavior. Verifies the logic even while the live composites are absent
 # on master (the check is dormant there, but its logic must already be correct so it
 # is sound the moment the composites land). Also covers the mutation-pr.yml
-# invariants (M1-M4), the plan-checks.yml invariants (P1-P4), the P5 run: script lint and the all-checks-settled.yml invariants (A1-A7) against
+# invariants (M1-M4), the plan-checks.yml invariants (P1-P4, P6, P7), the P5 run: script lint and the all-checks-settled.yml invariants (A1-A7) against
 # mutated copies of the real workflows tree, the promote P9 branches filter, the P10 aggregate-ignore knobs, the P11 trigger coverage, the
 # step-scoped DB env invariant (D1) with a throwaway setup-php-env composite,
 # with throwaway workflow + ADR fixtures, and the read-only --protection-readback
@@ -1407,7 +1407,7 @@ if should_run u1-workflows-absent-skips; then
   h_contains "u1-workflows-absent-skips-output" "$out" "U1 skipped"
 fi
 
-# plan-checks (P1-P4) and the run: script lint (P5). Each case builds a throwaway
+# plan-checks (P1-P4, P6, P7) and the run: script lint (P5). Each case builds a throwaway
 # workflows dir holding a copy of the real plan-checks.yml (or a probe) plus an ADR
 # fixture; the actions dir is empty. The --case runs need their own paths because
 # REPO_ROOT is set inside the unfiltered wrapper.
@@ -1444,6 +1444,22 @@ pc_case case_p2_adr_missing_fails 1 P2 - -none-
 pc_case case_p3_job_if_fails 1 P3 $'s/^    runs-on: .*$/&\\\n    if: true/'
 pc_case case_p4_write_fails 1 P4 's/^  pull-requests: read$/  pull-requests: write/'
 pc_case case_p4_secret_fails 1 P4 $'s/^    timeout-minutes: 50$/&\\\n    env:\\\n      X: ${{ secrets.FOO }}/'
+# P6: the stack steps stay gated on the needs step and run before plan checks.
+pc_case case_p6_needs_step_missing_fails 1 P6 's/^      id: needs$/      id: needz/'
+pc_case case_p6_ungated_stack_fails 1 P6 "/^      if: steps\\.needs\\.outputs\\.web == '1'\$/d"
+pc_case case_p6_stack_after_ci_fails 1 P6 $'s/^      run: docker compose -f docker-compose\\.ci\\.yml down -v .*$/&\\\n    - name: Late bun\\\n      if: steps.needs.outputs.bun == 1\\\n      uses: oven-sh\\/setup-bun@x/'
+pc_case case_p6_login_without_logout_fails 1 P6 's/^      run: go install (.*)$/      run: docker login ghcr.io \&\& go install \1/'
+# P6 widened: bun install, setup-go and go install are stack steps; an if: with
+# a non-needs term is ungated; a `docker compose \` split over lines is seen.
+pc_case case_p6_ungated_bun_install_fails 1 P6 '/name: Install bun dependencies/{n;/if:/d;}'
+pc_case case_p6_ungated_setup_go_fails 1 P6 '/name: Setup Go for actionlint/{n;/if:/d;}'
+pc_case case_p6_ungated_go_install_fails 1 P6 '/name: Install actionlint/{n;/if:/d;}'
+pc_case case_p6_always_or_needs_fails 1 P6 "s/^      if: steps\\.needs\\.outputs\\.web == '1'\$/      if: always() || steps.needs.outputs.web == '1'/"
+pc_case case_p6_split_compose_up_ungated_fails 1 P6 "/^      if: steps\\.needs\\.outputs\\.db == '1'\$/d; s/^( +)docker compose -f docker-compose\\.ci\\.yml up -d --wait mariadb\$/\\1docker compose -f docker-compose.ci.yml \\\\\\
+\\1  up -d --wait mariadb/"
+pc_case case_p6_needs_or_needs_passes 0 - "s/^      if: steps\\.needs\\.outputs\\.web == '1'\$/      if: steps.needs.outputs.db == '1' || steps.needs.outputs.web == '1'/"
+# P7: a relative COMPOSE_FILE would resolve under the cwd of a `cd ibl5 &&` row.
+pc_case case_p7_relative_compose_file_fails 1 P7 's#^( +)COMPOSE_FILE: .*$#\1COMPOSE_FILE: docker-compose.ci.yml#'
 
 # P5 probes: one workflow in an otherwise empty workflows dir.
 # p5_case <name> <want-exit> <file-body>

@@ -81,6 +81,9 @@ class TradeSuggestionsEngineInvariantTest extends DatabaseTestCase
     /** @var array<int, string> */
     private array $teamNames = [];
 
+    /** @var array<mixed> */
+    private array $panelStore = [];
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -148,6 +151,8 @@ class TradeSuggestionsEngineInvariantTest extends DatabaseTestCase
             $this->formRepo,
             new SettingsService($this->season),
             $modes,
+            new \TradeSuggestions\Feedback\FeedbackRepository($this->db),
+            new \TradeSuggestions\Feedback\PanelSessionState($this->panelStore),
         );
 
         foreach ($this->formRepo->getAllTeamsWithCity() as $team) {
@@ -316,7 +321,7 @@ class TradeSuggestionsEngineInvariantTest extends DatabaseTestCase
             [],
         );
         $partnerName = $league->teamNames[LaughTestRows::PARTNER_TID];
-        $item = new SuggestionItem($partnerName, ['Dupree'], ['Laettner'], 'u', 'p', SuggestionLink::forCandidate($partnerName, $deal));
+        $item = new SuggestionItem($partnerName, ['Dupree'], ['Laettner'], 'u', 'p', SuggestionLink::forCandidate($partnerName, $deal), str_repeat('a', 40), str_repeat('b', 40), []);
         $panel = new TradeSuggestionsPanelData(
             new ResolvedTeamMode(TeamMode::WinNow, TeamMode::WinNow, false),
             [$item],

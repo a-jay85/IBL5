@@ -1,5 +1,5 @@
 ---
-description: Trade suggestions module notes. Covers the v3 engine namespaces, the pipeline order, the laugh-test sweep, and every veto id with its rule.
+description: Trade suggestions module notes. Covers the v3 engine namespaces, the pipeline order, the laugh-test sweep, every veto id with its rule, and the hide and refresh feedback flow.
 last_verified: 2026-11-14
 ---
 
@@ -53,3 +53,17 @@ Some plumbing from v2 stays: `TeamModeService` and `TeamModeGuesser` pick each t
 - `STRONG_FOR_WEAK_WITHOUT_NET_GAIN`: a side gives up a strong starter spot to patch a weak one without a clear net gain.
 
 `ReasonWriter::forSide` quotes the side's top two gain components with their before and after numbers. It reads the season its mode weighs most and this season first. When neither season has a gain, it reads the other seasons by weight and adds the season to the clause, such as "next season". A rank clause quotes only a rank that got better. A side with no positive component gets no reason, and the ranker drops the deal.
+
+## Feedback (hide and refresh)
+
+Each card has a hide form and the panel has one refresh button. Both post to `modules.php?name=Trading&op=trade-suggestion-action`, which `Feedback\SuggestionFeedbackController` handles.
+
+A hide writes one row to `ibl_trade_suggestion_feedback`. The row holds the GM team id, the deal key, the core key, the partner team id, a JSON list of the assets, the reason codes and an optional note of up to 500 characters. The table allows one row per (`tid`, `deal_key`).
+
+`Feedback\DealKey` builds two keys for each deal. The deal key is a sha1 over both team ids and every asset on each side. The core key uses the same inputs with players only. `Feedback\HiddenDealFilter` drops a deal when either key matches a stored hide. So a variant that swaps the pick sweetener stays hidden.
+
+The service saves every idea it can show into the PHP session, keyed by deal key, through `Feedback\PanelSessionState`. The hide form posts only `deal_key`. The controller looks the deal up in the session and stores what it finds there. It takes the team id from the logged-in GM. It ignores any team id, partner or asset in the form.
+
+On failure the controller redirects to `/ibl5/index.php?trade_suggestion_error=<code>`. The codes are `method`, `csrf`, `auth`, `action`, `stale`, `reason` and `length`. A deal key the session does not hold is `stale`.
+
+Refresh moves the session offset forward by 3 ideas. When the offset reaches the end of the list it goes back to 0. A new sim resets the offset and the saved ideas.

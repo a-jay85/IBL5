@@ -22,6 +22,9 @@ use TradeSuggestions\Engine\LeagueSnapshot;
 use TradeSuggestions\Engine\ModeResolver;
 use TradeSuggestions\Engine\RankDiagnostics;
 use TradeSuggestions\Engine\Shape\Contracts\DealShapeInterface;
+use TradeSuggestions\Feedback\Contracts\FeedbackRepositoryInterface;
+use TradeSuggestions\Feedback\DealKey;
+use TradeSuggestions\Feedback\PanelSessionState;
 use TradeSuggestions\SuggestionPlayer;
 use TradeSuggestions\SuggestionValidationFilter;
 use TradeSuggestions\TeamModeGuesser;
@@ -59,6 +62,9 @@ class TradeSuggestionsServiceTest extends TestCase
     private const array PICK_SETS = [[], [910001], [910002], [910001, 910002]];
 
     private static ?LeagueSnapshot $league = null;
+
+    /** @var array<mixed> the fake session behind the panel state */
+    private array $panelStore = [];
 
     public function testTradesDisabledReturnsNull(): void
     {
@@ -129,6 +135,7 @@ class TradeSuggestionsServiceTest extends TestCase
         self::assertSame(9, $panel->diagnostics->scored);
         self::assertSame(
             [
+                'HIDDEN' => 0,
                 'NOT_BOTH_POSITIVE' => 0,
                 'LOPSIDED' => 0,
                 'EXPOSURE' => 0,
@@ -221,6 +228,182 @@ class TradeSuggestionsServiceTest extends TestCase
         self::assertSame([self::league()->players[2608]->name], $panel->items[0]->getLabels);
     }
 
+    public function testHiddenDealKeyIsDropped(): void
+    {
+        $this->build();
+        $baseline = $this->eligibleKeys();
+        self::assertCount(9, $baseline);
+        $hidden = $baseline[0];
+
+        $this->panelStore = [];
+        $panel = $this->build(feedback: $this->hiding(deal: [$hidden]));
+
+        self::assertNotContains($hidden, $this->itemKeys($panel));
+        self::assertNotContains($hidden, $this->eligibleKeys());
+        self::assertSame(8, $panel->eligibleCount);
+    }
+
+    public function testHiddenCoreKeyIsDropped(): void
+    {
+        $this->build();
+        $baseline = $this->eligibleKeys();
+        $session = new PanelSessionState($this->panelStore);
+        $entry = $session->entry($baseline[0]);
+        self::assertNotNull($entry);
+        $core = $entry['core'];
+        $sameCore = array_filter($baseline, static fn (string $k): bool => ($session->entry($k)['core'] ?? '') === $core);
+        // The pick variants of one player pair share its core.
+        self::assertGreaterThan(1, count($sameCore));
+
+        $this->panelStore = [];
+        $panel = $this->build(feedback: $this->hiding(core: [$core]));
+
+        self::assertSame([], array_intersect($sameCore, $this->eligibleKeys()));
+        self::assertSame(count($baseline) - count($sameCore), $panel->eligibleCount);
+        self::assertGreaterThanOrEqual(count($sameCore), $panel->diagnostics?->rejections['HIDDEN'] ?? 0);
+    }
+
+    public function testHiddenFilterUsesActingTid(): void
+    {
+        $feedback = self::createMock(FeedbackRepositoryInterface::class);
+        $feedback->expects($this->once())->method('hiddenKeys')->with(self::USER_TID)->willReturn(['deal' => [], 'core' => []]);
+
+        $this->build(feedback: $feedback);
+    }
+
+    public function testHiddenCountInDiagnostics(): void
+    {
+        $panel = $this->build();
+        self::assertSame(0, $panel->diagnostics?->rejections['HIDDEN'] ?? null);
+        $baseline = $this->eligibleKeys();
+
+        $this->panelStore = [];
+        $panel = $this->build(feedback: $this->hiding(deal: [$baseline[0], $baseline[1]]));
+
+        self::assertSame(2, $panel->diagnostics?->rejections['HIDDEN'] ?? null);
+    }
+
+    public function testSessionMapWritten(): void
+    {
+        $panel = $this->build();
+        $session = new PanelSessionState($this->panelStore);
+
+        self::assertNotSame([], $panel->items);
+        foreach ($panel->items as $item) {
+            $entry = $session->entry($item->dealKey);
+            self::assertNotNull($entry);
+            self::assertSame($item->coreKey, $entry['core']);
+            self::assertSame('Team ' . $entry['partnerTid'], $item->partnerTeamName);
+            $deal = json_decode($entry['dealJson'], true, 512, JSON_THROW_ON_ERROR);
+            self::assertIsArray($deal);
+            self::assertSame($item->giveLabels, $deal['give']);
+            self::assertSame($item->getLabels, $deal['get']);
+            self::assertIsArray($deal['keys']);
+            self::assertNotSame([], $deal['keys']);
+            foreach ($deal['keys'] as $key) {
+                self::assertMatchesRegularExpression('/^[UP]:[01]:\d+$/', $key);
+            }
+        }
+    }
+
+    public function testOffsetWindow(): void
+    {
+        $session = new PanelSessionState($this->panelStore);
+        $this->build(session: $session);
+        $all = $this->eligibleKeys();
+        $session->advance();
+
+        $panel = $this->build(session: $session);
+
+        self::assertSame(array_slice($all, 3, 3), $this->itemKeys($panel));
+        self::assertSame(3, $panel->offset);
+    }
+
+    public function testOffsetPastEndYieldsFirstPage(): void
+    {
+        $session = new PanelSessionState($this->panelStore);
+        $this->build(session: $session);
+        $all = $this->eligibleKeys();
+        $session->advance();
+        $session->advance();
+        self::assertSame(6, $session->offset());
+
+        // Five hidden ideas leave four, so the stored offset of 6 is past the end.
+        $panel = $this->build(session: $session, feedback: $this->hiding(deal: array_slice($all, 0, 5)));
+
+        self::assertLessThanOrEqual(6, $panel->eligibleCount);
+        self::assertSame(0, $panel->offset);
+        self::assertSame(array_slice($this->eligibleKeys(), 0, 3), $this->itemKeys($panel));
+    }
+
+    public function testPanelDataCarriesCounts(): void
+    {
+        $panel = $this->build();
+
+        self::assertSame(9, $panel->eligibleCount);
+        self::assertSame(0, $panel->offset);
+    }
+
+    public function testItemsCarryDealAndCoreKeys(): void
+    {
+        $panel = $this->build();
+        $byDeal = [];
+        foreach (self::scripted() as $c) {
+            $byDeal[DealKey::forCandidate($c)->deal] = $c;
+        }
+
+        self::assertNotSame([], $panel->items);
+        foreach ($panel->items as $item) {
+            self::assertArrayHasKey($item->dealKey, $byDeal);
+            $candidate = $byDeal[$item->dealKey];
+            self::assertSame(DealKey::forCandidate($candidate)->core, $item->coreKey);
+            self::assertSame('Team ' . $candidate->partnerTid, $item->partnerTeamName);
+        }
+    }
+
+    public function testNewSimKeyResetsTheOffset(): void
+    {
+        $session = new PanelSessionState($this->panelStore);
+        $this->build(session: $session);
+        $session->advance();
+        self::assertSame(3, $session->offset());
+
+        $panel = $this->build(session: $session, simKey: 'sim-3');
+
+        self::assertSame(0, $panel->offset);
+    }
+
+    /**
+     * @param list<string> $deal
+     * @param list<string> $core
+     */
+    private function hiding(array $deal = [], array $core = []): FeedbackRepositoryInterface
+    {
+        $feedback = self::createStub(FeedbackRepositoryInterface::class);
+        $feedback->method('hiddenKeys')->willReturn(['deal' => $deal, 'core' => $core]);
+        $feedback->method('latestForTeam')->willReturn(null);
+
+        return $feedback;
+    }
+
+    /**
+     * Every idea the last render offered, in ranked order.
+     *
+     * @return list<string>
+     */
+    private function eligibleKeys(): array
+    {
+        return array_keys((new PanelSessionState($this->panelStore))->eligible());
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function itemKeys(TradeSuggestionsPanelData $panel): array
+    {
+        return array_map(static fn (\TradeSuggestions\SuggestionItem $i): string => $i->dealKey, $panel->items);
+    }
+
     /**
      * @param list<TradeCandidate>|null $candidates null = the scripted twelve
      * @param list<int>|null $tradeable null = every player may be traded
@@ -233,6 +416,8 @@ class TradeSuggestionsServiceTest extends TestCase
         array $records = [70, 12],
         ?TeamModeSetting $stored = null,
         string $simKey = self::SIM_KEY,
+        ?FeedbackRepositoryInterface $feedback = null,
+        ?PanelSessionState $session = null,
     ): TradeSuggestionsPanelData {
         $panel = $this->service(
             candidates: $candidates ?? self::scripted(),
@@ -241,6 +426,8 @@ class TradeSuggestionsServiceTest extends TestCase
             records: $records,
             stored: $stored,
             simKey: $simKey,
+            feedback: $feedback,
+            session: $session,
         )->buildForTeam(self::USER_TID);
         self::assertNotNull($panel);
 
@@ -261,6 +448,8 @@ class TradeSuggestionsServiceTest extends TestCase
         array $records = [70, 12],
         ?TeamModeSetting $stored = null,
         string $simKey = self::SIM_KEY,
+        ?FeedbackRepositoryInterface $feedback = null,
+        ?PanelSessionState $session = null,
     ): TradeSuggestionsService {
         $league = self::league();
         $formRepo ??= $this->formRepo($league);
@@ -320,7 +509,18 @@ class TradeSuggestionsServiceTest extends TestCase
             $formRepo,
             $settings,
             $modes,
+            $feedback ?? self::noFeedback(),
+            $session ?? new PanelSessionState($this->panelStore),
         );
+    }
+
+    private static function noFeedback(): FeedbackRepositoryInterface
+    {
+        $feedback = self::createStub(FeedbackRepositoryInterface::class);
+        $feedback->method('hiddenKeys')->willReturn(['deal' => [], 'core' => []]);
+        $feedback->method('latestForTeam')->willReturn(null);
+
+        return $feedback;
     }
 
     /**

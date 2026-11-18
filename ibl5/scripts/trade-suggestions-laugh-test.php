@@ -93,6 +93,8 @@ $snapshots = new \TradeSuggestions\Engine\CachedLeagueSnapshotProvider(
 );
 
 $vetoes = \TradeSuggestions\Veto\VetoSet::standard();
+/** @var array<mixed> $panelStore The CLI has no session; the panel state lives in this array. */
+$panelStore = [];
 $service = new \TradeSuggestions\TradeSuggestionsService(
     $snapshots,
     new \TradeSuggestions\Engine\CandidateGenerator([
@@ -121,6 +123,8 @@ $service = new \TradeSuggestions\TradeSuggestionsService(
     $tradeFormRepo,
     new \Settings\SettingsService($season),
     $modeResolver,
+    new \TradeSuggestions\Feedback\FeedbackRepository($db),
+    new \TradeSuggestions\Feedback\PanelSessionState($panelStore),
 );
 
 $command = new \TradeSuggestions\Engine\Sweep\LeagueSweepCommand($service, $snapshots, $vetoes, $tradeFormRepo);

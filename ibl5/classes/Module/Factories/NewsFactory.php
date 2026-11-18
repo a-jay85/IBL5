@@ -96,6 +96,8 @@ final class NewsFactory implements ModuleFactoryInterface
             $tradeFormRepo,
             new \Settings\SettingsService($season),
             $modeResolver,
+            new \TradeSuggestions\Feedback\FeedbackRepository($db),
+            \TradeSuggestions\Feedback\PanelSessionState::current(),
         );
 
         return new \Topics\News\NewsController(

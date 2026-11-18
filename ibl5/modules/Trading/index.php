@@ -38,6 +38,13 @@ switch ($op) {
             $modeController->handleSetMode(is_string($methodRaw) ? $methodRaw : '', $_POST)
         );
         // HtmxHelper::redirect() is `never`, so no break is needed.
+    case "trade-suggestion-action":
+        $feedbackController = $factory->suggestionFeedbackController();
+        $feedbackMethodRaw = $services->request()->server('REQUEST_METHOD');
+        \Utilities\HtmxHelper::redirect(
+            $feedbackController->handle(is_string($feedbackMethodRaw) ? $feedbackMethodRaw : '', $_POST)
+        );
+        // HtmxHelper::redirect() is `never`, so no break is needed.
     case "roster-preview-api":
         $controller->handleRosterPreviewApi($user);
         break;

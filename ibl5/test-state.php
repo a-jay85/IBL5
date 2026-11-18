@@ -153,6 +153,8 @@ $knownActions = [
     'set-player-name',
     'shadow-log',
     'trade-suggestions-fixture',
+    'trade-suggestion-feedback-reset',
+    'trade-suggestion-feedback',
 ];
 
 // A named-but-unrecognised action is a client mistake, not a method mistake.
@@ -989,6 +991,40 @@ if ($method === 'POST' && $action === 'trade-suggestions-fixture') {
     $upsert->execute();
     $upsert->close();
     echo json_encode(['reset' => 'ok']);
+    $db->close();
+    exit;
+}
+
+// DELETE ?action=trade-suggestion-feedback-reset — clear every trade-idea hide
+// a test wrote. Rows keyed `e2e-...` are seeds owned by another spec, so they
+// stay; a real hide always writes a 40-hex key. No params are read.
+if ($method === 'DELETE' && $action === 'trade-suggestion-feedback-reset') {
+    $db->query("DELETE FROM `ibl_trade_suggestion_feedback` WHERE deal_key NOT LIKE 'e2e-%'");
+    echo json_encode(['cleared' => $db->affected_rows]);
+    $db->close();
+    exit;
+}
+
+// GET ?action=trade-suggestion-feedback&teamid=N — read back one team's
+// trade-idea hides, free text raw, so trade-suggestions.spec.ts can prove a hide
+// POST wrote (or refused to write). teamid must be an int in 1..28.
+if ($method === 'GET' && $action === 'trade-suggestion-feedback') {
+    $teamidRaw = filter_var($_GET['teamid'] ?? null, FILTER_VALIDATE_INT);
+    if ($teamidRaw === false || $teamidRaw < 1 || $teamidRaw > 28) {
+        http_response_code(400);
+        echo json_encode(['error' => 'trade-suggestion-feedback requires teamid as an integer in 1..28']);
+        $db->close();
+        exit;
+    }
+    $teamid = (int)$teamidRaw;
+    $stmt = $db->prepare(
+        "SELECT tid, deal_key, core_key, reason_codes, free_text FROM `ibl_trade_suggestion_feedback` WHERE tid = ? AND deal_key NOT LIKE 'e2e-%' ORDER BY id"
+    );
+    $stmt->bind_param('i', $teamid);
+    $stmt->execute();
+    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    echo json_encode(['rows' => $rows]);
     $db->close();
     exit;
 }

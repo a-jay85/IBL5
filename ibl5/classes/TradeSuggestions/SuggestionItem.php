@@ -12,6 +12,7 @@ final readonly class SuggestionItem
     /**
      * @param list<string> $giveLabels What the GM's team sends (player names or pick text)
      * @param list<string> $getLabels What the GM's team receives
+     * @param list<string> $profileLines Before/after rank lines for the GM's team
      */
     public function __construct(
         public string $partnerTeamName,
@@ -20,6 +21,9 @@ final readonly class SuggestionItem
         public string $userReason,
         public string $partnerReason,
         public string $prefillUrl,
+        public string $dealKey,
+        public string $coreKey,
+        public array $profileLines,
     ) {
     }
 }

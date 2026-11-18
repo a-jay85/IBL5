@@ -1,0 +1,15 @@
+{
+  "excluded": ["Bootstrap"],
+  "shards": [
+    {"shard": "s01", "members": ["BugPipeline","DataRetention","EngineRunner","FranchiseRecordBook","FreeAgencyPreview","Player","Records","SeasonLeaderboards"]},
+    {"shard": "s02", "members": ["HeadToHeadRecords","JsbParser","PageLayout","Search","SeasonArchive","Security","Settings","TeamOrderBy.php","TrainingCampRatingsDiff","Utilities"]},
+    {"shard": "s03", "members": ["AllStarAppearances","Boxscore","ComparePlayers","Contracts","DraftPickLocator","Logging","NextSim","Standings","TeamOffDefStats","UI"]},
+    {"shard": "s04", "members": ["Auth","Clock","LeagueConfig","LeagueStarters","Mail","Negotiation","ProjectedDraftOrder","Updater","Validation","Voting"]},
+    {"shard": "s05", "members": ["BulkImport","Cache","Database","Draft","DraftInfo","EngineBundle","EngineShadow","PlayerSearch","Trading"]},
+    {"shard": "s06", "members": ["CapSpace","Cli","Debug","DepthChart","DepthChartSnapshot","Extension","FreeAgency","League","LeagueSchedule","Legal"]},
+    {"shard": "s07", "members": ["Api","BasketballStats","Discord","FranchiseHistory","LastSimRecap","LeagueControlPanel","RookieOption","Season","SeasonRosterChanges","YourAccount"]},
+    {"shard": "s08", "members": ["ActivityTracker","ContractList","Http","Navigation","OnThisDay","Repositories","Rivalries","SeasonHighs","Team","TeamSchedule","TransactionHistory"]},
+    {"shard": "s09", "members": ["ApiKeys","AwardHistory","CareerLeaderboards","DraftHistory","EventLog","GMContactList","Module","OneOnOneGame","RecordHolders","Topics"]},
+    {"shard": "s10", "members": ["DraftClassImport","GameBoxscore","GoogleSheets","Injuries","Maintenance","Migration","PlrParser","Schedule","SimRecap","Waivers"]}
+  ]
+}

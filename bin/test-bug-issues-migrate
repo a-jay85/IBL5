@@ -274,6 +274,23 @@ h_eq "live_rerun_resumes_from_state: the first transfer is #10" "issue transfer 
 h_eq "live_rerun_resumes_from_state: no repeat transfer of #9" 0 "$(grep -c 'issue transfer 9 ' "$STUB/calls.log")"
 h_eq "live_rerun_resumes_from_state: the map has 29 entries" 29 "$(jq 'length' "$STUB"/mig/bug-issues-map-*.json)"
 
+# ── live_resume_with_old_still_public_restores_private ────────────────────────
+# A prior run died with OLD public: the state file says flip_public is done, the repo says PUBLIC.
+# Step 3 is skipped on the resume, and a failure later must still make OLD private again.
+make_stubs
+printf PUBLIC > "$STUB/old_visibility"
+mkdir -p "$STUB/mig"
+printf '%s\n' step_pause_cron=done step_labels=done step_flip_public=done flip_public=1 > "$STUB/mig/bug-issues-migrate.state"
+printf 4 > "$STUB/fail_transfer"
+run_mig "$CONFIRM" --live
+if [ "$RC" -ne 0 ]; then
+    h_pass "live_resume_with_old_still_public_restores_private: exits non-zero"
+else
+    h_fail "live_resume_with_old_still_public_restores_private: exits non-zero" "got 0"
+fi
+h_eq "live_resume_with_old_still_public_restores_private: OLD is private again" PRIVATE "$(cat "$STUB/old_visibility")"
+h_eq "live_resume_with_old_still_public_restores_private: no second flip to public" 0 "$(grep -c 'visibility public' "$STUB/calls.log")"
+
 # ── preflight_unexpected_issue_set_refuses ────────────────────────────────────
 make_stubs
 seq 1 30 > "$STUB/old_issues"

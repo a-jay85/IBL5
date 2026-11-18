@@ -341,6 +341,9 @@ if step_begin 3 flip_public; then
     fi
     act gh repo edit "$OLD" --visibility public --accept-visibility-change-consequences
     step_end
+elif [ "$LIVE" = 1 ] && st_has flip_public=1 && ! st_has flip_private=1; then
+    # A prior run left OLD public (its restore failed or it was killed). This run owns the restore.
+    FLIPPED=1
 fi
 
 # 4 ── transfer the issues

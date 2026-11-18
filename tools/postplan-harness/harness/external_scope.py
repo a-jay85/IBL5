@@ -646,7 +646,7 @@ def _dm_partner(body: list[str], idx: int, start: int) -> set[tuple[str, str]]:
     return {(" ".join(raw.split()), stmts[k - 1][2] if k else "") for k, (raw, _m, _c) in enumerate(stmts or [])}
 
 
-_DM_LOG_VALUE_RE = re.compile(r'"\$\{DISCORD_DM_SENT_LOG:-[^}"$`\\]*(?:\$HOME[^}"$`\\]*)?\}"')
+_DM_LOG_VALUE_RE = re.compile(r'"\$\{DISCORD_DM_SENT_LOG:-\$HOME/\.claude/discord-dm-sent\.log\}"')
 
 
 def _dm_log_assign_ok(raw: str, word: str | None) -> bool:

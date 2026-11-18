@@ -418,6 +418,13 @@ def test_dm_log_alias_of_spool_is_one_way():
     assert external_send_change(DM, sec) == _R_SEND
 
 
+def test_dm_log_alias_of_other_send_file_default_is_one_way():
+    for path in ("$HOME/.iblbot-dev-webhook-url", "$HOME/.iblbot-dm-id"):
+        sec = _dm(350, '+    log="${DISCORD_DM_SENT_LOG:-' + path + '}"',
+                  """+    printf '%s\\n' x >> "$log\"""")
+        assert external_send_change(DM, sec) == _R_SEND
+
+
 def test_dm_printf_attached_v_flag_is_one_way():
     assert external_send_change(DM, _dm(350, "+    printf -vTO '%s' 123")) is not None
 

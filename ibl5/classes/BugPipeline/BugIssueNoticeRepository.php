@@ -63,17 +63,18 @@ class BugIssueNoticeRepository extends \Database\BaseMysqliRepository implements
     /**
      * @return list<array{issue_number: int, reporter_discord_id: ?string, thread_id: ?string, original_message_id: ?string}>
      */
-    public function listPending(int $limit): array
+    public function listPending(int $limit, int $after = 0): array
     {
         $limit = max(self::MIN_LIMIT, min(self::MAX_LIMIT, $limit));
         $rows = $this->fetchAll(
             // @phpstan-ignore ibl.orderByMissingTiebreaker (issue_number is the PK of ibl_bug_issue_notices — inherently unique)
             "SELECT issue_number, reporter_discord_id, thread_id, original_message_id
              FROM `ibl_bug_issue_notices`
-             WHERE notice_state = 'pending'
+             WHERE notice_state = 'pending' AND issue_number > ?
              ORDER BY issue_number
              LIMIT ?",
-            'i',
+            'ii',
+            max(0, $after),
             $limit
         );
 

@@ -1725,8 +1725,13 @@ notify_closed_issues() {
             [ -n "$s" ] && log "ERROR: close notice for issue $s stuck in claimed"
         done < <(printf '%s' "$stale" | jq -r '.[]' 2>/dev/null)
     fi
-    rows="$(cli issue-notice-pending --limit=25)" || return 0
+    local after=0 page=0 count last
+    while [ "$page" -lt 20 ]; do
+    page=$((page + 1))
+    rows="$(cli issue-notice-pending --limit=25 --after="$after")" || return 0
     printf '%s' "$rows" | jq -e 'type == "array"' >/dev/null 2>&1 || return 0
+    count="$(printf '%s' "$rows" | jq 'length')"
+    last="$(printf '%s' "$rows" | jq -r '[.[].issue_number] | max // 0')"
     while IFS= read -r row; do
         [ -n "$row" ] || continue
         n="$(printf '%s' "$row" | jq -r '.issue_number // empty')"
@@ -1762,6 +1767,10 @@ notify_closed_issues() {
             log "close notice for issue $n: post failed (release -> ${res:-unknown})"
         fi
     done < <(printf '%s' "$rows" | jq -c '.[]' 2>/dev/null)
+    # A short page is the last one. A page that does not advance would loop forever.
+    [ "$count" -ge 25 ] && [[ "$last" =~ ^[0-9]+$ ]] && [ "$last" -gt "$after" ] || break
+    after="$last"
+    done
     return 0
 }
 

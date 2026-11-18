@@ -2635,7 +2635,8 @@ def _rearm_after_ci_fix(git, gh, llm, log, res, state, inputs, decision, outcome
     # The downgrade runs first, as in Phase 6.5: the seat and the add-only safety verdict
     # must both see the posted word.
     _apply_kept_downgrade(new, res, git, worktree, plan, master_sha, pr, log)
-    preview = evaluate(new)
+    nd = evaluate(new)
+    preview = nd
     if preview.second_review_candidates:
         # Before the preview, so a cleared PR still reaches the add-only safety verdict.
         new = second_review.review_pass(new, pr, git.head_tree, git.diff_vs_base, plan, log,

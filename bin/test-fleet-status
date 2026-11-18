@@ -1676,10 +1676,13 @@ assert_has "pr slot: queued row with no PR stays aligned" \
     "$OUTPUT" '^ +3\.        fm-title-plan\.md'
 assert_has "pr slot: in-progress row shows its PR" \
     "$OUTPUT" '▶ #3004  live-plan\.md'
+# A loose row matches a launchd row: the PR slot sits on the header line and
+# the pid on the line below it, so join each header to its next line first.
+LOOSE_JOINED="$(grep -A1 '● headless' <<< "$LOOSE_PLAIN" | paste -d' ' - - -)"
 assert_has "pr slot: orphan session matches its worktree branch" \
-    "$LOOSE_PLAIN" "● #3005  pid $PROMPT_ORPHAN_PID "
+    "$LOOSE_JOINED" "● headless   #3005  [^ ]+ +pid $PROMPT_ORPHAN_PID "
 assert_has "pr slot: orphan with no branch keeps the slot blank" \
-    "$LOOSE_PLAIN" "●        pid $ORPHAN_PID "
+    "$LOOSE_JOINED" "● headless {10}[^ ]+ +pid $ORPHAN_PID "
 assert_has "pr slot: the number links to the PR page" \
     "$OUTPUT_LINKS" '8;;https://github\.com/o/r/pull/3001.\\#3001'
 assert_has "pr slot: the link leaves the padding plain" \

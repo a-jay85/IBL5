@@ -314,6 +314,7 @@ final class TuningAssemblerTest extends TestCase
              * @param list<TuningFeedback> $hides
              * @param list<list<int>> $calls
              */
+            // @phpstan-ignore property.onlyWritten (by-reference capture; the test reads it)
             public function __construct(private readonly array $hides, private array &$calls)
             {
             }
@@ -366,6 +367,7 @@ final class TuningAssemblerTest extends TestCase
             /**
              * @param list<int> $calls
              */
+            // @phpstan-ignore property.onlyWritten (by-reference capture; the test reads it)
             public function __construct(private readonly int $perPartner, private readonly ?int $total, private array &$calls)
             {
             }

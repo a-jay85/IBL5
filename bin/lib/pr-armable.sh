@@ -142,11 +142,13 @@ pr_manual_testing_clearance() {
 #   `--json files` array touches the engine golden snapshot; the CALLER applies
 #   the mode policy (Phase 6.5: hold only when headless; pr-triage --arm: always
 #   hold). Echoes `golden-changed` when present, nothing otherwise.
+#   It also covers golden_seeds.sha256 and raw JSB captures, to match classify.py.
+#   The trace-pinned clearance lives only in harness.trace_pinned, so pr-triage --arm still holds every golden change for the owner.
 #   Pass the `.files` array, e.g. `gh pr view N --json files --jq '.files'`.
 pr_golden_hold() {
     local files_json="$1"
     if printf '%s' "$files_json" \
-        | jq -e 'any(.[]?; .path == "engine/internal/sim/testdata/golden.json")' \
+        | jq -e 'any(.[]?; .path == "engine/internal/sim/testdata/golden.json" or .path == "engine/internal/sim/testdata/golden_seeds.sha256" or (.path | startswith("engine/testdata/jsb-captures/")))' \
             >/dev/null 2>&1; then
         echo "golden-changed"
     fi

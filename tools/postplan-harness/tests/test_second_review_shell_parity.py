@@ -5,6 +5,7 @@ import re
 import subprocess
 
 from harness import armable
+from harness.classify import classify
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 LIB = os.path.join(REPO, "bin/lib/pr-armable.sh")
@@ -78,3 +79,36 @@ def _shell_array(name):
 def test_shell_ui_prefixes_match_python():
     assert _shell_array("PR_ARMABLE_UI_PREFIXES") == armable.UI_PATH_PREFIXES
     assert _shell_array("PR_ARMABLE_UI_SUFFIXES") == armable.UI_PATH_SUFFIXES
+
+
+def _golden(paths):
+    files = json.dumps([{"path": p} for p in paths])
+    proc = subprocess.run(
+        ["bash", "-c", 'source "$0"; pr_golden_hold "$1"', LIB, files],
+        capture_output=True, text=True, check=True)
+    return proc.stdout.strip()
+
+
+def test_golden_hold_parity_seeds_only():
+    paths = ["engine/internal/sim/testdata/golden_seeds.sha256"]
+    assert _golden(paths) == "golden-changed"
+    assert classify(paths, "").golden_changed is True
+
+
+def test_golden_hold_parity_capture_dir():
+    paths = ["engine/testdata/jsb-captures/foul-roll.jsonl"]
+    assert _golden(paths) == "golden-changed"
+    assert classify(paths, "").jsb_capture_changed is True
+
+
+def test_golden_hold_parity_unrelated_engine_file():
+    paths = ["engine/internal/sim/foul.go"]
+    assert _golden(paths) == ""
+    cls = classify(paths, "")
+    assert cls.golden_changed is False
+    assert cls.jsb_capture_changed is False
+
+
+def test_shell_golden_hold_ignores_trace_evidence():
+    paths = ["engine/internal/sim/testdata/golden.json", "engine/trace-evidence/x.json"]
+    assert _golden(paths) == "golden-changed"

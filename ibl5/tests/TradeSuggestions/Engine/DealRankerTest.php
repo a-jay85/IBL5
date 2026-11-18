@@ -11,6 +11,8 @@ use TradeSuggestions\Engine\DealRanker;
 use TradeSuggestions\Engine\ExposureFilter;
 use TradeSuggestions\Engine\LeagueSnapshot;
 use TradeSuggestions\Engine\RankGate;
+use TradeSuggestions\Engine\RankOutcome;
+use TradeSuggestions\Engine\RankTrace;
 use TradeSuggestions\Engine\ScoredDeal;
 use TradeSuggestions\Engine\SideGain;
 use TradeSuggestions\SuggestionValidationFilter;
@@ -301,6 +303,144 @@ final class DealRankerTest extends TestCase
         ]);
 
         self::assertEquals([self::oneForOne(), $bigger], array_map(static fn ($r): TradeCandidate => $r->deal->candidate, $result->selected));
+    }
+
+    public function testTraceRecordsOneEntryPerInputDeal(): void
+    {
+        [$deals, $trace] = self::tracedMix();
+
+        self::assertSame(count($deals), $trace->count());
+        self::assertSame(array_keys($deals), array_keys(self::sortedEntries($trace)));
+    }
+
+    public function testTraceOutcomeCountsAgreeWithDiagnostics(): void
+    {
+        [, $trace, $result] = self::tracedMix();
+        $counts = [];
+        foreach ($trace->entries() as $entry) {
+            $counts[$entry['outcome']->value] = ($counts[$entry['outcome']->value] ?? 0) + 1;
+        }
+        $d = $result->diagnostics;
+
+        self::assertSame($d->notBothPositive, $counts[RankOutcome::NotBothPositive->value]);
+        self::assertSame($d->lopsided, $counts[RankOutcome::Lopsided->value]);
+        self::assertSame($d->exposure, $counts[RankOutcome::Exposure->value]);
+        self::assertSame($d->vetoed, $counts[RankOutcome::Vetoed->value]);
+        self::assertSame(array_sum($d->validatorRejections), $counts[RankOutcome::Validator->value]);
+        self::assertSame($d->noMotive, $counts[RankOutcome::NoMotive->value]);
+        self::assertSame($d->selected, $counts[RankOutcome::Selected->value]);
+        self::assertSame(count($result->eligible) - $d->selected, $counts[RankOutcome::Eligible->value]);
+        self::assertSame(
+            $d->validated,
+            $counts[RankOutcome::Validator->value] + $counts[RankOutcome::NoMotive->value]
+                + $counts[RankOutcome::Selected->value] + $counts[RankOutcome::Eligible->value]
+        );
+        self::assertSame(2, $counts[RankOutcome::NotReached->value]);
+        self::assertSame(['FIRST_ONLY'], $trace->entries()[3]['veto']->firedIds());
+        self::assertSame(SuggestionValidationFilter::FAIL_CAP, $trace->entries()[4]['detail']);
+        self::assertSame('user', $trace->entries()[5]['detail']);
+    }
+
+    public function testTraceRankMatchesSortedPosition(): void
+    {
+        [$deals, $trace] = self::tracedMix();
+        $selected = [];
+        foreach ($trace->entries() as $index => $entry) {
+            if ($entry['outcome'] === RankOutcome::Selected || $entry['outcome'] === RankOutcome::Eligible) {
+                $selected[(int) $entry['rank']] = $index;
+            }
+        }
+        ksort($selected);
+
+        self::assertSame(range(1, 12), array_keys($selected));
+        $best = $deals[$selected[1]]->weakerSideTotal();
+        foreach ($trace->entries() as $index => $entry) {
+            if ($entry['outcome'] === RankOutcome::Eligible || $entry['outcome'] === RankOutcome::NotReached) {
+                self::assertLessThan($best, $deals[$index]->weakerSideTotal());
+            }
+        }
+        self::assertSame(RankOutcome::Selected, $trace->entries()[$selected[3]]['outcome']);
+        self::assertSame(RankOutcome::Eligible, $trace->entries()[$selected[4]]['outcome']);
+    }
+
+    public function testNoTraceLeavesResultUnchanged(): void
+    {
+        [$deals, , $traced] = self::tracedMix();
+        $s = self::league();
+        $plain = (new DealRanker())->select($s, self::simKey($s, self::USER, self::PARTNER), self::USER, $deals, new VetoSet([self::firstOnlyVeto()]), self::mixCallback());
+
+        self::assertEquals($plain, $traced);
+        self::assertCount(DealRanker::MAX_SUGGESTIONS, $plain->selected);
+        self::assertCount(DealRanker::KEEP_TOP, $plain->eligible);
+    }
+
+    /**
+     * One deal for each early gate, one validator and one no-motive deal, then
+     * 14 passing deals so KEEP_TOP leaves two not reached.
+     *
+     * @return array{0: list<ScoredDeal>, 1: RankTrace, 2: \TradeSuggestions\Engine\RankResult}
+     */
+    private static function tracedMix(): array
+    {
+        $s = self::league();
+        $simKey = self::simKey($s, self::USER, self::PARTNER);
+        $blocked = self::firstBlockedPartner($s, $simKey, self::USER);
+        $deals = [
+            self::scored(self::oneForOne(), 0.0, 5.0),
+            self::scored(self::oneForOne(), 1.0, 9.0),
+            self::scored(self::deal(self::USER, $blocked), 5.0, 5.0),
+            self::scored(self::oneForOne(), 5.0, 6.0),
+            self::scored(self::oneForOne(), 9.0, 9.0),
+            self::scored(self::oneForOne(), 8.0, 8.0),
+        ];
+        for ($k = 0; $k < 14; $k++) {
+            $deals[] = self::scored(self::oneForOne(), 7.0 - 0.1 * $k, 7.0 - 0.1 * $k);
+        }
+        $trace = new RankTrace();
+        $result = (new DealRanker())->select($s, $simKey, self::USER, $deals, new VetoSet([self::firstOnlyVeto()]), self::mixCallback(), DealRanker::MAX_SUGGESTIONS, $trace);
+
+        return [$deals, $trace, $result];
+    }
+
+    /**
+     * @return callable(ScoredDeal, DealView): array{0: RankGate, 1: string, 2: ?string, 3: ?string}
+     */
+    private static function mixCallback(): callable
+    {
+        return static fn (ScoredDeal $d, DealView $v): array => match ($d->user->total()) {
+            9.0 => [RankGate::Validator, SuggestionValidationFilter::FAIL_CAP, null, null],
+            8.0 => [RankGate::NoMotive, 'user', null, null],
+            default => [RankGate::Pass, '', 'u', 'p'],
+        };
+    }
+
+    private static function firstOnlyVeto(): \TradeSuggestions\Veto\Contracts\VetoInterface
+    {
+        // Fires on the first deal that reaches the veto gate (index 3 in the mix).
+        return new class () implements \TradeSuggestions\Veto\Contracts\VetoInterface {
+            private int $calls = 0;
+
+            public function id(): string
+            {
+                return 'FIRST_ONLY';
+            }
+
+            public function fires(DealView $deal): bool
+            {
+                return ++$this->calls === 1;
+            }
+        };
+    }
+
+    /**
+     * @return array<int, array{outcome: RankOutcome, veto: \TradeSuggestions\Veto\VetoReport, rank: ?int, detail: ?string}>
+     */
+    private static function sortedEntries(RankTrace $trace): array
+    {
+        $entries = $trace->entries();
+        ksort($entries);
+
+        return $entries;
     }
 
     /**

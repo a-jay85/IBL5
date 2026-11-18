@@ -6,6 +6,7 @@ namespace TradeSuggestions\Engine;
 
 use TradeSuggestions\Valuation\GainWeights;
 use TradeSuggestions\Veto\DealView;
+use TradeSuggestions\Veto\VetoReport;
 use TradeSuggestions\Veto\VetoSet;
 
 /**
@@ -29,8 +30,9 @@ final class DealRanker
     /**
      * @param list<ScoredDeal> $scored
      * @param callable(ScoredDeal, DealView): array{0: RankGate, 1: string, 2: ?string, 3: ?string} $passes
+     * @param ?RankTrace $trace when set, gets one outcome per input deal (the tuning page); null changes nothing
      */
-    public function select(LeagueSnapshot $s, string $simKey, int $userTid, array $scored, VetoSet $vetoes, callable $passes, int $limit = self::MAX_SUGGESTIONS): RankResult
+    public function select(LeagueSnapshot $s, string $simKey, int $userTid, array $scored, VetoSet $vetoes, callable $passes, int $limit = self::MAX_SUGGESTIONS, ?RankTrace $trace = null): RankResult
     {
         $memo = new PairRecordMemo();
         $partners = array_flip(ExposureFilter::eligiblePartners($simKey, $userTid, $s->teamIds));
@@ -41,19 +43,22 @@ final class DealRanker
         $vetoed = 0;
 
         $survivors = [];
-        foreach ($scored as $deal) {
+        foreach ($scored as $i => $deal) {
             if (!$deal->bothSidesPositive()) {
                 $notBothPositive++;
+                $trace?->record($i, RankOutcome::NotBothPositive, VetoReport::none(), null, null);
                 continue;
             }
             $u = $deal->user->total();
             $p = $deal->partner->total();
             if (max($u, $p) > GainWeights::LOPSIDED_RATIO * min($u, $p)) {
                 $lopsided++;
+                $trace?->record($i, RankOutcome::Lopsided, VetoReport::none(), null, null);
                 continue;
             }
             if (!isset($partners[$deal->candidate->partnerTid])) {
                 $exposure++;
+                $trace?->record($i, RankOutcome::Exposure, VetoReport::none(), null, null);
                 continue;
             }
             $view = DealView::fromScoredDeal($s, $deal, $memo);
@@ -63,9 +68,10 @@ final class DealRanker
                 foreach ($report->firedIds() as $id) {
                     $vetoedById[$id]++;
                 }
+                $trace?->record($i, RankOutcome::Vetoed, $report, null, null);
                 continue;
             }
-            $survivors[] = ['deal' => $deal, 'view' => $view];
+            $survivors[] = ['deal' => $deal, 'view' => $view, 'index' => $i];
         }
 
         usort($survivors, static fn (array $a, array $b): int
@@ -84,16 +90,27 @@ final class DealRanker
             [$gate, $detail, $userReason, $partnerReason] = $passes($survivor['deal'], $survivor['view']);
             if ($gate === RankGate::Validator) {
                 $validatorRejections[$detail] = ($validatorRejections[$detail] ?? 0) + 1;
+                $trace?->record($survivor['index'], RankOutcome::Validator, VetoReport::none(), null, $detail);
                 continue;
             }
             if ($gate === RankGate::NoMotive) {
                 $noMotive++;
+                $trace?->record($survivor['index'], RankOutcome::NoMotive, VetoReport::none(), null, $detail);
                 continue;
             }
             $ranked = new RankedDeal($survivor['deal'], $survivor['view'], count($eligible) + 1, $userReason, $partnerReason);
             $eligible[] = $ranked;
             if (count($selected) < $limit) {
                 $selected[] = $ranked;
+                $trace?->record($survivor['index'], RankOutcome::Selected, VetoReport::none(), $ranked->rank, null);
+            } else {
+                $trace?->record($survivor['index'], RankOutcome::Eligible, VetoReport::none(), $ranked->rank, null);
+            }
+        }
+        if ($trace !== null) {
+            // Sorted survivors the walk stopped before (validation budget or KEEP_TOP).
+            for ($j = $validated, $n = count($survivors); $j < $n; $j++) {
+                $trace->record($survivors[$j]['index'], RankOutcome::NotReached, VetoReport::none(), null, null);
             }
         }
 

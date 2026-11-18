@@ -311,12 +311,16 @@ h_eq "preflight_unexpected_issue_set_refuses: zero mutating calls" 0 "$(mutating
 h_contains "preflight_unexpected_issue_set_refuses: stderr names the issue set" "$(cat "$STUB/err")" "issue set"
 
 # ── unknown_flag_rejected ─────────────────────────────────────────────────────
+# Runs in the stub world with an empty confirmation line. If the parser ever
+# accepts a bad flag as --live, the run stays off real GitHub and Discord and
+# fails fast on the confirmation (exit 4) instead of hanging.
+make_stubs
 for flag in --bogus --live=yes --dry-run; do
-    "$MIGRATE" "$flag" > /dev/null 2>&1
-    h_eq "unknown_flag_rejected: $flag exits 2" 2 "$?"
+    run_mig "" "$flag"
+    h_eq "unknown_flag_rejected: $flag exits 2" 2 "$RC"
 done
-"$MIGRATE" --live --live > /dev/null 2>&1
-h_eq "unknown_flag_rejected: two arguments exit 2" 2 "$?"
+run_mig "" --live --live
+h_eq "unknown_flag_rejected: two arguments exit 2" 2 "$RC"
 
 # ── empty_migrate_dir_rejected ────────────────────────────────────────────────
 env BUG_ISSUES_MIGRATE_DIR= "$MIGRATE" > /dev/null 2> "$ROOT/empty.err"

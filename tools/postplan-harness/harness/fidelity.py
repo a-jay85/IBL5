@@ -2085,6 +2085,32 @@ _TERMINAL_WORD_RE = re.compile(r"^(NOT READY|READY WITH NOTES|READY)\b")
 _BODY_ONLY_SHA = "body-only"
 
 
+KEPT_SCOPE_HEADING = "### Kept new scope (you asked for this)"
+
+
+def owner_scope_terminal(fid: dict) -> str:
+    """The terminal line for an owner-quoted kept-scope verdict; "" otherwise."""
+    fid = fid or {}
+    word = fid.get("posted_verdict")
+    if word not in ("READY", "READY WITH NOTES") or not fid.get("kept_owner_scope"):
+        return ""
+    return (f"{word} — the only blocking findings are new scope you asked for; "
+            "each one is listed under Kept new scope")
+
+
+def sticky_terminal(fid: dict) -> str:
+    fid = fid or {}
+    return owner_scope_terminal(fid) or terminal_line(
+        fid.get("verdict_1"), fid.get("error_kind"), fid.get("remediation_sha"),
+        fid.get("verdict_2"), fid.get("reviewed_tree_2"), fid.get("rounds_completed", 0))
+
+
+def _kept_scope_line(item: dict) -> str:
+    def clean(s):
+        return " ".join(str(s or "").replace("`", "'").split())
+    return f"- `{clean(item.get('title'))}` (you said: `{clean(item.get('quote'))}`)"
+
+
 def _terminal_verdict_word(terminal: str) -> str | None:
     """The leading verdict word of the terminal line, the one machine-read verdict."""
     m = _TERMINAL_WORD_RE.match(terminal or "")
@@ -2290,6 +2316,10 @@ def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
         out.append("**Backlog issues filed:** " + ", ".join(
             _backlog_link(f"a-jay85/IBL5-backlog#{n}", n) for n in nums))
 
+    kept_scope = fid.get("kept_owner_scope") or []
+    if kept_scope and fid.get("posted_verdict") in ("READY", "READY WITH NOTES"):
+        out.extend(["", KEPT_SCOPE_HEADING])
+        out.extend(_kept_scope_line(k) for k in kept_scope)
     out.append("")
     out.append(MERGE_DIGEST_HEADING)
     out.extend(digest_rows_for_display(digest, fid,

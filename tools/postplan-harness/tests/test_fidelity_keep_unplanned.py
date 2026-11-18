@@ -268,12 +268,13 @@ def _bare_inputs(body, v1="NOT READY", v2=None, tree2=None):
                                  fidelity_tree_2=tree2, current_tree="t" * 40)
 
 
-def _stub_ctx(monkeypatch, value):
+def _stub_ctx(monkeypatch, value, payload=OWNER_PAYLOAD):
     monkeypatch.setattr(runner, "_unplanned_ctx", lambda *a: value)
+    monkeypatch.setattr(runner.owner_intent, "load", lambda slug: payload)
 
 
 def _downgrade(inputs, fid, pr=99, log=None):
-    res = types.SimpleNamespace(fidelity=fid)
+    res = types.SimpleNamespace(fidelity=fid, slug="demo")
     git = types.SimpleNamespace(diff_vs_base=lambda: "diff")
     runner._apply_kept_downgrade(inputs, res, git, ".", None, "base", pr, log or (lambda m: None))
     return res
@@ -285,12 +286,58 @@ def test_apply_downgrade_moves_verdict_2_slot_only(tmp_path, monkeypatch):
     inputs = _bare_inputs(KEPT_BODY, v1="NOT READY", v2="NOT READY", tree2="t" * 40)
     logs: list[str] = []
     res = _downgrade(inputs, {"verdict_path": path, "verdict_2": "NOT READY"}, log=logs.append)
-    assert (inputs.fidelity_verdict, inputs.fidelity_verdict_2) == ("NOT READY", "READY WITH NOTES")
+    assert (inputs.fidelity_verdict, inputs.fidelity_verdict_2) == ("NOT READY", "READY")
     assert res.fidelity["verdict_2"] == "NOT READY"
     assert res.fidelity["downgraded_unplanned"] is True
     assert "phase5.5: blocking findings are all kept unplanned scope; declared in PR body" in logs
     with open(path, encoding="utf-8") as fh:
         assert "NOT READY" in fh.read()
+
+
+def test_apply_kept_downgrade_posts_single_word(tmp_path, monkeypatch):
+    _stub_ctx(monkeypatch, _ctx())
+    path = _verdict(tmp_path, "NOT READY", KEEP_ITEM)
+    monkeypatch.setattr(fidelity, "verdict_path", lambda pr: path)
+    inputs = _bare_inputs(KEPT_BODY, v1="NOT READY")
+    logs: list[str] = []
+    res = _downgrade(inputs, {"verdict_path": path, "verdict_1": "NOT READY"}, log=logs.append)
+    assert inputs.fidelity_verdict == "READY"
+    assert res.fidelity["posted_verdict"] == "READY"
+    assert res.fidelity["posted_source"] == "verdict-1"
+    assert runner.select_fidelity_verdict(inputs.fidelity_verdict, inputs.fidelity_verdict_2,
+                                          inputs.fidelity_tree_2, inputs.current_tree)[0] == "READY"
+    assert res.fidelity["kept_owner_scope"] == [
+        {"title": us.title_of(KEEP_ITEM), "quote": OWNER_WORDS}]
+    assert res.fidelity["verdict_1"] == "NOT READY"
+    assert "phase5.5: blocking findings are all kept unplanned scope; declared in PR body" in logs
+
+
+def test_apply_kept_downgrade_clears_stale_posted_word(tmp_path, monkeypatch):
+    _stub_ctx(monkeypatch, _ctx())
+    path = _verdict(tmp_path, "NOT READY", KEEP_ITEM)
+    monkeypatch.setattr(fidelity, "verdict_path", lambda pr: path)
+    inputs = _bare_inputs(KEPT_BODY, v1="NOT READY")
+    res = _downgrade(inputs, {"verdict_path": path})
+    assert res.fidelity["posted_verdict"] == "READY"
+    inputs.fidelity_verdict = "NOT READY"
+    inputs.pr_body = "intro with the kept block removed\n"
+    runner._apply_kept_downgrade(inputs, res, types.SimpleNamespace(diff_vs_base=lambda: "d"),
+                                 ".", None, "base", 99, lambda m: None)
+    assert "posted_verdict" not in res.fidelity
+    assert "posted_source" not in res.fidelity
+    assert "kept_owner_scope" not in res.fidelity
+    assert inputs.fidelity_verdict == "NOT READY"
+
+
+def test_apply_kept_downgrade_no_intent_stays_not_ready(tmp_path, monkeypatch):
+    _stub_ctx(monkeypatch, _ctx(), payload=None)
+    path = _verdict(tmp_path, "NOT READY", KEEP_ITEM)
+    monkeypatch.setattr(fidelity, "verdict_path", lambda pr: path)
+    inputs = _bare_inputs(KEPT_BODY, v1="NOT READY")
+    res = _downgrade(inputs, {"verdict_path": path})
+    assert inputs.fidelity_verdict == "NOT READY"
+    assert "posted_verdict" not in res.fidelity
+    assert "downgraded_unplanned" not in res.fidelity
 
 
 def test_apply_downgrade_reads_verdict_1_when_verdict_2_is_stale(tmp_path, monkeypatch):
@@ -300,7 +347,7 @@ def test_apply_downgrade_reads_verdict_1_when_verdict_2_is_stale(tmp_path, monke
     stale = _verdict(tmp_path, "NOT READY", UNTAGGED_ITEM, name="v2.md")
     inputs = _bare_inputs(KEPT_BODY, v1="NOT READY", v2="NOT READY", tree2="s" * 40)
     _downgrade(inputs, {"verdict_path": stale})
-    assert (inputs.fidelity_verdict, inputs.fidelity_verdict_2) == ("READY WITH NOTES", "NOT READY")
+    assert (inputs.fidelity_verdict, inputs.fidelity_verdict_2) == ("READY", "NOT READY")
 
 
 def test_apply_downgrade_prefers_repin_verdict_file(tmp_path, monkeypatch):

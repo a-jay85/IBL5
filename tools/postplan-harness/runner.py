@@ -1373,7 +1373,7 @@ def _run_pass(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 git, gh, llm, log, res, state, inputs, decision, outcome,
                 worktree=worktree, pr=pr, sha=sha, live=live, fixture=fixture,
                 out_dir=out_dir, state_dir=_state_dir(out_dir, live, state_dir), slug=slug,
-                flag=_mc_flag, post_sticky=_post_sticky, plan=plan)
+                flag=_mc_flag, post_sticky=_post_sticky, plan=plan, master_sha=master_sha)
 
         if _should_resolve_behind(live, pr, decision, outcome):
             sha, outcome = _resolve_behind(git, gh, log, res, worktree, pr, sha,
@@ -2599,7 +2599,7 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
 
 def _rearm_after_ci_fix(git, gh, llm, log, res, state, inputs, decision, outcome, *,
                         worktree, pr, sha, live, fixture, out_dir, state_dir, slug,
-                        flag, post_sticky, plan=None):
+                        flag, post_sticky, plan=None, master_sha=None):
     """Phase 7: re-run Phase 6.5's arming decision after the fix loop turned CI green.
 
     Same ArmInputs, same evaluate(). Only (15), (16), (17) and current_tree are refreshed,
@@ -2628,17 +2628,29 @@ def _rearm_after_ci_fix(git, gh, llm, log, res, state, inputs, decision, outcome
         fidelity_blocking_findings=second_review.selected_blocking_findings(
             res.fidelity or {}, pr, cur_tree),
         llm_safety_holds=[])
-    # Before the preview, so a cleared PR still reaches the add-only safety verdict.
-    new = second_review.review_pass(new, pr, git.head_tree, git.diff_vs_base, plan, log,
-                                    second_review.spawner(llm, worktree))
-    preview = evaluate(new)
-    if not preview.holds:
+    # Phase 6.5 may have posted a kept-scope word into one slot. Put the reviewer's raw
+    # word back there, so the downgrade below decides afresh against the fresh state.
+    _posted_src = (res.fidelity or {}).get("posted_source")
+    if _posted_src == "verdict-2":
+        new.fidelity_verdict_2 = res.fidelity.get("verdict_2")
+    elif _posted_src is not None:
+        new.fidelity_verdict = res.fidelity.get("verdict_1")
+    # The downgrade runs first, as in Phase 6.5: the seat and the add-only safety verdict
+    # must both see the posted word.
+    _apply_kept_downgrade(new, res, git, worktree, plan, master_sha, pr, log)
+    nd = evaluate(new)
+    if nd.second_review_candidates:
+        # Before the preview, so a cleared PR still reaches the add-only safety verdict.
+        new = second_review.review_pass(new, pr, git.head_tree, git.diff_vs_base, plan, log,
+                                        second_review.spawner(llm, worktree))
+        nd = evaluate(new)
+    if not nd.holds:
         verdict = llm.call("safety-verdict", "haiku",
                            llm_calls.safety_verdict_prompt(new.classification, new.pr_title,
-                                                           preview),
+                                                           nd),
                            schemas.validate_safety_verdict)
         new.llm_safety_holds = verdict["holds"]
-    nd = evaluate(new)
+        nd = evaluate(new)
     res.arm = nd
     log("phase7 re-arm: " + ("ARMED" if nd.armed else
                              "HELD — " + "; ".join(f"({c.number}) {c.reason or c.name}"
@@ -3223,26 +3235,33 @@ def _declare_kept(kept_all, ctx, gh, body, pr, log) -> None:
 
 
 def _apply_kept_downgrade(inputs, res, git, worktree, plan, master_sha, pr, log) -> None:
-    """Condition (12) arm input: read a NOT READY whose blockers are all kept and declared
-    as READY WITH NOTES. Only the selected slot of `inputs` moves. The verdict file and
-    res.fidelity's verdict words stay as the reviewer wrote them."""
+    """The one posted verdict: a NOT READY whose blockers are all owner-quoted kept scope posts READY (or READY WITH NOTES). Only the selected slot of inputs and fid["posted_verdict"] move. The verdict file, verdict_1/verdict_2 and rounds keep the reviewer's word."""
+    fid = res.fidelity if res.fidelity is not None else {}
+    res.fidelity = fid
+    for key in ("posted_verdict", "posted_source", "kept_owner_scope"):
+        fid.pop(key, None)   # every call decides afresh; a stale READY never survives
     selected, source = select_fidelity_verdict(
         inputs.fidelity_verdict, inputs.fidelity_verdict_2,
         inputs.fidelity_tree_2, inputs.current_tree)
     if selected != "NOT READY":
         return
-    fid = res.fidelity or {}
     path = second_review.selected_fidelity_path(source, fid, pr)
     if not path or not any(unplanned_scope.is_unplanned_scope(t)
                            for t in fidelity.blocking_finding_texts(path)):
         return
     ctx = _unplanned_ctx(worktree, git, plan, master_sha, None, log)
-    if not unplanned_scope.downgrade_applies(path, ctx, inputs.pr_body):
+    payload = owner_intent.load(res.slug)
+    if not unplanned_scope.downgrade_applies(path, ctx, inputs.pr_body, payload):
         return
+    word = unplanned_scope.owner_scope_word(path)
     if source == "verdict-2":
-        inputs.fidelity_verdict_2 = "READY WITH NOTES"
+        inputs.fidelity_verdict_2 = word
     else:
-        inputs.fidelity_verdict = "READY WITH NOTES"
+        inputs.fidelity_verdict = word
+    fid["posted_verdict"], fid["posted_source"] = word, source
+    fid["kept_owner_scope"] = [
+        {"title": unplanned_scope.title_of(t), "quote": unplanned_scope.owner_quote(t)}
+        for t in fidelity.blocking_finding_texts(path)]
     fid["downgraded_unplanned"] = True
     log("phase5.5: blocking findings are all kept unplanned scope; declared in PR body")
 

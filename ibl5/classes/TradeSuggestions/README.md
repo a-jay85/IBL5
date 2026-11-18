@@ -1,6 +1,6 @@
 ---
-description: Trade suggestions module notes. Covers the v3 engine namespaces, the pipeline order, the laugh-test sweep, every veto id with its rule, and the hide and refresh feedback flow.
-last_verified: 2026-11-14
+description: Trade suggestions module notes. Covers the v3 engine namespaces, the pipeline order, the laugh-test sweep, every veto id with its rule, the hide and refresh feedback flow, and the admin tuning page.
+last_verified: 2026-11-18
 ---
 
 # Trade Suggestions
@@ -67,3 +67,59 @@ The service saves every idea it can show into the PHP session, keyed by deal key
 On failure the controller redirects to `/ibl5/index.php?trade_suggestion_error=<code>`. The codes are `method`, `csrf`, `auth`, `action`, `stale`, `reason` and `length`. A deal key the session does not hold is `stale`.
 
 Refresh moves the session offset forward by 3 ideas. When the offset reaches the end of the list it goes back to 0. A new sim resets the offset and the saved ideas.
+
+## Tuning page (admin)
+
+The tuning page lives at `modules.php?name=TradeSuggestionsTuning`. Only admins can open it. It reads data and never writes. The menu has no link to it.
+
+It takes two GET parameters:
+
+- `team` is `all` or a franchise tid. It defaults to tid 1. `all` runs every team and may stop early at the time budget.
+- `status` is `all`, `shown`, `vetoed` or `hidden`. It defaults to `all`.
+
+An unknown value falls back to the default, and the page names the parameter it ignored.
+
+### How to read a row
+
+Each row is one scored deal the engine built for that team in the current sim. The columns are:
+
+| Column | Meaning |
+|--------|---------|
+| Rank | The order the ranker gave the deal. |
+| Outcome | Where the deal ended. The labels are listed below. |
+| Partner | The other team. |
+| Shape | The deal shape that built it. |
+| Weaker side | The total gain of the side that gains less. |
+| Your gain by season | The `SideGain` parts for this team, one cell per season. |
+| Partner gain by season | The same parts for the partner. |
+| Vetoes | The veto ids that fired. |
+| Detail | The gate that dropped the deal, such as the validator fail code, the exposure cap or the lopsided ratio. |
+| Exposure | Whether the partner may be shown to this team. |
+| Feedback | The GM's hide reasons and note, as the GM typed them. |
+
+The outcome labels come from `Engine\RankOutcome`:
+
+| Label | Meaning |
+|-------|---------|
+| Shown (top 3) | The ranker picked it for the current panel. |
+| Eligible (later refresh) | It passed every gate and would show after a refresh. |
+| One side does not gain | One team's total gain is zero or less. |
+| Lopsided | One side gains far more than the other. |
+| Partner not open to this team | The exposure rule keeps this partner off this team's panel. |
+| Vetoed | At least one veto fired. |
+| Refused by trade rules | The trade validator rejected the deal. |
+| No reason for one side | One team has no motive for the deal. |
+| Not reached (cap hit) | The ranker filled its picks before it reached this deal. |
+| Hidden by the GM | The GM hid this deal from the panel. |
+
+Each team section opens with counts: the mode, the eligible partners, the raw candidates, the prefilter rejections, whether generation hit its cap, and the ranker diagnostics.
+
+For what each veto id means, see [Vetoes and reasons](#vetoes-and-reasons). This page uses the same ids.
+
+### Hidden ideas not in this run
+
+Below the rows, each team has a table of stored hides whose deal the current run did not build again. It lists the partner, the reasons, the note and the time the GM hid it.
+
+### Cost
+
+The page reads one cached snapshot. Then for each team it generates deals under the `CandidateBudget` caps, scores them and ranks them. It shows 60 rows per team. It checks a 20 second budget between teams. When the budget runs out it stops, and a note names the teams it skipped. The config block on the page prints the live values of these limits.

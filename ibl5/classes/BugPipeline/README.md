@@ -1,6 +1,6 @@
 ---
 description: Provides the repositories backing the Discord bug report ingestion pipeline, including the dormant status and the operator wake and context log.
-last_verified: 2026-11-02
+last_verified: 2026-11-18
 ---
 
 # BugPipeline
@@ -11,6 +11,7 @@ Backs the Discord bug report pipeline. `BugReportRepository` is the entry point 
 - **`BugReporterProfileRepository`** (`ibl_bug_reporter_profile`) — reporter tech-level upserts and lookups.
 - **`BugPipelineStateRepository`** (`ibl_bug_pipeline_state`) — the monotonic per-channel backfill watermark.
 - **`BugReportOperatorContextRepository`** (`ibl_bug_report_operator_context`): the operator-mention log described below.
+- **`BugIssueNoticeRepository`** (`ibl_bug_issue_notices`): one row per tracked GitHub issue, holding the Discord origin and the close-notice state. It is standalone and does not touch `ibl_bug_reports`. The states are `pending`, `claimed`, `notified`, `seeded`, `skipped` and `failed`. `claim()` moves `pending` to `claimed` before the tick posts, so a notice goes out at most once. `release()` returns a failed post to `pending` and ends in `failed` after 5 attempts. `seedNotified()` marks an issue that was already closed at migration time. `listStaleClaims()` feeds the stuck-claim log. The `bin/` tick reaches it through the `ibl5/scripts/bug-pipeline/issue-notice-*.php` wrappers. `BugReportRepository::renumberIssue()` rewrites `issue_number` on a report row after the issue moves repos.
 
 Each sub-repository implements an interface under `Contracts/`, and the shared `BugReportRowCasting` trait handles snowflake column precision by casting BIGINT Discord IDs to strings. Call sites construct `BugReportRepository` exactly as before.
 

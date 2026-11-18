@@ -55,6 +55,7 @@ final class TuningControllerTest extends TestCase
             /**
              * @param list<TuningFilter> $received
              */
+            // @phpstan-ignore property.onlyWritten (by-reference capture; the test reads it)
             public function __construct(private array &$received)
             {
             }

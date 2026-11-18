@@ -566,12 +566,12 @@ DEFER adr-check (deferred to post-pr for PR bypass check)
 DEFER refactor-flag (deferred to post-pr for PR bypass check)
 META-CHECK-DEFERRED: adr-check
 META-CHECK-DEFERRED: refactor-flag
-META-CHECKS: OK stage=pre-push hard=24 failed=0 warn=0 skip=3 defer=2'
+META-CHECKS: OK stage=pre-push hard=26 failed=0 warn=0 skip=3 defer=2'
 CONTRACT_FAIL_GOLDEN='FAIL  test-check-engine-freeze
 META-CHECK-FAILED: test-check-engine-freeze
 META-CHECK-DEFERRED: adr-check
 META-CHECK-DEFERRED: refactor-flag
-META-CHECKS: FAILED stage=pre-push hard=24 failed=1 warn=0 skip=3 defer=2'
+META-CHECKS: FAILED stage=pre-push hard=26 failed=1 warn=0 skip=3 defer=2'
 
 # contract_run <env-assignments...>: all-rc-0 stubs unless overridden; sets
 # _LAST_OUT and _LAST_RC from the pre-push stage on a throwaway fixture.

@@ -143,6 +143,7 @@ echo "gh $*" >> "$STUB/gh.log"
 echo "GH $*" >> "$STUB/calls.log"
 printf '%s\n' "$@" >> "$STUB/gh.args.log"   # one arg per line — proves title is a single argv element
 case "$*" in
+  *"repo view"*) if [ "${STUB_REPO_MISSING:-0}" = 1 ]; then exit 1; fi ;;
   *"issue create"*) [ "${GH_FAIL:-0}" = 1 ] && exit 1; echo "https://github.com/${BUG_PIPELINE_ISSUE_REPO}/issues/${STUB_ISSUE_NUMBER:-4242}" ;;
   *"issue view"*stateReason*)
       # Applies the driver's real --jq filter to a fixture, so a hostile title/comment in the

@@ -271,5 +271,23 @@ else
     bpt_fail "15: --help should mention --install-bot"
 fi
 
+# ── cron_setup_default_issue_repo_is_ibl5: unset var → the public code repo ───────
+_sched_unset="$(env -u BUG_PIPELINE_ISSUE_REPO "$SETUP_BIN" --print-schedule 2>/dev/null)"
+if grep -qF '<key>BUG_PIPELINE_ISSUE_REPO</key>' <<< "$_sched_unset" \
+    && grep -qF '<string>a-jay85/IBL5</string>' <<< "$_sched_unset" \
+    && ! grep -qF 'ibl5-bugs' <<< "$_sched_unset"; then
+    bpt_ok "cron_setup_default_issue_repo_is_ibl5"
+else
+    bpt_fail "cron_setup_default_issue_repo_is_ibl5 — plist should carry a-jay85/IBL5 and no ibl5-bugs"
+fi
+
+# ── cron_setup_empty_issue_repo_uses_default: an empty var must not blank the repo ──
+_sched_empty="$(env BUG_PIPELINE_ISSUE_REPO='' "$SETUP_BIN" --print-schedule 2>/dev/null)"
+if grep -qF '<string>a-jay85/IBL5</string>' <<< "$_sched_empty"; then
+    bpt_ok "cron_setup_empty_issue_repo_uses_default"
+else
+    bpt_fail "cron_setup_empty_issue_repo_uses_default — empty var should fall back to a-jay85/IBL5"
+fi
+
 # ── Summary ───────────────────────────────────────────────────────────────────
 h_done

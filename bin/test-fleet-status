@@ -678,6 +678,13 @@ OUTPUT_NOPLIST="$(run_fleet FLEET_STATUS_AUTOMOUSE_PLIST="$TMP/no-such-plist.pli
 # the escape rather than some SGR byte that drifted in with it.
 OUTPUT_LINKS="$(run_fleet FLEET_STATUS_FORCE_LINKS=1)"
 
+# A macOS update wipes the LaunchServices registration but keeps the cached
+# applet and stamp. A second render over that cache must register it again.
+FIRST_REGISTERED="$(ls "$TMP/apps/ibl5-queue-reorder.app" 2>/dev/null)"
+rm -f "$TMP/apps/ibl5-queue-reorder.app/registered"
+run_fleet FLEET_STATUS_FORCE_LINKS=1 >/dev/null
+REREGISTERED="$(ls "$TMP/apps/ibl5-queue-reorder.app" 2>/dev/null)"
+
 # The same page with every OSC 8 sequence removed. Padding is emitted OUTSIDE the
 # link precisely so this is byte-identical to the plain render's columns; the
 # stripped assertions below are what would catch a %-46s creeping back over a
@@ -1185,7 +1192,9 @@ assert_has "links: the applet's plist claims the scheme" \
     "$(cat "$TMP/apps/ibl5-queue-reorder.app/Contents/Info.plist" 2>/dev/null)" \
     'CFBundleURLSchemes:0 string ibl5-queue-reorder$'
 assert_has "links: the applet is registered with LaunchServices" \
-    "$(ls "$TMP/apps/ibl5-queue-reorder.app" 2>/dev/null)" '^registered$'
+    "$FIRST_REGISTERED" '^registered$'
+assert_has "links: a cached applet is registered again on the next render" \
+    "$REREGISTERED" '^registered$'
 assert_has "links: the stamp carries the scheme, so old applets rebuild" \
     "$(cat "$TMP/apps/ibl5-queue-reorder.cmd" 2>/dev/null)" '^ibl5-queue-reorder PATH='
 assert_lacks "links: no reorder link in a non-tty capture" \

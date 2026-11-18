@@ -255,10 +255,10 @@ log_word() {
 # The applet is built here with osacompile on first need and cached outside the
 # repo. PlistBuddy adds the scheme to its Info.plist. codesign re-signs it,
 # because an edited plist breaks the ad-hoc signature and LaunchServices then
-# ignores the scheme. lsregister registers it. The stamp file holds the scheme
-# and the command, and the applet is rebuilt only when that changes. The target
-# is the MAIN checkout's launcher, because a worktree path dies with the
-# worktree while the cached applet lives on.
+# ignores the scheme. lsregister registers it on every render (see below).
+# The stamp file holds the scheme and the command, and the applet is rebuilt
+# only when that changes. The target is the MAIN checkout's launcher, because a
+# worktree path dies with the worktree while the cached applet lives on.
 #
 # do shell script runs with a bare /usr/bin:/bin PATH, and the launcher needs
 # php, so the Homebrew prefixes go first. Its output goes to a fixed /tmp log.
@@ -301,9 +301,14 @@ reorder_link() {
             rm -rf "$tmp"; return 0
         fi
         { rm -rf "$app" && mv "$tmp" "$app"; } || { rm -rf "$tmp"; return 0; }
-        "$LSREGISTER_BIN" -f "$app" >/dev/null 2>&1 || return 0
         printf '%s' "$scheme $cmd" > "$stamp"
     fi
+    # Register on every render, not only after a build. A macOS update rebuilds
+    # the LaunchServices database and drops the scheme, while the cached applet
+    # and its stamp survive, so a build-only register left the link dead. It
+    # costs about 13 ms.
+    command -v "$LSREGISTER_BIN" >/dev/null 2>&1 || return 0
+    "$LSREGISTER_BIN" -f "$app" >/dev/null 2>&1 || return 0
     # shellcheck disable=SC1003  # '\033\\' is the OSC ST, as in link_file.
     printf '\033]8;;%s://open\033\\%s\033]8;;\033\\' "$scheme" 'reorder'
 }

@@ -494,7 +494,7 @@ hs_st_needs() { # <job block> <job name>; true when the block's needs line holds
 }
 
 hs_st_wf_wiring() { # <tests.yml>; checks the wiring of the harness-select job
-    local wf="$1" gate ht iso onb pr bad="" n
+    local wf="$1" gate ht iso onb pr bad="" n rerun NL=$'\n'
     [ -f "$wf" ] || { hs_st_fail st_wf_wiring "no workflow at $wf"; return 0; }
     gate="$(hs_st_block "$wf" gate)"
     ht="$(hs_st_block "$wf" harness-tests)"
@@ -507,6 +507,12 @@ hs_st_wf_wiring() { # <tests.yml>; checks the wiring of the harness-select job
     ! grep -qF 'paths-ignore:' <<<"$onb" || bad="$bad on-paths-ignore"
     ! grep -qE '^[[:space:]]+paths:' <<<"$pr" || bad="$bad pull_request-paths"
     grep -qF -- '--only "$HARNESS_SELECTED"' <<<"$ht" || bad="$bad parallel-only"
+    # "Re-run failed jobs" does not re-run harness-select, so each consuming job must pick
+    # ALL itself on attempt 2+ and read the selection only through that env line.
+    rerun="      HARNESS_SELECTED: \${{ github.run_attempt != '1' && ' ALL ' || needs.harness-select.outputs.names }}"
+    grep -qxF -- "$rerun" <<<"$ht" || bad="$bad harness-tests-rerun-all"
+    grep -qxF -- "$rerun" <<<"$iso" || bad="$bad isolated-rerun-all"
+    [ "$(grep -cF 'needs.harness-select.outputs' <<<"$ht$NL$iso" || true)" = 2 ] || bad="$bad selection-read-bypasses-rerun"
     grep -qxF "        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')" <<<"$gate" || bad="$bad gate-predicate"
     grep -qE '^      - name: bin/test-' <<<"$iso" || bad="$bad no-isolated-steps"
     n="$(awk -v q="'" '

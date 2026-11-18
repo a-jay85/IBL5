@@ -172,9 +172,25 @@ SPAWNED_PIDS="$SPAWNED_PIDS $LIVE_AUTOMOUSE_PID"
 
 # An unrelated live process — stands in for a reused PID. Alive, so `kill -0`
 # passes; its command says nothing about automouse, so the conjunction rejects it.
-sleep 120 >/dev/null 2>&1 &
-UNRELATED_PID=$!
-disown "$UNRELATED_PID" 2>/dev/null
+# Its PID must not equal a launchd stub row's PID (4242, 6002, ...): that row
+# prints "pid <n> " too, and the reuse-guard assertion would see it. Linux CI
+# hands out small PIDs, so a collision with 6002 did happen once. Respawn
+# until the PID is free of the stub's list.
+fixture_pid() {
+    case " $1 " in
+        *" 4242 "*|*" 4343 "*|*" 5151 "*|*" 5252 "*|*" 5353 "*) return 0 ;;
+        *" 6001 "*|*" 6002 "*|*" 6003 "*|*" 6004 "*|*" 6005 "*) return 0 ;;
+        *" 99999 "*) return 0 ;;
+    esac
+    return 1
+}
+while :; do
+    sleep 120 >/dev/null 2>&1 &
+    UNRELATED_PID=$!
+    disown "$UNRELATED_PID" 2>/dev/null
+    fixture_pid "$UNRELATED_PID" || break
+    kill "$UNRELATED_PID" 2>/dev/null
+done
 SPAWNED_PIDS="$SPAWNED_PIDS $UNRELATED_PID"
 
 # No-.md runner: invoked as `plan slug` (the documented form, without .md suffix).
@@ -244,9 +260,13 @@ for _f in "$STUBBIN"/child.*.pid; do
 done
 
 # A definitely-dead PID: spawn, reap, reuse the number.
-sleep 0 &
-DEAD_PID=$!
-wait "$DEAD_PID" 2>/dev/null
+# Same stub-PID guard as UNRELATED_PID above.
+while :; do
+    sleep 0 &
+    DEAD_PID=$!
+    wait "$DEAD_PID" 2>/dev/null
+    fixture_pid "$DEAD_PID" || break
+done
 
 NOW="$(date +%s)"
 printf '%s\n' "$NOW"        > "$AM/.heartbeat-$LIVE_AUTOMOUSE_PID-impl"
@@ -1676,10 +1696,13 @@ assert_has "pr slot: queued row with no PR stays aligned" \
     "$OUTPUT" '^ +3\.        fm-title-plan\.md'
 assert_has "pr slot: in-progress row shows its PR" \
     "$OUTPUT" '▶ #3004  live-plan\.md'
+# A loose row matches a launchd row: the PR slot sits on the header line and
+# the pid on the line below it, so join each header to its next line first.
+LOOSE_JOINED="$(grep -A1 '● headless' <<< "$LOOSE_PLAIN" | paste -d' ' - - -)"
 assert_has "pr slot: orphan session matches its worktree branch" \
-    "$LOOSE_PLAIN" "● #3005  pid $PROMPT_ORPHAN_PID "
+    "$LOOSE_JOINED" "● headless   #3005  [^ ]+ +pid $PROMPT_ORPHAN_PID "
 assert_has "pr slot: orphan with no branch keeps the slot blank" \
-    "$LOOSE_PLAIN" "●        pid $ORPHAN_PID "
+    "$LOOSE_JOINED" "● headless {10}[^ ]+ +pid $ORPHAN_PID "
 assert_has "pr slot: the number links to the PR page" \
     "$OUTPUT_LINKS" '8;;https://github\.com/o/r/pull/3001.\\#3001'
 assert_has "pr slot: the link leaves the padding plain" \

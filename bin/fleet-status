@@ -1477,9 +1477,12 @@ render_loose() {
         # detached HEAD gets no branch (so no PR) instead of the word HEAD.
         cwd="$(pid_cwd "$pid")"; branch=''
         [ -n "$cwd" ] && branch="$(git -C "$cwd" symbolic-ref --short -q HEAD 2>/dev/null)"
-        printf '  %s●%s %s pid %-7s up %-8s %s\n' \
-            "$YEL" "$R" "$(pr_slot "$branch")" "$pid" \
-            "$(human_age "$(pid_elapsed_secs "$pid")")" "$name"
+        # Same three-line shape as a launchd row: kind, PR, and name; then pid
+        # and uptime; then what it is doing.
+        printf '  %s●%s %-10s %s %s%s%s\n' \
+            "$YEL" "$R" headless "$(pr_slot "$branch")" "$B" "$name" "$R"
+        printf '      pid %-7s up %s\n' \
+            "$pid" "$(human_age "$(pid_elapsed_secs "$pid")")"
         printf '      %s%s%s\n' "$DIM" "$(loose_summary "$pid" "$args" "$cwd")" "$R"
     done <<EOF
 $(pgrep -f 'claude -p' 2>/dev/null)

@@ -290,6 +290,11 @@ def test_dm_if_wrapping_context_send_is_one_way():
     unwrap = _section(DM, 340, [" for chunk in \"${CHUNKS[@]}\"; do", "-    if false; then",
                                 _DM_SEND_CONTEXT, "-    fi", " done"])
     assert external_send_change(DM, unwrap) == _R_DM_FLOW
+    # The opener is re-added closed on its own line, so the test count is conserved, yet the
+    # send it wrapped now runs. Only the removed-side balance walk sees the left-open `if`.
+    moved = _section(DM, 340, [" for chunk in \"${CHUNKS[@]}\"; do", "-    if false; then",
+                               "+    if false; then :; fi", _DM_SEND_CONTEXT, "-    fi", " done"])
+    assert external_send_change(DM, moved) == _R_DM_FLOW
 
 
 def test_dm_redirect_into_spool_is_one_way():

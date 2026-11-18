@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\TradeSuggestions\Tuning;
 
+use Database\SqlPlaceholders;
 use Tests\WideUnit\WideUnitTestCase;
 use TradeSuggestions\Tuning\TuningFeedbackRepository;
 
@@ -18,7 +19,8 @@ final class TuningFeedbackRepositoryTest extends WideUnitTestCase
     }
 
     /**
-     * Security test: every tid is a bound placeholder, never SQL text.
+     * Security test: every tid is a bound placeholder, never SQL text. The
+     * list is the fixed-width `SqlPlaceholders::PID_LIST`, padded with -1.
      */
     public function testPlaceholderCountMatchesTeamCount(): void
     {
@@ -28,10 +30,13 @@ final class TuningFeedbackRepositoryTest extends WideUnitTestCase
         (new TuningFeedbackRepository($db))->forTeams([1, 2, 8]);
 
         $prepared = implode("\n", $db->getPreparedQueries());
-        self::assertStringContainsString('IN (?, ?, ?)', $prepared);
+        self::assertStringContainsString('IN (' . SqlPlaceholders::PID_LIST . ')', $prepared);
         self::assertStringNotContainsString('8', $prepared);
-        self::assertSame('iii', $db->getLastBoundTypes());
-        self::assertSame([1, 2, 8], $db->getLastBoundParams());
+        self::assertSame(SqlPlaceholders::PID_LIST_TYPES, $db->getLastBoundTypes());
+        $params = $db->getLastBoundParams();
+        self::assertCount(SqlPlaceholders::PID_LIST_WIDTH, $params);
+        self::assertSame([1, 2, 8], array_slice($params, 0, 3));
+        self::assertSame([-1], array_values(array_unique(array_slice($params, 3))));
     }
 
     public function testFreeTextAndReasonCodesPassThroughRaw(): void

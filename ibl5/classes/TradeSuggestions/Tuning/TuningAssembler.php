@@ -142,7 +142,11 @@ final class TuningAssembler implements TuningAssemblerInterface
     {
         $t = ($this->clock)();
 
-        return is_float($t) || is_int($t) ? (float) $t : 0.0;
+        if (is_float($t)) {
+            return $t;
+        }
+
+        return is_int($t) ? (float) $t : 0.0;
     }
 
     /**

@@ -1722,7 +1722,8 @@ close_notice_text() {
 # Each tick reads ONE page of at most 25 rows (at most 25 gh reads) after the issue number saved
 # in $NOTICE_CURSOR, then saves the page's last number. A short page resets the cursor to 0, so
 # open issues that stay pending never hide later rows: every row is polled within
-# ceil(pending/25) ticks.
+# ceil(pending/25)+1 ticks. The +1 is the empty page that follows a last full page when the
+# pending count is a multiple of 25; that tick polls nothing and only resets the cursor.
 notify_closed_issues() {
     local stale rows row n reporter thread msg cstate state reason notice token text target res s
     stale="$(cli issue-notice-stale)" || stale=''

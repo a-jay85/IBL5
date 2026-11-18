@@ -153,7 +153,10 @@ jobs:
         retention-days: 1
 
   mutation:
-    name: Infection PHP ${{ matrix.shard }}
+    # A module dispatch job reuses the plain 'Infection PHP' name, which the
+    # all-checks-settled.yml --ignore list already names, so a report-only run
+    # on a PR branch never holds the settle status.
+    name: ${{ startsWith(matrix.shard, 'module-') && 'Infection PHP' || format('Infection PHP {0}', matrix.shard) }}
     needs: [mirror-ready, shards, coverage]
     runs-on: ubuntu-26.04
     # 2026-11-16's 52-minute run over 10 shards is about 5 minutes each (an estimate).
@@ -341,6 +344,7 @@ jobs:
           || needs.mutation.result == 'failure'
           || needs.aggregate.result == 'failure'
           || (github.event_name == 'schedule' && (needs.mirror-ready.result == 'cancelled'
+              || needs.shards.result == 'cancelled'
               || needs.coverage.result == 'cancelled'
               || needs.mutation.result == 'cancelled'
               || needs.aggregate.result == 'cancelled'))) }}
@@ -362,6 +366,8 @@ jobs:
             MSG=$(printf 'Weekly mutation testing never ran (%s trigger).\n\nThe CI image mirror job (mirror-ready) was CANCELLED, most likely by its timeout-minutes cap, so the DB mirror never got ready and Infection was skipped. Check the run: %s' "${{ github.event_name }}" "$RUN_URL")
           elif [ "$MIRROR_RESULT" = "failure" ]; then
             MSG=$(printf 'Weekly mutation testing never ran (%s trigger).\n\nThe CI image mirror job (mirror-ready) FAILED, so the DB mirror never got ready and Infection was skipped. Check the run: %s' "${{ github.event_name }}" "$RUN_URL")
+          elif [ "$SHARDS_RESULT" = "cancelled" ]; then
+            MSG=$(printf 'Weekly mutation testing never ran (%s trigger).\n\nThe shard plan job (Plan mutation shards) was CANCELLED, most likely by its timeout-minutes cap, so coverage and every shard were skipped. Check the run: %s' "${{ github.event_name }}" "$RUN_URL")
           elif [ "$SHARDS_RESULT" = "failure" ]; then
             MSG=$(printf 'Weekly mutation testing never ran (%s trigger).\n\nThe shard plan job FAILED: an ibl5/classes entry is missing from ibl5/infection-shards.json, or the module input names no shard member. Check the run: %s' "${{ github.event_name }}" "$RUN_URL")
           elif [ "$COVERAGE_RESULT" != "success" ]; then
@@ -369,7 +375,7 @@ jobs:
           elif [ "$MUTATION_RESULT" = "cancelled" ] || [ "$AGGREGATE_RESULT" = "cancelled" ]; then
             MSG=$(printf 'Weekly mutation testing was CANCELLED (%s trigger).\n\nA shard or the aggregate job most likely hit its timeout-minutes cap. Check the run: %s' "${{ github.event_name }}" "$RUN_URL")
           elif [ "$MUTATION_RESULT" = "failure" ]; then
-            MSG=$(printf 'Weekly mutation testing FAILED (%s trigger).\n\nA shard'"'"'s Infection run crashed. Shards never fail on score, so this is an error. Check the run: %s' "${{ github.event_name }}" "$RUN_URL")
+            MSG=$(printf 'Weekly mutation testing FAILED (%s trigger).\n\nA shard failed. Either its Infection run crashed or its kills-are-real check (check-infection-ran --kills) found fake kills. Shards never fail on score, so the shard'"'"'s log names the cause. Check the run: %s' "${{ github.event_name }}" "$RUN_URL")
           else
             MSG=$(printf 'Weekly mutation testing FAILED (%s trigger).\n\nThe aggregate MSI across all shards fell below the %s%% bar, or a shard reported no results. Check the run: %s' "${{ github.event_name }}" "$MUTATION_MIN_MSI" "$RUN_URL")
           fi

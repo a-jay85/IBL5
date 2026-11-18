@@ -309,6 +309,13 @@ case_workflow_aggregate() {
 
 case_workflow_notify() {
     wf_has 'needs: [mirror-ready, shards, coverage, mutation, aggregate]'
+    wf_has "|| needs.shards.result == 'cancelled'"
+    wf_has '[ "$SHARDS_RESULT" = "cancelled" ]'
+    wf_has 'kills-are-real check'
+}
+
+case_workflow_module_name() {
+    wf_has "startsWith(matrix.shard, 'module-') && 'Infection PHP' ||"
 }
 
 case_workflow_dm_bar() {
@@ -334,7 +341,7 @@ case_aggregate_pass case_aggregate_fail_below_bar case_aggregate_covered_bar
 case_aggregate_missing_shard case_aggregate_zero_mutants case_aggregate_total_drift
 case_aggregate_unknown_label case_aggregate_near_miss_total case_aggregate_report_only
 case_aggregate_skipped_ignored case_flags_space_form case_flags_unknown
-case_workflow_matrix case_workflow_shard_step case_workflow_aggregate
+case_workflow_matrix case_workflow_shard_step case_workflow_aggregate case_workflow_module_name
 case_workflow_notify case_workflow_dm_bar case_settle_ignore"
 
 if [ $# -gt 0 ]; then

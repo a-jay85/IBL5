@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace TradeSuggestions\Tuning;
 
+use Database\SqlPlaceholders;
 use League\LeagueContext;
 use TradeSuggestions\Tuning\Contracts\TuningFeedbackRepositoryInterface;
 
@@ -28,15 +29,15 @@ class TuningFeedbackRepository extends \Database\BaseMysqliRepository implements
         if ($tids === []) {
             return [];
         }
-        // One bound placeholder per tid; no value is written into the SQL.
-        $placeholders = implode(', ', array_fill(0, count($tids), '?'));
+        // A fixed-width list of bound placeholders, padded with -1 (no team has
+        // that id), so no runtime value is ever written into the SQL text.
         $rows = $this->fetchAll(
-            "SELECT tid, partner_tid, deal_key, core_key, deal_json, reason_codes, free_text, created_at
+            'SELECT tid, partner_tid, deal_key, core_key, deal_json, reason_codes, free_text, created_at
                 FROM `ibl_trade_suggestion_feedback`
-                WHERE tid IN ({$placeholders})
-                ORDER BY tid ASC, created_at DESC, id DESC",
-            str_repeat('i', count($tids)),
-            ...$tids
+                WHERE tid IN (' . SqlPlaceholders::PID_LIST . ')
+                ORDER BY tid ASC, created_at DESC, id DESC',
+            SqlPlaceholders::PID_LIST_TYPES,
+            ...SqlPlaceholders::padPidList($tids)
         );
 
         $out = [];

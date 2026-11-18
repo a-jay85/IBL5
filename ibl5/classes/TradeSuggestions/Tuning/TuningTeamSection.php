@@ -16,6 +16,7 @@ final readonly class TuningTeamSection
     /**
      * @param list<int> $eligiblePartners
      * @param list<TuningRow> $rows at most `TuningBudget::MAX_ROWS_PER_TEAM`
+     * @param list<TuningFeedback> $unmatchedFeedback the team's hides that matched no deal in this run
      */
     public function __construct(
         public int $tid,
@@ -26,6 +27,7 @@ final readonly class TuningTeamSection
         public RankDiagnostics $diagnostics,
         public array $rows,
         public int $omittedRows,
+        public array $unmatchedFeedback = [],
     ) {
     }
 }

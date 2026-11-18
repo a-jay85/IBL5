@@ -29,6 +29,18 @@ final class TuningViewTest extends TestCase
         self::assertStringNotContainsString('<script>', $html);
     }
 
+    public function testUnmatchedFeedbackTableIsEscaped(): void
+    {
+        $html = self::render(unmatched: [self::feedback('<script>alert("tuning")</script> & co')]);
+
+        preg_match('/<table class="ibl-table tuning-unmatched" id="tuning-unmatched-1">(.*?)<\/table>/s', $html, $m);
+        $table = $m[1] ?? '';
+        self::assertStringContainsString('&lt;script&gt;alert(&quot;tuning&quot;)&lt;/script&gt; &amp; co', $table);
+        self::assertStringContainsString('Too old', $table);
+        self::assertStringNotContainsString('<script>', $html);
+        self::assertStringNotContainsString('tuning-unmatched', self::render());
+    }
+
     public function testTeamNameWithAmpersandIsEscaped(): void
     {
         $html = self::render(teamName: 'Fire & Ice');
@@ -120,6 +132,7 @@ final class TuningViewTest extends TestCase
     /**
      * @param list<TuningRow>|null $rows
      * @param list<int> $teamsNotRun
+     * @param list<TuningFeedback> $unmatched
      */
     private static function render(
         ?array $rows = null,
@@ -128,6 +141,7 @@ final class TuningViewTest extends TestCase
         bool $truncated = false,
         array $teamsNotRun = [],
         int $omitted = 0,
+        array $unmatched = [],
     ): string {
         $names = [];
         for ($tid = 1; $tid <= 28; $tid++) {
@@ -143,6 +157,7 @@ final class TuningViewTest extends TestCase
             diagnostics: new RankDiagnostics(0, 0, 0, 0, 0, [], 0, [], 0, 0),
             rows: $rows ?? [self::row()],
             omittedRows: $omitted,
+            unmatchedFeedback: $unmatched,
         );
         $report = new TuningReport(
             simKey: 'sim-1',

@@ -111,6 +111,7 @@ final class TuningAssembler implements TuningAssemblerInterface
                 $rows[] = self::row($tid, $deal, RankOutcome::Hidden, null, VetoReport::none(), null, $eligible, $index);
             }
 
+            $unmatched = self::unmatched($index->forTeam($tid), $rows);
             $rows = self::sorted(self::byStatus($rows, $f->status));
             $shown = array_slice($rows, 0, TuningBudget::MAX_ROWS_PER_TEAM);
 
@@ -123,6 +124,7 @@ final class TuningAssembler implements TuningAssemblerInterface
                 diagnostics: $result->diagnostics,
                 rows: $shown,
                 omittedRows: count($rows) - count($shown),
+                unmatchedFeedback: $unmatched,
             );
         }
 
@@ -136,6 +138,29 @@ final class TuningAssembler implements TuningAssemblerInterface
             teamsNotRun: $teamsNotRun,
             elapsedSeconds: $this->now() - $start,
         );
+    }
+
+    /**
+     * The team's stored hides that no row of this run picked up, because the
+     * engine did not regenerate that deal this sim.
+     *
+     * @param list<TuningFeedback> $feedback
+     * @param list<TuningRow> $rows every row, before the status filter
+     * @return list<TuningFeedback>
+     */
+    private static function unmatched(array $feedback, array $rows): array
+    {
+        $used = [];
+        foreach ($rows as $row) {
+            if ($row->feedback !== null) {
+                $used[spl_object_id($row->feedback)] = true;
+            }
+        }
+
+        return array_values(array_filter(
+            $feedback,
+            static fn (TuningFeedback $fb): bool => !isset($used[spl_object_id($fb)]),
+        ));
     }
 
     private function now(): float

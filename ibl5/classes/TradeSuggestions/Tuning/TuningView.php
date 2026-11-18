@@ -110,6 +110,24 @@ final class TuningView implements TuningViewInterface
         </tbody>
     </table>
 <?php endif; ?>
+<?php if ($section->unmatchedFeedback !== []): ?>
+    <h3>Hidden ideas not in this run</h3>
+    <table class="ibl-table tuning-unmatched" id="tuning-unmatched-<?= HtmlSanitizer::e($section->tid) ?>">
+        <thead>
+            <tr><th>Partner</th><th>Reasons</th><th>Note</th><th>Hidden at</th></tr>
+        </thead>
+        <tbody>
+<?php foreach ($section->unmatchedFeedback as $fb): ?>
+            <tr>
+                <td><?= HtmlSanitizer::e($report->teamNames[$fb->partnerTid] ?? (string) $fb->partnerTid) ?></td>
+                <td><?= HtmlSanitizer::e(implode(', ', $fb->reasonLabels())) ?></td>
+                <td><span class="tuning-note"><?= HtmlSanitizer::e($fb->freeText ?? '-') ?></span></td>
+                <td class="tuning-created-at"><?= HtmlSanitizer::e($fb->createdAt) ?></td>
+            </tr>
+<?php endforeach; ?>
+        </tbody>
+    </table>
+<?php endif; ?>
 <?php if ($section->omittedRows > 0): ?>
     <div class="ibl-alert ibl-alert--info"><?= HtmlSanitizer::e($section->omittedRows) ?> more rows not shown (cap <?= HtmlSanitizer::e(TuningBudget::MAX_ROWS_PER_TEAM) ?>).</div>
 <?php endif; ?>

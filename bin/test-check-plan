@@ -1021,6 +1021,32 @@ impl_model: sonnet
 auto_merge: false
 hold_trigger: golden-snap
 ---'"$M$HT_JUST"
+TP_STEP='
+## Pre-fire
+
+Run `python3 -m harness.trace_pinned check --branch toy` last.
+'
+assert_msg "gateH-trace-pinned-alone-passes" 0 "" "[H] hold_trigger" '---
+impl_model: sonnet
+auto_merge: false
+hold_trigger: trace-pinned
+---'"$M$TP_STEP$HT_JUST"
+assert_msg "gateH-trace-pinned-with-golden-new-fails" 1 "must be the only token" "" '---
+impl_model: sonnet
+auto_merge: false
+hold_trigger: trace-pinned, golden-new
+---'"$M$TP_STEP$HT_JUST"
+assert_msg "gateH-trace-pinned-check-only-in-fence-fails" 1 "needs a step running harness.trace_pinned check" "" '---
+impl_model: sonnet
+auto_merge: false
+hold_trigger: trace-pinned
+---'"$M"'
+## Pre-fire
+
+```
+python3 -m harness.trace_pinned check --branch toy
+```
+'"$HT_JUST"
 assert_msg "gateH-hold-trigger-body-only" 1 "no non-empty hold_trigger:" "" '---
 impl_model: sonnet
 auto_merge: false

@@ -1,0 +1,113 @@
+name: Deploy Auto-Retry
+
+# Reruns a production deploy once when its runner could not reach the server
+# over SSH before anything changed on prod. On 2026-11-18 the host's firewall
+# shut out one GitHub runner at a time for ~7 min, three times in one hour,
+# while other runners connected fine. A rerun gets a new runner and a new IP.
+#
+# It must run here, after the deploy run completes: a run cannot rerun itself
+# while one of its own jobs is still in progress.
+#
+# Safe to retry only these failures, because neither one touches prod:
+#   - Build and Deploy failed at "Fetch latest code on server" (step 1, only
+#     `git fetch` on the box).
+#   - Pre-flight failed at "Setup SSH" (the rehearsal's keyscan got no keys,
+#     before the read-only dump).
+on:
+  workflow_run:
+    workflows: ["Build and Deploy"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+# Never join the shared production-deploy group: a new pending run there
+# replaces the older pending one, which could cancel a queued deploy.
+concurrency:
+  group: deploy-auto-retry-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+jobs:
+  retry:
+    name: Retry deploy blocked before it reached the server
+    runs-on: ubuntu-26.04
+    # Attempt 1 only, so a host that stays blocked costs one retry, not a loop.
+    if: >-
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'production' &&
+      github.event.workflow_run.run_attempt == 1
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: write   # POST rerun-failed-jobs on the deploy run
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Decide whether the failure is safe to retry
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          JOBS=$(gh api "repos/${REPO}/actions/runs/${RUN_ID}/attempts/1/jobs" --paginate --jq '.jobs[]')
+          DEPLOY_STEP=$(printf '%s\n' "$JOBS" | jq -rs '[.[] | select(.name == "Build and Deploy") | .steps[] | select(.conclusion == "failure") | .name] | first // ""')
+          PREFLIGHT_STEP=$(printf '%s\n' "$JOBS" | jq -rs '[.[] | select(.name | startswith("Pre-flight")) | .steps[] | select(.conclusion == "failure") | .name] | first // ""')
+          echo "deploy failed step: ${DEPLOY_STEP:-none}; pre-flight failed step: ${PREFLIGHT_STEP:-none}"
+          if [ "$DEPLOY_STEP" = "Fetch latest code on server" ] || [ "$PREFLIGHT_STEP" = "Setup SSH" ]; then
+            :
+          else
+            echo "Not an unreachable-server failure; leaving it for a human."
+            echo "action=none" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Never redeploy an older commit over a newer one. A newer push to
+          # production starts its own deploy, which ships this commit too.
+          PROD_HEAD=$(gh api "repos/${REPO}/branches/production" --jq .commit.sha)
+          if [ "$PROD_HEAD" != "$HEAD_SHA" ]; then
+            echo "production moved from ${HEAD_SHA:0:7} to ${PROD_HEAD:0:7}; skipping the retry."
+            echo "action=skip-stale" >> "$GITHUB_OUTPUT"
+            echo "prod_head=${PROD_HEAD:0:7}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "action=retry" >> "$GITHUB_OUTPUT"
+
+      - name: Rerun the failed jobs on a new runner
+        id: rerun
+        if: steps.decide.outputs.action == 'retry'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: gh api -X POST "repos/${REPO}/actions/runs/${RUN_ID}/rerun-failed-jobs"
+
+      - name: Build Discord message
+        # failure() also covers the decide step itself failing, so an alert
+        # that promised a retry is never left hanging in silence.
+        if: steps.decide.outputs.action == 'skip-stale' || failure()
+        env:
+          ACTION: ${{ steps.decide.outputs.action }}
+          PROD_HEAD: ${{ steps.decide.outputs.prod_head }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ "$ACTION" = "skip-stale" ]; then
+            printf 'Deploy auto-retry skipped for commit %s: production has moved on to %s, and that deploy ships this commit too.\n\nRun: %s' \
+              "${HEAD_SHA:0:7}" "$PROD_HEAD" "$RUN_URL" > /tmp/discord-msg.txt
+          else
+            printf 'Deploy auto-retry could not start for commit %s. Retry by hand: gh run rerun %s --failed -R %s\n\nRun: %s' \
+              "${HEAD_SHA:0:7}" "$RUN_ID" "$REPO" "$RUN_URL" > /tmp/discord-msg.txt
+          fi
+
+      - name: Send Discord DM
+        # failure() also covers the decide step itself failing, so an alert
+        # that promised a retry is never left hanging in silence.
+        if: steps.decide.outputs.action == 'skip-stale' || failure()
+        uses: ./.github/actions/notify-discord
+        with:
+          webhook-url: ${{ secrets.DISCORD_ERRORS_WEBHOOK_URL || secrets.DISCORD_DEV_WEBHOOK_URL }}

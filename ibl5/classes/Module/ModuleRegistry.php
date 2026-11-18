@@ -58,6 +58,7 @@ final class ModuleRegistry
         'Terms',
         'Topics',
         'Trading',
+        'TradeSuggestionsTuning',
         'TrainingCampRatingsDiff',
         'TransactionHistory',
         'Voting',

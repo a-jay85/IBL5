@@ -280,9 +280,12 @@ def test_parse_go_json_fail():
     assert tp.parse_go_test_json(_stream("fail"), TEST) == "fail"
 
 
-def test_parse_go_json_absent():
+def test_parse_go_json_absent(repo):
     assert tp.parse_go_test_json(_stream("pass"), "TestTracePinnedOther") == "absent"
     assert tp.parse_go_test_json("", TEST) == "absent"
+    root, base = repo
+    absent = _fake_go(normal=tp.parse_go_test_json("", TEST), perturbed="fail")
+    assert _verdict(root, base, run_go=absent) == "test-absent"
 
 
 def _stream_go(normal, perturbed="fail"):

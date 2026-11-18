@@ -107,6 +107,9 @@ def test_golden_hold_parity_unrelated_engine_file():
     cls = classify(paths, "")
     assert cls.golden_changed is False
     assert cls.jsb_capture_changed is False
+    # The jq filter names exact golden paths; a prefix match would also catch foul.go.
+    with open(LIB) as f:
+        assert 'startswith("engine/internal/sim/")' not in f.read()
 
 
 def test_shell_golden_hold_ignores_trace_evidence():

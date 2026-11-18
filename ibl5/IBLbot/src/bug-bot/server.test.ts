@@ -566,7 +566,7 @@ describe('/edit-message', () => {
         expect(fetchMsg).not.toHaveBeenCalled();
     });
 
-    it('edit-message edits bot message with parse none', async () => {
+    it('edit-message edits bot message with allowedMentions.parse empty', async () => {
         const edit = vi.fn().mockResolvedValue(undefined);
         const channel = channelWithMessage({ id: MSG_ID, author: { id: BOT_ID }, edit });
         const res = await invoke(
@@ -778,7 +778,7 @@ describe('/post-with-mention', () => {
         expect(res.json).toHaveBeenCalledWith({ ok: true, target: 'reply', message_id: SENT_ID });
     });
 
-    it('post-with-mention allowedMentions only reporter', async () => {
+    it('post-with-mention sets allowedMentions.users to the reporter only', async () => {
         const thread = bugThread();
         await invoke(
             '/post-with-mention',

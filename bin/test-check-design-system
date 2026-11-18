@@ -1,0 +1,127 @@
+#!/bin/bash
+set -euo pipefail
+
+# Test harness for bin/check-design-system (CSS tokens + UI catalog gate).
+# Follows bin/test-check-shell-portability style.
+#
+# Every fixture lives in a mktemp dir; nothing is written inside the IBL5 tree.
+# The gate never scans bin/, so this file may hold the raw patterns.
+
+PASS=0
+FAIL=0
+
+pass() { echo "PASS: $1"; PASS=$((PASS + 1)); }
+fail() { echo "FAIL: $1"; FAIL=$((FAIL + 1)); }
+
+DIR=$(mktemp -d)
+trap 'rm -rf "$DIR"' EXIT
+
+BIN="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT="$BIN/check-design-system"
+CSS="$DIR/ibl5/design/components/fixture.css"
+UI="$DIR/ibl5/classes/UI"
+
+reset_tree() {
+    rm -rf "$DIR/ibl5"
+    mkdir -p "$DIR/ibl5/design/components" "$UI/Components" "$UI/Contracts"
+    printf '%s\n' '<?php' > "$UI/Alpha.php"
+    printf '%s\n' '<?php' > "$UI/Components/Beta.php"
+    printf '%s\n' '<?php' > "$UI/Contracts/AlphaInterface.php"
+    printf '%s\n' '| `Alpha` | a |' '| `Components\Beta` | b |' > "$UI/README.md"
+    : > "$CSS"
+}
+run_gate() { set +e; OUT=$("$SCRIPT" --root "$DIR" 2>&1); RC=$?; set -e; }
+expect() { # name want_rc want_substring
+    if [ "$RC" -eq "$2" ]; then
+        case "$OUT" in *"$3"*) pass "$1"; return 0 ;; esac
+    fi
+    fail "$1 (rc=$RC, want rc=$2 and '$3'; output: $OUT)"
+}
+# case_css name want_rc substring line...   (writes the CSS fixture, scans the tree)
+case_css() {
+    local name="$1" rc="$2" sub="$3"
+    shift 3
+    reset_tree
+    printf '%s\n' "$@" > "$CSS"
+    run_gate
+    expect "$name" "$rc" "$sub"
+}
+
+OKMSG="check-design-system: OK"
+HIT="ibl5/design/components/fixture.css:2:"
+
+# CSS: violations
+case_css color-var 1 "$HIT" '.a {' '    color: var(--color-accent-500);' '}'
+case_css color-var-spaced 1 "$HIT" '.a {' '    color: var( --color-error-600);' '}'
+case_css color-var-hint 1 "bare alias" '.a {' '    color: var(--color-accent-500);' '}'
+case_css z-index-num 1 "$HIT" '.a {' '    z-index: 50;' '}'
+case_css z-index-neg 1 "$HIT" '.a {' '    z-index: -1;' '}'
+case_css z-index-hint 1 "var(--z-*)" '.a {' '    z-index: 50;' '}'
+case_css font-weight-num 1 "$HIT" '.a {' '    font-weight: 600;' '}'
+case_css font-weight-hint 1 "var(--font-weight-*)" '.a {' '    font-weight: 600;' '}'
+case_css after-comment 1 "$HIT" '.a {' '    /* note */ z-index: 5;' '}'
+
+# CSS: passes
+case_css alias-ok 0 "$OKMSG" '.a {' '    color: var(--accent-500);' '}'
+case_css token-def-ok 0 "$OKMSG" ':root {' '    --color-local: red;' '}'
+case_css z-token-ok 0 "$OKMSG" '.a {' '    z-index: var(--z-sticky);' '}'
+case_css z-fallback-ok 0 "$OKMSG" '.a {' '    z-index: var(--z-modal, 1000);' '}'
+case_css weight-keyword-ok 0 "$OKMSG" '.a {' '    font-weight: bold;' '}'
+case_css weight-token-ok 0 "$OKMSG" '.a {' '    font-weight: var(--font-weight-semibold);' '}'
+case_css inline-comment-ok 0 "$OKMSG" '.a {' '    color: red; /* was var(--color-accent-500) */' '}'
+case_css block-comment-ok 0 "$OKMSG" '/*' '   uses var(--color-accent-500) and z-index: 9' '*/' '.a { color: red; }'
+case_css marker-ok 0 "$OKMSG" '.a {' '    z-index: 9; /* design-ok: third-party widget needs this */' '}'
+case_css marker-empty 1 "$HIT" '.a {' '    z-index: 9; /* design-ok: */' '}'
+case_css other-prop-ok 0 "$OKMSG" '.a {' '    --dc-z-index: 5;' '}'
+
+# UI catalog
+reset_tree
+run_gate
+expect catalog-ok 0 "$OKMSG"
+
+reset_tree
+printf '%s\n' '<?php' > "$UI/Gamma.php"
+run_gate
+expect catalog-missing-top 1 "Gamma (ibl5/classes/UI/Gamma.php)"
+
+reset_tree
+printf '%s\n' '<?php' > "$UI/Components/Delta.php"
+run_gate
+expect catalog-missing-sub 1 'Components\Delta'
+
+reset_tree
+printf '%s\n' '| Alpha | a |' '| `Components\Beta` | b |' > "$UI/README.md"
+run_gate
+expect catalog-needs-backticks 1 "Alpha (ibl5/classes/UI/Alpha.php)"
+
+reset_tree
+printf '%s\n' '<?php' > "$UI/Contracts/GammaInterface.php"
+run_gate
+expect catalog-contracts-exempt 0 "$OKMSG"
+
+# Both parts report in one run
+reset_tree
+printf '%s\n' '.a {' '    z-index: 3;' '}' > "$CSS"
+printf '%s\n' '<?php' > "$UI/Gamma.php"
+run_gate
+expect both-css 1 "$HIT"
+expect both-catalog 1 "Gamma (ibl5/classes/UI/Gamma.php)"
+
+# Usage errors
+set +e
+OUT=$("$SCRIPT" --root "$DIR/nope" 2>&1); RC=$?
+set -e
+expect missing-root 2 "no such directory"
+set +e
+OUT=$("$SCRIPT" --bogus 2>&1); RC=$?
+set -e
+expect bad-flag 2 "usage:"
+
+# The real tree passes
+set +e
+OUT=$("$SCRIPT" 2>&1); RC=$?
+set -e
+expect real-tree 0 "$OKMSG"
+
+echo "check-design-system harness: $PASS passed, $FAIL failed"
+[ "$FAIL" -eq 0 ]

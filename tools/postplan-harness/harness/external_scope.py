@@ -45,7 +45,7 @@ _DM_SEND_VARS = frozenset((
 _DM_LOG_TARGETS = frozenset(("log",))
 # An assignment bash makes while it evaluates arithmetic: `$((TO=5))`, `x[TO=5]`, `n++`.
 _DM_ARITH_SET_RE = re.compile(
-    r"(?:\(\(|\w\[)[^\]]*?(?:(?<![=!<>])=(?!=)|<<=|>>=|\+\+|--)"
+    r"(?:\(\(|\w\[|\$\[)[^\]]*?(?:(?<![=!<>])=(?!=)|<<=|>>=|\+\+|--)"
     r"|-(?:eq|ne|lt|le|gt|ge)\s+[^\s\]]*(?<![=!<>])=(?!=)"
 )
 # `sed` runs only as `sed [-n|-E|-r] '<script>' [file...]`. The script is one `p`/`d` with an

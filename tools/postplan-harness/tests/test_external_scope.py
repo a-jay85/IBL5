@@ -372,6 +372,7 @@ def test_dm_read_only_sed_is_quiet(line):
     "+    echo ${arr[TO=5]}",
     "+    x[TO=5]=1",
     "+    : $((n++))",
+    "+    echo $[TO=5]",
     '+    [[ 1 -eq TO=5 ]]',
 ])
 def test_dm_arithmetic_assignment_fires(line):

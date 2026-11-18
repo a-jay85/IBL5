@@ -196,7 +196,9 @@ jobs:
     # pre-flight failure → build-and-deploy is 'skipped', not 'failure'
     needs: [pre-flight, build-and-deploy]
     if: ${{ always() && (needs.build-and-deploy.result == 'failure' || needs.pre-flight.result == 'failure' || needs.pre-flight.result == 'cancelled') }}
-    timeout-minutes: 5
+    # 10, not 5: worst case is the keyscan retries (~240s) plus the state-read
+    # ssh retries (~185s), about 7 min, before the alert step even runs.
+    timeout-minutes: 10
     permissions:
       contents: read
       actions: read   # read this run's job steps to name the real failed step

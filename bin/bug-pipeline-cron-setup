@@ -180,10 +180,17 @@ bootstrap_issue_tracking() {
   command -v gh >/dev/null 2>&1 || { echo "gh not found — skipping issue-tracking bootstrap." >&2; return 0; }
 
   # The issue repo is the public code repo. View only: this script never creates or edits a
-  # repository. A missing repo is a config error, so stop before touching labels.
-  if ! gh repo view "$BUG_PIPELINE_ISSUE_REPO" >/dev/null 2>&1; then
-    echo "ERROR: issue repo $BUG_PIPELINE_ISSUE_REPO not found; --bootstrap-issues never creates or edits a repository" >&2
-    exit 1
+  # repository. Only a definite "repo not found" is a config error worth stopping for. Any
+  # other view failure (network blip, expired gh auth, GitHub 5xx) is transient, so skip the
+  # labels with a warning and let the install succeed.
+  local view_err
+  if ! view_err=$(gh repo view "$BUG_PIPELINE_ISSUE_REPO" 2>&1 >/dev/null); then
+    if printf '%s' "$view_err" | grep -qiE 'could not resolve to a repository|not found|HTTP 404'; then
+      echo "ERROR: issue repo $BUG_PIPELINE_ISSUE_REPO not found; --bootstrap-issues never creates or edits a repository" >&2
+      exit 1
+    fi
+    echo "WARN: could not check issue repo $BUG_PIPELINE_ISSUE_REPO (${view_err}); skipping issue-tracking bootstrap." >&2
+    return 0
   fi
 
   # Tracking-repo labels (area:* / root-cause:* are open vocabularies created on demand by #5b).

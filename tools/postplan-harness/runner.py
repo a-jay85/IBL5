@@ -2635,19 +2635,19 @@ def _rearm_after_ci_fix(git, gh, llm, log, res, state, inputs, decision, outcome
     # The downgrade runs first, as in Phase 6.5: the seat and the add-only safety verdict
     # must both see the posted word.
     _apply_kept_downgrade(new, res, git, worktree, plan, master_sha, pr, log)
-    nd = evaluate(new)
-    if nd.second_review_candidates:
+    preview = evaluate(new)
+    if preview.second_review_candidates:
         # Before the preview, so a cleared PR still reaches the add-only safety verdict.
         new = second_review.review_pass(new, pr, git.head_tree, git.diff_vs_base, plan, log,
                                         second_review.spawner(llm, worktree))
-        nd = evaluate(new)
-    if not nd.holds:
+        preview = evaluate(new)
+    if not preview.holds:
         verdict = llm.call("safety-verdict", "haiku",
                            llm_calls.safety_verdict_prompt(new.classification, new.pr_title,
-                                                           nd),
+                                                           preview),
                            schemas.validate_safety_verdict)
         new.llm_safety_holds = verdict["holds"]
-        nd = evaluate(new)
+    nd = evaluate(new)
     res.arm = nd
     log("phase7 re-arm: " + ("ARMED" if nd.armed else
                              "HELD — " + "; ".join(f"({c.number}) {c.reason or c.name}"

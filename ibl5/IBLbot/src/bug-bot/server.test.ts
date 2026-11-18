@@ -284,6 +284,13 @@ describe('/mention', () => {
         expect(ch.send).not.toHaveBeenCalled();
     });
 
+    it('400 when discord_id is 20 digits (overflows BIGINT UNSIGNED)', async () => {
+        const ch = { isSendable: () => true, send: vi.fn() };
+        const res = await invoke('/mention', { thread_id: 'T', discord_id: '99999999999999999999', message: 'm' }, clientWithChannel(ch));
+        expect(res.statusCode).toBe(400);
+        expect(ch.send).not.toHaveBeenCalled();
+    });
+
     it('500 when send rejects', async () => {
         const bad = { isSendable: () => true, send: vi.fn().mockRejectedValue(new Error('x')) };
         const res = await invoke('/mention', { thread_id: 'T', discord_id: REPORTER_ID, message: 'm' }, clientWithChannel(bad));

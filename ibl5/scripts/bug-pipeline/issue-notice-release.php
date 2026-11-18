@@ -8,9 +8,10 @@ declare(strict_types=1);
  *
  * Usage: php issue-notice-release.php --issue=N
  *
- * Prints "pending" or "failed". Exit 1 (message on stderr) when the row is not in the
- * claimed state. Exit 2 with a usage line on stderr for unknown flags, space-form flags,
- * or invalid values.
+ * Prints "pending" or "failed". Exit 1 (message on stderr) only when the row is not in
+ * the claimed state. A DB error is an uncaught
+ * exception (exit 255). Exit 2 with a usage line on stderr for unknown flags, space-form
+ * flags, or invalid values.
  */
 
 require __DIR__ . '/_bootstrap.php';
@@ -46,7 +47,7 @@ if (!isset($noticeOpts['issue']) || !ctype_digit($noticeOpts['issue'])) {
 $repo = new BugIssueNoticeRepository($mysqli_db);
 try {
     echo $repo->release((int) $noticeOpts['issue']), PHP_EOL;
-} catch (\RuntimeException $e) {
+} catch (\BugPipeline\NoticeNotClaimedException $e) {
     fwrite(STDERR, "issue-notice-release: {$e->getMessage()}\n");
     exit(1);
 }

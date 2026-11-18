@@ -11,12 +11,13 @@ use BugPipeline\Contracts\BugIssueNoticeRepositoryInterface;
  * Discord origin and the close-notice state machine. Every UPDATE guards on the
  * expected source state, so two concurrent ticks cannot both win a transition.
  *
- * Discord ids bind as STRINGS ("s") and are validated against /^[0-9]{17,20}$/
- * before any SQL runs. Never (int)-cast a snowflake.
+ * Discord ids bind as STRINGS ("s") and are validated against /^[0-9]{17,19}$/
+ * before any SQL runs. Discord ids are at most 19 digits; a 20-digit value can
+ * overflow the BIGINT UNSIGNED columns. Never (int)-cast a snowflake.
  */
 class BugIssueNoticeRepository extends \Database\BaseMysqliRepository implements BugIssueNoticeRepositoryInterface
 {
-    private const SNOWFLAKE_PATTERN = '/^[0-9]{17,20}$/';
+    private const SNOWFLAKE_PATTERN = '/^[0-9]{17,19}$/';
     private const VALID_REASONS = ['completed', 'not_planned', 'duplicate', 'other'];
     private const MIN_LIMIT = 1;
     private const MAX_LIMIT = 50;
@@ -136,7 +137,7 @@ class BugIssueNoticeRepository extends \Database\BaseMysqliRepository implements
             $issue
         );
         if ($affected !== 1) {
-            throw new \RuntimeException("issue {$issue} is not in the claimed state");
+            throw new NoticeNotClaimedException("issue {$issue} is not in the claimed state");
         }
 
         $row = $this->fetchOne(
@@ -180,7 +181,7 @@ class BugIssueNoticeRepository extends \Database\BaseMysqliRepository implements
     private static function assertSnowflake(?string $id, string $label): void
     {
         if ($id !== null && preg_match(self::SNOWFLAKE_PATTERN, $id) !== 1) {
-            throw new \InvalidArgumentException("{$label} id must be 17-20 digits");
+            throw new \InvalidArgumentException("{$label} id must be 17-19 digits");
         }
     }
 

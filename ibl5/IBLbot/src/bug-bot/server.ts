@@ -29,9 +29,10 @@ function isUnknownMessage(error: unknown): boolean {
         && (error as { code?: unknown }).code === 10008;
 }
 
-// Discord snowflake ids are 17-20 digit strings. Every id field the new routes accept
+// Discord snowflake ids are 17-19 digit strings (20 digits can overflow the BIGINT UNSIGNED
+// columns). Every id field the new routes accept
 // is validated against this; a mismatch is a 400.
-const SNOWFLAKE = /^[0-9]{17,20}$/;
+const SNOWFLAKE = /^[0-9]{17,19}$/;
 
 // Splits text at ≤CHUNK_MAX chars, preferring line breaks over mid-word cuts.
 // Each chunk after the first is prefixed with "(N/M): " so a reader knows more follows.

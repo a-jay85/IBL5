@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\BugPipeline;
 
 use BugPipeline\BugIssueNoticeRepository;
+use BugPipeline\NoticeNotClaimedException;
 use PHPUnit\Framework\Attributes\Group;
 use Tests\DatabaseIntegration\DatabaseTestCase;
 
@@ -87,7 +88,7 @@ class BugIssueNoticeRepositoryTest extends DatabaseTestCase
     {
         $this->repo->upsert(self::ISSUE, null, null, null, null, null);
 
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(NoticeNotClaimedException::class);
         $this->repo->release(self::ISSUE);
     }
 
@@ -106,7 +107,8 @@ class BugIssueNoticeRepositoryTest extends DatabaseTestCase
 
     public function testRejectsNonDigitDiscordId(): void
     {
-        foreach (['abc', '12345', '1234567890123456x', '123456789012345678901', ''] as $bad) {
+        // 20 digits is past Discord's 19-digit max and can overflow BIGINT UNSIGNED.
+        foreach (['abc', '12345', '1234567890123456x', '99999999999999999999', '123456789012345678901', ''] as $bad) {
             try {
                 $this->repo->upsert(self::ISSUE, null, $bad, null, null, null);
                 self::fail("reporter id '{$bad}' should have been rejected");

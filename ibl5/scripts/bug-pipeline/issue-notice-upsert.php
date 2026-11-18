@@ -6,7 +6,7 @@ declare(strict_types=1);
  * issue-notice-upsert.php — record the Discord origin of a tracked GitHub bug issue.
  *
  * Usage: php issue-notice-upsert.php --issue=N [--legacy=N] [--reporter=ID] [--channel=ID] [--thread=ID] [--message=ID]
- *   Ids are Discord snowflakes (17-20 digits) carried as STRINGS, never (int)-cast.
+ *   Ids are Discord snowflakes (17-19 digits) carried as STRINGS, never (int)-cast.
  *   Never touches the notice state, so a re-run cannot re-send a notice.
  *
  * Prints nothing on success. Exit 2 with a usage line on stderr for unknown flags,

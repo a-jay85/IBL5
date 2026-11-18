@@ -1752,7 +1752,7 @@ notify_closed_issues() {
         reporter="$(printf '%s' "$row" | jq -r '.reporter_discord_id // empty')"
         thread="$(printf '%s' "$row" | jq -r '.thread_id // empty')"
         msg="$(printf '%s' "$row" | jq -r '.original_message_id // empty')"
-        if [ -n "$reporter" ] && ! [[ "$reporter" =~ ^[0-9]{17,20}$ ]]; then
+        if [ -n "$reporter" ] && ! [[ "$reporter" =~ ^[0-9]{17,19}$ ]]; then
             log "close notice for issue $n: dropping malformed reporter id"
             reporter=''
         fi

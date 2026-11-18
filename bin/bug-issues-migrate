@@ -161,8 +161,15 @@ preflight() {
         || die 3 "cannot read $OLD"
     vis="${ov% *}"
     arch="${ov#* }"
-    if [ "$arch" = true ] && ! st_has step_flip_private=done; then
-        die 3 "$OLD is already archived and the state file does not say this run archived it"
+    # A run that died between the archive call and step_flip_private=done left
+    # archive_started=1 behind. Without that line (or the done line), someone
+    # else archived OLD, so refuse.
+    OLD_ARCHIVED=0
+    if [ "$arch" = true ]; then
+        if ! st_has step_flip_private=done && ! st_has archive_started=1; then
+            die 3 "$OLD is already archived and the state file does not say this run archived it"
+        fi
+        OLD_ARCHIVED=1
     fi
     case "$vis" in
         PRIVATE) ;;
@@ -182,6 +189,19 @@ preflight() {
     fi
     got="$(printf '%s\n%s\n' "$listed" "$transferred" | grep -E '^[0-9]+$' | sort -n | uniq)" || got=""
     want="$(seq "$FIRST" "$LAST")"
+    # An issue GitHub moved before the state file recorded it is in neither set.
+    # Ask OLD for it (step 4 does the same) and count it when the URL is in NEW.
+    local n url moved=""
+    for n in $want; do
+        if grep -qxF -- "$n" <<< "$got"; then continue; fi
+        url="$(gh issue view "$n" --repo "$OLD" --json url --jq .url 2>/dev/null)" || url=""
+        case "$url" in
+            "https://github.com/${NEW}/issues/"*) moved="$moved$n"$'\n' ;;
+        esac
+    done
+    if [ -n "$moved" ]; then
+        got="$(printf '%s\n%s\n' "$got" "$moved" | grep -E '^[0-9]+$' | sort -n | uniq)" || got=""
+    fi
     if [ "$got" != "$want" ]; then
         die 3 "issue set is not exactly $FIRST-$LAST. Open and transferred numbers: $(tr '\n' ' ' <<< "$got")"
     fi
@@ -373,19 +393,32 @@ fi
 
 # 5 ── make the old repo private again and archive it
 if step_begin 5 flip_private; then
-    act gh repo edit "$OLD" --visibility private --accept-visibility-change-consequences
-    if [ "$LIVE" = 1 ]; then
+    # A resume after a run that died inside this step skips what is already done.
+    # An archived repo is read-only, so its visibility edit would fail.
+    if [ "$LIVE" = 1 ] && st_has flip_private=1; then
+        say "   OLD is already private (state file); skipping the visibility edit"
         FLIPPED=0
-        st_add flip_private=1
+    else
+        act gh repo edit "$OLD" --visibility private --accept-visibility-change-consequences
+        if [ "$LIVE" = 1 ]; then
+            FLIPPED=0
+            st_add flip_private=1
+        fi
     fi
-    act gh repo archive "$OLD" --yes
+    if [ "$OLD_ARCHIVED" = 1 ]; then
+        say "   OLD is already archived; skipping the archive call"
+    else
+        st_add archive_started=1
+        act gh repo archive "$OLD" --yes
+    fi
     step_end
 fi
 
 # 6 ── label the new issues that carry a reporter id and remember the id
 if step_begin 6 reporter_labels; then
     if [ "$LIVE" = 1 ]; then
-        reporter_re='Reporter \(discord_author_id\): ([0-9]{17,20})'
+        # 17-19 digits, then a non-digit or the end: a longer number is not a Discord id.
+        reporter_re='Reporter \(discord_author_id\): ([0-9]{17,19})([^0-9]|$)'
         for n in $(seq "$FIRST" "$LAST"); do
             new="$(st_get "transfer_$n")"
             body="$(gh issue view "$new" --repo "$NEW" --json body --jq .body)"

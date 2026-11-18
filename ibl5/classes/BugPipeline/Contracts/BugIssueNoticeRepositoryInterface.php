@@ -42,6 +42,7 @@ interface BugIssueNoticeRepositoryInterface
     /**
      * @see \BugPipeline\BugIssueNoticeRepository::release()
      * @return 'pending'|'failed'
+     * @throws \BugPipeline\NoticeNotClaimedException when the row is not in the claimed state
      */
     public function release(int $issue): string;
 

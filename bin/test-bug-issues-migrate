@@ -52,7 +52,10 @@ case "$1 $2" in
       vis=""; prev=""
       for a in "$@"; do [ "$prev" = "--visibility" ] && vis="$a"; prev="$a"; done
       printf '%s' "$vis" | tr 'a-z' 'A-Z' > "$STUB/old_visibility" ;;
-  "repo archive") printf true > "$STUB/old_archived" ;;
+  "repo archive")
+      printf true > "$STUB/old_archived"
+      # Simulates a run that dies after GitHub archived OLD but before the step is recorded.
+      if [ -f "$STUB/fail_after_archive" ]; then exit 1; fi ;;
   "label list")
       if [ "$repo" = a-jay85/ibl5-bugs ]; then
           emit '[{"name":"bug","color":"d73a4a","description":"A bug"},{"name":"gm-reported","color":"0e8a16","description":""}]'
@@ -276,9 +279,12 @@ h_eq "live_rerun_resumes_from_state: the map has 29 entries" 29 "$(jq 'length' "
 
 # ── live_rerun_resumes_from_state: an issue moved before the state write ──────
 # A run died after GitHub moved #5 but before the state file recorded it.
-# The repo now answers #5 with a URL in the new repo, so the run must read the number and not move it again.
+# #5 is gone from OLD's issue list and absent from the state file. OLD answers
+# `gh issue view 5` with a URL in the new repo, so preflight must count it and
+# step 4 must read the number and not move it again.
 make_stubs
 printf '5 105\n' > "$STUB/xfer.map"
+grep -vx 5 "$STUB/old_issues" > "$STUB/old_issues.tmp"; mv "$STUB/old_issues.tmp" "$STUB/old_issues"
 run_mig "$CONFIRM" --live
 h_eq "live_rerun_resumes_from_state: moved issue run exits 0" 0 "$RC"
 h_eq "live_rerun_resumes_from_state: already-moved #5 is not transferred again" 0 "$(grep -c 'issue transfer 5 ' "$STUB/calls.log")"
@@ -301,6 +307,35 @@ else
 fi
 h_eq "live_resume_with_old_still_public_restores_private: OLD is private again" PRIVATE "$(cat "$STUB/old_visibility")"
 h_eq "live_resume_with_old_still_public_restores_private: no second flip to public" 0 "$(grep -c 'visibility public' "$STUB/calls.log")"
+
+# ── live_rerun_after_archive_before_state_write ───────────────────────────────
+# Run 1 dies right after GitHub archived OLD, before step_flip_private=done is written.
+# Run 2 must resume (not refuse with exit 3) and must not call edit or archive on OLD again.
+make_stubs
+: > "$STUB/fail_after_archive"
+run_mig "$CONFIRM" --live
+if [ "$RC" -ne 0 ]; then
+    h_pass "live_rerun_after_archive_before_state_write: first run exits non-zero"
+else
+    h_fail "live_rerun_after_archive_before_state_write: first run exits non-zero" "got 0"
+fi
+h_eq "live_rerun_after_archive_before_state_write: OLD is private and archived after run 1" \
+    "PRIVATE true" "$(cat "$STUB/old_visibility") $(cat "$STUB/old_archived")"
+rm -f "$STUB/fail_after_archive"
+: > "$STUB/calls.log"
+run_mig "$CONFIRM" --live
+h_eq "live_rerun_after_archive_before_state_write: rerun exits 0" 0 "$RC"
+h_eq "live_rerun_after_archive_before_state_write: no repo edit on the rerun" 0 "$(grep -c 'repo edit' "$STUB/calls.log")"
+h_eq "live_rerun_after_archive_before_state_write: no second archive call" 0 "$(grep -c 'repo archive' "$STUB/calls.log")"
+h_eq "live_rerun_after_archive_before_state_write: the map has 29 entries" 29 "$(jq 'length' "$STUB"/mig/bug-issues-map-*.json)"
+
+# ── preflight_archived_by_someone_else_refuses ────────────────────────────────
+make_stubs
+printf true > "$STUB/old_archived"
+run_mig "$CONFIRM" --live
+h_eq "preflight_archived_by_someone_else_refuses: exits 3" 3 "$RC"
+h_eq "preflight_archived_by_someone_else_refuses: zero mutating calls" 0 "$(mutating_count)"
+h_contains "preflight_archived_by_someone_else_refuses: stderr names the archive" "$(cat "$STUB/err")" "already archived"
 
 # ── preflight_unexpected_issue_set_refuses ────────────────────────────────────
 make_stubs

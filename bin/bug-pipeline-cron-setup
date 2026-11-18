@@ -185,7 +185,7 @@ bootstrap_issue_tracking() {
   # labels with a warning and let the install succeed.
   local view_err
   if ! view_err=$(gh repo view "$BUG_PIPELINE_ISSUE_REPO" 2>&1 >/dev/null); then
-    if printf '%s' "$view_err" | grep -qiE 'could not resolve to a repository|not found|HTTP 404'; then
+    if grep -qiE 'could not resolve to a repository|not found|HTTP 404' <<< "$view_err"; then
       echo "ERROR: issue repo $BUG_PIPELINE_ISSUE_REPO not found; --bootstrap-issues never creates or edits a repository" >&2
       exit 1
     fi

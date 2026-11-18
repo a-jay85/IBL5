@@ -47,4 +47,25 @@ runs:
         mkdir -p ~/.ssh
         echo "$DEPLOY_KEY" > ~/.ssh/id_deploy
         chmod 600 ~/.ssh/id_deploy
-        ssh-keyscan -p "$PORT" "$HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+        # Ride out short network blips on the host. ConnectionAttempts retries
+        # only the TCP connect, before any remote command runs, so a retry can
+        # never run a deploy command twice. 6 x 30s covers a ~3 min outage.
+        # Run 44396293952 failed on one 2 min connect timeout.
+        cat >> ~/.ssh/config <<'EOF'
+        Host *
+          ConnectTimeout 30
+          ConnectionAttempts 6
+          ServerAliveInterval 15
+          ServerAliveCountMax 4
+        EOF
+        chmod 600 ~/.ssh/config
+        # Retry the keyscan too: an empty known_hosts makes every later ssh fail.
+        # ssh-keyscan exits 0 even when it gets no keys, so check its output.
+        for _ in 1 2 3 4 5 6; do
+          KEYS=$(ssh-keyscan -T 30 -p "$PORT" "$HOST" 2>/dev/null || true)
+          if [ -n "$KEYS" ]; then
+            printf '%s\n' "$KEYS" >> ~/.ssh/known_hosts
+            break
+          fi
+          sleep 10
+        done

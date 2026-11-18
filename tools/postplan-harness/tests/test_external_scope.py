@@ -421,6 +421,16 @@ def test_dm_exit_in_new_function_is_one_way():
     assert external_send_change(DM, sec) == _R_DM_FLOW
 
 
+def test_dm_exit_moved_into_new_function_called_before_send_is_one_way():
+    body = ['     say "sending"', "+quit", "     send_one", "-exit 0", "+quit() {", "+    exit 0", "+}", " "]
+    assert external_send_change(DM, _section(DM, 150, body)) == _R_DM_FLOW
+
+
+def test_dm_one_line_if_exit_rewritten_as_or_guard_is_one_way():
+    sec = _dm(350, '-if [ "$DELIVERED" = 1 ]; then exit 0; fi', '+[ "$DELIVERED" = 1 ] || exit 0')
+    assert external_send_change(DM, sec) == _R_DM_FLOW
+
+
 def test_dm_break_in_new_function_without_own_loop_is_one_way():
     sec = _dm(150, "+stop() {", "+    break", "+}")
     assert external_send_change(DM, sec) == _R_DM_FLOW

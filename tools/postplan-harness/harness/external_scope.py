@@ -587,8 +587,9 @@ def _dm_guards(stmts: list[_DmStmt], words: list[_DmWords]) -> list[tuple[str, s
 
 
 def _dm_conserved(minus_stmts: list[_DmStmt], plus_stmts: list[_DmStmt]) -> bool:
-    """Every removed test, exit or guarded exit is re-added by the same block, and every added
-    exit that replaces none sits inside a function body the block adds."""
+    """Every removed test, exit or guarded exit is re-added by the same block. An added control
+    outside a new function body replaces a removed one. Inside a new function body only `return`,
+    `shift`, and `break`/`continue` under the function's own loop are allowed."""
     minus = [_dm_words(r, m) for r, m, _c in minus_stmts]
     plus = [_dm_words(r, m) for r, m, _c in plus_stmts]
     plus_cores: dict[str, int] = {}
@@ -620,8 +621,11 @@ def _dm_conserved(minus_stmts: list[_DmStmt], plus_stmts: list[_DmStmt]) -> bool
     for w, (inside, in_loop) in zip(plus, in_func):
         # In a new function only `return`/`shift`, and `break`/`continue` under a loop that the
         # function opens, stay local. `exit`, or a `break` that reaches the caller's loop, can
-        # skip a send wherever the function is called.
+        # skip a send wherever the function is called. Such a control never takes credit from a
+        # removed one, because a call to the function can sit anywhere, ahead of the send loop too.
         local = inside and (w[3] in ("return", "shift") or (in_loop and w[3] in ("break", "continue")))
+        if w[3] in _DM_CONTROL and inside and not local:
+            return False
         if w[3] in _DM_CONTROL and not local:
             if removed_control.get(w[5], 0) <= 0:
                 return False

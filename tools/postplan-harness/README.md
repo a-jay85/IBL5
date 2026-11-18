@@ -158,6 +158,8 @@ intent log, without touching GitHub.
   - **Failure.** A rejected, empty or timed-out attempt is reverted and the run fails closed with the original denial (exit 3). A retry that is still denied raises the ORIGINAL error and leaves the fixer's edits in the tree.
   - **Record.** `result.json` carries `gate_fix` (status, model, cost, files, gate class, phase, retry) and `audit.log` carries a `gatefix:` line. A fix whose retry passed adds a `gate-fix` marker block to the PR body. `actions.jsonl` gets no row, because the fixer issues no `gh` mutation and the PR body edit goes through the existing body-edit intent.
 
+- **Plan-hold label.** After the PR opens or updates, a live run syncs the orange `auto-merge-held-by-plan` label (`harness/plan_hold_label.py`). The harness adds it when the plan says `auto_merge: false` and at least one `hold_trigger:` token is owner-held, or no token is listed. Those PRs can never auto-merge without the owner. A plan whose tokens are all reviewer-clearable gets no label, because the second reviewer may clear it. A found plan with no hold loses the label, and a plan-blind run leaves it alone.
+
 - **Shadow fields only add holds.** `ArmInputs.reviewer_arming_holds` is the one field fed from the record, through `fidelity.reviewer_arming_holds`. `tests/test_fidelity_shadow.py` asserts that a hold adds condition (21) and leaves every other condition as it was, and that a clear, missing or invalid block changes nothing.
 
 ### Delta re-review (Phase 5.5)

@@ -173,6 +173,10 @@ class RecordingGh:
     def pr_status_label(self, pr: int, label: str) -> None:
         self.record("pr_status_label", pr=pr, label=label)
 
+    def label_ensure(self, label: str, color: str, description: str) -> None:
+        """Create a repo label if it is missing. Replay creates nothing."""
+        return None
+
     def issue_create(self, title: str, body: str, label: str) -> int | None:
         existing = sum(1 for a in self.actions() if a.get("action") == "issue_create")
         self.record("issue_create", title=title, label=label)
@@ -702,6 +706,14 @@ class LiveGh(RecordingGh):
         except HarnessError:
             pass
         self.record("pr_status_label", pr=pr, label=label)
+
+    def label_ensure(self, label: str, color: str, description: str) -> None:
+        """Best-effort: create the repo label with its color. An existing label is kept."""
+        try:
+            self._gh("label", "create", label, "--color", color,
+                     "--description", description)
+        except (HarnessError, OSError, subprocess.SubprocessError):
+            pass
 
     def branch_protection_strict(self) -> bool:
         """Fail closed: an unreadable or null protection config is treated as strict."""

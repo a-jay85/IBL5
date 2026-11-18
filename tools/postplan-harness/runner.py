@@ -75,6 +75,7 @@ from harness.classify import (BACKLOG_REPO, render_merge_digest,
 from harness.gate_backtest import upsert_gate_backtest
 from harness import merge_danger
 from harness import savedline
+from harness import plan_hold_label
 from harness.merge_danger import parse_merge_danger, render_merge_danger
 from harness import removed_guards
 from harness import removed_guard_fix
@@ -546,6 +547,8 @@ def _run_pass(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             log(f"phase2: pr_create intent recorded (title={copy['title']!r})")
         res.pr_number = pr
         state.checkpoint("pr-open", res)
+        if live:
+            plan_hold_label.sync(gh, pr, plan, log)
         if live and pr and sha:
             bg_ci = ciwatch.start_background_watch(worktree, pr, sha, out_dir,
                                                    verify_head=True)

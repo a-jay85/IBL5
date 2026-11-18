@@ -35,7 +35,7 @@ interface PlrFileWriterInterface
      *
      * Only includes lines where ordinal <= 1440 AND pid != 0.
      *
-     * @param list<string> $lines Lines from splitIntoLines()
+     * @param array<int, string> $lines Lines from splitIntoLines()
      * @return array<int, int> Map of line index → pid
      */
     public static function indexPlayerRecords(array $lines): array;

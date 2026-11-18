@@ -1,6 +1,6 @@
 ---
 description: Jump Shot Basketball binary file format specifications.
-last_verified: 2026-10-10
+last_verified: 2026-11-17
 ---
 
 # Jump Shot Basketball (JSB) Engine File Format Specifications
@@ -687,6 +687,7 @@ Three short lines (110, 56, 22 bytes) containing overflow/partial entries from t
 - **Total record slots:** 500 (64,000 / 128)
 - **Used records:** Stored in header (bytes 0–16 of record 0); e.g., `201`
 - **Unused slots:** Space-padded
+- **JSB's own view:** JSB writes the count left-justified in bytes 0-15 and stores record n at byte 16 + n * 128. The offsets below are the parser's view, which reads record i at i * 128, so each offset is 16 more than JSB's. Both views read the same bytes. `TrnFileWriter::appendRecords` writes in JSB's view (runbook F8).
 
 ### Record Layout (128 bytes)
 
@@ -732,8 +733,10 @@ Uses a sub-record system with **19-byte items** packed sequentially starting at 
 |--------|-------|-------------|
 | 0 | 1 | Marker: `1` = draft pick |
 | 1–6 | 6 | Draft year (right-justified) |
-| 7–12 | 6 | From Team ID (right-justified) |
-| 13–18 | 6 | To Team ID (right-justified) |
+| 7-12 | 6 | Round (right-justified) |
+| 13-18 | 6 | Original team ID, the team whose pick it is (right-justified) |
+
+A pick item names no giving or receiving team. JSB puts it in the record of the team that gives it up, after that team's player items. The 08-09 sim09 file shows this in record 80. `TrnFileParser` still returns the round as `from_team` and the original team as `to_team`.
 
 Multiple items can be packed into a single 128-byte record (up to 5 items at 19 bytes each).
 

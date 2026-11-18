@@ -47,6 +47,59 @@ class TrnFileWriter implements TrnFileWriterInterface
     }
 
     /**
+     * @see TrnFileWriterInterface::appendRecords()
+     */
+    public static function appendRecords(string $existing, array $records): string
+    {
+        if (strlen($existing) !== TrnFileParser::FILE_SIZE) {
+            throw new \RuntimeException(
+                'Invalid .trn file size: expected ' . TrnFileParser::FILE_SIZE . ' bytes, got ' . strlen($existing)
+            );
+        }
+
+        $count = self::readJsbRecordCount($existing);
+        $headerSize = TrnFileParser::JSB_HEADER_SIZE;
+        $data = $existing;
+
+        foreach ($records as $index => $record) {
+            if (strlen($record) !== TrnFileParser::RECORD_SIZE) {
+                throw new \RuntimeException(
+                    'Record at index ' . $index . ' is ' . strlen($record)
+                    . ' bytes, expected ' . TrnFileParser::RECORD_SIZE
+                );
+            }
+            $offset = $headerSize + $count * TrnFileParser::RECORD_SIZE;
+            /** @infection-ignore-all Equivalent: 64,000 - 16 is not a multiple of 128, so offset + 128 never equals the file size and > and >= reject the same counts. */
+            if ($offset + TrnFileParser::RECORD_SIZE > TrnFileParser::FILE_SIZE) {
+                throw new \RuntimeException('The .trn file is full at ' . $count . ' records');
+            }
+            // Builder records put the JSB record body at offset 16. JSB stores that body
+            // at 16 + n * 128 and pads its last 16 bytes with spaces.
+            $jsbRecord = substr($record, $headerSize) . str_repeat(' ', $headerSize);
+            $data = substr_replace($data, $jsbRecord, $offset, TrnFileParser::RECORD_SIZE);
+            $count++;
+        }
+
+        // JSB writes the count left-justified in the 16-byte header.
+        return substr_replace($data, str_pad((string) $count, $headerSize), 0, $headerSize);
+    }
+
+    /**
+     * @see TrnFileWriterInterface::readJsbRecordCount()
+     */
+    public static function readJsbRecordCount(string $data): int
+    {
+        $header = trim(substr($data, 0, TrnFileParser::JSB_HEADER_SIZE));
+        if ($header === '') {
+            return 0;
+        }
+        if (preg_match('/^\d+$/', $header) !== 1) {
+            throw new \RuntimeException('The .trn header does not hold a record count');
+        }
+        return (int) $header;
+    }
+
+    /**
      * Convert IBL calendar month to JSB binary format month.
      * Reverses the parse-time remap of JSB_PLAYOFF_MONTH → IBL_PLAYOFF_MONTH.
      */
@@ -108,14 +161,15 @@ class TrnFileWriter implements TrnFileWriterInterface
 
             if ($marker === TrnFileParser::TRADE_MARKER_PLAYER) {
                 // Player move: marker(1) + from_team(6) + to_team(6) + player_id(6)
-                $itemStr .= str_pad((string) $item['from_team'], 6, ' ', STR_PAD_LEFT);
-                $itemStr .= str_pad((string) $item['to_team'], 6, ' ', STR_PAD_LEFT);
+                $itemStr .= str_pad((string) ($item['from_team'] ?? 0), 6, ' ', STR_PAD_LEFT);
+                $itemStr .= str_pad((string) ($item['to_team'] ?? 0), 6, ' ', STR_PAD_LEFT);
                 $itemStr .= str_pad((string) ($item['player_id'] ?? 0), 6, ' ', STR_PAD_LEFT);
             } elseif ($marker === TrnFileParser::TRADE_MARKER_DRAFT_PICK) {
-                // Draft pick: marker(1) + draft_year(6) + from_team(6) + to_team(6)
+                // Draft pick: marker(1) + draft_year(6) + round(6) + original_team(6).
+                // JSB writes no from/to here. The pick travels with the record's giving team.
                 $itemStr .= str_pad((string) ($item['draft_year'] ?? 0), 6, ' ', STR_PAD_LEFT);
-                $itemStr .= str_pad((string) $item['from_team'], 6, ' ', STR_PAD_LEFT);
-                $itemStr .= str_pad((string) $item['to_team'], 6, ' ', STR_PAD_LEFT);
+                $itemStr .= str_pad((string) ($item['round'] ?? 0), 6, ' ', STR_PAD_LEFT);
+                $itemStr .= str_pad((string) ($item['original_team'] ?? 0), 6, ' ', STR_PAD_LEFT);
             }
 
             $record = substr_replace($record, $itemStr, $tradeOffset, TrnFileParser::TRADE_ITEM_SIZE);

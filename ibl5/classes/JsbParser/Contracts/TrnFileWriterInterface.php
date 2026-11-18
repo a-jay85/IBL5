@@ -22,6 +22,28 @@ interface TrnFileWriterInterface
     public static function generate(array $records): string;
 
     /**
+     * Append records to an existing JSB .trn file, as JSB itself does on Save.
+     *
+     * Every existing byte outside the new record slots stays as it was. Record n lands at
+     * byte 16 + n * 128, starting at the header count, and the header count is rewritten
+     * left-justified in bytes 0-15.
+     *
+     * @param string $existing Exactly 64,000 bytes of a JSB-written .trn file
+     * @param list<string> $records 128-byte records from the build*Record() methods
+     * @return string Exactly 64,000 bytes
+     * @throws \RuntimeException If the input size or header is invalid, a record is not 128 bytes, or the file is full
+     */
+    public static function appendRecords(string $existing, array $records): string;
+
+    /**
+     * Read the record count from a JSB .trn header (bytes 0-15).
+     *
+     * @return int The count, 0 for a blank header
+     * @throws \RuntimeException If the header holds anything other than digits and spaces
+     */
+    public static function readJsbRecordCount(string $data): int;
+
+    /**
      * Build a 128-byte injury record (type 1).
      *
      * @param int $month Transaction month (1-12)
@@ -44,12 +66,16 @@ interface TrnFileWriterInterface
     ): string;
 
     /**
-     * Build a 128-byte trade record (type 2) with player move items.
+     * Build a 128-byte trade record (type 2) with up to 5 items.
+     *
+     * JSB writes one record per giving team. A player item carries from_team, to_team and
+     * player_id. A draft pick item carries draft_year, round and original_team (the team
+     * whose pick it is), and takes its direction from the record's player items.
      *
      * @param int $month Transaction month (1-12)
      * @param int $day Transaction day (1-31)
-     * @param int $year Transaction year (4-digit)
-     * @param list<array{marker: int, from_team: int, to_team: int, player_id?: int, draft_year?: int}> $items Trade items
+     * @param int $year Season beginning year (4-digit), as JSB stores it
+     * @param list<array{marker: int, from_team?: int, to_team?: int, player_id?: int, draft_year?: int, round?: int, original_team?: int}> $items Trade items
      * @return string Exactly 128 bytes
      */
     public static function buildTradeRecord(int $month, int $day, int $year, array $items): string;

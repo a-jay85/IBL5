@@ -135,8 +135,8 @@ jobs:
         env:
           MAX_WALKBACK: '0'
           SKIP_CHECKS: Promote master to production,Auto-promotion paused
-          IGNORE_PENDING_CHECKS: Aggregate check status,recheck
-          IGNORE_FAILED_CHECKS: Aggregate check status,recheck
+          IGNORE_PENDING_CHECKS: Aggregate check status,recheck,recap
+          IGNORE_FAILED_CHECKS: Aggregate check status,recheck,recap
         run: |
           git push origin "$SHA:refs/heads/production"
   paused:
@@ -209,6 +209,13 @@ PPEOF
     p10-recheck-near-miss)
       tmp="$(mktemp)"
       sed 's/^\( *IGNORE_FAILED_CHECKS: \).*$/\1Aggregate check status,recheck-foo/' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    p10-no-recap)
+      # Old pin: aggregate plus recheck, without recap.
+      tmp="$(mktemp)"
+      sed 's/^\( *IGNORE_FAILED_CHECKS: \).*$/\1Aggregate check status,recheck/' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    p10-recap-near-miss)
+      tmp="$(mktemp)"
+      sed 's/^\( *IGNORE_FAILED_CHECKS: \).*$/\1Aggregate check status,recheck,recap-foo/' "$f" > "$tmp" && mv "$tmp" "$f" ;;
     p11-unlisted)        # block branches list after paths (cache-dependencies.yml shape)
       printf 'name: Doc Freshness Audit\non:\n  push:\n    paths: [%s]\n    branches:\n      - master\n' "'**.md'" > "$1/p11-docs-stub.yml" ;;
     p11-dangling)        # listed name with no workflow (Auto-Rebase rename drift)
@@ -233,7 +240,7 @@ PPEOF
 # Writes a minimal merge-script stub whose SKIP_CHECKS matches <skip-list>.
 put_merge() {
   # shellcheck disable=SC2016
-  printf 'SKIP_CHECKS="%s" \\\nIGNORE_PENDING_CHECKS="Aggregate check status,recheck" \\\nIGNORE_FAILED_CHECKS="Aggregate check status,recheck" \\\n    bin/check-master-ci-green "$SHA"\n' "$2" > "$1"
+  printf 'SKIP_CHECKS="%s" \\\nIGNORE_PENDING_CHECKS="Aggregate check status,recheck,recap" \\\nIGNORE_FAILED_CHECKS="Aggregate check status,recheck,recap" \\\n    bin/check-master-ci-green "$SHA"\n' "$2" > "$1"
 }
 
 # put_mutation_pr <wf-dir> <variant>
@@ -463,7 +470,7 @@ fi  # unfiltered
 
 # Permanent fixtures reused across promote-to-production cases
 CLEAN_PROMOTE="$TMP/promote-clean"
-printf '#!/bin/bash\nIGNORE_PENDING_CHECKS="${IGNORE_PENDING_CHECKS:-Aggregate check status,recheck}" \\\nIGNORE_FAILED_CHECKS="${IGNORE_FAILED_CHECKS:-Aggregate check status,recheck}" \\\n    bin/check-master-ci-green "$SHA"\ngit push origin production\n' > "$CLEAN_PROMOTE"
+printf '#!/bin/bash\nIGNORE_PENDING_CHECKS="${IGNORE_PENDING_CHECKS:-Aggregate check status,recheck,recap}" \\\nIGNORE_FAILED_CHECKS="${IGNORE_FAILED_CHECKS:-Aggregate check status,recheck,recap}" \\\n    bin/check-master-ci-green "$SHA"\ngit push origin production\n' > "$CLEAN_PROMOTE"
 chmod +x "$CLEAN_PROMOTE"
 FORCE_PROMOTE="$TMP/promote-force"
 printf '#!/bin/bash\ngit push --force origin production\n' > "$FORCE_PROMOTE"
@@ -595,6 +602,42 @@ if grep -qF '(P10) —' <<< "$out"; then
   h_pass "P10 rejects a near-miss recheck-foo value names P10"
 else
   h_fail "P10 rejects a near-miss recheck-foo value names P10" "output: $out"
+fi
+
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" p10-no-recap
+out="$("$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" 2>&1)"; rc=$?
+expect "P10 rejects a promote caller that does not ignore recap" 1 "$rc"
+if grep -qF '(P10) —' <<< "$out"; then
+  h_pass "P10 rejects a promote caller that does not ignore recap names P10"
+else
+  h_fail "P10 rejects a promote caller that does not ignore recap names P10" "output: $out"
+fi
+if grep -qF 'workflow:IGNORE_FAILED_CHECKS' <<< "$out"; then
+  h_pass "P10 names workflow:IGNORE_FAILED_CHECKS when the workflow list lacks recap"
+else
+  h_fail "P10 names workflow:IGNORE_FAILED_CHECKS when the workflow list lacks recap" "output: $out"
+fi
+
+# P10: merge script whose lists lack recap -> exit 1, names merge:IGNORE_FAILED_CHECKS
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" good
+merge_no_recap="$TMP/merge-no-recap"
+# shellcheck disable=SC2016
+printf 'SKIP_CHECKS="Promote master to production,Auto-promotion paused" \\\nIGNORE_PENDING_CHECKS="Aggregate check status,recheck,recap" \\\nIGNORE_FAILED_CHECKS="Aggregate check status,recheck" \\\n    bin/check-master-ci-green "$SHA"\n' > "$merge_no_recap"
+out="$("$CHECK" "$d_a" "$d_wf" "$merge_no_recap" "$CLEAN_PROMOTE" 2>&1)"; rc=$?
+expect "P10 rejects a merge script whose failed list lacks recap" 1 "$rc"
+if grep -qF 'merge:IGNORE_FAILED_CHECKS' <<< "$out"; then
+  h_pass "P10 names merge:IGNORE_FAILED_CHECKS when the merge script lacks recap"
+else
+  h_fail "P10 names merge:IGNORE_FAILED_CHECKS when the merge script lacks recap" "output: $out"
+fi
+
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" p10-recap-near-miss
+out="$("$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" 2>&1)"; rc=$?
+expect "P10 rejects a near-miss recap-foo value" 1 "$rc"
+if grep -qF '(P10) —' <<< "$out"; then
+  h_pass "P10 rejects a near-miss recap-foo value names P10"
+else
+  h_fail "P10 rejects a near-miss recap-foo value names P10" "output: $out"
 fi
 
 # P11: an unlisted push-to-master workflow, a listed name with no workflow, an

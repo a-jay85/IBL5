@@ -71,9 +71,10 @@ if [ "${SKIP_CI_CHECK:-0}" != "1" ]; then
     # `Aggregate check status` check-run also lands on master HEAD; it is
     # ignored while pending and when failed for the same reason.
     # "recheck" (.github/workflows/text-hold-recheck-run.yml) lands on master HEAD from PR body edits and tests no code; it is ignored the same way.
+    # "recap" (.github/workflows/sim-recap.yml) lands on master HEAD from its 10-minute cron and tests no code; a transient prod SSH timeout leaves it red, so it is ignored the same way.
     SKIP_CHECKS="Promote master to production,Auto-promotion paused" \
-    IGNORE_PENDING_CHECKS="Aggregate check status,recheck" \
-    IGNORE_FAILED_CHECKS="Aggregate check status,recheck" \
+    IGNORE_PENDING_CHECKS="Aggregate check status,recheck,recap" \
+    IGNORE_FAILED_CHECKS="Aggregate check status,recheck,recap" \
         "$SCRIPT_ROOT/bin/check-master-ci-green" "$MASTER_SHA" || fail "master HEAD is not green on CI (set SKIP_CI_CHECK=1 to bypass)"
 fi
 

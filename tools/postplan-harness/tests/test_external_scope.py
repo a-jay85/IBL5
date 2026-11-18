@@ -439,6 +439,11 @@ def test_dm_comment_trailing_backslash_does_not_hide_next_line():
     assert external_send_change(DM, sec) is not None
 
 
+def test_dm_new_function_named_like_external_command_is_one_way():
+    for name in ("sleep", "rm", "mv"):
+        assert external_send_change(DM, _dm(350, f"+{name}() {{ :; }}")) == _R_SEND
+
+
 def test_dm_exit_in_new_function_is_one_way():
     sec = _dm(150, "+early() {", "+    exit 0", "+}", "+early")
     assert external_send_change(DM, sec) == _R_DM_FLOW

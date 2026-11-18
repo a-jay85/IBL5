@@ -14,6 +14,7 @@ the same contract as `workflow_scope.workflow_send_change`.
 from __future__ import annotations
 
 import re
+import shutil
 
 from harness.workflow_scope import _HUNK_RE, _R_BAD_HUNK, _R_BAD_SECTION, _R_TRUNCATED, _SECTION_META
 
@@ -63,7 +64,14 @@ _DM_SAFE_COMMANDS = frozenset((
     "date", "ps", "dirname", "basename", "mkdir", "cat", "grep", "true", "false", ":",
     "local", "say",
 ))
-_DM_CONTROL = frozenset(("exit", "return", "break", "continue", "shift"))
+# Commands the script runs that a same-named function would silently replace. A PATH lookup
+# backs this up for names not listed.
+_DM_SHADOWABLE = frozenset((
+    "sleep", "rm", "mv", "cp", "ln", "ls", "touch", "chmod", "kill", "wait", "read", "trap",
+    "mktemp", "sort", "uniq", "stat", "id", "hostname", "uname", "timeout", "tee", "ssh", "curl",
+    "unset", "export", "declare", "typeset", "readonly", "set", "unalias", "alias", "cd", "pwd",
+))
+_DM_CONTROL = frozenset(("exit","return", "break", "continue", "shift"))
 _DM_SAFE_TARGETS = ("/dev/null", "1", "2", "-")
 # Scanned over the whole joined command, quoted text included, before any parsing.
 _DM_DENY_RE = re.compile(
@@ -691,8 +699,13 @@ def _dm_reason(hunks: list[tuple[int, int, list[str]]]) -> str | None:
         for ln in body:
             m = _DM_FUNC_RE.match(ln[1:]) if ln[:1] == "+" else None
             if m is not None and m.group(1) not in _DM_EXISTING_FUNCS:
-                if m.group(1) in _DM_SAFE_COMMANDS | _DM_CONTROL | _DM_TESTS:
-                    return _R_SEND  # a function named like a builtin changes what that builtin does
+                if (
+                    m.group(1) in _DM_SAFE_COMMANDS | _DM_CONTROL | _DM_TESTS | _DM_SHADOWABLE
+                    or shutil.which(m.group(1)) is not None
+                ):
+                    # A function named like a builtin or an external command (`sleep`, `rm`, `mv`)
+                    # changes what every unchanged call site runs.
+                    return _R_SEND
                 new_funcs.add(m.group(1))
     allowed = _DM_SAFE_COMMANDS | _DM_CONTROL | new_funcs
     for old_start, new_start, body in hunks:

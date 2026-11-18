@@ -103,8 +103,13 @@ SH
     cat > "$STUB/bin/curl" <<'SH'
 #!/usr/bin/env bash
 echo "curl $*" >> "$STUB/curl.log"
-case "$*" in *create-thread*) echo "CREATE_THREAD" >> "$STUB/calls.log";; *post-to-thread*) echo "POST_TO_THREAD" >> "$STUB/calls.log";; *reply-to-message*) echo "REPLY_TO_MESSAGE" >> "$STUB/calls.log";; *get-message*) echo "GET_MESSAGE" >> "$STUB/calls.log";; *mention*) echo "MENTION" >> "$STUB/calls.log";; esac
+case "$*" in *post-with-mention*) echo "$*" >> "$STUB/pwm.log"; echo "POST_WITH_MENTION" >> "$STUB/calls.log";; esac
+case "$*" in *post-with-mention*) ;; *create-thread*) echo "CREATE_THREAD" >> "$STUB/calls.log";; *post-to-thread*) echo "POST_TO_THREAD" >> "$STUB/calls.log";; *reply-to-message*) echo "REPLY_TO_MESSAGE" >> "$STUB/calls.log";; *get-message*) echo "GET_MESSAGE" >> "$STUB/calls.log";; *mention*) echo "MENTION" >> "$STUB/calls.log";; esac
 case "$*" in
+  *post-with-mention*)
+    [ "${STUB_PWM_FAIL:-0}" = 1 ] && exit 22
+    echo '{"ok":true,"target":"'"${STUB_PWM_TARGET:-thread}"'","message_id":"1420000000000000001"}'
+    ;;
   *create-thread*)
     if [ "${STUB_CREATE_THREAD_FAIL:-0}" = 1 ]; then
       echo '{}'   # no thread_id key → bot_create_thread's `jq -r '.thread_id // empty'` yields empty
@@ -139,6 +144,14 @@ echo "GH $*" >> "$STUB/calls.log"
 printf '%s\n' "$@" >> "$STUB/gh.args.log"   # one arg per line — proves title is a single argv element
 case "$*" in
   *"issue create"*) [ "${GH_FAIL:-0}" = 1 ] && exit 1; echo "https://github.com/${BUG_PIPELINE_ISSUE_REPO}/issues/${STUB_ISSUE_NUMBER:-4242}" ;;
+  *"issue view"*stateReason*)
+      # Applies the driver's real --jq filter to a fixture, so a hostile title/comment in the
+      # fixture proves the filter (not the stub) keeps it out of the tick.
+      [ "${GH_FAIL:-0}" = 1 ] && exit 1
+      inum=""; filt=""; prev=""
+      for a in "$@"; do [ "$prev" = "view" ] && inum="$a"; [ "$prev" = "--jq" ] && filt="$a"; prev="$a"; done
+      [ -f "$STUB/gh-issue-$inum.json" ] || exit 1
+      jq -r "$filt" "$STUB/gh-issue-$inum.json" ;;
   *"pr list"*headRefOid*)
       # CI-autofix detection path: --json number,headRefName,headRefOid,isDraft
       # driver's --jq already applied → emit pre-filtered "NUM BRANCH SHA" lines
@@ -251,6 +264,81 @@ printf '%s\n' '---END---' >> "$STUB/dm.stdin.log"
 exit "${STUB_DM_RC:-0}"
 SH
 
+    # issue-notice wrapper stubs (Phase 2 CLI): per-issue state lives in $STUB/notices/<n>.state so a
+    # claim persists across two tick runs. With no rows.json fixture they are inert (empty list).
+    mkdir -p "$STUB/notices"
+    cat > "$STUB/notice-lib.sh" <<'SH'
+notice_n() { for a in "$@"; do case "$a" in --issue=*) printf '%s' "${a#--issue=}";; esac; done; }
+notice_state() { # n -> current state (state file wins over the fixture's .state)
+    if [ -f "$STUB/notices/$1.state" ]; then cat "$STUB/notices/$1.state"; return; fi
+    jq -r --argjson n "$1" '[.[] | select(.issue_number == $n)][0].state // "pending"' "$STUB/notices/rows.json" 2>/dev/null
+}
+SH
+    cat > "$STUB/scripts/issue-notice-pending.php" <<'SH'
+#!/usr/bin/env bash
+. "$STUB/notice-lib.sh"
+echo "pending $*" >> "$STUB/notice-calls.log"
+[ -f "$STUB/notices/rows.json" ] || { echo '[]'; exit 0; }
+out='[]'
+while IFS= read -r row; do
+    n="$(printf '%s' "$row" | jq -r '.issue_number')"
+    [ "$(notice_state "$n")" = pending ] && out="$(printf '%s' "$out" | jq -c --argjson r "$row" '. + [$r | del(.state)]')"
+done < <(jq -c '.[]' "$STUB/notices/rows.json")
+printf '%s' "$out"
+SH
+    cat > "$STUB/scripts/issue-notice-claim.php" <<'SH'
+#!/usr/bin/env bash
+. "$STUB/notice-lib.sh"
+n="$(notice_n "$@")"
+echo "claim $n" >> "$STUB/notice-calls.log"
+[ -n "${STUB_CLAIM_EMPTY:-}" ] && exit 0
+if [ "$(notice_state "$n")" = pending ]; then printf claimed > "$STUB/notices/$n.state"; printf claimed; fi
+SH
+    cat > "$STUB/scripts/issue-notice-mark.php" <<'SH'
+#!/usr/bin/env bash
+. "$STUB/notice-lib.sh"
+n="$(notice_n "$@")"
+echo "mark $*" >> "$STUB/notice-calls.log"
+[ "${STUB_MARK_FAIL:-0}" = 1 ] && exit 1
+if [ "$(notice_state "$n")" = claimed ]; then
+    printf notified > "$STUB/notices/$n.state"
+    for a in "$@"; do case "$a" in --reason=*) printf '%s' "${a#--reason=}" > "$STUB/notices/$n.reason";; esac; done
+    printf notified
+fi
+SH
+    cat > "$STUB/scripts/issue-notice-release.php" <<'SH'
+#!/usr/bin/env bash
+. "$STUB/notice-lib.sh"
+n="$(notice_n "$@")"
+echo "release $n" >> "$STUB/notice-calls.log"
+[ "$(notice_state "$n")" = claimed ] || exit 0
+a=$(( $(cat "$STUB/notices/$n.attempts" 2>/dev/null || echo 0) + 1 )); echo "$a" > "$STUB/notices/$n.attempts"
+if [ "$a" -ge 5 ]; then printf failed > "$STUB/notices/$n.state"; printf failed; else printf pending > "$STUB/notices/$n.state"; printf pending; fi
+SH
+    cat > "$STUB/scripts/issue-notice-skip.php" <<'SH'
+#!/usr/bin/env bash
+. "$STUB/notice-lib.sh"
+n="$(notice_n "$@")"
+echo "skip $n" >> "$STUB/notice-calls.log"
+[ "$(notice_state "$n")" = claimed ] && { printf skipped > "$STUB/notices/$n.state"; printf skipped; }
+exit 0
+SH
+    cat > "$STUB/scripts/issue-notice-stale.php" <<'SH'
+#!/usr/bin/env bash
+cat "$STUB/notices/stale.json" 2>/dev/null || echo '[]'
+SH
+    cat > "$STUB/scripts/issue-notice-seed.php" <<'SH'
+#!/usr/bin/env bash
+. "$STUB/notice-lib.sh"
+n="$(notice_n "$@")"
+[ "$(notice_state "$n")" = pending ] && { printf seeded > "$STUB/notices/$n.state"; printf seeded; }
+exit 0
+SH
+    cat > "$STUB/scripts/issue-notice-upsert.php" <<'SH'
+#!/usr/bin/env bash
+echo "upsert $*" >> "$STUB/notice-calls.log"
+SH
+
     chmod +x "$STUB"/bin/* "$STUB"/scripts/*.php
 
     export STUB
@@ -305,6 +393,8 @@ bpt_reset() {
           "$STUB"/gh-pr-list-ci.out "$STUB"/gh-pr-checks-*.out \
           "$STUB"/ledger.json 2>/dev/null
     rm -rf "$STUB"/wt/* 2>/dev/null
+    rm -rf "$STUB"/notices "$STUB"/gh-issue-*.json 2>/dev/null
+    mkdir -p "$STUB/notices"
     # ci-autofix.lock is a directory (mkdir-based); rm -f silently fails on it
     rm -rf "$STUB"/ci-autofix.lock 2>/dev/null
     # prune worktrees from fake-repo added by ci-autofix wire tests
@@ -313,7 +403,7 @@ bpt_reset() {
     unset GH_FAIL STUB_THREAD_ID STUB_MESSAGE_ID STUB_ISSUE_NUMBER WT_NEW_FAIL STUB_CREATE_THREAD_FAIL \
           CLAIM_NEXT_RC LIST_ACTIVE_RC \
           STUB_MERGE_STATE STUB_MERGEABLE STUB_PR_VIEW_FAIL \
-          STUB_DM_RC STUB_POST_THREAD_FAIL \
+          STUB_DM_RC STUB_POST_THREAD_FAIL STUB_PWM_FAIL STUB_PWM_TARGET STUB_MARK_FAIL STUB_CLAIM_EMPTY \
           BUG_PIPELINE_FILE_ISSUES_ONLY STUB_REPLY_FAIL
 }
 

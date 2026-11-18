@@ -145,6 +145,17 @@ file_and_close_row() { # row_json
                 || log "file_and_close_row $id: reply failed (continuing)"
         fi
     fi
+    # Register the issue so a later close can be announced to the reporter (best-effort).
+    local reporter chan notice_args
+    reporter="$(printf '%s' "$row" | jq -r '.discord_author_id // empty')"
+    chan="$(printf '%s' "$row" | jq -r '.channel_id // empty')"
+    notice_args=(--issue="$n")
+    [ -n "$reporter" ] && notice_args+=(--reporter="$reporter")
+    [ -n "$chan" ] && notice_args+=(--channel="$chan")
+    [ -n "$tid" ] && notice_args+=(--thread="$tid")
+    [ -n "$msg_id" ] && notice_args+=(--message="$msg_id")
+    cli issue-notice-upsert "${notice_args[@]}" >/dev/null \
+        || log "issue-notice-upsert failed for #$n (best-effort)"
     cli transition "$id" filed --issue="$n" $clear_opt $thread_opt >/dev/null \
         && log "file_and_close_row $id: → filed (issue $n)"
 }
@@ -247,6 +258,19 @@ bot_mention() { # thread_id discord_id message  -> echoes message_id
         -H 'Content-Type: application/json' \
         -d "$(jq -nc --arg t "$1" --arg d "$2" --arg m "$3" '{thread_id:$t,discord_id:$d,message:$m}')" 2>/dev/null \
         | jq -r '.message_id // empty' 2>/dev/null
+}
+
+bot_post_with_mention() { # thread_id message_id reporter_id text  -> echoes the target used
+    # One call posts at most once: the bot picks thread, reply or channel itself and never
+    # falls through after a failed send, so a failure here is safe to release and retry.
+    "$CURL_BIN" -s --fail -X POST "$BOT_BASE_URL/post-with-mention" \
+        -H 'Content-Type: application/json' \
+        -d "$(jq -nc --arg t "$1" --arg m "$2" --arg d "$3" --arg x "$4" \
+            '{message:$x}
+             + (if $t != "" then {thread_id:$t} else {} end)
+             + (if $m != "" then {reply_to_message_id:$m} else {} end)
+             + (if $d != "" then {discord_id:$d} else {} end)')" \
+        | jq -r '.target // empty'
 }
 
 # Direct-DM the approver when a hunt escalates to needs_human (§ decisions 3/4/5).
@@ -1675,6 +1699,72 @@ reconcile_pr_open_rows() {
     return 0
 }
 
+# ── Close notices (public repo: every input below is untrusted) ───────────────
+# close_notice_text <n> <STATE_REASON> — prints "<token>\t<text>". The only text that reaches
+# Discord: fixed words, a digits-only issue number and the URL. No title, body or comment.
+close_notice_text() {
+    local n="$1" reason="${2:-}" url
+    [[ "$n" =~ ^[0-9]+$ ]] || return 1
+    url="https://github.com/${BUG_PIPELINE_ISSUE_REPO}/issues/$n"
+    case "$reason" in
+        COMPLETED)   printf 'completed\tThis bug report was closed as fixed. Thanks for reporting it! %s\n' "$url" ;;
+        NOT_PLANNED) printf 'not_planned\tThis bug report was closed as not planned. %s\n' "$url" ;;
+        DUPLICATE)   printf 'duplicate\tThis bug report was closed as a duplicate of an existing report. %s\n' "$url" ;;
+        *)           printf 'other\tThis bug report was closed. %s\n' "$url" ;;
+    esac
+}
+
+# Poll each tracked pending issue; post one notice per close. The DB claim decides who posts:
+# pending -> claimed (affected rows = 1) before the post, claimed -> notified after it. A crash in
+# between leaves the row claimed, logged every tick and never re-posted (at-most-once).
+notify_closed_issues() {
+    local stale rows row n reporter thread msg cstate state reason notice token text target res s
+    stale="$(cli issue-notice-stale)" || stale=''
+    if printf '%s' "$stale" | jq -e 'type == "array"' >/dev/null 2>&1; then
+        while IFS= read -r s; do
+            [ -n "$s" ] && log "ERROR: close notice for issue $s stuck in claimed"
+        done < <(printf '%s' "$stale" | jq -r '.[]' 2>/dev/null)
+    fi
+    rows="$(cli issue-notice-pending --limit=25)" || return 0
+    printf '%s' "$rows" | jq -e 'type == "array"' >/dev/null 2>&1 || return 0
+    while IFS= read -r row; do
+        [ -n "$row" ] || continue
+        n="$(printf '%s' "$row" | jq -r '.issue_number // empty')"
+        [[ "$n" =~ ^[0-9]+$ ]] || continue
+        reporter="$(printf '%s' "$row" | jq -r '.reporter_discord_id // empty')"
+        thread="$(printf '%s' "$row" | jq -r '.thread_id // empty')"
+        msg="$(printf '%s' "$row" | jq -r '.original_message_id // empty')"
+        if [ -n "$reporter" ] && ! [[ "$reporter" =~ ^[0-9]{17,20}$ ]]; then
+            log "close notice for issue $n: dropping malformed reporter id"
+            reporter=''
+        fi
+        cstate="$(bpgh_issue_close_state "$n")" || continue
+        state="${cstate%% *}"
+        reason=''
+        [ "$cstate" != "$state" ] && reason="${cstate#* }"
+        [ "$state" = "CLOSED" ] || continue
+        [ "$(cli issue-notice-claim --issue="$n")" = claimed ] || continue
+        if [ -z "$reporter" ] && [ -z "$thread" ] && [ -z "$msg" ]; then
+            cli issue-notice-skip --issue="$n" >/dev/null
+            log "close notice for issue $n: no reporter and no location — skipped"
+            continue
+        fi
+        notice="$(close_notice_text "$n" "$reason")" || { cli issue-notice-release --issue="$n" >/dev/null; continue; }
+        token="${notice%%$'\t'*}"
+        text="${notice#*$'\t'}"
+        if target="$(bot_post_with_mention "$thread" "$msg" "$reporter" "$text")" && [ -n "$target" ]; then
+            cli issue-notice-mark --issue="$n" --reason="$token" >/dev/null \
+                || log "ERROR: close notice for issue $n posted but mark failed — row stays claimed"
+            log "close notice for issue $n ($token) posted via $target"
+        else
+            res="$(cli issue-notice-release --issue="$n")"
+            [ "$res" = failed ] && log "ERROR: close notice for issue $n failed 5 times"
+            log "close notice for issue $n: post failed (release -> ${res:-unknown})"
+        fi
+    done < <(printf '%s' "$rows" | jq -c '.[]' 2>/dev/null)
+    return 0
+}
+
 # ── Main: empty-tick guard then dispatch ──────────────────────────────────────
 main() {
     # Heartbeat FIRST — before the preflight can `return 1`. This records "launchd fired
@@ -1724,6 +1814,7 @@ main() {
     # are cost-safe: reconcile only touches existing pr_open rows; maybe_hunt spawns zero
     # `claude` unless it actually claims a row.
     reconcile_pr_open_rows
+    notify_closed_issues
     # One hunt per tick: a claimed hunt runs foreground to completion, then the tick ends —
     # overlapping ticks can't double-hunt the same row (single-flight invariant 1).
     # Skipped in file-issues-only mode — no autonomous hunting.

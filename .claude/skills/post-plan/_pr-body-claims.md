@@ -1,6 +1,6 @@
 ---
 description: "PR body authoring rules: version/baseline citations must name their source file; external-state claims must carry a link or command output; negative-claim bullets must be re-read after every commit; coordinate citations (file:line, backlog row IDs) must be re-verified after every commit; Summary sentences about a touched file must be re-read; measured values must update the body in the same phase; test counts must come from a measurement and name their unit; departures from plan-exact content must be declared; backlog closing keywords come from the plan via the shared normalizer snippet; every body carries one Merge danger line whose Door is mechanically derived and never lowered below that floor, with a Self-governing segment for arming-path and gate-removed changes; an advisory How to revert line follows it; a Removed guards block lists every flagged guard removal with a one-line reason; pr-copy writes no exact count its packet does not show; a body names edited items and never tallies them by hand; an Unplanned change reasons section gives each unplanned path a one-line reason and never declares scope."
-last_verified: 2026-11-16
+last_verified: 2026-11-18
 ---
 
 # PR Body Claims
@@ -309,6 +309,8 @@ The extraction is section-bounded. It starts at the `## Declared scope` heading 
 ### Kept unplanned changes (runner-written)
 
 Phase 5.5 writes this block when it keeps a change that the fidelity reviewer tagged `[unplanned-scope]` and that no post-plan fix commit introduced. It is delimited by `<!-- kept-unplanned:begin -->` and `<!-- kept-unplanned:end -->` and carries its own `## Kept unplanned changes` heading, one bullet per kept change: the behavior first, then the paths. Never move these bullets under `## Declared scope`. That section is the author's path list, and `bin/lib/plan-scope-conformance` treats every path in it as declared. Never hand-edit the block. To veto a kept change, revert it and let the next run drop the block.
+
+An entry turns a `NOT READY` verdict into `READY` (or `READY WITH NOTES` when the review has notes) only when two things hold. The reviewer's finding quotes the owner as `owner: "..."`, and that quote appears in the verified `~/claude-plans/_intent/<branch>.md` payload. A hand-edited block alone changes nothing. To qualify a plan-driven run, go to the session where the owner asked for the extra change. Run `bin/capture-intent --list`, then `bin/capture-intent <indices>` on those turns, before you fire `bin/post-plan-now`. Without that file the verdict stays `NOT READY`. The sticky lists each qualifying item under `### Kept new scope (you asked for this)` with the owner's quoted words.
 
 ## Unplanned change reasons
 

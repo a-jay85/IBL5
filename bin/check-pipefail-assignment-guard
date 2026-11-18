@@ -1,0 +1,252 @@
+#!/bin/bash
+#
+# bin/check-pipefail-assignment-guard: keep new pipeline-status traps out of errexit+pipefail scripts.
+#
+# Under set -e plus pipefail, a pipeline's status is its rightmost non-zero stage. Three
+# shapes turn that into an abort that skips the script's own fallback code:
+#   pipeline-status  v=$(producer | filter) with no || on the statement, or a pipeline
+#                    statement whose last stage is grep (exit 1 on no match). An echo or
+#                    printf producer counts only when the last stage is grep.
+#   default-form     "${V:-$(producer | filter)}" or ${V:=...}. The fallback test after
+#                    it never runs.
+#   early-exit       a consumer that quits before its producer ends, for example
+#                    git worktree list --porcelain | awk '/^worktree / {print $2; exit}'
+#                    (also head, and sed with q). The producer exits 141 on SIGPIPE.
+#                    Flagged even with || true, which also drops a real failure.
+# See .claude/rules/shell-pipefail-grep.md for the rewrites.
+#
+# Skipped: comment lines; for pipeline-status only, lines holding && or ||, if/elif/while/
+# until/! conditions, local/export/readonly/declare assignments (they mask the status), and
+# lines ending in \ or |. A line ending in "# pipefail-ok: <reason>" with a non-empty
+# reason is exempt. The matcher is quote-blind and reads one physical line, so it misses
+# some sites. Known false positive: awk '... END {exit 1}' reads all input yet is flagged.
+#
+# Scope: added lines of shell files under bin/ that set both errexit and pipefail. When an
+# added line sets either one and the file was not armed by both at the merge-base, the
+# whole current file is scanned. The base is passed in with --since=<ref>, never derived
+# from repo state. Diffs compare the working tree against the merge-base, so staged and
+# unstaged tracked changes count. Untracked files do not.
+#
+# Harness fixtures are built by concatenation, so the harness passes this gate.
+#
+# gate-backtest-argv: --since={base}
+#
+# Bash 3.2 safe (macOS /bin/bash): no mapfile, no associative arrays, no ${x,,}.
+#
+# Exit codes: 0 = pass, 1 = violation found, 2 = usage or git error.
+
+set -euo pipefail
+
+usage() {
+    echo "usage: bin/check-pipefail-assignment-guard --since=<ref>"
+}
+
+die() {
+    echo "check-pipefail-assignment-guard: $1" >&2
+    exit 2
+}
+
+since=""
+if [ "$#" -eq 0 ]; then
+    usage >&2
+    die "use --since=<ref>"
+fi
+for arg in "$@"; do
+    case "$arg" in
+        -h|--help) usage; exit 0 ;;
+        --since=?*) since="${arg#--since=}" ;;
+        --since=) die "use --since=<ref>" ;;
+        --since) die "use --since=<ref> (the = form is required)" ;;
+        -*) die "unknown option: $arg" ;;
+        *) die "use --since=<ref> (unexpected argument: $arg)" ;;
+    esac
+done
+[ -n "$since" ] || die "use --since=<ref>"
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) || die "not inside a git repository"
+cd "$root"
+
+git rev-parse --verify --quiet "${since}^{commit}" >/dev/null || die "cannot resolve ref: $since"
+mb=$(git merge-base "$since" HEAD 2>/dev/null) || die "no merge-base (shallow clone?)"
+
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
+gitdiff() {
+    git -c core.quotePath=false diff --no-color --no-ext-diff --no-textconv \
+        --src-prefix=a/ --dst-prefix=b/ "$@"
+}
+
+# Run a diff into a file. A non-zero git exit is a usage or git error, never a pass.
+diff_to() {
+    local out="$1"
+    shift
+    gitdiff "$@" >"$out" || die "git diff failed: $*"
+}
+
+SQ="'"
+SHEBANG_RE='^#!.*[/[:space:]](bash|sh)([[:space:]]|$)'
+PIPEFAIL_RE='^[[:space:]]*set([[:space:]]+[-+][A-Za-z]+([[:space:]]+[a-z]+)?)*[[:space:]]+-[A-Za-z]*o[[:space:]]+pipefail'
+ERREXIT_RE='^[[:space:]]*set([[:space:]]+[-+][A-Za-z]+([[:space:]]+[a-z]+)?)*[[:space:]]+(-[A-Za-z]*e[A-Za-z]*|-o[[:space:]]+errexit)([[:space:]]|$)'
+ESCAPE_RE='#[[:space:]]*pipefail-ok:[[:space:]]*[^[:space:]]'
+SINGLE_PIPE_RE='(^|[^|])[|]([^|]|$)'
+ASSIGN_RE='^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*=[$][(]'
+DEFAULT_RE='[$][{][A-Za-z_][A-Za-z0-9_]*:?[-=][$][(]'
+CONTROL_RE='^[[:space:]]*(if|elif|while|until|!)[[:space:]]'
+EARLY_AWK_RE='[|][[:space:]]*awk[[:space:]][^|]*[^[:alnum:]_]exit([^[:alnum:]_]|$)'
+EARLY_HEAD_RE='[|][[:space:]]*head([[:space:]]|[)]|$)'
+EARLY_SED_RE="[|][[:space:]]*sed[[:space:]][^|]*[0-9/;{${SQ}][qQ]([;}${SQ}\"[:space:])]|\$)"
+HUNK_RE='^@@ -[0-9,]+ \+([0-9]+)'
+
+# Sets ARMED=1 when the file sets both errexit and pipefail on a non-comment line.
+armed_file() {
+    local x pf=0 ee=0
+    ARMED=0
+    while IFS= read -r x || [ -n "$x" ]; do
+        [[ $x =~ ^[[:space:]]*# ]] && continue
+        [[ $x =~ $PIPEFAIL_RE ]] && pf=1
+        [[ $x =~ $ERREXIT_RE ]] && ee=1
+    done <"$1"
+    [ "$pf" -eq 1 ] && [ "$ee" -eq 1 ] && ARMED=1
+    return 0
+}
+
+# Sets PW to the first word of the line's first pipeline stage.
+producer_word() {
+    local s="$1"
+    s="${s%%|*}"
+    s="${s##*\$(}"
+    s="${s##*;}"
+    s="${s##*&&}"
+    s="${s#"${s%%[![:space:]]*}"}"
+    case "$s" in
+        'if '*|'elif '*|'while '*|'until '*|'! '*) s="${s#* }" ;;
+    esac
+    s="${s#"${s%%[![:space:]]*}"}"
+    PW="${s%%[[:space:]]*}"
+}
+
+# Sets SHAPE to the first shape the line matches, or "" when clean or exempt.
+check_line() {
+    local raw="$1" code last lw
+    SHAPE=""
+    [[ $raw =~ $ESCAPE_RE ]] && return 0
+    code="${raw%%[[:space:]]#*}"
+    code="${code%"${code##*[![:space:]]}"}"
+    [[ $code =~ $SINGLE_PIPE_RE ]] || return 0
+    producer_word "$code"
+    if [ "$PW" != echo ] && [ "$PW" != printf ]; then
+        if [[ $code =~ $EARLY_AWK_RE ]] || [[ $code =~ $EARLY_HEAD_RE ]] || [[ $code =~ $EARLY_SED_RE ]]; then
+            SHAPE=early-exit
+            return 0
+        fi
+        if [[ $code =~ $DEFAULT_RE ]]; then
+            SHAPE=default-form
+            return 0
+        fi
+    fi
+    case "$code" in
+        *'||'*|*'&&'*|*'\'|*'|') return 0 ;;
+    esac
+    [[ $code =~ $CONTROL_RE ]] && return 0
+    last="${code##*|}"
+    last="${last#"${last%%[![:space:]]*}"}"
+    lw="${last%%[[:space:]]*}"
+    lw="${lw%)}"
+    if [[ $code =~ $ASSIGN_RE ]]; then
+        if [ "$lw" = grep ] || { [ "$PW" != echo ] && [ "$PW" != printf ]; }; then
+            SHAPE=pipeline-status
+        fi
+        return 0
+    fi
+    case "$code" in
+        *'$('*|*'<('*) return 0 ;;
+    esac
+    if [ "$lw" = grep ] || [ "$lw" = egrep ] || [ "$lw" = fgrep ]; then SHAPE=pipeline-status; fi
+    return 0
+}
+
+# --no-renames: a file moved into bin/ shows every line as added.
+diff_to "$tmp/full.diff" --no-renames -U0 "$mb" -- bin/
+rc=0
+grep -E '^(\+|@@ )' "$tmp/full.diff" >"$tmp/added.diff" || rc=$?
+[ "$rc" -le 1 ] || die "grep failed on the diff"
+
+: >"$tmp/hits"
+: >"$tmp/fullscan"
+
+path=""
+line=0
+elig=0
+while IFS= read -r l; do
+    case "$l" in
+        '+++ /dev/null')
+            path=""
+            elig=0
+            ;;
+        '+++ b/'*)
+            path="${l#+++ b/}"
+            elig=0
+            f="$root/$path"
+            if [ -f "$f" ]; then
+                first=""
+                IFS= read -r first <"$f" || true
+                if [[ $first =~ $SHEBANG_RE ]] || [[ $path == *.sh ]]; then
+                    armed_file "$f"
+                    elig=$ARMED
+                fi
+            fi
+            ;;
+        '@@ '*)
+            if [[ $l =~ $HUNK_RE ]]; then
+                line=${BASH_REMATCH[1]}
+            fi
+            ;;
+        '+'*)
+            c="${l#+}"
+            if [ "$elig" -eq 1 ] && ! [[ $c =~ ^[[:space:]]*# ]]; then
+                if [[ $c =~ $PIPEFAIL_RE ]] || [[ $c =~ $ERREXIT_RE ]]; then
+                    echo "$path" >>"$tmp/fullscan"
+                fi
+                check_line "$c"
+                if [ -n "$SHAPE" ]; then
+                    echo "$path:$line: [$SHAPE] ${c#"${c%%[![:space:]]*}"}" >>"$tmp/hits"
+                fi
+            fi
+            line=$((line + 1))
+            ;;
+    esac
+done <"$tmp/added.diff"
+
+# Errexit+pipefail newly armed: scan every line of the current file.
+if [ -s "$tmp/fullscan" ]; then
+    sort -u "$tmp/fullscan" >"$tmp/fullscan.u"
+    while IFS= read -r p; do
+        # Already armed at the merge-base: an edit to a set line arms nothing new.
+        ARMED=0
+        if git show "$mb:$p" >"$tmp/base.file" 2>/dev/null; then
+            armed_file "$tmp/base.file"
+        fi
+        [ "$ARMED" -eq 1 ] && continue
+        n=0
+        while IFS= read -r x || [ -n "$x" ]; do
+            n=$((n + 1))
+            [[ $x =~ ^[[:space:]]*# ]] && continue
+            check_line "$x"
+            if [ -n "$SHAPE" ]; then
+                echo "$p:$n: [$SHAPE] ${x#"${x%%[![:space:]]*}"}" >>"$tmp/hits"
+            fi
+        done <"$root/$p"
+    done <"$tmp/fullscan.u"
+fi
+
+if [ -s "$tmp/hits" ]; then
+    sort -t: -k1,1 -k2,2n -u "$tmp/hits"
+    echo "fix: [pipeline-status] put the fallback on the statement: v=\$(cmd | filter) || v=''"
+    echo "fix: [default-form] capture first, then default: v=\$(cmd | filter) || v=''; V=\"\${V:-\$v}\""
+    echo "fix: [early-exit] read all input: awk '/re/ && !f {print; f=1}' or sed -n '1s/^x //p'. A trailing || true also hides a real failure."
+    echo "fix: see .claude/rules/shell-pipefail-grep.md, or end the line with # pipefail-ok: <reason>"
+    exit 1
+fi
+
+echo "check-pipefail-assignment-guard: OK"

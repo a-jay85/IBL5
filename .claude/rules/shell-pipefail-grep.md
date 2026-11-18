@@ -1,6 +1,6 @@
 ---
-description: Avoid printf-pipe-grep-q under set -o pipefail — use herestring to prevent SIGPIPE false failures on Linux.
-last_verified: 2026-10-22
+description: Avoid printf-pipe-grep-q under set -o pipefail (herestring, no SIGPIPE), and keep pipeline-status traps out of errexit+pipefail bin/ scripts (two diff gates).
+last_verified: 2026-11-16
 paths: "bin/**"
 ---
 
@@ -46,3 +46,15 @@ ShellCheck does not catch this pattern — it passes SC lint.
 ## Early-exit awk and head
 
 The same SIGPIPE hits any consumer that quits before its producer finishes: `awk '... {print $2; exit}'`, `head -1`. `git worktree list --porcelain | awk '/^worktree / {print $2; exit}'` returns 141 once the list outgrows a pipe buffer, and `set -euo pipefail` kills the script with no output. Keep reading all input instead: `awk '/^worktree / && !f {print $2; f=1}'` or `sed -n '1s/^worktree //p'`. Appending `|| true` hides the failure but also drops a real one. Tiny producers (a few lines) are safe.
+
+## Pipeline status under errexit
+
+`bin/check-pipefail-assignment-guard` fails a PR that adds one of three shapes to a `bin/` shell file that sets both errexit and pipefail:
+
+- **pipeline-status.** `v=$(cmd | filter)` with no `||` on the statement, or a pipeline statement whose last stage is `grep`. A failing `cmd`, or a `grep` with no match, aborts the script before the next line can test `$v`. An `echo` or `printf` producer counts only when the last stage is `grep`.
+- **default-form.** `"${V:-$(cmd | filter)}"` or `${V:=...}`. The fallback on the next line never runs.
+- **early-exit.** A `cmd | awk '... exit'`, `cmd | head`, or `cmd | sed ...q` stage. The gate flags it even with `|| true`, because `|| true` also drops a real failure. Use the rewrites in the section above.
+
+To fix a hit, put the fallback on the statement (`v=$(cmd | filter) || v=''`), or capture first and apply the default after. When a site is safe, end the line with `# pipefail-ok: <reason>`. The reason must be non-empty.
+
+The gate reads only added lines, plus the whole file when the PR newly arms errexit and pipefail. It skips `local v=$(...)`, `if` or `while` conditions, and `< <(...)` process substitutions, because the shell ignores their status. The matcher does not parse quotes or join continued lines, so a gate pass does not prove a line is safe. `bin/test-check-pipefail-assignment-guard` holds a fixture for each review finding behind backlog issue 1645.

@@ -171,6 +171,8 @@ HUNT_LOG="${BUG_PIPELINE_HUNT_LOG:-$HOME/.claude/logs/bug-pipeline-hunt.log}"
 # Deliberately epoch-only — never a formatted timestamp — so the host-local `date -j`
 # skew in epoch_of()/future_ts() cannot leak into the recency comparison.
 TICK_HEARTBEAT="${BUG_PIPELINE_TICK_HEARTBEAT:-$HOME/.claude/logs/bug-pipeline-tick-heartbeat}"
+# Close-notice paging cursor: the last issue number the previous tick polled (see notify_closed_issues).
+NOTICE_CURSOR="${BUG_PIPELINE_NOTICE_CURSOR:-$HOME/.claude/logs/bug-pipeline-notice-cursor}"
 WT_NEW_BIN="${BUG_PIPELINE_WT_NEW_BIN:-$REPO_ROOT/bin/wt-new}"
 POST_PLAN_NOW_BIN="${BUG_PIPELINE_POST_PLAN_NOW_BIN:-$REPO_ROOT/bin/post-plan-now}"
 # Worktrees live OUTSIDE the repo (ADR-0046): a canonical sibling of the checkout.
@@ -1714,9 +1716,13 @@ close_notice_text() {
     esac
 }
 
-# Poll each tracked pending issue; post one notice per close. The DB claim decides who posts:
+# Poll tracked pending issues; post one notice per close. The DB claim decides who posts:
 # pending -> claimed (affected rows = 1) before the post, claimed -> notified after it. A crash in
 # between leaves the row claimed, logged every tick and never re-posted (at-most-once).
+# Each tick reads ONE page of at most 25 rows (at most 25 gh reads) after the issue number saved
+# in $NOTICE_CURSOR, then saves the page's last number. A short page resets the cursor to 0, so
+# open issues that stay pending never hide later rows: every row is polled within
+# ceil(pending/25) ticks.
 notify_closed_issues() {
     local stale rows row n reporter thread msg cstate state reason notice token text target res s
     stale="$(cli issue-notice-stale)" || stale=''
@@ -1725,13 +1731,19 @@ notify_closed_issues() {
             [ -n "$s" ] && log "ERROR: close notice for issue $s stuck in claimed"
         done < <(printf '%s' "$stale" | jq -r '.[]' 2>/dev/null)
     fi
-    local after=0 page=0 count last
-    while [ "$page" -lt 20 ]; do
-    page=$((page + 1))
+    local after count last
+    after="$(cat "$NOTICE_CURSOR" 2>/dev/null)" || after=0
+    [[ "$after" =~ ^[0-9]+$ ]] || after=0
     rows="$(cli issue-notice-pending --limit=25 --after="$after")" || return 0
     printf '%s' "$rows" | jq -e 'type == "array"' >/dev/null 2>&1 || return 0
     count="$(printf '%s' "$rows" | jq 'length')"
     last="$(printf '%s' "$rows" | jq -r '[.[].issue_number] | max // 0')"
+    # A full page that advances moves the cursor on; anything else starts over next tick.
+    if [ "$count" -ge 25 ] && [[ "$last" =~ ^[0-9]+$ ]] && [ "$last" -gt "$after" ]; then
+        printf '%s\n' "$last" > "$NOTICE_CURSOR" 2>/dev/null || true
+    else
+        printf '0\n' > "$NOTICE_CURSOR" 2>/dev/null || true
+    fi
     while IFS= read -r row; do
         [ -n "$row" ] || continue
         n="$(printf '%s' "$row" | jq -r '.issue_number // empty')"
@@ -1767,10 +1779,6 @@ notify_closed_issues() {
             log "close notice for issue $n: post failed (release -> ${res:-unknown})"
         fi
     done < <(printf '%s' "$rows" | jq -c '.[]' 2>/dev/null)
-    # A short page is the last one. A page that does not advance would loop forever.
-    [ "$count" -ge 25 ] && [[ "$last" =~ ^[0-9]+$ ]] && [ "$last" -gt "$after" ] || break
-    after="$last"
-    done
     return 0
 }
 

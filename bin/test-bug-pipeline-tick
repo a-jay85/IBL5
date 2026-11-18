@@ -791,6 +791,31 @@ else
     bpt_named_fail close_notice_reconcile_close_single_notice "posts=$(_cn_posts)"
 fi
 
+# 30 open pending rows, and issue 30 closes. One tick reads one page of 25 (at most 25 gh reads),
+# so tick 1 never reaches issue 30. Tick 2 starts after the saved cursor and posts its notice.
+bpt_reset
+_cn_all=""
+for _cn_i in $(seq 1 30); do
+    if [ "$_cn_i" = 30 ]; then _cn_issue 30 CLOSED COMPLETED; else _cn_issue "$_cn_i" OPEN ""; fi
+    _cn_all="${_cn_all:+$_cn_all,}$(_cn_row1 "$_cn_i")"
+done
+_cn_rows "[$_cn_all]"
+bpt_run
+_cn_reads1="$(grep -c "issue view" "$STUB/gh.log" 2>/dev/null)"
+_cn_posts1="$(_cn_posts)"
+_cn_cur1="$(cat "$STUB/notices/cursor" 2>/dev/null)"
+rm -f "$STUB/gh.log"
+bpt_run
+_cn_reads2="$(grep -c "issue view" "$STUB/gh.log" 2>/dev/null)"
+_cn_cur2="$(cat "$STUB/notices/cursor" 2>/dev/null)"
+if [ "${_cn_reads1:-0}" = 25 ] && [ "$_cn_posts1" = 0 ] && [ "$_cn_cur1" = 25 ] \
+    && [ "${_cn_reads2:-0}" -le 25 ] && [ "$(_cn_posts)" = 1 ] \
+    && [ "$(cat "$STUB/notices/30.state" 2>/dev/null)" = notified ] && [ "$_cn_cur2" = 0 ]; then
+    bpt_named_ok close_notice_pages_one_window_per_tick
+else
+    bpt_named_fail close_notice_pages_one_window_per_tick "reads=$_cn_reads1/$_cn_reads2 posts=$_cn_posts1/$(_cn_posts) cursor=$_cn_cur1/$_cn_cur2"
+fi
+
 echo "----"
 [ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"
 h_done

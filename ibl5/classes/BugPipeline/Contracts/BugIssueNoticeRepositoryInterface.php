@@ -27,7 +27,7 @@ interface BugIssueNoticeRepositoryInterface
      * @see \BugPipeline\BugIssueNoticeRepository::listPending()
      * @return list<array{issue_number: int, reporter_discord_id: ?string, thread_id: ?string, original_message_id: ?string}>
      */
-    public function listPending(int $limit): array;
+    public function listPending(int $limit, int $after = 0): array;
 
     /**
      * @see \BugPipeline\BugIssueNoticeRepository::claim()

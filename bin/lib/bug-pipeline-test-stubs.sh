@@ -280,11 +280,15 @@ SH
 . "$STUB/notice-lib.sh"
 echo "pending $*" >> "$STUB/notice-calls.log"
 [ -f "$STUB/notices/rows.json" ] || { echo '[]'; exit 0; }
+after=0; limit=25
+for a in "$@"; do case "$a" in --after=*) after="${a#--after=}";; --limit=*) limit="${a#--limit=}";; esac; done
 out='[]'
 while IFS= read -r row; do
     n="$(printf '%s' "$row" | jq -r '.issue_number')"
+    [ "$n" -gt "$after" ] || continue
+    [ "$(printf '%s' "$out" | jq 'length')" -lt "$limit" ] || break
     [ "$(notice_state "$n")" = pending ] && out="$(printf '%s' "$out" | jq -c --argjson r "$row" '. + [$r | del(.state)]')"
-done < <(jq -c '.[]' "$STUB/notices/rows.json")
+done < <(jq -c 'sort_by(.issue_number) | .[]' "$STUB/notices/rows.json")
 printf '%s' "$out"
 SH
     cat > "$STUB/scripts/issue-notice-claim.php" <<'SH'
@@ -349,6 +353,7 @@ SH
     export GH_BIN="$STUB/bin/gh"
     export BUG_PIPELINE_DM_BIN="$STUB/bin/discord-dm"
     export BUG_PIPELINE_SCRIPTS_DIR="$STUB/scripts"
+    export BUG_PIPELINE_NOTICE_CURSOR="$STUB/notices/cursor"  # bpt_reset clears notices/
     export BUG_PIPELINE_PLANS_DIR="$STUB/plans"
     export BUG_PIPELINE_ISSUE_REPO="test/bugs-fake"
     export BUG_PIPELINE_FILE_ISSUES_ONLY=''  # normal mode; per-case tests set to 1

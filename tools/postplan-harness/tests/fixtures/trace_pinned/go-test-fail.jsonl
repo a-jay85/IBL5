@@ -1,0 +1,9 @@
+{"Time":"2026-11-18T14:05:21.595983-08:00","Action":"start","Package":"example.com/scratch"}
+{"Time":"2026-11-18T14:05:21.713025-08:00","Action":"run","Package":"example.com/scratch","Test":"TestTracePinnedFoulRoll"}
+{"Time":"2026-11-18T14:05:21.713088-08:00","Action":"output","Package":"example.com/scratch","Test":"TestTracePinnedFoulRoll","Output":"=== RUN   TestTracePinnedFoulRoll\n","OutputType":"frame"}
+{"Time":"2026-11-18T14:05:21.713134-08:00","Action":"output","Package":"example.com/scratch","Test":"TestTracePinnedFoulRoll","Output":"    scratch_test.go:6: got 3, want 4\n","OutputType":"error"}
+{"Time":"2026-11-18T14:05:21.713141-08:00","Action":"output","Package":"example.com/scratch","Test":"TestTracePinnedFoulRoll","Output":"--- FAIL: TestTracePinnedFoulRoll (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-11-18T14:05:21.713146-08:00","Action":"fail","Package":"example.com/scratch","Test":"TestTracePinnedFoulRoll","Elapsed":0}
+{"Time":"2026-11-18T14:05:21.713153-08:00","Action":"output","Package":"example.com/scratch","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-11-18T14:05:21.713454-08:00","Action":"output","Package":"example.com/scratch","Output":"FAIL\texample.com/scratch\t0.117s\n","OutputType":"frame"}
+{"Time":"2026-11-18T14:05:21.713478-08:00","Action":"fail","Package":"example.com/scratch","Elapsed":0.117}

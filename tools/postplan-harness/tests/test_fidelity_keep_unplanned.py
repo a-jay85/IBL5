@@ -22,7 +22,12 @@ import runner
 GRID = "ibl5/design/components/negotiate.css"
 OTHER = "ibl5/classes/Other.php"
 FEAT = "feat: confine quick offer presets to three in a row"
-KEEP_ITEM = f"- [BLOCKING] [unplanned-scope] Remove or plan the button grid in {GRID}. Next action: move it."
+OWNER_WORDS = "please also add the button grid while you are in there"
+KEEP_ITEM = (f"- [BLOCKING] [unplanned-scope] Remove or plan the button grid in {GRID}. "
+             f'Next action: move it. owner: "{OWNER_WORDS}"')
+OWNER_PAYLOAD = {"version": 1, "session": "s",
+                 "turns": [{"timestamp": "t", "text": f"Ship it, and {OWNER_WORDS}.",
+                            "redactions": 0, "stripped": []}]}
 UNTAGGED_ITEM = "- [BLOCKING] Rename the helper in the plan's terms."
 KEPT_BODY = (f"intro\n\n{us.KEPT_BEGIN}\n## Kept unplanned changes\n"
              f"- Remove or plan the button grid in {GRID} (`{GRID}`)\n{us.KEPT_END}\n")
@@ -96,7 +101,7 @@ def test_partition_untagged_and_other_holds_untouched():
 
 def test_downgrade_all_kept(tmp_path):
     path = _verdict(tmp_path, "NOT READY", KEEP_ITEM)
-    assert us.downgrade_applies(path, _ctx(), KEPT_BODY) is True
+    assert us.downgrade_applies(path, _ctx(), KEPT_BODY, OWNER_PAYLOAD) is True
 
 
 def test_downgrade_refuses_untagged_blocker(tmp_path):

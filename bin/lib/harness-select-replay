@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# Usage: bin/lib/harness-select-replay <N>
+# Replays the last N merged PRs (N >= 20) through bin/run-shell-harnesses --select and
+# checks that every harness that failed in a tests.yml run on the PR's branch would
+# have been selected. The selection uses the current tree's scan, so a PR whose harness
+# has since changed replays against today's coverage.
+# Prints one line per PR, then a summary line. Exits 1 on any MISS, 2 on a gh failure
+# or a bad argument.
+set -euo pipefail
+
+REPO="a-jay85/IBL5"
+n="${1:-}"
+case "$n" in ''|*[!0-9]*) echo "Usage: bin/lib/harness-select-replay <N>, N an integer of at least 20" >&2; exit 2 ;; esac
+[ "$n" -ge 20 ] || { echo "Usage: bin/lib/harness-select-replay <N>, N an integer of at least 20" >&2; exit 2; }
+
+root="$(cd "$(dirname "$0")/../.." && pwd)"
+cd "$root"
+# shellcheck source=bin/lib/harness-select.sh
+. bin/lib/harness-select.sh
+total="$(hs_universe | grep -c . || true)"
+
+tmp="$(mktemp -d "${TMPDIR:-/tmp}/harness-replay.XXXXXX")"
+trap 'rm -rf "$tmp"' EXIT
+
+gh_or_die() { # <out-file> <gh args...>; runs gh, exits 2 on failure
+    local out="$1"
+    shift
+    gh "$@" >"$out" 2>"$tmp/gh.err" || { echo "replay: gh $1 $2 failed: $(head -3 "$tmp/gh.err")" >&2; exit 2; }
+}
+
+failed_names() { # <log-file>; prints each failed harness name, one per line
+    grep -oE '(^|[^A-Za-z0-9_./-])(ibl5/)?bin/test-[A-Za-z0-9_-]+ \(rc=' "$1" | grep -oE '(ibl5/)?bin/test-[A-Za-z0-9_-]+' || true
+    awk -F'\t' '$1 ~ /isolated/ && $2 ~ /^bin\/test-/ { split($2, a, " "); print a[1] }' "$1"
+}
+
+gh_or_die "$tmp/prs.tsv" pr list -R "$REPO" --state merged --limit "$n" \
+    --json number,headRefName --jq '.[] | "\(.number)\t\(.headRefName)"'
+
+prs=0 misses=0 skipped=0 selsum=0
+while IFS=$'\t' read -r num branch; do
+    [ -n "$num" ] || continue
+    prs=$((prs + 1))
+    files="$tmp/$num.files"
+    sel="$tmp/$num.sel"
+    gh_or_die "$files" api --paginate "repos/$REPO/pulls/$num/files" --jq '.[].filename'
+    bin/run-shell-harnesses --select "$files" --event pull_request --out "$sel" >"$tmp/$num.log" 2>&1 \
+        || { echo "replay: selection failed for #$num" >&2; exit 2; }
+    picked="$(cat "$sel")"
+    case "$picked" in
+        ALL) k="$total"; label=ALL ;;
+        NONE) k=0; label=NONE; skipped=$((skipped + 1)) ;;
+        *) k="$(wc -w <<<"$picked" | tr -d ' ')"; label="$k of $total" ;;
+    esac
+    selsum=$((selsum + k))
+
+    gh_or_die "$tmp/$num.runs" run list -R "$REPO" --workflow tests.yml --branch "$branch" \
+        --json databaseId,conclusion --limit 20 --jq '.[] | select(.conclusion == "failure") | .databaseId'
+    : >"$tmp/$num.failed"
+    harness_job_failed=""
+    while IFS= read -r run; do
+        [ -n "$run" ] || continue
+        gh_or_die "$tmp/$num.$run.log" run view "$run" -R "$REPO" --log-failed
+        if awk -F'\t' '$1 ~ /^Shell harness/ { f = 1 } END { exit !f }' "$tmp/$num.$run.log"; then
+            harness_job_failed=1
+        fi
+        failed_names "$tmp/$num.$run.log" >>"$tmp/$num.failed"
+    done <"$tmp/$num.runs"
+    names="$(sort -u "$tmp/$num.failed" | tr '\n' ' ')"
+    names="${names% }"
+
+    verdict=OK
+    if [ -n "$harness_job_failed" ] && [ -z "$names" ]; then
+        names=UNKNOWN
+        verdict=MISS
+    elif [ -n "$names" ] && [ "$picked" != ALL ]; then
+        for h in $names; do
+            case " $picked " in *" $h "*) ;; *) verdict=MISS ;; esac
+        done
+    fi
+    [ "$verdict" = OK ] || misses=$((misses + 1))
+    echo "#$num selected=$label failed=${names:--} verdict=$verdict"
+done <"$tmp/prs.tsv"
+
+mean="$(awk -v s="$selsum" -v p="$prs" 'BEGIN { if (p > 0) printf "%.1f", s / p; else print 0 }')"
+echo "replay: $prs PRs, $misses misses, $skipped fully skipped, mean selected $mean of $total"
+[ "$misses" -eq 0 ] || exit 1

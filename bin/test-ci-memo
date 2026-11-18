@@ -54,8 +54,10 @@ vr_if_shape() {
 # the test and analysis jobs. Path-filter outputs may gate only this allowlist.
 # A memo-only job may also need mirror-ready (ADR-0191) to pull GHCR mirror
 # images. mirror-ready reads no path-filter output, so it adds no filter skip.
+# The harness jobs also need harness-select (ADR-0261). It is memo-only itself and
+# reads no path-filter output, so it adds no filter skip either.
 CHANGES_ALLOWLIST="audit-js,audit-php,iblbot"
-MEMO_ONLY_JOBS="test harness-tests harness-tests-isolated db-integration phpstan shellcheck ibl5-ts-unit"
+MEMO_ONLY_JOBS="test harness-select harness-tests harness-tests-isolated db-integration phpstan shellcheck ibl5-ts-unit"
 UNCONDITIONAL_JOBS="static-guards"
 filter_free_topology() {
     local wf="$1" got bad=0 j
@@ -70,12 +72,13 @@ filter_free_topology() {
         awk -v job="$j" \
             -v want_needs="    needs: [ci-memo-check]" \
             -v want_needs_mirror="    needs: [ci-memo-check, mirror-ready]" \
+            -v want_needs_select="    needs: [ci-memo-check, mirror-ready, harness-select]" \
             -v want_if="    if: needs.ci-memo-check.outputs.hit != 'true'" '
             $0 == "  " job ":" { in_job=1; seen=1; next }
             /^  [a-zA-Z]/ && in_job { in_job=0 }
             in_job && /^    needs:/ { needs=$0 }
             in_job && /^    if:/    { iff=$0 }
-            END { exit !(seen && (needs == want_needs || needs == want_needs_mirror) && iff == want_if) }
+            END { exit !(seen && (needs == want_needs || needs == want_needs_mirror || (needs == want_needs_select && job ~ /^harness-tests/)) && iff == want_if) }
         ' "$wf" || { echo "$j: needs/if not exactly [ci-memo-check] + memo clause"; bad=1; }
     done
     for j in $UNCONDITIONAL_JOBS; do

@@ -7,7 +7,15 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from harness.external_scope import external_send_change
+from harness.external_scope import (
+    _R_DM_FLOW,
+    _R_DM_REDIRECT,
+    _R_DM_TOKEN,
+    _R_DM_UNREADABLE,
+    _R_SEND,
+    _R_TRUNCATED,
+    external_send_change,
+)
 from test_merge_danger_external_replay import (
     ACTION_YML,
     ACTION_YML_BODY,
@@ -20,6 +28,7 @@ from test_merge_danger_external_replay import (
     PRESERVE_ASSIGN_BODY,
     REMOTE_DUMP_BODY,
     SYNC,
+    _load,
     _section,
 )
 
@@ -205,3 +214,292 @@ def test_line_inside_local_string_is_quiet():
         ' " 2> >(db_strip_warnings >&2) || true',
     ]
     assert external_send_change(SYNC, _section(SYNC, 523, body)) is None
+
+
+# bin/discord-dm: a changed line fires only when it can change who gets a message or what is sent.
+
+_DM_SEND_CONTEXT = '     if [ "$USE_WEBHOOK" = 1 ]; then send_webhook_one "$chunk" "$IDX"; else send_one "$chunk"; fi'
+
+
+def _dm(start, *changed):
+    """A discord-dm section whose changed lines sit between two context lines."""
+    return _section(DM, start, ['     say "sending"', *changed, " "])
+
+
+def test_dm_pr4009_fixture_is_quiet():
+    assert external_send_change(DM, _load("pr4009-discord-dm.diff")) is None
+
+
+def test_dm_webhook_file_default_change_is_one_way():
+    sec = _dm(70,
+              '-WEBHOOK_FILE="${DISCORD_DM_WEBHOOK_FILE:-$HOME/.iblbot-dev-webhook-url}"',
+              '+WEBHOOK_FILE="${DISCORD_DM_WEBHOOK_FILE:-$HOME/.iblbot-prod-webhook-url}"')
+    assert external_send_change(DM, sec) == _R_SEND
+
+
+def test_dm_route_arm_change_is_one_way():
+    sec = _dm(90,
+              '-        --route)       ROUTE="${2:-}"; shift 2 ;;',
+              '+        --route)       ROUTE="/discordDM"; shift 2 ;;')
+    assert external_send_change(DM, sec) == _R_SEND
+
+
+def test_dm_chunk_cap_change_is_one_way():
+    assert external_send_change(DM, _dm(182, "-CAP=1900", "+CAP=500")) == _R_SEND
+
+
+def test_dm_guard_added_before_unchanged_send_assignment_is_one_way():
+    sec = _dm(120, '-USE_WEBHOOK=0; WEBHOOK_URL=""', '+false && USE_WEBHOOK=0; WEBHOOK_URL=""')
+    assert external_send_change(DM, sec) is not None
+
+
+def test_dm_curl_in_new_log_function_is_one_way():
+    sec = _dm(350, "+log_sent() {", '+    curl -s -d "$FULL_MSG" "$LOG_URL" >/dev/null 2>&1', "+}")
+    assert external_send_change(DM, sec) == _R_DM_TOKEN
+
+
+def test_dm_eval_is_one_way():
+    assert external_send_change(DM, _dm(350, '+eval "$DISCORD_DM_EXTRA"')) == _R_DM_TOKEN
+
+
+def test_dm_dot_source_is_one_way():
+    assert external_send_change(DM, _dm(350, '+. "$HOME/.discord-dm-rc"')) == _R_SEND
+
+
+def test_dm_guarded_exit_deleted_is_one_way():
+    assert external_send_change(DM, _dm(350, '-[ "$DELIVERED" = 1 ] && exit 0')) == _R_DM_FLOW
+
+
+def test_dm_guarded_exit_test_changed_is_one_way():
+    sec = _dm(350, '-[ "$DELIVERED" = 1 ] && exit 0',
+              '+if [ "$DELIVERED" = 0 ]; then', "+    exit 0", "+fi")
+    assert external_send_change(DM, sec) == _R_DM_FLOW
+
+
+def test_dm_guarded_exit_rewrite_keeps_test_and_exit_is_quiet():
+    sec = _dm(350, '-[ "$DELIVERED" = 1 ] && exit 0',
+              '+if [ "$DELIVERED" = 1 ]; then', "+    exit 0", "+fi")
+    assert external_send_change(DM, sec) is None
+
+
+def test_dm_if_wrapping_context_send_is_one_way():
+    sec = _section(DM, 340, [" for chunk in \"${CHUNKS[@]}\"; do", "+    if false; then",
+                             _DM_SEND_CONTEXT, "+    fi", " done"])
+    assert external_send_change(DM, sec) == _R_DM_FLOW
+    # Unwrapping a send runs it again. Only the removed-side balance walk sees this split `if`.
+    unwrap = _section(DM, 340, [" for chunk in \"${CHUNKS[@]}\"; do", "-    if false; then",
+                                _DM_SEND_CONTEXT, "-    fi", " done"])
+    assert external_send_change(DM, unwrap) == _R_DM_FLOW
+    # The opener is re-added closed on its own line, so the test count is conserved, yet the
+    # send it wrapped now runs. Only the removed-side balance walk sees the left-open `if`.
+    moved = _section(DM, 340, [" for chunk in \"${CHUNKS[@]}\"; do", "-    if false; then",
+                               "+    if false; then :; fi", _DM_SEND_CONTEXT, "-    fi", " done"])
+    assert external_send_change(DM, moved) == _R_DM_FLOW
+
+
+def test_dm_redirect_into_spool_is_one_way():
+    sec = _dm(350, """+    printf '%s\\n' "$FULL_MSG" >> "$SPOOL\"""")
+    assert external_send_change(DM, sec) == _R_DM_REDIRECT
+
+
+def test_dm_redirect_into_local_log_is_quiet():
+    sec = _dm(350, """+    printf '%s\\n' "$FULL_MSG" >> "$log\"""")
+    assert external_send_change(DM, sec) is None
+
+
+def test_dm_existing_send_function_call_is_one_way():
+    assert external_send_change(DM, _dm(350, '+chunk_message "$FULL_MSG"')) == _R_SEND
+
+
+def test_dm_redefine_existing_function_is_one_way():
+    sec = _dm(350, "+send_one() {", """+    printf '%s\\n' "$1\"""", "+}")
+    assert external_send_change(DM, sec) == _R_SEND
+
+
+def test_dm_send_var_prefix_name_is_quiet():
+    assert external_send_change(DM, _dm(350, '+    TO_LOG="$TO"')) is None
+
+
+def test_dm_quoted_send_word_fails_closed():
+    assert external_send_change(DM, _dm(350, '+    say "retry with curl later"')) == _R_DM_TOKEN
+
+
+def test_dm_unbalanced_quote_fails_closed():
+    sec = _dm(350, """+    printf '%s\\n' "unterminated""")
+    assert external_send_change(DM, sec) == _R_DM_UNREADABLE
+
+
+def test_dm_truncated_hunk_fails_closed():
+    sec = (_head(DM) + "@@ -170,4 +170,5 @@\n"
+           '     say "sending"\n+    TO_LOG="$TO"\n \n')
+    assert external_send_change(DM, sec) == _R_TRUNCATED
+
+
+@pytest.mark.parametrize("line", [
+    '+source "$HOME/x"',
+    "+v=`date`",
+    "+exec 3<>/dev/tcp/h/80",
+    '+wget -q "$u"',
+    "+cat <(printf x)",
+])
+def test_dm_deny_tokens_fire(line):
+    assert external_send_change(DM, _dm(350, line)) == _R_DM_TOKEN
+
+
+@pytest.mark.parametrize("line", [
+    '+    sed -i "s/.*/123/" "$HOME/.iblbot-dm-id"',
+    "+    sed -n 'w /tmp/x' \"$f\"",
+    "+    sed 'e' \"$f\"",
+    "+    sed 's/^/x/e'",
+    "+    sed -n 'p' \"$f\" sed 'p'",
+])
+def test_dm_sed_that_writes_or_runs_fires(line):
+    assert external_send_change(DM, _dm(350, line)) == _R_SEND
+
+
+@pytest.mark.parametrize("line", [
+    "+    sed -n '2,55p' \"$0\"",
+    "+    sed 's/^# \\{0,1\\}//'",
+    "+    sed '$d'",
+])
+def test_dm_read_only_sed_is_quiet(line):
+    assert external_send_change(DM, _dm(350, line)) is None
+
+
+@pytest.mark.parametrize("line", [
+    "+    echo $((TO=5))",
+    '+    echo "$((TO=5))"',
+    "+    echo ${arr[TO=5]}",
+    "+    x[TO=5]=1",
+    "+    : $((n++))",
+    "+    echo $[TO=5]",
+    '+    [[ 1 -eq TO=5 ]]',
+])
+def test_dm_arithmetic_assignment_fires(line):
+    assert external_send_change(DM, _dm(350, line)) == _R_SEND
+
+
+@pytest.mark.parametrize("old,new", [
+    ("-        i=$(( i + 1 ))", "+        i=$(( i + 2 ))"),
+    ("-    i=1", "+    i=2"),
+    ("-        n=$(( n + 1 ))", "+        n=$(( n + 5 ))"),
+    ("-    total=1", "+    total=5"),
+])
+def test_dm_counter_change_is_one_way(old, new):
+    assert external_send_change(DM, _dm(200, old, new)) == _R_SEND
+
+
+def test_dm_redirect_through_other_variable_fires():
+    sec = _dm(350, '+    f="$HOME/.iblbot-dm-id"', """+    printf '%s\\n' 1 > "$f\"""")
+    assert external_send_change(DM, sec) == _R_DM_REDIRECT
+
+
+def test_dm_negated_guarded_exit_is_one_way():
+    sec = _dm(350, '-[ "$DELIVERED" = 1 ] && exit 0', '+! [ "$DELIVERED" = 1 ] && exit 0')
+    assert external_send_change(DM, sec) == _R_DM_FLOW
+
+
+def test_dm_flipped_non_test_if_condition_is_one_way():
+    sec = _section(DM, 350, ['     say "sending"', "-if true; then", "+if false; then", "   exit 0", " fi", " "])
+    assert external_send_change(DM, sec) == _R_DM_FLOW
+
+
+def test_dm_negated_grep_if_condition_is_one_way():
+    sec = _section(DM, 350, ['     say "sending"', "-if grep -q x <<< \"$TO\"; then",
+                             "+if ! grep -q x <<< \"$TO\"; then", "   exit 0", " fi", " "])
+    assert external_send_change(DM, sec) == _R_DM_FLOW
+
+
+def test_dm_function_shadowing_builtin_is_one_way():
+    assert external_send_change(DM, _dm(350, "+exit() { :; }")) == _R_SEND
+
+
+def test_dm_log_alias_of_spool_is_one_way():
+    sec = _dm(350, '+    log="$SPOOL"', """+    printf '%s\\n' x >> "$log\"""")
+    assert external_send_change(DM, sec) == _R_SEND
+
+
+def test_dm_log_alias_of_other_send_file_default_is_one_way():
+    for path in ("$HOME/.iblbot-dev-webhook-url", "$HOME/.iblbot-dm-id"):
+        sec = _dm(350, '+    log="${DISCORD_DM_SENT_LOG:-' + path + '}"',
+                  """+    printf '%s\\n' x >> "$log\"""")
+        assert external_send_change(DM, sec) == _R_SEND
+
+
+def test_dm_printf_attached_v_flag_is_one_way():
+    assert external_send_change(DM, _dm(350, "+    printf -vTO '%s' 123")) is not None
+
+
+def test_dm_local_nameref_to_send_var_is_one_way():
+    sec = _dm(350, "+    local -n r=TO", '+    r="$OTHER"')
+    assert external_send_change(DM, sec) is not None
+
+
+def test_dm_comment_trailing_backslash_does_not_hide_next_line():
+    sec = _dm(350, "+    : # note \\", "+    TO=evil")
+    assert external_send_change(DM, sec) is not None
+
+
+def test_dm_new_function_named_like_external_command_is_one_way():
+    for name in ("sleep", "rm", "mv"):
+        assert external_send_change(DM, _dm(350, f"+{name}() {{ :; }}")) == _R_SEND
+
+
+def test_dm_exit_in_new_function_is_one_way():
+    sec = _dm(150, "+early() {", "+    exit 0", "+}", "+early")
+    assert external_send_change(DM, sec) == _R_DM_FLOW
+
+
+def test_dm_exit_moved_into_new_function_called_before_send_is_one_way():
+    body = ['     say "sending"', "+quit", "     send_one", "-exit 0", "+quit() {", "+    exit 0", "+}", " "]
+    assert external_send_change(DM, _section(DM, 150, body)) == _R_DM_FLOW
+
+
+def test_dm_one_line_if_exit_rewritten_as_or_guard_is_one_way():
+    sec = _dm(350, '-if [ "$DELIVERED" = 1 ]; then exit 0; fi', '+[ "$DELIVERED" = 1 ] || exit 0')
+    assert external_send_change(DM, sec) == _R_DM_FLOW
+
+
+def test_dm_break_in_new_function_without_own_loop_is_one_way():
+    sec = _dm(150, "+stop() {", "+    break", "+}")
+    assert external_send_change(DM, sec) == _R_DM_FLOW
+
+
+def test_dm_return_and_own_loop_break_in_new_function_are_quiet():
+    sec = _dm(150, "+h() {", "+    for w in a b; do", "+        break", "+    done",
+              "+    return 0", "+}", "+h")
+    assert external_send_change(DM, sec) is None
+
+
+_DM_MSG_GUARD = '[ -n "$MSG" ] || { echo "discord-dm: no message" >&2; exit 2; }'
+
+
+def test_dm_or_flipped_to_and_before_braced_exit_is_one_way():
+    sec = _dm(108, "-" + _DM_MSG_GUARD, "+" + _DM_MSG_GUARD.replace("||", "&&"))
+    assert external_send_change(DM, sec) == _R_DM_FLOW
+
+
+def test_dm_braced_exit_guard_kept_is_quiet():
+    sec = _dm(108, "-" + _DM_MSG_GUARD, "+" + _DM_MSG_GUARD.replace("no message", "empty message"))
+    assert external_send_change(DM, sec) is None
+
+
+def test_dm_exit_moved_into_else_arm_is_one_way():
+    sec = _dm(350, '-[ "$DELIVERED" = 1 ] && exit 0',
+              '+if [ "$DELIVERED" = 1 ]; then :; else exit 0; fi')
+    assert external_send_change(DM, sec) == _R_DM_FLOW
+
+
+def test_dm_one_line_if_exit_split_from_its_test_is_one_way():
+    sec = _dm(350, '-if [ "$DELIVERED" = 1 ]; then exit 0; fi', '+[ "$DELIVERED" = 1 ]', "+exit 0")
+    assert external_send_change(DM, sec) == _R_DM_FLOW
+
+
+def test_dm_one_line_if_exit_kept_is_quiet():
+    sec = _dm(350, '-if [ "$DELIVERED" = 1 ]; then exit 0; fi', '+[ "$DELIVERED" = 1 ] && exit 0')
+    assert external_send_change(DM, sec) is None
+
+
+@pytest.mark.parametrize("line", ['+    local "msg=x"', "+    local msg\\=x", "+    local 'TO=5'"])
+def test_dm_quoted_local_assignment_fires(line):
+    assert external_send_change(DM, _dm(350, line)) == _R_SEND

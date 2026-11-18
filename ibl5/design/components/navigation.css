@@ -177,14 +177,14 @@
      * the four buttons form a visually consistent row.
      */
     .team-action-link--discord {
-        background: var(--color-discord);
-        border-color: var(--color-discord-hover);
+        background: var(--discord);
+        border-color: var(--discord-hover);
     }
 
     .team-action-link--discord:hover,
     .team-action-link--discord:focus-visible {
-        background: var(--color-discord-hover);
-        border-color: var(--color-discord);
+        background: var(--discord-hover);
+        border-color: var(--discord);
     }
 }
 
@@ -561,7 +561,7 @@ nav .group > a:hover {
 .nav-dropdown-item:hover {
     color: white;
     background-color: var(--white-alpha-5);
-    border-left-color: var(--color-accent-500);
+    border-left-color: var(--accent-500);
 }
 
 /* Unlinked text in rawHtml nav items (e.g. "Waivers:", "View All Extensions: OFF") */
@@ -609,7 +609,7 @@ span.nav-dropdown-item a:hover {
 .mobile-dropdown-link:hover {
     color: white;
     background-color: var(--white-alpha-5);
-    border-left-color: var(--color-accent-500);
+    border-left-color: var(--accent-500);
 }
 
 /* Mobile section buttons (not links) */

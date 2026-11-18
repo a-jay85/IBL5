@@ -298,8 +298,8 @@ def upsert_kept_block(body: str, block: str) -> str:
     return removed_guards.upsert_marked_block(body, block, KEPT_BEGIN, KEPT_END)
 
 
-def downgrade_applies(verdict_path: str, ctx: Optional[dict], body_text: str) -> bool:
-    """True when a NOT READY verdict has only kept blockers and the PR body declares each one."""
+def downgrade_applies(verdict_path: str, ctx: Optional[dict], body_text: str, payload: Optional[dict] = None) -> bool:
+    """True when a NOT READY verdict's blockers are all kept, declared, and quoted from the owner."""
     from . import fidelity
 
     body = body_text or ""
@@ -312,7 +312,45 @@ def downgrade_applies(verdict_path: str, ctx: Optional[dict], body_text: str) ->
     texts = fidelity.blocking_finding_texts(verdict_path)
     if not texts or len(fidelity.verdict_items(verdict_path)["blocking"]) != len(texts):
         return False   # an unmarked bullet also blocks, and it can never be classified
-    return all(classify(text, **ctx) == "keep" and title_of(text) in declared for text in texts)
+    kept = [t for t in texts if is_unplanned_scope(t)]
+    if len(kept) != len(texts):
+        return False   # a bug in kept code is its own blocking finding and blocks
+    return all(classify(t, **ctx) == "keep" and title_of(t) in declared and owner_evidence_ok(t, payload)
+               for t in kept)
+
+
+# The reviewer copies the owner's words onto a kept-scope finding: owner: "<12+ chars>".
+# Straight double quotes only; curly quotes, backticks, or `owner said` never match, so
+# a malformed citation reads as no evidence and the verdict stays NOT READY.
+OWNER_QUOTE_RE = re.compile(r'\bowner:\s*"([^"\n]{12,400})"')
+
+
+def owner_quote(text: str) -> Optional[str]:
+    m = OWNER_QUOTE_RE.search(text or "")
+    return m.group(1) if m else None
+
+
+def _norm_words(s: str) -> str:
+    return " ".join(s.split()).casefold()
+
+
+def owner_evidence_ok(text: str, payload: Optional[dict]) -> bool:
+    """True only when the finding's owner quote occurs in one verified owner turn."""
+    quote = owner_quote(text)
+    if quote is None or not isinstance(payload, dict):
+        return False
+    turns = payload.get("turns")
+    if not isinstance(turns, list):
+        return False
+    needle = _norm_words(quote)
+    return any(isinstance(t, dict) and isinstance(t.get("text"), str)
+               and needle in _norm_words(t["text"]) for t in turns)
+
+
+def owner_scope_word(verdict_path: str) -> str:
+    """The posted word once every blocker qualified: notes keep WITH NOTES."""
+    from . import fidelity
+    return "READY WITH NOTES" if fidelity.verdict_items(verdict_path)["notes"] else "READY"
 
 
 class _ReadFailed(Exception):

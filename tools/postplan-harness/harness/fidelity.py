@@ -872,8 +872,13 @@ def _pointer_prompt(packet_dir: str, pr_number: int | str) -> str:
     )
 
 
+def _owner_suffix(section: str) -> str:
+    return f"\n\n{section}" if section else ""
+
+
 def review(llm, out_dir: str, worktree: str, packet_dir: str,
-           pr_number: int | str, reviewed_tree: str | None = None) -> tuple[str | None, str]:
+           pr_number: int | str, reviewed_tree: str | None = None,
+           owner_section: str = "") -> tuple[str | None, str]:
     """Run the review. Returns (verdict_word_or_None, error_kind_or_'').
 
     A `HarnessError` from the adapter is an *indeterminate* verdict: condition (12)
@@ -882,7 +887,8 @@ def review(llm, out_dir: str, worktree: str, packet_dir: str,
     """
     try:
         text = llm.call_tooled(
-            "plan-fidelity-review", "opus", _pointer_prompt(packet_dir, pr_number),
+            "plan-fidelity-review", "opus",
+            _pointer_prompt(packet_dir, pr_number) + _owner_suffix(owner_section),
             cwd=worktree, agent="pr-ready-phase6",
             allowed_tools=REVIEW_ALLOWED_TOOLS, denied_tools=REVIEW_DENIED_TOOLS,
             add_dirs=(packet_dir,), append_system_prompt=OVERRIDE,
@@ -1089,7 +1095,7 @@ def re_review(llm, gitad, out_dir: str, worktree: str, plan, master_sha: str,
               pr_body: str, pr_number: int | str, remediation_sha: str | None,
               verdict1_path: str, phase4b_ran: bool = False, *,
               round_num: int = 1, shadow_request: bool = False,
-              log=None) -> tuple[str | None, str | None, str | None]:
+              log=None, owner_section: str = "") -> tuple[str | None, str | None, str | None]:
     """One review per remediation round. Returns (verdict, reviewed_tree, verdict_path).
 
     A failure here is "no re-review happened" for this round: the prior verdict stands
@@ -1117,7 +1123,7 @@ def re_review(llm, gitad, out_dir: str, worktree: str, plan, master_sha: str,
                               extra_context=extra, shadow_request=shadow_request)
         text = llm.call_tooled(
             f"plan-fidelity-re-review-{round_num + 1}", "opus",
-            _pointer_prompt(packet, pr_number),
+            _pointer_prompt(packet, pr_number) + _owner_suffix(owner_section),
             cwd=worktree, agent="pr-ready-phase6",
             allowed_tools=REVIEW_ALLOWED_TOOLS, denied_tools=REVIEW_DENIED_TOOLS,
             add_dirs=(packet,), append_system_prompt=OVERRIDE,
@@ -2085,6 +2091,32 @@ _TERMINAL_WORD_RE = re.compile(r"^(NOT READY|READY WITH NOTES|READY)\b")
 _BODY_ONLY_SHA = "body-only"
 
 
+KEPT_SCOPE_HEADING = "### Kept new scope (you asked for this)"
+
+
+def owner_scope_terminal(fid: dict) -> str:
+    """The terminal line for an owner-quoted kept-scope verdict; "" otherwise."""
+    fid = fid or {}
+    word = fid.get("posted_verdict")
+    if word not in ("READY", "READY WITH NOTES") or not fid.get("kept_owner_scope"):
+        return ""
+    return (f"{word} — the only blocking findings are new scope you asked for; "
+            "each one is listed under Kept new scope")
+
+
+def sticky_terminal(fid: dict) -> str:
+    fid = fid or {}
+    return owner_scope_terminal(fid) or terminal_line(
+        fid.get("verdict_1"), fid.get("error_kind"), fid.get("remediation_sha"),
+        fid.get("verdict_2"), fid.get("reviewed_tree_2"), fid.get("rounds_completed", 0))
+
+
+def _kept_scope_line(item: dict) -> str:
+    def clean(s):
+        return " ".join(str(s or "").replace("`", "'").split())
+    return f"- `{clean(item.get('title'))}` (you said: `{clean(item.get('quote'))}`)"
+
+
 def _terminal_verdict_word(terminal: str) -> str | None:
     """The leading verdict word of the terminal line, the one machine-read verdict."""
     m = _TERMINAL_WORD_RE.match(terminal or "")
@@ -2290,6 +2322,10 @@ def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
         out.append("**Backlog issues filed:** " + ", ".join(
             _backlog_link(f"a-jay85/IBL5-backlog#{n}", n) for n in nums))
 
+    kept_scope = fid.get("kept_owner_scope") or []
+    if kept_scope and fid.get("posted_verdict") in ("READY", "READY WITH NOTES"):
+        out.extend(["", KEPT_SCOPE_HEADING])
+        out.extend(_kept_scope_line(k) for k in kept_scope)
     out.append("")
     out.append(MERGE_DIGEST_HEADING)
     out.extend(digest_rows_for_display(digest, fid,

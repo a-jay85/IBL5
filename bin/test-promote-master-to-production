@@ -12,6 +12,7 @@
 #   Part R  the promote caller's default ignore lists name `recheck` exactly:
 #           a cancelled or pending recheck passes; real reds and near-miss
 #           names (recheck-foo, rech) still block.
+#           The same holds for `recap` (sim-recap.yml): R6-R9.
 #   Part B  bin/promote-master-to-production against a real local bare repo used
 #           as `origin`. Proves the fast-forward-only property by making the
 #           remote DIVERGE and asserting the ref is untouched afterwards.
@@ -547,10 +548,10 @@ R_SHA="$DSHA"
 R_PENDING="$(sed -n 's/^IGNORE_PENDING_CHECKS="\${IGNORE_PENDING_CHECKS:-\([^}]*\)}".*/\1/p' "$PROMOTE_SCRIPT")"
 R_FAILED="$(sed -n 's/^IGNORE_FAILED_CHECKS="\${IGNORE_FAILED_CHECKS:-\([^}]*\)}".*/\1/p' "$PROMOTE_SCRIPT")"
 # expect() compares exit codes with -eq, so the string defaults use a plain test.
-if [ "$R_PENDING" = "Aggregate check status,recheck" ]; then h_pass "R0-promote-pending-default"
-else h_fail "R0-promote-pending-default" "want [Aggregate check status,recheck], got [$R_PENDING]"; fi
-if [ "$R_FAILED" = "Aggregate check status,recheck" ]; then h_pass "R0-promote-failed-default"
-else h_fail "R0-promote-failed-default" "want [Aggregate check status,recheck], got [$R_FAILED]"; fi
+if [ "$R_PENDING" = "Aggregate check status,recheck,recap" ]; then h_pass "R0-promote-pending-default"
+else h_fail "R0-promote-pending-default" "want [Aggregate check status,recheck,recap], got [$R_PENDING]"; fi
+if [ "$R_FAILED" = "Aggregate check status,recheck,recap" ]; then h_pass "R0-promote-failed-default"
+else h_fail "R0-promote-failed-default" "want [Aggregate check status,recheck,recap], got [$R_FAILED]"; fi
 
 r_run() { # <fixture-file>; sets r_out and r_rc
   r_rc=0
@@ -588,5 +589,29 @@ printf '%s\n' '{"check_runs":[{"name":"phpunit","status":"completed","conclusion
 r_run "$TMP/R-recheck-pending.json"
 expect     "R5-recheck-pending-passes"        0 "$r_rc"
 expect_out "R5-recheck-pending-logs-ignore"   "ignoring while pending: recheck" "$r_out"
+
+# R6. recap failed (transient prod SSH timeout), real tests green -> passes
+printf '%s\n' '{"check_runs":[{"name":"phpunit","status":"completed","conclusion":"success","completed_at":"2026-11-16T10:00:00Z","started_at":"2026-11-16T09:00:00Z"},{"name":"recap","status":"completed","conclusion":"failure","completed_at":"2026-11-16T10:02:00Z","started_at":"2026-11-16T10:01:30Z"}]}' > "$TMP/R-recap-failed.json"
+r_run "$TMP/R-recap-failed.json"
+expect     "R6-recap-failed-passes"           0 "$r_rc"
+expect_out "R6-recap-failed-logs-ignore"      "ignoring failed: recap (failure)" "$r_out"
+
+# R7. recap failed AND phpunit failure -> the real red still blocks
+printf '%s\n' '{"check_runs":[{"name":"phpunit","status":"completed","conclusion":"failure","completed_at":"2026-11-16T10:00:00Z","started_at":"2026-11-16T09:00:00Z"},{"name":"recap","status":"completed","conclusion":"failure","completed_at":"2026-11-16T10:02:00Z","started_at":"2026-11-16T10:01:30Z"}]}' > "$TMP/R-recap-real-red.json"
+r_run "$TMP/R-recap-real-red.json"
+expect     "R7-recap-plus-real-red-blocks"    1 "$r_rc"
+expect_out "R7-recap-plus-real-red-detail"    "checks failed: phpunit (failure)" "$r_out"
+
+# R8. recap pending, real tests green -> passes
+printf '%s\n' '{"check_runs":[{"name":"phpunit","status":"completed","conclusion":"success","completed_at":"2026-11-16T10:00:00Z","started_at":"2026-11-16T09:00:00Z"},{"name":"recap","status":"in_progress","conclusion":null,"completed_at":null,"started_at":"2026-11-16T10:02:00Z"}]}' > "$TMP/R-recap-pending.json"
+r_run "$TMP/R-recap-pending.json"
+expect     "R8-recap-pending-passes"          0 "$r_rc"
+expect_out "R8-recap-pending-logs-ignore"     "ignoring while pending: recap" "$r_out"
+
+# R9. near-miss suffix: a failed recap-foo is not ignored
+printf '%s\n' '{"check_runs":[{"name":"phpunit","status":"completed","conclusion":"success","completed_at":"2026-11-16T10:00:00Z","started_at":"2026-11-16T09:00:00Z"},{"name":"recap-foo","status":"completed","conclusion":"failure","completed_at":"2026-11-16T10:02:00Z","started_at":"2026-11-16T10:01:30Z"}]}' > "$TMP/R-recap-near-miss.json"
+r_run "$TMP/R-recap-near-miss.json"
+expect     "R9-recap-near-miss-blocks"        1 "$r_rc"
+expect_out "R9-recap-near-miss-detail"        "checks failed: recap-foo (failure)" "$r_out"
 
 h_done

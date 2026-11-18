@@ -390,7 +390,8 @@ else
   # IGNORE_PENDING_CHECKS and IGNORE_FAILED_CHECKS. It stays out of SKIP_CHECKS
   # because P7 and P8 pin that list to the promote workflow's job names.
   # `recheck` (text-hold-recheck-run.yml) is pinned in the same value for the same reason.
-  p10_val="Aggregate check status,recheck"
+  # `recap` (sim-recap.yml, cron on master, tests no code) is pinned the same way.
+  p10_val="Aggregate check status,recheck,recap"
   p10_bad=""
   for var in IGNORE_PENDING_CHECKS IGNORE_FAILED_CHECKS; do
     wf_val="$(sed -n "s/^ *${var}: *//p" "$pp_file" | head -1 | sed 's/[[:space:]]*#.*$//' | tr -d "\"'" | sed 's/[[:space:]]*$//')"

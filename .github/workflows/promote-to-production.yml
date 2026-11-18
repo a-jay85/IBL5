@@ -102,8 +102,11 @@ jobs:
           # edits dispatch it on master and cancel superseded runs. This
           # workflow's workflow_run list does not include it, so a stuck
           # pending or cancelled run would block the SHA for good.
-          IGNORE_PENDING_CHECKS: Aggregate check status,recheck
-          IGNORE_FAILED_CHECKS: Aggregate check status,recheck
+          # `recap` (sim-recap.yml) is the same case: its 10-minute cron
+          # lands on master HEAD, it tests no code, a transient prod SSH
+          # timeout fails it, and it is not in the workflow_run list either.
+          IGNORE_PENDING_CHECKS: Aggregate check status,recheck,recap
+          IGNORE_FAILED_CHECKS: Aggregate check status,recheck,recap
         shell: bash
         run: bin/promote-master-to-production "$PROMOTE_SHA" | tee -a "$GITHUB_OUTPUT"
 

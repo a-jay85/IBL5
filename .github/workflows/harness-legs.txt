@@ -8,6 +8,10 @@
 # Balance from the median per-script times of 8 CI runs (2026-11-16, sum 2800 s): about
 # 933 s of script time per leg on 4 workers, three legs. test-check-plan (median 512 s
 # over its shards) splits into three shards. Within a leg, list the slowest first.
+# CI runs an entry only when the harness-select job in tests.yml selects its script. The
+# selection keys on the script token after any VAR=value fields, so shard lines of one
+# harness run or skip together and this line format is unchanged. A change to this file,
+# to bin/lib/, or to .github/ runs every entry. bin/lib/harness-select.sh holds the rules.
 0 bin/test-pr-cycle-tick
 0 CHECK_PLAN_SHARD=2/3 bin/test-check-plan
 0 bin/test-plan-now

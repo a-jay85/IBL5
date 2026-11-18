@@ -4,6 +4,7 @@ import { commands } from './commands/index.js';
 import { startExpressServer } from './server/express.js';
 import { handleTradeButton } from './interactions/trade-buttons.js';
 import { handlePlanReviewButton } from './interactions/plan-review-buttons.js';
+import { handleApproveButton, handleApproveModal } from './interactions/approve-buttons.js';
 import { startStaleSweeper } from './server/stale-decision-sweeper.js';
 
 import { loadSimRecapSettings } from './sim-recap/settings.js';
@@ -66,6 +67,18 @@ client.on(Events.InteractionCreate, async interaction => {
             } catch (error) {
                 console.error(`Plan review button error for ${interaction.customId}:`, error);
             }
+        } else if (interaction.customId.startsWith('approve_')) {
+            try {
+                await handleApproveButton(interaction);
+            } catch (error) {
+                console.error(`Approve button error for ${interaction.customId}:`, error);
+            }
+        }
+    } else if (interaction.isModalSubmit() && interaction.customId.startsWith('approve_cond_')) {
+        try {
+            await handleApproveModal(interaction);
+        } catch (error) {
+            console.error(`Approve modal error for ${interaction.customId}:`, error);
         }
     } else if (interaction.isAutocomplete()) {
         const command = commands.get(interaction.commandName);

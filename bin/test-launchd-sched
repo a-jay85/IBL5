@@ -47,7 +47,8 @@ launchd-health-login.plist|bin/launchd-health-cron-setup|--print-schedule login|
 launchd-health-daily.plist|bin/launchd-health-cron-setup|--print-schedule daily|
 usage-gate-coordinator.plist|bin/usage-gate-cron-setup|--print|
 usage-gate-probe.plist|bin/usage-gate-cron-setup|--print-probe|
-finding-class-scan.plist|bin/finding-class-scan|--print-schedule|"
+finding-class-scan.plist|bin/finding-class-scan|--print-schedule|
+approve-click.plist|bin/approve-click-cron-setup|--print-schedule|"
 
 # Scripts whose arg-parse failure branches are pinned in <name>.cli.txt.
 CLI_SCRIPTS="wt-gc|bin/wt-gc-cron-setup
@@ -59,7 +60,8 @@ morning-digest|bin/automouse/morning-digest-cron-setup
 comprehension-digest|bin/automouse/comprehension-digest-cron-setup
 backups-sync|bin/backups-sync-setup
 bug-pipeline|bin/bug-pipeline-cron-setup
-finding-class-scan|bin/finding-class-scan"
+finding-class-scan|bin/finding-class-scan
+approve-click|bin/approve-click-cron-setup"
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT

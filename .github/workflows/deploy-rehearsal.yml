@@ -135,6 +135,7 @@ jobs:
         uses: ./.github/actions/setup-ssh
         with:
           require-secrets: 'true'
+          fail-on-unreachable: 'true'
           host: ${{ secrets.HOST }}
           port: ${{ secrets.PORT }}
           username: ${{ secrets.USERNAME }}

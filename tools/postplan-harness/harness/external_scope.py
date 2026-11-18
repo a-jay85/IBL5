@@ -597,7 +597,10 @@ def _dm_conserved(minus_stmts: list[_DmStmt], plus_stmts: list[_DmStmt]) -> bool
         plus_cores[w[5]] = plus_cores.get(w[5], 0) + 1
     removed_control: dict[str, int] = {}
     for w in minus:
-        if w[3] in _DM_CONTROL or w[3] in _DM_TESTS:
+        # A removed `if`/`elif`/`while`/`until` condition is a test whatever its command is:
+        # `if grep ...` or `if true` picks a branch just as `if [ ... ]` does.
+        is_cond = bool(w[0]) and w[0][0] in ("if", "elif", "while", "until")
+        if w[3] in _DM_CONTROL or w[3] in _DM_TESTS or is_cond:
             if plus_cores.get(w[5], 0) <= 0:
                 return False
             plus_cores[w[5]] -= 1

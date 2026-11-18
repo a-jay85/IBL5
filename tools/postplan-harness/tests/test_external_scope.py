@@ -393,6 +393,17 @@ def test_dm_negated_guarded_exit_is_one_way():
     assert external_send_change(DM, sec) == _R_DM_FLOW
 
 
+def test_dm_flipped_non_test_if_condition_is_one_way():
+    sec = _section(DM, 350, ['     say "sending"', "-if true; then", "+if false; then", "   exit 0", " fi", " "])
+    assert external_send_change(DM, sec) == _R_DM_FLOW
+
+
+def test_dm_negated_grep_if_condition_is_one_way():
+    sec = _section(DM, 350, ['     say "sending"', "-if grep -q x <<< \"$TO\"; then",
+                             "+if ! grep -q x <<< \"$TO\"; then", "   exit 0", " fi", " "])
+    assert external_send_change(DM, sec) == _R_DM_FLOW
+
+
 def test_dm_function_shadowing_builtin_is_one_way():
     assert external_send_change(DM, _dm(350, "+exit() { :; }")) == _R_SEND
 

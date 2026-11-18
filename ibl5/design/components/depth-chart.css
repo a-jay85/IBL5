@@ -365,7 +365,7 @@
 }
 
 .dc-card__name:hover {
-    color: var(--color-accent-500);
+    color: var(--accent-500);
 }
 
 
@@ -384,7 +384,7 @@
     height: 1.25rem;
     margin: 0 0 0 auto;
     cursor: pointer;
-    accent-color: var(--color-accent-500);
+    accent-color: var(--accent-500);
 }
 
 
@@ -452,7 +452,7 @@
 }
 
 .dc-card__stepper-arrow:focus-visible {
-    outline: 2px solid var(--color-accent-500);
+    outline: 2px solid var(--accent-500);
     outline-offset: -2px;
 }
 
@@ -525,7 +525,7 @@
 }
 
 .dc-card__stepper-input:focus {
-    outline: 2px solid var(--color-accent-500);
+    outline: 2px solid var(--accent-500);
     outline-offset: -2px;
 }
 
@@ -744,7 +744,7 @@
     height: 1.125rem;
     margin: 0 auto;
     cursor: pointer;
-    accent-color: var(--color-accent-500);
+    accent-color: var(--accent-500);
 }
 
 /* Saved Depth Charts - Dropdown, loading state, traded-player indicators */

@@ -19,7 +19,8 @@
 #                 "Not listed" is healthy only when the phase is CONFIRMED
 #                 as something else. Unknown phase => not exempt.
 #                 No job uses this mode now (sim-recap-poll was retired).
-LEJ_EXPECTED_JOBS='com.ibl5.automouse standard
+LEJ_EXPECTED_JOBS='com.ibl5.approve-click-tick standard
+com.ibl5.automouse standard
 com.ibl5.automouse-morning-digest standard
 com.ibl5.backups-sync standard
 com.ibl5.bug-bot keepalive

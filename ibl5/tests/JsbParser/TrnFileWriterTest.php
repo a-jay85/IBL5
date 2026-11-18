@@ -6,6 +6,7 @@ namespace Tests\JsbParser;
 
 use JsbParser\TrnFileParser;
 use JsbParser\TrnFileWriter;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -120,8 +121,10 @@ class TrnFileWriterTest extends TestCase
     public function testTradeWithDraftPickRoundTrip(): void
     {
         $record = TrnFileWriter::buildTradeRecord(12, 1, 2006, [
-            ['marker' => TrnFileParser::TRADE_MARKER_DRAFT_PICK, 'from_team' => 5, 'to_team' => 10, 'draft_year' => 2008],
+            ['marker' => TrnFileParser::TRADE_MARKER_DRAFT_PICK, 'draft_year' => 2008, 'round' => 2, 'original_team' => 10],
         ]);
+        // JSB's pick item: year, round, original team (sim09 record 80: `1  2009     1    20`).
+        $this->assertSame('1  2008     2    10', substr($record, 27, TrnFileParser::TRADE_ITEM_SIZE));
         $data = TrnFileWriter::generate([$record]);
 
         $tmpFile = $this->writeTmpFile($data);
@@ -140,11 +143,85 @@ class TrnFileWriterTest extends TestCase
             $this->assertCount(1, $trades[0]['trade_items']);
             $this->assertSame(TrnFileParser::TRADE_MARKER_DRAFT_PICK, $trades[0]['trade_items'][0]['marker']);
             $this->assertSame(2008, $trades[0]['trade_items'][0]['draft_year']);
-            $this->assertSame(5, $trades[0]['trade_items'][0]['from_team']);
+            // TrnFileParser still labels the round and original-team fields from_team / to_team.
+            $this->assertSame(2, $trades[0]['trade_items'][0]['from_team']);
             $this->assertSame(10, $trades[0]['trade_items'][0]['to_team']);
         } finally {
             unlink($tmpFile);
         }
+    }
+
+    public function testAppendRecordsKeepsExistingBytesAndPlacesRecordsAtJsbOffsets(): void
+    {
+        $existing = str_pad(str_pad('2', 16) . str_pad(' 11 22008 3 7  2993', 128) . str_pad(' 11 32008 3 7  2994', 127) . 'Q', TrnFileParser::FILE_SIZE);
+        $record = TrnFileWriter::buildWaiverRecord(1, 5, 2008, TrnFileParser::TYPE_WAIVER_CLAIM, 9, 1234);
+
+        $output = TrnFileWriter::appendRecords($existing, [$record]);
+
+        $this->assertSame(TrnFileParser::FILE_SIZE, strlen($output));
+        $this->assertSame(str_pad('3', 16), substr($output, 0, 16));
+        $this->assertSame(substr($existing, 16, 256), substr($output, 16, 256));
+        $this->assertSame(substr($record, 16) . str_repeat(' ', 16), substr($output, 16 + 256, 128));
+        $this->assertSame(substr($existing, 16 + 384), substr($output, 16 + 384));
+    }
+
+    public function testAppendRecordsRejectsAFullFile(): void
+    {
+        $existing = str_pad('499', TrnFileParser::FILE_SIZE);
+        $record = TrnFileWriter::buildWaiverRecord(1, 5, 2008, TrnFileParser::TYPE_WAIVER_CLAIM, 9, 1234);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/^The \.trn file is full at 499 records$/');
+        TrnFileWriter::appendRecords($existing, [$record]);
+    }
+
+    public function testAppendRecordsAcceptsTheLastSlot(): void
+    {
+        $existing = str_pad('498', TrnFileParser::FILE_SIZE);
+        $record = TrnFileWriter::buildWaiverRecord(1, 5, 2008, TrnFileParser::TYPE_WAIVER_CLAIM, 9, 1234);
+
+        $output = TrnFileWriter::appendRecords($existing, [$record]);
+
+        $this->assertSame(str_pad('499', 16), substr($output, 0, 16));
+        $this->assertSame(substr($record, 16) . str_repeat(' ', 16), substr($output, 16 + 498 * 128, 128));
+    }
+
+    public function testReadJsbRecordCountRejectsJunkHeader(): void
+    {
+        $this->assertSame(0, TrnFileWriter::readJsbRecordCount(str_repeat(' ', 16)));
+        $this->assertSame(77, TrnFileWriter::readJsbRecordCount(str_pad('77', 16)));
+        $this->expectException(\RuntimeException::class);
+        TrnFileWriter::readJsbRecordCount(str_repeat('Z', 16));
+    }
+
+    #[DataProvider('partlyNumericHeaderProvider')]
+    public function testReadJsbRecordCountRejectsAHeaderThatIsOnlyPartlyDigits(string $header): void
+    {
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/^The \.trn header does not hold a record count$/');
+        TrnFileWriter::readJsbRecordCount(str_pad($header, 16));
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function partlyNumericHeaderProvider(): array
+    {
+        return [
+            'digits then junk' => ['12x'],
+            'junk then digits' => ['x12'],
+        ];
+    }
+
+    public function testTradeItemWithoutTeamOrPickFieldsWritesZeros(): void
+    {
+        $record = TrnFileWriter::buildTradeRecord(1, 5, 2008, [
+            ['marker' => TrnFileParser::TRADE_MARKER_PLAYER, 'player_id' => 77],
+            ['marker' => TrnFileParser::TRADE_MARKER_DRAFT_PICK, 'draft_year' => 2009],
+        ]);
+
+        $this->assertSame('0     0     0    77', substr($record, 27, TrnFileParser::TRADE_ITEM_SIZE));
+        $this->assertSame('1  2009     0     0', substr($record, 27 + TrnFileParser::TRADE_ITEM_SIZE, TrnFileParser::TRADE_ITEM_SIZE));
     }
 
     public function testWaiverClaimRoundTrip(): void

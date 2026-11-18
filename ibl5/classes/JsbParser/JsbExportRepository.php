@@ -15,6 +15,60 @@ use JsbParser\Contracts\JsbExportRepositoryInterface;
 class JsbExportRepository extends \Database\BaseMysqliRepository implements JsbExportRepositoryInterface
 {
     /**
+     * @see \PlrParser\Contracts\PlrExportRepositoryInterface::getAllPlayerDepthCharts()
+     */
+    public function getAllPlayerDepthCharts(): array
+    {
+        $rows = $this->fetchAll(
+            'SELECT pid, teamid,
+                    COALESCE(dc_pg_depth, 0) AS dc_pg_depth, COALESCE(dc_sg_depth, 0) AS dc_sg_depth,
+                    COALESCE(dc_sf_depth, 0) AS dc_sf_depth, COALESCE(dc_pf_depth, 0) AS dc_pf_depth,
+                    COALESCE(dc_c_depth, 0) AS dc_c_depth, dc_can_play_in_game,
+                    COALESCE(dc_minutes, 0) AS dc_minutes, COALESCE(dc_of, 0) AS dc_of,
+                    COALESCE(dc_df, 0) AS dc_df, COALESCE(dc_oi, 0) AS dc_oi,
+                    COALESCE(dc_di, 0) AS dc_di, COALESCE(dc_bh, 0) AS dc_bh
+             FROM `ibl_plr`
+             WHERE ordinal <= 1440 AND pid <> 0
+             ORDER BY pid',
+        );
+
+        $result = [];
+        foreach ($rows as $row) {
+            $pid = self::toInt($row['pid']);
+            $result[$pid] = [
+                'pid' => $pid,
+                'teamid' => self::toInt($row['teamid']),
+                'dc_pg_depth' => self::toInt($row['dc_pg_depth']),
+                'dc_sg_depth' => self::toInt($row['dc_sg_depth']),
+                'dc_sf_depth' => self::toInt($row['dc_sf_depth']),
+                'dc_pf_depth' => self::toInt($row['dc_pf_depth']),
+                'dc_c_depth' => self::toInt($row['dc_c_depth']),
+                'dc_can_play_in_game' => self::toInt($row['dc_can_play_in_game']),
+                'dc_minutes' => self::toInt($row['dc_minutes']),
+                'dc_of' => self::toInt($row['dc_of']),
+                'dc_df' => self::toInt($row['dc_df']),
+                'dc_oi' => self::toInt($row['dc_oi']),
+                'dc_di' => self::toInt($row['dc_di']),
+                'dc_bh' => self::toInt($row['dc_bh']),
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * COALESCE over a tinyint unsigned column comes back from mysqli as a numeric string.
+     */
+    private static function toInt(mixed $value): int
+    {
+        if (is_int($value)) {
+            return $value;
+        }
+
+        return is_string($value) && is_numeric($value) ? (int) $value : 0;
+    }
+
+    /**
      * @see JsbExportRepositoryInterface::getAllPlayerChangeableFields()
      */
     public function getAllPlayerChangeableFields(): array
@@ -65,12 +119,15 @@ class JsbExportRepository extends \Database\BaseMysqliRepository implements JsbE
     public function getCompletedTradeItems(string $seasonStartDate): array
     {
         $rows = $this->fetchAll(
-            'SELECT tradeofferid, itemid, itemtype,
-                    trade_from, trade_to, created_at
-             FROM `ibl_trade_info`
-             WHERE approval = ? AND created_at >= ?
-             ORDER BY tradeofferid, id',
-            'ss',
+            'SELECT t.tradeofferid, t.itemid, t.itemtype,
+                    t.trade_from, t.trade_to, t.created_at,
+                    dp.year AS pick_year, dp.round AS pick_round, dp.teampick_teamid AS pick_teamid
+             FROM `ibl_trade_info` t
+             LEFT JOIN `ibl_draft_picks` dp ON t.itemtype = ? AND dp.pickid = t.itemid
+             WHERE t.approval = ? AND t.created_at >= ?
+             ORDER BY t.tradeofferid, t.id',
+            'sss',
+            \Trading\TradeItemType::DraftPick->value,
             'completed',
             $seasonStartDate,
         );
@@ -84,6 +141,9 @@ class JsbExportRepository extends \Database\BaseMysqliRepository implements JsbE
                 'trade_from' => is_string($row['trade_from']) ? $row['trade_from'] : '',
                 'trade_to' => is_string($row['trade_to']) ? $row['trade_to'] : '',
                 'created_at' => is_string($row['created_at']) ? $row['created_at'] : '',
+                'pick_year' => is_int($row['pick_year']) ? $row['pick_year'] : null,
+                'pick_round' => is_int($row['pick_round']) ? $row['pick_round'] : null,
+                'pick_teamid' => is_int($row['pick_teamid']) ? $row['pick_teamid'] : null,
             ];
         }
 

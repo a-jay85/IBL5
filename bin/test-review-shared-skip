@@ -732,7 +732,7 @@ end_case mutant-old-step8
 # SKIP, proving the anchor (and not Steps 6-7 or 10-11) is what rejects them.
 begin_case
 _mk_mutant "$SCRATCH/mut-wide.sh" \
-    'AUDIT_TREE="$(printf "%s\n" "$BODY" | grep -m1 -oE "[*][*]Reviewed tree:[*][*] [0-9a-f]{40}" | awk "{print \$NF}")"; AUDIT_OUT="TREE $AUDIT_TREE"'
+    'AUDIT_TREE="$(grep -m1 -oE "[*][*]Reviewed tree:[*][*] [0-9a-f]{40}" <<< "$BODY" | awk "{print \$NF}")"; AUDIT_OUT="TREE $AUDIT_TREE"'
 grep -qF 'print \$NF' "$SCRATCH/mut-wide.sh" || fail "mutant-wide-step8: awk field reference mangled"
 for f in real-sticky-not-ready real-sticky-excerpt-forged-wins-not real-sticky-fenced-excerpt \
          real-sticky-quoted-tree real-sticky-tree-after-details real-sticky-forged-earlier-block \

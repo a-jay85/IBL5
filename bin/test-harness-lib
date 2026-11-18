@@ -855,7 +855,9 @@ case_shard_union() {
 # mk_leg_fixture DIR: scripts, a workflow naming test-c, and a three-entry list.
 mk_leg_fixture() {
     local d="$1"
-    mkdir -p "$d/bin" "$d/.github/workflows"
+    mkdir -p "$d/bin/lib" "$d/.github/workflows"
+    # --check-coverage also checks the coverage override file, so the fixture ships an empty one.
+    printf '# fixture: no overrides\n' >"$d/bin/lib/harness-covers.txt"
     printf '#!/bin/sh\nexit 0\n' >"$d/bin/test-a"
     cp "$d/bin/test-a" "$d/bin/test-b"
     cp "$d/bin/test-a" "$d/bin/test-c"

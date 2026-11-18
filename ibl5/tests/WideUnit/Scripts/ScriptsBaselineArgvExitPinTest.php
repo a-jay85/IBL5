@@ -49,7 +49,11 @@ final class ScriptsBaselineArgvExitPinTest extends TestCase
                 ['1', '1', '0'],
                 ['--sim must be >= 1', '--sim=', '--sim=N is required'],
             ],
-            'jsbExport' => ['jsbExport.php', [''], []],
+            'jsbExport' => [
+                'jsbExport.php',
+                ['', "'Accessdenied.Thisscriptrequiresadministratorprivileges.'", '', "'InvalidCSRFtoken.'"],
+                [],
+            ],
             'reconstructPlr' => [
                 'reconstructPlr.php',
                 ['1', '2', '2', '2', '2', '$exitCode', '2', '$ok?0:1', '2', '$result->hasErrors()?1:0'],

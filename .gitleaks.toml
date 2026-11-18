@@ -70,6 +70,11 @@ regexes = [
   # credential; the DISCORD_DM_TO= prefix trips discord-client-id.
   '''DISCORD_DM_TO=283183467804491776''',
 
+  # Same public owner user ID, pinned as the only actor allowed to click the
+  # approve buttons in bin/approve-click-tick and checked for drift in
+  # bin/test-plan-review-seam. The OWNER_DISCORD_ID= prefix trips discord-client-id.
+  '''OWNER_DISCORD_ID="283183467804491776"''',
+
   # Literal documentation placeholder in API guides (.archive/, removed docs).
   '''your-api-key''',
 ]

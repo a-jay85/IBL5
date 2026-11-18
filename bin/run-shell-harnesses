@@ -19,7 +19,21 @@
 #   --list FILE --leg N   run the entries of leg N from FILE ("N [VAR=v ...] script")
 #   --check-coverage FILE --leg-count N   verify FILE against the filesystem
 #   --shard-union VAR=N   prove VAR=i/N shards of <script> cover its cases once
+#        bin/run-shell-harnesses [-j N] --list FILE --leg N --only "<names>"
+#        bin/run-shell-harnesses --select FILE --event E [--out OUT]
+#        bin/run-shell-harnesses --select-from-merge --event E --attempt N [--out OUT]
+#        bin/run-shell-harnesses --self-test
+#   --only "<names>"   run only the leg entries whose script is in names (ALL, NONE,
+#                      or a list; empty runs every entry); a leg with none exits 0
+#   --select FILE   print the harnesses the changed paths in FILE can affect
+#   --select-from-merge   take the changed paths from HEAD^1..HEAD of a merge checkout
+#   --event E   the CI event name; anything but pull_request selects every harness
+#   --attempt N   the CI run attempt; above 1 selects every harness
+#   --out OUT   write the selection (ALL, NONE, or the harness list) to OUT
+#   --self-test   run the selector's fixture cases
 set -euo pipefail
+# shellcheck source=bin/lib/harness-select.sh
+. "$(cd "$(dirname "$0")" && pwd)/lib/harness-select.sh"
 
 usage() { sed -n '/^# Usage:/,/^set /p' "$0" | sed '$d; s/^# \{0,1\}//'; }
 
@@ -120,12 +134,14 @@ END {
         echo "coverage: unlisted harness $t (add it to a leg in $file, or exempt it with a reason)" >&2
         fails=1
     done
+    hs_check_covers || fails=1
     [ "$fails" -ne 0 ] || echo "coverage: OK ($(grep -c . <<<"$paths") entries, $count legs)"
     return "$fails"
 }
 
 jobs_n=""
 list_file="" leg="" cov_file="" leg_count="" union_spec=""
+select_file="" select_merge="" event="" attempt="" out_file="" only="" only_set=""
 while [ $# -gt 0 ]; do
     case "$1" in
         -h|--help) usage; exit 0 ;;
@@ -135,11 +151,31 @@ while [ $# -gt 0 ]; do
         --check-coverage) cov_file="${2:?--check-coverage needs a file}"; shift 2 ;;
         --leg-count) leg_count="${2:?--leg-count needs a number}"; shift 2 ;;
         --shard-union) union_spec="${2:?--shard-union needs VAR=N}"; shift 2 ;;
+        --select) select_file="${2:?--select needs a changed-file list}"; shift 2 ;;
+        --select-from-merge) select_merge=1; shift ;;
+        --event) event="${2:?--event needs a name}"; shift 2 ;;
+        --attempt) attempt="${2:?--attempt needs a number}"; shift 2 ;;
+        --out) out_file="${2:?--out needs a file}"; shift 2 ;;
+        --only) [ $# -ge 2 ] || { echo "Usage: --only needs a value" >&2; exit 2; }; only="$2"; only_set=1; shift 2 ;;
+        --self-test) hs_self_test "$0"; exit $? ;;
         --) shift; break ;;
         -*) echo "Usage: unknown flag $1" >&2; exit 2 ;;
         *) break ;;
     esac
 done
+[ -n "$select_file$select_merge" ] || [ -z "$event$attempt$out_file" ] || { echo "Usage: --event, --attempt and --out go with --select or --select-from-merge" >&2; exit 2; }
+[ -z "$only_set" ] || { [ -n "$list_file" ] && [ -n "$leg" ]; } || { echo "Usage: --only goes with --list and --leg" >&2; exit 2; }
+if [ -n "$select_file$select_merge" ]; then
+    [ -z "$select_file" ] || [ -z "$select_merge" ] || { echo "Usage: --select and --select-from-merge are exclusive" >&2; exit 2; }
+    [ -n "$event" ] || { echo "Usage: --select and --select-from-merge need --event" >&2; exit 2; }
+    { [ $# -eq 0 ] && [ -z "$list_file$leg$cov_file$union_spec" ]; } || { echo "Usage: --select takes no scripts, --list, --leg, --check-coverage or --shard-union" >&2; exit 2; }
+    if [ -n "$select_merge" ]; then
+        [ -n "$attempt" ] || { echo "Usage: --select-from-merge needs --attempt" >&2; exit 2; }
+        hs_run_select merge - "$event" "$attempt" "$out_file"; exit $?
+    fi
+    [ -f "$select_file" ] || { echo "Usage: no such changed-file list $select_file" >&2; exit 2; }
+    hs_run_select file "$select_file" "$event" "${attempt:-1}" "$out_file"; exit $?
+fi
 [ -z "$union_spec" ] || { shard_union "$union_spec" "$@"; exit $?; }
 if [ -n "$cov_file" ]; then
     { [ $# -eq 0 ] && [ -z "$list_file$leg" ]; } || { echo "Usage: --check-coverage takes no scripts, --list or --leg" >&2; exit 2; }
@@ -157,6 +193,10 @@ if [ -n "$list_file" ] || [ -n "$leg" ]; then
     [ -f "$list_file" ] || { echo "Usage: no such list file $list_file" >&2; exit 2; }
     entries="$(awk -v leg="$leg" '$1 == leg { sub(/^[^[:space:]]+[[:space:]]+/, ""); print }' "$list_file")"
     [ -n "$entries" ] || { echo "Usage: leg $leg has no entries in $list_file" >&2; exit 2; }
+    if [ "$only_set" = 1 ]; then
+        entries="$(hs_filter_entries "$only" <<<"$entries")"
+        [ -n "$entries" ] || { echo "leg $leg: no selected harness on this leg; nothing to run"; exit 0; }
+    fi
     set --
     while IFS= read -r e; do set -- "$@" "$e"; done <<<"$entries"
 fi

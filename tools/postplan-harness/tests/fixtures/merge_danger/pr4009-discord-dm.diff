@@ -1,0 +1,76 @@
+diff --git a/bin/discord-dm b/bin/discord-dm
+index d7515866ab..a610bc1c99 100755
+--- a/bin/discord-dm
++++ b/bin/discord-dm
+@@ -46,6 +46,12 @@
+ # DISCORD_DM_WEBHOOK_FILE (default ~/.iblbot-dev-webhook-url),
+ # DISCORD_DM_ERRORS_WEBHOOK_FILE (default ~/.iblbot-errors-webhook-url).
+ #
++# Sent log: every delivered message (one line per message, not per chunk) appends
++# a tab-separated line to ${DISCORD_DM_SENT_LOG:-~/.claude/discord-dm-sent.log}:
++# ISO-8601 time, target (dev|errors|dm|route:<path>), caller, byte length, 60-char
++# preview. Caller = $DISCORD_DM_CALLER, else the parent script's basename, else
++# unknown. A logging failure never changes the exit code or output. See bin/dm-volume.
++#
+ # Exit: 0 delivered · 1 undeliverable (spooled) · 2 usage/config error.
+ 
+ set -uo pipefail
+@@ -91,7 +97,7 @@ while [ $# -gt 0 ]; do
+         --route)       ROUTE="${2:-}"; shift 2 ;;
+         --raw)         RAW=1; shift ;;
+         --error)       ERROR=1; shift ;;
+-        -h|--help)     sed -n '2,48p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
++        -h|--help)     sed -n '2,55p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+         -)             MSG=$(cat); shift ;;
+         --)            shift; MSG="$*"; break ;;
+         -*)            echo "discord-dm: unknown option $1" >&2; exit 2 ;;
+@@ -153,10 +159,11 @@ webhook_url_from() {
+     esac
+     printf '%s' "$u"
+ }
+-USE_WEBHOOK=0; WEBHOOK_URL=""
++USE_WEBHOOK=0; WEBHOOK_URL=""; WEBHOOK_KIND="dev"
+ if [ "$RAW" = 0 ] && [ "$TO" = "$OWNER_ID" ]; then
+     if [ "$ERROR" = 1 ] && [ -s "$ERRORS_WEBHOOK_FILE" ]; then
+         WEBHOOK_URL=$(webhook_url_from "$ERRORS_WEBHOOK_FILE")
++        [ -n "$WEBHOOK_URL" ] && WEBHOOK_KIND="errors"
+         [ -n "$WEBHOOK_URL" ] || echo "discord-dm: errors webhook file malformed; using the #dev webhook" >&2
+     fi
+     if [ -z "$WEBHOOK_URL" ] && [ -s "$WEBHOOK_FILE" ]; then
+@@ -344,7 +351,35 @@ for chunk in "${CHUNKS[@]}"; do
+     fi
+ done
+ 
+-[ "$DELIVERED" = 1 ] && exit 0
++# Sent log: one line per delivered message. Best-effort by design: every failure is
++# swallowed so logging can never change a send's exit code or output.
++log_sent() {
++    local log kind caller args word preview
++    log="${DISCORD_DM_SENT_LOG:-$HOME/.claude/discord-dm-sent.log}"
++    if [ "$USE_WEBHOOK" = 1 ]; then kind="$WEBHOOK_KIND"
++    elif [ "$RAW" = 1 ] || [ "$ROUTE" != "/discordDM" ]; then kind="route:$ROUTE"
++    else kind="dm"; fi
++    caller="${DISCORD_DM_CALLER:-}"
++    if [ -z "$caller" ]; then
++        args=$(ps -o args= -p "$PPID" 2>/dev/null)
++        for word in $args; do
++            case "$word" in bin/*|*/bin/*) [ -f "$word" ] && { caller="${word##*/}"; break; } ;; esac
++        done
++        [ -n "$caller" ] || caller="${args%% *}"
++        caller="${caller##*/}"
++    fi
++    [ -n "$caller" ] || caller="unknown"
++    caller=$(printf '%s' "$caller" | tr '\t\r\n' '   ')
++    preview=$(printf '%s' "$FULL_MSG" | head -n 1 | tr '\t\r' '  ' | cut -c1-60)
++    mkdir -p "$(dirname "$log")"
++    printf '%s\t%s\t%s\t%s\t%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$kind" "$caller" \
++        "$(printf '%s' "$FULL_MSG" | wc -c | tr -d ' ')" "$preview" >> "$log"
++}
++
++if [ "$DELIVERED" = 1 ]; then
++    { log_sent; } >/dev/null 2>&1 || true
++    exit 0
++fi
+ 
+ # Total failure. The message is the whole point of the call, so never let it
+ # evaporate: put it somewhere durable and somewhere visible, and exit non-zero so

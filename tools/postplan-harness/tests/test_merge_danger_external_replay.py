@@ -1,9 +1,11 @@
 """Replays for merge-danger trigger 2's non-workflow external paths.
 
 PR #3804 and #3830 touched `bin/db-sync-prod` without changing what the sync reads from prod,
-yet the floor held both one-way on the path touch alone. The fixtures are the
-`bin/db-sync-prod` sections of each PR diff, captured once with `gh pr diff`. Tests never call
-`gh`. The synthetic sections pin the true positives and the fail-closed shapes.
+and PR #4009 added a sent-message log to `bin/discord-dm` without changing what it sends, yet
+the floor held all three one-way on the path touch alone. The fixtures are the
+`bin/db-sync-prod` and `bin/discord-dm` sections of each PR diff, captured once with
+`gh pr diff`. Tests never call `gh`. The synthetic sections pin the true positives and the
+fail-closed shapes.
 """
 import os
 import sys
@@ -155,6 +157,16 @@ def test_send_discord_dm_curl_flag_is_one_way():
     _assert_one_way(_replay_text(_section(DM, 150, body)), f"external-path:{DM}")
 
 
+def test_send_discord_dm_webhook_target_is_one_way():
+    body = [
+        ' CURL_BIN="${DISCORD_DM_CURL_BIN:-curl}"',
+        '-WEBHOOK_FILE="${DISCORD_DM_WEBHOOK_FILE:-$HOME/.iblbot-dev-webhook-url}"',
+        '+WEBHOOK_FILE="${DISCORD_DM_WEBHOOK_FILE:-$HOME/.iblbot-prod-webhook-url}"',
+        ' ERRORS_WEBHOOK_FILE="${DISCORD_DM_ERRORS_WEBHOOK_FILE:-$HOME/.iblbot-errors-webhook-url}"',
+    ]
+    _assert_one_way(_replay_text(_section(DM, 69, body)), f"external-path:{DM}")
+
+
 def test_send_mail_transport_line_is_one_way():
     body = [
         "     {",
@@ -248,6 +260,10 @@ def test_llm_one_way_survives_two_way_floor():
 
 def test_replay_pr3804_herestring_rewrite_is_two_way():
     _assert_two_way_quiet(_replay_text(_load("pr3804-db-sync-prod.diff")))
+
+
+def test_replay_pr4009_discord_dm_is_two_way():
+    _assert_two_way_quiet(_replay_text(_load("pr4009-discord-dm.diff")))
 
 
 def test_replay_pr3804_blast_radius_is_not_external():

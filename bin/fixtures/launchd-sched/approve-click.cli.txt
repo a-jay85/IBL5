@@ -1,0 +1,4 @@
+args= exit=2
+approve-click-cron-setup: exactly one flag is required (--install, --uninstall, --print-schedule)
+args=--bogus-flag exit=2
+approve-click-cron-setup: unknown flag: --bogus-flag

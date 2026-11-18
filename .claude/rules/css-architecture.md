@@ -3,7 +3,7 @@ description: CSS architecture: all styles live in ibl5/design/components/; inlin
 paths:
   - "**/design/**/*.css"
   - "**/*View.php"
-last_verified: 2026-11-11
+last_verified: 2026-11-16
 ---
 
 # CSS Architecture Reference
@@ -36,6 +36,8 @@ Moved to `.claude/rules/css-architecture-detail.md` § daisyUI Components. daisy
 **Rule:** component CSS under `design/components/` must reference the **bare aliases** (`--navy-900`), never `--color-*` directly. Tailwind controls the `--color-*` namespace; the aliases are the stable contract and don't break on version bumps.
 
 Font weights and stacking levels follow the same rule. Write `var(--font-weight-semibold)` or `var(--z-sticky)` in place of a numeric `font-weight` or `z-index`; the `--font-weight-*` and `--z-*` tokens live in `design/tokens/tokens.css`. The keywords `bold` and `inherit` stay as written. A stylesheet that a page links without `themes/IBL/style/style.css` gets no `:root` tokens, so a bare `var(--z-modal)` there computes to `auto`. Such a file must use the fallback form, `var(--z-modal, 1000)`. Today that applies only to `design/components/block-fa-admin.css`, which `ibl5/block.php` links on its own.
+
+`bin/check-design-system` enforces these three rules on `design/components/*.css`, and CI runs it on each pull request. A line that needs a raw value takes a `/* design-ok: <reason> */` comment. Per-team colors are a separate family (`--team-color-*`, `--team-cell-*`) that PHP sets inline per element, so they never go through `--color-*`.
 
 ## Table Patterns
 

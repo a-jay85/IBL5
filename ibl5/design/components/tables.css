@@ -244,7 +244,7 @@
 
 /* Cap exceeded — red highlight when salary totals exceed hard cap */
 .ibl-data-table tfoot td.cap-exceeded {
-    color: var(--color-error-600);
+    color: var(--error-600);
     font-weight: var(--font-weight-bold);
 }
 

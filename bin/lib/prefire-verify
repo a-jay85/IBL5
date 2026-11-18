@@ -665,7 +665,7 @@ stage_pytest() {
 # A changed bin/ file maps by name to one harness: test-NAME runs itself; NAME,
 # lib/NAME and lib/NAME.sh map to test-NAME; automouse/queue maps to
 # test-automouse-queue (all under bin/). The harness runs once per legs line (one line per shard).
-# Harnesses that source or call a changed file are left to CI, which runs every harness.
+# Harnesses that source or call a changed file are left to CI, which runs each harness whose derived coverage (bin/lib/harness-select.sh) names a changed path.
 SHELL_LEGS=".github/workflows/harness-legs.txt"
 SHELL_BUDGET_DEFAULT=300
 SHELL_EST_DEFAULT=120
@@ -685,15 +685,7 @@ shell_say_notes() {
     done <<< "$SHELL_NOTES"
 }
 
-shell_harness_for() { # <changed bin/ path>; prints the harness path it maps to
-    local rel="${1#bin/}"
-    case "$rel" in
-        test-*) case "$rel" in */*) ;; *) printf 'bin/%s' "$rel"; return 0 ;; esac ;;
-    esac
-    rel="${rel#lib/}"
-    rel="${rel%.sh}"
-    printf 'bin/test-%s' "${rel//\//-}"
-}
+. "$SELF_DIR/harness-select.sh"
 
 shell_lookup() { # <harness> <changed path> <list-file>; appends the harness's legs lines
     local line i n=0

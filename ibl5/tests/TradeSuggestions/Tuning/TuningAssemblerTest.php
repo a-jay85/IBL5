@@ -248,6 +248,24 @@ final class TuningAssemblerTest extends TestCase
         self::assertSame([], $report->sections[0]->rows);
     }
 
+    public function testUnmatchedFeedbackIsListedPerTeam(): void
+    {
+        $target = $this->assembler(perPartner: 36)->build(self::filter(self::TEAM))->sections[0]->rows[0];
+        $hides = [
+            self::hide(self::TEAM, $target->dealKey, 'no-such-core'),
+            self::hide(self::TEAM, 'gone-deal', 'gone-core'),
+            self::hide(self::TEAM + 1, 'other-deal', 'other-core'),
+        ];
+
+        // The status filter drops the matched (hidden) row from view; its hide
+        // still counts as matched.
+        $section = $this->assembler(perPartner: 36, hides: $hides)
+            ->build(self::filter(self::TEAM, TuningStatus::Shown))->sections[0];
+
+        self::assertCount(1, $section->unmatchedFeedback);
+        self::assertSame('gone-deal', $section->unmatchedFeedback[0]->dealKey);
+    }
+
     private static function league(): LeagueSnapshot
     {
         return self::$league ??= SnapshotFactory::league();

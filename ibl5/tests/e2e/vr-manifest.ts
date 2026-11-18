@@ -178,6 +178,8 @@ export const VR_MANIFEST: VrRow[] = [
   // ── Auth modules ────────────────────────────────────────────
   { name: 'api-keys', auth: 'auth', url: 'modules.php?name=ApiKeys',
     anchor: 'form[action*="ApiKeys"]', viewports: ['desktop', 'mobile'], skipContentCheck: true },
+  { name: 'trade-suggestions-tuning-team', auth: 'auth', url: 'modules.php?name=TradeSuggestionsTuning&team=8&status=all',
+    anchor: '#tuning-team-8', extraMask: ['#tuning-sim', '.tuning-created-at'], dataDriven: true },
   { name: 'block-fa-admin', auth: 'auth', url: 'block.php',
     anchor: '.block-fa-day-banner', viewports: ['desktop'],
     notes: 'Admin FA blocking interface; discord link color changed (#7289da → var(--discord)).' },

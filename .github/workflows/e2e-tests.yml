@@ -2,7 +2,8 @@ name: E2E Tests
 
 on:
   pull_request:
-    branches: [master]
+    # No branches filter: stacked PRs run the full suite too, so prefire-verify
+    # can skip a bare bin/e2e-wt matrix row (bin/test-plan-checks-block pins it).
     # No `labeled`: a label run re-posted the required `E2E Tests` check and its gate
     # passed on all-skipped needs (backlog#1707). update-baselines.yml owns the label.
     types: [opened, synchronize, reopened, ready_for_review]

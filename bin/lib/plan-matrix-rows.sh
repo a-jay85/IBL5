@@ -66,11 +66,49 @@ plan_matrix_rows() {
 
 # --- row helpers shared with prefire-verify and plan-checks-block ----------
 # (moved from prefire-verify)
+# strip_shell_comment <cmd> — prints cmd without a trailing shell comment: an
+# unquoted, unescaped `#` at the start or after a space or tab, and the rest of
+# the line. A `#` inside quotes, after a backslash, or inside a word (a URL
+# `#anchor`, `$#`, `${#x}`) stays. An unclosed quote prints cmd unchanged, so a
+# row the scanner cannot read keeps its full text. Trailing whitespace is
+# trimmed. Only the exact-match checks call it (is_whole_suite_cmd,
+# is_parse_only_cmd). PLAN_ROW_LOCAL_RE, the docker check, the remote-host
+# guard and row_ci_needs read the full row, so a comment can still pin a row
+# local and can never send one to CI.
+strip_shell_comment() {
+    local s="$1" i=0 n=${#1} q="" ch prev=" "
+    while [ "$i" -lt "$n" ]; do
+        ch="${s:$i:1}"
+        if [ -n "$q" ]; then
+            if [ "$ch" = "\\" ] && [ "$q" = '"' ]; then i=$((i + 1))
+            elif [ "$ch" = "$q" ]; then q=""; fi
+        else
+            case "$ch" in
+                "'"|'"') q="$ch" ;;
+                "\\") i=$((i + 1)); ch="x" ;;
+                '#') case "$prev" in ' '|$'\t') break ;; esac ;;
+            esac
+        fi
+        prev="$ch"
+        i=$((i + 1))
+    done
+    if [ -n "$q" ]; then printf '%s' "$s"; return 0; fi
+    mtrim "${s:0:$i}"
+}
+
 CD_IBL5_RE='^cd[[:space:]]+ibl5[[:space:]]*&&[[:space:]]*(.*)$'
+# A bare worktree suite wrapper: bin/e2e-wt <slug> (the full Playwright suite,
+# CI job E2E Tests) or bin/db-test-up [<slug>] (PHPUnit against a seeded DB,
+# CI jobs test and db-integration in tests.yml). Both workflows run on every
+# PR, stacked PRs included (bin/test-plan-checks-block pins the triggers). Any
+# extra argument, pipe, chain or cd prefix falls through and the row runs.
+PLAN_ROW_SUITE_WRAPPER_RE='^(bin/e2e-wt[[:space:]]+[A-Za-z0-9][A-Za-z0-9._-]*|bin/db-test-up([[:space:]]+[A-Za-z0-9][A-Za-z0-9._-]*)?)$'
 is_whole_suite_cmd() {
-    local c="$1"
+    local c
+    c=$(strip_shell_comment "$1")
     c="${c#"${c%%[![:space:]]*}"}"
     c="${c%"${c##*[![:space:]]}"}"
+    [[ "$c" =~ $PLAN_ROW_SUITE_WRAPPER_RE ]] && return 0
     if [[ "$c" =~ $CD_IBL5_RE ]]; then c="${BASH_REMATCH[1]}"; fi
     case "$c" in
         'vendor/bin/phpunit'|'vendor/bin/phpunit --no-progress'|'composer run analyse'|'composer run analyse:tests'|'composer run test'|'composer test') return 0 ;;
@@ -78,12 +116,13 @@ is_whole_suite_cmd() {
     return 1
 }
 
-# Exit 0 when the row only parses or lints files: one `bash -n`, `sh -n` or
+# Exit 0 when the row, minus a trailing comment, only parses or lints files: one `bash -n`, `sh -n` or
 # `shellcheck` call with no `&`, `;`, `|`, `$(`, backtick, `<(` or `>(`. Such a row
 # can name bin/db-test-up without running it, so prefire-verify skips the DB
 # probe for it. Anything chained still probes (fail toward probing).
 is_parse_only_cmd() {
-    local c="$1"
+    local c
+    c=$(strip_shell_comment "$1")
     c="${c#"${c%%[![:space:]]*}"}"
     case "$c" in
         *'&'*|*';'*|*'|'*|*'$('*|*'`'*|*'<('*|*'>('*) return 1 ;;
@@ -100,6 +139,7 @@ PLAN_ROW_DB_RE='db-query|docker|--group[= ]database|DatabaseIntegration|db-test-
 # in the PLAN_ROW_COMPOSE_PHP form, AND its first word is on the allowlist.
 # Anything else stays local (fail toward local). DB, web and compose rows run
 # in CI: the Plan checks job starts the stacks row_ci_needs names for them.
+# A /tmp path the row only writes is not a marker (see _tmp_write_scrub).
 PLAN_ROW_LOCAL_RE='(^|[^[:alnum:]_/-])gh[[:space:]]|playwright|npx|npm|wget|bin/wt-|bin/automouse|bin/post-plan|bin/plan-now|bin/check-plan|bin/db-query|bin/db-test-up|launchctl|osascript|ssh|scp|rsync|~/|\$HOME|/Users/|/tmp/|claude-plans|PLAN|\.\./'
 # The one docker form that may reach CI. The ci step sets COMPOSE_FILE to the
 # absolute path ${{ github.workspace }}/docker-compose.ci.yml, and
@@ -108,6 +148,42 @@ PLAN_ROW_LOCAL_RE='(^|[^[:alnum:]_/-])gh[[:space:]]|playwright|npx|npm|wget|bin/
 PLAN_ROW_COMPOSE_PHP='docker compose exec -T php '
 # Web rows: CI starts the web stack and ci_host_rewrite maps the host.
 PLAN_ROW_WEB_RE='localhost|127\.0\.0\.1|curl'
+
+# A /tmp path a row writes: the operand of curl -o, -<letters>o, --output PATH
+# or --output=PATH (first word curl only), or the target of a > or N> redirect
+# (never >> or &>). Only a plain literal path counts, so a quoted, $-built or
+# globbed path stays local.
+PLAN_ROW_TMP_PATH_RE='/tmp/[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*'
+PLAN_ROW_TMP_CURL_OUT_RE='(^|[[:space:]])(-[A-Za-z]*o[[:space:]]*|--output([[:space:]]+|=))('"$PLAN_ROW_TMP_PATH_RE"')'
+PLAN_ROW_TMP_REDIR_RE='(^|[^>&0-9])[0-9]?>[[:space:]]*('"$PLAN_ROW_TMP_PATH_RE"')'
+
+# _tmp_write_scrub <cmd> — sets _TW_REST to cmd minus each /tmp path the row
+# only writes and exits 0, when every such path appears in at most one line of
+# PLAN_ROW_ALL_CMDS (the caller's whole row set, so no other row reads it).
+# Exits 1 with _TW_REST=cmd when PLAN_ROW_ALL_CMDS is unset or empty, or a
+# written path shows up in a second row. A /tmp path left in _TW_REST is a
+# read, so PLAN_ROW_LOCAL_RE keeps the row local.
+_tmp_write_scrub() {
+    local s="$1" m p n
+    _TW_REST="$1"
+    [ -n "${PLAN_ROW_ALL_CMDS:-}" ] || return 1
+    _row_first_word "$1"
+    while :; do
+        if [ "$_RFW_FIRST" = curl ] && [[ "$s" =~ $PLAN_ROW_TMP_CURL_OUT_RE ]]; then
+            p="${BASH_REMATCH[4]}"
+        elif [[ "$s" =~ $PLAN_ROW_TMP_REDIR_RE ]]; then
+            p="${BASH_REMATCH[2]}"
+        else
+            break
+        fi
+        m="${BASH_REMATCH[0]}"
+        n=$(grep -cF -- "$p" <<< "$PLAN_ROW_ALL_CMDS" || true)
+        [ "${n:-0}" -le 1 ] || return 1
+        s="${s/"$m"/ }"
+    done
+    _TW_REST="$s"
+    return 0
+}
 
 # _row_first_word <cmd> — sets _RFW_FIRST and _RFW_SECOND: the first two words
 # after any leading `cd <dir> &&` hops and a leading `!`. Shared by
@@ -125,7 +201,9 @@ _row_first_word() {
 
 row_runs_in_ci() {
     local c="$1" first second
-    grep -Eq -- "$PLAN_ROW_LOCAL_RE" <<< "$c" && return 1
+    local lc="$c"
+    _tmp_write_scrub "$c" && lc="$_TW_REST"
+    grep -Eq -- "$PLAN_ROW_LOCAL_RE" <<< "$lc" && return 1
     # A curl row aimed at a remote host stays local: ci_host_rewrite leaves
     # such a URL alone, so CI would test production instead of the PR.
     local url host i=0

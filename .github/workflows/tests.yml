@@ -23,7 +23,8 @@ on:
       - 'ibl5/package.json'
       - 'ibl5/bun.lock'
   pull_request:
-    branches: [ master, develop ]
+    # No branches filter: stacked PRs run the full suite too, so prefire-verify
+    # can skip a bare bin/db-test-up matrix row (bin/test-plan-checks-block pins it).
     types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
@@ -170,7 +171,7 @@ jobs:
         set -eo pipefail
         echo "::endgroup::"
 
-        if [ $PHPUNIT_EXIT -ne 0 ]; then
+        if [ "$PHPUNIT_EXIT" -ne 0 ]; then
           echo ""
           echo "════════════════════════════════════════"
           echo "  FAILURE SUMMARY"
@@ -180,7 +181,7 @@ jobs:
           sed 's/\x1b\[[0-9;]*m//g' /tmp/phpunit-output.txt | awk '/^FAILURES!$/,0' || true
           echo "════════════════════════════════════════"
         fi
-        exit $PHPUNIT_EXIT
+        exit "$PHPUNIT_EXIT"
 
     - name: Check coverage threshold
       working-directory: ibl5
@@ -195,6 +196,7 @@ jobs:
       run: |
         THRESHOLD=86
         BUFFER=5
+        # shellcheck disable=SC2016  # php -r source: $ is PHP, not shell
         COVERAGE=$(php -r '
           $xml = simplexml_load_file("coverage/clover.xml");
           $m = $xml->xpath("/coverage/project/metrics")[0];
@@ -586,16 +588,19 @@ jobs:
     - name: Update coverage baseline
       working-directory: ibl5
       run: |
+        # shellcheck disable=SC2016  # php -r source: $ is PHP, not shell
         COVERAGE=$(php -r '
           $xml = simplexml_load_file("coverage/clover.xml");
           $m = $xml->xpath("/coverage/project/metrics")[0];
           echo round((int)$m["coveredstatements"] / (int)$m["statements"] * 100, 2);
         ')
+        # shellcheck disable=SC2016  # php -r source: $ is PHP, not shell
         TOLERANCE=$(php -r '
           $json = file_get_contents("coverage-baseline.json");
           $data = json_decode($json, true);
           echo $data["tolerance"] ?? "0.5";
         ')
+        # shellcheck disable=SC2016  # php -r source: $ is PHP, not shell
         php -r '
           echo json_encode([
               "percentage" => (float) $argv[1],

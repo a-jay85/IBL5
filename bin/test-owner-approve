@@ -153,7 +153,23 @@ cat > "$TMP/fix/bin/lib/prefire-verify" <<'STUB'
 git rev-parse HEAD >> "$PF_LOG"
 exit "${PF_RC:-0}"
 STUB
-chmod +x "$TMP/fix/bin/lib/prefire-verify" "$TMP/fix/bin/owner-approve"
+# post-plan-now stub for the re-fire cases. It logs its args, then by REFIRE_MODE posts a
+# new READY or NOT READY sticky (ready|notready) or leaves the comments alone (none).
+cat > "$TMP/fix/bin/post-plan-now" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$FX/refire.log"
+case "${REFIRE_MODE:-none}" in
+    ready) word=READY ;;
+    notready) word="NOT READY" ;;
+    *) exit "${REFIRE_RC:-0}" ;;
+esac
+n=$(( $(wc -l < "$FX/comments.ndjson") + 1 ))
+body="**$word** · 2026-11-19 · auto-merge held"$'\n'"**Reviewed tree:** $(cat "$FX/tree")"$'\n''<!-- pr-ready-verdict -->'
+jq -nc --arg b "$body" --argjson id "$n" \
+    '{id:$id,updated_at:"2026-11-19T12:00:00Z",user:{login:"owner"},body:$b}' >> "$FX/comments.ndjson"
+exit "${REFIRE_RC:-0}"
+STUB
+chmod +x "$TMP/fix/bin/lib/prefire-verify" "$TMP/fix/bin/owner-approve" "$TMP/fix/bin/post-plan-now"
 git -C "$TMP/fix" add -A
 git -C "$TMP/fix" commit -q -m base
 
@@ -736,6 +752,86 @@ finish_old_marker() {
 }
 
 # ---------------------------------------------------------------------------
+# Re-fire cases: one bin/post-plan-now --state-changed after a kept-span approval
+# ---------------------------------------------------------------------------
+refire_setup() { # <case>: a kept block, a real diff= value, and a NOT READY sticky
+    fresh "$1"
+    use_origin
+    real_commit
+    write_kept_body
+    seed_sticky owner "NOT READY" "**Reviewed tree:** $A40"
+}
+refire_lines() { if [ -f "$FX/refire.log" ]; then wc -l < "$FX/refire.log" | tr -d ' '; else echo 0; fi; }
+no_refire() { [ ! -e "$FX/refire.log" ] || note "post-plan-now ran: $(cat "$FX/refire.log")"; }
+# Fails when --state-changed is dropped from the re-fire call (row 25).
+refire_kept_arms() {
+    refire_setup refire_kept_arms
+    run_oa_env REFIRE_MODE=ready REFIRE_RC=0 "$OA" "$PR" "ok" --poll=0 --timeout=30
+    want_rc 0
+    want_out "RESULT: armed"
+    [ "$(cat "$FX/refire.log" 2>/dev/null)" = "--state-changed" ] \
+        || note "refire.log is '$(cat "$FX/refire.log" 2>/dev/null)', want exactly --state-changed"
+}
+# Fails when the final verdict pass may re-fire again (row 26).
+refire_still_not_ready() {
+    refire_setup refire_still_not_ready
+    run_oa_env REFIRE_MODE=notready REFIRE_RC=0 "$OA" "$PR" "ok" --poll=0 --timeout=30
+    want_rc 4
+    want_posted "the verdict is NOT READY."
+    [ "$(refire_lines)" = 1 ] || note "post-plan-now ran $(refire_lines) times, want 1"
+    refute_gh "pr merge"
+}
+# Fails when OA_KEPT_ACCEPTED is set without a kept span (row 27).
+no_refire_without_kept() {
+    fresh no_refire_without_kept
+    use_origin
+    real_commit
+    printf 'Summary only\n' > "$FX/body"
+    seed_sticky owner "NOT READY" "**Reviewed tree:** $A40"
+    run_oa_env REFIRE_MODE=ready REFIRE_RC=0 "$OA" "$PR" "ok" --poll=0 --timeout=30
+    want_rc 4
+    want_posted "the verdict is NOT READY."
+    no_refire
+}
+# Fails when the unread test is dropped from the OA_KEPT_ACCEPTED condition (row 28).
+no_refire_diff_unread() {
+    fresh no_refire_diff_unread
+    use_origin
+    write_pr "$C40"
+    write_kept_body
+    seed_sticky owner "NOT READY" "**Reviewed tree:** $A40"
+    run_oa_env REFIRE_MODE=ready REFIRE_RC=0 "$OA" "$PR" "ok" --poll=0 --timeout=30
+    want_rc 4
+    grep -qF 'diff=unread -->' "$FX/posted.1.md" 2>/dev/null || note "the approval marker is not diff=unread"
+    no_refire
+}
+# Fails when the top-of-script headless exit is removed (row 29).
+headless_never_refires() {
+    refire_setup headless_never_refires
+    run_oa_env CLAUDE_HEADLESS=1 REFIRE_MODE=ready REFIRE_RC=0 "$OA" "$PR" "ok" --poll=0 --timeout=30
+    want_rc 3
+    want_out "RESULT: headless"
+    no_refire
+    refute_gh "pr comment"
+}
+# Fails when _oa_refire ignores the stub's exit code (row 30).
+refire_ppn_fails() {
+    refire_setup refire_ppn_fails
+    run_oa_env REFIRE_MODE=none REFIRE_RC=9 "$OA" "$PR" "ok" --poll=0 --timeout=30
+    want_rc 4
+    want_posted "bin/post-plan-now exit 9"
+    refute_gh "pr merge"
+}
+# Fails when the start-wait loop is removed (row 31).
+refire_never_starts() {
+    refire_setup refire_never_starts
+    run_oa_env REFIRE_MODE=none REFIRE_RC=0 "$OA" "$PR" "ok" --poll=0 --timeout=0
+    want_rc 4
+    want_posted "did not start"
+    [ "$(refire_lines)" = 1 ] || note "post-plan-now ran $(refire_lines) times, want 1"
+}
+
+# ---------------------------------------------------------------------------
 # Phase 5 case: the docs route through the script
 # ---------------------------------------------------------------------------
 docs_route_through_script() {
@@ -762,6 +858,8 @@ arm_label_fail arm_merge_fail_rollback pr_closed
 fixfirst_records finish_no_record finish_head_unmoved finish_wt_mismatch finish_wt_dirty
 finish_prefire_fail finish_prefire_prereq finish_arms finish_after_plain plain_head_moved_wait finish_after_plain_head_moved finish_extra_args
 marker_diff_fp diff_unread_head_missing kept_span_copied no_kept_span finish_new_marker finish_old_marker
+refire_kept_arms refire_still_not_ready no_refire_without_kept no_refire_diff_unread headless_never_refires
+refire_ppn_fails refire_never_starts
 docs_route_through_script
 "
 

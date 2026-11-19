@@ -495,5 +495,24 @@ case_begin workflow-no-fail-on-unreachable-true
 chk_eq "fail-on-unreachable true count" 0 "$(grep -c "fail-on-unreachable: 'true'" "$WF")"
 case_end
 
+case_begin workflow-fallback-names-ssh-reason
+fb_block=$(step_block "$FALLBACK_STEP")
+# shellcheck disable=SC2016
+chk_has "reason switch" "$fb_block" 'if [ "$FALLBACK_CODE" = "ssh-connect" ]; then'
+chk_has "ssh reason" "$fb_block" 'reason="SSH connect failure"'
+# shellcheck disable=SC2016
+chk_has "mysql reason" "$fb_block" 'reason="MySQL $FALLBACK_CODE"'
+# shellcheck disable=SC2016
+chk_has "warning uses reason" "$fb_block" 'Prod clone failed with $reason.'
+# shellcheck disable=SC2016
+chk_has "age and run sentence" "$fb_block" 'The rehearsal ran on a cached dump ${age_hours} hours old from run $src_url.'
+# shellcheck disable=SC2016
+chk_has "summary row" "$fb_block" '| Clone failure | $reason |'
+# shellcheck disable=SC2016
+chk_has "no-cache error" "$fb_block" '::error::prod clone hit $reason and no cached dump exists; failing as before'
+# shellcheck disable=SC2016
+chk_has "stale error" "$fb_block" '::error::prod clone hit $reason; cached dump $MATCHED_KEY is older than 7 days or has bad metadata; failing as before'
+case_end
+
 # New cases go above this line.
 h_done

@@ -230,13 +230,18 @@ jobs:
           FALLBACK_CODE: ${{ steps.dump.outputs.fallback_code }}
         run: |
           set -euo pipefail
+          if [ "$FALLBACK_CODE" = "ssh-connect" ]; then
+            reason="SSH connect failure"
+          else
+            reason="MySQL $FALLBACK_CODE"
+          fi
           if [ -z "$MATCHED_KEY" ]; then
-            echo "::error::prod clone hit MySQL $FALLBACK_CODE and no cached dump exists; failing as before"
+            echo "::error::prod clone hit $reason and no cached dump exists; failing as before"
             exit 1
           fi
           if ! age_out="$(bin/rehearsal-clone-fallback check-age rehearsal-dump-cache/meta.txt)"; then
             echo "$age_out"
-            echo "::error::cached dump $MATCHED_KEY is older than 7 days or has bad metadata; failing as before"
+            echo "::error::prod clone hit $reason; cached dump $MATCHED_KEY is older than 7 days or has bad metadata; failing as before"
             exit 1
           fi
           bin/rehearsal-clone-fallback decrypt rehearsal-dump-cache/prod-clone.sql.enc prod-clone.sql.gz
@@ -245,13 +250,15 @@ jobs:
           age_hours="$(sed -n 's/^age_hours=//p' <<< "$age_out")"
           src_url="$(sed -n 's/^source_run_url=//p' <<< "$age_out")"
           src_sha="$(sed -n 's/^source_sha=//p' <<< "$age_out")"
-          echo "::warning title=Rehearsal used cached prod dump::Prod clone failed with MySQL $FALLBACK_CODE. Rehearsing against the cached dump cloned ${age_hours}h ago by $src_url (sha $src_sha). Every downstream check still runs."
+          echo "::warning title=Rehearsal used cached prod dump::Prod clone failed with $reason. The rehearsal ran on a cached dump ${age_hours} hours old from run $src_url (sha $src_sha). Every downstream check still runs."
           {
             echo "### Deploy rehearsal used the cached prod dump"
             echo ""
+            echo "The rehearsal ran on a cached dump ${age_hours} hours old from run $src_url."
+            echo ""
             echo "| Field | Value |"
             echo "|---|---|"
-            echo "| Clone failure | MySQL $FALLBACK_CODE |"
+            echo "| Clone failure | $reason |"
             echo "| Dump age | ${age_hours}h (limit 168h) |"
             echo "| Source run | $src_url |"
             echo "| Source SHA | $src_sha |"

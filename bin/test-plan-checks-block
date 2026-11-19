@@ -585,6 +585,61 @@ chk "CI without markers: FAIL line" has "$OUT" "FAIL --live: IBL_CI_DB_READY is 
 chk "unknown flag exits 2 (got $RC)" eq "$RC" 2
 end_case
 
+# suite <cmd> exits 0 when is_whole_suite_cmd skips the row as a CI-covered suite.
+suite() (
+    # shellcheck source=bin/lib/plan-matrix-rows.sh
+    source "$REPO_ROOT/bin/lib/plan-matrix-rows.sh"
+    is_whole_suite_cmd "$1"
+)
+not_suite() { ! suite "$1"; }
+
+start_case case_routing_invariants
+# Each command is its own whole row set (PLAN_ROW_ALL_CMDS, read from Phase 4
+# on), so the /tmp near-misses below stay meaningful once write-only rows can
+# route to CI. route() runs in a subshell and inherits the variable.
+for c in \
+    "curl -s 'https://iblhoops.net/ibl5/index.php' # compare with http://localhost/ibl5/" \
+    "curl -s -o /tmp/pcb-remote.html 'https://iblhoops.net/ibl5/'" \
+    "curl -s -o '/tmp/pcb-q.html' 'http://my-slug.localhost/ibl5/'" \
+    'curl -s -o /tmp/$SLUG.html http://my-slug.localhost/ibl5/' \
+    "curl -s 'http://my-slug.localhost/ibl5/' >> /tmp/pcb-append.log" \
+    'sort -o /tmp/pcb-sorted.txt in.txt' \
+    'diff /tmp/pcb-a.out /tmp/pcb-b.out' \
+    'diff /tmp/pcb-a.out /tmp/pcb-b.out # expect no output' \
+    'bin/e2e-wt my-slug tests/e2e/flows/x.spec.ts' \
+    'bin/e2e-wt my-slug --project=chromium' \
+    'bin/e2e-wt my-slug | grep -c passed' \
+    'bin/db-test-up my-slug --no-run' \
+    'bin/db-test-up my-slug && echo ok' \
+    'true # PLAN marker' \
+    'grep -c x file.txt # see ~/notes'; do
+    PLAN_ROW_ALL_CMDS="$c"
+    chk "stays LOCAL: $c" routes_local "$c"
+done
+for c in \
+    "grep -c '#' file.txt" \
+    'grep -c "a # b" file.txt' \
+    "curl -s 'http://my-slug.localhost/ibl5/index.php#main' # expect 200" \
+    'cd ibl5 && vendor/bin/phpunit --filter testX tests/XTest.php # one test'; do
+    PLAN_ROW_ALL_CMDS="$c"
+    chk "stays CI: $c" routes_ci "$c"
+done
+unset PLAN_ROW_ALL_CMDS
+for c in \
+    'cd ibl5 && composer test --filter X # filtered' \
+    'vendor/bin/phpunit#x' \
+    '"composer test" # quoted' \
+    'bin/e2e-wt my-slug tests/e2e/flows/x.spec.ts # expect green' \
+    'bin/e2e-wt' \
+    'bin/db-test-up --no-run' \
+    'cd ibl5 && bin/e2e-wt my-slug'; do
+    chk "not a suite: $c" not_suite "$c"
+done
+for c in 'cd ibl5 && composer test' 'vendor/bin/phpunit --no-progress'; do
+    chk "suite: $c" suite "$c"
+done
+end_case
+
 # --- Routing table -----------------------------------------------------------
 # Frozen fixture: <verdict> TAB <needs> TAB <cmd>, one row per line. The LOCAL
 # commands come from the 2026-11-15 prefire-verify failure classification (some

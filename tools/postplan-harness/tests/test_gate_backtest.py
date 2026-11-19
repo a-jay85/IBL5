@@ -281,8 +281,9 @@ def test_truth_young_but_repaired_is_repaired():
 
 from harness.gate_backtest import (_FLAG_LINES_CAP,  # noqa: E402
                                    GATE_BACKTEST_BEGIN, GATE_BACKTEST_END, GateChange,
-                                   ReplayResult, Truth, compute_verdict, parse_gate_backtest_state,
-                                   render_gate_backtest, upsert_gate_backtest)
+                                   ReplayResult, Truth, _tally, compute_verdict,
+                                   parse_gate_backtest_state, render_gate_backtest,
+                                   upsert_gate_backtest)
 
 SPEC = ReplaySpec(argv=())
 
@@ -555,6 +556,14 @@ def test_tally_base_flag_same_lines_is_pre_existing():
     tally = _lined_tally(("x: bad",), ("x: bad",))
     assert tally.pre_existing == [10]
     assert tally.false_flags == []
+
+
+def test_tally_tree_wide_clean_flag_without_parent_run_is_false_flag():
+    r = ReplayResult(10, _g().path, "flag", "x", "absent", flag_lines=("src/a.txt:2:BAD old",))
+    tally = _tally(_g().path, [r], _truth(clean=(10,)))
+    assert tally.false_flags == [10]
+    assert tally.pre_existing == [] and tally.fixed_by_pr == []
+    assert tally.catches == [] and tally.unsettled_flags == []
 
 
 def test_tally_base_flag_new_line_is_false_flag():

@@ -1192,3 +1192,66 @@ def test_run_backtest_records_base_and_head_flag_lines(tmp_path):
         assert r.base_flag_lines == ("flagged",)
     for r in (r for r in results if r.outcome == "pass"):
         assert r.flag_lines == () and r.base_flag_lines == ()
+
+
+# --- Tree-wide gates: flags the PR's parent tree already carried ----------------------------
+
+from harness.gate_backtest import resolve_spec  # noqa: E402
+
+TREE_GATE = """#!/bin/sh
+# gate-backtest-argv:
+# gate-backtest-reads: src/*
+if [ -f src/parent-error ]; then exit 2; fi
+out=$(grep -n BAD src/a.txt | sed 's|^|src/a.txt:|')
+if [ -n "$out" ]; then printf '%s\\n' "$out"; exit 1; fi
+exit 0
+"""
+SEED_A = "ok\nBAD old\nok\n"
+
+
+def _tree_repo(tmp_path, seed_parent_error=False):
+    """Seed src/a.txt with one `BAD old`, then squash-style PRs A to D, all clean.
+
+    A edits src/b.txt only; B inserts a top line (shifting `BAD old`); C appends `BAD new`;
+    D appends a second `BAD old`. With `seed_parent_error`, the seed also carries
+    src/parent-error and the history is one PR that deletes it and edits src/b.txt.
+    Returns (repo, merge shas oldest first, candidate fix patch deleting the seed `BAD old`)."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    sh(repo, "init", "-q", "-b", "master")
+    commit_file(repo, "src/b.txt", "ok\n", "seed b")
+    if seed_parent_error:
+        (repo / "src/parent-error").write_text("x\n")
+    commit_file(repo, "src/a.txt", SEED_A, "seed a")
+    patch = _patch_from_master(repo, "src/a.txt", "ok\nok\n")
+    if seed_parent_error:
+        (repo / "src/parent-error").unlink()
+        return repo, [commit_file(repo, "src/b.txt", "ok\nedited\n", "chore: pr A")], patch
+    shas = [commit_file(repo, "src/b.txt", "ok\nedited\n", "chore: pr A"),
+            commit_file(repo, "src/a.txt", "ok top\n" + SEED_A, "chore: pr B"),
+            commit_file(repo, "src/a.txt", "ok top\n" + SEED_A + "BAD new\n", "chore: pr C"),
+            commit_file(repo, "src/a.txt", "ok top\n" + SEED_A + "BAD new\nBAD old\n",
+                        "chore: pr D")]
+    return repo, shas, patch
+
+
+def _tree_gate(script=TREE_GATE):
+    state, spec, reason = resolve_spec("bin/check-fake", script)
+    assert state == "replayable" and spec is not None, reason
+    return GateChange("bin/check-fake", "check-script", "replayable", spec, reason)
+
+
+def _tree_run(repo, shas, patch, tmp_path, script=TREE_GATE):
+    history = fetch_history(fake_gh(shas), make_git(str(repo)))
+    return run_backtest(str(repo), "HEAD", [_tree_gate(script)], history, overlay(script),
+                        str(tmp_path / "plans"), base_overlay={"bin/check-fake": None},
+                        fix_patch=patch)
+
+
+def test_tree_wide_gate_flags_every_pr_on_pre_existing_state(tmp_path):
+    repo, shas, patch = _tree_repo(tmp_path)
+    by_pr = {r.pr: r for r in _tree_run(repo, shas, patch, tmp_path)}
+    assert sorted(by_pr) == [1, 2, 3, 4]
+    for n, r in by_pr.items():
+        assert r.outcome == "flag", (n, r)
+        assert r.base_outcome == "absent", (n, r)

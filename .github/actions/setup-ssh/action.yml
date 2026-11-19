@@ -29,10 +29,17 @@ inputs:
       step reports the outage (for example a failure alert) still runs.
     required: false
     default: 'false'
+outputs:
+  blocked-ip:
+    description: >-
+      This runner's public IP when every keyscan try came back empty, else
+      empty. Give it to the host so they can find the firewall block.
+    value: ${{ steps.keyscan.outputs.blocked-ip }}
 runs:
   using: 'composite'
   steps:
     - name: Write deploy key and keyscan host
+      id: keyscan
       shell: bash
       env:
         PORT: ${{ inputs.port }}
@@ -82,7 +89,16 @@ runs:
         # failed later with a confusing "Host key verification failed".
         # Run 44411988785 hit that after the host blocked one runner for ~7 min.
         if [ -z "$KEYS" ]; then
-          echo "::error title=Prod SSH unreachable::ssh-keyscan got no host keys after 6 tries over ~4 min. This runner could not reach the SSH host. Other runners may still reach it, so a rerun (new runner, new IP) often passes."
+          # Record this runner's public IP. The host's firewall log is the only
+          # place that shows why one runner was shut out, and they need the IP
+          # to search it (3 blocked runners on 2026-11-18, each ~7 min).
+          RUNNER_IP=$(curl -fsS --max-time 10 https://api.ipify.org 2>/dev/null || true)
+          case "$RUNNER_IP" in
+            *[!0-9a-fA-F.:]*|'') RUNNER_IP=unknown ;;
+          esac
+          echo "blocked-ip=${RUNNER_IP}" >> "$GITHUB_OUTPUT"
+          echo "Prod SSH unreachable from runner IP ${RUNNER_IP} at $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_STEP_SUMMARY"
+          echo "::error title=Prod SSH unreachable::ssh-keyscan got no host keys after 6 tries over ~4 min. This runner (public IP ${RUNNER_IP}) could not reach the SSH host. Other runners may still reach it, so a rerun (new runner, new IP) often passes."
           if [ "$FAIL_ON_UNREACHABLE" = "true" ]; then
             exit 1
           fi

@@ -1,6 +1,6 @@
 ---
 description: /plan-prompt fires its drafted prompt as a detached headless Sonnet 4.6 run via bin/plan-now, with the user-facing forks pre-resolved in-session and bin/check-plan as the quality discriminator.
-last_verified: 2026-09-18
+last_verified: 2026-11-18
 ---
 
 # ADR-0096: `/plan-prompt` auto-fires the planning run headlessly
@@ -17,6 +17,10 @@ The hazard in doing so is specific: `/plan` Step 3.5 resolves `needs-user-input`
 ## Decision
 
 `/plan-prompt` Step 5 fires its drafted prompt via `bin/plan-now`, a launchd-detached headless Sonnet 4.6 `/plan` run, instead of stopping at the clipboard (the `pbcopy` stays, so a failed fire degrades to the old manual paste rather than losing the draft). Two mechanisms cover the missing human: **(a)** `/plan-prompt` Step 4.5 is a gate requiring the drafting session to resolve user-facing forks with `AskUserQuestion` *while a human is present* and bake the answers into the prompt as hard constraints; **(b)** `bin/plan-now` appends a headless coda instructing the run never to ask, and to record any surviving fork plus `auto_merge: false` (which `bin/check-plan` gate `[H]` then forces to carry a justification). The job runs `bin/check-plan` on the produced plan and logs a PASS/FAIL verdict — `check-plan` already fails on unresolved decisions (`DECIDE` / `TBD` / "subject to …"), which is precisely the failure mode of removing the human, so it is the discriminator for "did headless degrade this plan". Default disposition is `--queue` (**amended 2026-07-27, and again 2026-09-17 — see Consequences**; originally `--implement`): a plan that the job itself verified is queued for automouse, matching `/plan` Step 5's own default. `--implement` is the opt-out. [AMENDED 2026-09-17: reached only on an explicit user request; see Consequences.] <!-- slop-ok -->
+
+## Addendum — orchestrator model (2026-11-18) <!-- slop-ok -->
+
+The Decision above names a headless Sonnet 4.6 run (`claude-sonnet-4-6`). `bin/plan-now` now sets `MODEL="claude-sonnet-5-5"`, so the orchestrator is Sonnet 5.5. The model pin moved with newer Sonnet releases. The mechanism in this ADR is unchanged.
 
 ## Alternatives Considered
 

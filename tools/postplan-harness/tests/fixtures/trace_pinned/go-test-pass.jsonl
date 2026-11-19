@@ -1,0 +1,8 @@
+{"Time":"2026-11-18T14:05:20.900751-08:00","Action":"start","Package":"example.com/scratch"}
+{"Time":"2026-11-18T14:05:21.021985-08:00","Action":"run","Package":"example.com/scratch","Test":"TestTracePinnedFoulRoll"}
+{"Time":"2026-11-18T14:05:21.022053-08:00","Action":"output","Package":"example.com/scratch","Test":"TestTracePinnedFoulRoll","Output":"=== RUN   TestTracePinnedFoulRoll\n","OutputType":"frame"}
+{"Time":"2026-11-18T14:05:21.022097-08:00","Action":"output","Package":"example.com/scratch","Test":"TestTracePinnedFoulRoll","Output":"--- PASS: TestTracePinnedFoulRoll (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-11-18T14:05:21.022105-08:00","Action":"pass","Package":"example.com/scratch","Test":"TestTracePinnedFoulRoll","Elapsed":0}
+{"Time":"2026-11-18T14:05:21.022114-08:00","Action":"output","Package":"example.com/scratch","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-11-18T14:05:21.022417-08:00","Action":"output","Package":"example.com/scratch","Output":"ok  \texample.com/scratch\t0.121s\n"}
+{"Time":"2026-11-18T14:05:21.022432-08:00","Action":"pass","Package":"example.com/scratch","Elapsed":0.122}

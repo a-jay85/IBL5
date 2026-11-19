@@ -247,6 +247,7 @@ jobs:
           echo "$OUTPUT" >> "$GITHUB_OUTPUT"
 
       - name: Build Discord message
+        id: msg
         env:
           PREFLIGHT_RESULT: ${{ needs.pre-flight.result }}
           GH_STEP_NAME: ${{ steps.failed.outputs.STEP_NAME }}
@@ -264,25 +265,33 @@ jobs:
           STEP_NAME="${GH_STEP_NAME:-${SERVER_STEP_NAME:-unknown}}"
           LAST_MIGRATION="${LAST_MIGRATION:-unknown}"
           DEPLOYED_SHA="${DEPLOYED_SHA:-unknown}"
+          # Stay silent on attempt 1 when deploy-auto-retry.yml will rerun the
+          # run: the rehearsal failed at Setup SSH, or the deploy failed at
+          # "Fetch latest code on server". Neither touched prod. The retry
+          # workflow sends its own message if it skips the retry or cannot
+          # start it, and attempt 2 alerts here if it fails too. A cancelled
+          # rehearsal is never retried (that workflow needs conclusion
+          # 'failure'), so it always alerts.
+          if [ "$RUN_ATTEMPT" = "1" ] && {
+               { [ "$PREFLIGHT_RESULT" = "failure" ] && [ "$PREFLIGHT_STEP" = "Setup SSH" ]; } ||
+               { [ "$PREFLIGHT_RESULT" = "success" ] && [ "$STEP_NAME" = "Fetch latest code on server" ]; }
+             }; then
+            echo "Server unreachable on attempt 1; deploy-auto-retry.yml reruns it. No alert."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if [ "$PREFLIGHT_RESULT" = "failure" ] || [ "$PREFLIGHT_RESULT" = "cancelled" ]; then
-            # A rehearsal that failed at Setup SSH never reached prod; on
-            # attempt 1, deploy-auto-retry.yml reruns it once.
             PF_NEXT=''
-            if [ "$PREFLIGHT_STEP" = "Setup SSH" ] && [ "$RUN_ATTEMPT" = "1" ]; then
-              PF_NEXT=$(printf '\n\nThe rehearsal runner could not reach the server. Retrying once automatically on a new runner.')
+            if [ "$PREFLIGHT_STEP" = "Setup SSH" ]; then
+              PF_NEXT=$(printf '\n\nThe rehearsal runner could not reach the server, and the automatic retry on a new runner failed too.')
             fi
             MSG=$(printf 'Production deploy BLOCKED — pre-flight rehearsal %s for commit %s. Deploy did not start.\n\nCurrently live: SHA %s, last applied migration: %s%s\n\nRun: %s' \
               "${PREFLIGHT_RESULT^^}" "$SHORT_SHA" "$DEPLOYED_SHA" "$LAST_MIGRATION" "$PF_NEXT" "$RUN_URL")
           elif [ "$STEP_NAME" = "Fetch latest code on server" ]; then
             # Step 1 only runs `git fetch`. Failing here (almost always an ssh
             # timeout) changes nothing on the server, so say so plainly.
-            # On attempt 1, deploy-auto-retry.yml reruns the failed jobs once on
-            # a new runner; it sends its own message if it skips the retry.
-            if [ "$RUN_ATTEMPT" = "1" ]; then
-              NEXT='Retrying once automatically on a new runner. You will get another message only if that also fails or the retry is skipped.'
-            else
-              NEXT=$(printf 'Retry: gh run rerun %s --failed -R %s' "${{ github.run_id }}" "${{ github.repository }}")
-            fi
+            # Attempt 1 returned above; this is the failed automatic retry.
+            NEXT=$(printf 'The automatic retry on a new runner failed too. Retry: gh run rerun %s --failed -R %s' "${{ github.run_id }}" "${{ github.repository }}")
             IP_LINE=''
             if [ -n "$BLOCKED_IP" ]; then
               IP_LINE=$(printf '\nBlocked runner IP: %s' "$BLOCKED_IP")
@@ -296,6 +305,7 @@ jobs:
           printf '%s' "$MSG" > /tmp/discord-msg.txt
 
       - name: Send Discord DM
+        if: steps.msg.outputs.skip != 'true'
         uses: ./.github/actions/notify-discord
         with:
           webhook-url: ${{ secrets.DISCORD_ERRORS_WEBHOOK_URL || secrets.DISCORD_DEV_WEBHOOK_URL }}

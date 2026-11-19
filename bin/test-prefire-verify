@@ -1161,6 +1161,52 @@ case_ci_local_partition() {
     want_cnt dbq 1
 }
 
+# partition_check <want gate CI> <want gate local> <want block rows>: the gate
+# and plan-checks-block split the rows of the last run_gate plan the same way.
+partition_check() {
+    local gate_ci="" gate_local="" block_ci="" n mlog
+    mlog=$(matrix_log)
+    for n in 1 2; do
+        if grep -qF "matrix row $n: runs in CI (Plan checks), skipped locally" <<< "$OUT"; then
+            gate_ci="$gate_ci $n"
+        fi
+        if grep -qE "^### row $n: " <<< "$mlog" \
+            && ! grep -qF "### row $n: runs in CI (Plan checks)" <<< "$mlog"; then
+            gate_local="$gate_local $n"
+        fi
+    done
+    "$REPO/bin/lib/plan-checks-block" encode "$PLAN" > "$D/block.txt" 2>/dev/null \
+        || note "plan-checks-block encode failed"
+    mkdir -p "$D/decoded"
+    "$REPO/bin/lib/plan-checks-block" decode "$D/block.txt" "$D/decoded" \
+        || note "plan-checks-block decode failed"
+    block_ci=$(cut -f1 "$D/decoded/rows.tsv" 2>/dev/null | sort -n | tr '\n' ' ')
+    [ "$gate_ci" = "$1" ] || note "gate CI rows: want '$1', got '$gate_ci'"
+    [ "$gate_local" = "$2" ] || note "gate local rows: want '$2', got '$gate_local'"
+    [ "$block_ci" = "$3" ] || note "block rows: want '$3', got '$block_ci'"
+}
+
+# A curl row that only writes /tmp goes to CI on both sides; a /tmp reader stays local.
+case_ci_local_partition_tmp_writer() {
+    new_case
+    write_plan "$(row 1 "curl -s -o /tmp/pv-w.html -w '%{http_code}' 'http://my-slug.localhost/ibl5/'")" \
+               "$(row 2 'test -n /tmp/pv-a')"
+    run_gate --plan "$PLAN" --stage matrix
+    want_rc 0
+    partition_check " 1" " 2" "1 "
+}
+
+# A writer whose path another row reads stays local on both sides, and the
+# reader finds the file because both rows run on the Mac.
+case_ci_local_partition_tmp_cross_row() {
+    new_case
+    write_plan "$(row 1 'printf x > /tmp/pv-w.txt')" \
+               "$(row 2 'test -s /tmp/pv-w.txt')"
+    run_gate --plan "$PLAN" --stage matrix
+    want_rc 0
+    partition_check "" " 1 2" ""
+}
+
 # A DB row the Plan checks job runs does not trip the local DB probe.
 case_db_down_ci_db_row_skips_probe() {
     new_case
@@ -1177,6 +1223,47 @@ case_db_down_ci_db_row_skips_probe() {
 case_db_down_local_db_row_still_probes() {
     new_case
     write_plan "$(row 1 'bin/db-query "SELECT 1"')"
+    export STUB_PROBE_RC=3
+    run_gate --plan "$PLAN" --stage matrix
+    unset STUB_PROBE_RC
+    want_rc 3
+    want_out "DB unreachable; matrix row 1 needs it"
+}
+
+# Bare bin/e2e-wt <slug> and bin/db-test-up [<slug>] rows are whole suites that
+# CI runs (E2E Tests, tests.yml). A filtered wrapper row still runs locally.
+case_suite_wrapper_rows_skip() {
+    new_case
+    mkdir -p "$R/bin"
+    printf '#!/usr/bin/env bash\necho run >> "$CNT/e2e"\nexit 0\n' > "$R/bin/e2e-wt"
+    printf '#!/usr/bin/env bash\necho run >> "$CNT/dbtu"\nexit 0\n' > "$R/bin/db-test-up"
+    chmod +x "$R/bin/e2e-wt" "$R/bin/db-test-up"
+    write_plan "$(row 1 'bin/e2e-wt my-slug # expect green')" \
+               "$(row 2 'bin/db-test-up my-slug')" \
+               "$(row 3 'bin/e2e-wt my-slug tests/e2e/flows/x.spec.ts')"
+    run_gate --plan "$PLAN" --stage matrix
+    want_rc 0
+    want_out "matrix row 1: skipped, CI covers full-suite runs"
+    want_out "matrix row 2: skipped, CI covers full-suite runs"
+    want_cnt e2e 1
+    want_cnt dbtu 0
+}
+
+# A skipped bare bin/db-test-up row does not trip the local DB probe.
+case_suite_wrapper_db_row_skips_probe() {
+    new_case
+    write_plan "$(row 1 'bin/db-test-up my-slug # expect green')"
+    export STUB_PROBE_RC=3
+    run_gate --plan "$PLAN" --stage matrix
+    unset STUB_PROBE_RC
+    want_rc 0
+    refute_out "DB unreachable"
+}
+
+# A filtered bin/db-test-up row runs locally, so a down DB still exits 3.
+case_filtered_db_row_still_probes() {
+    new_case
+    write_plan "$(row 1 'bin/db-test-up my-slug --no-run')"
     export STUB_PROBE_RC=3
     run_gate --plan "$PLAN" --stage matrix
     unset STUB_PROBE_RC
@@ -2513,6 +2600,11 @@ case_row_sorter_near_misses
 case_ci_local_partition
 case_db_down_ci_db_row_skips_probe
 case_db_down_local_db_row_still_probes
+case_suite_wrapper_rows_skip
+case_suite_wrapper_db_row_skips_probe
+case_filtered_db_row_still_probes
+case_ci_local_partition_tmp_writer
+case_ci_local_partition_tmp_cross_row
 case_shell_name_mapping
 case_shell_lib_mapping
 case_shell_self_mapping

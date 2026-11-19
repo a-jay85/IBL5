@@ -11,8 +11,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
 REAL_CHECK_PROSE = Path(__file__).resolve().parents[3] / "bin" / "check-prose"
 
 TELL_LINE = "The cache warms fast — the pool stays small."
@@ -73,7 +71,6 @@ def _stacked(tmp_path, *, child_merges_master=False, child_tell=False):
     return repo, {"m0": m0, "master": master, "parent": parent}
 
 
-@pytest.mark.xfail(strict=True, reason="M1: two-dot diff vs tip; fixed in Phase 2")
 def test_master_fixed_line_not_flagged_on_stale_child(tmp_path):
     repo, _ = _stacked(tmp_path)
     rc, out = _prose(repo, "master")
@@ -101,6 +98,59 @@ def test_merge_base_ref_flags_parent_file_today(tmp_path):
 def test_child_own_tell_still_fails(tmp_path):
     repo, _ = _stacked(tmp_path, child_tell=True)
     rc, out = _prose(repo, "master")
+    print(out)
+    assert rc == 1
+    assert "docs/child.md:2:" in out
+
+
+def _hits(out):
+    return sorted(l.split(" ", 1)[0] for l in out.splitlines() if l.startswith("docs/"))
+
+
+def test_child_tell_still_fails_after_merging_master(tmp_path):
+    repo, _ = _stacked(tmp_path, child_merges_master=True, child_tell=True)
+    rc, out = _prose(repo, "master")
+    print(out)
+    assert rc == 1
+    assert _hits(out) == ["docs/child.md:2:"]
+
+
+def test_uncommitted_child_edit_is_scanned(tmp_path):
+    repo, _ = _stacked(tmp_path)
+    with open(repo / "docs" / "child.md", "a") as fh:
+        fh.write(f"{TELL_LINE}\n")
+    rc, out = _prose(repo, "master")
+    print(out)
+    assert rc == 1
+    assert _hits(out) == ["docs/child.md:2:"]
+
+
+def test_ancestor_ref_matches_two_dot_result(tmp_path):
+    repo = _init(tmp_path)
+    (repo / "docs" / "note.md").write_text(f"# Note\n\n{CLEAN_LINE}\n")
+    _commit(repo, "base")
+    _git(repo, "checkout", "-q", "-b", "feature")
+    with open(repo / "docs" / "note.md", "a") as fh:
+        fh.write(f"{TELL_LINE}\n")
+    _commit(repo, "tell")
+    base = _git(repo, "merge-base", "master", "HEAD")
+    rc_base, out_base = _prose(repo, base)
+    rc_master, out_master = _prose(repo, "master")
+    print(out_base, out_master)
+    assert _hits(out_base) == _hits(out_master) == ["docs/note.md:4:"]
+    assert rc_base == rc_master == 1
+
+
+def test_unrelated_ref_falls_back_to_tip_diff(tmp_path):
+    repo, _ = _stacked(tmp_path, child_tell=True)
+    _git(repo, "checkout", "-q", "--orphan", "other")
+    _git(repo, "rm", "-rq", "--cached", ".")
+    for f in (repo / "docs").iterdir():
+        f.unlink()
+    (repo / "docs" / "x.md").write_text(f"{CLEAN_LINE}\n")
+    _commit(repo, "orphan")
+    _git(repo, "checkout", "-q", "-f", "child")
+    rc, out = _prose(repo, "other")
     print(out)
     assert rc == 1
     assert "docs/child.md:2:" in out

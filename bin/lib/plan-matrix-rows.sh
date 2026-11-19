@@ -97,11 +97,18 @@ strip_shell_comment() {
 }
 
 CD_IBL5_RE='^cd[[:space:]]+ibl5[[:space:]]*&&[[:space:]]*(.*)$'
+# A bare worktree suite wrapper: bin/e2e-wt <slug> (the full Playwright suite,
+# CI job E2E Tests) or bin/db-test-up [<slug>] (PHPUnit against a seeded DB,
+# CI jobs test and db-integration in tests.yml). Both workflows run on every
+# PR, stacked PRs included (bin/test-plan-checks-block pins the triggers). Any
+# extra argument, pipe, chain or cd prefix falls through and the row runs.
+PLAN_ROW_SUITE_WRAPPER_RE='^(bin/e2e-wt[[:space:]]+[A-Za-z0-9][A-Za-z0-9._-]*|bin/db-test-up([[:space:]]+[A-Za-z0-9][A-Za-z0-9._-]*)?)$'
 is_whole_suite_cmd() {
     local c
     c=$(strip_shell_comment "$1")
     c="${c#"${c%%[![:space:]]*}"}"
     c="${c%"${c##*[![:space:]]}"}"
+    [[ "$c" =~ $PLAN_ROW_SUITE_WRAPPER_RE ]] && return 0
     if [[ "$c" =~ $CD_IBL5_RE ]]; then c="${BASH_REMATCH[1]}"; fi
     case "$c" in
         'vendor/bin/phpunit'|'vendor/bin/phpunit --no-progress'|'composer run analyse'|'composer run analyse:tests'|'composer run test'|'composer test') return 0 ;;

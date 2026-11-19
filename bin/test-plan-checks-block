@@ -684,6 +684,13 @@ chk "parse-only: bash -n with ; in a comment" po 'bash -n bin/x # a; b'
 chk "not parse-only: bash -n chained before a comment" eval '! po "bash -n bin/x; bin/db-test-up # c"'
 end_case
 
+start_case case_suite_wrapper_rows
+for c in 'bin/e2e-wt my-slug' 'bin/e2e-wt my-slug # expect green' 'bin/db-test-up' \
+    'bin/db-test-up my-slug # expect XTest in the green output'; do
+    chk "suite: $c" suite "$c"
+done
+end_case
+
 # --- Routing table -----------------------------------------------------------
 # Frozen fixture: <verdict> TAB <needs> TAB <cmd>, one row per line. The LOCAL
 # commands come from the 2026-11-15 prefire-verify failure classification (some

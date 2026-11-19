@@ -221,6 +221,8 @@ stage_matrix() {
     while IFS=$'\t' read -r num cmd; do
         [ -n "$num" ] || continue
         is_parse_only_cmd "$cmd" && continue
+        # A whole-suite row is skipped below, so it never needs the local DB.
+        is_whole_suite_cmd "$cmd" && continue
         # A DB row the Plan checks job runs never needs the local DB.
         row_runs_in_ci "$cmd" && continue
         if grep -Eq -- "$db_re" <<< "$cmd"; then first_db_num="$num"; first_db_cmd="$cmd"; break; fi

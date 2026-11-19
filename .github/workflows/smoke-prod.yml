@@ -36,7 +36,8 @@ jobs:
     if: >-
       github.event_name != 'workflow_run' ||
       github.event.workflow_run.conclusion == 'success'
-    timeout-minutes: 5
+    # setup-ssh retries can take about 6 minutes on a silent host
+    timeout-minutes: 15
     outputs:
       # 'true' when the IBL5 smoke was INCONCLUSIVE — either the on-box prober
       # hit a uniform WAF-class block (remote exit 3) or the production box was

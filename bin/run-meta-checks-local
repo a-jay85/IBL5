@@ -28,6 +28,8 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=bin/lib/branch-base.sh
+[ -f "$REPO_ROOT/bin/lib/branch-base.sh" ] && . "$REPO_ROOT/bin/lib/branch-base.sh"
 
 usage() {
     cat <<'EOF'
@@ -107,12 +109,30 @@ ROOT="${HOOK_ROOT:-$REPO_ROOT}"
 WORKFLOW="$ROOT/.github/workflows/pr-meta-checks.yml"
 
 # Base resolution — best-effort fetch so offline runs still work.
+# BASE_TIP is where the PR lands: the declared stacked base when one resolves
+# (bin/lib/branch-base.sh), else origin/master. BASE is its merge-base with HEAD.
 if [ -z "$BASE" ]; then
     git -C "$ROOT" fetch --quiet origin master 2>/dev/null || true
-    BASE=$(git -C "$ROOT" merge-base origin/master HEAD 2>/dev/null) \
-        || BASE=$(git -C "$ROOT" merge-base master HEAD 2>/dev/null) \
+    BASE_TIP=""
+    _br=$(git -C "$ROOT" symbolic-ref --quiet --short HEAD 2>/dev/null) || _br=""
+    if [ -n "$_br" ] && command -v branch_base_merge_target >/dev/null 2>&1; then
+        _decl=$(branch_base_merge_target "$ROOT" "$_br") || _decl=""
+        if [ -n "$_decl" ] && [ "$_decl" != "origin/master" ]; then
+            git -C "$ROOT" fetch --quiet origin "${_decl#origin/}" 2>/dev/null || true
+            git -C "$ROOT" rev-parse --verify --quiet "$_decl^{commit}" >/dev/null 2>&1 \
+                && BASE_TIP="$_decl"
+        fi
+    fi
+    [ -n "$BASE_TIP" ] || BASE_TIP=origin/master
+    BASE=$(git -C "$ROOT" merge-base "$BASE_TIP" HEAD 2>/dev/null) \
+        || { BASE_TIP=master; BASE=$(git -C "$ROOT" merge-base master HEAD 2>/dev/null); } \
         || { echo "run-meta-checks-local: cannot resolve a base commit" >&2; exit 3; }
+else
+    BASE_TIP="$BASE"
 fi
+BASE_TIP_SHA=$(git -C "$ROOT" rev-parse --verify --quiet "$BASE_TIP^{commit}" 2>/dev/null) \
+    || BASE_TIP_SHA="$BASE"
+echo "META-BASE: $BASE_TIP_SHA"
 
 # Changed-path set: committed range + unstaged + staged (matches bin/check-docs --since).
 CHANGED=$(
@@ -509,7 +529,7 @@ if [ "$STAGE" = "pre-push" ]; then
     queue_step "check-docs-no-staleness"       hard "$BIN/check-docs" --no-staleness
     queue_step "check-docs-since"              hard "$BIN/check-docs" "--since=$BASE"
     queue_step "check-prose-self-test"         hard "$BIN/check-prose" --self-test
-    queue_step "check-prose-since"             hard "$BIN/check-prose" "--since=$BASE"
+    queue_step "check-prose-since"             hard "$BIN/check-prose" "--since=$BASE_TIP_SHA"
     queue_step "check-registry-trigger-rows"   hard "$BIN/check-registry-trigger-rows"
     queue_step "check-model-pins"              hard "$BIN/check-model-pins"
     queue_step "test-check-model-pins"         hard "$BIN/test-check-model-pins"

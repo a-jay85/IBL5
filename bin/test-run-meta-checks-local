@@ -8,10 +8,10 @@
 # (case l) runs against the real workflow and runner on disk.
 
 set -euo pipefail
-# Group selector: all (default), base, contract, cache or parallel.
+# Group selector: all (default), base, contract, cache, parallel or stacked.
 GROUP="${1:-all}"
 case "$GROUP" in
-    all|base|contract|cache|parallel) ;;
+    all|base|contract|cache|parallel|stacked) ;;
     *) printf 'unknown group: %s\n' "$GROUP" >&2; exit 2 ;;
 esac
 want_group() { [ "$GROUP" = all ] || [ "$GROUP" = "$1" ]; }
@@ -148,6 +148,9 @@ make_repo() {
 
     # Copy the runner so it reads this repo's workflow and bin/.
     cp "$RUNNER" "$repo/bin/run-meta-checks-local"
+    # The runner sources its stacked-base resolver from bin/lib/ beside it.
+    mkdir -p "$repo/bin/lib"
+    cp "$SCRIPT_DIR/lib/branch-base.sh" "$repo/bin/lib/branch-base.sh"
 
     # Initial commit on master so git merge-base resolves.
     printf 'fixture\n' > "$repo/.gitkeep"
@@ -516,6 +519,91 @@ rm -rf "$REPO"
 want "case n: advisory step still ran unguarded" "$OUT" "WARN  check-hot-files"
 absent "case n: no timeout wording when unguarded" "$OUT" "timed out after"
 
+fi
+
+# ─── Stacked group: the declared stacked base sets META-BASE ─────────────────
+if want_group stacked; then
+# make_stacked_repo: fixture with a bare origin holding master and parent, and
+# a local child branch off parent (checked out). Prints the repo path.
+make_stacked_repo() {
+    local repo
+    repo=$(make_repo "$FIXTURE_WORKFLOW_ALL")
+    git init -q --bare "$repo.origin"
+    git -C "$repo" remote add origin "$repo.origin"
+    git -C "$repo" push -q origin master
+    git -C "$repo" checkout -q -b parent
+    printf 'parent\n' > "$repo/parent.txt"
+    git -C "$repo" add .
+    git -C "$repo" commit -q -m "parent"
+    git -C "$repo" push -q origin parent
+    git -C "$repo" checkout -q -b child
+    printf 'child\n' > "$repo/child.txt"
+    git -C "$repo" add .
+    git -C "$repo" commit -q -m "child"
+    git -C "$repo" fetch -q origin
+    printf '%s' "$repo"
+}
+stk_run() {
+    run_check_both env BRANCH_BASE_OFFLINE=1 \
+        "$REPO/bin/run-meta-checks-local" --self-test-hook "$REPO" "$@"
+}
+
+# ─── Case stk-1: declared parent on origin → META-BASE is origin/parent ─────
+REPO=$(make_stacked_repo)
+git -C "$REPO" config branch.child.iblBase parent
+PARENT_SHA=$(git -C "$REPO" rev-parse origin/parent)
+MASTER_SHA=$(git -C "$REPO" rev-parse origin/master)
+stk_run
+OUT="$_LAST_OUT"; RC="$_LAST_RC"
+rm -rf "$REPO" "$REPO.origin"
+want "case stk-1: META-BASE is the declared parent" "$OUT" "META-BASE: $PARENT_SHA"
+absent "case stk-1: META-BASE is not origin/master" "$OUT" "META-BASE: $MASTER_SHA"
+[ "$RC" -eq 0 ] && pass "case stk-1: exit 0" || fail "case stk-1: exit 0 (got $RC)"
+
+# ─── Case stk-2: recorded parent gone from origin → origin/master ───────────
+REPO=$(make_stacked_repo)
+git -C "$REPO" config branch.child.iblBase parent
+MASTER_SHA=$(git -C "$REPO" rev-parse origin/master)
+git -C "$REPO.origin" branch -q -D parent
+git -C "$REPO" fetch -q --prune origin
+stk_run
+OUT="$_LAST_OUT"; RC="$_LAST_RC"
+rm -rf "$REPO" "$REPO.origin"
+want "case stk-2: META-BASE falls back to origin/master" "$OUT" "META-BASE: $MASTER_SHA"
+[ "$RC" -eq 0 ] && pass "case stk-2: exit 0" || fail "case stk-2: exit 0 (got $RC)"
+
+# ─── Case stk-3: no iblBase key → origin/master ─────────────────────────────
+REPO=$(make_stacked_repo)
+MASTER_SHA=$(git -C "$REPO" rev-parse origin/master)
+stk_run
+OUT="$_LAST_OUT"; RC="$_LAST_RC"
+rm -rf "$REPO" "$REPO.origin"
+want "case stk-3: META-BASE is origin/master" "$OUT" "META-BASE: $MASTER_SHA"
+[ "$RC" -eq 0 ] && pass "case stk-3: exit 0" || fail "case stk-3: exit 0 (got $RC)"
+
+# ─── Case stk-4: hostile option-shaped iblBase → origin/master ──────────────
+REPO=$(make_stacked_repo)
+git -C "$REPO" config -- branch.child.iblBase '--upload-pack=x'
+STK4_KEY=$(git -C "$REPO" config --get branch.child.iblBase)
+MASTER_SHA=$(git -C "$REPO" rev-parse origin/master)
+stk_run
+OUT="$_LAST_OUT"; RC="$_LAST_RC"
+rm -rf "$REPO" "$REPO.origin"
+[ "$STK4_KEY" = "--upload-pack=x" ] && pass "case stk-4: hostile key recorded" \
+    || fail "case stk-4: hostile key recorded (got $STK4_KEY)"
+want "case stk-4: META-BASE is origin/master" "$OUT" "META-BASE: $MASTER_SHA"
+absent "case stk-4: no upload-pack text" "$OUT" "upload-pack"
+
+# ─── Case stk-5: explicit --base wins over iblBase ──────────────────────────
+REPO=$(make_stacked_repo)
+git -C "$REPO" config branch.child.iblBase parent
+PARENT_SHA=$(git -C "$REPO" rev-parse origin/parent)
+BASE=$(git -C "$REPO" rev-parse origin/master)
+stk_run --base "$BASE"
+OUT="$_LAST_OUT"; RC="$_LAST_RC"
+rm -rf "$REPO" "$REPO.origin"
+want "case stk-5: META-BASE is the explicit --base" "$OUT" "META-BASE: $BASE"
+absent "case stk-5: explicit --base ignores iblBase" "$OUT" "META-BASE: $PARENT_SHA"
 fi
 
 # ─── Shared fixture helpers for the contract, cache and parallel groups ─────

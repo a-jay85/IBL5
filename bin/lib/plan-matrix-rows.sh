@@ -66,9 +66,40 @@ plan_matrix_rows() {
 
 # --- row helpers shared with prefire-verify and plan-checks-block ----------
 # (moved from prefire-verify)
+# strip_shell_comment <cmd> — prints cmd without a trailing shell comment: an
+# unquoted, unescaped `#` at the start or after a space or tab, and the rest of
+# the line. A `#` inside quotes, after a backslash, or inside a word (a URL
+# `#anchor`, `$#`, `${#x}`) stays. An unclosed quote prints cmd unchanged, so a
+# row the scanner cannot read keeps its full text. Trailing whitespace is
+# trimmed. Only the exact-match checks call it (is_whole_suite_cmd,
+# is_parse_only_cmd). PLAN_ROW_LOCAL_RE, the docker check, the remote-host
+# guard and row_ci_needs read the full row, so a comment can still pin a row
+# local and can never send one to CI.
+strip_shell_comment() {
+    local s="$1" i=0 n=${#1} q="" ch prev=" "
+    while [ "$i" -lt "$n" ]; do
+        ch="${s:$i:1}"
+        if [ -n "$q" ]; then
+            if [ "$ch" = "\\" ] && [ "$q" = '"' ]; then i=$((i + 1))
+            elif [ "$ch" = "$q" ]; then q=""; fi
+        else
+            case "$ch" in
+                "'"|'"') q="$ch" ;;
+                "\\") i=$((i + 1)); ch="x" ;;
+                '#') case "$prev" in ' '|$'\t') break ;; esac ;;
+            esac
+        fi
+        prev="$ch"
+        i=$((i + 1))
+    done
+    if [ -n "$q" ]; then printf '%s' "$s"; return 0; fi
+    mtrim "${s:0:$i}"
+}
+
 CD_IBL5_RE='^cd[[:space:]]+ibl5[[:space:]]*&&[[:space:]]*(.*)$'
 is_whole_suite_cmd() {
-    local c="$1"
+    local c
+    c=$(strip_shell_comment "$1")
     c="${c#"${c%%[![:space:]]*}"}"
     c="${c%"${c##*[![:space:]]}"}"
     if [[ "$c" =~ $CD_IBL5_RE ]]; then c="${BASH_REMATCH[1]}"; fi
@@ -78,12 +109,13 @@ is_whole_suite_cmd() {
     return 1
 }
 
-# Exit 0 when the row only parses or lints files: one `bash -n`, `sh -n` or
+# Exit 0 when the row, minus a trailing comment, only parses or lints files: one `bash -n`, `sh -n` or
 # `shellcheck` call with no `&`, `;`, `|`, `$(`, backtick, `<(` or `>(`. Such a row
 # can name bin/db-test-up without running it, so prefire-verify skips the DB
 # probe for it. Anything chained still probes (fail toward probing).
 is_parse_only_cmd() {
-    local c="$1"
+    local c
+    c=$(strip_shell_comment "$1")
     c="${c#"${c%%[![:space:]]*}"}"
     case "$c" in
         *'&'*|*';'*|*'|'*|*'$('*|*'`'*|*'<('*|*'>('*) return 1 ;;

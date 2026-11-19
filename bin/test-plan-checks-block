@@ -640,6 +640,50 @@ for c in 'cd ibl5 && composer test' 'vendor/bin/phpunit --no-progress'; do
 done
 end_case
 
+# scc <cmd> prints strip_shell_comment's output for cmd.
+scc() (
+    # shellcheck source=bin/lib/plan-matrix-rows.sh
+    source "$REPO_ROOT/bin/lib/plan-matrix-rows.sh"
+    strip_shell_comment "$1"
+)
+# po <cmd> exits 0 when is_parse_only_cmd treats cmd as parse-only.
+po() (
+    # shellcheck source=bin/lib/plan-matrix-rows.sh
+    source "$REPO_ROOT/bin/lib/plan-matrix-rows.sh"
+    is_parse_only_cmd "$1"
+)
+
+start_case case_strip_shell_comment
+# Fixture: <input> TAB <expected>; `=` as the expected value means unchanged.
+SCC_FILE="$TMP/scc.tsv"
+cat > "$SCC_FILE" <<'SCC_EOF'
+composer test # expect green	composer test
+vendor/bin/phpunit #no-space-comment	vendor/bin/phpunit
+grep -c '#' f	=
+grep -c "a # b" f	=
+printf "a\" # b" f	=
+curl -s http://x.localhost/a#frag	=
+echo ${#x} $#	=
+grep x f \# y	=
+echo 'unterminated # x	=
+# only a comment	
+a#b # c	a#b
+cmd;# c	=
+SCC_EOF
+SCC_N=0
+while IFS=$'\t' read -r scc_in scc_want; do
+    [ "$scc_want" = "=" ] && scc_want="$scc_in"
+    chk "strip: $scc_in" test "$(scc "$scc_in")" = "$scc_want"
+    SCC_N=$((SCC_N + 1))
+done < "$SCC_FILE"
+chk "strip fixture: 12 pairs ran (got $SCC_N)" eq "$SCC_N" 12
+chk "suite: composer test with comment" suite 'cd ibl5 && composer test # expect green'
+chk "suite: phpunit with no-space comment" suite 'vendor/bin/phpunit #no-space-comment'
+chk "suite: analyse with a long comment" suite 'cd ibl5 && composer run analyse # green; the one-time removed-e() run must print an ibl.unescapedOutput error first'
+chk "parse-only: bash -n with ; in a comment" po 'bash -n bin/x # a; b'
+chk "not parse-only: bash -n chained before a comment" eval '! po "bash -n bin/x; bin/db-test-up # c"'
+end_case
+
 # --- Routing table -----------------------------------------------------------
 # Frozen fixture: <verdict> TAB <needs> TAB <cmd>, one row per line. The LOCAL
 # commands come from the 2026-11-15 prefire-verify failure classification (some

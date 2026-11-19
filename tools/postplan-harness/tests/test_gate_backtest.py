@@ -558,6 +558,49 @@ def test_tally_base_flag_same_lines_is_pre_existing():
     assert tally.false_flags == []
 
 
+# --- parent-commit credit for tree-wide gates ----------------------------------------------
+
+from harness.gate_backtest import (_PLAN, _PR_BODY, _SINCE, _TREE,  # noqa: E402
+                                   _line_key, is_tree_wide, lines_not_in_parent)
+
+
+def test_line_key_drops_line_number_only():
+    assert _line_key("src/a.css:12: x") == "src/a.css:: x"
+    assert _line_key("src/a.css:12:5: x") == "src/a.css::5: x"
+    assert _line_key("-> hint") == "-> hint"
+    assert _line_key("ERROR: 3 found") == "ERROR: 3 found"
+
+
+def test_line_key_ignores_mid_line_path():
+    assert _line_key("note: see src/a.css:12: x") == "note: see src/a.css:12: x"
+    assert _line_key("checks 3 and 4: x") == "checks 3 and 4: x"
+
+
+def test_lines_not_in_parent_matches_shifted_line():
+    assert lines_not_in_parent(("src/a.txt:3: BAD old",), ("src/a.txt:2: BAD old",)) == ()
+
+
+def test_lines_not_in_parent_counts_added_duplicate():
+    head = ("src/a.txt:2: BAD old", "src/a.txt:4: BAD old")
+    assert lines_not_in_parent(head, ("src/a.txt:2: BAD old",)) == ("src/a.txt:4: BAD old",)
+
+
+def test_lines_not_in_parent_capped_returns_head():
+    full = tuple(f"src/a.txt:{i}: BAD {i}" for i in range(_FLAG_LINES_CAP))
+    assert len(full) == 500
+    assert lines_not_in_parent(full, full) == full
+
+
+def test_is_tree_wide_only_for_pr_independent_specs():
+    assert is_tree_wide(_TREE)
+    assert is_tree_wide(ReplaySpec(argv=("--root", ".")))
+    assert is_tree_wide(ReplaySpec(argv=("--root", "{tree}")))
+    assert not is_tree_wide(_SINCE)
+    assert not is_tree_wide(_PLAN)
+    assert not is_tree_wide(_PR_BODY)
+    assert not is_tree_wide(ReplaySpec(argv=(), env=(("BASE_REF", "{base}"),)))
+
+
 def test_tally_tree_wide_clean_flag_without_parent_run_is_false_flag():
     r = ReplayResult(10, _g().path, "flag", "x", "absent", flag_lines=("src/a.txt:2:BAD old",))
     tally = _tally(_g().path, [r], _truth(clean=(10,)))

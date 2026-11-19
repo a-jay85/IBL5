@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import fnmatch
 import re
+from collections import Counter
 import shlex
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -80,6 +81,10 @@ class ReplayResult:
     base_attempt_secs: tuple[float, ...] = ()  # same for the base replay
     fix_attempt_secs: tuple[float, ...] = ()   # same for the fix rerun
     fix_flag_lines: tuple[str, ...] = ()       # fix-rerun stdout lines when fix_outcome == "flag"
+    parent_outcome: str = ""   # "", flag, pass, error, timeout: candidate gate on merge_sha^ (tree-wide specs only)
+    parent_detail: str = ""
+    parent_flag_lines: tuple[str, ...] = ()    # parent-run stdout lines when parent_outcome == "flag"
+    parent_attempt_secs: tuple[float, ...] = ()  # same as attempt_secs, for the parent run
 
 
 HEAD_OID_FIELD = "headRefOid"
@@ -432,6 +437,11 @@ def placeholder_names(spec: ReplaySpec) -> set[str]:
     return {name for tok in tokens for name in _PLACEHOLDER_RE.findall(tok)}
 
 
+def is_tree_wide(spec: ReplaySpec) -> bool:
+    """True when argv, env, and stdin name no PR-specific input, so the gate can only judge the tree."""
+    return not spec.needs_plan and placeholder_names(spec) <= {"tree"}
+
+
 def classify_exit(spec: ReplaySpec, rc: int, stdout: str) -> tuple[str, str]:
     """Map a replay's exit code and stdout to (outcome, detail). Exit 2 is an error, never a pass."""
     if spec.flag_stdout_re and rc in spec.ok_exits:
@@ -546,9 +556,56 @@ def lines_not_in_base(head: tuple[str, ...], base: tuple[str, ...]) -> tuple[str
     return tuple(line for line in head if line not in seen)
 
 
+_FLAG_LINE_NUMBER_RE = re.compile(r"^([^\s:]+):\d+:")
+
+
+def _line_key(line: str) -> str:
+    """A flag line with its leading `path:LINE:` number dropped, so a shifted line still matches."""
+    return _FLAG_LINE_NUMBER_RE.sub(r"\1::", line, count=1)
+
+
+def lines_not_in_parent(head: tuple[str, ...], parent: tuple[str, ...]) -> tuple[str, ...]:
+    """Head lines the parent-commit run cannot account for, matched by `_line_key` as a multiset.
+
+    Each parent line accounts for at most one head line with the same key, so a PR that adds a
+    second copy of a flagged line still introduces one. Every head line when either list is capped."""
+    if len(head) >= _FLAG_LINES_CAP or len(parent) >= _FLAG_LINES_CAP:
+        return head
+    budget = Counter(_line_key(line) for line in parent)
+    out = []
+    for line in head:
+        key = _line_key(line)
+        if budget[key] > 0:
+            budget[key] -= 1
+        else:
+            out.append(line)
+    return tuple(out)
+
+
+def lines_introduced(head: tuple[str, ...], base: tuple[str, ...], parent_outcome: str,
+                     parent: tuple[str, ...]) -> tuple[str, ...]:
+    """Head lines that neither the candidate gate on merge_sha^ nor the base gate on this tree printed.
+
+    Only a parent run that ended "flag" credits anything. "", pass, error, and timeout leave
+    lines_not_in_base(head, base) standing, so a failed parent run never clears a PR."""
+    if parent_outcome == "flag":
+        head = lines_not_in_parent(head, parent)
+    return lines_not_in_base(head, base)
+
+
 def new_flag_lines(r: ReplayResult) -> tuple[str, ...]:
     """Head flag lines the base gate did not also print on the same tree."""
     return lines_not_in_base(r.flag_lines, r.base_flag_lines)
+
+
+def introduced_flag_lines(r: ReplayResult) -> tuple[str, ...]:
+    """Head flag lines this PR's own diff introduced, by the parent-commit and base-gate comparisons."""
+    return lines_introduced(r.flag_lines, r.base_flag_lines, r.parent_outcome, r.parent_flag_lines)
+
+
+def parent_clears(r: ReplayResult) -> bool:
+    """True when the candidate gate on merge_sha^ printed every head flag line not already a base line."""
+    return r.parent_outcome == "flag" and bool(r.flag_lines) and not introduced_flag_lines(r)
 
 
 def fix_lines_pre_existing(r: ReplayResult) -> bool:

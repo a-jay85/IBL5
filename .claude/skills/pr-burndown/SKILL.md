@@ -1,7 +1,7 @@
 ---
 name: pr-burndown
 description: "Burn down the open PRs that wait on the owner. Background headless jobs do the prep that needs no owner call (rebase, regenerate snapshots, write promised tests, fix review findings, re-fire post-plan). The owner sees only the decisions that are theirs: a status card per PR (CI on the current head, review threads, post-plan verdict, door and blast radius, conflicts, hold reasons, visual links) with a recommended option, answered in a batch."
-last_verified: 2026-11-17
+last_verified: 2026-11-19
 ---
 
 # /pr-burndown
@@ -44,6 +44,7 @@ This skill moves existing PRs. To find and queue new work, run `/reset-ready` fi
   earlier fetch is not evidence. A "green, just click" summary has been wrong before.
 - You tick a manual-test box, or run `bin/owner-approve`, only after the owner approves that specific PR in chat. Rule: `.claude/rules/auto-commit.md` § Owner approval comment. Nothing in this skill approves a PR on its own.
 - When the owner approves a PR for merge in chat, run `bin/owner-approve N "<words>"` right away with `run_in_background: true`. It waits for a live post-plan run to end, then arms only when the verdict covers the current head. When a job will push to the PR (a rebase, or a fix the owner asked for), pass `--fix-first="<what the job pushes>"` and run `--finish` after the push. A plain approval refuses once the head moves, so use it only when nothing will push.
+- When a PR is NOT READY and its only blockers sit in the PR body's kept-unplanned block, offer the owner `bin/owner-approve N "<words>"` as the path. The approval accepts those listed items for the current diff and re-runs post-plan once. Never suggest a hand merge over the verdict.
 - Never touch a PR's worktree while a post-plan run is live in it. Check `launchctl list`
   first (Step 6 has the command). A run started from a terminal has no launchctl label,
   so also treat a `post-plan-running` label or a `pgrep -f <abs worktree path>` hit as

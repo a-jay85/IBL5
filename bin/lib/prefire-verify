@@ -213,6 +213,9 @@ stage_matrix() {
         say "FAIL plan has no Verification Matrix; no evidence to check" >&2
         return 1
     fi
+    # row_runs_in_ci reads the whole row set to tell whether another row reads
+    # a /tmp file a CI row writes (_tmp_write_scrub in plan-matrix-rows.sh).
+    PLAN_ROW_ALL_CMDS="$rows"
 
     # DB probe, once, before the first DB-touching row. A parse-only row
     # (`bash -n bin/db-test-up`) names a DB script without running it.

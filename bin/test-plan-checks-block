@@ -691,6 +691,30 @@ for c in 'bin/e2e-wt my-slug' 'bin/e2e-wt my-slug # expect green' 'bin/db-test-u
 done
 end_case
 
+start_case case_tmp_write_rows
+# A row that only writes a /tmp path routes to CI when the row set names that
+# path once. Each command below is its own whole row set.
+for c in \
+    "curl -s -o /tmp/pcb-w.html -w '%{http_code}' 'http://my-slug.localhost/ibl5/'" \
+    "curl -s --output=/tmp/pcb-w2.html 'http://my-slug.localhost/ibl5/'" \
+    "curl -sSo /tmp/pcb-w3.html 'http://localhost/ibl5/'"; do
+    PLAN_ROW_ALL_CMDS="$c"
+    chk "routes CI db web: $c" eq "$(route "$c")" "CI db web"
+done
+c="printf 'x\n' > /tmp/pcb-w4.txt"
+PLAN_ROW_ALL_CMDS="$c"
+chk "routes CI: $c" routes_ci "$c"
+TW_WRITER="curl -s -o /tmp/pcb-w.html -w '%{http_code}' 'http://my-slug.localhost/ibl5/'"
+unset PLAN_ROW_ALL_CMDS
+chk "stays LOCAL with no row set: $TW_WRITER" routes_local "$TW_WRITER"
+PLAN_ROW_ALL_CMDS=$(printf '%s\n%s\n' "$TW_WRITER" 'grep -c x /tmp/pcb-w.html')
+chk "stays LOCAL when another row reads the path: $TW_WRITER" routes_local "$TW_WRITER"
+c="curl -s -o /tmp/pcb-w.html 'http://my-slug.localhost/ibl5/' && grep -c x /tmp/pcb-w.html"
+PLAN_ROW_ALL_CMDS="$c"
+chk "stays LOCAL when the same row reads the path: $c" routes_local "$c"
+unset PLAN_ROW_ALL_CMDS TW_WRITER
+end_case
+
 # --- Routing table -----------------------------------------------------------
 # Frozen fixture: <verdict> TAB <needs> TAB <cmd>, one row per line. The LOCAL
 # commands come from the 2026-11-15 prefire-verify failure classification (some

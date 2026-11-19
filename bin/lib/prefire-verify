@@ -3,8 +3,10 @@
 #
 # Re-runs two checks on the current working tree before /post-plan fires (ADR-0244):
 #   1. every post-impl CLI-executable row of the plan's Verification Matrix
-#      (a row whose whole command is one of six whole-suite runs CI covers is skipped; see is_whole_suite_cmd;
-#      a row that row_runs_in_ci sends to the Plan checks CI job is skipped too)
+#      (a row whose whole command, minus a trailing shell comment, is a whole-suite run CI covers is
+#      skipped: six exact composer/phpunit runs, or a bare bin/e2e-wt <slug> or bin/db-test-up [<slug>];
+#      see is_whole_suite_cmd. A row that row_runs_in_ci sends to the Plan checks CI job is skipped too,
+#      including a row that only writes a /tmp file no other row names; see _tmp_write_scrub)
 #   2. PHPUnit on the tests mapped to the branch's changed files (full suite when a
 #      shared test input changed or mapping failed; skipped when no PHPUnit-relevant file changed)
 # The shell stage runs the bin/test-* harness lines mapped by name to the changed bin/ files,
@@ -195,10 +197,10 @@ write_record() { # <stage> <key>
 }
 
 # --- matrix stage -----------------------------------------------------------
-# Exit 0 when a matrix row's whole command, after trimming whitespace and an
-# optional `cd ibl5 &&` prefix, is exactly a whole-suite run that CI's required
-# checks already cover. Exact match only: any filter, path, --group, pipe or
-# `&&` chain to another command still runs.
+# Whole-suite rows (is_whole_suite_cmd) are skipped because CI's required
+# checks run the same suite on this PR. The match is exact after a trailing
+# comment is stripped: any filter, path, --group, pipe or `&&` chain to
+# another command still runs.
 stage_matrix() {
     local plan_sha rows rc num cmd log rows_rc
     if [ -z "$PLAN" ]; then
@@ -213,6 +215,9 @@ stage_matrix() {
         say "FAIL plan has no Verification Matrix; no evidence to check" >&2
         return 1
     fi
+    # row_runs_in_ci reads the whole row set to tell whether another row reads
+    # a /tmp file a CI row writes (_tmp_write_scrub in plan-matrix-rows.sh).
+    PLAN_ROW_ALL_CMDS="$rows"
 
     # DB probe, once, before the first DB-touching row. A parse-only row
     # (`bash -n bin/db-test-up`) names a DB script without running it.
@@ -221,6 +226,8 @@ stage_matrix() {
     while IFS=$'\t' read -r num cmd; do
         [ -n "$num" ] || continue
         is_parse_only_cmd "$cmd" && continue
+        # A whole-suite row is skipped below, so it never needs the local DB.
+        is_whole_suite_cmd "$cmd" && continue
         # A DB row the Plan checks job runs never needs the local DB.
         row_runs_in_ci "$cmd" && continue
         if grep -Eq -- "$db_re" <<< "$cmd"; then first_db_num="$num"; first_db_cmd="$cmd"; break; fi

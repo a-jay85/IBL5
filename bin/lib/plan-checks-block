@@ -190,6 +190,9 @@ do_encode() {
         echo "FAIL plan has no Verification Matrix" >&2
         return 3
     fi
+    # row_runs_in_ci reads the whole row set to tell whether another row reads
+    # a /tmp file a CI row writes (_tmp_write_scrub in plan-matrix-rows.sh).
+    PLAN_ROW_ALL_CMDS="$rows"
     tmp=$(mktemp -d "${TMPDIR:-/tmp}/plan-checks.XXXXXX") || return 3
     : > "$tmp/rows.tsv"
     local seen=()

@@ -1,6 +1,6 @@
 ---
-description: Deploy Rehearsal falls back to an encrypted cached prod dump, up to 7 days old, when the live clone fails with a connection-class MySQL error.
-last_verified: 2026-11-02
+description: Deploy Rehearsal falls back to an encrypted cached prod dump, up to 7 days old, when the live clone fails with a connection-class MySQL error or an ssh connect failure.
+last_verified: 2026-11-18
 ---
 
 # ADR-0224: Rehearsal Clone Fallback to an Encrypted Cached Dump
@@ -45,3 +45,29 @@ The `workflow_dispatch`-only input `simulate_clone_connection_failure` writes a 
 - `bin/rehearsal-prod-dump` is the read-only server-side dump script, unchanged.
 - `ibl5/docs/decisions/0023-deploy-rehearsal-pre-flight-gate.md` defines the pre-flight gate this relaxes.
 - `ibl5/docs/decisions/0059-rehearse-migrations-against-prod-clone.md` defines the prod clone.
+
+## Addendum 2026-11-18: ssh connect failures
+
+Run 44411988785 (commit cf38d9d) failed twice before a third attempt passed. On attempt 1 the setup-ssh keyscan came back empty after six tries, and the dump's ssh call then printed `ssh: connect to host *** port ***: Connection timed out` and exited 255. On attempt 2 the keyscan was empty again. Ssh reached the host about seven minutes later and stopped with `Host key verification failed`. Other runners reached prod in the same windows, so the prod firewall was blocking single runner IPs. The classifier knew only MySQL error codes, so it refused the fallback both times.
+
+`bin/rehearsal-clone-fallback classify` now also returns `fallback: ssh-connect` for the ssh client's own network-level lines:
+
+- `ssh: connect to host <h> port <p>:` followed by `Connection timed out`, `Connection refused`, `No route to host`, `Network is unreachable`, or `Connection reset by peer`.
+- `kex_exchange_identification:` or `ssh_exchange_identification:` with a closed, reset, or timed-out connection.
+- `banner exchange: Connection to <h> port <p>:` with a timed-out, refused, or reset connection.
+- `Connection closed by <h> port <p>` and `Connection reset by <h> port <p>`.
+- `Host key verification failed.`, only when the caller passes `--keyscan=empty`.
+
+Each pattern must match a whole stderr line from start to end. The stderr file also holds the remote script's output, and a remote line that quotes one of these phrases inside other text does not match. The MySQL codes are still checked first, unchanged. After them, any line with `Permission denied` or `Could not resolve hostname` returns `no-fallback`, even when an eligible line is also present. A failed login or a bad host name is a config fault, and a cached dump would hide it.
+
+The dump step learns the keyscan fact itself. Just before the ssh call it runs `ssh-keygen -F` against `~/.ssh/known_hosts` for the bare host and for the `[host]:port` form, which is the question ssh asks when it verifies a host key. A hit, or any probe exit code other than 1 (no entry), reads `present`. Only a missing file or a clean miss on both forms reads `empty`. A stale or pre-existing known_hosts can only push the answer to `present`, which keeps a host key mismatch a hard failure. `classify` defaults to `--keyscan=present` when the argument is absent, and an unknown value exits 2.
+
+The dump step still makes the ssh call when the keyscan is empty. The real stderr is the evidence the classifier reads, and the existing ConnectTimeout and ConnectionAttempts settings bound the cost.
+
+The rejected alternative "Classify by ssh exit status" stands. Exit 255 also covers auth failures and host key mismatches, so the classifier still reads stderr text.
+
+When the fallback runs for `ssh-connect`, the warning, the job summary, and both failure errors in the `fallback` step name "SSH connect failure" in the place where the MySQL path names its code. The summary states the age of the cached dump in hours and the URL of the run that cloned it. The 7-day age cap and the fail-when-no-cache rule are unchanged.
+
+A second dispatch-only input, `simulate_ssh_connect_failure`, writes a verbatim ssh timeout line into the dump stderr so the real classifier routes to the fallback. A runner IP block cannot be reproduced on demand, so this input is the one way to drive the path on a real runner. Like `simulate_clone_connection_failure`, it is read only through a `workflow_dispatch` guard, and `workflow_call` declares no inputs.
+
+The rehearsal's `Setup SSH` step must never set `fail-on-unreachable: 'true'` (the input from [#4053](https://github.com/a-jay85/IBL5/pull/4053)). An empty keyscan has to reach the dump step so this fallback can run. `bin/test-rehearsal-clone-fallback` fails if that line appears.

@@ -384,6 +384,7 @@ rc=0; _oa_verdict refire || rc=$?
 if [ "$rc" -eq 10 ]; then
     _oa_refire
     _oa_wait
+    _oa_read_pr || _oa_refuse 4 "could not re-read PR $OA_PR after the re-review."
     if [ "$head" != "$rec_head" ]; then
         _oa_refuse 4 "the re-review moved the head from $rec_head (the one the owner approved) to $head. Approve the new head again: bin/owner-approve $OA_PR \"<words>\"."
     fi

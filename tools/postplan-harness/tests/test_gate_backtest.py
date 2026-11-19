@@ -563,7 +563,8 @@ def test_tally_base_flag_same_lines_is_pre_existing():
 import pytest  # noqa: E402
 
 from harness.gate_backtest import (_PLAN, _PR_BODY, _SINCE, _TREE,  # noqa: E402
-                                   _line_key, _retry_lines, is_tree_wide, lines_not_in_parent)
+                                   _line_key, _retry_lines, is_tree_wide, lines_introduced,
+                                   lines_not_in_parent)
 
 
 def test_line_key_drops_line_number_only():
@@ -626,6 +627,7 @@ def test_tally_parent_same_lines_is_tree_state():
 @pytest.mark.parametrize("parent_outcome", ["", "pass", "error", "timeout"])
 def test_tally_parent_outcome_other_than_flag_is_false_flag(parent_outcome):
     head = ("src/a.txt:2: BAD old",)
+    assert lines_introduced(head, (), parent_outcome, head) == head
     _, _, v = _parent_verdict([_parent_row(10, head, head, parent_outcome=parent_outcome)])
     tally = v.per_gate["bin/check-foo"]
     assert tally.false_flags == [10]

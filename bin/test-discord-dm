@@ -847,6 +847,7 @@ db-backup.yml#1 webhook=errors
 db-backup.yml#2 webhook=errors
 db-backup.yml#3 webhook=errors
 db-backup.yml#4 webhook=errors
+deploy-auto-retry.yml#1 webhook=errors
 docfix-health.yml#1 webhook=errors
 docfix-health.yml#2 webhook=errors
 docs-refreshed-notify.yml#1 webhook=dev
@@ -868,7 +869,7 @@ printf '\n-- notify-discord call sites --\n'
 # G1: the live workflows match the table.
 G1_GOT=$(notify_sites "$ROOT/.github/workflows")
 if [ "$G1_GOT" = "$NOTIFY_SITES_WANT" ]; then
-    ok "G1: 17 sites pass the expected webhook-url and none pings"
+    ok "G1: 18 sites pass the expected webhook-url and none pings"
 else
     fail "G1: call sites differ from the table"
     diff <(printf '%s\n' "$NOTIFY_SITES_WANT") <(printf '%s\n' "$G1_GOT") | sed 's/^/       /'

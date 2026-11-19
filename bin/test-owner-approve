@@ -77,6 +77,13 @@ case "${1:-} ${2:-}" in
     "api --paginate")
         [ -e "$FX/fail.comments" ] && exit 1
         jq -s . "$FX/comments.ndjson" ;;
+    api\ repos/*/pulls/*)
+        # .base.ref reads $FX/base; any other --jq (the PR body) reads $FX/body.
+        case " $* " in
+            *" .base.ref "*) [ -f "$FX/base" ] && cat "$FX/base" ;;
+            *) [ -f "$FX/body" ] && cat "$FX/body" ;;
+        esac
+        exit 0 ;;
     api\ repos/*) cat "$FX/tree" ;;
     *) exit 0 ;;
 esac
@@ -500,7 +507,9 @@ fixfirst_records() {
     want_rc 6
     want_out "RESULT: fix-first-recorded"
     grep -qF 'Condition: rename the button' "$FX/posted.1.md" 2>/dev/null || note "no Condition line"
-    grep -qF "<!-- owner-approve mode=fix-first head=$H -->" "$FX/posted.1.md" 2>/dev/null || note "no record line"
+    grep -qF "<!-- owner-approve mode=fix-first head=$H diff=" "$FX/posted.1.md" 2>/dev/null || note "no record line"
+    command grep -qE "^<!-- owner-approve mode=fix-first head=$H diff=([0-9a-f]{40}|unread) -->\$" "$FX/posted.1.md" 2>/dev/null \
+        || note "record line does not end in diff=<40-hex|unread> -->"
     [ ! -e "$FX/launchctl.log" ] || note "the script waited"
     refute_gh "pr edit"
     refute_gh "pr merge"
@@ -631,6 +640,102 @@ finish_extra_args() {
 }
 
 # ---------------------------------------------------------------------------
+# Kept-unplanned cases: the marker's diff= fingerprint and the copied kept span
+# ---------------------------------------------------------------------------
+use_origin() { # gives the fixture repo an origin remote (itself) and the PR a base ref
+    git -C "$TMP/fix" remote get-url origin >/dev/null 2>&1 || git -C "$TMP/fix" remote add origin "$TMP/fix"
+    printf 'master\n' > "$FX/base"
+}
+real_commit() { # commits a real file change in the case worktree, points pr.json at it
+    printf '%s\n' "$CASE" > "$WT/$CASE.txt"
+    git -C "$WT" add "$CASE.txt"
+    git -C "$WT" commit -q -m "change $CASE"
+    H=$(git -C "$WT" rev-parse HEAD)
+    write_pr "$H"
+}
+marker_line() { tail -n 1 "$FX/posted.1.md" 2>/dev/null; }
+kept_span() {
+    awk '/^<!-- owner-approve:kept:begin -->$/ {on=1; next}
+         /^<!-- owner-approve:kept:end -->$/ {on=0; next}
+         on {print}' "$FX/posted.1.md" 2>/dev/null
+}
+KEPT_B1='- Renamed the retry flag in bin/foo (`bin/foo`)'
+KEPT_B2='- Added a dry-run switch to bin/bar (`bin/bar`)'
+write_kept_body() { # the PR body Phase 5.5 writes, with CRLF line ends
+    printf '%s\r\n' "Summary of the change" "" "<!-- kept-unplanned:begin -->" \
+        "## Kept unplanned changes" \
+        "Phase 5.5 kept these changes. No plan phase covers them." \
+        "$KEPT_B1" "$KEPT_B2" "<!-- kept-unplanned:end -->" "- a bullet outside the block" > "$FX/body"
+}
+# Fails when the marker writes the literal unread instead of the fingerprint (row 2).
+marker_diff_fp() {
+    fresh marker_diff_fp
+    use_origin
+    real_commit
+    local want
+    want=$(cd "$WT" && . "$REPO/bin/lib/human-signoff-classifier.sh" && git fetch -q origin master && hs_diff_fingerprint origin/master "$H")
+    [ "${#want}" -eq 40 ] || note "fixture fingerprint is '$want'"
+    run_oa "$PR" "ok"
+    [ "$(marker_line)" = "<!-- owner-approve mode=approve head=$H diff=$want -->" ] \
+        || note "marker is '$(marker_line)', want diff=$want"
+}
+# Fails when a failed fingerprint aborts the post instead of writing unread (row 3).
+diff_unread_head_missing() {
+    fresh diff_unread_head_missing
+    use_origin
+    write_pr "$C40"
+    run_oa "$PR" "ok"
+    [ -f "$FX/posted.1.md" ] || note "no approval comment posted"
+    [ "$(marker_line)" = "<!-- owner-approve mode=approve head=$C40 diff=unread -->" ] \
+        || note "marker is '$(marker_line)', want diff=unread"
+}
+# Fails when the awk filter copies non-bullet lines of the kept block (row 4).
+kept_span_copied() {
+    fresh kept_span_copied
+    write_kept_body
+    run_oa "$PR" "ok"
+    local span
+    span=$(kept_span)
+    [ "$span" = "$KEPT_B1"$'\n'"$KEPT_B2" ] || note "kept span is '$span'"
+    if grep -qF '## Kept unplanned changes' <<< "$span"; then note "the span holds the block header"; fi
+    if grep -qF 'Phase 5.5 kept' <<< "$span"; then note "the span holds the Phase 5.5 kept line"; fi
+    if grep -qF 'outside the block' <<< "$span"; then note "the span holds a bullet outside the block"; fi
+    [ "$(marker_line)" = "<!-- owner-approve mode=approve head=$H diff=unread -->" ] || note "the marker is not the last line"
+}
+# Fails when an empty kept list still writes the span delimiters (row 5).
+no_kept_span() {
+    fresh no_kept_span
+    printf 'Summary only\n- a bullet, no kept block\n' > "$FX/body"
+    run_oa "$PR" "ok"
+    [ -f "$FX/posted.1.md" ] || note "no approval comment posted"
+    if grep -qF 'owner-approve:kept:begin' "$FX/posted.1.md" 2>/dev/null; then note "a kept span was written with no kept block"; fi
+}
+# Fails when --finish cannot read the new marker with diff= (row 6). Both runs are real.
+finish_new_marker() {
+    fresh finish_new_marker
+    run_oa "$PR" "go" "--fix-first=fix it"
+    want_rc 6
+    grep -qF " diff=" "$FX/posted.1.md" 2>/dev/null || note "the record is not in the new shape"
+    new_commit
+    seed_ready
+    run_oa "$PR" --finish
+    want_rc 0
+    want_out "RESULT: armed"
+}
+# Invocation-2-only: hand-seeds a record from before diff= existed, so --finish must still read it (row 6).
+finish_old_marker() {
+    fresh finish_old_marker
+    local old_head=$H
+    jq -nc --arg b "Owner approved: \"go\". Head $old_head."$'\n\n'"<!-- owner-approve mode=fix-first head=$old_head -->" \
+        '{user:{login:"owner"},body:$b}' >> "$FX/comments.ndjson"
+    new_commit
+    seed_ready
+    run_oa "$PR" --finish
+    want_rc 0
+    want_out "RESULT: armed"
+}
+
+# ---------------------------------------------------------------------------
 # Phase 5 case: the docs route through the script
 # ---------------------------------------------------------------------------
 docs_route_through_script() {
@@ -656,6 +761,7 @@ verdict_foreign_author verdict_ignores_approval_text verdict_gh_error
 arm_label_fail arm_merge_fail_rollback pr_closed
 fixfirst_records finish_no_record finish_head_unmoved finish_wt_mismatch finish_wt_dirty
 finish_prefire_fail finish_prefire_prereq finish_arms finish_after_plain plain_head_moved_wait finish_after_plain_head_moved finish_extra_args
+marker_diff_fp diff_unread_head_missing kept_span_copied no_kept_span finish_new_marker finish_old_marker
 docs_route_through_script
 "
 

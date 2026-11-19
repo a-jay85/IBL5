@@ -40,6 +40,10 @@ on:
         description: 'Dry run: fake an ERROR 1203 from the prod dump so the real classifier routes to the cached-dump fallback. Skips no check.'
         type: boolean
         default: false
+      simulate_ssh_connect_failure:
+        description: 'Dry run: fake an ssh connect timeout from the prod dump so the real classifier routes to the cached-dump fallback. Skips no check.'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -129,13 +133,14 @@ jobs:
       # See ADR-0059. Prod MySQL is not reachable from the runner, so we dump
       # server-side over SSH (the db-backup.yml pattern), reusing the deploy key — no
       # new secrets.
-      # Connection-class clone failures fall back to the encrypted cached dump
+      # Connection-class clone failures (MySQL or ssh connect) fall back to the encrypted cached dump
       # (bin/rehearsal-clone-fallback); see ADR-0224.
       - name: Setup SSH
         uses: ./.github/actions/setup-ssh
         with:
           require-secrets: 'true'
-          fail-on-unreachable: 'true'
+          # Keep off: an empty keyscan must reach the dump step's ssh-connect fallback (ADR-0224).
+          fail-on-unreachable: 'false'
           host: ${{ secrets.HOST }}
           port: ${{ secrets.PORT }}
           username: ${{ secrets.USERNAME }}
@@ -145,6 +150,9 @@ jobs:
         id: dump
         env:
           SIMULATE_CONN_FAILURE: ${{ github.event_name == 'workflow_dispatch' && inputs.simulate_clone_connection_failure }}
+          SIMULATE_SSH_CONNECT_FAILURE: ${{ github.event_name == 'workflow_dispatch' && inputs.simulate_ssh_connect_failure }}
+          PROD_HOST: ${{ secrets.HOST }}
+          PROD_PORT: ${{ secrets.PORT }}
         run: |
           set -uo pipefail
           # Stream the committed, shellcheck-verified dump script to prod via `bash -s`.
@@ -152,12 +160,33 @@ jobs:
           # Season-sampling tradeoff + blind spot documented in ADR-0059.
           echo "clone_epoch=$(date +%s)" >> "$GITHUB_OUTPUT"
           echo "cache_day=$(date -u +%Y%m%d)" >> "$GITHUB_OUTPUT"
+          # keyscan-probe: begin
+          # Did setup-ssh's keyscan leave a key for prod? Ask known_hosts what ssh
+          # will ask. Port 22 entries are stored bare and others as [host]:port, so
+          # probe both. Any hit or any probe error reads "present" (fail closed).
+          # No known_hosts file means no key on file, so it reads "empty" (ADR-0224).
+          keyscan=empty
+          kh="$HOME/.ssh/known_hosts"
+          if [ -e "$kh" ]; then
+            for name in "$PROD_HOST" "[$PROD_HOST]:$PROD_PORT"; do
+              probe_rc=0
+              ssh-keygen -F "$name" -f "$kh" > /dev/null 2>&1 || probe_rc=$?
+              if [ "$probe_rc" -ne 1 ]; then keyscan=present; fi
+            done
+          fi
+          # keyscan-probe: end
+          echo "keyscan probe: known_hosts entry for prod is $keyscan" >&2
           rc=0
           if [ "${SIMULATE_CONN_FAILURE:-false}" = "true" ]; then
             echo "dry run: simulating a connection-class dump failure; the real classifier still decides" >&2
             echo "ERROR 1203 (42000): User rehearsal_dry_run already has more than 'max_user_connections' active connections" > dump-stderr.txt
             : > prod-clone.sql
             rc=1
+          elif [ "${SIMULATE_SSH_CONNECT_FAILURE:-false}" = "true" ]; then
+            echo "dry run: simulating an ssh connect timeout; the real classifier still decides" >&2
+            echo "ssh: connect to host rehearsal-dry-run.invalid port 22: Connection timed out" > dump-stderr.txt
+            : > prod-clone.sql
+            rc=255
           else
             ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy \
               ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
@@ -171,7 +200,7 @@ jobs:
           fi
           # Only the REMOTE dump's stderr is classified. A local mysql failure in the
           # load step below never reaches this classifier (ADR-0224).
-          if verdict="$(bin/rehearsal-clone-fallback classify dump-stderr.txt)"; then
+          if verdict="$(bin/rehearsal-clone-fallback classify dump-stderr.txt "--keyscan=$keyscan")"; then
             echo "$verdict"
             rm -f prod-clone.sql   # discard any partial dump from a mid-dump 2013
             echo "source=fallback-needed" >> "$GITHUB_OUTPUT"
@@ -179,7 +208,7 @@ jobs:
             exit 0
           fi
           echo "$verdict"
-          echo "::error::prod clone failed (exit $rc) without a connection-class MySQL error; no fallback"
+          echo "::error::prod clone failed (exit $rc) without a connection-class MySQL error or ssh connect failure; no fallback"
           exit "$rc"
 
       - name: Restore cached prod dump (connection-class fallback)

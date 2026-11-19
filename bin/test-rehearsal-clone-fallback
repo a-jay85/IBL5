@@ -439,5 +439,61 @@ chk_has "--help keyscan" "$OUT" "classify <stderr-file> [--keyscan=empty|present
 chk_has "--help still reaches check-age" "$OUT" "check-age <meta-file>"
 case_end
 
+FALLBACK_STEP='Decrypt + age-check cached prod dump'
+SIM_SSH_LINE='ssh: connect to host rehearsal-dry-run.invalid port 22: Connection timed out'
+
+case_begin workflow-dump-passes-keyscan
+dump_block=$(step_block "$DUMP_STEP")
+# shellcheck disable=SC2016
+chk_has "classify gets keyscan" "$dump_block" 'rehearsal-clone-fallback classify dump-stderr.txt "--keyscan=$keyscan"'
+chk_eq "classify call count in workflow" 1 "$(grep -c 'rehearsal-clone-fallback classify' "$WF")"
+chk_eq "probe begin marker count" 1 "$(grep -c '# keyscan-probe: begin' "$WF")"
+chk_eq "probe end marker count" 1 "$(grep -c '# keyscan-probe: end' "$WF")"
+case_end
+
+case_begin workflow-keyscan-probe-behaviour
+probe_src=$(awk '/# keyscan-probe: begin/ { on = 1; next } /# keyscan-probe: end/ { on = 0 } on' <<< "$(step_block "$DUMP_STEP")")
+[ -n "$probe_src" ] || CASE_ERR="${CASE_ERR}probe region not found; "
+ssh-keygen -q -t ed25519 -N '' -f "$T/probe-key" > /dev/null 2>&1 || CASE_ERR="${CASE_ERR}ssh-keygen keygen failed; "
+pub=$(cut -d' ' -f1,2 "$T/probe-key.pub" 2>/dev/null)
+mkdir -p "$T/fakebin"
+printf '#!/bin/sh\nexit 255\n' > "$T/fakebin/ssh-keygen"
+chmod +x "$T/fakebin/ssh-keygen"
+# run_probe <known_hosts-host-field|NONE> <port> [bin-dir-to-prepend]: run the
+# workflow's own probe region and print the keyscan value it settles on.
+run_probe() {
+    local p="$PATH"
+    rm -rf "${T:?}/home"
+    mkdir -p "$T/home/.ssh"
+    [ "$1" = NONE ] || printf '%s %s\n' "$1" "$pub" > "$T/home/.ssh/known_hosts"
+    [ $# -lt 3 ] || p="$3:$PATH"
+    # shellcheck disable=SC2016
+    HOME="$T/home" PATH="$p" PROD_HOST="$H" PROD_PORT="$2" \
+        bash -c "set -uo pipefail"$'\n'"$probe_src"$'\n''printf %s "$keyscan"'
+}
+chk_eq "no known_hosts file" empty "$(run_probe NONE "$P")"
+chk_eq "bare port-22 entry" present "$(run_probe "$H" 22)"
+chk_eq "bracketed entry" present "$(run_probe "[$H]:$P" "$P")"
+chk_eq "other host only" empty "$(run_probe 198.51.100.9 "$P")"
+chk_eq "probe error" present "$(run_probe 198.51.100.9 "$P" "$T/fakebin")"
+case_end
+
+case_begin workflow-ssh-injection-dispatch-only
+dump_block=$(step_block "$DUMP_STEP")
+# shellcheck disable=SC2016
+chk_has "ssh injection env" "$dump_block" \
+    "SIMULATE_SSH_CONNECT_FAILURE: \${{ github.event_name == 'workflow_dispatch' && inputs.simulate_ssh_connect_failure }}"
+# shellcheck disable=SC2016
+chk_has "ssh injection test" "$dump_block" '[ "${SIMULATE_SSH_CONNECT_FAILURE:-false}" = "true" ]'
+chk_has "ssh injection line" "$dump_block" "echo \"$SIM_SSH_LINE\" > dump-stderr.txt"
+chk_eq "ssh input read sites" 1 "$(grep -c 'inputs.simulate_ssh_connect_failure' "$WF")"
+grep -qxF '  workflow_call: {}' "$WF" || CASE_ERR="${CASE_ERR}workflow_call declares inputs; "
+expect_classify sim-ssh-line 0 "$SSHC" "$SIM_SSH_LINE"
+case_end
+
+case_begin workflow-no-fail-on-unreachable-true
+chk_eq "fail-on-unreachable true count" 0 "$(grep -c "fail-on-unreachable: 'true'" "$WF")"
+case_end
+
 # New cases go above this line.
 h_done

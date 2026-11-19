@@ -201,6 +201,11 @@ def test_allowlist_accepts_engine_go_golden_and_evidence():
         == "non-engine-path: engine/trace-evidence/other.json"
 
 
+def test_allowlist_rejects_capture_loader_change():
+    loader = "engine/internal/jsbtrace/jsbtrace.go"
+    assert tp.allowlist_verdict([ENGINE_FILE, loader], BRANCH) == f"loader-in-diff: {loader}"
+
+
 def test_empty_range_holds(repo):
     root, base = repo
     assert _verdict(root, base, changed=[]) == "empty-range"

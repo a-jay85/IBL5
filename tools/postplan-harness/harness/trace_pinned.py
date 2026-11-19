@@ -40,6 +40,7 @@ from .sql_equivalence import _blob_sha, _git
 TOKEN = "trace-pinned"
 EVIDENCE_DIR = "engine/trace-evidence"
 CAPTURE_DIR = "engine/testdata/jsb-captures"
+LOADER_DIR = "engine/internal/jsbtrace"  # the capture loader every pinned test trusts
 SCHEMA = 1
 TEST_PREFIX = "TestTracePinned"
 GOLDEN_FILES = ("engine/internal/sim/testdata/golden.json",
@@ -91,6 +92,8 @@ def allowlist_verdict(changed_files, branch) -> str:
     for path in files:
         if path.startswith(CAPTURE_DIR + "/"):
             return f"capture-in-diff: {path}"
+        if path.startswith(LOADER_DIR + "/"):
+            return f"loader-in-diff: {path}"
         if path in GOLDEN_FILES or path == own_evidence:
             continue
         if path.startswith("engine/") and path.endswith(".go"):

@@ -82,6 +82,19 @@ expect_no_fallback() {
     chk_has "$1 stdout" "$OUT" "no-fallback:"
 }
 
+# expect_classify <name> <want-rc> <want-stdout> <stderr-text> [classify-option]
+expect_classify() {
+    local f
+    f=$(fixture "fx-$1" "$4")
+    if [ $# -ge 5 ]; then
+        run classify "$f" "$5"
+    else
+        run classify "$f"
+    fi
+    chk_eq "$1 exit" "$2" "$RC"
+    chk_has "$1 stdout" "$OUT" "$3"
+}
+
 write_good_meta() { # <path> <epoch>
     run write-meta "$1" "$2" "$URL" "$SHA"
     chk_eq "write-meta exit" 0 "$RC"
@@ -121,8 +134,10 @@ chk_eq "empty exit" 1 "$RC"
 chk_has "empty stdout" "$OUT" "no-fallback: empty stderr"
 case_end
 
+# A refused connect now falls back (classify-ssh-connect-each-shape). An ssh
+# connect line whose error tail is outside the closed list still rejects.
 case_begin classify-rejects-ssh-only-failure
-expect_no_fallback ssh "ssh: connect to host example.net port 22: Connection refused"
+expect_no_fallback ssh "ssh: connect to host example.net port 22: Operation not permitted"
 case_end
 
 case_begin classify-rejects-near-misses
@@ -342,6 +357,86 @@ case_end
 case_begin workflow-no-artifact-upload
 chk_eq "upload-artifact count" 0 "$(grep -c 'upload-artifact' "$WF")"
 chk_has "plaintext gzip removed" "$(step_block "$SAVE_STEP")" "rm -f rehearsal-dump-cache/prod-clone.sql.gz"
+case_end
+
+# --- classify: ssh network-level shapes ----------------------------------------
+H='203.0.113.7'
+P='2222'
+SSHC='fallback: ssh-connect'
+
+case_begin classify-ssh-connect-each-shape
+expect_classify ssh-timeout 0 "$SSHC" "ssh: connect to host $H port $P: Connection timed out"
+expect_classify ssh-refused 0 "$SSHC" "ssh: connect to host $H port $P: Connection refused"
+expect_classify ssh-no-route 0 "$SSHC" "ssh: connect to host $H port $P: No route to host"
+expect_classify ssh-net-unreach 0 "$SSHC" "ssh: connect to host $H port $P: Network is unreachable"
+expect_classify ssh-connect-reset 0 "$SSHC" "ssh: connect to host $H port $P: Connection reset by peer"
+expect_classify ssh-kex-closed 0 "$SSHC" "kex_exchange_identification: Connection closed by remote host"
+expect_classify ssh-kex-reset 0 "$SSHC" "kex_exchange_identification: read: Connection reset by peer"
+expect_classify ssh-exch-closed 0 "$SSHC" "ssh_exchange_identification: Connection closed by remote host"
+expect_classify ssh-banner 0 "$SSHC" "banner exchange: Connection to $H port $P: Connection timed out"
+expect_classify ssh-closed-port 0 "$SSHC" "Connection closed by $H port $P"
+expect_classify ssh-reset-port 0 "$SSHC" "Connection reset by $H port $P"
+case_end
+
+case_begin classify-ssh-hostkey-needs-empty-keyscan
+expect_classify hostkey-empty 0 "$SSHC" "Host key verification failed." --keyscan=empty
+expect_classify hostkey-present 1 "no-fallback: host key verification failed" "Host key verification failed." --keyscan=present
+case_end
+
+case_begin classify-ssh-keyscan-defaults-present
+expect_classify hostkey-omitted 1 "no-fallback: host key verification failed" "Host key verification failed."
+case_end
+
+case_begin classify-ssh-auth-and-resolve-win
+expect_classify ssh-auth 1 "no-fallback: ssh auth or hostname failure" "deploy@$H: Permission denied (publickey)."
+expect_classify ssh-resolve 1 "no-fallback: ssh auth or hostname failure" "ssh: Could not resolve hostname prod.invalid: Name or service not known"
+expect_classify auth-beats-timeout 1 "no-fallback: ssh auth or hostname failure" \
+    "ssh: connect to host $H port $P: Connection timed out"$'\n'"deploy@$H: Permission denied (publickey)."
+expect_classify auth-beats-hostkey 1 "no-fallback: ssh auth or hostname failure" \
+    "Host key verification failed."$'\n'"deploy@$H: Permission denied (publickey)." --keyscan=empty
+case_end
+
+case_begin classify-ssh-near-miss-prefix
+expect_classify quoted-connect 1 "no-fallback:" "bash: line 7: ssh: connect to host $H port $P: Connection timed out"
+expect_classify quoted-mysql-text 1 "no-fallback:" "mariadb-dump: unexpected read error: Connection timed out"
+expect_classify quoted-hostkey 1 "no-fallback:" "remote: Host key verification failed." --keyscan=empty
+expect_classify indented-reset 1 "no-fallback:" "  Connection reset by $H port $P"
+case_end
+
+case_begin classify-ssh-near-miss-suffix
+expect_classify connect-trailer 1 "no-fallback:" "ssh: connect to host $H port $P: Connection timed out (retry 2)"
+expect_classify preauth-closed 1 "no-fallback:" "Connection closed by authenticating user deploy $H port $P [preauth]"
+case_end
+
+case_begin classify-keyscan-arg-rejected
+f=$(fixture fx-ks-arg "ssh: connect to host $H port $P: Connection timed out")
+run classify "$f" --keyscan=maybe
+chk_eq "--keyscan=maybe exit" 2 "$RC"
+chk_has "--keyscan=maybe stderr" "$ERR" "bad classify option"
+run classify "$f" --keyscan
+chk_eq "bare --keyscan exit" 2 "$RC"
+run classify "$f" --keyscan empty
+chk_eq "space-form exit" 2 "$RC"
+run classify --keyscan=empty
+chk_eq "option without file exit" 2 "$RC"
+case_end
+
+case_begin classify-empty-stderr-with-keyscan-empty
+: > "$T/fx-empty-ks"
+run classify "$T/fx-empty-ks" --keyscan=empty
+chk_eq "empty stderr exit" 1 "$RC"
+chk_has "empty stderr stdout" "$OUT" "no-fallback: empty stderr"
+case_end
+
+case_begin classify-mysql-first-with-keyscan-arg
+expect_classify mysql-2013-ks 0 "fallback: 2013" "ERROR 2013 (HY000): Lost connection to server during query" --keyscan=empty
+expect_classify mysql-beats-auth 0 "fallback: 1040" "ERROR 1040 (HY000): Too many connections"$'\n'"Permission denied"
+case_end
+
+case_begin cli-help-names-keyscan
+run --help
+chk_has "--help keyscan" "$OUT" "classify <stderr-file> [--keyscan=empty|present]"
+chk_has "--help still reaches check-age" "$OUT" "check-age <meta-file>"
 case_end
 
 # New cases go above this line.

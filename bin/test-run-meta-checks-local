@@ -598,12 +598,16 @@ absent "case stk-4: no upload-pack text" "$OUT" "upload-pack"
 REPO=$(make_stacked_repo)
 git -C "$REPO" config branch.child.iblBase parent
 PARENT_SHA=$(git -C "$REPO" rev-parse origin/parent)
-BASE=$(git -C "$REPO" rev-parse origin/master)
+MASTER_SHA=$(git -C "$REPO" rev-parse origin/master)
+# The explicit base differs from both origin/master and origin/parent, so
+# neither fallback can produce it by accident.
+BASE=$(git -C "$REPO" rev-parse HEAD)
 stk_run --base "$BASE"
 OUT="$_LAST_OUT"; RC="$_LAST_RC"
 rm -rf "$REPO" "$REPO.origin"
 want "case stk-5: META-BASE is the explicit --base" "$OUT" "META-BASE: $BASE"
 absent "case stk-5: explicit --base ignores iblBase" "$OUT" "META-BASE: $PARENT_SHA"
+absent "case stk-5: explicit --base is not origin/master" "$OUT" "META-BASE: $MASTER_SHA"
 fi
 
 # ─── Shared fixture helpers for the contract, cache and parallel groups ─────

@@ -742,6 +742,49 @@ got=$(pr_trigger_shape "$TMP/e2e-filtered.yml")
 chk "a filtered copy prints FILTERED (got $got)" eq "$got" FILTERED
 end_case
 
+start_case case_tuning_plan_rows
+# Nine location cells copied once from the Verification Matrix of
+# ~/claude-plans/trade-suggestions-engine-v3-6-tuning-page.md (outer backticks
+# removed, \| turned into |). The case never reads that plan. classify mirrors
+# the order of stage_matrix in bin/lib/prefire-verify. Verdicts were captured
+# from a run of the library.
+TUNING_FILE="$TMP/tuning-rows.tsv"
+cat > "$TUNING_FILE" <<'TUNING_ROWS_EOF'
+25	cd ibl5 && composer run analyse # green; the one-time removed-e() run must print an ibl.unescapedOutput error first
+29	curl -s -o /dev/null -w '%{http_code} %{redirect_url}' 'http://trade-suggestions-engine-v3-6-tuning-page.localhost/ibl5/modules.php?name=TradeSuggestionsTuning' # expect 302 followed by a URL containing name=YourAccount
+30	curl -s -o /tmp/tuning-admin.html -w '%{http_code} %{time_total}' --cookie '_auto_login=1' 'http://trade-suggestions-engine-v3-6-tuning-page.localhost/ibl5/modules.php?name=TradeSuggestionsTuning&team=all' # expect 200 and a time under 25
+31	curl -s --cookie '_auto_login=1' 'http://trade-suggestions-engine-v3-6-tuning-page.localhost/ibl5/modules.php?name=TradeSuggestionsTuning&team=3&status=nope' | grep -c 'id="tuning-ignored"' # expect 1
+44	cd ibl5 && composer test # expect green
+45	cd ibl5 && composer run analyse:tests # expect green
+46	bin/db-test-up trade-suggestions-engine-v3-6-tuning-page # expect TuningFeedbackRepositoryIntegrationTest in the green output
+47	bin/e2e-wt trade-suggestions-engine-v3-6-tuning-page # expect green
+48	diff /tmp/laugh-base.out /tmp/laugh-unit6.out # expect no output; both files from php scripts/trade-suggestions-laugh-test.php
+TUNING_ROWS_EOF
+TUNING_OUT=$(
+    # shellcheck source=bin/lib/plan-matrix-rows.sh
+    source "$REPO_ROOT/bin/lib/plan-matrix-rows.sh"
+    PLAN_ROW_ALL_CMDS=$(cut -f2- "$TUNING_FILE")
+    classify() {
+        if is_whole_suite_cmd "$1"; then echo SUITE
+        elif row_runs_in_ci "$1"; then printf 'CI %s\n' "$(row_ci_needs "$1")"
+        else echo LOCAL; fi
+    }
+    while IFS=$'\t' read -r num cmd; do
+        printf '%s %s\n' "$num" "$(classify "$cmd")"
+    done < "$TUNING_FILE"
+)
+TUNING_WANT='25 SUITE
+29 CI db web
+30 CI db web
+31 CI db web
+44 SUITE
+45 SUITE
+46 SUITE
+47 SUITE
+48 LOCAL'
+chk "tuning-plan verdicts: got $(tr '\n' ',' <<< "$TUNING_OUT")" eq "$TUNING_OUT" "$TUNING_WANT"
+end_case
+
 # --- Routing table -----------------------------------------------------------
 # Frozen fixture: <verdict> TAB <needs> TAB <cmd>, one row per line. The LOCAL
 # commands come from the 2026-11-15 prefire-verify failure classification (some

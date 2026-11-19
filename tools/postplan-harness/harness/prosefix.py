@@ -23,6 +23,7 @@ PROSE_FIX_DENIED_TOOLS = list(dict.fromkeys(
 
 _HIT_RE = re.compile(r"^(?P<path>[^\s:]+\.md):(?P<line>\d+): \[(?P<tell>[a-z0-9-]+)\] ")
 _HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+\d+(?:,\d+)? @@", re.M)
+_META_BASE_RE = re.compile(r"^META-BASE: (?P<sha>[0-9a-f]{7,40})$", re.M)
 
 
 def parse_hits(output: str) -> dict[str, set[int]]:
@@ -38,6 +39,39 @@ def parse_hits(output: str) -> dict[str, set[int]]:
 def gate_owned(flagged: dict[str, set[int]]) -> list[str]:
     """Flagged paths under a gate-owning prefix; a model may never edit these."""
     return sorted(denied_gate_edits(list(flagged)))
+
+
+def parse_meta_base(output: str) -> str | None:
+    """The base SHA `bin/run-meta-checks-local` printed on its `META-BASE:` line."""
+    m = _META_BASE_RE.search(output or "")
+    return m.group("sha") if m else None
+
+
+def pr_diff_paths(repo: str, base: str) -> set[str]:
+    """Paths the branch itself changed vs `base`, mirroring `bin/check-prose --since`.
+
+    A path counts when it differs from the merge-base of `base` and HEAD and also
+    from `base` itself. Both diffs include uncommitted edits. A diff git cannot run
+    yields the empty set, so every flagged path reads as outside the PR diff.
+    """
+    try:
+        fork = _git_out(repo, "merge-base", base, "HEAD").strip()
+    except subprocess.CalledProcessError:
+        fork = base
+    try:
+        own = {p for p in _git_out(repo, "diff", "--name-only", "--no-renames",
+                                   fork).splitlines() if p}
+        tip = {p for p in _git_out(repo, "diff", "--name-only", "--no-renames",
+                                   base).splitlines() if p}
+    except subprocess.CalledProcessError:
+        return set()
+    return own & tip
+
+
+def outside_pr_diff(repo: str, flagged: dict[str, set[int]], base: str) -> list[str]:
+    """Flagged paths the PR never changed; a model may never edit these."""
+    inside = pr_diff_paths(repo, base)
+    return sorted(p for p in flagged if p not in inside)
 
 
 def _git_out(repo: str, *args: str) -> str:
@@ -126,6 +160,14 @@ def attempt_prose_fix(*, git, llm, repo: str, argv: list[str], first_stdout: str
     if owned:
         log(f"phase2: prose-fix skipped (gate-owning path: {', '.join(owned)})")
         return False
+    base = parse_meta_base(first_stdout)
+    if base is None:
+        log("phase2: prose-fix skipped (no META-BASE line in meta-check output)")
+        return False
+    outside = outside_pr_diff(repo, flagged, base)
+    if outside:
+        log(f"phase2: prose-fix skipped (outside PR diff: {', '.join(outside)})")
+        return False
     if git.is_dirty():
         log("phase2: prose-fix skipped (dirty worktree)")
         return False
@@ -172,7 +214,7 @@ def attempt_prose_fix(*, git, llm, repo: str, argv: list[str], first_stdout: str
             break
         flagged = parse_hits(rerun.stdout)
         gate_output = rerun.stdout
-        if not flagged or gate_owned(flagged):
+        if not flagged or gate_owned(flagged) or outside_pr_diff(repo, flagged, base):
             break
         log(f"phase2: prose-fix attempt {n} ({model}) left "
             f"{sum(map(len, flagged.values()))} hit line(s)")

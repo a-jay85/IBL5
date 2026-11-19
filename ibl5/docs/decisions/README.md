@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-11-16
+last_verified: 2026-11-18
 ---
 
 # IBL5 Architecture Decision Records
@@ -118,6 +118,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0254](0254-discord-errors-webhook.md) | Failure notices go to #errors and nothing @mentions the owner | Accepted | Workflows pass `secrets.DISCORD_ERRORS_WEBHOOK_URL` and host scripts pass `bin/discord-dm --error` for failure notices, falling back to #dev and then the IBLbot DM; every owner @mention is removed, the merge-digest ping included, and `bin/test-discord-dm` scans `.github/` and `bin/` for any new one |
 | [0260](0260-weekly-mutation-sharding.md) | Weekly mutation testing runs as shards with one aggregate bar | Accepted | A committed map `ibl5/infection-shards.json` with a `check` gate, one shared coverage run, shards at `--min-msi=0`, one `MUTATION_MIN_MSI` bar over summed summary counts, and a report-only `module` dispatch. |
 | [0257](0257-css-token-gate.md) | Component CSS uses the token aliases and every UI class is in the catalog | Accepted | `bin/check-design-system` fails a PR on `var(--color-*)`, a numeric `z-index`, or a numeric `font-weight` in `ibl5/design/components/*.css`, and on a class under `ibl5/classes/UI/` with no row in its README; `Meta checks` runs it with `bin/test-check-design-system` |
+| [0266](0266-trace-pinned-golden-clearance.md) | Trace-pinned tests clear the engine golden hold | Accepted | A plan whose only token is `trace-pinned` gets arming conditions 5 and 7 lifted when `harness.trace_pinned` verifies a Go test that pins a raw JSB capture on the base branch and fails on a perturbed copy; the second reviewer never sees it. |
 
 ## When an ADR is Required
 

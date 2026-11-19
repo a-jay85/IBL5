@@ -28,6 +28,7 @@ while [ $# -gt 0 ]; do
   case "$1" in --base) BASE="$2"; shift 2 ;; *) shift ;; esac
 done
 DIR="$(cd "$(dirname "$0")" && pwd)"
+printf 'META-BASE: %s\n' "$(git rev-parse "$BASE")"
 failed=()
 out="$("$DIR/check-prose" "--since=$BASE" 2>&1)"; rc=$?
 if [ "$rc" -ne 0 ]; then
@@ -612,3 +613,87 @@ def test_runner_model_error_holds(prose_repo):
     assert ok is False
     assert os.path.exists(e.flag)
     assert len(llm.calls) == 1
+
+
+# ---------------------------------------------------- prose-fix stays inside the PR diff
+
+def _master_sha(env) -> str:
+    return _git(env.repo, "rev-parse", "master").strip()
+
+
+def test_prose_fix_skips_flagged_file_outside_pr_diff(prose_repo):
+    e = prose_repo
+    branch = _git(e.repo, "rev-parse", "--abbrev-ref", "HEAD").strip()
+    _git(e.repo, "checkout", "-q", "master")
+    other = Path(e.repo) / "docs" / "master-only.md"
+    other.write_text(TELL_LINE + "\n")
+    _git(e.repo, "add", "-A")
+    _git(e.repo, "commit", "-q", "-m", "master-only doc")
+    _git(e.repo, "checkout", "-q", branch)
+    _git(e.repo, "merge", "-q", "--no-edit", "master")
+    committed = other.read_bytes()
+    head = e.git.head()
+    out = (f"META-BASE: {_master_sha(e)}\n"
+           "docs/master-only.md:1: [em-dash] ...fast — the pool...  FIX: End the sentence.\n"
+           "META-CHECK-FAILED: check-prose-since\n")
+    llm = FakeToolLlm([])
+    assert _run_fix(e, llm, first_stdout=out) is False
+    assert llm.calls == []
+    assert other.read_bytes() == committed
+    assert e.git.head() == head
+    assert any("outside PR diff: docs/master-only.md" in l for l in e.log)
+
+
+def test_prose_fix_skips_without_meta_base_line(prose_repo):
+    e = prose_repo
+    out = ("docs/note.md:4: [em-dash] ...fast — the pool...  FIX: End the sentence.\n"
+           "META-CHECK-FAILED: check-prose-since\n")
+    llm = FakeToolLlm([])
+    assert _run_fix(e, llm, first_stdout=out) is False
+    assert llm.calls == []
+    assert any("no META-BASE line" in l for l in e.log)
+
+
+def test_prose_fix_in_diff_file_still_attempted(prose_repo):
+    e = prose_repo
+    out = (f"META-BASE: {_master_sha(e)}\n"
+           "docs/note.md:4: [em-dash] ...fast — the pool...  FIX: End the sentence.\n"
+           "META-CHECK-FAILED: check-prose-since\n")
+    llm = FakeToolLlm([_fix_line4])
+    assert _run_fix(e, llm, first_stdout=out) is True
+    assert len(llm.calls) == 1
+
+
+def test_parse_meta_base_rejects_near_miss():
+    assert prosefix.parse_meta_base("META-BASE: ") is None
+    assert prosefix.parse_meta_base("XMETA-BASE: abc1234") is None
+    assert prosefix.parse_meta_base("META-BASE: abc1234 extra") is None
+    assert prosefix.parse_meta_base("meta-base: abc1234") is None
+    assert prosefix.parse_meta_base("PASS  x\nMETA-BASE: abc1234\n") == "abc1234"
+
+
+def test_pr_diff_paths_excludes_squashed_parent_file(tmp_path):
+    repo = tmp_path / "stk"
+    (repo / "docs").mkdir(parents=True)
+    r = str(repo)
+    _git(r, "init", "-q", "-b", "master")
+    _git(r, "config", "user.email", "t@t")
+    _git(r, "config", "user.name", "t")
+    _git(r, "config", "commit.gpgsign", "false")
+    (repo / "docs" / "base.md").write_text("base\n")
+    _git(r, "add", "-A")
+    _git(r, "commit", "-q", "-m", "m0")
+    _git(r, "checkout", "-q", "-b", "parent")
+    (repo / "docs" / "parent.md").write_text(TELL_LINE + "\n")
+    _git(r, "add", "-A")
+    _git(r, "commit", "-q", "-m", "parent")
+    _git(r, "checkout", "-q", "-b", "child")
+    (repo / "docs" / "child.md").write_text(CLEAN_LINE + "\n")
+    _git(r, "add", "-A")
+    _git(r, "commit", "-q", "-m", "child")
+    _git(r, "checkout", "-q", "master")
+    _git(r, "merge", "-q", "--squash", "parent")
+    _git(r, "commit", "-q", "-m", "squash parent")
+    master = _git(r, "rev-parse", "HEAD").strip()
+    _git(r, "checkout", "-q", "child")
+    assert prosefix.pr_diff_paths(r, master) == {"docs/child.md"}

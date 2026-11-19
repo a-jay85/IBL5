@@ -20,6 +20,7 @@ import argparse
 import re
 import subprocess
 import sys
+from dataclasses import dataclass
 from typing import Iterable, Mapping, Optional, Sequence
 
 from . import removed_guards
@@ -332,6 +333,73 @@ def owner_quote(text: str) -> Optional[str]:
 
 def _norm_words(s: str) -> str:
     return " ".join(s.split()).casefold()
+
+
+# bin/owner-approve's approval comment. Its final non-blank line is the marker; diff= is
+# the PR diff's patch-id (hs_diff_fingerprint), or "unread" when it could not be computed.
+APPROVAL_MARKER_RE = re.compile(
+    r"^<!-- owner-approve mode=(?P<mode>approve|fix-first) head=(?P<head>[0-9a-f]{40})"
+    r" diff=(?P<diff>[0-9a-f]{40}|unread) -->$")
+APPROVAL_KEPT_BEGIN = "<!-- owner-approve:kept:begin -->"
+APPROVAL_KEPT_END = "<!-- owner-approve:kept:end -->"
+APPROVAL_WORDS_RE = re.compile(r'^Owner approved [^:\n]+: "(?P<w>[^"\n]*)"(?: \((?P<o>[^)\n]*)\))?')
+STICKY_MARKER_TEXT = "<!-- pr-ready-verdict -->"
+MIN_TITLE_LEN = 12
+
+
+@dataclass(frozen=True)
+class OwnerApproval:
+    words: str
+    kept_span: str
+    created_at: str
+
+
+def _authentic(comment: dict) -> bool:
+    user = comment.get("user") or {}
+    body = comment.get("body") or ""
+    return (user.get("type") == "User"
+            and comment.get("author_association") == "OWNER"
+            and STICKY_MARKER_TEXT not in body
+            and "<!-- hs-approved-diff" not in body)
+
+
+def approval_from_comments(comments: list, current_fp: Optional[str]) -> Optional[OwnerApproval]:
+    """The newest authentic bin/owner-approve approval bound to current_fp, else None."""
+    if not current_fp or not re.fullmatch(r"[0-9a-f]{40}", current_fp):
+        return None
+    found = []
+    for c in comments or []:
+        if not isinstance(c, dict) or not _authentic(c):
+            continue
+        lines = [ln.strip() for ln in (c.get("body") or "").replace("\r", "").split("\n") if ln.strip()]
+        m = APPROVAL_MARKER_RE.match(lines[-1]) if lines else None
+        if m:
+            found.append((c.get("created_at") or "", c, m))
+    if not found:
+        return None
+    created, c, m = max(found, key=lambda x: x[0])
+    if m.group("mode") != "approve":
+        return None
+    if m.group("diff") != current_fp:
+        return None
+    body = (c.get("body") or "").replace("\r", "")
+    b, e = body.find(APPROVAL_KEPT_BEGIN), body.find(APPROVAL_KEPT_END)
+    if b < 0 or e <= b:
+        return None
+    span = body[b + len(APPROVAL_KEPT_BEGIN):e].strip()
+    if not span:
+        return None
+    w = APPROVAL_WORDS_RE.match(body.split("\n", 1)[0])
+    words = (w.group("w") + (f" ({w.group('o')})" if w.group("o") else "")) if w else "owner approval"
+    return OwnerApproval(words=words, kept_span=span, created_at=created)
+
+
+def approval_covers(text: str, approval: Optional[OwnerApproval]) -> bool:
+    """True when the finding's title is one the owner saw in the approval's kept span."""
+    if approval is None:
+        return False
+    title = title_of(text).strip()
+    return len(title) >= MIN_TITLE_LEN and title in approval.kept_span
 
 
 def owner_evidence_ok(text: str, payload: Optional[dict]) -> bool:

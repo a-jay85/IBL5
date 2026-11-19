@@ -199,6 +199,22 @@ def owner_approval_state(labels, comments, base_ref, head_ref, cwd) -> str:
     return state if state in OWNER_APPROVAL_STATES else "error"
 
 
+DIFF_FP_RE = re.compile(r"[0-9a-f]{40}")
+
+
+def current_diff_fingerprint(base_ref: str, head_ref: str, cwd: str) -> Optional[str]:
+    """hs_diff_fingerprint for base...head, or None on any failure (fail closed)."""
+    try:
+        out = subprocess.run(
+            ["bash", "-c", 'source "$1" && hs_diff_fingerprint "$2" "$3"', "_",
+             str(HS_CLASSIFIER), base_ref, head_ref],
+            cwd=cwd, capture_output=True, text=True, timeout=30, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    fp = out.stdout.strip()
+    return fp if out.returncode == 0 and DIFF_FP_RE.fullmatch(fp) else None
+
+
 def resolve_owner_approval(gh, git, pr, labels, cwd, plan_false: bool) -> str:
     """Runner entry for (7): 'unchecked' unless the plan says auto_merge: false."""
     if not plan_false:

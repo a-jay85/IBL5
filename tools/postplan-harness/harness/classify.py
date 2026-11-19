@@ -74,6 +74,8 @@ _GO = re.compile(r"^engine/.*\.go$")
 _IBL5 = re.compile(r"^ibl5/")
 _ENGINE = re.compile(r"^engine/")
 GOLDEN_PATH = "engine/internal/sim/testdata/golden.json"
+GOLDEN_PATHS = (GOLDEN_PATH, "engine/internal/sim/testdata/golden_seeds.sha256")
+JSB_CAPTURE_PREFIX = "engine/testdata/jsb-captures/"
 _COMMENT_ADDED = re.compile(r"^\+\s*(//|#|/\*|\*)")
 _MODULE_REF = re.compile(r"(modules\.php\?name=[A-Za-z][A-Za-z0-9_]*|modules/[A-Za-z][A-Za-z0-9_]*/)")
 _RETRO_ROW_RE = re.compile(r"^\|\s*\d{4}-\d{2}-\d{2}\b.*class:.*routed to:")
@@ -920,7 +922,8 @@ def classify(files: list[str], diff_text: str, modified_files: list[str] | None 
     c.has_go = c.count_go > 0
     c.go_touched = c.go_touched_count > 0
     c.engine_only = c.go_touched and c.count_php == 0 and c.count_ibl5 == 0
-    c.golden_changed = GOLDEN_PATH in files
+    c.golden_changed = any(f in GOLDEN_PATHS for f in files)
+    c.jsb_capture_changed = any(f.startswith(JSB_CAPTURE_PREFIX) for f in files)
     c.has_shell = c.count_shell > 0
     c.has_workflow = c.count_workflow > 0
     c.has_skill_prose = any(_SKILL_PROSE.match(f) for f in files)

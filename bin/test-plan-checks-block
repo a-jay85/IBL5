@@ -585,6 +585,206 @@ chk "CI without markers: FAIL line" has "$OUT" "FAIL --live: IBL_CI_DB_READY is 
 chk "unknown flag exits 2 (got $RC)" eq "$RC" 2
 end_case
 
+# suite <cmd> exits 0 when is_whole_suite_cmd skips the row as a CI-covered suite.
+suite() (
+    # shellcheck source=bin/lib/plan-matrix-rows.sh
+    source "$REPO_ROOT/bin/lib/plan-matrix-rows.sh"
+    is_whole_suite_cmd "$1"
+)
+not_suite() { ! suite "$1"; }
+
+start_case case_routing_invariants
+# Each command is its own whole row set (PLAN_ROW_ALL_CMDS, read from Phase 4
+# on), so the /tmp near-misses below stay meaningful once write-only rows can
+# route to CI. route() runs in a subshell and inherits the variable.
+for c in \
+    "curl -s 'https://iblhoops.net/ibl5/index.php' # compare with http://localhost/ibl5/" \
+    "curl -s -o /tmp/pcb-remote.html 'https://iblhoops.net/ibl5/'" \
+    "curl -s -o '/tmp/pcb-q.html' 'http://my-slug.localhost/ibl5/'" \
+    'curl -s -o /tmp/$SLUG.html http://my-slug.localhost/ibl5/' \
+    "curl -s 'http://my-slug.localhost/ibl5/' >> /tmp/pcb-append.log" \
+    'sort -o /tmp/pcb-sorted.txt in.txt' \
+    'diff /tmp/pcb-a.out /tmp/pcb-b.out' \
+    'diff /tmp/pcb-a.out /tmp/pcb-b.out # expect no output' \
+    'bin/e2e-wt my-slug tests/e2e/flows/x.spec.ts' \
+    'bin/e2e-wt my-slug --project=chromium' \
+    'bin/e2e-wt my-slug | grep -c passed' \
+    'bin/db-test-up my-slug --no-run' \
+    'bin/db-test-up my-slug && echo ok' \
+    'true # PLAN marker' \
+    'grep -c x file.txt # see ~/notes'; do
+    PLAN_ROW_ALL_CMDS="$c"
+    chk "stays LOCAL: $c" routes_local "$c"
+done
+for c in \
+    "grep -c '#' file.txt" \
+    'grep -c "a # b" file.txt' \
+    "curl -s 'http://my-slug.localhost/ibl5/index.php#main' # expect 200" \
+    'cd ibl5 && vendor/bin/phpunit --filter testX tests/XTest.php # one test'; do
+    PLAN_ROW_ALL_CMDS="$c"
+    chk "stays CI: $c" routes_ci "$c"
+done
+unset PLAN_ROW_ALL_CMDS
+for c in \
+    'cd ibl5 && composer test --filter X # filtered' \
+    'vendor/bin/phpunit#x' \
+    '"composer test" # quoted' \
+    'bin/e2e-wt my-slug tests/e2e/flows/x.spec.ts # expect green' \
+    'bin/e2e-wt' \
+    'bin/db-test-up --no-run' \
+    'cd ibl5 && bin/e2e-wt my-slug'; do
+    chk "not a suite: $c" not_suite "$c"
+done
+for c in 'cd ibl5 && composer test' 'vendor/bin/phpunit --no-progress'; do
+    chk "suite: $c" suite "$c"
+done
+end_case
+
+# scc <cmd> prints strip_shell_comment's output for cmd.
+scc() (
+    # shellcheck source=bin/lib/plan-matrix-rows.sh
+    source "$REPO_ROOT/bin/lib/plan-matrix-rows.sh"
+    strip_shell_comment "$1"
+)
+# po <cmd> exits 0 when is_parse_only_cmd treats cmd as parse-only.
+po() (
+    # shellcheck source=bin/lib/plan-matrix-rows.sh
+    source "$REPO_ROOT/bin/lib/plan-matrix-rows.sh"
+    is_parse_only_cmd "$1"
+)
+
+start_case case_strip_shell_comment
+# Fixture: <input> TAB <expected>; `=` as the expected value means unchanged.
+SCC_FILE="$TMP/scc.tsv"
+cat > "$SCC_FILE" <<'SCC_EOF'
+composer test # expect green	composer test
+vendor/bin/phpunit #no-space-comment	vendor/bin/phpunit
+grep -c '#' f	=
+grep -c "a # b" f	=
+printf "a\" # b" f	=
+curl -s http://x.localhost/a#frag	=
+echo ${#x} $#	=
+grep x f \# y	=
+echo 'unterminated # x	=
+# only a comment	
+a#b # c	a#b
+cmd;# c	=
+SCC_EOF
+SCC_N=0
+while IFS=$'\t' read -r scc_in scc_want; do
+    [ "$scc_want" = "=" ] && scc_want="$scc_in"
+    chk "strip: $scc_in" test "$(scc "$scc_in")" = "$scc_want"
+    SCC_N=$((SCC_N + 1))
+done < "$SCC_FILE"
+chk "strip fixture: 12 pairs ran (got $SCC_N)" eq "$SCC_N" 12
+chk "suite: composer test with comment" suite 'cd ibl5 && composer test # expect green'
+chk "suite: phpunit with no-space comment" suite 'vendor/bin/phpunit #no-space-comment'
+chk "suite: analyse with a long comment" suite 'cd ibl5 && composer run analyse # green; the one-time removed-e() run must print an ibl.unescapedOutput error first'
+chk "parse-only: bash -n with ; in a comment" po 'bash -n bin/x # a; b'
+chk "not parse-only: bash -n chained before a comment" eval '! po "bash -n bin/x; bin/db-test-up # c"'
+end_case
+
+start_case case_suite_wrapper_rows
+for c in 'bin/e2e-wt my-slug' 'bin/e2e-wt my-slug # expect green' 'bin/db-test-up' \
+    'bin/db-test-up my-slug # expect XTest in the green output'; do
+    chk "suite: $c" suite "$c"
+done
+end_case
+
+start_case case_tmp_write_rows
+# A row that only writes a /tmp path routes to CI when the row set names that
+# path once. Each command below is its own whole row set.
+for c in \
+    "curl -s -o /tmp/pcb-w.html -w '%{http_code}' 'http://my-slug.localhost/ibl5/'" \
+    "curl -s --output=/tmp/pcb-w2.html 'http://my-slug.localhost/ibl5/'" \
+    "curl -sSo /tmp/pcb-w3.html 'http://localhost/ibl5/'"; do
+    PLAN_ROW_ALL_CMDS="$c"
+    chk "routes CI db web: $c" eq "$(route "$c")" "CI db web"
+done
+c="printf 'x\n' > /tmp/pcb-w4.txt"
+PLAN_ROW_ALL_CMDS="$c"
+chk "routes CI: $c" routes_ci "$c"
+TW_WRITER="curl -s -o /tmp/pcb-w.html -w '%{http_code}' 'http://my-slug.localhost/ibl5/'"
+unset PLAN_ROW_ALL_CMDS
+chk "stays LOCAL with no row set: $TW_WRITER" routes_local "$TW_WRITER"
+PLAN_ROW_ALL_CMDS=$(printf '%s\n%s\n' "$TW_WRITER" 'grep -c x /tmp/pcb-w.html')
+chk "stays LOCAL when another row reads the path: $TW_WRITER" routes_local "$TW_WRITER"
+c="curl -s -o /tmp/pcb-w.html 'http://my-slug.localhost/ibl5/' && grep -c x /tmp/pcb-w.html"
+PLAN_ROW_ALL_CMDS="$c"
+chk "stays LOCAL when the same row reads the path: $c" routes_local "$c"
+unset PLAN_ROW_ALL_CMDS TW_WRITER
+end_case
+
+# pr_trigger_shape <workflow file> prints PR when its on: block has a
+# pull_request trigger with no branches or branches-ignore filter, FILTERED
+# when the trigger is filtered, NOPR when there is no pull_request trigger.
+pr_trigger_shape() {
+    awk '
+        /^on:[[:space:]]*(#.*)?$/ { inon = 1; next }
+        inon && /^[^[:space:]#]/ { inon = 0 }
+        inon && /^  [A-Za-z_]+:/ { inpr = ($0 ~ /^  pull_request:[[:space:]]*(#.*)?$/); if (inpr) found = 1; next }
+        inpr && /^    (branches|branches-ignore):/ { bad = 1 }
+        END { print (found && !bad) ? "PR" : (found ? "FILTERED" : "NOPR") }
+    ' "$1"
+}
+
+start_case case_skipped_suites_run_on_stacked_prs
+# prefire-verify skips bare bin/e2e-wt and bin/db-test-up rows because these
+# workflows run on every PR, stacked PRs included.
+for wf in .github/workflows/e2e-tests.yml .github/workflows/tests.yml; do
+    got=$(pr_trigger_shape "$REPO_ROOT/$wf")
+    chk "$wf pull_request has no branches filter (got $got)" eq "$got" PR
+done
+# Negative control: the same file with the filter put back.
+awk '{ print } /^  pull_request:$/ { print "    branches: [master]" }' \
+    "$REPO_ROOT/.github/workflows/e2e-tests.yml" > "$TMP/e2e-filtered.yml"
+got=$(pr_trigger_shape "$TMP/e2e-filtered.yml")
+chk "a filtered copy prints FILTERED (got $got)" eq "$got" FILTERED
+end_case
+
+start_case case_tuning_plan_rows
+# Nine location cells copied once from the Verification Matrix of
+# ~/claude-plans/trade-suggestions-engine-v3-6-tuning-page.md (outer backticks
+# removed, \| turned into |). The case never reads that plan. classify mirrors
+# the order of stage_matrix in bin/lib/prefire-verify. Verdicts were captured
+# from a run of the library.
+TUNING_FILE="$TMP/tuning-rows.tsv"
+cat > "$TUNING_FILE" <<'TUNING_ROWS_EOF'
+25	cd ibl5 && composer run analyse # green; the one-time removed-e() run must print an ibl.unescapedOutput error first
+29	curl -s -o /dev/null -w '%{http_code} %{redirect_url}' 'http://trade-suggestions-engine-v3-6-tuning-page.localhost/ibl5/modules.php?name=TradeSuggestionsTuning' # expect 302 followed by a URL containing name=YourAccount
+30	curl -s -o /tmp/tuning-admin.html -w '%{http_code} %{time_total}' --cookie '_auto_login=1' 'http://trade-suggestions-engine-v3-6-tuning-page.localhost/ibl5/modules.php?name=TradeSuggestionsTuning&team=all' # expect 200 and a time under 25
+31	curl -s --cookie '_auto_login=1' 'http://trade-suggestions-engine-v3-6-tuning-page.localhost/ibl5/modules.php?name=TradeSuggestionsTuning&team=3&status=nope' | grep -c 'id="tuning-ignored"' # expect 1
+44	cd ibl5 && composer test # expect green
+45	cd ibl5 && composer run analyse:tests # expect green
+46	bin/db-test-up trade-suggestions-engine-v3-6-tuning-page # expect TuningFeedbackRepositoryIntegrationTest in the green output
+47	bin/e2e-wt trade-suggestions-engine-v3-6-tuning-page # expect green
+48	diff /tmp/laugh-base.out /tmp/laugh-unit6.out # expect no output; both files from php scripts/trade-suggestions-laugh-test.php
+TUNING_ROWS_EOF
+TUNING_OUT=$(
+    # shellcheck source=bin/lib/plan-matrix-rows.sh
+    source "$REPO_ROOT/bin/lib/plan-matrix-rows.sh"
+    PLAN_ROW_ALL_CMDS=$(cut -f2- "$TUNING_FILE")
+    classify() {
+        if is_whole_suite_cmd "$1"; then echo SUITE
+        elif row_runs_in_ci "$1"; then printf 'CI %s\n' "$(row_ci_needs "$1")"
+        else echo LOCAL; fi
+    }
+    while IFS=$'\t' read -r num cmd; do
+        printf '%s %s\n' "$num" "$(classify "$cmd")"
+    done < "$TUNING_FILE"
+)
+TUNING_WANT='25 SUITE
+29 CI db web
+30 CI db web
+31 CI db web
+44 SUITE
+45 SUITE
+46 SUITE
+47 SUITE
+48 LOCAL'
+chk "tuning-plan verdicts: got $(tr '\n' ',' <<< "$TUNING_OUT")" eq "$TUNING_OUT" "$TUNING_WANT"
+end_case
+
 # --- Routing table -----------------------------------------------------------
 # Frozen fixture: <verdict> TAB <needs> TAB <cmd>, one row per line. The LOCAL
 # commands come from the 2026-11-15 prefire-verify failure classification (some

@@ -15,6 +15,7 @@
 #      bin/test-check-plan gateQ  (only the gate [Q] seed-state block, for plan mutation checks)
 #      bin/test-check-plan gateHC  (only the gate [HC] How-column block, for plan mutation checks)
 #      bin/test-check-plan gateCR  (only the gate [CR] bare-marker block, for plan mutation checks)
+#      bin/test-check-plan gateH  (only the gate [H] hold cases, for plan mutation checks)
 #
 # shellcheck disable=SC2016  # backtick spans in the single-quoted plan fixtures
 # shellcheck disable=SC2034  # FAILED is read by h_done in bin/lib/harness.sh
@@ -33,6 +34,7 @@ trap 'rm -f "$TMP"/*.md 2>/dev/null; rmdir "$TMP" 2>/dev/null; h_cleanup' EXIT
 # `matrix-split` skips the cases outside gate XM; `gateSD` runs only the gate
 # [SD] cases and exits; `gateQ` runs only the gate [Q] seed-state cases and exits;
 # `gateCR` runs only the gate [CR] bare-marker cases and exits;
+# `gateH` runs only the gate [H] hold and hold_trigger cases and exits;
 # `gateVsyntax` runs only the gate [V] parse-arm and bin/fixtures cases and exits.
 TCP_ONLY="${1:-}"
 h_shard_init "${CHECK_PLAN_SHARD:-}"
@@ -620,7 +622,7 @@ fi
 [ "$TCP_ONLY" != gateVsyntax ] || h_done
 
 if [ "$TCP_ONLY" != matrix-split ]; then
-if [ "$TCP_ONLY" != gate13 ]; then
+if [ "$TCP_ONLY" != gate13 ] && [ "$TCP_ONLY" != gateH ]; then
 # A minimal well-formed matrix passes (exit 0). Baseline / no false positives.
 assert "clean-minimal" 0 "$FM"'
 | # | What to verify | Test type | Timing | Test file / location |
@@ -869,6 +871,7 @@ M='
 '
 
 if [ "$TCP_ONLY" != gate13 ]; then
+if [ "$TCP_ONLY" != gateH ]; then
 # Gate 8: a new `bin/foo` plus an ADR-step path resolves the trigger (exit 0).
 assert "gate8-bin-with-adr" 0 "$FM$M"'
 Phase 1 — Create `bin/foo` to do the thing.
@@ -967,6 +970,7 @@ assert_viol "gate-8-nnnn-placeholder-no-cue-fires" 1 '[8]' "$FM$M"'
 Phase 1 — Create `bin/foo` for the new tool.
 See ibl5/docs/decisions/NNNN-x.md for the decision.
 '
+fi # end gateH skip of the gate 8 cases
 
 # Gate H: a plan whose line-1 frontmatter declares `auto_merge: false` but has NO
 # `## Automouse Hold Justification` section must flag (exit 1). Frontmatter
@@ -1021,6 +1025,32 @@ impl_model: sonnet
 auto_merge: false
 hold_trigger: golden-snap
 ---'"$M$HT_JUST"
+TP_STEP='
+## Pre-fire
+
+Run `python3 -m harness.trace_pinned check --branch toy` last.
+'
+assert_msg "gateH-trace-pinned-alone-passes" 0 "" "[H] hold_trigger" '---
+impl_model: sonnet
+auto_merge: false
+hold_trigger: trace-pinned
+---'"$M$TP_STEP$HT_JUST"
+assert_msg "gateH-trace-pinned-with-golden-new-fails" 1 "must be the only token" "" '---
+impl_model: sonnet
+auto_merge: false
+hold_trigger: trace-pinned, golden-new
+---'"$M$TP_STEP$HT_JUST"
+assert_msg "gateH-trace-pinned-check-only-in-fence-fails" 1 "needs a step running harness.trace_pinned check" "" '---
+impl_model: sonnet
+auto_merge: false
+hold_trigger: trace-pinned
+---'"$M"'
+## Pre-fire
+
+```
+python3 -m harness.trace_pinned check --branch toy
+```
+'"$HT_JUST"
 assert_msg "gateH-hold-trigger-body-only" 1 "no non-empty hold_trigger:" "" '---
 impl_model: sonnet
 auto_merge: false
@@ -1029,6 +1059,7 @@ auto_merge: false
 
 hold_trigger: gate-weakening
 '"$HT_JUST"
+[ "$TCP_ONLY" != gateH ] || h_done
 
 # Gate H (a): the crammed one-line form must flag (exit 1). This is the whole
 # point of the sub-check — WITHOUT it the fixture below is silently read as

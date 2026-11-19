@@ -72,7 +72,7 @@ export function handleApproveDM(client: Client, dir: string = DECISIONS_DIR) {
             .setDescription(
                 `Head ${headSha.slice(0, 7)}.\n` +
                 'Approve runs `bin/owner-approve` on the Mac.\n' +
-                'Fix first records a condition and approves once it is met.\n' +
+                `Fix first records a condition. Run \`bin/owner-approve ${pr} --finish\` once the fix is pushed.\n` +
                 'This button expires in 24h.',
             )
             .setColor(0x5865f2)

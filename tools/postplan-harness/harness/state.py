@@ -74,6 +74,7 @@ class Classification:
     go_touched: bool = False
     engine_only: bool = False
     golden_changed: bool = False
+    jsb_capture_changed: bool = False
     docs_only: bool = False
     css_only: bool = False
     migration_only: bool = False

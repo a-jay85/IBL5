@@ -3,6 +3,7 @@
 # its frozenset in tools/postplan-harness/harness/armable.py; the pin test is
 # tools/postplan-harness/tests/test_hold_trigger_vocabulary.py.
 # <set> <token>
+# self-cleared: lifts conditions (5) and (7) itself when harness.trace_pinned returns ok; no seat.
 clearable security-surface
 clearable gate-weakening
 clearable golden-snapshot
@@ -18,3 +19,4 @@ owner-held other
 owner-held bootstrap-hazard
 owner-held security-irreducible
 owner-held golden-new
+self-cleared trace-pinned

@@ -348,6 +348,23 @@ def changes_from_unified_diff(diff_text: str) -> list[tuple[str, str]]:
     return out
 
 
+# A `#` at line start or after whitespace opens a comment in bash and in Python.
+_COMMENT_TAIL = re.compile(r"(?:^|\s)#.*$", re.M)
+_REF_BEFORE = r"(?<![\w.$-])"   # the lib path starts at a separator, quote, space or line start
+_REF_AFTER = r"(?![\w.-])"      # and the file name ends here
+
+
+def _references_lib(text: str, needle: str) -> bool:
+    """True when the code part of a gate's text names `needle` (`lib/<name>`) as a path.
+
+    Comment text never counts. The match covers `source "$here/lib/x"`, `. "$ROOT/bin/lib/x"`,
+    an exec or call site such as `"$here/lib/x" --flag`, and a bare `bin/lib/x` argument.
+    A longer name (`lib/x-extra`, `lib/x.sh`) and a prefixed name (`mylib/x`) do not match.
+    """
+    code = _COMMENT_TAIL.sub("", text)
+    return re.search(_REF_BEFORE + re.escape(needle) + _REF_AFTER, code) is not None
+
+
 def detect_gate_changes(changed, read_candidate, check_sources) -> list[GateChange]:
     """Classify a diff's changed paths into gate changes. `[]` means no gate was touched.
 
@@ -387,7 +404,7 @@ def detect_gate_changes(changed, read_candidate, check_sources) -> list[GateChan
         elif path.startswith("bin/lib/") and not removed:
             needle = path[len("bin/"):]
             for check_path in sorted(check_sources):
-                if needle in check_sources[check_path]:
+                if _references_lib(check_sources[check_path], needle):
                     add(resolved(check_path, "transitive", check_sources[check_path]))
     return list(out.values())
 

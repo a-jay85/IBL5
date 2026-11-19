@@ -299,7 +299,8 @@ def upsert_kept_block(body: str, block: str) -> str:
     return removed_guards.upsert_marked_block(body, block, KEPT_BEGIN, KEPT_END)
 
 
-def downgrade_applies(verdict_path: str, ctx: Optional[dict], body_text: str, payload: Optional[dict] = None) -> bool:
+def downgrade_applies(verdict_path: str, ctx: Optional[dict], body_text: str, payload: Optional[dict] = None,
+                      approval: Optional[OwnerApproval] = None) -> bool:
     """True when a NOT READY verdict's blockers are all kept, declared, and quoted from the owner."""
     from . import fidelity
 
@@ -316,7 +317,8 @@ def downgrade_applies(verdict_path: str, ctx: Optional[dict], body_text: str, pa
     kept = [t for t in texts if is_unplanned_scope(t)]
     if len(kept) != len(texts):
         return False   # a bug in kept code is its own blocking finding and blocks
-    return all(classify(t, **ctx) == "keep" and title_of(t) in declared and owner_evidence_ok(t, payload)
+    return all(classify(t, **ctx) == "keep" and title_of(t) in declared
+               and (owner_evidence_ok(t, payload) or approval_covers(t, approval))
                for t in kept)
 
 

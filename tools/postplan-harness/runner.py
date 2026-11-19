@@ -1013,7 +1013,7 @@ def _run_pass(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             if not live and (fixture or {}).get("red_ci_checks") is not None:
                 # replay-only seam for condition (15): live mode never reads this path
                 inputs.failed_checks = sorted(set((fixture or {}).get("red_ci_checks") or []))
-            _apply_kept_downgrade(inputs, res, git, worktree, plan, master_sha, pr, log)
+            _apply_kept_downgrade(inputs, res, git, gh, worktree, plan, master_sha, pr, log)
             # Before the preview, so a cleared PR still reaches the add-only safety verdict.
             inputs = second_review.review_pass(inputs, pr, git.head_tree, git.diff_vs_base, plan,
                                                log, second_review.spawner(llm, worktree))
@@ -2634,7 +2634,7 @@ def _rearm_after_ci_fix(git, gh, llm, log, res, state, inputs, decision, outcome
         new.fidelity_verdict = res.fidelity.get("verdict_1")
     # The downgrade runs first, as in Phase 6.5: the seat and the add-only safety verdict
     # must both see the posted word.
-    _apply_kept_downgrade(new, res, git, worktree, plan, master_sha, pr, log)
+    _apply_kept_downgrade(new, res, git, gh, worktree, plan, master_sha, pr, log)
     nd = evaluate(new)
     preview = nd
     if preview.second_review_candidates:
@@ -3232,8 +3232,24 @@ def _declare_kept(kept_all, ctx, gh, body, pr, log) -> None:
         log(f"phase5.5: kept-unplanned body write failed ({e.__class__.__name__}: {e})")
 
 
-def _apply_kept_downgrade(inputs, res, git, worktree, plan, master_sha, pr, log) -> None:
-    """The one posted verdict: a NOT READY whose blockers are all owner-quoted kept scope posts READY (or READY WITH NOTES). Only the selected slot of inputs and fid["posted_verdict"] move. The verdict file, verdict_1/verdict_2 and rounds keep the reviewer's word."""
+def _owner_approval_evidence(gh, git, worktree, pr, log):
+    """The owner-approve approval bound to the current diff, or None (fail closed)."""
+    armable = _armable_mod
+    try:
+        base_ref = f"origin/{gh.pr_base_ref()}"
+        git.fetch_base(base_ref)
+        fp = armable.current_diff_fingerprint(base_ref, "HEAD", str(worktree))
+        if fp is None:
+            log("kept-downgrade: no diff fingerprint; owner approval not consulted")
+            return None
+        return unplanned_scope.approval_from_comments(gh.pr_comments_json(pr), fp)
+    except Exception as exc:  # fail closed: no approval
+        log(f"kept-downgrade: owner approval unreadable: {exc}")
+        return None
+
+
+def _apply_kept_downgrade(inputs, res, git, gh, worktree, plan, master_sha, pr, log) -> None:
+    """The one posted verdict: a NOT READY whose blockers are all owner-approved kept scope posts READY (or READY WITH NOTES). Owner evidence is a captured quote, or else a bin/owner-approve comment on the current diff that lists the item. Only the selected slot of inputs and fid["posted_verdict"] move. The verdict file, verdict_1/verdict_2 and rounds keep the reviewer's word."""
     fid = res.fidelity if res.fidelity is not None else {}
     res.fidelity = fid
     for key in ("posted_verdict", "posted_source", "kept_owner_scope"):
@@ -3249,19 +3265,39 @@ def _apply_kept_downgrade(inputs, res, git, worktree, plan, master_sha, pr, log)
         return
     ctx = _unplanned_ctx(worktree, git, plan, master_sha, None, log)
     payload = owner_intent.load(res.slug)
+    approval = None
     if not unplanned_scope.downgrade_applies(path, ctx, inputs.pr_body, payload):
-        return
+        # Second evidence source: the owner's bin/owner-approve comment. Read only when
+        # the body declares a kept block, so other PRs make no extra gh calls.
+        declares_kept = unplanned_scope.KEPT_BEGIN in (inputs.pr_body or "")
+        if not declares_kept:
+            return
+        approval = _owner_approval_evidence(gh, git, worktree, pr, log)
+        if approval is None or not unplanned_scope.downgrade_applies(
+                path, ctx, inputs.pr_body, payload, approval=approval):
+            return
     word = unplanned_scope.owner_scope_word(path)
     if source == "verdict-2":
         inputs.fidelity_verdict_2 = word
     else:
         inputs.fidelity_verdict = word
     fid["posted_verdict"], fid["posted_source"] = word, source
-    fid["kept_owner_scope"] = [
-        {"title": unplanned_scope.title_of(t), "quote": unplanned_scope.owner_quote(t)}
-        for t in fidelity.blocking_finding_texts(path)]
+    texts = fidelity.blocking_finding_texts(path)
+    if approval is None:
+        fid["kept_owner_scope"] = [
+            {"title": unplanned_scope.title_of(t), "quote": unplanned_scope.owner_quote(t)}
+            for t in texts]
+    else:
+        captured = [unplanned_scope.owner_evidence_ok(t, payload) for t in texts]
+        fid["kept_owner_scope"] = [
+            {"title": unplanned_scope.title_of(t),
+             "quote": unplanned_scope.owner_quote(t) if cap else approval.words,
+             "source": "capture" if cap else "owner-approval"}
+            for t, cap in zip(texts, captured)]
     fid["downgraded_unplanned"] = True
     log("phase5.5: blocking findings are all kept unplanned scope; declared in PR body")
+    if approval is not None:
+        log(f"phase5.5: kept scope accepted by the owner-approve comment of {approval.created_at}")
 
 
 def _inject_removed_guards(copy: dict, plan, diff_body: str, worktree, log) -> bool:

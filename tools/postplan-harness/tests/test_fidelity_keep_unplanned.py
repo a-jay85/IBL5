@@ -276,7 +276,7 @@ def _stub_ctx(monkeypatch, value, payload=OWNER_PAYLOAD):
 def _downgrade(inputs, fid, pr=99, log=None):
     res = types.SimpleNamespace(fidelity=fid, slug="demo")
     git = types.SimpleNamespace(diff_vs_base=lambda: "diff")
-    runner._apply_kept_downgrade(inputs, res, git, ".", None, "base", pr, log or (lambda m: None))
+    runner._apply_kept_downgrade(inputs, res, git, None, ".", None, "base", pr, log or (lambda m: None))
     return res
 
 
@@ -322,7 +322,7 @@ def test_apply_kept_downgrade_clears_stale_posted_word(tmp_path, monkeypatch):
     inputs.fidelity_verdict = "NOT READY"
     inputs.pr_body = "intro with the kept block removed\n"
     runner._apply_kept_downgrade(inputs, res, types.SimpleNamespace(diff_vs_base=lambda: "d"),
-                                 ".", None, "base", 99, lambda m: None)
+                                 None, ".", None, "base", 99, lambda m: None)
     assert "posted_verdict" not in res.fidelity
     assert "posted_source" not in res.fidelity
     assert "kept_owner_scope" not in res.fidelity

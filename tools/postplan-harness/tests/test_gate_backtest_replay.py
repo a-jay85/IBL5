@@ -85,6 +85,11 @@ def gate(spec=None, path="bin/check-fake"):
     return GateChange(path, "check-script", "replayable", spec or ReplaySpec(argv=()), "header")
 
 
+# A spec that names {base}, so `is_tree_wide` is false and no parent-commit run cuts in ahead
+# of the path a test exercises. The fixture gates ignore argv, so the replay is otherwise the same.
+NOT_TREE_WIDE = ReplaySpec(argv=("--since={base}",))
+
+
 def overlay(script=NEW_GATE):
     return {"bin/check-fake": (script.encode(), 0o100755)}
 
@@ -264,7 +269,8 @@ def flaky_runner(calls, fail_calls=(), drain_stdin=False):
 def test_timeout_then_pass_gives_real_verdict(tmp_path):
     repo, shas = build_repo(tmp_path)
     calls = []
-    results = run(repo, shas, tmp_path, runner=flaky_runner(calls, {3}), per_replay_timeout=60)
+    results = run(repo, shas, tmp_path, runner=flaky_runner(calls, {3}), per_replay_timeout=60,
+                  gates=[gate(NOT_TREE_WIDE)])
     assert {r.pr: r.outcome for r in results} == EXPECTED
     assert len(calls) == 7
     assert sum(1 for r in results if len(r.attempt_secs) == 2) == 1
@@ -285,7 +291,8 @@ def test_timeout_twice_stays_timeout(tmp_path):
 def test_first_try_success_runs_once(tmp_path):
     repo, shas = build_repo(tmp_path)
     calls = []
-    results = run(repo, shas, tmp_path, runner=flaky_runner(calls))
+    results = run(repo, shas, tmp_path, runner=flaky_runner(calls),
+                  gates=[gate(NOT_TREE_WIDE)])
     assert len(calls) == 6
     assert {r.pr: r.outcome for r in results} == EXPECTED
     for r in results:
@@ -442,7 +449,8 @@ def _patch_from_master(repo, rel, content):
 def test_fix_overlay_rescues_flag_when_patch_fixes(tmp_path):
     repo, shas = build_repo(tmp_path)
     patch = _patch_from_master(repo, "config/required.txt", "required\n")
-    results = run(repo, [shas[0]], tmp_path, script=NEEDS_FILE_GATE, fix_patch=patch)
+    results = run(repo, [shas[0]], tmp_path, script=NEEDS_FILE_GATE, fix_patch=patch,
+                  gates=[gate(NOT_TREE_WIDE)])
     assert len(results) == 1
     assert results[0].outcome == "flag"
     assert results[0].fix_outcome == "pass"
@@ -451,7 +459,8 @@ def test_fix_overlay_rescues_flag_when_patch_fixes(tmp_path):
 def test_fix_overlay_patch_conflict_is_no_apply(tmp_path):
     repo, shas = build_repo(tmp_path)
     patch = _patch_from_master(repo, "src/f6.txt", "v6\nconfig/required.txt\n")
-    results = run(repo, [shas[0]], tmp_path, script=NEEDS_FILE_GATE, fix_patch=patch)
+    results = run(repo, [shas[0]], tmp_path, script=NEEDS_FILE_GATE, fix_patch=patch,
+                  gates=[gate(NOT_TREE_WIDE)])
     assert len(results) == 1
     assert results[0].outcome == "flag"
     assert results[0].fix_outcome == "no-apply"
@@ -471,6 +480,7 @@ def test_fix_rerun_runs_when_base_flags_and_head_adds_lines(tmp_path):
     repo, shas = build_repo(tmp_path)
     patch = _patch_from_master(repo, "config/required.txt", "required\n")
     results = run(repo, [shas[0]], tmp_path, script=HEAD_P11_P6_GATE, fix_patch=patch,
+                  gates=[gate(NOT_TREE_WIDE)],
                   base_overlay=base(BASE_P11_GATE))
     assert results[0].outcome == "flag"
     assert results[0].base_outcome == "flag"
@@ -483,6 +493,7 @@ def test_fix_rerun_keeps_line_the_patch_leaves(tmp_path):
     repo, shas = build_repo(tmp_path)
     patch = _patch_from_master(repo, "config/other.txt", "x\n")
     results = run(repo, [shas[0]], tmp_path, script=HEAD_P11_P6_GATE, fix_patch=patch,
+                  gates=[gate(NOT_TREE_WIDE)],
                   base_overlay=base(BASE_P11_GATE))
     assert results[0].fix_outcome == "flag"
     assert P6_LINE in results[0].fix_flag_lines
@@ -513,7 +524,8 @@ def test_fix_overlay_reset_before_next_gate(tmp_path):
     head = {"bin/check-fake": (NEEDS_FILE_GATE.encode(), 0o100755),
             twin: (NEEDS_FILE_GATE.encode(), 0o100755)}
     history = fetch_history(fake_gh([shas[0]]), make_git(str(repo)))
-    results = run_backtest(str(repo), "HEAD", [gate(), gate(path=twin)], history, head,
+    results = run_backtest(str(repo), "HEAD",
+                           [gate(NOT_TREE_WIDE), gate(NOT_TREE_WIDE, path=twin)], history, head,
                            str(tmp_path / "plans"), fix_patch=patch)
     assert [r.gate for r in results] == ["bin/check-fake", twin]
     for r in results:
@@ -1214,8 +1226,11 @@ def _tree_repo(tmp_path, seed_parent_error=False):
 
     A edits src/b.txt only; B inserts a top line (shifting `BAD old`); C appends `BAD new`;
     D appends a second `BAD old`. With `seed_parent_error`, the seed also carries
-    src/parent-error and the history is one PR that deletes it and edits src/b.txt.
-    Returns (repo, merge shas oldest first, candidate fix patch deleting the seed `BAD old`)."""
+    src/parent-error, the history is one PR that deletes it and edits src/b.txt, and the
+    patch is None, so the parent run is the only path that could credit that PR.
+    Returns (repo, merge shas oldest first, candidate fix patch deleting the seed `BAD old`).
+    The patch is cut from PR C's tree, so it applies there exactly; git apply needs a hunk that
+    ends at end of file to match there, so a seed-cut patch would not apply on C."""
     repo = tmp_path / "repo"
     repo.mkdir()
     sh(repo, "init", "-q", "-b", "master")
@@ -1223,15 +1238,15 @@ def _tree_repo(tmp_path, seed_parent_error=False):
     if seed_parent_error:
         (repo / "src/parent-error").write_text("x\n")
     commit_file(repo, "src/a.txt", SEED_A, "seed a")
-    patch = _patch_from_master(repo, "src/a.txt", "ok\nok\n")
     if seed_parent_error:
         (repo / "src/parent-error").unlink()
-        return repo, [commit_file(repo, "src/b.txt", "ok\nedited\n", "chore: pr A")], patch
+        return repo, [commit_file(repo, "src/b.txt", "ok\nedited\n", "chore: pr A")], None
     shas = [commit_file(repo, "src/b.txt", "ok\nedited\n", "chore: pr A"),
             commit_file(repo, "src/a.txt", "ok top\n" + SEED_A, "chore: pr B"),
-            commit_file(repo, "src/a.txt", "ok top\n" + SEED_A + "BAD new\n", "chore: pr C"),
-            commit_file(repo, "src/a.txt", "ok top\n" + SEED_A + "BAD new\nBAD old\n",
-                        "chore: pr D")]
+            commit_file(repo, "src/a.txt", "ok top\n" + SEED_A + "BAD new\n", "chore: pr C")]
+    patch = _patch_from_master(repo, "src/a.txt", "ok top\nok\nok\nBAD new\n")
+    shas.append(commit_file(repo, "src/a.txt", "ok top\n" + SEED_A + "BAD new\nBAD old\n",
+                            "chore: pr D"))
     return repo, shas, patch
 
 
@@ -1255,3 +1270,51 @@ def test_tree_wide_gate_flags_every_pr_on_pre_existing_state(tmp_path):
     for n, r in by_pr.items():
         assert r.outcome == "flag", (n, r)
         assert r.base_outcome == "absent", (n, r)
+
+
+def _tree_clean_truth(shas):
+    return {n: Truth("clean") for n in range(1, len(shas) + 1)}
+
+
+def test_tree_wide_parent_run_credits_tree_state_and_counts_introduced_lines(tmp_path):
+    repo, shas, patch = _tree_repo(tmp_path)
+    results = _tree_run(repo, shas, patch, tmp_path)
+    by_pr = {r.pr: r for r in results}
+    a, b, c, d = (by_pr[n] for n in (1, 2, 3, 4))
+    for r in (a, b):
+        assert r.parent_outcome == "flag", r
+        assert r.fix_outcome == "", r
+    assert c.parent_outcome == "flag" and d.parent_outcome == "flag"
+    assert c.fix_outcome == "flag", c
+    assert any(line.startswith("src/a.txt:") and line.endswith("BAD new")
+               for line in c.fix_flag_lines), c.fix_flag_lines
+    v = compute_verdict([_tree_gate()], results, _tree_clean_truth(shas))
+    tally = v.per_gate["bin/check-fake"]
+    assert sorted(tally.tree_state) == [1, 2]
+    assert sorted(tally.false_flags) == [3, 4]
+    assert tally.pre_existing == [] and tally.fixed_by_pr == []
+    assert v.state == "HELD"
+
+
+def test_parent_run_error_is_not_credited(tmp_path):
+    repo, shas, patch = _tree_repo(tmp_path, seed_parent_error=True)
+    results = _tree_run(repo, shas, patch, tmp_path)
+    assert len(results) == 1
+    r = results[0]
+    assert r.outcome == "flag"
+    assert r.parent_outcome == "error", r
+    tally = compute_verdict([_tree_gate()], results, _tree_clean_truth(shas)) \
+        .per_gate["bin/check-fake"]
+    assert tally.false_flags == [1]
+    assert tally.tree_state == []
+
+
+def test_parent_run_skipped_for_since_spec(tmp_path):
+    since_gate = TREE_GATE.replace("# gate-backtest-argv:\n", "# gate-backtest-argv: --since={base}\n")
+    assert since_gate != TREE_GATE
+    repo, shas, patch = _tree_repo(tmp_path)
+    results = _tree_run(repo, shas, patch, tmp_path, script=since_gate)
+    assert len(results) == 4
+    for r in results:
+        assert r.outcome == "flag", r
+        assert r.parent_outcome == "", r

@@ -515,12 +515,14 @@ class GateTally:
     skipped: int = 0
     errors: int = 0
     first_error: str = ""
+    tree_state: list[int] | None = None
 
     def __post_init__(self) -> None:
         self.catches = self.catches if self.catches is not None else []
         self.false_flags = self.false_flags if self.false_flags is not None else []
         self.unsettled_flags = self.unsettled_flags if self.unsettled_flags is not None else []
         self.pre_existing = self.pre_existing if self.pre_existing is not None else []
+        self.tree_state = self.tree_state if self.tree_state is not None else []
         self.fixed_by_pr = self.fixed_by_pr if self.fixed_by_pr is not None else []
 
 
@@ -638,6 +640,8 @@ def _tally(gate_path: str, results, truth: dict[int, Truth]) -> GateTally:
             elif state == "clean":
                 if r.base_outcome == "flag" and not new_flag_lines(r):
                     tally.pre_existing.append(r.pr)
+                elif parent_clears(r):
+                    tally.tree_state.append(r.pr)
                 elif r.fix_outcome == "pass" or fix_lines_pre_existing(r):
                     tally.fixed_by_pr.append(r.pr)
                 else:
@@ -717,7 +721,7 @@ def _retry_lines(results) -> list[str]:
     out = []
     for r in results or []:
         for stage, secs in (("head", r.attempt_secs), ("base", r.base_attempt_secs),
-                            ("fix", r.fix_attempt_secs)):
+                            ("fix", r.fix_attempt_secs), ("parent", r.parent_attempt_secs)):
             if len(secs) == 2:
                 out.append(f"- #{r.pr} `{_clean(r.gate)}` {stage}: "
                            f"{secs[0]:.1f} s, then {secs[1]:.1f} s")
@@ -754,6 +758,8 @@ def render_gate_backtest(verdict: Verdict, gates, results, truth: dict[int, Trut
     false_flags: list[int] = []
     unsettled: list[int] = []
     pre_existing: list[int] = []
+    tree_state: list[int] = []
+    parent_failed: list = []
     fixed_by_pr: list[int] = []
     if verdict.per_gate:
         lines += ["| Gate | Replayed | Catches | False flags | Pre-existing flags | Unsettled flags "
@@ -762,11 +768,12 @@ def render_gate_backtest(verdict: Verdict, gates, results, truth: dict[int, Trut
                   "-----------------|---------|--------|"]
         for path, t in verdict.per_gate.items():
             lines.append(f"| `{_clean(path)}` | {t.replayed} | {len(t.catches)} | "
-                         f"{len(t.false_flags)} | {len(t.pre_existing)} | "
+                         f"{len(t.false_flags)} | {len(t.pre_existing) + len(t.tree_state)} | "
                          f"{len(t.unsettled_flags)} | {t.skipped} | {t.errors} |")
             catches += t.catches
             false_flags += t.false_flags
             pre_existing += t.pre_existing
+            tree_state += t.tree_state
             fixed_by_pr += t.fixed_by_pr
             unsettled += t.unsettled_flags
             for pr in t.fixed_by_pr:
@@ -777,6 +784,8 @@ def render_gate_backtest(verdict: Verdict, gates, results, truth: dict[int, Trut
                     remainder_fixed.append(r)
             for pr in t.false_flags:
                 r = by_key.get((path, pr))
+                if r is not None and r.parent_outcome in ("error", "timeout"):
+                    parent_failed.append(r)
                 if r is not None and r.fix_skipped and r.fix_outcome.startswith("partial-"):
                     partial_refused.append(r)
         lines.append("")
@@ -793,9 +802,16 @@ def render_gate_backtest(verdict: Verdict, gates, results, truth: dict[int, Trut
             lines.append(f"  - Partial apply refused #{r.pr} (`{_clean(r.gate)}`, {why}): "
                          f"applied {_file_list(r.fix_applied) or 'none'}; "
                          f"skipped {_file_list(r.fix_skipped)}")
+        for r in parent_failed:
+            lines.append(f"  - Parent-commit run not credited #{r.pr} (`{_clean(r.gate)}`, "
+                         f"{_clean(r.parent_outcome)}: {_clean(r.parent_detail)})")
     if pre_existing:
         lines.append("- Pre-existing flags (base gate also flags, excluded from the threshold): "
                      + _numbers(pre_existing))
+    if tree_state:
+        lines.append("- Tree state (the candidate gate prints the same lines on the PR's parent "
+                     "commit, so the PR added none; excluded from the threshold): "
+                     + _numbers(tree_state))
     if fixed_by_pr:
         lines.append("- Fixed by the candidate PR (once this PR's own change is applied, the head "
                      "gate passes or prints only lines the base gate also prints; excluded from "

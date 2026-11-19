@@ -715,6 +715,33 @@ chk "stays LOCAL when the same row reads the path: $c" routes_local "$c"
 unset PLAN_ROW_ALL_CMDS TW_WRITER
 end_case
 
+# pr_trigger_shape <workflow file> prints PR when its on: block has a
+# pull_request trigger with no branches or branches-ignore filter, FILTERED
+# when the trigger is filtered, NOPR when there is no pull_request trigger.
+pr_trigger_shape() {
+    awk '
+        /^on:[[:space:]]*(#.*)?$/ { inon = 1; next }
+        inon && /^[^[:space:]#]/ { inon = 0 }
+        inon && /^  [A-Za-z_]+:/ { inpr = ($0 ~ /^  pull_request:[[:space:]]*(#.*)?$/); if (inpr) found = 1; next }
+        inpr && /^    (branches|branches-ignore):/ { bad = 1 }
+        END { print (found && !bad) ? "PR" : (found ? "FILTERED" : "NOPR") }
+    ' "$1"
+}
+
+start_case case_skipped_suites_run_on_stacked_prs
+# prefire-verify skips bare bin/e2e-wt and bin/db-test-up rows because these
+# workflows run on every PR, stacked PRs included.
+for wf in .github/workflows/e2e-tests.yml .github/workflows/tests.yml; do
+    got=$(pr_trigger_shape "$REPO_ROOT/$wf")
+    chk "$wf pull_request has no branches filter (got $got)" eq "$got" PR
+done
+# Negative control: the same file with the filter put back.
+awk '{ print } /^  pull_request:$/ { print "    branches: [master]" }' \
+    "$REPO_ROOT/.github/workflows/e2e-tests.yml" > "$TMP/e2e-filtered.yml"
+got=$(pr_trigger_shape "$TMP/e2e-filtered.yml")
+chk "a filtered copy prints FILTERED (got $got)" eq "$got" FILTERED
+end_case
+
 # --- Routing table -----------------------------------------------------------
 # Frozen fixture: <verdict> TAB <needs> TAB <cmd>, one row per line. The LOCAL
 # commands come from the 2026-11-15 prefire-verify failure classification (some

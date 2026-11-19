@@ -23,7 +23,8 @@ on:
       - 'ibl5/package.json'
       - 'ibl5/bun.lock'
   pull_request:
-    branches: [ master, develop ]
+    # No branches filter: stacked PRs run the full suite too, so prefire-verify
+    # can skip a bare bin/db-test-up matrix row (bin/test-plan-checks-block pins it).
     types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:

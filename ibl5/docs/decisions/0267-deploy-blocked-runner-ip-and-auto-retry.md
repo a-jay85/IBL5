@@ -1,6 +1,6 @@
 ---
 description: A new deploy-auto-retry.yml workflow reruns a production deploy once when its runner could not reach prod over SSH before anything changed on the server, and setup-ssh reports the blocked runner's public IP so the host can search its firewall log.
-last_verified: 2026-11-18
+last_verified: 2026-11-19
 ---
 
 > This ADR was drafted by the post-plan harness for this PR. A human must review and approve it before merging.
@@ -19,7 +19,7 @@ On 2026-11-18 the host's firewall shut out one GitHub runner at a time for about
 
 A new workflow, `.github/workflows/deploy-auto-retry.yml`, listens for a completed "Build and Deploy" run. It acts only on a failed run of attempt 1 from a push to `production`. It reads the run's jobs and retries only when the deploy job failed at "Fetch latest code on server" or a pre-flight job failed at "Setup SSH". Before it retries, it checks that the `production` branch head still equals the run's commit. When production has moved on, it skips the retry and DMs the owner, because the newer push starts its own deploy that ships the same commit. Otherwise it calls the `rerun-failed-jobs` API, which needs `actions: write`. When any of its steps fails, it DMs the owner the manual rerun command. The workflow uses its own concurrency group per run id, so it never joins the shared production-deploy group, where a new pending run would replace a queued deploy.
 
-`.github/actions/setup-ssh/action.yml` now records the runner's public IP from `api.ipify.org` when every keyscan try comes back empty. It writes the IP to the step summary, the error annotation, and a `blocked-ip` output. `.github/workflows/main.yml` passes that output to the failure alert. On attempt 1 the alert says a retry is under way. On later attempts it prints the manual rerun command.
+`.github/actions/setup-ssh/action.yml` now records the runner's public IP from `api.ipify.org` when every keyscan try comes back empty. It writes the IP to the step summary, the error annotation, and a `blocked-ip` output. `.github/workflows/main.yml` passes that output to the failure alert. On attempt 1, a failure that the retry workflow will rerun sends no alert. The owner hears about it only if the retry fails, gets skipped, or cannot start. The attempt 2 alert prints the manual rerun command.
 
 ## Alternatives Considered
 

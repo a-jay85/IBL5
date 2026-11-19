@@ -87,3 +87,58 @@ def test_notes_round_followup_present_files_without_round(tmp_path, git_shim):
         assert git.head_tree() == TREE_1
     finally:
         _cleanup(pr, f"{pr}-2")
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: eligibility notes mode, gate, fix call
+# ---------------------------------------------------------------------------
+
+def test_pr_copy_round_findings_mixed_returns_none():
+    assert fidelity.pr_copy_round_findings([_FOLLOWUP, _PR_COPY]) is None
+
+
+def test_pr_copy_round_findings_empty_returns_none():
+    assert fidelity.pr_copy_round_findings([]) is None
+
+
+def test_pr_copy_round_findings_all_pr_copy_returns_texts():
+    got = fidelity.pr_copy_round_findings([_PR_COPY])
+    assert got == [f"{_PR_COPY['title']}: {_PR_COPY['detail']}"]
+
+
+def test_eligibility_notes_mode_accepts_ready_with_notes():
+    got = fidelity.body_recheck_eligibility(VERDICT_RWN, TREE_1, TREE_1, PLAN_HASH,
+                                            PLAN_HASH, notes=["F"])
+    assert got == (["F"], None)
+
+
+def test_eligibility_notes_mode_declines_not_ready_and_tree_change():
+    got = fidelity.body_recheck_eligibility(VERDICT1_PURE_BODY, TREE_1, TREE_1, PLAN_HASH,
+                                            PLAN_HASH, notes=["F"])
+    assert got == (None, "prior-verdict-unparsed")
+    got = fidelity.body_recheck_eligibility(VERDICT_RWN, TREE_1, "b" * 40, PLAN_HASH,
+                                            PLAN_HASH, notes=["F"])
+    assert got == (None, "tree-changed")
+
+
+def test_eligibility_default_mode_still_accepts_not_ready_body_findings():
+    got, reason = fidelity.body_recheck_eligibility(VERDICT1_PURE_BODY, TREE_1, TREE_1,
+                                                    PLAN_HASH, PLAN_HASH)
+    assert reason is None and got and got[0].startswith("- [BLOCKING] Check 4")
+
+
+def test_fix_pr_copy_notes_returns_the_new_body(tmp_path):
+    llm = _RecheckLlm(UsageLedger(), {
+        "plan-fidelity-notes-body-fix-2": [{"body": "NEW body"}]})
+    got = fidelity.fix_pr_copy_notes(llm, "OLD body", ["F"], str(tmp_path), round_num=1)
+    assert got == "NEW body"
+    assert llm.calls == [("plan-fidelity-notes-body-fix-2", "sonnet")]
+    assert "OLD body" in llm.prompts["plan-fidelity-notes-body-fix-2"]
+
+
+def test_fix_pr_copy_notes_envelope_declines(tmp_path):
+    for reply in ({"result": {"body": "x"}}, "a bare string", {"body": "   "},
+                  {"body": "OLD body"}):
+        llm = _RecheckLlm(UsageLedger(), {"plan-fidelity-notes-body-fix-2": [reply]})
+        assert fidelity.fix_pr_copy_notes(llm, "OLD body", ["F"], str(tmp_path),
+                                          round_num=1) is None

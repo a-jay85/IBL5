@@ -143,6 +143,7 @@ case_end
 case_begin classify-rejects-near-misses
 expect_no_fallback nm-12030 "ERROR 12030 (HY000): x"
 expect_no_fallback nm-retried "note: retried 1203 times before success"
+expect_no_fallback nm-code-list "note: retried codes 2013|2003 before success"
 expect_no_fallback nm-rowcount "FAIL: ibl_box_scores row count 50 outside 1000..200000"
 case_end
 

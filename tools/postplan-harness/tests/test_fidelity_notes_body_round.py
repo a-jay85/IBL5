@@ -165,6 +165,9 @@ def test_notes_round_all_pr_copy_ends_ready(tmp_path, git_shim):
         assert res.fidelity["reviewed_tree_2"] == TREE_1
         assert res.fidelity["verdict_path"] == path2
         assert res.fidelity["review_items"][-1]["remediation_sha"] == runner.BODY_ONLY_SHA
+        terminal = fidelity.sticky_terminal(res.fidelity)
+        assert terminal.startswith("READY (re-review)")
+        assert fidelity._terminal_verdict_word(terminal) == "READY"
         assert _created_titles(gh) == []
         assert res.fidelity.get("filed_notes") is None
         assert res.fidelity.get("rounds", []) == []

@@ -1871,6 +1871,10 @@ def terminal_line(v1, error_kind, remediation_sha, v2, tree_2, rounds_completed)
     if v1 == "READY":
         return "READY"
     if v1 == "READY WITH NOTES":
+        if v2 == "READY":
+            # Only the PR-body notes round sets verdict 2 on a READY WITH NOTES first review.
+            return ("READY (re-review) — the pr-copy notes were fixed in the PR body and "
+                    f"re-reviewed clean on tree {tree_2 or 'unrecorded'}")
         return "READY WITH NOTES"
     if not remediation_sha:
         return ("NOT READY — the blocking findings listed above remain; "

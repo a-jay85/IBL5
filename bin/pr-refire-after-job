@@ -5,7 +5,7 @@
 # Use it when the step after a prep job is a post-plan run whose result needs the
 # owner anyway (a sign-off card, a manual check). Waking the parent session for
 # that only builds the card early. The next /pr-burndown run builds it when the
-# owner sits down. Rule: .claude/rules/work-triage.md § repeat-polling.
+# owner sits down. Rule: .claude/rules/work-triage-detail.md § Repeat-polling.
 #
 # Usage:
 #   bin/pr-refire-after-job N --pid P --result FILE --pre-sha SHA [--wt PATH] [--log FILE]

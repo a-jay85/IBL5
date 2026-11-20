@@ -48,10 +48,11 @@ class Tell:
     regex: re.Pattern
     fix: str
     scope: str = "both"  # both | doc | chat
+    raw: bool = False  # scan with inline code and quoted text kept (fenced code still skipped)
 
 
-def _t(name: str, pattern: str, fix: str, scope: str = "both", flags: int = re.I) -> Tell:
-    return Tell(name, re.compile(pattern, flags), fix, scope)
+def _t(name: str, pattern: str, fix: str, scope: str = "both", flags: int = re.I, raw: bool = False) -> Tell:
+    return Tell(name, re.compile(pattern, flags), fix, scope, raw)
 
 
 # Order matters only for display. Keep every pattern high-precision: a false
@@ -180,6 +181,34 @@ TELLS: list[Tell] = [
         "Link it: PR `[#123](https://github.com/a-jay85/IBL5/pull/123)` or backlog issue `[backlog#45](https://github.com/a-jay85/IBL5-backlog/issues/45)`.",
         scope="chat",
     ),
+    # The three tells below are chat-only and raw: backticked paths and names are
+    # the main case, so they scan the line before inline code is masked.
+    _t(
+        "relative-repo-path",
+        # Repo-relative path with a file extension or :line suffix, not part of an
+        # absolute path or a git object spec (no word char, / . ~ - : directly
+        # before it). A link label is exempt when its target is absolute:
+        # prose_lines rewrites such a target to ](/), and the lookahead skips it.
+        r"(?<![\w/.~:-])(?:ibl5|\.claude|bin|tools)/[\w.@/-]*\w(?:\.[A-Za-z]\w{0,5}\b|(?=:\d+))"
+        r"(?![^\[\]\s]*\]\(/\))",
+        "Write file paths in chat as absolute paths (e.g. /Users/ajaynicolas/GitHub/IBL5-worktrees/<slug>/ibl5/X.php). A repo-relative path opens against the main checkout in T3 Code and breaks for worktree files.",
+        scope="chat",
+        raw=True,
+    ),
+    _t(
+        "gate-by-number",
+        r"\bgate\s+#?\d+\b",
+        "Name the gate by what it checks, not its number; the owner doesn't know gate numbers.",
+        scope="chat",
+        raw=True,
+    ),
+    _t(
+        "merge-queue",
+        r"merge_group|mergeQueue|merge queue",
+        "This account will never have GitHub merge queue (free personal account). Don't propose or cite it.",
+        scope="chat",
+        raw=True,
+    ),
 ]
 
 
@@ -191,12 +220,21 @@ _TABLE_SEP = re.compile(r"^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$")
 _INLINE_CODE = re.compile(r"`[^`\n]*`")
 _QUOTED = re.compile(r'"[^"\n]{1,120}"')
 _LINK_TARGET = re.compile(r"\]\([^)]*\)")
+
+
+def _strip_link_target(m: re.Match) -> str:
+    # Keep one fact about the target: an absolute path becomes ](/), anything
+    # else ](). relative-repo-path reads it to exempt a path label whose link target is absolute.
+    return "](/)" if m.group(0).startswith("](/") else "]()"
 _URL = re.compile(r"https?://\S+")
 _HTML_COMMENT_ONE = re.compile(r"<!--.*?-->")
 
 
-def prose_lines(text: str):
-    """Yield (lineno, cleaned_line) for every line that can hold prose."""
+def prose_lines(text: str, keep_code: bool = False):
+    """Yield (lineno, cleaned_line) for every line that can hold prose.
+
+    keep_code=True keeps inline code spans and quoted text unmasked (fences, comments,
+    links and URLs are still skipped); used by the raw chat tells."""
     lines = text.split("\n")
     i = 0
     n = len(lines)
@@ -245,9 +283,10 @@ def prose_lines(text: str):
         if "<!--" in line:
             in_comment = True
             line = line.split("<!--", 1)[0]
-        line = _INLINE_CODE.sub("`code`", line)
-        line = _QUOTED.sub('"quoted"', line)
-        line = _LINK_TARGET.sub("]()", line)
+        if not keep_code:
+            line = _INLINE_CODE.sub("`code`", line)
+            line = _QUOTED.sub('"quoted"', line)
+        line = _LINK_TARGET.sub(_strip_link_target, line)
         line = _URL.sub("URL", line)
         if not line.strip():
             continue
@@ -264,17 +303,19 @@ class Hit:
 def scan_text(text: str, chat: bool = False, only_lines: set[int] | None = None) -> list[Hit]:
     scope_ok = {"both", "chat"} if chat else {"both", "doc"}
     hits: list[Hit] = []
-    for lineno, line in prose_lines(text):
-        if only_lines is not None and lineno not in only_lines:
-            continue
-        for tell in TELLS:
-            if tell.scope not in scope_ok:
+    for raw in (False, True):
+        for lineno, line in prose_lines(text, keep_code=raw):
+            if only_lines is not None and lineno not in only_lines:
                 continue
-            m = tell.regex.search(line)
-            if m:
-                start = max(0, m.start() - 25)
-                snippet = line[start : m.end() + 25].strip()
-                hits.append(Hit(lineno, tell, snippet))
+            for tell in TELLS:
+                if tell.scope not in scope_ok or tell.raw != raw:
+                    continue
+                m = tell.regex.search(line)
+                if m:
+                    start = max(0, m.start() - 25)
+                    snippet = line[start : m.end() + 25].strip()
+                    hits.append(Hit(lineno, tell, snippet))
+    hits.sort(key=lambda h: h.line)
     return hits
 
 
@@ -468,6 +509,9 @@ def mode_self_test() -> int:
         ("Not a hook. Not a gate. Just a doc.", {"not-x-not-y-just-z"}),
         ("Cache – then rebuild.", {"em-dash"}),
         ("see #1234 for context", {"bare-hash-ref"}),
+        ("Edit `ibl5/classes/Foo.php` next.", {"relative-repo-path"}),
+        ("Gate 5 blocked it.", {"gate-by-number"}),
+        ("Never use a merge queue here.", {"merge-queue"}),
         # slop-ok scope: prose after a mid-line marker is still scanned.
         ("Lead. <!-- slop-ok --> Tail fires — after the marker.", {"em-dash"}),
         ("Quoted aside. <!-- slop-ok --> It's a nudge, not a block.", {"comma-not"}),
@@ -525,7 +569,7 @@ def mode_self_test() -> int:
         ("https://example.com/page#section", False, False),
         # Exempt word prefixes — check, gate, step, etc.
         ("check #19 in the list", False, False),
-        ("gate #3 fires here", False, False),
+        ("gate #3 fires here", False, True),  # bare-hash-ref skips it; gate-by-number flags it in chat
         ("step #2 is next", False, False),
         ("He was the #1 seed and the #1 pick.", False, False),
         ("the #3 overall pick in the 2019 draft", False, False),
@@ -548,6 +592,31 @@ def mode_self_test() -> int:
         ("#1 seedling", False, True),
         # The backlog#N branch has no ranking exemption.
         ("backlog#12 seed", False, True),
+        # relative-repo-path: chat only, inline code flagged, fences and absolute paths exempt.
+        ("see `ibl5/classes/Foo.php` for it", False, True),
+        ("see .claude/rules/x.md", False, True),
+        ("see tools/x/y.py:12", False, True),
+        ("see bin/foo.sh.", False, True),
+        ("see `bin/check-prose` now", False, False),
+        ("cd ibl5 and run bin/check-prose", False, False),
+        ("see /Users/ajaynicolas/GitHub/IBL5-worktrees/x/ibl5/classes/Foo.php", False, False),
+        ("```\nibl5/classes/Foo.php\n```", False, False),
+        # A link label is exempt when the target is absolute; a relative target is not.
+        ("open [ibl5/classes/Foo.php](/Users/ajaynicolas/GitHub/IBL5-worktrees/x/ibl5/classes/Foo.php)", False, False),
+        ("open [ibl5/classes/Foo.php:12](/Users/ajaynicolas/GitHub/IBL5-worktrees/x/ibl5/classes/Foo.php:12)", False, False),
+        ("open [ibl5/classes/Foo.php](ibl5/classes/Foo.php)", False, True),
+        # A git object spec is exempt; a bare path in prose still trips.
+        ("run git show HEAD:ibl5/foo.php", False, False),
+        ("edit ibl5/classes/Foo.php next", False, True),
+        # gate-by-number: gate only; "hold 3" is plain English; "Check 25" is fine.
+        ("hold 3 seconds", False, False),
+        ("`gate 7` fired", False, True),
+        ("Check 25 denied the edit.", False, False),
+        ("```\ngate 5\n```", False, False),
+        # merge-queue.
+        ("use merge_group events", False, True),
+        ("enable mergeQueue", False, True),
+        ("```\nmerge queue\n```", False, False),
     ]
     fails = 0
     for text, expected in positive:

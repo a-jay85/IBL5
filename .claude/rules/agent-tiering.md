@@ -1,6 +1,6 @@
 ---
 description: Which tier to pick for each sub-agent, plus the Sonnet 5.5 def-pins and the effort setting per surface.
-last_verified: 2026-11-16
+last_verified: 2026-11-19
 ---
 
 # Agent Tiering
@@ -15,7 +15,7 @@ Tier every sub-agent (and every agent a plan spawns) by the reasoning the task a
 | **Sonnet** | `subagent_type: "sonnet-5-5"`, omit `model` (the def pins 5.5 and has no `Agent` tool, so it cannot spawn). | Synthesis: "is this finding relevant?", cross-file traces, semantic compliance checks, rename sweeps needing call-site judgment, review agents, manual-test classification. |
 | **Opus** | self (no delegation) | Novel reasoning, FK ordering, rule authoring, ADR writing, ambiguous test failures, final code review, open-ended diff-triage (Phase 6.5 bounded checklist: `agent-tiering-bounded-checklist.md`). Never delegate understanding. |
 | **Opus (delegated)** | `subagent_type: "plan-architect"` | Implementation **planning** only. `/plan` Step 3 picks between the three architect defs (`.claude/skills/plan/SKILL.md`). Do **not** pass inline `model`. |
-| **Fable** | `model: "fable"` | Rung above Opus (Fable 5.2 is 2× Opus 5.5 per token). Default to Opus; raise Opus effort to `high` before moving up. Past `high`, try Fable at `high` before Opus at `xhigh` or `max`. When Fable looks justified (Opus likely wrong **and** a wrong answer is expensive), ask the owner before the spawn and state the reason in one line. Asm-level static RE has no tier default. The `/plan` architect tier is an Opus judgment that `bin/plan-tier-hint` makes. A session may move that pick down, and needs the owner's OK to move it up to Fable. Full test: `agent-tiering-fable.md`. |
+| **Fable** | `model: "fable"` | Rung above Opus (Fable 5.2 is 2× Opus 5.5 per token). Default to Opus; raise Opus effort to `high` before moving up. Past `high`, try Fable at `high` before Opus at `xhigh` or `max`. Ask the owner before a Fable spawn (`skill-gate.sh` denies it until they OK it). Full test: `agent-tiering-fable.md`. |
 | **Effort** | `--effort` flag or `effort:` frontmatter | `high` on every surface that takes the flag. Per-surface detail and measurements: `agent-tiering-fable.md` § Effort. |
 
 > **The boundary keys on task *type* (judgment vs. mechanical), not raw model capability** — a stronger Sonnet moves nothing across the line. Why: `agent-tiering-detail.md`.
@@ -26,7 +26,7 @@ Tier every sub-agent (and every agent a plan spawns) by the reasoning the task a
 
 ## Fat-tail delegation
 
-Only the fat tail of tool results is worth a spawn. **Two fat calls per turn pass** (a `Read` ≥ 8 KB, unbounded `cat`/`git log`/`find`, a full Playwright run). The 3rd is denied. Batch it and the rest into ONE `Agent(model: "haiku")` digest spawn; use `subagent_type: "sonnet-5-5"` when the batch may pass ~100K tokens. Enforced by Check F in `~/.claude/hooks/output-guard.sh`. Independent slow items fan out concurrently instead. Detail: `agent-tiering-detail.md` §§ Skip the Agent, Fan out by independence.
+`output-guard.sh` Check F denies the 3rd fat call in a turn and names the batched digest spawn. Detail: `agent-tiering-detail.md` §§ Skip the Agent, Fan out by independence.
 
 ## `/plan` orchestrator model
 

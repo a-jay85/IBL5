@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import re
 
+from .sql_comments import migration_sections
 from .state import Classification
 
 FILES_CHANGED_BEGIN = "<!-- files-changed:begin -->"
@@ -941,6 +942,7 @@ def classify(files: list[str], diff_text: str, modified_files: list[str] | None 
     c.has_modified = len(modified_files) > 0
 
     c.filtered_diff = filter_diff(diff_text)
+    c.migration_diff = migration_sections(diff_text, _MIGRATION)
     c.retro_registry_row = retro_registry_row_from_diff(diff_text)
 
     c.has_comments_in_diff = any(

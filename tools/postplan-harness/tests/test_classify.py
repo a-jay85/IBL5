@@ -167,6 +167,29 @@ def test_filter_strips_migrations_and_locks():
     assert "ibl5/foo.php" in filtered and "trade.spec.ts" in filtered
 
 
+def _section(path: str, *added: str) -> str:
+    return (f"diff --git a/{path} b/{path}\n--- a/{path}\n+++ b/{path}\n@@ -0,0 +1 @@\n"
+            + "".join(f"+{a}\n" for a in added))
+
+
+def test_classify_fills_migration_diff_with_sql_migration_sections_only():
+    up = _section("ibl5/migrations/201_x.sql", "ALTER TABLE t ADD COLUMN c INT;")
+    down = _section("ibl5/migrations/201_x.down.sql", "ALTER TABLE t DROP COLUMN c;")
+    php = _section("ibl5/migrations/202_y.php", "echo 'php-marker';")
+    md = _section("ibl5/docs/x.md", "md-marker")
+    d = up + down + php + md
+    cls = classify(files_from_diff(d), d)
+    assert up in cls.migration_diff and down in cls.migration_diff
+    assert "php-marker" not in cls.migration_diff and "md-marker" not in cls.migration_diff
+    assert "migrations/" not in cls.filtered_diff
+
+
+def test_classify_migration_diff_empty_without_migrations():
+    d = _section("ibl5/docs/x.md", "hello")
+    cls = classify(files_from_diff(d), d, modified_files=["ibl5/docs/x.md"])
+    assert cls.migration_diff == ""
+
+
 def test_docs_only():
     d = ("diff --git a/ibl5/docs/x.md b/ibl5/docs/x.md\n--- a/ibl5/docs/x.md\n"
          "+++ b/ibl5/docs/x.md\n@@ -1 +1 @@\n+hello\n")

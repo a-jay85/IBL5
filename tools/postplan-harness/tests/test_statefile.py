@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import runner
 from harness import statefile
 from harness.adapters.llm import FixtureLlm
-from harness.state import HarnessError, RunResult, TerminalState, UsageLedger
+from harness.state import Classification, HarnessError, RunResult, TerminalState, UsageLedger
 
 # Replay runs reach fidelity's procedure lookup; see tests/conftest.py.
 pytestmark = pytest.mark.usefixtures("stub_ambient_git_show")
@@ -529,3 +529,11 @@ def test_statefile_persists_pause_edit_sid(tmp_path):
         .checkpoint("terminal", res)
     nxt = statefile.StateFile(path, "witness", _StubGit(), "/tmp/fake-out", lambda m: None)
     assert nxt.previous["pause_edit_sid"] == "S1"
+
+
+def test_to_json_drops_migration_diff():
+    res = RunResult(terminal=TerminalState.FAILED,
+                    classification=Classification(migration_diff="+DROP TABLE t\n", filtered_diff="x"))
+    cls = json.loads(res.to_json())["classification"]
+    assert "migration_diff" not in cls
+    assert "filtered_diff" not in cls

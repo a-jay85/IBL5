@@ -1,4 +1,4 @@
-"""Blank SQL comments on the added lines of a diff, so merge-danger trigger 1 matches statements only.
+"""Blank SQL comments on the added lines of a diff, and split a diff into per-file sections, so callers match statements only.
 
 Pure functions only. Comments are replaced by spaces of the same length and newlines are kept, so
 line count, columns and the diff's `+` prefix all survive and `DESTRUCTIVE_SQL` (anchored on `^\\+`)
@@ -19,6 +19,8 @@ Motivating inputs, both held one-way by comment text alone:
     PR #3495: `+-- Rollback (lossless for all other data): ALTER TABLE `ibl_team_info` DROP COLUMN `trade_mode`;`
 """
 from __future__ import annotations
+
+import re
 
 _CODE, _LINE, _BLOCK, _SQUOTE, _DQUOTE, _BACKTICK = range(6)
 _QUOTE_STATE = {"'": _SQUOTE, '"': _DQUOTE, "`": _BACKTICK}
@@ -94,7 +96,7 @@ def strip_added_sql_comments(diff_text: str) -> str:
 
     Each run of consecutive added lines inside one hunk is tokenized on its own, so an
     unterminated construct only un-strips its own run. A diff with no `@@` hunk is treated as one
-    bare hunk (the `_migration_sections` no-header case); `+++ ` is never an added line.
+    bare hunk (the `migration_sections` no-header case); `+++ ` is never an added line.
     """
     lines = diff_text.split("\n")
     has_hunks = any(ln.startswith("@@") for ln in lines)
@@ -124,3 +126,28 @@ def strip_added_sql_comments(diff_text: str) -> str:
             out.append(ln)
     flush()
     return "\n".join(out)
+
+
+_DIFF_HEADER_RE = re.compile(r"^diff --git a/.* b/(.*)$", re.MULTILINE)
+
+
+def diff_sections(diff_text: str) -> list[tuple[str, str]] | None:
+    """(b-path, section text) per `diff --git` header, in order. None when the text has no
+    header at all: an empty diff or a bare hunk."""
+    headers = list(_DIFF_HEADER_RE.finditer(diff_text))
+    if not headers:
+        return None
+    sections: list[tuple[str, str]] = []
+    for i, m in enumerate(headers):
+        end = headers[i + 1].start() if i + 1 < len(headers) else len(diff_text)
+        sections.append((m.group(1), diff_text[m.start():end]))
+    return sections
+
+
+def migration_sections(diff_text: str, pattern: re.Pattern[str]) -> str:
+    """The diff text belonging to files whose path matches pattern. A diff without `diff --git` headers is
+    searched whole, so a bare hunk still counts."""
+    sections = diff_sections(diff_text)
+    if sections is None:
+        return diff_text
+    return "".join(text for path, text in sections if pattern.match(path))

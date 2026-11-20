@@ -1,5 +1,6 @@
 """Unit tests for harness/sql_comments.py — comment blanking ahead of merge-danger trigger 1."""
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -8,7 +9,12 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness.armable import DESTRUCTIVE_SQL
-from harness.sql_comments import strip_added_sql_comments, strip_sql_comments
+from harness.sql_comments import (
+    diff_sections,
+    migration_sections,
+    strip_added_sql_comments,
+    strip_sql_comments,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures" / "merge-danger-migrations"
 
@@ -188,3 +194,36 @@ def test_diff_without_headers_strips_plain_plus_lines():
 def test_line_count_is_preserved_for_every_fixture(name):
     text = (FIXTURES / name).read_text(encoding="utf-8")
     assert strip_added_sql_comments(text).count("\n") == text.count("\n")
+
+
+_SQL_MIG = re.compile(r"^ibl5/migrations/.*\.sql$")
+
+
+def _file_section(path: str, *added: str) -> str:
+    return "\n".join([f"diff --git a/{path} b/{path}", f"--- a/{path}", f"+++ b/{path}",
+                      "@@ -0,0 +1 @@", *(f"+{a}" for a in added)]) + "\n"
+
+
+def test_diff_sections_splits_per_header_in_order():
+    one = _file_section("ibl5/migrations/201_x.sql", "SELECT 1;")
+    two = _file_section("ibl5/docs/x.md", "text")
+    sections = diff_sections(one + two)
+    assert sections == [("ibl5/migrations/201_x.sql", one), ("ibl5/docs/x.md", two)]
+    assert "".join(t for _, t in sections) == one + two
+
+
+def test_diff_sections_returns_none_without_header():
+    assert diff_sections("+DROP TABLE t\n") is None
+    assert diff_sections("") is None
+
+
+def test_migration_sections_keeps_only_matching_paths():
+    mig = _file_section("ibl5/migrations/201_x.sql", "SELECT 1;")
+    dump = _file_section("ibl5/docs/schema/current-schema.sql", "DROP TABLE IF EXISTS t;")
+    php = _file_section("ibl5/migrations/202_y.php", "echo 1;")
+    assert migration_sections(dump + mig + php, _SQL_MIG) == mig
+
+
+def test_migration_sections_searches_bare_hunk_whole():
+    bare = "+ALTER TABLE t DROP COLUMN c;\n"
+    assert migration_sections(bare, _SQL_MIG) == bare

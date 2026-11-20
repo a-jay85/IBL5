@@ -15,6 +15,7 @@
 #      bin/test-check-plan gateQ  (only the gate [Q] seed-state block, for plan mutation checks)
 #      bin/test-check-plan gateHC  (only the gate [HC] How-column block, for plan mutation checks)
 #      bin/test-check-plan gateCR  (only the gate [CR] bare-marker block, for plan mutation checks)
+#      bin/test-check-plan gateNC  (only the gate [NC] near-cap cases, for plan mutation checks)
 #      bin/test-check-plan gateH  (only the gate [H] hold cases, for plan mutation checks)
 #
 # shellcheck disable=SC2016  # backtick spans in the single-quoted plan fixtures
@@ -567,6 +568,136 @@ assert_msg "q_novr_class_unasserted_quiet" 0 "" "[Q-advisory]" "$FM_OPUS"'
 '
 fi
 [ "$TCP_ONLY" != gateQ ] || h_done
+
+# ---------------------------------------------------------------------------
+# Gate [NC]: near-cap byte-capped Critical Files target needs a budget-cuts
+# marker. Every case measures headroom at HEAD (CHECK_PLAN_BUDGET_REF=HEAD) so
+# CI and local runs read the same tree. Sizes are computed per run, never pinned.
+# `bin/test-check-plan gateNC` runs these alone.
+# ---------------------------------------------------------------------------
+if [ -z "$TCP_ONLY" ] || [ "$TCP_ONLY" = gateNC ]; then
+NC_RULES_CAPS="$SCRIPT_DIR/check-rules-byte-budget"
+NC_CONTRACT_CAPS="$SCRIPT_DIR/test-architect-contract-split"
+NC_LAZY_ROW=$("$NC_RULES_CAPS" --print-caps --ref=HEAD | awk -F'\t' '$2 == "lazy" && !f { print; f = 1 }')
+NC_LAZY=$(printf '%s' "$NC_LAZY_ROW" | cut -f1)
+NC_LAZY_B=$(printf '%s' "$NC_LAZY_ROW" | cut -f4)
+NC_NEAR=$((NC_LAZY_B + 100))      # lazy cap leaving exactly 100 B of headroom
+NC_AMPLE=$((NC_LAZY_B + 100000))  # lazy cap leaving 100000 B
+NC_CONTRACT=.claude/skills/plan/_architect-contract.md
+
+# _nc_run <name> <plan-body> [ENV=VAL ...]: run check-plan on the fixture with the
+# given env; sets NC_OUT. Returns 1 when this shard does not own the case.
+_nc_run() {
+    _nc_name="$1"; _nc_body="$2"; shift 2
+    _nc_f="$TMP/$_nc_name.md"
+    printf '%s\n' "$_nc_body" > "$_nc_f"
+    h_shard_take || return 1
+    NC_OUT="$(env CHECK_PLAN_BUDGET_REF=HEAD "$@" "$GUARD" "$_nc_f" 2>&1)" || true
+    return 0
+}
+# _nc_expect <name> <has|none> <token>: assert NC_OUT contains / lacks <token>.
+_nc_expect() {
+    if [ "$2" = has ]; then
+        if grep -qF -- "$3" <<< "$NC_OUT"; then h_pass "$1"; else h_fail "$1" "'$3' not in output"; fi
+    else
+        if grep -qF -- "$3" <<< "$NC_OUT"; then h_fail "$1" "'$3' unexpectedly in output"; else h_pass "$1"; fi
+    fi
+}
+_nc_cf() { printf '%s\n## Critical Files\n%s\n' "$FM$CF_MATRIX" "$1"; }
+
+# 1. No marker on a near-cap target: [NC] fires and states the headroom (row 7).
+if _nc_run gateNC-fail-without-marker "$(_nc_cf "- \`$NC_LAZY\` (extend)")" RULES_LAZY_BUDGET="$NC_NEAR"; then
+    _nc_expect "gateNC-fail-without-marker names path" has "[NC] plan changes $NC_LAZY"
+    _nc_expect "gateNC-fail-without-marker names headroom" has "100 B of headroom"
+fi
+# 2. A budget-cuts line with a reason clears it (row 8).
+if _nc_run gateNC-pass-with-marker "$(_nc_cf "- \`$NC_LAZY\` (extend)")
+budget-cuts: $NC_LAZY move the example table to a -detail.md companion" RULES_LAZY_BUDGET="$NC_NEAR"; then
+    _nc_expect "gateNC-pass-with-marker" none "[NC]"
+fi
+# 3. Ample headroom needs no marker (row 9).
+if _nc_run gateNC-ample-headroom "$(_nc_cf "- \`$NC_LAZY\` (extend)")" RULES_LAZY_BUDGET="$NC_AMPLE"; then
+    _nc_expect "gateNC-ample-headroom" none "[NC]"
+fi
+# 4. A target with no byte cap needs no marker (row 10).
+if _nc_run gateNC-no-cap "$(_nc_cf '- `bin/check-plan` (extend)')" RULES_LAZY_BUDGET="$NC_NEAR"; then
+    _nc_expect "gateNC-no-cap" none "[NC]"
+fi
+# 5. Near-miss markers still fail (row 11): another file, a bare context-budget, no reason.
+if _nc_run gateNC-nearmiss-other-file "$(_nc_cf "- \`$NC_LAZY\` (extend)")
+budget-cuts: .claude/rules/other.md cut the long example" RULES_LAZY_BUDGET="$NC_NEAR"; then
+    _nc_expect "gateNC-nearmiss-other-file" has "[NC] plan changes $NC_LAZY"
+fi
+if _nc_run gateNC-nearmiss-context-budget "$(_nc_cf "- \`$NC_LAZY\` (extend)")
+context-budget: big plan" RULES_LAZY_BUDGET="$NC_NEAR"; then
+    _nc_expect "gateNC-nearmiss-context-budget" has "[NC] plan changes $NC_LAZY"
+fi
+if _nc_run gateNC-nearmiss-no-reason "$(_nc_cf "- \`$NC_LAZY\` (extend)")
+budget-cuts: $NC_LAZY" RULES_LAZY_BUDGET="$NC_NEAR"; then
+    _nc_expect "gateNC-nearmiss-no-reason" has "[NC] plan changes $NC_LAZY"
+fi
+# 6. A reference-marked entry is not an edit (row 12).
+if _nc_run gateNC-reference-entry "$(_nc_cf "- \`$NC_LAZY\` (reference)")" RULES_LAZY_BUDGET="$NC_NEAR"; then
+    _nc_expect "gateNC-reference-entry" none "[NC]"
+fi
+# 7. Base-ref env (row 13). Empty behaves like unset; an unresolvable ref skips.
+if _nc_run gateNC-empty-ref "$(_nc_cf "- \`$NC_LAZY\` (extend)")" CHECK_PLAN_BUDGET_REF= RULES_LAZY_BUDGET="$NC_NEAR"; then
+    if grep -qF '[NC] plan changes' <<< "$NC_OUT" || grep -qF '[NC] skipped' <<< "$NC_OUT"; then
+        h_pass "gateNC-empty-ref derives the base ref"
+    else
+        h_fail "gateNC-empty-ref" "neither a violation nor a skip warning in output"
+    fi
+fi
+if _nc_run gateNC-bad-ref "$(_nc_cf "- \`$NC_LAZY\` (extend)")" CHECK_PLAN_BUDGET_REF=no-such-ref-xyz RULES_LAZY_BUDGET="$NC_NEAR"; then
+    _nc_expect "gateNC-bad-ref warns skipped" has "[NC] skipped"
+    _nc_expect "gateNC-bad-ref no violation" none "[NC] plan changes"
+fi
+# 8. print-caps contract (rows 3, 4, 5).
+if h_shard_take; then
+    _nc_rows="$("$NC_RULES_CAPS" --print-caps --ref=HEAD)"
+    _nc_ok=1
+    for _nc_pick in "$(sed -n '1p' <<< "$_nc_rows")" "$(sed -n '$p' <<< "$_nc_rows")"; do
+        _nc_p=$(cut -f1 <<< "$_nc_pick"); _nc_b=$(cut -f4 <<< "$_nc_pick")
+        _nc_real=$(git -C "$SCRIPT_DIR/.." show "HEAD:$_nc_p" | wc -c | tr -d '[:space:]')
+        [ "$_nc_b" = "$_nc_real" ] || { _nc_ok=0; h_fail "gateNC-print-caps-bytes" "$_nc_p: row says $_nc_b, git says $_nc_real"; }
+    done
+    [ "$_nc_ok" -eq 1 ] && h_pass "gateNC-print-caps bytes equal git show sizes"
+fi
+if h_shard_take; then
+    _nc_res_row=$(awk -F'\t' '$2 == "resident" && $4 > m { m = $4; r = $0 } END { print r }' <<< "$("$NC_RULES_CAPS" --print-caps --ref=HEAD)")
+    _nc_res_p=$(cut -f1 <<< "$_nc_res_row"); _nc_res_b=$(cut -f4 <<< "$_nc_res_row")
+    _nc_low=$((_nc_res_b - 1))
+    if RULES_RESIDENT_BUDGET="$_nc_low" "$NC_RULES_CAPS" >/dev/null 2>&1; then
+        h_fail "gateNC-resident-class" "lowered resident cap did not fail the normal run"
+    else
+        _nc_room=$(RULES_RESIDENT_BUDGET="$_nc_low" "$NC_RULES_CAPS" --print-caps --ref=HEAD | awk -F'\t' -v p="$_nc_res_p" '$1 == p { print $5 }')
+        if [ -n "$_nc_room" ] && [ "$_nc_room" -lt 0 ]; then
+            h_pass "gateNC-resident-class: lowered cap fails the run and shows negative headroom"
+        else
+            h_fail "gateNC-resident-class" "headroom for $_nc_res_p was '$_nc_room', want < 0"
+        fi
+    fi
+fi
+if h_shard_take; then
+    "$NC_RULES_CAPS" --print-caps --ref >/dev/null 2>&1; _nc_rc1=$?
+    "$NC_RULES_CAPS" --print-caps --ref=no-such-ref-xyz >/dev/null 2>&1; _nc_rc2=$?
+    if [ "$_nc_rc1" -eq 2 ] && [ "$_nc_rc2" -eq 2 ]; then
+        h_pass "gateNC-print-caps rejects '--ref' without '=' and an unknown ref (exit 2)"
+    else
+        h_fail "gateNC-print-caps-reject" "exit codes were $_nc_rc1 and $_nc_rc2, want 2 and 2"
+    fi
+fi
+# 9. Architect contract row comes from the contract-split script (row 14).
+_nc_contract_room=$("$NC_CONTRACT_CAPS" --print-caps --ref=HEAD | awk -F'\t' -v p="$NC_CONTRACT" '$1 == p { print $5 }')
+if _nc_run gateNC-architect-contract "$(_nc_cf "- \`$NC_CONTRACT\` (extend)")"; then
+    if [ -n "$_nc_contract_room" ] && [ "$_nc_contract_room" -lt 1024 ]; then
+        _nc_expect "gateNC-architect-contract trips below 1024 B" has "[NC] plan changes $NC_CONTRACT"
+    else
+        _nc_expect "gateNC-architect-contract quiet at or above 1024 B" none "[NC] plan changes $NC_CONTRACT"
+    fi
+fi
+fi
+[ "$TCP_ONLY" != gateNC ] || h_done
 
 # Gate [V] parse arm and bin/fixtures bare-path arm. TCP_ONLY=gateVsyntax runs
 # only these. The cells are single-quoted so the harness never expands them.

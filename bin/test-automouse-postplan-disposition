@@ -486,7 +486,9 @@ c2_case c2e-handoff-merged-terminal 0 p.md MERGED
 rm -rf "$C2D"
 
 # c3: guard contains lock release and continue
+C3_UNGUARDED=$(grep -F 'rm -rf "$CURRENT_LOCK"' "$RUNNER" | grep -vcF '2>/dev/null || true')
 if grep -qF 'rm -rf "$CURRENT_LOCK" 2>/dev/null || true' "$RUNNER" \
+   && [ "$C3_UNGUARDED" = 0 ] \
    && grep -qF 'CURRENT_LOCK=""' "$RUNNER" \
    && grep -qF 'continue' "$RUNNER"; then
     echo "ok: c3-lock-release-and-continue"

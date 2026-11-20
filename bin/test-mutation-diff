@@ -269,9 +269,9 @@ mkdir -p "$LOCK_DIR_UNDER_TEST"
 echo "$DEAD_PID" >"$LOCK_DIR_UNDER_TEST/pid"
 run_md base
 h_eq "stale lock is reclaimed: exit" 0 "$RC"
-h_contains "stale lock is reclaimed" "$OUT$ERR" "reclaiming stale lock"
+h_contains "dead-pid lock prints the reclaim notice" "$OUT$ERR" "reclaiming stale lock"
 h_absent "stale lock is reclaimed: lock dir gone" "$LOCK_DIR_UNDER_TEST"
-h_absent "stale lock is reclaimed: mutex gone" "$LOCK_DIR_UNDER_TEST.reclaim.lock"
+h_absent "dead-pid lock reclaim leaves no mutex dir" "$LOCK_DIR_UNDER_TEST.reclaim.lock"
 
 # 11b a live reclaim already holds the sibling mutex: the run refuses with exit 4 and leaves
 # the stale lock's pid alone instead of deleting it under the other reclaimer.

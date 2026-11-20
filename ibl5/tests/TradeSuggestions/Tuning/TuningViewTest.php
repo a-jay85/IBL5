@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\TradeSuggestions\Tuning;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use TradeSuggestions\Engine\GenerationResult;
 use TradeSuggestions\Engine\RankDiagnostics;
@@ -129,6 +130,109 @@ final class TuningViewTest extends TestCase
         self::assertSame(['selected', 'vetoed', 'hidden'], $m[1]);
     }
 
+    public function testTruncatedNoteShowsElapsedAndBudgetSeconds(): void
+    {
+        $html = self::render(truncated: true, teamsNotRun: [4]);
+
+        self::assertStringContainsString('Stopped after 21.5 s (budget 20 s). Teams not run: 4</div>', $html);
+    }
+
+    public function testRowCellsShowRankPartnerWeakerSideAndExposure(): void
+    {
+        $html = self::render(rows: [
+            self::row(rank: 4, weakerSideTotal: 1.2345),
+            self::row(rank: null, partnerTid: 99, exposureEligible: false),
+        ]);
+
+        preg_match_all('/<tr data-outcome="[a-z_]+">(.*?)<\/tr>/s', $html, $m);
+        preg_match_all('/<td>(.*?)<\/td>/s', $m[1][0] ?? '', $first);
+        preg_match_all('/<td>(.*?)<\/td>/s', $m[1][1] ?? '', $second);
+        self::assertSame(['4', 'Eligible (later refresh)', 'Team 2', 'ONE_FOR_ONE', '1.23'], array_slice($first[1], 0, 5));
+        self::assertSame('yes', $first[1][9] ?? null);
+        self::assertSame(['-', 'Eligible (later refresh)', '99'], array_slice($second[1], 0, 3));
+        self::assertSame('no', $second[1][9] ?? null);
+    }
+
+    public function testGainBySeasonListsEachSeasonWithTwoDecimals(): void
+    {
+        $twoSeasons = new SideGain(1, TeamMode::Middle, [0 => ['picks' => 1.234], 1 => ['cap' => 0.5]], [0.5, 0.5], 1.0);
+        $none = new SideGain(1, TeamMode::Middle, [], [], 1.0);
+        $html = self::render(rows: [self::row(gain: $twoSeasons), self::row(gain: $none)]);
+
+        preg_match_all('/<tr data-outcome="[a-z_]+">(.*?)<\/tr>/s', $html, $m);
+        preg_match_all('/<td>(.*?)<\/td>/s', $m[1][0] ?? '', $first);
+        preg_match_all('/<td>(.*?)<\/td>/s', $m[1][1] ?? '', $second);
+        self::assertSame(['1.23 / 0.50', '1.23 / 0.50'], array_slice($first[1], 5, 2));
+        self::assertSame(['-', '-'], array_slice($second[1], 5, 2));
+    }
+
+    public function testUnmatchedPartnerShowsNameOrTid(): void
+    {
+        $known = self::render(unmatched: [self::feedback('x', partnerTid: 2)]);
+        $unknown = self::render(unmatched: [self::feedback('x', partnerTid: 99)]);
+
+        self::assertMatchesRegularExpression('/id="tuning-unmatched-1">.*?<tbody>\s*<tr>\s*<td>Team 2<\/td>/s', $known);
+        self::assertMatchesRegularExpression('/id="tuning-unmatched-1">.*?<tbody>\s*<tr>\s*<td>99<\/td>/s', $unknown);
+    }
+
+    /**
+     * @return array<string, array{TeamMode, string}>
+     */
+    public static function modeProvider(): array
+    {
+        return [
+            'win now' => [TeamMode::WinNow, 'Win now'],
+            'rebuild' => [TeamMode::Rebuild, 'Rebuild'],
+            'middle' => [TeamMode::Middle, 'Middle'],
+        ];
+    }
+
+    #[DataProvider('modeProvider')]
+    public function testModeLabel(TeamMode $mode, string $label): void
+    {
+        self::assertStringContainsString('<li>Mode: ' . $label . '</li>', self::render(mode: $mode));
+    }
+
+    public function testCountsListShowsCappedAndDiagnostics(): void
+    {
+        $diagnostics = new RankDiagnostics(7, 1, 2, 3, 4, ['V1' => 2], 5, [], 6, 3);
+        $capped = self::render(capped: true, diagnostics: $diagnostics);
+        $open = self::render(capped: false);
+
+        self::assertStringContainsString('<li>Capped: yes</li>', $capped);
+        self::assertStringContainsString('<li>Capped: no</li>', $open);
+        self::assertStringContainsString('<li>generated: 7</li>', $capped);
+        self::assertStringContainsString('<li>vetoed_by_id: {&quot;V1&quot;:2}</li>', $capped);
+        self::assertStringContainsString('<li>validator_rejections: []</li>', $capped);
+    }
+
+    /**
+     * @return array<string, array{RankOutcome, string}>
+     */
+    public static function outcomeProvider(): array
+    {
+        return [
+            'selected' => [RankOutcome::Selected, 'Shown (top 3)'],
+            'eligible' => [RankOutcome::Eligible, 'Eligible (later refresh)'],
+            'not both positive' => [RankOutcome::NotBothPositive, 'One side does not gain'],
+            'lopsided' => [RankOutcome::Lopsided, 'Lopsided'],
+            'exposure' => [RankOutcome::Exposure, 'Partner not open to this team'],
+            'vetoed' => [RankOutcome::Vetoed, 'Vetoed'],
+            'validator' => [RankOutcome::Validator, 'Refused by trade rules'],
+            'no motive' => [RankOutcome::NoMotive, 'No reason for one side'],
+            'not reached' => [RankOutcome::NotReached, 'Not reached (cap hit)'],
+            'hidden' => [RankOutcome::Hidden, 'Hidden by the GM'],
+        ];
+    }
+
+    #[DataProvider('outcomeProvider')]
+    public function testOutcomeCellShowsItsLabel(RankOutcome $outcome, string $label): void
+    {
+        $html = self::render(rows: [self::row(outcome: $outcome)]);
+
+        self::assertMatchesRegularExpression('/<tr data-outcome="' . $outcome->value . '">\s*<td>[^<]*<\/td>\s*<td>' . preg_quote($label, '/') . '<\/td>/', $html);
+    }
+
     /**
      * @param list<TuningRow>|null $rows
      * @param list<int> $teamsNotRun
@@ -142,6 +246,9 @@ final class TuningViewTest extends TestCase
         array $teamsNotRun = [],
         int $omitted = 0,
         array $unmatched = [],
+        TeamMode $mode = TeamMode::Middle,
+        bool $capped = false,
+        ?RankDiagnostics $diagnostics = null,
     ): string {
         $names = [];
         for ($tid = 1; $tid <= 28; $tid++) {
@@ -151,10 +258,10 @@ final class TuningViewTest extends TestCase
         $section = new TuningTeamSection(
             tid: 1,
             teamName: $teamName,
-            mode: TeamMode::Middle,
+            mode: $mode,
             eligiblePartners: [2, 3],
-            generation: GenerationResult::empty(),
-            diagnostics: new RankDiagnostics(0, 0, 0, 0, 0, [], 0, [], 0, 0),
+            generation: new GenerationResult([], 0, 0, [], [], $capped, []),
+            diagnostics: $diagnostics ?? new RankDiagnostics(0, 0, 0, 0, 0, [], 0, [], 0, 0),
             rows: $rows ?? [self::row()],
             omittedRows: $omitted,
             unmatchedFeedback: $unmatched,
@@ -182,30 +289,34 @@ final class TuningViewTest extends TestCase
         ?string $detail = null,
         array $vetoIds = [],
         ?TuningFeedback $feedback = null,
+        int $partnerTid = 2,
+        float $weakerSideTotal = 1.5,
+        bool $exposureEligible = true,
+        ?SideGain $gain = null,
     ): TuningRow {
-        $gain = new SideGain(1, TeamMode::Middle, [0 => ['picks' => 1.5]], [0.3, 0.3, 0.2, 0.2], 1.0);
+        $gain ??= new SideGain(1, TeamMode::Middle, [0 => ['picks' => 1.5]], [0.3, 0.3, 0.2, 0.2], 1.0);
 
         return new TuningRow(
             tid: 1,
-            partnerTid: 2,
+            partnerTid: $partnerTid,
             shapeId: 'ONE_FOR_ONE',
             candidate: new TradeCandidate(1, 2, [101], [], [201], []),
             dealKey: str_repeat('a', 40),
             coreKey: str_repeat('b', 40),
             user: $gain,
             partner: $gain,
-            weakerSideTotal: 1.5,
+            weakerSideTotal: $weakerSideTotal,
             outcome: $outcome,
             rank: $rank,
             firedVetoIds: $vetoIds,
             detail: $detail,
-            exposureEligible: true,
+            exposureEligible: $exposureEligible,
             feedback: $feedback,
         );
     }
 
-    private static function feedback(string $freeText): TuningFeedback
+    private static function feedback(string $freeText, int $partnerTid = 2): TuningFeedback
     {
-        return new TuningFeedback(1, 2, str_repeat('a', 40), str_repeat('b', 40), '{}', ['TOO_OLD'], $freeText, '2026-11-18 00:00:00');
+        return new TuningFeedback(1, $partnerTid, str_repeat('a', 40), str_repeat('b', 40), '{}', ['TOO_OLD'], $freeText, '2026-11-18 00:00:00');
     }
 }

@@ -60,7 +60,7 @@ final class TuningView implements TuningViewInterface
     </table>
 </details>
 <?php if ($report->truncated): ?>
-<div class="ibl-alert ibl-alert--info" id="tuning-truncated">Stopped after <?= HtmlSanitizer::e(StatsFormatter::formatWithDecimals($report->elapsedSeconds, 1)) ?> s (budget <?= HtmlSanitizer::e(StatsFormatter::formatWithDecimals(TuningBudget::TIME_BUDGET_SECONDS, 0)) ?> s). Teams not run: <?= HtmlSanitizer::e(implode(', ', $report->teamsNotRun)) ?></div>
+<div class="ibl-alert ibl-alert--info" id="tuning-truncated">Stopped after <?= HtmlSanitizer::e(StatsFormatter::formatWithDecimals($report->elapsedSeconds, 1)) ?> s (budget <?= HtmlSanitizer::e(TuningBudget::TIME_BUDGET_SECONDS) ?> s). Teams not run: <?= HtmlSanitizer::e(implode(', ', $report->teamsNotRun)) ?></div>
 <?php endif; ?>
 <?php foreach ($report->sections as $section): ?>
 
@@ -73,7 +73,7 @@ final class TuningView implements TuningViewInterface
         <li>Prefilter rejected: <?= HtmlSanitizer::e($section->generation->prefilterRejected) ?></li>
         <li>Capped: <?= HtmlSanitizer::e($section->generation->capped ? 'yes' : 'no') ?></li>
 <?php foreach ($section->diagnostics->toArray() as $label => $count): ?>
-        <li><?= HtmlSanitizer::e($label) ?>: <?= HtmlSanitizer::e(is_array($count) ? json_encode($count) : $count) ?></li>
+        <li><?= HtmlSanitizer::e($label) ?>: <?= HtmlSanitizer::e($count) ?></li>
 <?php endforeach; ?>
     </ul>
 <?php if ($section->rows === []): ?>
@@ -92,7 +92,7 @@ final class TuningView implements TuningViewInterface
             <tr data-outcome="<?= HtmlSanitizer::e($row->outcome->value) ?>">
                 <td><?= HtmlSanitizer::e($row->rank ?? '-') ?></td>
                 <td><?= HtmlSanitizer::e($row->outcome->label()) ?></td>
-                <td><?= HtmlSanitizer::e($report->teamNames[$row->partnerTid] ?? (string) $row->partnerTid) ?></td>
+                <td><?= HtmlSanitizer::e($report->teamNames[$row->partnerTid] ?? $row->partnerTid) ?></td>
                 <td><?= HtmlSanitizer::e($row->shapeId) ?></td>
                 <td><?= HtmlSanitizer::e(StatsFormatter::formatWithDecimals($row->weakerSideTotal, 2)) ?></td>
                 <td><?= HtmlSanitizer::e(self::bySeason($row->user)) ?></td>
@@ -119,7 +119,7 @@ final class TuningView implements TuningViewInterface
         <tbody>
 <?php foreach ($section->unmatchedFeedback as $fb): ?>
             <tr>
-                <td><?= HtmlSanitizer::e($report->teamNames[$fb->partnerTid] ?? (string) $fb->partnerTid) ?></td>
+                <td><?= HtmlSanitizer::e($report->teamNames[$fb->partnerTid] ?? $fb->partnerTid) ?></td>
                 <td><?= HtmlSanitizer::e(implode(', ', $fb->reasonLabels())) ?></td>
                 <td><span class="tuning-note"><?= HtmlSanitizer::e($fb->freeText ?? '-') ?></span></td>
                 <td class="tuning-created-at"><?= HtmlSanitizer::e($fb->createdAt) ?></td>

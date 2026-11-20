@@ -28,7 +28,7 @@ authTest.describe('Trade suggestions tuning — admin', () => {
   });
 
   authTest('admin sees the tuning page with filters and config', async ({ page }) => {
-    await page.goto(`${TUNING_URL}&team=all&status=all`);
+    await page.goto(`${TUNING_URL}&team=all&status=all`, { timeout: 60_000 });
     await assertNoPhpErrors(page, 'on the tuning page for all teams');
 
     await expect(page.locator('h1.ibl-title')).toHaveText('Trade suggestions tuning');

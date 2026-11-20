@@ -6,10 +6,10 @@ from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from harness.gate_backtest import (ALLOWED_PLACEHOLDERS, REPLAY_SPECS, HistoricalPR, ReplaySpec,
-                                   _PLACEHOLDER_RE, detect_gate_changes, expand_argv, expand_env,
-                                   expand_stdin, flag_lines, parse_head_oid, placeholder_names,
-                                   resolve_spec)
+from harness.gate_backtest import (ALLOWED_PLACEHOLDERS, PLAN_REPLAY_TIMEOUT, REPLAY_SPECS,
+                                   HistoricalPR, ReplaySpec, _PLACEHOLDER_RE,
+                                   detect_gate_changes, expand_argv, expand_env, expand_stdin,
+                                   flag_lines, parse_head_oid, placeholder_names, resolve_spec)
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 T0 = datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc)
@@ -164,6 +164,25 @@ def test_header_reads_absent_is_unknown():
     _, spec, _ = resolve_spec(
         "bin/check-zzz", "# gate-backtest-argv: --since={base}\n# gate-backtest-readers: x\n")
     assert spec.reads == ()
+
+
+def test_stdin_gate_header_resolves_to_replay_spec():
+    path = os.path.join(REPO_ROOT, "bin", "check-loop-stdin-consumed-by-child")
+    with open(path) as fh:
+        text = fh.read()
+    state, spec, _ = resolve_spec("bin/check-loop-stdin-consumed-by-child", text)
+    assert state == "replayable"
+    assert spec.argv == ("--stats",)
+
+
+def test_plan_gates_carry_plan_replay_timeout():
+    assert PLAN_REPLAY_TIMEOUT == 180
+    assert REPLAY_SPECS["bin/check-plan"].timeout == PLAN_REPLAY_TIMEOUT
+    assert REPLAY_SPECS["bin/check-plan-staleness"].timeout == PLAN_REPLAY_TIMEOUT
+    plan_gates = {"bin/check-plan", "bin/check-plan-staleness"}
+    for path, spec in REPLAY_SPECS.items():
+        if isinstance(spec, ReplaySpec) and path not in plan_gates:
+            assert spec.timeout == 0, path
 
 
 def test_registry_covers_every_check_script():

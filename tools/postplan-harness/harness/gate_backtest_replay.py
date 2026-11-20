@@ -496,6 +496,7 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
         stdin_path = expand_stdin(spec, ctx)
         argv = [os.path.join(ctx["tree"], gate_path), *expand_argv(spec, ctx)]
         run_one = runner if runner is not None else _run_in_session
+        limit = max(per_replay_timeout, spec.timeout)
 
         def attempt():
             stdin_fh = None
@@ -508,9 +509,9 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
             try:
                 rc, out = run_one(argv, cwd=ctx["tree"], env=env,
                                   stdin=stdin_fh if stdin_fh is not None else subprocess.DEVNULL,
-                                  timeout=per_replay_timeout)
+                                  timeout=limit)
             except subprocess.TimeoutExpired:
-                return "timeout", f"{per_replay_timeout}s", (), round(timer() - began, 1), True
+                return "timeout", f"{limit}s", (), round(timer() - began, 1), True
             except OSError as exc:
                 return "error", re.sub(r"\s+", " ", str(exc))[:160], (), 0.0, False
             finally:

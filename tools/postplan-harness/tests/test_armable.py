@@ -294,6 +294,24 @@ def test_gate_backtest_is_additive_and_releases_nothing():
     assert {c.number for c in evaluate(both).holds} == {16}
 
 
+def test_gate_backtest_unknown_replay_failure_holds_condition_17():
+    """A replay that still times out at the raised bound stays UNKNOWN and holds (17)."""
+    from harness.gate_backtest import (REPLAY_SPECS, GateChange, ReplayResult, Truth,
+                                       compute_verdict)
+    g = GateChange("bin/check-plan", "check-script", "replayable",
+                   REPLAY_SPECS["bin/check-plan"], "registry")
+    results = [ReplayResult(n, "bin/check-plan", "timeout", "180s") for n in range(1, 31)]
+    truth = {n: Truth("clean") for n in range(1, 31)}
+    v = compute_verdict([g], results, truth)
+    assert v.state == "UNKNOWN"
+    assert "replay failed (timeout: 180s)" in v.reason
+    d = evaluate(inputs(gate_backtest_status=v.state, gate_backtest_reason=v.reason))
+    assert d.armed is False
+    assert {c.number for c in d.holds} == {17}
+    c17 = next(c for c in d.conditions if c.number == 17)
+    assert c17.reason.startswith("state=UNKNOWN")
+
+
 # Frozen from the evaluate() on master before condition (17) existed. A new condition that
 # blocks on its default flips all-pass; one that releases another hold flips feat-plus-meta-held.
 _CHARACTERIZATION_FIXTURES = [

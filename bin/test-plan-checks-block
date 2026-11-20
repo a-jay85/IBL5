@@ -502,6 +502,8 @@ chk "two piped php segments in \$( ) keep expected value" eq "$(row_rewrite "$PH
 chk "quoted ) in hop php args: only the arg URL rewritten" eq "$(row_rewrite "$PH_QIN")" "$PH_QOUT"
 chk "cd hop php args still rewritten" eq "$(row_rewrite 'test "$(cd ibl5 && php x.php http://localhost/ibl5/)" = ok')" 'test "$(cd ibl5 && php x.php http://localhost:8080/ibl5/)" = ok'
 chk "cd hop with no substitution still rewritten" eq "$(row_rewrite 'cd ibl5 && php -r 1 http://localhost/')" 'cd ibl5 && php -r 1 http://localhost:8080/'
+# A remote URL fetched in the hop's php args, file_get_contents("https://iblhoops.net/"),
+# is still seen by the remote-URL guard, so the row stays LOCAL.
 chk "remote URL in cd-hop php args stays LOCAL" routes_local "test \"\$(cd x && php -r 'echo file_get_contents(\"https://iblhoops.net/\");')\" = ok"
 end_case
 

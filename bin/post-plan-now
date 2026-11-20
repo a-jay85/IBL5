@@ -137,6 +137,9 @@ blocked_ship_block() {
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib/usage-gate.sh"
 WTLOCK_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib/worktree-lock.sh"
 . "$WTLOCK_LIB"
+# Absolute and captured before any cd. A relative ${BASH_SOURCE[0]} stops resolving
+# once this script runs cd "$ROOT" (bin/check-relative-path-used-after-cd).
+PPN_SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
 # LEGACY: the old sticky "post-plan is running" comment marker. Only used to delete stale
 # sticky comments; master's harness still posts them until this change merges.
@@ -520,9 +523,9 @@ esac
 # smoke. The git-helpers.sh line above keeps $ROOT deliberately -- it predates
 # this feature and is_in_worktree is meant to judge the caller's tree.
 # shellcheck source=bin/lib/session-id.sh
-. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib/session-id.sh"
+. "$PPN_SELF_DIR/lib/session-id.sh"
 # shellcheck source=bin/lib/plan-resolve.sh
-. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib/plan-resolve.sh"
+. "$PPN_SELF_DIR/lib/plan-resolve.sh"
 if ! is_in_worktree "$ROOT"; then
     echo "post-plan-now: refusing to run in the main checkout ($ROOT) — ADR-0062." >&2
     echo "  cd into the branch's worktree (or use --pr <n>) and re-run." >&2
@@ -651,7 +654,7 @@ fi
 # pass for this exact tree means no fire. A --rebase-only run pushes no new
 # content, so it is exempt.
 if [ "${REBASE_ONLY:-0}" -ne 1 ]; then
-    PREFIRE="${PREFIRE_VERIFY_SCRIPT:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/prefire-verify}"
+    PREFIRE="${PREFIRE_VERIFY_SCRIPT:-$PPN_SELF_DIR/lib/prefire-verify}"
     if [ ! -x "$PREFIRE" ]; then
         echo "post-plan-now: pre-fire gate $PREFIRE is missing; refusing to fire." >&2
         exit 10

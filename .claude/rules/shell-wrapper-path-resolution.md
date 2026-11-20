@@ -1,6 +1,6 @@
 ---
 description: When authoring a shell script wrapper that invokes a Python module, use PYTHONPATH to grant module access instead of cd-ing to the module root — cd before argument use silently reinterprets any caller-provided relative path.
-last_verified: 2026-11-05
+last_verified: 2026-11-20
 paths:
   - "bin/**"
 ---
@@ -38,8 +38,12 @@ cd "$ROOT/tools/my-module"
 exec python3 -m my.module "$@"
 ```
 
-**Why this matters:** relative-path arguments that work from the repo root will silently fail (or hit a different file) when the wrapper cd's first. The error is non-obvious because the script exits with a module-level FileNotFoundError, not a "wrong directory" message.
+A relative-path argument that works from the repo root silently fails, or hits a different file, when the wrapper cd's first. The script exits with a module-level FileNotFoundError, which does not point at the wrong directory.
 
 ## Why
 
 See `ibl5/docs/decisions/0118-shell-wrapper-path-resolution-via-pythonpath.md` for the rung ladder that rejected static analysis, a `bin/check-*` gate, and a forced verification row before landing on this authoring norm.
+
+## Gate
+
+The gate `bin/check-relative-path-used-after-cd` checks every shell file under `bin/` in CI. It flags a path argument used after a repo-root `cd` without first being made absolute. It also flags `dirname "$0"` or `dirname "${BASH_SOURCE[0]}"` evaluated after that `cd`. End a correct line with `# relpath-ok: <reason>`.

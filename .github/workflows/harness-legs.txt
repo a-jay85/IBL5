@@ -88,6 +88,7 @@
 1 bin/test-post-plan-fail-dm
 1 bin/test-check-ci-image-registry
 1 bin/test-check-plan-staleness
+1 bin/test-check-relative-path-used-after-cd
 1 bin/test-wt-stack
 1 bin/test-deleted-guards
 1 bin/test-sim-recap-ssh-gate

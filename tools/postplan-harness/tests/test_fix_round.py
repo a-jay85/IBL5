@@ -295,6 +295,84 @@ def test_confix_only_unattempted_items(tmp_path, monkeypatch):
     assert rec["status"] == "no-change"
 
 
+_TRIED_ITEMS = ["MISSING-FILE: ibl5/a.php", "MISSING: ibl5/tests/b.php"]
+
+
+def _tried_res():
+    """A result whose MISSING items Phase 5.0-pre already tried and could not fix."""
+    res = RunResult(terminal="x")
+    res.unresolved_conformance = list(_TRIED_ITEMS)
+    res.conformance_fix = {"items": list(_TRIED_ITEMS), "fixable": [],
+                           "unfixable": list(_TRIED_ITEMS), "reason": "no-fixable-items"}
+    return res
+
+
+class _NoCallGh(_Gh):
+    def pr_thread_ids(self, pr):
+        raise AssertionError("a skipped round must not fetch threads")
+
+    def trusted_open_threads(self, pr, include_outdated=False):
+        raise AssertionError("a skipped round must not fetch threads")
+
+    def actions(self):
+        raise AssertionError("a skipped round must not read actions")
+
+
+class _NoCallGit(_Git):
+    def head(self):
+        raise AssertionError("a skipped round must not read the head")
+
+
+def test_condition3_only_with_no_fixable_items_skips_before_gh(tmp_path):
+    rec, *_ = _run(tmp_path, res=_tried_res(), decision=_decision(3),
+                   gh=_NoCallGh(), git=_NoCallGit())
+    assert rec["status"] == "skipped"
+    assert rec["reason"] == "no-fixable-conformance"
+
+
+def test_condition3_with_untried_item_still_runs(tmp_path, monkeypatch):
+    res = _tried_res()
+    res.unresolved_conformance.append("MISSING: ibl5/c.php")
+    seen = {}
+
+    def fake_remediate(llm, git, plan, worktree, out_dir, items, **kw):
+        seen["items"] = list(items)
+        return {"sha": "", "items": list(items)}
+
+    monkeypatch.setattr(fix_round.conformance_fix, "remediate_missing", fake_remediate)
+    rec, *_ = _run(tmp_path, res=res, decision=_decision(3))
+    assert seen["items"] == ["MISSING: ibl5/c.php"]
+    assert rec["status"] != "skipped"
+
+
+def test_condition3_plus_review_hold_still_collects(tmp_path):
+    """A [2,3,11] hold keeps review_tg {2, 11}; review_tg.clear() would wrongly skip it."""
+    calls = []
+
+    class _CountGh(_Gh):
+        def pr_thread_ids(self, pr):
+            calls.append(pr)
+            return super().pr_thread_ids(pr)
+
+    rec, *_ = _run(tmp_path, res=_tried_res(), decision=_decision(2, 3, 11), gh=_CountGh())
+    assert len(calls) == 1
+    assert rec["status"] != "skipped"
+
+
+def test_condition3_with_unwired_conflict_skips_named(tmp_path):
+    """A [3,14] hold with no conflict re-review wired has nothing to act on."""
+    rec, *_ = _run(tmp_path, res=_tried_res(), decision=_decision(3, 14),
+                   gh=_NoCallGh(), git=_NoCallGit(), conflict_rereview=None)
+    assert rec["status"] == "skipped"
+    assert rec["reason"] == "no-fixable-conformance"
+
+
+def test_no_eligible_hold_reason_kept_without_condition3(tmp_path):
+    rec, *_ = _run(tmp_path, decision=_decision(19), gh=_NoCallGh(), git=_NoCallGit())
+    assert rec["status"] == "skipped"
+    assert rec["reason"] == "no-eligible-hold"
+
+
 def test_holding_findings_filters_nit_and_low_score():
     a, b = _finding(), _finding(score=40)
     c = _finding()

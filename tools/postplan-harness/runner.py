@@ -1123,9 +1123,11 @@ def _run_pass(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 texts = fidelity.blocking_finding_texts(path)
                 pr_files = git.conformance_files()
                 kept = [t for t in texts if not unplanned_scope.is_unplanned_scope(t)
-                        and fidelity_filefix.named_paths(t, pr_files)]
+                        and fidelity_filefix.named_paths(t, pr_files, line_suffix=True)]
                 if not kept:
-                    return {"ran": False, "reason": "no-file-blocker"}
+                    scoped = [t for t in texts if not unplanned_scope.is_unplanned_scope(t)]
+                    why = "unplanned-scope-only" if texts and not scoped else "no-file-blocker"
+                    return {"ran": False, "reason": why}
                 try:
                     packet = fidelity.build_packet(
                         out_dir, master_sha, git.head_tree(), plan, git.diff_vs_base(review.ref), body, pr,

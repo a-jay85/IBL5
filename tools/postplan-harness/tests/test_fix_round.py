@@ -112,7 +112,7 @@ class _Clock:
 
 def _run(tmp_path, *, decision=None, res=None, gh=None, git=None, llm=None, recheck=None,
          already_tried=False, commit=None, clock=None, env=None, plan=None, inputs=None,
-         mutation_check=None, fidelity_fix=None, conflict_rereview=None):
+         mutation_check=None, fidelity_fix=None, conflict_rereview=None, meta_fix=None):
     git = git or _Git()
     res = res if res is not None else RunResult(terminal="x")
     gh = gh or _Gh()
@@ -125,7 +125,7 @@ def _run(tmp_path, *, decision=None, res=None, gh=None, git=None, llm=None, rech
                                          "degraded": False}),
         already_tried=already_tried, clock=clock or _Clock(), env=env or {}, inputs=inputs,
         mutation_check=mutation_check, fidelity_fix=fidelity_fix,
-        conflict_rereview=conflict_rereview)
+        conflict_rereview=conflict_rereview, meta_fix=meta_fix)
     return rec, res, gh, git, llm
 
 
@@ -1228,3 +1228,100 @@ def test_security_past_cap_round_uses_plain_recheck(tmp_path):
     assert rec["status"] == "accepted"
     assert rec["security_overflow"] == 1
     assert "security_items" not in rec
+
+
+# ---- Pre-push meta-checks, condition (16) ----
+
+def _meta_res(*names):
+    res = RunResult(terminal="x")
+    res.meta_check_failures = [{"name": n, "output": ""} for n in names]
+    return res
+
+
+def _meta_fixer(git, calls, verdict, reason, *, commits=True, checks=("check-docs-since",)):
+    def meta_fix(remaining):
+        calls.append(remaining)
+        if commits:
+            git.commit("meta")
+        return {"verdict": verdict, "reason": reason, "checks": list(checks)}
+    return meta_fix
+
+
+def test_meta_hold_cleared_round_accepted(tmp_path):
+    calls = []
+    git = _Git()
+    rec, _, _, _, _ = _run(tmp_path, decision=_decision(16), res=_meta_res("check-docs-since"),
+                           git=git, llm=_Llm(git, []),
+                           meta_fix=_meta_fixer(git, calls, "cleared", "attempt 1 (sonnet)"))
+    assert rec["status"] == "accepted"
+    assert rec["targets"] == [16]
+    assert rec["meta"]["verdict"] == "cleared"
+    assert calls == [fix_round.DEADLINE_S]
+    assert git.head() == "head1"
+
+
+def test_meta_gate_path_rejects_round(tmp_path):
+    calls = []
+    git = _Git()
+    rec, _, _, _, _ = _run(tmp_path, decision=_decision(16), res=_meta_res("check-docs-since"),
+                           git=git, llm=_Llm(git, []),
+                           meta_fix=_meta_fixer(git, calls, "failed", "gate-path"))
+    assert (rec["status"], rec["reason"]) == ("rejected", "meta-check-gate-path")
+    assert git.head() == rec["head_before"] == "head0"
+    assert git.drops == ["head0"]
+
+
+def test_meta_still_failing_rejects_round(tmp_path):
+    calls = []
+    git = _Git()
+    rec, _, _, _, _ = _run(tmp_path, decision=_decision(16), res=_meta_res("check-docs-since"),
+                           git=git, llm=_Llm(git, []),
+                           meta_fix=_meta_fixer(git, calls, "failed", "still-failing"))
+    assert (rec["status"], rec["reason"]) == ("rejected", "meta-check-still-failing")
+    assert git.head() == rec["head_before"] == "head0"
+
+
+def test_meta_unfixable_skips_without_call(tmp_path):
+    calls = []
+    git = _Git()
+    rec, _, _, _, _ = _run(tmp_path, decision=_decision(16), res=_meta_res("check-model-pins"),
+                           git=git, llm=_Llm(git, []),
+                           meta_fix=_meta_fixer(git, calls, "cleared", "x"))
+    assert calls == []
+    assert (rec["status"], rec["reason"]) == ("skipped", "no-eligible-hold")
+    assert rec["meta"]["reason"] == "unfixable: check-model-pins"
+    assert git.head() == "head0"
+
+
+def test_meta_mixed_list_skips_without_call(tmp_path):
+    calls = []
+    git = _Git()
+    rec, _, _, _, _ = _run(tmp_path, decision=_decision(16),
+                           res=_meta_res("check-docs-since", "check-numbering"),
+                           git=git, llm=_Llm(git, []),
+                           meta_fix=_meta_fixer(git, calls, "cleared", "x"))
+    assert calls == []
+    assert rec["status"] == "skipped"
+    assert rec["meta"]["verdict"] == "skipped"
+    assert git.head() == "head0"
+
+
+def test_meta_refused_round_continues(tmp_path):
+    calls = []
+    git = _Git()
+    rec, _, _, _, _ = _run(tmp_path, decision=_decision(12, 16),
+                           res=_meta_res("check-docs-since"), git=git, llm=_Llm(git, []),
+                           fidelity_fix=lambda rem: git.commit("fix") and {"ran": True},
+                           meta_fix=_meta_fixer(git, calls, "refused", "no-edit", commits=False))
+    assert rec["status"] == "accepted"
+    assert git.head() == "head1"
+    assert git.drops == []
+    assert rec["meta"]["verdict"] == "refused"
+    assert len(calls) == 1
+
+
+def test_summary_line_names_cleared_meta_checks():
+    line = fix_round.summary_line({"status": "accepted", "sha": "abc", "items": [],
+                                   "meta": {"verdict": "cleared",
+                                            "checks": ["check-docs-since"]}})
+    assert line.endswith("; meta-check fix cleared check-docs-since")

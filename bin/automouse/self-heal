@@ -197,18 +197,27 @@ sweep_orphan_watchers() {
 
 # merged_pr_url <plan name>: print the URL of a MERGED PR on the plan's branch
 # and return 0. The branch is the handoff's "branch" field when one is left,
-# else the slug. Any gh error, or no merged PR, prints nothing and returns 1.
+# else the slug. Only a PR merged after the plan file was written counts. Any gh
+# error, or no such PR, prints nothing and returns 1.
 merged_pr_url() {
-    local name=$1 slug="${1%.md}" handoff branch="" url
+    local name=$1 slug="${1%.md}" handoff branch="" url row merged_at plan_mtime
     handoff="$NIGHTLY_DIR/handoff/${name}.json"
     if [ -f "$handoff" ]; then
         branch=$(jq -r '.branch // empty' "$handoff" 2>/dev/null) || branch=""
     fi
     { [ -n "$branch" ] && [ "$branch" != "null" ]; } || branch=$slug
-    if url=$(GH_PROMPT_DISABLED=1 "$AUTOMOUSE_GH" pr list --head "$branch" \
-                 --state merged --limit 1 --json url --jq '.[0].url // empty' \
+    plan_mtime=$(stat -L -f %m "$SKIPPED_DIR/$name" 2>/dev/null \
+                 || stat -L -c %Y "$SKIPPED_DIR/$name" 2>/dev/null) || return 1
+    # gh prints "<merged epoch> <url>". A PR merged before the plan file was
+    # written belongs to an older plan that reused the branch name: ignore it.
+    if row=$(GH_PROMPT_DISABLED=1 "$AUTOMOUSE_GH" pr list --head "$branch" \
+                 --state merged --limit 1 --json url,mergedAt \
+                 --jq '.[0] | select(. != null) | "\(.mergedAt | fromdateiso8601) \(.url)"' \
                  2>/dev/null); then
-        [ -n "$url" ] || return 1
+        [ -n "$row" ] || return 1
+        merged_at=${row%% *}
+        url=${row#* }
+        [ "$merged_at" -gt "$plan_mtime" ] 2>/dev/null || return 1
         printf '%s\n' "$url"
         return 0
     fi

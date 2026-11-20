@@ -102,7 +102,8 @@ done
 printf '%s\n' "$branch" >> "${STUB_GH_LOG:-/dev/null}"
 case "$branch" in
   *gherror*) exit 1 ;;
-  *merged*)  printf 'https://example.invalid/pull/9\n' ;;
+  *oldmerged*) printf '1 https://example.invalid/pull/1\n' ;;
+  *merged*)  printf '4102444800 https://example.invalid/pull/9\n' ;;
 esac
 exit 0
 GH_EOF
@@ -324,6 +325,14 @@ assert_gone "row13 dry-run leaves done/ empty" "$NDIR/done/plan-renamed.md"
 run_heal >/dev/null 2>&1
 assert_present "row13 real run moves it" "$NDIR/done/plan-renamed.md"
 assert_gone "row13 handoff removed" "$NDIR/handoff/plan-renamed.md.json"
+
+# Row 15: older merged PR on a reused branch name → stays in skipped/.
+setup
+mkplan plan-oldmerged.md
+ln -s "$PDIR/plan-oldmerged.md" "$NDIR/skipped/plan-oldmerged.md"
+run_heal >/dev/null 2>&1
+assert_present "row15 older merged PR stays in skipped/" "$NDIR/skipped/plan-oldmerged.md"
+assert_gone "row15 not in done/" "$NDIR/done/plan-oldmerged.md"
 
 # Row 14: no merged PR → no move; tombstone is reaped without a gh call.
 setup

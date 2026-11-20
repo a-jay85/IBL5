@@ -1038,6 +1038,28 @@ CREATE TABLE `ibl_box_scores_teams_season2007_phantom_backup` (
   KEY `idx_date_visitor_home_gotd` (`game_date`,`visitor_teamid`,`home_teamid`,`game_of_that_day`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `ibl_bug_issue_notices`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ibl_bug_issue_notices` (
+  `issue_number` int(10) unsigned NOT NULL,
+  `legacy_issue_number` int(10) unsigned DEFAULT NULL,
+  `reporter_discord_id` bigint(20) unsigned DEFAULT NULL,
+  `channel_id` bigint(20) unsigned DEFAULT NULL,
+  `thread_id` bigint(20) unsigned DEFAULT NULL,
+  `original_message_id` bigint(20) unsigned DEFAULT NULL,
+  `notice_state` enum('pending','claimed','notified','seeded','failed','skipped') NOT NULL DEFAULT 'pending',
+  `notice_attempts` tinyint(3) unsigned NOT NULL DEFAULT 0,
+  `notified_reason` varchar(16) DEFAULT NULL,
+  `claimed_at` datetime DEFAULT NULL,
+  `notified_at` datetime DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`issue_number`),
+  UNIQUE KEY `uq_legacy_issue` (`legacy_issue_number`),
+  KEY `idx_notice_state` (`notice_state`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ibl_bug_pipeline_state`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;

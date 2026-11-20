@@ -142,6 +142,14 @@ bpgh_close() {
     return 0
 }
 
+# bpgh_issue_close_state <issue_number> — prints "<STATE> <STATE_REASON>" (e.g. "CLOSED COMPLETED").
+# Requests no title, body or comments: the repo is public, so those are untrusted.
+bpgh_issue_close_state() {
+    bpgh_available || return 1
+    "$GH_BIN" issue view "$1" --repo "$BUG_PIPELINE_ISSUE_REPO" \
+        --json state,stateReason --jq '[.state, (.stateReason // "")] | join(" ")' 2>/dev/null
+}
+
 # bpgh_assign <issue_number> <login> — consumed by #5b's needs-human path.
 bpgh_assign() {
     local issue="$1" login="$2"

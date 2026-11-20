@@ -90,6 +90,28 @@ class BugReportRepositoryTest extends DatabaseTestCase
         self::assertSame('app crashes', $row['original_text']);
     }
 
+    // ── renumberIssue ──────────────────────────────────────────────────────────
+
+    public function testRenumberIssueUpdatesOnlyMatchingLegacyNumber(): void
+    {
+        $matching = $this->insertBugReport(['original_message_id' => self::MSG_ID, 'issue_number' => 910000001]);
+        $other = $this->insertBugReport(['original_message_id' => self::REPLY_ID, 'issue_number' => 910000002]);
+        $unnumbered = $this->insertBugReport(['original_message_id' => self::APPROVAL]);
+
+        self::assertSame(1, $this->repo->renumberIssue(910000001, 910000501));
+        self::assertSame(0, $this->repo->renumberIssue(910000001, 910000502), 'legacy number is gone after the move');
+
+        $matchingRow = $this->repo->findById($matching);
+        $otherRow = $this->repo->findById($other);
+        $unnumberedRow = $this->repo->findById($unnumbered);
+        self::assertNotNull($matchingRow);
+        self::assertNotNull($otherRow);
+        self::assertNotNull($unnumberedRow);
+        self::assertSame(910000501, $matchingRow['issue_number']);
+        self::assertSame(910000002, $otherRow['issue_number']);
+        self::assertNull($unnumberedRow['issue_number']);
+    }
+
     // ── dormant exclusion (enumerator + claim) ─────────────────────────────────
 
     public function testListActiveConversationsExcludesDormant(): void

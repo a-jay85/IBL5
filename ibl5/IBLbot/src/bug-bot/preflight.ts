@@ -4,8 +4,9 @@ import { config } from './config.js';
 
 // Every Discord permission the bug-bot's own surfaces need in the bug channel.
 // Deliberately the ACTUAL set, not a generous one — a false alarm here trains
-// people to ignore the log line. The bot never posts top-level in the channel
-// (all output goes into threads), so SendMessages is NOT required.
+// people to ignore the log line. The close-notice fallback posts top-level in the
+// channel, so SendMessages is required. It also covers unarchiving an unlocked
+// archived thread. ManageThreads stays out: the bot never unlocks a locked thread.
 export const REQUIRED_BUG_CHANNEL_PERMISSIONS: Record<string, bigint> = {
     // backfill + handlers read the channel at all
     ViewChannel: PermissionsBitField.Flags.ViewChannel,
@@ -15,6 +16,8 @@ export const REQUIRED_BUG_CHANNEL_PERMISSIONS: Record<string, bigint> = {
     AddReactions: PermissionsBitField.Flags.AddReactions,
     // POST /create-thread — message.startThread()
     CreatePublicThreads: PermissionsBitField.Flags.CreatePublicThreads,
+    // POST /post-with-mention main-channel fallback, and unarchiving an unlocked archived thread
+    SendMessages: PermissionsBitField.Flags.SendMessages,
     // POST /post-to-thread, /mention, /prMerged
     SendMessagesInThreads: PermissionsBitField.Flags.SendMessagesInThreads,
 };

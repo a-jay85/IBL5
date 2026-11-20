@@ -1,0 +1,365 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# bin/test-bug-issues-migrate — harness for bin/bug-issues-migrate. Every external command
+# (gh, curl, launchctl, php, the cron setup script) is a stub on a temp dir, so nothing here
+# touches GitHub, Discord, launchd or the database. Each stub logs one line per call to
+# $STUB/calls.log. OLD-repo issue and visibility state lives in files under $STUB.
+#
+# Stub world: old issues 1-29 (new number = old + 100), OLD private, NEW public, the bot
+# holds three messages with old links (two in the bug channel, one in a thread).
+
+set -u
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
+SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MIGRATE="$SELF_DIR/bug-issues-migrate"
+CONFIRM="MOVE 29 ISSUES FROM ibl5-bugs TO IBL5"
+BUG_CHANNEL="954494746464776192"
+THREAD="880000000000000001"
+MUTATING='issue transfer|repo edit|repo archive|label create|issue edit|/edit-message|bootout|launchctl bootstrap|issue-notice-upsert|issue-notice-seed|report-issue-renumber|cron-setup'
+
+h_tmp ROOT
+
+make_stubs() { # builds a fresh stub world in $STUB
+    rm -rf "$STUB"
+    mkdir -p "$STUB/bin" "$STUB/scripts" "$STUB/la" "$STUB/mig-parent"
+    : > "$STUB/calls.log"
+    : > "$STUB/la/com.ibl5.bug-pipeline-cron.plist"
+    seq 1 29 > "$STUB/old_issues"
+    : > "$STUB/xfer.map"
+    printf PRIVATE > "$STUB/old_visibility"
+    printf false > "$STUB/old_archived"
+    printf PUBLIC > "$STUB/new_visibility"
+
+    cat > "$STUB/bin/gh" <<'SH'
+#!/usr/bin/env bash
+echo "gh $*" >> "$STUB/calls.log"
+filt=""; prev=""
+for a in "$@"; do [ "$prev" = "--jq" ] && filt="$a"; prev="$a"; done
+emit() { if [ -n "$filt" ]; then jq -r "$filt" <<< "$1"; else printf '%s\n' "$1"; fi; }
+repo=""; prev=""
+for a in "$@"; do [ "$prev" = "--repo" ] && repo="$a"; prev="$a"; done
+case "$1 $2" in
+  "auth status") exit 0 ;;
+  "repo view")
+      case "$3" in
+        a-jay85/ibl5-bugs) emit "{\"visibility\":\"$(cat "$STUB/old_visibility")\",\"isArchived\":$(cat "$STUB/old_archived")}" ;;
+        a-jay85/IBL5) emit "{\"visibility\":\"$(cat "$STUB/new_visibility")\",\"isArchived\":false}" ;;
+        *) exit 1 ;;
+      esac ;;
+  "repo edit")
+      vis=""; prev=""
+      for a in "$@"; do [ "$prev" = "--visibility" ] && vis="$a"; prev="$a"; done
+      printf '%s' "$vis" | tr 'a-z' 'A-Z' > "$STUB/old_visibility" ;;
+  "repo archive")
+      printf true > "$STUB/old_archived"
+      # Simulates a run that dies after GitHub archived OLD but before the step is recorded.
+      if [ -f "$STUB/fail_after_archive" ]; then exit 1; fi ;;
+  "label list")
+      if [ "$repo" = a-jay85/ibl5-bugs ]; then
+          emit '[{"name":"bug","color":"d73a4a","description":"A bug"},{"name":"gm-reported","color":"0e8a16","description":""}]'
+      else
+          emit '[{"name":"bug"}]'
+      fi ;;
+  "issue list")
+      emit "$(jq -Rn '[inputs | select(length > 0) | {number: (. | tonumber)}]' < "$STUB/old_issues")" ;;
+  "issue view")
+      n="$3"
+      if [ "$repo" = a-jay85/ibl5-bugs ]; then
+          new="$(awk -v n="$n" '$1 == n { print $2 }' "$STUB/xfer.map")"
+          if [ -n "$new" ]; then emit "{\"url\":\"https://github.com/a-jay85/IBL5/issues/$new\"}"
+          else emit "{\"url\":\"https://github.com/a-jay85/ibl5-bugs/issues/$n\"}"; fi
+      else
+          old=$((n - 100))
+          rid="$(printf '77000000000000%04d' "$old")"
+          st=OPEN; [ $((old % 2)) -eq 0 ] && st=CLOSED
+          emit "$(jq -nc --arg b "Class: bug
+Reporter (discord_author_id): $rid
+Report id: $old" --arg s "$st" '{body:$b, state:$s}')"
+      fi ;;
+  "issue transfer")
+      n="$3"
+      if [ "$(cat "$STUB/fail_transfer" 2>/dev/null)" = "$n" ]; then exit 1; fi
+      new=$((n + 100))
+      echo "$n $new" >> "$STUB/xfer.map"
+      grep -vx "$n" "$STUB/old_issues" > "$STUB/old_issues.tmp"; mv "$STUB/old_issues.tmp" "$STUB/old_issues"
+      echo "https://github.com/a-jay85/IBL5/issues/$new" ;;
+  *) exit 0 ;;
+esac
+SH
+
+    cat > "$STUB/bin/curl" <<'SH'
+#!/usr/bin/env bash
+url=""; body=""; prev=""; method=GET
+for a in "$@"; do
+  case "$a" in http*) url="$a" ;; esac
+  [ "$prev" = "-d" ] && body="$a"
+  [ "$prev" = "-X" ] && method="$a"
+  prev="$a"
+done
+path="${url#http://bot.test}"
+echo "curl $method $path $body" >> "$STUB/calls.log"
+THREAD_ID=880000000000000001
+CHAN=954494746464776192
+case "$path" in
+  /) printf 'ok\n200' ;;
+  /list-threads)
+      if [ "$(jq -r '.archived' <<< "$body")" = true ]; then
+          printf '{"threads":[],"has_more":false,"next_before":null}\n200'
+      else
+          printf '{"threads":[{"id":"%s","archived":false,"locked":false}],"has_more":false,"next_before":null}\n200' "$THREAD_ID"
+      fi ;;
+  /scan-messages)
+      ch="$(jq -r '.channel_id' <<< "$body")"
+      if [ "$ch" = "$CHAN" ]; then
+          printf '%s\n200' "$(jq -nc --arg c "$CHAN" '{messages:[
+            {id:"990000000000000001", channel_id:$c, reference_message_id:"550000000000000002", created_timestamp:1,
+             content:"Filed: https://github.com/a-jay85/ibl5-bugs/issues/2 thanks"},
+            {id:"990000000000000002", channel_id:$c, reference_message_id:"550000000000000027", created_timestamp:2,
+             content:"Filed: https://github.com/a-jay85/ibl5-bugs/issues/27"},
+            {id:"990000000000000009", channel_id:$c, reference_message_id:null, created_timestamp:3,
+             content:"no link in this one"}], next_before:null}')"
+      else
+          printf '%s\n200' "$(jq -nc --arg c "$ch" '{messages:[
+            {id:"990000000000000003", channel_id:$c, reference_message_id:null, created_timestamp:4,
+             content:"Filed https://github.com/a-jay85/ibl5-bugs/issues/5."}], next_before:null}')"
+      fi ;;
+  /edit-message) printf '{"ok":true}\n%s' "${STUB_EDIT_CODE:-200}" ;;
+  *) printf '{}\n404' ;;
+esac
+SH
+
+    cat > "$STUB/bin/launchctl" <<'SH'
+#!/usr/bin/env bash
+echo "launchctl $*" >> "$STUB/calls.log"
+SH
+    cat > "$STUB/bin/php" <<'SH'
+#!/usr/bin/env bash
+echo "php $*" >> "$STUB/calls.log"
+case "$1" in *issue-notice-pending.php) echo '[]' ;; *) echo 1 ;; esac
+SH
+    cat > "$STUB/cron-setup" <<'SH'
+#!/usr/bin/env bash
+echo "cron-setup env=${BUG_PIPELINE_ISSUE_REPO:-} $*" >> "$STUB/calls.log"
+SH
+    chmod +x "$STUB"/bin/* "$STUB/cron-setup"
+}
+
+RC=0
+run_mig() { # <stdin-line> [args...]; stdout/stderr land in $STUB/out and $STUB/err
+    local line="$1"; shift
+    printf '%s\n' "$line" | env -u CLAUDE_HEADLESS STUB="$STUB" \
+        GH_BIN="$STUB/bin/gh" CURL_BIN="$STUB/bin/curl" LAUNCHCTL_BIN="$STUB/bin/launchctl" \
+        PHP_BIN="$STUB/bin/php" BUG_PIPELINE_SCRIPTS_DIR="$STUB/scripts" BOT_BASE_URL="http://bot.test" \
+        BUG_ISSUES_MIGRATE_DIR="$STUB/mig" BUG_ISSUES_MIGRATE_LAUNCH_AGENTS_DIR="$STUB/la" \
+        BUG_ISSUES_MIGRATE_CRON_SETUP="$STUB/cron-setup" BUG_PIPELINE_APPROVER_ID=123 \
+        "$MIGRATE" "$@" > "$STUB/out" 2> "$STUB/err"
+    RC=$?
+}
+calls() { cat "$STUB/calls.log"; }
+mutating_count() { grep -cE "$MUTATING" "$STUB/calls.log" || true; }
+first_line() { grep -nE "$1" "$STUB/calls.log" | sed -n '1s/:.*//p'; }
+last_line() { grep -nE "$1" "$STUB/calls.log" | sed -n '$s/:.*//p'; }
+
+STUB="$ROOT/world"
+
+# ── dry_run_changes_nothing ───────────────────────────────────────────────────
+make_stubs
+run_mig ""
+h_eq "dry_run_changes_nothing: exits 0" 0 "$RC"
+h_eq "dry_run_changes_nothing: zero mutating calls" 0 "$(mutating_count)"
+if [ -z "$(ls -A "$STUB/mig" 2>/dev/null)" ]; then
+    h_pass "dry_run_changes_nothing: migrate dir stays empty"
+else
+    h_fail "dry_run_changes_nothing: migrate dir stays empty" "$(ls -A "$STUB/mig")"
+fi
+OUT="$(cat "$STUB/out")"
+for s in pause_cron labels flip_public transfer flip_private reporter_labels scan edit_links db seed map resume_cron; do
+    h_contains "dry_run_changes_nothing: stdout names step $s" "$OUT" "STEP"
+    h_contains "dry_run_changes_nothing: stdout names $s" "$OUT" " $s"
+done
+h_contains "dry_run_changes_nothing: lines are prefixed DRY-RUN:" "$OUT" "DRY-RUN: gh issue transfer 29 a-jay85/IBL5 --repo a-jay85/ibl5-bugs"
+h_contains "dry_run_changes_nothing: reads the Discord scan" "$(calls)" "/scan-messages"
+
+# ── live_wrong_confirmation_refuses ───────────────────────────────────────────
+make_stubs
+run_mig "MOVE 28 ISSUES" --live
+h_eq "live_wrong_confirmation_refuses: exits 4" 4 "$RC"
+h_eq "live_wrong_confirmation_refuses: zero mutating calls" 0 "$(mutating_count)"
+h_absent "live_wrong_confirmation_refuses: no state file" "$STUB/mig/bug-issues-migrate.state"
+
+# ── live_headless_refuses ─────────────────────────────────────────────────────
+make_stubs
+printf '%s\n' "$CONFIRM" | env CLAUDE_HEADLESS=1 STUB="$STUB" GH_BIN="$STUB/bin/gh" CURL_BIN="$STUB/bin/curl" \
+    BUG_ISSUES_MIGRATE_DIR="$STUB/mig" "$MIGRATE" --live > "$STUB/out" 2> "$STUB/err"
+h_eq "live_headless_refuses: exits 5" 5 "$?"
+h_eq "live_headless_refuses: zero calls" 0 "$(grep -c . "$STUB/calls.log" || true)"
+
+# ── live_happy_path_order ─────────────────────────────────────────────────────
+make_stubs
+run_mig "$CONFIRM" --live
+h_eq "live_happy_path_order: exits 0" 0 "$RC"
+BOOTOUT="$(first_line 'launchctl bootout')"
+FIRST_EDIT="$(first_line 'repo edit')"
+LAST_XFER="$(last_line 'issue transfer')"
+LAST_PRIVATE="$(last_line 'visibility private')"
+FIRST_PUBLIC="$(first_line 'visibility public')"
+if [ "${BOOTOUT:-0}" -gt 0 ] && [ "$BOOTOUT" -lt "${FIRST_EDIT:-0}" ]; then
+    h_pass "live_happy_path_order: bootout before the first repo edit"
+else
+    h_fail "live_happy_path_order: bootout before the first repo edit" "bootout=$BOOTOUT edit=$FIRST_EDIT"
+fi
+h_eq "live_happy_path_order: first repo edit is the flip to public" "$FIRST_EDIT" "$FIRST_PUBLIC"
+if [ "${LAST_PRIVATE:-0}" -gt "${LAST_XFER:-99999}" ]; then
+    h_pass "live_happy_path_order: visibility private after the last transfer"
+else
+    h_fail "live_happy_path_order: visibility private after the last transfer" "private=$LAST_PRIVATE transfer=$LAST_XFER"
+fi
+MAP="$(ls "$STUB"/mig/bug-issues-map-*.json 2>/dev/null | sed -n 1p)"
+h_eq "live_happy_path_order: the map has 29 entries" 29 "$(jq 'length' "$MAP" 2>/dev/null)"
+h_eq "live_happy_path_order: map keeps old 2 -> new 102 with its thread-less message" \
+    "102:550000000000000002" "$(jq -r '.[] | select(.old == 2) | "\(.new):\(.original_message_id)"' "$MAP")"
+h_eq "live_happy_path_order: thread hit for old 5 is recorded" "$THREAD" "$(jq -r '.[] | select(.old == 5) | .thread_id' "$MAP")"
+h_contains "live_happy_path_order: the last call is cron-setup in install mode" "$(tail -n 1 "$STUB/calls.log")" "cron-setup env=a-jay85/IBL5 --install-schedule"
+h_eq "live_happy_path_order: 29 transfers" 29 "$(grep -c 'issue transfer' "$STUB/calls.log")"
+h_eq "live_happy_path_order: 29 upserts" 29 "$(grep -c 'issue-notice-upsert' "$STUB/calls.log")"
+h_eq "live_happy_path_order: 29 renumbers" 29 "$(grep -c 'report-issue-renumber' "$STUB/calls.log")"
+h_eq "live_happy_path_order: seeds exactly the closed issues (14)" 14 "$(grep -c 'issue-notice-seed' "$STUB/calls.log")"
+h_eq "live_happy_path_order: OLD ends private and archived" "PRIVATE true" "$(cat "$STUB/old_visibility") $(cat "$STUB/old_archived")"
+h_absent "live_happy_path_order: lock dir removed" "$STUB/mig/bug-issues-migrate.lock"
+h_contains "live_happy_path_order: upsert carries reporter, thread and legacy for old 5" \
+    "$(grep 'issue-notice-upsert' "$STUB/calls.log" | grep -- '--issue=105 ')" "--thread=$THREAD"
+
+# ── edit_rewrites_exact_issue_url_only (same live run) ────────────────────────
+EDIT_A="$(grep '/edit-message' "$STUB/calls.log" | grep '990000000000000001' | sed 's/^curl POST \/edit-message //')"
+EDIT_B="$(grep '/edit-message' "$STUB/calls.log" | grep '990000000000000002' | sed 's/^curl POST \/edit-message //')"
+h_eq "edit_rewrites_exact_issue_url_only: #2 becomes 102 and keeps the text after it" \
+    "Filed: https://github.com/a-jay85/IBL5/issues/102 thanks" "$(jq -r '.content' <<< "$EDIT_A")"
+h_eq "edit_rewrites_exact_issue_url_only: #27 becomes 127, never 1027 or 102 plus 7" \
+    "Filed: https://github.com/a-jay85/IBL5/issues/127" "$(jq -r '.content' <<< "$EDIT_B")"
+h_eq "edit_rewrites_exact_issue_url_only: a link ended by a period still rewrites (#5)" \
+    "Filed https://github.com/a-jay85/IBL5/issues/105." \
+    "$(grep '/edit-message' "$STUB/calls.log" | grep '990000000000000003' | sed 's/^curl POST \/edit-message //' | jq -r '.content')"
+h_eq "edit_rewrites_exact_issue_url_only: 3 edits, none for the message without a link" 3 "$(grep -c '/edit-message' "$STUB/calls.log")"
+
+# ── live_failure_mid_transfer_restores_visibility_and_cron ────────────────────
+make_stubs
+printf 10 > "$STUB/fail_transfer"
+run_mig "$CONFIRM" --live
+if [ "$RC" -ne 0 ]; then
+    h_pass "live_failure_mid_transfer_restores_visibility_and_cron: exits non-zero"
+else
+    h_fail "live_failure_mid_transfer_restores_visibility_and_cron: exits non-zero" "got 0"
+fi
+LAST_XFER="$(last_line 'issue transfer')"
+LAST_PRIVATE="$(last_line 'visibility private')"
+if [ "${LAST_PRIVATE:-0}" -gt "${LAST_XFER:-99999}" ]; then
+    h_pass "live_failure_mid_transfer_restores_visibility_and_cron: a final visibility private after the failed transfer"
+else
+    h_fail "live_failure_mid_transfer_restores_visibility_and_cron: a final visibility private after the failed transfer" "private=$LAST_PRIVATE transfer=$LAST_XFER"
+fi
+h_eq "live_failure_mid_transfer_restores_visibility_and_cron: OLD is private" PRIVATE "$(cat "$STUB/old_visibility")"
+h_contains "live_failure_mid_transfer_restores_visibility_and_cron: launchctl bootstrap restores the cron" "$(calls)" "launchctl bootstrap gui/"
+STATE_FILE="$STUB/mig/bug-issues-migrate.state"
+h_eq "live_failure_mid_transfer_restores_visibility_and_cron: state holds transfers 1-9" \
+    "1 2 3 4 5 6 7 8 9" "$(sed -n 's/^transfer_\([0-9]*\)=.*/\1/p' "$STATE_FILE" | tr '\n' ' ' | sed 's/ $//')"
+h_contains "live_failure_mid_transfer_restores_visibility_and_cron: stderr says how to resume" "$(cat "$STUB/err")" "to resume"
+h_absent "live_failure_mid_transfer_restores_visibility_and_cron: lock dir removed" "$STUB/mig/bug-issues-migrate.lock"
+
+# ── live_rerun_resumes_from_state (continues the failed world) ────────────────
+rm -f "$STUB/fail_transfer"
+: > "$STUB/calls.log"
+run_mig "$CONFIRM" --live
+h_eq "live_rerun_resumes_from_state: exits 0" 0 "$RC"
+h_eq "live_rerun_resumes_from_state: transfers only 10-29 (20 calls)" 20 "$(grep -c 'issue transfer' "$STUB/calls.log")"
+h_eq "live_rerun_resumes_from_state: the first transfer is #10" "issue transfer 10 " "$(grep 'issue transfer' "$STUB/calls.log" | sed -n '1s/^gh //; 1s/a-jay85.*//p')"
+h_eq "live_rerun_resumes_from_state: no repeat transfer of #9" 0 "$(grep -c 'issue transfer 9 ' "$STUB/calls.log")"
+h_eq "live_rerun_resumes_from_state: the map has 29 entries" 29 "$(jq 'length' "$STUB"/mig/bug-issues-map-*.json)"
+
+# ── live_rerun_resumes_from_state: an issue moved before the state write ──────
+# A run died after GitHub moved #5 but before the state file recorded it.
+# #5 is gone from OLD's issue list and absent from the state file. OLD answers
+# `gh issue view 5` with a URL in the new repo, so preflight must count it and
+# step 4 must read the number and not move it again.
+make_stubs
+printf '5 105\n' > "$STUB/xfer.map"
+grep -vx 5 "$STUB/old_issues" > "$STUB/old_issues.tmp"; mv "$STUB/old_issues.tmp" "$STUB/old_issues"
+run_mig "$CONFIRM" --live
+h_eq "live_rerun_resumes_from_state: moved issue run exits 0" 0 "$RC"
+h_eq "live_rerun_resumes_from_state: already-moved #5 is not transferred again" 0 "$(grep -c 'issue transfer 5 ' "$STUB/calls.log")"
+h_eq "live_rerun_resumes_from_state: the other 28 are transferred" 28 "$(grep -c 'issue transfer' "$STUB/calls.log")"
+h_eq "live_rerun_resumes_from_state: the map has #5 -> #105" 105 "$(jq -r '.[] | select(.old == 5) | .new' "$STUB"/mig/bug-issues-map-*.json)"
+
+# ── live_resume_with_old_still_public_restores_private ────────────────────────
+# A prior run died with OLD public: the state file says flip_public is done, the repo says PUBLIC.
+# Step 3 is skipped on the resume, and a failure later must still make OLD private again.
+make_stubs
+printf PUBLIC > "$STUB/old_visibility"
+mkdir -p "$STUB/mig"
+printf '%s\n' step_pause_cron=done step_labels=done step_flip_public=done flip_public=1 > "$STUB/mig/bug-issues-migrate.state"
+printf 4 > "$STUB/fail_transfer"
+run_mig "$CONFIRM" --live
+if [ "$RC" -ne 0 ]; then
+    h_pass "live_resume_with_old_still_public_restores_private: exits non-zero"
+else
+    h_fail "live_resume_with_old_still_public_restores_private: exits non-zero" "got 0"
+fi
+h_eq "live_resume_with_old_still_public_restores_private: OLD is private again" PRIVATE "$(cat "$STUB/old_visibility")"
+h_eq "live_resume_with_old_still_public_restores_private: no second flip to public" 0 "$(grep -c 'visibility public' "$STUB/calls.log")"
+
+# ── live_rerun_after_archive_before_state_write ───────────────────────────────
+# Run 1 dies right after GitHub archived OLD, before step_flip_private=done is written.
+# Run 2 must resume (not refuse with exit 3) and must not call edit or archive on OLD again.
+make_stubs
+: > "$STUB/fail_after_archive"
+run_mig "$CONFIRM" --live
+if [ "$RC" -ne 0 ]; then
+    h_pass "live_rerun_after_archive_before_state_write: first run exits non-zero"
+else
+    h_fail "live_rerun_after_archive_before_state_write: first run exits non-zero" "got 0"
+fi
+h_eq "live_rerun_after_archive_before_state_write: OLD is private and archived after run 1" \
+    "PRIVATE true" "$(cat "$STUB/old_visibility") $(cat "$STUB/old_archived")"
+rm -f "$STUB/fail_after_archive"
+: > "$STUB/calls.log"
+run_mig "$CONFIRM" --live
+h_eq "live_rerun_after_archive_before_state_write: rerun exits 0" 0 "$RC"
+h_eq "live_rerun_after_archive_before_state_write: no repo edit on the rerun" 0 "$(grep -c 'repo edit' "$STUB/calls.log")"
+h_eq "live_rerun_after_archive_before_state_write: no second archive call" 0 "$(grep -c 'repo archive' "$STUB/calls.log")"
+h_eq "live_rerun_after_archive_before_state_write: the map has 29 entries" 29 "$(jq 'length' "$STUB"/mig/bug-issues-map-*.json)"
+
+# ── preflight_archived_by_someone_else_refuses ────────────────────────────────
+make_stubs
+printf true > "$STUB/old_archived"
+run_mig "$CONFIRM" --live
+h_eq "preflight_archived_by_someone_else_refuses: exits 3" 3 "$RC"
+h_eq "preflight_archived_by_someone_else_refuses: zero mutating calls" 0 "$(mutating_count)"
+h_contains "preflight_archived_by_someone_else_refuses: stderr names the archive" "$(cat "$STUB/err")" "already archived"
+
+# ── preflight_unexpected_issue_set_refuses ────────────────────────────────────
+make_stubs
+seq 1 30 > "$STUB/old_issues"
+run_mig "$CONFIRM" --live
+h_eq "preflight_unexpected_issue_set_refuses: exits 3" 3 "$RC"
+h_eq "preflight_unexpected_issue_set_refuses: zero mutating calls" 0 "$(mutating_count)"
+h_contains "preflight_unexpected_issue_set_refuses: stderr names the issue set" "$(cat "$STUB/err")" "issue set"
+
+# ── unknown_flag_rejected ─────────────────────────────────────────────────────
+# Runs in the stub world with an empty confirmation line. If the parser ever
+# accepts a bad flag as --live, the run stays off real GitHub and Discord and
+# fails fast on the confirmation (exit 4) instead of hanging.
+make_stubs
+for flag in --bogus --live=yes --dry-run; do
+    run_mig "" "$flag"
+    h_eq "unknown_flag_rejected: $flag exits 2" 2 "$RC"
+done
+run_mig "" --live --live
+h_eq "unknown_flag_rejected: two arguments exit 2" 2 "$RC"
+
+# ── empty_migrate_dir_rejected ────────────────────────────────────────────────
+env BUG_ISSUES_MIGRATE_DIR= "$MIGRATE" > /dev/null 2> "$ROOT/empty.err"
+h_eq "empty_migrate_dir_rejected: exits 2" 2 "$?"
+h_contains "empty_migrate_dir_rejected: names the variable" "$(cat "$ROOT/empty.err")" "BUG_ISSUES_MIGRATE_DIR"
+
+h_done

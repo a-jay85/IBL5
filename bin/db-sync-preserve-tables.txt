@@ -9,3 +9,4 @@ ibl_bug_report_attachments
 ibl_bug_reporter_profile
 ibl_bug_pipeline_state
 ibl_bug_report_operator_context
+ibl_bug_issue_notices

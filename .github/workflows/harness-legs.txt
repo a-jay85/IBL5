@@ -34,6 +34,7 @@
 0 bin/test-events-review
 0 bin/test-postplan-arm-conditions
 0 bin/test-bug-pipeline-issue
+0 bin/test-bug-issues-migrate
 0 bin/test-check-phpunit-hygiene
 0 bin/test-automouse-comprehension-digest
 0 bin/test-post-review-findings

@@ -536,4 +536,24 @@ class BugReportRepository extends \Database\BaseMysqliRepository
     {
         return $this->claims->markSourceDeleted($originalMessageId);
     }
+
+    // -------------------------------------------------------------------------
+    // Issue renumber (legacy bot-assigned number -> GitHub issue number)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Move every report filed under a legacy issue number to its new GitHub issue number.
+     * Both numbers are small INTs (bound "i"), not snowflakes.
+     *
+     * @return int Affected rows (0 when no report carries the legacy number)
+     */
+    public function renumberIssue(int $legacyNumber, int $newNumber): int
+    {
+        return $this->execute(
+            'UPDATE `ibl_bug_reports` SET issue_number = ? WHERE issue_number = ?',
+            'ii',
+            $newNumber,
+            $legacyNumber
+        );
+    }
 }

@@ -1,0 +1,571 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/bug-issues-migrate — ONE-OFF, owner-run. Moves the 29 bug-pipeline issues from the
+# private a-jay85/ibl5-bugs repo into the public a-jay85/IBL5 repo, rewrites the Buggsy
+# links in Discord, and tells the pipeline DB about the new issue numbers.
+#
+# Agents and /post-plan never run --live. The implementation session runs the dry-run
+# through bin/test-bug-issues-migrate's stubs only.
+#
+# Modes:
+#   bin/bug-issues-migrate           dry-run (default): preflight reads and Discord scan reads
+#                                    only; prints every command as "DRY-RUN: ..."; writes nothing
+#   bin/bug-issues-migrate --live    arms the writes (asks you to type a confirmation line)
+#   bin/bug-issues-migrate --help
+#
+# Exit codes: 0 ok, 1 step failed (rerun to resume), 2 usage, 3 preflight mismatch,
+# 4 confirmation mismatch, 5 refused under CLAUDE_HEADLESS.
+#
+# Seams (tests stub these): GH_BIN, CURL_BIN, LAUNCHCTL_BIN, PHP_BIN, BUG_PIPELINE_SCRIPTS_DIR,
+# BOT_BASE_URL, BUG_ISSUES_MIGRATE_DIR (default $HOME/claude-plans/_backups; empty is an error),
+# BUG_ISSUES_MIGRATE_LAUNCH_AGENTS_DIR, BUG_ISSUES_MIGRATE_CRON_SETUP.
+# Live mode needs BUG_PIPELINE_APPROVER_ID exported, the same value you gave
+# bin/bug-pipeline-cron-setup --install-schedule, because step 12 reinstalls the cron plist.
+
+set -euo pipefail
+
+usage() {
+    cat <<'EOF'
+usage: bin/bug-issues-migrate [--live]
+  (no flag)  dry-run: preflight reads and Discord scan reads only, prints DRY-RUN: lines
+  --live     do it for real; reads one confirmation line from stdin first
+  --help     this text
+Exit codes: 0 ok, 1 step failed, 2 usage, 3 preflight mismatch, 4 confirmation mismatch, 5 headless
+EOF
+}
+
+LIVE=0
+case "$#" in
+    0) ;;
+    1) case "$1" in
+           --live) LIVE=1 ;;
+           -h|--help) usage; exit 0 ;;
+           *) usage >&2; exit 2 ;;
+       esac ;;
+    *) usage >&2; exit 2 ;;
+esac
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# shellcheck source=bin/lib/claim-file.sh disable=SC1091
+. "$REPO_ROOT/bin/lib/claim-file.sh"
+
+GH_BIN="${GH_BIN:-gh}"
+CURL_BIN="${CURL_BIN:-curl}"
+LAUNCHCTL_BIN="${LAUNCHCTL_BIN:-launchctl}"
+PHP_BIN="${PHP_BIN:-php}"
+SCRIPTS_DIR="${BUG_PIPELINE_SCRIPTS_DIR:-$REPO_ROOT/ibl5/scripts/bug-pipeline}"
+BOT_BASE_URL="${BOT_BASE_URL:-http://127.0.0.1:50001}"
+CRON_SETUP="${BUG_ISSUES_MIGRATE_CRON_SETUP:-$SCRIPT_DIR/bug-pipeline-cron-setup}"
+LAUNCH_AGENTS_DIR="${BUG_ISSUES_MIGRATE_LAUNCH_AGENTS_DIR:-$HOME/Library/LaunchAgents}"
+
+if [ "${BUG_ISSUES_MIGRATE_DIR+set}" = set ]; then
+    if [ -z "$BUG_ISSUES_MIGRATE_DIR" ]; then
+        echo "ERROR: BUG_ISSUES_MIGRATE_DIR is set but empty" >&2
+        exit 2
+    fi
+    DIR="$BUG_ISSUES_MIGRATE_DIR"
+else
+    DIR="$HOME/claude-plans/_backups"
+fi
+
+if [ "$LIVE" = 1 ] && [ -n "${CLAUDE_HEADLESS:-}" ]; then
+    echo "ERROR: --live refuses to run under CLAUDE_HEADLESS. The owner runs it by hand." >&2
+    exit 5
+fi
+
+OLD="a-jay85/ibl5-bugs"
+NEW="a-jay85/IBL5"
+FIRST=1
+LAST=29
+BUG_CHANNEL="954494746464776192"
+LABEL="com.ibl5.bug-pipeline-cron"
+CONFIRM="MOVE 29 ISSUES FROM ibl5-bugs TO IBL5"
+PLIST="$LAUNCH_AGENTS_DIR/$LABEL.plist"
+STATE="$DIR/bug-issues-migrate.state"
+LOCK="$DIR/bug-issues-migrate.lock"
+OLD_URL_RE='https://github\.com/a-jay85/ibl5-bugs/issues/[0-9]+'
+
+# Wrappers so a dry-run line reads like the real command.
+gh() { "$GH_BIN" "$@"; }
+launchctl() { "$LAUNCHCTL_BIN" "$@"; }
+
+say() { printf '%s\n' "$*"; }
+die() { local code="$1"; shift; printf 'ERROR: %s\n' "$*" >&2; exit "$code"; }
+
+# act <cmd...>: run it in live mode, print it in dry-run mode.
+act() {
+    if [ "$LIVE" = 1 ]; then
+        "$@"
+    else
+        printf 'DRY-RUN: %s\n' "$*"
+    fi
+}
+
+# ── State file (key=value lines; live mode only writes) ─────────────────────────
+st_has() { [ -f "$STATE" ] && grep -qxF -- "$1" "$STATE"; }
+st_get() {
+    [ -f "$STATE" ] || return 0
+    awk -F= -v k="$1" '$1 == k { v = substr($0, length(k) + 2) } END { if (v != "") print v }' "$STATE"
+}
+st_add() {
+    if [ "$LIVE" = 1 ]; then printf '%s\n' "$1" >> "$STATE"; fi
+    return 0
+}
+st_del() { # drop the line that equals $1 exactly
+    [ -f "$STATE" ] || return 0
+    local tmp="$STATE.tmp"
+    grep -vxF -- "$1" "$STATE" > "$tmp" || true
+    mv "$tmp" "$STATE"
+}
+
+CUR_STEP=""
+step_begin() { # <n> <name>; returns 1 when the step is already done
+    CUR_STEP="$2"
+    printf '== STEP %s %s\n' "$1" "$2"
+    if st_has "step_$2=done"; then
+        say "   already done (state file); skipping"
+        return 1
+    fi
+    return 0
+}
+step_end() { st_add "step_$CUR_STEP=done"; }
+
+# ── Bot calls: sets BOT_CODE and BOT_BODY, never exits ──────────────────────────
+BOT_CODE=""
+BOT_BODY=""
+bot_req() { # <GET|POST> <path> [json]
+    local out
+    if [ "$1" = GET ]; then
+        out="$("$CURL_BIN" -s -w '\n%{http_code}' -X GET "$BOT_BASE_URL$2" </dev/null)" || out=$'\n000'
+    else
+        out="$("$CURL_BIN" -s -w '\n%{http_code}' -X POST "$BOT_BASE_URL$2" \
+            -H 'Content-Type: application/json' -d "$3" </dev/null)" || out=$'\n000'
+    fi
+    BOT_CODE="${out##*$'\n'}"
+    BOT_BODY="${out%$'\n'*}"
+}
+
+# ── Preflight (both modes). Any mismatch exits 3 before a write. ────────────────
+preflight() {
+    gh auth status >/dev/null 2>&1 || die 3 "gh is not logged in (gh auth status failed)"
+
+    local nv ov vis arch
+    nv="$(gh repo view "$NEW" --json visibility --jq .visibility 2>/dev/null)" \
+        || die 3 "cannot read $NEW"
+    [ "$nv" = PUBLIC ] || die 3 "$NEW must be PUBLIC (it is: $nv)"
+
+    ov="$(gh repo view "$OLD" --json visibility,isArchived \
+        --jq '[.visibility, (.isArchived | tostring)] | join(" ")' 2>/dev/null)" \
+        || die 3 "cannot read $OLD"
+    vis="${ov% *}"
+    arch="${ov#* }"
+    # A run that died between the archive call and step_flip_private=done left
+    # archive_started=1 behind. Without that line (or the done line), someone
+    # else archived OLD, so refuse.
+    OLD_ARCHIVED=0
+    if [ "$arch" = true ]; then
+        if ! st_has step_flip_private=done && ! st_has archive_started=1; then
+            die 3 "$OLD is already archived and the state file does not say this run archived it"
+        fi
+        OLD_ARCHIVED=1
+    fi
+    case "$vis" in
+        PRIVATE) ;;
+        PUBLIC)
+            if ! { st_has flip_public=1 && ! st_has flip_private=1; }; then
+                die 3 "$OLD is PUBLIC but the state file does not record an unfinished flip. Make it private first."
+            fi ;;
+        *) die 3 "$OLD visibility is unexpected: $vis" ;;
+    esac
+
+    local listed transferred got want
+    listed="$(gh issue list --repo "$OLD" --state all --limit 200 --json number \
+        --jq '.[].number' 2>/dev/null)" || die 3 "cannot list issues in $OLD"
+    transferred=""
+    if [ -f "$STATE" ]; then
+        transferred="$(sed -n 's/^transfer_\([0-9][0-9]*\)=.*/\1/p' "$STATE")" || transferred=""
+    fi
+    got="$(printf '%s\n%s\n' "$listed" "$transferred" | grep -E '^[0-9]+$' | sort -n | uniq)" || got=""
+    want="$(seq "$FIRST" "$LAST")"
+    # An issue GitHub moved before the state file recorded it is in neither set.
+    # Ask OLD for it (step 4 does the same) and count it when the URL is in NEW.
+    local n url moved=""
+    for n in $want; do
+        if grep -qxF -- "$n" <<< "$got"; then continue; fi
+        url="$(gh issue view "$n" --repo "$OLD" --json url --jq .url 2>/dev/null)" || url=""
+        case "$url" in
+            "https://github.com/${NEW}/issues/"*) moved="$moved$n"$'\n' ;;
+        esac
+    done
+    if [ -n "$moved" ]; then
+        got="$(printf '%s\n%s\n' "$got" "$moved" | grep -E '^[0-9]+$' | sort -n | uniq)" || got=""
+    fi
+    if [ "$got" != "$want" ]; then
+        die 3 "issue set is not exactly $FIRST-$LAST. Open and transferred numbers: $(tr '\n' ' ' <<< "$got")"
+    fi
+
+    bot_req GET /
+    [ "$BOT_CODE" = 200 ] || die 3 "bug bot did not answer GET / (HTTP $BOT_CODE)"
+    bot_req POST /list-threads '{"archived":false}'
+    [ "$BOT_CODE" = 200 ] || die 3 "bug bot /list-threads failed (HTTP $BOT_CODE); is the bot new enough and can it read the channel?"
+
+    [ -f "$PLIST" ] || die 3 "cron plist not installed: $PLIST"
+
+    local probe
+    probe="$("$PHP_BIN" "$SCRIPTS_DIR/issue-notice-pending.php" --limit=1 2>/dev/null)" \
+        || die 3 "issue-notice-pending.php failed; is migration 221 applied and the DB reachable?"
+    jq -e 'type == "array"' >/dev/null 2>&1 <<< "$probe" \
+        || die 3 "issue-notice-pending.php did not print a JSON array"
+
+    if [ "$LIVE" = 1 ]; then
+        [ -n "${BUG_PIPELINE_APPROVER_ID:-}" ] \
+            || die 3 "export BUG_PIPELINE_APPROVER_ID first (same value as for --install-schedule)"
+        [ -x "$CRON_SETUP" ] || die 3 "cron setup script not executable: $CRON_SETUP"
+    fi
+}
+
+# ── Discord scan (read only, so dry-run runs it too) ────────────────────────────
+SCAN_LOADED=0
+SCAN_NDJSON=""
+get_scan() { # fills SCAN_NDJSON with one JSON object per bot message that has an old URL
+    if [ "$SCAN_LOADED" = 1 ]; then return 0; fi
+    local threads before body more channels ch hits
+    bot_req POST /list-threads '{"archived":false}'
+    [ "$BOT_CODE" = 200 ] || die 1 "list active threads failed (HTTP $BOT_CODE)"
+    threads="$(jq -r '.threads[].id' <<< "$BOT_BODY")"
+    before=""
+    while :; do
+        body="$(jq -nc --arg b "$before" '{archived:true} + (if $b != "" then {before:$b} else {} end)')"
+        bot_req POST /list-threads "$body"
+        [ "$BOT_CODE" = 200 ] || die 1 "list archived threads failed (HTTP $BOT_CODE)"
+        threads="$threads"$'\n'"$(jq -r '.threads[].id' <<< "$BOT_BODY")"
+        more="$(jq -r '.has_more' <<< "$BOT_BODY")"
+        before="$(jq -r '.next_before // empty' <<< "$BOT_BODY")"
+        if [ "$more" != true ] || [ -z "$before" ]; then break; fi
+    done
+    channels="$BUG_CHANNEL"$'\n'"$threads"
+    for ch in $channels; do
+        before=""
+        while :; do
+            body="$(jq -nc --arg c "$ch" --arg b "$before" '{channel_id:$c} + (if $b != "" then {before:$b} else {} end)')"
+            bot_req POST /scan-messages "$body"
+            [ "$BOT_CODE" = 200 ] || die 1 "scan of channel $ch failed (HTTP $BOT_CODE)"
+            hits="$(jq -c --arg re "$OLD_URL_RE" '.messages[] | select(.content | test($re))' <<< "$BOT_BODY")" || hits=""
+            if [ -n "$hits" ]; then SCAN_NDJSON="$SCAN_NDJSON$hits"$'\n'; fi
+            before="$(jq -r '.next_before // empty' <<< "$BOT_BODY")"
+            if [ -z "$before" ]; then break; fi
+        done
+    done
+    SCAN_LOADED=1
+}
+
+# ── Trap: live only. Restore visibility and the cron, then say how to resume. ───
+STARTED=0
+FLIPPED=0
+CRON_PAUSED=0
+RESUMED=0
+LOCK_OWNED=0
+on_exit() {
+    local rc=$? i cleaned=0
+    trap - EXIT
+    if [ "$LIVE" = 1 ] && [ "$STARTED" = 1 ]; then
+        if [ "$FLIPPED" = 1 ]; then
+            cleaned=1
+            i=0
+            while [ "$i" -lt 3 ]; do
+                i=$((i + 1))
+                if "$GH_BIN" repo edit "$OLD" --visibility private --accept-visibility-change-consequences >/dev/null 2>&1; then
+                    FLIPPED=0
+                    st_del flip_public=1
+                    st_del step_flip_public=done
+                    break
+                fi
+            done
+            if [ "$FLIPPED" = 1 ]; then
+                printf 'ERROR: could not make %s private again. Fix it by hand NOW: gh repo edit %s --visibility private --accept-visibility-change-consequences\n' "$OLD" "$OLD" >&2
+            fi
+        fi
+        if [ "$CRON_PAUSED" = 1 ] && [ "$RESUMED" != 1 ]; then
+            cleaned=1
+            "$LAUNCHCTL_BIN" bootstrap "gui/$(id -u)" "$PLIST" \
+                || printf 'ERROR: could not reload the cron. Run: launchctl bootstrap gui/%s %s\n' "$(id -u)" "$PLIST" >&2
+            st_del step_pause_cron=done
+        fi
+        if [ "$rc" -ne 0 ] || [ "$cleaned" = 1 ]; then
+            printf 'State file: %s\nRerun bin/bug-issues-migrate --live to resume.\n' "$STATE" >&2
+            if [ "$rc" -eq 0 ]; then rc=1; fi
+        fi
+        if [ "$LOCK_OWNED" = 1 ]; then rm -rf "$LOCK"; fi
+    fi
+    exit "$rc"
+}
+
+# ── Go ──────────────────────────────────────────────────────────────────────────
+preflight
+
+if [ "$LIVE" = 1 ]; then
+    printf 'This moves %s issues out of %s for real.\nType this line exactly to go ahead:\n%s\n> ' "$LAST" "$OLD" "$CONFIRM" >&2
+    line=""
+    IFS= read -r line || line=""
+    [ "$line" = "$CONFIRM" ] || die 4 "confirmation did not match; nothing was written"
+    mkdir -p "$DIR"
+    if mkdir "$LOCK" 2>/dev/null && claim_file "$LOCK/pid" printf '%s\n' "$$"; then
+        LOCK_OWNED=1
+    else
+        die 1 "another run holds $LOCK"
+    fi
+    STARTED=1
+    trap on_exit EXIT
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+else
+    say "DRY-RUN: nothing below is executed. Reads only: preflight and the Discord scan."
+fi
+
+# 1 ── pause the cron so no tick races the move
+if step_begin 1 pause_cron; then
+    if [ "$LIVE" = 1 ]; then CRON_PAUSED=1; fi
+    act launchctl bootout "gui/$(id -u)/$LABEL" \
+        || say "   bootout returned non-zero; the job may already be unloaded"
+    step_end
+elif [ "$LIVE" = 1 ] && ! st_has step_resume_cron=done; then
+    CRON_PAUSED=1
+fi
+
+# 2 ── copy labels
+if step_begin 2 labels; then
+    if [ "$LIVE" = 1 ]; then
+        new_names="$(gh label list --repo "$NEW" --json name --jq '.[].name' --limit 200)"
+        old_labels="$(gh label list --repo "$OLD" --json name,color,description --limit 200 --jq '.[] | @json')"
+        while IFS= read -r l; do
+            [ -n "$l" ] || continue
+            name="$(jq -r '.name' <<< "$l")"
+            if grep -qxF -- "$name" <<< "$new_names"; then continue; fi
+            color="$(jq -r '.color // ""' <<< "$l")"
+            desc="$(jq -r '.description // ""' <<< "$l")"
+            gh label create "$name" --repo "$NEW" --color "$color" --description "$desc" >/dev/null
+        done <<< "$old_labels"
+    else
+        say "DRY-RUN: (for each label on $OLD that is missing on $NEW) gh label create <name> --repo $NEW --color <c> --description <d>"
+    fi
+    step_end
+fi
+
+# 3 ── make the old repo public (GitHub only transfers issues between repos that allow it)
+if step_begin 3 flip_public; then
+    if [ "$LIVE" = 1 ]; then
+        FLIPPED=1
+        st_add flip_public=1
+    fi
+    act gh repo edit "$OLD" --visibility public --accept-visibility-change-consequences
+    step_end
+elif [ "$LIVE" = 1 ] && st_has flip_public=1 && ! st_has flip_private=1; then
+    # A prior run left OLD public (its restore failed or it was killed). This run owns the restore.
+    FLIPPED=1
+fi
+
+# 4 ── transfer the issues
+if step_begin 4 transfer; then
+    for n in $(seq "$FIRST" "$LAST"); do
+        if [ "$LIVE" != 1 ]; then
+            printf 'DRY-RUN: gh issue transfer %s %s --repo %s\n' "$n" "$NEW" "$OLD"
+            continue
+        fi
+        if [ -n "$(st_get "transfer_$n")" ]; then continue; fi
+        url="$(gh issue view "$n" --repo "$OLD" --json url --jq .url)"
+        case "$url" in
+            "https://github.com/$NEW/issues/"*)
+                new="${url##*/}" ;;
+            *)
+                out="$(gh issue transfer "$n" "$NEW" --repo "$OLD")"
+                new=""
+                last_line="${out##*$'\n'}"
+                if [[ "$last_line" =~ /issues/([0-9]+)$ ]]; then new="${BASH_REMATCH[1]}"; fi ;;
+        esac
+        [[ "$new" =~ ^[0-9]+$ ]] || die 1 "could not read the new number for old issue $n"
+        st_add "transfer_$n=$new"
+        say "   #$n -> #$new"
+    done
+    step_end
+fi
+
+# 5 ── make the old repo private again and archive it
+if step_begin 5 flip_private; then
+    # A resume after a run that died inside this step skips what is already done.
+    # An archived repo is read-only, so its visibility edit would fail.
+    if [ "$LIVE" = 1 ] && st_has flip_private=1; then
+        say "   OLD is already private (state file); skipping the visibility edit"
+        FLIPPED=0
+    else
+        act gh repo edit "$OLD" --visibility private --accept-visibility-change-consequences
+        if [ "$LIVE" = 1 ]; then
+            FLIPPED=0
+            st_add flip_private=1
+        fi
+    fi
+    if [ "$OLD_ARCHIVED" = 1 ]; then
+        say "   OLD is already archived; skipping the archive call"
+    else
+        st_add archive_started=1
+        act gh repo archive "$OLD" --yes
+    fi
+    step_end
+fi
+
+# 6 ── label the new issues that carry a reporter id and remember the id
+if step_begin 6 reporter_labels; then
+    if [ "$LIVE" = 1 ]; then
+        # 17-19 digits, then a non-digit or the end: a longer number is not a Discord id.
+        reporter_re='Reporter \(discord_author_id\): ([0-9]{17,19})([^0-9]|$)'
+        for n in $(seq "$FIRST" "$LAST"); do
+            new="$(st_get "transfer_$n")"
+            body="$(gh issue view "$new" --repo "$NEW" --json body --jq .body)"
+            if [[ "$body" =~ $reporter_re ]]; then
+                if [ -z "$(st_get "reporter_$new")" ]; then st_add "reporter_$new=${BASH_REMATCH[1]}"; fi
+                gh issue edit "$new" --repo "$NEW" --add-label gm-reported >/dev/null
+            fi
+        done
+    else
+        say "DRY-RUN: (for each new issue whose body has 'Reporter (discord_author_id): <id>') gh issue edit <new> --repo $NEW --add-label gm-reported"
+    fi
+    step_end
+fi
+
+# 7 ── scan Discord for old links (threads give thread ids, channel posts give the original message)
+if step_begin 7 scan; then
+    get_scan
+    count="$(grep -c . <<< "$SCAN_NDJSON" || true)"
+    say "   bot messages with an old link: ${count:-0}"
+    if [ "$LIVE" = 1 ]; then
+        while IFS= read -r m; do
+            [ -n "$m" ] || continue
+            ch="$(jq -r '.channel_id' <<< "$m")"
+            ref="$(jq -r '.reference_message_id // ""' <<< "$m")"
+            nums="$(jq -r '[.content | scan("https://github\\.com/a-jay85/ibl5-bugs/issues/([0-9]+)") | .[0]] | unique | join(" ")' <<< "$m")"
+            for o in $nums; do
+                if [ "$o" -lt "$FIRST" ] || [ "$o" -gt "$LAST" ]; then continue; fi
+                if [ "$ch" = "$BUG_CHANNEL" ]; then
+                    if [ -n "$ref" ] && [ -z "$(st_get "msg_$o")" ]; then st_add "msg_$o=$ref"; fi
+                else
+                    if [ -z "$(st_get "thread_$o")" ]; then st_add "thread_$o=$ch"; fi
+                fi
+            done
+        done <<< "$SCAN_NDJSON"
+    fi
+    step_end
+fi
+
+# 8 ── rewrite the old links in the bot's own messages (exact issue number only)
+if step_begin 8 edit_links; then
+    get_scan
+    if [ "$LIVE" = 1 ]; then
+        map='{}'
+        for n in $(seq "$FIRST" "$LAST"); do
+            map="$(jq -c --arg o "$n" --arg w "$(st_get "transfer_$n")" '. + {($o): $w}' <<< "$map")"
+        done
+        while IFS= read -r m; do
+            [ -n "$m" ] || continue
+            mid="$(jq -r '.id' <<< "$m")"
+            ch="$(jq -r '.channel_id' <<< "$m")"
+            if st_has "edited_$mid=1"; then continue; fi
+            content="$(jq -r '.content' <<< "$m")"
+            newc="$(jq -r --argjson map "$map" '.content | gsub("https://github\\.com/a-jay85/ibl5-bugs/issues/(?<n>[0-9]+)"; if $map[.n] then "https://github.com/a-jay85/IBL5/issues/" + $map[.n] else "https://github.com/a-jay85/ibl5-bugs/issues/" + .n end)' <<< "$m")"
+            if [ "$newc" = "$content" ]; then continue; fi
+            bot_req POST /edit-message "$(jq -nc --arg c "$ch" --arg m "$mid" --arg x "$newc" '{channel_id:$c, message_id:$m, content:$x}')"
+            case "$BOT_CODE" in
+                200) st_add "edited_$mid=1" ;;
+                410) say "   message $mid was deleted; skipping"; st_add "edited_$mid=1" ;;
+                403) die 1 "edit of message $mid refused (HTTP 403: $BOT_BODY). Stopping." ;;
+                *) die 1 "edit of message $mid failed (HTTP $BOT_CODE)" ;;
+            esac
+        done <<< "$SCAN_NDJSON"
+    else
+        while IFS= read -r m; do
+            [ -n "$m" ] || continue
+            mid="$(jq -r '.id' <<< "$m")"
+            ch="$(jq -r '.channel_id' <<< "$m")"
+            nums="$(jq -r '[.content | scan("https://github\\.com/a-jay85/ibl5-bugs/issues/([0-9]+)") | .[0]] | unique | join(",")' <<< "$m")"
+            printf 'DRY-RUN: POST /edit-message channel=%s message=%s (rewrite old issue(s) %s to %s issues)\n' "$ch" "$mid" "$nums" "$NEW"
+        done <<< "$SCAN_NDJSON"
+    fi
+    step_end
+fi
+
+# 9 ── tell the pipeline DB
+if step_begin 9 db; then
+    if [ "$LIVE" = 1 ]; then
+        for n in $(seq "$FIRST" "$LAST"); do
+            new="$(st_get "transfer_$n")"
+            reporter="$(st_get "reporter_$new")"
+            thread="$(st_get "thread_$n")"
+            msg="$(st_get "msg_$n")"
+            args=(--issue="$new" --legacy="$n" --channel="$BUG_CHANNEL")
+            if [ -n "$reporter" ]; then args+=(--reporter="$reporter"); fi
+            if [ -n "$thread" ]; then args+=(--thread="$thread"); fi
+            if [ -n "$msg" ]; then args+=(--message="$msg"); fi
+            "$PHP_BIN" "$SCRIPTS_DIR/issue-notice-upsert.php" "${args[@]}" >/dev/null
+            "$PHP_BIN" "$SCRIPTS_DIR/report-issue-renumber.php" --legacy="$n" --new="$new" >/dev/null
+        done
+    else
+        for n in $(seq "$FIRST" "$LAST"); do
+            printf 'DRY-RUN: %s %s/issue-notice-upsert.php --issue=<new for old %s> --legacy=%s --channel=%s [--reporter=<id> --thread=<id> --message=<id>]\n' "$PHP_BIN" "$SCRIPTS_DIR" "$n" "$n" "$BUG_CHANNEL"
+            printf 'DRY-RUN: %s %s/report-issue-renumber.php --legacy=%s --new=<new for old %s>\n' "$PHP_BIN" "$SCRIPTS_DIR" "$n" "$n"
+        done
+    fi
+    step_end
+fi
+
+# 10 ── seed already-closed issues so the first live tick posts no notice for them
+if step_begin 10 seed; then
+    if [ "$LIVE" = 1 ]; then
+        for n in $(seq "$FIRST" "$LAST"); do
+            new="$(st_get "transfer_$n")"
+            state="$(gh issue view "$new" --repo "$NEW" --json state --jq .state)"
+            if [ "$state" = CLOSED ]; then
+                "$PHP_BIN" "$SCRIPTS_DIR/issue-notice-seed.php" --issue="$new" >/dev/null
+            fi
+        done
+    else
+        say "DRY-RUN: (for each new issue whose state is CLOSED) $PHP_BIN $SCRIPTS_DIR/issue-notice-seed.php --issue=<new>"
+    fi
+    step_end
+fi
+
+# 11 ── write the old -> new map
+MAP_FILE="$DIR/bug-issues-map-$(date +%F).json"
+if step_begin 11 map; then
+    if [ "$LIVE" = 1 ]; then
+        out='[]'
+        for n in $(seq "$FIRST" "$LAST"); do
+            new="$(st_get "transfer_$n")"
+            out="$(jq -c --argjson o "$n" --argjson w "$new" \
+                --arg r "$(st_get "reporter_$new")" --arg t "$(st_get "thread_$n")" \
+                --arg m "$(st_get "msg_$n")" --arg c "$BUG_CHANNEL" \
+                '. + [{old:$o, new:$w,
+                       reporter_discord_id:(if $r == "" then null else $r end),
+                       thread_id:(if $t == "" then null else $t end),
+                       original_message_id:(if $m == "" then null else $m end),
+                       channel_id:$c}]' <<< "$out")"
+        done
+        jq . <<< "$out" > "$MAP_FILE"
+        say "   wrote $MAP_FILE"
+    else
+        say "DRY-RUN: write $MAP_FILE with $LAST entries {old,new,reporter_discord_id,thread_id,original_message_id,channel_id}"
+    fi
+    step_end
+fi
+
+# 12 ── reinstall the cron against the new repo
+if step_begin 12 resume_cron; then
+    act env BUG_PIPELINE_ISSUE_REPO="$NEW" "$CRON_SETUP" --install-schedule
+    if [ "$LIVE" = 1 ]; then RESUMED=1; fi
+    step_end
+fi
+
+if [ "$LIVE" = 1 ]; then
+    say "Done. The map is $MAP_FILE. Next: close the issues that are already fixed (see the plan's owner step)."
+else
+    say "Dry-run finished. Nothing was changed."
+fi

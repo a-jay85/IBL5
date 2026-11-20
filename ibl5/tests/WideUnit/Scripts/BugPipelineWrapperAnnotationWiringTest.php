@@ -26,8 +26,26 @@ final class BugPipelineWrapperAnnotationWiringTest extends TestCase
         yield 'get-reporter-tech-level' => ['get-reporter-tech-level'];
         yield 'list-active-conversations' => ['list-active-conversations'];
         yield 'list-pr-open' => ['list-pr-open'];
+        yield 'report-issue-renumber' => ['report-issue-renumber'];
         yield 'set-reporter-tech-level' => ['set-reporter-tech-level'];
         yield 'transition' => ['transition'];
+    }
+
+    /**
+     * Wrappers over BugIssueNoticeRepository (the issue-notice-* family).
+     *
+     * @return iterable<string, array{string}>
+     */
+    public static function noticeWrapperProvider(): iterable
+    {
+        yield 'issue-notice-claim' => ['issue-notice-claim'];
+        yield 'issue-notice-mark' => ['issue-notice-mark'];
+        yield 'issue-notice-pending' => ['issue-notice-pending'];
+        yield 'issue-notice-release' => ['issue-notice-release'];
+        yield 'issue-notice-seed' => ['issue-notice-seed'];
+        yield 'issue-notice-skip' => ['issue-notice-skip'];
+        yield 'issue-notice-stale' => ['issue-notice-stale'];
+        yield 'issue-notice-upsert' => ['issue-notice-upsert'];
     }
 
     /**
@@ -36,7 +54,9 @@ final class BugPipelineWrapperAnnotationWiringTest extends TestCase
     public static function argvWrapperProvider(): iterable
     {
         yield 'claim-next' => ['claim-next'];
+        yield 'report-issue-renumber' => ['report-issue-renumber'];
         yield 'transition' => ['transition'];
+        yield from self::noticeWrapperProvider();
     }
 
     #[DataProvider('wrapperProvider')]
@@ -58,6 +78,26 @@ final class BugPipelineWrapperAnnotationWiringTest extends TestCase
 
         self::assertGreaterThan($requirePos, $annotationPos, 'annotation must come after the bootstrap require in ' . $name);
         self::assertLessThan($constructPos, $annotationPos, 'annotation must come before the repository construction in ' . $name);
+    }
+
+    #[DataProvider('noticeWrapperProvider')]
+    public function testNoticeWrapperAnnotatesMysqliBetweenBootstrapRequireAndRepositoryConstruction(string $name): void
+    {
+        $src = $this->readWrapper($name);
+
+        $requirePos = strpos($src, "require __DIR__ . '/_bootstrap.php';");
+        self::assertNotFalse($requirePos, 'bootstrap require not found in ' . $name);
+        $constructPos = strpos($src, 'new BugIssueNoticeRepository($mysqli_db)');
+        self::assertNotFalse($constructPos, 'repository construction not found in ' . $name);
+
+        self::assertSame(
+            1,
+            preg_match('/@var\s+\\\\mysqli\s+\$mysqli_db/', $src, $m, PREG_OFFSET_CAPTURE),
+            $name . ' must annotate $mysqli_db as \mysqli'
+        );
+
+        self::assertGreaterThan($requirePos, $m[0][1], 'annotation must come after the bootstrap require in ' . $name);
+        self::assertLessThan($constructPos, $m[0][1], 'annotation must come before the repository construction in ' . $name);
     }
 
     #[DataProvider('argvWrapperProvider')]

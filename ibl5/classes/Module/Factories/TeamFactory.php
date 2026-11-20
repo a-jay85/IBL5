@@ -21,7 +21,7 @@ final class TeamFactory implements ModuleFactoryInterface
         $db = $this->services->db();
         $leagueContext = $this->services->leagueContext();
         $commonRepo = $this->services->teamIdentity();
-        $teamRepository = new \Team\TeamRepository($db);
+        $teamRepository = new \Team\TeamRepository($db, $leagueContext);
         // Rivalries reads IBL tables only, so the Olympics Team page gets no rivals card.
         $rivalsCardBuilder = $leagueContext->isOlympics()
             ? null

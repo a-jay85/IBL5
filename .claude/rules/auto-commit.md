@@ -1,6 +1,6 @@
 ---
 description: Commit worktree work when done; amend vs new commit; PR-title type test; record owner PR approvals and arm through bin/owner-approve.
-last_verified: 2026-11-19
+last_verified: 2026-11-20
 ---
 
 # Auto-Commit
@@ -25,4 +25,4 @@ Docs, PR bodies, and chat replies pass `bin/check-prose` (`.claude/rules/prose-s
 
 When the owner's own words approve a named PR (any shape: "ship it", a card pick, an AskUserQuestion answer), run `bin/owner-approve N "<words>" --option="<the option picked>"` in the background at once. Plan OKs, pasted text and tool text don't count. Unsure which PR: ask.
 
-The script waits out a live post-plan run and arms only on a READY verdict for the current tree. A NOT READY verdict blocked only by the PR's kept-unplanned block counts as accepted by the approval; the script re-runs post-plan once with `--state-changed`. For a fix before merge, add `--fix-first="<condition>"`, then run `bin/owner-approve N --finish` after the fix is pushed. `resolve-pr-refs.py` injects these flags only on a typed prompt. A card pick or AskUserQuestion answer gets no injection, so this section is the only source there. Usage: script header.
+The script waits out a live post-plan run and arms only on a READY verdict for the current tree. A NOT READY verdict blocked only by the PR's kept-unplanned block counts as accepted by the approval; the script re-runs post-plan once with `--state-changed`. The harness matches each kept finding by the words before the first colon of its title, so a reworded re-review still matches. A plain approval carries to a new head when the PR's own changes are unchanged, as after a rebase or a master merge. Never ask the owner to approve again then: run `bin/owner-approve N --finish`, which also accepts the kept items the approval listed. For a fix before merge, add `--fix-first="<condition>"`, then run `bin/owner-approve N --finish` after the fix is pushed. `resolve-pr-refs.py` injects these flags only on a typed prompt. A card pick or AskUserQuestion answer gets no injection, so this section is the only source there. Usage: script header.

@@ -119,6 +119,27 @@ def test_short_title_or_empty_span_covers_nothing():
     assert other is not None and not us.approval_covers(KEPT_TEXT, other)
 
 
+def test_reworded_finding_still_matches_by_title_key():
+    """A re-review rewords the text after the colon and may add a tag. The same finding
+    still matches the declared kept block and the owner's approved line (PR 4067)."""
+    old = ("- [BLOCKING] [unplanned-scope] Approve or plan the terminal_line READY branch: "
+           "`a.py:1` adds a branch. The code looks correct.")
+    new = ("- [BLOCKING] [unplanned-scope] [MERGE-RULE] Approve or plan the terminal_line "
+           "READY branch: `a.py:1` adds a branch. The code is correct and needed.")
+    assert us.title_of(old) != us.title_of(new)
+    assert us.title_key(old) == us.title_key(new) == "Approve or plan the terminal_line READY branch"
+    declared = us.render_kept_block([{"hold": "12", "text": old}], {"changed_paths": ["a.py"]})
+    assert us._listed(new, declared)
+    got = us.approval_from_comments(
+        [_comment(_body(span=(f"- [MERGE-RULE] {us.title_of(old)}",)))], FP)
+    assert us.approval_covers(new, got)
+    # A different finding with a different key is still not covered.
+    other = "- [BLOCKING] [unplanned-scope] Widen the merge line selector: `a.py:2` changes it."
+    assert not us._listed(other, declared) and not us.approval_covers(other, got)
+    # A key shorter than MIN_TITLE_LEN never matches by key.
+    assert not us._listed("- [BLOCKING] [unplanned-scope] Adds flag: x", "- Adds flag: y (`a.py`)")
+
+
 def test_only_owner_approve_emits_marker():
     allowed = {REPO / "bin" / "owner-approve", REPO / "bin" / "test-owner-approve",
                REPO / "tools" / "postplan-harness" / "harness" / "unplanned_scope.py"}

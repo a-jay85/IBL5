@@ -952,7 +952,12 @@ def _sql_bearing(stmt: Stmt, strict=False) -> bool:
 
 def _sql_const_names(toks: list[Token]) -> set[str]:
     """Names of class constants (`const BASE = 'SELECT ...';`) whose value holds SQL text."""
-    names: set[str] = set()
+    return {n for n, text in _const_texts(toks).items() if SQL_KEYWORD_PATTERN.search(text)}
+
+
+def _const_texts(toks: list[Token]) -> dict[str, str]:
+    """Class constant name -> the string text of its value."""
+    names: dict[str, str] = {}
     for i, tok in enumerate(toks):
         if tok.kind != "IDENT" or tok.text.lower() != "const":
             continue
@@ -970,8 +975,7 @@ def _sql_const_names(toks: list[Token]) -> set[str]:
             elif toks[k].kind == "DQSTRING":
                 parts.extend(toks[k].parts)
             k += 1
-        if SQL_KEYWORD_PATTERN.search(" ".join(parts)):
-            names.add(name)
+        names[name] = " ".join(parts)
     return names
 
 
@@ -1606,6 +1610,7 @@ def _scan_file(path: str, pair: SourcePair) -> str:
     for m in methods:
         _mark_sql_const_refs(m.stmts, const_names)
     added = pair.added_lines
+    write_consts = {n: h for n, t in _const_texts(toks).items() if (h := _write_hit(t))}
     for method in methods:
         for stmt in method.stmts:
             if stmt.overlaps(added):
@@ -1622,6 +1627,16 @@ def _scan_file(path: str, pair: SourcePair) -> str:
         hit = _write_hit(text)
         if hit:
             return f"scan: write keyword {hit} at {path}:{tok.line}"
+    # an added statement that runs an unchanged write constant adds a write path
+    for method in methods:
+        for stmt in method.stmts:
+            if not stmt.overlaps(added):
+                continue
+            for k in range(1, len(stmt.toks)):
+                t = stmt.toks[k]
+                if (t.kind == "IDENT" and t.text in write_consts and stmt.toks[k - 1].text == "::"
+                        and not (k + 1 < len(stmt.toks) and stmt.toks[k + 1].text == "(")):
+                    return f"scan: write keyword {write_consts[t.text]} at {path}:{stmt.line}"
     for tok in toks:
         if tok.kind == "IDENT" and tok.text.lower().endswith("multi_query") and any(tok.line <= ln <= tok.end_line for ln in added):
             return f"scan: write keyword MULTI_QUERY at {path}:{tok.line}"

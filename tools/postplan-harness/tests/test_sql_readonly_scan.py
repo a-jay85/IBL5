@@ -407,6 +407,29 @@ def test_write_keyword_in_class_constant_holds():
     assert _scan(head) == f"scan: write keyword DELETE at {REPO}:{_line(head, 'PURGE =')}"
 
 
+def test_added_method_running_unchanged_write_constant_holds():
+    base = _php("""    private const PURGE_SQL = 'DELETE FROM ibl_x WHERE id = ?';
+
+    public function noop(): void
+    {
+        return;
+    }
+""")
+    head = _php("""    private const PURGE_SQL = 'DELETE FROM ibl_x WHERE id = ?';
+
+    public function noop(): void
+    {
+        return;
+    }
+
+    public function purge(int $id): void
+    {
+        $this->execute(self::PURGE_SQL, 'i', $id);
+    }
+""")
+    assert _scan(head, base) == f"scan: write keyword DELETE at {REPO}:{_line(head, 'self::PURGE_SQL')}"
+
+
 _FILTER_BASE = _php("""    public function byDate(): array
     {
         $dateFilter = 'game_date > 0';

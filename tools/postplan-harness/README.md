@@ -409,6 +409,8 @@ env -i HOME="$HOME" PATH="$LPATH" sh -c \
 
 ## Gate reads header for partial applies
 
+Each replay runs under a time bound. The bound is the run's `--per-replay-timeout` (default 60 s, `PER_REPLAY_TIMEOUT`) unless the gate's registry entry sets a larger `timeout`. The plan-file gates `bin/check-plan` and `bin/check-plan-staleness` use `PLAN_REPLAY_TIMEOUT` (180 s), because `bin/check-plan` took 26 to 31 s on a 187 to 324 KB plan on an idle machine. A replay that times out runs once more. A second timeout, or any other replay error, makes the verdict UNKNOWN, and condition 17 holds the PR. A gate file missing from an older merged-PR tree is skipped as `gate-absent` and never runs.
+
 A gate may declare the repo files it reads with header lines such as `# gate-backtest-reads: config/* src/fx6.txt`. Each entry is an fnmatch glob relative to the repo root. The header matters only when a candidate fix PR's patch applies in part to an old tree. The replay credits the half-applied tree only when all four checks pass:
 
 1. The gate declares a reads header. A gate without one gets `partial-no-reads`.

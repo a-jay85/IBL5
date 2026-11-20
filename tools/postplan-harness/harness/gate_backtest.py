@@ -34,6 +34,7 @@ class ReplaySpec:
     needs_plan: bool = False
     stdin: str = ""                       # placeholder-bearing file path fed as the gate's stdin; "" = DEVNULL
     reads: tuple[str, ...] = ()           # fnmatch globs (repo-relative) for files the gate reads; () = unknown
+    timeout: int = 0                      # seconds; 0 = the run's per-replay timeout. A larger value raises this gate's bound only.
 
 
 @dataclass(frozen=True)
@@ -100,7 +101,10 @@ def parse_head_oid(value) -> str:
 
 _SINCE = ReplaySpec(argv=("--since={base}",))
 _TREE = ReplaySpec(argv=())
-_PLAN = ReplaySpec(argv=("{plan_file}",), needs_plan=True)
+# bin/check-plan took 26.5-30.7 s on 187-324 KB plans on an idle machine (2026-11-19),
+# half the 60 s run default, so a loaded post-plan run timed it out.
+PLAN_REPLAY_TIMEOUT = 180
+_PLAN = ReplaySpec(argv=("{plan_file}",), needs_plan=True, timeout=PLAN_REPLAY_TIMEOUT)
 
 _PR_BODY = ReplaySpec(argv=("--body-file", "{body_file}"))
 # Range-aware AND body-aware: the PR body is fed on stdin so a historical

@@ -144,6 +144,7 @@ REPLAY_SPECS: dict[str, ReplaySpec | str] = {
     "bin/check-model-pins": _TREE,
     "bin/check-playwright-pinning": _TREE,
     "bin/check-registry-trigger-rows": _TREE,
+    "bin/check-relative-path-used-after-cd": _TREE,
     "bin/check-rules-byte-budget": _TREE,
     "bin/check-shell-portability": _TREE,
     "bin/check-skill-arguments": _TREE,

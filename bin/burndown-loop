@@ -258,6 +258,9 @@ bl_lock_live_pid() {
     return 0
 }
 
+# bl_lock_stale <lockdir>: rc 0 when no live process holds $LOCK (bl_lock_live_pid empty).
+bl_lock_stale() { [ -z "$(bl_lock_live_pid)" ]; }
+
 bl_lock_acquire() {
     local pid
     mkdir -p "$STATE"
@@ -268,8 +271,7 @@ bl_lock_acquire() {
             exit 4
         fi
         bl_log "reclaimed stale lock pid=$(cat "$LOCK/pid" 2>/dev/null || echo none)"
-        rm -rf "$LOCK"
-        { mkdir "$LOCK" 2>/dev/null && claim_file "$LOCK/pid" printf '%s\n' "$$"; } \
+        claim_reclaim "$LOCK" pid bl_lock_stale printf '%s\n' "$$" \
             || { echo "burndown-loop: already running" >&2; exit 4; }
     fi
     trap bl_cleanup EXIT

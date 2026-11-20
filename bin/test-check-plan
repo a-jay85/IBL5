@@ -4479,6 +4479,128 @@ assert_viol "nd-fenced-marker-ignored-passes" 0 '[ND]' "$FM_OPUS$CF_MATRIX"'
 '
 
 # ---------------------------------------------------------------------------
+# Gate [ND-advisory] fixtures
+# ---------------------------------------------------------------------------
+# Every case rides the clean scaffold: bin/check-plan prints advisories only on a clean run.
+# Matrix row 2: an unmarked Stack phase warns.
+assert_msg "nda-stack-baseline-warns" 0 '[ND-advisory] Phase 1' '' "$FM_OPUS$CF_MATRIX"'
+## Phase 1: Stack on PR #1 and record the baseline
+
+Read `.claude/rules/postplan-harness-tests.md` before starting.
+'
+# Matrix row 3: an unmarked Capture phase warns.
+assert_msg "nda-capture-baseline-warns" 0 '[ND-advisory] Phase 1' '' "$FM_OPUS$CF_MATRIX"'
+## Phase 1: Capture the baseline
+
+Run the suite and keep the output.
+'
+# Matrix row 4: an honoured marker silences the advisory.
+assert_msg "nda-marked-silent" 0 '' '[ND-advisory]' "$FM_OPUS$CF_MATRIX"'
+## Phase 1: Capture the baseline
+
+**No diff:** writes the baseline under /tmp only
+'
+# Matrix row 5: a bookkeeping heading is exempt.
+assert_msg "nda-bookkeeping-silent" 0 '' '[ND-advisory]' "$FM_OPUS$CF_MATRIX"'
+## Phase 1: Run the sweep [phases: S]
+
+Run the sweep.
+'
+# Matrix row 6: a phase named in Out of Scope is exempt.
+assert_msg "nda-out-of-scope-silent" 0 '' '[ND-advisory]' "$FM_OPUS$CF_MATRIX"'
+## Phase 1: Measure the footprint
+
+Measure it.
+
+## Out of Scope
+
+- Phase 1 moved to a follow-up plan
+'
+# Matrix row 7: another phase number in Out of Scope does not exempt phase 1.
+assert_msg "nda-oos-other-number-warns" 0 '[ND-advisory] Phase 1' '' "$FM_OPUS$CF_MATRIX"'
+## Phase 1: Measure the footprint
+
+Measure it.
+
+## Out of Scope
+
+- Phase 12 moved to a follow-up plan
+'
+# Matrix row 8: an editing verb is not a candidate.
+assert_msg "nda-editing-phase-silent" 0 '' '[ND-advisory]' "$FM_OPUS$CF_MATRIX"'
+## Phase 1: Add X to Y
+
+Edit it.
+'
+# Matrix row 9: Record is not in the verb list.
+assert_msg "nda-record-verb-silent" 0 '' '[ND-advisory]' "$FM_OPUS$CF_MATRIX"'
+## Phase 1: Record the baseline in the ADR
+
+Write it down.
+'
+# Matrix row 10: a hyphenated word that starts with Run is not the verb.
+assert_msg "nda-run-hyphen-silent" 0 '' '[ND-advisory]' "$FM_OPUS$CF_MATRIX"'
+## Phase 1: Run-loop case for the queue
+
+Add the case.
+'
+# Matrix row 11: a sub-numbered heading never opens a phase.
+assert_msg "nda-subnumbered-silent" 0 '' '[ND-advisory]' "$FM_OPUS$CF_MATRIX"'
+## Phase 2.5: Run the sweep
+
+Run it.
+'
+# Matrix row 12: a 14-character reason is unmarked, so the existing [ND] violation fires.
+assert_msg "nda-short-reason-violates" 1 'reason is under 15 characters' '' "$FM_OPUS$CF_MATRIX"'
+## Phase 1: Capture the baseline
+
+**No diff:** queue the plan
+'
+
+# Matrix row 13: marker parity. planfile.parse_phases and the bash gate must agree on
+# which phases carry an honoured marker, so a drift in either parser fails CI.
+_nda_py='import sys
+sys.path.insert(0, sys.argv[1])
+from harness.planfile import parse_phases
+with open(sys.argv[2], encoding="utf-8") as fh:
+    phases = parse_phases(fh.read())
+if not phases:
+    print("nophase")
+else:
+    print("honoured" if phases[0].no_diff_reason else "unmarked")
+'
+_nda_parity_case() {
+    # <name> <expected> <heading> <body>
+    local name="$1" expect="$2" heading="$3" pbody="$4" pf hv bv bout brc
+    h_shard_take || return 0
+    pf="$TMP/$name.md"
+    printf '%s\n%s\n%s\n\n%s\n' "$FM_OPUS$CF_MATRIX" "$heading" "" "$pbody" > "$pf"
+    if ! hv=$(python3 -I -c "$_nda_py" "$SCRIPT_DIR/../tools/postplan-harness" "$pf"); then
+        h_fail "$name" "harness verdict failed to run"; return 0
+    fi
+    brc=0
+    bout="$("$GUARD" "$pf" 2>&1)" || brc=$?
+    if grep -qF '[ND-advisory]' <<< "$bout"; then bv=unmarked
+    elif [ "$brc" -eq 1 ] && grep -qF 'reason is under 15 characters' <<< "$bout"; then bv=unmarked
+    elif [ "$brc" -eq 0 ]; then bv=honoured
+    else bv="exit-$brc"; fi
+    [ "$expect" = nophase ] && [ "$bv" = honoured ] && bv=nophase
+    if [ "$hv" = "$expect" ] && [ "$bv" = "$expect" ]; then
+        h_pass "$name"
+    else
+        h_fail "$name" "expected $expect, harness=$hv bash=$bv"
+    fi
+}
+_nda_parity_case "nda-parity-valid" honoured '## Phase 1: Capture the baseline' '**No diff:** queues the plan'
+_nda_parity_case "nda-parity-14-char" unmarked '## Phase 1: Capture the baseline' '**No diff:** queue the plan'
+_nda_parity_case "nda-parity-bulleted" honoured '## Phase 1: Capture the baseline' '- **No diff:** queues the parked plan'
+_nda_parity_case "nda-parity-fenced" unmarked '## Phase 1: Capture the baseline' '```
+**No diff:** queues the parked plan
+```'
+_nda_parity_case "nda-parity-indented" honoured '## Phase 1: Capture the baseline' '   **No diff:** queues the parked plan'
+_nda_parity_case "nda-parity-subnumbered" nophase '## Phase 2.5: Capture the baseline' 'Capture it.'
+
+# ---------------------------------------------------------------------------
 # Gate [G] fixtures (4 cases)
 # ---------------------------------------------------------------------------
 # Unwired bin/test-* script in the location cell — must flag [G].

@@ -18,6 +18,10 @@
 #
 # The session check reads ~/.claude/session-registry/active.json (repo == worktree root,
 # pid alive). An unreadable registry counts as "no session": fail open to DM now.
+# The session that fired the run does not count either. bin/post-plan-now records its
+# own process ancestors in FAILDM_FIRER_PIDS at fire time. That session ends its turn
+# right after the fire and never sees the failure, so holding the DM for it only adds
+# FAILDM_DELAY of silence.
 # Headless runs do not count: an entry whose pid argv has a -p or --print token is
 # skipped, since no human is there to re-fire. If ps cannot read the argv, the entry
 # counts as live and the DM is held.
@@ -27,7 +31,7 @@
 #   bin/post-plan-fail-dm --deferred <root> <safe-slug> <log> <message>   (the held job)
 #
 # Env (tests): FAILDM_DELAY, FAILDM_REGISTRY, FAILDM_DM_CMD, FAILDM_LAUNCHCTL,
-# FAILDM_LOG_DIR.
+# FAILDM_LOG_DIR, FAILDM_FIRER_PIDS.
 
 if [ "${1:-}" = "--help" ]; then
     cat <<'EOF'
@@ -50,6 +54,8 @@ Env:
   FAILDM_DM_CMD    Override discord-dm binary path
   FAILDM_LAUNCHCTL Override launchctl binary path
   FAILDM_LOG_DIR   Override log directory
+  FAILDM_FIRER_PIDS Space-separated pids of the session that fired the run;
+                   a registry entry with one of these pids does not hold the DM
 
 Exit codes:
   0  DM sent or hold job scheduled
@@ -87,9 +93,10 @@ send_dm() {
 # Prints 1 when a live session's repo is $ROOT, else nothing.
 live_session_in_root() {
     [ -r "$REGISTRY" ] || return 0
-    python3 - "$REGISTRY" "$ROOT" <<'PY' 2>/dev/null || true
+    python3 - "$REGISTRY" "$ROOT" "${FAILDM_FIRER_PIDS:-}" <<'PY' 2>/dev/null || true
 import json, os, subprocess, sys
 reg, root = sys.argv[1], os.path.realpath(sys.argv[2])
+firer = {t for t in sys.argv[3].split() if t.isdigit()}
 
 def headless(pid):
     # A headless run was started as `claude -p ...` or `claude --print ...`.
@@ -110,6 +117,8 @@ for s in json.load(open(reg)).values():
         pid = int(s.get("pid"))
         os.kill(pid, 0)
     except (OSError, TypeError, ValueError):
+        continue
+    if str(pid) in firer:
         continue
     if headless(pid):
         continue

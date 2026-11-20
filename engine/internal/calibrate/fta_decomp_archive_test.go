@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 	"time"
 
@@ -169,6 +170,7 @@ func TestRealArchive_FTADecomp(t *testing.T) {
 						float64(tb.Game2GA+tb.Game3GA), float64(tb.GameTOV), float64(tb.GameORB),
 						float64(mine), tb.IsHome, margin, mine > theirs, mine == theirs,
 					)
+					engSide.AddSTL(float64(tb.GameSTL))
 				}
 			}
 
@@ -178,6 +180,7 @@ func TestRealArchive_FTADecomp(t *testing.T) {
 			for _, e := range gr.Events {
 				if e.Kind == result.EventFoul {
 					siteFouls[e.FoulSite]++
+					engSide.AddSiteFoul(fmt.Sprint(e.FoulSite))
 				}
 				if e.Kind == result.EventPossessionStart {
 					sim.ClassifyPossession(cur, &mix)
@@ -215,13 +218,16 @@ func TestRealArchive_FTADecomp(t *testing.T) {
 				dst.FGA += float64(bx.TwoGA + bx.ThreeGA)
 				dst.TOV += float64(bx.TOV)
 				dst.ORB += float64(bx.ORB)
+				dst.STL += float64(bx.STL)
 			}
 			margin := ftaAbs(sg.HomeScore - sg.VisitorScore)
 			tied := sg.HomeScore == sg.VisitorScore
 			scoSide.AddTeamGame(vis.FTA, vis.FTM, vis.PF, vis.FGA, vis.TOV, vis.ORB,
 				float64(sg.VisitorScore), false, margin, sg.VisitorScore > sg.HomeScore, tied)
+			scoSide.AddSTL(vis.STL)
 			scoSide.AddTeamGame(home.FTA, home.FTM, home.PF, home.FGA, home.TOV, home.ORB,
 				float64(sg.HomeScore), true, margin, sg.HomeScore > sg.VisitorScore, tied)
+			scoSide.AddSTL(home.STL)
 		}
 		cleanup()
 		snapshots++
@@ -292,6 +298,23 @@ func TestRealArchive_FTADecomp(t *testing.T) {
 		t.Logf("  pf-by-site: %-16s %.3f", site, foulsBySite[site.String()])
 	}
 	t.Logf("  pf-by-site-sum: %.3f (engine pf/g %.3f)", siteSum, engSum.PFPerG)
+	// WALK lines feed the j27 doc's archive walk table. They never use the
+	// MEASURE prefix, which ParseMeasureLog owns.
+	for _, side := range []struct {
+		name string
+		sum  FTASummary
+	}{{"engine", engSum}, {"sco", scoSum}} {
+		t.Logf("WALK side=%s pf=%.3f fta=%.3f tov=%.3f stl=%.3f home_away_fta=%.3f",
+			side.name, side.sum.PFPerG, side.sum.FTAPerG, side.sum.TOVPerG, side.sum.STLPerG, side.sum.HomeAwayRatio)
+	}
+	walkSites := make([]string, 0, len(engSum.SitePFPerG))
+	for site := range engSum.SitePFPerG {
+		walkSites = append(walkSites, site)
+	}
+	sort.Strings(walkSites)
+	for _, site := range walkSites {
+		t.Logf("WALK site_pf site=%s per_team_game=%.3f", site, engSum.SitePFPerG[site])
+	}
 	if d := siteSum - engSum.PFPerG; d > 0.001 || d < -0.001 {
 		t.Errorf("pf-by-site sum %.4f differs from engine pf/g %.4f by more than 0.001", siteSum, engSum.PFPerG)
 	}

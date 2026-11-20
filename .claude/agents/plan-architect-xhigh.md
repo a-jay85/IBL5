@@ -27,6 +27,7 @@ A single self-contained implementation plan for exactly one unit of work, consis
 - **Resolve every decision.** A plan contains concrete actions, not deferred questions. Never leave "TBD", "decide later", or an unresolved "X or Y" in the plan — pick, and state why. The plan may be executed by an agent that cannot make judgment calls.
 - **Right-size the work.** One plan equals one pull request. If the task genuinely spans independent concerns or a refactor that must land before the feature using it, say so plainly rather than bundling.
 - **Tier the labor.** Where the project's injected guidance asks you to label each phase's executing tier, do so — the tiering decision belongs in the plan, decided now, not at execution time.
+- **Name your budget cuts.** When a Critical Files target sits close to its byte cap, `bin/check-plan` gate `[NC]` asks for one `budget-cuts: <path> <the text you cut, or the -detail.md companion the text moves to>` line per such file. Write that line in the phase that edits the file.
 
 ## Mid-design exploration
 

@@ -31,7 +31,7 @@ set -euo pipefail
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     cat <<'EOF'
-Usage: bin/check-rules-byte-budget [--report-mode]
+Usage: bin/check-rules-byte-budget [--report-mode | --print-caps [--ref=<rev>]]
 
 CI gate: cap the byte size of always-loaded .claude/rules/*.md files.
 
@@ -39,6 +39,7 @@ Modes:
   (no args)      Gate mode — four checks, exits 1 on any violation (CI default).
   --report-mode  Report mode — repo-wide dead-glob sweep only, JSON on stdout,
                  always exits 0; no gate semantics.
+  --print-caps   Read-only: TAB rows path/class/cap/bytes/headroom at --ref (default HEAD).
 
 Checks:
   1. Per-file cap: resident (no paths:) <= RULES_RESIDENT_BUDGET (default 5200 B);
@@ -59,6 +60,20 @@ fi
 # Prints ONE JSON array on stdout and exits 0 — no gate semantics, no exit 1.
 REPORT_MODE=0
 if [ "${1:-}" = "--report-mode" ]; then REPORT_MODE=1; shift || true; fi
+# --print-caps [--ref=<rev>]: read-only. Prints one TAB-separated row per
+# .claude/rules/*.md at <rev> (default HEAD): path, class, cap, bytes, headroom.
+# A resident row's headroom is the smaller of its own room and the room left
+# under MAX_TOTAL. Exits 0 before Checks 1-4, so no gate text reaches stdout.
+PRINT_CAPS=0
+CAPS_REF=""
+if [ "${1:-}" = "--print-caps" ]; then
+  PRINT_CAPS=1; shift || true
+  case "${1:-}" in
+    --ref=?*) CAPS_REF="${1#--ref=}"; shift ;;
+    "") ;;
+    *) echo "check-rules-byte-budget: --print-caps takes only --ref=<rev>, got '$1'" >&2; exit 2 ;;
+  esac
+fi
 
 RESIDENT_MAX_BYTES="${RULES_RESIDENT_BUDGET:-5200}"
 # Resident rules were last measured 2026-08-12: work-triage.md 4968 B, agent-tiering.md
@@ -106,6 +121,35 @@ _rule_globs() {
     inlist && /^[^[:space:]]/         { inlist=0 }
   ' | tr -d '"\047'
 }
+
+if (( PRINT_CAPS )); then
+  _ref="${CAPS_REF:-HEAD}"
+  git -C "$ROOT" rev-parse --verify -q "${_ref}^{commit}" >/dev/null \
+    || { echo "check-rules-byte-budget: unknown ref '$_ref'" >&2; exit 2; }
+  _tmp="$(mktemp)"; trap 'rm -f "$_tmp"' EXIT
+  _res_total=0; _rows=()
+  _rule_list=$(git -C "$ROOT" ls-tree --name-only "$_ref" -- .claude/rules/ \
+                 | grep -E '^\.claude/rules/[^/]+\.md$') || _rule_list=''
+  while IFS= read -r _rel; do
+    [ -n "$_rel" ] || continue
+    git -C "$ROOT" show "${_ref}:${_rel}" > "$_tmp" || exit 2
+    _b=$(wc -c < "$_tmp" | tr -d '[:space:]') || _b=''
+    if [ -n "$(_rule_globs "$_tmp")" ]; then
+      _rows+=("$_rel lazy $LAZY_MAX_BYTES $_b")
+    else
+      _rows+=("$_rel resident $RESIDENT_MAX_BYTES $_b"); _res_total=$((_res_total + _b))
+    fi
+  done <<< "$_rule_list"
+  _tot_room=$((MAX_TOTAL - _res_total))
+  # bash 3.2 + set -u: a bare "${_rows[@]}" on an empty array is "unbound".
+  for _r in ${_rows[@]+"${_rows[@]}"}; do
+    read -r _rel _cls _cap _b <<< "$_r"
+    _room=$((_cap - _b))
+    if [ "$_cls" = resident ] && [ "$_tot_room" -lt "$_room" ]; then _room=$_tot_room; fi
+    printf '%s\t%s\t%s\t%s\t%s\n' "$_rel" "$_cls" "$_cap" "$_b" "$_room"
+  done
+  exit 0
+fi
 
 # --- --report-mode -----------------------------------------------------------
 # Repo-wide (NOT changeset-scoped) dead-glob scan. Exits 0 BEFORE Checks 1/2/3/4

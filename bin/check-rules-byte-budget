@@ -128,16 +128,18 @@ if (( PRINT_CAPS )); then
     || { echo "check-rules-byte-budget: unknown ref '$_ref'" >&2; exit 2; }
   _tmp="$(mktemp)"; trap 'rm -f "$_tmp"' EXIT
   _res_total=0; _rows=()
+  _rule_list=$(git -C "$ROOT" ls-tree --name-only "$_ref" -- .claude/rules/ \
+                 | grep -E '^\.claude/rules/[^/]+\.md$') || _rule_list=''
   while IFS= read -r _rel; do
+    [ -n "$_rel" ] || continue
     git -C "$ROOT" show "${_ref}:${_rel}" > "$_tmp" || exit 2
-    _b=$(wc -c < "$_tmp" | tr -d '[:space:]')
+    _b=$(wc -c < "$_tmp" | tr -d '[:space:]') || _b=''
     if [ -n "$(_rule_globs "$_tmp")" ]; then
       _rows+=("$_rel lazy $LAZY_MAX_BYTES $_b")
     else
       _rows+=("$_rel resident $RESIDENT_MAX_BYTES $_b"); _res_total=$((_res_total + _b))
     fi
-  done < <(git -C "$ROOT" ls-tree --name-only "$_ref" -- .claude/rules/ \
-             | grep -E '^\.claude/rules/[^/]+\.md$')
+  done <<< "$_rule_list"
   _tot_room=$((MAX_TOTAL - _res_total))
   for _r in "${_rows[@]}"; do
     read -r _rel _cls _cap _b <<< "$_r"

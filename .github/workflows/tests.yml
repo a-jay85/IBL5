@@ -770,6 +770,13 @@ jobs:
       - name: Composite behavior contracts
         if: ${{ !cancelled() }}
         run: bin/check-composite-contracts
+      # bashpid-under-set-u: macOS /bin/bash is 3.2 and has no BASHPID, so a bare
+      # read under set -u aborts the script there (backlog#1859, PR #3937).
+      - name: Check bin/ scripts never read BASHPID bare
+        if: ${{ !cancelled() }}
+        run: |
+          bin/test-check-bashpid-under-set-u
+          bin/check-bashpid-under-set-u
       # rules-byte-budget: a path-unscoped .claude/rules/*.md file (always loaded
       # into every session's context) can grow past its token budget via an edit
       # that no path filter covers. bin/check-rules-byte-budget (NEW,

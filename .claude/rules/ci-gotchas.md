@@ -24,7 +24,7 @@ Only after confirming those three can you treat a failure as infrastructure nois
 
 ## `gh run rerun` replays the original event payload
 
-`gh run rerun <id>` replays the event snapshot captured at trigger time — **PR body edits made after that moment are invisible**. A rerun that needs the current PR body (e.g. a gate that parses body fields) will behave as if the old body is still there.
+`gh run rerun <id>` replays the event snapshot captured at trigger time, so **PR body edits made after that moment are invisible**. A rerun that needs the current PR body (e.g. a gate that parses body fields) will behave as if the old body is still there.
 
 **Fix:** push an empty commit to produce a new event with the current payload. Never `gh run rerun` when the gate reads the PR body.
 

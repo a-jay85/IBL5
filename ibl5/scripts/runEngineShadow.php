@@ -81,7 +81,7 @@ if ($lockHandle === false || !flock($lockHandle, LOCK_EX | LOCK_NB)) {
 
 // ── Resolve season year: --year override, else Season->endingYear (parity with
 // the removed inline EngineShadowStep). IBL-scoped (null LeagueContext). ───────
-$opts = getopt('', ['year::']); // @phpstan-ignore ibl.unknownCliOption
+$opts = getopt('', ['year::']); // @phpstan-ignore ibl.unknownCliOption (the $argv loop above rejects unknown flags)
 $yearOpt = $opts['year'] ?? null;
 $seasonYear = is_string($yearOpt) && ctype_digit($yearOpt)
     ? (int) $yearOpt

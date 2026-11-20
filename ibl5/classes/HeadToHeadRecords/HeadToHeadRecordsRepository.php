@@ -348,7 +348,7 @@ perspectives AS (
             $gmNames = array_keys($gmSet);
         } else {
             $tenureRows = $this->fetchRows(
-                'SELECT DISTINCT gm_display_name FROM `ibl_gm_tenures` ORDER BY gm_display_name', // @phpstan-ignore-line ibl.orderByMissingTiebreaker
+                'SELECT DISTINCT gm_display_name FROM `ibl_gm_tenures` ORDER BY gm_display_name', // @phpstan-ignore ibl.orderByMissingTiebreaker (DISTINCT on the one sort column makes every row unique)
             );
             $gmNames = array_map(
                 static fn (array $r): string => is_string($r['gm_display_name']) ? $r['gm_display_name'] : '',

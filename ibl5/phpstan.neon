@@ -3,6 +3,7 @@ includes:
     - phpstan-baseline.neon
 
 parameters:
+    reportIgnoresWithoutComments: true
     tmpDir: tmp
     level: max
     paths:

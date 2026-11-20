@@ -48,7 +48,7 @@ class RcbRepository extends \Database\BaseMysqliRepository
                     $params[] = $r['source_file'];
                 }
                 $total += $this->execute(
-                    "INSERT INTO `ibl_rcb_alltime_records` " . $columns . " VALUES " . $placeholders, // @phpstan-ignore ibl.sqlStringConcatenation
+                    "INSERT INTO `ibl_rcb_alltime_records` " . $columns . " VALUES " . $placeholders, // @phpstan-ignore ibl.sqlStringConcatenation ($columns is a literal and $placeholders is only ? marks; values are bound)
                     $types,
                     ...$params
                 );
@@ -96,7 +96,7 @@ class RcbRepository extends \Database\BaseMysqliRepository
                     $params[] = $r['source_file'];
                 }
                 $total += $this->execute(
-                    "INSERT INTO `ibl_rcb_season_records` " . $columns . " VALUES " . $placeholders, // @phpstan-ignore ibl.sqlStringConcatenation
+                    "INSERT INTO `ibl_rcb_season_records` " . $columns . " VALUES " . $placeholders, // @phpstan-ignore ibl.sqlStringConcatenation ($columns is a literal and $placeholders is only ? marks; values are bound)
                     $types,
                     ...$params
                 );

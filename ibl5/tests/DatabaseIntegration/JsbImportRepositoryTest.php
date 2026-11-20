@@ -436,6 +436,61 @@ class JsbImportRepositoryTest extends DatabaseTestCase
         self::assertSame(1, (int) $row2['cnt'], '2099 unchanged');
     }
 
+    public function testReplaceRcbSeasonRecordsSumsRowCountAcrossChunks(): void
+    {
+        // 510 rows forces two 500-row INSERT chunks; the return must sum both.
+        $records = [];
+        for ($i = 0; $i < 510; $i++) {
+            $records[] = [
+                'season_year' => 2099,
+                'scope' => 'team',
+                'teamid' => intdiv($i, 10),
+                'context' => 'home',
+                'stat_category' => 'pts',
+                'ranking' => ($i % 10) + 1,
+                'player_name' => "Chunk Player $i",
+                'player_position' => 'PG',
+                'car_block_id' => $i + 1,
+                'pid' => null,
+                'stat_value' => 40,
+                'record_season_year' => 2099,
+                'source_file' => 'chunk.rcb',
+            ];
+        }
+
+        $inserted = $this->repo->replaceRcbSeasonRecords(2099, $records);
+
+        self::assertSame(510, $inserted);
+    }
+
+    public function testReplaceRcbAlltimeRecordsSumsRowCountAcrossChunks(): void
+    {
+        // 510 rows forces two 500-row INSERT chunks; the return must sum both.
+        $records = [];
+        for ($i = 0; $i < 510; $i++) {
+            $records[] = [
+                'scope' => 'team',
+                'teamid' => intdiv($i, 10),
+                'record_type' => 'single_season',
+                'stat_category' => 'ppg',
+                'ranking' => ($i % 10) + 1,
+                'player_name' => "Chunk Player $i",
+                'car_block_id' => $i + 1,
+                'pid' => null,
+                'stat_value' => 20.0,
+                'stat_raw' => 200,
+                'team_of_record' => null,
+                'season_year' => 2099,
+                'career_total' => null,
+                'source_file' => 'chunk.rcb',
+            ];
+        }
+
+        $inserted = $this->repo->replaceRcbAlltimeRecords($records);
+
+        self::assertSame(510, $inserted);
+    }
+
     // ── resolveTeamIdByName ─────────────────────────────────────
 
     public function testResolveTeamIdByNameFindsDirectMatch(): void

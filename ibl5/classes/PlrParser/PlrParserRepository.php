@@ -141,8 +141,7 @@ class PlrParserRepository extends \Database\BaseMysqliRepository implements PlrP
             static fn (string $column): string => '`' . $column . '`',
             self::SNAPSHOT_COLUMNS,
         ));
-        // $columns is built from the validated SNAPSHOT_COLUMNS constant, not user input
-        $sql = "SELECT {$columns} FROM ibl_plr_snapshots WHERE season_year = ? AND snapshot_phase = ?"; // @phpstan-ignore ibl.sqlStringInterpolation
+        $sql = "SELECT {$columns} FROM ibl_plr_snapshots WHERE season_year = ? AND snapshot_phase = ?"; // @phpstan-ignore ibl.sqlStringInterpolation ($columns comes from the SNAPSHOT_COLUMNS constant, not user input)
         $rows = $this->fetchAll($sql, 'is', $seasonYear, $phase);
 
         $byPid = [];

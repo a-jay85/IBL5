@@ -214,4 +214,32 @@ class AttachmentInputValidatorTest extends TestCase
         $this->assertSame([], $out);
         $this->assertNotNull($reject);
     }
+
+    public function testSizeCapMatchesTheBotFetcherCap(): void
+    {
+        $botCap = $this->botFetcherMaxBytes();
+
+        $atCap = $this->validator->validateAll([$this->entry(['file_size' => $botCap])]);
+        $this->assertCount(1, $atCap, 'a file the bot accepts must pass the PHP validator');
+
+        $overCap = $this->validator->validateAll([$this->entry(['file_size' => $botCap + 1])]);
+        $this->assertSame([], $overCap, 'a file the bot rejects must fail the PHP validator');
+    }
+
+    private function botFetcherMaxBytes(): int
+    {
+        $path = __DIR__ . '/../../IBLbot/src/bug-bot/attachments.ts';
+        // phpunit-hygiene-allow: the cap lives in TypeScript, so its source is the only seam PHP can read.
+        $source = file_get_contents($path);
+        $this->assertIsString($source, "cannot read {$path}");
+
+        $matched = preg_match('/const MAX_BYTES = ([\d\s*]+);/', $source, $m);
+        $this->assertSame(1, $matched, 'MAX_BYTES = <a * b * ...>; not found in attachments.ts');
+
+        $bytes = 1;
+        foreach (explode('*', $m[1]) as $factor) {
+            $bytes *= intval(trim($factor));
+        }
+        return $bytes;
+    }
 }

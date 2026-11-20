@@ -108,7 +108,7 @@ class HeadToHeadRecordsController
             default      => $this->repo->buildFranchisesMatrix($f['phase'], $f['scope']),
         };
 
-        // @phpstan-ignore ibl.echoInNonView
+        // @phpstan-ignore ibl.echoInNonView (controller entry point: emits the already-composed View output)
         echo $this->view->renderFilterForm($f['dimension'], $f['phase'], $f['scope'])
             . $this->view->renderMatrix($payload, $this->resolveUserMatchKeys($f['dimension'], $payload))
             . $this->view->renderTapTooltipScript();

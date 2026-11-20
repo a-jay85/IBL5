@@ -28,7 +28,7 @@ class NewsControllerGoldenTest extends ModuleEntryPointTestCase
     {
         // The marker stub must be declared before the base setUp() loads theme-stubs.php, and only for the
         // separate-process test; PHPUnit exposes the running test's name only through an internal method.
-        if (str_contains($this->toString(), 'testGoldenHomeFileBranch')) { // @phpstan-ignore method.internal
+        if (str_contains($this->toString(), 'testGoldenHomeFileBranch')) { // @phpstan-ignore method.internal (PHPUnit exposes the running test name only through this method)
             require_once __DIR__ . '/fixtures/blocks-stub.php';
         }
         parent::setUp();

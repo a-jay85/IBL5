@@ -24,7 +24,7 @@ class FreeAgencyCapCalculatorFactoryTest extends TestCase
 
         $result = $factory->forTeam($team, $season);
 
-        // @phpstan-ignore-next-line (return type is the interface — asserting it is intentional contract test)
+        // @phpstan-ignore method.alreadyNarrowedType (asserting the declared return type is the intended contract test)
         $this->assertInstanceOf(FreeAgencyCapCalculatorInterface::class, $result);
     }
 

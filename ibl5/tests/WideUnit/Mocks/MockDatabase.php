@@ -489,7 +489,7 @@ class MockDatabase extends \mysqli
      * suppresses the runtime LSP deprecation; the ignore below is its
      * static-analysis twin.
      *
-     * @phpstan-ignore method.childReturnType
+     * @phpstan-ignore method.childReturnType (mock returns its own statement type; see ReturnTypeWillChange above)
      */
     #[\ReturnTypeWillChange]
     public function prepare(string $query): MockPreparedStatement

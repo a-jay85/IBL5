@@ -19,7 +19,7 @@ class ScoFileWriterTest extends TestCase
 
     private function mockDb(): \mysqli
     {
-        return $this->createStub(\mysqli::class); // @phpstan-ignore staticMethod.dynamicCall
+        return $this->createStub(\mysqli::class); // @phpstan-ignore staticMethod.dynamicCall (PHPUnit stub factories are called on $this by convention)
     }
 
     /** Build a minimal synthetic .sco of the correct size (all spaces). */

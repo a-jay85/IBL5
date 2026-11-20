@@ -78,6 +78,11 @@ test.describe('Admin entry-point scripts: non-admin gets 403', () => {
     expect(await response?.text()).toContain('Access denied. Administrator privileges required.');
   });
 
+  test('non-admin is denied the trade suggestions tuning page', async ({ page }) => {
+    const response = await page.goto('modules.php?name=TradeSuggestionsTuning');
+    expect(response?.status()).toBe(403);
+  });
+
   test('LeagueControlPanel module POST export=active_players is denied before the JSON handler', async ({
     request,
   }) => {

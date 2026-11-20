@@ -46,7 +46,7 @@ final class LighthouseUrls
      *
      * @var list<string>
      */
-    public const ADMIN_ONLY_MODULES = ['LeagueControlPanel'];
+    public const ADMIN_ONLY_MODULES = ['LeagueControlPanel', 'TradeSuggestionsTuning'];
 
     /** @var list<string> */
     public const REPRESENTATIVE_PATHS = [

@@ -420,7 +420,7 @@ case_shell_stage_rejects_unknown() {
     shell_case
     run_gate --stage shells
     want_rc 2
-    want_out "--stage must be matrix, phases, phpunit, pytest, shell, exec-mutations, or all (got 'shells')"
+    want_out "--stage must be matrix, phases, phpunit, pytest, shell, exec-mutations, local-mutations, or all (got 'shells')"
 }
 
 # write_plan <row-line>...  — each argument is a full table row.
@@ -688,7 +688,7 @@ test_all_never_invokes_infection() {
     chmod +x "$R/bin/mutation-diff" "$R/ibl5/bin/check-infection-excludes"
     run_gate --plan "$PLAN"
     want_rc 0
-    want_out "all requested stages passed (phases matrix phpunit pytest shell)"
+    want_out "all requested stages passed (phases matrix phpunit pytest shell local-mutations)"
     want_cnt mutation 0
     want_cnt excludes 0
     [ ! -e "$D/mutation-diff-called" ] || note "bin/mutation-diff ran under --stage all"
@@ -1111,14 +1111,15 @@ case_unclear_row_runs_locally() {
 
 case_fire_point_skips_exec_mutations() {
     new_case
-    xm_plan 'grep -qx a ibl5/tracked.txt'
+    # A CI-routed record: "all" leaves it to the Plan checks job, so local-mutations skips it.
+    ci_mut_plan
     # The pre-hash leftover repair calls `pending`; only `run` means the stage ran.
     printf '#!/usr/bin/env bash\ncase "$1" in\n    run) touch "%s/xmlib-called"; exit 0 ;;\n    pending) exit 1 ;;\n    *) exit 0 ;;\nesac\n' "$D" > "$D/stubs/xmlib-sentinel"
     chmod +x "$D/stubs/xmlib-sentinel"
     OUT=$(cd "$R" && PREFIRE_EXEC_MUTATIONS_LIB="$D/stubs/xmlib-sentinel" "$GATE" --base master --plan "$PLAN" --fire-point 2>&1); RC=$?
     want_rc 0
     refute_out "exec-mutations passed"
-    want_out "all requested stages passed (phases matrix phpunit pytest shell)"
+    want_out "all requested stages passed (phases matrix phpunit pytest shell local-mutations)"
     [ ! -e "$D/xmlib-called" ] || note "plan-exec-mutations ran at the fire point"
 }
 
@@ -1591,7 +1592,117 @@ test_xm_bad_stage_rejected() {
     new_case
     run_gate --stage exec_mutations
     want_rc 2
-    want_out "--stage must be matrix, phases, phpunit, pytest, shell, exec-mutations, or all"
+    want_out "--stage must be matrix, phases, phpunit, pytest, shell, exec-mutations, local-mutations, or all"
+}
+
+# ---------------------------------------------------------------------------
+# local-mutations stage: runs the records the Plan checks CI job never sees.
+# ---------------------------------------------------------------------------
+# lm_plan <check> [match] [replace]: like xm_plan, but the check is wrapped in `bash -c '...'`,
+# so row_runs_in_ci sends it local (first word bash without -n). <check> holds no single quote.
+lm_plan() {
+    local chk="bash -c 'echo run >> \"\$CNT/xm\"; $1'"
+    write_plan "$(row 1 "${chk//|/\\|}")"
+    {
+        printf '\n## Executable Mutations\n\n'
+        printf '%smutation\nrow: 1\nfile: ibl5/tracked.txt\ncheck: %s\n' '```' "$chk"
+        printf 'match: %s\nreplace: %s\n%s\n' "${2:-a}" "${3:-b}" '```'
+    } >> "$PLAN"
+}
+# ci_mut_plan: one matrix row and one mutation record whose check row_runs_in_ci sends to CI
+# (no `echo` counter: echo is a local-only first word). The local-mutations stage skips it.
+ci_mut_plan() {
+    local chk='grep -qx a ibl5/tracked.txt'
+    write_plan "$(row 1 "$chk")"
+    {
+        printf '\n## Executable Mutations\n\n'
+        printf '%smutation\nrow: 1\nfile: ibl5/tracked.txt\ncheck: %s\n' '```' "$chk"
+        printf 'match: a\nreplace: b\n%s\n' '```'
+    } >> "$PLAN"
+}
+lm_passes() { pass_files '\.local-mutations\..*\.pass$'; }
+lm_logs() { pass_files '\.local-mutations\.log$'; }
+
+test_local_mutations_runs_dropped_record() {
+    new_case
+    lm_plan 'grep -qx a ibl5/tracked.txt'
+    run_gate --plan "$PLAN" --stage local-mutations
+    want_rc 0
+    want_out "TRIPPED row 1"
+    want_out "local-mutations passed"
+    local want_name
+    want_name="$(tree_hash).local-mutations.$(git hash-object "$PLAN").pass"
+    [ "$(lm_passes)" = "$want_name" ] || note "pass record is '$(lm_passes)', wanted $want_name"
+    [ -n "$(lm_logs)" ] || note "no local-mutations log file"
+    [ "$(xm_tracked)" = a ] || note "tracked.txt is '$(xm_tracked)', not a"
+    want_cnt xm 2
+}
+
+test_local_mutations_db_down_fails_closed() {
+    new_case
+    lm_plan 'bin/db-query "SELECT 1"'
+    export STUB_PROBE_RC=1
+    run_gate --plan "$PLAN" --stage local-mutations
+    want_rc 3
+    want_out "mutation row 1 needs the DB"
+    [ -z "$(lm_passes)" ] || note "a local-mutations pass record exists"
+    want_cnt xm 0
+    unset STUB_PROBE_RC
+}
+
+test_local_mutations_non_db_skips_probe() {
+    new_case
+    lm_plan 'grep -qx a ibl5/tracked.txt'
+    export STUB_PROBE_RC=1
+    run_gate --plan "$PLAN" --stage local-mutations
+    want_rc 0
+    want_cnt probe 0
+    unset STUB_PROBE_RC
+}
+
+test_local_mutations_ci_records_skip() {
+    new_case
+    ci_mut_plan
+    run_gate --plan "$PLAN" --stage local-mutations
+    want_rc 0
+    want_out "SKIP local-mutations: every Executable Mutations record runs in the Plan checks CI job"
+    [ -z "$(lm_logs)" ] || note "a local-mutations log exists"
+    [ -z "$(lm_passes)" ] || note "a local-mutations pass record exists"
+}
+
+test_local_mutations_untripped_fails_closed() {
+    new_case
+    lm_plan 'true'
+    run_gate --plan "$PLAN" --stage local-mutations
+    want_rc 1
+    want_out "FAIL local-mutations: a row did not trip"
+    [ -z "$(lm_passes)" ] || note "a local-mutations pass record exists"
+}
+
+test_local_mutations_plan_edit_reruns() {
+    new_case
+    lm_plan 'grep -qx a ibl5/tracked.txt'
+    run_gate --plan "$PLAN" --stage local-mutations
+    want_rc 0
+    want_cnt xm 2
+    run_gate --plan "$PLAN" --stage local-mutations
+    want_rc 0
+    want_out "local-mutations pass cached"
+    want_cnt xm 2
+    lm_plan 'grep -qx a ibl5/tracked.txt' a c
+    run_gate --plan "$PLAN" --stage local-mutations
+    want_rc 0
+    refute_out "local-mutations pass cached"
+    want_cnt xm 4
+}
+
+test_all_runs_local_mutations() {
+    new_case
+    lm_plan 'grep -qx a ibl5/tracked.txt'
+    run_gate --plan "$PLAN"
+    want_rc 0
+    want_out "all requested stages passed (phases matrix phpunit pytest shell local-mutations)"
+    want_out "local-mutations passed"
 }
 
 test_help_lists_exec_mutations() {
@@ -2295,7 +2406,7 @@ test_stage_rejects_unknown_name_lists_pytest() {
     new_case
     run_gate --stage pytests
     want_rc 2
-    want_out "--stage must be matrix, phases, phpunit, pytest, shell, exec-mutations, or all (got 'pytests')"
+    want_out "--stage must be matrix, phases, phpunit, pytest, shell, exec-mutations, local-mutations, or all (got 'pytests')"
 }
 
 test_pytest_all_includes_pytest_stage() {
@@ -2304,7 +2415,7 @@ test_pytest_all_includes_pytest_stage() {
     touch_file tools/postplan-harness/tests/test_unrelated.py
     run_gate --plan "$PLAN"
     want_rc 0
-    want_out "all requested stages passed (phases matrix phpunit pytest shell)"
+    want_out "all requested stages passed (phases matrix phpunit pytest shell local-mutations)"
     want_cnt pytest 1
 }
 
@@ -2380,7 +2491,7 @@ test_phases_all_order_runs_phases_first() {
     green_plan
     run_gate --plan "$PLAN"
     want_rc 0
-    want_out 'all requested stages passed (phases matrix phpunit pytest shell)'
+    want_out 'all requested stages passed (phases matrix phpunit pytest shell local-mutations)'
 }
 
 # phases_real_case: new_case plus a tracked src/a.txt, the real harness symlinked
@@ -2578,6 +2689,13 @@ test_xm_killed_lib_recovers_and_reports
 test_xm_locked_stage
 test_xm_locked_recover
 test_xm_bad_stage_rejected
+test_local_mutations_runs_dropped_record
+test_local_mutations_db_down_fails_closed
+test_local_mutations_non_db_skips_probe
+test_local_mutations_ci_records_skip
+test_local_mutations_untripped_fails_closed
+test_local_mutations_plan_edit_reruns
+test_all_runs_local_mutations
 test_xm_default_uses_short_limits
 test_xm_fire_point_uses_larger_limits
 test_xm_fire_point_limits_match_harness

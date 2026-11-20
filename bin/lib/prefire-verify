@@ -11,8 +11,10 @@
 #      shared test input changed or mapping failed; skipped when no PHPUnit-relevant file changed)
 # The shell stage runs the bin/test-* harness lines mapped by name to the changed bin/ files,
 # within a local time budget; every other harness, and every caller harness, is left to CI.
-# The Executable Mutations rows (bin/lib/plan-exec-mutations run) run in the Plan checks CI job.
-# The exec-mutations stage stays for an implementer who asks for it by name; "all" leaves it out.
+# The Executable Mutations rows whose check row_runs_in_ci sends to CI run in the Plan checks
+# CI job. "all" runs the rest in the local-mutations stage (bin/lib/plan-checks-block local),
+# behind the DB probe when a check needs the DB. The exec-mutations stage runs every row and
+# stays for an implementer who asks for it by name.
 # Mutation score is gated by CI's required check "Infection PHP (per-PR diff)" (ADR-0237).
 # It trusts no implementer-written ledger. Only this script writes pass records,
 # keyed by tree hash, in the per-worktree git dir. It fails closed.
@@ -22,12 +24,13 @@
 # a row fails on the findings CI fails on and passes on the info notes CI ignores.
 # A row that sets SHELLCHECK_OPTS inline overrides it.
 #
-# Usage: bin/lib/prefire-verify [--plan <path>] [--stage matrix|phases|phpunit|pytest|shell|exec-mutations|all]
+# Usage: bin/lib/prefire-verify [--plan <path>] [--stage matrix|phases|phpunit|pytest|shell|exec-mutations|local-mutations|all]
 #                               [--base <ref>] [--bypass <reason>] [--fire-point]
-#   --fire-point  exec-mutations only: use the larger limits (300 s per check run, 1800 s
-#                 total) instead of the implementer's 120 s / 300 s. The fire point's "all" run
-#                 skips that stage, so the flag matters only for a named exec-mutations run.
-#                 bin/post-plan-now passes it; a pass under either limit is the same record.
+#   --fire-point  exec-mutations and local-mutations only: use the larger limits (300 s per
+#                 check run, 1800 s total) instead of the implementer's 120 s / 300 s. The fire
+#                 point's "all" run includes local-mutations, so the flag sets that stage's
+#                 limits there. bin/post-plan-now passes it; a pass under either limit is the
+#                 same record.
 #   --base        base ref for the phpunit, pytest and shell stages' diff (default: git config
 #                 branch.<name>.iblBase, else origin/master)
 # Exit codes:
@@ -46,6 +49,7 @@
 #   PREFIRE_DB_PROBE_CMD   default bin/db-query "SELECT 1", run from the repo root
 #   PREFIRE_PHASES_CMD     default python3 -m harness.conformance, run from tools/postplan-harness/ as "<cmd> --phases <plan> <root>"; empty means the default
 #   PREFIRE_EXEC_MUTATIONS_LIB  default bin/lib/plan-exec-mutations
+#   PREFIRE_PLAN_CHECKS_BLOCK_LIB  default bin/lib/plan-checks-block
 #
 # Environment:
 #   PREFIRE_PHPUNIT_FULL=1  run the full suite; 0, empty or unset maps files to tests and defers unmapped files to CI
@@ -91,9 +95,9 @@ while [ $# -gt 0 ]; do
 done
 
 case "$STAGE" in
-    matrix|phases|phpunit|pytest|shell|exec-mutations|all) : ;;
+    matrix|phases|phpunit|pytest|shell|exec-mutations|local-mutations|all) : ;;
     infection) die 2 "--stage infection was removed; CI's required check \"Infection PHP (per-PR diff)\" covers mutation testing, so skip this call" ;;
-    *) die 2 "--stage must be matrix, phases, phpunit, pytest, shell, exec-mutations, or all (got '$STAGE')" ;;
+    *) die 2 "--stage must be matrix, phases, phpunit, pytest, shell, exec-mutations, local-mutations, or all (got '$STAGE')" ;;
 esac
 case "${PREFIRE_PHPUNIT_FULL:-}" in
     ''|0|1) : ;;
@@ -131,6 +135,7 @@ prefire_tree_hash() {
 }
 
 XM_LIB="${PREFIRE_EXEC_MUTATIONS_LIB:-$SELF_DIR/plan-exec-mutations}"
+PCB_LIB="${PREFIRE_PLAN_CHECKS_BLOCK_LIB:-$SELF_DIR/plan-checks-block}"
 # SIGKILL cannot be trapped, so an earlier exec-mutations run may have left a mutation
 # applied and journalled. Restore it before the tree hash is taken: no stage may run
 # against, or record a pass for, a mutated tree.
@@ -851,8 +856,63 @@ xm_cleanup() { # stop a running lib child, then restore any journalled mutation
     "$XM_LIB" recover --root "$ROOT" >/dev/null 2>&1
 }
 
+# xm_run_judged <label> <run-args...> — run bin/lib/plan-exec-mutations run with
+# the stage limits plus <run-args>, judge its log, and return 0 (every row
+# tripped), 1 (a row did not trip, or a revert failed) or 3 (a prerequisite
+# is missing). exec-mutations passes the plan; local-mutations passes --records.
+xm_run_judged() {
+    local label="$1" log rc
+    shift
+    if ! command -v gtimeout >/dev/null 2>&1 && ! command -v timeout >/dev/null 2>&1; then
+        say "FAIL $label prerequisite missing: gtimeout or timeout (brew install coreutils)" >&2
+        return 3
+    fi
+
+    log="$STATE_DIR/$TREE.$label.log"
+    # The lib traps its own signals and reverts. This stage adds two things: it runs the
+    # lib in the background so a signal interrupts `wait` at once (bash defers traps
+    # while a foreground child runs), and it forwards the signal and runs recover itself.
+    trap 'xm_cleanup' EXIT
+    trap 'xm_cleanup; exit 130' INT
+    trap 'xm_cleanup; exit 143' TERM
+    trap 'xm_cleanup; exit 129' HUP
+    "$XM_LIB" run --root "$ROOT" --timeout "$XM_TIMEOUT" --max-timeout "$XM_MAX_TIMEOUT" \
+        --scale 2 --budget "$XM_BUDGET" "$@" > "$log" 2>&1 &
+    XM_CHILD=$!
+    wait "$XM_CHILD"; rc=$?
+    XM_CHILD=""
+    trap - EXIT INT TERM HUP
+    cat "$log"
+
+    if grep -q '^NO-TIMEOUT' "$log"; then
+        say "FAIL $label prerequisite missing: gtimeout or timeout" >&2
+        return 3
+    fi
+    if [ "$rc" -eq 4 ]; then  # EXEC-LOCKED
+        say "FAIL $label: another plan-exec-mutations run holds this worktree's exec lock; wait for it to finish, then re-run" >&2
+        return 3
+    fi
+    if [ "$rc" -eq 3 ]; then
+        xm_cleanup
+        say "FAIL $label: a mutation could not be reverted or its backup failed; run bin/lib/plan-exec-mutations recover --root $ROOT, check git status, then re-run" >&2
+        return 1
+    fi
+    if [ "$rc" -gt 1 ]; then
+        # The lib died without running its own trap (SIGKILL, OOM), so a mutation may still be
+        # applied and no NEXT-STEP line was printed for the row it was on.
+        xm_cleanup
+        say "FAIL $label: the mutation script stopped unexpectedly (exit $rc); any planted bug was reverted if recover could. Check git status, then re-run" >&2
+        return 1
+    fi
+    if [ "$rc" -ne 0 ] || grep -qE '^(HELD|BASELINE-FAILED|NOT-APPLIED|UNDECIDED|REVERT-FAILED) row ' "$log"; then
+        say "FAIL $label: a row did not trip (exit $rc); follow the NEXT-STEP line under each failing row. Never edit a row's check command or delete a row to get green" >&2
+        return 1
+    fi
+    return 0
+}
+
 stage_exec_mutations() {
-    local xm_key recs log rc
+    local xm_key recs rc
     if [ -z "$PLAN" ]; then
         say "SKIP exec-mutations: no plan (ad-hoc path)"
         return 0
@@ -875,53 +935,57 @@ stage_exec_mutations() {
         return 0
     fi
     rm -f "$recs"
-    if ! command -v gtimeout >/dev/null 2>&1 && ! command -v timeout >/dev/null 2>&1; then
-        say "FAIL exec-mutations prerequisite missing: gtimeout or timeout (brew install coreutils)" >&2
-        return 3
-    fi
-
-    log="$STATE_DIR/$TREE.exec-mutations.log"
-    # The lib traps its own signals and reverts. This stage adds two things: it runs the
-    # lib in the background so a signal interrupts `wait` at once (bash defers traps
-    # while a foreground child runs), and it forwards the signal and runs recover itself.
-    trap 'xm_cleanup' EXIT
-    trap 'xm_cleanup; exit 130' INT
-    trap 'xm_cleanup; exit 143' TERM
-    trap 'xm_cleanup; exit 129' HUP
-    "$XM_LIB" run --root "$ROOT" --timeout "$XM_TIMEOUT" --max-timeout "$XM_MAX_TIMEOUT" \
-        --scale 2 --budget "$XM_BUDGET" "$PLAN" > "$log" 2>&1 &
-    XM_CHILD=$!
-    wait "$XM_CHILD"; rc=$?
-    XM_CHILD=""
-    trap - EXIT INT TERM HUP
-    cat "$log"
-
-    if grep -q '^NO-TIMEOUT' "$log"; then
-        say "FAIL exec-mutations prerequisite missing: gtimeout or timeout" >&2
-        return 3
-    fi
-    if [ "$rc" -eq 4 ]; then  # EXEC-LOCKED
-        say "FAIL exec-mutations: another plan-exec-mutations run holds this worktree's exec lock; wait for it to finish, then re-run" >&2
-        return 3
-    fi
-    if [ "$rc" -eq 3 ]; then
-        xm_cleanup
-        say "FAIL exec-mutations: a mutation could not be reverted or its backup failed; run bin/lib/plan-exec-mutations recover --root $ROOT, check git status, then re-run" >&2
-        return 1
-    fi
-    if [ "$rc" -gt 1 ]; then
-        # The lib died without running its own trap (SIGKILL, OOM), so a mutation may still be
-        # applied and no NEXT-STEP line was printed for the row it was on.
-        xm_cleanup
-        say "FAIL exec-mutations: the mutation script stopped unexpectedly (exit $rc); any planted bug was reverted if recover could. Check git status, then re-run" >&2
-        return 1
-    fi
-    if [ "$rc" -ne 0 ] || grep -qE '^(HELD|BASELINE-FAILED|NOT-APPLIED|UNDECIDED|REVERT-FAILED) row ' "$log"; then
-        say "FAIL exec-mutations: a row did not trip (exit $rc); follow the NEXT-STEP line under each failing row. Never edit a row's check command or delete a row to get green" >&2
-        return 1
-    fi
+    xm_run_judged exec-mutations "$PLAN"; rc=$?
+    [ "$rc" -eq 0 ] || return "$rc"
     write_record exec-mutations "$xm_key"
     say "exec-mutations passed"
+    return 0
+}
+
+# --- local-mutations stage --------------------------------------------------
+# Runs the Executable Mutations records the Plan checks CI job never sees:
+# bin/lib/plan-checks-block local prints the records encode leaves out of the
+# PR-body block (row_runs_in_ci is false for their check). When one of them
+# matches PLAN_ROW_DB_RE it needs the DB, so the stage runs the DB probe first
+# and fails closed (exit 3). A run with no DB-shaped record skips the probe.
+stage_local_mutations() {
+    local lm_key recs rc rrow rfile rcheck rmatch rrepl db_row=""
+    if [ -z "$PLAN" ]; then
+        say "SKIP local-mutations: no plan (ad-hoc path)"
+        return 0
+    fi
+    lm_key=$(git hash-object "$PLAN")
+    cache_hit local-mutations "$lm_key" && return 0
+    recs=$(mktemp "${TMPDIR:-/tmp}/prefire-lm.XXXXXX") || return 3
+    "$PCB_LIB" local "$PLAN" > "$recs"; rc=$?
+    if [ "$rc" -eq 3 ]; then
+        say "FAIL local-mutations: bin/lib/plan-checks-block local exited 3; fix the plan's Verification Matrix or mutation block" >&2
+        rm -f "$recs"; return 1
+    elif [ "$rc" -ne 0 ]; then
+        say "FAIL local-mutations: bin/lib/plan-checks-block local exited $rc" >&2
+        rm -f "$recs"; return 3
+    fi
+    if [ ! -s "$recs" ]; then
+        rm -f "$recs"
+        say "SKIP local-mutations: every Executable Mutations record runs in the Plan checks CI job"
+        return 0
+    fi
+    while IFS= read -r -d '' rrow && IFS= read -r -d '' rfile && IFS= read -r -d '' rcheck \
+        && IFS= read -r -d '' rmatch && IFS= read -r rrepl; do
+        if [ -z "$db_row" ] && grep -qE -- "$PLAN_ROW_DB_RE" <<< "$rcheck"; then db_row="$rrow"; fi
+    done < "$recs"
+    if [ -n "$db_row" ] && [ -n "${PREFIRE_DB_PROBE_CMD:-}" ]; then
+        bash -c "$PREFIRE_DB_PROBE_CMD" </dev/null >/dev/null 2>&1; rc=$?
+        if [ "$rc" -ne 0 ]; then
+            say "FAIL local-mutations prerequisite missing: mutation row $db_row needs the DB and the probe ($PREFIRE_DB_PROBE_CMD) failed; start the stack with bin/wt-stack start <slug>, then re-run" >&2
+            rm -f "$recs"; return 3
+        fi
+    fi
+    xm_run_judged local-mutations --records "$recs"; rc=$?
+    rm -f "$recs"
+    [ "$rc" -eq 0 ] || return "$rc"
+    write_record local-mutations "$lm_key"
+    say "local-mutations passed"
     return 0
 }
 
@@ -959,7 +1023,7 @@ stage_phases() {
 
 # --- run --------------------------------------------------------------------
 case "$STAGE" in
-    all) STAGES="phases matrix phpunit pytest shell" ;;
+    all) STAGES="phases matrix phpunit pytest shell local-mutations" ;;
     *)   STAGES="$STAGE" ;;
 esac
 

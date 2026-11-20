@@ -65,7 +65,8 @@ final class RequireLeagueContextInFactoryRule implements Rule
                 continue;
             }
 
-            $className = $scope->resolveName($new->class);            if (!$this->reflectionProvider->hasClass($className)) {
+            $className = $scope->resolveName($new->class);
+            if (!$this->reflectionProvider->hasClass($className)) {
                 continue;
             }
 
@@ -74,7 +75,8 @@ final class RequireLeagueContextInFactoryRule implements Rule
                 continue;
             }
 
-            $param = $this->findLeagueContextParam($class->getConstructor());            if ($param === null) {
+            $param = $this->findLeagueContextParam($class->getConstructor());
+            if ($param === null) {
                 continue;
             }
 

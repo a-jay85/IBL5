@@ -18,7 +18,7 @@
 # 4 confirmation mismatch, 5 refused under CLAUDE_HEADLESS.
 #
 # Seams (tests stub these): GH_BIN, CURL_BIN, LAUNCHCTL_BIN, PHP_BIN, BUG_PIPELINE_SCRIPTS_DIR,
-# BOT_BASE_URL, BUG_ISSUES_MIGRATE_DIR (default $HOME/claude-plans/_backups; empty is an error),
+# BOT_BASE_URL, BUG_ISSUES_MIGRATE_SLEEP_BIN (default sleep), BUG_ISSUES_MIGRATE_DIR (default $HOME/claude-plans/_backups; empty is an error),
 # BUG_ISSUES_MIGRATE_LAUNCH_AGENTS_DIR, BUG_ISSUES_MIGRATE_CRON_SETUP.
 # Live mode needs BUG_PIPELINE_APPROVER_ID exported, the same value you gave
 # bin/bug-pipeline-cron-setup --install-schedule, because step 12 reinstalls the cron plist.
@@ -55,6 +55,7 @@ GH_BIN="${GH_BIN:-gh}"
 CURL_BIN="${CURL_BIN:-curl}"
 LAUNCHCTL_BIN="${LAUNCHCTL_BIN:-launchctl}"
 PHP_BIN="${PHP_BIN:-php}"
+SLEEP_BIN="${BUG_ISSUES_MIGRATE_SLEEP_BIN:-sleep}"
 SCRIPTS_DIR="${BUG_PIPELINE_SCRIPTS_DIR:-$REPO_ROOT/ibl5/scripts/bug-pipeline}"
 BOT_BASE_URL="${BOT_BASE_URL:-http://127.0.0.1:50001}"
 CRON_SETUP="${BUG_ISSUES_MIGRATE_CRON_SETUP:-$SCRIPT_DIR/bug-pipeline-cron-setup}"
@@ -93,8 +94,46 @@ OLD_URL_RE='https://github\.com/a-jay85/ibl5-bugs/issues/[0-9]+'
 gh() { command "$GH_BIN" "$@"; }
 launchctl() { command "$LAUNCHCTL_BIN" "$@"; }
 
+nap() { command "$SLEEP_BIN" "$1"; }
+
 say() { printf '%s\n' "$*"; }
 die() { local code="$1"; shift; printf 'ERROR: %s\n' "$*" >&2; exit "$code"; }
+
+# repo_edit_retry <public|private>: flip OLD's visibility, retrying while GitHub is still
+# settling a previous change. 10 tries, 10s apart. Returns 1 when every try failed.
+repo_edit_retry() {
+    local vis="$1" i=0
+    while [ "$i" -lt 10 ]; do
+        i=$((i + 1))
+        if gh repo edit "$OLD" --visibility "$vis" --accept-visibility-change-consequences >/dev/null 2>&1; then
+            return 0
+        fi
+        if [ "$i" -lt 10 ]; then nap 10; fi
+    done
+    return 1
+}
+
+old_visibility() { gh repo view "$OLD" --json visibility --jq .visibility 2>/dev/null || true; }
+
+# ensure_visibility <PUBLIC|PRIVATE>: GitHub applies a visibility switch asynchronously, and a
+# transfer right after the flip fails with "Old issue is not transferrable". Flip if needed,
+# wait until the view agrees, then give GitHub 30s more to settle.
+ensure_visibility() {
+    local want="$1" lower i=0 cur
+    lower="$(printf '%s' "$want" | tr 'A-Z' 'a-z')"
+    cur="$(old_visibility)"
+    if [ "$cur" != "$want" ]; then
+        repo_edit_retry "$lower" || die 1 "could not make $OLD $lower (gh repo edit failed 10 times)"
+    fi
+    while :; do
+        cur="$(old_visibility)"
+        if [ "$cur" = "$want" ]; then break; fi
+        i=$((i + 1))
+        if [ "$i" -ge 30 ]; then die 1 "$OLD never reported $want (last seen: ${cur:-nothing})"; fi
+        nap 2
+    done
+    nap 30
+}
 
 # act <cmd...>: run it in live mode, print it in dry-run mode.
 act() {
@@ -270,21 +309,16 @@ CRON_PAUSED=0
 RESUMED=0
 LOCK_OWNED=0
 on_exit() {
-    local rc=$? i cleaned=0
+    local rc=$? cleaned=0
     trap - EXIT
     if [ "$LIVE" = 1 ] && [ "$STARTED" = 1 ]; then
         if [ "$FLIPPED" = 1 ]; then
             cleaned=1
-            i=0
-            while [ "$i" -lt 3 ]; do
-                i=$((i + 1))
-                if "$GH_BIN" repo edit "$OLD" --visibility private --accept-visibility-change-consequences >/dev/null 2>&1; then
-                    FLIPPED=0
-                    st_del flip_public=1
-                    st_del step_flip_public=done
-                    break
-                fi
-            done
+            if repo_edit_retry private; then
+                FLIPPED=0
+                st_del flip_public=1
+                st_del step_flip_public=done
+            fi
             if [ "$FLIPPED" = 1 ]; then
                 printf 'ERROR: could not make %s private again. Fix it by hand NOW: gh repo edit %s --visibility private --accept-visibility-change-consequences\n' "$OLD" "$OLD" >&2
             fi
@@ -361,7 +395,11 @@ if step_begin 3 flip_public; then
         FLIPPED=1
         st_add flip_public=1
     fi
-    act gh repo edit "$OLD" --visibility public --accept-visibility-change-consequences
+    if [ "$LIVE" = 1 ]; then
+        ensure_visibility PUBLIC
+    else
+        act gh repo edit "$OLD" --visibility public --accept-visibility-change-consequences
+    fi
     step_end
 elif [ "$LIVE" = 1 ] && st_has flip_public=1 && ! st_has flip_private=1; then
     # A prior run left OLD public (its restore failed or it was killed). This run owns the restore.
@@ -370,22 +408,37 @@ fi
 
 # 4 ── transfer the issues
 if step_begin 4 transfer; then
+    if [ "$LIVE" = 1 ]; then
+        # Covers a resume where OLD was made private by hand after step 3 finished.
+        FLIPPED=1
+        ensure_visibility PUBLIC
+    fi
     for n in $(seq "$FIRST" "$LAST"); do
         if [ "$LIVE" != 1 ]; then
             printf 'DRY-RUN: gh issue transfer %s %s --repo %s\n' "$n" "$NEW" "$OLD"
             continue
         fi
         if [ -n "$(st_get "transfer_$n")" ]; then continue; fi
-        url="$(gh issue view "$n" --repo "$OLD" --json url --jq .url)"
-        case "$url" in
-            "https://github.com/$NEW/issues/"*)
-                new="${url##*/}" ;;
-            *)
-                out="$(gh issue transfer "$n" "$NEW" --repo "$OLD")"
-                new=""
+        new=""
+        attempt=0
+        while :; do
+            # Re-read the url each pass: an earlier attempt may have landed after gh reported failure.
+            url="$(gh issue view "$n" --repo "$OLD" --json url --jq .url)" || url=""
+            case "$url" in
+                "https://github.com/$NEW/issues/"*)
+                    new="${url##*/}"
+                    break ;;
+            esac
+            attempt=$((attempt + 1))
+            if out="$(gh issue transfer "$n" "$NEW" --repo "$OLD")"; then
                 last_line="${out##*$'\n'}"
-                if [[ "$last_line" =~ /issues/([0-9]+)$ ]]; then new="${BASH_REMATCH[1]}"; fi ;;
-        esac
+                if [[ "$last_line" =~ /issues/([0-9]+)$ ]]; then new="${BASH_REMATCH[1]}"; fi
+                break
+            fi
+            if [ "$attempt" -ge 5 ]; then die 1 "transfer of old issue $n failed $attempt times"; fi
+            say "   transfer of #$n failed (attempt $attempt of 5); waiting 15s"
+            nap 15
+        done
         [[ "$new" =~ ^[0-9]+$ ]] || die 1 "could not read the new number for old issue $n"
         st_add "transfer_$n=$new"
         say "   #$n -> #$new"
@@ -401,10 +454,12 @@ if step_begin 5 flip_private; then
         say "   OLD is already private (state file); skipping the visibility edit"
         FLIPPED=0
     else
-        act gh repo edit "$OLD" --visibility private --accept-visibility-change-consequences
         if [ "$LIVE" = 1 ]; then
+            repo_edit_retry private || die 1 "could not make $OLD private (gh repo edit failed 10 times)"
             FLIPPED=0
             st_add flip_private=1
+        else
+            act gh repo edit "$OLD" --visibility private --accept-visibility-change-consequences
         fi
     fi
     if [ "$OLD_ARCHIVED" = 1 ]; then

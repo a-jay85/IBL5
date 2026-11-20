@@ -143,8 +143,56 @@ def test_gate_held_thread_stays_out_of_round(tmp_path, monkeypatch):
     rec, calls = _run(tmp_path, fx, res, gh, monkeypatch)
     assert calls == []
     assert rec["items"] == []
-    assert (rec["status"], rec["reason"]) == ("no-change", "no-commit")
+    assert (rec["status"], rec["reason"]) == ("no-change", "nothing-to-fix")
     assert rec["reevaluate"] is False
+
+
+def test_gate_held_and_open_thread_round_reports_nothing_to_fix(tmp_path, monkeypatch):
+    fx, res, gh, _rows = _load("gate_path_check_docs.json", monkeypatch)
+    rec, calls = _run(tmp_path, fx, res, gh, monkeypatch)
+    assert calls == []
+    assert (rec["status"], rec["reason"]) == ("no-change", "nothing-to-fix")
+    assert rec["items"] == []
+    assert rec["collect_skips"] == {"gate_held": 1, "open_thread": 1}
+
+
+def test_round_with_disposed_item_keeps_no_commit_reason(tmp_path, monkeypatch):
+    fx, res, gh, _rows = _load("reply_only_conflict_summary.json", monkeypatch)
+    rec, calls = _run(tmp_path, fx, res, gh, monkeypatch, outcome="declined-already-fixed")
+    assert len(calls) == 1
+    assert (rec["status"], rec["reason"]) == ("no-change", "no-commit")
+
+
+def _run_targets(tmp_path, monkeypatch, targets, **kw):
+    """One round on a result with nothing to collect, so only the wired fixer can act."""
+    res = RunResult(terminal="x")
+    monkeypatch.setattr(fix_round.thread_ingestion, "fetch_trusted_threads",
+                        lambda gh_, pr, ids, **k: [])
+    git = _Git()
+    return fix_round.run_fix_round(
+        decision=_decision(*targets), res=res, gh=_Gh(), llm=_Llm(), git=git,
+        worktree=str(tmp_path), plan=None, pr=PR, out_dir=str(tmp_path), log=lambda m: None,
+        commit=lambda msg: git.commit(msg),
+        recheck=lambda pre: {"new_holding": [], "conformance_added": [], "degraded": False},
+        already_tried=False, env={}, **kw)
+
+
+def test_fidelity_reason_decides_nothing_to_fix(tmp_path, monkeypatch):
+    ran = _run_targets(tmp_path, monkeypatch, [12],
+                       fidelity_fix=lambda remaining: {"ran": True, "blockers": 1,
+                                                       "outcome": "no-edits"})
+    assert (ran["status"], ran["reason"]) == ("no-change", "no-commit")
+    idle = _run_targets(tmp_path, monkeypatch, [12],
+                        fidelity_fix=lambda remaining: {"ran": False, "reason": "no-file-blocker"})
+    assert (idle["status"], idle["reason"]) == ("no-change", "nothing-to-fix")
+
+
+def test_conflict_rereview_keeps_no_commit_reason(tmp_path, monkeypatch):
+    verdict = sorted(fix_round._DECIDED_VERDICTS)[0]
+    rec = _run_targets(tmp_path, monkeypatch, [14],
+                       conflict_rereview=lambda: (verdict, 1, "reviewed"))
+    assert (rec["status"], rec["reason"]) == ("no-change", "no-commit")
+    assert rec["conflict_rereview"]["verdict"] == verdict
 
 
 def test_reply_only_round_sets_reevaluate(tmp_path, monkeypatch):

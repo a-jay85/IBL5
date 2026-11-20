@@ -486,7 +486,10 @@ def run_fix_round(*, decision, res, gh, llm, git, worktree, plan, pr, out_dir, l
             _prove_mutations()
             _rereview_conflict()
             record["status"] = "no-change"
-            record["reason"] = "no-commit"
+            acted = (items or mi or held_worked or stale
+                     or record["fidelity"].get("ran")
+                     or record["conflict_rereview"])
+            record["reason"] = "no-commit" if acted else "nothing-to-fix"
             record["reevaluate"] = (bool(defer) or bool(record["row_repairs"])
                                     or record["conflict_rereview"].get("verdict") in _DECIDED_VERDICTS)
             record["defer"] = defer

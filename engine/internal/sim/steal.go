@@ -2,7 +2,6 @@ package sim
 
 import (
 	"github.com/a-jay85/IBL5/engine/internal/result"
-	"github.com/a-jay85/IBL5/engine/internal/rng"
 )
 
 // The live JSB 5.60 code-4 turnover path (live trace
@@ -15,16 +14,29 @@ import (
 // offensiveFoulOnTurnover is the share of code-4 turnovers that become offensive fouls.
 const offensiveFoulOnTurnover = 0.1 // const 0.1 at 0x4da7a0, live trace 2026-11-16
 
-// stealPool is the defense's steal pool from FUN_004e2fc0: Σ over defenders of
-// stlRate (+0xDD0, STL/MIN×44) × fatigue, capped at
-// defQualityCapMultiplier·defQualityCapTeamMult·leagueSTL48 (the def_matchup_quality
-// ceiling, 0x4e3222).
-func stealPool(defense *teamState) float64 {
+// stealCapLeagueSTL48 is the league STL/48 the steal cap reads at runtime,
+// 2.043 in the live trace of the steal roll (row league STL/48, see
+// engine/docs/j27-live-outcome-map-port.md Residuals). JSB keeps one league
+// STL/48 value; the foul-bucket baseline still reads leagueSTL48 (1.834)
+// until that file's owner moves it, so the two stay separate here.
+const stealCapLeagueSTL48 = 2.043
+
+// stealTermSum is the uncapped steal total from FUN_004e2fc0: Σ over defenders of
+// stlRate (+0xDD0, STL/MIN×44) × fatigue.
+func stealTermSum(defense *teamState) float64 {
 	var total float64
 	for _, d := range defense.players {
 		total += stlRate(d) * d.fatigue
 	}
-	ceiling := defQualityCapMultiplier * defQualityCapTeamMult * leagueSTL48
+	return total
+}
+
+// stealPool is the defense's steal pool from FUN_004e2fc0: stealTermSum capped at
+// defQualityCapMultiplier·defQualityCapTeamMult·stealCapLeagueSTL48 (the
+// def_matchup_quality ceiling, 0x4e3222).
+func stealPool(defense *teamState) float64 {
+	total := stealTermSum(defense)
+	ceiling := defQualityCapMultiplier * defQualityCapTeamMult * stealCapLeagueSTL48
 	if total > ceiling {
 		return ceiling
 	}
@@ -43,11 +55,11 @@ func turnoverPool(offense *teamState) float64 {
 
 // resolveTurnoverPath runs the code-4 turnover path for ball handler bh and
 // reports whether it ended in a steal (which arms the defense's fast break).
-// Draw order: the offensive-foul draw, then the steal roll, then the stealer
-// pick on a steal. An offensive foul charges bh a turnover and a personal foul
+// Draw order: the offensive-foul draw, then the steal roll. On a steal the
+// stealer pick reuses the steal roll and draws nothing. An offensive foul charges bh a turnover and a personal foul
 // tagged FoulSiteOffensiveTurnover (feeding foul-out like any other foul), counts
 // toward the offense's team fouls, and shoots no free throws. JSB picks the
-// stealer from the same steal roll; this port picks it with selectStealer.
+// stealer from the same steal roll, and so does this port (pickStealerFromRoll).
 func (gs *gameState) resolveTurnoverPath(offense, defense *teamState, bh onCourt, code outcomeCode) bool {
 	gs.emit(result.Event{
 		Kind: result.EventTurnover, Period: gs.period, Clock: gs.clock,
@@ -66,7 +78,7 @@ func (gs *gameState) resolveTurnoverPath(offense, defense *teamState, bh onCourt
 		observePathEnd(code, pathEndTurnover)
 		return false
 	}
-	stealer, _ := selectStealer(defense, gs.rng)
+	stealer, _ := pickStealerFromRoll(defense, roll)
 	gs.emit(result.Event{
 		Kind: result.EventSteal, Period: gs.period, Clock: gs.clock,
 		TeamID: offense.teamID, PlayerID: bh.PID, DefenderID: stealer.PID,
@@ -75,35 +87,30 @@ func (gs *gameState) resolveTurnoverPath(offense, defense *teamState, bh onCourt
 	return true
 }
 
-// selectStealer picks which defender is credited a steal, by weighted random
-// over STL_rating × fatigue (a careless turnover is taken by an active, ball-
-// hawking defender). The second return is false when every defender has a zero
-// weight (an all-unrated roster): the caller still gets players[0] but the pick
-// was a fallback, never a divide-by-zero. Mirrors selectDefender/selectRebounder.
-func selectStealer(defense *teamState, r *rng.RNG) (onCourt, bool) {
+// pickStealerFromRoll credits the steal from the steal roll itself, the way
+// FUN_004e2fc0 does: defenders own consecutive half-open bins (prev, cum] of
+// width stlRate × fatigue in lineup order, and the bin holding roll wins. When
+// the uncapped total passes the cap, JSB scales every bin edge by
+// stealPool/total, so the bins split the capped pool in proportion to each
+// defender's term. A zero-width bin never matches. No bin matching (roll beyond
+// the bins, or roll == 0 on a zero first bin) returns the last defender with
+// false; an empty defense returns the zero onCourt with false. It draws no RNG.
+func pickStealerFromRoll(defense *teamState, roll float64) (onCourt, bool) {
 	if len(defense.players) == 0 {
 		return onCourt{}, false
 	}
-	weights := make([]float64, len(defense.players))
-	var sum float64
-	for i, p := range defense.players {
-		w := float64(p.STL) * p.fatigue
-		if w < 0 {
-			w = 0
+	scale := 1.0
+	if total, pool := stealTermSum(defense), stealPool(defense); total > pool {
+		scale = pool / total
+	}
+	var raw, prev float64
+	for _, d := range defense.players {
+		raw += stlRate(d) * d.fatigue
+		cum := raw * scale
+		if roll > prev && roll <= cum {
+			return d, true
 		}
-		weights[i] = w
-		sum += w
+		prev = cum
 	}
-	if sum <= 0 {
-		return defense.players[0], false
-	}
-	roll := r.Float64() * sum
-	var acc float64
-	for i, w := range weights {
-		acc += w
-		if roll <= acc {
-			return defense.players[i], true
-		}
-	}
-	return defense.players[len(defense.players)-1], true
+	return defense.players[len(defense.players)-1], false
 }

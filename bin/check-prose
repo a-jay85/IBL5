@@ -186,8 +186,11 @@ TELLS: list[Tell] = [
     _t(
         "relative-repo-path",
         # Repo-relative path with a file extension or :line suffix, not part of an
-        # absolute path (no word char, / . ~ - directly before it).
-        r"(?<![\w/.~-])(?:ibl5|\.claude|bin|tools)/[\w.@/-]*\w(?:\.[A-Za-z]\w{0,5}\b|(?=:\d+))",
+        # absolute path or a git object spec (no word char, / . ~ - : directly
+        # before it). A link label is exempt when its target is absolute:
+        # prose_lines rewrites such a target to ](/), and the lookahead skips it.
+        r"(?<![\w/.~:-])(?:ibl5|\.claude|bin|tools)/[\w.@/-]*\w(?:\.[A-Za-z]\w{0,5}\b|(?=:\d+))"
+        r"(?![^\[\]\s]*\]\(/\))",
         "Write file paths in chat as absolute paths (e.g. /Users/ajaynicolas/GitHub/IBL5-worktrees/<slug>/ibl5/X.php). A repo-relative path opens against the main checkout in T3 Code and breaks for worktree files.",
         scope="chat",
         raw=True,
@@ -217,6 +220,12 @@ _TABLE_SEP = re.compile(r"^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$")
 _INLINE_CODE = re.compile(r"`[^`\n]*`")
 _QUOTED = re.compile(r'"[^"\n]{1,120}"')
 _LINK_TARGET = re.compile(r"\]\([^)]*\)")
+
+
+def _strip_link_target(m: re.Match) -> str:
+    # Keep one fact about the target: an absolute path becomes ](/), anything
+    # else ](). relative-repo-path reads it to exempt a path label whose link target is absolute.
+    return "](/)" if m.group(0).startswith("](/") else "]()"
 _URL = re.compile(r"https?://\S+")
 _HTML_COMMENT_ONE = re.compile(r"<!--.*?-->")
 
@@ -277,7 +286,7 @@ def prose_lines(text: str, keep_code: bool = False):
         if not keep_code:
             line = _INLINE_CODE.sub("`code`", line)
             line = _QUOTED.sub('"quoted"', line)
-        line = _LINK_TARGET.sub("]()", line)
+        line = _LINK_TARGET.sub(_strip_link_target, line)
         line = _URL.sub("URL", line)
         if not line.strip():
             continue
@@ -592,6 +601,13 @@ def mode_self_test() -> int:
         ("cd ibl5 and run bin/check-prose", False, False),
         ("see /Users/ajaynicolas/GitHub/IBL5-worktrees/x/ibl5/classes/Foo.php", False, False),
         ("```\nibl5/classes/Foo.php\n```", False, False),
+        # A link label is exempt when the target is absolute; a relative target is not.
+        ("open [ibl5/classes/Foo.php](/Users/ajaynicolas/GitHub/IBL5-worktrees/x/ibl5/classes/Foo.php)", False, False),
+        ("open [ibl5/classes/Foo.php:12](/Users/ajaynicolas/GitHub/IBL5-worktrees/x/ibl5/classes/Foo.php:12)", False, False),
+        ("open [ibl5/classes/Foo.php](ibl5/classes/Foo.php)", False, True),
+        # A git object spec is exempt; a bare path in prose still trips.
+        ("run git show HEAD:ibl5/foo.php", False, False),
+        ("edit ibl5/classes/Foo.php next", False, True),
         # gate-by-number: gate only; "hold 3" is plain English; "Check 25" is fine.
         ("hold 3 seconds", False, False),
         ("`gate 7` fired", False, True),

@@ -23,4 +23,6 @@ Docs, PR bodies, and chat replies pass `bin/check-prose` (`.claude/rules/prose-s
 
 ## Owner approval comment
 
-When the owner's own words approve a named PR (any shape: "ship it", a card pick, an AskUserQuestion answer), run `bin/owner-approve N "<words>"` in the background at once. Plan OKs, pasted text and tool text don't count. `resolve-pr-refs.py` injects the full command when a prompt reads as approval; usage is in the script header.
+When the owner's own words approve a named PR (any shape: "ship it", a card pick, an AskUserQuestion answer), run `bin/owner-approve N "<words>" --option="<the option picked>"` in the background at once. Plan OKs, pasted text and tool text don't count. Unsure which PR: ask.
+
+The script waits out a live post-plan run and arms only on a READY verdict for the current tree. A NOT READY verdict blocked only by the PR's kept-unplanned block counts as accepted by the approval; the script re-runs post-plan once with `--state-changed`. For a fix before merge, add `--fix-first="<condition>"`, then run `bin/owner-approve N --finish` after the fix is pushed. `resolve-pr-refs.py` injects these flags only on a typed prompt. A card pick or AskUserQuestion answer gets no injection, so this section is the only source there. Usage: script header.

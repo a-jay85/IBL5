@@ -7,6 +7,7 @@
 # One script owns both sides, so the encoder and the decoder cannot drift.
 #
 # Usage: bin/lib/plan-checks-block encode <plan>
+#        bin/lib/plan-checks-block local <plan>
 #        bin/lib/plan-checks-block decode <body-file> <outdir>
 #        bin/lib/plan-checks-block needs --body-file F
 #        bin/lib/plan-checks-block ci --body-file F --labels-file L
@@ -16,6 +17,10 @@
 #         Records: bin/lib/plan-exec-mutations parse output. Exit 3 when the
 #         plan has no Verification Matrix or parse fails; exit 5 when the
 #         block is over 32768 bytes.
+# local   print, in the parse byte format, the mutation records encode
+#         leaves out of the block (row_runs_in_ci is false for their check).
+#         bin/lib/prefire-verify runs them in its local-mutations stage.
+#         Exit 3 as for encode.
 # decode  write <outdir>/rows.tsv (num TAB cmd) and <outdir>/records.nul (the
 #         exact parse byte format). Exit 0 ok; 4 no begin marker; 3 corrupt.
 # needs   print db=, web=, bun=, actionlint= lines (0 or 1): the stacks the
@@ -25,7 +30,7 @@
 #         exactly `plan-checks`. Rewrites localhost URLs (ci_host_rewrite) and
 #         fails a row whose stack's IBL_CI_<DB|WEB|BUN>_READY is not 1.
 #         Exit 0 pass; 1 fail.
-# All four exit 2 on a usage error.
+# All five exit 2 on a usage error.
 
 set -uo pipefail
 
@@ -36,6 +41,7 @@ source "$SELF_DIR/plan-matrix-rows.sh"
 
 usage() {
     echo "Usage: bin/lib/plan-checks-block encode <plan>" >&2
+    echo "       bin/lib/plan-checks-block local <plan>" >&2
     echo "       bin/lib/plan-checks-block decode <body-file> <outdir>" >&2
     echo "       bin/lib/plan-checks-block needs --body-file F" >&2
     echo "       bin/lib/plan-checks-block ci --body-file F --labels-file L" >&2
@@ -183,17 +189,47 @@ sys.exit(decode(sys.argv[2], sys.argv[3]))
 ' "$@"
 }
 
-do_encode() {
-    local plan="$1" rows rows_rc num cmd tmp recs_rc prev dup
-    rows=$(plan_matrix_rows "$plan"); rows_rc=$?
+# load_records <plan> <tmpdir> — the one partition encode and local share.
+# Reads the plan's matrix rows into MATRIX_ROWS and PLAN_ROW_ALL_CMDS
+# (row_runs_in_ci reads the whole row set to tell whether another row reads
+# a /tmp file a CI row writes; _tmp_write_scrub in plan-matrix-rows.sh),
+# parses the mutation records, and splits them: <tmpdir>/records.ci gets
+# each record whose check row_runs_in_ci sends to CI, <tmpdir>/records.local
+# gets the rest. Return 3 when the plan has no Verification Matrix or parse fails.
+load_records() {
+    local plan="$1" tmp="$2" rows_rc recs_rc rrow rfile rcheck rmatch rrepl
+    MATRIX_ROWS=$(plan_matrix_rows "$plan"); rows_rc=$?
     if [ "$rows_rc" -eq 2 ]; then
         echo "FAIL plan has no Verification Matrix" >&2
         return 3
     fi
-    # row_runs_in_ci reads the whole row set to tell whether another row reads
-    # a /tmp file a CI row writes (_tmp_write_scrub in plan-matrix-rows.sh).
-    PLAN_ROW_ALL_CMDS="$rows"
+    PLAN_ROW_ALL_CMDS="$MATRIX_ROWS"
+    "$SELF_DIR/plan-exec-mutations" parse "$plan" > "$tmp/records.nul"; recs_rc=$?
+    if [ "$recs_rc" -ne 0 ]; then
+        echo "FAIL plan-exec-mutations parse exited $recs_rc: $(head -1 "$tmp/records.nul" | tr '\0' ' ')" >&2
+        return 3
+    fi
+    : > "$tmp/records.ci"
+    : > "$tmp/records.local"
+    while IFS= read -r -d '' rrow <&3 \
+        && IFS= read -r -d '' rfile <&3 && IFS= read -r -d '' rcheck <&3 \
+        && IFS= read -r -d '' rmatch <&3 && IFS= read -r rrepl <&3; do
+        if row_runs_in_ci "$rcheck"; then
+            printf '%s\0%s\0%s\0%s\0%s\n' "$rrow" "$rfile" "$rcheck" "$rmatch" "$rrepl" >> "$tmp/records.ci"
+        else
+            printf '%s\0%s\0%s\0%s\0%s\n' "$rrow" "$rfile" "$rcheck" "$rmatch" "$rrepl" >> "$tmp/records.local"
+        fi
+    done 3< "$tmp/records.nul"
+    return 0
+}
+
+do_encode() {
+    local plan="$1" num cmd tmp prev dup
     tmp=$(mktemp -d "${TMPDIR:-/tmp}/plan-checks.XXXXXX") || return 3
+    if ! load_records "$plan" "$tmp"; then
+        rm -rf "$tmp"
+        return 3
+    fi
     : > "$tmp/rows.tsv"
     local seen=()
     while IFS=$'\t' read -r num cmd; do
@@ -206,25 +242,23 @@ do_encode() {
         [ "$dup" -eq 0 ] || continue
         seen+=("$cmd")
         printf '%s\t%s\n' "$num" "$cmd" >> "$tmp/rows.tsv"
-    done <<< "$rows"
-    "$SELF_DIR/plan-exec-mutations" parse "$plan" > "$tmp/records.nul"; recs_rc=$?
-    if [ "$recs_rc" -ne 0 ]; then
-        echo "FAIL plan-exec-mutations parse exited $recs_rc: $(head -1 "$tmp/records.nul" | tr '\0' ' ')" >&2
-        rm -rf "$tmp"
-        return 3
-    fi
-    # Keep only records whose check command runs in CI (same filter as the rows).
-    : > "$tmp/records.ci"
-    local rrow rfile rcheck rmatch rrepl
-    while IFS= read -r -d '' rrow <&3 \
-        && IFS= read -r -d '' rfile <&3 && IFS= read -r -d '' rcheck <&3 \
-        && IFS= read -r -d '' rmatch <&3 && IFS= read -r rrepl <&3; do
-        row_runs_in_ci "$rcheck" || continue
-        printf '%s\0%s\0%s\0%s\0%s\n' "$rrow" "$rfile" "$rcheck" "$rmatch" "$rrepl" >> "$tmp/records.ci"
-    done 3< "$tmp/records.nul"
+    done <<< "$MATRIX_ROWS"
     codec encode "$tmp/rows.tsv" "$tmp/records.ci" "$CAP"; rc=$?
     rm -rf "$tmp"
     return "$rc"
+}
+
+# do_local <plan> — print the records encode leaves out (load_records).
+do_local() {
+    local tmp
+    tmp=$(mktemp -d "${TMPDIR:-/tmp}/plan-checks.XXXXXX") || return 3
+    if ! load_records "$1" "$tmp"; then
+        rm -rf "$tmp"
+        return 3
+    fi
+    cat "$tmp/records.local"
+    rm -rf "$tmp"
+    return 0
 }
 
 # ci_stacks_ready <what> <needs tokens> — the readiness guard. Each db, web or
@@ -405,6 +439,11 @@ case "$MODE" in
         done
         [ -n "$BODY" ] && [ -r "$BODY" ] && [ -n "$LABELS" ] && [ -r "$LABELS" ] || usage
         do_ci "$BODY" "$LABELS"; exit $?
+        ;;
+    local)
+        [ "$#" -eq 1 ] || usage  # local takes one plan path
+        [ -r "$1" ] || usage  # local: unreadable plan or a flag
+        do_local "$1"; exit $?
         ;;
     *) usage ;;
 esac

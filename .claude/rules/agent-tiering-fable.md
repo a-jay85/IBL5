@@ -1,5 +1,5 @@
 ---
-description: Read-on-demand only (no auto-attach trigger) — when Fable is justified over Opus, and how to use it, effort per surface, how the /plan architect tier is judged. Ask the owner before any Fable spawn; state the justification in one line. Parent agent-tiering.md carries the resident one-line summary., plus the Haiku 5.5 measurement and price cliff
+description: Read-on-demand only (no auto-attach trigger) — when Fable is justified over Opus, and how to use it, effort per surface, how the /plan architect tier is judged. Ask the owner before any Fable spawn; state the justification in one line. Parent agent-tiering.md carries the resident one-line summary. Also holds the Haiku 5.5 measurement and price cliff.
 last_verified: 2026-11-20
 paths: ".claude/rules/agent-tiering-fable.md"
 ---

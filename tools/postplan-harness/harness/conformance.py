@@ -532,10 +532,13 @@ def _matrix_assertion_items(plan: PlanInfo, diff_body: str, pr_body: str,
 def _method_declared(name: str, text: str) -> bool:
     """True when `text` declares `name`: a PHP/Python `function name` / `def name`, or a
     bash-style bare `name() {` anchored at start of line (optional diff `+` and indent)
-    so a call site like `$this->name()` never counts (backlog#1133)."""
+    so a call site like `$this->name()` never counts (backlog#1133). A Go `func Name(` or
+    receiver `func (r *T) Name(` declaration also counts, anchored at line start (optional
+    diff `+` or indent); generic `Name[` is accepted (backlog#1934)."""
     return re.search(
         rf"(function|def)\s+{re.escape(name)}\b"
-        rf"|^[+\s]*{re.escape(name)}\s*\(\s*\)",
+        rf"|^[+\s]*{re.escape(name)}\s*\(\s*\)"
+        rf"|^[+\s]*func\s+(\([^)]*\)\s*)?{re.escape(name)}\s*[\[(]",
         text,
         re.MULTILINE,
     ) is not None

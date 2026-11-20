@@ -563,7 +563,7 @@ def test_named_paths_line_suffix_off_by_default():
 def test_eligible_paths_ignores_line_suffix():
     from harness import fidelity_filefix as ff
     rules = ".claude/rules/ci-gotchas.md"
-    assert ff.eligible_paths([f"[BLOCKING] `{rules}:26` is wrong."], [rules]) == frozenset()
+    assert ff.eligible_paths([f"- [BLOCKING] `{rules}:26` is wrong."], [rules]) == frozenset()
 
 
 def test_named_paths_line_suffix_near_miss():
@@ -576,15 +576,8 @@ def test_named_paths_line_suffix_near_miss():
 def test_fr_fidelity_fix_accepts_line_suffixed_blocker(rig, monkeypatch, fid_pr):
     pr = fid_pr(7303)
     monkeypatch.setattr(runner.unplanned_scope, "downgrade_applies", lambda *a, **k: False)
-    built = []
-
-    def boom(*a, **k):
-        built.append(1)
-        raise HarnessError("stop-here", "test stops after the packet call")
-
-    monkeypatch.setattr(runner.fidelity, "build_packet", boom)
     res = rig.run(_not_ready_llm(rig, f"`{PATH}:1587` still drops the row."), extra=_pr_extra(pr))
-    assert built
+    assert res.fix_round["fidelity"].get("ran") is True
     assert res.fix_round["fidelity"].get("reason") != "no-file-blocker"
 
 

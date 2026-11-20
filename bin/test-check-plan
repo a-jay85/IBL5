@@ -687,6 +687,21 @@ if h_shard_take; then
         h_fail "gateNC-print-caps-reject" "exit codes were $_nc_rc1 and $_nc_rc2, want 2 and 2"
     fi
 fi
+if h_shard_take; then
+    # A ref with no .claude/rules/*.md leaves the row array empty. bash 3.2
+    # under set -u used to die "unbound variable" there. Run it under /bin/bash.
+    _nc_empty_tree=$(git -C "$SCRIPT_DIR/.." hash-object -t tree -w /dev/null)
+    _nc_empty_ref=$(GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t \
+        git -C "$SCRIPT_DIR/.." commit-tree "$_nc_empty_tree" -m empty < /dev/null)
+    _nc_err=$(mktemp)
+    _nc_out=$(/bin/bash "$NC_RULES_CAPS" --print-caps --ref="$_nc_empty_ref" 2>"$_nc_err"); _nc_rc3=$?
+    _nc_errtxt=$(cat "$_nc_err"); rm -f "$_nc_err"
+    if [ "$_nc_rc3" -eq 0 ] && [ -z "$_nc_out" ] && [ -z "$_nc_errtxt" ]; then
+        h_pass "gateNC-print-caps on a ref with no rules: exit 0, no rows, no stderr (/bin/bash)"
+    else
+        h_fail "gateNC-print-caps-empty-ref" "exit $_nc_rc3, stdout '$_nc_out', stderr '$_nc_errtxt'"
+    fi
+fi
 # 9. Architect contract row comes from the contract-split script (row 14).
 _nc_contract_room=$("$NC_CONTRACT_CAPS" --print-caps --ref=HEAD | awk -F'\t' -v p="$NC_CONTRACT" '$1 == p { print $5 }')
 if _nc_run gateNC-architect-contract "$(_nc_cf "- \`$NC_CONTRACT\` (extend)")"; then

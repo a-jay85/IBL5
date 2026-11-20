@@ -141,7 +141,8 @@ if (( PRINT_CAPS )); then
     fi
   done <<< "$_rule_list"
   _tot_room=$((MAX_TOTAL - _res_total))
-  for _r in "${_rows[@]}"; do
+  # bash 3.2 + set -u: a bare "${_rows[@]}" on an empty array is "unbound".
+  for _r in ${_rows[@]+"${_rows[@]}"}; do
     read -r _rel _cls _cap _b <<< "$_r"
     _room=$((_cap - _b))
     if [ "$_cls" = resident ] && [ "$_tot_room" -lt "$_room" ]; then _room=$_tot_room; fi

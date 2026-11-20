@@ -131,6 +131,8 @@ claim_file_lying_mkdir_stub "$LM/lie"
     echo 'set -u'
     echo 'NIGHTLY_DIR="$1"; LOG="$1/log"; export PATH="$2:$PATH"'
     printf '. "%s"\n' "$GATE_LIB"
+    printf '. "%s/claim-file.sh"\n' "$(dirname "$GATE_LIB")"
+    iso_region _cost_lock_stale
     iso_region acquire_cost_lock
     cat <<'PROBE'
 if acquire_cost_lock; then
@@ -164,6 +166,8 @@ fi
     echo 'CAP_DEFERRED=" "; DEPENDS_HELD=" "; SINGLE_PLAN=""; RESUME_PLAN=""; RESUME_SID=""'
     printf '. "%s"\n' "$GATE_LIB"
     printf '. "%s/../automouse/lib-queue-order"\n' "$(dirname "$GATE_LIB")"
+    printf '. "%s/claim-file.sh"\n' "$(dirname "$GATE_LIB")"
+    iso_region _plan_lock_stale
     iso_region claim_next_plan
     cat <<'PROBE'
 out=$(claim_next_plan); rc=$?
@@ -187,6 +191,79 @@ if [ "$cn_wins" = 1 ] && [ -n "$cn_pid" ] && [ "$cn_pid" = "$cn_win_pid" ]; then
     row_ok claim_next_plan_lying_mkdir_one_claimer
 else
     row_fail claim_next_plan_lying_mkdir_one_claimer "wins=$cn_wins pidfile=[$cn_pid] winner=[$cn_win_pid]"
+fi
+
+# --- Stale-reclaim mutex cases: claim_reclaim must refuse while a live reclaim holds the mutex ---
+DEAD_PID=999999
+while kill -0 "$DEAD_PID" 2>/dev/null; do DEAD_PID=$((DEAD_PID - 1)); done
+
+# cost_lock_stale_reclaim_mutex_held: dead-pid cost lock plus a live reclaim mutex.
+# acquire_cost_lock gives up after its attempts and leaves the dead pid in place.
+CM="$LM/cm"; mkdir -p "$CM/reports/.cost-report.lock" "$CM/reports/.cost-report.lock.reclaim.lock"
+: > "$CM/log"
+printf '%s\n' "$DEAD_PID" > "$CM/reports/.cost-report.lock/pid"
+printf '%s\n' "$$" > "$CM/reports/.cost-report.lock.reclaim.lock/owner"
+(
+    set -u
+    # shellcheck disable=SC2034  # read by the acquire_cost_lock body eval'd below
+    NIGHTLY_DIR="$CM"; LOG="$CM/log"
+    eval "$(iso_region _cost_lock_stale)"; eval "$(iso_region acquire_cost_lock)"
+    acquire_cost_lock
+) && cm_rc=0 || cm_rc=$?
+cm_pid=$(cat "$CM/reports/.cost-report.lock/pid" 2>/dev/null) || cm_pid=""
+if [ "$cm_rc" = 1 ] && grep -qF 'could not acquire lock after 10 attempts' "$CM/log" && [ "$cm_pid" = "$DEAD_PID" ]; then
+    row_ok cost_lock_stale_reclaim_mutex_held
+else
+    row_fail cost_lock_stale_reclaim_mutex_held "rc=$cm_rc pidfile=[$cm_pid] want dead pid $DEAD_PID"
+fi
+
+# stale_plan_probe <dir> <with-mutex 0|1>: one queued plan whose lock holds a dead pid;
+# prints "rc=<n> out=<basename>". With the mutex flag, a live reclaim mutex sits beside the lock.
+stale_plan_probe() {
+    (
+        set -u
+        export IBL5_USAGE_GATE_STATE_DIR="$1/state"; mkdir -p "$1/state/markers" "$1/state/cleared"
+        # shellcheck disable=SC2034  # read by the claim_next_plan body eval'd below
+        QUEUE_DIR="$1/queue"; LOG="$1/log"; LOCK_TTL_SECS=60
+        # shellcheck disable=SC2034
+        CAP_DEFERRED=" "; DEPENDS_HELD=" "; SINGLE_PLAN=""; RESUME_PLAN=""; RESUME_SID=""
+        # shellcheck source=/dev/null
+        . "$GATE_LIB"
+        # shellcheck source=bin/automouse/lib-queue-order
+        . "$(dirname "$GATE_LIB")/../automouse/lib-queue-order"
+        eval "$(iso_region _plan_lock_stale)"; eval "$(iso_region claim_next_plan)"
+        mkdir -p "$QUEUE_DIR/only.md.lock"; : > "$QUEUE_DIR/only.md"
+        printf '%s\n' "$DEAD_PID" > "$QUEUE_DIR/only.md.lock/pid"
+        if [ "$2" = 1 ]; then
+            mkdir "$QUEUE_DIR/only.md.lock.reclaim.lock"
+            printf '%s\n' "$$" > "$QUEUE_DIR/only.md.lock.reclaim.lock/owner"
+        fi
+        out=$(claim_next_plan); rc=$?
+        printf 'rc=%s out=%s\n' "$rc" "$(basename "$out")"
+    )
+}
+
+# claim_next_plan_stale_reclaim_mutex_held: dead-pid plan lock plus a live reclaim mutex.
+# claim_next_plan refuses, claims nothing, and leaves the dead pid in place.
+mkdir -p "$LM/sm"; : > "$LM/sm/log"
+sm_out=$(stale_plan_probe "$LM/sm" 1)
+sm_pid=$(cat "$LM/sm/queue/only.md.lock/pid" 2>/dev/null) || sm_pid=""
+if [ "$sm_out" = "rc=1 out=" ] && [ "$sm_pid" = "$DEAD_PID" ]; then
+    row_ok claim_next_plan_stale_reclaim_mutex_held
+else
+    row_fail claim_next_plan_stale_reclaim_mutex_held "out=[$sm_out] pidfile=[$sm_pid] want dead pid $DEAD_PID"
+fi
+
+# claim_next_plan_stale_reclaimed: same dead-pid lock, no mutex. The claimer takes it,
+# the pid file names the claimer, and the reclaim mutex is gone.
+mkdir -p "$LM/sr"; : > "$LM/sr/log"
+sr_out=$(stale_plan_probe "$LM/sr" 0)
+sr_pid=$(cat "$LM/sr/queue/only.md.lock/pid" 2>/dev/null) || sr_pid=""
+if [ "$sr_out" = "rc=0 out=only.md" ] && [ -n "$sr_pid" ] && [ "$sr_pid" != "$DEAD_PID" ] \
+   && [ ! -e "$LM/sr/queue/only.md.lock.reclaim.lock" ]; then
+    row_ok claim_next_plan_stale_reclaimed
+else
+    row_fail claim_next_plan_stale_reclaimed "out=[$sr_out] pidfile=[$sr_pid] mutex_left=$([ -e "$LM/sr/queue/only.md.lock.reclaim.lock" ] && echo yes || echo no)"
 fi
 rm -rf "$LM"
 if [ "$H_FAIL" -ne 0 ]; then echo "RESULT: FAILED (lying-mkdir cases)"; exit 1; fi
@@ -218,6 +295,7 @@ ph_probe() { # $1 = setup snippet; prints "claimed=<plan> rc=<n>"
         # claim_next_plan iterates queue_entries_ordered from lib-queue-order.
         # shellcheck source=bin/automouse/lib-queue-order
         . "$(dirname "$GATE_LIB")/../automouse/lib-queue-order"
+        eval "$(iso_region _plan_lock_stale)"
         eval "$(iso_region claim_next_plan)"
         rm -rf "$QUEUE_DIR"; mkdir -p "$QUEUE_DIR"
         : > "$QUEUE_DIR/held.md"

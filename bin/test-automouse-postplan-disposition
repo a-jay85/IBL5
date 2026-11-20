@@ -60,7 +60,7 @@ for fn in automouse_pr_state automouse_branch_for_plan dispose_plan_done dispose
           postplan_cap_timeout should_hold_postplan_disposal notify_postplan_hold \
           postplan_newest_verdict postplan_no_worktree_dispose_if_merged claim_next_plan \
           dispose_resumed_postplan_lock postplan_budget postplan_release_label_after_cap \
-          parse_judge_verdict plan_requires_judge; do
+          parse_judge_verdict plan_requires_judge _plan_lock_stale; do
     FN_SRC="$(extract_fn "$fn")"
     if [ -z "$FN_SRC" ]; then
         echo "FAIL: could not extract $fn from $RUNNER"

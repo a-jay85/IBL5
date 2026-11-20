@@ -1,0 +1,185 @@
+#!/usr/bin/env bash
+# Tests bin/check-relative-path-used-after-cd: buggy fixtures must be flagged (shape-A and
+# shape-B), clean and near-miss fixtures must pass, and bad arguments must exit 2.
+#
+# Fixtures sit in quoted heredocs. The gate skips heredoc bodies, so this file passes
+# its own gate when CI runs the tree-mode scan. Exit 0 iff all cases pass.
+set -euo pipefail
+
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
+GATE="$(cd "$(dirname "$0")" && pwd)/check-relative-path-used-after-cd"
+h_tmp TMP
+
+# expect <label> <want_rc> <want_substring> <gate-arg>...
+expect() {
+    local label="$1" want_rc="$2" want_sub="$3" out rc
+    shift 3
+    set +e
+    out="$("$GATE" "$@" </dev/null 2>&1)"
+    rc=$?
+    set -e
+    case "$rc:$out" in
+        "$want_rc":*"$want_sub"*) h_pass "$label" ;;
+        *) h_fail "$label: rc=$rc (want $want_rc), want substring '$want_sub': $out" ;;
+    esac
+}
+
+cat > "$TMP/A1.sh" <<'FIX'
+case "$1" in --plan) PLAN="$2"; shift 2 ;; esac
+[ ! -f "$PLAN" ] && exit 2
+ROOT=$(git rev-parse --show-toplevel)
+cd "$ROOT"
+cat "$PLAN"
+FIX
+expect "A1 prefire-verify shape flags PLAN" 1 "$TMP/A1.sh:5: shape-A" --files "$TMP/A1.sh"
+
+cat > "$TMP/A2.sh" <<'FIX'
+for arg in "$@"; do
+    case "$arg" in
+        --records=*) RECORDS="${arg#--records=}" ;;
+    esac
+done
+cd "$REPO_ROOT"
+wc -l < "$RECORDS"
+FIX
+expect "A2 --records= form flags RECORDS" 1 "$TMP/A2.sh:7: shape-A" --files "$TMP/A2.sh"
+
+cat > "$TMP/B1.sh" <<'FIX'
+cd "$ROOT" || usage
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/worktree-lock.sh"
+FIX
+expect "B1 plan-exec-mutations shape flags BASH_SOURCE after cd" 1 "$TMP/B1.sh:2: shape-B" --files "$TMP/B1.sh"
+
+cat > "$TMP/B2.sh" <<'FIX'
+if true; then
+    cd "$WT_ROOT" || exit 1
+fi
+HERE=$(dirname "$0")
+FIX
+expect 'B2 dirname "$0" after indented cd flags' 1 "$TMP/B2.sh:4: shape-B" --files "$TMP/B2.sh"
+
+cat > "$TMP/B3.sh" <<'FIX'
+cd "$ROOT"
+LIB="${BASH_SOURCE[0]%/*}/lib"
+FIX
+expect 'B3 BASH_SOURCE %/* after cd flags' 1 "$TMP/B3.sh:2: shape-B" --files "$TMP/B3.sh"
+
+cat > "$TMP/N1.sh" <<'FIX'
+case "$1" in --plan) PLAN="$2"; shift 2 ;; esac
+PLAN="$(cd "$(dirname "$PLAN")" && pwd)/$(basename "$PLAN")"
+ROOT=$(git rev-parse --show-toplevel)
+cd "$ROOT"
+cat "$PLAN"
+FIX
+expect "N1 resolved with cd+pwd before cd is clean" 0 "clean" --files "$TMP/N1.sh"
+
+cat > "$TMP/N2.sh" <<'FIX'
+case "$1" in --plan) PLAN="$2"; shift 2 ;; esac
+case "$PLAN" in /*) ;; *) PLAN="$PWD/$PLAN" ;; esac
+ROOT=$(git rev-parse --show-toplevel)
+cd "$ROOT"
+cat "$PLAN"
+FIX
+expect "N2 case /*) guard before cd is clean" 0 "clean" --files "$TMP/N2.sh"
+
+cat > "$TMP/N3.sh" <<'FIX'
+SELF_LIBDIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+cd "$ROOT"
+. "$SELF_LIBDIR/worktree-lock.sh"
+FIX
+expect "N3 self dir captured before cd is clean" 0 "clean" --files "$TMP/N3.sh"
+
+cat > "$TMP/N4.sh" <<'FIX'
+cd "$ROOT"
+awk '{ print $0 }' f
+awk '/^worktree / { sub(/^worktree /, "", $0); print }' f
+sed "s/x/$0/" f
+FIX
+expect 'N4 awk and sed $0 after cd is clean' 0 "clean" --files "$TMP/N4.sh"
+
+cat > "$TMP/N5.sh" <<'FIX'
+MODEL="$2"
+JOBS="$2"
+TARGET_PR="$1"
+NAME="$1"
+BASE_BRANCH="$2"
+RESUME_SID="$2"
+SEC="$1"
+MAXSEC="$2"
+BUDGET="$2"
+SCOPE="$2"
+MANIFEST="$2"
+cd "$ROOT"
+echo "$MODEL"
+echo "$JOBS"
+echo "$TARGET_PR"
+echo "$NAME"
+echo "$BASE_BRANCH"
+echo "$RESUME_SID"
+echo "$SEC"
+echo "$MAXSEC"
+echo "$BUDGET"
+echo "$SCOPE"
+echo "$MANIFEST"
+FIX
+expect "N5 non-path argument names are clean" 0 "clean" --files "$TMP/N5.sh"
+
+cat > "$TMP/N6.sh" <<'FIX'
+REPLAN="$1"
+PLAN_ID="$2"
+cd "$ROOT"
+echo "$REPLAN $PLAN_ID"
+FIX
+expect "N6 near-miss names REPLAN and PLAN_ID are clean" 0 "clean" --files "$TMP/N6.sh"
+
+cat > "$TMP/N7.sh" <<'FIX'
+go() {
+    cd "$ROOT"
+}
+HERE=$(dirname "$0")
+FIX
+expect "N7 cd inside a function body does not arm" 0 "clean" --files "$TMP/N7.sh"
+
+cat > "$TMP/N8.sh" <<'FIX'
+X=$(cd "$ROOT" && pwd)
+( cd "$ROOT" && make )
+HERE=$(dirname "$0")
+FIX
+expect "N8 cd inside a subshell does not arm" 0 "clean" --files "$TMP/N8.sh"
+
+cat > "$TMP/N9.sh" <<'FIX'
+cd "$ROOT"
+# HERE=$(dirname "$0")
+FIX
+expect "N9 comment lines are clean" 0 "clean" --files "$TMP/N9.sh"
+
+cat > "$TMP/N10.sh" <<'FIX'
+cd "$ROOT"
+cat <<'EOF'
+HERE=$(dirname "$0")
+EOF
+FIX
+expect "N10 heredoc body is clean" 0 "clean" --files "$TMP/N10.sh"
+
+cat > "$TMP/E1.sh" <<'FIX'
+if true; then
+    cd "$WT_ROOT" || exit 1
+fi
+HERE=$(dirname "$0") # relpath-ok: caller always passes an absolute path
+FIX
+expect "E1 marker with a reason exempts the line" 0 "clean" --files "$TMP/E1.sh"
+
+cat > "$TMP/E2.sh" <<'FIX'
+if true; then
+    cd "$WT_ROOT" || exit 1
+fi
+HERE=$(dirname "$0") # relpath-ok:
+FIX
+expect "E2 marker with an empty reason still flags" 1 "$TMP/E2.sh:4: shape-B" --files "$TMP/E2.sh"
+
+expect "U1 unknown argument exits 2" 2 "unknown argument" --bogus
+expect "U2 --files with no path exits 2" 2 "needs at least one path" --files
+
+h_done

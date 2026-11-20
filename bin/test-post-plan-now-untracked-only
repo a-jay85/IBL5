@@ -2,7 +2,7 @@
 # Tests bin/post-plan-now's "nothing to ship" guard: a worktree whose only change is an
 # untracked file must ship, while a clean tree or an ignored-only file must still refuse.
 #
-# Three cases, exit 0 iff all pass.
+# Four cases, exit 0 iff all pass. Case 4 runs post-plan-now by a relative path from a subdirectory.
 set -euo pipefail
 
 # shellcheck source=bin/lib/harness.sh
@@ -83,6 +83,31 @@ if grep -qF "nothing to do" <<< "$ERR"; then
 else
     pass "untracked-only tree: passes the nothing-to-ship guard"
 fi
+
+# Case 4: post-plan-now run by a relative path from a subdirectory must still find
+# its own lib/ after cd "$ROOT" and reach the main-checkout refusal (exit 7).
+# The copy of bin/ sits two levels above the cwd, so the relative path never
+# bounces off "/" (an extra ".." at / resolves to / and would hide the bug).
+RELMAIN="$TMP/relmain"
+cp -R "$REPO/bin" "$TMP/relbin"
+mkdir -p "$RELMAIN/bin/lib" "$RELMAIN/sub"
+git -C "$RELMAIN" init -b feat-rel >/dev/null 2>&1
+git -C "$RELMAIN" config user.email "test@example.com"
+git -C "$RELMAIN" config user.name "Test"
+cp "$REPO/bin/lib/git-helpers.sh" "$RELMAIN/bin/lib/git-helpers.sh"
+git -C "$RELMAIN" add .
+git -C "$RELMAIN" commit --quiet -m "init"
+RC=0; ERR=""
+set +e
+ERR="$(cd "$RELMAIN/sub" && POST_PLAN_MAIN_ROOT="$RELMAIN" HOME="$TMP" \
+       ../../relbin/post-plan-now 2>&1 >/dev/null)"
+RC=$?
+set -e
+case "$RC:$ERR" in
+    7:*'refusing to run in the main checkout'*)
+        pass "relative invocation from a subdirectory reaches the main-checkout refusal" ;;
+    *) fail "relative invocation from a subdirectory: rc=$RC (want 7): $ERR" ;;
+esac
 
 if ls "$TMP/runlog"/post-plan-now-feat-new-file-*.log >/dev/null 2>&1; then
     pass "runner log lands in POSTPLAN_LOG_DIR"

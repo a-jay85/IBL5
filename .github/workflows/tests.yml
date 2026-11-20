@@ -693,6 +693,14 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: ibl5
         run: bin/check-csrf-field-name
+      # relative-path-used-after-cd: a path argument or dirname "$0" read after a
+      # repo-root cd resolves against the wrong directory (PRs #3702 and #3857).
+      # The harness runs first in the same step, so it never goes unwired.
+      - name: Check relative paths are resolved before cd
+        if: ${{ !cancelled() }}
+        run: |
+          bin/test-check-relative-path-used-after-cd
+          bin/check-relative-path-used-after-cd
       # seed-id-uniqueness: seed fixtures load with ON DUPLICATE KEY UPDATE, so a
       # reused pid/teamid silently clobbers an earlier row instead of failing
       # (PR #1024). Also catches hand-picked duplicate migration numbers.

@@ -1,0 +1,175 @@
+#!/bin/bash
+#
+# bin/check-relative-path-used-after-cd: catch a relative path read after a repo-root cd.
+#
+# After a script runs cd "$ROOT" (or REPO_ROOT, WT_ROOT, TOP...), every relative path
+# resolves against that directory, not the caller's. Two shapes of the bug:
+#   shape-A  a path-typed variable (PLAN, RECORDS, OUT, ..._FILE) set from a positional
+#            argument ($1, ${2}, $OPTARG, ${arg#--x=}) and never made absolute, then
+#            used after the cd.
+#   shape-B  dirname of $0 or ${BASH_SOURCE[0]} (or ${BASH_SOURCE[0]%/*}) evaluated
+#            after the cd. A relative $0 no longer points at the script.
+# See .claude/rules/shell-wrapper-path-resolution.md.
+#
+# One pass per file tracks state line by line. A top-level line that starts with cd and
+# a variable named like a repo root arms the file. A cd inside $( ), ( ) or a function
+# body never arms. Skipped regions: comment lines, heredoc bodies, function bodies. The
+# cost is a miss for a bug wholly inside one function.
+#
+# Allow marker: end the hit line with a trailing comment of the form
+#   # relpath-ok: <reason>
+# A marker with no reason does not count.
+#
+# Modes: no argument scans every shell file under bin/ and prints repo-relative paths.
+# --files <path>... scans exactly those files and never changes directory, so a relative
+# fixture path resolves against the caller's cwd.
+#
+# Bash 3.2 safe (macOS /bin/bash). The awk is POSIX: no gensub, no 3-argument match.
+#
+# Exit codes: 0 = clean, 1 = hit found, 2 = usage error or missing file.
+#
+# gate-backtest-argv:
+
+set -euo pipefail
+
+usage() { echo "usage: bin/check-relative-path-used-after-cd [--files <path>...]"; }
+die() { echo "check-relative-path-used-after-cd: $*" >&2; exit 2; }
+
+# Held by other batch items: tree mode filters hits in these files. Empty today.
+HELD_EXEMPT=""
+
+FILES_MODE=0
+files=()
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        -h|--help) usage; exit 0 ;;
+        --files)
+            shift
+            [ "$#" -gt 0 ] || { echo "check-relative-path-used-after-cd: --files needs at least one path" >&2; exit 2; }
+            for f in "$@"; do
+                [ -f "$f" ] || die "no such file: $f"
+                files+=("$f")
+            done
+            FILES_MODE=1
+            break ;;
+        *) echo "check-relative-path-used-after-cd: unknown argument: $1" >&2; usage >&2; exit 2 ;;
+    esac
+done
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+if [ "$FILES_MODE" -eq 0 ]; then
+    if list=$(git -C "$ROOT" ls-files -- bin 2>/dev/null) && [ -n "$list" ]; then :; else list=$(cd "$ROOT" && find bin -type f); fi
+    while IFS= read -r f; do
+        if [ -f "$ROOT/$f" ]; then files+=("$f"); fi
+    done <<< "$list"
+fi
+
+# Bash 3.2 + set -u: expanding an empty array errors, so stop before awk.
+if [ "${#files[@]}" -eq 0 ]; then echo "check-relative-path-used-after-cd: clean (0 files)"; exit 0; fi
+
+read -r -d '' AWK_PROG <<'AWK' || true
+function pathy(n) { return n ~ /^(PLAN|RECORDS|OUT|LOG|FILE|DIR|[A-Z_]+_(FILE|PATH|DIR|LOG|OUT))$/ }
+function report(kind, v) {
+    if (kind == "shape-A")
+        printf "%s:%d: shape-A: $%s set from an argument at line %d, used after cd at line %d; make it absolute before the cd\n", FILENAME, FNR, v, tainted[v], cd_line
+    else
+        printf "%s:%d: shape-B: dirname of $0 or BASH_SOURCE after cd at line %d; capture it in a variable before the cd\n", FILENAME, FNR, cd_line
+    hits++
+}
+FNR == 1 {
+    armed = 0; in_func = 0; in_heredoc = 0; cd_line = 0; split("", tainted)
+    skip = !(FILENAME ~ /\.(sh|bash)$/ || $0 ~ /^#!.*sh/)
+}
+skip { next }
+{
+    line = $0
+    trimmed = line
+    sub(/^[[:space:]]+/, "", trimmed)
+    sub(/[[:space:]]+$/, "", trimmed)
+    if (in_heredoc) { if (trimmed == hd_end) in_heredoc = 0; next }
+    if (line ~ /^[[:space:]]*#/) next
+    ok = (line ~ /#[[:space:]]*relpath-ok:[[:space:]]*[^[:space:]]/)
+    self_ref = (line ~ /dirname[[:space:]]+(--[[:space:]]+)?"?[$][{]?(BASH_SOURCE([[]0[]])?|0)([}"[:space:])]|$)/ || line ~ /[$][{](BASH_SOURCE([[]0[]])?|0)%\/[*][}]/)
+    root_cd = (line ~ /^[[:space:]]*cd[[:space:]]+"?[$][{]?[A-Z_]*(ROOT|REPO|TOP|WT)[A-Z_]*[}]?"?([^A-Za-z0-9_]|$)/)
+
+    # Heredoc start: <<WORD, <<-WORD, <<'WORD', <<"WORD", never <<<. The body starts next line.
+    hd_new = 0
+    probe = line
+    gsub(/<<</, "", probe)
+    if (match(probe, /<<-?[[:space:]]*["']?[A-Za-z_][A-Za-z0-9_]*/)) {
+        hd_word = substr(probe, RSTART, RLENGTH)
+        sub(/^<<-?[[:space:]]*["']?/, "", hd_word)
+        hd_new = 1
+    }
+
+    # Function bodies: opener sets in_func with its indent; a lone } at that indent clears it.
+    indent = match(line, /[^[:space:]]/) - 1
+    if (!in_func && (line ~ /^[[:space:]]*(function[[:space:]]+)?[A-Za-z_][A-Za-z0-9_.:-]*[[:space:]]*[(][)]/ || line ~ /^[[:space:]]*function[[:space:]]+[A-Za-z_]/)) {
+        if (line !~ /[}][[:space:]]*$/) { in_func = 1; func_indent = indent }
+    } else if (in_func && line ~ /^[[:space:]]*[}][[:space:]]*$/ && indent == func_indent) {
+        in_func = 0
+    }
+
+    # Taint (shape A): NAME=RHS with a path-typed NAME, before the cd, outside functions.
+    n = split(line, parts, ";")
+    for (i = 1; i <= n; i++) {
+        stmt = parts[i]
+        sub(/^[[:space:]]+/, "", stmt)
+        sub(/^case[[:space:]]+[^[:space:]]+[[:space:]]+in[[:space:]]+/, "", stmt)
+        sub(/^[[:space:]]*[-A-Za-z0-9_*=|"']*[)][[:space:]]+/, "", stmt)
+        sub(/^(local|export|readonly)[[:space:]]+/, "", stmt)
+        if (!match(stmt, /^[A-Za-z_][A-Za-z0-9_]*=/)) continue
+        name = substr(stmt, 1, RLENGTH - 1)
+        rhs = substr(stmt, RLENGTH + 1)
+        sub(/[[:space:]]+$/, "", rhs)
+        positional = (rhs ~ /^"?[$]([1-9]|[{][1-9]([#%][^}]*)?[}]|[{]?OPTARG[}]?|[{](arg|opt)[#%][^}]*[}])"?$/)
+        if (pathy(name) && !armed && !in_func) {
+            if (positional) tainted[name] = FNR
+            else delete tainted[name]
+        }
+    }
+
+    # Uses after arming. Checked before the arming step, so the cd line never reports.
+    tainted_use = 0
+    v = ""
+    for (k in tainted) {
+        if (line ~ ("[$][{]?" k "([^A-Za-z0-9_]|$)")) { tainted_use = 1; v = k; break }
+    }
+    if (armed && !in_func && tainted_use && !ok) { report("shape-A", v); delete tainted[v] }
+    if (armed && !in_func && self_ref && !ok) report("shape-B", "")
+    if (root_cd && !in_func) { armed = 1; cd_line = FNR }
+
+    if (hd_new) { in_heredoc = 1; hd_end = hd_word }
+}
+END { exit (hits > 0 ? 1 : 0) }
+AWK
+
+if [ "$FILES_MODE" -eq 1 ]; then
+    # --files mode runs awk from the caller's cwd, so relative fixture paths resolve there.
+    if out=$(awk "$AWK_PROG" "${files[@]}"); then rc=0; else rc=$?; fi
+else
+    if out=$(cd "$ROOT" && awk "$AWK_PROG" "${files[@]}"); then rc=0; else rc=$?; fi
+fi
+if [ "$FILES_MODE" -eq 0 ] && [ -n "$HELD_EXEMPT" ] && [ -n "$out" ]; then
+    kept=""
+    while IFS= read -r l; do
+        skip_line=0
+        for h in $HELD_EXEMPT; do
+            case "$l" in "$h":*) skip_line=1 ;; esac
+        done
+        if [ "$skip_line" -eq 0 ]; then kept="$kept$l"$'\n'; fi
+    done <<< "$out"
+    out="${kept%$'\n'}"
+    if [ -z "$out" ]; then rc=0; fi
+fi
+case "$rc" in
+    0) echo "check-relative-path-used-after-cd: clean (${#files[@]} files)"; exit 0 ;;
+    1)
+        printf '%s\n' "$out"
+        echo "fix: make the path absolute before the cd, or capture the script dir before the cd"
+        echo "fix: or end the line with # relpath-ok: <reason> when the site is correct another way"
+        echo "see .claude/rules/shell-wrapper-path-resolution.md"
+        exit 1
+        ;;
+    *) echo "check-relative-path-used-after-cd: awk failed (exit $rc)" >&2; exit 2 ;;
+esac

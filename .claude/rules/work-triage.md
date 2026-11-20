@@ -1,6 +1,6 @@
 ---
-description: Triage work as ad-hoc vs /plan; ad-hoc bar, safety mirror, execution routing and its inline-edit trial, hook-enforced triggers.
-last_verified: 2026-11-19
+description: Ad-hoc vs. /plan triage, the safety mirror, and edit routing.
+last_verified: 2026-11-20
 ---
 
 # Work Triage Rule
@@ -33,8 +33,6 @@ Even when the bar says ad-hoc, run a quick safety check. If the change touches a
 then prefer `/plan` to design the defense and its check up front. What counts, and why the PR-time backstop falls short: `work-triage-detail.md` § Safety mirror backstop.
 
 ## Execution routing: an ad-hoc verdict does not mean Opus edits inline
-
-The verdict decides *whether to plan*. Who edits is a separate call.
 
 **Route each chunk of edits before making it.** It is **Sonnet-executable** when both hold (same test as `/plan` Step 4 gate 13):
 

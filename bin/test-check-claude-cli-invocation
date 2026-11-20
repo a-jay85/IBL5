@@ -277,21 +277,22 @@ PFSRC="$HERE/postplan-fix"
 cp "$PFSRC" "$T/pf0"
 expect "[pf_baseline_clean]" "$T/pf0" 0
 
-# mutant NAME OLD NEW CLASS  -- build a copy with OLD replaced by NEW, expect CLASS
+# mutant LABEL FILE OLD NEW CLASS  -- build FILE from a copy with OLD replaced by NEW,
+# expect CLASS. A vanished OLD anchor fails loudly through the cmp -s guard.
 mutant() {
-    local name="$1" old="$2" new="$3" class="$4" dst="$T/$1"
+    local label="$1" dst="$T/$2" old="$3" new="$4" class="$5"
     subst "$PFSRC" "$old" "$new" "$dst"
     if cmp -s "$T/pf0" "$dst"; then
-        fail "[$name] anchor '$old' not found in bin/postplan-fix"
+        fail "$label anchor '$old' not found in bin/postplan-fix"
         return 0
     fi
-    expect_class "[$name]" "$dst" "$class"
+    expect_class "$label" "$dst" "$class"
 }
 
-mutant pf_m1 '--disallowedTools "$DENIED")' '--disallowedTools "$DENIED" "$PROMPT")' prompt-after-variadic
-mutant pf_m2 '--max-budget-usd 5' '--max-budget-usd 5 --no-such-flag-zz' unknown-flag
-mutant pf_m3 '2>"$HR_TMP/stderr"' '2>&1' stderr-merged-capture
-mutant pf_m4 '${TMO[@]+"${TMO[@]}"} ' '' no-timeout
+mutant "[pf_m1]" pf_m1 '--disallowedTools "$DENIED")' '--disallowedTools "$DENIED" "$PROMPT")' prompt-after-variadic
+mutant "[pf_m2]" pf_m2 '--max-budget-usd 5' '--max-budget-usd 5 --no-such-flag-zz' unknown-flag
+mutant "[pf_m3]" pf_m3 '2>"$HR_TMP/stderr"' '2>&1' stderr-merged-capture
+mutant "[pf_m4]" pf_m4 '${TMO[@]+"${TMO[@]}"} ' '' no-timeout
 
 # ------------------------------------------------------------------- usage
 

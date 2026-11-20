@@ -1,6 +1,6 @@
 ---
 description: Steps 4 and 5 of plan/SKILL.md (the matrix-validation gates and the plan-file write), Read on demand by the /plan orchestrator once at the start of Step 4 and never preloaded.
-last_verified: 2026-11-18
+last_verified: 2026-11-19
 ---
 
 This file is Read-on-demand only. The Step 4 and Step 5 stubs in `.claude/skills/plan/SKILL.md` cite it by name. Read it once, when the architect's last section has returned. You then hold it through Step 5.

@@ -1,6 +1,6 @@
 ---
 description: The conditional parts of plan/SKILL.md Steps 4.5 and 5 (the hold challenge, drift remediation, staleness remediation), each loaded by the /plan orchestrator one section at a time and only when its trigger fires.
-last_verified: 2026-11-18
+last_verified: 2026-11-19
 ---
 
 This file is Read-on-demand only, one section at a time. Never Read it whole. The SKILL.md Step 4.5 stub and two pointers in `_validate-and-write.md` § Step 5 each name a section and the `awk` command that loads it.

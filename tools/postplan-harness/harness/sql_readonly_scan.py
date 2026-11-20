@@ -265,6 +265,7 @@ class Node:
     kids: list = field(default_factory=list)
     name: str = ""            # call/method name, operator, or array keys
     keys: list = field(default_factory=list)   # array item keys (str or None)
+    key_nodes: list = field(default_factory=list)  # array: expression nodes of non-literal keys
     line: int = 0
 
 
@@ -507,7 +508,7 @@ class _Parser:
 
     def array(self, close) -> Node:
         line = self.take().line
-        keys, vals = [], []
+        keys, vals, key_nodes = [], [], []
         while not self.at(close):
             if self.at(","):
                 self.take()
@@ -521,6 +522,8 @@ class _Parser:
                 if self.at("=>"):
                     self.take()
                     key = v.text if v.kind == "lit" else None
+                    if key is None:
+                        key_nodes.append(v)  # judged by _is_safe: a foreach key bind reads it
                     v = self.expr(0)
                     keys.append(key if key is not None else Ellipsis)
                 else:
@@ -531,7 +534,7 @@ class _Parser:
             elif not self.at(close):
                 raise _ParseFail("bad array literal")
         self.expect(close)
-        return Node("array", kids=vals, keys=keys, line=line)
+        return Node("array", kids=vals, keys=keys, key_nodes=key_nodes, line=line)
 
     def primary(self) -> Node:
         tok = self.peek()
@@ -1434,6 +1437,8 @@ def _is_safe(expr: Node, method: Method, ctx: _Ctx, key=None, depth=0, visiting=
         items = list(zip(expr.keys, expr.kids))
         if key is not None and all(k is not None and k is not Ellipsis for k, _ in items):
             items = [(k, v) for k, v in items if k == key]
+        if not all(_is_safe(k, method, ctx, None, depth, visiting) for k in expr.key_nodes):
+            return False  # a non-literal key can carry caller text into a foreach key bind
         return all(_is_safe(v, method, ctx, None, depth, visiting) for _, v in items)
     if kind == "call":
         if expr.name not in STRING_BUILDER_ARGS:

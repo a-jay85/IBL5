@@ -23,6 +23,9 @@
 # posted; 4 not armed, a reason comment posted whenever gh can post one; 5 a
 # post-plan run was still live at --timeout, reason comment posted; 6 fix-first
 # condition recorded, run --finish after the fix is pushed.
+# A NOT READY verdict on an approval that lists kept unplanned changes and a diff
+# fingerprint first gets one bin/post-plan-now --state-changed re-review; exit 4
+# can follow that re-review.
 set -uo pipefail
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
@@ -40,8 +43,10 @@ OA_REPO=a-jay85/IBL5
 OA_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=bin/lib/held-prs.sh
 . "$OA_ROOT/bin/lib/held-prs.sh"
+# shellcheck source=bin/lib/human-signoff-classifier.sh
+. "$OA_ROOT/bin/lib/human-signoff-classifier.sh"
 
-OA_PR="" OA_WORDS="" OA_OPTION="" OA_FIX="" OA_FINISH=0 OA_TIMEOUT=3600 OA_POLL=20 OA_WT=""
+OA_PR="" OA_WORDS="" OA_OPTION="" OA_FIX="" OA_FINISH=0 OA_TIMEOUT=3600 OA_POLL=20 OA_WT="" OA_KEPT_ACCEPTED=0
 head_tree_armed="" head="" branch="" state="" labels=",," rec_mode=approve rec_head="" me="" comments="" verdict_word=""
 _oa_usage() { printf 'owner-approve: %s\n' "$1" >&2; printf 'RESULT: usage\n'; exit 2; }
 pos=0
@@ -97,8 +102,31 @@ _oa_read_pr() { # sets head, branch, state, labels; returns 1 on any read error
     labels=",$(jq -r '[.labels[].name] | join(",")' "$tmpd/pr.json")," || return 1
     [ -n "$head" ] && [ -n "$branch" ]
 }
-_oa_approval_body() {
-    local today t3 sess opt_part="" mode=approve
+# The patch-id of the PR diff, or "unread". The harness treats "unread" as no approval.
+_oa_diff_fp() {
+    local head="$1" base fp
+    [ -n "$OA_WT" ] && [ -d "$OA_WT" ] || { printf 'unread'; return 0; }
+    base=$(gh api "repos/$OA_REPO/pulls/$OA_PR" --jq .base.ref 2>/dev/null) || base=""
+    [ -n "$base" ] || { printf 'unread'; return 0; }
+    git -C "$OA_WT" fetch --quiet origin "$base" 2>/dev/null || true
+    fp=$(cd "$OA_WT" && hs_diff_fingerprint "origin/$base" "$head" 2>/dev/null) || fp=""
+    case "$fp" in
+        [0-9a-f]*) [ "${#fp}" -eq 40 ] && { printf '%s' "$fp"; return 0; } ;;
+    esac
+    printf 'unread'
+}
+
+# The "- " bullet lines of the PR body's kept-unplanned block, one per line. Empty when absent.
+_oa_kept_lines() {
+    gh api "repos/$OA_REPO/pulls/$OA_PR" --jq '.body // ""' 2>/dev/null \
+      | tr -d '\r' \
+      | awk '/^<!-- kept-unplanned:begin -->$/ {on=1; next}
+             /^<!-- kept-unplanned:end -->$/   {on=0; next}
+             on && /^- / {print}'
+}
+
+_oa_approval_body() { # [diff fingerprint] [kept bullet lines]
+    local today t3 sess opt_part="" mode=approve diff_fp="${1:-}" kept="${2:-}"
     today=$(date +%F)
     t3="${T3CODE_THREAD_ID:-unknown}"
     sess="${CLAUDE_CODE_SESSION_ID:-unknown}"
@@ -109,7 +137,10 @@ _oa_approval_body() {
         mode=fix-first
         printf '\nCondition: %s\nThe label and the arm wait until the fix is pushed and `bin/owner-approve %s --finish` passes.\n' "$OA_FIX" "$OA_PR"
     fi
-    printf '\n<!-- owner-approve mode=%s head=%s -->' "$mode" "${head:-unread}"
+    if [ -n "$kept" ]; then
+        printf '\nKept unplanned changes this approval accepts:\n<!-- owner-approve:kept:begin -->\n%s\n<!-- owner-approve:kept:end -->\n' "$kept"
+    fi
+    printf '\n<!-- owner-approve mode=%s head=%s diff=%s -->' "$mode" "${head:-unread}" "${diff_fp:-unread}"
 }
 _oa_safe() { printf '%s' "$1" | tr -cs 'A-Za-z0-9._-' '-'; }
 _oa_find_wt() { # prints the worktree checked out on $branch, or nothing
@@ -219,7 +250,9 @@ _oa_verdict() {
     banner=$(hp_verdict_banner "$sticky")
     word=$(printf '%s' "$banner" | tr -d '*' | sed -E 's/^[[:space:]]*(LATEST VERDICT: )?//')
     case "$word" in
-        "NOT READY "*) _oa_refuse 4 "the verdict is NOT READY." ;;
+        "NOT READY "*)
+            [ "${1:-final}" = refire ] && [ "$OA_KEPT_ACCEPTED" = 1 ] && return 10
+            _oa_refuse 4 "the verdict is NOT READY." ;;
         "READY WITH NOTES "*) verdict_word="READY WITH NOTES" ;;
         "READY "*) verdict_word=READY ;;
         *) _oa_refuse 4 "the verdict banner is missing or unreadable." ;;
@@ -261,7 +294,7 @@ _oa_finish_record() { # sets rec_mode and rec_head from this login's newest appr
     local rec
     _oa_comments
     rec=$(printf '%s' "$comments" | jq -r -s --arg me "$me" '[add // [] | .[] | select(.user.login == $me) | .body // ""] | .[]' \
-        | sed -nE 's/^<!-- owner-approve mode=(approve|fix-first) head=([0-9a-f]{40}) -->$/\1 \2/p' | tail -n 1)
+        | sed -nE 's/^<!-- owner-approve mode=(approve|fix-first) head=([0-9a-f]{40})( diff=([0-9a-f]{40}|unread))? -->$/\1 \2/p' | tail -n 1)
     [ -n "$rec" ] || _oa_refuse 4 "no owner approval comment from $me on PR $OA_PR. Run bin/owner-approve $OA_PR \"<words>\" first."
     rec_mode=${rec%% *}
     rec_head=${rec#* }
@@ -282,11 +315,50 @@ _oa_prefire() {
     [ "$rc" -eq 0 ] || _oa_refuse 4 "bin/lib/prefire-verify exited $rc in $OA_WT (1 a check failed, 3 a prerequisite is missing, 4 the tree changed)."
 }
 
+# The newest sticky's "id:updated_at", or "none". Same selection as _oa_verdict.
+_oa_sticky_key() {
+    gh api --paginate "repos/$OA_REPO/issues/$OA_PR/comments" 2>/dev/null \
+      | jq -rs --arg m "$HP_STICKY_MARKER" '[add // [] | .[] | select((.body // "") | contains($m) and (contains("<!-- owner-approve") | not))] | last | if . == null then "none" else "\(.id):\(.updated_at)" end' 2>/dev/null \
+      || printf 'none'
+}
+# True only when _oa_live names a live run. "Cannot tell" (exit 2) counts as not live
+# here; the _oa_wait after the re-fire refuses on it.
+_oa_run_live() {
+    local why
+    why=$(_oa_live) && [ "$why" != "$OA_NONE" ]
+}
+
+# One re-review with --state-changed so hold-repeat cannot decline it. Never under CLAUDE_HEADLESS.
+_oa_refire() {
+    local before rc waited=0 cap
+    [ -z "${CLAUDE_HEADLESS:-}" ] || _oa_refuse 4 "the verdict is NOT READY."
+    [ -n "$OA_WT" ] && [ -d "$OA_WT" ] || _oa_refuse 4 "the verdict is NOT READY, and no worktree was found to re-review from."
+    before=$(_oa_sticky_key)
+    printf 'owner-approve: the verdict is NOT READY on kept unplanned changes the owner approved; re-running post-plan\n' >&2
+    ( cd "$OA_WT" && "$OA_ROOT/bin/post-plan-now" --state-changed </dev/null ) >&2; rc=$?
+    [ "$rc" -eq 0 ] || _oa_refuse 4 "the verdict is NOT READY, and the re-review did not start (bin/post-plan-now exit $rc)."
+    cap=300; [ "$OA_TIMEOUT" -lt "$cap" ] && cap=$OA_TIMEOUT
+    while ! _oa_run_live && [ "$(_oa_sticky_key)" = "$before" ]; do
+        [ "$waited" -ge "$cap" ] && _oa_refuse 4 "the verdict is NOT READY, and the re-review did not start within ${cap}s."
+        _oa_pause "$OA_POLL"; waited=$((waited + OA_POLL))
+        [ "$OA_POLL" -gt 0 ] || waited=$cap
+    done
+}
+
 pr_ok=1
 _oa_read_pr || pr_ok=0
 if [ "$OA_FINISH" -eq 0 ]; then rec_head=$head; fi
 if [ "$OA_FINISH" -eq 0 ]; then
-    _oa_post "$(_oa_approval_body)" || { printf 'owner-approve: posting the approval comment failed. Nothing else was done.\n' >&2; printf 'RESULT: refused\n'; exit 4; }
+    OA_WT=$(_oa_find_wt)
+    oa_diff_fp=unread
+    oa_kept=""
+    if [ "$pr_ok" -eq 1 ]; then
+        oa_diff_fp=$(_oa_diff_fp "$head")
+        oa_kept=$(_oa_kept_lines)
+    fi
+    # Only an approve-mode approval that lists kept items on a read diff may re-fire.
+    if [ -z "$OA_FIX" ] && [ -n "$oa_kept" ] && [ "$oa_diff_fp" != unread ]; then OA_KEPT_ACCEPTED=1; fi
+    _oa_post "$(_oa_approval_body "$oa_diff_fp" "$oa_kept")" || { printf 'owner-approve: posting the approval comment failed. Nothing else was done.\n' >&2; printf 'RESULT: refused\n'; exit 4; }
     printf 'owner-approve: approval comment posted on PR %s\n' "$OA_PR" >&2
 fi
 [ "$pr_ok" -eq 1 ] || _oa_refuse 4 "could not read PR $OA_PR with gh pr view, so its head and state are unknown."
@@ -306,5 +378,16 @@ if [ "$rec_mode" = "approve" ] && [ "$head" != "$rec_head" ]; then
     _oa_refuse 4 "the head moved from $rec_head (the one the owner approved) to $head. Approve the new head again: bin/owner-approve $OA_PR \"<words>\"."
 fi
 if [ "$rec_mode" = "fix-first" ]; then _oa_prefire; fi
-_oa_verdict
+# A NOT READY on kept items the owner just approved gets one re-review. The harness
+# reads the approval comment as owner evidence. --finish never sets OA_KEPT_ACCEPTED.
+rc=0; _oa_verdict refire || rc=$?
+if [ "$rc" -eq 10 ]; then
+    _oa_refire
+    _oa_wait
+    _oa_read_pr || _oa_refuse 4 "could not re-read PR $OA_PR after the re-review."
+    if [ "$head" != "$rec_head" ]; then
+        _oa_refuse 4 "the re-review moved the head from $rec_head (the one the owner approved) to $head. Approve the new head again: bin/owner-approve $OA_PR \"<words>\"."
+    fi
+    _oa_verdict final
+fi
 _oa_arm

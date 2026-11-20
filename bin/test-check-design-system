@@ -74,6 +74,13 @@ case_css marker-ok 0 "$OKMSG" '.a {' '    z-index: 9; /* design-ok: third-party 
 case_css marker-empty 1 "$HIT" '.a {' '    z-index: 9; /* design-ok: */' '}'
 case_css other-prop-ok 0 "$OKMSG" '.a {' '    --dc-z-index: 5;' '}'
 
+# CSS: subfolders are scanned
+reset_tree
+mkdir -p "$DIR/ibl5/design/components/sub"
+printf '%s\n' '.a {' '    z-index: 3;' '}' > "$DIR/ibl5/design/components/sub/nested.css"
+run_gate
+expect css-subfolder 1 "ibl5/design/components/sub/nested.css:2:"
+
 # UI catalog
 reset_tree
 run_gate

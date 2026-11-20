@@ -161,21 +161,11 @@ sleep 120
 RUNNER
 chmod +x "$STUBBIN/automouse/run"
 
-# fds redirected to /dev/null, NOT inherited: a background child holding this
-# script's stdout keeps the pipe open, so any caller reading our output (CI, a
-# pipeline, `bin/test`) blocks until the child's own timeout rather than until we
-# exit. Observed as a full 120s stall on an otherwise instant run.
-"$STUBBIN/automouse/run" plan live-plan.md >/dev/null 2>&1 &
-LIVE_AUTOMOUSE_PID=$!
-disown "$LIVE_AUTOMOUSE_PID" 2>/dev/null
-SPAWNED_PIDS="$SPAWNED_PIDS $LIVE_AUTOMOUSE_PID"
-
-# An unrelated live process — stands in for a reused PID. Alive, so `kill -0`
-# passes; its command says nothing about automouse, so the conjunction rejects it.
-# Its PID must not equal a launchd stub row's PID (4242, 6002, ...): that row
-# prints "pid <n> " too, and the reuse-guard assertion would see it. Linux CI
-# hands out small PIDs, so a collision with 6002 did happen once. Respawn
-# until the PID is free of the stub's list.
+# A fixture PID must not equal a launchd stub row's PID (4242, 6002, ...): that
+# row prints "pid <n> " too, and an assertion that greps the page for the
+# fixture's PID would see it. Linux CI hands out small PIDs, so collisions with
+# 6001 and 6002 did happen. Each fixture respawns until its PID is free of the
+# stub's list.
 fixture_pid() {
     case " $1 " in
         *" 4242 "*|*" 4343 "*|*" 5151 "*|*" 5252 "*|*" 5353 "*) return 0 ;;
@@ -184,6 +174,26 @@ fixture_pid() {
     esac
     return 1
 }
+
+# fds redirected to /dev/null, NOT inherited: a background child holding this
+# script's stdout keeps the pipe open, so any caller reading our output (CI, a
+# pipeline, `bin/test`) blocks until the child's own timeout rather than until we
+# exit. Observed as a full 120s stall on an otherwise instant run.
+# The "impl runner with both files prints one detail line" check counts this
+# PID's lines on the whole page, so a stub-row collision makes the count 2.
+# A killed runner's child still gets reaped: cleanup() reads every child.*.pid.
+while :; do
+    "$STUBBIN/automouse/run" plan live-plan.md >/dev/null 2>&1 &
+    LIVE_AUTOMOUSE_PID=$!
+    disown "$LIVE_AUTOMOUSE_PID" 2>/dev/null
+    fixture_pid "$LIVE_AUTOMOUSE_PID" || break
+    kill "$LIVE_AUTOMOUSE_PID" 2>/dev/null
+done
+SPAWNED_PIDS="$SPAWNED_PIDS $LIVE_AUTOMOUSE_PID"
+
+# An unrelated live process — stands in for a reused PID. Alive, so `kill -0`
+# passes; its command says nothing about automouse, so the conjunction rejects it.
+# Same stub-PID guard as the live runner above.
 while :; do
     sleep 120 >/dev/null 2>&1 &
     UNRELATED_PID=$!

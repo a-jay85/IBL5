@@ -237,7 +237,7 @@ def test_bare_replace_restore_is_unproven():
 
 def test_delete_then_replace_full_copy_restore_is_proven():
     down = DOWN_SQL[:1] + ("DELETE FROM ibl_demo;", "REPLACE INTO ibl_demo SELECT * FROM ibl_demo_backup_900;")
-    assert _reason(_pair(down=down)) != "down-no-restore:ibl_demo"
+    assert _reason(_pair(down=down)) == "proven"
 
 
 def test_backup_after_rewrite_is_unproven():

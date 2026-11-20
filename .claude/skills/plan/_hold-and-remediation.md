@@ -1,6 +1,6 @@
 ---
 description: The conditional parts of plan/SKILL.md Steps 4.5 and 5 (the hold challenge, drift remediation, staleness remediation), each loaded by the /plan orchestrator one section at a time and only when its trigger fires.
-last_verified: 2026-11-18
+last_verified: 2026-11-20
 ---
 
 This file is Read-on-demand only, one section at a time. Never Read it whole. The SKILL.md Step 4.5 stub and two pointers in `_validate-and-write.md` § Step 5 each name a section and the `awk` command that loads it.
@@ -70,6 +70,8 @@ bin/check-plan --draft "$DRAFT"
 ```
 
 Re-run the check **once**. If it still exits non-zero, stop and report — do not loop; an unbounded retry burns the run, exactly as the Turn-1 outline retry is bounded. The deleted prose is recoverable from the architect's transcript if it mattered; a drifted plan silently shipped is not. <!-- slop-ok -->
+
+Re-sends sent after a drift remediation count toward the same cap of 2 per run, with no separate budget.
 <!-- end: drift-remediation -->
 
 ## Staleness remediation

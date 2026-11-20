@@ -167,7 +167,10 @@ esac
     printf '#!/bin/bash\n'
     printf 'rm -f %s\n' "$(shq "$RUNNER")"   # self-delete first; bash keeps the open fd
     printf '%s\n' 'export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:$PATH"'
-    printf 'cd %s && CLAUDE_HEADLESS=1 caffeinate -s claude -p %s --dangerously-skip-permissions --model claude-sonnet-5-5 --session-id %s --effort low --name %s\n' \
+    # Cap the session at 2 hours of wall clock. Stock macOS ships no timeout(1);
+    # perl's alarm survives exec, so SIGALRM ends claude (the same fallback as
+    # _pf_timeout_argv in bin/postplan-fix).
+    printf 'cd %s && CLAUDE_HEADLESS=1 caffeinate -s perl -e "alarm shift; exec @ARGV or exit 127" 7200 claude -p %s --dangerously-skip-permissions --model claude-sonnet-5-5 --session-id %s --effort low --name %s\n' \
         "$(shq "$WT_ROOT")" "$(shq "$PROMPT")" "$SESSION_ID" "$(shq "$LABEL")"
 } > "$RUNNER"
 chmod 700 "$RUNNER"

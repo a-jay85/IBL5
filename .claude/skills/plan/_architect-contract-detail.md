@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for _architect-contract.md — incident callbacks, counter-examples, procedure elaboration, and taxonomy rationale moved from the rules spine. The plan-architect never reads it; load only when editing the contract.
-last_verified: 2026-11-16
+last_verified: 2026-11-20
 ---
 
 Read-on-demand companion to `_architect-contract.md` (the plan-architect's output contract). This file holds the incident callbacks, counter-examples, procedure elaboration, and extended rationale for each operative rule in the spine. The plan-architect never reads it — the spine's pointer lines name the specific section to open when editing the contract.
@@ -132,6 +132,8 @@ When a behavior looks untestable pre-prod, **split it by slice before conceding*
 "The daemon can't run on my laptop" is a claim about *registration*, not about the code the daemon runs; a blanket exception spanning a whole tick feature is precisely the failure this bullet exists to stop. A slice that genuinely survives the split is a **recorded exception, not a deletion**: a line-anchored `<!-- pre-prod-exception: <slice + why> -->` marker plus a matching `## Pre-prod Exception Justification` entry naming its category (scheduling / reachability / credential).
 
 Silence is not coverage, and "we'll see once it's live" is not a plan. Dissolving a post-merge-only row means **building the pre-prod exercise path** — never **deleting the row**.
+
+A script whose default mode is a read-only dry-run or preview against real services (GitHub, Discord, the DB, launchd reads) needs a pre-merge matrix row where the implementation session runs that dry-run with the real default binaries (no `*_BIN` overrides) and asserts exit 0 plus the expected preview output. A harness that stubs every binary does not satisfy it. The pre-prod exception covers only the live write slice. PR #4046's `bin/bug-issues-migrate` shipped a `gh()` wrapper that recursed into itself under the default `GH_BIN=gh` (exit 139) while every stubbed test passed.
 
 ## Conditional sections
 

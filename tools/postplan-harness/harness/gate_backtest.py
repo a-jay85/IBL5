@@ -133,6 +133,7 @@ REPLAY_SPECS: dict[str, ReplaySpec | str] = {
     # Whole-tree scans with no required argument.
     "bin/check-bashpid-under-set-u": _TREE,
     "bin/check-ci-image-registry": _TREE,
+    "bin/check-claude-cli-invocation": _TREE,
     "bin/check-claude-dir-placement": _TREE,
     "bin/check-composite-contracts": _TREE,
     "bin/check-design-system": _TREE,

@@ -3,7 +3,7 @@
 # bin/test-bug-issues-migrate — harness for bin/bug-issues-migrate. Every external command
 # (gh, curl, launchctl, php, the cron setup script) is a stub on a temp dir, so nothing here
 # touches GitHub, Discord, launchd or the database. Each stub logs one line per call to
-# $STUB/calls.log. OLD-repo issue and visibility state lives in files under $STUB.
+# $STUB/calls.log (sleeps go to $STUB/sleeps.log and return at once). OLD-repo issue and visibility state lives in files under $STUB.
 #
 # Stub world: old issues 1-29 (new number = old + 100), OLD private, NEW public, the bot
 # holds three messages with old links (two in the bug channel, one in a thread).
@@ -51,6 +51,13 @@ case "$1 $2" in
   "repo edit")
       vis=""; prev=""
       for a in "$@"; do [ "$prev" = "--visibility" ] && vis="$a"; prev="$a"; done
+      # fail_edit_<vis> holds a count of edits to refuse before one is allowed to work.
+      left="$(cat "$STUB/fail_edit_$vis" 2>/dev/null || echo 0)"
+      if [ "$left" -gt 0 ]; then
+          echo $((left - 1)) > "$STUB/fail_edit_$vis"
+          echo "GraphQL: visibility change still settling" >&2
+          exit 1
+      fi
       printf '%s' "$vis" | tr 'a-z' 'A-Z' > "$STUB/old_visibility" ;;
   "repo archive")
       printf true > "$STUB/old_archived"
@@ -81,6 +88,12 @@ Report id: $old" --arg s "$st" '{body:$b, state:$s}')"
   "issue transfer")
       n="$3"
       if [ "$(cat "$STUB/fail_transfer" 2>/dev/null)" = "$n" ]; then exit 1; fi
+      # fail_transfer_once: refuse that issue one time, the way GitHub does just after a flip.
+      if [ "$(cat "$STUB/fail_transfer_once" 2>/dev/null)" = "$n" ]; then
+          rm -f "$STUB/fail_transfer_once"
+          echo "GraphQL: Old issue is not transferrable (transferIssue)" >&2
+          exit 1
+      fi
       new=$((n + 100))
       echo "$n $new" >> "$STUB/xfer.map"
       grep -vx "$n" "$STUB/old_issues" > "$STUB/old_issues.tmp"; mv "$STUB/old_issues.tmp" "$STUB/old_issues"
@@ -143,6 +156,10 @@ SH
 #!/usr/bin/env bash
 echo "cron-setup env=${BUG_PIPELINE_ISSUE_REPO:-} $*" >> "$STUB/calls.log"
 SH
+    cat > "$STUB/bin/sleep" <<'SH'
+#!/usr/bin/env bash
+echo "sleep $*" >> "$STUB/sleeps.log"
+SH
     chmod +x "$STUB"/bin/* "$STUB/cron-setup"
 }
 
@@ -154,7 +171,7 @@ run_mig() { # <stdin-line> [args...]; stdout/stderr land in $STUB/out and $STUB/
         PHP_BIN="$STUB/bin/php" BUG_PIPELINE_SCRIPTS_DIR="$STUB/scripts" BOT_BASE_URL="http://bot.test" \
         BUG_ISSUES_MIGRATE_DIR="$STUB/mig" BUG_ISSUES_MIGRATE_LAUNCH_AGENTS_DIR="$STUB/la" \
         BUG_ISSUES_MIGRATE_CRON_SETUP="$STUB/cron-setup" BUG_PIPELINE_APPROVER_ID=123 \
-        "$MIGRATE" "$@" > "$STUB/out" 2> "$STUB/err"
+        BUG_ISSUES_MIGRATE_SLEEP_BIN="$STUB/bin/sleep" "$MIGRATE" "$@" > "$STUB/out" 2> "$STUB/err"
     RC=$?
 }
 calls() { cat "$STUB/calls.log"; }
@@ -308,6 +325,56 @@ fi
 h_eq "live_resume_with_old_still_public_restores_private: OLD is private again" PRIVATE "$(cat "$STUB/old_visibility")"
 h_eq "live_resume_with_old_still_public_restores_private: no second flip to public" 0 "$(grep -c 'visibility public' "$STUB/calls.log")"
 
+# ── transfer_retries_then_succeeds ────────────────────────────────────────────
+make_stubs
+printf 7 > "$STUB/fail_transfer_once"
+run_mig "$CONFIRM" --live
+h_eq "transfer_retries_then_succeeds: exits 0" 0 "$RC"
+h_eq "transfer_retries_then_succeeds: #7 is attempted twice" 2 "$(grep -c 'issue transfer 7 ' "$STUB/calls.log")"
+h_eq "transfer_retries_then_succeeds: #7 is mapped to #107" 107 "$(jq -r '.[] | select(.old == 7) | .new' "$STUB"/mig/bug-issues-map-*.json)"
+h_eq "transfer_retries_then_succeeds: the map has 29 entries" 29 "$(jq 'length' "$STUB"/mig/bug-issues-map-*.json)"
+h_contains "transfer_retries_then_succeeds: waits 15s between attempts" "$(cat "$STUB/sleeps.log")" "sleep 15"
+h_contains "transfer_retries_then_succeeds: settles 30s after the flip" "$(cat "$STUB/sleeps.log")" "sleep 30"
+
+# ── resume_reflips_public ─────────────────────────────────────────────────────
+# The state file says the flip is done but the owner made OLD private by hand.
+make_stubs
+mkdir -p "$STUB/mig"
+printf '%s\n' step_pause_cron=done step_labels=done flip_public=1 step_flip_public=done > "$STUB/mig/bug-issues-migrate.state"
+run_mig "$CONFIRM" --live
+h_eq "resume_reflips_public: exits 0" 0 "$RC"
+REFLIP="$(first_line 'visibility public')"
+FIRST_XFER="$(first_line 'issue transfer')"
+if [ "${REFLIP:-0}" -gt 0 ] && [ "$REFLIP" -lt "${FIRST_XFER:-0}" ]; then
+    h_pass "resume_reflips_public: flips public before the first transfer"
+else
+    h_fail "resume_reflips_public: flips public before the first transfer" "public=$REFLIP transfer=$FIRST_XFER"
+fi
+h_eq "resume_reflips_public: 29 transfers" 29 "$(grep -c 'issue transfer' "$STUB/calls.log")"
+h_eq "resume_reflips_public: OLD ends private" PRIVATE "$(cat "$STUB/old_visibility")"
+
+# ── private_restore_retries ───────────────────────────────────────────────────
+make_stubs
+printf 2 > "$STUB/fail_edit_private"
+run_mig "$CONFIRM" --live
+h_eq "private_restore_retries: exits 0" 0 "$RC"
+h_eq "private_restore_retries: OLD ends private" PRIVATE "$(cat "$STUB/old_visibility")"
+h_eq "private_restore_retries: 3 private edits (2 fail, 1 works)" 3 "$(grep -c 'visibility private' "$STUB/calls.log")"
+h_eq "private_restore_retries: no ERROR line" 0 "$(grep -c ERROR "$STUB/err")"
+
+# ── private_restore_gives_up_loudly (the on_exit path) ────────────────────────
+make_stubs
+printf 100 > "$STUB/fail_edit_private"
+printf 10 > "$STUB/fail_transfer"
+run_mig "$CONFIRM" --live
+if [ "$RC" -ne 0 ]; then
+    h_pass "private_restore_gives_up_loudly: exits non-zero"
+else
+    h_fail "private_restore_gives_up_loudly: exits non-zero" "got 0"
+fi
+h_eq "private_restore_gives_up_loudly: 10 private edits tried" 10 "$(grep -c 'visibility private' "$STUB/calls.log")"
+h_contains "private_restore_gives_up_loudly: ERROR names the manual fix" "$(cat "$STUB/err")" "could not make a-jay85/ibl5-bugs private again"
+
 # ── live_rerun_after_archive_before_state_write ───────────────────────────────
 # Run 1 dies right after GitHub archived OLD, before step_flip_private=done is written.
 # Run 2 must resume (not refuse with exit 3) and must not call edit or archive on OLD again.
@@ -356,6 +423,18 @@ for flag in --bogus --live=yes --dry-run; do
 done
 run_mig "" --live --live
 h_eq "unknown_flag_rejected: two arguments exit 2" 2 "$RC"
+
+# ── default_bins_resolve_on_path ──────────────────────────────────────────────
+# GH_BIN and LAUNCHCTL_BIN unset: the gh()/launchctl() wrappers must reach the stub
+# binaries on PATH, not recurse into themselves (that crashed with exit 139).
+make_stubs
+printf '\n' | env -u CLAUDE_HEADLESS -u GH_BIN -u LAUNCHCTL_BIN PATH="$STUB/bin:$PATH" STUB="$STUB" \
+    CURL_BIN="$STUB/bin/curl" PHP_BIN="$STUB/bin/php" BUG_PIPELINE_SCRIPTS_DIR="$STUB/scripts" \
+    BOT_BASE_URL="http://bot.test" BUG_ISSUES_MIGRATE_DIR="$STUB/mig" \
+    BUG_ISSUES_MIGRATE_LAUNCH_AGENTS_DIR="$STUB/la" BUG_ISSUES_MIGRATE_CRON_SETUP="$STUB/cron-setup" \
+    BUG_PIPELINE_APPROVER_ID=123 BUG_ISSUES_MIGRATE_SLEEP_BIN="$STUB/bin/sleep" "$MIGRATE" > "$STUB/out" 2> "$STUB/err"
+h_eq "default_bins_resolve_on_path: dry run exits 0" 0 "$?"
+h_contains "default_bins_resolve_on_path: stub gh was called" "$(calls)" "gh "
 
 # ── empty_migrate_dir_rejected ────────────────────────────────────────────────
 env BUG_ISSUES_MIGRATE_DIR= "$MIGRATE" > /dev/null 2> "$ROOT/empty.err"

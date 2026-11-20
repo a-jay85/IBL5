@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import fnmatch
 import re
+from collections import Counter
 import shlex
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -80,6 +81,10 @@ class ReplayResult:
     base_attempt_secs: tuple[float, ...] = ()  # same for the base replay
     fix_attempt_secs: tuple[float, ...] = ()   # same for the fix rerun
     fix_flag_lines: tuple[str, ...] = ()       # fix-rerun stdout lines when fix_outcome == "flag"
+    parent_outcome: str = ""   # "", flag, pass, error, timeout: candidate gate on merge_sha^ (tree-wide specs only)
+    parent_detail: str = ""
+    parent_flag_lines: tuple[str, ...] = ()    # parent-run stdout lines when parent_outcome == "flag"
+    parent_attempt_secs: tuple[float, ...] = ()  # same as attempt_secs, for the parent run
 
 
 HEAD_OID_FIELD = "headRefOid"
@@ -348,6 +353,23 @@ def changes_from_unified_diff(diff_text: str) -> list[tuple[str, str]]:
     return out
 
 
+# A `#` at line start or after whitespace opens a comment in bash and in Python.
+_COMMENT_TAIL = re.compile(r"(?:^|\s)#.*$", re.M)
+_REF_BEFORE = r"(?<![\w.$-])"   # the lib path starts at a separator, quote, space or line start
+_REF_AFTER = r"(?![\w.-])"      # and the file name ends here
+
+
+def _references_lib(text: str, needle: str) -> bool:
+    """True when the code part of a gate's text names `needle` (`lib/<name>`) as a path.
+
+    Comment text never counts. The match covers `source "$here/lib/x"`, `. "$ROOT/bin/lib/x"`,
+    an exec or call site such as `"$here/lib/x" --flag`, and a bare `bin/lib/x` argument.
+    A longer name (`lib/x-extra`, `lib/x.sh`) and a prefixed name (`mylib/x`) do not match.
+    """
+    code = _COMMENT_TAIL.sub("", text)
+    return re.search(_REF_BEFORE + re.escape(needle) + _REF_AFTER, code) is not None
+
+
 def detect_gate_changes(changed, read_candidate, check_sources) -> list[GateChange]:
     """Classify a diff's changed paths into gate changes. `[]` means no gate was touched.
 
@@ -387,7 +409,7 @@ def detect_gate_changes(changed, read_candidate, check_sources) -> list[GateChan
         elif path.startswith("bin/lib/") and not removed:
             needle = path[len("bin/"):]
             for check_path in sorted(check_sources):
-                if needle in check_sources[check_path]:
+                if _references_lib(check_sources[check_path], needle):
                     add(resolved(check_path, "transitive", check_sources[check_path]))
     return list(out.values())
 
@@ -430,6 +452,11 @@ def placeholder_names(spec: ReplaySpec) -> set[str]:
     """Every `{name}` a spec references across argv, env values, and stdin."""
     tokens = [*spec.argv, *(value for _, value in spec.env), spec.stdin]
     return {name for tok in tokens for name in _PLACEHOLDER_RE.findall(tok)}
+
+
+def is_tree_wide(spec: ReplaySpec) -> bool:
+    """True when argv, env, and stdin name no PR-specific input, so the gate can only judge the tree."""
+    return not spec.needs_plan and placeholder_names(spec) <= {"tree"}
 
 
 def classify_exit(spec: ReplaySpec, rc: int, stdout: str) -> tuple[str, str]:
@@ -505,12 +532,14 @@ class GateTally:
     skipped: int = 0
     errors: int = 0
     first_error: str = ""
+    tree_state: list[int] | None = None
 
     def __post_init__(self) -> None:
         self.catches = self.catches if self.catches is not None else []
         self.false_flags = self.false_flags if self.false_flags is not None else []
         self.unsettled_flags = self.unsettled_flags if self.unsettled_flags is not None else []
         self.pre_existing = self.pre_existing if self.pre_existing is not None else []
+        self.tree_state = self.tree_state if self.tree_state is not None else []
         self.fixed_by_pr = self.fixed_by_pr if self.fixed_by_pr is not None else []
 
 
@@ -546,9 +575,56 @@ def lines_not_in_base(head: tuple[str, ...], base: tuple[str, ...]) -> tuple[str
     return tuple(line for line in head if line not in seen)
 
 
+_FLAG_LINE_NUMBER_RE = re.compile(r"^([^\s:]+):\d+:")
+
+
+def _line_key(line: str) -> str:
+    """A flag line with its leading `path:LINE:` number dropped, so a shifted line still matches."""
+    return _FLAG_LINE_NUMBER_RE.sub(r"\1::", line, count=1)
+
+
+def lines_not_in_parent(head: tuple[str, ...], parent: tuple[str, ...]) -> tuple[str, ...]:
+    """Head lines the parent-commit run cannot account for, matched by `_line_key` as a multiset.
+
+    Each parent line accounts for at most one head line with the same key, so a PR that adds a
+    second copy of a flagged line still introduces one. Every head line when either list is capped."""
+    if len(head) >= _FLAG_LINES_CAP or len(parent) >= _FLAG_LINES_CAP:
+        return head
+    budget = Counter(_line_key(line) for line in parent)
+    out = []
+    for line in head:
+        key = _line_key(line)
+        if budget[key] > 0:
+            budget[key] -= 1
+        else:
+            out.append(line)
+    return tuple(out)
+
+
+def lines_introduced(head: tuple[str, ...], base: tuple[str, ...], parent_outcome: str,
+                     parent: tuple[str, ...]) -> tuple[str, ...]:
+    """Head lines that neither the candidate gate on merge_sha^ nor the base gate on this tree printed.
+
+    Only a parent run that ended "flag" credits anything. "", pass, error, and timeout leave
+    lines_not_in_base(head, base) standing, so a failed parent run never clears a PR."""
+    if parent_outcome == "flag":
+        head = lines_not_in_parent(head, parent)
+    return lines_not_in_base(head, base)
+
+
 def new_flag_lines(r: ReplayResult) -> tuple[str, ...]:
     """Head flag lines the base gate did not also print on the same tree."""
     return lines_not_in_base(r.flag_lines, r.base_flag_lines)
+
+
+def introduced_flag_lines(r: ReplayResult) -> tuple[str, ...]:
+    """Head flag lines this PR's own diff introduced, by the parent-commit and base-gate comparisons."""
+    return lines_introduced(r.flag_lines, r.base_flag_lines, r.parent_outcome, r.parent_flag_lines)
+
+
+def parent_clears(r: ReplayResult) -> bool:
+    """True when the candidate gate on merge_sha^ printed every head flag line not already a base line."""
+    return r.parent_outcome == "flag" and bool(r.flag_lines) and not introduced_flag_lines(r)
 
 
 def fix_lines_pre_existing(r: ReplayResult) -> bool:
@@ -581,6 +657,8 @@ def _tally(gate_path: str, results, truth: dict[int, Truth]) -> GateTally:
             elif state == "clean":
                 if r.base_outcome == "flag" and not new_flag_lines(r):
                     tally.pre_existing.append(r.pr)
+                elif parent_clears(r):
+                    tally.tree_state.append(r.pr)
                 elif r.fix_outcome == "pass" or fix_lines_pre_existing(r):
                     tally.fixed_by_pr.append(r.pr)
                 else:
@@ -660,7 +738,7 @@ def _retry_lines(results) -> list[str]:
     out = []
     for r in results or []:
         for stage, secs in (("head", r.attempt_secs), ("base", r.base_attempt_secs),
-                            ("fix", r.fix_attempt_secs)):
+                            ("fix", r.fix_attempt_secs), ("parent", r.parent_attempt_secs)):
             if len(secs) == 2:
                 out.append(f"- #{r.pr} `{_clean(r.gate)}` {stage}: "
                            f"{secs[0]:.1f} s, then {secs[1]:.1f} s")
@@ -697,6 +775,8 @@ def render_gate_backtest(verdict: Verdict, gates, results, truth: dict[int, Trut
     false_flags: list[int] = []
     unsettled: list[int] = []
     pre_existing: list[int] = []
+    tree_state: list[int] = []
+    parent_failed: list = []
     fixed_by_pr: list[int] = []
     if verdict.per_gate:
         lines += ["| Gate | Replayed | Catches | False flags | Pre-existing flags | Unsettled flags "
@@ -705,11 +785,12 @@ def render_gate_backtest(verdict: Verdict, gates, results, truth: dict[int, Trut
                   "-----------------|---------|--------|"]
         for path, t in verdict.per_gate.items():
             lines.append(f"| `{_clean(path)}` | {t.replayed} | {len(t.catches)} | "
-                         f"{len(t.false_flags)} | {len(t.pre_existing)} | "
+                         f"{len(t.false_flags)} | {len(t.pre_existing) + len(t.tree_state)} | "
                          f"{len(t.unsettled_flags)} | {t.skipped} | {t.errors} |")
             catches += t.catches
             false_flags += t.false_flags
             pre_existing += t.pre_existing
+            tree_state += t.tree_state
             fixed_by_pr += t.fixed_by_pr
             unsettled += t.unsettled_flags
             for pr in t.fixed_by_pr:
@@ -720,6 +801,8 @@ def render_gate_backtest(verdict: Verdict, gates, results, truth: dict[int, Trut
                     remainder_fixed.append(r)
             for pr in t.false_flags:
                 r = by_key.get((path, pr))
+                if r is not None and r.parent_outcome in ("error", "timeout"):
+                    parent_failed.append(r)
                 if r is not None and r.fix_skipped and r.fix_outcome.startswith("partial-"):
                     partial_refused.append(r)
         lines.append("")
@@ -736,9 +819,16 @@ def render_gate_backtest(verdict: Verdict, gates, results, truth: dict[int, Trut
             lines.append(f"  - Partial apply refused #{r.pr} (`{_clean(r.gate)}`, {why}): "
                          f"applied {_file_list(r.fix_applied) or 'none'}; "
                          f"skipped {_file_list(r.fix_skipped)}")
+        for r in parent_failed:
+            lines.append(f"  - Parent-commit run not credited #{r.pr} (`{_clean(r.gate)}`, "
+                         f"{_clean(r.parent_outcome)}: {_clean(r.parent_detail)})")
     if pre_existing:
         lines.append("- Pre-existing flags (base gate also flags, excluded from the threshold): "
                      + _numbers(pre_existing))
+    if tree_state:
+        lines.append("- Tree state (the candidate gate prints the same lines on the PR's parent "
+                     "commit, so the PR added none; excluded from the threshold): "
+                     + _numbers(tree_state))
     if fixed_by_pr:
         lines.append("- Fixed by the candidate PR (once this PR's own change is applied, the head "
                      "gate passes or prints only lines the base gate also prints; excluded from "

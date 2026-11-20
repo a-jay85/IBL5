@@ -2,15 +2,22 @@
 #
 # bin/rehearsal-clone-fallback — every decision the deploy rehearsal makes about
 # falling back to the last good cached prod dump when the live clone hits a
-# connection-class MySQL error. .github/workflows/deploy-rehearsal.yml only calls
+# connection-class MySQL error or an ssh connect failure.
+# .github/workflows/deploy-rehearsal.yml only calls
 # this script; bin/test-rehearsal-clone-fallback covers it on every PR.
 #
 # Usage:
-#   bin/rehearsal-clone-fallback classify <stderr-file>
+#   bin/rehearsal-clone-fallback classify <stderr-file> [--keyscan=empty|present]
 #       Reads the captured stderr of the remote dump call. Prints "fallback: <code>"
 #       and exits 0 for MySQL 1203, 1040, 2002, 2003, or 2013 (mysql client,
-#       mariadb-dump connect, or mariadb-dump mid-dump format). Otherwise prints
-#       "no-fallback: <reason>" and exits 1.
+#       mariadb-dump connect, or mariadb-dump mid-dump format). Prints
+#       "fallback: ssh-connect" and exits 0 when a whole stderr line is an ssh
+#       client network failure: connect timed out, refused, no route, network
+#       unreachable, or reset, or a connection closed or reset during key exchange.
+#       "Host key verification failed." counts only with --keyscan=empty (the
+#       runner holds no key for prod). The default is --keyscan=present. A
+#       "Permission denied" or "Could not resolve hostname" line always wins.
+#       Otherwise prints "no-fallback: <reason>" and exits 1.
 #   bin/rehearsal-clone-fallback write-meta <meta-file> <clone-epoch> <run-url> <sha>
 #       Writes the three-line cache metadata file. Bad input exits 2, writes nothing.
 #   bin/rehearsal-clone-fallback check-age <meta-file> [now-epoch]
@@ -50,7 +57,7 @@ no_flags() {
 }
 
 classify() {
-    local f="$1" re m code
+    local f="$1" keyscan="$2" re m code
     if [ ! -f "$f" ] || [ ! -r "$f" ]; then
         usage_err "cannot read stderr file: $f"
     fi
@@ -71,7 +78,33 @@ classify() {
         printf 'fallback: %s\n' "$code"
         exit 0
     done
-    echo "no-fallback: no connection-class MySQL error"
+    # ssh network-level shapes. Only the ssh client's own line forms count, each
+    # anchored at both ends: the file also holds remote-command stderr, and a
+    # remote line that quotes one of these phrases must not match.
+    # Auth and name-resolution failures win over any eligible line (fail closed).
+    if command grep -a -E -q -e 'Permission denied|Could not resolve hostname' "$f"; then
+        echo "no-fallback: ssh auth or hostname failure"
+        exit 1
+    fi
+    if command grep -a -E -q -e '^Host key verification failed\.$' "$f"; then
+        if [ "$keyscan" = "empty" ]; then
+            echo "fallback: ssh-connect"
+            exit 0
+        fi
+        echo "no-fallback: host key verification failed with a host key on file"
+        exit 1
+    fi
+    for re in \
+        '^ssh: connect to host [^[:space:]]+ port [^[:space:]]+: (Connection timed out|Connection refused|No route to host|Network is unreachable|Connection reset by peer)$' \
+        '^(kex|ssh)_exchange_identification: (read: )?(Connection closed by remote host|Connection reset by peer|Connection timed out)$' \
+        '^banner exchange: Connection to [^[:space:]]+ port [^[:space:]]+: (Connection timed out|Connection refused|Connection reset by peer)$' \
+        '^Connection (closed|reset) by [^[:space:]]+ port [^[:space:]]+$'; do
+        if command grep -a -E -q -e "$re" "$f"; then
+            echo "fallback: ssh-connect"
+            exit 0
+        fi
+    done
+    echo "no-fallback: no connection-class MySQL error or ssh connect failure"
     exit 1
 }
 
@@ -154,9 +187,17 @@ cmd="${1:-}"
 case "$cmd" in
     -h|--help) help_text; exit 0 ;;
     classify)
-        no_flags "$@"
-        [ $# -eq 1 ] || usage_err "classify takes exactly one argument"
-        classify "$1" ;;
+        [ $# -ge 1 ] && [ $# -le 2 ] || usage_err "classify takes one or two arguments"
+        case "$1" in -*) usage_err "unknown flag: $1" ;; esac
+        keyscan=present
+        if [ $# -eq 2 ]; then
+            case "$2" in
+                --keyscan=empty) keyscan=empty ;;
+                --keyscan=present) keyscan=present ;;
+                *) usage_err "bad classify option: $2 (want --keyscan=empty or --keyscan=present)" ;;
+            esac
+        fi
+        classify "$1" "$keyscan" ;;
     write-meta)
         no_flags "$@"
         [ $# -eq 4 ] || usage_err "write-meta takes exactly four arguments"

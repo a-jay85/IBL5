@@ -127,6 +127,16 @@ bpt_expect_eq "bootstrap run 2 exits 0 (idempotent)" 0 "$r2"
 bpt_log_has "$STUB" gh.log "label create pipeline-authored" "code-repo pipeline-authored label created"
 bpt_log_has "$STUB" gh.log "a-jay85/IBL5" "pipeline-authored targets the CODE repo a-jay85/IBL5"
 
+# ── bootstrap_never_creates_repo: a missing repo is an error, never a create ──
+bpt_reset
+STUB_REPO_MISSING=1 PATH="$STUB/bin:$PATH" BUG_PIPELINE_ISSUE_REPO="test/bugs-fake" \
+    "$SELF_DIR/bug-pipeline-cron-setup" --bootstrap-issues >"$STUB/bootstrap.out" 2>&1
+r3=$?
+bpt_expect_eq "bootstrap with a missing repo exits 1" 1 "$r3"
+bpt_log_has "$STUB" bootstrap.out "never creates or edits a repository" "missing repo: error names the view-only rule"
+bpt_log_lacks "$STUB" gh.log "repo create" "bootstrap_never_creates_repo: no gh repo create call"
+bpt_log_lacks "$STUB" gh.log "label create" "missing repo: no label created either"
+
 echo "----"
 [ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"
 h_done

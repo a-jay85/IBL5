@@ -1,6 +1,6 @@
 ---
 description: Run the Discord bug/feature pipeline orchestrator as a Mac-local launchd LaunchAgent firing a poll-only bash driver every 180s via StartInterval — not a daemon, tmux, or persistent claude — with single-flight enforced by an atomic DB lease and no prod credentials in its environment.
-last_verified: 2026-11-04
+last_verified: 2026-11-18
 ---
 
 # ADR-0080: Mac-local launchd cron topology for the Discord bug/feature pipeline
@@ -224,3 +224,15 @@ Two changes close it:
 Two gaps stay open. An acknowledgement-age signal was left out because no cheap local source exists: the queue tables are empty after a wipe, and the bot's heartbeat file proves it ticks, which is a different fact from acknowledging reports. A degraded verdict still reaches no one on its own. `bin/launchd-health-check` is the smallest existing route to a Discord DM, and wiring the checker into it is a follow-up.
 
 The migration replay cannot recreate the loss. Migrations 153 and 158 use `CREATE TABLE IF NOT EXISTS` with no drop, and both are recorded as applied on the main DB. The topology decision is unchanged.
+
+## Addendum 2026-11-18: bug issues live in public a-jay85/IBL5
+
+The tracking issues moved from the private repo `a-jay85/ibl5-bugs` to the public repo `a-jay85/IBL5`. GitHub cannot transfer an issue out of a private repo into a public one. The owner therefore runs the one-off `bin/bug-issues-migrate`: it flips the old repo public, transfers issues 1 to 29, flips it private again and archives it. The old repo stays archived and private. The script is a dry run by default. `--live` needs a typed confirmation line and refuses to run headless.
+
+The pipeline still has no inbound surface. Close notices come from the 180 s tick. It polls `gh issue view --json state,stateReason` for each row of the new `ibl_bug_issue_notices` table. The table is local-only and sits on the preserve list, so a prod sync leaves it alone.
+
+The public issue surface is untrusted input. Anyone can edit an issue title or comment. The Discord text is built from fixed strings, the digits-only issue number, the close reason and the URL. The bot adds the one reporter mention and sends `allowedMentions` limited to that user. A mention token inside the message text is rejected.
+
+Each issue gets exactly one notice. The row moves `pending` to `claimed` in the DB before the post, so a crash between claim and post cannot send twice. The tick logs a stuck claim and never re-posts it. Five failed posts end the row in `failed`. Issues already closed at migration time are marked `seeded`, and the tick never posts for them.
+
+`bin/bug-pipeline-cron-setup --bootstrap-issues` no longer creates a repository. It views the issue repo and exits 1 when it is missing.

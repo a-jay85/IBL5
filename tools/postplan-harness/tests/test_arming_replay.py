@@ -403,7 +403,7 @@ def test_worktree_log_message_edit_clears_self_governing(tmp_path):
     d = merge_danger.derive_from_worktree(tree, diff)
     assert d.self_governing is False, d.why
     assert d.door == "two-way"
-    assert d.why.startswith("mechanical: replay cleared arming-path (48 inputs: 0 loosened")
+    assert d.why.startswith("mechanical: replay cleared arming-path (53 inputs: 0 loosened")
 
 
 def test_worktree_add_only_hold_clears_self_governing(tmp_path):
@@ -412,7 +412,7 @@ def test_worktree_add_only_hold_clears_self_governing(tmp_path):
     d = merge_danger.derive_from_worktree(tree, diff)
     assert d.self_governing is False, d.why
     assert "0 loosened" in d.replay_note
-    assert "48 tightened" in d.replay_note
+    assert "53 tightened" in d.replay_note
 
 
 def test_worktree_loosening_edit_keeps_self_governing(tmp_path):
@@ -421,7 +421,7 @@ def test_worktree_loosening_edit_keeps_self_governing(tmp_path):
     d = merge_danger.derive_from_worktree(tree, diff)
     assert d.self_governing is True
     assert f"arming-path:{ARMABLE}" in d.triggers
-    assert d.replay_note.startswith("replay kept arming-path (48 inputs: ")
+    assert d.replay_note.startswith("replay kept arming-path (53 inputs: ")
     assert "0 loosened" not in d.replay_note
     assert "held->armed" in d.replay_note
 

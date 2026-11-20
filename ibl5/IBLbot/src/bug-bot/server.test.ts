@@ -20,7 +20,11 @@ vi.mock('express', () => {
 });
 
 vi.mock('./config.js', () => ({
-    config: { express: { port: 50001 }, bugChannelId: 'BUG_CHANNEL' },
+    config: { express: { port: 50001 }, bugChannelId: '111111111111111111' },
+}));
+
+vi.mock('./preflight.js', () => ({
+    checkBugChannelPermissions: vi.fn(),
 }));
 
 vi.mock('./php-client.js', () => ({
@@ -29,6 +33,15 @@ vi.mock('./php-client.js', () => ({
 
 import { startBugBotServer } from './server.js';
 import * as phpClient from './php-client.js';
+import { checkBugChannelPermissions } from './preflight.js';
+
+const BUG_CHANNEL = '111111111111111111';
+const BOT_ID = '999999999999999999';
+const OTHER_ID = '888888888888888888';
+const REPORTER_ID = '777777777777777777';
+const THREAD_ID = '222222222222222222';
+const MSG_ID = '333333333333333333';
+const SENT_ID = '444444444444444444';
 
 function makeRes() {
     const res = {
@@ -63,6 +76,7 @@ async function invoke(path: string, body: unknown, client: Client) {
 beforeEach(() => {
     vi.clearAllMocks();
     h.routes = {};
+    vi.mocked(checkBugChannelPermissions).mockResolvedValue({ status: 'ok' });
 });
 
 describe('loopback bind (gate 14b)', () => {
@@ -163,8 +177,14 @@ describe('/post-to-thread', () => {
         const msg = 'Short message under cap';
         const res = await invoke('/post-to-thread', { thread_id: 'T', message: msg }, clientWithChannel(ch));
         expect(ch.send).toHaveBeenCalledTimes(1);
-        expect(ch.send).toHaveBeenCalledWith(msg);
+        expect(ch.send).toHaveBeenCalledWith({ content: msg, allowedMentions: { parse: [] } });
         expect(res.json).toHaveBeenCalledWith({ ok: true, chunks: 1 });
+    });
+
+    it('post-to-thread sends with parse none', async () => {
+        const ch = { isSendable: () => true, send: vi.fn().mockResolvedValue(undefined) };
+        await invoke('/post-to-thread', { thread_id: 'T', message: 'hello @everyone <@&5>' }, clientWithChannel(ch));
+        expect(ch.send).toHaveBeenCalledWith({ content: 'hello @everyone <@&5>', allowedMentions: { parse: [] } });
     });
 
     it('(b) over-cap: 5599-char fixture splits into multiple ordered chunks, content preserved whitespace-insensitively', async () => {
@@ -173,7 +193,7 @@ describe('/post-to-thread', () => {
         // so lastIndexOf('\n', 1900) finds position 1899, well before the 1900 cap
         const original = Array.from({ length: 56 }, () => 'x'.repeat(99)).join('\n');
         const res = await invoke('/post-to-thread', { thread_id: 'T', message: original }, clientWithChannel(ch));
-        const calls = ch.send.mock.calls.map((c: unknown[]) => c[0] as string);
+        const calls = ch.send.mock.calls.map((c: unknown[]) => (c[0] as { content: string }).content);
         expect(calls.length).toBeGreaterThan(1);
         // Ordering: each chunk after the first must carry the exact (N/total) counter
         const parts = calls.map((c: string, i: number) => {
@@ -197,7 +217,7 @@ describe('/post-to-thread', () => {
         // No whitespace → split falls back to CHUNK_MAX=1900; trimStart eats nothing
         const original = 'a'.repeat(1901);
         const res = await invoke('/post-to-thread', { thread_id: 'T', message: original }, clientWithChannel(ch));
-        const calls = ch.send.mock.calls.map((c: unknown[]) => c[0] as string);
+        const calls = ch.send.mock.calls.map((c: unknown[]) => (c[0] as { content: string }).content);
         expect(calls).toHaveLength(2);
         const prefix2 = '(2/2): ';
         expect(calls[1].startsWith(prefix2)).toBe(true);
@@ -216,7 +236,7 @@ describe('/post-to-thread', () => {
         // newline-rich so the cut lands at ~1806 (not at position 6 via space fallback)
         const original = '(2/9): ' + Array.from({ length: 40 }, () => 'x'.repeat(99)).join('\n');
         const res = await invoke('/post-to-thread', { thread_id: 'T', message: original }, clientWithChannel(ch));
-        const calls = ch.send.mock.calls.map((c: unknown[]) => c[0] as string);
+        const calls = ch.send.mock.calls.map((c: unknown[]) => (c[0] as { content: string }).content);
         expect(calls.length).toBeGreaterThan(1);
         // Chunk 1: verbatim prefix of original — no server prefix prepended, no content stripped
         expect(calls[0]).toBe(original.slice(0, calls[0].length));
@@ -238,19 +258,42 @@ describe('/mention', () => {
     });
 
     it('returns {message_id} as a string (the approval_message_id)', async () => {
-        const res = await invoke('/mention', { thread_id: 'T', discord_id: '42', message: 'm' }, clientWithChannel(sendable));
+        const res = await invoke('/mention', { thread_id: 'T', discord_id: REPORTER_ID, message: 'm' }, clientWithChannel(sendable));
         expect(res.json).toHaveBeenCalledWith({ message_id: 'MENTION_MSG_ID' });
         expect(typeof res.json.mock.calls[0][0].message_id).toBe('string');
     });
 
     it('interpolates the mention and message into the send', async () => {
-        await invoke('/mention', { thread_id: 'T', discord_id: '42', message: 'ping' }, clientWithChannel(sendable));
-        expect(sendable.send).toHaveBeenCalledWith('<@42> ping');
+        await invoke('/mention', { thread_id: 'T', discord_id: REPORTER_ID, message: 'ping' }, clientWithChannel(sendable));
+        expect(sendable.send).toHaveBeenCalledWith(expect.objectContaining({ content: `<@${REPORTER_ID}> ping` }));
+    });
+
+    it('mention allowedMentions only target user', async () => {
+        const ch = { isSendable: () => true, send: vi.fn().mockResolvedValue({ id: 'MENTION_MSG_ID' }) };
+        await invoke('/mention', { thread_id: 'T', discord_id: REPORTER_ID, message: 'hi @everyone <@&5>' }, clientWithChannel(ch));
+        expect(ch.send).toHaveBeenCalledWith({
+            content: `<@${REPORTER_ID}> hi @everyone <@&5>`,
+            allowedMentions: { parse: [], users: [REPORTER_ID] },
+        });
+    });
+
+    it('400 when discord_id is not a snowflake', async () => {
+        const ch = { isSendable: () => true, send: vi.fn() };
+        const res = await invoke('/mention', { thread_id: 'T', discord_id: '42', message: 'm' }, clientWithChannel(ch));
+        expect(res.statusCode).toBe(400);
+        expect(ch.send).not.toHaveBeenCalled();
+    });
+
+    it('400 when discord_id is 20 digits (overflows BIGINT UNSIGNED)', async () => {
+        const ch = { isSendable: () => true, send: vi.fn() };
+        const res = await invoke('/mention', { thread_id: 'T', discord_id: '99999999999999999999', message: 'm' }, clientWithChannel(ch));
+        expect(res.statusCode).toBe(400);
+        expect(ch.send).not.toHaveBeenCalled();
     });
 
     it('500 when send rejects', async () => {
         const bad = { isSendable: () => true, send: vi.fn().mockRejectedValue(new Error('x')) };
-        const res = await invoke('/mention', { thread_id: 'T', discord_id: '42', message: 'm' }, clientWithChannel(bad));
+        const res = await invoke('/mention', { thread_id: 'T', discord_id: REPORTER_ID, message: 'm' }, clientWithChannel(bad));
         expect(res.statusCode).toBe(500);
     });
 });
@@ -452,5 +495,381 @@ describe('/reply-to-message', () => {
             clientWithChannel(channelWithSource({ reply })),
         );
         expect(res.statusCode).toBe(500);
+    });
+});
+
+// A fake client resolving channels by id, with an identified bot user.
+function clientWithChannels(channels: Record<string, unknown>): Client {
+    return {
+        user: { id: BOT_ID },
+        channels: {
+            fetch: vi.fn((id: string) => {
+                const hit = channels[id];
+                if (hit instanceof Error) return Promise.reject(hit);
+                return Promise.resolve(hit ?? null);
+            }),
+        },
+    } as unknown as Client;
+}
+
+function bugThread(overrides: Record<string, unknown> = {}) {
+    return {
+        id: THREAD_ID,
+        isThread: () => true,
+        parentId: BUG_CHANNEL,
+        locked: false,
+        archived: false,
+        setArchived: vi.fn().mockResolvedValue(undefined),
+        send: vi.fn().mockResolvedValue({ id: SENT_ID }),
+        ...overrides,
+    };
+}
+
+function bugChannelWith(extra: Record<string, unknown> = {}) {
+    return {
+        id: BUG_CHANNEL,
+        isThread: () => false,
+        isTextBased: () => true,
+        isSendable: () => true,
+        send: vi.fn().mockResolvedValue({ id: SENT_ID }),
+        messages: { fetch: vi.fn() },
+        ...extra,
+    };
+}
+
+describe('/edit-message', () => {
+    function channelWithMessage(message: unknown) {
+        return bugChannelWith({ messages: { fetch: vi.fn().mockResolvedValue(message) } });
+    }
+
+    it('edit-message refuses non-bot author', async () => {
+        const edit = vi.fn();
+        const channel = channelWithMessage({ id: MSG_ID, author: { id: OTHER_ID }, edit });
+        const res = await invoke(
+            '/edit-message',
+            { channel_id: BUG_CHANNEL, message_id: MSG_ID, content: 'new' },
+            clientWithChannels({ [BUG_CHANNEL]: channel }),
+        );
+        expect(res.statusCode).toBe(403);
+        expect(res.json).toHaveBeenCalledWith({ error: 'not_bot_author' });
+        expect(edit).not.toHaveBeenCalled();
+    });
+
+    it('edit-message refuses channel outside bug channel', async () => {
+        const OUTSIDE = '555555555555555555';
+        const fetchMsg = vi.fn();
+        const outside = {
+            id: OUTSIDE,
+            isThread: () => false,
+            isTextBased: () => true,
+            messages: { fetch: fetchMsg },
+        };
+        const res = await invoke(
+            '/edit-message',
+            { channel_id: OUTSIDE, message_id: MSG_ID, content: 'new' },
+            clientWithChannels({ [OUTSIDE]: outside }),
+        );
+        expect(res.statusCode).toBe(403);
+        expect(fetchMsg).not.toHaveBeenCalled();
+    });
+
+    it('edit-message edits bot message with allowedMentions.parse empty', async () => {
+        const edit = vi.fn().mockResolvedValue(undefined);
+        const channel = channelWithMessage({ id: MSG_ID, author: { id: BOT_ID }, edit });
+        const res = await invoke(
+            '/edit-message',
+            { channel_id: BUG_CHANNEL, message_id: MSG_ID, content: 'new @everyone' },
+            clientWithChannels({ [BUG_CHANNEL]: channel }),
+        );
+        expect(res.statusCode).toBe(200);
+        expect(edit).toHaveBeenCalledWith({ content: 'new @everyone', allowedMentions: { parse: [] } });
+    });
+
+    it('edits a bot message inside a bug-channel thread', async () => {
+        const edit = vi.fn().mockResolvedValue(undefined);
+        const thread = bugThread({
+            isTextBased: () => true,
+            messages: { fetch: vi.fn().mockResolvedValue({ id: MSG_ID, author: { id: BOT_ID }, edit }) },
+        });
+        const res = await invoke(
+            '/edit-message',
+            { channel_id: THREAD_ID, message_id: MSG_ID, content: 'new' },
+            clientWithChannels({ [THREAD_ID]: thread }),
+        );
+        expect(res.statusCode).toBe(200);
+        expect(edit).toHaveBeenCalledTimes(1);
+    });
+
+    it('400 on a non-snowflake id or empty content', async () => {
+        const client = clientWithChannels({ [BUG_CHANNEL]: bugChannelWith() });
+        const badId = await invoke('/edit-message', { channel_id: 'nope', message_id: MSG_ID, content: 'x' }, client);
+        expect(badId.statusCode).toBe(400);
+        const empty = await invoke('/edit-message', { channel_id: BUG_CHANNEL, message_id: MSG_ID, content: '' }, client);
+        expect(empty.statusCode).toBe(400);
+    });
+
+    it('410 when the message no longer exists', async () => {
+        const channel = bugChannelWith({ messages: { fetch: vi.fn().mockRejectedValue(unknownMessageError()) } });
+        const res = await invoke(
+            '/edit-message',
+            { channel_id: BUG_CHANNEL, message_id: MSG_ID, content: 'x' },
+            clientWithChannels({ [BUG_CHANNEL]: channel }),
+        );
+        expect(res.statusCode).toBe(410);
+    });
+});
+
+describe('/list-threads', () => {
+    function threadsOf(...ts: Array<{ id: string; archived: boolean; locked: boolean }>) {
+        return new Map(ts.map((t) => [t.id, t]));
+    }
+
+    it('list-threads pages archived threads', async () => {
+        const T1 = '100000000000000001';
+        const T2 = '100000000000000002';
+        const fetchArchived = vi.fn().mockResolvedValue({
+            threads: threadsOf({ id: T1, archived: true, locked: false }, { id: T2, archived: true, locked: true }),
+            hasMore: true,
+        });
+        const channel = bugChannelWith({ threads: { fetchArchived, fetchActive: vi.fn() } });
+        const BEFORE = '100000000000000009';
+        const res = await invoke(
+            '/list-threads',
+            { archived: true, before: BEFORE },
+            clientWithChannels({ [BUG_CHANNEL]: channel }),
+        );
+        expect(fetchArchived).toHaveBeenCalledWith({ type: 'public', before: BEFORE, limit: 100 });
+        expect(res.json).toHaveBeenCalledWith({
+            threads: [
+                { id: T1, archived: true, locked: false },
+                { id: T2, archived: true, locked: true },
+            ],
+            has_more: true,
+            next_before: T2,
+        });
+    });
+
+    it('lists active threads without paging', async () => {
+        const T1 = '100000000000000001';
+        const fetchActive = vi.fn().mockResolvedValue({ threads: threadsOf({ id: T1, archived: false, locked: false }) });
+        const channel = bugChannelWith({ threads: { fetchArchived: vi.fn(), fetchActive } });
+        const res = await invoke('/list-threads', { archived: false }, clientWithChannels({ [BUG_CHANNEL]: channel }));
+        expect(res.json).toHaveBeenCalledWith({
+            threads: [{ id: T1, archived: false, locked: false }],
+            has_more: false,
+            next_before: null,
+        });
+    });
+
+    it('list-threads 503 when permission missing', async () => {
+        vi.mocked(checkBugChannelPermissions).mockResolvedValue({ status: 'missing', missing: ['SendMessages'] });
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const fetchArchived = vi.fn();
+        const channel = bugChannelWith({ threads: { fetchArchived, fetchActive: vi.fn() } });
+        const res = await invoke('/list-threads', { archived: true }, clientWithChannels({ [BUG_CHANNEL]: channel }));
+        expect(res.statusCode).toBe(503);
+        expect(res.json).toHaveBeenCalledWith({ error: 'missing_permissions', detail: 'missing: SendMessages' });
+        expect(fetchArchived).not.toHaveBeenCalled();
+        expect(console.error).toHaveBeenCalledWith(expect.stringContaining('SendMessages'));
+    });
+
+    it('503 when permissions are unknown', async () => {
+        vi.mocked(checkBugChannelPermissions).mockResolvedValue({ status: 'unknown', reason: 'no member' });
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const res = await invoke('/list-threads', { archived: false }, clientWithChannels({ [BUG_CHANNEL]: bugChannelWith() }));
+        expect(res.statusCode).toBe(503);
+    });
+
+    it('400 when archived is not a boolean', async () => {
+        const res = await invoke('/list-threads', { archived: 'yes' }, clientWithChannels({}));
+        expect(res.statusCode).toBe(400);
+    });
+});
+
+describe('/scan-messages', () => {
+    it('scan-messages returns only bot messages', async () => {
+        const M1 = '300000000000000001';
+        const M2 = '300000000000000002';
+        const M3 = '300000000000000003';
+        const page = new Map<string, unknown>([
+            [M3, { id: M3, author: { id: BOT_ID }, content: 'bot note', reference: { messageId: MSG_ID }, createdTimestamp: 3000 }],
+            [M2, { id: M2, author: { id: OTHER_ID }, content: 'gm chatter', reference: null, createdTimestamp: 2000 }],
+            [M1, { id: M1, author: { id: BOT_ID }, content: 'older bot note', reference: null, createdTimestamp: 1000 }],
+        ]);
+        const fetchMsgs = vi.fn().mockResolvedValue(page);
+        const channel = bugChannelWith({ messages: { fetch: fetchMsgs } });
+        const res = await invoke('/scan-messages', { channel_id: BUG_CHANNEL }, clientWithChannels({ [BUG_CHANNEL]: channel }));
+        expect(fetchMsgs).toHaveBeenCalledWith({ limit: 100, before: undefined });
+        expect(res.json).toHaveBeenCalledWith({
+            messages: [
+                { id: M3, channel_id: BUG_CHANNEL, content: 'bot note', reference_message_id: MSG_ID, created_timestamp: 3000 },
+                { id: M1, channel_id: BUG_CHANNEL, content: 'older bot note', reference_message_id: null, created_timestamp: 1000 },
+            ],
+            next_before: null,
+        });
+    });
+
+    it('returns next_before when the page is full', async () => {
+        const full = new Map<string, unknown>(
+            Array.from({ length: 100 }, (_, i) => {
+                const id = `5000000000000${String(1000 + (100 - i))}`;
+                return [id, { id, author: { id: OTHER_ID }, content: '', reference: null, createdTimestamp: 1000 - i }];
+            }),
+        );
+        const channel = bugChannelWith({ messages: { fetch: vi.fn().mockResolvedValue(full) } });
+        const res = await invoke('/scan-messages', { channel_id: BUG_CHANNEL }, clientWithChannels({ [BUG_CHANNEL]: channel }));
+        expect(res.json.mock.calls[0][0].next_before).toBe('50000000000001001');
+    });
+
+    it('403 outside the bug channel scope', async () => {
+        const OUTSIDE = '555555555555555555';
+        const outside = { id: OUTSIDE, isThread: () => false, isTextBased: () => true, messages: { fetch: vi.fn() } };
+        const res = await invoke('/scan-messages', { channel_id: OUTSIDE }, clientWithChannels({ [OUTSIDE]: outside }));
+        expect(res.statusCode).toBe(403);
+    });
+
+    it('503 when permission missing', async () => {
+        vi.mocked(checkBugChannelPermissions).mockResolvedValue({ status: 'missing', missing: ['ReadMessageHistory'] });
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const res = await invoke('/scan-messages', { channel_id: BUG_CHANNEL }, clientWithChannels({ [BUG_CHANNEL]: bugChannelWith() }));
+        expect(res.statusCode).toBe(503);
+    });
+});
+
+describe('/post-with-mention', () => {
+    const ALLOWED = { parse: [], users: [REPORTER_ID], repliedUser: false };
+
+    it('post-with-mention unarchives before send', async () => {
+        const order: string[] = [];
+        const thread = bugThread({
+            archived: true,
+            setArchived: vi.fn(async () => { order.push('unarchive'); }),
+            send: vi.fn(async () => { order.push('send'); return { id: SENT_ID }; }),
+        });
+        const res = await invoke(
+            '/post-with-mention',
+            { message: 'closed', discord_id: REPORTER_ID, thread_id: THREAD_ID },
+            clientWithChannels({ [THREAD_ID]: thread, [BUG_CHANNEL]: bugChannelWith() }),
+        );
+        expect(order).toEqual(['unarchive', 'send']);
+        expect(thread.setArchived).toHaveBeenCalledWith(false, 'bug close notice');
+        expect(res.json).toHaveBeenCalledWith({ ok: true, target: 'thread', message_id: SENT_ID });
+    });
+
+    it('post-with-mention locked thread falls back', async () => {
+        const thread = bugThread({ locked: true, archived: true });
+        const channel = bugChannelWith();
+        const res = await invoke(
+            '/post-with-mention',
+            { message: 'closed', discord_id: REPORTER_ID, thread_id: THREAD_ID },
+            clientWithChannels({ [THREAD_ID]: thread, [BUG_CHANNEL]: channel }),
+        );
+        expect(thread.setArchived).not.toHaveBeenCalled();
+        expect(thread.send).not.toHaveBeenCalled();
+        expect(channel.send).toHaveBeenCalledTimes(1);
+        expect(res.json).toHaveBeenCalledWith({ ok: true, target: 'channel', message_id: SENT_ID });
+    });
+
+    it('post-with-mention unknown thread replies to original', async () => {
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const reply = vi.fn().mockResolvedValue({ id: SENT_ID });
+        const channel = bugChannelWith({ messages: { fetch: vi.fn().mockResolvedValue({ reply }) } });
+        const gone = Object.assign(new Error('Unknown Channel'), { code: 10003 });
+        const res = await invoke(
+            '/post-with-mention',
+            { message: 'closed', discord_id: REPORTER_ID, thread_id: THREAD_ID, reply_to_message_id: MSG_ID },
+            clientWithChannels({ [THREAD_ID]: gone, [BUG_CHANNEL]: channel }),
+        );
+        expect(reply).toHaveBeenCalledTimes(1);
+        expect(channel.send).not.toHaveBeenCalled();
+        expect(res.json).toHaveBeenCalledWith({ ok: true, target: 'reply', message_id: SENT_ID });
+    });
+
+    it('post-with-mention sets allowedMentions.users to the reporter only', async () => {
+        const thread = bugThread();
+        await invoke(
+            '/post-with-mention',
+            { message: 'closed', discord_id: REPORTER_ID, thread_id: THREAD_ID },
+            clientWithChannels({ [THREAD_ID]: thread, [BUG_CHANNEL]: bugChannelWith() }),
+        );
+        expect(thread.send).toHaveBeenCalledWith({ content: `<@${REPORTER_ID}> closed`, allowedMentions: ALLOWED });
+    });
+
+    it('allowedMentions pings nobody when no discord_id is given', async () => {
+        const channel = bugChannelWith();
+        await invoke('/post-with-mention', { message: 'closed' }, clientWithChannels({ [BUG_CHANNEL]: channel }));
+        expect(channel.send).toHaveBeenCalledWith({
+            content: 'closed',
+            allowedMentions: { parse: [], users: [], repliedUser: false },
+        });
+    });
+
+    it('post-with-mention rejects non-digit discord_id', async () => {
+        const channel = bugChannelWith();
+        const res = await invoke(
+            '/post-with-mention',
+            { message: 'closed', discord_id: '12ab' },
+            clientWithChannels({ [BUG_CHANNEL]: channel }),
+        );
+        expect(res.statusCode).toBe(400);
+        expect(channel.send).not.toHaveBeenCalled();
+    });
+
+    it('post-with-mention rejects mention token in message', async () => {
+        const channel = bugChannelWith();
+        for (const message of ['hi @everyone', 'hi @here', 'hi <@123>']) {
+            const res = await invoke('/post-with-mention', { message }, clientWithChannels({ [BUG_CHANNEL]: channel }));
+            expect(res.statusCode).toBe(400);
+        }
+        expect(channel.send).not.toHaveBeenCalled();
+    });
+
+    it('post-with-mention send failure returns 502 without fallback', async () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const thread = bugThread({ send: vi.fn().mockRejectedValue(new Error('boom')) });
+        const reply = vi.fn();
+        const channel = bugChannelWith({ messages: { fetch: vi.fn().mockResolvedValue({ reply }) } });
+        const res = await invoke(
+            '/post-with-mention',
+            { message: 'closed', thread_id: THREAD_ID, reply_to_message_id: MSG_ID },
+            clientWithChannels({ [THREAD_ID]: thread, [BUG_CHANNEL]: channel }),
+        );
+        expect(res.statusCode).toBe(502);
+        expect(reply).not.toHaveBeenCalled();
+        expect(channel.send).not.toHaveBeenCalled();
+    });
+
+    it('falls back when the unarchive throws', async () => {
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const thread = bugThread({ archived: true, setArchived: vi.fn().mockRejectedValue(new Error('403')) });
+        const channel = bugChannelWith();
+        const res = await invoke(
+            '/post-with-mention',
+            { message: 'closed', thread_id: THREAD_ID },
+            clientWithChannels({ [THREAD_ID]: thread, [BUG_CHANNEL]: channel }),
+        );
+        expect(thread.send).not.toHaveBeenCalled();
+        expect(res.json).toHaveBeenCalledWith({ ok: true, target: 'channel', message_id: SENT_ID });
+    });
+
+    it('falls back when the thread belongs to another parent', async () => {
+        const thread = bugThread({ parentId: '555555555555555555' });
+        const channel = bugChannelWith();
+        await invoke(
+            '/post-with-mention',
+            { message: 'closed', thread_id: THREAD_ID },
+            clientWithChannels({ [THREAD_ID]: thread, [BUG_CHANNEL]: channel }),
+        );
+        expect(thread.send).not.toHaveBeenCalled();
+        expect(channel.send).toHaveBeenCalledTimes(1);
+    });
+
+    it('503 when permission missing, nothing posted', async () => {
+        vi.mocked(checkBugChannelPermissions).mockResolvedValue({ status: 'missing', missing: ['SendMessages'] });
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const channel = bugChannelWith();
+        const res = await invoke('/post-with-mention', { message: 'closed' }, clientWithChannels({ [BUG_CHANNEL]: channel }));
+        expect(res.statusCode).toBe(503);
+        expect(channel.send).not.toHaveBeenCalled();
     });
 });

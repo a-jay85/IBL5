@@ -47,6 +47,13 @@ describe('checkBugChannelPermissions', () => {
         expect(res).toEqual({ status: 'ok' });
     });
 
+    it('preflight requires SendMessages', async () => {
+        expect(Object.keys(REQUIRED_BUG_CHANNEL_PERMISSIONS)).toContain('SendMessages');
+        const withoutSend = ALL.filter((f) => f !== PermissionsBitField.Flags.SendMessages);
+        const res = await checkBugChannelPermissions(clientWith(channelHolding(withoutSend)));
+        expect(res).toEqual({ status: 'missing', missing: ['SendMessages'] });
+    });
+
     it('names AddReactions when only that one is missing — the ✴️ ack case', async () => {
         const withoutReact = ALL.filter((f) => f !== PermissionsBitField.Flags.AddReactions);
         const res = await checkBugChannelPermissions(clientWith(channelHolding(withoutReact)));

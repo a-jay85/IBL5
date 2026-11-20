@@ -266,6 +266,9 @@ OWNER_HELD_PLAN_TRIGGERS = frozenset({
     "ui", "truly-manual", "schema", "merge-rule", "gate-removal", "one-way", "unresolved-fork",
     "other", "bootstrap-hazard", "security-irreducible", "golden-new",
 })
+# The self-cleared tokens never reach the seat. trace-pinned lifts conditions (5) and (7)
+# only when harness.trace_pinned returns "ok" and it is the plan's only token.
+SELF_CLEARED_PLAN_TRIGGERS = frozenset({"trace-pinned"})
 UI_PATH_PREFIXES = ("ibl5/design/", "ibl5/themes/", "ibl5/templates/", "ibl5/jslib/", "ibl5/modules/", "ibl5/images/")
 UI_PATH_SUFFIXES = (".css", ".js", ".html", ".twig", "View.php")
 
@@ -287,6 +290,14 @@ def plan_triggers_clearable(triggers, sql_equivalence_evidence: str) -> bool:
     if tokens & EVIDENCE_GATED_PLAN_TRIGGERS and sql_equivalence_evidence != "ok":
         return False
     return True
+
+
+def trace_pinned_lifts(inp) -> bool:
+    """True only when the plan names exactly trace-pinned, its evidence is "ok",
+    and no raw JSB capture changed. Fails closed."""
+    return (set(inp.plan_hold_triggers or ()) == SELF_CLEARED_PLAN_TRIGGERS
+            and inp.trace_pinned_evidence == "ok"
+            and not inp.classification.jsb_capture_changed)
 
 
 def second_review_candidates(inp, cs) -> dict[int, str]:
@@ -393,6 +404,7 @@ class ArmInputs:
     owner_approval: str = "unchecked"   # (7) token from resolve_owner_approval
     plan_hold_triggers: tuple = ()                # line-1 `hold_trigger:` tokens; () keeps condition (7) with the owner
     sql_equivalence_evidence: str = "unchecked"   # sql_equivalence.arm_input_value(); only "ok" lets `sql-equivalent` reach the seat
+    trace_pinned_evidence: str = "unchecked"   # trace_pinned.arm_input_value(); only "ok" with hold_trigger exactly trace-pinned lifts (5) and (7)
     fidelity_gate_edit_only: bool = False         # every blocking fidelity finding is [GATE-EDIT]
     second_review_verdict: Optional[str] = None   # "CLEAN"/"REJECT"; None = the seat gave no verdict
     second_review_tree: Optional[str] = None      # tree the seat reviewed; must equal current_tree
@@ -696,10 +708,14 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
         p5_reason = ""
     cs.append(ConditionResult(4, "phase5-verify", p5_blocked, p5_reason))
 
-    golden = inp.classification.golden_changed
-    c5 = ConditionResult(5, "golden-snapshot-headless", golden and inp.headless,
-                         "golden.json changed in headless mode" if (golden and inp.headless) else "")
-    if golden and not inp.headless:
+    golden = inp.classification.golden_changed or inp.classification.jsb_capture_changed
+    lifted = golden and trace_pinned_lifts(inp)
+    blocked = golden and inp.headless and not lifted
+    c5 = ConditionResult(5, "golden-snapshot-headless", blocked,
+                         "golden snapshot or JSB capture changed in headless mode" if blocked else "")
+    if lifted:
+        c5.warning = "golden change cleared by trace-pinned evidence (harness.trace_pinned)"
+    elif golden and not inp.headless:
         c5.warning = ("golden.json changed: simulation behavior changed. Confirm this was an "
                       "intentional `make -C engine golden-update`, not a masked regression")
     cs.append(c5)
@@ -725,6 +741,8 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     val = inp.plan_auto_merge_value
     if inp.plan_auto_merge_false or val == "false":
         if inp.owner_approval == "match":
+            c7_blocked, c7_reason = False, ""
+        elif trace_pinned_lifts(inp):
             c7_blocked, c7_reason = False, ""
         elif inp.owner_approval == "unchecked":
             c7_blocked, c7_reason = True, "plan declares auto_merge: false"

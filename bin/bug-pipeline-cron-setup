@@ -6,8 +6,9 @@
 # host-durable, poll-only, cheap on empty ticks. The plist Program/WorkingDirectory
 # point at the durable MAIN checkout (never a worktree, which gets torn down).
 #
-# Also bootstraps the best-effort GitHub issue-tracking projection (§3f): the private
-# tracking repo, its issue labels, and the code-repo `pipeline-authored` hold label.
+# Also bootstraps the best-effort GitHub issue-tracking projection (§3f): its issue labels
+# on the public code repo (a-jay85/IBL5) and the `pipeline-authored` hold label. It only
+# views the repo; it never creates one.
 #
 # Also installs the Mac-local bug-bot itself (com.ibl5.bug-bot) as a second
 # LaunchAgent. The bot ran under pm2 until 2026-09-14; see the addendum on ADR-0080
@@ -18,7 +19,7 @@
 #   bin/bug-pipeline-cron-setup --print-schedule      # emit the cron plist to stdout (no side effect)
 #   bin/bug-pipeline-cron-setup --install-schedule    # install + load the cron LaunchAgent + bootstrap issues
 #   bin/bug-pipeline-cron-setup --uninstall-schedule  # unload + remove the cron LaunchAgent
-#   bin/bug-pipeline-cron-setup --bootstrap-issues    # (re)create the tracking repo + labels only
+#   bin/bug-pipeline-cron-setup --bootstrap-issues    # ensure the issue labels exist (repo must already exist)
 #   bin/bug-pipeline-cron-setup --print-bot           # emit the bug-bot plist to stdout (no side effect)
 #   bin/bug-pipeline-cron-setup --install-bot         # install + load the bug-bot LaunchAgent
 #   bin/bug-pipeline-cron-setup --uninstall-bot       # unload + remove the bug-bot LaunchAgent
@@ -72,7 +73,7 @@ BOT_DOTENV="$IBLBOT_DIR/.env.bugbot"
 NODE_BIN="${NODE_BIN:-$(command -v node || true)}"
 
 # The PRIVATE tracking repo the cron mirrors issues to (§3f). Override via env.
-BUG_PIPELINE_ISSUE_REPO="${BUG_PIPELINE_ISSUE_REPO:-a-jay85/ibl5-bugs}"
+BUG_PIPELINE_ISSUE_REPO="${BUG_PIPELINE_ISSUE_REPO:-a-jay85/IBL5}"
 # A-Jay's Discord snowflake (STRING) — the feature-path approver. A config value,
 # never derived from untrusted input. Empty until the operator sets it.
 BUG_PIPELINE_APPROVER_ID="${BUG_PIPELINE_APPROVER_ID:-}"
@@ -178,9 +179,19 @@ PLIST
 bootstrap_issue_tracking() {
   command -v gh >/dev/null 2>&1 || { echo "gh not found — skipping issue-tracking bootstrap." >&2; return 0; }
 
-  # Private tracking repo (holds raw GM text + reporter ids for RCA — must stay private).
-  gh repo view "$BUG_PIPELINE_ISSUE_REPO" >/dev/null 2>&1 \
-    || gh repo create "$BUG_PIPELINE_ISSUE_REPO" --private 2>/dev/null || true
+  # The issue repo is the public code repo. View only: this script never creates or edits a
+  # repository. Only a definite "repo not found" is a config error worth stopping for. Any
+  # other view failure (network blip, expired gh auth, GitHub 5xx) is transient, so skip the
+  # labels with a warning and let the install succeed.
+  local view_err
+  if ! view_err=$(gh repo view "$BUG_PIPELINE_ISSUE_REPO" 2>&1 >/dev/null); then
+    if grep -qiE 'could not resolve to a repository|not found|HTTP 404' <<< "$view_err"; then
+      echo "ERROR: issue repo $BUG_PIPELINE_ISSUE_REPO not found; --bootstrap-issues never creates or edits a repository" >&2
+      exit 1
+    fi
+    echo "WARN: could not check issue repo $BUG_PIPELINE_ISSUE_REPO (${view_err}); skipping issue-tracking bootstrap." >&2
+    return 0
+  fi
 
   # Tracking-repo labels (area:* / root-cause:* are open vocabularies created on demand by #5b).
   local label

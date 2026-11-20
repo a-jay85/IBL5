@@ -27,7 +27,12 @@ from pathlib import Path
 
 from harness import rebuildable
 from harness.armable import DESTRUCTIVE_SQL
-from harness.sql_comments import strip_added_sql_comments
+from harness.sql_comments import (
+    _DIFF_HEADER_RE,
+    diff_sections as _diff_sections,
+    migration_sections,
+    strip_added_sql_comments,
+)
 from harness.migration_revert_proof import unproven_migrations
 from harness.external_scope import external_send_change
 from harness.gate_backtest import GateChange, changes_from_unified_diff, detect_gate_changes
@@ -63,7 +68,6 @@ _NOTIFY_TEXT_RE = re.compile(r"notify-discord|DISCORD_")
 _SITE_WIDE_PATHS = ("ibl5/.htaccess", "ibl5/router.php", "ibl5/composer.json")
 _MIGRATION_RE = re.compile(r"^ibl5/migrations/.*\.sql$")
 _PHP_MIGRATION_RE = re.compile(r"^ibl5/migrations/.*\.php$")
-_DIFF_HEADER_RE = re.compile(r"^diff --git a/.* b/(.*)$", re.MULTILINE)
 _RENAME_RE = re.compile(r"^rename from (.+)\nrename to (.+)$", re.MULTILINE)
 # `DELETE FROM t1, t2 USING ...` lists a second target after the first name (fails closed).
 _DELETE_LIST_RE = re.compile(
@@ -91,26 +95,9 @@ class MalformedMergeDanger(ValueError):
     """The body carries a `**Merge danger:**` line that does not parse, or more than one."""
 
 
-def _diff_sections(diff_text: str) -> list[tuple[str, str]] | None:
-    """(b-path, section text) per `diff --git` header, in order. None when the text has no
-    header at all: an empty diff or a bare hunk."""
-    headers = list(_DIFF_HEADER_RE.finditer(diff_text))
-    if not headers:
-        return None
-    sections: list[tuple[str, str]] = []
-    for i, m in enumerate(headers):
-        end = headers[i + 1].start() if i + 1 < len(headers) else len(diff_text)
-        sections.append((m.group(1), diff_text[m.start():end]))
-    return sections
-
-
 def _migration_sections(diff_text: str, pattern: re.Pattern[str] = _MIGRATION_RE) -> str:
-    """The diff text belonging to files whose path matches pattern (default: .sql migrations). A diff without `diff --git` headers is
-    searched whole, so a bare hunk still counts."""
-    sections = _diff_sections(diff_text)
-    if sections is None:
-        return diff_text
-    return "".join(text for path, text in sections if pattern.match(path))
+    """The diff text belonging to files whose path matches pattern (default: .sql migrations)."""
+    return migration_sections(diff_text, pattern)
 
 
 def _added_text(diff_text: str) -> str:

@@ -841,7 +841,7 @@ docs_route_through_script() {
         note "the skill still arms or labels directly"
     fi
     grep -qF 'bin/owner-approve' "$skill" || note "the skill never names bin/owner-approve"
-    grep -qF "When the owner's own words in chat approve a named PR, comment on it at once." "$rule" || note "the rule lost its trigger sentence"
+    grep -qF "When the owner's own words approve a named PR (any shape:" "$rule" || note "the rule lost its trigger sentence"
     grep -qF 'bin/owner-approve N' "$rule" || note "the rule does not point at bin/owner-approve N"
     if grep -qF 'gh pr comment N --body' "$rule"; then note "the manual comment command survives in the rule"; fi
 }

@@ -117,6 +117,98 @@ else
     fail reclaim_race_inline_double_owner "wins/ownerA=[$rr_inline], expected 2 winners"
 fi
 
+t_pid_dead() { local p; p=$(cat "$1/pid" 2>/dev/null) || p=""; [ -n "$p" ] && ! kill -0 "$p" 2>/dev/null; }
+# dead_pid: print the pid of a process that has already exited.
+dead_pid() { local d; sh -c 'exit 0' & d=$!; wait "$d" 2>/dev/null || true; printf '%s\n' "$d"; }
+
+# reclaim_helper_race_one_owner: same barrier, claim_reclaim yields one winner (racer A).
+rr_helper=$(race_reclaim helper)
+if [ "$rr_helper" = "1 1" ]; then
+    ok reclaim_helper_race_one_owner
+else
+    fail reclaim_helper_race_one_owner "wins/ownerA=[$rr_helper], expected [1 1]"
+fi
+
+# reclaim_absent_lock_claims
+L="$T/rc-absent"
+if claim_reclaim "$L" pid t_pid_dead printf '%s\n' "$$" \
+    && [ "$(cat "$L/pid" 2>/dev/null)" = "$$" ] && [ ! -e "$L.reclaim.lock" ]; then
+    ok reclaim_absent_lock_claims
+else
+    fail reclaim_absent_lock_claims "pid=[$(cat "$L/pid" 2>/dev/null)] mutex=$([ -e "$L.reclaim.lock" ] && echo present || echo absent)"
+fi
+
+# reclaim_live_lock_refused
+L="$T/rc-live"
+mkdir "$L" && printf '%s\n' "$$" > "$L/pid"
+claim_reclaim "$L" pid t_pid_dead printf '%s\n' "$$"; rc=$?
+if [ "$rc" = 1 ] && [ "$(cat "$L/pid" 2>/dev/null)" = "$$" ] && [ ! -e "$L.reclaim.lock" ]; then
+    ok reclaim_live_lock_refused
+else
+    fail reclaim_live_lock_refused "rc=$rc pid=[$(cat "$L/pid" 2>/dev/null)]"
+fi
+
+# reclaim_live_mutex_refused
+L="$T/rc-livemutex"
+dp=$(dead_pid)
+mkdir "$L" && printf '%s\n' "$dp" > "$L/pid"
+mkdir "$L.reclaim.lock" && printf '%s\n' "$$" > "$L.reclaim.lock/owner"
+claim_reclaim "$L" pid t_pid_dead printf '%s\n' "$$"; rc=$?
+if [ "$rc" = 1 ] && [ "$(cat "$L/pid" 2>/dev/null)" = "$dp" ] \
+    && [ "$(cat "$L.reclaim.lock/owner" 2>/dev/null)" = "$$" ]; then
+    ok reclaim_live_mutex_refused
+else
+    fail reclaim_live_mutex_refused "rc=$rc pid=[$(cat "$L/pid" 2>/dev/null)] owner=[$(cat "$L.reclaim.lock/owner" 2>/dev/null)]"
+fi
+
+# reclaim_dead_mutex_reaped
+L="$T/rc-deadmutex"
+dp=$(dead_pid)
+dp2=$(dead_pid)
+mkdir "$L" && printf '%s\n' "$dp" > "$L/pid"
+mkdir "$L.reclaim.lock" && printf '%s\n' "$dp2" > "$L.reclaim.lock/owner"
+claim_reclaim "$L" pid t_pid_dead printf '%s\n' "$$"; rc=$?
+if [ "$rc" = 0 ] && [ "$(cat "$L/pid" 2>/dev/null)" = "$$" ] && [ ! -e "$L.reclaim.lock" ]; then
+    ok reclaim_dead_mutex_reaped
+else
+    fail reclaim_dead_mutex_reaped "rc=$rc pid=[$(cat "$L/pid" 2>/dev/null)]"
+fi
+
+# reclaim_old_mutex_reaped
+L="$T/rc-oldmutex"
+dp=$(dead_pid)
+mkdir "$L" && printf '%s\n' "$dp" > "$L/pid"
+mkdir "$L.reclaim.lock" && printf '%s\n' "$$" > "$L.reclaim.lock/owner"
+touch -t 202001010000 "$L.reclaim.lock"
+claim_reclaim "$L" pid t_pid_dead printf '%s\n' "$$"; rc=$?
+if [ "$rc" = 0 ] && [ ! -e "$L.reclaim.lock" ]; then
+    ok reclaim_old_mutex_reaped
+else
+    fail reclaim_old_mutex_reaped "rc=$rc mutex=$([ -e "$L.reclaim.lock" ] && echo present || echo absent)"
+fi
+
+# reclaim_claim_cmd_content
+L="$T/rc-content"
+claim_reclaim "$L" at t_pid_dead printf '%s\n' 123; rc=$?
+if [ "$rc" = 0 ] && [ "$(cat "$L/at" 2>/dev/null)" = 123 ] && [ ! -e "$L/pid" ]; then
+    ok reclaim_claim_cmd_content
+else
+    fail reclaim_claim_cmd_content "rc=$rc at=[$(cat "$L/at" 2>/dev/null)]"
+fi
+
+# reclaim_lying_mkdir_live_mutex_refused
+L="$T/rc-lying"
+dp=$(dead_pid)
+claim_file_lying_mkdir_stub "$T/lm"
+mkdir "$L" && printf '%s\n' "$dp" > "$L/pid"
+mkdir "$L.reclaim.lock" && printf '%s\n' "$$" > "$L.reclaim.lock/owner"
+( PATH="$T/lm:$PATH"; claim_reclaim "$L" pid t_pid_dead printf '%s\n' "$$" ); rc=$?
+if [ "$rc" = 1 ] && [ "$(cat "$L/pid" 2>/dev/null)" = "$dp" ]; then
+    ok reclaim_lying_mkdir_live_mutex_refused
+else
+    fail reclaim_lying_mkdir_live_mutex_refused "rc=$rc pid=[$(cat "$L/pid" 2>/dev/null)]"
+fi
+
 # claim_missing_parent_fails_closed
 cm_ok=1
 if claim_file "$T/nope/x"; then cm_ok=0; fi

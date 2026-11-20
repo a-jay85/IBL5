@@ -17,6 +17,10 @@
 # Also reaps heartbeat-watcher subshells orphaned by a killed bin/automouse/run
 # (PPID 1, argv bin/automouse/run, direct `sleep 60` child, no live heartbeat
 # file names it).
+#
+# Merged sweep: a skipped/ plan whose branch has a MERGED PR shipped by hand
+# after automouse gave up on it. It moves to done/ whatever the skip reason.
+# A gh error or no merged PR leaves it in skipped/.
 
 set -u
 
@@ -29,9 +33,10 @@ Also reaps orphan skipped-dir entries whose plan file has left ~/claude-plans/.
 Also reaps heartbeat-watcher subshells orphaned by a killed bin/automouse/run
 (PPID 1, argv bin/automouse/run, direct `sleep 60` child, no live heartbeat file
 names it).
+Also moves a skipped plan to done/ when its branch has a merged PR.
 
 Options:
-  --dry-run   Preview healed / still-stale / reaped counts without making changes.
+  --dry-run   Preview healed / still-stale / reaped / merged counts without making changes.
 
 Only plans with a .staleness sidecar are eligible for recovery. Ambiguity and
 poison-pill skips are never requeued. Tombstone reaping runs first and is
@@ -52,6 +57,8 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ORPHAN_ARGV_RE_DEFAULT='^[^ ]*bash [^ ]*bin/automouse/run( |$)'
 : "${AUTOMOUSE_ORPHAN_ARGV_RE:=$ORPHAN_ARGV_RE_DEFAULT}"
 : "${AUTOMOUSE_ORPHAN_PPID:=1}"
+# gh binary for the merged sweep. Tests point it at a stub so no case asks GitHub.
+: "${AUTOMOUSE_GH:=gh}"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/../lib/plan-depends-on"
 # shellcheck source=../lib/automouse-queue-order.sh
@@ -66,6 +73,7 @@ DRY_RUN=0
 healed=0
 still_stale=0
 tombstones=0
+merged_done=0
 healed_names_file="$(mktemp)"
 trap 'rm -f "$healed_names_file"' EXIT
 
@@ -187,6 +195,26 @@ sweep_orphan_watchers() {
     echo "self-heal: $orphans_reaped orphan watcher(s) reaped, $orphans_spared spared."
 }
 
+# merged_pr_url <plan name>: print the URL of a MERGED PR on the plan's branch
+# and return 0. The branch is the handoff's "branch" field when one is left,
+# else the slug. Any gh error, or no merged PR, prints nothing and returns 1.
+merged_pr_url() {
+    local name=$1 slug="${1%.md}" handoff branch="" url
+    handoff="$NIGHTLY_DIR/handoff/${name}.json"
+    if [ -f "$handoff" ]; then
+        branch=$(jq -r '.branch // empty' "$handoff" 2>/dev/null) || branch=""
+    fi
+    { [ -n "$branch" ] && [ "$branch" != "null" ]; } || branch=$slug
+    if url=$(GH_PROMPT_DISABLED=1 "$AUTOMOUSE_GH" pr list --head "$branch" \
+                 --state merged --limit 1 --json url --jq '.[0].url // empty' \
+                 2>/dev/null); then
+        [ -n "$url" ] || return 1
+        printf '%s\n' "$url"
+        return 0
+    fi
+    return 1
+}
+
 scan_depends_holds
 sweep_orphan_watchers
 
@@ -215,6 +243,30 @@ for f in "$SKIPPED_DIR"/*.md; do
             echo "reaped tombstone: $name (plan no longer in $PLANS_DIR)"
         fi
         tombstones=$((tombstones + 1))
+        continue
+    fi
+
+    # Merged sweep: the plan shipped by hand after automouse skipped it. Runs
+    # before the marker gate because a merged plan is done whatever the skip
+    # reason was.
+    if pr_url="$(merged_pr_url "$name")"; then
+        if [ "$DRY_RUN" -eq 1 ]; then
+            echo "would move to done/: $name (merged PR $pr_url)"
+        else
+            mkdir -p "$NIGHTLY_DIR/done"
+            if mv -f "$f" "$NIGHTLY_DIR/done/$name"; then
+                # The morning digest reads done/ entries by their own mtime.
+                touch -h -- "$NIGHTLY_DIR/done/$name" 2>/dev/null || true
+                rm -f "$marker" "$SKIPPED_DIR/${name}.attempts" \
+                      "$SKIPPED_DIR/${name}.failure" "$SKIPPED_DIR/${name}.cap-refunds" \
+                      "$NIGHTLY_DIR/handoff/${name}.json"
+                echo "moved to done/: $name (merged PR $pr_url)"
+            else
+                echo "self-heal: move to done/ failed for $name (left in skipped/)"
+                continue
+            fi
+        fi
+        merged_done=$((merged_done + 1))
         continue
     fi
 
@@ -249,7 +301,7 @@ for f in "$SKIPPED_DIR"/*.md; do
 done
 
 if [ "$DRY_RUN" -eq 1 ]; then
-    echo "self-heal (dry-run): $healed would heal, $still_stale still stale, $tombstones tombstone(s) would be reaped. No changes made."
+    echo "self-heal (dry-run): $healed would heal, $still_stale still stale, $tombstones tombstone(s) would be reaped, $merged_done merged plan(s) would move to done/. No changes made."
     exit 0
 fi
 
@@ -267,5 +319,5 @@ if [ "$healed" -gt 0 ]; then
     } > "$report"
 fi
 
-echo "self-heal: $healed plan(s) recovered, $still_stale still stale, $tombstones tombstone(s) reaped."
+echo "self-heal: $healed plan(s) recovered, $still_stale still stale, $tombstones tombstone(s) reaped, $merged_done merged plan(s) moved to done/."
 exit 0

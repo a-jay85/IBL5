@@ -85,8 +85,28 @@ run_heal() {
     NIGHTLY_DIR="$NDIR" PLANS_DIR="$PDIR" STALENESS_GUARD="$TMP/stub-guard" \
         AUTOMOUSE_CHECK_PLAN=/usr/bin/true \
         AUTOMOUSE_ORPHAN_ARGV_RE="${HB_ARGV_RE:-__no_process_argv_matches_this__}" \
-        AUTOMOUSE_ORPHAN_PPID="${HB_ORPHAN_PPID:-1}" "$SCRIPT" "$@"
+        AUTOMOUSE_ORPHAN_PPID="${HB_ORPHAN_PPID:-1}" \
+        AUTOMOUSE_GH="$TMP/stub-gh" "$SCRIPT" "$@"
 }
+
+# Stub gh for the merged sweep: logs each --head branch, prints a merged PR URL
+# when the branch contains "merged", exits 1 when it contains "gherror", and
+# prints nothing (no merged PR) otherwise.
+cat > "$TMP/stub-gh" <<'GH_EOF'
+#!/usr/bin/env bash
+branch=""
+while [ $# -gt 0 ]; do
+    [ "$1" = "--head" ] && { branch=$2; shift; }
+    shift
+done
+printf '%s\n' "$branch" >> "${STUB_GH_LOG:-/dev/null}"
+case "$branch" in
+  *gherror*) exit 1 ;;
+  *merged*)  printf 'https://example.invalid/pull/9\n' ;;
+esac
+exit 0
+GH_EOF
+chmod +x "$TMP/stub-gh"
 
 # Create fixture plans carrying a valid impl_model:, which bin/automouse/queue add
 # now requires. Use for plans the heal path is expected to requeue successfully.
@@ -251,6 +271,71 @@ h_eq "guard: assert_not_queued is quiet on an empty queue" "" \
 ln -s /nonexistent-1576 "$NDIR/queue/010-plan-stale.md"   # stray queue/010-plan-stale.md
 h_eq "guard: stray queue/010-plan-stale.md trips assert_not_queued" "guard N" \
      "$(tripped_labels assert_not_queued "guard N" plan-stale)"
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Rows 10-14 — MERGED SWEEP: a skipped plan whose branch has a merged PR moves
+# to done/ whatever the skip reason; gh errors and unmerged branches stay put.
+# ---------------------------------------------------------------------------
+# Row 10: merged, no staleness marker (a poison-pill skip) → done/, sidecars gone.
+setup
+mkplan plan-merged.md
+ln -s "$PDIR/plan-merged.md" "$NDIR/skipped/plan-merged.md"
+touch "$NDIR/skipped/plan-merged.md.attempts" "$NDIR/skipped/plan-merged.md.failure"
+out=$(run_heal 2>&1)
+assert_gone "row10 left skipped/" "$NDIR/skipped/plan-merged.md"
+assert_present "row10 in done/" "$NDIR/done/plan-merged.md"
+assert_gone "row10 .attempts gone" "$NDIR/skipped/plan-merged.md.attempts"
+assert_gone "row10 .failure gone" "$NDIR/skipped/plan-merged.md.failure"
+assert_not_queued "row10 not requeued" plan-merged
+h_contains "row10 names the PR" "$out" "moved to done/: plan-merged.md (merged PR https://example.invalid/pull/9)"
+h_contains "row10 summary counts it" "$out" "1 merged plan(s) moved to done/"
+
+# Row 11: merged AND staleness-marked with a passing guard ("fresh") → done/, not requeued.
+setup
+mkplan plan-merged-fresh.md
+ln -s "$PDIR/plan-merged-fresh.md" "$NDIR/skipped/plan-merged-fresh.md"
+touch "$NDIR/skipped/plan-merged-fresh.md.staleness"
+run_heal >/dev/null 2>&1
+assert_present "row11 in done/" "$NDIR/done/plan-merged-fresh.md"
+assert_gone "row11 .staleness gone" "$NDIR/skipped/plan-merged-fresh.md.staleness"
+assert_not_queued "row11 merged beats heal" plan-merged-fresh
+
+# Row 12: gh error → stays in skipped/ (fail closed).
+setup
+mkplan plan-gherror.md
+ln -s "$PDIR/plan-gherror.md" "$NDIR/skipped/plan-gherror.md"
+run_heal >/dev/null 2>&1
+assert_present "row12 gh error stays in skipped/" "$NDIR/skipped/plan-gherror.md"
+assert_gone "row12 not in done/" "$NDIR/done/plan-gherror.md"
+
+# Row 13: handoff branch wins over the slug; dry-run moves nothing.
+setup
+mkplan plan-renamed.md
+ln -s "$PDIR/plan-renamed.md" "$NDIR/skipped/plan-renamed.md"
+mkdir -p "$NDIR/handoff"
+printf '{"branch":"renamed-merged"}\n' > "$NDIR/handoff/plan-renamed.md.json"
+: > "$TMP/gh.log"
+out=$(STUB_GH_LOG="$TMP/gh.log" run_heal --dry-run 2>&1)
+h_eq "row13 gh asked for the handoff branch" "renamed-merged" "$(cat "$TMP/gh.log")"
+h_contains "row13 dry-run names the move" "$out" "would move to done/: plan-renamed.md"
+assert_present "row13 dry-run leaves skipped/" "$NDIR/skipped/plan-renamed.md"
+assert_gone "row13 dry-run leaves done/ empty" "$NDIR/done/plan-renamed.md"
+run_heal >/dev/null 2>&1
+assert_present "row13 real run moves it" "$NDIR/done/plan-renamed.md"
+assert_gone "row13 handoff removed" "$NDIR/handoff/plan-renamed.md.json"
+
+# Row 14: no merged PR → no move; tombstone is reaped without a gh call.
+setup
+mkplan plan-open.md
+ln -s "$PDIR/plan-open.md" "$NDIR/skipped/plan-open.md"
+ln -s "$PDIR/gone-merged.md" "$NDIR/skipped/gone-merged.md"   # dangling
+: > "$TMP/gh.log"
+STUB_GH_LOG="$TMP/gh.log" run_heal >/dev/null 2>&1
+assert_present "row14 unmerged stays in skipped/" "$NDIR/skipped/plan-open.md"
+assert_gone "row14 tombstone reaped" "$NDIR/skipped/gone-merged.md"
+assert_gone "row14 tombstone not moved to done/" "$NDIR/done/gone-merged.md"
+h_eq "row14 gh asked only for the live plan" "plan-open" "$(cat "$TMP/gh.log")"
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------

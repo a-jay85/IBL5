@@ -15,7 +15,8 @@
 #                    Flagged even with || true, which also drops a real failure.
 # See .claude/rules/shell-pipefail-grep.md for the rewrites.
 #
-# Skipped: comment lines; for pipeline-status only, lines holding && or ||, if/elif/while/
+# Skipped: comment lines; pipes inside a <( ... ) or >( ... ) process substitution
+# (bash ignores its status); for pipeline-status only, lines holding && or ||, if/elif/while/
 # until/! conditions, local/export/readonly/declare assignments (they mask the status), and
 # lines ending in \ or |. A line ending in "# pipefail-ok: <reason>" with a non-empty
 # reason is exempt. The matcher is quote-blind and reads one physical line, so it misses
@@ -126,6 +127,29 @@ producer_word() {
     PW="${s%%[[:space:]]*}"
 }
 
+# Sets STRIPPED to the line with every <( ... ) and >( ... ) span cut out, nested parens
+# included. An unclosed span runs to the end of the line. Bash never reports a process
+# substitution's exit status to errexit or pipefail, so a pipe inside one is safe.
+strip_psub() {
+    local s="$1" out="" c depth=0 i=0 n=${#1}
+    while [ "$i" -lt "$n" ]; do
+        c="${s:$i:1}"
+        if [ "$depth" -gt 0 ]; then
+            case "$c" in
+                '(') depth=$((depth + 1)) ;;
+                ')') depth=$((depth - 1)) ;;
+            esac
+        elif { [ "$c" = '<' ] || [ "$c" = '>' ]; } && [ "${s:$((i + 1)):1}" = '(' ]; then
+            depth=1
+            i=$((i + 1))
+        else
+            out="$out$c"
+        fi
+        i=$((i + 1))
+    done
+    STRIPPED="$out"
+}
+
 # Sets SHAPE to the first shape the line matches, or "" when clean or exempt.
 check_line() {
     local raw="$1" code last lw
@@ -134,6 +158,13 @@ check_line() {
     code="${raw%%[[:space:]]#*}"
     code="${code%"${code##*[![:space:]]}"}"
     [[ $code =~ $SINGLE_PIPE_RE ]] || return 0
+    case "$code" in
+        *'<('*|*'>('*)
+            strip_psub "$code"
+            code="$STRIPPED"
+            [[ $code =~ $SINGLE_PIPE_RE ]] || return 0
+            ;;
+    esac
     producer_word "$code"
     if [ "$PW" != echo ] && [ "$PW" != printf ]; then
         if [[ $code =~ $EARLY_AWK_RE ]] || [[ $code =~ $EARLY_HEAD_RE ]] || [[ $code =~ $EARLY_SED_RE ]]; then
@@ -160,7 +191,7 @@ check_line() {
         return 0
     fi
     case "$code" in
-        *'$('*|*'<('*) return 0 ;;
+        *'$('*) return 0 ;;
     esac
     if [ "$lw" = grep ] || [ "$lw" = egrep ] || [ "$lw" = fgrep ]; then SHAPE=pipeline-status; fi
     return 0

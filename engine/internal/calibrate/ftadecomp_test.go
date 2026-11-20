@@ -71,7 +71,10 @@ func TestSummarizeFTASide_TiesAndEmptyDenominators(t *testing.T) {
 }
 
 func TestSummarizeFTASide_ZeroDenominatorsError(t *testing.T) {
-	full := FTASide{TeamGames: 2, FTA: 30, PF: 40, HomeGames: 1, AwayGames: 1}
+	// STL and SitePF are set so the error branches are checked with the new
+	// fields present.
+	full := FTASide{TeamGames: 2, FTA: 30, PF: 40, HomeGames: 1, AwayGames: 1,
+		STL: 8, SitePF: map[string]float64{"non-shooting": 3}}
 	cases := []struct {
 		name string
 		mut  func(*FTASide)
@@ -439,5 +442,47 @@ func TestIsDegenerateFTAGame(t *testing.T) {
 					tc.pts0, tc.pts1, tc.fta0, tc.fta1, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestFTASide_STLAndSitePF(t *testing.T) {
+	var s FTASide
+	s.AddTeamGame(20, 15, 18, 80, 12, 10, 100, true, 4, true, false)
+	s.AddSTL(7)
+	s.AddTeamGame(24, 18, 22, 84, 16, 12, 96, false, 4, false, false)
+	s.AddSTL(9)
+	for range 3 {
+		s.AddSiteFoul("non-shooting")
+	}
+	s.AddSiteFoul("shooting-two")
+
+	sum, err := SummarizeFTASide(s)
+	if err != nil {
+		t.Fatalf("SummarizeFTASide: %v", err)
+	}
+	ftaApprox(t, "STLPerG", sum.STLPerG, 8)
+	ftaApprox(t, "TOVPerG", sum.TOVPerG, 14)
+	ftaApprox(t, "SitePFPerG[non-shooting]", sum.SitePFPerG["non-shooting"], 1.5)
+	ftaApprox(t, "SitePFPerG[shooting-two]", sum.SitePFPerG["shooting-two"], 0.5)
+	if len(sum.SitePFPerG) != 2 {
+		t.Errorf("SitePFPerG has %d sites, want 2: %v", len(sum.SitePFPerG), sum.SitePFPerG)
+	}
+
+	// A side with no site fouls (the .sco side) keeps a nil map.
+	s.SitePF = nil
+	sum, err = SummarizeFTASide(s)
+	if err != nil {
+		t.Fatalf("SummarizeFTASide without sites: %v", err)
+	}
+	if sum.SitePFPerG != nil {
+		t.Errorf("SitePFPerG = %v, want nil when SitePF is nil", sum.SitePFPerG)
+	}
+}
+
+func TestFTASide_AddSiteFoulZeroValue(t *testing.T) {
+	var s FTASide
+	s.AddSiteFoul("non-shooting")
+	if got := s.SitePF["non-shooting"]; got != 1 {
+		t.Errorf("SitePF[non-shooting] = %v, want 1", got)
 	}
 }

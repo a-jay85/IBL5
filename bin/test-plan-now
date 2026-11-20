@@ -1014,6 +1014,10 @@ for _producer in plan-now post-plan-now docfix-run; do
         fail "bin/$_producer sources lib/session-id.sh via a cwd-derived root — breaks under a foreign cwd"
     elif grep -q 'BASH_SOURCE\[0\].*lib/session-id\.sh\|SCRIPT_DIR/lib/session-id\.sh' "$_p"; then
         ok "bin/$_producer sources lib/session-id.sh from its own directory"
+    elif grep -q 'PPN_SELF_DIR/lib/session-id\.sh' "$_p" \
+        && grep -qE '^PPN_SELF_DIR="\$\(cd "\$\(dirname "\$\{BASH_SOURCE\[0\]\}"\)" && pwd -P\)"' "$_p"; then
+        # bin/post-plan-now resolves its own dir into PPN_SELF_DIR before its cd "$ROOT".
+        ok "bin/$_producer sources lib/session-id.sh from its own directory"
     else
         fail "bin/$_producer has no recognisable lib/session-id.sh source line"
     fi

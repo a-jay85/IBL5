@@ -540,6 +540,79 @@ chk "! php localhost URL rewritten" eq "$(row_rewrite '! php x.php http://localh
 chk "cd && ! php localhost URL rewritten" eq "$(row_rewrite 'cd ibl5 && ! php x.php http://localhost/api')" 'cd ibl5 && ! php x.php http://localhost:8080/api'
 end_case
 
+# --- Partition: encode keeps the CI records, local prints the rest -----------
+# PARTITION_PLAN has three matrix rows and one mutation record per row. Row 1
+# routes CI; row 2 (bin/db-query) and row 3 (bash bin/test-x) stay local.
+PARTITION_PLAN="$TMP/partition.md"
+mkplan "$PARTITION_PLAN" "$(row 1 'bin/test-alpha-fixture')" "$(row 2 'bin/db-query "SELECT 1"')" \
+    "$(row 3 'bash bin/test-x')" -- \
+    "$(mblock 1 target.txt ALPHA BETA)
+$(mblock 2 target.txt ALPHA GAMMA)
+$(mblock 3 other.txt other DELTA)"
+# rec <row> <file> <check> <match> <replace> — one record in the parse byte format.
+rec() { printf '%s\0%s\0%s\0%s\0%s\n' "$1" "$2" "$3" "$4" "$5"; }
+
+start_case encode_partition_pinned
+enc "$PARTITION_PLAN" > "$TMP/part-body"; RC=$?
+chk "encode exits 0 (got $RC)" eq "$RC" 0
+dec "$TMP/part-body" "$TMP/part-out"; RC=$?
+chk "decode exits 0 (got $RC)" eq "$RC" 0
+rec 1 target.txt 'bin/test-alpha-fixture' ALPHA BETA > "$TMP/part-want.nul"
+chk "records.nul holds exactly the row 1 record" cmp -s "$TMP/part-out/records.nul" "$TMP/part-want.nul"
+chk "rows.tsv holds exactly the one CI matrix row" \
+    eq "$(cat "$TMP/part-out/rows.tsv")" "$(printf '1\tbin/test-alpha-fixture')"
+end_case
+
+local_out() { (cd "$R" && "$LIB" local "$1"); }
+
+start_case local_partition_complement
+local_out "$PARTITION_PLAN" > "$TMP/part-local.nul"; RC=$?
+chk "local exits 0 (got $RC)" eq "$RC" 0
+{ rec 2 target.txt 'bin/db-query "SELECT 1"' ALPHA GAMMA; rec 3 other.txt 'bash bin/test-x' other DELTA; } > "$TMP/part-local-want.nul"
+chk "local prints exactly the row 2 and row 3 records" cmp -s "$TMP/part-local.nul" "$TMP/part-local-want.nul"
+chk "the decoded block still holds only row 1" cmp -s "$TMP/part-out/records.nul" "$TMP/part-want.nul"
+(cd "$R" && "$XM" parse "$PARTITION_PLAN") | tr '\0' '\037' | sort > "$TMP/part-parse.sorted"
+cat "$TMP/part-out/records.nul" "$TMP/part-local.nul" | tr '\0' '\037' | sort > "$TMP/part-halves.sorted"
+chk "the two halves sorted equal the parse output" cmp -s "$TMP/part-halves.sorted" "$TMP/part-parse.sorted"
+end_case
+
+start_case local_partition_near_miss
+NM_PLAN="$TMP/near-miss.md"
+mkplan "$NM_PLAN" "$(row 1 'bash -n bin/foo')" "$(row 2 'bash bin/foo')" "$(row 3 'docker run --rm alpine true')" -- \
+    "$(mblock 1 target.txt ALPHA BETA)
+$(mblock 2 target.txt ALPHA GAMMA)
+$(mblock 3 other.txt other DELTA)"
+local_out "$NM_PLAN" > "$TMP/nm-local.nul"; RC=$?
+chk "local exits 0 (got $RC)" eq "$RC" 0
+{ rec 2 target.txt 'bash bin/foo' ALPHA GAMMA; rec 3 other.txt 'docker run --rm alpine true' other DELTA; } > "$TMP/nm-local-want.nul"
+chk "local prints rows 2 and 3 only" cmp -s "$TMP/nm-local.nul" "$TMP/nm-local-want.nul"
+enc "$NM_PLAN" > "$TMP/nm-body"
+dec "$TMP/nm-body" "$TMP/nm-out"
+rec 1 target.txt 'bash -n bin/foo' ALPHA BETA > "$TMP/nm-ci-want.nul"
+chk "the decoded block holds row 1 only" cmp -s "$TMP/nm-out/records.nul" "$TMP/nm-ci-want.nul"
+end_case
+
+start_case local_rejects_extra_arg
+OUT=$(cd "$R" && "$LIB" local "$PARTITION_PLAN" extra 2>&1); RC=$?
+chk "exits 2 (got $RC)" eq "$RC" 2
+chk "prints the usage text" has "$OUT" "Usage:"
+end_case
+
+start_case local_rejects_flag
+OUT=$(cd "$R" && "$LIB" local --bogus 2>&1); RC=$?
+chk "exits 2 (got $RC)" eq "$RC" 2
+chk "prints the usage text" has "$OUT" "Usage:"
+end_case
+
+start_case local_no_matrix_exits_3
+NMX_PLAN="$TMP/no-matrix.md"
+printf '# Fixture plan\n\n## Executable Mutations\n\n%s\n' "$(mblock 1 target.txt ALPHA BETA)" > "$NMX_PLAN"
+OUT=$(cd "$R" && "$LIB" local "$NMX_PLAN" 2>"$TMP/nmx.err"); RC=$?
+chk "exits 3 (got $RC)" eq "$RC" 3
+chk "stderr names the missing matrix" has "$(cat "$TMP/nmx.err")" "FAIL plan has no Verification Matrix"
+chk "stdout is empty" eq "$OUT" ""
+end_case
+
 # A stub curl on PATH logs the arguments it got and exits 0, so ci can run
 # web rows offline.
 mkdir -p "$TMP/stubbin"

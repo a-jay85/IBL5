@@ -52,6 +52,71 @@ else
     ok claim_dir_counts_held
 fi
 
+# ---- two-racer stale-reclaim harness (backlog#1855) ----
+# Each racer is a real bash process, so $$ is its own pid. Barrier: both racers judge
+# the lock stale, then B waits for A to finish re-taking it before B acts. On the old
+# inline pattern B's rm -rf deletes A's fresh lock and B claims too: two owners.
+export CLAIM_LIB="$ROOT/bin/lib/claim-file.sh"
+cat > "$T/racer.sh" <<'RACER'
+#!/usr/bin/env bash
+# racer.sh <inline|helper> <A|B> <lockdir> <syncdir>
+set -u
+. "$CLAIM_LIB"
+mode=$1 id=$2 L=$3 S=$4
+pid_dead() { local p; p=$(cat "$1/pid" 2>/dev/null) || p=""; [ -n "$p" ] && ! kill -0 "$p" 2>/dev/null; }
+wait_for() {
+    local i=0
+    while [ ! -e "$1" ]; do
+        i=$((i + 1))
+        if [ "$i" -gt 200 ]; then echo timeout > "$S/result.$id"; : > "$S/done.$id"; exit 2; fi
+        sleep 0.05
+    done
+}
+if ! pid_dead "$L"; then echo held > "$S/result.$id"; : > "$S/done.$id"; exit 1; fi
+: > "$S/judged.$id"
+wait_for "$S/judged.A"
+wait_for "$S/judged.B"
+[ "$id" = B ] && wait_for "$S/done.A"
+if [ "$mode" = inline ]; then
+    rm -rf "$L"
+    if mkdir "$L" 2>/dev/null && claim_file "$L/pid" printf '%s\n' "$$"; then r=won; else r=lost; fi
+else
+    if claim_reclaim "$L" pid pid_dead printf '%s\n' "$$"; then r=won; else r=lost; fi
+fi
+echo "$r" > "$S/result.$id"
+: > "$S/done.$id"
+i=0; while [ ! -e "$S/release" ] && [ "$i" -lt 200 ]; do i=$((i + 1)); sleep 0.05; done
+RACER
+
+# race_reclaim <inline|helper>: seed a lock owned by a dead pid, run racers A and B
+# through the barrier, print "<wins> <1 when the pid file names racer A, else 0>".
+race_reclaim() {
+    local mode=$1 R="$T/race-$1" L dead a_pid b_pid wins i=0 owner_a=0
+    L="$R/lock"
+    mkdir -p "$R/sync"
+    sh -c 'exit 0' & dead=$!
+    wait "$dead" 2>/dev/null || true
+    mkdir "$L" && printf '%s\n' "$dead" > "$L/pid"
+    bash "$T/racer.sh" "$mode" A "$L" "$R/sync" & a_pid=$!
+    bash "$T/racer.sh" "$mode" B "$L" "$R/sync" & b_pid=$!
+    while { [ ! -e "$R/sync/done.A" ] || [ ! -e "$R/sync/done.B" ]; } && [ "$i" -lt 300 ]; do
+        i=$((i + 1)); sleep 0.05
+    done
+    wins=$(cat "$R/sync/result.A" "$R/sync/result.B" 2>/dev/null | grep -c '^won$')
+    [ "$(cat "$L/pid" 2>/dev/null)" = "$a_pid" ] && owner_a=1
+    : > "$R/sync/release"
+    wait "$a_pid" "$b_pid" 2>/dev/null
+    printf '%s %s\n' "$wins" "$owner_a"
+}
+
+# reclaim_race_inline_double_owner: the barrier reproduces the bug on the old shape.
+rr_inline=$(race_reclaim inline)
+if [ "${rr_inline%% *}" = 2 ]; then
+    ok reclaim_race_inline_double_owner
+else
+    fail reclaim_race_inline_double_owner "wins/ownerA=[$rr_inline], expected 2 winners"
+fi
+
 # claim_missing_parent_fails_closed
 cm_ok=1
 if claim_file "$T/nope/x"; then cm_ok=0; fi

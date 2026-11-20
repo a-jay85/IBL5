@@ -733,6 +733,13 @@ if [ "$SUBMITS20" = 1 ]; then
         grep -qE -- '--session-id [0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' "$(runner_of "$SB")" \
           && ok "(20.1) session-id: uuid is bare and unquoted in the runner" \
           || bad "(20.1) session-id: --session-id missing or UUID is quoted in the runner"
+        # Sub-check 20.1 source pin: the printf format in bin/docfix-run keeps the bare
+        # `--session-id %s` slot. Wrapping the slot as '%s' inside the single-quoted format
+        # glues back to the same runner bytes, so no run-time check can see it; this one
+        # reads the source text instead.
+        grep -qF -- '--session-id %s --effort low' "$REAL_DOCFIX" \
+          && ok "(20.1) session-id: docfix-run format keeps the bare --session-id %s slot" \
+          || bad "(20.1) session-id: docfix-run format lost the bare --session-id %s slot"
         # Sub-check 20.1 sidecar: docfix-run writes a .session sidecar whose content
         # equals the UUID embedded in the runner's command line.
         UUID20=$(printf '%s' "$CMD_LINE20" | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -1)
@@ -1410,8 +1417,12 @@ exec_runner() {
         claude()     { pwd -P > "$OUT/cwd"; printf '%s' "$2" > "$OUT/prompt"
                        printf '%s\n' "$@" > "$OUT/args"; printf '%s' "${CLAUDE_HEADLESS:-}" > "$OUT/headless"; }
         caffeinate() { [ "$1" = "-s" ] && shift; "$@"; }
+        # The runner wraps claude in `perl -e "alarm shift; exec @ARGV ..." 7200`.
+        # A real perl cannot exec a shell function, so drop -e, the program and
+        # the seconds, then run the rest in this shell.
+        perl()       { shift 3; "$@"; }
         launchctl()  { printf '%s\n' "$*" >> "$OUT/launchctl"; }
-        export -f claude caffeinate launchctl
+        export -f claude caffeinate perl launchctl
         HOME="$SB/home" bash "$1" >/dev/null 2>&1
     )
 }

@@ -723,6 +723,15 @@ jobs:
         run: |
           bin/test-check-loop-stdin-consumed-by-child
           bin/check-loop-stdin-consumed-by-child --stats
+      # claude-cli: a claude -p call with no timeout hangs its caller, 2>&1 inside a
+      # $(...) capture mixes stderr into the parsed verdict, a prompt after a variadic
+      # tool flag is read as a tool name, and an unlisted flag aborts the run
+      # (backlog#1613). The harness runs first so a broken matcher fails loudly.
+      - name: Check claude -p invocations are safe
+        if: ${{ !cancelled() }}
+        run: |
+          bin/test-check-claude-cli-invocation
+          bin/check-claude-cli-invocation --stats
       # th-aria-label: aria-label on <th> silently fails axe empty-table-header;
       # the correct fix is a sr-only span inside the th (PR postmortem, a11y audit).
       - name: Check th aria-label usage

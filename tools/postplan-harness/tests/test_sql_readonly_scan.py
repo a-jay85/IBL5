@@ -260,6 +260,19 @@ def test_new_assignment_feeding_unchanged_sql_holds():
         f"scan: unbound interpolation $userValue at {REPO}:{_line(head, '$filter = $userValue')}")
 
 
+def test_added_write_to_local_feeding_interpolated_local_holds():
+    base = _php("""    public function filtered(string $userValue): array
+    {
+        $tmp = 'a = 1';
+        $filter = $tmp;
+        return $this->fetchAll('SELECT * FROM t WHERE ' . $filter);
+    }
+""")
+    head = base.replace("$tmp = 'a = 1';", "$tmp = $userValue;")
+    assert _scan(head, base=base) == (
+        f"scan: unbound interpolation $userValue at {REPO}:{_line(head, '$tmp = $userValue')}")
+
+
 def test_prose_from_message_holds_exactly():
     head = _php("""    public function cached(string $key): array
     {

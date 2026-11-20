@@ -1306,8 +1306,28 @@ def _feeding_assignments(method: Method, added, class_props=None, changed_calls=
         if id(stmt) in sql:
             for name, key in _interpolated_keys(stmt, method.siblings):
                 interpolated.setdefault(name, set()).add(key)
+    assigns = _assignments(method)
+    # follow locals that feed an interpolated name (`$filter = $tmp`), so an added write to
+    # `$tmp` is judged even though the SQL never names it
+    changed = True
+    while changed:
+        changed = False
+        for _stmt, name, value, _op in assigns:
+            if name not in interpolated:
+                continue
+            for leaf in _concat_leaves(value):
+                if leaf.kind not in ("var", "index"):
+                    continue
+                src = _root_text(leaf)
+                if src == "?" or src == name:
+                    continue
+                have = interpolated.setdefault(src, set())
+                new = interpolated[name] - have
+                if new:
+                    have |= new
+                    changed = True
     out = []
-    for stmt, name, value, _op in _assignments(method):
+    for stmt, name, value, _op in assigns:
         if name in interpolated and (stmt.overlaps(added) or _calls_any(value, changed_calls)):
             for key in sorted(interpolated[name], key=lambda k: (k is not None, k or "")):
                 out.append(value if key is None else Node("keyed", name=key, kids=[value], line=value.line))

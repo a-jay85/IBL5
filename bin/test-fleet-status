@@ -219,9 +219,15 @@ SPAWNED_PIDS="$SPAWNED_PIDS $PP_PID"
 # ancestry never reaches a PID fleet-status printed — which is exactly the state
 # of a headless run whose supervisor died, and the only thing case 10's section
 # should ever show.
-"$STUBBIN/claude" -p --name fixture-orphan >/dev/null 2>&1 &
-ORPHAN_PID=$!
-disown "$ORPHAN_PID" 2>/dev/null
+# Respawn until its PID misses the launchd stub list (see fixture_pid): CI once
+# handed it 6001, so it matched a stub row and left the orphan section.
+while :; do
+    "$STUBBIN/claude" -p --name fixture-orphan >/dev/null 2>&1 &
+    ORPHAN_PID=$!
+    disown "$ORPHAN_PID" 2>/dev/null
+    fixture_pid "$ORPHAN_PID" || break
+    kill "$ORPHAN_PID" 2>/dev/null
+done
 SPAWNED_PIDS="$SPAWNED_PIDS $ORPHAN_PID"
 
 # A second orphan that carries a prompt and runs inside a worktree, so its
@@ -231,11 +237,15 @@ mkdir -p "$TMP/IBL5-worktrees/fixture-wt-slug/ibl5"
 # A real (unborn) branch, so the row's PR slot can match it by branch name.
 git -C "$TMP/IBL5-worktrees/fixture-wt-slug/ibl5" init -q 2>/dev/null
 git -C "$TMP/IBL5-worktrees/fixture-wt-slug/ibl5" symbolic-ref HEAD refs/heads/fixture-wt-branch
-(cd "$TMP/IBL5-worktrees/fixture-wt-slug/ibl5" \
-    && exec "$STUBBIN/claude" -p "Fix the fixture widget
+while :; do
+    (cd "$TMP/IBL5-worktrees/fixture-wt-slug/ibl5" \
+        && exec "$STUBBIN/claude" -p "Fix the fixture widget
 SECOND PROMPT LINE") >/dev/null 2>&1 &
-PROMPT_ORPHAN_PID=$!
-disown "$PROMPT_ORPHAN_PID" 2>/dev/null
+    PROMPT_ORPHAN_PID=$!
+    disown "$PROMPT_ORPHAN_PID" 2>/dev/null
+    fixture_pid "$PROMPT_ORPHAN_PID" || break
+    kill "$PROMPT_ORPHAN_PID" 2>/dev/null
+done
 SPAWNED_PIDS="$SPAWNED_PIDS $PROMPT_ORPHAN_PID"
 
 # Give the runners a moment to fork their children and write their pid files.

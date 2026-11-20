@@ -43,6 +43,13 @@ N_LOCAL="local X=\$(git ls-files $PIPE sort)"
 N_IF="if git ls-files $PIPE grep x >/dev/null; then :; fi"
 N_ARG="echo \"\$(git ls-files $PIPE grep x)\""
 N_PSUB="mapfile -t a < <(git ls-files $PIPE grep x)" # exit-ok: fixture text for the process-substitution skip case
+A_PSUB_ARG="diff <(a) <(b) $PIPE grep x" # exit-ok: fixture text for the bare process-substitution argument case
+N_PSUB_IN="diff <(git ls-files $PIPE grep x) <(b)" # exit-ok: fixture text for a pipe inside a bare process substitution
+N_PSUB_IN2="diff <(git ls-files $PIPE grep x) expected.txt" # exit-ok: fixture text for a pipe inside a bare process substitution
+N_PSUB_NEST="diff <(sort <(git ls-files $PIPE grep x)) b" # exit-ok: fixture text for a nested process substitution
+N_PSUB_OUT="git ls-files $PIPE tee >(a $PIPE grep x) >/dev/null" # exit-ok: fixture text for an output process substitution
+A_PSUB_MIX="diff <(git ls-files $PIPE sort) b $PIPE grep x" # exit-ok: fixture text for pipes inside and outside a process substitution
+A_REDIR_OUT="cat < <(a) $PIPE grep x" # exit-ok: fixture text for a grep pipe after a redirected process substitution
 N_CONT1="X=\$(git ls-files $PIPE sort) \\"
 N_CONT2="    $PIPE$PIPE X=''"
 
@@ -152,6 +159,13 @@ case_line local-masks-passes 0 'OK' bin/p.sh "$N_LOCAL"
 case_line if-grep-condition-passes 0 'OK' bin/p.sh "$N_IF"
 case_line substitution-argument-passes 0 'OK' bin/p.sh "$N_ARG"
 case_line process-substitution-passes 0 'OK' bin/p.sh "$N_PSUB"
+case_line process-substitution-argument-flagged 1 '[pipeline-status]' bin/p.sh "$A_PSUB_ARG"
+case_line pipe-inside-process-substitution-passes 0 'OK' bin/p.sh "$N_PSUB_IN"
+case_line pipe-inside-process-substitution-file-arg-passes 0 'OK' bin/p.sh "$N_PSUB_IN2"
+case_line pipe-inside-nested-process-substitution-passes 0 'OK' bin/p.sh "$N_PSUB_NEST"
+case_line pipe-inside-output-process-substitution-passes 0 'OK' bin/p.sh "$N_PSUB_OUT"
+case_line pipe-outside-process-substitution-flagged 1 '[pipeline-status]' bin/p.sh "$A_PSUB_MIX"
+case_line grep-after-redirected-process-substitution-flagged 1 '[pipeline-status]' bin/p.sh "$A_REDIR_OUT"
 case_line comment-line-passes 0 'OK' bin/p.sh "# $A1"
 case_line errexit-only-file-passes 0 'OK' bin/np.sh "$A1"
 case_line pipefail-only-file-passes 0 'OK' bin/pf.sh "$A1"

@@ -272,9 +272,10 @@ jobs:
           # start it, and attempt 2 alerts here if it fails too. A cancelled
           # rehearsal is never retried (that workflow needs conclusion
           # 'failure'), so it always alerts.
+          # The skip test reads only GitHub's step record (GH_STEP_NAME), never the server file.
           if [ "$RUN_ATTEMPT" = "1" ] && {
                { [ "$PREFLIGHT_RESULT" = "failure" ] && [ "$PREFLIGHT_STEP" = "Setup SSH" ]; } ||
-               { [ "$PREFLIGHT_RESULT" = "success" ] && [ "$STEP_NAME" = "Fetch latest code on server" ]; }
+               { [ "$PREFLIGHT_RESULT" = "success" ] && [ "$GH_STEP_NAME" = "Fetch latest code on server" ]; }
              }; then
             echo "Server unreachable on attempt 1; deploy-auto-retry.yml reruns it. No alert."
             echo "skip=true" >> "$GITHUB_OUTPUT"

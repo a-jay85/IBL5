@@ -1167,13 +1167,17 @@ assert_lacks "automouse: no separate runners section" \
 
 # 10 — the ancestry dedupe. Both directions matter: without the positive case a
 # render_loose that printed nothing at all would still pass.
+# Both checks read the loose section only. CI hands out small PIDs, so the real
+# child can get a PID a launchd stub row prints (6001-6005). Searching the whole
+# page then finds that row and fails even when the dedupe works.
+LOOSE_SECTION="$(sed -n '/UNACCOUNTED HEADLESS SESSIONS/,/PAUSED JOBS/p' <<< "$OUTPUT")"
 if [ -n "$CHILD_PID" ]; then
     assert_lacks "loose: child of a listed job is deduped by ancestry" \
-        "$OUTPUT" "pid $CHILD_PID "
+        "$LOOSE_SECTION" "pid $CHILD_PID "
 else
     fail "loose: child of a listed job is deduped by ancestry (fixture child never started)"
 fi
-assert_has "loose: a true orphan IS shown" "$OUTPUT" "pid $ORPHAN_PID "
+assert_has "loose: a true orphan IS shown" "$LOOSE_SECTION" "pid $ORPHAN_PID "
 
 # 10b — the summary line under each loose row. Off a terminal it names the
 # worktree and never the prompt; the override shows the prompt's first line.

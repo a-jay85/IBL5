@@ -8,6 +8,12 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 T=$(mktemp -d)
 trap 'rm -rf "$T"' EXIT
+# The adopted-sites check below names usage-gated entry points (bin/automouse/run,
+# bin/burndown-loop, ...), so the usage-isolation scan in bin/test-harness-lib
+# requires this file to isolate the usage gate.
+# shellcheck source=lib/usage-test-isolation.sh
+. "$ROOT/bin/lib/usage-test-isolation.sh"
+usage_test_isolate "$T/usage"
 
 FAILED=0
 ok() { printf 'ok %s\n' "$1"; }

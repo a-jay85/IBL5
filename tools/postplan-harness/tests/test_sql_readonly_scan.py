@@ -652,3 +652,27 @@ def test_safe_write_in_helper_feeding_unchanged_sql_passes():
         $x = 'name';
 """)
     assert _scan(head, base=_HELPER_BASE) == "ok"
+
+
+_CONST_SQL = """    private const BASE_SQL = 'SELECT * FROM t ORDER BY ';
+
+    public function sorted(string $col): array
+    {
+        return $this->fetchAll(self::BASE_SQL . $col);
+    }
+"""
+
+
+def test_public_param_concatenated_onto_sql_constant_holds():
+    assert _scan(_php(_CONST_SQL)) != "ok"
+
+
+def test_sql_constant_alone_passes():
+    head = _php("""    private const BASE_SQL = 'SELECT * FROM t';
+
+    public function all(): array
+    {
+        return $this->fetchAll(self::BASE_SQL);
+    }
+""")
+    assert _scan(head) == "ok"

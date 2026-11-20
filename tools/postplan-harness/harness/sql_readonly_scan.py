@@ -655,6 +655,7 @@ class Stmt:
     end_line: int
     _node: object = None
     _parsed: bool = False
+    refs_sql_const: bool = False   # names a class constant whose value holds SQL text
 
     def overlaps(self, lines) -> bool:
         return any(self.line <= ln <= self.end_line for ln in lines)
@@ -944,7 +945,47 @@ def _builder_args(stmt: Stmt) -> list[Node]:
 
 def _sql_bearing(stmt: Stmt, strict=False) -> bool:
     pattern = SQL_KEYWORD_PATTERN_STRICT if strict else SQL_KEYWORD_PATTERN
+    if not strict and stmt.refs_sql_const:
+        return True
     return pattern.search(stmt.literal_text()) is not None
+
+
+def _sql_const_names(toks: list[Token]) -> set[str]:
+    """Names of class constants (`const BASE = 'SELECT ...';`) whose value holds SQL text."""
+    names: set[str] = set()
+    for i, tok in enumerate(toks):
+        if tok.kind != "IDENT" or tok.text.lower() != "const":
+            continue
+        j = i + 1
+        while j < len(toks) and not (toks[j].kind == "OP" and toks[j].text in ("=", ";")):
+            j += 1
+        if j >= len(toks) or toks[j].text != "=" or j < 1 or toks[j - 1].kind != "IDENT":
+            continue
+        name = toks[j - 1].text
+        k = j + 1
+        parts: list[str] = []
+        while k < len(toks) and not (toks[k].kind == "OP" and toks[k].text == ";"):
+            if toks[k].kind == "STRING":
+                parts.append(toks[k].text)
+            elif toks[k].kind == "DQSTRING":
+                parts.extend(toks[k].parts)
+            k += 1
+        if SQL_KEYWORD_PATTERN.search(" ".join(parts)):
+            names.add(name)
+    return names
+
+
+def _mark_sql_const_refs(stmts: list[Stmt], const_names: set[str]) -> None:
+    """Flag each statement that reads `self::NAME` / `static::NAME` / `Cls::NAME` for a SQL constant."""
+    if not const_names:
+        return
+    for stmt in stmts:
+        toks = stmt.toks
+        for k in range(1, len(toks)):
+            if (toks[k].kind == "IDENT" and toks[k].text in const_names and toks[k - 1].text == "::"
+                    and not (k + 1 < len(toks) and toks[k + 1].text == "(")):
+                stmt.refs_sql_const = True
+                break
 
 
 def _names(node: Node) -> set[str]:
@@ -1561,6 +1602,9 @@ def _reaches_changed(methods: list[Method], ctx: "_Ctx", added) -> tuple[set[str
 def _scan_file(path: str, pair: SourcePair) -> str:
     toks = lex(pair.head_text)
     methods = structure(toks)
+    const_names = _sql_const_names(toks)
+    for m in methods:
+        _mark_sql_const_refs(m.stmts, const_names)
     added = pair.added_lines
     for method in methods:
         for stmt in method.stmts:
@@ -1592,6 +1636,8 @@ def _scan_file(path: str, pair: SourcePair) -> str:
                 class_props |= {n for n, _k in _interpolated_keys(st, m.siblings) if "->" in n or "::" in n}
     to_judge = list(methods)
     top = top_level_method(toks, methods)
+    if top is not None:
+        _mark_sql_const_refs(top.stmts, const_names)
     if top is not None and any(_sql_bearing(s) for s in top.stmts):
         to_judge.append(top)
     changed_methods, reaching = _reaches_changed(to_judge, ctx, added)

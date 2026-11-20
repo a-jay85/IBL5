@@ -1067,7 +1067,6 @@ def _run_pass(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             _fr_targets = fix_round.targets(decision)
             _fr_tried = bool((live or state_dir is not None)
                              and holdrepeat.fix_round_tried(_fr_sd, slug, _fr_targets))
-            _fr_before = reviewcache.per_file_patch_ids(git.diff_vs_base())
             _fr_ctx: dict = {}
             _fr_posts = fix_round.DeferredPosts(gh)
 
@@ -1171,65 +1170,87 @@ def _run_pass(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             def _fr_conflict_rereview():
                 return _fix_round_conflict_rereview(llm, git)
 
-            _fr_snap = fix_round.snapshot(res)
-            fr = fix_round.run_fix_round(
-                decision=decision, res=res, gh=gh, llm=llm, git=git, worktree=worktree or ".",
-                plan=plan, pr=pr, out_dir=out_dir, log=log,
-                commit=_fr_commit,
-                recheck=_fr_recheck, already_tried=_fr_tried, inputs=inputs,
-                fidelity_fix=_fr_fidelity_fix if pr else None,
-                conflict_rereview=_fr_conflict_rereview if pr else None,
-                meta_fix=_fr_meta_fix if live else None,
-                security_bar=_reviewer_bar_verdict)
-            if (fr.get("status") != "skipped"
-                    or fr.get("reason") == "holdrepeat-same-holds"):
-                # Other skips leave result.json byte-identical; the already-tried skip
-                # is kept so the sticky can show its line.
-                res.fix_round = fr
-            if fr.get("status") != "skipped":
-                if git.is_dirty():
-                    fix_round.clean_tree(git)
+            _fr_prior = None
+            _fr_pre = decision
+            _fr_deadline_at = fix_round.shared_deadline()
+            for _fr_round in range(1, fix_round.MAX_FIX_ROUNDS + 1):
+                _fr_snap = fix_round.snapshot(res)
+                # Each round's delta review covers only that round's edits.
+                _fr_before = reviewcache.per_file_patch_ids(git.diff_vs_base())
+                fr = fix_round.run_fix_round(
+                    decision=decision, res=res, gh=gh, llm=llm, git=git, worktree=worktree or ".",
+                    plan=plan, pr=pr, out_dir=out_dir, log=log,
+                    commit=_fr_commit,
+                    recheck=_fr_recheck, already_tried=_fr_tried if _fr_prior is None else False,
+                    inputs=inputs,
+                    fidelity_fix=_fr_fidelity_fix if pr else None,
+                    conflict_rereview=_fr_conflict_rereview if pr else None,
+                    meta_fix=_fr_meta_fix if live else None,
+                    security_bar=_reviewer_bar_verdict,
+                    prior=_fr_prior, deadline_at=_fr_deadline_at)
+                if _fr_prior is None and (fr.get("status") != "skipped"
+                                          or fr.get("reason") == "holdrepeat-same-holds"):
+                    # Other skips leave result.json byte-identical; the already-tried skip
+                    # is kept so the sticky can show its line.
+                    res.fix_round = fr
+                if fr.get("status") != "skipped":
                     if git.is_dirty():
-                        raise HarnessError("fix-round-dirty-tree",
-                                           "the fix round left uncommitted edits it could not clear")
-            pushed = ""
-            if fr.get("status") == "accepted":
-                try:
-                    pushed = _push_with_gate_fix(
-                        git, log, "phase6.5-fix", llm=None, worktree=worktree,
-                        out_dir=out_dir, res=res, gh=gh,
-                        pr=(pr if isinstance(git, LiveGit) else None)) or fr["sha"]
-                except HarnessError as e:
-                    log(f"phase6.5-fix: push failed ({e.kind}); discarding the round")
-                    if git.drop_commit(fr["head_before"]) or git.head() != fr["head_before"]:
-                        raise HarnessError("fix-round-undo-failed",
-                                           "push failed and the undo did not land") from e
-                    fix_round.restore(res, _fr_snap)
-                    fr["status"], fr["reason"], fr["reevaluate"] = "rejected", "push-failed", False
-                    fr["defer"] = []
-                    fr["row_repairs"] = []
-                    fix_round._write(out_dir, fr)
-            if fr.get("status") == "accepted" or (fr.get("status") == "no-change"
-                                                  and fr.get("reevaluate")):
-                fix_round.flush(gh, pr, fr, pushed or git.head(), log)
+                        fix_round.clean_tree(git)
+                        if git.is_dirty():
+                            raise HarnessError("fix-round-dirty-tree",
+                                               "the fix round left uncommitted edits it could not clear")
+                pushed = ""
                 if fr.get("status") == "accepted":
-                    _fr_posts.replay(pushed or git.head(), log)
-                res.findings, res.scored_findings = same_run_threads.prune_findings(
-                    res.findings, res.scored_findings, fix_round.prune_keys(fr))
-                if _fr_ctx:
-                    cls, meta = _fr_ctx["cls"], _fr_ctx["meta"]
-                    cache_key, cache_files = _fr_ctx["cache_key"], _fr_ctx["cache_files"]
-                unresolved = res.unresolved_conformance
-                _write_conformance_handoff(out_dir, unresolved)
-                if fr.get("status") == "accepted":
-                    sha = git.head()
-                    _repin_fidelity_after_same_run(llm, git, gh, out_dir, worktree, plan,
-                                                   master_sha, body, pr, pushed or sha, res, log)
-                fix_round.apply_plan_repair(plan, fr, out_dir, log)
-                _clear_meta_flag_after_fix_round(fr, git, res, log)
-                _arm = _evaluate_arm(log_suffix=" (post-fix-round)")
-                inputs, decision, _mc_flag = _arm["inputs"], _arm["decision"], _arm["mc_flag"]
-            _fr_line = fix_round.summary_line(fr)
+                    try:
+                        pushed = _push_with_gate_fix(
+                            git, log, "phase6.5-fix", llm=None, worktree=worktree,
+                            out_dir=out_dir, res=res, gh=gh,
+                            pr=(pr if isinstance(git, LiveGit) else None)) or fr["sha"]
+                    except HarnessError as e:
+                        log(f"phase6.5-fix: push failed ({e.kind}); discarding the round")
+                        if git.drop_commit(fr["head_before"]) or git.head() != fr["head_before"]:
+                            raise HarnessError("fix-round-undo-failed",
+                                               "push failed and the undo did not land") from e
+                        fix_round.restore(res, _fr_snap)
+                        fr["status"], fr["reason"], fr["reevaluate"] = "rejected", "push-failed", False
+                        fr["defer"] = []
+                        fr["row_repairs"] = []
+                        fix_round.write_record(out_dir, fr, _fr_prior)
+                if fr.get("status") == "accepted" or (fr.get("status") == "no-change"
+                                                      and fr.get("reevaluate")):
+                    fix_round.flush(gh, pr, fr, pushed or git.head(), log)
+                    if fr.get("status") == "accepted":
+                        _fr_posts.replay(pushed or git.head(), log)
+                    res.findings, res.scored_findings = same_run_threads.prune_findings(
+                        res.findings, res.scored_findings, fix_round.prune_keys(fr))
+                    if _fr_ctx:
+                        cls, meta = _fr_ctx["cls"], _fr_ctx["meta"]
+                        cache_key, cache_files = _fr_ctx["cache_key"], _fr_ctx["cache_files"]
+                    unresolved = res.unresolved_conformance
+                    _write_conformance_handoff(out_dir, unresolved)
+                    if fr.get("status") == "accepted":
+                        sha = git.head()
+                        _repin_fidelity_after_same_run(llm, git, gh, out_dir, worktree, plan,
+                                                       master_sha, body, pr, pushed or sha, res, log)
+                    fix_round.apply_plan_repair(plan, fr, out_dir, log)
+                    _clear_meta_flag_after_fix_round(fr, git, res, log)
+                    _arm = _evaluate_arm(log_suffix=" (post-fix-round)")
+                    inputs, decision, _mc_flag = _arm["inputs"], _arm["decision"], _arm["mc_flag"]
+                if _fr_prior is not None and fr.get("status") != "skipped":
+                    res.fix_round = fix_round.with_rounds(_fr_prior, fr)
+                    fix_round._write(out_dir, res.fix_round)
+                if _fr_round >= fix_round.MAX_FIX_ROUNDS:
+                    break
+                _fr_stop = fix_round.second_round_stop(
+                    fr, fix_round.targets(_fr_pre), fix_round.targets(decision), _fr_deadline_at)
+                if _fr_stop:
+                    if fr.get("status") != "skipped":
+                        log(f"phase6.5-fix: no round 2 ({_fr_stop})")
+                    break
+                log("phase6.5-fix: blocked target set shrank; starting round 2")
+                _fr_prior, _fr_pre = fr, decision
+                _fr_posts = fix_round.DeferredPosts(gh)
+            _fr_line = fix_round.summary_line(res.fix_round or fr)
             if _fr_line:
                 log(f"phase6.5-fix: {_fr_line}")
         # Review cache write: normal-completion path only, so a raised HarnessError

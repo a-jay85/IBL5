@@ -37,7 +37,7 @@ REPAIRED_PLAN_BASENAME = "fix-round-plan.md"
 ORIGINAL_PLAN_BASENAME = "fix-round-plan.orig.md"
 _DECIDED_VERDICTS = ("CONFLICT-REVIEW=CLEAN", "CONFLICT-REVIEW=FOUND-PROBLEM")
 _UNREADABLE_DELTA = "<unreadable-delta>"
-MAX_FIX_ROUNDS = 1          # asserted by test; the round has no loop
+MAX_FIX_ROUNDS = 2  # asserted by test; the runner loops at most this many rounds
 MAX_ITEMS = 8               # threads first, then unthreaded findings
 DEADLINE_S = 1200           # wall clock for the whole round, re-check included
 RESULT_BASENAME = "fix-round.json"
@@ -214,6 +214,47 @@ def _write(out_dir: str, record: dict) -> dict:
     return record
 
 
+def with_rounds(first: dict, second: dict) -> dict:
+    """Round 1's keys stay top-level for single-round readers; ``rounds`` holds both."""
+    head = {k: v for k, v in first.items() if k != "rounds"}
+    return {**head, "rounds": [head, second]}
+
+
+def write_record(out_dir: str, record: dict, prior: dict | None = None) -> dict:
+    """Write ``fix-round.json``; a round-2 record merges under ``prior``. Returns ``record``."""
+    if prior is None:
+        _write(out_dir, record)
+    elif record.get("status") == "skipped":
+        _write(out_dir, prior)
+    else:
+        _write(out_dir, with_rounds(prior, record))
+    return record
+
+
+def shared_deadline(clock=time.monotonic) -> float:
+    """Absolute deadline that both rounds of one run share."""
+    return clock() + DEADLINE_S
+
+
+def time_left(deadline_at: float, clock=time.monotonic) -> float:
+    return deadline_at - clock()
+
+
+def second_round_stop(first: dict, before: list, after: list, deadline_at: float) -> str:
+    """Empty when round 2 is due; otherwise the reason it does not run."""
+    if first.get("rounds"):
+        return "already-ran"
+    if first.get("status") != "accepted":
+        return f"round-1-{first.get('status') or 'missing'}"
+    if not after:
+        return "no-target-hold"
+    if not set(after) < set(before):
+        return "no-shrink"
+    if time_left(deadline_at) <= 0:
+        return "deadline"
+    return ""
+
+
 def _held_row_item(row) -> dict:
     """One fixer item for a HELD row, in the shape `collect_items` gives an unthreaded finding."""
     body = (f"Executable Mutations row {row.row} HELD: with {row.match} replaced by {row.replace} "
@@ -248,12 +289,13 @@ def _remove_quietly(path: str | None) -> None:
 def run_fix_round(*, decision, res, gh, llm, git, worktree, plan, pr, out_dir, log,
                   commit, recheck, already_tried, clock=time.monotonic, env=None,
                   inputs=None, mutation_check=None, fidelity_fix=None,
-                  conflict_rereview=None, security_bar=None, meta_fix=None) -> dict:
-    """Run at most one round. Always writes ``fix-round.json`` and returns the record.
+                  conflict_rereview=None, security_bar=None, prior=None,
+                  deadline_at=None, meta_fix=None) -> dict:
+    """Run one round. Always writes ``fix-round.json`` and returns this round's record.
 
     ``record["status"]`` is one of skipped, no-change, accepted, rejected, aborted.
     """
-    if res.fix_round:
+    if res.fix_round and prior is None:
         return res.fix_round
     tg = targets(decision)
     record: dict = {"status": "skipped", "reason": "", "targets": tg, "items": [],
@@ -261,13 +303,13 @@ def run_fix_round(*, decision, res, gh, llm, git, worktree, plan, pr, out_dir, l
                     "row_repairs": [], "mutation": {}, "fidelity": {}, "conflict_rereview": {}, "meta": {}}
     if not enabled(env):
         record["reason"] = "disabled"
-        return _write(out_dir, record)
+        return write_record(out_dir, record, prior)
     if not tg:
         record["reason"] = "no-target-hold"
-        return _write(out_dir, record)
+        return write_record(out_dir, record, prior)
     if already_tried:
         record["reason"] = "holdrepeat-same-holds"
-        return _write(out_dir, record)
+        return write_record(out_dir, record, prior)
     mutation_holding = getattr(inputs, "exec_mutations_holding", None) or ()
     held, stale = (mutation_repair.eligible_rows(mutation_holding)
                    if MUTATION_CONDITION in tg else ([], []))
@@ -287,13 +329,13 @@ def run_fix_round(*, decision, res, gh, llm, git, worktree, plan, pr, out_dir, l
             and (CONFLICT_CONDITION not in tg or conflict_rereview is None)
             and not meta_ok):
         record["reason"] = "no-fixable-conformance" if 3 in tg else "no-eligible-hold"
-        return _write(out_dir, record)
+        return write_record(out_dir, record, prior)
 
     head_before = git.head()
     record["head_before"] = head_before
     snap = snapshot(res)
     t0 = clock()
-    deadline = t0 + DEADLINE_S
+    deadline = t0 + DEADLINE_S if deadline_at is None else deadline_at
     defer: list[dict] = []
     before_holding = mutation_repair.holding_row_ids(mutation_holding)
     held_worked: list[str] = []
@@ -508,7 +550,7 @@ def run_fix_round(*, decision, res, gh, llm, git, worktree, plan, pr, out_dir, l
                                     or record["conflict_rereview"].get("verdict") in _DECIDED_VERDICTS)
             record["defer"] = defer
             settled = True
-            return _write(out_dir, record)
+            return write_record(out_dir, record, prior)
         if record.get("security_items", 0):
             # A blind Opus re-review of the post-fix tree; any remaining security
             # hold rejects the round, so the original hold goes to the owner.
@@ -536,7 +578,7 @@ def run_fix_round(*, decision, res, gh, llm, git, worktree, plan, pr, out_dir, l
         record["defer"] = defer
         record["reevaluate"] = True
         settled = True
-        return _write(out_dir, record)
+        return write_record(out_dir, record, prior)
     except Exception as e:
         settled = True
         _discard(e)
@@ -547,14 +589,14 @@ def run_fix_round(*, decision, res, gh, llm, git, worktree, plan, pr, out_dir, l
         else:
             record["status"], record["reason"] = "rejected", f"error:{type(e).__name__}"
         log(f"fix-round: rejected ({record['reason']}); tree reset to {head_before[:10]}")
-        return _write(out_dir, record)
+        return write_record(out_dir, record, prior)
     finally:
         if not settled:
             inflight = sys.exc_info()[1]
             _discard(inflight)
             record["status"] = "aborted"
             record["reason"] = type(inflight).__name__ if inflight is not None else "interrupted"
-            _write(out_dir, record)
+            write_record(out_dir, record, prior)
 
 
 def flush(gh, pr, record: dict, pushed_sha: str, log) -> int:
@@ -645,6 +687,30 @@ def _extra_clauses(record: dict) -> str:
 
 
 def summary_line(record: dict) -> str:
+    """Round 1's sticky line, plus a ``round 2:`` clause when a second round ran."""
+    rounds = record.get("rounds") or []
+    base = _round_line(rounds[0] if rounds else record)
+    if len(rounds) < 2 or not base:
+        return base
+    return base + "; round 2: " + _round_two_clause(rounds[1])
+
+
+def _round_two_clause(record: dict) -> str:
+    status = record.get("status")
+    items = record.get("items") or []
+    fixed = sum(1 for r in items if r.get("outcome") == "fixed")
+    declined = sum(1 for r in items if r.get("outcome") == "declined")
+    if status == "accepted":
+        return (f"fixed {fixed} of {len(items)} items in {record.get('sha', '')[:12]}"
+                + _extra_clauses(record))
+    if status == "no-change":
+        return f"no code change; {declined} threads declined" + _extra_clauses(record)
+    if status == "rejected":
+        return f"discarded ({record.get('reason', '')}); this verdict is the round-1 hold"
+    return f"{status} ({record.get('reason', '')})"
+
+
+def _round_line(record: dict) -> str:
     """One sticky line per status; empty when the round did not run or was disabled."""
     status = record.get("status")
     items = record.get("items") or []
@@ -664,7 +730,15 @@ def summary_line(record: dict) -> str:
 
 
 def digest_rows(record: dict) -> list:
-    """One merge-digest row per repair that reached the plan file."""
+    """One merge-digest row per repair that reached the plan file, across both rounds."""
+    rows = _digest_rows_one(record)
+    for extra in (record.get("rounds") or [])[1:]:
+        rows += _digest_rows_one(extra)
+    return rows
+
+
+def _digest_rows_one(record: dict) -> list:
+    """One merge-digest row per repair that reached the plan file in one round."""
     if not record.get("repair_applied"):
         return []
     return [f"**Fix round repaired Executable Mutations row {r.get('row')} ({r.get('file')}):** "

@@ -133,6 +133,8 @@ When a behavior looks untestable pre-prod, **split it by slice before conceding*
 
 Silence is not coverage, and "we'll see once it's live" is not a plan. Dissolving a post-merge-only row means **building the pre-prod exercise path** — never **deleting the row**.
 
+A script whose default mode is a read-only dry-run or preview against real services (GitHub, Discord, the DB, launchd reads) needs a pre-merge matrix row where the implementation session runs that dry-run with the real default binaries (no `*_BIN` overrides) and asserts exit 0 plus the expected preview output. A harness that stubs every binary does not satisfy it. The pre-prod exception covers only the live write slice. PR #4046's `bin/bug-issues-migrate` shipped a `gh()` wrapper that recursed into itself under the default `GH_BIN=gh` (exit 139) while every stubbed test passed.
+
 ## Conditional sections
 
 ### Backlog — GitHub Issue bookkeeping
@@ -161,8 +163,6 @@ Artifacts live **outside** the repo (`~/.claude/…`, launchd plists) so they ar
 The Truly-manual UI/UX row plus `auto_merge: false` (Step 4 gate 14d) remains exactly the right output for a look-and-feel judgment. Do **not** collapse it with Step 4 gate 16, which asks a different question — does deploy-dependent *behavior* carry a pre-prod-exercisable row at all — and which never licenses dropping the row 14d forces.
 
 If the judgment can only be rendered after *this PR's own* artifact is live on prod (a CI-deployed file, an applied migration, a registered daemon), the default is to **build the pre-prod exercise path and keep the row gating**: phrase it to run against the worktree Docker stack, CI, or the prod-clone `.github/workflows/deploy-rehearsal.yml` rehearsal. Recording it instead under a `## Post-merge verification` PR-body note plus a mechanized follow-up is a **narrow, marker-recorded exception** — requires `<!-- pre-prod-exception: ... -->` plus `## Pre-prod Exception Justification`, and may cover only the slice that is genuinely intrinsic. Dissolving a post-merge-only row means **building** the pre-prod path, never **deleting** the row — and never as a way to shed the forced UI/UX hold.
-
-A script whose default mode is a read-only dry-run or preview against real services (GitHub, Discord, the DB, launchd reads) needs a pre-merge matrix row where the implementation session runs that dry-run with the real default binaries (no `*_BIN` overrides) and asserts exit 0 plus the expected preview output. A harness that stubs every binary does not satisfy it. The pre-prod exception covers only the live write slice. PR #4046's `bin/bug-issues-migrate` shipped a `gh()` wrapper that recursed into itself under the default `GH_BIN=gh` (exit 139) while every stubbed test passed.
 
 ### Pre-prod testability — distinct from Verification-gap
 

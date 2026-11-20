@@ -23,10 +23,11 @@ def _load(pr: str) -> tuple[list[str], dict[str, SourcePair]]:
             continue
         stem = Path(path).stem
         base = d / "base" / f"{stem}.php.txt"
+        head = (d / "head" / f"{stem}.php.txt").read_text()
         files[path] = SourcePair(
             base.read_text() if base.exists() else None,
-            (d / "head" / f"{stem}.php.txt").read_text(),
-            parse_added_lines((d / f"{stem}.diff").read_text()),
+            head,
+            parse_added_lines((d / f"{stem}.diff").read_text(), len(head.splitlines())),
         )
     return changed, files
 

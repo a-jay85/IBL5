@@ -681,6 +681,7 @@ class Param:
     name: str
     default: list[Token] | None
     by_ref: bool = False   # declared `&$name`, so a call writes the caller's variable
+    variadic: bool = False  # declared `...$name`, so it takes every arg from its index on
 
 
 @dataclass
@@ -748,7 +749,8 @@ def _params(toks: list[Token]) -> list[Param]:
         if k + 1 < len(grp) and grp[k + 1].text == "=":
             default = grp[k + 2:]
         by_ref = any(t.kind == "OP" and t.text == "&" for t in grp[:k])
-        out.append(Param(grp[k].text, default, by_ref))
+        variadic = any(t.kind == "OP" and t.text == "..." for t in grp[:k])
+        out.append(Param(grp[k].text, default, by_ref, variadic))
     return out
 
 
@@ -1533,8 +1535,12 @@ def _call_sites_safe(method: Method, param_index: int, ctx: _Ctx) -> bool:
         if any(a.kind in ("spread", "named") for a in args[:param_index + 1]):
             return False
         if param_index < len(args):
-            if not _is_safe(args[param_index], caller, ctx, ctx.key, ctx.depth + 1, ctx.visiting):
-                return False
+            judged = args[param_index:] if param.variadic else args[param_index:param_index + 1]
+            for arg in judged:
+                if arg.kind in ("spread", "named"):
+                    return False
+                if not _is_safe(arg, caller, ctx, ctx.key, ctx.depth + 1, ctx.visiting):
+                    return False
         elif not _is_literal_tokens(param.default):
             return False
     return True

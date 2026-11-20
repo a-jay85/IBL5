@@ -37,7 +37,7 @@ The scan treats these as safe. Each comes from the three target PRs.
 
 ## Backtest
 
-The replay test `tools/postplan-harness/tests/test_sql_readonly_replay.py` runs the scan over the five PR fixtures. #3985 returns "ok". #3815 holds on an `implode(...)` at `PlayerRecordRepository.php:214`, because its batch method calls helpers the PR changed, so the unchanged SQL is judged again. #3870 holds on `$safeLabel`, built from `$label` inside a new private method, so the base file's use of `$safeLabel` does not vouch for it, and `$label` comes from a public method's argument. Both stay owner-held. [#3816](https://github.com/a-jay85/IBL5/pull/3816) and [#3820](https://github.com/a-jay85/IBL5/pull/3820) touch `ibl5/api.php`, so the path check holds them.
+The replay test `tools/postplan-harness/tests/test_sql_readonly_replay.py` runs the scan over the five PR fixtures, using the production line rule (the head line count goes to `parse_added_lines`, so a deleted guard word marks the whole file). #3985 returns "ok". #3815 holds on an `implode(...)` at `PlayerRecordRepository.php:214`, because its batch method calls helpers the PR changed, so the unchanged SQL is judged again. #3870 holds on `$safeLabel`, built from `$label` inside a new private method, so the base file's use of `$safeLabel` does not vouch for it, and `$label` comes from a public method's argument. Both stay owner-held. [#3816](https://github.com/a-jay85/IBL5/pull/3816) and [#3820](https://github.com/a-jay85/IBL5/pull/3820) touch `ibl5/api.php`, so the path check holds them.
 
 ## Not covered
 

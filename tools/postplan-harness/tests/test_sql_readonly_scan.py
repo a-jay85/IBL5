@@ -712,3 +712,30 @@ def test_sql_constant_alone_passes():
     }
 """)
     assert _scan(head) == "ok"
+
+
+_VARIADIC_METHOD = """    private function joined(string ...$parts): array
+    {
+        return $this->fetchAll('SELECT * FROM t WHERE ' . implode(' AND ', $parts), '');
+    }
+"""
+
+
+def test_variadic_param_judges_every_argument():
+    head = _php(_VARIADIC_METHOD + """
+    public function run(string $user): array
+    {
+        return $this->joined('a = 1', $user);
+    }
+""")
+    assert _scan(head).startswith("scan: unbound interpolation")
+
+
+def test_variadic_param_all_literal_args_pass():
+    head = _php(_VARIADIC_METHOD + """
+    public function run(): array
+    {
+        return $this->joined('a = 1', 'b = 2');
+    }
+""")
+    assert _scan(head) == "ok"

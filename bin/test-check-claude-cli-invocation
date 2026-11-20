@@ -20,6 +20,8 @@ T=$(mktemp -d)
 trap 'rm -rf "$T"' EXIT
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
+# The fixtures name usage-gated entry points (bin/test-harness-lib scans for them).
+. "$HERE/lib/usage-test-isolation.sh"; usage_test_isolate "$T/usage"
 SCRIPT="$HERE/check-claude-cli-invocation"
 
 OUT=""

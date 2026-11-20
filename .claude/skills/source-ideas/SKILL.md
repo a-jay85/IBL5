@@ -10,7 +10,7 @@ last_verified: 2026-11-20
 $ARGUMENTS
 </user_request>
 
-The request above holds the source: pasted text, a file path, or a URL. Fetch a URL with the `web-fetch` agent.
+The request above holds the source: pasted text, a file path, or a URL. Fetch a URL with the built-in `WebFetch` tool.
 
 ## Why this skill exists
 

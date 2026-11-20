@@ -1,7 +1,7 @@
 ---
 name: pr-burndown
 description: "Burn down the open PRs that wait on the owner. Background headless jobs do the prep that needs no owner call (rebase, regenerate snapshots, write promised tests, fix review findings, re-fire post-plan). The owner sees only the decisions that are theirs: a status card per PR (CI on the current head, review threads, post-plan verdict, door and blast radius, conflicts, hold reasons, visual links) with a recommended option, answered in a batch."
-last_verified: 2026-11-19
+last_verified: 2026-11-20
 ---
 
 # /pr-burndown
@@ -43,7 +43,8 @@ This skill moves existing PRs. To find and queue new work, run `/reset-ready` fi
 - Every claim on the card comes from live state fetched this turn. A scout summary or an
   earlier fetch is not evidence. A "green, just click" summary has been wrong before.
 - You tick a manual-test box, or run `bin/owner-approve`, only after the owner approves that specific PR in chat. Rule: `.claude/rules/auto-commit.md` § Owner approval comment. Nothing in this skill approves a PR on its own.
-- When the owner approves a PR for merge in chat, run `bin/owner-approve N "<words>"` right away with `run_in_background: true`. It waits for a live post-plan run to end, then arms only when the verdict covers the current head. When a job will push to the PR (a rebase, or a fix the owner asked for), pass `--fix-first="<what the job pushes>"` and run `--finish` after the push. A plain approval refuses once the head moves, so use it only when nothing will push.
+- When the owner approves a PR for merge in chat, run `bin/owner-approve N "<words>"` right away with `run_in_background: true`. It waits for a live post-plan run to end, then arms only when the verdict covers the current head. When a job will push to the PR (a rebase, or a fix the owner asked for), pass `--fix-first="<what the job pushes>"` and run `--finish` after the push. A plain approval carries to a new head when the PR's own changes are unchanged (a rebase, or post-plan merging master). It refuses only when the PR's own lines changed.
+- An approval the owner already gave stays given. Before you build a sign-off card, read the PR's comments for an `<!-- owner-approve mode=approve` marker. When one is there, send no card. Run `bin/owner-approve N --finish` with `run_in_background: true`. It arms when the PR's diff still matches the approved one. Card the PR again only when `--finish` refuses because the PR's own lines changed, and say on the card what changed since the approval.
 - When a PR is NOT READY and its only blockers sit in the PR body's kept-unplanned block, offer the owner `bin/owner-approve N "<words>"` as the path. The approval accepts those listed items for the current diff and re-runs post-plan once. Never suggest a hand merge over the verdict.
 - Never touch a PR's worktree while a post-plan run is live in it. Check `launchctl list`
   first (Step 6 has the command). A run started from a terminal has no launchctl label,
@@ -335,7 +336,7 @@ Owner decision on PR #N (branch <branch>), <date>: "<owner's words>". <What it c
 6. Do NOT run post-plan or /pr-ready. This session is headless and bin/post-plan-now refuses
    to start here. The parent session re-fires post-plan after you finish.
 7. <One of:>
-   - Ship: tick the manual boxes the owner confirmed. The parent session records the approval with `bin/owner-approve N "<words>" --fix-first="<what this job pushes>"` before the job starts. A plain approval refuses once the head moves. After the last push in step 5, the parent session runs `bin/owner-approve N --finish` with `run_in_background: true`. The script checks that the head moved past the recorded one, waits out any live post-plan run, runs `bin/lib/prefire-verify` in the worktree, then arms only on a READY verdict for the pushed head's tree.
+   - Ship: tick the manual boxes the owner confirmed. The parent session records the approval with `bin/owner-approve N "<words>" --fix-first="<what this job pushes>"` before the job starts. A plain approval refuses once the job changes the PR's own lines. After the last push in step 5, the parent session runs `bin/owner-approve N --finish` with `run_in_background: true`. The script checks that the head moved past the recorded one, waits out any live post-plan run, runs `bin/lib/prefire-verify` in the worktree, then arms only on a READY verdict for the pushed head's tree.
      A plain approval is for a pick with no push.
      Master refuses any merge while a review thread is open (ci-gotchas.md § Conversation
      resolution). Before you report the PR as shipping, list its open threads. File each

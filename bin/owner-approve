@@ -16,6 +16,9 @@
 # condition and stops. --finish later requires a new pushed head, the PR's worktree
 # clean at that head, and a bin/lib/prefire-verify pass there, then waits, checks
 # the verdict, and arms. --finish after a plain approval resumes at the wait.
+# A plain approval carries to a new head (a rebase, or post-plan merging master)
+# when the PR's merge-base diff fingerprint equals the one in the approval marker,
+# so the owner never re-approves unchanged work. A changed diff still refuses.
 #
 # Run it from a Claude session through the Bash tool with run_in_background: true.
 # The last stdout line is RESULT: armed|refused|timeout|fix-first-recorded|headless|usage.
@@ -25,7 +28,7 @@
 # condition recorded, run --finish after the fix is pushed.
 # A NOT READY verdict on an approval that lists kept unplanned changes and a diff
 # fingerprint first gets one bin/post-plan-now --state-changed re-review; exit 4
-# can follow that re-review.
+# can follow that re-review. --finish on such an approval gets the same re-review.
 set -uo pipefail
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
@@ -47,7 +50,7 @@ OA_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$OA_ROOT/bin/lib/human-signoff-classifier.sh"
 
 OA_PR="" OA_WORDS="" OA_OPTION="" OA_FIX="" OA_FINISH=0 OA_TIMEOUT=3600 OA_POLL=20 OA_WT="" OA_KEPT_ACCEPTED=0
-head_tree_armed="" head="" branch="" state="" labels=",," rec_mode=approve rec_head="" me="" comments="" verdict_word=""
+head_tree_armed="" head="" branch="" state="" labels=",," rec_mode=approve rec_head="" rec_diff="" rec_kept=false me="" comments="" verdict_word=""
 _oa_usage() { printf 'owner-approve: %s\n' "$1" >&2; printf 'RESULT: usage\n'; exit 2; }
 pos=0
 while [ $# -gt 0 ]; do
@@ -290,14 +293,19 @@ _oa_arm() {
     exit 0
 }
 
-_oa_finish_record() { # sets rec_mode and rec_head from this login's newest approval comment
+_oa_finish_record() { # sets rec_mode, rec_head and rec_diff from this login's newest approval comment
     local rec
     _oa_comments
     rec=$(printf '%s' "$comments" | jq -r -s --arg me "$me" '[add // [] | .[] | select(.user.login == $me) | .body // ""] | .[]' \
-        | sed -nE 's/^<!-- owner-approve mode=(approve|fix-first) head=([0-9a-f]{40})( diff=([0-9a-f]{40}|unread))? -->$/\1 \2/p' | tail -n 1)
+        | sed -nE 's/^<!-- owner-approve mode=(approve|fix-first) head=([0-9a-f]{40})( diff=([0-9a-f]{40}|unread))? -->$/\1 \2 \4/p' | tail -n 1)
     [ -n "$rec" ] || _oa_refuse 4 "no owner approval comment from $me on PR $OA_PR. Run bin/owner-approve $OA_PR \"<words>\" first."
     rec_mode=${rec%% *}
-    rec_head=${rec#* }
+    rec=${rec#* }
+    rec_head=${rec%% *}
+    rec_diff=${rec#"$rec_head"}
+    rec_diff=${rec_diff# }
+    # Did that same approval list kept-unplanned items? Then --finish may re-fire on them.
+    rec_kept=$(printf '%s' "$comments" | jq -r -s --arg me "$me" '[add // [] | .[] | select(.user.login == $me) | .body // "" | select(test("(?m)^<!-- owner-approve mode=(approve|fix-first) head="))] | last // "" | contains("<!-- owner-approve:kept:begin -->")') || rec_kept=false
     if [ "$rec_mode" = fix-first ] && [ "$head" = "$rec_head" ]; then
         _oa_refuse 4 "the head is still $head, the commit the fix-first condition was recorded on. Push the fix, then run --finish again."
     fi
@@ -345,6 +353,29 @@ _oa_refire() {
     done
 }
 
+# A plain approval covers the PR's own changes, not one commit. When the head moved
+# (a rebase onto master, or post-plan merging master during its re-review) and the
+# merge-base diff fingerprint still equals the one recorded at approval, the approval
+# carries to the new head. A changed fingerprint, an unread one on either side, or a
+# fix-first record still refuses. The verdict must still cover the new head's tree.
+_oa_head_carry() { # <context: "the head moved" or "the re-review moved the head">
+    local now_fp
+    [ "$head" = "$rec_head" ] && return 0
+    if [ "$rec_mode" = approve ] && hs_is_fingerprint "$rec_diff"; then
+        if [ -n "$OA_WT" ] && [ -d "$OA_WT" ]; then
+            git -C "$OA_WT" fetch --quiet origin "$branch" 2>/dev/null || true
+        fi
+        now_fp=$(_oa_diff_fp "$head")
+        if [ "$now_fp" = "$rec_diff" ]; then
+            printf 'owner-approve: %s from %s to %s, but the PR'\''s own changes are unchanged (diff %s). The approval carries.\n' \
+                "$1" "$rec_head" "$head" "$rec_diff" >&2
+            rec_head=$head
+            return 0
+        fi
+    fi
+    _oa_refuse 4 "$1 from $rec_head (the one the owner approved) to $head, and the PR's own changes are not the approved ones. Approve the new head again: bin/owner-approve $OA_PR \"<words>\"."
+}
+
 pr_ok=1
 _oa_read_pr || pr_ok=0
 if [ "$OA_FINISH" -eq 0 ]; then rec_head=$head; fi
@@ -358,6 +389,7 @@ if [ "$OA_FINISH" -eq 0 ]; then
     fi
     # Only an approve-mode approval that lists kept items on a read diff may re-fire.
     if [ -z "$OA_FIX" ] && [ -n "$oa_kept" ] && [ "$oa_diff_fp" != unread ]; then OA_KEPT_ACCEPTED=1; fi
+    rec_diff=$oa_diff_fp
     _oa_post "$(_oa_approval_body "$oa_diff_fp" "$oa_kept")" || { printf 'owner-approve: posting the approval comment failed. Nothing else was done.\n' >&2; printf 'RESULT: refused\n'; exit 4; }
     printf 'owner-approve: approval comment posted on PR %s\n' "$OA_PR" >&2
 fi
@@ -371,23 +403,25 @@ fi
 if [ "$OA_FINISH" -eq 1 ]; then _oa_finish_record; fi
 OA_WT=$(_oa_find_wt)
 _oa_wait
-# A plain approval covers only the head the owner saw. _oa_wait re-reads the PR,
-# and --finish reads the head fresh, so either can land on a newer commit.
+# A plain approval covers the PR's own changes the owner saw. _oa_wait re-reads the
+# PR, and --finish reads the head fresh, so either can land on a newer commit;
+# _oa_head_carry lets it through only when the PR's diff fingerprint is unchanged.
 # Fix-first expects the head to move; _oa_finish_record and _oa_prefire guard it.
-if [ "$rec_mode" = "approve" ] && [ "$head" != "$rec_head" ]; then
-    _oa_refuse 4 "the head moved from $rec_head (the one the owner approved) to $head. Approve the new head again: bin/owner-approve $OA_PR \"<words>\"."
-fi
+if [ "$rec_mode" = "approve" ]; then _oa_head_carry "the head moved"; fi
 if [ "$rec_mode" = "fix-first" ]; then _oa_prefire; fi
-# A NOT READY on kept items the owner just approved gets one re-review. The harness
-# reads the approval comment as owner evidence. --finish never sets OA_KEPT_ACCEPTED.
+# --finish on a plain approval that listed kept items, with the diff still the approved
+# one (checked by _oa_head_carry above), accepts those items the same way a fresh run does.
+if [ "$OA_FINISH" -eq 1 ] && [ "$rec_mode" = approve ] && [ "$rec_kept" = true ] && hs_is_fingerprint "$rec_diff"; then
+    OA_KEPT_ACCEPTED=1
+fi
+# A NOT READY on kept items the owner approved gets one re-review. The harness
+# reads the approval comment as owner evidence.
 rc=0; _oa_verdict refire || rc=$?
 if [ "$rc" -eq 10 ]; then
     _oa_refire
     _oa_wait
     _oa_read_pr || _oa_refuse 4 "could not re-read PR $OA_PR after the re-review."
-    if [ "$head" != "$rec_head" ]; then
-        _oa_refuse 4 "the re-review moved the head from $rec_head (the one the owner approved) to $head. Approve the new head again: bin/owner-approve $OA_PR \"<words>\"."
-    fi
+    _oa_head_carry "the re-review moved the head"
     _oa_verdict final
 fi
 _oa_arm

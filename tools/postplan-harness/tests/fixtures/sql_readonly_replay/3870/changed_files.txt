@@ -1,0 +1,4 @@
+ibl5/classes/RecordHolders/TeamRecordRepository.php
+ibl5/tests/DatabaseIntegration/TeamSingleGameBatchCharacterizationTest.php
+ibl5/tests/RecordHolders/TeamSingleGameBatchQueryTest.php
+ibl5/tests/RecordHolders/TeamSingleGameBranchQueryTest.php

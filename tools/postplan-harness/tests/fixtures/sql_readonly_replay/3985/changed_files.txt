@@ -1,0 +1,3 @@
+ibl5/classes/Rivalries/RivalriesRepository.php
+ibl5/tests/DatabaseIntegration/RivalriesPairCharacterizationTest.php
+ibl5/tests/Rivalries/RivalriesRepositoryTest.php

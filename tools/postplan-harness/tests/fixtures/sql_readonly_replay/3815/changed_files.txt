@@ -1,0 +1,4 @@
+ibl5/classes/RecordHolders/PlayerRecordRepository.php
+ibl5/tests/DatabaseIntegration/PlayerRecordRepositoryTest.php
+ibl5/tests/RecordHolders/PlayerRecordCandidateQueryTest.php
+ibl5/tests/RecordHolders/PlayerRecordRepositoryBatchQueryTest.php

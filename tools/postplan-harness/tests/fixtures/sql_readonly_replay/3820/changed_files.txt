@@ -1,0 +1,8 @@
+ibl5/api.php
+ibl5/classes/Api/Controller/TradeAcceptController.php
+ibl5/classes/Api/Controller/TradeDeclineController.php
+ibl5/classes/Api/README.md
+ibl5/docs/API_GUIDE.md
+ibl5/tests/Api/Controller/TradeAcceptControllerTest.php
+ibl5/tests/Api/Controller/TradeDeclineControllerTest.php
+ibl5/tests/e2e/flows/api-v1-rest.spec.ts

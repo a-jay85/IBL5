@@ -13,8 +13,14 @@ The evidence binds to the git blob SHA of each rewritten source file. A tree has
 would be circular, since writing the file changes the tree, and post-plan's commit
 changes the commit SHA. A blob SHA survives that commit and goes stale on any edit.
 
-    python3 -m harness.sql_equivalence record --branch B --before F --after F \\
-        --source P [--source P ...] --bind-test T [--bind-test T ...]
+Evidence carries a `kind` (ADR-0248 `rewrite`, or `new-query` for a new read-only
+query that serves an existing read path). Both kinds run the static read-only scan in
+`harness.sql_readonly_scan`. A `new-query` file also names a committed
+`ibl5/tests/DatabaseIntegration/**Test.php::method` equivalence test.
+
+    python3 -m harness.sql_equivalence record --branch B --kind rewrite|new-query \\
+        --before F --after F --source P [--source P ...] --bind-test T [--bind-test T ...] \\
+        [--equivalence-test T ...]
     python3 -m harness.sql_equivalence check --branch B
 """
 from __future__ import annotations
@@ -27,9 +33,14 @@ import subprocess
 import sys
 from pathlib import Path
 
+from harness import sql_readonly_scan
+
 TOKEN = "sql-equivalent"
 EVIDENCE_DIR = "ibl5/tests/sql-equivalence"
-SCHEMA = 1
+SCHEMA = 2
+KINDS = ("rewrite", "new-query")
+EQUIVALENCE_TEST_PATH = re.compile(r"^ibl5/tests/DatabaseIntegration/.+Test\.php::\w+$")
+HUNK_HEADER = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
 HASH_LINE = re.compile(r"^HASH[ \t]")
 
 
@@ -55,12 +66,21 @@ def _blob_sha(root, rel_path) -> str:
     return proc.stdout.strip()
 
 
-def record(root, branch, before, after, sources, bind_tests) -> int:
+def record(root, branch, before, after, sources, bind_tests, kind="rewrite",
+           equivalence_tests=()) -> int:
     """Write the evidence file. 0 on pass, 1 on mismatch or zero cases, 2 on refusal."""
     sources = list(sources or ())
     bind_tests = list(bind_tests or ())
+    equivalence_tests = list(equivalence_tests or ())
     if not sources or not bind_tests:
         print("sql_equivalence: record needs at least one --source and one --bind-test",
+              file=sys.stderr)
+        return 2
+    if kind not in KINDS:
+        print(f"sql_equivalence: unknown --kind {kind!r}", file=sys.stderr)
+        return 2
+    if kind == "new-query" and not equivalence_tests:
+        print("sql_equivalence: --kind new-query needs at least one --equivalence-test",
               file=sys.stderr)
         return 2
     before_lines = read_hash_lines(before)
@@ -74,6 +94,8 @@ def record(root, branch, before, after, sources, bind_tests) -> int:
         "after_digest": digest(after_lines),
         "sources": {src: _blob_sha(root, src) for src in sources},
         "bind_tests": bind_tests,
+        "kind": kind,
+        "equivalence_tests": equivalence_tests,
     }
     out = evidence_path(root, branch)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -97,7 +119,7 @@ def _has_method(root, rel_path, method) -> bool:
 
 
 def _load(path):
-    """The parsed evidence object, or None when it is not a schema-1 JSON object."""
+    """The parsed evidence object, or None when it is not a current-schema JSON object."""
     try:
         data = json.loads(path.read_text())
     except ValueError:
@@ -107,7 +129,71 @@ def _load(path):
     return data
 
 
-def evaluate_evidence(root, branch, changed_files) -> str:
+_GUARD_WORDS = re.compile(
+    r"\bthrow\b|\bin_array\b|\bif\b|\breturn\b|\bpreg_\w+|\bintval\b|\bctype_\w+|\bis_numeric\b"
+    r"|\bfilter_var\b|\bescape\w*|\bquote\w*|\bhtmlspecialchars\b|\(\s*(?:int|float|bool)\s*\)|\babs\s*\(",
+    re.IGNORECASE)
+
+
+def parse_added_lines(diff_text, total_lines=None) -> frozenset[int]:
+    """Head line numbers a `git diff --unified=0` adds or deletes beside, from its `@@ -a,b +c,d @@` headers.
+
+    A hunk that deletes a guard-looking line (throw, in_array, a cast, an escape), whether
+    it is a pure deletion or a replacement, can strand the guard far from the statement it
+    protected. When `total_lines` is given, that deletion marks every head line so each SQL
+    statement in the file is judged.
+    """
+    added: set[int] = set()
+    for line in diff_text.splitlines():
+        m = HUNK_HEADER.match(line)
+        if m:
+            start = int(m.group(1))
+            count = 1 if m.group(2) is None else int(m.group(2))
+            added.update(range(start, start + count))
+            if count == 0:
+                # a pure deletion adds no line; mark the head lines on both sides of the
+                # gap so a statement that lost its guard (a sanitizer) still gets judged
+                added.update(ln for ln in (start, start + 1) if ln >= 1)
+        elif line.startswith("-") and not line.startswith("---"):
+            # any deleted guard-looking line counts, also when a replacement line is added
+            # beside it (`-1 +1`): the unchanged SQL line it protected must be re-judged
+            if total_lines and _GUARD_WORDS.search(line[1:]):
+                added.update(range(1, total_lines + 1))
+    return frozenset(added)
+
+
+def _base_text(root, base, path):
+    """The file at `base`, or None when it is new on the branch. Other git failures raise."""
+    proc = subprocess.run(["git", "show", f"{base}:{path}"], cwd=str(root),
+                          capture_output=True, text=True)
+    if proc.returncode == 0:
+        return proc.stdout
+    if "does not exist" in proc.stderr or "exists on disk, but not in" in proc.stderr:
+        return None
+    raise subprocess.CalledProcessError(proc.returncode, proc.args, proc.stdout, proc.stderr)
+
+
+def _load_source_pairs(root, base, paths) -> dict:
+    """Base text, head text and added lines per path, diffed against `base`."""
+    pairs = {}
+    for path in paths:
+        head = (Path(root) / path).read_text()
+        diff = _git(["diff", "--no-color", "--unified=0", base, "--", path], cwd=root)
+        base_text = _base_text(root, base, path)
+        added = parse_added_lines(diff, len(head.splitlines()))
+        if base_text is None and not added:
+            # an untracked new file has no diff; every line of it is new
+            added = frozenset(range(1, len(head.splitlines()) + 1))
+        pairs[path] = sql_readonly_scan.SourcePair(base_text, head, added)
+    return pairs
+
+
+def resolve_base(root, base="origin/master") -> str:
+    """The merge-base `_changed_files` diffs from (`<base>...HEAD`)."""
+    return _git(["merge-base", base, "HEAD"], cwd=root).strip()
+
+
+def evaluate_evidence(root, branch, changed_files, base=None) -> str:
     """"ok" when the evidence is present, passing, in the diff and fresh; else a note."""
     try:
         changed = set(changed_files or ())
@@ -148,16 +234,53 @@ def evaluate_evidence(root, branch, changed_files) -> str:
             test_path, _, method = entry.partition("::")
             if not test_path.startswith("ibl5/tests/") or not _has_method(root, test_path, method):
                 return f"bind test missing: {entry}"
+        kind = data.get("kind")
+        if kind not in ("rewrite", "new-query"):
+            return "malformed: kind"
+        if kind == "new-query":
+            note = _equivalence_tests_note(root, data.get("equivalence_tests"), changed)
+            if note:
+                return note
+        php = [p for p in sorted(changed) if p.endswith(".php") and not p.startswith("ibl5/tests/")]
+        scanned = [p for p in php if (Path(root) / p).is_file()]
+        merge_base = resolve_base(root) if base is None else base
+        pairs = _load_source_pairs(root, merge_base, scanned)
+        for gone in php:
+            if gone not in pairs:
+                # a deleted file adds no line, so it scans as an empty head
+                pairs[gone] = sql_readonly_scan.SourcePair(_base_text(root, merge_base, gone), "", frozenset())
+        scan_note = sql_readonly_scan.scan_sources(kind, sorted(changed), pairs)
+        if scan_note != "ok":
+            return scan_note
         return "ok"
     except Exception:
         return "error"
 
 
-def arm_input_value(plan_hold_triggers, root, branch, changed_files) -> str:
+def _equivalence_tests_note(root, equivalence_tests, changed):
+    """None when every new-query equivalence test is a DatabaseIntegration test in the diff."""
+    if not equivalence_tests or not isinstance(equivalence_tests, list):
+        return "no equivalence test"
+    for eq_path in equivalence_tests:
+        if not isinstance(eq_path, str):
+            return "equivalence test path"
+        if not EQUIVALENCE_TEST_PATH.match(eq_path):
+            return f"equivalence test path: {eq_path}"
+        test_path, _, method = eq_path.partition("::")
+        if _is_bad_path(test_path):
+            return "bad path"
+        if test_path not in changed:
+            return f"equivalence test not in diff: {eq_path}"
+        if not _has_method(root, test_path, method):
+            return f"equivalence test missing: {eq_path}"
+    return None
+
+
+def arm_input_value(plan_hold_triggers, root, branch, changed_files, base=None) -> str:
     """The `ArmInputs.sql_equivalence_evidence` value. Reads nothing without the token."""
     if TOKEN not in set(plan_hold_triggers or ()):
         return "not-applicable"
-    return evaluate_evidence(root, branch, changed_files)
+    return evaluate_evidence(root, branch, changed_files, base)
 
 
 def _git(args, cwd=None) -> str:
@@ -179,10 +302,12 @@ def _parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
     rec = sub.add_parser("record", help="compare two HASH dumps and write the evidence file")
     rec.add_argument("--branch", required=True)
+    rec.add_argument("--kind", choices=("rewrite", "new-query"), required=True)
     rec.add_argument("--before", required=True)
     rec.add_argument("--after", required=True)
     rec.add_argument("--source", action="append", default=[])
     rec.add_argument("--bind-test", action="append", default=[], dest="bind_test")
+    rec.add_argument("--equivalence-test", action="append", default=[], dest="equivalence_test")
     chk = sub.add_parser("check", help="print the arming verdict for this branch's evidence")
     chk.add_argument("--branch", required=True)
     return parser
@@ -193,7 +318,8 @@ def main(argv) -> int:
     args = parser.parse_args(argv)
     root = _git(["rev-parse", "--show-toplevel"]).strip()
     if args.command == "record":
-        rc = record(root, args.branch, args.before, args.after, args.source, args.bind_test)
+        rc = record(root, args.branch, args.before, args.after, args.source, args.bind_test,
+                    args.kind, args.equivalence_test)
         if rc != 2:
             print(f"sql_equivalence: wrote {evidence_path(root, args.branch)} "
                   f"({'pass' if rc == 0 else 'fail'})")

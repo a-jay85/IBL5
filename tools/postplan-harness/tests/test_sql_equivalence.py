@@ -1,7 +1,8 @@
 """The SQL-equivalence evidence recorder and the arming-time validator.
 
-Each test builds a throwaway git repo, records evidence for one rewritten source
-file, then checks the verdict `arm_input_value` would hand to armable."""
+Each test builds a throwaway git repo whose first commit stands in for origin/master,
+records evidence for one source file, then checks the verdict `arm_input_value` would
+hand to armable."""
 import ast
 import json
 import subprocess
@@ -10,6 +11,8 @@ from pathlib import Path
 import pytest
 
 from harness import sql_equivalence as se
+from harness import sql_readonly_scan
+from harness.armable import plan_triggers_clearable
 
 BRANCH = "pair-queries-faster"
 SOURCE = "ibl5/classes/Foo/FooRepository.php"
@@ -17,6 +20,11 @@ BIND_FILE = "ibl5/tests/Foo/FooRepositoryTest.php"
 BIND_TEST = f"{BIND_FILE}::testPairQueryBindsEveryUserValue"
 EVIDENCE = f"ibl5/tests/sql-equivalence/{BRANCH}.json"
 CHANGED = [EVIDENCE, SOURCE, BIND_FILE]
+EQ_FILE = "ibl5/tests/DatabaseIntegration/FooRepositoryTest.php"
+EQ_TEST = f"{EQ_FILE}::testPairQueryMatchesTheOldQuery"
+INTERPOLATED = ("<?php\nfinal class FooRepository\n{\n    public function byTeam(int $teamId): array\n"
+                "    {\n        return $this->fetchAll('SELECT * FROM t WHERE tid = ' . $teamId);\n"
+                "    }\n}\n")
 DUMP = "noise line\nHASH case-1 aaa\nHASH\tcase-2 bbb\nHASH case-3 ccc\n"
 
 
@@ -25,10 +33,25 @@ def repo(tmp_path):
     root = tmp_path / "repo"
     root.mkdir()
     subprocess.run(["git", "init", "-q"], cwd=root, check=True)
-    for rel, body in ((SOURCE, "<?php // new query\n"), (BIND_FILE, "<?php function testPairQueryBindsEveryUserValue() {}\n")):
+    (root / "README").write_text("base\n")
+    _commit(root, "base")
+    base = _git(root, "rev-parse", "HEAD")
+    subprocess.run(["git", "update-ref", "refs/remotes/origin/master", base], cwd=root, check=True)
+    for rel, body in ((SOURCE, "<?php // new query\n"), (BIND_FILE, "<?php function testPairQueryBindsEveryUserValue() {}\n"),
+                      (EQ_FILE, "<?php function testPairQueryMatchesTheOldQuery() {}\n")):
         (root / rel).parent.mkdir(parents=True, exist_ok=True)
         (root / rel).write_text(body)
     return root
+
+
+def _git(root, *args) -> str:
+    return subprocess.run(["git", *args], cwd=root, check=True, capture_output=True, text=True).stdout.strip()
+
+
+def _commit(root, message):
+    subprocess.run(["git", "add", "-A"], cwd=root, check=True)
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", message],
+                   cwd=root, check=True)
 
 
 def _dump(tmp_path, name, text):
@@ -37,9 +60,11 @@ def _dump(tmp_path, name, text):
     return p
 
 
-def _record(repo, tmp_path, before=DUMP, after=DUMP, sources=(SOURCE,), bind_tests=(BIND_TEST,)):
+def _record(repo, tmp_path, before=DUMP, after=DUMP, sources=(SOURCE,), bind_tests=(BIND_TEST,),
+            kind="rewrite", equivalence_tests=()):
     return se.record(repo, BRANCH, _dump(tmp_path, "before.txt", before),
-                     _dump(tmp_path, "after.txt", after), list(sources), list(bind_tests))
+                     _dump(tmp_path, "after.txt", after), list(sources), list(bind_tests),
+                     kind=kind, equivalence_tests=list(equivalence_tests))
 
 
 def _evidence(repo):
@@ -128,7 +153,7 @@ def test_evaluate_malformed_json(repo, tmp_path):
     (repo / EVIDENCE).write_text("[1, 2]")
     assert se.evaluate_evidence(repo, BRANCH, CHANGED) == "malformed"
     _record(repo, tmp_path)
-    _rewrite(repo, schema=2)
+    _rewrite(repo, schema=1)
     assert se.evaluate_evidence(repo, BRANCH, CHANGED) == "malformed"
 
 
@@ -222,7 +247,103 @@ def test_evaluate_crash_fails_closed(repo, tmp_path, monkeypatch):
     assert se.evaluate_evidence(repo, BRANCH, CHANGED) == "error"
 
 
+def test_new_query_evidence_ok(repo, tmp_path):
+    assert _record(repo, tmp_path, kind="new-query", equivalence_tests=(EQ_TEST,)) == 0
+    data = _evidence(repo)
+    assert data["kind"] == "new-query"
+    assert data["equivalence_tests"] == [EQ_TEST]
+    assert se.evaluate_evidence(repo, BRANCH, [*CHANGED, EQ_FILE]) == "ok"
+
+
+def test_missing_evidence_holds(repo, tmp_path):
+    assert se.arm_input_value(("sql-equivalent",), repo, BRANCH, CHANGED) == "absent"
+
+
+def test_git_failure_is_error(repo, tmp_path):
+    _record(repo, tmp_path)
+    assert se.evaluate_evidence(repo, BRANCH, CHANGED, base="no-such-ref").startswith("error")
+
+
+def test_missing_kind_is_malformed(repo, tmp_path):
+    _record(repo, tmp_path)
+    data = _evidence(repo)
+    del data["kind"]
+    (repo / EVIDENCE).write_text(json.dumps(data))
+    assert se.evaluate_evidence(repo, BRANCH, CHANGED) == "malformed: kind"
+    _rewrite(repo, kind="bogus")
+    assert se.evaluate_evidence(repo, BRANCH, CHANGED) == "malformed: kind"
+
+
+def test_equivalence_test_outside_dbintegration_rejected(repo, tmp_path):
+    outside = "ibl5/tests/RecordHolders/FooRepositoryTest.php::testPairQueryMatchesTheOldQuery"
+    _record(repo, tmp_path, kind="new-query", equivalence_tests=(outside,))
+    assert se.evaluate_evidence(repo, BRANCH, [*CHANGED, outside.split("::")[0]]) == (
+        f"equivalence test path: {outside}")
+
+
+def test_equivalence_test_not_in_diff_rejected(repo, tmp_path):
+    _record(repo, tmp_path, kind="new-query", equivalence_tests=(EQ_TEST,))
+    assert se.evaluate_evidence(repo, BRANCH, CHANGED) == f"equivalence test not in diff: {EQ_TEST}"
+
+
+def test_rewrite_kind_interpolation_rejected(repo, tmp_path):
+    (repo / SOURCE).write_text(INTERPOLATED)
+    _record(repo, tmp_path)
+    assert se.evaluate_evidence(repo, BRANCH, CHANGED) == (
+        f"scan: unbound interpolation $teamId at {SOURCE}:6")
+
+
+def test_deleted_php_file_does_not_hold(repo, tmp_path):
+    gone = "ibl5/scripts/old.php"
+    (repo / gone).parent.mkdir(parents=True, exist_ok=True)
+    (repo / gone).write_text("<?php\n$db->query('SELECT 1');\n")
+    _commit(repo, "base has a script this branch deletes")
+    subprocess.run(["git", "update-ref", "refs/remotes/origin/master", "HEAD"], cwd=repo, check=True)
+    (repo / gone).unlink()
+    _record(repo, tmp_path)
+    assert se.evaluate_evidence(repo, BRANCH, [*CHANGED, gone]) == "ok"
+
+
+def test_stacked_base_added_lines(repo, tmp_path):
+    (repo / SOURCE).write_text(INTERPOLATED)
+    _commit(repo, "parent branch adds the interpolated query")
+    parent = _git(repo, "rev-parse", "HEAD")
+    head = INTERPOLATED.replace("}\n}\n", "}\n\n    public function all(): array\n    {\n"
+                                "        return $this->fetchAll('SELECT * FROM t');\n    }\n}\n")
+    (repo / SOURCE).write_text(head)
+    _commit(repo, "child branch adds a bound query")
+    pairs = se._load_source_pairs(repo, parent, [SOURCE])
+    assert pairs[SOURCE].added_lines == frozenset({8, 9, 10, 11, 12})
+    _record(repo, tmp_path)
+    assert se.evaluate_evidence(repo, BRANCH, CHANGED, base=parent) == "ok"
+    assert se.evaluate_evidence(repo, BRANCH, CHANGED).startswith("scan: unbound interpolation $teamId")
+
+
+def test_empty_range_holds(repo, tmp_path):
+    assert sql_readonly_scan.scan_sources("new-query", [], {}) == "new-query: no Repository source in diff"
+    _commit(repo, "branch work")
+    _record(repo, tmp_path, kind="new-query", equivalence_tests=(EQ_TEST,))
+    assert se.evaluate_evidence(repo, BRANCH, [EVIDENCE, EQ_FILE], base="HEAD") == (
+        f"source not in diff: {SOURCE}")
+
+
+def test_record_requires_kind(tmp_path):
+    base = ["record", "--branch", BRANCH, "--before", "b.txt", "--after", "a.txt",
+            "--source", SOURCE, "--bind-test", BIND_TEST]
+    for extra in ([], ["--kind", "bogus"]):
+        with pytest.raises(SystemExit) as exc:
+            se.main([*base, *extra])
+        assert exc.value.code != 0
+
+
 # ---- arm_input_value ----
+
+def test_arm_input_value_new_query_interpolation_holds(repo, tmp_path):
+    (repo / SOURCE).write_text(INTERPOLATED)
+    _record(repo, tmp_path, kind="new-query", equivalence_tests=(EQ_TEST,))
+    value = se.arm_input_value(("sql-equivalent",), repo, BRANCH, [*CHANGED, EQ_FILE])
+    assert value == f"scan: unbound interpolation $teamId at {SOURCE}:6"
+    assert plan_triggers_clearable({"sql-equivalent"}, value) is False
 
 def test_arm_input_value_not_applicable_without_token(tmp_path):
     missing_root = tmp_path / "no-such-repo"

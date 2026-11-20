@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for _architect-contract.md — incident callbacks, counter-examples, procedure elaboration, and taxonomy rationale moved from the rules spine. The plan-architect never reads it; load only when editing the contract.
-last_verified: 2026-11-16
+last_verified: 2026-11-18
 ---
 
 Read-on-demand companion to `_architect-contract.md` (the plan-architect's output contract). This file holds the incident callbacks, counter-examples, procedure elaboration, and extended rationale for each operative rule in the spine. The plan-architect never reads it — the spine's pointer lines name the specific section to open when editing the contract.
@@ -213,6 +213,8 @@ The **reflection assertion** shape: in the `*Test.php` file, `$r = new \Reflecti
 A named-but-unasserted invariant, a "stateless by inspection" note, or a reviewer's word discharges nothing; there is no prose-only path.
 
 A **SQL-equivalent rewrite** runs its before/after corpus diff on the local DB only, because CI's seed is not live data. Its bind-list `PHPUnit` row runs in CI.
+
+A **SQL-equivalent new read-only query** uses the same token and the same three rows, with `--kind new-query --equivalence-test ibl5/tests/DatabaseIntegration/<X>Test.php::<method>` on the `record` command. It applies only when the diff touches only `*Repository.php` files and tests, every value is a `?`, and identifiers come from constants, literal ternaries, or names the old query already interpolated. Write keywords, actor identity, and any path outside Repository/tests keep the owner hold (ADR-0265).
 
 A discharge never replaces a defense — the **Security** bullet (SQL prepared statements, `CsrfGuard`, etc.) is required regardless.
 

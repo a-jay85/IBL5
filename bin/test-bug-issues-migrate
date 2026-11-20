@@ -357,6 +357,18 @@ done
 run_mig "" --live --live
 h_eq "unknown_flag_rejected: two arguments exit 2" 2 "$RC"
 
+# ── default_bins_resolve_on_path ──────────────────────────────────────────────
+# GH_BIN and LAUNCHCTL_BIN unset: the gh()/launchctl() wrappers must reach the stub
+# binaries on PATH, not recurse into themselves (that crashed with exit 139).
+make_stubs
+printf '\n' | env -u CLAUDE_HEADLESS -u GH_BIN -u LAUNCHCTL_BIN PATH="$STUB/bin:$PATH" STUB="$STUB" \
+    CURL_BIN="$STUB/bin/curl" PHP_BIN="$STUB/bin/php" BUG_PIPELINE_SCRIPTS_DIR="$STUB/scripts" \
+    BOT_BASE_URL="http://bot.test" BUG_ISSUES_MIGRATE_DIR="$STUB/mig" \
+    BUG_ISSUES_MIGRATE_LAUNCH_AGENTS_DIR="$STUB/la" BUG_ISSUES_MIGRATE_CRON_SETUP="$STUB/cron-setup" \
+    BUG_PIPELINE_APPROVER_ID=123 "$MIGRATE" > "$STUB/out" 2> "$STUB/err"
+h_eq "default_bins_resolve_on_path: dry run exits 0" 0 "$?"
+h_contains "default_bins_resolve_on_path: stub gh was called" "$(calls)" "gh "
+
 # ── empty_migrate_dir_rejected ────────────────────────────────────────────────
 env BUG_ISSUES_MIGRATE_DIR= "$MIGRATE" > /dev/null 2> "$ROOT/empty.err"
 h_eq "empty_migrate_dir_rejected: exits 2" 2 "$?"

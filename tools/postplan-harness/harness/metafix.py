@@ -169,6 +169,8 @@ def attempt_meta_fix(*, git, llm, repo: str, argv: list[str], commit, log,
         first = _run_gate(argv, repo, deadline)
     except subprocess.TimeoutExpired:
         return _out("refused", "gate-timeout")
+    except OSError as e:
+        return _out("refused", f"gate-error:{type(e).__name__}")
     if first.returncode == 0:
         return _out("refused", "rerun-passed")
     if first.returncode != 1:
@@ -212,6 +214,8 @@ def attempt_meta_fix(*, git, llm, repo: str, argv: list[str], commit, log,
             rerun = _run_gate(argv, repo, deadline)
         except subprocess.TimeoutExpired:
             return _out("failed", "timeout", checks)
+        except OSError:
+            return _out("failed", "gate-error", checks)
         if rerun.returncode == 0:
             log(f"fix-round: meta-fix CLEARED {' '.join(checks)} on attempt {n} ({model})")
             return _out("cleared", f"attempt {n} ({model})", checks)

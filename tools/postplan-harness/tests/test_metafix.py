@@ -386,3 +386,14 @@ def test_attempt_scope_violation_fails(env):
 
     out = _attempt(env, FakeLlm(env.repo, [edit]))
     assert (out["verdict"], out["reason"]) == ("failed", "scope")
+
+
+def test_attempt_missing_gate_script_refuses(env):
+    llm = FakeLlm(env.repo, [_bump_guide])
+    out = metafix.attempt_meta_fix(git=FakeGit(env.repo), llm=llm, repo=env.repo,
+                                   argv=[os.path.join(env.repo, "bin", "no-such-gate")],
+                                   commit=_commit(env.repo), log=lambda m: None,
+                                   timeout=120, today=NEW_DATE)
+    assert out["verdict"] == "refused"
+    assert out["reason"].startswith("gate-error:")
+    assert llm.calls == []

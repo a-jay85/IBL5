@@ -3674,6 +3674,24 @@ CREATE TABLE `ibl_sim_game_recaps_phantom_backup` (
   KEY `fk_sgr_home` (`home_teamid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `ibl_sim_publish_progress`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ibl_sim_publish_progress` (
+  `sim` int(10) unsigned NOT NULL COMMENT 'Overall sim number (same type as ibl_sim_summaries.sim)',
+  `title_override` varchar(100) DEFAULT NULL COMMENT 'Manual thread name; NULL = computed title',
+  `enqueued_at` datetime DEFAULT NULL COMMENT 'Set by the done notify; NULL = row exists only to hold an override',
+  `claim_token` char(36) DEFAULT NULL COMMENT 'UUID of the IBLbot process that owns the drip',
+  `heartbeat_at` datetime DEFAULT NULL COMMENT 'Refreshed on every claim and step advance',
+  `attempts` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Claim count; a row at the cap is never claimed',
+  `thread_id` varchar(20) DEFAULT NULL COMMENT 'Discord snowflake of the created thread',
+  `last_step` int(11) NOT NULL DEFAULT -1 COMMENT 'Index of the last step confirmed posted; -1 = none',
+  `finished_at` datetime DEFAULT NULL COMMENT 'Set when the whole drip is posted',
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`sim`),
+  KEY `idx_pending` (`finished_at`,`enqueued_at`,`sim`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ibl_sim_summaries`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;

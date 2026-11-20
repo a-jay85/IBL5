@@ -1,6 +1,7 @@
 package sim
 
 import (
+	"math"
 	"testing"
 
 	"github.com/a-jay85/IBL5/engine/internal/bundle"
@@ -71,8 +72,7 @@ func TestResolveTurnoverPath_StealSplitOrientation(t *testing.T) {
 	}
 }
 
-// stealPool caps at defQualityCapMultiplier·defQualityCapTeamMult·leagueSTL48, the
-// same ceiling defQuality uses.
+// stealPool caps at defQualityCapMultiplier·defQualityCapTeamMult·stealCapLeagueSTL48.
 func TestStealPool_CappedAtDefQualityCeiling(t *testing.T) {
 	_, def := stealLineups(40, 99)
 	for i := range def.players {
@@ -80,9 +80,28 @@ func TestStealPool_CappedAtDefQualityCeiling(t *testing.T) {
 		def.players[i].RealLifeSTL = 100 // 4400 per 44: far past the cap
 		def.players[i].fatigue = 1
 	}
-	want := defQualityCapMultiplier * defQualityCapTeamMult * leagueSTL48
+	want := defQualityCapMultiplier * defQualityCapTeamMult * stealCapLeagueSTL48
 	if got := stealPool(def); got != want {
 		t.Errorf("stealPool = %v, want the cap %v", got, want)
+	}
+}
+
+// Over the cap, stealPool returns the cap built from the live league STL/48,
+// 2.043. The literal pins it so a revert to leagueSTL48 (1.834) fails.
+func TestStealPool_CapUsesLiveLeagueSTL48(t *testing.T) {
+	def := realSTLDefense(5000, 5000, 5000, 5000, 5000)
+	want := defQualityCapMultiplier * defQualityCapTeamMult * 2.043
+	if got := stealPool(def); math.Abs(got-want) > 1e-12 {
+		t.Errorf("stealPool = %v, want the 2.043 cap %v", got, want)
+	}
+}
+
+// Below the cap, stealPool returns the raw summed terms.
+func TestStealPool_BelowCapReturnsSum(t *testing.T) {
+	def := realSTLDefense(10, 20, 30)
+	want := stealTerm(def.players[0]) + stealTerm(def.players[1]) + stealTerm(def.players[2])
+	if got := stealPool(def); math.Abs(got-want) > 1e-12 {
+		t.Errorf("stealPool = %v, want the raw sum %v", got, want)
 	}
 }
 
@@ -191,21 +210,139 @@ func TestResolveTurnoverPath_OffensiveFoul(t *testing.T) {
 	t.Fatal("no seed in range produced an offensive foul")
 }
 
-// --- matrix #4: all-zero STL weights → players[0] fallback, no divide-by-zero --
+// --- the stealer pick reuses the steal roll (FUN_004e2fc0) ---
 
-func TestSelectStealer_AllZeroWeightsFallsBack(t *testing.T) {
-	b := richBundle()
-	// Zero out every STL rating so the weighted sum is zero.
-	for i := range b.Players {
-		b.Players[i].STL = 0
+// realSTLDefense builds a defense whose players carry real career steals, so each
+// stlRate is exact (steals per minute × 44) and a zero gives a zero-width bin.
+func realSTLDefense(stls ...int) *teamState {
+	_, def := stealLineups(40, 30)
+	def.players = def.players[:len(stls)]
+	for i, stl := range stls {
+		def.players[i].RealLifeMIN = 1000
+		def.players[i].RealLifeSTL = stl
+		def.players[i].fatigue = 1
 	}
-	defense := newTeamState(b.Players, 3, true)
+	return def
+}
 
-	got, ok := selectStealer(defense, rng.New(7))
+// stealTerm is one defender's bin width, stlRate × fatigue.
+func stealTerm(d onCourt) float64 { return stlRate(d) * d.fatigue }
+
+// A roll exactly on a bin's upper edge credits that slot; a roll just above it
+// credits the next slot.
+func TestPickStealerFromRoll_BinsBySlot(t *testing.T) {
+	def := realSTLDefense(10, 20, 30)
+	if stealTermSum(def) > stealPool(def) {
+		t.Fatalf("fixture terms %v pass the cap %v; want an uncapped defense", stealTermSum(def), stealPool(def))
+	}
+	e1 := stealTerm(def.players[0])
+	e2 := e1 + stealTerm(def.players[1])
+	e3 := e2 + stealTerm(def.players[2])
+	cases := []struct {
+		roll float64
+		want int
+	}{
+		{e1, 0},
+		{e1 + 1e-9, 1},
+		{(e2 + e3) / 2, 2},
+	}
+	for _, c := range cases {
+		got, ok := pickStealerFromRoll(def, c.roll)
+		if !ok || got.PID != def.players[c.want].PID {
+			t.Errorf("roll %v: got PID %d ok=%v, want slot %d PID %d ok=true",
+				c.roll, got.PID, ok, c.want, def.players[c.want].PID)
+		}
+	}
+}
+
+// A zero-width first bin is never credited: roll 0 matches nothing, and a tiny
+// positive roll lands in slot 1.
+func TestPickStealerFromRoll_ZeroTermNeverCredited(t *testing.T) {
+	def := realSTLDefense(0, 20)
+	if got, ok := pickStealerFromRoll(def, 0); ok {
+		t.Errorf("roll 0 credited PID %d; want no bin to match", got.PID)
+	}
+	got, ok := pickStealerFromRoll(def, 1e-9)
+	if !ok || got.PID != def.players[1].PID {
+		t.Errorf("roll 1e-9: got PID %d ok=%v, want slot 1 PID %d ok=true", got.PID, ok, def.players[1].PID)
+	}
+}
+
+// A roll beyond every bin falls back to the last defender with false.
+func TestPickStealerFromRoll_BeyondPoolFallsBackToLastSlot(t *testing.T) {
+	def := realSTLDefense(10, 20)
+	got, ok := pickStealerFromRoll(def, stealTermSum(def)+1)
 	if ok {
-		t.Error("ok should be false on the all-zero fallback")
+		t.Error("ok should be false when no bin holds the roll")
 	}
-	if got.PID != defense.players[0].PID {
-		t.Errorf("fallback returned %d, want players[0] = %d", got.PID, defense.players[0].PID)
+	if got.PID != def.players[1].PID {
+		t.Errorf("fallback returned PID %d, want the last defender %d", got.PID, def.players[1].PID)
+	}
+}
+
+// An empty defense returns the zero onCourt with false and never indexes a slot.
+func TestPickStealerFromRoll_EmptyDefense(t *testing.T) {
+	got, ok := pickStealerFromRoll(&teamState{}, 0.5)
+	if ok || got.PID != 0 {
+		t.Errorf("empty defense: got PID %d ok=%v, want the zero onCourt and false", got.PID, ok)
+	}
+}
+
+// Over the cap, JSB scales every bin edge by pool/total, so the bins split the
+// capped pool: a roll just under the pool still credits the last defender.
+func TestPickStealerFromRoll_ScalesBinsToCap(t *testing.T) {
+	def := realSTLDefense(5000, 5000, 5000)
+	total, pool := stealTermSum(def), stealPool(def)
+	if total <= pool {
+		t.Fatalf("fixture total %v sits under the cap %v; want a capped defense", total, pool)
+	}
+	got, ok := pickStealerFromRoll(def, pool*(1-1e-9))
+	if !ok || got.PID != def.players[2].PID {
+		t.Errorf("roll just under the pool: got PID %d ok=%v, want slot 2 PID %d ok=true", got.PID, ok, def.players[2].PID)
+	}
+	got, ok = pickStealerFromRoll(def, pool/3+1e-9)
+	if !ok || got.PID != def.players[1].PID {
+		t.Errorf("roll just past the first scaled edge: got PID %d ok=%v, want slot 1 PID %d ok=true", got.PID, ok, def.players[1].PID)
+	}
+}
+
+// A steal possession and a no-steal possession from the same seed leave the RNG
+// at the same position. Both draw the offensive-foul roll and the steal roll
+// only, so the stealer pick consumes nothing.
+func TestResolveTurnoverPath_StealDrawsOneRoll(t *testing.T) {
+	build := func(stl int) (*teamState, *teamState) {
+		off, _ := stealLineups(40, 30)
+		for i := range off.players {
+			off.players[i].RealLifeMIN = 1000
+			off.players[i].RealLifeTVR = 1 // tiny turnover pool, under the steal cap
+			off.players[i].fatigue = 1
+		}
+		return off, realSTLDefense(stl, stl, stl, stl, stl)
+	}
+	var seed uint64
+	for s := uint64(1); s < 1000; s++ {
+		if rng.New(s).Float64() >= offensiveFoulOnTurnover {
+			seed = s
+			break
+		}
+	}
+	if seed == 0 {
+		t.Fatal("no seed in range skips the offensive foul")
+	}
+	offA, defA := build(0)
+	gsA := &gameState{rng: rng.New(seed), period: 1, clock: 500}
+	if gsA.resolveTurnoverPath(offA, defA, offA.players[0], outcomeTurnover) {
+		t.Fatal("a zero steal pool must not steal")
+	}
+	offB, defB := build(5000)
+	if stealPool(defB) <= turnoverPool(offB) {
+		t.Fatalf("steal pool %v must exceed the turnover pool %v", stealPool(defB), turnoverPool(offB))
+	}
+	gsB := &gameState{rng: rng.New(seed), period: 1, clock: 500}
+	if !gsB.resolveTurnoverPath(offB, defB, offB.players[0], outcomeTurnover) {
+		t.Fatal("a steal pool above the turnover pool must steal")
+	}
+	if a, b := gsA.rng.Float64(), gsB.rng.Float64(); a != b {
+		t.Errorf("next draw after no-steal %v != after steal %v; the stealer pick drew from the RNG", a, b)
 	}
 }

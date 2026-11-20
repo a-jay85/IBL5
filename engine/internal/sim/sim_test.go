@@ -708,6 +708,12 @@ func findBox(boxes []result.PlayerBox, pid int) *result.PlayerBox {
 //     at the old upper bound. 0.30 restores headroom around that new center
 //     without loosening assertions 1-2 (the mechanical and statistical gates,
 //     unaffected by the possession-count shift).
+//     Upper bound WIDENED for backlog#1923 (0.30 -> 0.38): after the J27 code-4
+//     port this fixture runs ~44.5 turnovers/game, so the expected rate is
+//     0.007 × 44.55 = 0.312/game, already above 0.30. Master passed at 0.2917
+//     by a low draw. Removing the stealer's RNG draw shifts the stream and lands
+//     0.3083, inside assertion 2's 4σ. 0.38 sits at the expected value plus 4σ
+//     per game (σ ≈ 0.016 over 1200 games).
 func TestSimulate_InjuryRateBand(t *testing.T) {
 	const n = 1200
 	base := richBundle()
@@ -753,10 +759,10 @@ func TestSimulate_InjuryRateBand(t *testing.T) {
 	// turnovers/game 30.40, injuries/game 0.1833 — turnovers rise with possession
 	// count, as expected. Both remain comfortably inside the UNCHANGED [0.15,0.30]
 	// band with margin on both sides. See below for the observed value.
-	t.Logf("injuries/game = %.4f (turnovers/game = %.2f) — J25 faithful 16.0 center, band [0.15, 0.30]",
+	t.Logf("injuries/game = %.4f (turnovers/game = %.2f) — J25 faithful 16.0 center, band [0.15, 0.38]",
 		perGame, float64(turnovers)/float64(n))
-	if perGame < 0.15 || perGame > 0.30 {
-		t.Errorf("injuries/game = %.4f (%d over %d games), want corpus band [0.15, 0.30] "+
+	if perGame < 0.15 || perGame > 0.38 {
+		t.Errorf("injuries/game = %.4f (%d over %d games), want corpus band [0.15, 0.38] "+
 			"(turnovers/game = %.2f)", perGame, injuries, n, float64(turnovers)/float64(n))
 	}
 }

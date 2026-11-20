@@ -1,0 +1,334 @@
+#!/bin/bash
+set -euo pipefail
+
+# Test harness for bin/check-claude-cli-invocation (the claude -p call-site gate).
+# Follows bin/test-check-loop-stdin-consumed-by-child style.
+#
+# Every fixture lives in a mktemp dir; nothing is written inside the IBL5 tree.
+# Fixtures are written with quoted heredocs. The gate skips heredoc bodies and
+# test-* basenames, so it never scans this file.
+#
+# Usage: bin/test-check-claude-cli-invocation
+
+PASS=0
+FAIL=0
+
+pass() { echo "PASS: $1"; PASS=$((PASS + 1)); }
+fail() { echo "FAIL: $1"; FAIL=$((FAIL + 1)); }
+
+T=$(mktemp -d)
+trap 'rm -rf "$T"' EXIT
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT="$HERE/check-claude-cli-invocation"
+
+OUT=""
+RC=0
+run_gate() { set +e; OUT=$("$SCRIPT" "$@" 2>&1); RC=$?; set -e; }
+
+# expect NAME FILE WANT_RC  -- scan FILE and compare the exit code
+expect() {
+    local name="$1" file="$2" want="$3"
+    run_gate "$file"
+    if [ "$RC" -ne "$want" ]; then
+        fail "$name (rc=$RC, want $want; output: $OUT)"
+        return 0
+    fi
+    if [ "$want" -eq 0 ] && [ -n "$OUT" ]; then
+        fail "$name (rc 0 but output: $OUT)"
+        return 0
+    fi
+    pass "$name"
+}
+
+# expect_class NAME FILE CLASS [LINE]  -- rc 1 and a hit "<basename>:<LINE>: <CLASS>:"
+expect_class() {
+    local name="$1" file="$2" class="$3" line="${4:-}" base
+    base="$(basename "$file")"
+    run_gate "$file"
+    if [ "$RC" -ne 1 ]; then
+        fail "$name (rc=$RC, want 1; output: $OUT)"
+        return 0
+    fi
+    if [ -n "$line" ]; then
+        case "$OUT" in
+            *"$base:$line: $class:"*) pass "$name" ;;
+            *) fail "$name (no '$base:$line: $class:' in: $OUT)" ;;
+        esac
+    else
+        case "$OUT" in
+            *"$base:"*": $class:"*) pass "$name" ;;
+            *) fail "$name (no '$class' hit in: $OUT)" ;;
+        esac
+    fi
+}
+
+# lineof FILE FIXED  -- first line number holding the fixed string
+lineof() { grep -nF -m1 -- "$2" "$1" | cut -d: -f1; }
+
+# subst SRC OLD NEW DST  -- fixed-string replace of every OLD with NEW (no regex)
+subst() {
+    awk -v old="$2" -v new="$3" '
+        {
+            out = ""; rest = $0
+            while ((i = index(rest, old)) > 0) {
+                out = out substr(rest, 1, i - 1) new
+                rest = substr(rest, i + length(old))
+            }
+            print out rest
+        }' "$1" > "$4"
+}
+
+# ---------------------------------------------------------------- good forms
+
+# Real shapes copied from bin/postplan-fix: the timeout-argv function, both array
+# literals, and the statements that execute them.
+cat > "$T/good_pf_hr_argv.sh" <<'FIX'
+#!/bin/bash
+_pf_timeout_argv() {  # <secs>
+    TMO=()
+    if command -v timeout >/dev/null 2>&1; then TMO=(timeout "$1")
+    elif command -v gtimeout >/dev/null 2>&1; then TMO=(gtimeout "$1")
+    # Stock macOS ships neither; perl does. alarm survives exec, so SIGALRM ends claude.
+    elif command -v perl >/dev/null 2>&1; then TMO=(perl -e 'alarm shift; exec @ARGV or die "exec: $!"' "$1")
+    else echo "postplan-fix: warning: no timeout, gtimeout or perl on PATH; the session has no wall-clock cap" >&2; fi
+}
+    HR_ARGV=(claude -p --model claude-sonnet-5-5 --max-turns "$HR_MAX_TURNS"
+        --max-budget-usd "$HR_MAX_BUDGET_USD"
+        --permission-prompts none --allowedTools "$ALLOWED" --tools "$ALLOWED"
+        --disallowedTools "$DENIED")
+    _pf_timeout_argv "$HR_TIMEOUT_SECS"
+    REPLY="$(printf '%s\n' "$HR_PROMPT" | CLAUDE_HEADLESS=1 PYTHONDONTWRITEBYTECODE=1 ${TMO[@]+"${TMO[@]}"} "${HR_ARGV[@]}" 2>"$HR_TMP/stderr")" || true
+FIX
+expect "[good_pf_hr_argv]" "$T/good_pf_hr_argv.sh" 0
+
+cat > "$T/good_pf_argv.sh" <<'FIX'
+#!/bin/bash
+_pf_timeout_argv() {  # <secs>
+    TMO=()
+    if command -v timeout >/dev/null 2>&1; then TMO=(timeout "$1")
+    elif command -v gtimeout >/dev/null 2>&1; then TMO=(gtimeout "$1")
+    elif command -v perl >/dev/null 2>&1; then TMO=(perl -e 'alarm shift; exec @ARGV or die "exec: $!"' "$1")
+    fi
+}
+    ARGV=(claude -p --model claude-sonnet-5-5 --max-turns 100 --max-budget-usd 5
+        --permission-prompts none --allowedTools "$ALLOWED" --tools "$ALLOWED"
+        --disallowedTools "$DENIED")
+    FIX_TIMEOUT=1500
+    _pf_timeout_argv "$FIX_TIMEOUT"
+    REPLY="$(printf '%s\n' "$PROMPT" | ${TMO[@]+"${TMO[@]}"} "${ARGV[@]}" 2>"$ERRLOG")" || true
+FIX
+expect "[good_pf_argv]" "$T/good_pf_argv.sh" 0
+
+cat > "$T/good_timeout_word.sh" <<'FIX'
+#!/bin/bash
+out="$(timeout 90 claude -p "$p" 2>"$errf")"
+FIX
+expect "[good_timeout_word]" "$T/good_timeout_word.sh" 0
+
+cat > "$T/good_log_merge.sh" <<'FIX'
+#!/bin/bash
+timeout 600 claude -p "$p" > "$LOG" 2>&1
+FIX
+expect "[good_log_merge]" "$T/good_log_merge.sh" 0
+
+cat > "$T/good_capture_file_merge.sh" <<'FIX'
+#!/bin/bash
+out=$(timeout 9 claude -p x >"$f" 2>&1)
+FIX
+expect "[good_capture_file_merge]" "$T/good_capture_file_merge.sh" 0
+
+cat > "$T/good_prompt_before_variadic.sh" <<'FIX'
+#!/bin/bash
+timeout 90 claude -p "$1" --allowedTools ''
+FIX
+expect "[good_prompt_before_variadic]" "$T/good_prompt_before_variadic.sh" 0
+
+cat > "$T/good_splat.sh" <<'FIX'
+#!/bin/bash
+timeout "$secs" claude -p "$p" --tools Read "$@"
+FIX
+expect "[good_splat]" "$T/good_splat.sh" 0
+
+# The fixed docfix-run runner line (perl alarm wrap inside a printf emitter).
+cat > "$T/good_perl_alarm.sh" <<'FIX'
+#!/bin/bash
+{
+    printf 'cd %s && CLAUDE_HEADLESS=1 caffeinate -s perl -e "alarm shift; exec @ARGV or exit 127" 7200 claude -p %s --dangerously-skip-permissions --model claude-sonnet-5-5 --session-id %s --effort low --name %s\n' \
+        "$(shq "$WT_ROOT")" "$(shq "$PROMPT")" "$SESSION_ID" "$(shq "$LABEL")"
+} > "$RUNNER"
+FIX
+expect "[good_perl_alarm]" "$T/good_perl_alarm.sh" 0
+
+# A command string held in a variable is data, not a call site (shape of post-plan-now:990).
+cat > "$T/good_cmd_string.sh" <<'FIX'
+#!/bin/bash
+CMD="cd \"$WT\"; CLAUDE_HEADLESS=1 caffeinate -s claude -p ${SKILL_PROMPT_ARG} --name \"$LABEL\"; echo done"
+FIX
+expect "[good_cmd_string]" "$T/good_cmd_string.sh" 0
+
+cat > "$T/good_max_turns.sh" <<'FIX'
+#!/bin/bash
+timeout 9 claude -p --max-turns 100 x
+FIX
+expect "[good_max_turns]" "$T/good_max_turns.sh" 0
+
+cat > "$T/good_quoted_prompt_flag.sh" <<'FIX'
+#!/bin/bash
+timeout 9 claude -p "/plan x --implement"
+FIX
+expect "[good_quoted_prompt_flag]" "$T/good_quoted_prompt_flag.sh" 0
+
+cat > "$T/good_minefield.sh" <<'FIX'
+#!/bin/bash
+# claude -p "$p"
+echo see claude -p docs
+echo "usage: claude -p --headless"
+cat <<'EOF'
+claude -p "$x"
+EOF
+rest="${args#*claude -p }"
+FIX
+expect "[good_minefield]" "$T/good_minefield.sh" 0
+
+cat > "$T/good_marker.sh" <<'FIX'
+#!/bin/bash
+claude -p "$p" # claude-cli-ok: detached tab a human watches
+FIX
+expect "[good_marker]" "$T/good_marker.sh" 0
+
+: > "$T/good_empty.sh"
+expect "[good_empty]" "$T/good_empty.sh" 0
+
+# ----------------------------------------------------------------- bad forms
+
+cat > "$T/bad_no_timeout.sh" <<'FIX'
+#!/bin/bash
+claude -p "$p"
+FIX
+expect_class "[bad_no_timeout]" "$T/bad_no_timeout.sh" no-timeout 2
+
+# The statement bin/docfix-run:170 held before the perl wrap (line and continuation).
+cat > "$T/bad_docfix_old_printf.sh" <<'FIX'
+#!/bin/bash
+{
+    printf 'cd %s && CLAUDE_HEADLESS=1 caffeinate -s claude -p %s --dangerously-skip-permissions --model claude-sonnet-5-5 --session-id %s --effort low --name %s\n' \
+        "$(shq "$WT_ROOT")" "$(shq "$PROMPT")" "$SESSION_ID" "$(shq "$LABEL")"
+} > "$RUNNER"
+FIX
+expect_class "[bad_docfix_old_printf]" "$T/bad_docfix_old_printf.sh" no-timeout 3
+
+cat > "$T/bad_array_no_timeout.sh" <<'FIX'
+#!/bin/bash
+A=(claude -p --model m)
+"${A[@]}" <"$f"
+FIX
+expect_class "[bad_array_no_timeout]" "$T/bad_array_no_timeout.sh" no-timeout
+
+cat > "$T/bad_merged_capture.sh" <<'FIX'
+#!/bin/bash
+out=$(timeout 90 claude -p "$p" 2>&1)
+FIX
+expect_class "[bad_merged_capture]" "$T/bad_merged_capture.sh" stderr-merged-capture 2
+
+cat > "$T/bad_merged_capture_order.sh" <<'FIX'
+#!/bin/bash
+out=$(timeout 9 claude -p x 2>&1 >/dev/null)
+FIX
+expect_class "[bad_merged_capture_order]" "$T/bad_merged_capture_order.sh" stderr-merged-capture 2
+
+cat > "$T/bad_variadic_allowed.sh" <<'FIX'
+#!/bin/bash
+timeout 90 claude -p --allowedTools Read "$prompt"
+FIX
+expect_class "[bad_variadic_allowed]" "$T/bad_variadic_allowed.sh" prompt-after-variadic 2
+
+cat > "$T/bad_variadic_disallowed.sh" <<'FIX'
+#!/bin/bash
+timeout 90 claude -p --disallowedTools Read "$prompt"
+FIX
+expect_class "[bad_variadic_disallowed]" "$T/bad_variadic_disallowed.sh" prompt-after-variadic 2
+
+cat > "$T/bad_variadic_tools.sh" <<'FIX'
+#!/bin/bash
+timeout 90 claude -p --tools Read "$prompt"
+FIX
+expect_class "[bad_variadic_tools]" "$T/bad_variadic_tools.sh" prompt-after-variadic 2
+
+cat > "$T/bad_unknown_flag.sh" <<'FIX'
+#!/bin/bash
+timeout 90 claude -p --no-such-flag-zz x
+FIX
+expect_class "[bad_unknown_flag]" "$T/bad_unknown_flag.sh" unknown-flag 2
+
+cat > "$T/bad_marker_empty.sh" <<'FIX'
+#!/bin/bash
+claude -p "$p" # claude-cli-ok:
+FIX
+expect_class "[bad_marker_empty]" "$T/bad_marker_empty.sh" no-timeout 2
+case "$OUT" in
+    *"needs a non-empty reason"*) pass "[bad_marker_empty] output names the empty reason" ;;
+    *) fail "[bad_marker_empty] output lacks 'needs a non-empty reason': $OUT" ;;
+esac
+
+# ------------------------------------------- mutated copies of the real good file
+
+PFSRC="$HERE/postplan-fix"
+cp "$PFSRC" "$T/pf0"
+expect "[pf_baseline_clean]" "$T/pf0" 0
+
+# mutant NAME OLD NEW CLASS  -- build a copy with OLD replaced by NEW, expect CLASS
+mutant() {
+    local name="$1" old="$2" new="$3" class="$4" dst="$T/$1"
+    subst "$PFSRC" "$old" "$new" "$dst"
+    if cmp -s "$T/pf0" "$dst"; then
+        fail "[$name] anchor '$old' not found in bin/postplan-fix"
+        return 0
+    fi
+    expect_class "[$name]" "$dst" "$class"
+}
+
+mutant pf_m1 '--disallowedTools "$DENIED")' '--disallowedTools "$DENIED" "$PROMPT")' prompt-after-variadic
+mutant pf_m2 '--max-budget-usd 5' '--max-budget-usd 5 --no-such-flag-zz' unknown-flag
+mutant pf_m3 '2>"$HR_TMP/stderr"' '2>&1' stderr-merged-capture
+mutant pf_m4 '${TMO[@]+"${TMO[@]}"} ' '' no-timeout
+
+# ------------------------------------------------------------------- usage
+
+run_gate --bogus
+if [ "$RC" -eq 2 ]; then pass "[usage_unknown_option]"; else fail "[usage_unknown_option] (rc=$RC, want 2)"; fi
+
+run_gate "$T/does-not-exist"
+if [ "$RC" -eq 2 ]; then pass "[usage_missing_file]"; else fail "[usage_missing_file] (rc=$RC, want 2)"; fi
+
+run_gate --stats "$T/good_timeout_word.sh"
+case "$OUT" in
+    *"scanned 1 files, 1 call sites, 0 escaped, 0 hits"*) pass "[stats_line]" ;;
+    *) fail "[stats_line] (output: $OUT)" ;;
+esac
+
+# --------------------------------------------------------- allowlist drift
+
+# Local only: CI runners have no claude binary.
+if command -v claude >/dev/null 2>&1; then
+    allowed_line="$(grep -E '^ALLOWED_FLAGS=' "$SCRIPT")"
+    missing=""
+    help_flags="$(claude --help 2>/dev/null | grep -oE -- '(^|[ ,])--?[a-zA-Z][a-zA-Z-]*' | tr -d ' ,' | sort -u)" || help_flags=""
+    while IFS= read -r flag; do
+        [ -n "$flag" ] || continue
+        case " $allowed_line " in
+            *"$flag "*|*"$flag\""*) ;;
+            *) missing="$missing $flag" ;;
+        esac
+    done <<< "$help_flags"
+    if [ -z "$missing" ]; then
+        pass "[help_flags_allowlisted]"
+    else
+        fail "[help_flags_allowlisted] flags in claude --help but not in ALLOWED_FLAGS:$missing"
+    fi
+else
+    echo "SKIP: claude not on PATH; allowlist drift not checked"
+fi
+
+echo "$PASS passed, $FAIL failed"
+[ "$FAIL" -eq 0 ]

@@ -1695,25 +1695,28 @@ def self_test():
         if code != expected:
             failures += 1
             print("FAIL rewrite-scan %s: expected exit %d, got %d" % (name, expected, code))
-    for with_undo, expected in ((True, 0), (False, 1)):
+    for with_undo, expected in ((True, []), (False, ["rewrite-no-backup"])):
         cases += 1
         tmp = tempfile.mkdtemp()
         try:
             mig = os.path.join(tmp, "x.sql")
             if with_undo:
+                # Only the undo/ script is written, so undo_script_path() alone
+                # decides the result. The down-file triggers this leaves firing
+                # are filtered out below, as in REWRITE_CASES.
                 os.mkdir(os.path.join(tmp, "undo"))
                 with open(os.path.join(tmp, "undo", "x.sql"), "w") as fh:
                     fh.write("-- restore\n")
-                # The case pins the undo-script check; the down partner keeps
-                # down-file-missing out of the exit code.
-                with open(os.path.join(tmp, "x.down.sql"), "w") as fh:
-                    fh.write("-- restores: t\n")
-            code, _ = run_scan(mig, REWRITE_BACKED_SQL, [(1, 999)], "strict", None, Lookups(None, None, mig))
+            statements, _ = extract_sql(mig, REWRITE_BACKED_SQL)
+            hits = evaluate(
+                statements, list(range(len(statements))), Lookups(None, None, mig), rewrite_path=mig
+            )
         finally:
             shutil.rmtree(tmp)
-        if code != expected:
+        got = sorted(set(h[0] for h in hits if h[0] not in DOWN_TRIGGERS))
+        if got != expected:
             failures += 1
-            print("FAIL rewrite-disk undo=%s: expected exit %d, got %d" % (with_undo, expected, code))
+            print("FAIL rewrite-disk undo=%s: expected %s, got %s" % (with_undo, expected, got))
     print("%d cases, %d failures" % (cases, failures))
     return 1 if failures else 0
 

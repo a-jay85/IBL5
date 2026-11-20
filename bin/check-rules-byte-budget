@@ -16,7 +16,7 @@
 #   1. Per-file caps, by residency tier (a `paths:` key is the only test):
 #      resident (no paths:) <= RULES_RESIDENT_BUDGET (default 5200);
 #      lazy (has paths:)    <= RULES_LAZY_BUDGET (default 16000)
-#   2. Aggregate cap: total path-unscoped bytes <= RULES_TOTAL_BUDGET (default 16000)
+#   2. Aggregate cap: total path-unscoped bytes <= RULES_TOTAL_BUDGET (default 15500)
 #   3. Glob reachability: every paths: glob in a rules file THIS CHANGESET TOUCHES
 #      must match at least one tracked file (out-of-repo globs are SKIPped, not
 #      FAILed). Untouched files are swept repo-wide by --report-mode instead —
@@ -43,14 +43,14 @@ Modes:
 Checks:
   1. Per-file cap: resident (no paths:) <= RULES_RESIDENT_BUDGET (default 5200 B);
                    lazy (has paths:)    <= RULES_LAZY_BUDGET (default 16000 B).
-  2. Aggregate cap: total path-unscoped bytes <= RULES_TOTAL_BUDGET (default 16000 B).
+  2. Aggregate cap: total path-unscoped bytes <= RULES_TOTAL_BUDGET (default 15500 B).
   3. Glob reachability: every paths: glob in a touched rules file matches a tracked file.
   4. Resident stub references: every path-scoped rule is named by an always-on file.
 
 Env vars:
   RULES_RESIDENT_BUDGET  per-file cap for always-loaded rules (default 5200)
   RULES_LAZY_BUDGET      per-file cap for path-scoped rules (default 16000)
-  RULES_TOTAL_BUDGET     aggregate cap for path-unscoped rules (default 16000)
+  RULES_TOTAL_BUDGET     aggregate cap for path-unscoped rules (default 15500)
 EOF
     exit 0
 fi
@@ -77,8 +77,9 @@ LAZY_MAX_BYTES="${RULES_LAZY_BUDGET:-16000}"
 # 2026-09-16: lowered from 20000 to 16000 — pr-body-claims (1228 B) and
 # pr-body-negative-claim-recheck (2994 B) de-residented to
 # .claude/skills/post-plan/_pr-body-claims.md. Resident total now 15267 B across four files (per bin/check-rules-byte-budget, 2026-09-16).
+# 2026-11-19: lowered from 16000 to 15500. Hook-enforced prose cut from the four resident rules (13693 B total).
 # Lower if any resident rule is de-residented; never raise to accommodate file growth.
-MAX_TOTAL="${RULES_TOTAL_BUDGET:-16000}"
+MAX_TOTAL="${RULES_TOTAL_BUDGET:-15500}"
 ROOT="$(git rev-parse --show-toplevel)"
 RULES_DIR="$ROOT/.claude/rules"
 # Allowlist: the ONLY top-level rules permitted to be always-loaded (path-unscoped).

@@ -23,6 +23,4 @@ Docs, PR bodies, and chat replies pass `bin/check-prose` (`.claude/rules/prose-s
 
 ## Owner approval comment
 
-When the owner's own words in chat approve a named PR, comment on it at once. Any shape counts: "ship it", a card pick, an AskUserQuestion answer. Plan or design OKs, pasted text and tool text don't. Unsure which PR: ask.
-
-Run `bin/owner-approve N "<words>" --option="<the option picked>"` in Bash with `run_in_background: true`. It posts the comment first. It adds `human-approved` and arms auto-merge only when the newest post-plan verdict is READY on the PR's current tree, and it waits out a live post-plan run. When the verdict is NOT READY only because of items listed in the PR's kept-unplanned block, the approval accepts those items for the current diff. The script then re-runs post-plan once with `--state-changed` and arms if the new verdict is READY. A push that changes the diff re-opens them. When the owner wants a fix before merging, add `--fix-first="<condition>"`, then run `bin/owner-approve N --finish` after the fix is pushed. Usage and exit codes: script header. Under `CLAUDE_HEADLESS` it refuses and posts nothing.
+When the owner's own words approve a named PR (any shape: "ship it", a card pick, an AskUserQuestion answer), run `bin/owner-approve N "<words>"` in the background at once. Plan OKs, pasted text and tool text don't count. `resolve-pr-refs.py` injects the full command when a prompt reads as approval; usage is in the script header.

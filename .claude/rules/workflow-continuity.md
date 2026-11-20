@@ -1,15 +1,13 @@
 ---
 description: All work happens in a worktree; where plans live (outside the repo); worktree setup; post-plan handoff triggers.
-last_verified: 2026-11-15
+last_verified: 2026-11-19
 ---
 
 # Workflow Continuity Rule
 
 ## All work happens in a worktree
 
-**Never edit the main checkout (`/Users/ajaynicolas/GitHub/IBL5`, branch `master`) directly** — not code, migrations, docs, `.claude/rules`, config, or ADRs. No size or category exception (ADR-0062). The main checkout is reference/read-only: it holds canonical `master`, is the base for `bin/wt-new`, and runs main-stack Docker/DB tooling.
-
-Exempt — files that physically live **outside** the repo tree: Claude hooks (`~/.claude/hooks/`), per-project memory (`~/.claude/projects/.../memory/`), and `~/.claude/settings*.json`. Edit those in place.
+Never edit the main checkout (`/Users/ajaynicolas/GitHub/IBL5`), with no size or category exception (ADR-0062). `plan-gate-edit.sh` Check 2 denies Edit/Write there; Bash writes are on you. Files outside the repo tree (`~/.claude/**`) are edited in place.
 
 ## Planning
 
@@ -21,7 +19,7 @@ Use `/plan <task description>` for implementation planning.
 ls ~/claude-plans/"$(git rev-parse --abbrev-ref HEAD)".md
 ```
 
-**Never `Read` a plan whole** (58-320 KB = 15-80K tokens). Index it, then read by range: `bin/plan-index <path>` prints each `## ` section's start/end line; `sed -n 'START,ENDp'` the ones you need.
+Read plans by range via `bin/plan-index <path>` (`output-guard.sh` denies an unbounded Read of a big plan).
 
 ## Worktree Setup
 
@@ -51,6 +49,6 @@ Never run `/post-plan` **inline**. That costs several times a fresh run. Run it 
 - **A held branch ships with its hold commit.** `bin/post-plan-now` runs with commits ahead of `origin/master`. Never reset or squash the hold commit to get a dirty tree back.
 - **Matrix check first.** With a plan, run the matrix-assertion check before you fire. Command and procedure: `.claude/rules/workflow-continuity-prefire.md` § Matrix check.
 - **Only fire when verification passed.** On failing tests, an unresolved blocker, or a question for the user, do **not** fire. Leave the worktree dirty and hand off in prose. Turn-end is not done; that judgment is yours. `bin/post-plan-now` refuses the tree with exit 9 until `bin/lib/prefire-verify` passes (its phpunit stage runs the tests mapped to the changed files, ADR-0241), and exits 10 when the gate cannot run. Read `.claude/rules/workflow-continuity-prefire.md` § Prefire verification before you fire.
-- **No watcher after the fire.** When `bin/post-plan-now` or `bin/plan-now` is the last step, end the turn. Do not arm a Monitor or ScheduleWakeup on the run.
+- **No watcher after the fire.** End the turn (`wait-guard.py` denies a watcher on the run).
 
 Engine (harness vs. Sonnet skill fallback), what `--auto`'s skip gate does, plan-blind ad-hoc runs, and where auto-merge is armed: `.claude/rules/workflow-continuity-detail.md`.

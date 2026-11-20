@@ -1,6 +1,6 @@
 ---
 description: Triage work as ad-hoc vs /plan; ad-hoc bar, safety mirror, execution routing and its inline-edit trial, hook-enforced triggers.
-last_verified: 2026-11-17
+last_verified: 2026-11-19
 ---
 
 # Work Triage Rule
@@ -45,21 +45,11 @@ The verdict decides *whether to plan*. Who edits is a separate call.
 
 One sweep, one agent. Independent chunks get one agent each, in one message. A chunk of 5+ files stays inline only when **entangled** with the design or **trivial** (`work-triage-detail.md` § Inline vs. delegated).
 
-### The hard trigger: ≥5 distinct files in one turn
+### Hook-enforced routing
 
-Hook-enforced by `~/.claude/hooks/plan-gate-edit.sh` § Check 1. Its deny message gives routing and the escape hatch. Details: `work-triage-detail.md` § Hard trigger.
+Hooks deny these, and each deny message gives the route: 5+ distinct files in one turn (`plan-gate-edit.sh` Check 1), inline `Skill(plan)` (`skill-gate.sh`), and waits on job files or post-plan runs (`wait-guard.py`). Detail: `work-triage-detail.md` §§ Hard trigger, `/plan` verdict routing.
 
-## Execution routing: a `/plan` verdict routes to `bin/plan-now`, never inline
-
-Hook-enforced by `~/.claude/hooks/skill-gate.sh`, which denies inline `Skill(plan)`. Exemptions and escape hatch: `work-triage-detail.md` § `/plan` verdict routing.
-
-## Execution routing: repeat-polling is a spend bug
-
-Never poll on the main thread; each poll re-reads the full context. Use `run_in_background: true` + Monitor, or a ScheduleWakeup timed to the finish.
-
-When the wait ends in an owner step (sign-off card, manual check), don't wake the session. A detached script follows up and DMs the owner. For a prep job, run `bin/pr-refire-after-job`. `~/.claude/hooks/wait-guard.py` blocks a Monitor or background Bash wait on a `/tmp/pr-burndown/` job file unless the command ends with `# wake-ok: <reason>`.
-
-Name the completion signal before writing the watcher. File mtime or size is never one. Valid signals: `work-triage-detail.md` § The readiness predicate.
+Never poll on the main thread. Use `run_in_background: true` + Monitor, or a ScheduleWakeup timed to the finish. When the wait ends in an owner step, a detached script follows up (`bin/pr-refire-after-job`). Name the completion signal first; file mtime or size is never one (`work-triage-detail.md` § The readiness predicate).
 
 ## Calibration
 

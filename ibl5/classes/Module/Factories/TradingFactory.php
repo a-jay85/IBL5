@@ -59,4 +59,26 @@ final class TradingFactory implements ModuleFactoryInterface
             $this->services->auth()
         );
     }
+
+    public function teamModeController(): \TradeSuggestions\TeamModeController
+    {
+        return new \TradeSuggestions\TeamModeController(
+            $this->services->auth(),
+            $this->services->teamIdentity(),
+            new \TradeSuggestions\TeamModeService(
+                new \TradeSuggestions\TeamModeRepository($this->services->db()),
+                new \TradeSuggestions\TeamModeGuesser()
+            )
+        );
+    }
+
+    public function suggestionFeedbackController(): \TradeSuggestions\Feedback\SuggestionFeedbackController
+    {
+        return new \TradeSuggestions\Feedback\SuggestionFeedbackController(
+            $this->services->auth(),
+            $this->services->teamIdentity(),
+            new \TradeSuggestions\Feedback\FeedbackRepository($this->services->db()),
+            \TradeSuggestions\Feedback\PanelSessionState::current(),
+        );
+    }
 }

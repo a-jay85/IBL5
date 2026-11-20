@@ -34,6 +34,71 @@ final class NewsFactory implements ModuleFactoryInterface
         string $tableBgcolor2 = '#CCCCCC',
     ): \Topics\News\NewsController {
         $db = $this->services->db();
+        $season = $this->services->season();
+        $tradeFormRepo = new \Trading\TradeFormRepository($db);
+        $tradeValidator = new \Trading\TradeValidator($db, $season);
+        $teamModeRepo = new \TradeSuggestions\TeamModeRepository($db);
+
+        $assetRepo = new \TradeSuggestions\SuggestionAssetRepository($db);
+        $draftOrder = new \ProjectedDraftOrder\ProjectedDraftOrderService(new \ProjectedDraftOrder\ProjectedDraftOrderRepository($db));
+        // One resolver for the loader, the provider and the service, so the
+        // panel's mode line reads the run the provider just made.
+        $modeResolver = new \TradeSuggestions\Engine\ModeResolver(
+            $assetRepo,
+            $draftOrder,
+            $teamModeRepo,
+            $tradeFormRepo,
+            new \TradeSuggestions\TeamModeService($teamModeRepo, new \TradeSuggestions\TeamModeGuesser()),
+            $season,
+        );
+        $snapshots = new \TradeSuggestions\Engine\CachedLeagueSnapshotProvider(
+            new \TradeSuggestions\Engine\LeagueSnapshotLoader(
+                new \TradeSuggestions\Projection\ProjectionPlayerRepository($db),
+                new \TradeSuggestions\Valuation\ValuationTeamFactorsRepository($db),
+                new \Standings\StandingsRepository($db),
+                $draftOrder,
+                $assetRepo,
+                $tradeFormRepo,
+                $modeResolver,
+                $season,
+            ),
+            new \Cache\DatabaseCache($db),
+            new \TradeSuggestions\Engine\SnapshotKeyRepository($db),
+            $modeResolver,
+            $season,
+        );
+
+        $tradeSuggestionsService = new \TradeSuggestions\TradeSuggestionsService(
+            $snapshots,
+            new \TradeSuggestions\Engine\CandidateGenerator([
+                new \TradeSuggestions\Engine\Shape\OneForOne(),
+                new \TradeSuggestions\Engine\Shape\TwoForOne(),
+                new \TradeSuggestions\Engine\Shape\OneForTwo(),
+                new \TradeSuggestions\Engine\Shape\StarForYoungAndPicks(),
+                new \TradeSuggestions\Engine\Shape\DumpPaidWithPick(),
+                new \TradeSuggestions\Engine\Shape\ExpiringForLong(),
+                new \TradeSuggestions\Engine\Shape\PickSwap(),
+                new \TradeSuggestions\Engine\Shape\ChangeOfScenery(),
+            ]),
+            \TradeSuggestions\Veto\VetoSet::standard(),
+            new \TradeSuggestions\Engine\DealRanker(),
+            new \TradeSuggestions\SuggestionValidationFilter(
+                $tradeValidator,
+                new \Trading\TradeCapCalculator(
+                    $this->services->teamIdentity(),
+                    new \Trading\BuyoutLedgerRepository($db),
+                    $season,
+                    $tradeValidator,
+                ),
+                $tradeFormRepo,
+                $season,
+            ),
+            $tradeFormRepo,
+            new \Settings\SettingsService($season),
+            $modeResolver,
+            new \TradeSuggestions\Feedback\FeedbackRepository($db),
+            \TradeSuggestions\Feedback\PanelSessionState::current(),
+        );
 
         return new \Topics\News\NewsController(
             new \Topics\News\NewsPageConfig(
@@ -57,6 +122,8 @@ final class NewsFactory implements ModuleFactoryInterface
             new \Topics\News\NewsView(),
             onThisDayService: \OnThisDay\OnThisDayFactory::createService($db, $this->services->leagueContext()),
             onThisDayView: new \OnThisDay\OnThisDayView(),
+            tradeSuggestionsService: $tradeSuggestionsService,
+            tradeSuggestionsView: new \TradeSuggestions\TradeSuggestionsView(),
         );
     }
 }

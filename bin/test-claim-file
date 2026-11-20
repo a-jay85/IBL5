@@ -209,6 +209,27 @@ else
     fail reclaim_lying_mkdir_live_mutex_refused "rc=$rc pid=[$(cat "$L/pid" 2>/dev/null)]"
 fi
 
+# claim_reclaim_sites_adopted
+ad_missing=""
+while IFS='|' read -r ad_file ad_needle; do
+    [ -n "$ad_file" ] || continue
+    grep -qF -- "$ad_needle" "$ROOT/$ad_file" || ad_missing="$ad_missing [$ad_file: $ad_needle]"
+done <<'SITES'
+bin/automouse/run|claim_reclaim "$lock" pid _cost_lock_stale
+bin/automouse/run|claim_reclaim "$lock" pid _plan_lock_stale
+bin/mutation-diff|claim_reclaim "$LOCK_DIR" pid md_lock_stale
+bin/burndown-loop|claim_reclaim "$LOCK" pid bl_lock_stale
+bin/usage-gate-coordinator|claim_reclaim "$LOCK" at ugc_lock_stale
+bin/bug-pipeline-tick|claim_reclaim "$CI_AUTOFIX_LOCK" pid ci_lock_stale
+bin/lib/launchd-job.sh|claim_reclaim "$lock" pid ljob_slot_empty
+bin/lib/launchd-job.sh|claim_reclaim "$lock" pid ljob_slot_dead
+SITES
+if [ -z "$ad_missing" ]; then
+    ok claim_reclaim_sites_adopted
+else
+    fail claim_reclaim_sites_adopted "missing:$ad_missing"
+fi
+
 # claim_missing_parent_fails_closed
 cm_ok=1
 if claim_file "$T/nope/x"; then cm_ok=0; fi

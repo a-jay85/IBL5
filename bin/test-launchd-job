@@ -1186,6 +1186,28 @@ else
         "dead rc=$L6_DEAD_RC lock=$L6_DEAD_LOCK submits=$L6_DEAD_SUBMITS; live rc=$L6_LIVE_RC submits=$L6_LIVE_SUBMITS msg=$L6_LIVE_MSG; empty rc=$L6_EMPTY_RC submits=$L6_EMPTY_SUBMITS"
 fi
 
+# L6c: a dead holder's lock with a live reclaim mutex is not reclaimed; the launcher
+# counts a try and gives up at the cap.
+reset_slot
+sleep 0 & L6C_DEAD=$!
+wait "$L6C_DEAD" 2>/dev/null
+slot_plant_lock "$L6C_DEAD"
+mkdir -p "$SLOT_LOCK.reclaim.lock"
+printf '%s\n' "$$" > "$SLOT_LOCK.reclaim.lock/owner"
+export LJOB_LOCK_TRIES=3
+slot_claim com.ibl5.test-a-reclaim
+L6C_RC=$?
+unset LJOB_LOCK_TRIES
+L6C_SUBMITS="$(slot_lines "$SLOT/submits")"
+L6C_MSG=0; grep -qF "ERROR: slot lock busy" "$SLOT/err" && L6C_MSG=1
+L6C_PID="$(cat "$SLOT_LOCK/pid" 2>/dev/null || true)"
+rm -rf "$SLOT_LOCK.reclaim.lock"
+if [[ $L6C_RC -eq 1 && "$L6C_SUBMITS" == "0" && $L6C_MSG -eq 1 && "$L6C_PID" == "$L6C_DEAD" ]]; then
+    pass "L6c_stale_lock_reclaim_mutex_held"
+else
+    fail "L6c_stale_lock_reclaim_mutex_held" "rc=$L6C_RC submits=$L6C_SUBMITS msg=$L6C_MSG pid=$L6C_PID"
+fi
+
 # L5b: L5 again with the lying mkdir first on PATH; the pid file is the claim.
 reset_slot
 for i in 1 2; do

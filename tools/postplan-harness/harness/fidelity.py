@@ -18,7 +18,7 @@ import time
 
 from .state import HarnessError
 from . import llm_calls
-from . import fidelity_filefix
+from . import fidelity_filefix, rules_budget_carveout
 from . import schemas
 from . import hold_text
 from .classify import strip_runner_blocks
@@ -983,6 +983,11 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
            else f"inactive ({filefix.reason})"))
     filefix_note = (f"\n{fidelity_filefix.prompt_text(filefix.eligible)}\n"
                     if filefix.active else "")
+    # Budget-forced trims (ADR-0184 carve-out module): git and --print-caps decide, never
+    # the reviewer. Adds a fix hint to the fixer's copy of the finding; the verdict file,
+    # its severity tags and the keep-unplanned path are untouched.
+    work_list = rules_budget_carveout.annotate_work_list(
+        work_list, worktree, master_sha, skip=withheld)
 
     procedure = _find_procedure(worktree, master_sha, REMEDIATION_PATHS,
                                 "remediation-procedure-missing")

@@ -25,6 +25,25 @@
 #      bin/test-architect-contract-split --self-test  (also proves checker catches a deletion)
 #      bin/test-architect-contract-split --help       (usage)
 
+CONTRACT_CAP_BYTES=33792
+VERIFICATION_CAP_BYTES=21504
+# --print-caps [--ref=<rev>]: read-only. One TAB row per capped file:
+# path, "file", cap, bytes at <rev> (default HEAD), headroom.
+if [ "${1:-}" = "--print-caps" ]; then
+  _ref=HEAD
+  case "${2:-}" in --ref=?*) _ref="${2#--ref=}" ;; "") ;;
+    *) echo "test-architect-contract-split: --print-caps takes only --ref=<rev>" >&2; exit 2 ;; esac
+  _root="$(git rev-parse --show-toplevel)"
+  git -C "$_root" rev-parse --verify -q "${_ref}^{commit}" >/dev/null || { echo "unknown ref '$_ref'" >&2; exit 2; }
+  for _pair in ".claude/skills/plan/_architect-contract.md:$CONTRACT_CAP_BYTES" \
+               ".claude/review-shared/_plan-verification.md:$VERIFICATION_CAP_BYTES"; do
+    _p="${_pair%%:*}"; _c="${_pair##*:}"
+    _b=$(git -C "$_root" show "${_ref}:${_p}" | wc -c | tr -d '[:space:]')
+    printf '%s\tfile\t%s\t%s\t%s\n' "$_p" "$_c" "$_b" "$((_c - _b))"
+  done
+  exit 0
+fi
+
 set -uo pipefail
 
 # shellcheck source=bin/lib/harness.sh
@@ -825,7 +844,7 @@ else
     "$CONTRACT_RULES" \
     "$CONTRACT_DETAIL" \
     "architect-contract" \
-    33792 \
+    "$CONTRACT_CAP_BYTES" \
     true
 
   check_read_budget
@@ -853,7 +872,7 @@ else
     "$VERIFICATION_RULES" \
     "$VERIFICATION_DETAIL" \
     "plan-verification" \
-    21504 \
+    "$VERIFICATION_CAP_BYTES" \
     false
 
   # The checkers above pass silently; h_done needs one counted assertion.

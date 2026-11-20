@@ -4557,7 +4557,7 @@ assert_msg "nda-short-reason-violates" 1 'reason is under 15 characters' '' "$FM
 **No diff:** queue the plan
 '
 
-# Matrix row 13: marker parity. planfile.parse_phases and the bash gate must agree on
+# Matrix row 13: marker parity. harness.planfile.parse_phases and the bash gate must agree on
 # which phases carry an honoured marker, so a drift in either parser fails CI.
 _nda_py='import sys
 sys.path.insert(0, sys.argv[1])

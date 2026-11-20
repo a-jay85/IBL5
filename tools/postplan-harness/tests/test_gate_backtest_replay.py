@@ -147,6 +147,66 @@ def test_present_gate_exec_failure_still_errors(tmp_path):
     assert [r.outcome for r in results] == ["error"]
 
 
+def test_gate_added_mid_history_skips_older_trees_with_real_runner(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    late_sha = commit_file(repo, "bin/check-late", "#!/bin/sh\nexit 0\n", "chore: add late gate",
+                           mode=0o755)
+    late = GateChange("bin/check-late", "transitive", "replayable", ReplaySpec(argv=()), "")
+    results = run(repo, [shas[0], late_sha], tmp_path, gates=[late])
+    assert not [r for r in results if r.outcome == "error"]
+    assert [r.detail for r in results if r.outcome == "skipped"] == ["gate-absent"]
+    assert len([r for r in results if r.outcome != "skipped"]) == 1
+
+
+def slow_gate(seconds, seen):
+    def runner(argv, **kw):
+        seen.append(kw["timeout"])
+        if kw["timeout"] < seconds:
+            raise subprocess.TimeoutExpired(argv, kw["timeout"])
+        return 0, ""
+    return runner
+
+
+def test_spec_timeout_raises_replay_bound(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    seen = []
+    results = run(repo, shas[:1], tmp_path, gates=[gate(ReplaySpec(argv=(), timeout=180))],
+                  runner=slow_gate(90, seen))
+    assert not [r for r in results if r.outcome in ("timeout", "error")]
+    assert set(seen) == {180}
+
+
+def test_default_spec_keeps_per_replay_timeout(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    seen = []
+    results = run(repo, shas[:1], tmp_path, gates=[gate()], runner=slow_gate(90, seen))
+    assert [r.outcome for r in results] == ["timeout"]
+    assert results[0].detail == "60s"
+    assert set(seen) == {60}
+
+
+def test_run_timeout_above_spec_timeout_wins(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    seen = []
+    run(repo, shas[:1], tmp_path, gates=[gate(ReplaySpec(argv=(), timeout=180))],
+        per_replay_timeout=300, runner=slow_gate(90, seen))
+    assert set(seen) == {300}
+
+
+def test_spec_timeout_replay_that_still_times_out_reports_bound(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    seen = []
+
+    def runner(argv, **kw):
+        seen.append(kw["timeout"])
+        raise subprocess.TimeoutExpired(argv, kw["timeout"])
+
+    results = run(repo, shas[:1], tmp_path, gates=[gate(ReplaySpec(argv=(), timeout=180))],
+                  runner=runner)
+    assert [(r.outcome, r.detail) for r in results] == [("timeout", "180s")]
+    assert seen == [180, 180]
+
+
 def test_default_spec_keeps_devnull_even_with_body(tmp_path):
     repo, shas = build_repo(tmp_path)
     results = run(repo, shas[:2], tmp_path, gates=[gate(ReplaySpec(argv=()))], script=STDIN_GATE,

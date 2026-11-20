@@ -80,6 +80,32 @@ def test_held_row_is_reported(tmp_path):
     assert report.tree_suspect is False
 
 
+def test_suffixed_row_id_round_trips(tmp_path):
+    repo, plan = _repo(tmp_path)
+    lib = _stub(tmp_path, ONE_RECORD + '\nrun) echo "HELD row 12-neg — still exited 0"; exit 1 ;;')
+    report = run_executable_mutations(plan, repo, lib=lib)
+    assert [r.row for r in report.results] == ["12-neg"]
+    assert report.holding == ("row 12-neg HELD — still exited 0",)
+
+
+def test_malformed_row_id_falls_to_unavailable(tmp_path):
+    # Near-miss: "12.neg" carries a dot, which the row-id class rejects.
+    repo, plan = _repo(tmp_path)
+    lib = _stub(tmp_path, ONE_RECORD + '\nrun) echo "HELD row 12.neg — still exited 0"; exit 1 ;;')
+    report = run_executable_mutations(plan, repo, lib=lib)
+    assert report.results == ()
+    assert report.holding == ("executor-unavailable: run exited 1",)
+
+
+def test_digit_row_id_parses_to_int(tmp_path):
+    repo, plan = _repo(tmp_path)
+    lib = _stub(tmp_path, ONE_RECORD + '\nrun) echo "TRIPPED row 7 — ok"; exit 0 ;;')
+    report = run_executable_mutations(plan, repo, lib=lib)
+    assert [r.row for r in report.results] == [7]
+    assert isinstance(report.results[0].row, int)
+    assert report.holding == ()
+
+
 def test_revert_failed_marks_tree_suspect(tmp_path):
     repo, plan = _repo(tmp_path)
     lib = _stub(tmp_path, ONE_RECORD + '\nrun) echo "REVERT-FAILED row 1 — status changed"; exit 3 ;;')

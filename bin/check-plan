@@ -253,6 +253,7 @@
 #                              characters. The post-plan harness honors it nowhere
 #                              else (planfile.parse_phases), so a short reason or a
 #                              marker outside a phase is a silent no-op.
+#                              Also warns ([ND-advisory], never fails) when a phase heading opens with Measure, Capture, Baseline, Run, Snapshot or Stack and the phase carries no honoured marker.
 #   VR VR snapshots marker   — a `## Critical Files` entry that
 #                              cf_parse_section_raw classifies MUST_APPEAR and
 #                              whose path contains `-snapshots` must carry the
@@ -2190,10 +2191,49 @@ _nd_in_phase=0
 _nd_marker_re='^[[:space:]]*([-*][[:space:]]+)?\*\*No diff:\*\*'
 _nd_h2_re='^##[[:space:]]'
 _nd_phase_re='^##[[:space:]]+(Phase|Step)[[:space:]]*[0-9]+'
+# [ND-advisory] state: a phase heading that opens with a setup or measure verb and has no
+# honoured marker draws a warning. Mirrors planfile.py heading, bookkeeping and Out of Scope
+# rules; tests/parity block in bin/test-check-plan pin the two parsers together.
+_nda_head_re='^##[[:space:]]+(Phase|Step)[[:space:]]+([0-9]+)[[:space:]]*:[[:space:]]*(.*)$'
+_nda_verb_re='^(Measure|Capture|Baseline|Run|Snapshot|Stack)([[:space:]:]|$)'
+_nda_bk_re='\[phases:[[:space:]]*S([[:space:]]*/[[:space:]]*S)*[[:space:]]*\]'
+_nda_oos_head_re='^##[[:space:]]+[Oo][Uu][Tt][[:space:]]+[Oo][Ff][[:space:]]+[Ss][Cc][Oo][Pp][Ee]'
+_nda_oos_num_re='(^|[^[:alnum:]_])([Pp][Hh][Aa][Ss][Ee]|[Ss][Tt][Ee][Pp])[[:space:]]*([0-9]+)([^[:alnum:]_]|$)'
+_nda_kind=''
+_nda_num=''
+_nda_title=''
+_nda_cand=0
+_nda_marked=0
+_nda_in_oos=0
+_nda_oos=' '
+_nda_pending=''
+_nda_rest=''
+_nda_close() {
+    if [ "$_nda_cand" -eq 1 ] && [ "$_nda_marked" -eq 0 ]; then
+        _nda_pending="${_nda_pending}${_nda_kind}"$'\t'"${_nda_num}"$'\t'"${_nda_title}"$'\n'
+    fi
+    _nda_cand=0
+    _nda_marked=0
+}
 while IFS= read -r line; do
     if [[ "$line" =~ $_nd_h2_re ]]; then
+        _nda_close
+        if [[ "$line" =~ $_nda_oos_head_re ]]; then _nda_in_oos=1; else _nda_in_oos=0; fi
+        if [[ "$line" =~ $_nda_head_re ]]; then
+            _nda_kind="${BASH_REMATCH[1]}"
+            _nda_num="${BASH_REMATCH[2]}"
+            mtrim_v _nda_title "${BASH_REMATCH[3]}"
+            if [[ "$_nda_title" =~ $_nda_verb_re ]] && ! [[ "$line" =~ $_nda_bk_re ]]; then _nda_cand=1; fi
+        fi
         if [[ "$line" =~ $_nd_phase_re ]]; then _nd_in_phase=1; else _nd_in_phase=0; fi
         continue
+    fi
+    if [ "$_nda_in_oos" -eq 1 ]; then
+        _nda_rest="$line"
+        while [[ "$_nda_rest" =~ $_nda_oos_num_re ]]; do
+            _nda_oos="${_nda_oos}${BASH_REMATCH[3]} "
+            _nda_rest="${_nda_rest#*"${BASH_REMATCH[0]}"}"
+        done
     fi
     [[ "$line" =~ $_nd_marker_re ]] || continue
     if [ "$_nd_in_phase" -eq 0 ]; then
@@ -2205,8 +2245,15 @@ while IFS= read -r line; do
     # 15 mirrors NO_DIFF_MIN_REASON in tools/postplan-harness/harness/planfile.py
     if [ "${#_nd_reason}" -lt 15 ]; then
         viol "[ND] **No diff:** reason is under 15 characters — say what the phase delivers instead of a diff (issue closed, plan queued, post-merge step): ${line}"
+    else _nda_marked=1  # honoured: mirrors NO_DIFF_MIN_REASON
     fi
 done < "$GATEP_BODY"
+_nda_close
+while IFS=$'\t' read -r _k _n _t; do
+    [ -n "$_k" ] || continue
+    case "$_nda_oos" in *" ${_n} "*) continue ;; esac
+    warn "[ND-advisory] ${_k} ${_n} (${_t}): if this phase edits no file, add the line **No diff:** <reason of 15+ chars> under its heading. Post-plan holds the PR when a phase cites repo files that the diff never touches."
+done <<< "$_nda_pending"
 
 # ---------------------------------------------------------------------------
 # Gate G: a matrix row naming a bin/test-* / bin/check-* script must name one CI

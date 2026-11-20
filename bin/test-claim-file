@@ -8,6 +8,12 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 T=$(mktemp -d)
 trap 'rm -rf "$T"' EXIT
+# The adopted-sites check below names usage-gated entry points (bin/automouse/run,
+# bin/burndown-loop, ...), so the usage-isolation scan in bin/test-harness-lib
+# requires this file to isolate the usage gate.
+# shellcheck source=lib/usage-test-isolation.sh
+. "$ROOT/bin/lib/usage-test-isolation.sh"
+usage_test_isolate "$T/usage"
 
 FAILED=0
 ok() { printf 'ok %s\n' "$1"; }
@@ -50,6 +56,184 @@ if claim_file "$T/d"; then
     fail claim_dir_counts_held "claimed over a directory"
 else
     ok claim_dir_counts_held
+fi
+
+# ---- two-racer stale-reclaim harness (backlog#1855) ----
+# Each racer is a real bash process, so $$ is its own pid. Barrier: both racers judge
+# the lock stale, then B waits for A to finish re-taking it before B acts. On the old
+# inline pattern B's rm -rf deletes A's fresh lock and B claims too: two owners.
+export CLAIM_LIB="$ROOT/bin/lib/claim-file.sh"
+cat > "$T/racer.sh" <<'RACER'
+#!/usr/bin/env bash
+# racer.sh <inline|helper> <A|B> <lockdir> <syncdir>
+set -u
+. "$CLAIM_LIB"
+mode=$1 id=$2 L=$3 S=$4
+pid_dead() { local p; p=$(cat "$1/pid" 2>/dev/null) || p=""; [ -n "$p" ] && ! kill -0 "$p" 2>/dev/null; }
+wait_for() {
+    local i=0
+    while [ ! -e "$1" ]; do
+        i=$((i + 1))
+        if [ "$i" -gt 200 ]; then echo timeout > "$S/result.$id"; : > "$S/done.$id"; exit 2; fi
+        sleep 0.05
+    done
+}
+if ! pid_dead "$L"; then echo held > "$S/result.$id"; : > "$S/done.$id"; exit 1; fi
+: > "$S/judged.$id"
+wait_for "$S/judged.A"
+wait_for "$S/judged.B"
+[ "$id" = B ] && wait_for "$S/done.A"
+if [ "$mode" = inline ]; then
+    rm -rf "$L"
+    if mkdir "$L" 2>/dev/null && claim_file "$L/pid" printf '%s\n' "$$"; then r=won; else r=lost; fi
+else
+    if claim_reclaim "$L" pid pid_dead printf '%s\n' "$$"; then r=won; else r=lost; fi
+fi
+echo "$r" > "$S/result.$id"
+: > "$S/done.$id"
+i=0; while [ ! -e "$S/release" ] && [ "$i" -lt 200 ]; do i=$((i + 1)); sleep 0.05; done
+RACER
+
+# race_reclaim <inline|helper>: seed a lock owned by a dead pid, run racers A and B
+# through the barrier, print "<wins> <1 when the pid file names racer A, else 0>".
+race_reclaim() {
+    local mode=$1 R="$T/race-$1" L dead a_pid b_pid wins i=0 owner_a=0
+    L="$R/lock"
+    mkdir -p "$R/sync"
+    sh -c 'exit 0' & dead=$!
+    wait "$dead" 2>/dev/null || true
+    mkdir "$L" && printf '%s\n' "$dead" > "$L/pid"
+    bash "$T/racer.sh" "$mode" A "$L" "$R/sync" & a_pid=$!
+    bash "$T/racer.sh" "$mode" B "$L" "$R/sync" & b_pid=$!
+    while { [ ! -e "$R/sync/done.A" ] || [ ! -e "$R/sync/done.B" ]; } && [ "$i" -lt 300 ]; do
+        i=$((i + 1)); sleep 0.05
+    done
+    wins=$(cat "$R/sync/result.A" "$R/sync/result.B" 2>/dev/null | grep -c '^won$') || wins=0
+    [ "$(cat "$L/pid" 2>/dev/null)" = "$a_pid" ] && owner_a=1
+    : > "$R/sync/release"
+    wait "$a_pid" "$b_pid" 2>/dev/null
+    printf '%s %s\n' "$wins" "$owner_a"
+}
+
+# reclaim_race_inline_double_owner: the barrier reproduces the bug on the old shape.
+rr_inline=$(race_reclaim inline)
+if [ "${rr_inline%% *}" = 2 ]; then
+    ok reclaim_race_inline_double_owner
+else
+    fail reclaim_race_inline_double_owner "wins/ownerA=[$rr_inline], expected 2 winners"
+fi
+
+t_pid_dead() { local p; p=$(cat "$1/pid" 2>/dev/null) || p=""; [ -n "$p" ] && ! kill -0 "$p" 2>/dev/null; }
+# dead_pid: print the pid of a process that has already exited.
+dead_pid() { local d; sh -c 'exit 0' & d=$!; wait "$d" 2>/dev/null || true; printf '%s\n' "$d"; }
+
+# reclaim_helper_race_one_owner: same barrier, claim_reclaim yields one winner (racer A).
+rr_helper=$(race_reclaim helper)
+if [ "$rr_helper" = "1 1" ]; then
+    ok reclaim_helper_race_one_owner
+else
+    fail reclaim_helper_race_one_owner "wins/ownerA=[$rr_helper], expected [1 1]"
+fi
+
+# reclaim_absent_lock_claims
+L="$T/rc-absent"
+if claim_reclaim "$L" pid t_pid_dead printf '%s\n' "$$" \
+    && [ "$(cat "$L/pid" 2>/dev/null)" = "$$" ] && [ ! -e "$L.reclaim.lock" ]; then
+    ok reclaim_absent_lock_claims
+else
+    fail reclaim_absent_lock_claims "pid=[$(cat "$L/pid" 2>/dev/null)] mutex=$([ -e "$L.reclaim.lock" ] && echo present || echo absent)"
+fi
+
+# reclaim_live_lock_refused
+L="$T/rc-live"
+mkdir "$L" && printf '%s\n' "$$" > "$L/pid"
+claim_reclaim "$L" pid t_pid_dead printf '%s\n' "$$"; rc=$?
+if [ "$rc" = 1 ] && [ "$(cat "$L/pid" 2>/dev/null)" = "$$" ] && [ ! -e "$L.reclaim.lock" ]; then
+    ok reclaim_live_lock_refused
+else
+    fail reclaim_live_lock_refused "rc=$rc pid=[$(cat "$L/pid" 2>/dev/null)]"
+fi
+
+# reclaim_live_mutex_refused
+L="$T/rc-livemutex"
+dp=$(dead_pid)
+mkdir "$L" && printf '%s\n' "$dp" > "$L/pid"
+mkdir "$L.reclaim.lock" && printf '%s\n' "$$" > "$L.reclaim.lock/owner"
+claim_reclaim "$L" pid t_pid_dead printf '%s\n' "$$"; rc=$?
+if [ "$rc" = 1 ] && [ "$(cat "$L/pid" 2>/dev/null)" = "$dp" ] \
+    && [ "$(cat "$L.reclaim.lock/owner" 2>/dev/null)" = "$$" ]; then
+    ok reclaim_live_mutex_refused
+else
+    fail reclaim_live_mutex_refused "rc=$rc pid=[$(cat "$L/pid" 2>/dev/null)] owner=[$(cat "$L.reclaim.lock/owner" 2>/dev/null)]"
+fi
+
+# reclaim_dead_mutex_reaped
+L="$T/rc-deadmutex"
+dp=$(dead_pid)
+dp2=$(dead_pid)
+mkdir "$L" && printf '%s\n' "$dp" > "$L/pid"
+mkdir "$L.reclaim.lock" && printf '%s\n' "$dp2" > "$L.reclaim.lock/owner"
+claim_reclaim "$L" pid t_pid_dead printf '%s\n' "$$"; rc=$?
+if [ "$rc" = 0 ] && [ "$(cat "$L/pid" 2>/dev/null)" = "$$" ] && [ ! -e "$L.reclaim.lock" ]; then
+    ok reclaim_dead_mutex_reaped
+else
+    fail reclaim_dead_mutex_reaped "rc=$rc pid=[$(cat "$L/pid" 2>/dev/null)]"
+fi
+
+# reclaim_old_mutex_reaped
+L="$T/rc-oldmutex"
+dp=$(dead_pid)
+mkdir "$L" && printf '%s\n' "$dp" > "$L/pid"
+mkdir "$L.reclaim.lock" && printf '%s\n' "$$" > "$L.reclaim.lock/owner"
+touch -t 202001010000 "$L.reclaim.lock"
+claim_reclaim "$L" pid t_pid_dead printf '%s\n' "$$"; rc=$?
+if [ "$rc" = 0 ] && [ ! -e "$L.reclaim.lock" ]; then
+    ok reclaim_old_mutex_reaped
+else
+    fail reclaim_old_mutex_reaped "rc=$rc mutex=$([ -e "$L.reclaim.lock" ] && echo present || echo absent)"
+fi
+
+# reclaim_claim_cmd_content
+L="$T/rc-content"
+claim_reclaim "$L" at t_pid_dead printf '%s\n' 123; rc=$?
+if [ "$rc" = 0 ] && [ "$(cat "$L/at" 2>/dev/null)" = 123 ] && [ ! -e "$L/pid" ]; then
+    ok reclaim_claim_cmd_content
+else
+    fail reclaim_claim_cmd_content "rc=$rc at=[$(cat "$L/at" 2>/dev/null)]"
+fi
+
+# reclaim_lying_mkdir_live_mutex_refused
+L="$T/rc-lying"
+dp=$(dead_pid)
+claim_file_lying_mkdir_stub "$T/lm"
+mkdir "$L" && printf '%s\n' "$dp" > "$L/pid"
+mkdir "$L.reclaim.lock" && printf '%s\n' "$$" > "$L.reclaim.lock/owner"
+( PATH="$T/lm:$PATH"; claim_reclaim "$L" pid t_pid_dead printf '%s\n' "$$" ); rc=$?
+if [ "$rc" = 1 ] && [ "$(cat "$L/pid" 2>/dev/null)" = "$dp" ]; then
+    ok reclaim_lying_mkdir_live_mutex_refused
+else
+    fail reclaim_lying_mkdir_live_mutex_refused "rc=$rc pid=[$(cat "$L/pid" 2>/dev/null)]"
+fi
+
+# claim_reclaim_sites_adopted
+ad_missing=""
+while IFS='|' read -r ad_file ad_needle; do
+    [ -n "$ad_file" ] || continue
+    grep -qF -- "$ad_needle" "$ROOT/$ad_file" || ad_missing="$ad_missing [$ad_file: $ad_needle]"
+done <<'SITES'
+bin/automouse/run|claim_reclaim "$lock" pid _cost_lock_stale
+bin/automouse/run|claim_reclaim "$lock" pid _plan_lock_stale
+bin/mutation-diff|claim_reclaim "$LOCK_DIR" pid md_lock_stale
+bin/burndown-loop|claim_reclaim "$LOCK" pid bl_lock_stale
+bin/usage-gate-coordinator|claim_reclaim "$LOCK" at ugc_lock_stale
+bin/bug-pipeline-tick|claim_reclaim "$CI_AUTOFIX_LOCK" pid ci_lock_stale
+bin/lib/launchd-job.sh|claim_reclaim "$lock" pid ljob_slot_empty
+bin/lib/launchd-job.sh|claim_reclaim "$lock" pid ljob_slot_dead
+SITES
+if [ -z "$ad_missing" ]; then
+    ok claim_reclaim_sites_adopted
+else
+    fail claim_reclaim_sites_adopted "missing:$ad_missing"
 fi
 
 # claim_missing_parent_fails_closed

@@ -186,6 +186,9 @@ if ! state="$(docker inspect -f '{{.State.Running}}' ibl5-mariadb 2>&1)" || [ "$
     exit 3
 fi
 
+# md_lock_stale <lockdir>: rc 0 when the lock's pid file names a dead process.
+md_lock_stale() { local p; p=$(cat "$1/pid" 2>/dev/null) || p=""; [ -n "$p" ] && ! kill -0 "$p" 2>/dev/null; }
+
 LOCK_DIR="${MUTATION_DIFF_LOCK_DIR:-/tmp/ibl5-mutation-diff.lock}"
 LOCK_HELD=0
 trap 'if [ -n "${INFECTION_LOG:-}" ]; then rm -f "$INFECTION_LOG"; fi; if [ "${LOCK_HELD:-0}" = 1 ]; then rm -rf "$LOCK_DIR"; fi' EXIT
@@ -205,8 +208,7 @@ else
         exit 4
     fi
     echo "Notice: reclaiming stale lock $LOCK_DIR (pid $pid is not running)."
-    rm -rf "$LOCK_DIR"
-    if ! { mkdir "$LOCK_DIR" 2>/dev/null && claim_file "$LOCK_DIR/pid" printf '%s\n' "$$"; }; then
+    if ! claim_reclaim "$LOCK_DIR" pid md_lock_stale printf '%s\n' "$$"; then
         echo "Error: could not take $LOCK_DIR after reclaiming it." >&2
         exit 4
     fi

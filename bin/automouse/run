@@ -1002,32 +1002,37 @@ model_tier() {
     esac
 }
 
+# _cost_lock_stale <lock>: rc 0 when the cost-report lock's owner pid is dead or the
+# lock dir is older than 60 s. acquire_cost_lock judges with it, and claim_reclaim
+# re-judges with it under the reclaim mutex.
+_cost_lock_stale() {
+    local owner now lock_epoch
+    owner=$(cat "$1/pid" 2>/dev/null) || owner=""
+    now=$(date +%s)
+    lock_epoch=$(stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || echo "$now")  # cost-lock age
+    { [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; } || [ "$(( now - lock_epoch ))" -gt 60 ]
+}
+
 # Acquire an exclusive mutex for the cost-report RMW sequence. Mirrors the
 # claim_next_plan() pattern: mkdir "$lock" is atomic; PID written to "$lock/pid".
 # Stale detection: dead PID (kill -0 fails) OR age > cost_lock_ttl seconds.
-# Steal via rm -rf + re-mkdir, log the steal. Spins up to max_attempts times
+# Steal via claim_reclaim (bin/lib/claim-file.sh), log the steal. Spins up to max_attempts times
 # (0.2s each); on exhaustion returns 1 and logs a warning so the caller can
 # proceed unguarded rather than drop the row.
 acquire_cost_lock() {
     local lock="$NIGHTLY_DIR/reports/.cost-report.lock"
-    local cost_lock_ttl=60
-    local owner now lock_epoch attempt=0 max_attempts=10
+    local owner attempt=0 max_attempts=10
     mkdir -p "$(dirname "$lock")"
     while [ "$attempt" -lt "$max_attempts" ]; do
         if mkdir "$lock" 2>/dev/null && claim_file "$lock/pid" printf '%s\n' "$$"; then
             return 0
         fi
         owner=$(cat "$lock/pid" 2>/dev/null) || owner=""
-        now=$(date +%s)
-        lock_epoch=$(stat -c %Y "$lock" 2>/dev/null || stat -f %m "$lock" 2>/dev/null || echo "$now")  # cost-lock age
-        if { [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; } \
-           || [ "$(( now - lock_epoch ))" -gt "$cost_lock_ttl" ]; then
-            rm -rf "$lock" 2>/dev/null || true
-            if mkdir "$lock" 2>/dev/null && claim_file "$lock/pid" printf '%s\n' "$$"; then
-                printf '[%s] cost-report: stole stale lock (dead/expired owner=%s)\n' \
-                    "$(date +%H:%M:%S)" "${owner:-?}" >> "$LOG"
-                return 0
-            fi
+        if _cost_lock_stale "$lock" \
+           && claim_reclaim "$lock" pid _cost_lock_stale printf '%s\n' "$$"; then
+            printf '[%s] cost-report: stole stale lock (dead/expired owner=%s)\n' \
+                "$(date +%H:%M:%S)" "${owner:-?}" >> "$LOG"
+            return 0
         fi
         attempt=$(( attempt + 1 ))
         sleep 0.2
@@ -2483,10 +2488,9 @@ claim_next_plan() {
                 rm -rf "$lock" 2>/dev/null || true
                 continue
             fi
-            rm -rf "$lock" 2>/dev/null || true
-            # Re-create atomically; the loser of a two-stealer race fails mkdir
-            # here and simply falls through to the next plan.
-            if mkdir "$lock" 2>/dev/null && claim_file "$lock/pid" printf '%s\n' "$$"; then
+            # Reclaim under the <lock>.reclaim.lock mutex. _plan_lock_stale re-judges
+            # there, so a second stealer sees this runner's fresh pid and falls through.
+            if claim_reclaim "$lock" pid _plan_lock_stale printf '%s\n' "$$"; then
                 printf '[%s] stole stale lock for %s (dead/expired owner=%s)\n' \
                     "$(date +%H:%M:%S)" "$plan_name" "${owner:-?}" >> "$LOG"
                 printf '%s\n' "$plan"
@@ -2496,6 +2500,19 @@ claim_next_plan() {
         # Live lock held by a sibling — skip to the next-oldest plan.
     done < <(queue_entries_ordered)
     return 1
+}
+
+# _plan_lock_stale <lock>: rc 0 when a queue plan lock may be stolen: its owner pid is
+# dead or it is older than LOCK_TTL_SECS, and no live usage-gate pause holds it.
+# claim_reclaim re-runs it under the reclaim mutex, so the paused-held check is repeated.
+_plan_lock_stale() {
+    local owner now lock_epoch held
+    held=$(cat "$1/paused-held" 2>/dev/null) || held=""
+    if [ -n "$held" ] && usage_paused_hold_live "$held" "$LOCK_TTL_SECS"; then return 1; fi
+    owner=$(cat "$1/pid" 2>/dev/null) || owner=""
+    now=$(date +%s)
+    lock_epoch=$(stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || echo "$now")
+    { [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; } || [ "$(( now - lock_epoch ))" -gt "$LOCK_TTL_SECS" ]
 }
 
 # One log per runner process ($$). phase_env_error, phase_stalled, and

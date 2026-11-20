@@ -1,6 +1,6 @@
 ---
 description: Shell portability gotchas for bin/ scripts and skill inline bash — BSD vs GNU date and stat, SSH single-line commands, heredoc JSON, isolated bash blocks in skills, shellcheck only the scripts you changed.
-last_verified: 2026-11-13
+last_verified: 2026-11-20
 paths:
   - "bin/**"
   - ".claude/skills/**/*.md"
@@ -42,6 +42,7 @@ uutils mkdir, the default on Ubuntu 26.04, can report success to both of two rac
 
 - Take a lock with `mkdir "$d" 2>/dev/null && claim_file "$d/pid" printf '%s\n' "$$"`.
 - Remove a lock dir with `rm -rf`. `rmdir` fails once the dir holds a claim file.
+- Reclaim a stale lock with `claim_reclaim <lockdir> <claim-name> <stale-fn> [cmd...]` from the same file. Never run `rm -rf` and a fresh `mkdir` inline. Two runners can both judge one dead lock stale, and the second `rm -rf` then deletes the first runner's fresh lock. The helper takes the sibling mutex `<lockdir>.reclaim.lock`, runs `<stale-fn> <lockdir>` again under it, and only then removes and re-takes the lock. Each site passes its own predicate and claim file name. `bin/test-claim-file` case `reclaim_helper_race_one_owner` runs two real racers through a barrier.
 - A launchd job string cannot source a repo file, so `ljob_submit_wrapper_text` claims its marker inline with `(set -C; : > "$marker")`.
 - Test a lock with `claim_file_lying_mkdir_stub`, which writes a `mkdir` that always exits 0. Put its dir first on PATH.
 

@@ -647,6 +647,41 @@ else
 fi
 rm -rf "$_cl_lock"
 
+# ── ci_lock_acquire: a stale lock is reclaimed under the sibling mutex ─────────────────
+# An aged lock dir with a dead pid. A live mutex (owner = this shell) refuses the reclaim and
+# leaves the pid alone; with no mutex the reclaim re-takes the lock and drops the mutex dir.
+_sr_lock="$STUB/stale-ci.lock"
+sleep 0 & _sr_dead=$!
+wait "$_sr_dead" 2>/dev/null
+_sr_plant() {
+    rm -rf "$_sr_lock" "$_sr_lock.reclaim.lock"
+    mkdir -p "$_sr_lock" && printf '%s\n' "$_sr_dead" > "$_sr_lock/pid"
+    touch -t 202001010000 "$_sr_lock"
+}
+_sr_acquire() {
+    BUG_PIPELINE_CI_AUTOFIX_LOCK="$_sr_lock" \
+        bash -c 'cd "$(dirname "$1")" && source "$1" && ci_lock_acquire' bpt-lock-shim "$BPT_DRIVER" 2>&1
+}
+_sr_plant
+mkdir "$_sr_lock.reclaim.lock" && printf '%s\n' "$$" > "$_sr_lock.reclaim.lock/owner"
+_sr_rc=0
+_sr_out="$(_sr_acquire)" || _sr_rc=$?
+if [ "$_sr_rc" = 1 ] && [ "$(cat "$_sr_lock/pid" 2>/dev/null)" = "$_sr_dead" ]; then
+    bpt_named_ok ci_lock_stale_reclaim_mutex_held
+else
+    bpt_named_fail ci_lock_stale_reclaim_mutex_held "rc=$_sr_rc out=$_sr_out pid=$(cat "$_sr_lock/pid" 2>/dev/null)"
+fi
+_sr_plant
+_sr_rc=0
+_sr_out="$(_sr_acquire)" || _sr_rc=$?
+_sr_pid="$(cat "$_sr_lock/pid" 2>/dev/null)"
+if [ "$_sr_rc" = 0 ] && [ -n "$_sr_pid" ] && [ "$_sr_pid" != "$_sr_dead" ] && [ ! -e "$_sr_lock.reclaim.lock" ]; then
+    bpt_named_ok ci_lock_stale_reclaimed
+else
+    bpt_named_fail ci_lock_stale_reclaimed "rc=$_sr_rc out=$_sr_out pid=$_sr_pid mutex=$([ -e "$_sr_lock.reclaim.lock" ] && echo present || echo absent)"
+fi
+rm -rf "$_sr_lock" "$_sr_lock.reclaim.lock"
+
 # ── Close notices (Phase 4): poll the public repo, claim in the DB, post once ──────────
 # The gh stub applies the driver's real --jq to a fixture that carries a hostile title and a
 # hostile comment, so a leak of either into a posted body is a real failure of the filter.

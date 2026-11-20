@@ -567,6 +567,44 @@ test_lock_stale_reclaimed() {
     assert_no_file lock_stale:released "$STATE/lock"
 }
 
+# A stale lock whose sibling reclaim mutex is held by a live reclaimer is not taken: the loop
+# exits 4 and the dead pid stays in the lock.
+test_lock_stale_reclaim_mutex_held() {
+    local ok=1
+    new_env
+    seed_usage 0 1
+    mkdir -p "$STATE/lock" "$STATE/lock.reclaim.lock"
+    echo 999999 > "$STATE/lock/pid"
+    echo "$$" > "$STATE/lock.reclaim.lock/owner"
+    run_loop run --once
+    [ "$RC" = 4 ] || ok=0
+    case "$OUT" in *"burndown-loop: already running"*) ;; *) ok=0 ;; esac
+    [ "$(cat "$STATE/lock/pid" 2>/dev/null)" = 999999 ] || ok=0
+    [ ! -e "$T/claude.calls" ] || ok=0
+    if [ "$ok" = 1 ]; then
+        named_ok bl_stale_reclaim_mutex_held
+    else
+        named_fail bl_stale_reclaim_mutex_held "rc=$RC out=$OUT pid=$(cat "$STATE/lock/pid" 2>/dev/null)"
+    fi
+}
+
+# A stale lock with no mutex is reclaimed: the loop gets past the lock and leaves no mutex dir.
+test_lock_stale_reclaim_clean() {
+    local ok=1
+    new_env
+    seed_usage 50 160
+    mkdir -p "$STATE/lock"
+    echo 999999 > "$STATE/lock/pid"
+    run_loop run --once
+    [ "$RC" != 4 ] || ok=0
+    [ ! -e "$STATE/lock.reclaim.lock" ] || ok=0
+    if [ "$ok" = 1 ]; then
+        named_ok bl_stale_lock_reclaimed
+    else
+        named_fail bl_stale_lock_reclaimed "rc=$RC out=$OUT"
+    fi
+}
+
 # ---------------------------------------------------------------- batches
 
 test_batch_ran_then_exhausted() {

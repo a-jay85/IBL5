@@ -1525,6 +1525,38 @@ test_coord_tick_busy() {
     assert_contains coord_busy:log "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" "tick-busy"
 }
 
+# A stale tick lock whose sibling reclaim mutex is held by a live reclaimer is not taken: the
+# tick logs tick-busy and the lock's at stamp is untouched.
+test_coord_stale_reclaim_mutex_held() {
+    local lk old
+    coord_setup 50
+    lk="$IBL5_USAGE_GATE_STATE_DIR/coordinator.lock.d"
+    coord_marker $SID_A plan-now
+    old=$(( $(date +%s) - 1000 ))
+    mkdir "$lk" "$lk.reclaim.lock"
+    printf '%s\n' "$old" > "$lk/at"
+    printf '%s\n' "$$" > "$lk.reclaim.lock/owner"
+    run_coord --once >/dev/null 2>&1
+    sleep 0.3
+    row_result coord_stale_reclaim_mutex_held:log 1 "$(grep -c 'tick-busy' "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")"
+    row_result coord_stale_reclaim_mutex_held:at-unchanged "$old" "$(cat "$lk/at" 2>/dev/null)"
+}
+
+# A stale tick lock with no mutex is reclaimed: no tick-busy line and no mutex dir remains.
+test_coord_stale_reclaimed() {
+    local lk log=""
+    coord_setup 50
+    lk="$IBL5_USAGE_GATE_STATE_DIR/coordinator.lock.d"
+    coord_marker $SID_A plan-now
+    mkdir "$lk"
+    printf '%s\n' "$(( $(date +%s) - 1000 ))" > "$lk/at"
+    run_coord --once >/dev/null 2>&1
+    sleep 0.3
+    [ -f "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log" ] && log=$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")
+    row_result coord_stale_reclaimed:no-busy 0 "$(printf '%s\n' "$log" | grep -c 'tick-busy')"
+    assert_no_file coord_stale_reclaimed:no-mutex "$lk.reclaim.lock"
+}
+
 # icebox_seed <nightly-dir>: one iced plan, an empty queue.
 icebox_seed() {
     mkdir -p "$1/icebox" "$1/queue" "$T/plans"

@@ -1411,6 +1411,14 @@ ci_log() {
     printf '[%s] ci-autofix: %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$*" >> "$CI_AUTOFIX_LOG" 2>/dev/null || true
 }
 
+# ci_lock_stale <lockdir>: rc 0 when the lock dir is older than CI_AUTOFIX_TIMEOUT_SECS.
+ci_lock_stale() {
+    local m n
+    m="$(stat -c '%Y' "$1" 2>/dev/null || stat -f '%m' "$1" 2>/dev/null || echo 0)"
+    n="$(date +%s)"
+    [ $(( n - m )) -gt "$CI_AUTOFIX_TIMEOUT_SECS" ]
+}
+
 # ci_lock_acquire — mkdir-based single-flight lock; returns 0 on success, 1 if held.
 # Cleans stale locks (older than CI_AUTOFIX_TIMEOUT_SECS) before retrying.
 ci_lock_acquire() {
@@ -1422,7 +1430,9 @@ ci_lock_acquire() {
         now="$(date +%s)"
         if [ $(( now - lock_mtime )) -gt "$CI_AUTOFIX_TIMEOUT_SECS" ]; then
             ci_log "ci_lock_acquire: stale lock (age $(( now - lock_mtime ))s) — cleaning"
-            rm -rf "$CI_AUTOFIX_LOCK" 2>/dev/null || true
+            if claim_reclaim "$CI_AUTOFIX_LOCK" pid ci_lock_stale printf '%s\n' "$$"; then return 0; fi
+            ci_log "ci_lock_acquire: race — lock acquired by concurrent tick"
+            return 1
         else
             ci_log "ci_lock_acquire: lock held — skipping tick"
             return 1

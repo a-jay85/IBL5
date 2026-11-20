@@ -161,9 +161,14 @@ ljob_count_live() {
 . "$(dirname "${BASH_SOURCE[0]}")/claim-file.sh"
 ljob_lock_dir() { printf '%s\n' "${LJOB_LOCK_DIR:-$HOME/Library/Caches/com.ibl5.ljob-locks}"; }
 
+# ljob_slot_dead <lock>: rc 0 when the pid file names a dead holder.
+ljob_slot_dead() { local h; h="$(cat "$1/pid" 2>/dev/null || true)"; [[ -n "$h" ]] && ! kill -0 "$h" 2>/dev/null; }
+# ljob_slot_empty <lock>: rc 0 when the lock dir exists with an empty or missing pid file.
+ljob_slot_empty() { [[ -d "$1" && -z "$(cat "$1/pid" 2>/dev/null || true)" ]]; }
+
 # ljob_slot_lock <label_prefix>: per-prefix lock dir whose O_EXCL pid file is the claim.
-# A lock whose holder is dead is broken, after re-reading the pid file so a lock
-# taken over in between survives. A pid file still empty after 5 tries means the
+# A lock whose holder is dead is reclaimed with claim_reclaim, which re-reads the pid
+# file under its mutex so a lock taken over in between survives. A pid file still empty after 5 tries means the
 # holder died between its mkdir and its write. The pid write is exclusive, so a
 # stalled holder that wakes after that break cannot share the lock. LJOB_LOCK_TRIES caps the retries
 # (unset or empty = unbounded) and a capped run returns 1.
@@ -183,15 +188,14 @@ ljob_slot_lock() {
         if [[ -z "$holder" ]]; then
             empties=$((empties + 1))
             if [[ $empties -ge 5 ]]; then
-                rm -rf "$lock"
+                claim_reclaim "$lock" pid ljob_slot_empty printf '%s\n' "$$" && return 0
                 empties=0
                 continue
             fi
         elif ! kill -0 "$holder" 2>/dev/null; then
-            if [[ "$(cat "$lock/pid" 2>/dev/null || true)" == "$holder" ]]; then
-                rm -rf "$lock"
-            fi
-            continue
+            # claim_reclaim re-reads the pid under the reclaim mutex, so a lock taken
+            # over in between survives. A refused reclaim counts a try and sleeps below.
+            claim_reclaim "$lock" pid ljob_slot_dead printf '%s\n' "$$" && return 0
         else
             empties=0
         fi

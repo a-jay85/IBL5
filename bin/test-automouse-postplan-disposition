@@ -60,7 +60,7 @@ for fn in automouse_pr_state automouse_branch_for_plan dispose_plan_done dispose
           postplan_cap_timeout should_hold_postplan_disposal notify_postplan_hold \
           postplan_newest_verdict postplan_no_worktree_dispose_if_merged claim_next_plan \
           dispose_resumed_postplan_lock postplan_budget postplan_release_label_after_cap \
-          parse_judge_verdict plan_requires_judge; do
+          parse_judge_verdict plan_requires_judge _plan_lock_stale; do
     FN_SRC="$(extract_fn "$fn")"
     if [ -z "$FN_SRC" ]; then
         echo "FAIL: could not extract $fn from $RUNNER"
@@ -486,7 +486,9 @@ c2_case c2e-handoff-merged-terminal 0 p.md MERGED
 rm -rf "$C2D"
 
 # c3: guard contains lock release and continue
+C3_UNGUARDED=$(grep -F 'rm -rf "$CURRENT_LOCK"' "$RUNNER" | grep -vcF '2>/dev/null || true')
 if grep -qF 'rm -rf "$CURRENT_LOCK" 2>/dev/null || true' "$RUNNER" \
+   && [ "$C3_UNGUARDED" = 0 ] \
    && grep -qF 'CURRENT_LOCK=""' "$RUNNER" \
    && grep -qF 'continue' "$RUNNER"; then
     echo "ok: c3-lock-release-and-continue"

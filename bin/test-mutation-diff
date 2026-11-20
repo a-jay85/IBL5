@@ -269,8 +269,26 @@ mkdir -p "$LOCK_DIR_UNDER_TEST"
 echo "$DEAD_PID" >"$LOCK_DIR_UNDER_TEST/pid"
 run_md base
 h_eq "stale lock is reclaimed: exit" 0 "$RC"
-h_contains "stale lock is reclaimed" "$OUT$ERR" "reclaiming stale lock"
+h_contains "dead-pid lock prints the reclaim notice" "$OUT$ERR" "reclaiming stale lock"
 h_absent "stale lock is reclaimed: lock dir gone" "$LOCK_DIR_UNDER_TEST"
+h_absent "dead-pid lock reclaim leaves no mutex dir" "$LOCK_DIR_UNDER_TEST.reclaim.lock"
+
+# 11b a live reclaim already holds the sibling mutex: the run refuses with exit 4 and leaves
+# the stale lock's pid alone instead of deleting it under the other reclaimer.
+make_repo
+modify_class
+sh -c 'exit 0' &
+DEAD_PID=$!
+wait "$DEAD_PID" 2>/dev/null || true
+mkdir -p "$LOCK_DIR_UNDER_TEST"
+echo "$DEAD_PID" >"$LOCK_DIR_UNDER_TEST/pid"
+mkdir "$LOCK_DIR_UNDER_TEST.reclaim.lock"
+echo "$$" >"$LOCK_DIR_UNDER_TEST.reclaim.lock/owner"
+run_md base
+h_eq "stale_lock_reclaim_mutex_held: exit" 4 "$RC"
+h_contains "stale_lock_reclaim_mutex_held: error" "$OUT$ERR" "could not take"
+h_eq "stale_lock_reclaim_mutex_held: pid kept" "$DEAD_PID" "$(cat "$LOCK_DIR_UNDER_TEST/pid" 2>/dev/null)"
+rm -rf "$LOCK_DIR_UNDER_TEST.reclaim.lock"
 
 # 12
 make_repo

@@ -307,14 +307,17 @@ PLAN_ROW_FETCH_SEG_RE='(^|[[:space:]|;&`!('"'"'"])curl[[:space:]]|(^|\$\(|<\(|>\
 # _FS_PRE[i] is the text before its arguments (ending with the command word)
 # and _FS_SEG[i] holds the arguments. A curl segment ends at the next | ; & )
 # < > or backtick. PHP code and bun scripts hold ; and ), so a php, bun or
-# bunx segment ends only at an unquoted && || ; or | (see _unquoted_end).
+# bunx segment ends at an unquoted && || ; or |, or at the unquoted ) that
+# closes an enclosing substitution or group (see _unquoted_end).
 # _FS_CURL[i] is 1 for curl.
 # _FS_TAIL is the text after the last segment; _FS_N counts the segments.
 # _unquoted_end <text> — sets _UE_LEN to the length of the leading part of text
 # that stops at the first && || ; or | outside single and double quotes.
-# With a second argument `paren` (the command opened with $(, <( or >( ), it
-# also stops at the unquoted ) that closes that substitution, so an expected
-# value after it, as in test "$(php -v)" = "<url>", stays byte-exact.
+# With a second argument `paren`, it also stops at an unquoted ) that has no
+# matching ( in text. In well-formed shell that ) closes a $(, <(, >( or ( that
+# opened before text began, either at the command word ($(php) or before a cd
+# hop or pipe ($(cd x && php, $(echo x | php). An expected value after it, as
+# in test "$(cd x && php -r 1)" = "<url>", stays byte-exact.
 _unquoted_end() {
     local s="$1" i=0 n=${#1} q="" ch nx depth=0 paren="${2:-}"
     while [ "$i" -lt "$n" ]; do
@@ -348,8 +351,7 @@ _fetch_split() {
         rest="${s:$(( ${#pre} + ${#m} ))}"
         case "$m" in
             *curl*) seg="${rest%%$term}"; _FS_CURL[_FS_N]=1 ;;
-            *'('*) _unquoted_end "$rest" paren; seg="${rest:0:$_UE_LEN}"; _FS_CURL[_FS_N]=0 ;;
-            *) _unquoted_end "$rest"; seg="${rest:0:$_UE_LEN}"; _FS_CURL[_FS_N]=0 ;;
+            *) _unquoted_end "$rest" paren; seg="${rest:0:$_UE_LEN}"; _FS_CURL[_FS_N]=0 ;;
         esac
         _FS_PRE[_FS_N]="$pre$m"; _FS_SEG[_FS_N]="$seg"
         _FS_N=$((_FS_N + 1))

@@ -484,6 +484,29 @@ row_rewrite() {
         ci_row_rewrite "$1"
     )
 }
+
+# A cd hop or a pipe inside $( ) hides the ( from the php match. The php
+# segment still ends at the ) that closes the substitution, so the expected
+# value after it stays byte-exact (backlog issue 1924).
+start_case case_row_rewrite_paren_hop
+PH_CD="test \"\$(cd ibl5 && php -r 'echo X;')\" = \"http://localhost/ibl5\""
+PH_PIPE='test "$(echo x | php -r 1)" = "http://localhost/"'
+PH_WRAP="bash -c 'test \"\$(cd ibl5 && php -r 1)\" = \"http://localhost/\"'"
+PH_MULTI='test "$(echo x | php -r 1 | php -r 2)" = "http://localhost/"'
+PH_QIN="test \"\$(cd ibl5 && php -r 'echo \")\";' http://localhost/)\" = \"http://localhost/\""
+PH_QOUT="test \"\$(cd ibl5 && php -r 'echo \")\";' http://localhost:8080/)\" = \"http://localhost/\""
+chk "cd hop in \$( ) keeps expected value" eq "$(row_rewrite "$PH_CD")" "$PH_CD"
+chk "pipe hop in \$( ) keeps expected value" eq "$(row_rewrite "$PH_PIPE")" "$PH_PIPE"
+chk "cd hop in bash -c '\$( )' keeps expected value" eq "$(row_rewrite "$PH_WRAP")" "$PH_WRAP"
+chk "two piped php segments in \$( ) keep expected value" eq "$(row_rewrite "$PH_MULTI")" "$PH_MULTI"
+chk "quoted ) in hop php args: only the arg URL rewritten" eq "$(row_rewrite "$PH_QIN")" "$PH_QOUT"
+chk "cd hop php args still rewritten" eq "$(row_rewrite 'test "$(cd ibl5 && php x.php http://localhost/ibl5/)" = ok')" 'test "$(cd ibl5 && php x.php http://localhost:8080/ibl5/)" = ok'
+chk "cd hop with no substitution still rewritten" eq "$(row_rewrite 'cd ibl5 && php -r 1 http://localhost/')" 'cd ibl5 && php -r 1 http://localhost:8080/'
+# A remote URL fetched in the hop's php args, file_get_contents("https://iblhoops.net/"),
+# is still seen by the remote-URL guard, so the row stays LOCAL.
+chk "remote URL in cd-hop php args stays LOCAL" routes_local "test \"\$(cd x && php -r 'echo file_get_contents(\"https://iblhoops.net/\");')\" = ok"
+end_case
+
 start_case case_row_rewrite_skip_list
 chk "grep pattern row unchanged" eq "$(row_rewrite 'grep -q "http://localhost/ibl5/" ibl5/docs/x.md')" 'grep -q "http://localhost/ibl5/" ibl5/docs/x.md'
 chk "test \$(curl) row rewritten" eq "$(row_rewrite 'test "$(curl -s -o /dev/null -w %{http_code} http://plan-checks-ci-local-rows.localhost/ibl5/)" = 200')" 'test "$(curl -s -o /dev/null -w %{http_code} http://localhost:8080/ibl5/)" = 200'

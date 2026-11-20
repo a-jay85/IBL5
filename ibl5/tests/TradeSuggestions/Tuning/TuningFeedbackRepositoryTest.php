@@ -64,6 +64,45 @@ final class TuningFeedbackRepositoryTest extends WideUnitTestCase
         self::assertNull($rows[0]->freeText);
     }
 
+    public function testStringColumnsPassThrough(): void
+    {
+        $db = $this->mockDb();
+        $db->onQuery('ibl_trade_suggestion_feedback', [self::row('', null)]);
+
+        $rows = (new TuningFeedbackRepository($db))->forTeams([4]);
+
+        self::assertSame(str_repeat('a', 40), $rows[0]->dealKey);
+        self::assertSame(str_repeat('b', 40), $rows[0]->coreKey);
+        self::assertSame('{}', $rows[0]->dealJson);
+        self::assertSame('2026-11-18 10:00:00', $rows[0]->createdAt);
+    }
+
+    public function testMistypedColumnsFallBackToZeroAndEmpty(): void
+    {
+        $db = $this->mockDb();
+        $db->onQuery('ibl_trade_suggestion_feedback', [[
+            'tid' => '4',
+            'partner_tid' => null,
+            'deal_key' => 7,
+            'core_key' => null,
+            'deal_json' => null,
+            'reason_codes' => null,
+            'free_text' => 5,
+            'created_at' => null,
+        ]]);
+
+        $rows = (new TuningFeedbackRepository($db))->forTeams([4]);
+
+        self::assertSame(0, $rows[0]->tid);
+        self::assertSame(0, $rows[0]->partnerTid);
+        self::assertSame('', $rows[0]->dealKey);
+        self::assertSame('', $rows[0]->coreKey);
+        self::assertSame('', $rows[0]->dealJson);
+        self::assertSame([], $rows[0]->reasonCodes);
+        self::assertNull($rows[0]->freeText);
+        self::assertSame('', $rows[0]->createdAt);
+    }
+
     private function mockDb(): \Tests\WideUnit\Mocks\MockDatabase
     {
         $db = $this->mockDb;

@@ -5,7 +5,7 @@
     {"shard": "s02", "members": ["HeadToHeadRecords","JsbParser","PageLayout","Search","SeasonArchive","Security","Settings","TeamOrderBy.php","TrainingCampRatingsDiff","Utilities"]},
     {"shard": "s03", "members": ["AllStarAppearances","Boxscore","ComparePlayers","Contracts","DraftPickLocator","Logging","NextSim","Standings","TeamOffDefStats","UI"]},
     {"shard": "s04", "members": ["Auth","Clock","LeagueConfig","LeagueStarters","Mail","Negotiation","ProjectedDraftOrder","Updater","Validation","Voting"]},
-    {"shard": "s05", "members": ["BulkImport","Cache","Database","Draft","DraftInfo","EngineBundle","EngineShadow","PlayerSearch","Trading"]},
+    {"shard": "s05", "members": ["BulkImport","Cache","Database","Draft","DraftInfo","EngineBundle","EngineShadow","PlayerSearch","TradeSuggestions","Trading"]},
     {"shard": "s06", "members": ["CapSpace","Cli","Debug","DepthChart","DepthChartSnapshot","Extension","FreeAgency","League","LeagueSchedule","Legal"]},
     {"shard": "s07", "members": ["Api","BasketballStats","Discord","FranchiseHistory","LastSimRecap","LeagueControlPanel","RookieOption","Season","SeasonRosterChanges","YourAccount"]},
     {"shard": "s08", "members": ["ActivityTracker","ContractList","Http","Navigation","OnThisDay","Repositories","Rivalries","SeasonHighs","Team","TeamSchedule","TransactionHistory"]},

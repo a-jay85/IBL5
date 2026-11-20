@@ -10,6 +10,8 @@ use TradeSuggestions\Engine\Contracts\LeagueSnapshotProviderInterface;
 use TradeSuggestions\Engine\DealRanker;
 use TradeSuggestions\Engine\DealScorer;
 use TradeSuggestions\Engine\ExposureFilter;
+use TradeSuggestions\Engine\LeagueSnapshot;
+use TradeSuggestions\Engine\RankGate;
 use TradeSuggestions\Engine\RankGateCallback;
 use TradeSuggestions\Engine\RankOutcome;
 use TradeSuggestions\Engine\RankTrace;
@@ -21,6 +23,7 @@ use TradeSuggestions\TeamMode;
 use TradeSuggestions\Tuning\Contracts\TuningAssemblerInterface;
 use TradeSuggestions\Tuning\Contracts\TuningFeedbackRepositoryInterface;
 use TradeSuggestions\Valuation\GainWeights;
+use TradeSuggestions\Veto\DealView;
 use TradeSuggestions\Veto\VetoReport;
 use TradeSuggestions\Veto\VetoSet;
 use Trading\Contracts\TradeFormRepositoryInterface;
@@ -83,49 +86,9 @@ final class TuningAssembler implements TuningAssemblerInterface
                 break;
             }
 
-            $g = $this->generator->generate($s, $tid, $simKey);
-            $scored = DealScorer::scoreAll($s, $g, $g->shapeIdByKey);
-            // Hidden ideas leave before the ranker, exactly as on the GM panel.
-            $split = HiddenDealFilter::apply($scored, $index->hiddenKeys($tid));
-            $kept = $split['kept'];
-            $trace = new RankTrace();
-            $result = $this->ranker->select($s, $simKey, $tid, $kept, $this->vetoes, $gate, DealRanker::MAX_SUGGESTIONS, $trace);
-
-            $eligible = ExposureFilter::eligiblePartners($simKey, $tid, $s->teamIds);
-            $entries = $trace->entries();
-            $rows = [];
-            foreach ($kept as $i => $deal) {
-                $entry = $entries[$i] ?? null;
-                $rows[] = self::row(
-                    $tid,
-                    $deal,
-                    $entry['outcome'] ?? RankOutcome::NotReached,
-                    $entry['rank'] ?? null,
-                    $entry['veto'] ?? VetoReport::none(),
-                    $entry['detail'] ?? null,
-                    $eligible,
-                    $index,
-                );
-            }
-            foreach ($split['dropped'] as $deal) {
-                $rows[] = self::row($tid, $deal, RankOutcome::Hidden, null, VetoReport::none(), null, $eligible, $index);
-            }
-
-            $unmatched = self::unmatched($index->forTeam($tid), $rows);
-            $rows = self::sorted(self::byStatus($rows, $f->status));
-            $shown = array_slice($rows, 0, TuningBudget::MAX_ROWS_PER_TEAM);
-
-            $sections[] = new TuningTeamSection(
-                tid: $tid,
-                teamName: $teamNames[$tid] ?? '',
-                mode: $s->mode($tid),
-                eligiblePartners: $eligible,
-                generation: $g,
-                diagnostics: $result->diagnostics,
-                rows: $shown,
-                omittedRows: count($rows) - count($shown),
-                unmatchedFeedback: $unmatched,
-            );
+            // One method call per team, so its candidates and trace are freed
+            // before the next team runs (the all-teams page ran out of memory).
+            $sections[] = $this->section($s, $simKey, $tid, $f, $teamNames, $index, $gate);
         }
 
         return new TuningReport(
@@ -137,6 +100,64 @@ final class TuningAssembler implements TuningAssemblerInterface
             truncated: $truncated,
             teamsNotRun: $teamsNotRun,
             elapsedSeconds: $this->now() - $start,
+        );
+    }
+
+    /**
+     * @param array<int, string> $teamNames
+     * @param callable(ScoredDeal, DealView): array{0: RankGate, 1: string, 2: ?string, 3: ?string} $gate
+     */
+    private function section(
+        LeagueSnapshot $s,
+        string $simKey,
+        int $tid,
+        TuningFilter $f,
+        array $teamNames,
+        TuningFeedbackIndex $index,
+        callable $gate,
+    ): TuningTeamSection {
+        $g = $this->generator->generate($s, $tid, $simKey);
+        $scored = DealScorer::scoreAll($s, $g, $g->shapeIdByKey);
+        // Hidden ideas leave before the ranker, exactly as on the GM panel.
+        $split = HiddenDealFilter::apply($scored, $index->hiddenKeys($tid));
+        $kept = $split['kept'];
+        $trace = new RankTrace();
+        $result = $this->ranker->select($s, $simKey, $tid, $kept, $this->vetoes, $gate, DealRanker::MAX_SUGGESTIONS, $trace);
+
+        $eligible = ExposureFilter::eligiblePartners($simKey, $tid, $s->teamIds);
+        $entries = $trace->entries();
+        $rows = [];
+        foreach ($kept as $i => $deal) {
+            $entry = $entries[$i] ?? null;
+            $rows[] = self::row(
+                $tid,
+                $deal,
+                $entry['outcome'] ?? RankOutcome::NotReached,
+                $entry['rank'] ?? null,
+                $entry['veto'] ?? VetoReport::none(),
+                $entry['detail'] ?? null,
+                $eligible,
+                $index,
+            );
+        }
+        foreach ($split['dropped'] as $deal) {
+            $rows[] = self::row($tid, $deal, RankOutcome::Hidden, null, VetoReport::none(), null, $eligible, $index);
+        }
+
+        $unmatched = self::unmatched($index->forTeam($tid), $rows);
+        $rows = self::sorted(self::byStatus($rows, $f->status));
+        $shown = array_slice($rows, 0, TuningBudget::MAX_ROWS_PER_TEAM);
+
+        return new TuningTeamSection(
+            tid: $tid,
+            teamName: $teamNames[$tid] ?? '',
+            mode: $s->mode($tid),
+            eligiblePartners: $eligible,
+            generation: $g,
+            diagnostics: $result->diagnostics,
+            rows: $shown,
+            omittedRows: count($rows) - count($shown),
+            unmatchedFeedback: $unmatched,
         );
     }
 

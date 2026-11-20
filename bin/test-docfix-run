@@ -1410,8 +1410,12 @@ exec_runner() {
         claude()     { pwd -P > "$OUT/cwd"; printf '%s' "$2" > "$OUT/prompt"
                        printf '%s\n' "$@" > "$OUT/args"; printf '%s' "${CLAUDE_HEADLESS:-}" > "$OUT/headless"; }
         caffeinate() { [ "$1" = "-s" ] && shift; "$@"; }
+        # The runner wraps claude in `perl -e "alarm shift; exec @ARGV ..." 7200`.
+        # A real perl cannot exec a shell function, so drop -e, the program and
+        # the seconds, then run the rest in this shell.
+        perl()       { shift 3; "$@"; }
         launchctl()  { printf '%s\n' "$*" >> "$OUT/launchctl"; }
-        export -f claude caffeinate launchctl
+        export -f claude caffeinate perl launchctl
         HOME="$SB/home" bash "$1" >/dev/null 2>&1
     )
 }

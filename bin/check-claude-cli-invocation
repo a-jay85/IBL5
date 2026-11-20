@@ -1,0 +1,587 @@
+#!/bin/bash
+# <!-- no-adr: lint gate that follows the existing bin/check-* pattern; no new architectural boundary -->
+#
+# bin/check-claude-cli-invocation — keep `claude -p` call sites in bin/ safe.
+#
+# gate-backtest-argv: --stats
+# gate-backtest-reads: bin/* bin/lib/*
+#
+# Four flaw classes, each seen in review of PR #3363 (backlog#1613):
+#   no-timeout            the call has no timeout, gtimeout or perl-alarm wrapper, so
+#                         one hung session holds its caller forever.
+#   stderr-merged-capture 2>&1 inside a $(...) capture mixes stderr text into the
+#                         verdict the caller parses.
+#   prompt-after-variadic a positional prompt follows --allowedTools, --disallowedTools
+#                         or --tools, which are variadic, so claude reads the prompt
+#                         as one more tool name. Put the prompt first or on stdin.
+#   unknown-flag          a flag outside the committed allowlist; an unknown option
+#                         makes claude exit before it runs anything.
+#
+# A call site is `claude -p` (or --print) at a real command position: the start of a
+# simple command, after timeout/caffeinate/env/exec/nohup/command/nice/perl wrappers,
+# assignments and options, or the first element of a NAME=( ... ) array literal. A
+# printf whose format string holds `claude -p` is read as the runner script it emits.
+# Comments, usage strings, heredoc bodies and other quoted text are never call sites.
+#
+# A timeout passes when the prefix holds timeout or gtimeout, a token with "alarm" (the
+# perl `alarm shift; exec @ARGV` idiom) or an expansion named like TMO or TIMEOUT. For
+# an array call site, an exec statement that holds NAME[@] must carry such a token.
+#
+# A site passes when its statement ends with `# claude-cli-ok: <reason>` (a non-empty
+# reason is required).
+#
+# Scope: bash files directly under bin/ and bin/lib/ (no subdirectories, no test-*
+# scripts, no Python). Not traced: commands built as strings and run later
+# (CMD="... claude -p ..."), flags appended to an array after its literal, flags reached
+# through "$@", backtick substitutions, and the body of a function that execs an array.
+# Flags are checked against a committed list because CI runners have no claude binary.
+# The awk program is POSIX only, so BSD awk (macOS) and mawk (Ubuntu) agree.
+#
+# Usage: bin/check-claude-cli-invocation [--stats] [file ...]
+#
+# Exit codes: 0 = clean, 1 = violation found, 2 = usage error.
+
+set -euo pipefail
+
+here="$(cd "$(dirname "$0")" && pwd)"
+
+die() { echo "check-claude-cli-invocation: $*" >&2; exit 2; }
+
+TIMEOUT_WORDS="timeout gtimeout"
+TIMEOUT_VAR_RE='TMO|TIMEOUT'
+MERGE_TOKEN='2>&1'
+MARKER='# claude-cli-ok:'
+# captured from claude --help (claude --version: 2.1.327 (Claude Code)) on 2026-11-20
+# hidden flag: --help omits --max-turns; claude -p --max-turns abc x fails "must be a number", not "unknown option"
+ALLOWED_FLAGS="--add-dir --agent --agents --all --allow-dangerously-skip-permissions --allowed-tools --allowedTools --append-system-prompt --autocompact --ax-screen-reader --background --bare --betas --bg --brief --chrome --cloud --continue --dangerously-skip-permissions --debug --debug-file --desktop --disable-slash-commands --disallowed-tools --disallowedTools --effort --environment --exclude-dynamic-system-prompt-sections --fallback-model --file --fork-session --forward-subagent-text --from-pr --help --ide --include-hook-events --include-partial-messages --input-format --json-schema --max-budget-usd --mcp-config --model --name --no-chrome --no-session-persistence --output-format --permission-mode --permission-prompt-tool --permission-prompts --plugin-dir --plugin-url --print --prompt-suggestions --remote-control --remote-control-session-name-prefix --replay-user-messages --restricted --resume --safe-mode --session-id --setting-sources --settings --strict-mcp-config --system-prompt --system-prompt-snapshot --teleport --tmux --tools --verbose --version --worktree -c -d -h -n -p -r -v -w --max-turns"
+# captured from claude --help (claude --version: 2.1.327 (Claude Code)) on 2026-11-20
+VARIADIC_FLAGS="--add-dir --allowed-tools --allowedTools --betas --disallowed-tools --disallowedTools --file --mcp-config --tools"
+
+usage() {
+    cat <<'EOF'
+Usage: bin/check-claude-cli-invocation [--stats] [file ...]
+
+Checks every `claude -p` call site under bin/ and bin/lib/ for four flaws:
+  no-timeout             wrap the call in timeout, gtimeout or perl alarm
+  stderr-merged-capture  send stderr to its own file inside $(...)
+  prompt-after-variadic  put the prompt before the tool flags or on stdin
+  unknown-flag           the flag is not in the committed claude flag list
+
+Fix: correct the call, or end its statement with # claude-cli-ok: <reason>
+
+Arguments:
+  [file ...]   files to scan (default: shell scripts directly under bin/ and bin/lib/)
+  --stats      print a one-line scan summary to stderr
+
+Exit codes: 0 = clean, 1 = violation found, 2 = usage error
+EOF
+}
+
+read -r -d '' AWK_PROG <<'AWK' || true
+function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
+function bname(s) { sub(/^.*\//, "", s); return s }
+function unq(s) { gsub(RE_Q, "", s); return s }
+
+function reset_lexer() {
+    ntk = 0; sp = 1; kind[1] = "C"; bi[1] = 1; capf[1] = 0; bd[1] = 0; ar[1] = 0
+    wb[1] = ""; wk[1] = 0; wl[1] = 0
+    sqs = 0; hd_want = 0; hd_pending = 0; hd_dash = 0; hd_end = ""; in_hd = 0; cont = 0; arn = 0
+}
+
+function push_frame(k, newbuf, cap) {
+    sp++; kind[sp] = k; capf[sp] = cap; bd[sp] = 0; ar[sp] = 0
+    if (newbuf) { bi[sp] = sp; wb[sp] = ""; wk[sp] = 0; wl[sp] = 0 }
+    else bi[sp] = bi[sp - 1]
+}
+
+function emit(ty, txt, ln) {
+    ntk++; tt[ntk] = ty; tx[ntk] = txt; tc[ntk] = capf[sp]
+    tl[ntk] = (force_ln > 0) ? force_ln : ln
+}
+
+function app(txt, ln,    k) {
+    k = bi[sp]
+    if (!wk[k]) { wk[k] = 1; wl[k] = ln }
+    wb[k] = wb[k] txt
+}
+
+function flush_word(    k, t) {
+    k = bi[sp]
+    if (!wk[k]) return
+    t = wb[k]; wb[k] = ""; wk[k] = 0
+    emit((t ~ RE_SPECIAL) ? "X" : "W", t, wl[k])
+    if (hd_want) { hd_want = 0; hd_end = unq(t); hd_pending = 1 }
+}
+
+# dollar: handle a $ at offset i; returns the next offset.
+function dollar(s, i, ln, indq,    nx) {
+    nx = substr(s, i + 1, 1)
+    if (nx == "(") { app("$(", ln); emit("(", "$(", ln); push_frame("$", 1, 1); return i + 2 }
+    if (nx == "{") { app("${", ln); push_frame("B", 0, 0); return i + 2 }
+    if (nx == sq && !indq) { app("$" sq, ln); sqs = 2; return i + 2 }
+    app("$", ln)
+    return i + 1
+}
+
+function lex_line(s, ln,    n, i, c, nx, nn, rest, k, j, fd, op, kd, tmp) {
+    if (in_hd) {
+        tmp = s
+        if (hd_dash) sub(/^\t+/, "", tmp)
+        if (tmp == hd_end) in_hd = 0
+        return
+    }
+    n = length(s); i = 1; cont = 0
+    while (i <= n) {
+        if (sqs) {
+            rest = substr(s, i)
+            if (sqs == 1) {
+                j = index(rest, sq)
+                if (j == 0) { app(rest, ln); i = n + 1; continue }
+                app(substr(rest, 1, j), ln); i += j; sqs = 0; continue
+            }
+            if (!match(rest, RE_AQ)) { app(rest, ln); i = n + 1; continue }
+            c = substr(rest, RSTART, 1)
+            if (c == "\\") { app(substr(rest, 1, RSTART + 1), ln); i += RSTART + 1; continue }
+            app(substr(rest, 1, RSTART), ln); i += RSTART; sqs = 0; continue
+        }
+        kd = kind[sp]
+        if (kd == "D") {
+            rest = substr(s, i)
+            if (!match(rest, RE_DQ)) { app(rest, ln); i = n + 1; continue }
+            if (RSTART > 1) { app(substr(rest, 1, RSTART - 1), ln); i += RSTART - 1; continue }
+            c = substr(rest, 1, 1)
+            if (c == "\"") { app(c, ln); sp--; i++; continue }
+            if (c == "\\") {
+                if (i == n) { i++; continue }
+                app(substr(rest, 1, 2), ln); i += 2; continue
+            }
+            i = dollar(s, i, ln, 1)
+            continue
+        }
+        if (kd == "B") {
+            rest = substr(s, i)
+            if (!match(rest, RE_B)) { app(rest, ln); i = n + 1; continue }
+            if (RSTART > 1) { app(substr(rest, 1, RSTART - 1), ln); i += RSTART - 1; continue }
+            c = substr(rest, 1, 1)
+            if (c == "\"") { app(c, ln); push_frame("D", 0, 0); i++; continue }
+            if (c == sq) {
+                app(c, ln); i++
+                if (kind[sp - 1] != "D") sqs = 1
+                continue
+            }
+            if (c == "\\") { app(substr(rest, 1, 2), ln); i += 2; continue }
+            if (c == "$") { i = dollar(s, i, ln, (kind[sp - 1] == "D")); continue }
+            if (c == "{") { bd[sp]++; app(c, ln); i++; continue }
+            app(c, ln)
+            if (bd[sp] > 0) bd[sp]--; else sp--
+            i++; continue
+        }
+        c = substr(s, i, 1); k = bi[sp]
+        if (c == " " || c == "\t") { flush_word(); i++; continue }
+        if (c == sq) { app(c, ln); sqs = 1; i++; continue }
+        if (c == "\"") { app(c, ln); push_frame("D", 0, 0); i++; continue }
+        if (c == "$") { i = dollar(s, i, ln, 0); continue }
+        if (c == "\\") {
+            if (i == n) { cont = 1; i++ }
+            else { app(substr(s, i, 2), ln); i += 2 }
+            continue
+        }
+        if (c == "#") {
+            if (!wk[k]) { cmt[ln] = substr(s, i); i = n + 1 }
+            else { app(c, ln); i++ }
+            continue
+        }
+        if (c == ";") {
+            flush_word()
+            if (substr(s, i + 1, 1) == ";") { emit("S", ";;", ln); i += 2 }
+            else { emit("S", ";", ln); i++ }
+            continue
+        }
+        if (c == "|") {
+            flush_word(); nx = substr(s, i + 1, 1)
+            if (nx == "|") { emit("S", "||", ln); i += 2 }
+            else if (nx == "&") { emit("S", "|&", ln); i += 2 }
+            else { emit("S", "|", ln); i++ }
+            continue
+        }
+        if (c == "&") {
+            flush_word(); nx = substr(s, i + 1, 1)
+            if (nx == "&") { emit("S", "&&", ln); i += 2 }
+            else if (nx == ">") {
+                op = "&>"; i += 2
+                if (substr(s, i, 1) == ">") { op = "&>>"; i++ }
+                emit("R", op, ln)
+            }
+            else { emit("S", "&", ln); i++ }
+            continue
+        }
+        if (c == "<" || c == ">") {
+            if (arn > 0) { app(c, ln); i++; continue }
+            if (wk[k] && wb[k] ~ /^[0-9]+$/) { fd = wb[k]; wb[k] = ""; wk[k] = 0 }
+            else { flush_word(); fd = "" }
+            nx = substr(s, i + 1, 1); nn = substr(s, i + 2, 1)
+            if (nx == "(") { emit("(", c "(", ln); push_frame("S", 1, 0); i += 2; continue }
+            if (c == ">") {
+                if (nx == ">") op = ">>"
+                else if (nx == "&") op = ">&"
+                else if (nx == "|") op = ">|"
+                else op = ">"
+            } else {
+                if (nx == "<" && nn == "<") op = "<<<"
+                else if (nx == "<" && nn == "-") op = "<<-"
+                else if (nx == "<") op = "<<"
+                else if (nx == "&") op = "<&"
+                else op = "<"
+            }
+            i += length(op)
+            if (op ~ /&$/) {
+                rest = substr(s, i)
+                if (match(rest, /^([0-9]+-?|-)/)) { op = op substr(rest, 1, RLENGTH); i += RLENGTH }
+            }
+            emit("R", fd op, ln)
+            if ((op == "<<" || op == "<<-") && fd == "") { hd_want = 1; hd_dash = (op == "<<-") }
+            continue
+        }
+        if (c == "(") {
+            if (wk[k] && wb[k] ~ /^[A-Za-z_][A-Za-z0-9_]*\+?=$/) {
+                tmp = wb[k]; sub(/\+?=$/, "", tmp); wb[k] = ""; wk[k] = 0
+                emit("AO", tmp, ln); push_frame("A", 1, capf[sp]); i++; continue
+            }
+            flush_word(); emit("(", "(", ln); push_frame("S", 1, capf[sp])
+            if (substr(s, i + 1, 1) == "(" || substr(s, i - 1, 1) == "(") { ar[sp] = 1; arn++ }
+            i++; continue
+        }
+        if (c == ")") {
+            flush_word()
+            if (kd == "$") { emit(")", ")", ln); sp--; app(")", ln) }
+            else if (kd == "S") { emit(")", ")", ln); if (ar[sp]) arn--; sp-- }
+            else if (kd == "A") { emit("AC", ")", ln); sp-- }
+            else emit(")", ")", ln)
+            i++; continue
+        }
+        rest = substr(s, i)
+        match(rest, RE_RUN)
+        app(substr(rest, 1, RLENGTH), ln); i += RLENGTH
+    }
+    if (sqs) app(" ", ln)
+    else if (kind[sp] == "D" || kind[sp] == "B") app(" ", ln)
+    else if (!cont) {
+        flush_word()
+        if (kind[sp] != "A") emit("S", "NL", ln)
+    }
+    if (hd_pending && !sqs) { in_hd = 1; hd_pending = 0 }
+}
+
+function finish_lex() {
+    while (sp > 1) sp--
+    flush_word()
+    tt[ntk + 1] = ""; tt[ntk + 2] = ""
+}
+
+# ---- analysis over the token list ----------------------------------------------
+
+function is_stop(k) {
+    return (tt[k] == "S" || tt[k] == "(" || tt[k] == ")" || tt[k] == "AO" || tt[k] == "AC" || (tt[k] == "W" && (tx[k] in STOPW)))
+}
+function stmt_start(k) {
+    while (k > 1 && !is_stop(k - 1)) k--
+    return k
+}
+function stmt_end(k,    d, t) {
+    d = 0
+    while (k + 1 <= ntk) {
+        t = tt[k + 1]
+        if (t == "(") d++
+        else if (t == ")") { if (d == 0) break; d-- }
+        else if (d == 0 && (t == "S" || t == "AC")) break
+        k++
+    }
+    return k
+}
+function skip_nested(j,    d) {
+    d = 0
+    for (; j <= ntk; j++) {
+        if (tt[j] == "(") d++
+        else if (tt[j] == ")") { d--; if (d <= 0) return j }
+    }
+    return ntk
+}
+function ptok_ok(k,    t) {
+    t = tx[k]
+    if (tt[k] == "X") return 1
+    if (tt[k] != "W") return 0
+    if (k > 1 && tt[k - 1] == "W" && tx[k - 1] == "-u" && t ~ /^[A-Za-z_][A-Za-z0-9_]*$/) return 1   # env -u NAME
+    if (t ~ /^[A-Za-z_][A-Za-z0-9_]*=/) return 1
+    if (bname(t) in WRAP) return 1
+    if (t ~ /^-/) return 1
+    if (t ~ /^[0-9]+[smhd]?$/) return 1
+    if (t ~ /^%[sd]$/) return 1
+    return 0
+}
+function is_timeout_tok(k,    b, v) {
+    if (tt[k] == "W") {
+        b = bname(tx[k])
+        if (index(" " TIMEOUT_WORDS " ", " " b " ") > 0) return 1
+    }
+    if (index(tx[k], "alarm") > 0) return 1
+    if (tt[k] == "X" && tx[k] ~ /^"?\$/) {
+        v = tx[k]; sub(/^"?\$\{?/, "", v)
+        if (match(v, /^[A-Za-z_][A-Za-z0-9_]*/)) {
+            v = toupper(substr(v, 1, RLENGTH))
+            if (v ~ TIMEOUT_VAR_RE) return 1
+        }
+    }
+    return 0
+}
+# is_claude_word: the claude binary, by name or through a CLAUDE-named variable such as "$CLAUDE_BIN".
+function is_claude_word(k,    v) {
+    if (tt[k] == "W") return (bname(tx[k]) == "claude")
+    if (tt[k] != "X") return 0
+    v = tx[k]
+    return (v ~ /^"?\$\{?[A-Za-z0-9_]*CLAUDE[A-Za-z0-9_]*\}?"?$/)
+}
+function gather(j,    t) {
+    while (j <= ntk) {
+        t = tt[j]
+        if (t == "(") { j = skip_nested(j) + 1; continue }
+        if (t != "W" && t != "X") break
+        nav++; avt[nav] = t; avx[nav] = tx[j]; j++
+    }
+}
+# merge_scan: 1 when stderr is merged into the captured stdout of the statement s..e.
+function merge_scan(s, e,    j, d, t, outr) {
+    d = 0; outr = 0
+    for (j = s; j <= e; j++) {
+        t = tt[j]
+        if (t == "(") d++
+        else if (t == ")") d--
+        else if (d == 0 && t == "R") {
+            if (tx[j] == MERGE_TOKEN) { if (!outr) return 1 }
+            else if (tx[j] ~ /^(1?>>?|&>>?|>\|)$/) outr = 1
+        }
+    }
+    if (tt[e + 1] == "S" && tx[e + 1] == "|&") return 1
+    return 0
+}
+function mk_range(lo, hi,    l, r) {
+    for (l = lo; l <= hi; l++) {
+        if ((l in cmt) && index(cmt[l], MARKER) == 1) {
+            site_marker = 1
+            r = trim(substr(cmt[l], length(MARKER) + 1))
+            if (length(r) > reason_len) reason_len = length(r)
+        }
+    }
+}
+function range_hi(e) { return (e + 1 <= ntk) ? tl[e + 1] : tl[e] }
+
+function report(f, ln, cls, detail) {
+    printf "%s:%d: %s: %s\n", f, ln, cls, detail
+    hits++
+}
+
+# site_finish: run the four checks for one call site. av holds the argv tokens.
+function site_finish(f, ln, has_timeout, merged_capture,    a, fl, hq, sfx, vstate, cnt, prompt_after_variadic, flag) {
+    calls++
+    sfx = ""
+    if (site_marker) {
+        if (reason_len > 0) { escaped++; return }
+        sfx = " (claude-cli-ok marker needs a non-empty reason)"
+    }
+    prompt_after_variadic = 0; vstate = 0; cnt = 0
+    for (a = 1; a <= nav; a++) {
+        if (avt[a] == "W" && avx[a] ~ /^-/) {
+            fl = avx[a]; hq = (index(fl, "=") > 0); sub(/=.*/, "", fl)
+            if (fl in variadic) { vstate = 1; cnt = hq ? 1 : 0 } else vstate = 0
+            continue
+        }
+        if (!vstate) continue
+        if (avx[a] ~ /^"?\$[@*]"?$/ || index(avx[a], "[@]") > 0) { vstate = 0; continue }
+        cnt++
+        if (cnt >= 2) prompt_after_variadic = 1
+    }
+    if (!has_timeout) report(f, ln, "no-timeout", "wrap the call in timeout, gtimeout or perl alarm" sfx)
+    if (merged_capture) report(f, ln, "stderr-merged-capture", "send stderr to its own file inside $(...)" sfx)
+    if (prompt_after_variadic) report(f, ln, "prompt-after-variadic", "put the prompt before the tool flags or on stdin" sfx)
+    for (a = 1; a <= nav; a++) {
+        if (avt[a] != "W" || avx[a] !~ /^-/) continue
+        flag = avx[a]; sub(/=.*/, "", flag)
+        if (flag == "-" || flag == "--") continue
+        if (!(flag in allowed)) report(f, ln, "unknown-flag", flag sfx)
+    }
+}
+
+function analyze(f, inner,    i, j, s, e, k, prefix_ok, hast, aopen, ac, name, nexec, hasexec, mrg, ks, ke, w, t, nm) {
+    for (i = 1; i <= ntk; i++) {
+        if (!is_claude_word(i)) continue
+        if (!(tt[i + 1] == "W" && (tx[i + 1] == "-p" || tx[i + 1] == "--print"))) continue
+        prefix_ok = 1; hast = 0; j = i - 1
+        while (j >= 1 && !is_stop(j)) {
+            if (!ptok_ok(j)) { prefix_ok = 0; break }
+            if (is_timeout_tok(j)) hast = 1
+            j--
+        }
+        if (!prefix_ok) continue
+        nav = 0
+        if (!inner) { site_marker = 0; reason_len = 0 }
+        if (j >= 1 && tt[j] == "AO") {
+            aopen = j; name = tx[j]
+            for (ac = i; ac <= ntk && tt[ac] != "AC"; ac++) ;
+            gather(i + 1)
+            if (!inner) mk_range(tl[aopen], tl[ac <= ntk ? ac : ntk])
+            hasexec = 0; mrg = 0
+            for (k = 1; k <= ntk; k++) {
+                if (tt[k] != "X" || index(tx[k], "{" name "[@]") == 0) continue
+                if (k > aopen && k < ac) continue
+                ks = stmt_start(k); ke = stmt_end(k)
+                hasexec = 1
+                for (w = ks; w <= ke; w++) if (is_timeout_tok(w)) hast = 1
+                if (tc[k] && merge_scan(ks, ke)) mrg = 1
+                gather(k + 1)
+                if (!inner) mk_range(tl[ks], range_hi(ke))
+            }
+            if (!hasexec) hast = hast
+            site_finish(f, tl[i], hast, mrg)
+        } else {
+            s = stmt_start(i); e = stmt_end(i)
+            gather(i + 1)
+            if (!inner) mk_range(tl[s], range_hi(e))
+            mrg = (tc[i] && merge_scan(s, e)) ? 1 : 0
+            site_finish(f, tl[i], hast, mrg)
+        }
+    }
+    if (inner) return
+    # printf emitters: a quoted format holding claude -p is read as the runner it writes
+    for (i = 1; i <= ntk; i++) {
+        if (tt[i] != "W" || tx[i] != "printf") continue
+        s = stmt_start(i); ok = 1
+        for (j = s; j < i; j++) if (!ptok_ok(j)) { ok = 0; break }
+        if (!ok) continue
+        k = i + 1
+        while (tt[k] == "W" && tx[k] ~ /^-/) k++
+        if (tt[k] != "X") continue
+        t = tx[k]
+        if (index(t, "claude -p") == 0 && index(t, "claude --print") == 0) continue
+        if (substr(t, 1, 1) != sq && substr(t, 1, 1) != "\"") continue
+        if (substr(t, length(t), 1) != substr(t, 1, 1)) continue
+        npf++
+        pf_text[npf] = substr(t, 2, length(t) - 2); pf_line[npf] = tl[k]
+        site_marker = 0; reason_len = 0
+        mk_range(tl[s], range_hi(stmt_end(i)))
+        pf_mark[npf] = site_marker; pf_rl[npf] = reason_len
+    }
+}
+
+function finish_file(    p, m, lines, q) {
+    finish_lex()
+    npf = 0
+    analyze(cur, 0)
+    for (p = 1; p <= npf; p++) {
+        reset_lexer()
+        force_ln = pf_line[p]
+        m = split(pf_text[p], lines, "\n")
+        for (q = 1; q <= m; q++) lex_line(lines[q], pf_line[p])
+        finish_lex()
+        site_marker = pf_mark[p]; reason_len = pf_rl[p]
+        analyze(cur, 1)
+        force_ln = 0
+    }
+}
+
+BEGIN {
+    sq = sprintf("%c", 39)
+    RE_SPECIAL = "[" sq "\"$\\\\]"
+    RE_DQ = "[\"\\\\$]"
+    RE_B = "[\"" sq "\\\\${}]"
+    RE_AQ = "[" sq "\\\\]"
+    RE_RUN = "^[^ \t" sq "\"$\\\\;&|<>()#]+"
+    RE_Q = "[" sq "\"\\\\]"
+    n = split(ALLOWED, la, " "); for (i = 1; i <= n; i++) allowed[la[i]] = 1
+    n = split(VARIADIC, la, " "); for (i = 1; i <= n; i++) variadic[la[i]] = 1
+    n = split("timeout gtimeout caffeinate env exec nohup command nice perl", la, " "); for (i = 1; i <= n; i++) WRAP[la[i]] = 1
+    n = split("! if then do else elif while until {", la, " "); for (i = 1; i <= n; i++) STOPW[la[i]] = 1
+    force_ln = 0
+}
+
+FNR == 1 {
+    if (nfiles > 0) finish_file()
+    nfiles++; cur = FILENAME
+    split("", cmt)
+    reset_lexer()
+}
+{ lex_line($0, FNR) }
+
+END {
+    if (nfiles > 0) finish_file()
+    if (stats + 0 == 1) printf "check-claude-cli-invocation: scanned %d files, %d call sites, %d escaped, %d hits\n", nfiles, calls, escaped, hits > "/dev/stderr"
+    exit (hits > 0 ? 1 : 0)
+}
+AWK
+
+main() {
+    local stats=0 f first
+    local explicit=() cands=() files=()
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -h | --help) usage; exit 0 ;;
+            --stats) stats=1 ;;
+            -*) die "unknown option: $1" ;;
+            *) explicit+=("$1") ;;
+        esac
+        shift
+    done
+
+    if [ "${#explicit[@]}" -gt 0 ]; then
+        for f in "${explicit[@]}"; do
+            [ -e "$f" ] || die "no such file: $f"
+            cands+=("$f")
+        done
+    else
+        cd "$here/.."
+        for f in bin/* bin/lib/*; do
+            [ -f "$f" ] || continue
+            case "${f##*/}" in test-*) continue ;; esac
+            cands+=("$f")
+        done
+    fi
+
+    if [ "${#cands[@]}" -gt 0 ]; then
+        for f in "${cands[@]}"; do
+            [ -s "$f" ] || continue
+            if [ "${#explicit[@]}" -eq 0 ]; then
+                case "$f" in
+                    *.sh) ;;
+                    *)
+                        first=""
+                        IFS= read -r first < "$f" || true
+                        case "$first" in '#!'*sh*) ;; *) continue ;; esac
+                        ;;
+                esac
+            fi
+            files+=("$f")
+        done
+    fi
+
+    if [ "${#files[@]}" -eq 0 ]; then
+        if [ "$stats" -eq 1 ]; then
+            echo "check-claude-cli-invocation: scanned 0 files, 0 call sites, 0 escaped, 0 hits" >&2
+        fi
+        exit 0
+    fi
+
+    local rc=0
+    awk -v stats="$stats" -v ALLOWED="$ALLOWED_FLAGS" -v VARIADIC="$VARIADIC_FLAGS" \
+        -v TIMEOUT_WORDS="$TIMEOUT_WORDS" -v TIMEOUT_VAR_RE="$TIMEOUT_VAR_RE" \
+        -v MERGE_TOKEN="$MERGE_TOKEN" -v MARKER="$MARKER" \
+        "$AWK_PROG" "${files[@]}" || rc=$?
+    case "$rc" in
+        0) exit 0 ;;
+        1)
+            echo "check-claude-cli-invocation: a claude -p call site has a flaw (see the lines above)." >&2
+            echo "fix: correct the call, or end its statement with # claude-cli-ok: <reason>" >&2
+            exit 1
+            ;;
+        *) die "awk failed (exit $rc)" ;;
+    esac
+}
+
+main "$@"

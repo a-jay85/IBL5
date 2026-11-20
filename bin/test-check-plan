@@ -5313,15 +5313,16 @@ _corpus_guard_ok() {
     # Gate [AB] is downgradeable too: it postdates every frozen corpus plan, and
     # the plans it flags carry genuine plan-only negated greps (true positives).
     # Gate [CW] is the same: frozen plans shipped before prefire-verify ran their rows.
+    # Gate [NC] is the same: frozen plans edit near-cap rules with no budget-cuts: line.
     # The [H] missing-hold_trigger line is the same: frozen held plans predate the key.
     _cgo_other="$(printf '%s\n' "$_cgo_out" | awk '
         /^check-plan: violations in /{v=1; next}
         /^check-plan: /{v=0}
-        v && /^\[/ && !/^\[E\]/ && !/^\[AB\]/ && !/^\[CW\]/ && !/^\[V\].*unbalanced backtick after Phase 5\.0 strip/ && !/^\[V\].*does not parse as shell after Phase 5\.0 strip/ && !/^\[V\].*a bare bin\/fixtures\/ file path/ && !/^\[F\] ## Critical Files entry has an absolute path/ && !/^\[H\].*no non-empty hold_trigger:/ {print}')"
+        v && /^\[/ && !/^\[E\]/ && !/^\[AB\]/ && !/^\[CW\]/ && !/^\[NC\]/ && !/^\[V\].*unbalanced backtick after Phase 5\.0 strip/ && !/^\[V\].*does not parse as shell after Phase 5\.0 strip/ && !/^\[V\].*a bare bin\/fixtures\/ file path/ && !/^\[F\] ## Critical Files entry has an absolute path/ && !/^\[H\].*no non-empty hold_trigger:/ {print}')"
     _cgo_dvio="$(printf '%s\n' "$_cgo_out" | awk '
         /^check-plan: violations in /{v=1; next}
         /^check-plan: /{v=0}
-        v && (/^\[E\]/ || /^\[AB\]/ || /^\[CW\]/ || /^\[V\].*unbalanced backtick after Phase 5\.0 strip/ || /^\[V\].*does not parse as shell after Phase 5\.0 strip/ || /^\[V\].*a bare bin\/fixtures\/ file path/ || /^\[F\] ## Critical Files entry has an absolute path/ || /^\[H\].*no non-empty hold_trigger:/) {print}' | head -1)"
+        v && (/^\[E\]/ || /^\[AB\]/ || /^\[CW\]/ || /^\[NC\]/ || /^\[V\].*unbalanced backtick after Phase 5\.0 strip/ || /^\[V\].*does not parse as shell after Phase 5\.0 strip/ || /^\[V\].*a bare bin\/fixtures\/ file path/ || /^\[F\] ## Critical Files entry has an absolute path/ || /^\[H\].*no non-empty hold_trigger:/) {print}' | head -1)"
     # Downgrade ONLY when: non-zero exit, zero non-downgradeable lines, and at
     # least one downgradeable line actually explains the failure. A non-zero exit
     # with no visible violation line still fails loudly instead of passing silently.

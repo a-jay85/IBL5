@@ -11,7 +11,7 @@ no-adr: lazy companion holding text moved from auto-commit.md; no new decision s
 
 ## Owner-approve mechanics
 
-`bin/owner-approve` waits out a live post-plan run and arms only on a READY verdict for the current tree. A NOT READY verdict blocked only by the PR's kept-unplanned block counts as accepted by the approval; the script re-runs post-plan once with `--state-changed`. The harness matches each kept finding by the words before the first colon of its title, so a reworded re-review still matches. On a carried approval, `--finish` also accepts the kept items the approval listed. `resolve-pr-refs.py` injects the flags only on a typed prompt. A card pick or AskUserQuestion answer gets no injection, so `.claude/rules/auto-commit.md` § Owner approval comment is the only source there. Usage and exit codes: script header.
+`bin/owner-approve` waits out a live post-plan run and arms only on a READY verdict for the current tree. A NOT READY verdict blocked only by the PR's kept-unplanned block counts as accepted by the approval; the script re-runs post-plan once with `--state-changed`. The harness matches each kept finding by the words before the first colon of its title, so a reworded re-review still matches. On a carried approval, `--finish` also accepts the kept items the approval listed. `resolve-pr-refs.py` injects the flags only on a typed prompt. A card pick or AskUserQuestion answer gets no injection; the run command and the `--fix-first` and `--finish` flags in `.claude/rules/auto-commit.md` § Owner approval comment cover that case. Usage and exit codes: script header.
 
 ## Commit-nudge Stop hook
 

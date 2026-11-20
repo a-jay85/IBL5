@@ -122,6 +122,31 @@ def test_missing_stdin_file_is_error_not_crash(tmp_path):
     assert all(r.outcome == "error" and "stdin:" in r.detail for r in results)
 
 
+def test_absent_gate_skipped_as_gate_absent(tmp_path):
+    repo, shas = build_repo(tmp_path)
+    calls = []
+
+    def runner(argv, **kw):
+        calls.append(argv)
+        return 0, ""
+
+    absent = GateChange("bin/check-x", "transitive", "replayable", ReplaySpec(argv=()), "")
+    results = run(repo, shas[:1], tmp_path, gates=[absent], runner=runner)
+    assert [(r.outcome, r.detail) for r in results] == [("skipped", "gate-absent")]
+    assert not any(r.outcome == "error" for r in results)
+    assert calls == []
+
+
+def test_present_gate_exec_failure_still_errors(tmp_path):
+    repo, shas = build_repo(tmp_path)
+
+    def runner(argv, **kw):
+        raise PermissionError(13, "Permission denied")
+
+    results = run(repo, shas[:1], tmp_path, gates=[gate()], runner=runner)
+    assert [r.outcome for r in results] == ["error"]
+
+
 def test_default_spec_keeps_devnull_even_with_body(tmp_path):
     repo, shas = build_repo(tmp_path)
     results = run(repo, shas[:2], tmp_path, gates=[gate(ReplaySpec(argv=()))], script=STDIN_GATE,

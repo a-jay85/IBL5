@@ -953,6 +953,18 @@ if [ "$FM_HOLD" -eq 1 ]; then # [H] hold_trigger gate
                 viol "[H] hold_trigger token '$ht_tok' is not in bin/lib/hold-trigger-tokens.txt; use one of: $(tr '\n' ' ' <<< "$HT_KNOWN")"
             fi
         done <<< "$HT_TOKENS"
+        # trace-pinned lifts conditions (5) and (7) with no reviewer, so it must stand
+        # alone and the plan must run the evidence check. The check line is read from
+        # the fence-stripped body, so a fenced example does not count.
+        if grep -qxF -- "trace-pinned" <<< "$HT_TOKENS"; then
+            ht_other=$(grep -vxF -- "trace-pinned" <<< "$HT_TOKENS") || ht_other=''
+            if [ -n "$ht_other" ]; then
+                viol "[H] hold_trigger trace-pinned must be the only token"
+            fi
+            if ! grep -qF -- "harness.trace_pinned check" "$GATEP_BODY"; then
+                viol "[H] hold_trigger trace-pinned needs a step running harness.trace_pinned check"
+            fi
+        fi
     fi
 fi
 

@@ -557,6 +557,10 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
                         scratch.checkout(pr.merge_sha)
                         scratch.overlay(overlay_files)
                         checked_out = True
+                    gate_file = os.path.join(scratch.dir, gate.path)
+                    if not os.path.lexists(gate_file):
+                        skip(pr, gate, "gate-absent")
+                        continue
                     base = git(["rev-parse", pr.merge_sha + "^"]).strip()
                     diff_file = os.path.join(work, f"{pr.number}.diff")
                     with open(diff_file, "w", encoding="utf-8", errors="replace") as fh:

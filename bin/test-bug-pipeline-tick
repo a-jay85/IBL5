@@ -647,6 +647,175 @@ else
 fi
 rm -rf "$_cl_lock"
 
+# ── Close notices (Phase 4): poll the public repo, claim in the DB, post once ──────────
+# The gh stub applies the driver's real --jq to a fixture that carries a hostile title and a
+# hostile comment, so a leak of either into a posted body is a real failure of the filter.
+_CN_THREAD="880000000000000001"
+_CN_MSG="990000000000000002"
+_CN_REPORTER="770000000000000009"
+_cn_issue() { # <n> <STATE> <reason> — gh fixture with hostile text on every issue
+    jq -nc --arg s "$2" --arg r "$3" \
+        '{state:$s, stateReason:$r, title:"@everyone <@&123> [x](http://evil)", comments:[{body:"@everyone evil <@&123>"}]}' \
+        > "$STUB/gh-issue-$1.json"
+}
+_cn_rows() { printf '%s' "$1" > "$STUB/notices/rows.json"; }
+_cn_posts() { local got; got="$(grep -c . "$STUB/pwm.log" 2>/dev/null)"; printf '%s' "${got:-0}"; }
+_cn_row1() { # <n> [thread] [message] [reporter] [state]
+    jq -nc --argjson n "$1" --arg t "${2-$_CN_THREAD}" --arg m "${3-}" --arg d "${4-$_CN_REPORTER}" --arg st "${5-pending}" \
+        '{issue_number:$n, reporter_discord_id:(if $d=="" then null else $d end), thread_id:(if $t=="" then null else $t end), original_message_id:(if $m=="" then null else $m end), state:$st}'
+}
+
+bpt_reset
+_cn_issue 31 CLOSED COMPLETED
+_cn_rows "[$(_cn_row1 31)]"
+bpt_run
+if [ "$(_cn_posts)" = 1 ] && grep -qF "closed as fixed" "$STUB/pwm.log" \
+    && [ "$(cat "$STUB/notices/31.state" 2>/dev/null)" = notified ] \
+    && [ "$(cat "$STUB/notices/31.reason" 2>/dev/null)" = completed ] \
+    && grep -qF "$_CN_REPORTER" "$STUB/pwm.log"; then
+    bpt_named_ok close_notice_completed_posts_once
+else
+    bpt_named_fail close_notice_completed_posts_once "posts=$(_cn_posts) state=$(cat "$STUB/notices/31.state" 2>/dev/null)"
+fi
+
+bpt_reset
+_cn_issue 32 CLOSED NOT_PLANNED
+_cn_rows "[$(_cn_row1 32)]"
+bpt_run
+if grep -qF "closed as not planned" "$STUB/pwm.log" && ! grep -qF "closed as fixed" "$STUB/pwm.log" \
+    && [ "$(cat "$STUB/notices/32.reason" 2>/dev/null)" = not_planned ]; then
+    bpt_named_ok close_notice_not_planned_wording
+else
+    bpt_named_fail close_notice_not_planned_wording "$(cat "$STUB/pwm.log" 2>/dev/null)"
+fi
+
+bpt_reset
+_cn_issue 33 CLOSED DUPLICATE
+_cn_rows "[$(_cn_row1 33)]"
+bpt_run
+if grep -qF "closed as a duplicate" "$STUB/pwm.log" && ! grep -qF "closed as fixed" "$STUB/pwm.log" \
+    && [ "$(cat "$STUB/notices/33.reason" 2>/dev/null)" = duplicate ]; then
+    bpt_named_ok close_notice_duplicate_wording
+else
+    bpt_named_fail close_notice_duplicate_wording "$(cat "$STUB/pwm.log" 2>/dev/null)"
+fi
+
+bpt_reset
+_cn_issue 34 CLOSED COMPLETED
+_cn_rows "[$(_cn_row1 34)]"
+bpt_run
+bpt_run
+if [ "$(_cn_posts)" = 1 ] && [ "$(cat "$STUB/notices/34.state" 2>/dev/null)" = notified ]; then
+    bpt_named_ok close_notice_second_tick_posts_nothing
+else
+    bpt_named_fail close_notice_second_tick_posts_nothing "posts=$(_cn_posts)"
+fi
+
+bpt_reset
+_cn_issue 35 CLOSED COMPLETED
+_cn_rows "[$(_cn_row1 35 "$_CN_THREAD" "" "$_CN_REPORTER" seeded)]"
+bpt_run
+if [ "$(_cn_posts)" = 0 ] && ! grep -qF "issue view" "$STUB/gh.log" 2>/dev/null; then
+    bpt_named_ok close_notice_seeded_posts_nothing
+else
+    bpt_named_fail close_notice_seeded_posts_nothing "posts=$(_cn_posts)"
+fi
+
+bpt_reset
+_cn_issue 36 OPEN ""
+_cn_rows "[$(_cn_row1 36)]"
+bpt_run
+if [ "$(_cn_posts)" = 0 ] && [ ! -f "$STUB/notices/36.state" ]; then
+    bpt_named_ok close_notice_open_issue_posts_nothing
+else
+    bpt_named_fail close_notice_open_issue_posts_nothing "posts=$(_cn_posts)"
+fi
+
+bpt_reset
+_cn_issue 37 CLOSED COMPLETED
+_cn_rows "[$(_cn_row1 37 "" "" "$_CN_REPORTER")]"
+bpt_run
+if [ "$(_cn_posts)" = 1 ] && grep -qF "$_CN_REPORTER" "$STUB/pwm.log" && ! grep -qF "thread_id" "$STUB/pwm.log"; then
+    bpt_named_ok close_notice_no_thread_main_channel_mention
+else
+    bpt_named_fail close_notice_no_thread_main_channel_mention "$(cat "$STUB/pwm.log" 2>/dev/null)"
+fi
+
+bpt_reset
+_cn_issue 38 CLOSED COMPLETED
+_cn_issue 39 CLOSED NOT_PLANNED
+_cn_rows "[$(_cn_row1 38), $(_cn_row1 39)]"
+bpt_run
+if [ "$(_cn_posts)" = 2 ] && ! grep -qF "@everyone" "$STUB/pwm.log" && ! grep -qF "<@&" "$STUB/pwm.log" \
+    && ! grep -qF "evil" "$STUB/pwm.log"; then
+    bpt_named_ok close_notice_malicious_title_never_posted
+else
+    bpt_named_fail close_notice_malicious_title_never_posted "$(cat "$STUB/pwm.log" 2>/dev/null)"
+fi
+
+bpt_reset
+_cn_issue 40 CLOSED COMPLETED
+_cn_rows "[$(_cn_row1 40 "$_CN_THREAD" "" "12345abc")]"
+bpt_run
+if [ "$(_cn_posts)" = 1 ] && ! grep -qF "12345abc" "$STUB/pwm.log" && grep -qF "thread_id" "$STUB/pwm.log"; then
+    bpt_named_ok close_notice_bad_reporter_id_dropped
+else
+    bpt_named_fail close_notice_bad_reporter_id_dropped "$(cat "$STUB/pwm.log" 2>/dev/null)"
+fi
+
+bpt_reset
+_cn_issue 41 CLOSED COMPLETED
+_cn_rows "[$(_cn_row1 41)]"
+export STUB_PWM_FAIL=1
+for _i in 1 2 3 4 5; do bpt_run; done
+_cn_fifth_log="$(cat "$STUB/tick.out")"
+bpt_run   # a sixth tick: the failed row is terminal, so nothing more is posted
+unset STUB_PWM_FAIL
+if [ "$(cat "$STUB/notices/41.state" 2>/dev/null)" = failed ] && [ "$(_cn_posts)" = 5 ] \
+    && grep -qF "close notice for issue 41 failed 5 times" <<< "$_cn_fifth_log"; then
+    bpt_named_ok close_notice_post_failure_releases_then_fails_at_five
+else
+    bpt_named_fail close_notice_post_failure_releases_then_fails_at_five "state=$(cat "$STUB/notices/41.state" 2>/dev/null) posts=$(_cn_posts)"
+fi
+
+bpt_reset
+_cn_issue 4242 CLOSED COMPLETED
+_cn_rows "[$(_cn_row1 4242)]"
+bpt_set_list_pr_open '[{"id":"7","status":"pr_open","pr_number":"55","issue_number":"4242"}]'
+bpt_set_gh_pr_view 'MERGED'
+bpt_run
+if [ "$(_cn_posts)" = 1 ] && grep -qF "issue close 4242" "$STUB/gh.log" \
+    && [ "$(cat "$STUB/notices/4242.state" 2>/dev/null)" = notified ]; then
+    bpt_named_ok close_notice_reconcile_close_single_notice
+else
+    bpt_named_fail close_notice_reconcile_close_single_notice "posts=$(_cn_posts)"
+fi
+
+# 30 open pending rows, and issue 30 closes. One tick reads one page of 25 (at most 25 gh reads),
+# so tick 1 never reaches issue 30. Tick 2 starts after the saved cursor and posts its notice.
+bpt_reset
+_cn_all=""
+for _cn_i in $(seq 1 30); do
+    if [ "$_cn_i" = 30 ]; then _cn_issue 30 CLOSED COMPLETED; else _cn_issue "$_cn_i" OPEN ""; fi
+    _cn_all="${_cn_all:+$_cn_all,}$(_cn_row1 "$_cn_i")"
+done
+_cn_rows "[$_cn_all]"
+bpt_run
+_cn_reads1="$(grep -c "issue view" "$STUB/gh.log" 2>/dev/null)"
+_cn_posts1="$(_cn_posts)"
+_cn_cur1="$(cat "$STUB/notices/cursor" 2>/dev/null)"
+rm -f "$STUB/gh.log"
+bpt_run
+_cn_reads2="$(grep -c "issue view" "$STUB/gh.log" 2>/dev/null)"
+_cn_cur2="$(cat "$STUB/notices/cursor" 2>/dev/null)"
+if [ "${_cn_reads1:-0}" = 25 ] && [ "$_cn_posts1" = 0 ] && [ "$_cn_cur1" = 25 ] \
+    && [ "${_cn_reads2:-0}" -le 25 ] && [ "$(_cn_posts)" = 1 ] \
+    && [ "$(cat "$STUB/notices/30.state" 2>/dev/null)" = notified ] && [ "$_cn_cur2" = 0 ]; then
+    bpt_named_ok close_notice_pages_one_window_per_tick
+else
+    bpt_named_fail close_notice_pages_one_window_per_tick "reads=$_cn_reads1/$_cn_reads2 posts=$_cn_posts1/$(_cn_posts) cursor=$_cn_cur1/$_cn_cur2"
+fi
+
 echo "----"
 [ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"
 h_done

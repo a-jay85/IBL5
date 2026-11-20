@@ -35,9 +35,39 @@ def test_detect_non_gate_paths_empty():
 
 
 def test_detect_transitive_lib_change():
-    sources = {"bin/check-a": "source bin/lib/x.sh\n", "bin/check-docs": "no mention\n"}
+    sources = {"bin/check-a": 'source "$here/lib/x.sh"\n', "bin/check-docs": "no mention\n"}
     out = _detect([("M", "bin/lib/x.sh")], check_sources=sources)
     assert [(c.path, c.kind) for c in out] == [("bin/check-a", "transitive")]
+
+
+def _transitive(src):
+    out = _detect([("M", "bin/lib/prefire-verify")], check_sources={"bin/check-x": src})
+    return [c.path for c in out if c.kind == "transitive"]
+
+
+def test_detect_comment_only_lib_mention_is_not_transitive():
+    src = '#!/usr/bin/env bash\n# feeds bin/lib/prefire-verify\n    # see bin/lib/prefire-verify\necho ok\n'
+    assert _transitive(src) == []
+
+
+def test_detect_here_exec_form_is_transitive():
+    src = 'here="$(dirname "$0")"\n"$here/lib/prefire-verify" --stage pytest\n'
+    assert _transitive(src) == ["bin/check-x"]
+
+
+def test_detect_root_bin_lib_form_is_transitive():
+    src = 'ROOT="$(git rev-parse --show-toplevel)"\nout=$("$ROOT/bin/lib/prefire-verify")\n'
+    assert _transitive(src) == ["bin/check-x"]
+
+
+def test_detect_lib_superstring_is_not_transitive():
+    src = 'source "$here/lib/prefire-verify-extra"\nrun bin/lib/prefire-verify.sh\n'
+    assert _transitive(src) == []
+
+
+def test_detect_trailing_comment_mention_is_not_transitive():
+    src = 'echo ok   # wraps bin/lib/prefire-verify\n'
+    assert _transitive(src) == []
 
 
 def test_ci_workflow_and_arming_not_replayable():
@@ -1035,3 +1065,12 @@ def test_changes_from_unified_diff():
         ("A", "bin/check-new"), ("D", "bin/check-old"),
         ("R", "bin/check-now"), ("M", "ibl5/x.php")]
     assert changes_from_unified_diff("") == []
+
+
+def test_verdict_all_gate_absent_is_thin_sample():
+    gate = GateChange("bin/check-x", "transitive", "replayable", SPEC, "")
+    results = [ReplayResult(n, "bin/check-x", "skipped", "gate-absent") for n in range(1, 31)]
+    v = compute_verdict([gate], results, _truth(clean=range(1, 31)))
+    assert v.state == "UNKNOWN"
+    assert "thin sample" in v.reason
+    assert "replay failed" not in v.reason

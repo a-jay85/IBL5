@@ -2,6 +2,7 @@ import express from 'express';
 import type { Client } from 'discord.js';
 import { config } from './config.js';
 import * as phpClient from './php-client.js';
+import { checkBugChannelPermissions } from './preflight.js';
 
 /**
  * The 6 §3c loopback Express endpoints the PR #5 cron calls to make the bot
@@ -28,6 +29,11 @@ function isUnknownMessage(error: unknown): boolean {
         && (error as { code?: unknown }).code === 10008;
 }
 
+// Discord snowflake ids are 17-19 digit strings (20 digits can overflow the BIGINT UNSIGNED
+// columns). Every id field the new routes accept
+// is validated against this; a mismatch is a 400.
+const SNOWFLAKE = /^[0-9]{17,19}$/;
+
 // Splits text at ≤CHUNK_MAX chars, preferring line breaks over mid-word cuts.
 // Each chunk after the first is prefixed with "(N/M): " so a reader knows more follows.
 const CHUNK_MAX = 1900;
@@ -50,6 +56,30 @@ export function chunkMessage(text: string): string[] {
 export function startBugBotServer(client: Client): void {
     const app = express();
     app.use(express.json());
+
+    // Returns the channel when `id` is the bug channel or a thread whose parent is the
+    // bug channel; otherwise null (the route answers 403). Stops the endpoints from
+    // reaching any other channel the bot can see.
+    async function resolveBugScopedChannel(id: string) {
+        const channel = await client.channels.fetch(id);
+        if (!channel) return null;
+        if (id === config.bugChannelId) return channel;
+        if (channel.isThread() && channel.parentId === config.bugChannelId) return channel;
+        return null;
+    }
+
+    // Loud preflight for the scan and post routes. Both `missing` and `unknown` are 503:
+    // the caller must not act on a bot whose permissions cannot be confirmed.
+    async function requirePermissions(res: express.Response): Promise<boolean> {
+        const result = await checkBugChannelPermissions(client);
+        if (result.status === 'ok') return true;
+        const detail = result.status === 'missing'
+            ? `missing: ${result.missing.join(', ')}`
+            : `unknown: ${result.reason}`;
+        console.error(`Bug-bot permission preflight failed — bug channel ${config.bugChannelId} ${detail}`);
+        res.status(503).json({ error: 'missing_permissions', detail });
+        return false;
+    }
 
     // POST /react — { message_id, emoji }
     app.post('/react', async (req, res) => {
@@ -118,7 +148,7 @@ export function startBugBotServer(client: Client): void {
                 return;
             }
             const chunks = chunkMessage(message);
-            for (const chunk of chunks) { await channel.send(chunk); }
+            for (const chunk of chunks) { await channel.send({ content: chunk, allowedMentions: { parse: [] } }); }
             res.json({ ok: true, chunks: chunks.length });
         } catch (error) {
             console.error('/post-to-thread failed:', error);
@@ -136,13 +166,21 @@ export function startBugBotServer(client: Client): void {
             res.status(400).send('Missing thread_id, discord_id, or message');
             return;
         }
+        if (typeof discord_id !== 'string' || !SNOWFLAKE.test(discord_id)) {
+            res.status(400).send('Invalid discord_id');
+            return;
+        }
         try {
             const channel = await client.channels.fetch(thread_id);
             if (!channel || !channel.isSendable()) {
                 res.status(500).send('Thread is not sendable');
                 return;
             }
-            const sent = await channel.send(`<@${discord_id}> ${message}`);
+            // Only the target user is pinged; a role or @everyone inside `message` is not.
+            const sent = await channel.send({
+                content: `<@${discord_id}> ${message}`,
+                allowedMentions: { parse: [], users: [discord_id] },
+            });
             res.json({ message_id: sent.id });   // the posted mention's id (string)
         } catch (error) {
             console.error('/mention failed:', error);
@@ -280,6 +318,241 @@ export function startBugBotServer(client: Client): void {
             }
             console.error('/reply-to-message failed:', error);
             res.status(500).send('Failed to reply');
+        }
+    });
+
+    // POST /edit-message — { channel_id, message_id, content }
+    // Edits only the bot's own message, and only inside the bug channel or its threads.
+    app.post('/edit-message', async (req, res) => {
+        const { channel_id, message_id, content } = req.body ?? {};
+        if (typeof channel_id !== 'string' || !SNOWFLAKE.test(channel_id)
+            || typeof message_id !== 'string' || !SNOWFLAKE.test(message_id)) {
+            res.status(400).send('Invalid channel_id or message_id');
+            return;
+        }
+        if (typeof content !== 'string' || content.length < 1 || content.length > 2000) {
+            res.status(400).send('content must be 1..2000 characters');
+            return;
+        }
+        try {
+            const channel = await resolveBugScopedChannel(channel_id);
+            if (!channel) {
+                res.status(403).json({ error: 'channel_out_of_scope' });
+                return;
+            }
+            if (!channel.isTextBased()) {
+                res.status(500).send('Channel is not text-based');
+                return;
+            }
+            const message = await channel.messages.fetch(message_id);
+            if (message.author.id !== client.user?.id) {
+                res.status(403).json({ error: 'not_bot_author' });
+                return;
+            }
+            await message.edit({ content, allowedMentions: { parse: [] } });
+            res.json({ ok: true, message_id: message.id });
+        } catch (error) {
+            if (isUnknownMessage(error)) {
+                res.status(410).send('Message deleted');
+                return;
+            }
+            console.error('/edit-message failed:', error);
+            res.status(500).send('Failed to edit message');
+        }
+    });
+
+    // POST /list-threads — { archived, before? } → { threads, has_more, next_before }
+    app.post('/list-threads', async (req, res) => {
+        const { archived, before } = req.body ?? {};
+        if (typeof archived !== 'boolean') {
+            res.status(400).send('archived must be a boolean');
+            return;
+        }
+        if (before !== undefined && (typeof before !== 'string' || !SNOWFLAKE.test(before))) {
+            res.status(400).send('Invalid before');
+            return;
+        }
+        try {
+            if (!(await requirePermissions(res))) return;
+            const channel = await client.channels.fetch(config.bugChannelId);
+            if (!channel || !('threads' in channel)) {
+                res.status(500).send('Bug channel has no threads');
+                return;
+            }
+            const toWire = (t: { id: string; archived: boolean | null; locked: boolean | null }) => ({
+                id: t.id,
+                archived: t.archived ?? false,
+                locked: t.locked ?? false,
+            });
+            if (!archived) {
+                const active = await channel.threads.fetchActive();
+                res.json({ threads: [...active.threads.values()].map(toWire), has_more: false, next_before: null });
+                return;
+            }
+            const page = await channel.threads.fetchArchived({ type: 'public', before, limit: 100 });
+            const threads = [...page.threads.values()].map(toWire);
+            const last = threads[threads.length - 1];
+            res.json({
+                threads,
+                has_more: page.hasMore,
+                next_before: page.hasMore && last ? last.id : null,
+            });
+        } catch (error) {
+            console.error('/list-threads failed:', error);
+            res.status(500).send('Failed to list threads');
+        }
+    });
+
+    // POST /scan-messages — { channel_id, before? } → { messages, next_before }
+    // One page of 100; only the bot's own messages are returned. next_before is the
+    // oldest id of the page (null at the end) so the caller can keep paging.
+    app.post('/scan-messages', async (req, res) => {
+        const { channel_id, before } = req.body ?? {};
+        if (typeof channel_id !== 'string' || !SNOWFLAKE.test(channel_id)) {
+            res.status(400).send('Invalid channel_id');
+            return;
+        }
+        if (before !== undefined && (typeof before !== 'string' || !SNOWFLAKE.test(before))) {
+            res.status(400).send('Invalid before');
+            return;
+        }
+        try {
+            if (!(await requirePermissions(res))) return;
+            const channel = await resolveBugScopedChannel(channel_id);
+            if (!channel) {
+                res.status(403).json({ error: 'channel_out_of_scope' });
+                return;
+            }
+            if (!channel.isTextBased()) {
+                res.status(500).send('Channel is not text-based');
+                return;
+            }
+            const page = [...(await channel.messages.fetch({ limit: 100, before })).values()];
+            const botId = client.user?.id;
+            const messages = page
+                .filter((m) => m.author.id === botId)
+                .map((m) => ({
+                    id: m.id,
+                    channel_id,
+                    content: m.content,
+                    reference_message_id: m.reference?.messageId ?? null,
+                    created_timestamp: m.createdTimestamp,
+                }));
+            const oldest = page[page.length - 1];
+            res.json({ messages, next_before: page.length >= 100 && oldest ? oldest.id : null });
+        } catch (error) {
+            console.error('/scan-messages failed:', error);
+            res.status(500).send('Failed to scan messages');
+        }
+    });
+
+    // POST /post-with-mention — { message, discord_id?, thread_id?, reply_to_message_id? }
+    // Posts a close notice at most once: thread, else reply to the original, else the
+    // bug channel. A lookup that cannot locate the target falls through; a send that
+    // throws is a 502 and never tries the next target.
+    app.post('/post-with-mention', async (req, res) => {
+        const { message, discord_id, thread_id, reply_to_message_id } = req.body ?? {};
+        if (typeof message !== 'string' || message.length === 0) {
+            res.status(400).send('Missing message');
+            return;
+        }
+        if (/@everyone|@here|<@/.test(message)) {
+            res.status(400).send('message must not contain mention tokens');
+            return;
+        }
+        for (const [name, value] of [['discord_id', discord_id], ['thread_id', thread_id], ['reply_to_message_id', reply_to_message_id]] as const) {
+            if (value !== undefined && value !== null && (typeof value !== 'string' || !SNOWFLAKE.test(value))) {
+                res.status(400).send(`Invalid ${name}`);
+                return;
+            }
+        }
+        const reporterId: string | null = discord_id ?? null;
+        const content = reporterId ? `<@${reporterId}> ${message}` : message;
+        if (content.length > 2000) {
+            res.status(400).send('content exceeds 2000 characters');
+            return;
+        }
+        const allowedMentions = { parse: [] as never[], users: reporterId ? [reporterId] : [], repliedUser: false };
+        try {
+            if (!(await requirePermissions(res))) return;
+
+            // (1) the thread
+            if (thread_id) {
+                try {
+                    const thread = await client.channels.fetch(thread_id);
+                    if (thread && thread.isThread() && thread.parentId === config.bugChannelId && !thread.locked) {
+                        let usable = true;
+                        if (thread.archived) {
+                            try {
+                                await thread.setArchived(false, 'bug close notice');
+                            } catch (unarchiveError) {
+                                console.warn('/post-with-mention: unarchive failed, falling back:', unarchiveError);
+                                usable = false;
+                            }
+                        }
+                        if (usable) {
+                            let sent;
+                            try {
+                                sent = await thread.send({ content, allowedMentions });
+                            } catch (sendError) {
+                                console.error('/post-with-mention thread send failed:', sendError);
+                                res.status(502).send('Failed to send');
+                                return;
+                            }
+                            res.json({ ok: true, target: 'thread', message_id: sent.id });
+                            return;
+                        }
+                    }
+                } catch (lookupError) {
+                    console.warn('/post-with-mention: thread lookup failed, falling back:', lookupError);
+                }
+            }
+
+            const bugChannel = await client.channels.fetch(config.bugChannelId);
+            if (!bugChannel || !bugChannel.isTextBased()) {
+                res.status(500).send('Bug channel is not text-based');
+                return;
+            }
+
+            // (2) reply to the original report
+            if (reply_to_message_id) {
+                let original = null;
+                try {
+                    original = await bugChannel.messages.fetch(reply_to_message_id);
+                } catch (lookupError) {
+                    console.warn('/post-with-mention: original lookup failed, falling back:', lookupError);
+                }
+                if (original) {
+                    let sent;
+                    try {
+                        sent = await original.reply({ content, allowedMentions });
+                    } catch (sendError) {
+                        console.error('/post-with-mention reply failed:', sendError);
+                        res.status(502).send('Failed to send');
+                        return;
+                    }
+                    res.json({ ok: true, target: 'reply', message_id: sent.id });
+                    return;
+                }
+            }
+
+            // (3) the bug channel
+            if (!bugChannel.isSendable()) {
+                res.status(500).send('Bug channel is not sendable');
+                return;
+            }
+            let sent;
+            try {
+                sent = await bugChannel.send({ content, allowedMentions });
+            } catch (sendError) {
+                console.error('/post-with-mention channel send failed:', sendError);
+                res.status(502).send('Failed to send');
+                return;
+            }
+            res.json({ ok: true, target: 'channel', message_id: sent.id });
+        } catch (error) {
+            console.error('/post-with-mention failed:', error);
+            res.status(500).send('Failed to post');
         }
     });
 

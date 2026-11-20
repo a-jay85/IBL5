@@ -34,7 +34,7 @@
 		<key>PATH</key>
 		<string>/opt/homebrew/opt/mariadb/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:@HOME@/.local/bin</string>
 		<key>BUG_PIPELINE_ISSUE_REPO</key>
-		<string>a-jay85/ibl5-bugs</string>
+		<string>a-jay85/IBL5</string>
 		<key>BUG_PIPELINE_APPROVER_ID</key>
 		<string></string>
 		<!-- Set to 1 to enable file-issues-only mode: files GitHub Issues + replies to GMs

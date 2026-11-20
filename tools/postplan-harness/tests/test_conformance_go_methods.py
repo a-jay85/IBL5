@@ -133,3 +133,119 @@ def test_legacy_copy_matches_real_on_non_go_inputs():
     ]
     for name, text in cases:
         assert _legacy_method_declared(name, text) == _method_declared(name, text), (name, text)
+
+
+_JSBTRACE_PATH = "engine/internal/jsbtrace/jsbtrace_test.go"
+_JSBTRACE_TESTS = (
+    "TestLoadDefaultDirWhenOverrideUnset",
+    "TestLoadDefaultDirWhenOverrideEmpty",
+    "TestLoadOverrideDirWins",
+    "TestLoadRejectsPathEscape",
+    "TestLoadRejectsBadHeader",
+    "TestLoadRejectsZeroRecords",
+    "TestLoadRejectsRecordMissingOut",
+)
+
+
+def test_jsbtrace_test_file_declares_its_test_funcs():
+    """Mutation: deleting the Go arm (the real file stops matching AFTER)."""
+    path = os.path.join(_REPO_ROOT, _JSBTRACE_PATH)
+    assert os.path.isfile(path), f"missing real Go fixture {path}"
+    with open(path, encoding="utf-8") as fh:
+        text = fh.read()
+    assert len(_JSBTRACE_TESTS) == 7
+    for name in _JSBTRACE_TESTS:
+        assert _method_declared(name, text), name
+        assert not _legacy_method_declared(name, text), name
+    assert not _method_declared("TestNoSuchFunc", text)
+
+
+_GO_FUNC_LINE = re.compile(r"^func\s+(?:\([^)]*\)\s*)?(Test\w+)")
+_TEXT_SUFFIXES = (".go", ".py", ".sh", ".php", ".ts", ".js")
+
+
+def _tracked_files() -> list[str]:
+    out = subprocess.run(["git", "ls-files"], cwd=_REPO_ROOT,
+                         capture_output=True, text=True, check=True).stdout
+    return [f for f in out.split("\n") if f]
+
+
+def _read_text(rel: str) -> str | None:
+    try:
+        with open(os.path.join(_REPO_ROOT, rel), encoding="utf-8") as fh:
+            return fh.read()
+    except (UnicodeDecodeError, OSError):
+        return None
+
+
+def _has_witness(name: str, text: str) -> bool:
+    """Independent string scan (no regex): a `func ` line that holds ` name(` or ` name[`."""
+    for line in text.splitlines():
+        s = line.strip()
+        if s.startswith("func ") and (f" {name}(" in s or f" {name}[" in s):
+            return True
+    return False
+
+
+def _first_line(name: str, text: str) -> int:
+    for i, line in enumerate(text.splitlines(), 1):
+        if _method_declared(name, line):
+            return i
+    return 0
+
+
+def test_go_corpus_diff_flips_only_go_declarations():
+    """Mutation: widening the Go arm keyword to `\\w+` flips a non-Go pair and fails (d)."""
+    if os.environ.get("POSTPLAN_CORPUS_DIFF") != "1":
+        pytest.skip("SKIP: set POSTPLAN_CORPUS_DIFF=1 to diff the Go-func corpus")
+    plans_dir = os.environ.get("PLANS_DIR") or os.path.expanduser("~/claude-plans")
+    assert os.path.isdir(plans_dir), f"POSTPLAN_CORPUS_DIFF=1 but no plan corpus at {plans_dir}"
+
+    plan_paths = [p for p in sorted(glob.glob(os.path.join(plans_dir, "*.md")))
+                  if not p.endswith("-shared-context.md")]
+    assert plan_paths, f"no *.md plans under {plans_dir}"
+    names: set[str] = set()
+    for p in plan_paths:
+        info = locate_plan("corpus", explicit_path=p)
+        if not info.found:
+            continue
+        names.update(m for m in info.required_test_methods if "-" not in m)
+
+    tracked = _tracked_files()
+    texts: dict[str, str] = {}
+    for rel in tracked:
+        if rel.endswith(_TEXT_SUFFIXES) or (rel.startswith("bin/") and "." not in os.path.basename(rel)):
+            body = _read_text(rel)
+            if body is not None:
+                texts[rel] = body
+    for rel, body in texts.items():
+        if rel.endswith(".go"):
+            for line in body.splitlines():
+                m = _GO_FUNC_LINE.match(line)
+                if m:
+                    names.add(m.group(1))
+
+    pairs = 0
+    flips: list[tuple[str, str]] = []
+    for name in sorted(names):
+        for rel, body in texts.items():
+            if name not in body:
+                continue
+            pairs += 1
+            before = _legacy_method_declared(name, body)
+            after = _method_declared(name, body)
+            assert not (before and not after), f"superset broken: {name} in {rel}"
+            if before != after:
+                flips.append((name, rel))
+
+    print(f"scanned={len(plan_paths)} names={len(names)} texts={len(texts)} pairs={pairs} flips={len(flips)}")
+    for name, rel in flips:
+        print(f"  {name} -> {rel}:{_first_line(name, texts[rel])}")
+
+    assert flips, "no flips: the diff passed vacuously"
+    for name, rel in flips:
+        assert rel.endswith(".go"), f"non-Go flip: {name} -> {rel}"
+        assert _has_witness(name, texts[rel]), f"no string-scan witness: {name} -> {rel}"
+    flipped = set(flips)
+    for name in _JSBTRACE_TESTS:
+        assert (name, _JSBTRACE_PATH) in flipped, f"jsbtrace func not flipped: {name}"

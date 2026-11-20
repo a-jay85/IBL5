@@ -29,6 +29,7 @@ MAX_FILES = 3
 # permission must fail closed, so an unmarked bullet earns nothing here.
 _BLOCKING_RE = re.compile(r"^\s*(?:[-*]|\d+[.)])\s+\[BLOCKING\](?=\s|$)")
 _CODE_SPAN_RE = re.compile(r"`([^`\n]+)`")
+_LINE_SUFFIX_RE = re.compile(r"^(.+?):\d+(?:[-:]\d+)?$")
 _LAST_VERIFIED_RE = re.compile(r"^last_verified:")
 
 
@@ -48,16 +49,21 @@ def _is_rules_md(path: str) -> bool:
             and "/" not in path[len(RULES_PREFIX):])
 
 
-def named_paths(finding_text: str, pr_files) -> set[str]:
+def named_paths(finding_text: str, pr_files, *, line_suffix: bool = False) -> set[str]:
     """PR-diff files a finding names in code spans: a full path, or a unique basename.
 
     Bare prose such as `visual-review-prs.md step 3` is ignored, and a basename shared
-    by two or more PR files is ambiguous and adds nothing.
+    by two or more PR files is ambiguous and adds nothing. With `line_suffix`, a trailing
+    `:LINE`, `:LINE-LINE` or `:LINE:COL` is dropped before matching.
     """
     pr_files = list(pr_files)
     out: set[str] = set()
     for token in _CODE_SPAN_RE.findall(finding_text):
         token = token.strip()
+        if line_suffix:
+            m = _LINE_SUFFIX_RE.match(token)
+            if m:
+                token = m.group(1)
         if token in pr_files:
             out.add(token)
         elif token and "/" not in token:

@@ -540,9 +540,61 @@ def test_fidelity_fix_skips_unplanned_scope_blockers(rig, monkeypatch, fid_pr):
 
     monkeypatch.setattr(fix_round, "run_fix_round", counted)
     res = rig.run(llm, extra=_pr_extra(pr))
-    assert res.fix_round["fidelity"] == {"ran": False, "reason": "no-file-blocker"}
+    assert res.fix_round["fidelity"] == {"ran": False, "reason": "unplanned-scope-only"}
     assert during_round == []
     assert 12 in _holds(res)
+
+
+def test_named_paths_line_suffix_matches_pr_file():
+    from harness import fidelity_filefix as ff
+    full = "tools/postplan-harness/harness/sql_readonly_scan.py"
+    got = ff.named_paths(f"- [BLOCKING] `{full}:1587` drops the row.", [full], line_suffix=True)
+    assert got == {full}
+    got = ff.named_paths("`sql_readonly_scan.py:12-40` drops it.", [full], line_suffix=True)
+    assert got == {full}
+
+
+def test_named_paths_line_suffix_off_by_default():
+    from harness import fidelity_filefix as ff
+    full = "tools/postplan-harness/harness/sql_readonly_scan.py"
+    assert ff.named_paths(f"`{full}:1587` drops the row.", [full]) == set()
+
+
+def test_eligible_paths_ignores_line_suffix():
+    from harness import fidelity_filefix as ff
+    rules = ".claude/rules/ci-gotchas.md"
+    assert ff.eligible_paths([f"- [BLOCKING] `{rules}:26` is wrong."], [rules]) == frozenset()
+
+
+def test_named_paths_line_suffix_near_miss():
+    from harness import fidelity_filefix as ff
+    files = ["harness/foo.py"]
+    for span in ("foo.py:abc", "foo.py:", "12:30"):
+        assert ff.named_paths(f"`{span}` is wrong.", files, line_suffix=True) == set(), span
+
+
+def test_fr_fidelity_fix_accepts_line_suffixed_blocker(rig, monkeypatch, fid_pr):
+    pr = fid_pr(7303)
+    monkeypatch.setattr(runner.unplanned_scope, "downgrade_applies", lambda *a, **k: False)
+    res = rig.run(_not_ready_llm(rig, f"`{PATH}:1587` still drops the row."), extra=_pr_extra(pr))
+    assert res.fix_round["fidelity"].get("ran") is True
+    assert res.fix_round["fidelity"].get("reason") != "no-file-blocker"
+
+
+def test_fr_fidelity_fix_unplanned_scope_only_reason(rig, monkeypatch, fid_pr):
+    pr = fid_pr(7304)
+    monkeypatch.setattr(runner.unplanned_scope, "downgrade_applies", lambda *a, **k: False)
+    res = rig.run(_not_ready_llm(rig, f"[unplanned-scope] `{PATH}:12` is outside every phase."),
+                  extra=_pr_extra(pr))
+    assert res.fix_round["fidelity"] == {"ran": False, "reason": "unplanned-scope-only"}
+
+
+def test_fr_fidelity_fix_no_texts_keeps_no_file_blocker(rig, monkeypatch, fid_pr):
+    pr = fid_pr(7305)
+    monkeypatch.setattr(runner.unplanned_scope, "downgrade_applies", lambda *a, **k: False)
+    monkeypatch.setattr(runner.fidelity, "blocking_finding_texts", lambda path: [])
+    res = rig.run(_not_ready_llm(rig, f"`{PATH}` still drops the row."), extra=_pr_extra(pr))
+    assert res.fix_round["fidelity"] == {"ran": False, "reason": "no-file-blocker"}
 
 
 def test_runner_recheck_forwards_security_seat(rig, monkeypatch):

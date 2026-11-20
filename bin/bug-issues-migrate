@@ -87,9 +87,11 @@ STATE="$DIR/bug-issues-migrate.state"
 LOCK="$DIR/bug-issues-migrate.lock"
 OLD_URL_RE='https://github\.com/a-jay85/ibl5-bugs/issues/[0-9]+'
 
-# Wrappers so a dry-run line reads like the real command.
-gh() { "$GH_BIN" "$@"; }
-launchctl() { "$LAUNCHCTL_BIN" "$@"; }
+# Wrappers so a dry-run line reads like the real command. `command` skips shell
+# functions, so the default GH_BIN=gh runs the gh binary instead of this wrapper
+# calling itself until bash crashes (exit 139).
+gh() { command "$GH_BIN" "$@"; }
+launchctl() { command "$LAUNCHCTL_BIN" "$@"; }
 
 say() { printf '%s\n' "$*"; }
 die() { local code="$1"; shift; printf 'ERROR: %s\n' "$*" >&2; exit "$code"; }

@@ -346,6 +346,7 @@ def test_condition3_with_untried_item_still_runs(tmp_path, monkeypatch):
 
 
 def test_condition3_plus_review_hold_still_collects(tmp_path):
+    """A [2,3,11] hold keeps review_tg {2, 11}; review_tg.clear() would wrongly skip it."""
     calls = []
 
     class _CountGh(_Gh):
@@ -359,6 +360,7 @@ def test_condition3_plus_review_hold_still_collects(tmp_path):
 
 
 def test_condition3_with_unwired_conflict_skips_named(tmp_path):
+    """A [3,14] hold with no conflict re-review wired has nothing to act on."""
     rec, *_ = _run(tmp_path, res=_tried_res(), decision=_decision(3, 14),
                    gh=_NoCallGh(), git=_NoCallGit(), conflict_rereview=None)
     assert rec["status"] == "skipped"

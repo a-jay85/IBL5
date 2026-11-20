@@ -148,6 +148,7 @@ def test_gate_held_thread_stays_out_of_round(tmp_path, monkeypatch):
 
 
 def test_gate_held_and_open_thread_round_reports_nothing_to_fix(tmp_path, monkeypatch):
+    """The live [2,11] shape: the gate-held thread and its finding both stay out."""
     fx, res, gh, _rows = _load("gate_path_check_docs.json", monkeypatch)
     rec, calls = _run(tmp_path, fx, res, gh, monkeypatch)
     assert calls == []

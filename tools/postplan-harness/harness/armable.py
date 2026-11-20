@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Callable, Optional, Sequence
 
 from . import labels
+from .sql_comments import migration_sections, strip_added_sql_comments
 from .state import ArmDecision, Classification, ConditionResult, Finding
 
 
@@ -64,13 +65,18 @@ ROW_CHECKBOX_RE = re.compile(r"^- \[([ x])\] \*\*[^*]+\*\*")
 
 # Condition (9) deterministic hold-trigger surface (the enumerable subset; the
 # bounded LLM verdict may ADD holds on top — never release one).
-# Raw regex: it matches SQL comment text too. merge_danger trigger 1 blanks comments with
-# sql_comments.strip_added_sql_comments first; condition (9) scans filtered_diff, which
-# classify.filter_diff has already stripped of migrations/, so it never meets a migration line.
+# Raw regex: it matches SQL comment text too, so both callers blank comments with
+# sql_comments.strip_added_sql_comments first. Condition (9) scans only the added lines of up
+# .sql migrations (Classification.migration_diff minus *.down.sql), and it defers to merge
+# danger: a diff whose merge_danger_state is TWO-WAY (prove_revertible, PR #3915) does not
+# hold here. Condition (18) still holds every other state.
 DESTRUCTIVE_SQL = re.compile(
     r"^\+.*\b(DROP\s+TABLE|DROP\s+COLUMN|ALTER\s+TABLE\s+\S+\s+RENAME|RENAME\s+COLUMN|TRUNCATE)\b",
     re.IGNORECASE | re.MULTILINE,
 )
+# Up .sql migrations only. A .down.sql file runs at revert time, never at deploy, and merge
+# danger trigger 1 still scans it (an unpaired or unproven down file keeps (18) held).
+_UP_SQL_MIGRATION_RE = re.compile(r"^ibl5/migrations/(?!.*\.down\.sql$).*\.sql$")
 
 
 def _manual_section(body: str) -> list[str] | None:
@@ -352,11 +358,20 @@ def _apply_second_review(inp, cs, cands) -> list[str]:
     return cleared
 
 
-def deterministic_safety_holds(cls: Classification, title: str) -> list[str]:
+def deterministic_safety_holds(cls: Classification, title: str, *,
+                               merge_danger_state: str = "MISSING") -> list[str]:
     """Condition (9)'s enumerable hold-triggers. The bounded LLM verdict (when
-    enabled) can only APPEND to this list."""
+    enabled) can only APPEND to this list.
+
+    Scans the comment-stripped added lines of up .sql migrations only, so schema-dump, doc and
+    code text, SQL comments and down files never hold here. When merge_danger_state is TWO-WAY,
+    merge danger trigger 1 already ran this scan and prove_revertible released it, so (9)
+    defers. Any other state, the fail-closed default included, holds."""
     holds: list[str] = []
-    if cls.has_migration and DESTRUCTIVE_SQL.search(cls.filtered_diff or ""):
+    if merge_danger_state == "TWO-WAY":
+        return holds
+    sql = strip_added_sql_comments(migration_sections(cls.migration_diff or "", _UP_SQL_MIGRATION_RE))
+    if cls.has_migration and DESTRUCTIVE_SQL.search(sql):
         holds.append("destructive/schema-tightening migration in realized diff")
     return holds
 
@@ -768,7 +783,8 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     u_hold = ui_hold(_ui_paths(inp), inp.pr_labels)
     cs.append(ConditionResult(8, "ui-review-floor", bool(u_hold), u_hold))
 
-    det_holds = deterministic_safety_holds(inp.classification, inp.pr_title)
+    det_holds = deterministic_safety_holds(inp.classification, inp.pr_title,
+                                           merge_danger_state=inp.merge_danger_state)
     all_holds = det_holds + list(inp.llm_safety_holds)
     if inp.degraded_agents:
         all_holds = all_holds + ["review unavailable: " + ", ".join(inp.degraded_agents)]

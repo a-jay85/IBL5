@@ -751,32 +751,96 @@ def test_condition_19_never_releases_other_holds():
     assert {c.number for c in d.holds} == {3}
 
 
-# --- condition (9): migration blindness ----------------------------------------------------------
+# --- condition (9): up-migration-only scan with merge-danger deference ---------------------------
 
-def test_condition_9_never_sees_migration_sections():
-    from dataclasses import replace
+_C9_HOLD = ["destructive/schema-tightening migration in realized diff"]
+
+
+def _c9_cls(*files):
+    """files: (path, [added lines]). Real headers, built through classify()."""
+    from harness.classify import classify, files_from_diff
+    diff = "".join(
+        f"diff --git a/{p} b/{p}\n+++ b/{p}\n@@ -0,0 +1,{len(ls)} @@\n" + "".join(f"+{l}\n" for l in ls)
+        for p, ls in files)
+    return classify(files_from_diff(diff), diff)
+
+
+def _c9(*files, state="ONE-WAY"):
     from harness.armable import deterministic_safety_holds
-    from harness.classify import filter_diff
-    diff = ("diff --git a/ibl5/migrations/201_x.sql b/ibl5/migrations/201_x.sql\n"
-            "+++ b/ibl5/migrations/201_x.sql\n"
-            "@@ -0,0 +1 @@\n"
-            "+ALTER TABLE t DROP COLUMN c;\n"
-            "diff --git a/docs/x.md b/docs/x.md\n"
-            "+++ b/docs/x.md\n"
-            "@@ -0,0 +1 @@\n"
-            "+prose\n")
-    filtered = filter_diff(diff)
-    assert "migrations/" not in filtered
-    assert "+prose" in filtered
-    cls = replace(Classification(), has_migration=True, filtered_diff=filtered)
-    assert deterministic_safety_holds(cls, "chore: x") == []
+    return deterministic_safety_holds(_c9_cls(*files), "chore: x", merge_danger_state=state)
 
 
-def test_condition_9_still_holds_on_destructive_text_outside_migrations():
+_C9_ADDITIVE = ("ibl5/migrations/300_x.sql", ["CREATE TABLE x (id INT);"])
+
+
+def test_condition_9_ignores_schema_dump_drop_with_additive_migration():
+    assert _c9(_C9_ADDITIVE,
+               ("ibl5/docs/schema/current-schema.sql", ["DROP TABLE IF EXISTS `x`;"])) == []
+
+
+def test_condition_9_ignores_destructive_text_in_php_and_md():
+    assert _c9(_C9_ADDITIVE,
+               ("ibl5/classes/X.php", ['$db->query("DROP TABLE x");']),
+               ("ibl5/docs/x.md", ["DROP COLUMN y"])) == []
+
+
+def test_condition_9_ignores_rollback_line_comment():
+    assert _c9(("ibl5/migrations/300_x.sql",
+                ["CREATE TABLE x (id INT);", "-- Rollback: DROP TABLE x;"])) == []
+
+
+def test_condition_9_ignores_block_comments():
+    assert _c9(("ibl5/migrations/300_x.sql",
+                ["/* DROP COLUMN y */", "/*", "DROP TABLE x;", "*/"])) == []
+
+
+def test_condition_9_ignores_down_file():
+    assert _c9(_C9_ADDITIVE,
+               ("ibl5/migrations/300_x.down.sql", ["DROP TABLE x;"])) == []
+
+
+def test_condition_9_holds_real_drop_table():
+    assert _c9(("ibl5/migrations/300_x.sql", ["DROP TABLE x;"])) == _C9_HOLD
+
+
+def test_condition_9_holds_drop_column():
+    assert _c9(("ibl5/migrations/300_x.sql", ["ALTER TABLE t DROP COLUMN c;"])) == _C9_HOLD
+
+
+def test_condition_9_holds_truncate_after_trailing_comment():
+    assert _c9(("ibl5/migrations/300_x.sql", ["SELECT 1; -- keep", "TRUNCATE t;"])) == _C9_HOLD
+
+
+def test_condition_9_holds_teardown_named_migration():
+    assert _c9(("ibl5/migrations/300_teardown.sql", ["DROP TABLE x;"])) == _C9_HOLD
+
+
+def test_condition_9_holds_drop_inside_string_literal():
+    assert _c9(("ibl5/migrations/300_x.sql",
+                ["INSERT INTO t VALUES ('DROP TABLE x');"])) == _C9_HOLD
+
+
+def test_condition_9_holds_unterminated_block_comment():
+    assert _c9(("ibl5/migrations/300_x.sql", ["/* DROP TABLE x;"])) == _C9_HOLD
+
+
+def test_condition_9_defers_to_two_way():
+    assert _c9(("ibl5/migrations/300_x.sql", ["DROP TABLE x;"]), state="TWO-WAY") == []
+
+
+def test_condition_9_default_state_fails_closed():
     from harness.armable import deterministic_safety_holds
-    cls = Classification(has_migration=True, filtered_diff="+DROP TABLE t\n")
-    assert deterministic_safety_holds(cls, "chore: x") == [
-        "destructive/schema-tightening migration in realized diff"]
+    cls = _c9_cls(("ibl5/migrations/300_x.sql", ["DROP TABLE x;"]))
+    assert deterministic_safety_holds(cls, "chore: x") == _C9_HOLD
+
+
+def test_evaluate_condition_9_reads_merge_danger_state():
+    cls = _c9_cls(("ibl5/migrations/300_x.sql", ["DROP TABLE x;"]))
+    one = evaluate(inputs(classification=cls, merge_danger_state="ONE-WAY"))
+    two = evaluate(inputs(classification=cls, merge_danger_state="TWO-WAY"))
+    assert 9 in {c.number for c in one.holds}
+    assert 9 not in {c.number for c in two.holds}
+
 
 # --- condition (2): only Important findings hold ---------------------------------
 

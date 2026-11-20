@@ -1650,6 +1650,22 @@ test_local_mutations_db_down_fails_closed() {
     unset STUB_PROBE_RC
 }
 
+test_local_mutations_default_probe_fails_closed() {
+    new_case
+    lm_plan 'bin/db-query "SELECT 1"'
+    mkdir -p "$R/bin"
+    printf '#!/usr/bin/env bash\nexit 1\n' > "$R/bin/db-query"
+    chmod +x "$R/bin/db-query"
+    local saved="$PREFIRE_DB_PROBE_CMD"
+    unset PREFIRE_DB_PROBE_CMD
+    run_gate --plan "$PLAN" --stage local-mutations
+    export PREFIRE_DB_PROBE_CMD="$saved"
+    want_rc 3
+    want_out "mutation row 1 needs the DB"
+    [ -z "$(lm_passes)" ] || note "a local-mutations pass record exists"
+    want_cnt xm 0
+}
+
 test_local_mutations_non_db_skips_probe() {
     new_case
     lm_plan 'grep -qx a ibl5/tracked.txt'
@@ -2691,6 +2707,7 @@ test_xm_locked_recover
 test_xm_bad_stage_rejected
 test_local_mutations_runs_dropped_record
 test_local_mutations_db_down_fails_closed
+test_local_mutations_default_probe_fails_closed
 test_local_mutations_non_db_skips_probe
 test_local_mutations_ci_records_skip
 test_local_mutations_untripped_fails_closed

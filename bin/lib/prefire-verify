@@ -981,6 +981,14 @@ stage_local_mutations() {
             rm -f "$recs"; return 3
         fi
     fi
+    # No seam set (the production case): probe with the matrix stage's default.
+    if [ -n "$db_row" ] && [ -z "${PREFIRE_DB_PROBE_CMD:-}" ]; then
+        bin/db-query "SELECT 1" >/dev/null 2>&1; rc=$?
+        if [ "$rc" -ne 0 ]; then
+            say "FAIL local-mutations prerequisite missing: mutation row $db_row needs the DB and the probe (bin/db-query \"SELECT 1\") failed; start the stack with bin/wt-stack start <slug>, then re-run" >&2
+            rm -f "$recs"; return 3
+        fi
+    fi
     xm_run_judged local-mutations --records "$recs"; rc=$?
     rm -f "$recs"
     [ "$rc" -eq 0 ] || return "$rc"

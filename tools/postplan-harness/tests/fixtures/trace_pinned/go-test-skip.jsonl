@@ -1,0 +1,9 @@
+{"Time":"2026-11-18T14:05:21.183105-08:00","Action":"start","Package":"example.com/scratch"}
+{"Time":"2026-11-18T14:05:21.417348-08:00","Action":"run","Package":"example.com/scratch","Test":"TestTracePinnedFoulRoll"}
+{"Time":"2026-11-18T14:05:21.417543-08:00","Action":"output","Package":"example.com/scratch","Test":"TestTracePinnedFoulRoll","Output":"=== RUN   TestTracePinnedFoulRoll\n","OutputType":"frame"}
+{"Time":"2026-11-18T14:05:21.417687-08:00","Action":"output","Package":"example.com/scratch","Test":"TestTracePinnedFoulRoll","Output":"    scratch_test.go:6: no capture yet\n"}
+{"Time":"2026-11-18T14:05:21.417729-08:00","Action":"output","Package":"example.com/scratch","Test":"TestTracePinnedFoulRoll","Output":"--- SKIP: TestTracePinnedFoulRoll (0.00s)\n","OutputType":"frame"}
+{"Time":"2026-11-18T14:05:21.41775-08:00","Action":"skip","Package":"example.com/scratch","Test":"TestTracePinnedFoulRoll","Elapsed":0}
+{"Time":"2026-11-18T14:05:21.417774-08:00","Action":"output","Package":"example.com/scratch","Output":"PASS\n","OutputType":"frame"}
+{"Time":"2026-11-18T14:05:21.418335-08:00","Action":"output","Package":"example.com/scratch","Output":"ok  \texample.com/scratch\t0.235s\n"}
+{"Time":"2026-11-18T14:05:21.418373-08:00","Action":"pass","Package":"example.com/scratch","Elapsed":0.235}

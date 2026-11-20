@@ -8,7 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from harness.armable import CLEARABLE_PLAN_TRIGGERS, OWNER_HELD_PLAN_TRIGGERS
+from harness.armable import (CLEARABLE_PLAN_TRIGGERS, OWNER_HELD_PLAN_TRIGGERS,
+                             SELF_CLEARED_PLAN_TRIGGERS)
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 TOKEN_FILE = REPO_ROOT / "bin" / "lib" / "hold-trigger-tokens.txt"
@@ -23,7 +24,7 @@ EVENTS_REVIEW_FRONTMATTER = ["impl_model: sonnet", "auto_merge: false"]
 
 
 def _token_file_sets():
-    sets = {"clearable": set(), "owner-held": set()}
+    sets = {"clearable": set(), "owner-held": set(), "self-cleared": set()}
     for raw in TOKEN_FILE.read_text().splitlines():
         line = raw.strip()
         if not line or line.startswith("#"):
@@ -46,6 +47,17 @@ def test_token_file_matches_armable_sets():
 def test_token_file_sets_are_disjoint():
     sets = _token_file_sets()
     assert not (sets["clearable"] & sets["owner-held"])
+
+
+def test_self_cleared_tokens_match_vocabulary_file():
+    assert _token_file_sets()["self-cleared"] == set(SELF_CLEARED_PLAN_TRIGGERS)
+    assert SELF_CLEARED_PLAN_TRIGGERS == frozenset({"trace-pinned"})
+
+
+def test_self_cleared_disjoint_from_other_sets():
+    sets = _token_file_sets()
+    assert not (sets["self-cleared"] & (sets["clearable"] | sets["owner-held"]))
+    assert not (SELF_CLEARED_PLAN_TRIGGERS & (CLEARABLE_PLAN_TRIGGERS | OWNER_HELD_PLAN_TRIGGERS))
 
 
 def test_validate_and_write_lists_every_token():

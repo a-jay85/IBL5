@@ -82,6 +82,19 @@ expect_no_fallback() {
     chk_has "$1 stdout" "$OUT" "no-fallback:"
 }
 
+# expect_classify <name> <want-rc> <want-stdout> <stderr-text> [classify-option]
+expect_classify() {
+    local f
+    f=$(fixture "fx-$1" "$4")
+    if [ $# -ge 5 ]; then
+        run classify "$f" "$5"
+    else
+        run classify "$f"
+    fi
+    chk_eq "$1 exit" "$2" "$RC"
+    chk_has "$1 stdout" "$OUT" "$3"
+}
+
 write_good_meta() { # <path> <epoch>
     run write-meta "$1" "$2" "$URL" "$SHA"
     chk_eq "write-meta exit" 0 "$RC"
@@ -121,13 +134,16 @@ chk_eq "empty exit" 1 "$RC"
 chk_has "empty stdout" "$OUT" "no-fallback: empty stderr"
 case_end
 
+# A refused connect now falls back (classify-ssh-connect-each-shape). An ssh
+# connect line whose error tail is outside the closed list still rejects.
 case_begin classify-rejects-ssh-only-failure
-expect_no_fallback ssh "ssh: connect to host example.net port 22: Connection refused"
+expect_no_fallback ssh "ssh: connect to host example.net port 22: Operation not permitted"
 case_end
 
 case_begin classify-rejects-near-misses
 expect_no_fallback nm-12030 "ERROR 12030 (HY000): x"
 expect_no_fallback nm-retried "note: retried 1203 times before success"
+expect_no_fallback nm-code-list "note: retried codes 2013|2003 before success"
 expect_no_fallback nm-rowcount "FAIL: ibl_box_scores row count 50 outside 1000..200000"
 case_end
 
@@ -342,6 +358,161 @@ case_end
 case_begin workflow-no-artifact-upload
 chk_eq "upload-artifact count" 0 "$(grep -c 'upload-artifact' "$WF")"
 chk_has "plaintext gzip removed" "$(step_block "$SAVE_STEP")" "rm -f rehearsal-dump-cache/prod-clone.sql.gz"
+case_end
+
+# --- classify: ssh network-level shapes ----------------------------------------
+H='203.0.113.7'
+P='2222'
+SSHC='fallback: ssh-connect'
+
+case_begin classify-ssh-connect-each-shape
+expect_classify ssh-timeout 0 "$SSHC" "ssh: connect to host $H port $P: Connection timed out"
+expect_classify ssh-refused 0 "$SSHC" "ssh: connect to host $H port $P: Connection refused"
+expect_classify ssh-no-route 0 "$SSHC" "ssh: connect to host $H port $P: No route to host"
+expect_classify ssh-net-unreach 0 "$SSHC" "ssh: connect to host $H port $P: Network is unreachable"
+expect_classify ssh-connect-reset 0 "$SSHC" "ssh: connect to host $H port $P: Connection reset by peer"
+expect_classify ssh-kex-closed 0 "$SSHC" "kex_exchange_identification: Connection closed by remote host"
+expect_classify ssh-kex-reset 0 "$SSHC" "kex_exchange_identification: read: Connection reset by peer"
+expect_classify ssh-exch-closed 0 "$SSHC" "ssh_exchange_identification: Connection closed by remote host"
+expect_classify ssh-banner 0 "$SSHC" "banner exchange: Connection to $H port $P: Connection timed out"
+expect_classify ssh-closed-port 0 "$SSHC" "Connection closed by $H port $P"
+expect_classify ssh-reset-port 0 "$SSHC" "Connection reset by $H port $P"
+case_end
+
+case_begin classify-ssh-hostkey-needs-empty-keyscan
+expect_classify hostkey-empty 0 "$SSHC" "Host key verification failed." --keyscan=empty
+expect_classify hostkey-present 1 "no-fallback: host key verification failed" "Host key verification failed." --keyscan=present
+case_end
+
+case_begin classify-ssh-keyscan-defaults-present
+expect_classify hostkey-omitted 1 "no-fallback: host key verification failed" "Host key verification failed."
+case_end
+
+case_begin classify-ssh-auth-and-resolve-win
+expect_classify ssh-auth 1 "no-fallback: ssh auth or hostname failure" "deploy@$H: Permission denied (publickey)."
+expect_classify ssh-resolve 1 "no-fallback: ssh auth or hostname failure" "ssh: Could not resolve hostname prod.invalid: Name or service not known"
+expect_classify auth-beats-timeout 1 "no-fallback: ssh auth or hostname failure" \
+    "ssh: connect to host $H port $P: Connection timed out"$'\n'"deploy@$H: Permission denied (publickey)."
+expect_classify auth-beats-hostkey 1 "no-fallback: ssh auth or hostname failure" \
+    "Host key verification failed."$'\n'"deploy@$H: Permission denied (publickey)." --keyscan=empty
+case_end
+
+case_begin classify-ssh-near-miss-prefix
+expect_classify quoted-connect 1 "no-fallback:" "bash: line 7: ssh: connect to host $H port $P: Connection timed out"
+expect_classify quoted-mysql-text 1 "no-fallback:" "mariadb-dump: unexpected read error: Connection timed out"
+expect_classify quoted-hostkey 1 "no-fallback:" "remote: Host key verification failed." --keyscan=empty
+expect_classify indented-reset 1 "no-fallback:" "  Connection reset by $H port $P"
+case_end
+
+case_begin classify-ssh-near-miss-suffix
+expect_classify connect-trailer 1 "no-fallback:" "ssh: connect to host $H port $P: Connection timed out (retry 2)"
+expect_classify preauth-closed 1 "no-fallback:" "Connection closed by authenticating user deploy $H port $P [preauth]"
+case_end
+
+case_begin classify-keyscan-arg-rejected
+f=$(fixture fx-ks-arg "ssh: connect to host $H port $P: Connection timed out")
+run classify "$f" --keyscan=maybe
+chk_eq "--keyscan=maybe exit" 2 "$RC"
+chk_has "--keyscan=maybe stderr" "$ERR" "bad classify option"
+run classify "$f" --keyscan
+chk_eq "bare --keyscan exit" 2 "$RC"
+run classify "$f" --keyscan empty
+chk_eq "space-form exit" 2 "$RC"
+run classify --keyscan=empty
+chk_eq "option without file exit" 2 "$RC"
+case_end
+
+case_begin classify-empty-stderr-with-keyscan-empty
+: > "$T/fx-empty-ks"
+run classify "$T/fx-empty-ks" --keyscan=empty
+chk_eq "empty stderr exit" 1 "$RC"
+chk_has "empty stderr stdout" "$OUT" "no-fallback: empty stderr"
+case_end
+
+case_begin classify-mysql-first-with-keyscan-arg
+expect_classify mysql-2013-ks 0 "fallback: 2013" "ERROR 2013 (HY000): Lost connection to server during query" --keyscan=empty
+expect_classify mysql-beats-auth 0 "fallback: 1040" "ERROR 1040 (HY000): Too many connections"$'\n'"Permission denied"
+case_end
+
+case_begin cli-help-names-keyscan
+run --help
+chk_has "--help keyscan" "$OUT" "classify <stderr-file> [--keyscan=empty|present]"
+chk_has "--help still reaches check-age" "$OUT" "check-age <meta-file>"
+case_end
+
+FALLBACK_STEP='Decrypt + age-check cached prod dump'
+SIM_SSH_LINE='ssh: connect to host rehearsal-dry-run.invalid port 22: Connection timed out'
+
+case_begin workflow-dump-passes-keyscan
+dump_block=$(step_block "$DUMP_STEP")
+# shellcheck disable=SC2016
+chk_has "classify gets keyscan" "$dump_block" 'rehearsal-clone-fallback classify dump-stderr.txt "--keyscan=$keyscan"'
+chk_eq "classify call count in workflow" 1 "$(grep -c 'rehearsal-clone-fallback classify' "$WF")"
+chk_eq "probe begin marker count" 1 "$(grep -c '# keyscan-probe: begin' "$WF")"
+chk_eq "probe end marker count" 1 "$(grep -c '# keyscan-probe: end' "$WF")"
+case_end
+
+case_begin workflow-keyscan-probe-behaviour
+probe_src=$(awk '/# keyscan-probe: begin/ { on = 1; next } /# keyscan-probe: end/ { on = 0 } on' <<< "$(step_block "$DUMP_STEP")")
+[ -n "$probe_src" ] || CASE_ERR="${CASE_ERR}probe region not found; "
+ssh-keygen -q -t ed25519 -N '' -f "$T/probe-key" > /dev/null 2>&1 || CASE_ERR="${CASE_ERR}ssh-keygen keygen failed; "
+pub=$(cut -d' ' -f1,2 "$T/probe-key.pub" 2>/dev/null)
+mkdir -p "$T/fakebin"
+printf '#!/bin/sh\nexit 255\n' > "$T/fakebin/ssh-keygen"
+chmod +x "$T/fakebin/ssh-keygen"
+# run_probe <known_hosts-host-field|NONE> <port> [bin-dir-to-prepend]: run the
+# workflow's own probe region and print the keyscan value it settles on.
+run_probe() {
+    local p="$PATH"
+    rm -rf "${T:?}/home"
+    mkdir -p "$T/home/.ssh"
+    [ "$1" = NONE ] || printf '%s %s\n' "$1" "$pub" > "$T/home/.ssh/known_hosts"
+    [ $# -lt 3 ] || p="$3:$PATH"
+    # shellcheck disable=SC2016
+    HOME="$T/home" PATH="$p" PROD_HOST="$H" PROD_PORT="$2" \
+        bash -c "set -uo pipefail"$'\n'"$probe_src"$'\n''printf %s "$keyscan"'
+}
+chk_eq "no known_hosts file" empty "$(run_probe NONE "$P")"
+chk_eq "bare port-22 entry" present "$(run_probe "$H" 22)"
+chk_eq "bracketed entry" present "$(run_probe "[$H]:$P" "$P")"
+chk_eq "other host only" empty "$(run_probe 198.51.100.9 "$P")"
+chk_eq "probe error" present "$(run_probe 198.51.100.9 "$P" "$T/fakebin")"
+case_end
+
+case_begin workflow-ssh-injection-dispatch-only
+dump_block=$(step_block "$DUMP_STEP")
+# shellcheck disable=SC2016
+chk_has "ssh injection env" "$dump_block" \
+    "SIMULATE_SSH_CONNECT_FAILURE: \${{ github.event_name == 'workflow_dispatch' && inputs.simulate_ssh_connect_failure }}"
+# shellcheck disable=SC2016
+chk_has "ssh injection test" "$dump_block" '[ "${SIMULATE_SSH_CONNECT_FAILURE:-false}" = "true" ]'
+chk_has "ssh injection line" "$dump_block" "echo \"$SIM_SSH_LINE\" > dump-stderr.txt"
+chk_eq "ssh input read sites" 1 "$(grep -c 'inputs.simulate_ssh_connect_failure' "$WF")"
+grep -qxF '  workflow_call: {}' "$WF" || CASE_ERR="${CASE_ERR}workflow_call declares inputs; "
+expect_classify sim-ssh-line 0 "$SSHC" "$SIM_SSH_LINE"
+case_end
+
+case_begin workflow-no-fail-on-unreachable-true
+chk_eq "fail-on-unreachable true count" 0 "$(grep -c "fail-on-unreachable: 'true'" "$WF")"
+case_end
+
+case_begin workflow-fallback-names-ssh-reason
+fb_block=$(step_block "$FALLBACK_STEP")
+# shellcheck disable=SC2016
+chk_has "reason switch" "$fb_block" 'if [ "$FALLBACK_CODE" = "ssh-connect" ]; then'
+chk_has "ssh reason" "$fb_block" 'reason="SSH connect failure"'
+# shellcheck disable=SC2016
+chk_has "mysql reason" "$fb_block" 'reason="MySQL $FALLBACK_CODE"'
+# shellcheck disable=SC2016
+chk_has "warning uses reason" "$fb_block" 'Prod clone failed with $reason.'
+# shellcheck disable=SC2016
+chk_has "age and run sentence" "$fb_block" 'The rehearsal ran on a cached dump ${age_hours} hours old from run $src_url.'
+# shellcheck disable=SC2016
+chk_has "summary row" "$fb_block" '| Clone failure | $reason |'
+# shellcheck disable=SC2016
+chk_has "no-cache error" "$fb_block" '::error::prod clone hit $reason and no cached dump exists; failing as before'
+# shellcheck disable=SC2016
+chk_has "stale error" "$fb_block" '::error::prod clone hit $reason; cached dump $MATCHED_KEY is older than 7 days or has bad metadata; failing as before'
 case_end
 
 # New cases go above this line.

@@ -248,6 +248,9 @@ def test_fix_round_timeout_posts_original_hold_no_push(rig, monkeypatch):
 def test_fix_round_user_thread_reply_recorded(rig, monkeypatch):
     # Phase 4.5 would handle the thread first; stub it so the round is the one that sees it.
     monkeypatch.setattr(runner, "_run_thread_ingestion_phase", lambda *a, **k: {})
+    # This rig keeps returning thread 501 as open after it is fixed, so the hold set shrinks
+    # and a second round would start. Pin one round: the test is about round 1's reply.
+    monkeypatch.setattr(fix_round, "MAX_FIX_ROUNDS", 1)
     extra = {"thread_ids": [501], "trusted_threads": [
         {"commentId": 501, "path": PATH, "line": 2, "body": "please reconsider this",
          "authorLogin": thread_ingestion.TRUSTED_LOGIN, "authorType": "User",
@@ -317,7 +320,8 @@ def test_fix_round_reevaluates_every_condition(rig, monkeypatch):
 def test_fix_round_one_round_per_run(rig):
     llm = rig.llm(later=[FINDING, OTHER])
     res = rig.run(llm)
-    assert fix_round.MAX_FIX_ROUNDS == 1
+    # At most two rounds; a rejected round 1 never starts round 2, so one fixer call here.
+    assert fix_round.MAX_FIX_ROUNDS == 2
     fixer_calls = [a for a in llm.tooled_argvs if a[0] == "thread-remediation"]
     assert len(fixer_calls) == 1
     assert res.fix_round["status"] in ("rejected", "accepted", "no-change")
@@ -662,3 +666,137 @@ def test_meta_flag_kept_when_round_not_cleared(tmp_path, monkeypatch, fr):
     assert runner._clear_meta_flag_after_fix_round(fr, _BranchGit(), res, lambda m: None) is False
     assert os.path.exists(flag)
     assert res.meta_check_failures == [{"name": "check-docs-since", "output": "x"}]
+
+
+# ---- The second round's gate, through the real runner loop ----
+
+def _hold_sequence(monkeypatch, *sets):
+    """Make each distinct arming evaluation block exactly the listed target conditions.
+
+    The rig's own holds are real production output; this overrides only the target members
+    per evaluation, in order, so a test names the pre- and post-round sets. The last set
+    repeats for any later evaluation.
+    """
+    seen = []
+    real_evaluate = runner.evaluate
+
+    def evaluate(inputs):
+        if not seen or seen[-1] is not inputs:
+            seen.append(inputs)
+        want = sets[min(len(seen), len(sets)) - 1]
+        decision = real_evaluate(inputs)
+        for c in decision.conditions:
+            if c.number in fix_round.TARGET_CONDITIONS:
+                c.blocked = c.number in want
+        return decision
+
+    monkeypatch.setattr(runner, "evaluate", evaluate)
+
+
+def _fake_rounds(rig, monkeypatch, *outcomes):
+    """Replace run_fix_round with a recorder that returns one canned record per call.
+
+    An accepted outcome commits through the runner's own commit callback first, so the rig
+    git advances its head and the runner pushes a real new sha. Returns (calls, records).
+    """
+    calls, records = [], []
+
+    def fake(**kw):
+        calls.append(kw)
+        status, reason = outcomes[len(calls) - 1]
+        rec = {"status": status, "reason": reason, "head_before": rig.git.head(),
+               "targets": fix_round.targets(kw["decision"]), "items": [], "defer": [],
+               "row_repairs": [], "reevaluate": status == "accepted"}
+        if status == "accepted":
+            kw["commit"](f"fix(review): round {len(calls)}")
+            rec["sha"] = rig.git.head()
+        records.append(rec)
+        return rec
+
+    monkeypatch.setattr(fix_round, "run_fix_round", fake)
+    return calls, records
+
+
+ACCEPTED = ("accepted", "recheck-clean")
+
+
+def _log(rig):
+    return (rig.tmp_path / "out" / "audit.log").read_text()
+
+
+def test_runner_second_round_runs_after_accepted_shrink(rig, monkeypatch):
+    _hold_sequence(monkeypatch, {2, 3}, {3}, set())
+    calls, _ = _fake_rounds(rig, monkeypatch, ACCEPTED, ACCEPTED)
+    res = rig.run(rig.llm(later=[]))
+    assert len(calls) == 2
+    rounds = res.fix_round["rounds"]
+    assert len(rounds) == 2
+    assert rounds[0]["status"] == "accepted"
+    on_disk = json.loads((rig.tmp_path / "out" / "fix-round.json").read_text())
+    assert on_disk["rounds"] == rounds
+    assert "phase6.5-fix: blocked target set shrank; starting round 2" in _log(rig)
+
+
+def test_runner_second_round_gets_prior_and_shared_deadline(rig, monkeypatch):
+    _hold_sequence(monkeypatch, {2, 3}, {3}, set())
+    calls, records = _fake_rounds(rig, monkeypatch, ACCEPTED, ACCEPTED)
+    rig.run(rig.llm(later=[]))
+    assert len(calls) == 2
+    assert calls[0]["prior"] is None
+    assert calls[0]["already_tried"] is False
+    assert calls[1]["prior"] == records[0]
+    assert calls[1]["already_tried"] is False
+    assert calls[0]["deadline_at"] is not None
+    assert calls[0]["deadline_at"] == calls[1]["deadline_at"]
+
+
+def test_runner_no_second_round_without_shrink(rig, monkeypatch):
+    _hold_sequence(monkeypatch, {2, 3}, {2, 3})
+    calls, _ = _fake_rounds(rig, monkeypatch, ACCEPTED, ACCEPTED)
+    res = rig.run(rig.llm(later=[]))
+    assert len(calls) == 1
+    assert "rounds" not in res.fix_round
+    assert "phase6.5-fix: no round 2 (no-shrink)" in _log(rig)
+
+
+def test_runner_no_second_round_after_reject(rig, monkeypatch):
+    _hold_sequence(monkeypatch, {2, 3}, {3})
+    calls, _ = _fake_rounds(rig, monkeypatch, ("rejected", "new-finding"), ACCEPTED)
+    res = rig.run(rig.llm(later=[]))
+    assert len(calls) == 1
+    assert "rounds" not in res.fix_round
+    assert "phase6.5-fix: no round 2 (round-1-rejected)" in _log(rig)
+
+
+def test_runner_no_second_round_after_deadline(rig, monkeypatch):
+    _hold_sequence(monkeypatch, {2, 3}, {3})
+    calls, _ = _fake_rounds(rig, monkeypatch, ACCEPTED, ACCEPTED)
+    monkeypatch.setattr(fix_round, "time_left", lambda *a, **k: 0.0)
+    res = rig.run(rig.llm(later=[]))
+    assert len(calls) == 1
+    assert "rounds" not in res.fix_round
+    assert "phase6.5-fix: no round 2 (deadline)" in _log(rig)
+
+
+def test_runner_second_round_push_failure_keeps_round_one(rig, monkeypatch):
+    _hold_sequence(monkeypatch, {2, 3}, {3}, {3})
+    calls, _ = _fake_rounds(rig, monkeypatch, ACCEPTED, ACCEPTED)
+    real_push = runner._push_with_gate_fix
+    pushes = []
+
+    def boom(git, log, phase, *a, **k):
+        if phase == "phase6.5-fix":
+            pushes.append(git.head())
+            if len(pushes) == 2:
+                raise HarnessError("push-failed", "no")
+        return real_push(git, log, phase, *a, **k)
+
+    monkeypatch.setattr(runner, "_push_with_gate_fix", boom)
+    res = rig.run(rig.llm(later=[]))
+    assert len(calls) == 2
+    rounds = res.fix_round["rounds"]
+    assert rounds[0]["status"] == "accepted"
+    assert rounds[1]["status"] == "rejected"
+    assert rounds[1]["reason"] == "push-failed"
+    assert rig.git.head() == rounds[0]["sha"]
+    assert rig.git.drops == [rounds[1]["head_before"]]

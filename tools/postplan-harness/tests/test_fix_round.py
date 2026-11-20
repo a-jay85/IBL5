@@ -3,6 +3,7 @@ import hashlib
 import json
 import os
 import sys
+import time
 from types import SimpleNamespace
 
 import pytest
@@ -112,7 +113,8 @@ class _Clock:
 
 def _run(tmp_path, *, decision=None, res=None, gh=None, git=None, llm=None, recheck=None,
          already_tried=False, commit=None, clock=None, env=None, plan=None, inputs=None,
-         mutation_check=None, fidelity_fix=None, conflict_rereview=None, meta_fix=None):
+         mutation_check=None, fidelity_fix=None, conflict_rereview=None, prior=None,
+         deadline_at=None, meta_fix=None):
     git = git or _Git()
     res = res if res is not None else RunResult(terminal="x")
     gh = gh or _Gh()
@@ -125,7 +127,8 @@ def _run(tmp_path, *, decision=None, res=None, gh=None, git=None, llm=None, rech
                                          "degraded": False}),
         already_tried=already_tried, clock=clock or _Clock(), env=env or {}, inputs=inputs,
         mutation_check=mutation_check, fidelity_fix=fidelity_fix,
-        conflict_rereview=conflict_rereview, meta_fix=meta_fix)
+        conflict_rereview=conflict_rereview, prior=prior, deadline_at=deadline_at,
+        meta_fix=meta_fix)
     return rec, res, gh, git, llm
 
 
@@ -226,7 +229,7 @@ def test_second_call_is_noop(tmp_path):
     rec2, *_ = _run(tmp_path, res=res, git=git, llm=llm)
     assert rec2 is rec
     assert llm.calls == before
-    assert fix_round.MAX_FIX_ROUNDS == 1
+    assert fix_round.MAX_FIX_ROUNDS == 2
 
 
 def test_enabled_unset_empty_zero():
@@ -1325,3 +1328,117 @@ def test_summary_line_names_cleared_meta_checks():
                                    "meta": {"verdict": "cleared",
                                             "checks": ["check-docs-since"]}})
     assert line.endswith("; meta-check fix cleared check-docs-since")
+
+
+# --- second round: progress gate, shared deadline, merged record ---------------------------
+
+def _accepted(sha="a" * 40, fixed=2, total=2):
+    items = [{"outcome": "fixed"}] * fixed + [{"outcome": "declined"}] * (total - fixed)
+    return {"status": "accepted", "reason": "", "targets": [12, 14], "items": items,
+            "sha": sha, "reevaluate": True, "head_before": "head0", "row_repairs": []}
+
+
+def test_second_round_stop_due_on_strict_shrink():
+    assert fix_round.second_round_stop(_accepted(), [12, 14], [14], time.monotonic() + 600) == ""
+
+
+def test_second_round_stop_equal_sets_is_no_shrink():
+    got = fix_round.second_round_stop(_accepted(), [12, 14], [12, 14], time.monotonic() + 600)
+    assert got == "no-shrink"
+
+
+def test_second_round_stop_non_subset_is_no_shrink():
+    got = fix_round.second_round_stop(_accepted(), [2, 12, 14], [12, 19], time.monotonic() + 600)
+    assert got == "no-shrink"
+
+
+def test_second_round_stop_requires_accepted_round_one():
+    future = time.monotonic() + 600
+    rejected = {"status": "rejected", "reason": "timeout"}
+    assert fix_round.second_round_stop(rejected, [12, 14], [14], future) == "round-1-rejected"
+    no_change = {"status": "no-change"}
+    assert fix_round.second_round_stop(no_change, [12, 14], [14], future) == "round-1-no-change"
+
+
+def test_second_round_stop_deadline_passed():
+    got = fix_round.second_round_stop(_accepted(), [12, 14], [14], time.monotonic() - 1)
+    assert got == "deadline"
+
+
+def test_second_round_stop_all_targets_cleared():
+    got = fix_round.second_round_stop(_accepted(), [12], [], time.monotonic() + 600)
+    assert got == "no-target-hold"
+
+
+def test_second_round_stop_already_ran():
+    first = fix_round.with_rounds(_accepted(), _accepted("b" * 40))
+    assert fix_round.second_round_stop(first, [12, 14], [14], time.monotonic() + 600) == "already-ran"
+
+
+def test_with_rounds_keeps_round_one_top_level():
+    first, second = _accepted("a" * 40), _accepted("b" * 40, fixed=1, total=1)
+    merged = fix_round.with_rounds(first, second)
+    assert merged["status"] == "accepted"
+    assert merged["sha"] == "a" * 40
+    assert merged["targets"] == [12, 14]
+    assert len(merged["rounds"]) == 2
+    assert merged["rounds"][1] is second
+
+
+def test_write_record_skipped_round_two_keeps_prior(tmp_path):
+    prior = _accepted()
+    skipped = {"status": "skipped", "reason": "no-eligible-hold"}
+    assert fix_round.write_record(str(tmp_path), skipped, prior) is skipped
+    written = json.loads((tmp_path / fix_round.RESULT_BASENAME).read_text())
+    assert written == prior
+    assert "rounds" not in written
+
+
+def test_run_fix_round_round_two_skips_prior_early_return(tmp_path):
+    prior = _accepted()
+    res = RunResult(terminal="x")
+    res.fix_round = prior
+    rec, *_ = _run(tmp_path, res=res, env={fix_round.ENV_FLAG: "0"}, prior=prior)
+    assert rec is not res.fix_round
+    assert rec["reason"] == "disabled"
+
+
+def test_run_fix_round_round_two_shares_deadline(tmp_path):
+    prior = _accepted()
+    res = RunResult(terminal="x")
+    res.fix_round = prior
+    res.findings = [_finding()]
+    git = _Git()
+    git.sha = "head5"
+    clock = _Clock()
+    rec, res, gh, git, llm = _run(tmp_path, res=res, git=git, clock=clock, prior=prior,
+                                  deadline_at=clock() - 1)
+    assert rec["status"] == "rejected" and rec["reason"] == "timeout"
+    assert rec["head_before"] == "head5"
+    assert git.drops == ["head5"]
+    written = json.loads((tmp_path / fix_round.RESULT_BASENAME).read_text())
+    assert written["rounds"][0] == prior
+    assert written["rounds"][1]["reason"] == "timeout"
+    assert written["status"] == "accepted"
+
+
+def test_summary_line_two_rounds_adds_round_two_clause():
+    first = _accepted("a" * 40)
+    ok = fix_round.with_rounds(first, _accepted("b" * 40, fixed=1, total=1))
+    assert fix_round.summary_line(ok) == (
+        "Fix round: fixed 2 of 2 items in aaaaaaaaaaaa; "
+        "re-reviewed and re-evaluated on the new head; "
+        "round 2: fixed 1 of 1 items in bbbbbbbbbbbb")
+    bad = fix_round.with_rounds(first, {"status": "rejected", "reason": "new-finding"})
+    assert fix_round.summary_line(bad).endswith(
+        "; round 2: discarded (new-finding); this verdict is the round-1 hold")
+
+
+def test_digest_rows_includes_round_two_repairs():
+    first = _accepted()
+    second = dict(_accepted("b" * 40), repair_applied=True,
+                  row_repairs=[{"row": 7, "file": "x.py", "old_match": "old", "new_match": "new"}])
+    assert fix_round.digest_rows(first) == []
+    rows = fix_round.digest_rows(fix_round.with_rounds(first, second))
+    assert len(rows) == 1
+    assert "row 7 (x.py)" in rows[0]

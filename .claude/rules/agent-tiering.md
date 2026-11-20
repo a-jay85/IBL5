@@ -1,6 +1,6 @@
 ---
 description: Which tier to pick for each sub-agent, plus the Sonnet 5.5 def-pins and the effort setting per surface.
-last_verified: 2026-11-19
+last_verified: 2026-11-20
 ---
 
 # Agent Tiering
@@ -20,7 +20,7 @@ Tier every sub-agent (and every agent a plan spawns) by the reasoning the task a
 
 > **The boundary keys on task *type* (judgment vs. mechanical), not raw model capability** — a stronger Sonnet moves nothing across the line. Why: `agent-tiering-detail.md`.
 
-**Haiku price cliff.** Above ~100K prompt tokens per request Haiku's rates rise 5x; send large-context jobs to Sonnet. Detail: `agent-tiering-detail.md` § Haiku 5.5 measurement.
+**Haiku price cliff.** Above ~100K prompt tokens per request Haiku's rates rise 5x; send large-context jobs to Sonnet. Detail: `agent-tiering-fable.md` § Haiku 5.5 measurement.
 
 **Plan `impl_model:` is a different namespace** — these values do not carry over; six literals only: `.claude/rules/automouse-workflow.md`.
 

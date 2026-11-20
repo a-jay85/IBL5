@@ -102,7 +102,7 @@ race_reclaim() {
     while { [ ! -e "$R/sync/done.A" ] || [ ! -e "$R/sync/done.B" ]; } && [ "$i" -lt 300 ]; do
         i=$((i + 1)); sleep 0.05
     done
-    wins=$(cat "$R/sync/result.A" "$R/sync/result.B" 2>/dev/null | grep -c '^won$')
+    wins=$(cat "$R/sync/result.A" "$R/sync/result.B" 2>/dev/null | grep -c '^won$') || wins=0
     [ "$(cat "$L/pid" 2>/dev/null)" = "$a_pid" ] && owner_a=1
     : > "$R/sync/release"
     wait "$a_pid" "$b_pid" 2>/dev/null

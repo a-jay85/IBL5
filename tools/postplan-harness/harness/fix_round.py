@@ -271,10 +271,13 @@ def run_fix_round(*, decision, res, gh, llm, git, worktree, plan, pr, out_dir, l
     held, stale = (mutation_repair.eligible_rows(mutation_holding)
                    if MUTATION_CONDITION in tg else ([], []))
     review_tg = set(tg) & REVIEW_CONDITIONS
+    if 3 in tg and not confix_items(res):
+        # Phase 5.0-pre already tried every MISSING item, so condition (3) gives the round nothing to fix.
+        review_tg.discard(3)
     if (not review_tg and not held and not stale
             and (FIDELITY_CONDITION not in tg or fidelity_fix is None)
             and (CONFLICT_CONDITION not in tg or conflict_rereview is None)):
-        record["reason"] = "no-eligible-hold"
+        record["reason"] = "no-fixable-conformance" if 3 in tg else "no-eligible-hold"
         return _write(out_dir, record)
 
     head_before = git.head()

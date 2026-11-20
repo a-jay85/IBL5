@@ -311,8 +311,9 @@ def test_truth_young_but_repaired_is_repaired():
 
 from harness.gate_backtest import (_FLAG_LINES_CAP,  # noqa: E402
                                    GATE_BACKTEST_BEGIN, GATE_BACKTEST_END, GateChange,
-                                   ReplayResult, Truth, compute_verdict, parse_gate_backtest_state,
-                                   render_gate_backtest, upsert_gate_backtest)
+                                   ReplayResult, Truth, _tally, compute_verdict,
+                                   parse_gate_backtest_state, render_gate_backtest,
+                                   upsert_gate_backtest)
 
 SPEC = ReplaySpec(argv=())
 
@@ -585,6 +586,158 @@ def test_tally_base_flag_same_lines_is_pre_existing():
     tally = _lined_tally(("x: bad",), ("x: bad",))
     assert tally.pre_existing == [10]
     assert tally.false_flags == []
+
+
+# --- parent-commit credit for tree-wide gates ----------------------------------------------
+
+import pytest  # noqa: E402
+
+from harness.gate_backtest import (_PLAN, _PR_BODY, _SINCE, _TREE,  # noqa: E402
+                                   _line_key, _retry_lines, is_tree_wide, lines_introduced,
+                                   lines_not_in_parent)
+
+
+def test_line_key_drops_line_number_only():
+    assert _line_key("src/a.css:12: x") == "src/a.css:: x"
+    assert _line_key("src/a.css:12:5: x") == "src/a.css::5: x"
+    assert _line_key("-> hint") == "-> hint"
+    assert _line_key("ERROR: 3 found") == "ERROR: 3 found"
+
+
+def test_line_key_ignores_mid_line_path():
+    assert _line_key("note: see src/a.css:12: x") == "note: see src/a.css:12: x"
+    assert _line_key("checks 3 and 4: x") == "checks 3 and 4: x"
+
+
+def test_lines_not_in_parent_matches_shifted_line():
+    assert lines_not_in_parent(("src/a.txt:3: BAD old",), ("src/a.txt:2: BAD old",)) == ()
+
+
+def test_lines_not_in_parent_counts_added_duplicate():
+    head = ("src/a.txt:2: BAD old", "src/a.txt:4: BAD old")
+    assert lines_not_in_parent(head, ("src/a.txt:2: BAD old",)) == ("src/a.txt:4: BAD old",)
+
+
+def test_lines_not_in_parent_capped_returns_head():
+    full = tuple(f"src/a.txt:{i}: BAD {i}" for i in range(_FLAG_LINES_CAP))
+    assert len(full) == 500
+    assert lines_not_in_parent(full, full) == full
+
+
+def test_is_tree_wide_only_for_pr_independent_specs():
+    assert is_tree_wide(_TREE)
+    assert is_tree_wide(ReplaySpec(argv=("--root", ".")))
+    assert is_tree_wide(ReplaySpec(argv=("--root", "{tree}")))
+    assert not is_tree_wide(_SINCE)
+    assert not is_tree_wide(_PLAN)
+    assert not is_tree_wide(_PR_BODY)
+    assert not is_tree_wide(ReplaySpec(argv=(), env=(("BASE_REF", "{base}"),)))
+
+
+def _parent_row(pr, head, parent, parent_outcome="flag", base_outcome="absent", base=(),
+                parent_detail=""):
+    return ReplayResult(pr, "bin/check-foo", "flag", head[0] if head else "", base_outcome,
+                        flag_lines=head, base_flag_lines=base, parent_outcome=parent_outcome,
+                        parent_detail=parent_detail, parent_flag_lines=parent)
+
+
+def _parent_verdict(rows):
+    res = _results("bin/check-foo", _passes(1, 6)) + rows
+    t = _truth(clean=range(1, 20))
+    return res, t, compute_verdict([_g()], res, t)
+
+
+def test_tally_parent_same_lines_is_tree_state():
+    _, _, v = _parent_verdict([_parent_row(10, ("src/a.txt:3: BAD old",), ("src/a.txt:2: BAD old",))])
+    tally = v.per_gate["bin/check-foo"]
+    assert tally.tree_state == [10]
+    assert tally.false_flags == [] and tally.pre_existing == [] and tally.fixed_by_pr == []
+
+
+@pytest.mark.parametrize("parent_outcome", ["", "pass", "error", "timeout"])
+def test_tally_parent_outcome_other_than_flag_is_false_flag(parent_outcome):
+    head = ("src/a.txt:2: BAD old",)
+    assert lines_introduced(head, (), parent_outcome, head) == head
+    _, _, v = _parent_verdict([_parent_row(10, head, head, parent_outcome=parent_outcome)])
+    tally = v.per_gate["bin/check-foo"]
+    assert tally.false_flags == [10]
+    assert tally.tree_state == []
+
+
+def test_tally_parent_capped_is_false_flag():
+    full = tuple(f"src/a.txt:{i}: BAD {i}" for i in range(_FLAG_LINES_CAP))
+    assert len(full) == 500
+    _, _, v = _parent_verdict([_parent_row(10, full, full)])
+    tally = v.per_gate["bin/check-foo"]
+    assert tally.false_flags == [10]
+    assert tally.tree_state == []
+
+
+def test_tally_base_credit_wins_over_parent():
+    head = ("src/a.txt:2: BAD old",)
+    _, _, v = _parent_verdict([_parent_row(10, head, head, base_outcome="flag", base=head)])
+    tally = v.per_gate["bin/check-foo"]
+    assert tally.pre_existing == [10]
+    assert tally.tree_state == [] and tally.false_flags == []
+
+
+def test_verdict_parent_lines_differ_still_holds():
+    rows = [_parent_row(n, ("src/a.txt:3: run 2",), ("src/a.txt:3: run 1",)) for n in (10, 11)]
+    _, _, v = _parent_verdict(rows)
+    tally = v.per_gate["bin/check-foo"]
+    assert tally.false_flags == [10, 11]
+    assert tally.tree_state == []
+    assert v.state == "HELD"
+
+
+def test_render_shows_tree_state_line():
+    rows = [_parent_row(n, ("src/a.txt:3: BAD old",), ("src/a.txt:2: BAD old",)) for n in (10, 11)]
+    res, t, v = _parent_verdict(rows)
+    block = render_gate_backtest(v, [_g()], res, t, 30)
+    assert ("- Tree state (the candidate gate prints the same lines on the PR's parent commit, "
+            "so the PR added none; excluded from the threshold): #10, #11") in block.splitlines()
+    assert "- False flags:" not in block
+
+
+def test_render_counts_tree_state_in_pre_existing_column():
+    head = ("src/a.txt:2: BAD old",)
+    rows = [_parent_row(10, head, (), parent_outcome="", base_outcome="flag", base=head),
+            _parent_row(11, ("src/a.txt:3: BAD old",), head),
+            _parent_row(12, ("src/a.txt:4: BAD old",), head)]
+    res, t, v = _parent_verdict(rows)
+    tally = v.per_gate["bin/check-foo"]
+    assert tally.pre_existing == [10] and tally.tree_state == [11, 12]
+    block = render_gate_backtest(v, [_g()], res, t, 30)
+    row = next(ln for ln in block.splitlines() if ln.startswith("| `bin/check-foo`"))
+    cells = [c.strip() for c in row.strip("|").split("|")]
+    header = next(ln for ln in block.splitlines() if ln.startswith("| Gate |"))
+    names = [c.strip() for c in header.strip("|").split("|")]
+    assert cells[names.index("Pre-existing flags")] == "3"
+
+
+def test_render_names_uncredited_parent_run():
+    head = ("src/a.txt:2: BAD old",)
+    rows = [_parent_row(10, head, (), parent_outcome="timeout", parent_detail="total-cap")]
+    res, t, v = _parent_verdict(rows)
+    assert v.per_gate["bin/check-foo"].false_flags == [10]
+    block = render_gate_backtest(v, [_g()], res, t, 30)
+    assert ("  - Parent-commit run not credited #10 (`bin/check-foo`, timeout: total-cap)"
+            in block.splitlines())
+
+
+def test_retry_lines_name_parent_stage():
+    r = ReplayResult(10, "bin/check-foo", "flag", "x", parent_outcome="flag",
+                     parent_attempt_secs=(60.0, 1.2))
+    assert _retry_lines([r]) == ["", "Replays retried once after a timeout:",
+                                 "- #10 `bin/check-foo` parent: 60.0 s, then 1.2 s"]
+
+
+def test_tally_tree_wide_clean_flag_without_parent_run_is_false_flag():
+    r = ReplayResult(10, _g().path, "flag", "x", "absent", flag_lines=("src/a.txt:2:BAD old",))
+    tally = _tally(_g().path, [r], _truth(clean=(10,)))
+    assert tally.false_flags == [10]
+    assert tally.pre_existing == [] and tally.fixed_by_pr == []
+    assert tally.catches == [] and tally.unsettled_flags == []
 
 
 def test_tally_base_flag_new_line_is_false_flag():

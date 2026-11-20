@@ -25,8 +25,8 @@ from datetime import datetime, timezone
 from harness.gate_backtest import (GATE_BACKTEST_BEGIN, GATE_BACKTEST_END, HEAD_OID_FIELD,
                                    GateChange, HistoricalPR, ReplayResult, Verdict, classify_exit,
                                    changes_from_unified_diff, classify_truth, compute_verdict,
-                                   detect_gate_changes, flag_lines, lines_not_in_base,
-                                   parse_head_oid, expand_argv, expand_env, expand_stdin, is_check_script,
+                                   detect_gate_changes, flag_lines, lines_introduced, lines_not_in_base,
+                                   parse_head_oid, expand_argv, expand_env, expand_stdin, is_check_script, is_tree_wide,
                                    render_gate_backtest, resolve_spec)
 
 REPO_SLUG = "a-jay85/IBL5"
@@ -438,6 +438,9 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
     With `fix_patch`, a head `flag` the base gate did not also flag is followed by one head-gate
     replay on the same checkout with the candidate's own non-gate diff applied; the result rides
     on `fix_outcome`/`fix_detail` and never changes `outcome`.
+    A flagged tree-wide replay (`is_tree_wide`) whose head lines the base gate does not already
+    explain also runs the candidate gate once on `merge_sha^`. That result rides on
+    `parent_outcome`/`parent_flag_lines` and never changes `outcome`.
     With `plan_history`, gates that need a plan replay those PRs after every other gate has
     replayed `history`; gates that need no plan never see `plan_history`.
     """
@@ -592,12 +595,34 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
                                 base_detail = re.sub(r"\s+", " ", f"base-overlay: {exc}")[:160]
                             finally:
                                 scratch.overlay(overlay_files)
+                    parent_outcome = parent_detail = ""
+                    parent_lines: tuple[str, ...] = ()
+                    parent_secs: tuple[float, ...] = ()
+                    if (outcome == "flag" and is_tree_wide(spec)
+                            and (base_outcome != "flag" or lines_not_in_base(head_lines, base_lines))):
+                        if clock() - start >= total_cap:
+                            parent_outcome, parent_detail = "timeout", "total-cap"
+                        else:
+                            try:
+                                scratch.checkout(base)
+                                scratch.overlay(overlay_files)
+                                parent_outcome, parent_detail, parent_lines, parent_secs = execute(
+                                    spec, ctx, gate.path)
+                            except (OSError, subprocess.CalledProcessError) as exc:
+                                parent_outcome = "error"
+                                parent_detail = re.sub(r"\s+", " ", f"parent-checkout: {exc}")[:160]
+                            finally:
+                                scratch.checkout(pr.merge_sha)  # parent run: back to the merge tree
+                                scratch.overlay(overlay_files)
+                    parent_cleared = (parent_outcome == "flag" and bool(head_lines)
+                                      and not lines_introduced(head_lines, base_lines,
+                                                               parent_outcome, parent_lines))
                     fix_outcome = fix_detail = ""
                     fix_applied: list[str] = []
                     fix_skipped: list[str] = []
                     fix_secs: tuple[float, ...] = ()
                     fix_lines: tuple[str, ...] = ()
-                    if (outcome == "flag" and fix_patch is not None
+                    if (outcome == "flag" and fix_patch is not None and not parent_cleared
                             and (base_outcome != "flag" or lines_not_in_base(head_lines, base_lines))):
                         if clock() - start >= total_cap:
                             fix_outcome, fix_detail = "timeout", "total-cap"
@@ -634,7 +659,11 @@ def run_backtest(repo: str, candidate_head: str, gates: list[GateChange],
                                                 attempt_secs=head_secs,
                                                 base_attempt_secs=base_secs,
                                                 fix_attempt_secs=fix_secs,
-                                                fix_flag_lines=fix_lines))
+                                                fix_flag_lines=fix_lines,
+                                                parent_outcome=parent_outcome,
+                                                parent_detail=parent_detail,
+                                                parent_flag_lines=parent_lines,
+                                                parent_attempt_secs=parent_secs))
     finally:
         shutil.rmtree(work, ignore_errors=True)
     return results

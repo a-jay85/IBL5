@@ -1375,8 +1375,15 @@ def _feeding_call_args(method: Method, added, ctx) -> list[Node]:
                 if arg.kind in ("spread", "named"):
                     out.append(arg)
                     continue
-                if k < len(callee.params) and _param_interpolated(callee, callee.params[k].name):
-                    keys = _callee_param_keys(callee, callee.params[k].name)
+                # args past the last declared param land in a trailing variadic param
+                if k < len(callee.params):
+                    param = callee.params[k]
+                elif callee.params and callee.params[-1].variadic:
+                    param = callee.params[-1]
+                else:
+                    continue
+                if _param_interpolated(callee, param.name):
+                    keys = _callee_param_keys(callee, param.name)
                     if None in keys or not keys:
                         out.append(arg)
                     else:

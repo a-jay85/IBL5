@@ -93,6 +93,7 @@ class Classification:
     e2e_spec_modules: list[str] = field(default_factory=list)
     has_e2e_prod_overlap: bool = False
     filtered_diff: str = ""          # migrations/lockfiles/snapshots stripped
+    migration_diff: str = ""         # .sql migration sections only (condition 9); never written to result.json
     retro_registry_row: str = ""     # added `## Class registry` row (Phase 9 routing), if any
 
     def summary(self) -> str:
@@ -350,6 +351,7 @@ class RunResult:
                 d.pop(key, None)
         if self.classification:
             d["classification"].pop("filtered_diff", None)  # keep result.json small
+            d["classification"].pop("migration_diff", None)  # keep result.json small
         if d.get("plan"):                       # unambiguous slug → keep result.json byte-identical
             if not d["plan"].get("variant_selection"):
                 d["plan"].pop("variant_selection", None)

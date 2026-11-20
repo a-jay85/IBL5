@@ -1,6 +1,6 @@
 ---
-description: bin/post-plan-now runs bin/lib/prefire-verify (full PHPUnit, the plan's matrix rows, changed-file Infection at MSI 100) and exits 9 until all three pass on the current tree; the automouse impl prompt runs it stage by stage first. The Infection stage was removed by ADR-0237.
-last_verified: 2026-11-12
+description: bin/post-plan-now runs bin/lib/prefire-verify, whose `--stage all` runs five stages (phases, matrix, phpunit, pytest, shell), and exits 9 until they pass on the current tree; the automouse impl prompt runs it stage by stage first. The Infection stage was removed by ADR-0237.
+last_verified: 2026-11-20
 ---
 
 # ADR-0227: Pre-fire verification gate in post-plan-now

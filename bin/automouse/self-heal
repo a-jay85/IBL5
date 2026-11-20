@@ -206,8 +206,8 @@ merged_pr_url() {
         branch=$(jq -r '.branch // empty' "$handoff" 2>/dev/null) || branch=""
     fi
     { [ -n "$branch" ] && [ "$branch" != "null" ]; } || branch=$slug
-    plan_mtime=$(stat -L -f %m "$SKIPPED_DIR/$name" 2>/dev/null \
-                 || stat -L -c %Y "$SKIPPED_DIR/$name" 2>/dev/null) || return 1
+    plan_mtime=$(stat -L -c %Y "$SKIPPED_DIR/$name" 2>/dev/null \
+                 || stat -L -f %m "$SKIPPED_DIR/$name" 2>/dev/null) || return 1
     # gh prints "<merged epoch> <url>". A PR merged before the plan file was
     # written belongs to an older plan that reused the branch name: ignore it.
     if row=$(GH_PROMPT_DISABLED=1 "$AUTOMOUSE_GH" pr list --head "$branch" \

@@ -12,7 +12,7 @@ import * as fsp from 'node:fs/promises';
 // https host allowlist. Every path is wrapped — nothing here throws; a failure
 // degrades to URL-only (local_path stays null).
 
-const MAX_BYTES = 10 * 1024 * 1024; // 10 MiB — mirrors AttachmentInputValidator::MAX_FILE_SIZE.
+const MAX_BYTES = 10 * 1024 * 1024; // 10 MiB; AttachmentInputValidatorTest (PHP) fails if this differs from MAX_FILE_SIZE.
 const DEFAULT_TIMEOUT_MS = 10_000;
 const MAX_CONTENT_TYPE_LENGTH = 100;
 

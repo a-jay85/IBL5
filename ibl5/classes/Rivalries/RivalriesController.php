@@ -42,7 +42,7 @@ final class RivalriesController
      */
     public function main(array $get, ?string $userTeamKey, ?string $userGm): void
     {
-        // @phpstan-ignore ibl.echoInNonView
+        // @phpstan-ignore ibl.echoInNonView (controller entry point: emits the already-composed View output)
         echo $this->handle($get, $userTeamKey, $userGm);
     }
 

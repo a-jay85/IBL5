@@ -60,7 +60,7 @@ require_once __DIR__ . '/../db/db.php';
 /** @var \mysqli $mysqli_db */
 
 // ── Parse CLI options ─────────────────────────────────────────────────────────
-$opts = getopt('', ['year:', 'start::', 'end::', 'game-type::', 'seed::', 'league-id::']); // @phpstan-ignore ibl.unknownCliOption
+$opts = getopt('', ['year:', 'start::', 'end::', 'game-type::', 'seed::', 'league-id::']); // @phpstan-ignore ibl.unknownCliOption (the $argv loop above rejects unknown flags)
 
 $yearOpt = $opts['year'] ?? null;
 if (!is_string($yearOpt) || !ctype_digit($yearOpt)) {

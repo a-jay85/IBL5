@@ -27,7 +27,7 @@ class FreeAgencyEntityLoaderTest extends TestCase
         $loader = new FreeAgencyEntityLoader($this->mockDb);
         $player = $loader->loadPlayer(42);
 
-        // @phpstan-ignore-next-line (asserting return type as intentional contract test)
+        // @phpstan-ignore method.alreadyNarrowedType (asserting the declared return type is the intended contract test)
         $this->assertInstanceOf(Player::class, $player);
         $this->assertSame(42, $player->getPlayerID());
     }
@@ -50,7 +50,7 @@ class FreeAgencyEntityLoaderTest extends TestCase
         $loader = new FreeAgencyEntityLoader($this->mockDb);
         $team = $loader->loadTeam('Boston');
 
-        // @phpstan-ignore-next-line (asserting return type as intentional contract test)
+        // @phpstan-ignore method.alreadyNarrowedType (asserting the declared return type is the intended contract test)
         $this->assertInstanceOf(Team::class, $team);
     }
 
@@ -127,7 +127,7 @@ class FreeAgencyEntityLoaderTest extends TestCase
         $loader = new FreeAgencyEntityLoader($this->mockDb);
         $team   = $loader->loadTeam('');
 
-        // @phpstan-ignore-next-line (asserting return type as intentional contract test)
+        // @phpstan-ignore method.alreadyNarrowedType (asserting the declared return type is the intended contract test)
         $this->assertInstanceOf(Team::class, $team);
     }
 }

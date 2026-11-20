@@ -28,7 +28,7 @@ final class AttachmentInputValidator
     private const MAX_URL_LENGTH = 2048;
     private const MAX_FILENAME_LENGTH = 255;
     private const MAX_CONTENT_TYPE_LENGTH = 100;
-    private const MAX_FILE_SIZE = 10485760; // 10 MiB — mirrors the byte cap the bot fetcher enforces.
+    private const MAX_FILE_SIZE = 10485760; // 10 MiB; AttachmentInputValidatorTest fails if the bot fetcher cap differs.
 
     private const DEFAULT_HOSTS = ['cdn.discordapp.com', 'media.discordapp.net'];
     private const DEFAULT_CACHE_DIR = '/Users/ajaynicolas/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/bug-pipeline/attachments';

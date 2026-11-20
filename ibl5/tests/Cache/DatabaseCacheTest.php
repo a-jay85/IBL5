@@ -406,7 +406,7 @@ class MockCacheDb extends \mysqli
      * runtime LSP deprecation; the ignore below is its static-analysis twin.
      *
      * @return MockCacheStmt|false
-     * @phpstan-ignore method.childReturnType
+     * @phpstan-ignore method.childReturnType (mock returns its own statement type; see ReturnTypeWillChange above)
      */
     #[\ReturnTypeWillChange]
     public function prepare(string $query): MockCacheStmt|false

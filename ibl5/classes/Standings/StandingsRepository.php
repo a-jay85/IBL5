@@ -299,11 +299,9 @@ class StandingsRepository extends \Database\BaseMysqliRepository implements Stan
      */
     public function getSeriesRecords(): array
     {
-        // (self, opponent) is the view's composite key, so the pair is already a
-        // unique sort; there is no LIMIT here and no row can tie.
         /** @var list<SeriesRecordRow> */
         return $this->fetchAll(
-            // @phpstan-ignore ibl.orderByMissingTiebreaker
+            // @phpstan-ignore ibl.orderByMissingTiebreaker (self + opponent is the view composite key, so no two rows tie)
             "SELECT self, opponent, wins, losses FROM vw_series_records ORDER BY self, opponent",
             ""
         );

@@ -27,6 +27,7 @@ last_verified: 2026-11-20
 - Positive: a bare `BASHPID` read fails CI before it breaks a macOS run.
 - Positive: the gate is a whole-tree scan, so it needs no base ref.
 - Negative: comment stripping is quote-blind, so a `#` inside a quoted string can hide part of a line from the scan.
+- Negative: the first version of the regex misses three braced reads: `${BASHPID?}`, `${#BASHPID}` and `${BASHPID[0]}`. Their harness cases fail until the regex catches them.
 - Negative: one more `bin/check-*` gate and one more `bin/test-*` harness to maintain.
 
 ## References

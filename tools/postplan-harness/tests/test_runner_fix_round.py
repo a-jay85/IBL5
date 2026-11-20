@@ -620,3 +620,45 @@ def test_runner_recheck_forwards_security_seat(rig, monkeypatch):
     assert "opus" in seen
     assert got["rc"]["security_seat"] == "opus"
     assert callable(got["bar"])
+
+
+# ---- Condition (16): the pre-push flag after a meta-check fix ----
+
+class _BranchGit:
+    def branch(self):
+        return "b"
+
+
+def _meta_flag_setup(tmp_path, monkeypatch):
+    from harness.armable import meta_checks_flag_path
+    from harness.state import RunResult
+    monkeypatch.setattr(runner, "META_CHECKS_TMP_DIR", str(tmp_path))
+    flag = meta_checks_flag_path("b", str(tmp_path))
+    with open(flag, "w") as fh:
+        fh.write("check-docs-since\n")
+    res = RunResult(terminal="x")
+    res.meta_check_failures = [{"name": "check-docs-since", "output": "x"}]
+    res.meta_checks_ok = False
+    return flag, res
+
+
+def test_meta_flag_cleared_after_accepted_cleared_round(tmp_path, monkeypatch):
+    flag, res = _meta_flag_setup(tmp_path, monkeypatch)
+    logs = []
+    fr = {"status": "accepted", "meta": {"verdict": "cleared"}}
+    assert runner._clear_meta_flag_after_fix_round(fr, _BranchGit(), res, logs.append) is True
+    assert not os.path.exists(flag)
+    assert res.meta_check_failures == []
+    assert res.meta_checks_ok is True
+    assert any("meta-check flag cleared" in m for m in logs)
+
+
+@pytest.mark.parametrize("fr", [
+    {"status": "rejected", "meta": {"verdict": "cleared"}},
+    {"status": "accepted", "meta": {"verdict": "refused"}},
+])
+def test_meta_flag_kept_when_round_not_cleared(tmp_path, monkeypatch, fr):
+    flag, res = _meta_flag_setup(tmp_path, monkeypatch)
+    assert runner._clear_meta_flag_after_fix_round(fr, _BranchGit(), res, lambda m: None) is False
+    assert os.path.exists(flag)
+    assert res.meta_check_failures == [{"name": "check-docs-since", "output": "x"}]

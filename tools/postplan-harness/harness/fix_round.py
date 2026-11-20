@@ -1,9 +1,9 @@
-"""One in-run fix round for holds on arming conditions {2, 3, 11, 12, 14, 19}.
+"""One in-run fix round for holds on arming conditions {2, 3, 11, 12, 14, 16, 19}.
 
 Owns no fixer for review work. It sequences the ones that exist:
 ``thread_ingestion.disposition_thread`` (review threads, unthreaded findings, and test-only
 strengthening for a HELD mutation row), ``conformance_fix.remediate_missing`` (MISSING items)
-and the runner's ``fidelity_fix`` and ``conflict_rereview`` callables. It adds the budget, the
+and the runner's ``fidelity_fix``, ``conflict_rereview`` and ``meta_fix`` callables. It adds the budget, the
 accept-or-discard decision, the deferred reply flush, and the one repair it makes itself: a new
 ``match`` for a stale Executable Mutations row, checked by ``mutation_repair``.
 Nothing is pushed or posted to GitHub inside the round, and the plan file is never written
@@ -21,17 +21,18 @@ import tempfile
 import time
 from typing import Mapping
 
-from . import armable, conformance_fix, mutation_repair, reviewcache, same_run_threads, thread_ingestion
+from . import armable, conformance_fix, metafix, mutation_repair, reviewcache, same_run_threads, thread_ingestion
 from .adapters import llm as llm_mod
 from .labels import render_body
 from .state import HarnessError
 
 ENV_FLAG = "POSTPLAN_FIX_ROUND"
-TARGET_CONDITIONS = frozenset({2, 3, 11, 12, 14, 19})
+TARGET_CONDITIONS = frozenset({2, 3, 11, 12, 14, 16, 19})
 REVIEW_CONDITIONS = frozenset({2, 3, 11})
 MUTATION_CONDITION = 19
 FIDELITY_CONDITION = 12
 CONFLICT_CONDITION = 14
+META_CONDITION = 16
 REPAIRED_PLAN_BASENAME = "fix-round-plan.md"
 ORIGINAL_PLAN_BASENAME = "fix-round-plan.orig.md"
 _DECIDED_VERDICTS = ("CONFLICT-REVIEW=CLEAN", "CONFLICT-REVIEW=FOUND-PROBLEM")
@@ -247,7 +248,7 @@ def _remove_quietly(path: str | None) -> None:
 def run_fix_round(*, decision, res, gh, llm, git, worktree, plan, pr, out_dir, log,
                   commit, recheck, already_tried, clock=time.monotonic, env=None,
                   inputs=None, mutation_check=None, fidelity_fix=None,
-                  conflict_rereview=None, security_bar=None) -> dict:
+                  conflict_rereview=None, security_bar=None, meta_fix=None) -> dict:
     """Run at most one round. Always writes ``fix-round.json`` and returns the record.
 
     ``record["status"]`` is one of skipped, no-change, accepted, rejected, aborted.
@@ -257,7 +258,7 @@ def run_fix_round(*, decision, res, gh, llm, git, worktree, plan, pr, out_dir, l
     tg = targets(decision)
     record: dict = {"status": "skipped", "reason": "", "targets": tg, "items": [],
                     "defer": [], "sha": "", "reevaluate": False, "head_before": "",
-                    "row_repairs": [], "mutation": {}, "fidelity": {}, "conflict_rereview": {}}
+                    "row_repairs": [], "mutation": {}, "fidelity": {}, "conflict_rereview": {}, "meta": {}}
     if not enabled(env):
         record["reason"] = "disabled"
         return _write(out_dir, record)
@@ -271,12 +272,20 @@ def run_fix_round(*, decision, res, gh, llm, git, worktree, plan, pr, out_dir, l
     held, stale = (mutation_repair.eligible_rows(mutation_holding)
                    if MUTATION_CONDITION in tg else ([], []))
     review_tg = set(tg) & REVIEW_CONDITIONS
+    meta_names = ([f.get("name") for f in (getattr(res, "meta_check_failures", None) or ())]
+                  if META_CONDITION in tg else [])
+    meta_ok = META_CONDITION in tg and meta_fix is not None and metafix.fixable(meta_names)
+    if META_CONDITION in tg and not meta_ok:
+        record["meta"] = {"verdict": "skipped", "reason": "no-fixer" if meta_fix is None
+                          else "unfixable: " + (" ".join(str(n) for n in meta_names)
+                                                or "no-pre-push-failure")}
     if 3 in tg and not confix_items(res):
         # Phase 5.0-pre already tried every MISSING item, so condition (3) gives the round nothing to fix.
         review_tg.discard(3)
     if (not review_tg and not held and not stale
             and (FIDELITY_CONDITION not in tg or fidelity_fix is None)
-            and (CONFLICT_CONDITION not in tg or conflict_rereview is None)):
+            and (CONFLICT_CONDITION not in tg or conflict_rereview is None)
+            and not meta_ok):
         record["reason"] = "no-fixable-conformance" if 3 in tg else "no-eligible-hold"
         return _write(out_dir, record)
 
@@ -482,6 +491,11 @@ def run_fix_round(*, decision, res, gh, llm, git, worktree, plan, pr, out_dir, l
         if FIDELITY_CONDITION in tg and fidelity_fix is not None:
             record["fidelity"] = fidelity_fix(max(1, int(_check_deadline()))) or {}
             _check_deadline()
+        if meta_ok:
+            record["meta"] = meta_fix(max(1, int(_check_deadline()))) or {}
+            _check_deadline()
+            if record["meta"].get("verdict") == "failed":
+                raise _Reject("meta-check-" + str(record["meta"].get("reason") or "failed"))
         if git.head() == head_before:
             _prove_mutations()
             _rereview_conflict()
@@ -621,6 +635,9 @@ def _extra_clauses(record: dict) -> str:
     if record.get("repair_applied") is not False:
         for r in record.get("row_repairs") or ():
             clauses += f"; repaired Executable Mutations row {r.get('row')} match in {r.get('file')}"
+    meta = record.get("meta") or {}
+    if meta.get("verdict") == "cleared":
+        clauses += "; meta-check fix cleared " + " ".join(meta.get("checks") or ())
     verdict = (record.get("conflict_rereview") or {}).get("verdict")
     if verdict:
         clauses += f"; conflict review re-run: {verdict}"

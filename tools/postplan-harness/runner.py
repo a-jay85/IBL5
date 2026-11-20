@@ -40,7 +40,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 HARNESS_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, conformance, conformance_fix, fidelity, fix_round, gatefix, gitutil, heldmarker, history_shape, holdrepeat, how_to_revert, llm_calls,
-                     manual_rows, manual_testing, outcome_log, outofscope, prosefix, rebase_cause, rules_budget_carveout,
+                     manual_rows, manual_testing, metafix, outcome_log, outofscope, prosefix, rebase_cause, rules_budget_carveout,
                      reviewcache, same_run_threads, schemas, scope_conformance, statefile, usage_pause)
 from harness import fidelity_delta
 from harness import conflict, conflict_report, fidelity_filefix
@@ -233,6 +233,21 @@ def _record_failure_context(res: RunResult, e: HarnessError) -> None:
     res.error_cmd = _redact(e.cmd) or None
     res.error_output_tail = _redact(e.output) or None
 
+
+
+def _clear_meta_flag_after_fix_round(fr: dict, git, res, log) -> bool:
+    """Drop the pre-push meta-check flag once an accepted, pushed round carried a cleared fix."""
+    if fr.get("status") != "accepted" or (fr.get("meta") or {}).get("verdict") != "cleared":
+        return False
+    meta_flag = meta_checks_flag_path(git.branch(), META_CHECKS_TMP_DIR)
+    try:
+        os.unlink(meta_flag)
+    except FileNotFoundError:
+        pass
+    res.meta_check_failures = []
+    res.meta_checks_ok = True
+    log("fix-round: pre-push meta-check flag cleared (meta-fix re-run passed)")
+    return True
 
 
 def _fix_round_conflict_rereview(llm, git):
@@ -1042,7 +1057,7 @@ def _run_pass(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         _run_removed_guard_fix(gh, llm, git, worktree, plan, pr, body, log)
         _arm = _evaluate_arm()
         inputs, decision, _mc_flag = _arm["inputs"], _arm["decision"], _arm["mc_flag"]
-        # ---- Phase 6.5-fix: one in-run fix round for holds on conditions {2, 3, 11, 12, 14, 19} ----
+        # ---- Phase 6.5-fix: one in-run fix round for holds on conditions {2, 3, 11, 12, 14, 16, 19} ----
         # Runs between the first arming evaluation and everything that records or posts it.
         # It edits code only; the unchanged _evaluate_arm judges the new head. A rejected
         # round resets the tree and the original decision stands.
@@ -1146,6 +1161,13 @@ def _run_pass(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                                    withheld=tuple(t for t in texts if t not in kept))
                 return {"ran": True, "blockers": len(kept), "outcome": outcome.get("reason")}
 
+            def _fr_meta_fix(remaining):
+                argv = [os.path.join(worktree or "", "bin", "run-meta-checks-local"),
+                        "--stage", "pre-push", "--base", "origin/master"]
+                return metafix.attempt_meta_fix(git=git, llm=llm, repo=worktree or "",
+                                                argv=argv, commit=_fr_commit, log=log,
+                                                timeout=remaining)
+
             def _fr_conflict_rereview():
                 return _fix_round_conflict_rereview(llm, git)
 
@@ -1157,6 +1179,7 @@ def _run_pass(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 recheck=_fr_recheck, already_tried=_fr_tried, inputs=inputs,
                 fidelity_fix=_fr_fidelity_fix if pr else None,
                 conflict_rereview=_fr_conflict_rereview if pr else None,
+                meta_fix=_fr_meta_fix if live else None,
                 security_bar=_reviewer_bar_verdict)
             if (fr.get("status") != "skipped"
                     or fr.get("reason") == "holdrepeat-same-holds"):
@@ -1203,6 +1226,7 @@ def _run_pass(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                     _repin_fidelity_after_same_run(llm, git, gh, out_dir, worktree, plan,
                                                    master_sha, body, pr, pushed or sha, res, log)
                 fix_round.apply_plan_repair(plan, fr, out_dir, log)
+                _clear_meta_flag_after_fix_round(fr, git, res, log)
                 _arm = _evaluate_arm(log_suffix=" (post-fix-round)")
                 inputs, decision, _mc_flag = _arm["inputs"], _arm["decision"], _arm["mc_flag"]
             _fr_line = fix_round.summary_line(fr)

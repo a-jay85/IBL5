@@ -43,7 +43,7 @@ final class LeagueControlPanelFactory implements ModuleFactoryInterface
     public function processor(): \LeagueControlPanel\LeagueControlPanelProcessor
     {
         $db = $this->services->db();
-        // @phpstan-ignore ibl.factoryOmitsLeagueContext (Award tallies read ibl_votes_ASG and ibl_votes_EOY, which have no Olympics entry in LeagueContext::TABLE_MAP, so voting stays on IBL tables)
+        // @phpstan-ignore ibl.factoryOmitsLeagueContext (Award tallies read ibl_votes_ASG and ibl_votes_EOY, which have no Olympics entry in LeagueContext::TABLE_MAP; the shared league context already maps nothing for them, so they keep reading IBL tables)
         $votingRepository = new \Voting\VotingRepository($db);
         $votingResultsService = new \Voting\VotingResultsService($votingRepository);
         $awardGenerationService = new \LeagueControlPanel\LeagueControlPanelAwardGenerationService(

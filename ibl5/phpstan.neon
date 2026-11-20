@@ -184,6 +184,10 @@ services:
         tags:
             - phpstan.rules.rule
     -
+        class: PHPStanRules\BanRawDbHandleInEntryPointRule
+        tags:
+            - phpstan.rules.rule
+    -
         class: PHPStanRules\BanHardcodedEnvironmentStringsRule
         tags:
             - phpstan.rules.rule

@@ -1,6 +1,6 @@
 ---
-description: Read-on-demand only (no auto-attach trigger) — when Fable is justified over Opus, and how to use it, effort per surface, how the /plan architect tier is judged. Ask the owner before any Fable spawn; state the justification in one line. Parent agent-tiering.md carries the resident one-line summary.
-last_verified: 2026-11-16
+description: Read-on-demand only (no auto-attach trigger) — when Fable is justified over Opus, and how to use it, effort per surface, how the /plan architect tier is judged. Ask the owner before any Fable spawn; state the justification in one line. Parent agent-tiering.md carries the resident one-line summary., plus the Haiku 5.5 measurement and price cliff
+last_verified: 2026-11-20
 paths: ".claude/rules/agent-tiering-fable.md"
 ---
 
@@ -77,3 +77,20 @@ The judge reads the `/plan` task line, the full brief with its tier-routing line
 ## Asm-level static RE (JSB engine): no default tier
 
 Asm-level static reverse-engineering gets no tier of its own. It takes the same Fable test as any other task. For a `/plan` run, `bin/plan-tier-hint` picks the architect, and the orchestrator keeps its verdict. Do not move an RE plan to `plan-architect-xhigh` when the hint says default. Do not add a Fable verify pass to an Opus RE draft unless the Fable test above passes for that draft. The owner set this on 2026-11-16, after an RE plan ran on Fable over a default hint.
+
+## Haiku 5.5 measurement
+
+A/B on 2026-10-08 (Sonnet twice, Haiku once, bar sealed first): `~/claude-plans/_reports/2026-10-08-haiku-5-5-vs-sonnet-5-5-ab.md`.
+
+| Surface | Tasks | Verdict | $/task S, H |
+|---|---|---|---|
+| `explore` | 8 | PASS | 0.154, 0.010 |
+| `manual_test` | 8 | FAIL | 0.059, 0.003 |
+| `fat_tail_digest` | 6 | PASS | 0.082, 0.005 |
+| `security_probe` | 5 | PASS (on Haiku) | n/a, 0.007 |
+| `backlog_housekeeping` | 0 | NO-LIVE-SURFACE | n/a |
+| `agent_d` | 0 | TRIGGER-UNMET | n/a |
+
+Only parity moves a surface. Cost never offsets a quality drop; a refusal fails it. Agent D stays on Sonnet until its trigger holds (20+ examples per category, 4 weeks of precision data).
+
+**Price cliff.** Haiku bills $0.10/$0.50 per MTok to 100K prompt tokens per request (cache included), $0.50/$2.50 above, 1/4 of Sonnet's input rate. A multi-turn agent's prompt grows each turn and can cross 100K late. Send those jobs to Sonnet.

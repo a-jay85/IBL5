@@ -23,7 +23,7 @@ final class RefreshRecordHoldersStep implements PipelineStepInterface
     public const DEFAULT_BUDGET_SECONDS = 180.0;
 
     /**
-     * @param \Closure(): \RecordHolders\CachedRecordHoldersService $serviceFactory
+     * @param \Closure(): \RecordHolders\Contracts\RecordHoldersCacheInterface $serviceFactory
      */
     public function __construct(
         private readonly \Closure $serviceFactory,
@@ -36,7 +36,7 @@ final class RefreshRecordHoldersStep implements PipelineStepInterface
     public static function fromDb(\mysqli $db, \Clock\ClockInterface $clock, float $startedAt): self
     {
         return new self(
-            static function () use ($db): \RecordHolders\CachedRecordHoldersService {
+            static function () use ($db): \RecordHolders\Contracts\RecordHoldersCacheInterface {
                 $repo = new \RecordHolders\RecordHoldersRepository($db);
                 $inner = new \RecordHolders\RecordHoldersService($repo);
                 return new \RecordHolders\CachedRecordHoldersService($inner, new \Cache\DatabaseCache($db));
@@ -68,7 +68,6 @@ final class RefreshRecordHoldersStep implements PipelineStepInterface
         try {
             $before = $this->clock->microtime();
             $service = ($this->serviceFactory)();
-            // @phpstan-ignore ibl.interfaceMissingPublicMethod (RecordHoldersServiceInterface has implementer RecordHoldersService without this method)
             $records = $service->rebuildCache();
         } catch (\Throwable $e) {
             return StepResult::failure($this->getLabel(), $e->getMessage());

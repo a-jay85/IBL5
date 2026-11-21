@@ -47,4 +47,31 @@ class NewsRepositorySearchTest extends TestCase
 
         $this->assertSame([['sid' => 7, 'title' => 'Big Game', 'time' => '2025-01-15 10:00:00']], $rows);
     }
+
+    public function testSearchStoriesMentioningClosesStatementAfterReadingRows(): void
+    {
+        $result = self::createStub(\mysqli_result::class);
+        $result->method('fetch_assoc')->willReturn(null);
+
+        $stmt = $this->createMock(\mysqli_stmt::class);
+        $stmt->method('get_result')->willReturn($result);
+        $stmt->expects($this->once())->method('close');
+
+        $db = self::createStub(\mysqli::class);
+        $db->method('prepare')->willReturn($stmt);
+
+        $this->assertSame([], (new NewsRepository($db))->searchStoriesMentioning('Kobe'));
+    }
+
+    public function testSearchStoriesMentioningClosesStatementWhenResultSetIsMissing(): void
+    {
+        $stmt = $this->createMock(\mysqli_stmt::class);
+        $stmt->method('get_result')->willReturn(false);
+        $stmt->expects($this->once())->method('close');
+
+        $db = self::createStub(\mysqli::class);
+        $db->method('prepare')->willReturn($stmt);
+
+        $this->assertNull((new NewsRepository($db))->searchStoriesMentioning('Kobe'));
+    }
 }

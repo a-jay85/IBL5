@@ -185,16 +185,69 @@ _tmp_write_scrub() {
     return 0
 }
 
+# Prefix forms _row_first_word strips after the plain `cd <dir> &&` hops.
+# Each fails toward local: a form that does not match exactly leaves its own
+# first word in place, and no such word is on the row_runs_in_ci allowlist.
+#   NAME=value   value empty, or a literal that does not start with / ~ $ or a quote
+PLAN_ROW_ENV_ASSIGN_RE='^([A-Za-z_][A-Za-z0-9_]*)=([A-Za-z0-9_.,:@+-][A-Za-z0-9_.,:/@+=-]*)?[[:space:]]+(.*)$'
+#   env [-u NAME]... [NAME=value]...   any other env flag stops the strip
+PLAN_ROW_ENV_CMD_RE='^env[[:space:]]+(.*)$'
+PLAN_ROW_ENV_UNSET_RE='^-u[[:space:]]+[A-Za-z_][A-Za-z0-9_]*[[:space:]]+(.*)$'
+#   cd "$(git rev-parse --show-toplevel)[/sub]" &&   no sub segment starts with a dot
+PLAN_ROW_TOPCD_RE='^cd[[:space:]]+"\$\(git rev-parse --show-toplevel\)((/[A-Za-z0-9_-][A-Za-z0-9_.-]*)*)"[[:space:]]*&&[[:space:]]*(.*)$'
+#   ( ... )   one whole-command subshell that holds no other parenthesis
+PLAN_ROW_SUBSHELL_RE='^\(([^()]*)\)[[:space:]]*$'
+PLAN_ROW_CD_HOP_RE='^cd[[:space:]]+([A-Za-z0-9_./-]+)[[:space:]]*&&[[:space:]]*(.*)$'
+# The Homebrew python3 path some plans hard-code. As the command word it
+# routes like python3, and ci_row_rewrite swaps it for the runner's python3.
+PLAN_ROW_BREW_PY=/opt/homebrew/bin/python3
+# Mac-only absolute paths. A row that reaches the allowlist through a prefix
+# form or the Homebrew python3 word stays local when one of these remains.
+PLAN_ROW_MAC_ABS_RE='/opt/|/usr/local/|/Applications/|/Library/|/private/|/var/folders/|/Volumes/'
+# A go test fuzz run never ends without -fuzztime, so it stays local.
+PLAN_ROW_GO_FUZZ_RE='(^|[[:space:]])-{1,2}(test\.)?fuzz([=[:space:]]|$)'
+
 # _row_first_word <cmd> — sets _RFW_FIRST and _RFW_SECOND: the first two words
-# after any leading `cd <dir> &&` hops and a leading `!`. Shared by
-# row_runs_in_ci and row_ci_needs, so the two never disagree on the first word.
+# after any leading `cd <dir> &&` hops, a leading `!`, and the prefix forms
+# above. Also sets _RFW_REST (the command from the first word on), _RFW_NEW
+# (1 when a prefix form or the Homebrew python3 word was seen, else 0) and
+# _RFW_BREW (1 when the first word is PLAN_ROW_BREW_PY, reported as python3).
+# Shared by row_runs_in_ci, row_ci_needs, ci_row_rewrite and _tmp_write_scrub,
+# so they never disagree on the first word.
 _row_first_word() {
-    local c="$1"
+    local c="$1" in_env=0
+    _RFW_NEW=0; _RFW_BREW=0
     c="${c#"${c%%[![:space:]]*}"}"
     while [[ "$c" =~ ^cd[[:space:]]+([A-Za-z0-9_./-]+)[[:space:]]*\&\&[[:space:]]*(.*)$ ]]; do
         c="${BASH_REMATCH[2]}"
     done
     c="${c#!}"; c="${c#"${c%%[![:space:]]*}"}"
+    while :; do
+        if [ "$in_env" = 1 ] && [[ "$c" =~ $PLAN_ROW_ENV_UNSET_RE ]]; then
+            c="${BASH_REMATCH[1]}"
+        elif [[ "$c" =~ $PLAN_ROW_ENV_ASSIGN_RE ]]; then
+            case "${BASH_REMATCH[1]}" in PATH|HOME|DYLD_*|LD_*) break ;; esac
+            c="${BASH_REMATCH[3]}"
+            [ "$in_env" = 1 ] && in_env=2
+        elif [ "$in_env" = 0 ] && [[ "$c" =~ $PLAN_ROW_ENV_CMD_RE ]]; then
+            in_env=1; c="${BASH_REMATCH[1]}"
+        elif [[ "$c" =~ $PLAN_ROW_TOPCD_RE ]]; then
+            in_env=0; c="${BASH_REMATCH[3]}"
+        elif [[ "$c" =~ $PLAN_ROW_SUBSHELL_RE ]]; then
+            in_env=0; c="${BASH_REMATCH[1]}"
+        elif [ "$_RFW_NEW" = 1 ] && [[ "$c" =~ $PLAN_ROW_CD_HOP_RE ]]; then
+            c="${BASH_REMATCH[2]}"
+        else
+            break
+        fi
+        c="${c#"${c%%[![:space:]]*}"}"
+        _RFW_NEW=1
+    done
+    if [ "${c%%[[:space:]]*}" = "$PLAN_ROW_BREW_PY" ]; then
+        _RFW_BREW=1; _RFW_NEW=1
+        c="python3${c#"$PLAN_ROW_BREW_PY"}"
+    fi
+    _RFW_REST="$c"
     _RFW_FIRST="${c%%[[:space:]]*}"
     _RFW_SECOND="${c#"$_RFW_FIRST"}"; _RFW_SECOND="${_RFW_SECOND#"${_RFW_SECOND%%[![:space:]]*}"}"; _RFW_SECOND="${_RFW_SECOND%%[[:space:]]*}"
 }
@@ -237,27 +290,36 @@ row_runs_in_ci() {
     is_whole_suite_cmd "$c" && return 1
     _row_first_word "$c"
     first="$_RFW_FIRST"; second="$_RFW_SECOND"
+    # A prefix form or the Homebrew python3 word must not hide a whole-suite
+    # run or a Mac-only path. The PLAN_ROW_BREW_PY command word is the one
+    # /opt/ path allowed, and ci_row_rewrite replaces it in CI.
+    if [ "$_RFW_NEW" = 1 ]; then
+        is_whole_suite_cmd "$_RFW_REST" && return 1
+        grep -Eq -- "$PLAN_ROW_MAC_ABS_RE" <<< "${c/"$PLAN_ROW_BREW_PY"/}" && return 1
+    fi
     case "$first" in
         bin/test-*|bin/check-*|bin/lib/*|vendor/bin/phpunit|python3|shellcheck|grep|rg|jq) return 0 ;;
         php|actionlint|test|\[|printf|seq|diff|curl|bun|bunx|bin/run-shell-harnesses|bin/generate-codebase-map) return 0 ;;
         docker) [ "$second" = compose ] && return 0 ;;
         command) [ "$second" = grep ] && return 0 ;;
         git) case "$second" in grep|ls-files|check-ignore) return 0 ;; esac ;;
-        bash) [ "$second" = -n ] && return 0 ;;
+        bash) case "$second" in -n|bin/test-*|bin/check-*|bin/lib/*|bin/run-shell-harnesses|bin/generate-codebase-map) return 0 ;; esac ;;
+        go) [ "$second" = test ] && ! [[ "$c" =~ $PLAN_ROW_GO_FUZZ_RE ]] && return 0 ;;
     esac
     return 1
 }
 
 # row_ci_needs <cmd> — prints the space-separated subset of `db web bun
-# actionlint` that the Plan checks job must start before this row runs.
+# actionlint go` that the Plan checks job must start before this row runs.
 # Pass it only commands row_runs_in_ci accepted.
 #   db          the command matches PLAN_ROW_DB_RE
 #   web db      it matches PLAN_ROW_WEB_RE or holds PLAN_ROW_COMPOSE_PHP (the
 #               php container depends on mariadb, and the DB step seeds first)
 #   bun         bun or bunx is a command word anywhere in the row
 #   actionlint  actionlint is a command word anywhere in the row
+#   go          go is the first word (row_runs_in_ci sends only go test)
 row_ci_needs() {
-    local c="$1" db=0 web=0 bun=0 al=0 out=""
+    local c="$1" db=0 web=0 bun=0 al=0 gon=0 out=""
     grep -Eq -- "$PLAN_ROW_DB_RE" <<< "$c" && db=1
     if grep -Eq -- "$PLAN_ROW_WEB_RE" <<< "$c" || [[ "$c" == *"$PLAN_ROW_COMPOSE_PHP"* ]]; then
         web=1; db=1
@@ -266,6 +328,7 @@ row_ci_needs() {
     case "$_RFW_FIRST" in
         bun|bunx) bun=1 ;;
         actionlint) al=1 ;;
+        go) gon=1 ;;
     esac
     # bun, bunx or actionlint as a command word later in the row, such as
     # test "$(bun ...)" = 1, needs the same stack as when it comes first.
@@ -281,6 +344,7 @@ row_ci_needs() {
     [ "$web" -eq 1 ] && out="${out:+$out }web"
     [ "$bun" -eq 1 ] && out="${out:+$out }bun"
     [ "$al" -eq 1 ] && out="${out:+$out }actionlint"
+    [ "$gon" -eq 1 ] && out="${out:+$out }go"
     printf '%s\n' "$out"
 }
 

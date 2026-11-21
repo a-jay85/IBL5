@@ -1599,7 +1599,7 @@ test_xm_bad_stage_rejected() {
 # local-mutations stage: runs the records the Plan checks CI job never sees.
 # ---------------------------------------------------------------------------
 # lm_plan <check> [match] [replace]: like xm_plan, but the check is wrapped in `bash -c '...'`,
-# so row_runs_in_ci sends it local (first word bash without -n). <check> holds no single quote.
+# so row_runs_in_ci sends it local (bash routes to CI only with -n or a CI-allowed bin/ script word, so bash -c stays local). <check> holds no single quote.
 lm_plan() {
     local chk="bash -c 'echo run >> \"\$CNT/xm\"; $1'"
     write_plan "$(row 1 "${chk//|/\\|}")"

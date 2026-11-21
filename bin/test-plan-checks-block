@@ -542,10 +542,10 @@ end_case
 
 # --- Partition: encode keeps the CI records, local prints the rest -----------
 # PARTITION_PLAN has three matrix rows and one mutation record per row. Row 1
-# routes CI; row 2 (bin/db-query) and row 3 (bash bin/test-x) stay local.
+# routes CI; row 2 (bin/db-query) and row 3 (bash scripts/x.sh) stay local.
 PARTITION_PLAN="$TMP/partition.md"
 mkplan "$PARTITION_PLAN" "$(row 1 'bin/test-alpha-fixture')" "$(row 2 'bin/db-query "SELECT 1"')" \
-    "$(row 3 'bash bin/test-x')" -- \
+    "$(row 3 'bash scripts/x.sh')" -- \
     "$(mblock 1 target.txt ALPHA BETA)
 $(mblock 2 target.txt ALPHA GAMMA)
 $(mblock 3 other.txt other DELTA)"
@@ -568,7 +568,7 @@ local_out() { (cd "$R" && "$LIB" local "$1"); }
 start_case local_partition_complement
 local_out "$PARTITION_PLAN" > "$TMP/part-local.nul"; RC=$?
 chk "local exits 0 (got $RC)" eq "$RC" 0
-{ rec 2 target.txt 'bin/db-query "SELECT 1"' ALPHA GAMMA; rec 3 other.txt 'bash bin/test-x' other DELTA; } > "$TMP/part-local-want.nul"
+{ rec 2 target.txt 'bin/db-query "SELECT 1"' ALPHA GAMMA; rec 3 other.txt 'bash scripts/x.sh' other DELTA; } > "$TMP/part-local-want.nul"
 chk "local prints exactly the row 2 and row 3 records" cmp -s "$TMP/part-local.nul" "$TMP/part-local-want.nul"
 chk "the decoded block still holds only row 1" cmp -s "$TMP/part-out/records.nul" "$TMP/part-want.nul"
 (cd "$R" && "$XM" parse "$PARTITION_PLAN") | tr '\0' '\037' | sort > "$TMP/part-parse.sorted"
@@ -898,7 +898,7 @@ LOCAL	-	bin/lib/plan-matrix-assertions ~/claude-plans/trade-suggestions-engine-v
 LOCAL	-	bin/mutation-diff origin/master
 CI	none	bin/run-shell-harnesses --check-coverage .github/workflows/harness-legs.txt
 CI	bun	bun ibl5/tests/e2e/vr-recorder/rendered-views-selftest.ts | grep -qx 'ok union-sorted-deduped'`; red if `.sort()` is dropped from `files
-LOCAL	-	cd "$(git rev-parse --show-toplevel)" && bin/check-prose --since=master
+CI	none	cd "$(git rev-parse --show-toplevel)" && bin/check-prose --since=master
 CI	bun	cd ibl5 && bun test tests/ts-unit/", "is_error": false}]
 CI	bun	cd ibl5 && bun test tests/ts-unit/".
 CI	bun	cd ibl5 && bun test tests/ts-unit/`
@@ -959,6 +959,58 @@ CI	bun	bun test x.test.ts
 CI	bun	bunx vitest run x.test.ts
 CI	none	bin/run-shell-harnesses --list
 CI	none	bin/generate-codebase-map
+CI	none	PYTHONPATH=tools/postplan-harness python3 -m pytest -q tests/test_x.py
+CI	none	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=tools/postplan-harness python3 -m pytest -q tests/test_x.py
+CI	none	TB_ONLY=pb bin/test-x
+CI	none	MASTER_BOT_TESTS_YML= bin/test-merge-line-watch
+CI	none	env -u PR_BODY -u MASTER_BOT_TESTS_YML bin/check-x
+CI	none	(cd ibl5 && vendor/bin/phpunit --filter testX tests/X/XTest.php)
+CI	db	(cd ibl5 && vendor/bin/phpunit tests/DatabaseIntegration/XTest.php)
+CI	none	cd "$(git rev-parse --show-toplevel)/tools/postplan-harness" && python3 -m pytest -q tests/test_x.py -k y
+CI	bun	FOO=1 bunx vitest run x.test.ts
+CI	none	PYTHONPATH=tools/postplan-harness python3 -c 'import harness'
+CI	none	(cd tools/postplan-harness && python3 -c 'import harness')
+CI	none	cd "$(git rev-parse --show-toplevel)/tools/postplan-harness" && python3 -c 'import harness'
+CI	none	env -u PR_BODY grep -q _row_first_word bin/lib/plan-matrix-rows.sh
+LOCAL	-	PYTHONPATH=/Users/x python3 -m pytest
+LOCAL	-	PYTHONPATH=a:/Users/x python3 -m pytest
+LOCAL	-	PYTHONPATH=tools/x:/opt/x python3 -m pytest
+LOCAL	-	MASTER_BOT_TESTS_YML=/nonexistent/tests.yml bin/test-merge-line-watch
+LOCAL	-	PYTHONPATH="tools/x" python3 -m pytest
+LOCAL	-	FOO=$(mktemp) bin/test-x
+LOCAL	-	PATH=bin:x bin/test-x
+LOCAL	-	FOO =1 bin/test-x
+LOCAL	-	TB_ONLY=pb gh pr view 1
+LOCAL	-	TB_ONLY=pb bin/test-x && gh pr view 1
+LOCAL	-	env -u X gh pr view 1
+LOCAL	-	env -i bin/test-x
+LOCAL	-	(cd ibl5 && vendor/bin/phpunit)
+LOCAL	-	FOO=1 vendor/bin/phpunit
+LOCAL	-	(cd ibl5 && bin/x) && (cd y && bin/test-z)
+LOCAL	-	cd "$(git rev-parse --show-toplevel)/.." && bin/test-x
+LOCAL	-	cd "$(git rev-parse --show-cdup)" && bin/test-x
+CI	none	bash bin/test-x
+CI	none	TB_ONLY=pb bash bin/test-x
+CI	go	cd engine && go test ./...
+CI	go	cd engine && go test -count=1 ./internal/sim -run TestX
+CI	go	cd engine && go test -run TestFuzzyMatch ./internal/sim
+CI	go	GOFLAGS=-count=1 go test ./internal/sim
+CI	none	/opt/homebrew/bin/python3 -m pytest -q tests/test_x.py
+CI	none	cd tools/postplan-harness && /opt/homebrew/bin/python3 -m pytest -q tests/test_x.py
+CI	none	bash bin/test-plan-checks-block
+CI	go	cd engine && go test -count=1 -run '^$' ./internal/sim
+CI	none	cd tools/postplan-harness && /opt/homebrew/bin/python3 -c 'import harness'
+LOCAL	-	bash ~/x
+LOCAL	-	bash -c 'bin/test-x'
+LOCAL	-	env bash -c 'bin/test-x'
+LOCAL	-	bash scripts/x.sh
+LOCAL	-	bash ibl5/bin/test-db-sync-now
+LOCAL	-	cd engine && go vet ./...
+LOCAL	-	cd engine && go run ./cmd/x
+LOCAL	-	cd engine && go build ./...
+LOCAL	-	cd engine && go test -run='^$' -fuzz=FuzzX ./internal/sim
+LOCAL	-	/opt/homebrew/bin/python3.12 -m pytest
+LOCAL	-	cd tools/x && /opt/homebrew/bin/python3 /opt/homebrew/lib/x.py
 ROUTING_TABLE_EOF
 
 start_case case_routing_table

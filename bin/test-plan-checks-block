@@ -397,6 +397,9 @@ chk "chained rm -rf stays LOCAL" routes_local 'cd ibl5/IBLbot && npx vitest run 
 chk "semicolon-chained npx stays LOCAL" routes_local 'cd ibl5/IBLbot && npx vitest run x.test.ts; npx tsc'
 chk "command substitution operand stays LOCAL" routes_local 'cd ibl5/IBLbot && npx vitest run $(cat list)'
 chk "subshell followed by another command stays LOCAL" routes_local '(cd ibl5/IBLbot && npx vitest run x.test.ts) && bin/test-y'
+chk "backgrounded & stays LOCAL" routes_local 'cd ibl5/IBLbot && npx vitest run x.test.ts & rm -rf y'
+chk "backgrounded subshell stays LOCAL" routes_local '(cd ibl5/IBLbot && npx vitest run x.test.ts) & echo hi'
+chk "second line stays LOCAL" routes_local "$(printf 'cd ibl5/IBLbot && npx vitest run x.test.ts\nrm -rf y')"
 end_case
 
 start_case case_needs_column

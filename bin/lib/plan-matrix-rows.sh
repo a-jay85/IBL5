@@ -148,8 +148,9 @@ PLAN_ROW_LOCAL_RE='(^|[^[:alnum:]_/-])gh[[:space:]]|playwright|npx|npm|wget|bin/
 # first vitest argument must not be a flag, so a bare whole-suite run stays
 # local. Every other npx or npm row still matches PLAN_ROW_LOCAL_RE.
 PLAN_ROW_IBLBOT_VITEST_RE='^([[:space:]]*\(?[[:space:]]*cd[[:space:]]+(\./)?ibl5/IBLbot[[:space:]]*&&[[:space:]]*)npx([[:space:]]+vitest[[:space:]]+run[[:space:]]+[^-[:space:]].*)$'
-# A chained, piped or substituted command, or a URL, keeps such a row local.
-PLAN_ROW_IBLBOT_VITEST_BAD_RE='&&|\||;|`|\$\(|://'
+# A chained, backgrounded, piped or substituted command, a URL, or a control
+# character (newline, CR, tab) keeps such a row local.
+PLAN_ROW_IBLBOT_VITEST_BAD_RE='&|\||;|`|\$\(|://|[[:cntrl:]]'
 # The one docker form that may reach CI. The ci step sets COMPOSE_FILE to the
 # absolute path ${{ github.workspace }}/docker-compose.ci.yml, and
 # plan-checks-block ci pins any relative value to the repo root, so a

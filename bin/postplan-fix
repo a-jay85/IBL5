@@ -709,6 +709,24 @@ LAST line of the final message."
                 || ! hr_m="$(gh api "repos/a-jay85/IBL5/commits/$hr_mc/pulls" --jq '[.[] | select(.merged_at != null and .base.ref == "master")] | length' 2>/dev/null)"; then
                 HR_MASTERBAD="could not verify origin/master commit ${hr_mc:0:12}; "; break
             fi
+            # The CI bot pushes "[auto]" snapshot commits straight to master, unsigned and with
+            # no PR. Allow one only when it touches nothing but the files those workflows write,
+            # so a spoofed bot email cannot carry code or gate changes.
+            hr_bot_ok=0
+            if [ "$(git -C "$WT" log -1 --format=%ce "$hr_mc" 2>/dev/null)" = "github-actions[bot]@users.noreply.github.com" ] \
+                && [[ "$(git -C "$WT" log -1 --format=%s "$hr_mc" 2>/dev/null)" == *"[auto]" ]]; then
+                hr_bot_ok=1
+                while IFS= read -r hr_f; do
+                    [ -n "$hr_f" ] || continue
+                    case "$hr_f" in
+                        ibl5/coverage-baseline.json|ibl5/phpstan-baseline-counts.json|ibl5/docs/schema/current-schema.sql) ;;
+                        .claude/rules/codebase-map.md|.claude/rules/codebase-map-detail.md) ;;
+                        ibl5/tests/e2e/*-snapshots/*.png) ;;
+                        *) hr_bot_ok=0; break ;;
+                    esac
+                done < <(git -C "$WT" -c core.quotepath=off diff-tree --no-commit-id --name-only -r -m "$hr_mc" 2>/dev/null)
+            fi
+            if [ "$hr_bot_ok" = 1 ]; then continue; fi
             if [ "$hr_v" != "$(printf 'true\tnoreply@github.com')" ] || ! [ "$hr_m" -ge 1 ] 2>/dev/null; then
                 HR_MASTERBAD="origin/master got a direct push (${hr_mc:0:12}); "; break
             fi

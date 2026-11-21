@@ -326,6 +326,20 @@ if word == "eligible" and fp == sys.argv[4]:
         else printf 'ABSENT\n'; fi
         return 0
     }
+    # The shared .git/config also takes branch keys from sibling worktrees and from a fix
+    # session's own `push -u`; neither can run code, so the verdict ignores them. Read with
+    # --file from /, which loads no repo and runs nothing.
+    _hr_cfg_norm() {  # <config file>: its settings minus user.*, other branches' keys, and own remote/merge
+        local l
+        l="$( (cd / && git config --file "$1" --list) 2>/dev/null)" || { printf 'UNREADABLE\n'; return 0; }
+        printf '%s\n' "$l" | awk -v b="branch.$branch." '
+            /^user\./ { next }
+            index($0, "branch.") == 1 {
+                if (index($0, b) != 1) next
+                if (substr($0, length(b) + 1) ~ /^(remote|merge)=/) next
+            }
+            { print }'
+    }
     # Paths a fix session may never touch: the gates, the checkers this launcher re-runs,
     # the arming conditions and the launch machinery itself. Prefix rules, so a new helper is
     # covered without a list edit: bin/lib/* holds everything this script and bin/post-plan-now
@@ -543,15 +557,57 @@ LAST line of the final message."
     fi
     # t0 comes after the launcher's own ledger write, so only the session's writes are newer.
     touch "$HR_TMP/t0"
+    # backlog#1879 gap C: the git config, hooks and gitdir pointers every later git call loads.
+    HR_GC="$HR_TMP/gitcfg"; mkdir -p "$HR_GC"
+    HR_GC_COMMON="$(git -C "$WT" rev-parse --path-format=absolute --git-common-dir)"
+    HR_GC_GITDIR="$(git -C "$WT" rev-parse --path-format=absolute --git-dir)"
+    HR_GC_PATHS=("$HR_GC_GITDIR/commondir" "$HR_GC_GITDIR/gitdir" "$HR_GC_GITDIR/config.worktree" "$HR_GC_COMMON/hooks" \
+        "$(git -C "$WT" rev-parse --path-format=absolute --git-path hooks)" "$HOME/.gitconfig" "${XDG_CONFIG_HOME:-$HOME/.config}/git/config")
+    if [ -f "$WT/.git" ]; then HR_GC_PATHS+=("$WT/.git"); fi
+    HR_GC_HP="$(git -C "$WT" config --get core.hooksPath || true)"
+    if [ -n "$HR_GC_HP" ]; then case "$HR_GC_HP" in /*) ;; *) HR_GC_HP="$WT/$HR_GC_HP" ;; esac; HR_GC_PATHS+=("$HR_GC_HP"); fi
+    hr_gi=0
+    for p in "${HR_GC_PATHS[@]}"; do
+        hr_gi=$((hr_gi + 1))
+        _hr_state "$p" > "$HR_GC/$hr_gi.state"
+        if [ -e "$p" ] || [ -L "$p" ]; then cp -RP "$p" "$HR_GC/$hr_gi.copy"; fi
+    done
+    cp -p "$HR_GC_COMMON/config" "$HR_GC/common.copy"
+    _hr_cfg_norm "$HR_GC_COMMON/config" > "$HR_GC/common.norm"
 
     # 3e. The prompt goes on stdin: the tool flags are variadic, so a trailing positional
     # prompt could be read as one more tool name.
     cd "$WT"
     # PYTHONDONTWRITEBYTECODE: a session that runs pytest writes no harness .pyc files.
     REPLY="$(printf '%s\n' "$HR_PROMPT" | CLAUDE_HEADLESS=1 PYTHONDONTWRITEBYTECODE=1 ${TMO[@]+"${TMO[@]}"} "${HR_ARGV[@]}" 2>"$HR_TMP/stderr")" || true
+    # backlog#1879 gap C: put back the git config, hooks and gitdir pointers before any git call
+    # below, rev-parse included (a rewritten .git pointer redirects it) and _hr_revert's
+    # ls-remote, push and checkout included. The verdict waits until the session tips are read.
+    HR_GITCFGBAD=""
+    hr_gi=0
+    for p in "${HR_GC_PATHS[@]}"; do
+        hr_gi=$((hr_gi + 1))
+        if [ "$(_hr_state "$p")" != "$(cat "$HR_GC/$hr_gi.state")" ]; then
+            HR_GITCFGBAD+="$p changed; "
+            rm -rf "$p"
+            if [ -e "$HR_GC/$hr_gi.copy" ] || [ -L "$HR_GC/$hr_gi.copy" ]; then cp -RP "$HR_GC/$hr_gi.copy" "$p"; fi
+        fi
+    done
+    if [ "$(_hr_cfg_norm "$HR_GC_COMMON/config")" != "$(cat "$HR_GC/common.norm")" ]; then
+        HR_GITCFGBAD+="$HR_GC_COMMON/config changed; "
+        HR_GC_KEEP="$( (cd / && git config --file "$HR_GC_COMMON/config" --list) 2>/dev/null | grep -E '^branch\.' || true)"
+        rm -f "$HR_GC_COMMON/config"; cp -p "$HR_GC/common.copy" "$HR_GC_COMMON/config"
+        HR_GC_HAVE="$( (cd / && git config --file "$HR_GC_COMMON/config" --list) 2>/dev/null || true)"
+        while IFS= read -r l; do
+            [ -n "$l" ] || continue
+            case "$l" in "branch.$branch."*) continue ;; esac
+            grep -qxF -- "$l" <<< "$HR_GC_HAVE" || (cd / && git config --file "$HR_GC_COMMON/config" --add "${l%%=*}" "${l#*=}") || true
+        done <<< "$HR_GC_KEEP"
+    fi
     # The commits the session made, read before any restore: _hr_revert rewrites origin only
     # when its tip is one of these.
     HR_SESSION_TIPS="$(git -C "$WT" rev-parse HEAD "refs/heads/$branch" 2>/dev/null | tr '\n' ' ')" || true
+    if [ -n "$HR_GITCFGBAD" ]; then _hr_reject git-config "$HR_GITCFGBAD"; fi
 
     # 3f. Marker parse: tolerant on decoration, strict on value. Text mode keeps only the
     # final message, so the marker is read from its last non-blank line.

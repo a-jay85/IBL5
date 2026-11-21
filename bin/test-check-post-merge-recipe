@@ -583,4 +583,32 @@ else
     h_fail "replay-2144: $why"
 fi
 
+# ---------------------------------------------------------------------------
+# Shape 4: owner-after-merge prose with no `## After merge` row (ADR-0198 update)
+# ---------------------------------------------------------------------------
+FIXDIR="$(cd "$(dirname "$SCRIPT")" && pwd)/fixtures/after-merge-prose"
+run_raw "$SCRIPT" --body-file "$FIXDIR/pos-4046.txt" --repo-slug a-jay85/IBL5
+check "prose-pos-4046-fails" 1 "after-merge-prose"
+run_raw "$SCRIPT" --body-file "$FIXDIR/pos-4035.txt" --repo-slug a-jay85/IBL5
+check "prose-pos-4035-fails" 1 "after-merge-prose"
+run_raw "$SCRIPT" --body-file "$FIXDIR/pos-with-row.txt" --repo-slug a-jay85/IBL5
+check "prose-with-row-passes" 0
+for neg in neg-claims-after-merge-cmd neg-auto-merge neg-fenced; do
+    run_raw "$SCRIPT" --body-file "$FIXDIR/$neg.txt" --repo-slug a-jay85/IBL5
+    check "prose-$neg-passes" 0
+done
+
+SENT='The launchd agent is not installed by merging. The owner runs the installer once on the Mac after merge.'
+printf '%s\n\n<!-- post-merge-recipe-ok: reviewed by the owner already -->\n' "$SENT" | fx prose-recipe-waiver
+run_case prose-recipe-waiver
+check "prose-recipe-waiver-does-not-cover-prose" 1 "after-merge-prose"
+
+printf '%s\n\n<!-- after-merge-prose-ok: owner step is in the runbook -->\n' "$SENT" | fx prose-waiver-ok
+run_case prose-waiver-ok
+check "prose-valid-waiver-passes" 0 "" "after-merge-prose: waived"
+
+printf '%s\n\n<!-- after-merge-prose-ok: 12345678901234 -->\n' "$SENT" | fx prose-waiver-short
+run_case prose-waiver-short
+check "prose-14-char-waiver-fails" 1 "15+ characters"
+
 h_done

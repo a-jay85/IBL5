@@ -306,6 +306,26 @@ if word == "eligible" and fp == sys.argv[4]:
         _hr_record "rejected-$1"
         _hr_finish "$HR_RC_GAVEUP" "gave-up-$1"
     }
+    # Content snapshots for the tamper checks. A hash survives `touch -t` and a write in the
+    # same second as t0, which the mtime tests miss; those tests stay as a second net.
+    _hr_snap() {  # <root>; stdin = paths relative to it; stdout = sorted "<sha256>  <path>" lines
+        (cd "$1" && tr '\n' '\0' | xargs -0 -r shasum -a 256 -- 2>/dev/null) | LC_ALL=C sort
+        return 0
+    }
+    _hr_written() {  # <root> <snapshot>; stdin = paths; stdout = each path new or changed against it
+        _hr_snap "$1" | LC_ALL=C comm -13 "$2" - | sed 's/^[0-9a-f]*  //'
+        return 0
+    }
+    _hr_state() {  # <path>: a fingerprint of a file, symlink or directory tree, or ABSENT
+        if [ -L "$1" ]; then printf 'L %s\n' "$(readlink "$1")"
+        elif [ -f "$1" ]; then shasum -a 256 < "$1"
+        elif [ -d "$1" ]; then
+            (cd "$1" && find . -type l | LC_ALL=C sort | while IFS= read -r p; do printf 'L %s %s\n' "$p" "$(readlink "$p")"; done
+             find . -type f -perm -u+x | LC_ALL=C sort | sed 's/^/X /'
+             find . -type f -print0 | xargs -0 -r shasum -a 256 -- | LC_ALL=C sort)
+        else printf 'ABSENT\n'; fi
+        return 0
+    }
     # Paths a fix session may never touch: the gates, the checkers this launcher re-runs,
     # the arming conditions and the launch machinery itself. Prefix rules, so a new helper is
     # covered without a list edit: bin/lib/* holds everything this script and bin/post-plan-now
@@ -506,6 +526,14 @@ LAST line of the final message."
         "$MAIN_ROOT"/*) HR_MAIN_EXCL+=(":(exclude)${STATE_DIR#"$MAIN_ROOT"/}") ;;
     esac
     git -C "$MAIN_ROOT" status --porcelain -- . "${HR_MAIN_EXCL[@]}" > "$HR_TMP/main.before"
+    # Content snapshots of the ignored files the checks below judge, taken before the session.
+    # A file new or changed against them counts as written, whatever its mtime says.
+    git -C "$MAIN_ROOT" -c core.quotepath=off ls-files --others --ignored --exclude-standard -- tools/postplan-harness "${HR_MAIN_EXCL[@]}" \
+        | { grep -E '\.(py|pyc|pth)$|sitecustomize|usercustomize' || true; } | _hr_snap "$MAIN_ROOT" > "$HR_TMP/main-ign.before"
+    { git -C "$WT" -c core.quotepath=off ls-files --others --ignored --exclude-standard -- bin .claude .github tools/postplan-harness/harness tools/postplan-harness/runner.py
+      git -C "$WT" -c core.quotepath=off ls-files --others --ignored --exclude-standard -- harness ':(glob)*.py' ':(glob)**/*.pth'
+    } | LC_ALL=C sort -u | _hr_snap "$WT" > "$HR_TMP/wt-ign.before"
+    _hr_state "$HOME/.claude/hooks" > "$HR_TMP/claude-hooks.before"
 
     # 6. Record the attempt before launch. Without this write the cap cannot hold.
     if ! _hr_py fix-record --state-dir "$STATE_DIR" --slug "$branch" --fingerprint "$HR_FP" \
@@ -590,18 +618,22 @@ LAST line of the final message."
         HR_EXTBAD+="main checkout changed; "
     fi
     # Status never lists ignored files, yet the recheck imports code from the main checkout's
-    # harness. An ignored file (.pyc, .pth, sitecustomize) written since t0 counts as tamper.
+    # harness. An ignored file (.pyc, .pth, sitecustomize) written since t0, or new or changed
+    # against the pre-launch snapshot, counts as tamper.
     # _hr_py sets PYTHONDONTWRITEBYTECODE, so the launcher's own runs write none.
+    HR_MAIN_W="$(git -C "$MAIN_ROOT" -c core.quotepath=off ls-files --others --ignored --exclude-standard -- tools/postplan-harness "${HR_MAIN_EXCL[@]}" \
+        | { grep -E '\.(py|pyc|pth)$|sitecustomize|usercustomize' || true; } | _hr_written "$MAIN_ROOT" "$HR_TMP/main-ign.before")"
     while IFS= read -r p; do
         [ -n "$p" ] || continue
         # Only files Python could import or execute count; a log or cache file is harmless.
         case "$p" in *.py|*.pyc|*.pth|*sitecustomize*|*usercustomize*) ;; *) continue ;; esac
-        if [ "$MAIN_ROOT/$p" -nt "$HR_TMP/t0" ]; then
+        if [ "$MAIN_ROOT/$p" -nt "$HR_TMP/t0" ] || grep -qxF -- "$p" <<< "$HR_MAIN_W"; then
             HR_EXTBAD+="main checkout ignored file written ($p); "
             break
         fi
     done < <(git -C "$MAIN_ROOT" -c core.quotepath=off ls-files --others --ignored --exclude-standard -- tools/postplan-harness "${HR_MAIN_EXCL[@]}")
-    if [ -d "$HOME/.claude/hooks" ] && [ -n "$(find "$HOME/.claude/hooks" -newer "$HR_TMP/t0" -type f 2>/dev/null)" ]; then
+    if { [ -d "$HOME/.claude/hooks" ] && [ -n "$(find "$HOME/.claude/hooks" -newer "$HR_TMP/t0" -type f 2>/dev/null)" ]; } \
+        || [ "$(_hr_state "$HOME/.claude/hooks")" != "$(cat "$HR_TMP/claude-hooks.before")" ]; then
         HR_EXTBAD+="a file under ~/.claude/hooks changed; "
     fi
     # master on origin: admins may push it directly, and the refs guard only watches the PR
@@ -648,27 +680,30 @@ LAST line of the final message."
         [ -n "$p" ] || continue
         if _hr_is_gate_path "$p"; then _hr_reject gate-path "$p"; fi
     done <<< "$HR_PATHS"
-    # Ignored files that already existed stay legal; only one written since t0 counts. Worktree
+    # Ignored files that already existed stay legal; only one written since t0, or new or
+    # changed against the pre-launch snapshot, counts. Worktree
     # bytecode is skipped: pytest writes it, and the recheck imports the main checkout's harness.
     HR_IGN="$(git -C "$WT" -c core.quotepath=off ls-files --others --ignored --exclude-standard -- bin .claude .github tools/postplan-harness/harness tools/postplan-harness/runner.py)"
+    HR_IGN_W="$(printf '%s\n' "$HR_IGN" | _hr_written "$WT" "$HR_TMP/wt-ign.before")"
     while IFS= read -r p; do
         [ -n "$p" ] || continue
         case "$p" in */__pycache__/*|*.pyc) continue ;; esac
-        if _hr_is_gate_path "$p" && [ "$WT/$p" -nt "$HR_TMP/t0" ]; then _hr_reject gate-path "$p (ignored file written)"; fi
+        if _hr_is_gate_path "$p" && { [ "$WT/$p" -nt "$HR_TMP/t0" ] || grep -qxF -- "$p" <<< "$HR_IGN_W"; }; then _hr_reject gate-path "$p (ignored file written)"; fi
     done <<< "$HR_IGN"
     # 4. planted-python: `python3 -m` puts its cwd first on sys.path, so a new top-level
     # harness/ package, a new top-level .py or a new .pth anywhere can shadow or hook a real
     # module. _hr_py runs -I and never imports one; this keeps one off the push too.
-    # Ignored ones count only when written since t0. git clean -fd keeps ignored files,
+    # Ignored ones count only when written since t0 or changed against the snapshot. git clean -fd keeps ignored files,
     # so they are removed here before the revert.
     HR_PLANTED=()
     while IFS= read -r p; do
         [ -n "$p" ] || continue
         if _hr_planted_py "$p"; then HR_PLANTED+=("$p"); fi
     done < <(git -C "$WT" -c core.quotepath=off ls-files --others --exclude-standard)
+    HR_PY_W="$(git -C "$WT" -c core.quotepath=off ls-files --others --ignored --exclude-standard -- harness ':(glob)*.py' ':(glob)**/*.pth' | _hr_written "$WT" "$HR_TMP/wt-ign.before")"
     while IFS= read -r p; do
         [ -n "$p" ] || continue
-        if _hr_planted_py "$p" && [ "$WT/$p" -nt "$HR_TMP/t0" ]; then HR_PLANTED+=("$p"); fi
+        if _hr_planted_py "$p" && { [ "$WT/$p" -nt "$HR_TMP/t0" ] || grep -qxF -- "$p" <<< "$HR_PY_W"; }; then HR_PLANTED+=("$p"); fi
     done < <(git -C "$WT" -c core.quotepath=off ls-files --others --ignored --exclude-standard -- harness ':(glob)*.py' ':(glob)**/*.pth')
     if [ "${#HR_PLANTED[@]}" -gt 0 ]; then
         for p in "${HR_PLANTED[@]}"; do rm -f -- "$WT/$p"; done

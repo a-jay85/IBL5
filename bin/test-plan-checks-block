@@ -394,23 +394,23 @@ body_for() {
     enc "$bp" > "$TMP/nb-$name.body"
 }
 needs_of() { (cd "$R" && "$LIB" needs --body-file "$1" 2>&1); }
-ZEROS="$(printf 'db=0\nweb=0\nbun=0\nactionlint=0')"
+ZEROS="$(printf 'db=0\nweb=0\nbun=0\nactionlint=0\ngo=0')"
 
 start_case case_needs_zeros
 body_for plain 'bin/test-alpha-fixture'
 OUT=$(needs_of "$TMP/nb-plain.body"); RC=$?
 chk "no-stack block exits 0 (got $RC)" eq "$RC" 0
-chk "no-stack block prints four zeros" eq "$OUT" "$ZEROS"
+chk "no-stack block prints five zeros" eq "$OUT" "$ZEROS"
 OUT=$(needs_of "$TMP/hello"); RC=$?
 chk "absent block exits 0 (got $RC)" eq "$RC" 0
-chk "absent block prints four zeros" eq "$OUT" "$ZEROS"
+chk "absent block prints five zeros" eq "$OUT" "$ZEROS"
 OUT=$(needs_of "$TMP/flip"); RC=$?
 chk "corrupt block exits 0 (got $RC)" eq "$RC" 0
-chk "corrupt block prints four zeros" eq "$OUT" "$ZEROS"
-body_for stacks 'curl -sf http://localhost/ibl5/' 'cd ibl5 && bun test x' 'actionlint x.yml'
+chk "corrupt block prints five zeros" eq "$OUT" "$ZEROS"
+body_for stacks 'curl -sf http://localhost/ibl5/' 'cd ibl5 && bun test x' 'actionlint x.yml' 'cd engine && go test ./internal/sim'
 OUT=$(needs_of "$TMP/nb-stacks.body"); RC=$?
 chk "stack block exits 0 (got $RC)" eq "$RC" 0
-chk "stack block prints all ones" eq "$OUT" "$(printf 'db=1\nweb=1\nbun=1\nactionlint=1')"
+chk "stack block prints all ones" eq "$OUT" "$(printf 'db=1\nweb=1\nbun=1\nactionlint=1\ngo=1')"
 MP="$TMP/nb-mut.md"
 mkplan "$MP" "$(row 1 'bin/test-alpha-fixture')" -- \
     "$(printf '%smutation\nrow: 1\nfile: target.txt\nmatch: ALPHA\nreplace: BETA\ncheck: cd ibl5 && bun test x\n%s\n' "$F" "$F")"
@@ -519,6 +519,8 @@ chk "grep row naming php as a path word unchanged" eq "$(row_rewrite 'grep -q ht
 chk "grep then curl rewritten" eq "$(row_rewrite 'grep -q x f && curl -sf http://localhost/ibl5/')" 'grep -q x f && curl -sf http://localhost:8080/ibl5/'
 chk "test with backtick curl rewritten" eq "$(row_rewrite 'test "`curl -s http://localhost/ibl5/`" = ok')" 'test "`curl -s http://localhost:8080/ibl5/`" = ok'
 # Only the arguments of curl (or php, bun, bunx) are rewritten.
+chk "Homebrew python3 command word rewritten" eq "$(row_rewrite 'cd tools/postplan-harness && /opt/homebrew/bin/python3 -m pytest -q')" 'cd tools/postplan-harness && python3 -m pytest -q'
+chk "Homebrew python3 path as an argument unchanged" eq "$(row_rewrite 'grep -c /opt/homebrew/bin/python3 x.txt')" 'grep -c /opt/homebrew/bin/python3 x.txt'
 chk "grep pattern after curl unchanged" eq "$(row_rewrite "curl -s http://localhost/ | grep -q 'http://localhost/ibl5'")" "curl -s http://localhost:8080/ | grep -q 'http://localhost/ibl5'"
 chk "expected string after curl unchanged" eq "$(row_rewrite 'test "$(curl -s http://x.localhost/u)" = "http://x.localhost/ok"')" 'test "$(curl -s http://localhost:8080/u)" = "http://x.localhost/ok"'
 chk "diff <(curl) rewritten" eq "$(row_rewrite 'diff <(curl -s http://x.localhost/api) expected.json')" 'diff <(curl -s http://localhost:8080/api) expected.json'
@@ -621,7 +623,7 @@ chmod +x "$TMP/stubbin/curl"
 # ci_env runs the ci driver with the CI stack markers and COMPOSE_FILE cleared,
 # so the offline cases mean the same inside the Plan checks job.
 ci_env() {
-    (cd "$R" && env -u IBL_CI_DB_READY -u IBL_CI_WEB_READY -u IBL_CI_BUN_READY -u COMPOSE_FILE \
+    (cd "$R" && env -u IBL_CI_DB_READY -u IBL_CI_WEB_READY -u IBL_CI_BUN_READY -u IBL_CI_GO_READY -u COMPOSE_FILE \
         PATH="$TMP/stubbin:$PATH" "$@" "$LIB" ci --body-file "$BODYF" --labels-file "$TMP/nolabels" 2>&1)
 }
 
@@ -657,6 +659,21 @@ OUT=$(ci_env IBL_CI_DB_READY=1 IBL_CI_WEB_READY=1); RC=$?
 chk "marker 1: exits 0 (got $RC)" eq "$RC" 0
 chk "log line shows needs and the rewritten host" has "$OUT" "plan-checks: matrix row 1 [needs: db web]: curl -sf http://localhost:8080/ibl5/"
 chk "curl got the rewritten host" eq "$(cat "$TMP/curl.log")" "-sf http://localhost:8080/ibl5/"
+end_case
+
+# A go row needs IBL_CI_GO_READY=1 as well. Unset or empty fails before the row
+# runs, so the go command never executes.
+start_case case_readiness_guard_go
+body_for gguard 'cd engine && go test ./internal/sim'
+BODYF="$TMP/nb-gguard.body"
+OUT=$(ci_env); RC=$?
+chk "go marker unset: exits 1 (got $RC)" eq "$RC" 1
+chk "go marker unset: names the stack" has "$OUT" "needs go but the job did not start it (IBL_CI_GO_READY is not 1)"
+chk "go marker unset: the row never ran" eq "$(grep -c 'PASS plan-checks' <<< "$OUT" || true)" 0
+OUT=$(ci_env IBL_CI_GO_READY=); RC=$?
+chk "go marker empty: exits 1 (got $RC)" eq "$RC" 1
+chk "go marker empty: names the stack" has "$OUT" "needs go but the job did not start it (IBL_CI_GO_READY is not 1)"
+chk "go marker empty: the row never ran" eq "$(grep -c 'PASS plan-checks' <<< "$OUT" || true)" 0
 end_case
 
 # A relative COMPOSE_FILE is pinned to the repo root, so a row that cds into a

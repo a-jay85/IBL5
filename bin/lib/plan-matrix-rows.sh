@@ -448,5 +448,12 @@ ci_row_rewrite() {
         fi
         i=$((i + 1))
     done
-    printf '%s\n' "$out$_FS_TAIL"
+    out="$out$_FS_TAIL"
+    # A row whose command word is the Homebrew python3 path runs the runner's
+    # python3 in CI. Only that first occurrence changes; the same path as a
+    # later argument (a grep pattern, say) stays as written. The local
+    # mutation stage never calls this, so the Mac keeps the real path.
+    _row_first_word "$out"
+    [ "$_RFW_BREW" = 1 ] && out="${out/"$PLAN_ROW_BREW_PY"/python3}"
+    printf '%s\n' "$out"
 }

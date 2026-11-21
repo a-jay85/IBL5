@@ -13,11 +13,11 @@
 #
 # Usage: bin/run-shell-harnesses [-j N] <script> [<script> ...]
 #        bin/run-shell-harnesses [-j N] --list FILE --leg N
-#        bin/run-shell-harnesses --check-coverage FILE --leg-count N
+#        bin/run-shell-harnesses --check-coverage [FILE] [--leg-count N]
 #        bin/run-shell-harnesses --shard-union VAR=N <script> [args ...]
 #   -j N   parallel workers (default: CPU count)
 #   --list FILE --leg N   run the entries of leg N from FILE ("N [VAR=v ...] script")
-#   --check-coverage FILE --leg-count N   verify FILE against the filesystem
+#   --check-coverage [FILE] [--leg-count N]   verify FILE (default: this checkout harness-legs.txt) against the filesystem
 #   --shard-union VAR=N   prove VAR=i/N shards of <script> cover its cases once
 #        bin/run-shell-harnesses [-j N] --list FILE --leg N --only "<names>"
 #        bin/run-shell-harnesses --select FILE --event E [--out OUT]
@@ -148,7 +148,10 @@ while [ $# -gt 0 ]; do
         -j) jobs_n="${2:?-j needs a number}"; shift 2 ;;
         --list) list_file="${2:?--list needs a file}"; shift 2 ;;
         --leg) leg="${2:?--leg needs a leg number}"; shift 2 ;;
-        --check-coverage) cov_file="${2:?--check-coverage needs a file}"; shift 2 ;;
+        --check-coverage)
+            # A bare --check-coverage checks this checkout's leg file, the one CI passes.
+            if [ $# -ge 2 ] && [ "${2#-}" = "$2" ]; then cov_file="$2"; shift 2
+            else cov_file="$(cd "$(dirname "$0")/.." && pwd)/.github/workflows/harness-legs.txt"; shift; fi ;;
         --leg-count) leg_count="${2:?--leg-count needs a number}"; shift 2 ;;
         --shard-union) union_spec="${2:?--shard-union needs VAR=N}"; shift 2 ;;
         --select) select_file="${2:?--select needs a changed-file list}"; shift 2 ;;

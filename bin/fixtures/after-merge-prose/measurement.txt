@@ -1,0 +1,23 @@
+Measured 2026-11-20 with bin/fixtures/after-merge-prose/measure.sh against bin/lib/post-merge-rows.sh PMR_PROSE_RE.
+
+== measure.sh prs
+HIT #4035: 24	- The launchd agent is not installed by merging. The owner runs CODE once on the Mac after merge.
+HIT #4046: 27	- The migrate script is not run by this change. The owner runs it by hand.
+prs: hits=2 of 250
+
+Verdicts:
+- #4035: true positive. A named owner step after merge, written as prose.
+- #4046: true positive. A named owner step ("runs it by hand"), written as prose.
+False positives: 0.
+
+== measure.sh plans
+PLAN discord-approve-buttons.md
+PLAN review-owed-remediation-ordering.md
+PLAN weekly-product-analytics-review-118.md
+plans: would-fail=3 of 2746
+
+Verdicts:
+- discord-approve-buttons.md line 621: true positive. "The owner runs the installer once after merge".
+- review-owed-remediation-ordering.md line 867: true positive. "someone runs `bin/pr-review-now <N>` by hand" is an optional owner step; it should be a row or carry a waiver.
+- weekly-product-analytics-review-118.md line 173: true positive. "Until the owner runs `...` on the main checkout after merge".
+False positives: 0.

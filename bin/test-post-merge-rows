@@ -159,4 +159,78 @@ mkdir -p "$SCRATCH/bin2/lib" "$SCRATCH/bin2/post-merge-ci-run"
 cp "$LIB" "$SCRATCH/bin2/lib/post-merge-rows.sh"
 h_eq "executor-directory is not a file" no "$(bash -c '. "$1"; if pmr_executor_ready auto:ci; then echo yes; else echo no; fi' _ "$SCRATCH/bin2/lib/post-merge-rows.sh")"
 
+# --- prose detector: fixture manifest (matrix row 5) ---------------------------------
+FIXDIR="$SCRIPT_DIR/fixtures/after-merge-prose"
+while IFS=$'\t' read -r _fx _want; do
+    [ -n "$_fx" ] || continue
+    if pmr_prose_hits "$FIXDIR/$_fx" > /dev/null; then _got=hit; else _got=clean; fi
+    h_eq "prose-fixture $_fx" "$_want" "$_got"
+done < "$FIXDIR/manifest.txt"
+
+# --- prose text filter: fence, comment, blockquote, inline code (matrix row 6) -------
+cat > "$SCRATCH/prose.md" <<'EOF'
+plain prose line with `inline code` here
+```
+fenced line
+```
+> quoted line
+<!-- comment line -->
+after the comment
+EOF
+_pt="$(pmr_prose_text "$SCRATCH/prose.md")"
+h_eq "prose-text keeps prose" 1 "$(grep -c 'plain prose line' <<< "$_pt")"
+h_eq "prose-text maps inline code" 1 "$(grep -c 'with CODE here' <<< "$_pt")"
+h_eq "prose-text drops fence" 0 "$(grep -c 'fenced line' <<< "$_pt")"
+h_eq "prose-text drops blockquote" 0 "$(grep -c 'quoted line' <<< "$_pt")"
+h_eq "prose-text drops comment" 0 "$(grep -c 'comment line' <<< "$_pt")"
+h_eq "prose-text keeps line after comment" 1 "$(grep -c 'after the comment' <<< "$_pt")"
+
+# --- waiver (matrix row 7) -----------------------------------------------------------
+printf 'no waiver here\n' > "$SCRATCH/w-none.md"
+printf '<!-- after-merge-prose-ok: 12345678901234 -->\n' > "$SCRATCH/w-14.md"
+printf '<!-- after-merge-prose-ok: 123456789012345 -->\n' > "$SCRATCH/w-15.md"
+pmr_waiver "$SCRATCH/w-none.md"; h_eq "waiver none" 1 "$?"
+pmr_waiver "$SCRATCH/w-14.md"; h_eq "waiver 14 chars malformed" 2 "$?"
+pmr_waiver "$SCRATCH/w-15.md"; h_eq "waiver 15 chars valid" 0 "$?"
+
+# --- pmr_plan_check (matrix rows 7 and 8) --------------------------------------------
+STEPS="$SCRATCH/steps"; mkdir -p "$STEPS"
+PROSE='The owner runs the installer once on the Mac after merge.'
+printf '# Plan\n\n%s\n' "$PROSE" > "$SCRATCH/p-prose.md"
+_o="$(pmr_plan_check "$SCRATCH/p-prose.md" "$STEPS" "")"; _rc=$?
+h_eq "plan-check prose no row fails" 1 "$_rc"
+h_eq "plan-check prose names [AM]" 1 "$(grep -c '^\[AM\] owner-after-merge prose' <<< "$_o")"
+
+printf '# Plan\n\n%s\n\n<!-- after-merge-prose-ok: owner step covered by the digest -->\n' "$PROSE" > "$SCRATCH/p-waived.md"
+pmr_plan_check "$SCRATCH/p-waived.md" "$STEPS" "" > /dev/null; h_eq "plan-check valid waiver passes" 0 "$?"
+
+printf '# Plan\n\n%s\n\n<!-- after-merge-prose-ok: short -->\n' "$PROSE" > "$SCRATCH/p-badwaiver.md"
+_o="$(pmr_plan_check "$SCRATCH/p-badwaiver.md" "$STEPS" "")"; _rc=$?
+h_eq "plan-check malformed waiver fails closed" 1 "$_rc"
+h_eq "plan-check malformed waiver names reason length" 1 "$(grep -c 'at least 15 characters' <<< "$_o")"
+
+printf '# Plan\n\n%s\n\n## After merge\n\n- **Row 1** [manual] — run the installer\n' "$PROSE" > "$SCRATCH/p-row.md"
+pmr_plan_check "$SCRATCH/p-row.md" "$STEPS" "" > /dev/null; h_eq "plan-check row present passes" 0 "$?"
+
+printf '# Plan\n\n## After merge\n\n- **Row 1** [auto:mac ghost-step] — run it\n' > "$SCRATCH/p-nostep.md"
+_o="$(pmr_plan_check "$SCRATCH/p-nostep.md" "$STEPS" "")"; _rc=$?
+h_eq "plan-check missing step fails" 1 "$_rc"
+h_eq "plan-check missing step names it" 1 "$(grep -c 'auto:mac ghost-step' <<< "$_o")"
+
+printf '# Plan\n\n## After merge\n\n- **Row 1** [auto:mac ghost-step] — run it\n\nbin/post-merge-steps/ghost-step — NEW\n' > "$SCRATCH/p-cue.md"
+pmr_plan_check "$SCRATCH/p-cue.md" "$STEPS" "" > /dev/null; h_eq "plan-check creation cue passes" 0 "$?"
+
+: > "$STEPS/real-step"
+printf '# Plan\n\n## After merge\n\n- **Row 1** [auto:mac real-step] — run it\n' > "$SCRATCH/p-disk.md"
+pmr_plan_check "$SCRATCH/p-disk.md" "$STEPS" "" > /dev/null; h_eq "plan-check step on disk passes" 0 "$?"
+
+_o="$(pmr_plan_check "$SCRATCH/p-disk.md" "$STEPS" "3 1 7")"; _rc=$?
+h_eq "plan-check row number taken by matrix fails" 1 "$_rc"
+h_eq "plan-check taken row names the repeat" 1 "$(grep -c 'repeats a Verification Matrix row number' <<< "$_o")"
+
+printf '# Plan\n\n## After merge\n\n- **Row 1** [bogus tag] — run it\n' > "$SCRATCH/p-unparse.md"
+_o="$(pmr_plan_check "$SCRATCH/p-unparse.md" "$STEPS" "")"; _rc=$?
+h_eq "plan-check unparseable row fails" 1 "$_rc"
+h_eq "plan-check unparseable row names it" 1 "$(grep -c 'unparseable After merge row' <<< "$_o")"
+
 h_done

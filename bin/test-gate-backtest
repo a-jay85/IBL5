@@ -470,8 +470,9 @@ rp_candidate() {
     cp "$REPO_ROOT/bin/$2" "$RP/bin/$2"
     chmod 755 "$RP/bin/$2"
     # Carry the bin/lib files the gate sources, as a real branch adding them would.
-    # shellcheck disable=SC2016  # literal $SCRIPT_DIR in the sed pattern
-    sed -n 's|^source "\$SCRIPT_DIR/lib/\([A-Za-z0-9._-]*\)".*|\1|p' "$REPO_ROOT/bin/$2" \
+    # Both source forms count: "$SCRIPT_DIR/lib/X" and "$(dirname "$0")/lib/X".
+    # shellcheck disable=SC2016  # literal $SCRIPT_DIR and $(dirname "$0") in the sed pattern
+    sed -nE 's@^source "(\$SCRIPT_DIR|\$\(dirname "\$0"\))/lib/([A-Za-z0-9._-]+)".*@\2@p' "$REPO_ROOT/bin/$2" \
         | while IFS= read -r lib; do
             mkdir -p "$RP/bin/lib"
             cp "$REPO_ROOT/bin/lib/$lib" "$RP/bin/lib/$lib"

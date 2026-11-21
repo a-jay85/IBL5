@@ -231,10 +231,15 @@ SPAWNED_PIDS="$SPAWNED_PIDS $PP_PID"
 # should ever show.
 # Respawn until its PID misses the launchd stub list (see fixture_pid): CI once
 # handed it 6001, so it matched a stub row and left the orphan section.
+# Each orphan is double-forked: the subshell exits, so init adopts it. As our
+# child, its ancestry would include this script and the harness runner. CI hands
+# those small PIDs too, and one equal to a stub row (6001-6005) made fleet-status
+# count the orphan as a listed job's child and hide it.
+ORPHAN_PID_FILE="$TMP/orphan.pid"
 while :; do
-    "$STUBBIN/claude" -p --name fixture-orphan >/dev/null 2>&1 &
-    ORPHAN_PID=$!
-    disown "$ORPHAN_PID" 2>/dev/null
+    ( "$STUBBIN/claude" -p --name fixture-orphan </dev/null >/dev/null 2>&1 &
+      printf '%s\n' "$!" > "$ORPHAN_PID_FILE" )
+    ORPHAN_PID="$(cat "$ORPHAN_PID_FILE")"
     fixture_pid "$ORPHAN_PID" || break
     kill "$ORPHAN_PID" 2>/dev/null
 done
@@ -248,11 +253,11 @@ mkdir -p "$TMP/IBL5-worktrees/fixture-wt-slug/ibl5"
 git -C "$TMP/IBL5-worktrees/fixture-wt-slug/ibl5" init -q 2>/dev/null
 git -C "$TMP/IBL5-worktrees/fixture-wt-slug/ibl5" symbolic-ref HEAD refs/heads/fixture-wt-branch
 while :; do
-    (cd "$TMP/IBL5-worktrees/fixture-wt-slug/ibl5" \
-        && exec "$STUBBIN/claude" -p "Fix the fixture widget
-SECOND PROMPT LINE") >/dev/null 2>&1 &
-    PROMPT_ORPHAN_PID=$!
-    disown "$PROMPT_ORPHAN_PID" 2>/dev/null
+    ( cd "$TMP/IBL5-worktrees/fixture-wt-slug/ibl5" || exit 1
+      "$STUBBIN/claude" -p "Fix the fixture widget
+SECOND PROMPT LINE" </dev/null >/dev/null 2>&1 &
+      printf '%s\n' "$!" > "$ORPHAN_PID_FILE" )
+    PROMPT_ORPHAN_PID="$(cat "$ORPHAN_PID_FILE")"
     fixture_pid "$PROMPT_ORPHAN_PID" || break
     kill "$PROMPT_ORPHAN_PID" 2>/dev/null
 done

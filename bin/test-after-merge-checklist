@@ -103,6 +103,7 @@ make_tree() {
 make_tree "$SCRATCH/tree-none"
 make_tree "$SCRATCH/tree-ci" post-merge-ci-run
 make_tree "$SCRATCH/tree-both" post-merge-ci-run post-merge-run
+make_tree "$SCRATCH/tree-mac" post-merge-run
 REAL_DRIVER="$DRIVER"
 
 gh_count() { grep -c "^$1" "$SCRATCH/gh.log" || true; }
@@ -221,6 +222,22 @@ DRIVER="$REAL_DRIVER"
 want "auto:mac row without its executor stays manual" "$OUT" "manual_count=3"
 want "auto:ci row with its executor is automatic" "$OUT" "auto_ci_count=1"
 want "no auto:mac count" "$OUT" "auto_mac_count=0"
+
+# bin/post-merge-run now ships. With its file beside the lib, an auto:mac row is automatic and
+# leaves the manual count; the auto:ci row still has no executor, so it stays manual.
+begin_case "mac-executor-only"
+reset
+DRIVER="$SCRATCH/tree-mac/after-merge-checklist"
+run "$SCRATCH/tagged.md"
+DRIVER="$REAL_DRIVER"
+eq "exit 0" "$RC" "0"
+want "auto:mac row with its executor is not manual" "$OUT" "manual_count=3"
+want "auto:mac row is counted automatic" "$OUT" "auto_mac_count=1"
+want "auto:ci row without its executor stays manual" "$OUT" "auto_ci_count=0"
+_posted="$(cat "$SCRATCH/posted.md")"
+want "auto:mac row says it runs on the Mac" "$_posted" "runs automatically on the owner's Mac"
+want "auto:ci row says nothing runs it yet" "$_posted" 'nothing runs auto:ci rows yet'
+wantnot "auto:mac row does not claim a person must do it" "$_posted" 'nothing runs auto:mac rows yet'
 
 # ---------------------------------------------------------------------------
 begin_case "redelivered_event_is_noop"

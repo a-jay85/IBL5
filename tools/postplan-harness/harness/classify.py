@@ -5,6 +5,8 @@ Pure functions: file list + unified diff text in, Classification out.
 """
 from __future__ import annotations
 
+import dataclasses
+import os
 import re
 
 from .sql_comments import migration_sections
@@ -812,15 +814,35 @@ AFTER_MERGE_END = "<!-- after-merge:end -->"
 _AFTER_MERGE_RE = re.compile(r"^## After merge[ \t]*$", re.M)
 
 
-def render_after_merge_block(rows: list) -> str:
+_AUTO_TAG_RE = re.compile(r"^(?P<kind>auto:(?:mac|ci)) (?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)$")
+_AUTO_MAC_SENTENCE = (
+    "Rows tagged auto:mac run once on the owner's Mac through bin/post-merge-run, "
+    "which sends a Discord message only when one fails.")
+
+
+def _fail_closed_tag(row, steps_dir):
+    """Keep a tag only when it is `manual` or an auto:mac step present in steps_dir."""
+    tag = getattr(row, "tag", "")
+    if not tag or tag == "manual":
+        return row
+    m = _AUTO_TAG_RE.match(tag)
+    if m and m["kind"] == "auto:mac" and steps_dir and os.path.isfile(os.path.join(steps_dir, m["name"])):
+        return row
+    return dataclasses.replace(row, tag="manual")
+
+
+def render_after_merge_block(rows: list, steps_dir: str | None = None) -> str:
     """The `## After merge` block for post-merge rows, or "" when there are none."""
     if not rows:
         return ""
     from .manual_rows import render_after_merge  # local import keeps module-level cycle-free
+    rows = [_fail_closed_tag(r, steps_dir) for r in rows]
+    mac_note = f" {_AUTO_MAC_SENTENCE}" if any(
+        getattr(r, "tag", "").startswith("auto:mac ") for r in rows) else ""
     return (
         f"{AFTER_MERGE_HEADING}\n\n"
         "These rows run only after the PR merges. The merge workflow posts them as a "
-        "checklist comment on this PR and sends one Discord message.\n\n"
+        f"checklist comment on this PR and sends one Discord message.{mac_note}\n\n"
         f"{render_after_merge(rows)}\n{AFTER_MERGE_END}"
     )
 

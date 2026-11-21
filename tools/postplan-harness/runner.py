@@ -1025,7 +1025,9 @@ def _run_pass(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 removed_guards_holds=_rg_holds,
                 reviewer_arming_holds=fidelity.reviewer_arming_holds(
                     (res.fidelity or {}).get(fidelity.SHADOW_KEY), git.conformance_files(),
-                    git.diff_vs_base(), log),
+                    git.diff_vs_base(), log,
+                    review_inputs=_landed_later_review_inputs(git, review, log),
+                ),
             )
             if not live and (fixture or {}).get("current_tree"):
                 # replay-only seam, the checks_outcome pattern: live mode never reads it
@@ -3216,6 +3218,21 @@ def _review_base(git, log=None, label="phase5.5"):
     if log is not None:
         log(f"{label}: review base: {rb.describe()}")
     return rb
+
+
+def _landed_later_review_inputs(git, review, log):
+    """Review-base inputs for the planned-landed arming filter, or None on the master base.
+
+    The Phase 5.5 reviewer judged the diff against ``review``. A file only the parent
+    changed must not clear the reviewer's MISSING item. A git failure returns empty
+    inputs, which keeps every planned-landed hold."""
+    if review is None or review.parent is None:
+        return None
+    try:
+        return git.conformance_files(review.ref), git.diff_vs_base(review.ref)
+    except Exception as exc:  # noqa: BLE001
+        log(f"arming: review-base landed-later inputs unreadable ({exc}); keeping planned-landed holds")
+        return (), ""  # fail closed: empty review-base inputs keep every hold
 
 
 def _unplanned_ctx(worktree, git, plan, master_sha, diff_body, log):

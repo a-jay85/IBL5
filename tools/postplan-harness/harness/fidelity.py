@@ -1697,8 +1697,22 @@ def _landed_later(item, changed_files, diff_text: str) -> bool:
     return False
 
 
-def reviewer_arming_holds(shadow, changed_files, diff_text: str, log) -> list[str]:
+def _landed_for_arming(item, changed_files, diff_text, review_inputs):
+    """True only when the item landed in the master diff and, on a stacked run, also in
+    the review-base diff the Phase 5.5 reviewer judged. Either miss keeps the hold."""
+    if not _landed_later(item, changed_files, diff_text):
+        return False
+    if review_inputs is None:
+        return True
+    review_files, review_diff = review_inputs
+    return _landed_later(item, review_files, review_diff)
+
+
+def reviewer_arming_holds(shadow, changed_files, diff_text: str, log, *,
+                           review_inputs=None) -> list[str]:
     """Condition (21) parts from the SHADOW-ARMING record. Add-only: it never clears a hold.
+
+    `review_inputs` is `(files, diff)` against the stacked review base, or None on the master base.
 
     Anything but a well-formed present or carried record is neutral: [] plus one log line.
     """
@@ -1711,7 +1725,8 @@ def reviewer_arming_holds(shadow, changed_files, diff_text: str, log) -> list[st
         parts = []
         pl = fields["planned_landed"]
         if pl["hold"] is True and not shadow.get("plan_blind"):
-            items = [i for i in pl["missing"] if not _landed_later(i, changed_files, diff_text)]
+            items = [i for i in pl["missing"]
+                     if not _landed_for_arming(i, changed_files, diff_text, review_inputs)]
             if items:
                 parts.append("planned-landed: " + ", ".join(
                     f"{_one_line(i.get('kind'))}:{_one_line(i.get('token'))}" for i in items))

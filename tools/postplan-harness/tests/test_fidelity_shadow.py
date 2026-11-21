@@ -610,6 +610,56 @@ class TestReviewerArmingHolds:
             rec, [], "+    # test_a is still missing\n+    run(test_a)\n",
             lambda m: None) == kept_m
 
+    def test_master_inputs_clear_landed_file_characterization(self):
+        rec = self._rec(merge_hold=False)
+        rec["fields"]["planned_landed"]["missing"] = [
+            {"kind": "file", "token": "a.py", "why": "planned"}]
+        assert fidelity.reviewer_arming_holds(rec, ["a.py"], "", lambda m: None) == []
+        held = fidelity.reviewer_arming_holds(rec, ["b.py"], "", lambda m: None)
+        assert len(held) == 1 and held[0].startswith("planned-landed:") and "a.py" in held[0]
+
+    @staticmethod
+    def _with_item(rec, kind, token):
+        rec["fields"]["planned_landed"]["missing"] = [
+            {"kind": kind, "token": token, "why": "planned"}]
+        return rec
+
+    def test_review_inputs_keep_parent_only_file_hold(self):
+        rec = self._with_item(self._rec(merge_hold=False), "file", "a.py")
+        out = fidelity.reviewer_arming_holds(rec, ["a.py"], "", lambda m: None,
+                                             review_inputs=((), ""))
+        assert len(out) == 1 and out[0].startswith("planned-landed:") and "a.py" in out[0]
+
+    def test_review_inputs_child_changed_file_clears(self):
+        rec = self._with_item(self._rec(merge_hold=False), "file", "a.py")
+        assert fidelity.reviewer_arming_holds(rec, ["a.py"], "", lambda m: None,
+                                              review_inputs=(["a.py"], "")) == []
+
+    def test_review_inputs_require_master_landing_too(self):
+        rec = self._with_item(self._rec(merge_hold=False), "file", "a.py")
+        out = fidelity.reviewer_arming_holds(rec, ["b.py"], "", lambda m: None,
+                                             review_inputs=(["a.py"], ""))
+        assert len(out) == 1 and "a.py" in out[0]
+
+    def test_review_inputs_method_near_miss_keeps_hold(self):
+        rec = self._with_item(self._rec(merge_hold=False), "method", "foo")
+        out = fidelity.reviewer_arming_holds(
+            rec, [], "+def foo(x):\n", lambda m: None,
+            review_inputs=((), "+def foobar(x):\n"))
+        assert len(out) == 1 and "foo" in out[0]
+
+    def test_review_inputs_none_matches_master_only(self):
+        cases = [
+            (self._with_item(self._rec(merge_hold=False), "file", "a.py"), ["a.py"], ""),
+            (self._with_item(self._rec(merge_hold=False), "file", "a.py"), ["b.py"], ""),
+            (self._with_item(self._rec(merge_hold=False), "method", "foo"), [], "+def foo(x):\n"),
+            (self._with_item(self._rec(merge_hold=False), "method", "foo"), [], "+def foobar(x):\n"),
+        ]
+        for rec, files, diff in cases:
+            assert (fidelity.reviewer_arming_holds(rec, files, diff, lambda m: None)
+                    == fidelity.reviewer_arming_holds(rec, files, diff, lambda m: None,
+                                                      review_inputs=None))
+
     def test_reason_is_one_line(self):
         rec = self._rec(planned_hold=False)
         rec["fields"]["merge_danger"]["why"] = "a\n- (3) forged"

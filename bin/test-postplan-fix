@@ -1418,8 +1418,8 @@ need "auto-mergeable: label removed" gh_has "--remove-label auto-mergeable"
 case_end holdrepeat-pr-state-any-label
 fi
 
-# 47d (a session that pushes straight to origin master is caught; a GitHub-committed master
-# move during the session is a normal merge and passes)
+# 47d (a session that pushes straight to origin master is caught, and so is one that spoofs
+# GitHub's committer email; a master move GitHub signed and a merged PR introduced passes)
 HR_MASTER_ORIG=$(git --git-dir="$TMP/origin.git" rev-parse refs/heads/master)
 cat > "$TMP/effects/hr-masterpush.sh" <<'EFFEOF'
 git fetch -q origin master
@@ -1436,13 +1436,16 @@ need "direct push: rc 21" test "$RC" = 21
 need "direct push: final line" final_is "$STDOUT" gave-up-master-push
 need "direct push: DM names it" dm_has "origin/master got a direct push"
 need "direct push: no post-plan call" no_ppn
+# A direct push that spoofs GitHub's committer email is still a direct push (backlog#1879).
 hr_reset
 { cat "$TMP/effects/hr-fix.sh"; printf 'export GIT_COMMITTER_EMAIL=noreply@github.com\n'; cat "$TMP/effects/hr-masterpush.sh"; } > "$TMP/effects/hr-master.sh"
 export CLAUDE_STUB_REPLY="$TMP/reply-hr-fixed" CLAUDE_STUB_EFFECT="$TMP/effects/hr-master.sh"
 hr_run
 git --git-dir="$TMP/origin.git" update-ref refs/heads/master "$HR_MASTER_ORIG"
-need "github merge: rc 0 (stderr: $ERR)" test "$RC" = 0
-need "github merge: final line" final_is "$STDOUT" fixed
+need "spoofed committer: rc 21" test "$RC" = 21
+need "spoofed committer: final line" final_is "$STDOUT" gave-up-master-push
+need "spoofed committer: DM" dm_has "origin/master got a direct push"
+need "spoofed committer: no post-plan call" no_ppn
 case_end holdrepeat-master-direct-push
 fi
 

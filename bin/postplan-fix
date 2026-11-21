@@ -636,20 +636,27 @@ LAST line of the final message."
         || [ "$(_hr_state "$HOME/.claude/hooks")" != "$(cat "$HR_TMP/claude-hooks.before")" ]; then
         HR_EXTBAD+="a file under ~/.claude/hooks changed; "
     fi
-    # master on origin: admins may push it directly, and the refs guard only watches the PR
-    # branch. Every commit GitHub lands by a merge carries GitHub as committer, and the baseline
-    # workflow pushes as github-actions[bot]. Any other committer since the pre-session fetch is
-    # a direct push; an owner push in that window gives up too, which is the safe side. An
-    # unreadable master rejects as well. Detected, not repaired: the launcher never rewrites master.
+    # master on origin: admins may push it directly, and the refs guard only watches the PR.
+    # Each commit master gained since launch must be a GitHub merge: signed by GitHub
+    # (verified, committer noreply@github.com) AND introduced by a merged PR based on master.
+    # A committer email alone is spoofable (backlog#1879). An unreadable answer rejects.
     HR_MASTERBAD=""
     if ! git -C "$WT" fetch -q origin master >/dev/null 2>&1 \
-        || ! HR_MASTER_CE="$(git -C "$WT" log --format='%ce %h' "$HR_MASTER0..refs/remotes/origin/master" 2>/dev/null)"; then
+        || ! HR_MASTER_NEW="$(git -C "$WT" rev-list "$HR_MASTER0..refs/remotes/origin/master" 2>/dev/null)"; then
         HR_MASTERBAD="could not read origin/master after the session; "
+    elif [ "$(grep -c . <<< "$HR_MASTER_NEW")" -gt 50 ]; then
+        HR_MASTERBAD="origin/master got a direct push (more than 50 new commits); "
     else
-        HR_MASTER_CE="$(grep -Ev '^(noreply@github\.com|github-actions\[bot\]@users\.noreply\.github\.com) ' <<< "$HR_MASTER_CE" || true)"
-        if [ -n "$HR_MASTER_CE" ]; then
-            HR_MASTERBAD="origin/master got a direct push (${HR_MASTER_CE##* }); "
-        fi
+        while IFS= read -r hr_mc; do
+            [ -n "$hr_mc" ] || continue
+            if ! hr_v="$(gh api "repos/a-jay85/IBL5/commits/$hr_mc" --jq '[(.commit.verification.verified | tostring), .commit.committer.email] | @tsv' 2>/dev/null)" \
+                || ! hr_m="$(gh api "repos/a-jay85/IBL5/commits/$hr_mc/pulls" --jq '[.[] | select(.merged_at != null and .base.ref == "master")] | length' 2>/dev/null)"; then
+                HR_MASTERBAD="could not verify origin/master commit ${hr_mc:0:12}; "; break
+            fi
+            if [ "$hr_v" != "$(printf 'true\tnoreply@github.com')" ] || ! [ "$hr_m" -ge 1 ] 2>/dev/null; then
+                HR_MASTERBAD="origin/master got a direct push (${hr_mc:0:12}); "; break
+            fi
+        done <<< "$HR_MASTER_NEW"
     fi
     if [ -n "$HR_PRBAD" ]; then _hr_reject pr-state "$HR_PRBAD$HR_MASTERBAD$HR_EXTBAD"; fi
     if [ -n "$HR_MASTERBAD" ]; then _hr_reject master-push "$HR_MASTERBAD$HR_EXTBAD"; fi

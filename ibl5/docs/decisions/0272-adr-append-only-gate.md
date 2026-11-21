@@ -11,7 +11,7 @@ last_verified: 2026-11-20
 
 ## Context
 
-`.claude/rules/adr-append-only.md` freezes the Context, Decision, Rationale and Alternatives sections of an accepted ADR. Enforcement was prompt-only: the docfix prompt and the rule doc told agents to append an Addendum, and nothing in CI checked it. The rule failed in practice. PR 3367 rewrote ADR-0104 Decision item 2 in place. PR 3373 rewrote the Decision text of ADR-0013 and ADR-0169. PR 3637 rewrote the ADR-0169 frontmatter `description`. A scan of master found 71 of 499 ADR-file modifications touching frozen sections.
+`.claude/rules/adr-append-only.md` freezes the Context, Decision, Rationale and Alternatives sections of an accepted ADR. Enforcement was prompt-only: the docfix prompt and the rule doc told agents to append an Addendum, and nothing in CI checked it. The rule failed in practice. PR 3367 rewrote ADR-0104 Decision item 2 in place. PR 3373 rewrote the Decision text of ADR-0013 and ADR-0169. PR 3637 rewrote the ADR-0169 frontmatter `description`. A replay of this gate over master history found frozen text changed in 81 of the 279 first-parent commits that modified an ADR file.
 
 ## Decision
 
@@ -44,7 +44,8 @@ The harness `bin/test-check-adr-append-only` runs in the `static-guards` job of 
 - Positive: the gate is diff-only, so the historical violations never block a PR.
 - Negative: a docfix PR that rewrites frozen numerics now fails `Meta checks` until it appends an Addendum or carries the bypass marker.
 - Negative: an insertion inside a frozen section passes, so a new line spliced into the middle of a Decision is not caught.
-- Phase 5 corpus numbers: PHASE5-NUMBERS-PENDING.
+- Corpus replay: 502 commit-by-file ADR modifications on first-parent master. The gate ran once per commit that modified an ADR: 279 commits, 198 pass (exit 0), 81 fail (exit 1), none exit 2. The 156 findings split into 142 rewrites and 14 removals, by section: 57 frontmatter `description`, 64 Decision, 18 Context, 17 Alternatives Considered.
+- Corpus audit: About 16 sampled flagged commits were read. All were true positives, meaning frozen text rewritten or removed with no allowed shape. The 57 description findings are the largest class, and all are real edits of a line the rule freezes, so they need the bypass marker or an Addendum.
 
 ## References
 

@@ -297,7 +297,6 @@ while IFS=$'\t' read -r status a b; do
     LT=()
     HOS=()
     HOC=()
-    HNC=()
     HFIRST=()
     HEND=()
     nl=0
@@ -307,7 +306,6 @@ while IFS=$'\t' read -r status a b; do
             h=$((h + 1))
             HOS[$h]="${BASH_REMATCH[1]}"
             HOC[$h]="${BASH_REMATCH[3]:-1}"
-            HNC[$h]="${BASH_REMATCH[6]:-1}"
             HFIRST[$h]="$nl"
             HEND[$h]="$nl"
             continue

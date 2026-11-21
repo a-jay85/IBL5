@@ -58,7 +58,7 @@ final class OrderBySqlShape
         }
 
         $table = strtolower($from[1]);
-        $alias = isset($from[2]) && $from[2] !== '' ? strtolower($from[2]) : null;
+        $alias = isset($from[2]) ? strtolower($from[2]) : null;
 
         // An ORDER BY name can refer to a SELECT-list alias instead of a column,
         // so a name the SELECT list defines with AS never counts as a column.

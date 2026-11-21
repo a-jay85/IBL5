@@ -173,3 +173,22 @@ def test_replay_negative_cases_stay_held(tmp_path, case):
     if case in ("seeds-only", "capture-added-by-same-pr"):
         assert 5 in blocked
     assert second_review_candidates(inp, decision.conditions) == {}
+
+
+def print_replay_verdicts():
+    """One line per (PR, file list) with the verdict the synthetic evidence gets.
+    Run from tools/postplan-harness: python3 -m tests.test_trace_pinned_replay"""
+    import tempfile
+    from pathlib import Path
+    for pr in ENGINE_PRS:
+        files = _engine_records()[f"engine-golden-{pr}"]["inputs"]["classification"]["files"]
+        paths = _engine_paths(files)
+        for label, changed in (("engine-only", _changed(paths)), ("full-list", _changed(files))):
+            with tempfile.TemporaryDirectory() as tmp:
+                root, base = _replay_repo(Path(tmp), paths)
+                go = _go()
+                print(pr, label, tp.evaluate_evidence(root, BRANCH, base, changed, run_go=go))
+
+
+if __name__ == "__main__":
+    print_replay_verdicts()

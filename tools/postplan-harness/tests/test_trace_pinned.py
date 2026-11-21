@@ -211,6 +211,17 @@ def test_empty_range_holds(repo):
     assert _verdict(root, base, changed=[]) == "empty-range"
 
 
+UNRELATED = "engine/internal/backup/plr.go"
+
+
+def test_unrelated_engine_edit_cannot_borrow_pinned_capture(repo):
+    """backlog#1930: an unrelated engine edit rides a pinned test of a different routine."""
+    root, base = repo
+    _write(root, UNRELATED, "package backup\n\nfunc assemble() int { return 2 }\n")
+    verdict = _verdict(root, base, changed=[*CHANGED, UNRELATED])
+    assert verdict == "ok"  # Phase 3 flips this assertion
+
+
 # ---- (b) the test ----
 
 def test_test_name_without_prefix_holds(repo):

@@ -84,16 +84,35 @@ pmr_executor_ready() {
 # pmr_is_count VALUE -- 0 iff VALUE is one or more ASCII digits and nothing else.
 pmr_is_count() { local _re='^[0-9]+$'; [[ "${1-}" =~ $_re ]]; }
 
-# pmr_prose_text FILE -- `lineno<TAB>text` for prose lines only: fenced blocks, HTML
-# comments and blockquotes are dropped, and each inline code span becomes CODE.
+# pmr_prose_text FILE [KEEP_COMMENTS] -- `lineno<TAB>text` for prose lines only: fenced blocks
+# and blockquotes are dropped, each inline code span becomes CODE, and HTML comments are cut
+# out (only the commented text goes, so prose before `<!--` on the same line stays). With
+# KEEP_COMMENTS=1 the comments stay, so pmr_waiver can read its marker.
 pmr_prose_text() {
-    awk '
+    awk -v keep="${2-0}" '
         /^[[:space:]]*(```|~~~)/ { infence = !infence; next }
         infence { next }
-        /<!--/ { incomment = 1 }
-        incomment { if (/-->/) incomment = 0; next }
         /^[[:space:]]*>/ { next }
-        { line = $0; gsub(/`[^`]*`/, "CODE", line); print NR "\t" line }
+        {
+            line = $0; gsub(/`[^`]*`/, "CODE", line)
+            if (keep != 1) {
+                out = ""
+                while (length(line) > 0) {
+                    if (incomment) {
+                        i = index(line, "-->")
+                        if (i == 0) { line = ""; break }
+                        line = substr(line, i + 3); incomment = 0
+                    } else {
+                        i = index(line, "<!--")
+                        if (i == 0) { out = out line; line = ""; break }
+                        out = out substr(line, 1, i - 1); line = substr(line, i + 4); incomment = 1
+                    }
+                }
+                line = out
+                if (line == "" && $0 != "") next
+            }
+            print NR "\t" line
+        }
     ' "$1"
 }
 
@@ -108,7 +127,7 @@ pmr_prose_hits() {
 # pmr_waiver FILE -- 0 valid `<!-- after-merge-prose-ok: <15+ chars> -->`, 1 none, 2 malformed.
 pmr_waiver() {
     local _m _r
-    _m="$(grep -m1 -F "<!-- $PMR_WAIVER_TAG" "$1" || true)"
+    _m="$(pmr_prose_text "$1" 1 | grep -m1 -F "<!-- $PMR_WAIVER_TAG" || true)"
     [ -n "$_m" ] || return 1
     _r="${_m#*"$PMR_WAIVER_TAG"}"; _r="${_r%%-->*}"
     _r="$(printf '%s' "$_r" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')"

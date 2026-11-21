@@ -621,6 +621,8 @@ _vs_clean gate-V-fixtures-path-with-verb \
 fi
 [ "$TCP_ONLY" != gateVsyntax ] || h_done
 
+# `gateCW` skips everything from here to the gate [CW] cases, which sit last.
+if [ "$TCP_ONLY" != gateCW ]; then
 if [ "$TCP_ONLY" != matrix-split ]; then
 if [ "$TCP_ONLY" != gate13 ] && [ "$TCP_ONLY" != gateH ]; then
 # A minimal well-formed matrix passes (exit 0). Baseline / no false positives.
@@ -6542,11 +6544,15 @@ else
 fi
 fi
 GUARD="$AB_GUARD_SAVED"
+fi
 
 # ---------------------------------------------------------------------------
 # Gate [CW]: prefire-verify runs matrix rows from the repo root, so a row that starts
 # with an ibl5/-only tool can never pass. The 2026-11-06 trade-suggestions skip.
+# `bin/test-check-plan gateCW` runs these cases alone; the guard opened after
+# the gateVsyntax group skips every case between there and here.
 # ---------------------------------------------------------------------------
+if [ -z "$TCP_ONLY" ] || [ "$TCP_ONLY" = gateCW ]; then
 assert_viol "gateCW-bare-phpunit-flags" 1 '[CW]' "$FM"'
 ## Verification Matrix
 | # | What to verify | Test type | Timing | Test file / location |
@@ -6810,6 +6816,42 @@ assert_viol "gateCW-version-flag-extra-arg-flags" 1 '[CW]' "$FM"'
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---------------|-----------|--------|---------------------|
 | 1 | x | CLI-executable | post-impl | `composer --version test` |
+'
+assert_viol "gateCW-version-flag-redirect-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `composer --version >/dev/null 2>&1` |
+'
+assert_viol "gateCW-version-flag-fd-dup-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `npm --version 2>&1` |
+'
+assert_viol "gateCW-version-flag-amp-redirect-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `bun --version &>/dev/null` |
+'
+assert_viol "gateCW-version-flag-redirect-extra-arg-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `composer --version >/dev/null test` |
+'
+assert_viol "gateCW-redirect-no-version-flag-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `composer test >/dev/null 2>&1` |
+'
+assert_viol "gateCW-version-flag-redirect-then-test-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `composer --version >/dev/null && composer test` |
 '
 assert_viol "gateCW-bun-run-ibl5-path-ok" 0 '[CW]' "$FM"'
 ## Verification Matrix
@@ -7127,5 +7169,7 @@ assert_viol "gateCW-timeout-s-value-root-tool-ok" 0 '[CW]' "$FM"'
 |---|---------------|-----------|--------|---------------------|
 | 1 | x | CLI-executable | post-impl | `timeout -s KILL 5m bin/check-prose --since=master` |
 '
+fi
+[ "$TCP_ONLY" != gateCW ] || h_done
 
 h_done

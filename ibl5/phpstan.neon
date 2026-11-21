@@ -185,6 +185,12 @@ services:
         tags:
             - phpstan.rules.rule
     -
+        class: PHPStanRules\RequireInterfaceDeclaresPublicMethodsRule
+        arguments:
+            receiverSuffixes: [Controller, Service, View]
+        tags:
+            - phpstan.rules.rule
+    -
         class: PHPStanRules\BanRawDbHandleInEntryPointRule
         tags:
             - phpstan.rules.rule

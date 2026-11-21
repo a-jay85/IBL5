@@ -68,6 +68,7 @@ final class RefreshRecordHoldersStep implements PipelineStepInterface
         try {
             $before = $this->clock->microtime();
             $service = ($this->serviceFactory)();
+            // @phpstan-ignore ibl.interfaceMissingPublicMethod (RecordHoldersServiceInterface has implementer RecordHoldersService without this method)
             $records = $service->rebuildCache();
         } catch (\Throwable $e) {
             return StepResult::failure($this->getLabel(), $e->getMessage());

@@ -26,4 +26,11 @@ interface TeamControllerInterface
      * @return void Outputs complete HTML page directly
      */
     public function displayTeamPage(int $teamid): void;
+
+    /**
+     * Display main menu
+     *
+     * @return void Outputs the menu directly
+     */
+    public function displayMenu(): void;
 }

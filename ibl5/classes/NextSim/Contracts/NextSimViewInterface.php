@@ -56,4 +56,11 @@ interface NextSimViewInterface
      * @return string HTML output with tabs wrapping the position table
      */
     public function renderTabbedPositionTable(array $games, string $activePosition, Team $userTeam, array $userStarters): string;
+
+    /**
+     * Render the column highlight script
+     *
+     * @return string HTML script tag defining the global highlight initializer
+     */
+    public function renderColumnHighlightScript(): string;
 }

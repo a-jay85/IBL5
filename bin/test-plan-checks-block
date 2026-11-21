@@ -365,7 +365,7 @@ chk "compose exec without -T stays LOCAL" routes_local 'docker compose exec php 
 chk "compose -f other.yml stays LOCAL" routes_local 'docker compose -f other.yml exec -T php php -v'
 chk "plain container exec stays LOCAL" routes_local 'docker exec php-base php -v'
 chk "compose exec into another service stays LOCAL" routes_local 'docker compose exec -T mariadb mariadb -e "SELECT 1"'
-chk "npx stays LOCAL" routes_local 'npx vitest run x.test.ts'
+chk "bare npx with no IBLbot cd stays LOCAL" routes_local 'npx vitest run x.test.ts'
 chk "mutation-diff stays LOCAL" routes_local 'bin/mutation-diff master'
 chk "unknown first word stays LOCAL" routes_local 'make test'
 chk "whole-suite phpunit stays LOCAL" routes_local 'cd ibl5 && vendor/bin/phpunit'
@@ -375,6 +375,30 @@ chk "slug curl routes CI" routes_ci 'curl -sf http://plan-checks-ci-local-rows.l
 chk "DatabaseIntegration phpunit routes CI" routes_ci 'cd ibl5 && vendor/bin/phpunit tests/DatabaseIntegration/SomeTest.php'
 end_case
 
+start_case case_iblbot_vitest_rows
+chk "IBLbot vitest file routes CI" routes_ci 'cd ibl5/IBLbot && npx vitest run tests/x.test.ts'
+chk "IBLbot vitest file with -t filter routes CI" routes_ci "cd ibl5/IBLbot && npx vitest run tests/x.test.ts -t 'rejects over-cap trade'"
+chk "IBLbot vitest in a subshell routes CI" routes_ci '(cd ibl5/IBLbot && npx vitest run tests/x.test.ts)'
+chk "IBLbot vitest with ./ prefixed dir routes CI" routes_ci 'cd ./ibl5/IBLbot && npx vitest run x.test.ts'
+chk "wrong dir (ibl5) stays LOCAL" routes_local 'cd ibl5 && npx vitest run x.test.ts'
+chk "prefix dir (IBLbotX) stays LOCAL" routes_local 'cd ibl5/IBLbotX && npx vitest run x.test.ts'
+chk "dir escaping via .. stays LOCAL" routes_local 'cd ibl5/IBLbot/../.. && npx vitest run x.test.ts'
+chk "watch mode (no run) stays LOCAL" routes_local 'cd ibl5/IBLbot && npx vitest x.test.ts'
+chk "no test file stays LOCAL" routes_local 'cd ibl5/IBLbot && npx vitest run'
+chk "flag before the file stays LOCAL" routes_local 'cd ibl5/IBLbot && npx vitest run --coverage'
+chk "npx flag before vitest stays LOCAL" routes_local 'cd ibl5/IBLbot && npx --yes vitest run x.test.ts'
+chk "npx other tool stays LOCAL" routes_local 'cd ibl5/IBLbot && npx tsc --noEmit'
+chk "npm test stays LOCAL" routes_local 'cd ibl5/IBLbot && npm test'
+chk "parent-dir file operand stays LOCAL" routes_local 'cd ibl5/IBLbot && npx vitest run ../x.test.ts'
+chk "absolute file operand stays LOCAL" routes_local 'cd ibl5/IBLbot && npx vitest run /tmp/x.test.ts'
+chk "home file operand stays LOCAL" routes_local 'cd ibl5/IBLbot && npx vitest run ~/x.test.ts'
+chk "URL file operand stays LOCAL" routes_local 'cd ibl5/IBLbot && npx vitest run https://example.com/x.test.ts'
+chk "chained rm -rf stays LOCAL" routes_local 'cd ibl5/IBLbot && npx vitest run x.test.ts && rm -rf y'
+chk "semicolon-chained npx stays LOCAL" routes_local 'cd ibl5/IBLbot && npx vitest run x.test.ts; npx tsc'
+chk "command substitution operand stays LOCAL" routes_local 'cd ibl5/IBLbot && npx vitest run $(cat list)'
+chk "subshell followed by another command stays LOCAL" routes_local '(cd ibl5/IBLbot && npx vitest run x.test.ts) && bin/test-y'
+end_case
+
 start_case case_needs_column
 chk "web row also needs db" eq "$(route 'curl -sf http://localhost/ibl5/')" "CI db web"
 chk "container row also needs db" eq "$(route 'docker compose exec -T php php -v')" "CI db web"
@@ -382,6 +406,7 @@ chk "DB test row needs db" eq "$(route 'cd ibl5 && vendor/bin/phpunit tests/Data
 chk "bun row" eq "$(route 'cd ibl5 && bun test x')" "CI bun"
 chk "bunx row" eq "$(route 'bunx vitest run x')" "CI bun"
 chk "actionlint row" eq "$(route 'actionlint .github/workflows/x.yml')" "CI actionlint"
+chk "iblbot vitest row" eq "$(route 'cd ibl5/IBLbot && npx vitest run x.test.ts')" "CI node"
 chk "plain row needs nothing" eq "$(route 'bin/test-x')" "CI "
 end_case
 
@@ -394,23 +419,23 @@ body_for() {
     enc "$bp" > "$TMP/nb-$name.body"
 }
 needs_of() { (cd "$R" && "$LIB" needs --body-file "$1" 2>&1); }
-ZEROS="$(printf 'db=0\nweb=0\nbun=0\nactionlint=0\ngo=0')"
+ZEROS="$(printf 'db=0\nweb=0\nbun=0\nactionlint=0\ngo=0\nnode=0')"
 
 start_case case_needs_zeros
 body_for plain 'bin/test-alpha-fixture'
 OUT=$(needs_of "$TMP/nb-plain.body"); RC=$?
 chk "no-stack block exits 0 (got $RC)" eq "$RC" 0
-chk "no-stack block prints five zeros" eq "$OUT" "$ZEROS"
+chk "no-stack block prints six zeros" eq "$OUT" "$ZEROS"
 OUT=$(needs_of "$TMP/hello"); RC=$?
 chk "absent block exits 0 (got $RC)" eq "$RC" 0
-chk "absent block prints five zeros" eq "$OUT" "$ZEROS"
+chk "absent block prints six zeros" eq "$OUT" "$ZEROS"
 OUT=$(needs_of "$TMP/flip"); RC=$?
 chk "corrupt block exits 0 (got $RC)" eq "$RC" 0
-chk "corrupt block prints five zeros" eq "$OUT" "$ZEROS"
-body_for stacks 'curl -sf http://localhost/ibl5/' 'cd ibl5 && bun test x' 'actionlint x.yml' 'cd engine && go test ./internal/sim'
+chk "corrupt block prints six zeros" eq "$OUT" "$ZEROS"
+body_for stacks 'curl -sf http://localhost/ibl5/' 'cd ibl5 && bun test x' 'actionlint x.yml' 'cd engine && go test ./internal/sim' 'cd ibl5/IBLbot && npx vitest run x.test.ts'
 OUT=$(needs_of "$TMP/nb-stacks.body"); RC=$?
 chk "stack block exits 0 (got $RC)" eq "$RC" 0
-chk "stack block prints all ones" eq "$OUT" "$(printf 'db=1\nweb=1\nbun=1\nactionlint=1\ngo=1')"
+chk "stack block prints all ones" eq "$OUT" "$(printf 'db=1\nweb=1\nbun=1\nactionlint=1\ngo=1\nnode=1')"
 MP="$TMP/nb-mut.md"
 mkplan "$MP" "$(row 1 'bin/test-alpha-fixture')" -- \
     "$(printf '%smutation\nrow: 1\nfile: target.txt\nmatch: ALPHA\nreplace: BETA\ncheck: cd ibl5 && bun test x\n%s\n' "$F" "$F")"
@@ -651,7 +676,7 @@ chmod +x "$TMP/stubbin/curl"
 # ci_env runs the ci driver with the CI stack markers and COMPOSE_FILE cleared,
 # so the offline cases mean the same inside the Plan checks job.
 ci_env() {
-    (cd "$R" && env -u IBL_CI_DB_READY -u IBL_CI_WEB_READY -u IBL_CI_BUN_READY -u IBL_CI_GO_READY -u COMPOSE_FILE \
+    (cd "$R" && env -u IBL_CI_DB_READY -u IBL_CI_WEB_READY -u IBL_CI_BUN_READY -u IBL_CI_GO_READY -u IBL_CI_NODE_READY -u COMPOSE_FILE \
         PATH="$TMP/stubbin:$PATH" "$@" "$LIB" ci --body-file "$BODYF" --labels-file "$TMP/nolabels" 2>&1)
 }
 
@@ -702,6 +727,32 @@ OUT=$(ci_env IBL_CI_GO_READY=); RC=$?
 chk "go marker empty: exits 1 (got $RC)" eq "$RC" 1
 chk "go marker empty: names the stack" has "$OUT" "needs go but the job did not start it (IBL_CI_GO_READY is not 1)"
 chk "go marker empty: the row never ran" eq "$(grep -c 'PASS plan-checks' <<< "$OUT" || true)" 0
+end_case
+
+# A node row (IBLbot vitest) needs IBL_CI_NODE_READY=1 the same way.
+start_case case_readiness_guard_node
+body_for nguard 'cd ibl5/IBLbot && npx vitest run x.test.ts'
+BODYF="$TMP/nb-nguard.body"
+OUT=$(ci_env); RC=$?
+chk "node marker unset: exits 1 (got $RC)" eq "$RC" 1
+chk "node marker unset: names the stack" has "$OUT" "needs node but the job did not start it (IBL_CI_NODE_READY is not 1)"
+chk "node marker unset: the row never ran" eq "$(grep -c 'PASS plan-checks' <<< "$OUT" || true)" 0
+OUT=$(ci_env IBL_CI_NODE_READY=); RC=$?
+chk "node marker empty: exits 1 (got $RC)" eq "$RC" 1
+chk "node marker empty: names the stack" has "$OUT" "needs node but the job did not start it (IBL_CI_NODE_READY is not 1)"
+chk "node marker empty: the row never ran" eq "$(grep -c 'PASS plan-checks' <<< "$OUT" || true)" 0
+end_case
+
+# Every readiness marker ci_stacks_ready reads must be set by a step in the
+# Plan checks workflow, or its rows fail on every CI run.
+workflow_sets() { grep -qF -- "echo $1=1" "$REPO_ROOT/.github/workflows/plan-checks.yml"; }
+start_case case_ready_markers_wired
+MARKERS=$(sed -n '/^ci_stacks_ready()/,/^}/p' "$REPO_ROOT/bin/lib/plan-checks-block" | grep -oE 'IBL_CI_[A-Z]+_READY' | sort -u)
+chk "ci_stacks_ready names at least one marker" test -n "$MARKERS"
+while IFS= read -r name; do
+    [ -n "$name" ] || continue
+    chk "workflow sets $name" workflow_sets "$name"
+done <<< "$MARKERS"
 end_case
 
 # A relative COMPOSE_FILE is pinned to the repo root, so a row that cds into a
@@ -967,6 +1018,13 @@ LOCAL	-	docker compose exec php php -v
 LOCAL	-	docker compose -f other.yml exec -T php php -v
 CI	db,web	docker compose exec -T php php -v
 LOCAL	-	npx vitest run x.test.ts
+CI	node	cd ibl5/IBLbot && npx vitest run tests/x.test.ts -t 'rejects over-cap trade'
+CI	node	(cd ibl5/IBLbot && npx vitest run tests/x.test.ts)
+LOCAL	-	cd ibl5 && npx vitest run x.test.ts
+LOCAL	-	cd ibl5/IBLbot && npx vitest x.test.ts
+LOCAL	-	cd ibl5/IBLbot && npx vitest run --coverage
+LOCAL	-	cd ibl5/IBLbot && npx vitest run x.test.ts && rm -rf y
+LOCAL	-	cd ibl5/IBLbot && npm test
 CI	bun	cd ibl5 && bunx vitest run tests/ts-unit/vr-pr-body.test.ts
 LOCAL	-	bin/mutation-diff master
 LOCAL	-	make test

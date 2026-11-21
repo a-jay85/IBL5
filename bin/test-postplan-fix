@@ -1874,7 +1874,7 @@ hr_run
 need "rc 21" test "$RC" = 21
 need "final line" final_is "$STDOUT" gave-up-git-config
 need "DM names the file" dm_has ".gitconfig"
-need "no insteadOf left" test -z "$(git config --global --get-regexp insteadof 2>/dev/null)"
+need "no url.insteadOf left" test -z "$(git config --global --get-regexp insteadof 2>/dev/null)"
 need "origin unchanged" origin_is_tip
 git config --global --remove-section "url.$TMP/evil.git" 2>/dev/null || true; rm -rf "$TMP/evil.git"
 else fail "holdrepeat-git-config-global-insteadof: HOME is not under TMP; refusing a write to the real home"; fi

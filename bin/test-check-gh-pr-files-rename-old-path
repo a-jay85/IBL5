@@ -11,6 +11,8 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GATE="$REPO_ROOT/bin/check-gh-pr-files-rename-old-path"
 T="$(mktemp -d)"
 trap 'rm -rf "$T"' EXIT
+# shellcheck source=bin/lib/usage-test-isolation.sh
+. "$REPO_ROOT/bin/lib/usage-test-isolation.sh"; usage_test_isolate "$T/usage"
 
 fail=0
 

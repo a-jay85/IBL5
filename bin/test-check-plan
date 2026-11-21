@@ -6817,6 +6817,11 @@ assert_viol "gateCW-version-flag-extra-arg-flags" 1 '[CW]' "$FM"'
 |---|---------------|-----------|--------|---------------------|
 | 1 | x | CLI-executable | post-impl | `composer --version test` |
 '
+# A version flag may carry trailing redirects (a-jay85/IBL5-backlog#1788). The -flags
+# near-misses guard the redirect group: a flag group widened to
+# (--version|-[vV]|[a-z]+) would pass `composer test >/dev/null 2>&1`, and an optional
+# operator (&>>?|>>?|<)? would read ` test` as a redirect target, so the
+# extra-arg case above would pass.
 assert_viol "gateCW-version-flag-redirect-ok" 0 '[CW]' "$FM"'
 ## Verification Matrix
 | # | What to verify | Test type | Timing | Test file / location |

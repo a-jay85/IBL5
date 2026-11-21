@@ -204,6 +204,7 @@ class NewsRepository extends \Database\BaseMysqliRepository implements NewsRepos
     {
         // Bound via prepared statement; only LIKE metacharacters need escaping.
         $searchTerm = '%' . addcslashes($needle, '\\%_') . '%';
+        // @phpstan-ignore ibl.orderByMissingTiebreaker (query moved verbatim from Player/articles.php; ties on time keep their old order, and a tiebreaker is a separate change to the pinned SQL)
         $stmt = $this->db->prepare('SELECT sid, title, time FROM nuke_stories WHERE hometext LIKE ? OR bodytext LIKE ? ORDER BY time DESC');
         if ($stmt === false) {
             return null;

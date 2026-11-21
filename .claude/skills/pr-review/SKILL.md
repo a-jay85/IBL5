@@ -6,7 +6,7 @@ name: pr-review
 description: Token-efficient code review for pull requests
 disable-model-invocation: true
 model: claude-sonnet-5-5
-last_verified: 2026-10-25
+last_verified: 2026-11-21
 ---
 
 Provide a code review for the given pull request. This command optimizes token usage by fetching the diff once and distributing only what each agent needs.
@@ -61,7 +61,7 @@ Store all of these results — they will be passed as context to agents below.
 
 ## Step 3: Launch parallel agents (merged by tier)
 
-**Read** `.claude/review-shared/_review-agents.md` for the canonical agent definitions. It defines 2 merged agents (A=architecture+bugs+DB+git history+code comments, C=previous PRs). For a PR touching shell, workflow, or `.claude/` prose files, also **Read** `.claude/review-shared/_shell-workflow-agent.md` (Agent E). It gets `$DIFF` from Step 2c and the file list from Step 2b like every other agent, and the **CRITICAL: No agent should call `gh pr diff`** rule below applies to it unchanged. No awk pre-slice here: `/pr-review` has no `$DIFF_FILE` temp file, and its 100KB fallback path already handles oversized diffs. Every agent closes each finding with the § Per-finding fields metadata line (severity, pre-existing, bug class, other instances); carry those fields into Step 4 and Step 6.
+**Read** `.claude/review-shared/_review-agents.md` with `limit: 250` for the canonical agent definitions. It defines 2 merged agents (A=architecture+bugs+DB+git history+code comments, C=previous PRs). For a PR touching shell, workflow, or `.claude/` prose files, also **Read** `.claude/review-shared/_shell-workflow-agent.md` with `limit: 300` (Agent E). It gets `$DIFF` from Step 2c and the file list from Step 2b like every other agent, and the **CRITICAL: No agent should call `gh pr diff`** rule below applies to it unchanged. No awk pre-slice here: `/pr-review` has no `$DIFF_FILE` temp file, and its 100KB fallback path already handles oversized diffs. Every agent closes each finding with the § Per-finding fields metadata line (severity, pre-existing, bug class, other instances); carry those fields into Step 4 and Step 6.
 
 Launch applicable agents in parallel. Each agent receives:
 - The filtered diff from Step 2c
@@ -77,7 +77,7 @@ Launch applicable agents in parallel. Each agent receives:
 
 ## Step 4: Confidence scoring
 
-**Read** `.claude/review-shared/_review-rubric.md` for the canonical rubric, thresholds, Automatic-Zero rule list, and IBL5 false-positive list.
+**Read** `.claude/review-shared/_review-rubric.md` with `limit: 250` for the canonical rubric, thresholds, Automatic-Zero rule list, and IBL5 false-positive list.
 
 Collect all issues found in Step 3 into a numbered list. Launch a **single Haiku agent**, pass it the issues list plus the **Scoring scale and Thresholds sections** from `_review-rubric.md` (not the full Automatic Zero or false-positive lists — review agents have already filtered those). Instruct it to return JSON scores per the rubric.
 
@@ -91,7 +91,7 @@ Classify per `_review-rubric.md` § Pre-existing defects and labels (Important a
 
 ## Step 6: Re-check eligibility
 
-**Read** `.claude/review-shared/_posting-procedure.md` — it carries this step's eligibility re-check plus the dispositioning and link-format rules cited below. Bind `$PR_NUMBER` from Step 2a before running anything from it. Follow its **Re-check eligibility** section now.
+**Read** `.claude/review-shared/_posting-procedure.md` with `limit: 200`. It carries this step's eligibility re-check plus the dispositioning and link-format rules cited below. Bind `$PR_NUMBER` from Step 2a before running anything from it. Follow its **Re-check eligibility** section now.
 
 ## Step 7: Post findings
 

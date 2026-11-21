@@ -12,6 +12,7 @@ use Module\ModuleServices;
  *
  * index.php keeps the closures that RookieOptionController takes on
  * handleSubmission(), so the auth and CSRF checks stay at the boundary.
+ * articles.php and extension.php compose through newsRepository() and extensionController().
  */
 final class PlayerFactory implements ModuleFactoryInterface
 {
@@ -50,6 +51,19 @@ final class PlayerFactory implements ModuleFactoryInterface
             $commonRepo,
             new \Player\PlayerPageService(),
             $this->services->request()
+        );
+    }
+
+    public function newsRepository(): \Topics\News\NewsRepository
+    {
+        return new \Topics\News\NewsRepository($this->services->db());
+    }
+
+    public function extensionController(string $serverName): \Extension\ExtensionController
+    {
+        return new \Extension\ExtensionController(
+            $this->services->teamIdentity(),
+            new \Extension\ExtensionService($this->services->db(), $serverName),
         );
     }
 }

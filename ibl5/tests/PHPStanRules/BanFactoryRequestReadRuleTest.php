@@ -9,6 +9,18 @@ use PHPStan\Testing\RuleTestCase;
 use PHPStanRules\BanFactoryRequestReadRule;
 
 /**
+ * Rule tests for the factory request-read and identity-parameter ban (ADR-0171).
+ *
+ * What each check guards against:
+ * - Pass-through: the zero-arg ModuleServices::request() accessor stays legal, so a rule
+ *   without the receiver-type guard would flag it.
+ * - Corpus: ApiKeysFactory::controller() takes host and https as arguments and reads no
+ *   request field itself; reading them there again is what the registered rule reports.
+ * - Registration: naming PHPStanRules\BanFactoryRequestReadRuleX in phpstan.neon aborts
+ *   PHPStan at container build.
+ * - Security surface: a factory parameter named $sessionHost matches the identity pattern
+ *   that ModuleFactorySecuritySurfaceTest detects.
+ *
  * @extends RuleTestCase<BanFactoryRequestReadRule>
  */
 final class BanFactoryRequestReadRuleTest extends RuleTestCase

@@ -242,6 +242,48 @@ def test_rebase_onto_real_precommit_hook_pass_lands(monkeypatch):
         _cleanup_full(key, branch, d)
 
 
+def _carried_flag_setup(monkeypatch):
+    """A repo whose HEAD moved past `pre`, a LiveGit that carries a condition-(14) flag, and
+    a marker write that fails with OSError."""
+    import harness.armable as armable
+
+    d, _base, _master, key, branch = _make_simple_conflict_repo(
+        lostwork_script=_LOSTWORK_EQUIV)
+    pre = _rev(d, "HEAD")
+    _sh(d, "commit", "--allow-empty", "-m", "replayed")
+    g = LiveGit(d)
+    g.last_conflict_flag_state = armable.FLAG_CARRIED
+
+    def failing_write(*_args, **_kw):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(armable, "record_conflict_resolution", failing_write)
+    return d, key, branch, pre, g
+
+
+def test_rebind_carried_flag_write_failure_restores_head(monkeypatch):
+    d, key, branch, pre, g = _carried_flag_setup(monkeypatch)
+    try:
+        with pytest.raises(HarnessError) as exc:
+            g._rebind_carried_flag(branch, pre_rebase_sha=pre)
+        assert "could not re-bind conflict flag" in exc.value.detail
+        assert "OSError: disk full" in exc.value.detail
+        assert _rev(d, "HEAD") == pre
+        assert _sh(d, "status", "--porcelain").stdout.strip() == ""
+    finally:
+        _cleanup_full(key, branch, d)
+
+
+def test_rebind_carried_flag_write_failure_without_pre_sha_reraises(monkeypatch):
+    d, key, branch, pre, g = _carried_flag_setup(monkeypatch)
+    try:
+        with pytest.raises(OSError, match="disk full"):
+            g._rebind_carried_flag(branch)
+        assert _rev(d, "HEAD") != pre
+    finally:
+        _cleanup_full(key, branch, d)
+
+
 def test_emergency_abort_clears_merge_head():
     d, _base, _master, key, branch = _make_simple_conflict_repo(
         lostwork_script=_LOSTWORK_EQUIV)

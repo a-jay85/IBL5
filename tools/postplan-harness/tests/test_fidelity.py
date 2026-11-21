@@ -310,6 +310,33 @@ def test_packet_context_carries_the_reviewed_tree(tmp_path, git_shim):
     assert "PHASE_4B_RAN: yes" in ctx
 
 
+def _context_with(tmp_path, git_shim, **kw):
+    git_shim.setenv("GIT_SHIM_OK_PATH", ".claude/review-shared/_plan-fidelity-review.md")
+    out = tmp_path / "out"
+    out.mkdir()
+    packet = fidelity.build_packet(str(out), "deadbeef", TREE, _plan(found=False),
+                                   "d", "b", 42, True, worktree=str(tmp_path), **kw)
+    return open(os.path.join(packet, "context.md")).read()
+
+
+def test_packet_context_conflict_paths_listed(tmp_path, git_shim):
+    ctx = _context_with(tmp_path, git_shim,
+                        conflict_resolved_paths=["harness/adapters/gitad.py", "runner.py"])
+    assert "CONFLICT_RESOLVED_PATHS: harness/adapters/gitad.py, runner.py\n" in ctx
+
+
+def test_packet_context_conflict_paths_empty_says_none(tmp_path, git_shim):
+    ctx = _context_with(tmp_path, git_shim, conflict_resolved_paths=[])
+    assert ("CONFLICT_RESOLVED_PATHS: (none — no rebase in this run auto-resolved a conflict)\n"
+            in ctx)
+
+
+def test_packet_context_conflict_paths_default_not_recorded(tmp_path, git_shim):
+    ctx = _context_with(tmp_path, git_shim)
+    assert "CONFLICT_RESOLVED_PATHS: (not recorded for this packet)\n" in ctx
+    assert "rebases cleanly" not in ctx
+
+
 # --- review() -----------------------------------------------------------------
 
 class _RaisingLlm(FixtureLlm):

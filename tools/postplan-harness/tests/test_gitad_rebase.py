@@ -177,6 +177,71 @@ def test_rebase_onto_continue_failure_restores(monkeypatch):
         _cleanup_full(key, branch, d)
 
 
+def _install_precommit_hook(d, body):
+    """Point the fixture repo at a private hooks dir so a global core.hooksPath is never
+    written to. Returns the dir; the caller removes it."""
+    hooks_dir = tempfile.mkdtemp(prefix="pp-hook-")
+    path = os.path.join(hooks_dir, "pre-commit")
+    with open(path, "w") as fh:
+        fh.write("#!/bin/sh\n" + body)
+    os.chmod(path, 0o755)
+    _sh(d, "config", "core.hooksPath", hooks_dir)
+    return hooks_dir
+
+
+def test_rebase_onto_real_precommit_hook_denial_restores():
+    d, _base, _master, key, branch = _make_simple_conflict_repo(
+        lostwork_script=_LOSTWORK_EQUIV)
+    pre = _rev(d, "HEAD")
+    hooks_dir = _install_precommit_hook(
+        d,
+        'if [ -d "$(git rev-parse --git-path rebase-merge)" ]; then\n'
+        '  echo "HOOKDENY-1763: resolution rejected by real hook" >&2\n'
+        '  exit 1\n'
+        'fi\n'
+        'exit 0\n',
+    )
+    llm = _WritingLlm(d, "feature.txt", content="merged content\n")
+    try:
+        with pytest.raises(HarnessError) as exc:
+            LiveGit(d, llm=llm).rebase_onto()
+        assert "pre-commit hook denied the resolution" in exc.value.detail
+        assert "HOOKDENY-1763: resolution rejected by real hook" in exc.value.detail
+        assert _rev(d, "HEAD") == pre
+        assert not os.path.exists(os.path.join(d, ".git", "rebase-merge"))
+        assert _sh(d, "status", "--porcelain").stdout.strip() == ""
+        assert _merge_head(d) == ""
+    finally:
+        shutil.rmtree(hooks_dir, ignore_errors=True)
+        _cleanup_full(key, branch, d)
+
+
+def test_rebase_onto_real_precommit_hook_pass_lands(monkeypatch):
+    d, _base, master_sha, key, branch = _make_simple_conflict_repo(
+        lostwork_script=_LOSTWORK_EQUIV)
+    marker_dir = tempfile.mkdtemp(prefix="pp-hook-marker-")
+    marker = os.path.join(marker_dir, "ran")
+    monkeypatch.setenv("PP_HOOK_MARKER", marker)
+    hooks_dir = _install_precommit_hook(
+        d,
+        'if [ -d "$(git rev-parse --git-path rebase-merge)" ]; then\n'
+        '  : > "$PP_HOOK_MARKER"\n'
+        'fi\n'
+        'exit 0\n',
+    )
+    llm = _WritingLlm(d, "feature.txt", content="merged content\n")
+    try:
+        g = LiveGit(d, llm=llm)
+        g.rebase_onto()
+        assert os.path.exists(marker), "the real hook never ran during the resolution"
+        assert _parents(d) == [master_sha]
+        assert _merge_head(d) == ""
+    finally:
+        shutil.rmtree(hooks_dir, ignore_errors=True)
+        shutil.rmtree(marker_dir, ignore_errors=True)
+        _cleanup_full(key, branch, d)
+
+
 def test_emergency_abort_clears_merge_head():
     d, _base, _master, key, branch = _make_simple_conflict_repo(
         lostwork_script=_LOSTWORK_EQUIV)

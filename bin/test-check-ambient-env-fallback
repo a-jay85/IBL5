@@ -1,0 +1,94 @@
+#!/bin/bash
+# shellcheck disable=SC2016 # fixture text holds literal expansions
+set -euo pipefail
+
+# Test harness for bin/check-ambient-env-fallback (the undocumented-ambient-var gate).
+# Follows bin/test-check-bashpid-under-set-u style.
+#
+# Every fixture lives in a mktemp dir; nothing is written inside the IBL5 tree.
+# Fixture lines are single-quoted, and the gate strips single-quoted spans, so the
+# gate passes on this file.
+
+PASS=0
+FAIL=0
+
+pass() { echo "PASS: $1"; PASS=$((PASS + 1)); }
+fail() { echo "FAIL: $1"; FAIL=$((FAIL + 1)); }
+
+DIR=$(mktemp -d)
+trap 'rm -rf "$DIR"' EXIT
+
+BIN="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT="$BIN/check-ambient-env-fallback"
+SB='#!/bin/bash'
+FX="$DIR/fixture.sh"
+
+mk() { local out="$1"; shift; printf '%s\n' "$@" > "$out"; }
+run_gate() { set +e; OUT=$("$SCRIPT" "$@" 2>&1); RC=$?; set -e; }
+expect() { # name want_rc want_substring
+    if [ "$RC" -eq "$2" ]; then
+        case "$OUT" in *"$3"*) pass "$1"; return 0 ;; esac
+    fi
+    fail "$1 (rc=$RC, want rc=$2 and '$3'; output: $OUT)"
+}
+# case_fx name want_rc substring line...   (writes $FX as shebang + lines, scans it)
+case_fx() {
+    local name="$1" rc="$2" sub="$3"
+    shift 3
+    mk "$FX" "$SB" "$@"
+    run_gate --files "$FX"
+    expect "$name" "$rc" "$sub"
+}
+
+# Failing shapes. line163-verbatim reproduces bin/check-reviewer-eval:163 from PR #3350,
+# the issue's only occurrence (both review threads point at that one line).
+case_fx line163-verbatim 1 'fixture.sh:3:' 'ROOT="$(pwd)"' '    --repo "${REPO_DIR:-${REPO:-$ROOT}}" \' '    --gh gh'
+case_fx line163-names-repo 1 '(unassigned: REPO)' 'ROOT="$(pwd)"' '    --repo "${REPO_DIR:-${REPO:-$ROOT}}" \' '    --gh gh'
+case_fx one-level-bare 1 'fixture.sh:2:' 'x="${REPO_DIR:-$REPO}"'
+case_fx one-level-braced 1 'fixture.sh:2:' 'x="${TOOL_BIN:-${ROOT}/bin/tool}"'
+HASH='#'  # the gate is quote-blind, so a literal " #" in a fixture line would read as a comment
+case_fx short-waiver-still-fails 1 'fixture.sh:2:' "x=\"\${A:-\$REPO}\"  ${HASH} ambient-env-ok: too short"
+case_fx waiver-on-other-line 1 'fixture.sh:3:' '# ambient-env-ok: this reason is long enough' 'x="${A:-$REPO}"'
+case_fx fix-hint-printed 1 'fix: name the target' 'x="${A:-$REPO}"'
+
+# Passing shapes: every corpus false-positive candidate the rule must not flag.
+case_fx xdg-then-home 0 'OK' 'CACHE="${XDG_CACHE_HOME:-${HOME:-/nonexistent}/.cache}"'
+case_fx home-alternate 0 'OK' 'd="${EVENTS_DIR:-${HOME:+$HOME/.events}}"'
+case_fx lowercase-locals 0 'OK' 'plan="${plan:-${recovered:-}}"'
+case_fx specific-names 0 'OK' 'LC="${FAILDM_LAUNCHCTL:-${LAUNCHCTL_CMD:-launchctl}}"'
+case_fx waived 0 'OK' 'x="${A:-$REPO}"  # ambient-env-ok: the caller harness sets REPO'
+case_fx self-assigned-root 0 'OK' 'ROOT="$(pwd)"' 'x="${TOOL_BIN:-$ROOT/bin/tool}"'
+case_fx local-assigned 0 'OK' 'f() {' '    local REPO="$1"' '    echo "${A:-$REPO}"' '}'
+case_fx export-assigned 0 'OK' 'export BASE=/srv' 'y="${A:-$BASE}"'
+case_fx comment-line 0 'OK' '# example: ${REPO_DIR:-${REPO:-$ROOT}}'
+case_fx single-quoted-literal 0 'OK' "grep -qF 'x=\"\${A:-\$ROOT/bin}\"' f"
+case_fx alternate-not-fallback 0 'OK' 'x="${A:+$REPO}"'
+case_fx primary-position 0 'OK' 'x="${REPO:-/tmp}"'
+case_fx longer-names 0 'OK' 'x="${A:-$REPOSITORY} ${B:-$ROOT_PATH}"'
+case_fx standard-vars 0 'OK' 'x="${A:-$PATH} ${B:-$TMPDIR} ${C:-$PWD}"'
+
+# Scope: non-shell files are skipped, a shebang-only shell file is scanned.
+mk "$DIR/tool.py" '#!/usr/bin/env python3' 'x = "${A:-$REPO}"'
+run_gate --files "$DIR/tool.py"
+expect non-shell-skipped 0 'OK'
+mk "$DIR/noext" '#!/usr/bin/env bash' 'x="${A:-$REPO}"'
+run_gate --files "$DIR/noext"
+expect shebang-only-scanned 1 'noext:2:'
+
+# Usage errors.
+run_gate --bogus
+expect usage-unknown-flag 2 'unknown option'
+run_gate --files
+expect usage-files-empty 2 '--files needs'
+run_gate --files "$DIR/missing"
+expect usage-missing-file 2 'no such file'
+run_gate --help
+expect help-exits-0 0 'usage:'
+
+# The real tree passes (backlog#1610 fixed the only live hit).
+run_gate
+expect real-tree-passes 0 'OK'
+
+echo ""
+echo "Results: $PASS passed, $FAIL failed"
+[ "$FAIL" -eq 0 ]

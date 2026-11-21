@@ -27,4 +27,11 @@ interface TeamScheduleViewInterface
      * @return string HTML output
      */
     public function render(Team $team, array $games, int $simLengthInDays, string $seasonPhase): string;
+
+    /**
+     * Set remaining SOS summary data for display
+     *
+     * @param array{remaining_sos: float|string, remaining_sos_rank: int} $sosSummary
+     */
+    public function setSosSummary(array $sosSummary): void;
 }

@@ -1,0 +1,6 @@
+pos-4046.txt	hit
+pos-4035.txt	hit
+pos-with-row.txt	hit
+neg-claims-after-merge-cmd.txt	clean
+neg-auto-merge.txt	clean
+neg-fenced.txt	clean

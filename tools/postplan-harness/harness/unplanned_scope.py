@@ -281,6 +281,37 @@ def title_of(item_text: str) -> str:
     return title.split(". Next action", 1)[0].strip()
 
 
+_LEAD_TAGS_RE = re.compile(r"^(?:\[[^\[\]\s][^\[\]]*\]\s+)+")
+_BULLET_RE = re.compile(r"^\s*(?:[-*]|\d+[.)])\s+")
+
+
+def title_key(text: str) -> str:
+    """The part of a finding title that stays put across re-reviews.
+
+    The reviewer rewords the explanation after the first `: ` on every run, and it may
+    add or drop a bracketed tag such as `[MERGE-RULE]`. The key drops leading tags and
+    keeps the words before the first `: `, so the same finding matches its declared line
+    and the owner's approved line. A title with no `: ` keeps its whole text.
+    """
+    title = title_of(text) if is_unplanned_scope(text) else _BULLET_RE.sub("", text.splitlines()[0] if text else "")
+    title = _LEAD_TAGS_RE.sub("", title.strip())
+    return title.split(": ", 1)[0].split(". Next action", 1)[0].strip()
+
+
+def _listed_keys(span: str) -> set:
+    """The title key of each bullet line in a kept block or an approval's kept span."""
+    return {title_key(ln) for ln in span.splitlines() if _BULLET_RE.match(ln)}
+
+
+def _listed(text: str, span: str) -> bool:
+    """True when the finding's title, or its stable key, is listed in `span`."""
+    title = title_of(text).strip()
+    if len(title) >= MIN_TITLE_LEN and title in span:
+        return True
+    key = title_key(text)
+    return len(key) >= MIN_TITLE_LEN and key in _listed_keys(span)
+
+
 def render_kept_block(kept: Sequence[dict], ctx: Optional[dict]) -> str:
     """The PR-body declaration, or "" when nothing was kept."""
     if not kept:
@@ -317,7 +348,7 @@ def downgrade_applies(verdict_path: str, ctx: Optional[dict], body_text: str, pa
     kept = [t for t in texts if is_unplanned_scope(t)]
     if len(kept) != len(texts):
         return False   # a bug in kept code is its own blocking finding and blocks
-    return all(classify(t, **ctx) == "keep" and title_of(t) in declared
+    return all(classify(t, **ctx) == "keep" and _listed(t, declared)
                and (owner_evidence_ok(t, payload) or approval_covers(t, approval))
                for t in kept)
 
@@ -400,8 +431,7 @@ def approval_covers(text: str, approval: Optional[OwnerApproval]) -> bool:
     """True when the finding's title is one the owner saw in the approval's kept span."""
     if approval is None:
         return False
-    title = title_of(text).strip()
-    return len(title) >= MIN_TITLE_LEN and title in approval.kept_span
+    return _listed(text, approval.kept_span)
 
 
 def owner_evidence_ok(text: str, payload: Optional[dict]) -> bool:

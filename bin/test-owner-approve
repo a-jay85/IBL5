@@ -846,6 +846,106 @@ docs_route_through_script() {
     if grep -qF 'gh pr comment N --body' "$rule"; then note "the manual comment command survives in the rule"; fi
 }
 
+# ---------------------------------------------------------------------------
+# Carry cases: a plain approval follows a new head whose PR diff is unchanged
+# ---------------------------------------------------------------------------
+carry_setup() { # <case>: a real PR change on top of a per-case base branch
+    fresh "$1"
+    use_origin
+    git -C "$WT" branch -q "b/$CASE" master
+    printf 'b/%s\n' "$CASE" > "$FX/base"
+    real_commit
+}
+rebase_case() { # moves the base branch on, then rebases the PR onto it; pr.json follows
+    git -C "$WT" checkout -q "b/$CASE"
+    printf 'master moved\n' > "$WT/master-$CASE.txt"
+    git -C "$WT" add "master-$CASE.txt"
+    git -C "$WT" commit -q -m "master moves under $CASE"
+    git -C "$WT" checkout -q "case/$CASE"
+    git -C "$WT" rebase -q "b/$CASE" >/dev/null 2>&1 || note "fixture rebase failed"
+    H=$(git -C "$WT" rev-parse HEAD)
+    write_pr "$H"
+}
+live_then_moved() { # the first pr view shows the approved head with post-plan running
+    jq -nc --arg h "$H" --arg b "case/$CASE" '{state:"OPEN",headRefOid:$h,headRefName:$b,labels:[{name:"post-plan-running"}]}' > "$FX/pr.live.json"
+    echo 1 > "$FX/pr.live.left"
+}
+# Fails when a rebase-only head move still asks the owner to approve again.
+carry_rebase_arms() {
+    carry_setup carry_rebase_arms
+    live_then_moved
+    rebase_case
+    seed_ready
+    run_oa "$PR" "go" --poll=0 --timeout=30
+    want_rc 0
+    want_out "RESULT: armed"
+    want_out "The approval carries"
+    want_gh "--match-head-commit $H"
+}
+# Fails when the carry ignores a change to the PR's own lines after the approval.
+carry_changed_diff_refuses() {
+    carry_setup carry_changed_diff_refuses
+    live_then_moved
+    rebase_case
+    printf 'edited after approval\n' >> "$WT/$CASE.txt"
+    git -C "$WT" commit -q -am "edit $CASE"
+    H=$(git -C "$WT" rev-parse HEAD)
+    write_pr "$H"
+    seed_ready
+    run_oa "$PR" "go" --poll=0 --timeout=30
+    want_rc 4
+    want_posted "the PR's own changes are not the approved ones"
+    refute_out "The approval carries"
+    refute_gh "pr merge"
+}
+# Fails when --finish after a plain approval drops the recorded diff= value.
+carry_finish_rebase_arms() {
+    carry_setup carry_finish_rebase_arms
+    printf -- '-\t0\tcom.ibl5.post-plan-fleet-%s\n' "$PR" > "$FX/launchctl.out"
+    echo 99 > "$FX/launchctl.left"
+    run_oa "$PR" "go" --poll=1 --timeout=0
+    want_rc 5
+    : > "$FX/launchctl.out"
+    rebase_case
+    seed_ready
+    run_oa "$PR" --finish
+    want_rc 0
+    want_out "RESULT: armed"
+    want_out "The approval carries"
+}
+# Fails when --finish ignores the kept span of the approval it resumes: a NOT READY
+# on kept items the owner approved must get its one re-review, then arm.
+finish_kept_refire_arms() {
+    refire_setup finish_kept_refire_arms
+    printf -- '-\t0\tcom.ibl5.post-plan-fleet-%s\n' "$PR" > "$FX/launchctl.out"
+    echo 99 > "$FX/launchctl.left"
+    run_oa "$PR" "go" --poll=1 --timeout=0
+    want_rc 5
+    : > "$FX/launchctl.out"
+    run_oa_env REFIRE_MODE=ready REFIRE_RC=0 "$OA" "$PR" --finish --poll=0 --timeout=30
+    want_rc 0
+    want_out "RESULT: armed"
+    [ "$(cat "$FX/refire.log" 2>/dev/null)" = "--state-changed" ] \
+        || note "refire.log is '$(cat "$FX/refire.log" 2>/dev/null)', want exactly --state-changed"
+}
+# Fails when --finish re-fires for an approval that listed no kept items.
+finish_no_kept_no_refire() {
+    fresh finish_no_kept_no_refire
+    use_origin
+    real_commit
+    printf 'Summary only\n' > "$FX/body"
+    seed_sticky owner "NOT READY" "**Reviewed tree:** $A40"
+    printf -- '-\t0\tcom.ibl5.post-plan-fleet-%s\n' "$PR" > "$FX/launchctl.out"
+    echo 99 > "$FX/launchctl.left"
+    run_oa "$PR" "go" --poll=1 --timeout=0
+    want_rc 5
+    : > "$FX/launchctl.out"
+    run_oa_env REFIRE_MODE=ready REFIRE_RC=0 "$OA" "$PR" --finish --poll=0 --timeout=30
+    want_rc 4
+    want_posted "the verdict is NOT READY."
+    no_refire
+}
+
 ALL_CASES="
 body_literal body_option ids_unset ids_empty headless_refuses headless_empty_proceeds
 usage_unknown_flag usage_space_form no_repo_writes
@@ -860,6 +960,8 @@ finish_prefire_fail finish_prefire_prereq finish_arms finish_after_plain plain_h
 marker_diff_fp diff_unread_head_missing kept_span_copied no_kept_span finish_new_marker finish_old_marker
 refire_kept_arms refire_still_not_ready no_refire_without_kept no_refire_diff_unread headless_never_refires
 refire_ppn_fails refire_never_starts
+carry_rebase_arms carry_changed_diff_refuses carry_finish_rebase_arms
+finish_kept_refire_arms finish_no_kept_no_refire
 docs_route_through_script
 "
 

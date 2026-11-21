@@ -38,6 +38,24 @@ final class ModuleServices
         return self::$current;
     }
 
+    /**
+     * The published services, or new services over the boot container when none are published.
+     * Direct-access scripts that require mainfile.php call this; modules.php and index.php publish first.
+     *
+     * @param \Closure(): \Bootstrap\Contracts\ContainerInterface $containerSource
+     */
+    public static function currentOrPublish(\Closure $containerSource): self
+    {
+        if (self::$current !== null) {
+            return self::$current;
+        }
+
+        $services = new self($containerSource());
+        self::publish($services);
+
+        return $services;
+    }
+
     public static function clearCurrent(): void
     {
         self::$current = null;

@@ -194,6 +194,39 @@ class NewsRepository extends \Database\BaseMysqliRepository implements NewsRepos
         );
     }
 
+    /**
+     * Stories whose hometext or bodytext mentions $needle, newest first.
+     * Returns null when the statement cannot be prepared or yields no result set.
+     *
+     * @return list<array{sid: int, title: string|null, time: string|null}>|null
+     */
+    public function searchStoriesMentioning(string $needle): ?array
+    {
+        // Bound via prepared statement; only LIKE metacharacters need escaping.
+        $searchTerm = '%' . addcslashes($needle, '\\%_') . '%';
+        $stmt = $this->db->prepare('SELECT sid, title, time FROM nuke_stories WHERE hometext LIKE ? OR bodytext LIKE ? ORDER BY time DESC');
+        if ($stmt === false) {
+            return null;
+        }
+
+        $stmt->bind_param('ss', $searchTerm, $searchTerm);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        if ($result === false) {
+            $stmt->close();
+            return null;
+        }
+
+        $rows = [];
+        while (is_array($row = $result->fetch_assoc())) {
+            /** @var array{sid: int, title: string|null, time: string|null} $row nuke_stories: sid int(11) NOT NULL, title varchar(80) NULL, time datetime NULL (per ibl5/docs/schema/current-schema.sql) */
+            $rows[] = $row;
+        }
+        $stmt->close();
+
+        return $rows;
+    }
+
     public function incrementStoryCounter(int $sid): int
     {
         return $this->execute(

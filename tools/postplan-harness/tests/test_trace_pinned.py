@@ -535,6 +535,14 @@ def test_zero_count_block_holds(repo):
     assert _verdict(root, base, run_go=go) == f"unexercised-change: {ENGINE_FILE}"
 
 
+def test_comment_inside_covered_span_holds(repo):
+    root, base = repo
+    code = tp._git(["show", f"{base}:{ENGINE_FILE}"], cwd=str(root))
+    _write(root, ENGINE_FILE, code.replace("func", "// note\n\nfunc", 1))
+    assert tp.added_lines(root, base, ENGINE_FILE) == {3, 4}
+    assert _verdict(root, base) == f"unexercised-change: {ENGINE_FILE}"
+
+
 def test_missing_cover_profile_holds(repo):
     root, base = repo
     assert _verdict(root, base, run_go=_fake_go(write_profile=False)) == "coverage-unreadable"

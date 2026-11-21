@@ -382,6 +382,13 @@ def coverage_verdict(root, base, ported, blocks) -> str:
         added = added_lines(root, base, path)
         if added is None:
             return f"diff-unreadable: {path}"
+        try:
+            src = (Path(root) / path).read_text().splitlines()
+        except OSError:
+            return f"diff-unreadable: {path}"
+        # blank and `//`-only lines never count: a Go cover block spans lines between statements
+        added = {n for n in added if 0 < n <= len(src) and src[n - 1].strip()
+                 and not src[n - 1].strip().startswith("//")}
         spans = blocks.get(path, ())
         if not any(c > 0 and s <= n <= e for n in added for s, e, c in spans):
             return f"unexercised-change: {path}"

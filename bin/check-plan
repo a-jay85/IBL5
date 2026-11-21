@@ -231,6 +231,11 @@
 #                              at least 15 characters, name an intrinsic slice
 #                              (scheduling, reachability, credential, live host),
 #                              and the What cell must miss the [Q] lexicon.
+#   AM After merge section   — the plan's own `## After merge` rows (ADR-0198
+#                              grammar) parse, name a bin/post-merge-steps step
+#                              that exists or is created in the plan, and reuse no
+#                              matrix row number. Owner-after-merge prose needs a
+#                              row, a post-merge: matrix row, or a waiver.
 #   X  (no-change) marker    — a `(no-change)` matrix marker sits on a Visual-regression
 #                              row, directly after the backticked test token. The
 #                              post-plan harness honors it nowhere else, so a
@@ -393,6 +398,9 @@ source "$SCRIPT_DIR/lib/critical-files.sh"
 
 # shellcheck source=bin/lib/plan-matrix-rows.sh
 source "$SCRIPT_DIR/lib/plan-matrix-rows.sh"
+
+# shellcheck source=bin/lib/post-merge-rows.sh
+source "$SCRIPT_DIR/lib/post-merge-rows.sh"
 
 # shellcheck source=lib/hold-check.sh
 if [ -r "$SCRIPT_DIR/lib/hold-check.sh" ]; then
@@ -2785,6 +2793,24 @@ while IFS= read -r row; do
         viol "[PM] look-and-feel row cannot be post-merge: it is screenshot-reviewable on the open PR via a vr: cell (gate [Q]): ${row}"
     fi
 done < "$GATEP_MATRIX"
+
+# ---------------------------------------------------------------------------
+# Gate AM: the plan's own `## After merge` rows (ADR-0198 grammar) parse, name a step that
+# exists or is created in this plan, and do not reuse a matrix row number. Owner-after-merge
+# prose needs one such row or a post-merge: matrix row. Logic and tests live in
+# bin/lib/post-merge-rows.sh (pmr_plan_check) and bin/test-post-merge-rows.
+# ---------------------------------------------------------------------------
+_am_taken=""
+while IFS= read -r row; do
+    matrix_split "$row" || continue
+    case "$MC_NUM" in ''|'#') continue ;; esac
+    _am_taken="$_am_taken $MC_NUM"
+done < "$GATEP_MATRIX"
+if ! _am_out="$(pmr_plan_check "$PLAN_FILE" "$PMR_BIN_DIR/post-merge-steps" "$_am_taken")"; then
+    while IFS= read -r _am_l; do
+        if [ -n "$_am_l" ]; then viol "$_am_l"; fi
+    done <<< "$_am_out"
+fi
 
 # ---------------------------------------------------------------------------
 # Gate P: Pre-prod exercise path for a declared deploy-dependent artifact.

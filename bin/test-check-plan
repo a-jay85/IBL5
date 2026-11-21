@@ -5992,6 +5992,29 @@ assert_viol "pm_untagged_truly_manual_untouched" 0 "[PM]" "$FM_OPUS"'
 | 1 | the exported CSV opens in Excel without a repair prompt | Truly-manual | post-impl | n/a |
 '
 
+# Gate [AM]: owner-after-merge prose needs a `## After merge` row; rows must parse.
+# Case A: prose with no row -> [AM] fires.
+assert_viol "am_prose_no_row_fails" 1 "[AM] owner-after-merge prose" "$FM_OPUS"'
+The owner runs the installer by hand after merge.
+
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `bin/test-post-merge-rows` |
+'
+# Case B: the same prose plus a row -> clean.
+assert_viol "am_prose_with_row_passes" 0 "[AM]" "$FM_OPUS"'
+The owner runs the installer by hand after merge.
+
+## After merge
+- **Row 90** [manual] — run the installer
+
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `bin/test-post-merge-rows` |
+'
+
 # Gate [K]: autonomy-contract frontmatter validation.
 # [K] fires when stop_condition:/evidence: frontmatter fields are present but
 # malformed or unpaired. [K] must NOT fire when both fields are absent.

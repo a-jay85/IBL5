@@ -45,7 +45,7 @@ final class RequireNativeTypeDeclarationsRule implements Rule
         $errors = [];
         foreach ($targets as $target) {
             if ($target instanceof Function_) {
-                $label = 'Function ' . $target->name->toString() . '()';
+                $label = 'Function ' . $this->qualifiedName($target) . '()';
                 $this->checkFunctionLike($target, $label, true, $errors);
                 continue;
             }
@@ -54,7 +54,7 @@ final class RequireNativeTypeDeclarationsRule implements Rule
                 continue;
             }
 
-            $className = $target->name !== null ? $target->name->toString() : 'class@anonymous';
+            $className = $target->name !== null ? $this->qualifiedName($target) : 'class@anonymous';
 
             foreach ($target->getMethods() as $method) {
                 $label = 'Method ' . $className . '::' . $method->name->toString() . '()';
@@ -120,6 +120,19 @@ final class RequireNativeTypeDeclarationsRule implements Rule
         } elseif ($this->containsBareObject($returnType)) {
             $errors[] = $this->bareObjectError('Return type of ' . $label, $function->getStartLine());
         }
+    }
+
+    /**
+     * Fully qualified name from the NameResolver's `namespacedName`, else the short name.
+     */
+    private function qualifiedName(ClassLike|Function_ $target): string
+    {
+        $namespaced = $target->namespacedName ?? null;
+        if ($namespaced instanceof Node\Name) {
+            return $namespaced->toString();
+        }
+
+        return $target->name !== null ? $target->name->toString() : '';
     }
 
     private function bareObjectError(string $subject, int $line): \PHPStan\Rules\IdentifierRuleError

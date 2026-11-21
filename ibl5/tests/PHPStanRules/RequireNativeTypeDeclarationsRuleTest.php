@@ -23,19 +23,19 @@ final class RequireNativeTypeDeclarationsRuleTest extends RuleTestCase
         $this->analyse(
             [__DIR__ . '/Fixtures/NativeTypesMissing.php'],
             [
-                [self::missingProperty('MissingTypesView', 'db'), 9],
-                [self::missingProperty('MissingTypesView', 'legacy'), 10],
-                [self::missingParam('repo', 'Method MissingTypesView::__construct()'), 12],
-                [self::missingParam('team', 'Method MissingTypesView::render()'), 16],
-                [self::missingReturn('Method MissingTypesView::noReturn()'), 21],
-                [self::missingParam('items', 'Method MissingTypesView::spread()'), 25],
-                [self::missingParam('id', 'Method MissingTypesContract::load()'), 32],
-                [self::missingReturn('Method MissingTypesContract::load()'), 32],
-                [self::missingReturn('Method MissingTypesAbstract::build()'), 37],
-                [self::missingReturn('Method MissingTypesTrait::untypedTraitMethod()'), 46],
-                [self::missingReturn('Method MissingTypesEnum::label()'), 55],
-                [self::missingParam('value', 'Function missingTypesFunction()'), 61],
-                [self::missingReturn('Function missingTypesFunction()'), 61],
+                [self::missingProperty('Tests\\PHPStanRules\\Fixtures\\MissingTypesView', 'db'), 9],
+                [self::missingProperty('Tests\\PHPStanRules\\Fixtures\\MissingTypesView', 'legacy'), 10],
+                [self::missingParam('repo', 'Method Tests\\PHPStanRules\\Fixtures\\MissingTypesView::__construct()'), 12],
+                [self::missingParam('team', 'Method Tests\\PHPStanRules\\Fixtures\\MissingTypesView::render()'), 16],
+                [self::missingReturn('Method Tests\\PHPStanRules\\Fixtures\\MissingTypesView::noReturn()'), 21],
+                [self::missingParam('items', 'Method Tests\\PHPStanRules\\Fixtures\\MissingTypesView::spread()'), 25],
+                [self::missingParam('id', 'Method Tests\\PHPStanRules\\Fixtures\\MissingTypesContract::load()'), 32],
+                [self::missingReturn('Method Tests\\PHPStanRules\\Fixtures\\MissingTypesContract::load()'), 32],
+                [self::missingReturn('Method Tests\\PHPStanRules\\Fixtures\\MissingTypesAbstract::build()'), 37],
+                [self::missingReturn('Method Tests\\PHPStanRules\\Fixtures\\MissingTypesTrait::untypedTraitMethod()'), 46],
+                [self::missingReturn('Method Tests\\PHPStanRules\\Fixtures\\MissingTypesEnum::label()'), 55],
+                [self::missingParam('value', 'Function Tests\\PHPStanRules\\Fixtures\\missingTypesFunction()'), 61],
+                [self::missingReturn('Function Tests\\PHPStanRules\\Fixtures\\missingTypesFunction()'), 61],
                 [self::missingReturn('Method class@anonymous::run()'), 66],
             ],
         );
@@ -46,12 +46,12 @@ final class RequireNativeTypeDeclarationsRuleTest extends RuleTestCase
         $this->analyse(
             [__DIR__ . '/Fixtures/NativeTypesBareObject.php'],
             [
-                [self::bareObject('Property BareObjectMock::$handle'), 9],
-                [self::bareObject('Parameter $user of Method BareObjectMock::__construct()'), 11],
-                [self::bareObject('Parameter $stmt of Method BareObjectMock::bind()'), 15],
-                [self::bareObject('Return type of Method BareObjectMock::fetch()'), 19],
-                [self::bareObject('Return type of Method BareObjectMock::maybeFetch()'), 24],
-                [self::bareObject('Parameter $value of Method BareObjectMock::mixedInput()'), 29],
+                [self::bareObject('Property Tests\\PHPStanRules\\Fixtures\\BareObjectMock::$handle'), 9],
+                [self::bareObject('Parameter $user of Method Tests\\PHPStanRules\\Fixtures\\BareObjectMock::__construct()'), 11],
+                [self::bareObject('Parameter $stmt of Method Tests\\PHPStanRules\\Fixtures\\BareObjectMock::bind()'), 15],
+                [self::bareObject('Return type of Method Tests\\PHPStanRules\\Fixtures\\BareObjectMock::fetch()'), 19],
+                [self::bareObject('Return type of Method Tests\\PHPStanRules\\Fixtures\\BareObjectMock::maybeFetch()'), 24],
+                [self::bareObject('Parameter $value of Method Tests\\PHPStanRules\\Fixtures\\BareObjectMock::mixedInput()'), 29],
             ],
         );
     }
@@ -61,9 +61,9 @@ final class RequireNativeTypeDeclarationsRuleTest extends RuleTestCase
         $this->analyse(
             [__DIR__ . '/Fixtures/NativeTypesPhpDocOnly.php'],
             [
-                [self::missingProperty('PhpDocOnlyTypes', 'mockDb'), 10],
-                [self::missingParam('x', 'Method PhpDocOnlyTypes::f()'), 13],
-                [self::missingReturn('Method PhpDocOnlyTypes::g()'), 18],
+                [self::missingProperty('Tests\\PHPStanRules\\Fixtures\\PhpDocOnlyTypes', 'mockDb'), 10],
+                [self::missingParam('x', 'Method Tests\\PHPStanRules\\Fixtures\\PhpDocOnlyTypes::f()'), 13],
+                [self::missingReturn('Method Tests\\PHPStanRules\\Fixtures\\PhpDocOnlyTypes::g()'), 18],
             ],
         );
     }

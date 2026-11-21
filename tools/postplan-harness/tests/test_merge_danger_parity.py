@@ -169,7 +169,7 @@ def test_shell_docs_refresh_self_governing():
     state = _shell_state(body)
     out = subprocess.run(
         ["bash", "-c", 'source "$1/bin/lib/pr-armable.sh" && pr_docs_refresh_hold "$2" "$3" "$4" "$5"',
-         "_", str(REPO), "docs-stale-refresh-20261015", '[{"path": "ibl5/docs/guide.md"}]', state, "READY"],
+         "_", str(REPO), "docs-stale-refresh-20261015", '[{"filename": "ibl5/docs/guide.md", "status": "modified"}]', state, "READY"],
         capture_output=True, text=True, check=True).stdout.strip().splitlines()
     assert out == ["docs-refresh:merge-danger:SELF-GOVERNING"]
 

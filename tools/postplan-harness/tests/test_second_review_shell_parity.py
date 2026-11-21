@@ -82,7 +82,7 @@ def test_shell_ui_prefixes_match_python():
 
 
 def _golden(paths):
-    files = json.dumps([{"path": p} for p in paths])
+    files = json.dumps([{"filename": p, "status": "modified"} for p in paths])
     proc = subprocess.run(
         ["bash", "-c", 'source "$0"; pr_golden_hold "$1"', LIB, files],
         capture_output=True, text=True, check=True)

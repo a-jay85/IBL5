@@ -767,11 +767,19 @@ def body_only_findings(verdict_path: str) -> list[str] | None:
     return body_only_findings_text(text)
 
 
+def _conflict_paths_value(paths: list[str] | None) -> str:
+    """CONFLICT_RESOLVED_PATHS value. None means the caller did not read the run's list."""
+    if paths is None:
+        return "(not recorded for this packet)"
+    return ", ".join(paths) if paths else "(none — no rebase in this run auto-resolved a conflict)"
+
+
 def build_packet(out_dir: str, master_sha: str, reviewed_tree: str, plan, diff: str,
                  pr_body: str, pr_number: int | str, phase4b_ran: bool, *,
                  worktree: str = ".", packet_name: str = "fidelity-packet",
                  extra_context: str = "", review_findings: str = "",
-                 shadow_request: bool = False) -> str:
+                 shadow_request: bool = False,
+                 conflict_resolved_paths: list[str] | None = None) -> str:
     """Write the seven `_phase-5.5-fidelity.md` Step-2 inputs as files. Returns the dir.
 
     `shadow_request` asks the reviewer for the procedure 6f `## SHADOW-ARMING` block and adds
@@ -814,8 +822,7 @@ def build_packet(out_dir: str, master_sha: str, reviewed_tree: str, plan, diff: 
     )
     _write("context.md",
            "# Context\n\n"
-           "CONFLICT_RESOLVED_PATHS: (none — the harness path rebases cleanly or fails "
-           "closed before reaching Phase 5.5)\n"
+           f"CONFLICT_RESOLVED_PATHS: {_conflict_paths_value(conflict_resolved_paths)}\n"
            f"PHASE_4B_RAN: {'yes' if phase4b_ran else 'no'}\n"
            + findings_block
            + f"REVIEW_TIMESTAMP: {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}\n"
@@ -1369,10 +1376,12 @@ def _says_already_done(text: str, pr_number: int | None = None) -> bool:
 
 
 NOTE_HARMS = ("crash", "wrong-value", "lost-data", "security", "false-gate")
-_TOOLING_PATH_RE = re.compile(r"(?<![\w/.-])(?:bin|tools|\.claude|\.github|ibl5/docs)/")
+# `~/` (home) and `./` (cwd) count as path starts; ibl5/ may follow `/` in an absolute path (backlog#1771).
+_TOOLING_PATH_RE = re.compile(r"(?<![\w/.-])(?:~/|\./)?(?:bin|tools|\.claude|\.github|ibl5/docs)/")
 _WEBSITE_PATH_RE = re.compile(
-    r"(?<![\w/.-])(?:ibl5/(?!docs/)"
-    r"|(?:classes|modules|themes|migrations|includes|blocks|language|config|jslib|design)/)")
+    r"(?<![\w.-])ibl5/(?!docs/)"
+    r"|(?<![\w/.-])(?:~/|\./)?"
+    r"(?:classes|modules|themes|migrations|includes|blocks|language|config|jslib|design)/")
 
 
 def _is_harmless_tooling(note: dict) -> bool:

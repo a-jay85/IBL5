@@ -67,7 +67,9 @@ pmr_parse_row() {
 # `-f`, not `-x`: callers run executors as `bash bin/...`, so the exec bit is not trusted.
 # Fail closed: until the file lands, a row with that tag is a person's job, so the digest lists it.
 # Contract for the executor units: the file lands in the same PR that wires it to run
-# (unit 2 also replaces the workflow's literal --auto-failed-count 0), because its
+# (unit 2, the post-merge-ci-run executor, replaces the workflow's literal --auto-failed-count 0 with its
+# auto:ci failures; auto:mac failures never reach that count, because bin/post-merge-run runs on
+# the Mac after the digest and sends one DM per failing PR itself), because its
 # presence on master is what turns the rows automatic.
 pmr_executor_ready() {
     local _f

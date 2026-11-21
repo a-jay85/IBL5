@@ -1,6 +1,6 @@
 ---
 description: Truly-manual matrix rows tagged post-merge render under a separate ## After merge PR-body section outside the Phase 6.5 condition (1) window, and a merge workflow job posts them as a checklist comment.
-last_verified: 2026-10-21
+last_verified: 2026-11-20
 ---
 
 # ADR-0198: Post-merge manual rows move to an After merge section
@@ -38,3 +38,17 @@ A tagged row still forces `impl_model: opus` and `/plan` gate 14(a), so the huma
 ## Addendum: one #merged message per merge (2026-10-21)
 
 The Decision above says the checklist job "sends one #merged Discord message". ADR-0208 retires that message. The job now only posts the sticky PR comment and emits counts. The single #merged digest carries the directions link and @mentions the owner when a person is needed.
+
+## Update (2026-11-20): plan rows, the prose check, and the auto:mac executor
+
+A plan that leaves an owner step after merge now says so in a `## After merge` section of ADR-0198 rows, numbered after the last matrix row. Gate `[AM]` in `bin/check-plan` fails a plan that holds owner-after-merge prose and no row. The post-plan harness copies the plan's rows into the PR body and rewrites tags fail closed. A tag stays only when it is `manual` or when its `auto:mac` step file exists under `bin/post-merge-steps/` (example). Every other tag, `auto:ci` included, becomes `manual`.
+
+The PR-body check `bin/check-post-merge-recipe` gains a prose check with a waiver, `<!-- after-merge-prose-ok: <15+ chars> -->`. The detector `PMR_PROSE_RE` lives in `bin/lib/post-merge-rows.sh`. Measured on 2026-11-20 with `bin/fixtures/after-merge-prose/measure.sh`: `hits=2 of 250` recent PR bodies and `would-fail=3 of 2746` plans. All five hits are true positives and none is a false positive (`bin/fixtures/after-merge-prose/measurement.txt`).
+
+`bin/post-merge-run` runs `auto:mac` rows on the owner's Mac. The step convention is a tracked regular file at `bin/post-merge-steps/<name>` (example). It receives `--pr <N>`, runs from the main checkout with `CLAUDE_HEADLESS=1`, is idempotent, and exits 0 on success. The PR body supplies only the step name. A name that is not a tracked, non-symlink file under that directory is reported as `unknown-step`.
+
+`bin/pr-cycle-tick` triggers the sweep ahead of its usage gate, because the sweep spends no Claude. The first run records a `since` time under `$HOME/.ibl5-post-merge-run`, so earlier merges are never back-filled. A merge commit that has not reached the checkout stays pending for 24 hours, then sends one `checkout-behind` DM.
+
+The merge digest runs at merge time, before the Mac has run anything, so it cannot know `auto:mac` outcomes. The executor owns them and sends one DM per failing PR. The digest's `--auto-failed-count 0` now covers `auto:ci` failures only.
+
+This update is the decision record for `bin/post-merge-run` and `bin/test-post-merge-run`.

@@ -229,7 +229,7 @@
 #                              (scheduling, reachability, credential, live host),
 #                              and the What cell must miss the [Q] lexicon.
 #   AM After merge section   — the plan's own `## After merge` rows (ADR-0198
-#                              grammar) parse, name a bin/post-merge-steps step
+#                              grammar) parse, name a post-merge step script
 #                              that exists or is created in the plan, and reuse no
 #                              matrix row number. Owner-after-merge prose needs a
 #                              row, a post-merge: matrix row, or a waiver.

@@ -178,10 +178,11 @@ def test_rendered_rows_parse_in_bash(tmp_path):
     f = tmp_path / "body.md"
     f.write_text(block + "\n")
     script = ('source bin/lib/post-merge-rows.sh; pmr_rows "$1" | while IFS= read -r l; do '
-              'pmr_parse_row "$l"; echo "$PMR_KIND $PMR_NAME $PMR_VALID"; done')
+              'pmr_parse_row "$l"; echo "$PMR_KIND $PMR_NAME $PMR_VALID $PMR_TEXT"; done')
     out = subprocess.run(["bash", "-c", script, "_", str(f)], cwd=REPO_ROOT,
                          capture_output=True, text=True, check=True).stdout.splitlines()
-    assert out == ["auto:mac ok-step 1", "manual  1"]
+    # PMR_TEXT keeps the em-dash separator, so a render that changes it no longer matches.
+    assert out == ["auto:mac ok-step 1 — run it", "manual  1 — do it by hand"]
 
 
 def test_after_merge_section_skips_fences():

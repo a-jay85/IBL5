@@ -27,6 +27,7 @@ def test_read_autoresolved_list_missing_file_is_empty():
 
 
 def test_autoresolved_list_path_matches_writer_literal():
+    assert conflict.autoresolved_list_path("k") == "/tmp/postplan-conflict-files-k-autoresolved.txt"
     key = _key()
     path = conflict.autoresolved_list_path(key)
     assert path == f"/tmp/postplan-conflict-files-{key}-autoresolved.txt"

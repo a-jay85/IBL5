@@ -1,0 +1,110 @@
+#!/bin/bash
+# bin/test-check-agent-allowlist — fixture harness for bin/check-agent-allowlist.
+# Each case builds a throwaway git repo under mktemp (outside the repo tree)
+# holding a copy of the gate plus fixture files, runs the gate, and checks the
+# exit code and output. The case_hist_* fixtures are the PR #3379 strings.
+set -u
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+GATE="$ROOT/bin/check-agent-allowlist"
+TMP=$(mktemp -d "${TMPDIR:-/tmp}/test-check-agent-allowlist.XXXXXX") || exit 2
+trap 'rm -rf "$TMP"' EXIT
+PASS=0; FAIL=0; R=""; OUT=""; RC=0
+
+ok()      { PASS=$((PASS + 1)); echo "ok: $1"; }
+fail()    { FAIL=$((FAIL + 1)); echo "FAIL: $1" >&2; }
+want()    { if grep -qF -- "$3" <<< "$2"; then ok "$1"; else fail "$1 (missing: $3; got: $2)"; fi; }
+wantnot() { if grep -qF -- "$3" <<< "$2"; then fail "$1 (unexpected: $3)"; else ok "$1"; fi; }
+rc_is()   { if [ "$RC" = "$2" ]; then ok "$1 exits $2"; else fail "$1 exits $2 (got $RC: $OUT)"; fi; }
+mkrepo()  { R="$TMP/$1"; mkdir -p "$R/bin"; cp "$GATE" "$R/bin/check-agent-allowlist"; git -C "$R" init -q; }
+run_gate() { git -C "$R" add -A; OUT=$("$R/bin/check-agent-allowlist" "$@" 2>&1); RC=$?; }
+# file_case NAME RC WANT LINE...: bin/fx holds LINE... one per line.
+# An empty WANT means the gate must print nothing.
+file_case() {
+    local name="$1" rc="$2" wantstr="$3"; shift 3
+    mkrepo "$name"; printf '%s\n' "$@" > "$R/bin/fx"; run_gate; rc_is "$name" "$rc"
+    if [ -n "$wantstr" ]; then want "$name" "$OUT" "$wantstr"
+    elif [ -z "$OUT" ]; then ok "$name prints nothing"
+    else fail "$name prints nothing (got: $OUT)"; fi
+}
+
+file_case case_hist_accept_edits 1 'bin/fx:3: permission-mode:' \
+    '    ( cd "$WORKDIR" && \' \
+    '        timeout 60 claude -p "$prompt" \' \
+    '            --permission-mode acceptEdits \' \
+    '            --allowedTools "Read" ) \' \
+    '        > agent.json 2>&1'
+file_case case_hist_3379_rule 1 'bin/fx:3: shell-client-rule: Bash(mysql:*)' \
+    '    ( cd "$WORKDIR" && \' \
+    '        timeout 60 claude -p "$prompt" \' \
+    '            --allowedTools "Bash(mysql:*)" "Bash(${SIM_RECAP_MYSQL_BIN}:*)" "Write" ) \' \
+    '        > agent.json 2>&1'
+want case_hist_3379_variable_rule "$OUT" 'bin/fx:3: variable-rule: Bash(${SIM_RECAP_MYSQL_BIN}:*)'
+file_case case_hist_pre3379_rule 1 'bin/fx:1: shell-client-rule: Bash(mysql:*)' \
+    'claude -p "$prompt" --allowedTools "Bash(mysql:*)" "Write"'
+file_case case_bypass_equals 1 'bin/fx:1: permission-mode:' \
+    'claude -p "$p" --permission-mode=bypassPermissions'
+file_case case_abs_path_client 1 'shell-client-rule: Bash(/opt/homebrew/bin/mysql:*)' \
+    'claude -p "$p" --allowedTools "Bash(/opt/homebrew/bin/mysql:*)"'
+file_case case_allowedtools_next_line 1 'bin/fx:2: shell-client-rule: Bash(psql:*)' \
+    'claude -p "$p" --allowedTools \' \
+    '    "Bash(psql:*)"'
+file_case case_sh_client_flagged 1 'shell-client-rule: Bash(sh -c:*)' \
+    'claude -p "$p" --allowedTools "Bash(sh -c:*)"'
+file_case case_marker_above_command 0 '' \
+    'run_agent() {' \
+    '    # The agent gets only the SQL-only wrapper, inside a temp workdir.' \
+    '    # agent-allowlist-ok: wrapper takes SQL only and acceptEdits stays in the workdir' \
+    '    ( cd "$WORKDIR" && MYSQL_PWD="${SIM_RECAP_DB_PASSWORD:-}" \' \
+    '        timeout "$SIM_RECAP_CLAUDE_TIMEOUT" "$SIM_RECAP_CLAUDE_BIN" -p "$prompt" \' \
+    '            --model "$SIM_RECAP_MODEL" --output-format json \' \
+    '            --permission-mode acceptEdits \' \
+    '            --allowedTools "Bash(${SIM_RECAP_MYSQL_WRAPPER}:*)" ) \' \
+    '        > "$WORKDIR/agent.json" 2>&1' \
+    '}'
+file_case case_same_line_marker 0 '' \
+    'claude -p "$p" --permission-mode bypassPermissions  # agent-allowlist-ok: fixture reason long enough'
+file_case case_marker_separated_by_code 1 'bin/fx:4: permission-mode:' \
+    '    # agent-allowlist-ok: wrapper takes SQL only and acceptEdits stays in the workdir' \
+    '    local x=1' \
+    '    claude -p "$p" \' \
+    '        --permission-mode acceptEdits'
+file_case case_marker_short_reason 1 'bin/fx:2: permission-mode:' \
+    '    # agent-allowlist-ok: too short' \
+    '    claude -p "$p" --permission-mode acceptEdits'
+file_case case_disallowed_tools 0 '' \
+    'claude -p "$p" --disallowedTools "Bash(mysql:*)" "Bash(env:*)"'
+file_case case_deny_assignment 0 '' \
+    "BL_UNBLOCK_DENY='Bash(env:*) Bash(bash -c:*) Bash(ssh:*)'" \
+    'claude -p "$p" --disallowedTools "$BL_UNBLOCK_DENY"'
+file_case case_near_miss_rules 0 '' \
+    'claude -p "$p" --allowedTools "Bash(git status:*)" "Bash(shellcheck:*)" "Read"'
+file_case case_near_miss_default_mode 0 '' 'claude -p "$p" --permission-mode default'
+file_case case_near_miss_plan_mode 0 '' 'claude -p "$p" --permission-mode plan'
+file_case case_comment_mention 0 '' \
+    '    # never pass --permission-mode acceptEdits or --allowedTools "Bash(mysql:*)" here'
+
+# case_excluded_paths: bin/test-* and *.md are skipped; bin/fx is not
+mkrepo case_excluded_paths
+for f in bin/fx bin/test-fx bin/notes.md; do
+    printf '%s\n' 'claude -p "$p" --permission-mode acceptEdits' > "$R/$f"
+done
+run_gate; rc_is case_excluded_paths 1
+want case_excluded_paths "$OUT" 'bin/fx:1: permission-mode:'
+wantnot case_excluded_paths_test "$OUT" 'bin/test-fx'
+wantnot case_excluded_paths_md "$OUT" 'bin/notes.md'
+
+# case_usage: an unknown flag fails loudly; --help succeeds
+mkrepo case_usage
+run_gate --bogus; rc_is case_usage_unknown_flag 2
+want case_usage_unknown_flag "$OUT" 'unknown argument: --bogus'
+run_gate --help; rc_is case_usage_help 0
+want case_usage_help "$OUT" 'Usage: bin/check-agent-allowlist'
+
+# case_not_a_repo: fail closed outside a git repo
+mkdir -p "$TMP/norepo/bin"; cp "$GATE" "$TMP/norepo/bin/check-agent-allowlist"
+OUT=$("$TMP/norepo/bin/check-agent-allowlist" 2>&1); RC=$?
+rc_is case_not_a_repo 2
+want case_not_a_repo "$OUT" 'not inside a git repo'
+
+echo "test-check-agent-allowlist: $PASS passed, $FAIL failed"
+[ "$FAIL" -eq 0 ]

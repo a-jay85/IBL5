@@ -1,0 +1,123 @@
+#!/bin/bash
+# <!-- no-adr: additive lint gate over bin/ agent permission flags; ADR-0093 already owns the agent trust boundary this gate checks -->
+# bin/check-agent-allowlist — CI gate: a headless claude run under bin/ must not
+# get a wider grant than its comments document.
+#
+# Why: PR #3379 shipped bin/sim-recap-tick with an auto-approving permission
+# mode and an allow rule for the raw mysql client, which can run shell commands
+# through `system` and `\!`. Review caught it three times (backlog issue 1609).
+# This gate fails the PR that adds such a grant without a documented reason.
+#
+# Usage: bin/check-agent-allowlist   (scans the repo that holds this script)
+# ---
+# A finding is accepted by a comment `# agent-allowlist-ok: <reason>` whose
+# reason is 15+ chars, on the flagged line itself or in the unbroken comment
+# block directly above the first line of the backslash-continued command.
+# ---
+# Fail closed: not a git repo, a git error, or no tracked bin/ files exits 2.
+PATH="/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin${PATH:+:$PATH}"; export PATH
+
+usage() {
+    cat <<'EOF'
+Usage: bin/check-agent-allowlist
+
+CI gate: scans tracked files under bin/ (skipping bin/test-* and *.md) for a
+headless claude run that gets
+  --permission-mode acceptEdits or bypassPermissions, or
+  an allow rule (--allowedTools / --tools) whose Bash(...) binary is a
+  shell-capable client (mysql, psql, bash, ssh, ...) or a $VARIABLE,
+and exits 1 unless a "# agent-allowlist-ok: <reason of 15+ chars>" comment
+sits on the line or in the unbroken comment block above the command.
+
+Exit codes:
+  0  No undocumented grant found
+  1  One or more findings (printed as path:line: kind: detail)
+  2  Usage error, not a git repo, or no tracked files under bin/
+EOF
+}
+
+die() { echo "check-agent-allowlist: $*" >&2; exit 2; }
+
+set -eu
+
+case "${1:-}" in
+    -h|--help) usage; exit 0 ;;
+    "") ;;
+    *) usage >&2; die "unknown argument: $1" ;;
+esac
+
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+if ! ROOT=$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null); then
+    die "not inside a git repo: $SCRIPT_DIR"
+fi
+if ! FILES=$(git -C "$ROOT" ls-files -- bin); then
+    die "git ls-files failed in $ROOT"
+fi
+[ -n "$FILES" ] || die "no tracked files under bin/ in $ROOT"
+
+AWK_PROG='
+function trim(s) { sub(/^[[:space:]]+/, "", s); sub(/[[:space:]]+$/, "", s); return s }
+function marker_ok(s,   m) {
+    if (!match(s, /#[[:space:]]*agent-allowlist-ok:/)) return 0
+    m = trim(substr(s, RSTART + RLENGTH))
+    return length(m) >= 15
+}
+function covered(n,   s, k) {
+    if (marker_ok(line[n])) return 1
+    s = n
+    while (s > 1 && line[s-1] ~ /\\[[:space:]]*$/) s--
+    for (k = s - 1; k >= 1 && line[k] ~ /^[[:space:]]*#/; k--)
+        if (marker_ok(line[k])) return 1
+    return 0
+}
+function report(n, kind, detail) {
+    if (!covered(n)) printf "%s:%d: %s: %s\n", path, n, kind, detail
+}
+{ line[NR] = $0 }
+END {
+    for (n = 1; n <= NR; n++) {
+        t = line[n]
+        if (t ~ /^[[:space:]]*#/) continue
+        if (t ~ /--permission-mode[[:space:]=]+[^[:space:]]?(acceptEdits|bypassPermissions)/)
+            report(n, "permission-mode", "auto-approving mode needs an agent-allowlist-ok marker")
+        allow = 0
+        if (t ~ /--allowed-?[Tt]ools|--tools([[:space:]=]|$)/) allow = 1
+        if (n > 1 && line[n-1] ~ /--allowed-?[Tt]ools[[:space:]]*\\[[:space:]]*$/) allow = 1
+        if (!allow) continue
+        rest = t
+        while (match(rest, /Bash\([^)]*\)/)) {
+            tok = substr(rest, RSTART, RLENGTH)
+            rest = substr(rest, RSTART + RLENGTH)
+            bin = substr(tok, 6, length(tok) - 6)
+            sub(/^[[:space:]]+/, "", bin)
+            sub(/[[:space:]].*$/, "", bin)
+            gsub(/"/, "", bin); gsub(sq, "", bin)
+            sub(/:?\*$/, "", bin)
+            sub(/:$/, "", bin)
+            if (bin ~ /^\$/) {
+                report(n, "variable-rule", tok " names its binary through a variable; show it is a safe wrapper and add a marker")
+                continue
+            }
+            sub(/^.*\//, "", bin)
+            if (bin ~ /^(mysql|mariadb|psql|sqlite3|bash|sh|zsh|env|eval|python|python3|node|perl|ruby|php|ssh)$/)
+                report(n, "shell-client-rule", tok " lets the agent run a shell-capable client")
+        }
+    }
+}'
+
+found=0
+while IFS= read -r f; do
+    case "$f" in
+        bin/test-*|bin/check-agent-allowlist|*.md) continue ;;
+    esac
+    [ -f "$ROOT/$f" ] || continue
+    grep -Iq . "$ROOT/$f" < /dev/null || continue
+    if ! out=$(awk -v path="$f" -v sq="'" "$AWK_PROG" "$ROOT/$f" < /dev/null); then
+        die "awk failed on $f"
+    fi
+    if [ -n "$out" ]; then
+        printf '%s\n' "$out"
+        found=1
+    fi
+done <<< "$FILES"
+exit "$found"

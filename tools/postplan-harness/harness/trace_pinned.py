@@ -84,7 +84,7 @@ def _git_bytes(args, cwd) -> bytes:
 
 # --- (a) path allowlist -----------------------------------------------------------------------
 
-def allowlist_verdict(changed_files, branch) -> str:
+def allowlist_verdict(changed_files, branch, ported=frozenset()) -> str:
     files = list(changed_files or ())
     if not files:
         return "empty-range"
@@ -97,7 +97,9 @@ def allowlist_verdict(changed_files, branch) -> str:
         if path in GOLDEN_FILES or path == own_evidence:
             continue
         if path.startswith("engine/") and path.endswith(".go"):
-            continue
+            if path.endswith("_test.go") or path in ported:
+                continue
+            return f"undeclared-engine-file: {path}"
         return f"non-engine-path: {path}"
     return "ok"
 
@@ -332,7 +334,8 @@ def evaluate_data(root, branch, base, changed_files, data, run_go=None) -> str:
             or not all(isinstance(t, dict) for t in tests):
         return "evidence-malformed"
     changed = list(changed_files or ())
-    allowed = allowlist_verdict(changed, branch)
+    ported = {p for t in tests for p in (_ported_list(t) or ())}
+    allowed = allowlist_verdict(changed, branch, ported)
     if allowed != "ok":
         return allowed
     if not base:

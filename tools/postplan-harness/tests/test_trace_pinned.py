@@ -196,16 +196,31 @@ def test_allowlist_rejects_capture_in_diff(repo):
     assert tp.allowlist_verdict([readme], BRANCH) == f"capture-in-diff: {readme}"
 
 
-def test_allowlist_accepts_engine_go_golden_and_evidence():
-    files = [ENGINE_FILE, TEST_FILE, "engine/cmd/x/main.go", *tp.GOLDEN_FILES, EVIDENCE]
-    assert tp.allowlist_verdict(files, BRANCH) == "ok"
+def test_allowlist_requires_declared_engine_go():
+    cmd = "engine/cmd/x/main.go"
+    files = [ENGINE_FILE, TEST_FILE, cmd, *tp.GOLDEN_FILES, EVIDENCE]
+    assert tp.allowlist_verdict(files, BRANCH, {ENGINE_FILE, cmd}) == "ok"
+    assert tp.allowlist_verdict(files, BRANCH, {ENGINE_FILE}) == f"undeclared-engine-file: {cmd}"
+    assert tp.allowlist_verdict(files, BRANCH) == f"undeclared-engine-file: {ENGINE_FILE}"
     assert tp.allowlist_verdict(["engine/trace-evidence/other.json"], BRANCH) \
         == "non-engine-path: engine/trace-evidence/other.json"
 
 
+def test_allowlist_exempts_test_files_without_declaration():
+    files = [TEST_FILE, "engine/cmd/x/main_test.go", GOLDEN, EVIDENCE]
+    assert tp.allowlist_verdict(files, BRANCH) == "ok"
+
+
+def test_loader_in_diff_wins_over_ported_reasons(repo):
+    root, base = repo
+    loader = "engine/internal/jsbtrace/jsbtrace.go"
+    _write_evidence(root, ported_files=[ENGINE_FILE, loader])
+    assert _verdict(root, base, changed=[*CHANGED, loader]) == f"loader-in-diff: {loader}"
+
+
 def test_allowlist_rejects_capture_loader_change():
     loader = "engine/internal/jsbtrace/jsbtrace.go"
-    assert tp.allowlist_verdict([ENGINE_FILE, loader], BRANCH) == f"loader-in-diff: {loader}"
+    assert tp.allowlist_verdict([ENGINE_FILE, loader], BRANCH, {ENGINE_FILE}) == f"loader-in-diff: {loader}"
 
 
 def test_empty_range_holds(repo):
@@ -221,7 +236,7 @@ def test_unrelated_engine_edit_cannot_borrow_pinned_capture(repo):
     root, base = repo
     _write(root, UNRELATED, "package backup\n\nfunc assemble() int { return 2 }\n")
     verdict = _verdict(root, base, changed=[*CHANGED, UNRELATED])
-    assert verdict == "ok"  # Phase 3 flips this assertion
+    assert verdict == f"undeclared-engine-file: {UNRELATED}"
 
 
 # ---- (b) the test ----

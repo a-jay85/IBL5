@@ -507,6 +507,34 @@ chk "cd hop with no substitution still rewritten" eq "$(row_rewrite 'cd ibl5 && 
 chk "remote URL in cd-hop php args stays LOCAL" routes_local "test \"\$(cd x && php -r 'echo file_get_contents(\"https://iblhoops.net/\");')\" = ok"
 end_case
 
+# A backtick substitution has no ( for _unquoted_end to count. The php, bun
+# or bunx segment still ends at the backtick that closes the substitution, so
+# the expected value after it stays byte-exact (backlog issue 1944).
+start_case case_row_rewrite_backtick_hop
+BT_CD='test "`cd x && php -r 1`" = "http://localhost/"'
+BT_BARE='test "`php -r 1`" = "http://localhost/"'
+BT_UNQ='test `cd x && php -r 1` = http://localhost/'
+BT_SQ="test \"\`cd x && php -r 'echo 1;'\`\" = \"http://localhost/\""
+BT_PIPE='test "`echo http://localhost/ | php -r 1`" = "http://127.0.0.1/"'
+BT_BUN='test "`cd x && bun -e 1`" = "http://localhost/"'
+BT_ESC_IN="test \"\`php -r 'echo \\\`;' http://localhost/\`\" = \"http://localhost/\""
+BT_ESC_OUT="test \"\`php -r 'echo \\\`;' http://localhost:8080/\`\" = \"http://localhost/\""
+SQ_IN='echo '"'"'`'"'"' | php x.php `cat f` http://localhost/'
+SQ_OUT='echo '"'"'`'"'"' | php x.php `cat f` http://localhost:8080/'
+chk "cd hop in backticks keeps expected value" eq "$(row_rewrite "$BT_CD")" "$BT_CD"
+chk "bare php in backticks keeps expected value" eq "$(row_rewrite "$BT_BARE")" "$BT_BARE"
+chk "unquoted backtick hop keeps expected value" eq "$(row_rewrite "$BT_UNQ")" "$BT_UNQ"
+chk "single-quoted php code in backtick hop keeps expected value" eq "$(row_rewrite "$BT_SQ")" "$BT_SQ"
+chk "pipe hop in backticks keeps expected value" eq "$(row_rewrite "$BT_PIPE")" "$BT_PIPE"
+chk "bun hop in backticks keeps expected value" eq "$(row_rewrite "$BT_BUN")" "$BT_BUN"
+chk "bunx args in backticks rewritten, expected kept" eq "$(row_rewrite 'test "`bunx tsx x.ts http://localhost/`" = "http://localhost/"')" 'test "`bunx tsx x.ts http://localhost:8080/`" = "http://localhost/"'
+chk "two backtick subs each end at their own close" eq "$(row_rewrite 'test "`php -r 1`" = "x" && test "`php -r 2 http://localhost/`" = "http://localhost/"')" 'test "`php -r 1`" = "x" && test "`php -r 2 http://localhost:8080/`" = "http://localhost/"'
+chk "escaped backtick in a backtick sub is not the close" eq "$(row_rewrite "$BT_ESC_IN")" "$BT_ESC_OUT"
+chk "single-quoted backtick before php opens no substitution" eq "$(row_rewrite "$SQ_IN")" "$SQ_OUT"
+chk "backtick in php args outside a substitution: URL still rewritten" eq "$(row_rewrite 'php x.php `cat f` http://localhost/')" 'php x.php `cat f` http://localhost:8080/'
+chk "remote URL in backtick-hop php args stays LOCAL" routes_local "test \"\`cd x && php -r 'echo file_get_contents(\"https://iblhoops.net/\");'\`\" = ok"
+end_case
+
 start_case case_row_rewrite_skip_list
 chk "grep pattern row unchanged" eq "$(row_rewrite 'grep -q "http://localhost/ibl5/" ibl5/docs/x.md')" 'grep -q "http://localhost/ibl5/" ibl5/docs/x.md'
 chk "test \$(curl) row rewritten" eq "$(row_rewrite 'test "$(curl -s -o /dev/null -w %{http_code} http://plan-checks-ci-local-rows.localhost/ibl5/)" = 200')" 'test "$(curl -s -o /dev/null -w %{http_code} http://localhost:8080/ibl5/)" = 200'

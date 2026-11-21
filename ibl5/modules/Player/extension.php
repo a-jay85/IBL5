@@ -4,19 +4,19 @@ declare(strict_types=1);
 
 require __DIR__ . '/../../mainfile.php';
 
-global $mysqli_db, $user, $authService;
-$nukeCompat = new \Utilities\NukeCompat();
-/** @var \mysqli $mysqli_db */
+global $user, $authService, $bootApp;
 /** @var \Auth\AuthService $authService */
+/** @var \Bootstrap\Application $bootApp */
+$services = \Module\ModuleServices::currentOrPublish(
+    static fn (): \Bootstrap\Contracts\ContainerInterface => $bootApp->getContainer()
+);
+$nukeCompat = $services->nukeCompat();
 
 $httpRequest = \Http\HttpRequest::fromGlobals();
 $serverNameRaw = $httpRequest->server('SERVER_NAME');
 $serverName = is_string($serverNameRaw) ? $serverNameRaw : '';
 
-$controller = new \Extension\ExtensionController(
-    new \Repositories\TeamIdentityRepository($mysqli_db),
-    new \Extension\ExtensionService($mysqli_db, $serverName),
-);
+$controller = $services->factory(\Module\Factories\PlayerFactory::class)->extensionController($serverName);
 
 // NukeCompat::isUser()/cookieDecode() ignore their argument and read the $authService global
 // that mainfile.php's boot() wired up. Gate order lives in the controller.

@@ -52,10 +52,11 @@ $cat = $catid;
 
 function theindex(int $catid): void
 {
-    global $storyhome, $topicname, $topicimage, $topictext, $datetime, $user, $nukeurl, $prefix, $multilingual, $currentlang, $db, $articlecomm, $module_name, $userinfo, $authService, $mysqli_db;
-    assert($mysqli_db instanceof \mysqli);
+    global $storyhome, $topicname, $topicimage, $topictext, $datetime, $user, $nukeurl, $prefix, $multilingual, $currentlang, $db, $articlecomm, $module_name, $userinfo, $authService;
     assert($authService instanceof \Auth\Contracts\AuthServiceInterface);
-    $nukeCompat = new \Utilities\NukeCompat();
+    $services = \Module\ModuleServices::current();
+    $newsFactory = $services->factory(\Module\Factories\NewsFactory::class);
+    $nukeCompat = $services->nukeCompat();
     if ($nukeCompat->isUser($user)) {$userinfo = $authService->getUserInfo();}
     // Language filter: the value is bound by NewsRepository; null means no clause.
     $language = (is_numeric($multilingual) && (int) $multilingual === 1 && is_string($currentlang)) ? $currentlang : null;
@@ -63,7 +64,7 @@ function theindex(int $catid): void
     echo '<h1 class="ibl-title">News Categories</h1>';
     $ui = is_array($userinfo) ? $userinfo : [];
     $storynum = isset($ui['storynum']) && is_numeric($ui['storynum']) ? (int) $ui['storynum'] : (is_numeric($storyhome) ? (int) $storyhome : 0);
-    $newsService = new \Topics\News\NewsService($mysqli_db);
+    $newsService = $newsFactory->service();
     $newsService->bumpCategory($catid);
     $stories = $newsService->getCategoryPageStories($catid, $storynum, $language);
     $viewModels = [];
@@ -120,7 +121,7 @@ function theindex(int $catid): void
             'topicimage' => $topicimage, 'topictext' => $topictext,
         ];
     }
-    (new \Topics\News\NewsView())->renderStories($viewModels);
+    $newsFactory->view()->renderStories($viewModels);
     PageLayout\PageLayout::footer();
 }
 

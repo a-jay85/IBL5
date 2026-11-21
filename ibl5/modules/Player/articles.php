@@ -2,9 +2,6 @@
 
 declare(strict_types=1);
 
-global $mysqli_db;
-/** @var \mysqli $mysqli_db */
-
 // Sanitize input to prevent SQL injection
 $rawPlayer = $_REQUEST['player'] ?? null;
 $player = is_string($rawPlayer) ? trim($rawPlayer) : '';
@@ -14,30 +11,19 @@ if ($player === '' || $player === '0') {
     return;
 }
 
-// Bound via prepared statement below; only LIKE metacharacters need escaping.
-$searchTerm = '%' . addcslashes($player, '\\%_') . '%';
-$query = "SELECT sid, title, time FROM nuke_stories WHERE hometext LIKE ? OR bodytext LIKE ? ORDER BY time DESC";
-$stmt = $mysqli_db->prepare($query);
+$rows = \Module\ModuleServices::current()
+    ->factory(\Module\Factories\PlayerFactory::class)
+    ->newsRepository()
+    ->searchStoriesMentioning($player);
 
-if ($stmt === false) {
+if ($rows === null) {
     echo "<small>Error searching for articles.</small>";
-    return;
-}
-
-$stmt->bind_param('ss', $searchTerm, $searchTerm);
-$stmt->execute();
-$result = $stmt->get_result();
-
-if ($result === false) {
-    echo "<small>Error searching for articles.</small>";
-    $stmt->close();
     return;
 }
 
 echo "<small>";
 
-while (is_array($row = $result->fetch_assoc())) {
-    /** @var array{sid: int, title: string|null, time: string|null} $row nuke_stories: sid int(11) NOT NULL, title varchar(80) NULL, time datetime NULL (per ibl5/docs/schema/current-schema.sql) */
+foreach ($rows as $row) {
     $sid = htmlspecialchars((string) $row['sid'], ENT_QUOTES, 'UTF-8');
     $title = htmlspecialchars($row['title'] ?? '', ENT_QUOTES, 'UTF-8');
     $time = htmlspecialchars($row['time'] ?? '', ENT_QUOTES, 'UTF-8');
@@ -47,5 +33,3 @@ while (is_array($row = $result->fetch_assoc())) {
 }
 
 echo "</small>";
-
-$stmt->close();

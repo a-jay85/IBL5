@@ -51,6 +51,7 @@ pmr_parse_row() {
                 manual) PMR_TEXT="$_after" ;;
                 "auto:ci "*|"auto:mac "*)
                     _nm="${_tag#* }"
+                    # shellcheck disable=SC2034  # PMR_TEXT is an output callers read
                     if [[ "$_nm" =~ $PMR_NAME_RE ]]; then
                         PMR_KIND="${_tag%% *}"; PMR_NAME="$_nm"; PMR_TEXT="$_after"
                     else

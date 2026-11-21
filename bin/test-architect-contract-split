@@ -13,7 +13,7 @@
 #   1. No-loss    : every baseline token survives in rules ∪ detail
 #   2. Residency  : every operative token (bold/gate/fenced) survives in rules file specifically
 #   3. Orphans    : every Why: _…-detail.md § <heading> pointer in rules resolves
-#   4. Size caps  : _architect-contract.md ≤ 33792 B (raised from 33280 for the trace-pinned engine port bullet, ADR-0266; before that from 32768 for the gate [HC] sentence and the slop-ok markers that clear old prose tells, matrix row 9; before that from 31744 for the SQL-equivalent rewrite bullet, ADR-0248; before that from 31232 for the narrow-check sentence, ADR-0199 addendum; before that from 30208, ADR-0206), _plan-verification.md ≤ 21504 B
+#   4. Size caps  : _architect-contract.md ≤ 34816 B (raised from 33792 for the After merge rows bullet and the auto:mac sentence, ADR-0198; before that from 33280 for the trace-pinned engine port bullet, ADR-0266; before that from 32768 for the gate [HC] sentence and the slop-ok markers that clear old prose tells, matrix row 9; before that from 31744 for the SQL-equivalent rewrite bullet, ADR-0248; before that from 31232 for the narrow-check sentence, ADR-0199 addendum; before that from 30208, ADR-0206), _plan-verification.md ≤ 21504 B
 #   5. Read budget: every plan-architect def carries the no-re-read bounds (check_read_budget)
 #                   (only enforced when the detail file exists — skipped on the un-split tree)
 #   6. Mutation rule: full-matrix mutation-rule text stays in the contract and _validate-and-write.md gate 9
@@ -825,7 +825,7 @@ else
     "$CONTRACT_RULES" \
     "$CONTRACT_DETAIL" \
     "architect-contract" \
-    33792 \
+    34816 \
     true
 
   check_read_budget

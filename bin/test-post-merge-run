@@ -13,6 +13,7 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/lib/harness.sh
 . "$SCRIPT_DIR/lib/harness.sh"
+# shellcheck disable=SC2034  # read by bin/lib/harness.sh
 H_FAIL_FD=2  # FAIL: lines stay on stderr, as in the sibling harnesses
 
 RUN_SRC="${PMR_RUN_SRC:-$SCRIPT_DIR/post-merge-run}"

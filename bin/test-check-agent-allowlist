@@ -73,6 +73,7 @@ file_case case_marker_short_reason 1 'bin/fx:2: permission-mode:' \
     '    claude -p "$p" --permission-mode acceptEdits'
 file_case case_disallowed_tools 0 '' \
     'claude -p "$p" --disallowedTools "Bash(mysql:*)" "Bash(env:*)"'
+# case_deny_assignment copies the bin/burndown-loop:150 *_DENY= shape
 file_case case_deny_assignment 0 '' \
     "BL_UNBLOCK_DENY='Bash(env:*) Bash(bash -c:*) Bash(ssh:*)'" \
     'claude -p "$p" --disallowedTools "$BL_UNBLOCK_DENY"'

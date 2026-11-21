@@ -140,6 +140,7 @@ REPLAY_SPECS: dict[str, ReplaySpec | str] = {
     "bin/check-digest-prose": _TREE,
     "bin/check-e2e-fa-offers-owner": _TREE,
     "bin/check-e2e-mutator-isolation": _TREE,
+    "bin/check-gh-pr-files-rename-old-path": _TREE,
     "bin/check-loop-stdin-consumed-by-child": _TREE,
     "bin/check-model-pins": _TREE,
     "bin/check-playwright-pinning": _TREE,

@@ -769,7 +769,7 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     elif val == DOCS_REFRESH_TOKEN:
         sel7, src7 = select_fidelity_verdict(inp.fidelity_verdict, inp.fidelity_verdict_2,
                                              inp.fidelity_tree_2, inp.current_tree)
-        holds7 = docs_refresh_holds(inp.branch, inp.classification.files,
+        holds7 = docs_refresh_holds(inp.branch, inp.ui_paths if inp.ui_paths is not None else inp.classification.files,
                                     inp.merge_danger_state, sel7, rules_diffs=inp.docs_refresh_rules_diffs)
         c7_blocked = bool(holds7)
         c7_reason = (f"auto_merge: {DOCS_REFRESH_TOKEN} failed: " + ", ".join(holds7)

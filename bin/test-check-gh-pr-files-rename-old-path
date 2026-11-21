@@ -80,6 +80,13 @@ files="$(gh pr view "$num" --json files --jq '.files')"
 jq -r '.[].path' <<< "$files"
 EOF
 run_case "C4 informational" 0 "$r"
+# The informational caller is clear only because no predicate is in HOLD_FNS for it;
+# a `gh:3` entry would make every `gh pr view --json files` user a hold site.
+if grep -E '^HOLD_FNS=' "$GATE" | grep -qF 'gh:3'; then
+    echo "FAIL: C4 HOLD_FNS lists gh:3"; fail=1
+else
+    echo "ok: C4 HOLD_FNS has no gh:3 entry"
+fi
 
 # C5 Rule A: predicate body reads .path
 r="$T/c5"

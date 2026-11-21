@@ -229,7 +229,9 @@ case_last_verified_bump() {
 
 case_addendum_append() {
     new_case b
-    printf '%s\n' '' '## Addendum — fixture (2026-11-20)' '' 'The decision is unchanged; this paragraph only records a later fact.' \
+    # The first appended line is the heading, not a blank: a blank first line would let a
+    # zero-count hunk mistaken for a one-line change pass as a whitespace-only edit.
+    printf '%s\n' '## Addendum — fixture (2026-11-20)' '' 'The decision is unchanged; this paragraph only records a later fact.' \
         >>"$CASE_DIR/$ADR104"
     commit_pr
     run_case "$CASE_NAME" 0 'OK' --since=master

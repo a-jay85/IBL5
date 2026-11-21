@@ -148,6 +148,10 @@ class TradingEntryPointTest extends ModuleEntryPointTestCase
         $this->assertNotSame('', $output);
     }
 
+    /**
+     * The three trade-offer scripts build their controller through TradingFactory::controller(),
+     * so the container auth object must be the one the controller checks first.
+     */
     public function testMakeTradeOfferScriptReachesControllerAuth(): void
     {
         $this->skipWebBoot();

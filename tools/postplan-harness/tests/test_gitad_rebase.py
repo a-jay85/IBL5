@@ -217,6 +217,8 @@ def test_rebase_onto_real_precommit_hook_denial_restores():
 
 
 def test_rebase_onto_real_precommit_hook_pass_lands(monkeypatch):
+    # Negative control. The marker proves the harness ran the real hook: if the hook name in
+    # the `git hook run` argv became `pre-commit-disabled`, the marker would never be written.
     d, _base, master_sha, key, branch = _make_simple_conflict_repo(
         lostwork_script=_LOSTWORK_EQUIV)
     marker_dir = tempfile.mkdtemp(prefix="pp-hook-marker-")

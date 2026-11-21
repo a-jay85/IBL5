@@ -3,7 +3,9 @@
 PRs #3908, #3918, #3949, #4008 and #4040 ported JSB foul and outcome routines and the owner
 merged each one by hand, because condition (5) holds every golden change in a headless run
 and condition (7) held their `golden-new` plan token. As merged they carry no trace evidence,
-so they stay held. Each `engine-golden-*` corpus entry holds the PR's file list, pasted from
+so they stay held. With synthetic evidence declaring every non-test .go file, #3908, #3918,
+#3949 and #4008 clear; #4040 stays held because a test in internal/sim cannot execute its
+engine/cmd change. Each `engine-golden-*` corpus entry holds the PR's file list, pasted from
 `gh pr diff <N> --name-only -R a-jay85/IBL5`."""
 import dataclasses
 import json
@@ -61,6 +63,17 @@ SYN_TEST_FILE = "engine/internal/sim/synthetic_trace_test.go"
 SYN_SOURCE = (f'package sim\n\nimport (\n\t"testing"\n\n\t"github.com/a-jay85/IBL5/engine/internal/jsbtrace"\n)\n\n'
               f'func {SYN_TEST_NAME}(t *testing.T) {{\n\tc := jsbtrace.MustLoad(t, "{SYN_CAPTURE_NAME}")\n\t_ = c\n}}\n')
 SEEDS = "engine/internal/sim/testdata/golden_seeds.sha256"
+CLEARING_PRS = ("3908", "3918", "3949", "4008")
+UNREACHABLE_PREFIX = "engine/cmd/"  # package main: a test in internal/sim never executes it
+
+
+def _syn_ported(files):
+    return [f for f in files if f.endswith(".go") and not f.endswith("_test.go")]
+
+
+def _syn_go(paths, **kw):
+    covered = [p for p in _syn_ported(paths) if not p.startswith(UNREACHABLE_PREFIX)]
+    return _fake_go(capture_name=SYN_CAPTURE_NAME, **{"covered": covered, **kw})
 
 
 def _engine_paths(files):
@@ -71,11 +84,7 @@ def _stream_verdict(name):
     return tp.parse_go_test_json(_stream(name), TEST)
 
 
-def _go(**kw):
-    return _fake_go(capture_name=SYN_CAPTURE_NAME, **kw)
-
-
-def _replay_repo(tmp_path, files, *, capture="base", with_test=True):
+def _replay_repo(tmp_path, files, *, capture="base", with_test=True, ported=None):
     """Temp repo: base holds the capture (`capture="base"`), head holds stubs for `files`.
 
     `capture` is "base", "head" (added by the same PR) or "none" (on neither commit).
@@ -94,15 +103,12 @@ def _replay_repo(tmp_path, files, *, capture="base", with_test=True):
         _write(root, SYN_CAPTURE, _capture_text())
     if with_test:
         _write(root, SYN_TEST_FILE, SYN_SOURCE)
-        if capture == "base":
-            assert tp.record(root, BRANCH, [f"{PACKAGE}:{SYN_TEST_NAME}"], [SYN_CAPTURE_NAME],
-                             run_go=_go()) == 0
-        else:
-            entry = {"package": PACKAGE, "test": SYN_TEST_NAME, "file": SYN_TEST_FILE,
-                     "test_blob": _git(root, "hash-object", SYN_TEST_FILE), "capture": SYN_CAPTURE,
-                     "capture_sha256": tp._sha256(_capture_text().encode())}
-            _write(root, EVIDENCE, json.dumps({"schema": 1, "token": "trace-pinned",
-                                               "branch": BRANCH, "tests": [entry]}))
+        entry = {"package": PACKAGE, "test": SYN_TEST_NAME, "file": SYN_TEST_FILE,
+                 "test_blob": _git(root, "hash-object", SYN_TEST_FILE), "capture": SYN_CAPTURE,
+                 "capture_sha256": tp._sha256(_capture_text().encode()),
+                 "ported_files": _syn_ported(files) if ported is None else list(ported)}
+        _write(root, EVIDENCE, json.dumps({"schema": tp.SCHEMA, "token": "trace-pinned",
+                                           "branch": BRANCH, "tests": [entry]}))
     _commit(root, "head")
     return root, base
 
@@ -117,15 +123,24 @@ def _arm(inp, evidence, *, capture_changed=False):
                                plan_hold_triggers=("trace-pinned",))
 
 
-@pytest.mark.parametrize("pr", ENGINE_PRS)
+@pytest.mark.parametrize("pr", CLEARING_PRS)
 def test_synthetic_trace_pinned_clears_engine_prs(tmp_path, pr):
     record = _engine_records()[f"engine-golden-{pr}"]
     paths = _engine_paths(record["inputs"]["classification"]["files"])
     root, base = _replay_repo(tmp_path, paths)
-    verdict = tp.evaluate_evidence(root, BRANCH, base, _changed(paths), run_go=_go())
+    verdict = tp.evaluate_evidence(root, BRANCH, base, _changed(paths), run_go=_syn_go(paths))
     assert verdict == "ok"
     decision = evaluate(_arm(_decode(record), verdict))
     assert not _blocked(decision) & {5, 7}
+
+
+def test_synthetic_trace_pinned_holds_cmd_change_4040(tmp_path):
+    record = _engine_records()["engine-golden-4040"]
+    paths = _engine_paths(record["inputs"]["classification"]["files"])
+    root, base = _replay_repo(tmp_path, paths)
+    verdict = tp.evaluate_evidence(root, BRANCH, base, _changed(paths), run_go=_syn_go(paths))
+    assert verdict == "unexercised-change: engine/cmd/reallife-fixture/main.go"
+    assert {5, 7} <= _blocked(evaluate(_arm(_decode(record), verdict)))
 
 
 @pytest.mark.parametrize("pr", ENGINE_PRS)
@@ -133,31 +148,38 @@ def test_full_file_list_matches_corpus_expectation(tmp_path, pr):
     record = _engine_records()[f"engine-golden-{pr}"]
     files = record["inputs"]["classification"]["files"]
     root, base = _replay_repo(tmp_path, _engine_paths(files))
-    verdict = tp.evaluate_evidence(root, BRANCH, base, _changed(files), run_go=_go())
+    verdict = tp.evaluate_evidence(root, BRANCH, base, _changed(files),
+                                   run_go=_syn_go(_engine_paths(files)))
     assert verdict == record["full_list_expected"], f"engine-golden-{pr} printed {verdict!r}"
 
 
 NEGATIVE_IDS = ("engine-copied-expectations", "failing-trace-test", "skipped-trace-test",
-                "non-engine-file", "missing-capture", "seeds-only", "capture-added-by-same-pr")
+                "non-engine-file", "missing-capture", "seeds-only", "capture-added-by-same-pr",
+                "undeclared-port", "unexercised-port")
 
 
 @pytest.mark.parametrize("case", NEGATIVE_IDS)
 def test_replay_negative_cases_stay_held(tmp_path, case):
     record = _engine_records()["engine-golden-3918"]
     paths = _engine_paths(record["inputs"]["classification"]["files"])
-    go, build, changed, capture_changed = _go(), {}, _changed(paths), False
+    go, build, changed, capture_changed = _syn_go(paths), {}, _changed(paths), False
     if case == "engine-copied-expectations":
-        go, prefix = _go(perturbed="pass"), "circular:"
+        go, prefix = _syn_go(paths, perturbed="pass"), "circular:"
     elif case == "failing-trace-test":
-        go, prefix = _go(normal=_stream_verdict("fail")), "test-fail"
+        go, prefix = _syn_go(paths, normal=_stream_verdict("fail")), "test-fail"
     elif case == "skipped-trace-test":
-        go, prefix = _go(normal=_stream_verdict("skip")), "test-skip"
+        go, prefix = _syn_go(paths, normal=_stream_verdict("skip")), "test-skip"
     elif case == "non-engine-file":
         changed, prefix = _changed(paths, extra=("ibl5/classes/Trade/TradeService.php",)), "non-engine-path:"
     elif case == "missing-capture":
         build, prefix = {"capture": "none"}, "capture-not-on-base"
     elif case == "seeds-only":
         paths, changed, build, prefix = [SEEDS], [SEEDS], {"with_test": False}, "evidence-missing"
+    elif case == "undeclared-port":
+        build = {"ported": [p for p in _syn_ported(paths) if not p.endswith("/transition.go")]}
+        prefix = "undeclared-engine-file:"
+    elif case == "unexercised-port":
+        go, prefix = _syn_go(paths, covered=()), "unexercised-change:"
     else:
         build, changed, prefix = {"capture": "head"}, _changed(paths, extra=(SYN_CAPTURE,)), "capture-in-diff:"
         capture_changed = True
@@ -173,3 +195,22 @@ def test_replay_negative_cases_stay_held(tmp_path, case):
     if case in ("seeds-only", "capture-added-by-same-pr"):
         assert 5 in blocked
     assert second_review_candidates(inp, decision.conditions) == {}
+
+
+def print_replay_verdicts():
+    """One line per (PR, file list) with the verdict the synthetic evidence gets.
+    Run from tools/postplan-harness: python3 -m tests.test_trace_pinned_replay"""
+    import tempfile
+    from pathlib import Path
+    for pr in ENGINE_PRS:
+        files = _engine_records()[f"engine-golden-{pr}"]["inputs"]["classification"]["files"]
+        paths = _engine_paths(files)
+        for label, changed in (("engine-only", _changed(paths)), ("full-list", _changed(files))):
+            with tempfile.TemporaryDirectory() as tmp:
+                root, base = _replay_repo(Path(tmp), paths)
+                go = _syn_go(paths)
+                print(pr, label, tp.evaluate_evidence(root, BRANCH, base, changed, run_go=go))
+
+
+if __name__ == "__main__":
+    print_replay_verdicts()

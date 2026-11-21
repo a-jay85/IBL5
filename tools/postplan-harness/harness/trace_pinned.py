@@ -3,23 +3,27 @@
 An engine port PR that changes the golden snapshot may clear arming conditions (5) and (7)
 without the owner when a Go test pins the ported routine to a raw JSB capture. The capture
 is a per-call (input, output) dump taken by a hook on the original JSB binary
-(`engine/docs/jsb-trace-capture.md`). The PR commits an evidence file at
-`engine/trace-evidence/<branch>.json` naming each test and the capture it loads.
+(`engine/docs/jsb-trace-capture.md`). The PR commits an evidence file (schema 2) at
+`engine/trace-evidence/<branch>.json` naming each test, the capture it loads, and the
+non-test engine `.go` files it ports (`ported_files`).
 
 At arming time the runner calls `arm_input_value`. It returns exactly "ok" only when:
 
-(a) every changed path is an engine `.go` file, a golden snapshot file, or this branch's
-    evidence file, and no raw capture is added or modified;
+(a) every changed path is an engine `_test.go` file, a non-test engine `.go` file that some
+    entry declares in `ported_files`, a golden snapshot file, or this branch's evidence
+    file, and no raw capture or capture-loader file is added or modified; each declared
+    file is a changed, existing, non-test engine `.go` file outside those two directories;
 (b) each named test starts with `TestTracePinned`, sits in a changed `_test.go` file, calls
     `jsbtrace.MustLoad(`, and its blob SHA matches the evidence;
     each capture already exists on the base commit with the recorded sha256;
-(c) each test passes under `go test -json`, and fails when every captured output is
+(c) each test passes under `go test -json -coverprofile`, executes at least one line the PR
+    adds in every file its entry declares, and fails when every captured output is
     perturbed, which proves its expected values come from the capture.
 
 Any other state returns a reason string, and armable keeps both holds (fail closed).
 
     python3 -m harness.trace_pinned record --branch B --test ./internal/sim:TestTracePinnedX \\
-        --capture x.jsonl [--test ... --capture ...]
+        --capture x.jsonl --ported engine/internal/sim/x.go[,engine/...] [--test ... ...]
     python3 -m harness.trace_pinned check --branch B
 """
 from __future__ import annotations
@@ -41,7 +45,7 @@ TOKEN = "trace-pinned"
 EVIDENCE_DIR = "engine/trace-evidence"
 CAPTURE_DIR = "engine/testdata/jsb-captures"
 LOADER_DIR = "engine/internal/jsbtrace"  # the capture loader every pinned test trusts
-SCHEMA = 1
+SCHEMA = 2
 TEST_PREFIX = "TestTracePinned"
 GOLDEN_FILES = ("engine/internal/sim/testdata/golden.json",
                 "engine/internal/sim/testdata/golden_seeds.sha256")
@@ -50,6 +54,9 @@ CAPTURE_FORMAT = "jsb-trace/1"
 CAPTURE_SOURCES = ("frida", "x32dbg")
 _ADDRESS = re.compile(r"^0x[0-9a-f]+$")
 _PACKAGE = re.compile(r"^\./[A-Za-z0-9_./-]+$")
+GO_MOD = "engine/go.mod"
+_HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
+_COVER_LINE = re.compile(r"^(.+\.go):(\d+)\.\d+,(\d+)\.\d+ \d+ (\d+)$")
 
 
 def evidence_rel(branch) -> str:
@@ -63,7 +70,7 @@ def evidence_path(root, branch) -> Path:
 
 
 def _load(path):
-    """The parsed evidence object, or None when it is not a schema-1 JSON object."""
+    """The parsed evidence object, or None unless it is a JSON object with the current SCHEMA."""
     try:
         data = json.loads(Path(path).read_text())
     except (OSError, ValueError):
@@ -84,7 +91,7 @@ def _git_bytes(args, cwd) -> bytes:
 
 # --- (a) path allowlist -----------------------------------------------------------------------
 
-def allowlist_verdict(changed_files, branch) -> str:
+def allowlist_verdict(changed_files, branch, ported=frozenset()) -> str:
     files = list(changed_files or ())
     if not files:
         return "empty-range"
@@ -97,7 +104,9 @@ def allowlist_verdict(changed_files, branch) -> str:
         if path in GOLDEN_FILES or path == own_evidence:
             continue
         if path.startswith("engine/") and path.endswith(".go"):
-            continue
+            if path.endswith("_test.go") or path in ported:
+                continue
+            return f"undeclared-engine-file: {path}"
         return f"non-engine-path: {path}"
     return "ok"
 
@@ -194,15 +203,19 @@ def parse_go_test_json(stdout, test) -> str:
     return "absent"
 
 
-def run_go_test(root, package, test, env=None) -> str:
+def run_go_test(root, package, test, env=None, cover_profile=None, cover_pkgs=()) -> str:
     """The verdict of one `go test -json -run '^<test>$' <package>` run in `<root>/engine`."""
     if shutil.which("go") is None:
         return "go-unavailable"
     run_env = {k: v for k, v in os.environ.items() if k != "JSB_TRACE_CAPTURE_DIR"}
     run_env.update(env or {})
+    cmd = ["go", "test", "-count=1", "-json", "-run", f"^{test}$"]
+    if cover_profile:
+        cmd += ["-covermode=set", f"-coverpkg={','.join(cover_pkgs)}", f"-coverprofile={cover_profile}"]
+    cmd.append(package)
     try:
         proc = subprocess.run(
-            ["go", "test", "-count=1", "-json", "-run", f"^{test}$", package],
+            cmd,
             cwd=str(Path(root) / "engine"), env=run_env, capture_output=True, text=True,
             timeout=GO_TIMEOUT)
     except subprocess.TimeoutExpired:
@@ -228,6 +241,42 @@ def resolve_base(root, branch) -> str:
         return _git(["merge-base", "HEAD", ref], cwd=str(root)).strip()
     except (subprocess.CalledProcessError, OSError):
         return ""
+
+
+def _ported_list(entry):
+    """The entry's declared ported_files, or None unless a non-empty list of unique strings."""
+    ported = entry.get("ported_files")
+    if not isinstance(ported, list) or not ported:
+        return None
+    if not all(isinstance(p, str) for p in ported) or len(set(ported)) != len(ported):
+        return None
+    return ported
+
+
+def _bad_ported_path(path) -> bool:
+    parts = path.split("/")
+    return (not path.startswith("engine/") or not path.endswith(".go") or "\\" in path
+            or any(part in ("", ".", "..") for part in parts))
+
+
+def _check_ported(root, entry, changed) -> str:
+    """Each declared file is a changed, existing, non-test engine .go file outside the
+    capture and loader directories."""
+    ported = _ported_list(entry)
+    if ported is None:
+        return "ported-malformed"
+    for path in ported:
+        if _bad_ported_path(path):
+            return f"ported-bad-path: {path}"
+        if path.endswith("_test.go"):
+            return f"ported-test-file: {path}"
+        if path.startswith(CAPTURE_DIR + "/") or path.startswith(LOADER_DIR + "/"):
+            return f"ported-protected-dir: {path}"
+        if not (Path(root) / path).is_file():
+            return f"ported-missing: {path}"
+        if path not in changed:
+            return f"ported-not-in-diff: {path}"
+    return "ok"
 
 
 def _check_test_entry(root, entry, changed) -> str:
@@ -270,12 +319,99 @@ def _check_capture(root, base, entry) -> str:
     return "ok"
 
 
-def _run_entry(root, entry, run_go) -> str:
+def _module_path(root) -> str:
+    """The module line of engine/go.mod, or "" when it is missing."""
+    try:
+        text = (Path(root) / GO_MOD).read_text()
+    except OSError:
+        return ""
+    found = re.search(r"^module\s+(\S+)\s*$", text, re.M)
+    return found.group(1) if found else ""
+
+
+def _cover_pkgs(module, ported):
+    dirs = {str(Path(p).parent.relative_to("engine")) for p in ported}
+    return sorted(module if d == "." else f"{module}/{d}" for d in dirs)
+
+
+def parse_cover_profile(text, module):
+    """{repo path: [(start line, end line, count)]} of a -coverprofile file, or None when
+    the text is not one. Blocks of other modules are dropped."""
+    lines = [ln for ln in (text or "").splitlines() if ln.strip()]
+    if not lines or not lines[0].startswith("mode: ") or not module:
+        return None
+    prefix = module + "/"
+    blocks = {}
+    for line in lines[1:]:
+        found = _COVER_LINE.match(line)
+        if not found:
+            return None  # malformed profile line
+        name = found.group(1)
+        if not name.startswith(prefix):
+            continue
+        rel = "engine/" + name[len(prefix):]
+        blocks.setdefault(rel, []).append(
+            (int(found.group(2)), int(found.group(3)), int(found.group(4))))
+    return blocks
+
+
+def added_lines(root, base, path):
+    """Line numbers `path` adds in the work tree vs `base`; None on a git error."""
+    try:
+        _git(["cat-file", "-e", f"{base}:{path}"], cwd=str(root))
+    except subprocess.CalledProcessError:
+        text = (Path(root) / path).read_text()
+        return set(range(1, len(text.splitlines()) + 1))
+    try:
+        diff = _git(["diff", "-U0", "--no-color", "--no-renames", base, "--", path], cwd=str(root))
+    except (subprocess.CalledProcessError, OSError):
+        return None
+    lines = set()
+    for line in diff.splitlines():
+        hunk = _HUNK.match(line)
+        if hunk:
+            start = int(hunk.group(1))
+            count = int(hunk.group(2)) if hunk.group(2) is not None else 1
+            lines.update(range(start, start + count))
+    return lines
+
+
+def coverage_verdict(root, base, ported, blocks) -> str:
+    """ok when the run executed at least one added line of every declared file."""
+    for path in sorted(ported):
+        added = added_lines(root, base, path)
+        if added is None:
+            return f"diff-unreadable: {path}"
+        try:
+            src = (Path(root) / path).read_text().splitlines()
+        except OSError:
+            return f"diff-unreadable: {path}"
+        # blank and `//`-only lines never count: a Go cover block spans lines between statements
+        added = {n for n in added if 0 < n <= len(src) and src[n - 1].strip()
+                 and not src[n - 1].strip().startswith("//")}
+        spans = blocks.get(path, ())
+        if not any(c > 0 and s <= n <= e for n in added for s, e, c in spans):
+            return f"unexercised-change: {path}"
+    return "ok"
+
+
+def _run_entry(root, base, entry, run_go) -> str:
     """Steps (c) and the perturbation run for one evidence entry."""
     test, package, capture = entry["test"], entry["package"], entry["capture"]
-    verdict = run_go(root, package, test)
-    if verdict != "pass":
-        return f"test-{verdict}"
+    ported, module = entry["ported_files"], _module_path(root)
+    with tempfile.TemporaryDirectory(prefix="trace-pinned-cover-") as cover_dir:
+        profile = Path(cover_dir) / "cover.out"
+        verdict = run_go(root, package, test, cover_profile=str(profile),
+                         cover_pkgs=_cover_pkgs(module, ported))
+        if verdict != "pass":
+            return f"test-{verdict}"
+        text = profile.read_text() if profile.is_file() else ""
+    blocks = parse_cover_profile(text, module)
+    if blocks is None:
+        return "coverage-unreadable"
+    covered = coverage_verdict(root, base, ported, blocks)
+    if covered != "ok":
+        return covered
     with tempfile.TemporaryDirectory(prefix="trace-pinned-") as tmp:
         if write_perturbed_dir(root, capture, tmp) == 0:
             return "capture-out-unperturbable"
@@ -296,15 +432,17 @@ def evaluate_data(root, branch, base, changed_files, data, run_go=None) -> str:
             or not all(isinstance(t, dict) for t in tests):
         return "evidence-malformed"
     changed = list(changed_files or ())
-    allowed = allowlist_verdict(changed, branch)
+    ported = {p for t in tests for p in (_ported_list(t) or ())}
+    allowed = allowlist_verdict(changed, branch, ported)
     if allowed != "ok":
         return allowed
     if not base:
         return "base-unresolved"
     for entry in tests:
-        for step in (lambda: _check_test_entry(root, entry, changed),
+        for step in (lambda: _check_ported(root, entry, changed),
+                     lambda: _check_test_entry(root, entry, changed),
                      lambda: _check_capture(root, base, entry),
-                     lambda: _run_entry(root, entry, run_go)):
+                     lambda: _run_entry(root, base, entry, run_go)):
             note = step()
             if note != "ok":
                 return note
@@ -356,14 +494,18 @@ def _find_test_file(root, package, test) -> str:
     return ""
 
 
-def record(root, branch, test_specs, capture_names, run_go=None) -> int:
+def record(root, branch, test_specs, capture_names, run_go=None, ported_specs=None) -> int:
     """Write the evidence file after every check passes. 0 written, 1 refused, 2 usage."""
     test_specs, capture_names = list(test_specs or ()), list(capture_names or ())
+    ported_specs = list(ported_specs or ())
     if not test_specs or len(test_specs) != len(capture_names):
         print("trace_pinned: record needs equal counts of --test and --capture", file=sys.stderr)
         return 2
+    if len(ported_specs) != len(test_specs):
+        print("trace_pinned: record needs one --ported per --test", file=sys.stderr)
+        return 2
     tests = []
-    for spec, name in zip(test_specs, capture_names):
+    for spec, name, ported in zip(test_specs, capture_names, ported_specs):
         package, sep, test = spec.rpartition(":")
         if not sep or not package or not test or "/" in name:
             print(f"trace_pinned: bad --test {spec!r} or --capture {name!r}", file=sys.stderr)
@@ -373,6 +515,7 @@ def record(root, branch, test_specs, capture_names, run_go=None) -> int:
         capture_file = Path(root) / capture
         tests.append({
             "package": package, "test": test, "file": file,
+            "ported_files": ported.split(","),
             "test_blob": _blob_sha(root, file) if file else "",
             "capture": capture,
             "capture_sha256": _sha256(capture_file.read_bytes()) if capture_file.is_file() else "",
@@ -398,6 +541,8 @@ def _parser() -> argparse.ArgumentParser:
     rec.add_argument("--branch", required=True)
     rec.add_argument("--test", action="append", default=[])
     rec.add_argument("--capture", action="append", default=[])
+    rec.add_argument("--ported", action="append", default=[],
+                     help="comma-separated engine .go files the paired --test ports; one per --test")
     chk = sub.add_parser("check", help="print the arming verdict for this branch's evidence")
     chk.add_argument("--branch", required=True)
     return parser
@@ -407,7 +552,7 @@ def main(argv) -> int:
     args = _parser().parse_args(argv)
     root = _git(["rev-parse", "--show-toplevel"]).strip()
     if args.command == "record":
-        return record(root, args.branch, args.test, args.capture)
+        return record(root, args.branch, args.test, args.capture, ported_specs=args.ported)
     base = resolve_base(root, args.branch)
     verdict = (evaluate_evidence(root, args.branch, base, changed_files_since(root, base))
                if base else "base-unresolved")

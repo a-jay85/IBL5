@@ -100,13 +100,15 @@ def _fake_go(normal="pass", perturbed="fail", calls=None, capture_name=CAPTURE_N
 def _entry(root, **overrides):
     entry = {"package": PACKAGE, "test": TEST, "file": TEST_FILE,
              "test_blob": _git(root, "hash-object", TEST_FILE), "capture": CAPTURE,
-             "capture_sha256": tp._sha256((Path(root) / CAPTURE).read_bytes())}
+             "capture_sha256": tp._sha256((Path(root) / CAPTURE).read_bytes()),
+             "ported_files": [ENGINE_FILE]}
     entry.update(overrides)
     return entry
 
 
 def _write_evidence(root, **overrides):
-    data = {"schema": 1, "token": "trace-pinned", "branch": BRANCH, "tests": [_entry(root, **overrides)]}
+    data = {"schema": tp.SCHEMA, "token": "trace-pinned", "branch": BRANCH,
+            "tests": [_entry(root, **overrides)]}
     _write(root, EVIDENCE, json.dumps(data))
 
 
@@ -165,7 +167,7 @@ def test_missing_evidence_holds(tmp_path):
 
 def test_malformed_evidence_holds(repo):
     root, base = repo
-    _write(root, EVIDENCE, json.dumps({"schema": 1, "token": "trace-pinned", "branch": "other",
+    _write(root, EVIDENCE, json.dumps({"schema": tp.SCHEMA, "token": "trace-pinned", "branch": "other",
                                        "tests": [_entry(root)]}))
     assert _verdict(root, base) == "evidence-malformed"
     _write(root, EVIDENCE, "{not json")
@@ -400,7 +402,8 @@ def test_cli_rejects_unknown_flag(repo, monkeypatch):
 def test_evidence_path_not_gitignored(tmp_path, monkeypatch):
     root, _ = _make_repo(tmp_path)
     monkeypatch.setattr(tp, "run_go_test", _fake_go())
-    assert tp.record(root, BRANCH, [f"{PACKAGE}:{TEST}"], [CAPTURE_NAME]) == 0
+    assert tp.record(root, BRANCH, [f"{PACKAGE}:{TEST}"], [CAPTURE_NAME],
+                     ported_specs=[ENGINE_FILE]) == 0
     written = root / "engine" / "trace-evidence" / f"{BRANCH}.json"
     assert written.is_file()
     assert tp.evidence_path(root, BRANCH) == written
@@ -414,10 +417,73 @@ def test_evidence_path_not_gitignored(tmp_path, monkeypatch):
 def test_record_refuses_on_failing_check(tmp_path, monkeypatch):
     root, _ = _make_repo(tmp_path)
     monkeypatch.setattr(tp, "run_go_test", _fake_go(perturbed="pass"))
-    assert tp.record(root, BRANCH, [f"{PACKAGE}:{TEST}"], [CAPTURE_NAME]) == 1
+    assert tp.record(root, BRANCH, [f"{PACKAGE}:{TEST}"], [CAPTURE_NAME],
+                     ported_specs=[ENGINE_FILE]) == 1
     assert not (root / EVIDENCE).exists()
 
 
 def test_record_requires_equal_test_and_capture_counts(tmp_path):
     root, _ = _make_repo(tmp_path)
     assert tp.record(root, BRANCH, [f"{PACKAGE}:{TEST}"], []) == 2
+
+
+@pytest.mark.parametrize("value", [[], ENGINE_FILE, [ENGINE_FILE, 7], [ENGINE_FILE, ENGINE_FILE]],
+                         ids=["empty-list", "string-not-list", "non-string-item", "duplicate-item"])
+def test_ported_malformed_field_types_hold(repo, value):
+    root, base = repo
+    _write_evidence(root, ported_files=value)
+    assert _verdict(root, base, changed=[TEST_FILE, GOLDEN, EVIDENCE]) == "ported-malformed"
+
+
+@pytest.mark.parametrize("path,reason", [
+    ("engine/../ibl5/x.go", "ported-bad-path"), ("/engine/internal/sim/x.go", "ported-bad-path"),
+    ("engine/go.mod", "ported-bad-path"), (TEST_FILE, "ported-test-file"),
+    ("engine/internal/jsbtrace/jsbtrace.go", "ported-protected-dir"),
+    ("engine/testdata/jsb-captures/x.go", "ported-protected-dir")])
+def test_ported_bad_paths_hold(repo, path, reason):
+    root, base = repo
+    _write_evidence(root, ported_files=[path])
+    assert _verdict(root, base, changed=[TEST_FILE, GOLDEN, EVIDENCE]) == f"{reason}: {path}"
+
+
+def test_ported_missing_or_unchanged_file_holds(repo):
+    root, base = repo
+    gone = "engine/internal/sim/gone.go"
+    _write_evidence(root, ported_files=[ENGINE_FILE, gone])
+    assert _verdict(root, base, changed=[*CHANGED, gone]) == f"ported-missing: {gone}"
+    _write_evidence(root, ported_files=[ENGINE_FILE])
+    assert _verdict(root, base, changed=[TEST_FILE, GOLDEN, EVIDENCE]) \
+        == f"ported-not-in-diff: {ENGINE_FILE}"
+
+
+def test_schema_1_evidence_holds_as_malformed(repo):
+    root, base = repo
+    _write(root, EVIDENCE, json.dumps({"schema": 1, "token": "trace-pinned", "branch": BRANCH,
+                                       "tests": [_entry(root)]}))
+    assert _verdict(root, base) == "evidence-malformed"
+
+
+def test_record_writes_ported_files(tmp_path):
+    root, _ = _make_repo(tmp_path)
+    assert tp.record(root, BRANCH, [f"{PACKAGE}:{TEST}"], [CAPTURE_NAME], run_go=_fake_go(),
+                     ported_specs=[ENGINE_FILE]) == 0
+    data = json.loads((root / EVIDENCE).read_text())
+    assert data["schema"] == tp.SCHEMA == 2
+    assert data["tests"][0]["ported_files"] == [ENGINE_FILE]
+
+
+def test_cli_record_ported_count_mismatch_exits_2(tmp_path, monkeypatch, capsys):
+    root, _ = _make_repo(tmp_path)
+    monkeypatch.chdir(root)
+    argv = ["record", "--branch", BRANCH, "--test", f"{PACKAGE}:{TEST}", "--capture", CAPTURE_NAME]
+    assert tp.main(argv) == 2
+    assert "one --ported per --test" in capsys.readouterr().err
+    assert not (root / EVIDENCE).exists()
+
+
+def test_record_refuses_empty_ported_item(tmp_path, capsys):
+    root, _ = _make_repo(tmp_path)
+    assert tp.record(root, BRANCH, [f"{PACKAGE}:{TEST}"], [CAPTURE_NAME], run_go=_fake_go(),
+                     ported_specs=[f"{ENGINE_FILE},"]) == 1
+    assert "ported-bad-path: " in capsys.readouterr().err
+    assert not (root / EVIDENCE).exists()

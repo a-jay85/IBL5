@@ -41,7 +41,7 @@ TOKEN = "trace-pinned"
 EVIDENCE_DIR = "engine/trace-evidence"
 CAPTURE_DIR = "engine/testdata/jsb-captures"
 LOADER_DIR = "engine/internal/jsbtrace"  # the capture loader every pinned test trusts
-SCHEMA = 1
+SCHEMA = 2
 TEST_PREFIX = "TestTracePinned"
 GOLDEN_FILES = ("engine/internal/sim/testdata/golden.json",
                 "engine/internal/sim/testdata/golden_seeds.sha256")
@@ -63,7 +63,7 @@ def evidence_path(root, branch) -> Path:
 
 
 def _load(path):
-    """The parsed evidence object, or None when it is not a schema-1 JSON object."""
+    """The parsed evidence object, or None unless it is a JSON object with the current SCHEMA."""
     try:
         data = json.loads(Path(path).read_text())
     except (OSError, ValueError):
@@ -230,6 +230,42 @@ def resolve_base(root, branch) -> str:
         return ""
 
 
+def _ported_list(entry):
+    """The entry's declared ported_files, or None unless a non-empty list of unique strings."""
+    ported = entry.get("ported_files")
+    if not isinstance(ported, list) or not ported:
+        return None
+    if not all(isinstance(p, str) for p in ported) or len(set(ported)) != len(ported):
+        return None
+    return ported
+
+
+def _bad_ported_path(path) -> bool:
+    parts = path.split("/")
+    return (not path.startswith("engine/") or not path.endswith(".go") or "\\" in path
+            or any(part in ("", ".", "..") for part in parts))
+
+
+def _check_ported(root, entry, changed) -> str:
+    """Each declared file is a changed, existing, non-test engine .go file outside the
+    capture and loader directories."""
+    ported = _ported_list(entry)
+    if ported is None:
+        return "ported-malformed"
+    for path in ported:
+        if _bad_ported_path(path):
+            return f"ported-bad-path: {path}"
+        if path.endswith("_test.go"):
+            return f"ported-test-file: {path}"
+        if path.startswith(CAPTURE_DIR + "/") or path.startswith(LOADER_DIR + "/"):
+            return f"ported-protected-dir: {path}"
+        if not (Path(root) / path).is_file():
+            return f"ported-missing: {path}"
+        if path not in changed:
+            return f"ported-not-in-diff: {path}"
+    return "ok"
+
+
 def _check_test_entry(root, entry, changed) -> str:
     """Steps (b) and capture provenance for one evidence entry, before any Go run."""
     test, file, package = entry.get("test"), entry.get("file"), entry.get("package")
@@ -302,7 +338,8 @@ def evaluate_data(root, branch, base, changed_files, data, run_go=None) -> str:
     if not base:
         return "base-unresolved"
     for entry in tests:
-        for step in (lambda: _check_test_entry(root, entry, changed),
+        for step in (lambda: _check_ported(root, entry, changed),
+                     lambda: _check_test_entry(root, entry, changed),
                      lambda: _check_capture(root, base, entry),
                      lambda: _run_entry(root, entry, run_go)):
             note = step()
@@ -356,14 +393,18 @@ def _find_test_file(root, package, test) -> str:
     return ""
 
 
-def record(root, branch, test_specs, capture_names, run_go=None) -> int:
+def record(root, branch, test_specs, capture_names, run_go=None, ported_specs=None) -> int:
     """Write the evidence file after every check passes. 0 written, 1 refused, 2 usage."""
     test_specs, capture_names = list(test_specs or ()), list(capture_names or ())
+    ported_specs = list(ported_specs or ())
     if not test_specs or len(test_specs) != len(capture_names):
         print("trace_pinned: record needs equal counts of --test and --capture", file=sys.stderr)
         return 2
+    if len(ported_specs) != len(test_specs):
+        print("trace_pinned: record needs one --ported per --test", file=sys.stderr)
+        return 2
     tests = []
-    for spec, name in zip(test_specs, capture_names):
+    for spec, name, ported in zip(test_specs, capture_names, ported_specs):
         package, sep, test = spec.rpartition(":")
         if not sep or not package or not test or "/" in name:
             print(f"trace_pinned: bad --test {spec!r} or --capture {name!r}", file=sys.stderr)
@@ -373,6 +414,7 @@ def record(root, branch, test_specs, capture_names, run_go=None) -> int:
         capture_file = Path(root) / capture
         tests.append({
             "package": package, "test": test, "file": file,
+            "ported_files": ported.split(","),
             "test_blob": _blob_sha(root, file) if file else "",
             "capture": capture,
             "capture_sha256": _sha256(capture_file.read_bytes()) if capture_file.is_file() else "",
@@ -398,6 +440,8 @@ def _parser() -> argparse.ArgumentParser:
     rec.add_argument("--branch", required=True)
     rec.add_argument("--test", action="append", default=[])
     rec.add_argument("--capture", action="append", default=[])
+    rec.add_argument("--ported", action="append", default=[],
+                     help="comma-separated engine .go files the paired --test ports; one per --test")
     chk = sub.add_parser("check", help="print the arming verdict for this branch's evidence")
     chk.add_argument("--branch", required=True)
     return parser
@@ -407,7 +451,7 @@ def main(argv) -> int:
     args = _parser().parse_args(argv)
     root = _git(["rev-parse", "--show-toplevel"]).strip()
     if args.command == "record":
-        return record(root, args.branch, args.test, args.capture)
+        return record(root, args.branch, args.test, args.capture, ported_specs=args.ported)
     base = resolve_base(root, args.branch)
     verdict = (evaluate_evidence(root, args.branch, base, changed_files_since(root, base))
                if base else "base-unresolved")

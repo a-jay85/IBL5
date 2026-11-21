@@ -411,6 +411,79 @@ def test_premerge_record_rejects_wrong_first_parent(make_repo):
     assert _nothing_written(r)
 
 
+def _commit_on(d, ref, files, msg="c"):
+    """Detach at `ref`, write `files` ({name: text}), commit them, return the new SHA."""
+    _git(d, "checkout", "-q", "--detach", ref)
+    for name, text in files.items():
+        _write(d, name, text)
+    _git(d, "add", "-A")
+    _git(d, "commit", "-q", "-m", msg)
+    return _rev(d, "HEAD")
+
+
+def test_premerge_record_rejects_rebased_head_with_foreign_path(make_repo):
+    r = make_repo()
+    _commit_on(r.d, "origin/master", {"b.txt": "foreign\n"})
+    with pytest.raises(premerge.PremergeError, match="never touched"):
+        premerge.record(r.d, r.branch, r.pre_sha, ("f.txt",))
+    assert _nothing_written(r)
+
+
+def test_premerge_record_rejects_pre_sha_inside_base(make_repo):
+    r = make_repo()
+    pre_in_base = _rev(r.d, "origin/master")
+    _commit_on(r.d, "origin/master", {"a.txt": "a\n"})
+    with pytest.raises(premerge.PremergeError, match="never touched"):
+        premerge.record(r.d, r.branch, pre_in_base, ("a.txt",))
+    assert _nothing_written(r)
+
+
+def test_premerge_record_rejects_prefix_lookalike_path(make_repo):
+    r = make_repo()
+    pre = _commit_on(r.d, "origin/master", {"notes.txt": "n\n"}, "branch: notes")
+    _commit_on(r.d, "origin/master", {"notes.txt.bak": "n\n"})
+    with pytest.raises(premerge.PremergeError, match="notes.txt.bak"):
+        premerge.record(r.d, r.branch, pre, ("notes.txt",))
+    assert _nothing_written(r)
+
+
+def test_premerge_record_accepts_replay_onto_newer_base(make_repo):
+    r = make_repo()
+    r.advance_master("newer\n", name="c.txt")
+    head = _commit_on(r.d, "origin/master", {"f.txt": CLEAN, "own.txt": "branch-only file\n"})
+    premerged = premerge.record(r.d, r.branch, r.pre_sha, ("f.txt",))
+    assert premerged.sha == head
+    assert premerged.pre_sha == r.pre_sha
+
+
+def _stacked(r):
+    """origin/parent = master + p.txt; the child commit adds child.txt on top of it."""
+    parent = _commit_on(r.d, "origin/master", {"p.txt": "p1\n"}, "parent: p")
+    _git(r.d, "update-ref", "refs/remotes/origin/parent", parent)
+    _git(r.d, "config", f"branch.{r.branch}.iblBase", "parent")
+    child = _commit_on(r.d, parent, {"child.txt": "child\n"}, "child: c")
+    newer_parent = _commit_on(r.d, parent, {"p2.txt": "p2\n"}, "parent: newer")
+    _git(r.d, "update-ref", "refs/remotes/origin/parent", newer_parent)
+    return child, newer_parent
+
+
+def test_premerge_record_accepts_stacked_rebase_onto_parent(make_repo):
+    r = make_repo()
+    child, newer_parent = _stacked(r)
+    head = _commit_on(r.d, newer_parent, {"child.txt": "child\n"}, "child: rebased")
+    premerged = premerge.record(r.d, r.branch, child, ("child.txt",), base="origin/parent")
+    assert premerged.sha == head
+
+
+def test_premerge_record_rejects_stacked_head_touching_parent_path(make_repo):
+    r = make_repo()
+    child, newer_parent = _stacked(r)
+    _commit_on(r.d, newer_parent, {"child.txt": "child\n", "p.txt": "p3\n"}, "child: rebased")
+    with pytest.raises(premerge.PremergeError, match="p.txt"):
+        premerge.record(r.d, r.branch, child, ("child.txt",), base="origin/parent")
+    assert _nothing_written(r)
+
+
 def test_premerge_record_rejects_empty_files(make_repo):
     r = make_repo()
     r.merge_by_hand(CLEAN)

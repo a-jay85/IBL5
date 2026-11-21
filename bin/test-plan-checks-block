@@ -1000,7 +1000,7 @@ LOCAL	-	FOO =1 bin/test-x
 LOCAL	-	TB_ONLY=pb gh pr view 1
 LOCAL	-	TB_ONLY=pb bin/test-x && gh pr view 1
 LOCAL	-	env -u X gh pr view 1
-LOCAL	-	env -i bin/test-x
+LOCAL	-	env -v bin/test-x
 LOCAL	-	(cd ibl5 && vendor/bin/phpunit)
 LOCAL	-	FOO=1 vendor/bin/phpunit
 LOCAL	-	(cd ibl5 && bin/x) && (cd y && bin/test-z)

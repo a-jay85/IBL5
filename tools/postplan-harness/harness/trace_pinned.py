@@ -3,23 +3,27 @@
 An engine port PR that changes the golden snapshot may clear arming conditions (5) and (7)
 without the owner when a Go test pins the ported routine to a raw JSB capture. The capture
 is a per-call (input, output) dump taken by a hook on the original JSB binary
-(`engine/docs/jsb-trace-capture.md`). The PR commits an evidence file at
-`engine/trace-evidence/<branch>.json` naming each test and the capture it loads.
+(`engine/docs/jsb-trace-capture.md`). The PR commits an evidence file (schema 2) at
+`engine/trace-evidence/<branch>.json` naming each test, the capture it loads, and the
+non-test engine `.go` files it ports (`ported_files`).
 
 At arming time the runner calls `arm_input_value`. It returns exactly "ok" only when:
 
-(a) every changed path is an engine `.go` file, a golden snapshot file, or this branch's
-    evidence file, and no raw capture is added or modified;
+(a) every changed path is an engine `_test.go` file, a non-test engine `.go` file that some
+    entry declares in `ported_files`, a golden snapshot file, or this branch's evidence
+    file, and no raw capture or capture-loader file is added or modified; each declared
+    file is a changed, existing, non-test engine `.go` file outside those two directories;
 (b) each named test starts with `TestTracePinned`, sits in a changed `_test.go` file, calls
     `jsbtrace.MustLoad(`, and its blob SHA matches the evidence;
     each capture already exists on the base commit with the recorded sha256;
-(c) each test passes under `go test -json`, and fails when every captured output is
+(c) each test passes under `go test -json -coverprofile`, executes at least one line the PR
+    adds in every file its entry declares, and fails when every captured output is
     perturbed, which proves its expected values come from the capture.
 
 Any other state returns a reason string, and armable keeps both holds (fail closed).
 
     python3 -m harness.trace_pinned record --branch B --test ./internal/sim:TestTracePinnedX \\
-        --capture x.jsonl [--test ... --capture ...]
+        --capture x.jsonl --ported engine/internal/sim/x.go[,engine/...] [--test ... ...]
     python3 -m harness.trace_pinned check --branch B
 """
 from __future__ import annotations

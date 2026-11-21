@@ -1,6 +1,6 @@
 ---
 description: Runbook for capturing per-call (input, output) pairs from the original JSB binary into a jsb-trace/1 JSONL file.
-last_verified: 2026-11-17
+last_verified: 2026-11-20
 ---
 
 # JSB per-call trace capture
@@ -28,3 +28,13 @@ A capture lands in its own PR, before the port PR that uses it. The owner review
 ## Using a capture
 
 Write a test named `TestTracePinned...`. Load the file with `jsbtrace.MustLoad`. Feed each `in` to the ported function. Assert the result equals that record's `out`. The expected values live only in the capture.
+
+## Trace-pinned evidence
+
+A port PR that changes the golden snapshot can clear the owner hold with a `TestTracePinned*` test that loads a capture already on the base branch. Record the evidence with one `--ported` list per `--test`:
+
+    cd tools/postplan-harness && python3 -m harness.trace_pinned record --branch <branch> \
+        --test ./internal/sim:TestTracePinnedX --capture x.jsonl \
+        --ported engine/internal/sim/x.go,engine/internal/result/result.go
+
+List every non-test engine `.go` file the PR changes for that routine. The check holds the PR when a changed non-test engine `.go` file is in no list, or when the pinned test executes no added line of a listed file. A comment-only edit, a pure deletion, a rename, and any file under `engine/cmd/` therefore hold for the owner. The reason strings live in `tools/postplan-harness/harness/trace_pinned.py`.

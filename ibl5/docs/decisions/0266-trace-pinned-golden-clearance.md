@@ -1,6 +1,6 @@
 ---
 description: An engine port whose Go test pins a raw JSB capture already on the base branch clears its golden-snapshot hold with the trace-pinned token, checked by harness.trace_pinned, with no owner and no second reviewer.
-last_verified: 2026-11-18
+last_verified: 2026-11-20
 ---
 
 # ADR-0266: Trace-Pinned Tests Clear the Engine Golden Hold
@@ -38,3 +38,7 @@ A plan whose only hold token is `trace-pinned` gets conditions (5) and (7) lifte
 - `bin/check-plan`: gate `[H]`'s stand-alone and check-step rules.
 - `engine/internal/jsbtrace/jsbtrace.go`: the Go capture loader.
 - `ibl5/docs/decisions/0231-second-reviewer-clears-holds.md`: the reviewer seat this class bypasses.
+
+## Addendum 2026-11-20: declared ported files and changed-line coverage
+
+Backlog issue a-jay85/IBL5-backlog#1930 found that the path check in the Decision accepted any engine `*.go` file. A PR could change the golden through an unrelated engine edit and still clear with a pinned test of a different routine. The evidence file is now schema 2. Each entry lists the non-test engine `.go` files it ports in `ported_files`, and every changed non-test engine `.go` file must appear in some list. The harness runs each pinned test with `-coverprofile` and holds unless the test executes at least one added line of every file its entry declares. Test files under `engine/` stay exempt from the list. A comment-only edit, a pure deletion, a rename, or a `package main` under `engine/cmd/` cannot meet the coverage rule and holds for the owner. A pinned test written to call an unrelated function on purpose still passes, and the owner sees that test in the diff of any held sibling change only. Schema-1 evidence now reads as malformed; none existed when this change landed.

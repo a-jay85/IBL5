@@ -116,14 +116,54 @@ final class PrArmableLibCliTest extends TestCase
 
     public function testGoldenHoldFiresWhenGoldenTouched(): void
     {
-        $files = '[{"path":"ibl5/x.php"},{"path":"engine/internal/sim/testdata/golden.json"}]';
+        $files = '[{"filename":"ibl5/x.php","status":"modified"},{"filename":"engine/internal/sim/testdata/golden.json","status":"modified"}]';
         self::assertSame('golden-changed', $this->runFn('pr_golden_hold', [$files])['output']);
     }
 
     public function testGoldenHoldEmptyWhenGoldenUntouched(): void
     {
-        $files = '[{"path":"ibl5/x.php"}]';
+        $files = '[{"filename":"ibl5/x.php","status":"modified"}]';
         self::assertSame('', $this->runFn('pr_golden_hold', [$files])['output']);
+    }
+
+    public function testGoldenHoldCountsPreviousFilenameOfRename(): void
+    {
+        $files = '[{"filename":"engine/internal/sim/testdata/golden_v2.json","status":"renamed","previous_filename":"engine/internal/sim/testdata/golden.json"}]';
+        self::assertSame('golden-changed', $this->runFn('pr_golden_hold', [$files])['output']);
+    }
+
+    public function testGoldenHoldFailsClosedOnGhPrViewShape(): void
+    {
+        $files = '[{"path":"ibl5/x.php","changeType":"MODIFIED"}]';
+        self::assertSame('golden-changed', $this->runFn('pr_golden_hold', [$files])['output']);
+    }
+
+    public function testGoldenHoldFailsClosedOnEmptyInput(): void
+    {
+        self::assertSame('golden-changed', $this->runFn('pr_golden_hold', [''])['output']);
+    }
+
+    public function testGoldenHoldFailsClosedOnRenameWithoutOldPath(): void
+    {
+        $files = '[{"filename":"ibl5/x.php","status":"renamed"}]';
+        self::assertSame('golden-changed', $this->runFn('pr_golden_hold', [$files])['output']);
+    }
+
+    public function testDocsRefreshHoldCountsPreviousFilenameOfRename(): void
+    {
+        $files = '[{"filename":"ibl5/docs/guide.md","status":"renamed","previous_filename":"bin/x"}]';
+        self::assertSame(
+            'docs-refresh:paths:bin/x',
+            $this->runFn('pr_docs_refresh_hold', ['docs-stale-refresh-20261120', $files, 'TWO-WAY', 'READY'])['output']
+        );
+    }
+
+    public function testDocsRefreshHoldFailsClosedOnGhPrViewShape(): void
+    {
+        self::assertSame(
+            'docs-refresh:paths:bad-shape',
+            $this->runFn('pr_docs_refresh_hold', ['docs-stale-refresh-20261120', '[{"path":"ibl5/docs/guide.md"}]', 'TWO-WAY', 'READY'])['output']
+        );
     }
 
     // --- (8) UI floor — path-keyed, label-aware ---

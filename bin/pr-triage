@@ -706,13 +706,13 @@ while [ "$i" -lt "$PR_COUNT" ]; do
 
     # --- compute signals ---
     changed_paths="$(printf '%s' "$files" | jq -r '.[].path')"
-    clearance="$(pr_manual_testing_clearance "$body" "$changed_paths")"
-    golden="$(pr_golden_hold "$files")"
-    # The UI floor needs the REST file list: only it carries a rename's old
-    # path (`gh pr list --json files` drops it). A failed read passes "" and
-    # pr_ui_hold fails closed.
+    clearance="$(pr_manual_testing_clearance "$body" "$changed_paths")"  # files-json-ok: mirrors harness classification.files (armable.py:691) for parity
+    # The UI floor and the golden hold need the REST file list: only it carries
+    # a rename's old path (`gh pr list --json files` drops it and caps at 100).
+    # A failed read passes "" and both predicates fail closed.
     ui_files="$($GH_API_CMD "repos/$SLUG/pulls/$num/files?per_page=100" --paginate --slurp 2>/dev/null \
         | jq -c 'add // []' 2>/dev/null)" || ui_files=""
+    golden="$(pr_golden_hold "$ui_files")"
     feat="$(pr_ui_hold "$ui_files" "$labels")"
     # `| tr` like deps/unresolved below: both axes can fire, and the predicate
     # emits one reason per LINE — an untranslated newline splits the report row.

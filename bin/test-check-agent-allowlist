@@ -8,6 +8,9 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 GATE="$ROOT/bin/check-agent-allowlist"
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/test-check-agent-allowlist.XXXXXX") || exit 2
 trap 'rm -rf "$TMP"' EXIT
+# Fixture text names usage-gated scripts (bin/burndown-loop, run_gate), so
+# point the usage gate's state at the temp dir (bin/test-harness-lib scan).
+export IBL5_USAGE_GATE_STATE_DIR="$TMP/usage-state"
 PASS=0; FAIL=0; R=""; OUT=""; RC=0
 
 ok()      { PASS=$((PASS + 1)); echo "ok: $1"; }

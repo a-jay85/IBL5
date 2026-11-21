@@ -371,17 +371,22 @@ PLAN_ROW_FETCH_SEG_RE='(^|[[:space:]|;&`!('"'"'"])curl[[:space:]]|(^|\$\(|<\(|>\
 # _FS_PRE[i] is the text before its arguments (ending with the command word)
 # and _FS_SEG[i] holds the arguments. A curl segment ends at the next | ; & )
 # < > or backtick. PHP code and bun scripts hold ; and ), so a php, bun or
-# bunx segment ends at an unquoted && || ; or |, or at the unquoted ) that
-# closes an enclosing substitution or group (see _unquoted_end).
+# bunx segment ends at an unquoted && || ; or |, at the unquoted ) that
+# closes an enclosing substitution or group, or at the backtick that closes
+# an enclosing backtick substitution (see _unquoted_end and _bt_open).
 # _FS_CURL[i] is 1 for curl.
 # _FS_TAIL is the text after the last segment; _FS_N counts the segments.
-# _unquoted_end <text> — sets _UE_LEN to the length of the leading part of text
-# that stops at the first && || ; or | outside single and double quotes.
+# _unquoted_end <text> [paren] [bt] — sets _UE_LEN to the length of the leading part
+# of text that stops at the first && || ; or | outside single and double quotes.
 # With a second argument `paren`, it also stops at an unquoted ) that has no
 # matching ( in text. In well-formed shell that ) closes a $(, <(, >( or ( that
 # opened before text began, either at the command word ($(php) or before a cd
 # hop or pipe ($(cd x && php, $(echo x | php). An expected value after it, as
 # in test "$(cd x && php -r 1)" = "<url>", stays byte-exact.
+# With a third argument `bt` (the text starts inside a backtick substitution,
+# per _bt_open), it also stops at the first backtick not preceded by a
+# backslash, inside quotes or not, so test "`cd x && php -r 1`" = "<url>"
+# keeps its expected value too.
 _unquoted_end() {
     local s="$1" i=0 n=${#1} q="" ch nx depth=0 paren="${2:-}" bt="${3:-}"
     while [ "$i" -lt "$n" ]; do

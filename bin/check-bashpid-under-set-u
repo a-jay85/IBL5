@@ -19,7 +19,7 @@ set -euo pipefail
 
 die() { echo "check-bashpid-under-set-u: $*" >&2; exit 2; }
 # shellcheck disable=SC2016 # regex text, nothing to expand
-BAD_RE='\$(BASHPID([^[:alnum:]_]|$)|\{BASHPID(\}|:[^-+]|[/#%^,]))'
+BAD_RE='\$(BASHPID([^[:alnum:]_]|$)|\{#?BASHPID(\}|:[^-+]|[/#%^,?[]))'
 
 files=()
 case "${1:-}" in

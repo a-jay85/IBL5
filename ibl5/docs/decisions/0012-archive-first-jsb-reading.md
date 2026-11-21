@@ -1,6 +1,6 @@
 ---
 description: JSB file reading uses archive-first strategy via JsbSourceResolver — reads all JSB file types directly from backup ZIP without extracting to disk.
-last_verified: 2026-09-21
+last_verified: 2026-11-20
 ---
 
 # ADR-0012: Archive-first JSB file reading

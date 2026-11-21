@@ -8,7 +8,7 @@ paths:
   - "ibl5/classes/Player/Contract/**/*"
   - "ibl5/classes/Waivers/**/*"
   - "ibl5/classes/ContractList/**/*"
-last_verified: 2026-09-21
+last_verified: 2026-11-20
 ---
 
 # IBL Contract Rules (CBA)

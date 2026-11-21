@@ -1,6 +1,6 @@
 ---
 description: Retrospective ADR documenting the complete XSS burndown across Plans A, B, and C — 315 baseline suppressions eliminated, 18 view files now in zero-floor.
-last_verified: 2026-09-21
+last_verified: 2026-11-20
 ---
 
 # ADR-0032: XSS Burndown Retrospective

@@ -1,6 +1,6 @@
 ---
 description: The post-plan harness drafts a missing ADR with Opus 5 when bin/pre-push-adr-hook denies a push for a decision-trigger surface, gated by the same local checks a human runs, one attempt per run.
-last_verified: 2026-09-20
+last_verified: 2026-11-20
 ---
 
 # ADR-0135: Post-Plan Harness Drafts Missing ADRs on Pre-Push Denial

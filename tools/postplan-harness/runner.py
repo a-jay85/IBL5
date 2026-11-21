@@ -4127,7 +4127,8 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
             packet_diff if packet_diff is not None else diff, body, pr,
             phase4b_ran=phase4b_ran, worktree=worktree or ".",
             review_findings=review_findings, shadow_request=True,
-            conflict_resolved_paths=_packet_conflict_paths(slug))
+            conflict_resolved_paths=_packet_conflict_paths(slug),
+        )
     except HarnessError as e:
         log(f"phase5.5 fidelity: packet failed ({e.kind}) - verdict indeterminate")
         res.fidelity = {"verdict_1": None, "error_kind": e.kind,

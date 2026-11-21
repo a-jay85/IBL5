@@ -1,6 +1,6 @@
 ---
 description: Verification Matrix mutation claims become executable through a keyed ## Executable Mutations section; one bin/lib script owns the grammar, Phase 5.0 applies each edit, requires the check to fail, reverts, and arming condition (19) holds on any claim that did not trip.
-last_verified: 2026-11-12
+last_verified: 2026-11-20
 ---
 
 # ADR-0199: Executable mutation claims
@@ -85,3 +85,11 @@ fresh run. CI still runs the test suites on every push.
 ## Addendum: reuse record removed (2026-11-12)
 
 The 2026-11-12 amendment above added a reuse record. Pre-fire wrote it, and post-plan read it through `reuse_prefire_pass` in `tools/postplan-harness/harness/mutations.py`. After ADR-0244, post-plan no longer runs the mutation rows, so nothing called `reuse_prefire_pass`. This change deletes that function and its helpers. It also deletes `write_xm_sidecar` from `bin/lib/prefire-verify`, so pre-fire no longer writes `exec-mutations.rows-<id>.reuse` files.
+
+## Addendum (2026-11-20): exit codes 125 to 127
+
+The decision above says exit 124 is `UNDECIDED` and any other non-zero exit is `TRIPPED`. The executor also maps exits 125, 126 and 127 to `UNDECIDED`. Exit 125 means the timeout wrapper itself failed. Exit 126 means the check command could not run, and exit 127 means the shell could not find it. None of the three shows that the mutated code made the check fail, so a row ending in one holds the PR the same way a timeout does.
+
+`bin/lib/plan-exec-mutations` applies this mapping, and `bin/test-plan-exec-mutations` runs a case for each of the three codes.
+
+The post-plan skill files that carried the executor's result block were deleted in [#3367](https://github.com/a-jay85/IBL5/pull/3367). Executable mutations now run at pre-fire time in `bin/lib/prefire-verify` ([#3712](https://github.com/a-jay85/IBL5/pull/3712), [#3912](https://github.com/a-jay85/IBL5/pull/3912)), and the harness runner passes an empty mutation hold list to arming.

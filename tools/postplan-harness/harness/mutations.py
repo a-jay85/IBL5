@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Optional
 
 from .adapters.llm import run_bounded
-from .state import HarnessError
+from .state import SUBPROCESS_TIMEOUT, HarnessError
 
 JOURNAL_DIRNAME = "exec-mutations"
 DEFAULT_LIB = Path(__file__).resolve().parents[3] / "bin" / "lib" / "plan-exec-mutations"
@@ -110,9 +110,11 @@ def run_executable_mutations(plan: Path, cwd: Path, *, lib: Path = DEFAULT_LIB,
                             str(plan)],
                            step="exec-mutations", timeout=bound, cwd=str(cwd),
                            errors="surrogateescape")
-    except HarnessError:
+    except HarnessError as e:
         clean = _recover(lib, cwd)
-        return MutationReport(True, (), ("executor-timeout",), not clean)
+        if e.kind == SUBPROCESS_TIMEOUT:
+            return MutationReport(True, (), ("executor-timeout",), not clean)
+        return MutationReport(True, (), (f"executor-unavailable: {e.kind}: {e.detail}",), not clean)
     except OSError as e:
         clean = _recover(lib, cwd)
         return MutationReport(True, (), (f"executor-unavailable: {e}",), not clean)

@@ -12,7 +12,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness.adapters.gitad import LiveGit
 from harness.mutations import DEFAULT_LIB, JOURNAL_DIRNAME, run_executable_mutations
-from harness.state import MUTATION_JOURNAL_PENDING, HarnessError
+from harness import mutations as mut
+from harness.state import MUTATION_JOURNAL_PENDING, PRECOMMIT_HANG, SUBPROCESS_TIMEOUT, HarnessError
 
 FENCE = "`" * 3
 PLAN = f"""# Fixture plan
@@ -80,6 +81,32 @@ def test_held_row_is_reported(tmp_path):
     assert report.tree_suspect is False
 
 
+def test_suffixed_row_id_round_trips(tmp_path):
+    repo, plan = _repo(tmp_path)
+    lib = _stub(tmp_path, ONE_RECORD + '\nrun) echo "HELD row 12-neg — still exited 0"; exit 1 ;;')
+    report = run_executable_mutations(plan, repo, lib=lib)
+    assert [r.row for r in report.results] == ["12-neg"]
+    assert report.holding == ("row 12-neg HELD — still exited 0",)
+
+
+def test_malformed_row_id_falls_to_unavailable(tmp_path):
+    # Near-miss: "12.neg" carries a dot, which the row-id class rejects.
+    repo, plan = _repo(tmp_path)
+    lib = _stub(tmp_path, ONE_RECORD + '\nrun) echo "HELD row 12.neg — still exited 0"; exit 1 ;;')
+    report = run_executable_mutations(plan, repo, lib=lib)
+    assert report.results == ()
+    assert report.holding == ("executor-unavailable: run exited 1",)
+
+
+def test_digit_row_id_parses_to_int(tmp_path):
+    repo, plan = _repo(tmp_path)
+    lib = _stub(tmp_path, ONE_RECORD + '\nrun) echo "TRIPPED row 7 — ok"; exit 0 ;;')
+    report = run_executable_mutations(plan, repo, lib=lib)
+    assert [r.row for r in report.results] == [7]
+    assert isinstance(report.results[0].row, int)
+    assert report.holding == ()
+
+
 def test_revert_failed_marks_tree_suspect(tmp_path):
     repo, plan = _repo(tmp_path)
     lib = _stub(tmp_path, ONE_RECORD + '\nrun) echo "REVERT-FAILED row 1 — status changed"; exit 3 ;;')
@@ -118,6 +145,37 @@ def test_executor_timeout_recovers(tmp_path, recover_rc, suspect):
     assert "executor-timeout" in report.holding
     assert (tmp_path / "recover-called").exists()
     assert report.tree_suspect is suspect
+
+
+def _fake_run_bounded(raise_kind, calls):
+    """Stand-in for harness.mutations.run_bounded: parse yields one record, run raises."""
+    def fake(argv, *, step, **_kw):
+        calls.append(step)
+        if step == "exec-mutations":
+            raise HarnessError(raise_kind, "boom")
+        out = "1\0target.txt\0bash check.sh\0ALPHA\0BETA\n" if step == "exec-mutations-parse" else ""
+        return subprocess.CompletedProcess(argv, 0, out, "")
+    return fake
+
+
+@pytest.mark.parametrize("kind", [PRECOMMIT_HANG, MUTATION_JOURNAL_PENDING])
+def test_non_timeout_harness_error_keeps_its_kind(tmp_path, monkeypatch, kind):
+    repo, plan = _repo(tmp_path)
+    calls = []
+    monkeypatch.setattr(mut, "run_bounded", _fake_run_bounded(kind, calls))
+    report = run_executable_mutations(plan, repo, lib=tmp_path / "unused")
+    assert report.holding == (f"executor-unavailable: {kind}: boom",)
+    assert "exec-mutations-recover" in calls
+    assert report.tree_suspect is False
+
+
+def test_subprocess_timeout_kind_keeps_timeout_label(tmp_path, monkeypatch):
+    repo, plan = _repo(tmp_path)
+    calls = []
+    monkeypatch.setattr(mut, "run_bounded", _fake_run_bounded(SUBPROCESS_TIMEOUT, calls))
+    report = run_executable_mutations(plan, repo, lib=tmp_path / "unused")
+    assert report.holding == ("executor-timeout",)
+    assert "exec-mutations-recover" in calls
 
 
 def test_run_passes_adaptive_flags(tmp_path):

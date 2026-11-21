@@ -638,6 +638,7 @@ run_agent() { # sim prompt
     # chained, or $(...) form of it. No bare "Write": that matches any path. Under
     # acceptEdits the agent may write and redirect into scratch files inside the
     # temp workdir only, which is where payload.json lands.
+    # agent-allowlist-ok: acceptEdits writes only inside the temp workdir; the Bash rule is the SQL-only wrapper (ADR-0093)
     ( cd "$WORKDIR" && MYSQL_PWD="${SIM_RECAP_DB_PASSWORD:-}" \
         timeout "$SIM_RECAP_CLAUDE_TIMEOUT" "$SIM_RECAP_CLAUDE_BIN" -p "$prompt" \
             --model "$SIM_RECAP_MODEL" --output-format json \

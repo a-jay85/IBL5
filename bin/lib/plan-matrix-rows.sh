@@ -140,7 +140,16 @@ PLAN_ROW_DB_RE='db-query|docker|--group[= ]database|DatabaseIntegration|db-test-
 # Anything else stays local (fail toward local). DB, web and compose rows run
 # in CI: the Plan checks job starts the stacks row_ci_needs names for them.
 # A /tmp path the row only writes is not a marker (see _tmp_write_scrub).
+# PLAN_ROW_IBLBOT_VITEST_RE is the one npx exemption (an IBLbot vitest run).
 PLAN_ROW_LOCAL_RE='(^|[^[:alnum:]_/-])gh[[:space:]]|playwright|npx|npm|wget|bin/wt-|bin/automouse|bin/post-plan|bin/plan-now|bin/check-plan|bin/db-query|bin/db-test-up|launchctl|osascript|ssh|scp|rsync|~/|\$HOME|/Users/|/tmp/|claude-plans|PLAN|\.\./'
+# The one npx form that may reach CI: `cd ibl5/IBLbot && npx vitest run <file>`,
+# optionally inside ( ... ). The Plan checks job sets up Node and runs npm ci in
+# ibl5/IBLbot for it. Group 1 is the cd prefix, group 3 the vitest words; the
+# first vitest argument must not be a flag, so a bare whole-suite run stays
+# local. Every other npx or npm row still matches PLAN_ROW_LOCAL_RE.
+PLAN_ROW_IBLBOT_VITEST_RE='^([[:space:]]*\(?[[:space:]]*cd[[:space:]]+(\./)?ibl5/IBLbot[[:space:]]*&&[[:space:]]*)npx([[:space:]]+vitest[[:space:]]+run[[:space:]]+[^-[:space:]].*)$'
+# A chained, piped or substituted command, or a URL, keeps such a row local.
+PLAN_ROW_IBLBOT_VITEST_BAD_RE='&&|\||;|`|\$\(|://'
 # The one docker form that may reach CI. The ci step sets COMPOSE_FILE to the
 # absolute path ${{ github.workspace }}/docker-compose.ci.yml, and
 # plan-checks-block ci pins any relative value to the repo root, so a
@@ -256,6 +265,15 @@ row_runs_in_ci() {
     local c="$1" first second
     local lc="$c"
     _tmp_write_scrub "$c" && lc="$_TW_REST"
+    # Capture BASH_REMATCH before the second =~ overwrites it.
+    local iblbot=0 ibl_pre ibl_rest
+    if [[ "$lc" =~ $PLAN_ROW_IBLBOT_VITEST_RE ]]; then
+        ibl_pre="${BASH_REMATCH[1]}"; ibl_rest="${BASH_REMATCH[3]}"
+        if ! [[ "$ibl_rest" =~ $PLAN_ROW_IBLBOT_VITEST_BAD_RE ]]; then
+            iblbot=1
+            lc="$ibl_pre$ibl_rest"
+        fi
+    fi
     grep -Eq -- "$PLAN_ROW_LOCAL_RE" <<< "$lc" && return 1
     # A curl row aimed at a remote host stays local: ci_host_rewrite leaves
     # such a URL alone, so CI would test production instead of the PR.
@@ -297,6 +315,8 @@ row_runs_in_ci() {
         is_whole_suite_cmd "$_RFW_REST" && return 1
         grep -Eq -- "$PLAN_ROW_MAC_ABS_RE" <<< "${c/"$PLAN_ROW_BREW_PY"/}" && return 1
     fi
+    # An IBLbot vitest row passed every guard above; its first word is npx.
+    [ "$iblbot" = 1 ] && return 0
     case "$first" in
         bin/test-*|bin/check-*|bin/lib/*|vendor/bin/phpunit|python3|shellcheck|grep|rg|jq) return 0 ;;
         php|actionlint|test|\[|printf|seq|diff|curl|bun|bunx|bin/run-shell-harnesses|bin/generate-codebase-map) return 0 ;;
@@ -310,7 +330,7 @@ row_runs_in_ci() {
 }
 
 # row_ci_needs <cmd> — prints the space-separated subset of `db web bun
-# actionlint go` that the Plan checks job must start before this row runs.
+# actionlint go node` that the Plan checks job must start before this row runs.
 # Pass it only commands row_runs_in_ci accepted.
 #   db          the command matches PLAN_ROW_DB_RE
 #   web db      it matches PLAN_ROW_WEB_RE or holds PLAN_ROW_COMPOSE_PHP (the
@@ -318,8 +338,9 @@ row_runs_in_ci() {
 #   bun         bun or bunx is a command word anywhere in the row
 #   actionlint  actionlint is a command word anywhere in the row
 #   go          go is the first word (row_runs_in_ci sends only go test)
+#   node        the row matches PLAN_ROW_IBLBOT_VITEST_RE (setup-node + npm ci)
 row_ci_needs() {
-    local c="$1" db=0 web=0 bun=0 al=0 gon=0 out=""
+    local c="$1" db=0 web=0 bun=0 al=0 gon=0 node_n=0 out=""
     grep -Eq -- "$PLAN_ROW_DB_RE" <<< "$c" && db=1
     if grep -Eq -- "$PLAN_ROW_WEB_RE" <<< "$c" || [[ "$c" == *"$PLAN_ROW_COMPOSE_PHP"* ]]; then
         web=1; db=1
@@ -330,6 +351,7 @@ row_ci_needs() {
         actionlint) al=1 ;;
         go) gon=1 ;;
     esac
+    [[ "$c" =~ $PLAN_ROW_IBLBOT_VITEST_RE ]] && node_n=1
     # bun, bunx or actionlint as a command word later in the row, such as
     # test "$(bun ...)" = 1, needs the same stack as when it comes first.
     local i=0 pre
@@ -345,6 +367,7 @@ row_ci_needs() {
     [ "$bun" -eq 1 ] && out="${out:+$out }bun"
     [ "$al" -eq 1 ] && out="${out:+$out }actionlint"
     [ "$gon" -eq 1 ] && out="${out:+$out }go"
+    [ "$node_n" -eq 1 ] && out="${out:+$out }node"
     printf '%s\n' "$out"
 }
 

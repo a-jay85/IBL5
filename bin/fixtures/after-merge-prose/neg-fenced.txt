@@ -1,0 +1,9 @@
+```
+The launchd agent is not installed by merging. The owner runs `bin/approve-click-cron-setup --install` once on the Mac after merge.
+```
+
+> The launchd agent is not installed by merging. The owner runs `bin/approve-click-cron-setup --install` once on the Mac after merge.
+
+<!--
+The launchd agent is not installed by merging. The owner runs `bin/approve-click-cron-setup --install` once on the Mac after merge.
+-->

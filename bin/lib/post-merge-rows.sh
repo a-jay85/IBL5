@@ -4,13 +4,18 @@
 # The single home of the `## After merge` row grammar (ADR-0198):
 #   - **Row N** [<tag>] — text
 # where <tag> is `manual`, `auto:ci <name>`, or `auto:mac <name>`. A row with no tag is
-# manual. Consumers: bin/after-merge-checklist and bin/digest-dm-build. Later units add the
+# manual. Consumers: bin/after-merge-checklist, bin/digest-dm-build, bin/check-plan gate [AM],
+# bin/check-post-merge-recipe and bin/post-merge-run. Later units add the
 # executors (see pmr_executor_ready) and the writer gates. Tested by bin/test-post-merge-rows.
 #
 # Portable to bash 3.2: no associative arrays, no ${v,,}, no mapfile, no declare -n.
 
 PMR_END_ANCHOR='<!-- after-merge:end -->'
 PMR_NAME_RE='^[A-Za-z0-9][A-Za-z0-9._-]*$'
+# Owner-after-merge prose (ADR-0198 update 2026-11-20). Case-insensitive ERE, one line at a
+# time. Calibrated 2026-11-20: 2 hits in 250 merged bodies (#4046, #4035), 0 false positives.
+PMR_PROSE_RE='(owner|you|someone|a person)[^.]{0,40}(run|runs|must run|needs to run|install|installs)[^.]{0,80}(after (the )?merge|once merged|by hand|manually)|not installed by (merging|the merge)|(after|once) (the )?(this )?(pr )?(is )?merg(e|ed)[^.]{0,60}(owner|you) (run|runs|must|install)|(owner|you) (run|runs|must run)[^.]{0,60}by hand'
+PMR_WAIVER_TAG='after-merge-prose-ok:'
 # The bin/ directory that holds this lib. Executors are looked up here, so a checkout
 # that carries the executor file turns its rows automatic and one that lacks it does not.
 PMR_BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -76,6 +81,69 @@ pmr_executor_ready() {
 
 # pmr_is_count VALUE -- 0 iff VALUE is one or more ASCII digits and nothing else.
 pmr_is_count() { local _re='^[0-9]+$'; [[ "${1-}" =~ $_re ]]; }
+
+# pmr_prose_text FILE -- `lineno<TAB>text` for prose lines only: fenced blocks, HTML
+# comments and blockquotes are dropped, and each inline code span becomes CODE.
+pmr_prose_text() {
+    awk '
+        /^[[:space:]]*(```|~~~)/ { infence = !infence; next }
+        infence { next }
+        /<!--/ { incomment = 1 }
+        incomment { if (/-->/) incomment = 0; next }
+        /^[[:space:]]*>/ { next }
+        { line = $0; gsub(/`[^`]*`/, "CODE", line); print NR "\t" line }
+    ' "$1"
+}
+
+# pmr_prose_hits FILE -- prints each owner-after-merge prose line; 0 iff at least one.
+pmr_prose_hits() {
+    local _t
+    _t="$(pmr_prose_text "$1" | grep -iE "$PMR_PROSE_RE" || true)"
+    [ -n "$_t" ] || return 1
+    printf '%s\n' "$_t"
+}
+
+# pmr_waiver FILE -- 0 valid `<!-- after-merge-prose-ok: <15+ chars> -->`, 1 none, 2 malformed.
+pmr_waiver() {
+    local _m _r
+    _m="$(grep -m1 -F "<!-- $PMR_WAIVER_TAG" "$1" || true)"
+    [ -n "$_m" ] || return 1
+    _r="${_m#*"$PMR_WAIVER_TAG"}"; _r="${_r%%-->*}"
+    _r="$(printf '%s' "$_r" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')"
+    [ "${#_r}" -ge 15 ] || return 2
+}
+
+# pmr_plan_check PLAN STEPS_DIR [TAKEN] -- one `[AM] ...` line per violation; 0 iff none.
+# TAKEN is a space-separated list of Verification Matrix row numbers.
+pmr_plan_check() {
+    local _plan="$1" _steps="$2" _taken=" ${3-} " _out="" _line _n _rows _w=0
+    _rows="$(pmr_rows "$_plan")"
+    while IFS= read -r _line; do
+        [ -n "$_line" ] || continue
+        pmr_parse_row "$_line"
+        _n="${PMR_LABEL//[!0-9]/}"
+        if [ "$PMR_VALID" -ne 1 ]; then
+            _out+="[AM] unparseable After merge row (tag must be manual, auto:mac <name> or auto:ci <name>): $_line"$'\n'; continue
+        fi
+        case "$_taken" in *" $_n "*) _out+="[AM] After merge row $_n repeats a Verification Matrix row number: $_line"$'\n' ;; esac
+        if [ "$PMR_KIND" = auto:ci ] && ! pmr_executor_ready auto:ci; then
+            _out+="[AM] auto:ci has no executor on this checkout; write the row as manual: $_line"$'\n'
+        fi
+        if [ "$PMR_KIND" = auto:mac ] && [ ! -f "$_steps/$PMR_NAME" ] && ! grep -qE "bin/post-merge-steps/$PMR_NAME.*(— NEW|Create)" "$_plan"; then
+            _out+="[AM] auto:mac $PMR_NAME: no bin/post-merge-steps/$PMR_NAME on disk and no creation-cue line in the plan: $_line"$'\n'
+        fi
+    done <<< "$_rows"
+    if [ -z "$_rows" ] && ! pmr_prose_text "$_plan" | grep -qiE '(^|[^a-z-])post-merge:'; then
+        pmr_waiver "$_plan" || _w=$?
+        if [ "$_w" -eq 2 ]; then
+            _out+="[AM] after-merge-prose-ok waiver needs a reason of at least 15 characters"$'\n'
+        elif [ "$_w" -eq 1 ] && pmr_prose_hits "$_plan" > /dev/null; then
+            _out+="[AM] owner-after-merge prose with no After merge row; add a ## After merge row (ADR-0198) or a post-merge: matrix row"$'\n'
+        fi
+    fi
+    [ -z "$_out" ] && return 0
+    printf '%s' "$_out"; return 1
+}
 
 # pmr_needs_you_reasons MANUAL AUTO_FAILED [JOB=RESULT ...] -- sets
 # PMR_NEEDS_YOU_REASONS (space-separated), the after-merge items the digest names.

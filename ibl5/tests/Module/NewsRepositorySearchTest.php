@@ -30,7 +30,9 @@ class NewsRepositorySearchTest extends TestCase
 
         (new NewsRepository($db))->searchStoriesMentioning('50%_off\\');
 
-        $expected = '%50\\%\\_off\\\\%';
+        $expected = <<<'BOUND'
+        %50\%\_off\\%
+        BOUND;
         $this->assertSame([$expected, $expected], $db->getLastBoundParams());
     }
 

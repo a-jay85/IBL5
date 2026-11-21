@@ -1,6 +1,6 @@
 ---
 description: The ADR decision-trigger gate and the harness auto-draft both move to the commit site, ahead of the Phase 2 commit.
-last_verified: 2026-09-21
+last_verified: 2026-11-20
 ---
 
 # ADR-0138: ADR Auto-Draft Fires at the Phase 2 Commit Site

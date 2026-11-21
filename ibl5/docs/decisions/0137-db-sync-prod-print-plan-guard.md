@@ -1,6 +1,6 @@
 ---
 description: bin/db-sync-prod rejects a bare --print-plan instead of silently running the destructive prod sync, and the agent convention is recorded in .claude/rules/db-sync-prod-dry-run.md.
-last_verified: 2026-09-21
+last_verified: 2026-11-20
 ---
 
 > This ADR was drafted by the post-plan harness for this PR. A human must review and approve it before merging.

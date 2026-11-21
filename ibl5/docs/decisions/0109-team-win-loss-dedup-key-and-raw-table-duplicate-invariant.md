@@ -1,6 +1,6 @@
 ---
 description: ibl_team_win_loss keys on the (date, visitor, home) matchup triple with min(game_of_that_day) as the canonical row, so a duplicate boxscore is invisible in the view by design; the duplicate invariant therefore lives on the raw ibl_box_scores_teams table, runs unconditionally, and covers every game type.
-last_verified: 2026-09-20
+last_verified: 2026-11-20
 ---
 
 # ADR-0109: Matchup-Triple Dedup Key for `ibl_team_win_loss`, and a Raw-Table Duplicate Invariant

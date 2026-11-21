@@ -1,6 +1,6 @@
 ---
 description: bin/db-sync-prod has no dry run for the prod path — --print-plan only plans a --snapshot load, and on its own it used to fall through to the real destructive sync.
-last_verified: 2026-09-21
+last_verified: 2026-11-20
 paths: "bin/db-sync-prod"
 ---
 

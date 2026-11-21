@@ -306,6 +306,40 @@ if word == "eligible" and fp == sys.argv[4]:
         _hr_record "rejected-$1"
         _hr_finish "$HR_RC_GAVEUP" "gave-up-$1"
     }
+    # Content snapshots for the tamper checks. A hash survives `touch -t` and a write in the
+    # same second as t0, which the mtime tests miss; those tests stay as a second net.
+    _hr_snap() {  # <root>; stdin = paths relative to it; stdout = sorted "<sha256>  <path>" lines
+        (cd "$1" && tr '\n' '\0' | xargs -0 -r shasum -a 256 -- 2>/dev/null) | LC_ALL=C sort
+        return 0
+    }
+    _hr_written() {  # <root> <snapshot>; stdin = paths; stdout = each path new or changed against it
+        _hr_snap "$1" | LC_ALL=C comm -13 "$2" - | sed 's/^[0-9a-f]*  //'
+        return 0
+    }
+    _hr_state() {  # <path>: a fingerprint of a file, symlink or directory tree, or ABSENT
+        if [ -L "$1" ]; then printf 'L %s\n' "$(readlink "$1")"
+        elif [ -f "$1" ]; then shasum -a 256 < "$1"
+        elif [ -d "$1" ]; then
+            (cd "$1" && find . -type l | LC_ALL=C sort | while IFS= read -r p; do printf 'L %s %s\n' "$p" "$(readlink "$p")"; done
+             find . -type f -perm -u+x | LC_ALL=C sort | sed 's/^/X /'
+             find . -type f -print0 | xargs -0 -r shasum -a 256 -- | LC_ALL=C sort)
+        else printf 'ABSENT\n'; fi
+        return 0
+    }
+    # The shared .git/config also takes branch keys from sibling worktrees and from a fix
+    # session's own `push -u`; neither can run code, so the verdict ignores them. Read with
+    # --file from /, which loads no repo and runs nothing.
+    _hr_cfg_norm() {  # <config file>: its settings minus user.*, other branches' keys, and own remote/merge
+        local l
+        l="$( (cd / && git config --file "$1" --list) 2>/dev/null)" || { printf 'UNREADABLE\n'; return 0; }
+        printf '%s\n' "$l" | awk -v b="branch.$branch." '
+            /^user\./ { next }
+            index($0, "branch.") == 1 {
+                if (index($0, b) != 1) next
+                if (substr($0, length(b) + 1) ~ /^(remote|merge)=/) next
+            }
+            { print }'
+    }
     # Paths a fix session may never touch: the gates, the checkers this launcher re-runs,
     # the arming conditions and the launch machinery itself. Prefix rules, so a new helper is
     # covered without a list edit: bin/lib/* holds everything this script and bin/post-plan-now
@@ -506,6 +540,14 @@ LAST line of the final message."
         "$MAIN_ROOT"/*) HR_MAIN_EXCL+=(":(exclude)${STATE_DIR#"$MAIN_ROOT"/}") ;;
     esac
     git -C "$MAIN_ROOT" status --porcelain -- . "${HR_MAIN_EXCL[@]}" > "$HR_TMP/main.before"
+    # Content snapshots of the ignored files the checks below judge, taken before the session.
+    # A file new or changed against them counts as written, whatever its mtime says.
+    git -C "$MAIN_ROOT" -c core.quotepath=off ls-files --others --ignored --exclude-standard -- tools/postplan-harness "${HR_MAIN_EXCL[@]}" \
+        | { grep -E '\.(py|pyc|pth)$|sitecustomize|usercustomize' || true; } | _hr_snap "$MAIN_ROOT" > "$HR_TMP/main-ign.before"
+    { git -C "$WT" -c core.quotepath=off ls-files --others --ignored --exclude-standard -- bin .claude .github tools/postplan-harness/harness tools/postplan-harness/runner.py
+      git -C "$WT" -c core.quotepath=off ls-files --others --ignored --exclude-standard -- harness ':(glob)*.py' ':(glob)**/*.pth'
+    } | LC_ALL=C sort -u | _hr_snap "$WT" > "$HR_TMP/wt-ign.before"
+    _hr_state "$HOME/.claude/hooks" > "$HR_TMP/claude-hooks.before"
 
     # 6. Record the attempt before launch. Without this write the cap cannot hold.
     if ! _hr_py fix-record --state-dir "$STATE_DIR" --slug "$branch" --fingerprint "$HR_FP" \
@@ -515,15 +557,57 @@ LAST line of the final message."
     fi
     # t0 comes after the launcher's own ledger write, so only the session's writes are newer.
     touch "$HR_TMP/t0"
+    # backlog#1879 gap C: the git config, hooks and gitdir pointers every later git call loads.
+    HR_GC="$HR_TMP/gitcfg"; mkdir -p "$HR_GC"
+    HR_GC_COMMON="$(git -C "$WT" rev-parse --path-format=absolute --git-common-dir)"
+    HR_GC_GITDIR="$(git -C "$WT" rev-parse --path-format=absolute --git-dir)"
+    HR_GC_PATHS=("$HR_GC_GITDIR/commondir" "$HR_GC_GITDIR/gitdir" "$HR_GC_GITDIR/config.worktree" "$HR_GC_COMMON/hooks" \
+        "$(git -C "$WT" rev-parse --path-format=absolute --git-path hooks)" "$HOME/.gitconfig" "${XDG_CONFIG_HOME:-$HOME/.config}/git/config")
+    if [ -f "$WT/.git" ]; then HR_GC_PATHS+=("$WT/.git"); fi
+    HR_GC_HP="$(git -C "$WT" config --get core.hooksPath || true)"
+    if [ -n "$HR_GC_HP" ]; then case "$HR_GC_HP" in /*) ;; *) HR_GC_HP="$WT/$HR_GC_HP" ;; esac; HR_GC_PATHS+=("$HR_GC_HP"); fi
+    hr_gi=0
+    for p in "${HR_GC_PATHS[@]}"; do
+        hr_gi=$((hr_gi + 1))
+        _hr_state "$p" > "$HR_GC/$hr_gi.state"
+        if [ -e "$p" ] || [ -L "$p" ]; then cp -RP "$p" "$HR_GC/$hr_gi.copy"; fi
+    done
+    cp -p "$HR_GC_COMMON/config" "$HR_GC/common.copy"
+    _hr_cfg_norm "$HR_GC_COMMON/config" > "$HR_GC/common.norm"
 
     # 3e. The prompt goes on stdin: the tool flags are variadic, so a trailing positional
     # prompt could be read as one more tool name.
     cd "$WT"
     # PYTHONDONTWRITEBYTECODE: a session that runs pytest writes no harness .pyc files.
     REPLY="$(printf '%s\n' "$HR_PROMPT" | CLAUDE_HEADLESS=1 PYTHONDONTWRITEBYTECODE=1 ${TMO[@]+"${TMO[@]}"} "${HR_ARGV[@]}" 2>"$HR_TMP/stderr")" || true
+    # backlog#1879 gap C: put back the git config, hooks and gitdir pointers before any git call
+    # below, rev-parse included (a rewritten .git pointer redirects it) and _hr_revert's
+    # ls-remote, push and checkout included. The verdict waits until the session tips are read.
+    HR_GITCFGBAD=""
+    hr_gi=0
+    for p in "${HR_GC_PATHS[@]}"; do
+        hr_gi=$((hr_gi + 1))
+        if [ "$(_hr_state "$p")" != "$(cat "$HR_GC/$hr_gi.state")" ]; then
+            HR_GITCFGBAD+="$p changed; "
+            rm -rf "$p"
+            if [ -e "$HR_GC/$hr_gi.copy" ] || [ -L "$HR_GC/$hr_gi.copy" ]; then cp -RP "$HR_GC/$hr_gi.copy" "$p"; fi
+        fi
+    done
+    if [ "$(_hr_cfg_norm "$HR_GC_COMMON/config")" != "$(cat "$HR_GC/common.norm")" ]; then
+        HR_GITCFGBAD+="$HR_GC_COMMON/config changed; "
+        HR_GC_KEEP="$( (cd / && git config --file "$HR_GC_COMMON/config" --list) 2>/dev/null | grep -E '^branch\.' || true)"
+        rm -f "$HR_GC_COMMON/config"; cp -p "$HR_GC/common.copy" "$HR_GC_COMMON/config"
+        HR_GC_HAVE="$( (cd / && git config --file "$HR_GC_COMMON/config" --list) 2>/dev/null || true)"
+        while IFS= read -r l; do
+            [ -n "$l" ] || continue
+            case "$l" in "branch.$branch."*) continue ;; esac
+            grep -qxF -- "$l" <<< "$HR_GC_HAVE" || (cd / && git config --file "$HR_GC_COMMON/config" --add "${l%%=*}" "${l#*=}") || true
+        done <<< "$HR_GC_KEEP"
+    fi
     # The commits the session made, read before any restore: _hr_revert rewrites origin only
     # when its tip is one of these.
     HR_SESSION_TIPS="$(git -C "$WT" rev-parse HEAD "refs/heads/$branch" 2>/dev/null | tr '\n' ' ')" || true
+    if [ -n "$HR_GITCFGBAD" ]; then _hr_reject git-config "$HR_GITCFGBAD"; fi
 
     # 3f. Marker parse: tolerant on decoration, strict on value. Text mode keeps only the
     # final message, so the marker is read from its last non-blank line.
@@ -590,34 +674,63 @@ LAST line of the final message."
         HR_EXTBAD+="main checkout changed; "
     fi
     # Status never lists ignored files, yet the recheck imports code from the main checkout's
-    # harness. An ignored file (.pyc, .pth, sitecustomize) written since t0 counts as tamper.
+    # harness. An ignored file (.pyc, .pth, sitecustomize) written since t0, or new or changed
+    # against the pre-launch snapshot, counts as tamper.
     # _hr_py sets PYTHONDONTWRITEBYTECODE, so the launcher's own runs write none.
+    HR_MAIN_W="$(git -C "$MAIN_ROOT" -c core.quotepath=off ls-files --others --ignored --exclude-standard -- tools/postplan-harness "${HR_MAIN_EXCL[@]}" \
+        | { grep -E '\.(py|pyc|pth)$|sitecustomize|usercustomize' || true; } | _hr_written "$MAIN_ROOT" "$HR_TMP/main-ign.before")"
     while IFS= read -r p; do
         [ -n "$p" ] || continue
         # Only files Python could import or execute count; a log or cache file is harmless.
         case "$p" in *.py|*.pyc|*.pth|*sitecustomize*|*usercustomize*) ;; *) continue ;; esac
-        if [ "$MAIN_ROOT/$p" -nt "$HR_TMP/t0" ]; then
+        if [ "$MAIN_ROOT/$p" -nt "$HR_TMP/t0" ] || grep -qxF -- "$p" <<< "$HR_MAIN_W"; then
             HR_EXTBAD+="main checkout ignored file written ($p); "
             break
         fi
     done < <(git -C "$MAIN_ROOT" -c core.quotepath=off ls-files --others --ignored --exclude-standard -- tools/postplan-harness "${HR_MAIN_EXCL[@]}")
-    if [ -d "$HOME/.claude/hooks" ] && [ -n "$(find "$HOME/.claude/hooks" -newer "$HR_TMP/t0" -type f 2>/dev/null)" ]; then
+    if { [ -d "$HOME/.claude/hooks" ] && [ -n "$(find "$HOME/.claude/hooks" -newer "$HR_TMP/t0" -type f 2>/dev/null)" ]; } \
+        || [ "$(_hr_state "$HOME/.claude/hooks")" != "$(cat "$HR_TMP/claude-hooks.before")" ]; then
         HR_EXTBAD+="a file under ~/.claude/hooks changed; "
     fi
-    # master on origin: admins may push it directly, and the refs guard only watches the PR
-    # branch. Every commit GitHub lands by a merge carries GitHub as committer, and the baseline
-    # workflow pushes as github-actions[bot]. Any other committer since the pre-session fetch is
-    # a direct push; an owner push in that window gives up too, which is the safe side. An
-    # unreadable master rejects as well. Detected, not repaired: the launcher never rewrites master.
+    # master on origin: admins may push it directly, and the refs guard only watches the PR.
+    # Each commit master gained since launch must be a GitHub merge: signed by GitHub
+    # (verified, committer noreply@github.com) AND introduced by a merged PR based on master.
+    # A committer email alone is spoofable (backlog#1879). An unreadable answer rejects.
     HR_MASTERBAD=""
     if ! git -C "$WT" fetch -q origin master >/dev/null 2>&1 \
-        || ! HR_MASTER_CE="$(git -C "$WT" log --format='%ce %h' "$HR_MASTER0..refs/remotes/origin/master" 2>/dev/null)"; then
+        || ! HR_MASTER_NEW="$(git -C "$WT" rev-list "$HR_MASTER0..refs/remotes/origin/master" 2>/dev/null)"; then
         HR_MASTERBAD="could not read origin/master after the session; "
+    elif [ "$(grep -c . <<< "$HR_MASTER_NEW")" -gt 50 ]; then
+        HR_MASTERBAD="origin/master got a direct push (more than 50 new commits); "
     else
-        HR_MASTER_CE="$(grep -Ev '^(noreply@github\.com|github-actions\[bot\]@users\.noreply\.github\.com) ' <<< "$HR_MASTER_CE" || true)"
-        if [ -n "$HR_MASTER_CE" ]; then
-            HR_MASTERBAD="origin/master got a direct push (${HR_MASTER_CE##* }); "
-        fi
+        while IFS= read -r hr_mc; do
+            [ -n "$hr_mc" ] || continue
+            if ! hr_v="$(gh api "repos/a-jay85/IBL5/commits/$hr_mc" --jq '[(.commit.verification.verified | tostring), .commit.committer.email] | @tsv' 2>/dev/null)" \
+                || ! hr_m="$(gh api "repos/a-jay85/IBL5/commits/$hr_mc/pulls" --jq '[.[] | select(.merged_at != null and .base.ref == "master")] | length' 2>/dev/null)"; then
+                HR_MASTERBAD="could not verify origin/master commit ${hr_mc:0:12}; "; break
+            fi
+            # The CI bot pushes "[auto]" snapshot commits straight to master, unsigned and with
+            # no PR. Allow one only when it touches nothing but the files those workflows write,
+            # so a spoofed bot email cannot carry code or gate changes.
+            hr_bot_ok=0
+            if [ "$(git -C "$WT" log -1 --format=%ce "$hr_mc" 2>/dev/null)" = "github-actions[bot]@users.noreply.github.com" ] \
+                && [[ "$(git -C "$WT" log -1 --format=%s "$hr_mc" 2>/dev/null)" == *"[auto]" ]]; then
+                hr_bot_ok=1
+                while IFS= read -r hr_f; do
+                    [ -n "$hr_f" ] || continue
+                    case "$hr_f" in
+                        ibl5/coverage-baseline.json|ibl5/phpstan-baseline-counts.json|ibl5/docs/schema/current-schema.sql) ;;
+                        .claude/rules/codebase-map.md|.claude/rules/codebase-map-detail.md) ;;
+                        ibl5/tests/e2e/*-snapshots/*.png) ;;
+                        *) hr_bot_ok=0; break ;;
+                    esac
+                done < <(git -C "$WT" -c core.quotepath=off diff-tree --no-commit-id --name-only -r -m "$hr_mc" 2>/dev/null)
+            fi
+            if [ "$hr_bot_ok" = 1 ]; then continue; fi
+            if [ "$hr_v" != "$(printf 'true\tnoreply@github.com')" ] || ! [ "$hr_m" -ge 1 ] 2>/dev/null; then
+                HR_MASTERBAD="origin/master got a direct push (${hr_mc:0:12}); "; break
+            fi
+        done <<< "$HR_MASTER_NEW"
     fi
     if [ -n "$HR_PRBAD" ]; then _hr_reject pr-state "$HR_PRBAD$HR_MASTERBAD$HR_EXTBAD"; fi
     if [ -n "$HR_MASTERBAD" ]; then _hr_reject master-push "$HR_MASTERBAD$HR_EXTBAD"; fi
@@ -648,27 +761,30 @@ LAST line of the final message."
         [ -n "$p" ] || continue
         if _hr_is_gate_path "$p"; then _hr_reject gate-path "$p"; fi
     done <<< "$HR_PATHS"
-    # Ignored files that already existed stay legal; only one written since t0 counts. Worktree
+    # Ignored files that already existed stay legal; only one written since t0, or new or
+    # changed against the pre-launch snapshot, counts. Worktree
     # bytecode is skipped: pytest writes it, and the recheck imports the main checkout's harness.
     HR_IGN="$(git -C "$WT" -c core.quotepath=off ls-files --others --ignored --exclude-standard -- bin .claude .github tools/postplan-harness/harness tools/postplan-harness/runner.py)"
+    HR_IGN_W="$(printf '%s\n' "$HR_IGN" | _hr_written "$WT" "$HR_TMP/wt-ign.before")"
     while IFS= read -r p; do
         [ -n "$p" ] || continue
         case "$p" in */__pycache__/*|*.pyc) continue ;; esac
-        if _hr_is_gate_path "$p" && [ "$WT/$p" -nt "$HR_TMP/t0" ]; then _hr_reject gate-path "$p (ignored file written)"; fi
+        if _hr_is_gate_path "$p" && { [ "$WT/$p" -nt "$HR_TMP/t0" ] || grep -qxF -- "$p" <<< "$HR_IGN_W"; }; then _hr_reject gate-path "$p (ignored file written)"; fi
     done <<< "$HR_IGN"
     # 4. planted-python: `python3 -m` puts its cwd first on sys.path, so a new top-level
     # harness/ package, a new top-level .py or a new .pth anywhere can shadow or hook a real
     # module. _hr_py runs -I and never imports one; this keeps one off the push too.
-    # Ignored ones count only when written since t0. git clean -fd keeps ignored files,
+    # Ignored ones count only when written since t0 or changed against the snapshot. git clean -fd keeps ignored files,
     # so they are removed here before the revert.
     HR_PLANTED=()
     while IFS= read -r p; do
         [ -n "$p" ] || continue
         if _hr_planted_py "$p"; then HR_PLANTED+=("$p"); fi
     done < <(git -C "$WT" -c core.quotepath=off ls-files --others --exclude-standard)
+    HR_PY_W="$(git -C "$WT" -c core.quotepath=off ls-files --others --ignored --exclude-standard -- harness ':(glob)*.py' ':(glob)**/*.pth' | _hr_written "$WT" "$HR_TMP/wt-ign.before")"
     while IFS= read -r p; do
         [ -n "$p" ] || continue
-        if _hr_planted_py "$p" && [ "$WT/$p" -nt "$HR_TMP/t0" ]; then HR_PLANTED+=("$p"); fi
+        if _hr_planted_py "$p" && { [ "$WT/$p" -nt "$HR_TMP/t0" ] || grep -qxF -- "$p" <<< "$HR_PY_W"; }; then HR_PLANTED+=("$p"); fi
     done < <(git -C "$WT" -c core.quotepath=off ls-files --others --ignored --exclude-standard -- harness ':(glob)*.py' ':(glob)**/*.pth')
     if [ "${#HR_PLANTED[@]}" -gt 0 ]; then
         for p in "${HR_PLANTED[@]}"; do rm -f -- "$WT/$p"; done

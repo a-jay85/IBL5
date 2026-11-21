@@ -226,6 +226,27 @@ if [ "\$1 \$2" = "pr comment" ]; then
     echo "https://github.com/a-jay85/IBL5/pull/77#issuecomment-555"
     exit 0
 fi
+# backlog#1879: master-commit lookups. The caller's real --jq filter runs over canned JSON, so the
+# launcher's filter is exercised and never bypassed. gh.commits.fail makes every lookup fail.
+if [ "\$1" = "api" ]; then
+    api_path="\$2"; jq_expr=""; shift 2
+    while [ \$# -gt 0 ]; do
+        case "\$1" in --jq) jq_expr="\$2"; shift ;; esac
+        shift
+    done
+    case "\$api_path" in
+        repos/a-jay85/IBL5/commits/*)
+            [ -e "$TMP/gh.commits.fail" ] && exit 1
+            sha="\${api_path#repos/a-jay85/IBL5/commits/}"
+            case "\$sha" in
+                */pulls) f="$TMP/gh.pulls.\${sha%/pulls}.json"; dflt='[]' ;;
+                *) f="$TMP/gh.commit.\$sha.json"; dflt='{"commit":{"verification":{"verified":false},"committer":{"email":"someone@example.com"}}}' ;;
+            esac
+            if [ -f "\$f" ]; then jq -r "\$jq_expr" < "\$f"; else printf '%s' "\$dflt" | jq -r "\$jq_expr"; fi
+            exit 0 ;;
+    esac
+    set -- api "\$api_path"
+fi
 if [ "\$1 \$2" = "api repos/a-jay85/IBL5/issues/comments/555" ]; then cat "$TMP/gh.lastcomment" 2>/dev/null; exit 0; fi
 if [ "\$1 \$2" = "pr edit" ] || [ "\$1 \$2" = "pr merge" ]; then exit 0; fi
 exit 1
@@ -932,6 +953,7 @@ hr_env() {
         LAUNCHCTL_CMD="$TMP/launchctl-stub"
 }
 hr_reset() {
+    rm -f "$TMP"/gh.commit.*.json "$TMP"/gh.pulls.*.json "$TMP/gh.commits.fail"
     git -C "$WTH" reset -q --hard "$HR_TIP"
     git -C "$WTH" clean -fdq
     git --git-dir="$TMP/origin.git" update-ref "refs/heads/$B_HR" "$HR_TIP"
@@ -1396,8 +1418,8 @@ need "auto-mergeable: label removed" gh_has "--remove-label auto-mergeable"
 case_end holdrepeat-pr-state-any-label
 fi
 
-# 47d (a session that pushes straight to origin master is caught; a GitHub-committed master
-# move during the session is a normal merge and passes)
+# 47d (a session that pushes straight to origin master is caught, and so is one that spoofs
+# GitHub's committer email; a master move GitHub signed and a merged PR introduced passes)
 HR_MASTER_ORIG=$(git --git-dir="$TMP/origin.git" rev-parse refs/heads/master)
 cat > "$TMP/effects/hr-masterpush.sh" <<'EFFEOF'
 git fetch -q origin master
@@ -1414,13 +1436,16 @@ need "direct push: rc 21" test "$RC" = 21
 need "direct push: final line" final_is "$STDOUT" gave-up-master-push
 need "direct push: DM names it" dm_has "origin/master got a direct push"
 need "direct push: no post-plan call" no_ppn
+# A direct push that spoofs GitHub's committer email is still a direct push (backlog#1879).
 hr_reset
 { cat "$TMP/effects/hr-fix.sh"; printf 'export GIT_COMMITTER_EMAIL=noreply@github.com\n'; cat "$TMP/effects/hr-masterpush.sh"; } > "$TMP/effects/hr-master.sh"
 export CLAUDE_STUB_REPLY="$TMP/reply-hr-fixed" CLAUDE_STUB_EFFECT="$TMP/effects/hr-master.sh"
 hr_run
 git --git-dir="$TMP/origin.git" update-ref refs/heads/master "$HR_MASTER_ORIG"
-need "github merge: rc 0 (stderr: $ERR)" test "$RC" = 0
-need "github merge: final line" final_is "$STDOUT" fixed
+need "spoofed committer: rc 21" test "$RC" = 21
+need "spoofed committer: final line" final_is "$STDOUT" gave-up-master-push
+need "spoofed committer: DM" dm_has "origin/master got a direct push"
+need "spoofed committer: no post-plan call" no_ppn
 case_end holdrepeat-master-direct-push
 fi
 
@@ -1654,6 +1679,253 @@ need "nested pth: DM names it" dm_has "planted-python: a/b/x.pth"
 need "nested pth: removed" test ! -e "$WTH/a/b/x.pth"
 need "nested pth: origin unchanged" origin_is_tip
 case_end holdrepeat-planted-nested-scope
+fi
+
+# backlog#1879: tamper that the mtime tests, the master committer check and an unwatched git
+# config could not see. Every case undoes its own plant after hr_run and its checks, so a run
+# against the old launcher leaves the later cases clean.
+hr_session_effect() {  # <effect lines>: hr-fix.sh plus the given lines (printf %b escapes), as the session
+    { cat "$TMP/effects/hr-fix.sh"; printf '%b' "$1"; } > "$TMP/effects/hr-1879.sh"
+    export CLAUDE_STUB_REPLY="$TMP/reply-hr-fixed" CLAUDE_STUB_EFFECT="$TMP/effects/hr-1879.sh"
+}
+hr_gc_setup() {
+    HR_HOOKS="$(git -C "$WTH" rev-parse --path-format=absolute --git-path hooks)"
+    printf '#!/bin/sh\necho hit >> %s\nexit 1\n' "$TMP/fsmon.hit" > "$TMP/fsmon.sh"; chmod +x "$TMP/fsmon.sh"
+    rm -f "$TMP/fsmon.hit" "$TMP/hook.hit"
+}
+
+# gap A: a write backdated before t0 is still a write
+if should_run "holdrepeat-backdated-ignored-gate-file"; then
+hr_reset
+cp "$HR_EXCL" "$TMP/exclude.orig"; printf '/bin/postplan-sneaky\n' >> "$HR_EXCL"
+hr_session_effect 'printf "x\\n" > bin/postplan-sneaky\ntouch -t 200001010000 bin/postplan-sneaky\n'
+hr_run
+need "rc 21" test "$RC" = 21
+need "final line" final_is "$STDOUT" gave-up-gate-path
+need "DM names the file" dm_has "gate-path: bin/postplan-sneaky (ignored file written)"
+need "no post-plan call" no_ppn
+cp "$TMP/exclude.orig" "$HR_EXCL"; rm -f "$WTH/bin/postplan-sneaky"
+case_end holdrepeat-backdated-ignored-gate-file
+fi
+
+if should_run "holdrepeat-backdated-planted-pth"; then
+hr_reset
+cp "$HR_EXCL" "$TMP/exclude.orig"; printf '/x.pth\n' >> "$HR_EXCL"
+hr_session_effect 'printf "import os\\n" > x.pth\ntouch -t 200001010000 x.pth\n'
+hr_run
+need "rc 21" test "$RC" = 21
+need "final line" final_is "$STDOUT" gave-up-planted-python
+need "DM names the file" dm_has "planted-python: x.pth"
+need "removed" test ! -e "$WTH/x.pth"
+need "no post-plan call" no_ppn
+cp "$TMP/exclude.orig" "$HR_EXCL"; rm -f "$WTH/x.pth"
+case_end holdrepeat-backdated-planted-pth
+fi
+
+if should_run "holdrepeat-backdated-main-harness-py"; then
+hr_reset
+cp "$HR_EXCL" "$TMP/exclude.orig"; printf '/tools/postplan-harness/sitecustomize.py\n' >> "$HR_EXCL"
+HR_MAIN_PY="$MAIN/tools/postplan-harness/sitecustomize.py"
+hr_session_effect "$(printf 'mkdir -p %q\nprintf "x = 1\\\\n" > %q\ntouch -t 200001010000 %q\n' "$MAIN/tools/postplan-harness" "$HR_MAIN_PY" "$HR_MAIN_PY")"
+hr_run
+need "rc 21" test "$RC" = 21
+need "final line" final_is "$STDOUT" gave-up-gate-path
+need "DM names the file" dm_has "main checkout ignored file written (tools/postplan-harness/sitecustomize.py)"
+need "no post-plan call" no_ppn
+cp "$TMP/exclude.orig" "$HR_EXCL"; rm -f "$HR_MAIN_PY"
+case_end holdrepeat-backdated-main-harness-py
+fi
+
+if should_run "holdrepeat-ignored-rewrite-backdated"; then
+hr_reset
+cp "$HR_EXCL" "$TMP/exclude.orig"; printf '/bin/postplan-preexisting\n' >> "$HR_EXCL"
+printf 'orig\n' > "$WTH/bin/postplan-preexisting"; touch -t 200001010000 "$WTH/bin/postplan-preexisting"
+hr_session_effect 'printf "evil\\n" > bin/postplan-preexisting\ntouch -t 200001010000 bin/postplan-preexisting\n'
+hr_run
+need "rc 21" test "$RC" = 21
+need "final line" final_is "$STDOUT" gave-up-gate-path
+need "DM names the file" dm_has "gate-path: bin/postplan-preexisting (ignored file written)"
+need "no post-plan call" no_ppn
+cp "$TMP/exclude.orig" "$HR_EXCL"; rm -f "$WTH/bin/postplan-preexisting"
+case_end holdrepeat-ignored-rewrite-backdated
+fi
+
+if should_run "holdrepeat-user-hook-backdated"; then
+hr_reset
+printf 'orig\n' > "$HOME/.claude/hooks/existing.sh"; touch -t 200001010000 "$HOME/.claude/hooks/existing.sh"
+hr_session_effect "$(printf 'printf "evil\\\\n" > %q\ntouch -t 200001010000 %q\n' "$HOME/.claude/hooks/existing.sh" "$HOME/.claude/hooks/existing.sh")"
+hr_run
+need "rc 21" test "$RC" = 21
+need "final line" final_is "$STDOUT" gave-up-gate-path
+need "DM names the hooks dir" dm_has "a file under ~/.claude/hooks changed"
+need "no post-plan call" no_ppn
+rm -f "$HOME/.claude/hooks/existing.sh"
+case_end holdrepeat-user-hook-backdated
+fi
+
+# gap B: a master commit must be GitHub-signed and introduced by a merged PR
+HR_SIGNED='{"commit":{"verification":{"verified":true},"committer":{"email":"noreply@github.com"}}}'
+HR_UNSIGNED='{"commit":{"verification":{"verified":false},"committer":{"email":"noreply@github.com"}}}'
+HR_PR_MERGED='[{"merged_at":"2026-11-20T00:00:00Z","base":{"ref":"master"}}]'
+HR_PR_OPEN='[{"merged_at":null,"base":{"ref":"master"}}]'
+hr_master_effect() {  # <commit json> <pulls json>: fix, then push a master commit GitHub describes with these
+    { cat "$TMP/effects/hr-fix.sh"; printf 'export GIT_COMMITTER_EMAIL=noreply@github.com\n'; cat "$TMP/effects/hr-masterpush.sh"
+      printf 'printf "%%s" %q > %q/gh.commit.$sha.json\n' "$1" "$TMP"
+      printf 'printf "%%s" %q > %q/gh.pulls.$sha.json\n' "$2" "$TMP"
+    } > "$TMP/effects/hr-master.sh"
+    export CLAUDE_STUB_REPLY="$TMP/reply-hr-fixed" CLAUDE_STUB_EFFECT="$TMP/effects/hr-master.sh"
+}
+hr_master_restore() { git --git-dir="$TMP/origin.git" update-ref refs/heads/master "$HR_MASTER_ORIG"; }
+
+if should_run "holdrepeat-master-merge-proof"; then
+hr_reset
+export CLAUDE_STUB_REPLY="$TMP/reply-hr-fixed" CLAUDE_STUB_EFFECT="$TMP/effects/hr-fix.sh"
+hr_run
+need "no master move: rc 0 (stderr: $ERR)" test "$RC" = 0
+need "no master move: final line" final_is "$STDOUT" fixed
+if gh_has "IBL5/commits/"; then fail "no master move: a commit lookup ran"; fi
+hr_reset
+hr_master_effect "$HR_SIGNED" "$HR_PR_MERGED"
+hr_run
+hr_master_restore
+need "signed merge: rc 0 (stderr: $ERR)" test "$RC" = 0
+need "signed merge: final line" final_is "$STDOUT" fixed
+case_end holdrepeat-master-merge-proof
+fi
+
+if should_run "holdrepeat-master-merge-near-miss"; then
+hr_near_miss() {  # <label> <commit json> <pulls json>
+    hr_reset
+    hr_master_effect "$2" "$3"
+    hr_run
+    hr_master_restore
+    need "$1: rc 21" test "$RC" = 21
+    need "$1: final line" final_is "$STDOUT" gave-up-master-push
+    need "$1: DM names it" dm_has "origin/master got a direct push"
+    need "$1: no post-plan call" no_ppn
+}
+hr_near_miss "open PR" "$HR_SIGNED" "$HR_PR_OPEN"
+hr_near_miss "unsigned commit" "$HR_UNSIGNED" "$HR_PR_MERGED"
+hr_near_miss "no PR" "$HR_SIGNED" '[]'
+case_end holdrepeat-master-merge-near-miss
+fi
+
+if should_run "holdrepeat-master-verify-unreadable"; then
+hr_reset
+touch "$TMP/gh.commits.fail"
+hr_master_effect "$HR_SIGNED" "$HR_PR_MERGED"
+hr_run
+hr_master_restore
+rm -f "$TMP/gh.commits.fail"
+need "rc 21" test "$RC" = 21
+need "final line" final_is "$STDOUT" gave-up-master-push
+need "DM names the lookup" dm_has "could not verify origin/master commit"
+need "no post-plan call" no_ppn
+case_end holdrepeat-master-verify-unreadable
+fi
+
+# gap C: git config, hooks and gitdir pointers every later git call loads
+if should_run "holdrepeat-git-config-fsmonitor"; then
+hr_reset; hr_gc_setup
+hr_session_effect "$(printf 'git config core.fsmonitor %q\n' "$TMP/fsmon.sh")"
+hr_run
+need "rc 21" test "$RC" = 21
+need "final line" final_is "$STDOUT" gave-up-git-config
+need "DM names it" dm_has "git-config: "
+need "fsmonitor never ran" test ! -e "$TMP/fsmon.hit"
+need "config restored" test -z "$(git -C "$WTH" config --get core.fsmonitor)"
+need "no post-plan call" no_ppn
+git -C "$WTH" config --unset-all core.fsmonitor 2>/dev/null || true
+case_end holdrepeat-git-config-fsmonitor
+fi
+
+if should_run "holdrepeat-git-hook-planted"; then
+hr_reset; hr_gc_setup
+hr_session_effect "$(printf 'mkdir -p %q\nprintf "#!/bin/sh\\\\necho hit >> %s\\\\nexit 1\\\\n" > %q/pre-commit\nchmod +x %q/pre-commit\n' "$HR_HOOKS" "$TMP/hook.hit" "$HR_HOOKS" "$HR_HOOKS")"
+hr_run
+need "rc 21" test "$RC" = 21
+need "final line" final_is "$STDOUT" gave-up-git-config
+need "hook never ran" test ! -e "$TMP/hook.hit"
+need "hook removed" test ! -e "$HR_HOOKS/pre-commit"
+need "no post-plan call" no_ppn
+rm -f "$HR_HOOKS/pre-commit"
+case_end holdrepeat-git-hook-planted
+fi
+
+if should_run "holdrepeat-gitdir-pointer-restored"; then
+hr_reset; hr_gc_setup
+cp "$WTH/.git" "$TMP/dotgit.orig"
+hr_session_effect "$(printf 'printf "gitdir: %%s\\\\n" %q > .git\n' "$TMP/no-such-gitdir")"
+hr_run
+need "rc 21" test "$RC" = 21
+need "final line" final_is "$STDOUT" gave-up-git-config
+need ".git restored" cmp -s "$WTH/.git" "$TMP/dotgit.orig"
+need "no post-plan call" no_ppn
+cp "$TMP/dotgit.orig" "$WTH/.git"
+case_end holdrepeat-gitdir-pointer-restored
+fi
+
+if should_run "holdrepeat-git-config-global-insteadof"; then
+if [[ "$HOME" == "$TMP"/* ]]; then
+hr_reset; hr_gc_setup
+git clone -q --bare "$TMP/origin.git" "$TMP/evil.git"
+hr_session_effect "$(printf 'git config --global url.%q.insteadOf "$(git remote get-url origin)"\n' "$TMP/evil.git")"
+hr_run
+need "rc 21" test "$RC" = 21
+need "final line" final_is "$STDOUT" gave-up-git-config
+need "DM names the file" dm_has ".gitconfig"
+need "no url.insteadOf left" test -z "$(git config --global --get-regexp insteadof 2>/dev/null)"
+need "origin unchanged" origin_is_tip
+git config --global --remove-section "url.$TMP/evil.git" 2>/dev/null || true; rm -rf "$TMP/evil.git"
+else fail "holdrepeat-git-config-global-insteadof: HOME is not under TMP; refusing a write to the real home"; fi
+case_end holdrepeat-git-config-global-insteadof
+fi
+
+if should_run "holdrepeat-git-config-xdg-empty"; then
+if [[ "$HOME" == "$TMP"/* ]]; then
+hr_reset; hr_gc_setup
+need "xdg config absent" test ! -e "$HOME/.config/git/config"
+export XDG_CONFIG_HOME=""
+hr_session_effect "$(printf 'mkdir -p "$HOME/.config/git"\ngit config --file "$HOME/.config/git/config" core.fsmonitor %q\n' "$TMP/fsmon.sh")"
+hr_run
+need "rc 21" test "$RC" = 21
+need "final line" final_is "$STDOUT" gave-up-git-config
+need "xdg config removed" test ! -e "$HOME/.config/git/config"
+need "fsmonitor never ran" test ! -e "$TMP/fsmon.hit"
+unset XDG_CONFIG_HOME; rm -f "$HOME/.config/git/config"
+else fail "holdrepeat-git-config-xdg-empty: HOME is not under TMP; refusing a write to the real home"; fi
+case_end holdrepeat-git-config-xdg-empty
+fi
+
+if should_run "holdrepeat-git-config-touch-only"; then
+hr_reset; hr_gc_setup
+hr_session_effect "$(printf 'touch -t 200001010000 "$(git rev-parse --path-format=absolute --git-common-dir)/config" %q\n' "$HR_EXCL")"
+hr_run
+need "rc 0 (stderr: $ERR)" test "$RC" = 0
+need "final line" final_is "$STDOUT" fixed
+case_end holdrepeat-git-config-touch-only
+fi
+
+if should_run "holdrepeat-git-config-other-branch-key"; then
+hr_reset; hr_gc_setup
+hr_session_effect 'git config branch.other-slug.iblBase master\n'
+hr_run
+need "rc 0 (stderr: $ERR)" test "$RC" = 0
+need "final line" final_is "$STDOUT" fixed
+need "other branch key kept" test "$(git -C "$WTH" config --get branch.other-slug.iblBase)" = master
+git -C "$WTH" config --unset branch.other-slug.iblBase 2>/dev/null || true
+case_end holdrepeat-git-config-other-branch-key
+fi
+
+if should_run "holdrepeat-git-config-own-branch-key"; then
+hr_reset; hr_gc_setup
+hr_session_effect "$(printf 'git config branch.%q.pushRemote origin\n' "$B_HR")"
+hr_run
+need "rc 21" test "$RC" = 21
+need "final line" final_is "$STDOUT" gave-up-git-config
+need "own key restored" test -z "$(git -C "$WTH" config --get "branch.$B_HR.pushRemote")"
+git -C "$WTH" config --unset "branch.$B_HR.pushRemote" 2>/dev/null || true
+case_end holdrepeat-git-config-own-branch-key
 fi
 
 # 55 (the plan comment is verified by the URL gh pr comment printed, so a first page of

@@ -14,8 +14,8 @@ use Psr\Log\LoggerInterface;
  */
 final class PublishEnqueuer
 {
-    /** @var callable(): void */
-    private $poke;
+    /** @var \Closure(): void */
+    private \Closure $poke;
 
     private readonly LoggerInterface $logger;
 
@@ -28,7 +28,7 @@ final class PublishEnqueuer
         callable $poke,
         ?LoggerInterface $logger = null,
     ) {
-        $this->poke = $poke;
+        $this->poke = \Closure::fromCallable($poke);
         $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('sim-recap');
     }
 

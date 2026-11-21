@@ -52,6 +52,7 @@ class PlayerViewFactory
      * @param int|null $pageType One of the PlayerPageType constants
      * @return PlayerViewInterface|object The view instance
      */
+    // @phpstan-ignore ibl.bareObjectType (returns one of 13 view classes with no shared supertype)
     public function createView(?int $pageType): object
     {
         return match ($pageType) {

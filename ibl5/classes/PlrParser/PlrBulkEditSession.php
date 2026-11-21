@@ -71,7 +71,7 @@ final class PlrBulkEditSession
      * @return resource
      * @throws \RuntimeException source missing/unreadable, backup failed, or fopen failed
      */
-    public function open()
+    public function open(): mixed
     {
         if (!is_file($this->plrPath) || !is_readable($this->plrPath)) {
             throw new \RuntimeException("PLR file not found or unreadable: {$this->plrPath}");
@@ -97,7 +97,7 @@ final class PlrBulkEditSession
      * @param resource $handle
      * @throws \RuntimeException when a live write is short or a dry-run seek fails
      */
-    public function write($handle, string $bytes): void
+    public function write(mixed $handle, string $bytes): void
     {
         if ($this->dryRun) {
             if (fseek($handle, strlen($bytes), SEEK_CUR) === -1) {

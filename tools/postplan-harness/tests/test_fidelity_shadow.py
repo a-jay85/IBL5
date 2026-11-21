@@ -655,6 +655,14 @@ class TestReviewerArmingHolds:
             (self._with_item(self._rec(merge_hold=False), "method", "foo"), [], "+def foo(x):\n"),
             (self._with_item(self._rec(merge_hold=False), "method", "foo"), [], "+def foobar(x):\n"),
         ]
+        # A landed item beside an unlanded one: the hold for the unlanded item must survive.
+        mixed = self._rec(merge_hold=False)
+        mixed["fields"]["planned_landed"]["missing"] = [
+            {"kind": "file", "token": "a.py", "why": "planned"},
+            {"kind": "file", "token": "b.py", "why": "planned"}]
+        assert fidelity.reviewer_arming_holds(
+            mixed, ["a.py"], "", lambda m: None) == ["planned-landed: file:b.py"]
+        cases.append((mixed, ["a.py"], ""))
         for rec, files, diff in cases:
             assert (fidelity.reviewer_arming_holds(rec, files, diff, lambda m: None)
                     == fidelity.reviewer_arming_holds(rec, files, diff, lambda m: None,

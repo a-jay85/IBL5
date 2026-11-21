@@ -1,0 +1,12 @@
+mode: set
+github.com/a-jay85/IBL5/engine/internal/sim/aggregate.go:35.2,36.36 2 1
+github.com/a-jay85/IBL5/engine/internal/sim/aggregate.go:37.3,38.1 1 1
+github.com/a-jay85/IBL5/engine/internal/sim/aggregate.go:39.2,39.33 1 1
+github.com/a-jay85/IBL5/engine/internal/sim/aggregate.go:40.3,41.1 1 1
+github.com/a-jay85/IBL5/engine/internal/sim/aggregate.go:45.2,46.23 2 1
+github.com/a-jay85/IBL5/engine/internal/sim/aggregate.go:47.3,48.1 1 1
+github.com/a-jay85/IBL5/engine/internal/sim/aggregate.go:35.2,36.36 2 1
+github.com/a-jay85/IBL5/engine/internal/sim/aggregate.go:37.3,38.1 1 1
+github.com/a-jay85/IBL5/engine/internal/result/result.go:85.2,85.11 1 0
+github.com/a-jay85/IBL5/engine/internal/result/result.go:87.3,87.24 1 0
+github.com/a-jay85/IBL5/engine/internal/result/result.go:89.3,89.26 1 0

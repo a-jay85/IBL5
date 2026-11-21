@@ -50,6 +50,9 @@ CAPTURE_FORMAT = "jsb-trace/1"
 CAPTURE_SOURCES = ("frida", "x32dbg")
 _ADDRESS = re.compile(r"^0x[0-9a-f]+$")
 _PACKAGE = re.compile(r"^\./[A-Za-z0-9_./-]+$")
+GO_MOD = "engine/go.mod"
+_HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
+_COVER_LINE = re.compile(r"^(.+\.go):(\d+)\.\d+,(\d+)\.\d+ \d+ (\d+)$")
 
 
 def evidence_rel(branch) -> str:
@@ -196,15 +199,19 @@ def parse_go_test_json(stdout, test) -> str:
     return "absent"
 
 
-def run_go_test(root, package, test, env=None) -> str:
+def run_go_test(root, package, test, env=None, cover_profile=None, cover_pkgs=()) -> str:
     """The verdict of one `go test -json -run '^<test>$' <package>` run in `<root>/engine`."""
     if shutil.which("go") is None:
         return "go-unavailable"
     run_env = {k: v for k, v in os.environ.items() if k != "JSB_TRACE_CAPTURE_DIR"}
     run_env.update(env or {})
+    cmd = ["go", "test", "-count=1", "-json", "-run", f"^{test}$"]
+    if cover_profile:
+        cmd += ["-covermode=set", f"-coverpkg={','.join(cover_pkgs)}", f"-coverprofile={cover_profile}"]
+    cmd.append(package)
     try:
         proc = subprocess.run(
-            ["go", "test", "-count=1", "-json", "-run", f"^{test}$", package],
+            cmd,
             cwd=str(Path(root) / "engine"), env=run_env, capture_output=True, text=True,
             timeout=GO_TIMEOUT)
     except subprocess.TimeoutExpired:
@@ -308,12 +315,92 @@ def _check_capture(root, base, entry) -> str:
     return "ok"
 
 
-def _run_entry(root, entry, run_go) -> str:
+def _module_path(root) -> str:
+    """The module line of engine/go.mod, or "" when it is missing."""
+    try:
+        text = (Path(root) / GO_MOD).read_text()
+    except OSError:
+        return ""
+    found = re.search(r"^module\s+(\S+)\s*$", text, re.M)
+    return found.group(1) if found else ""
+
+
+def _cover_pkgs(module, ported):
+    dirs = {str(Path(p).parent.relative_to("engine")) for p in ported}
+    return sorted(module if d == "." else f"{module}/{d}" for d in dirs)
+
+
+def parse_cover_profile(text, module):
+    """{repo path: [(start line, end line, count)]} of a -coverprofile file, or None when
+    the text is not one. Blocks of other modules are dropped."""
+    lines = [ln for ln in (text or "").splitlines() if ln.strip()]
+    if not lines or not lines[0].startswith("mode: ") or not module:
+        return None
+    prefix = module + "/"
+    blocks = {}
+    for line in lines[1:]:
+        found = _COVER_LINE.match(line)
+        if not found:
+            return None  # malformed profile line
+        name = found.group(1)
+        if not name.startswith(prefix):
+            continue
+        rel = "engine/" + name[len(prefix):]
+        blocks.setdefault(rel, []).append(
+            (int(found.group(2)), int(found.group(3)), int(found.group(4))))
+    return blocks
+
+
+def added_lines(root, base, path):
+    """Line numbers `path` adds in the work tree vs `base`; None on a git error."""
+    try:
+        _git(["cat-file", "-e", f"{base}:{path}"], cwd=str(root))
+    except subprocess.CalledProcessError:
+        text = (Path(root) / path).read_text()
+        return set(range(1, len(text.splitlines()) + 1))
+    try:
+        diff = _git(["diff", "-U0", "--no-color", "--no-renames", base, "--", path], cwd=str(root))
+    except (subprocess.CalledProcessError, OSError):
+        return None
+    lines = set()
+    for line in diff.splitlines():
+        hunk = _HUNK.match(line)
+        if hunk:
+            start = int(hunk.group(1))
+            count = int(hunk.group(2)) if hunk.group(2) is not None else 1
+            lines.update(range(start, start + count))
+    return lines
+
+
+def coverage_verdict(root, base, ported, blocks) -> str:
+    """ok when the run executed at least one added line of every declared file."""
+    for path in sorted(ported):
+        added = added_lines(root, base, path)
+        if added is None:
+            return f"diff-unreadable: {path}"
+        spans = blocks.get(path, ())
+        if not any(c > 0 and s <= n <= e for n in added for s, e, c in spans):
+            return f"unexercised-change: {path}"
+    return "ok"
+
+
+def _run_entry(root, base, entry, run_go) -> str:
     """Steps (c) and the perturbation run for one evidence entry."""
     test, package, capture = entry["test"], entry["package"], entry["capture"]
-    verdict = run_go(root, package, test)
-    if verdict != "pass":
-        return f"test-{verdict}"
+    ported, module = entry["ported_files"], _module_path(root)
+    with tempfile.TemporaryDirectory(prefix="trace-pinned-cover-") as cover_dir:
+        profile = Path(cover_dir) / "cover.out"
+        verdict = run_go(root, package, test, cover_profile=str(profile),
+                         cover_pkgs=_cover_pkgs(module, ported))
+        if verdict != "pass":
+            return f"test-{verdict}"
+        text = profile.read_text() if profile.is_file() else ""
+    blocks = parse_cover_profile(text, module)
+    if blocks is None:
+        return "coverage-unreadable"
+    covered = coverage_verdict(root, base, ported, blocks)
+    if covered != "ok":
+        return covered
     with tempfile.TemporaryDirectory(prefix="trace-pinned-") as tmp:
         if write_perturbed_dir(root, capture, tmp) == 0:
             return "capture-out-unperturbable"
@@ -344,7 +431,7 @@ def evaluate_data(root, branch, base, changed_files, data, run_go=None) -> str:
         for step in (lambda: _check_ported(root, entry, changed),
                      lambda: _check_test_entry(root, entry, changed),
                      lambda: _check_capture(root, base, entry),
-                     lambda: _run_entry(root, entry, run_go)):
+                     lambda: _run_entry(root, base, entry, run_go)):
             note = step()
             if note != "ok":
                 return note

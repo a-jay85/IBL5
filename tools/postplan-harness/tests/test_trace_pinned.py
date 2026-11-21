@@ -23,6 +23,7 @@ CAPTURE = f"engine/testdata/jsb-captures/{CAPTURE_NAME}"
 TEST_FILE = "engine/internal/sim/foul_roll_trace_test.go"
 ENGINE_FILE = "engine/internal/sim/foul.go"
 GOLDEN = "engine/internal/sim/testdata/golden.json"
+MODULE = "github.com/a-jay85/IBL5/engine"
 EVIDENCE = f"engine/trace-evidence/{BRANCH}.json"
 CHANGED = [ENGINE_FILE, TEST_FILE, GOLDEN, EVIDENCE]
 
@@ -85,14 +86,26 @@ def _make_repo(tmp_path, capture_text=None):
     return root, base
 
 
-def _fake_go(normal="pass", perturbed="fail", calls=None, capture_name=CAPTURE_NAME):
-    def run_go(root, package, test, env=None):
+def _profile(covered, zero=(), span=(1, 10000)):
+    rows = ["mode: set"]
+    for path, count in [*((p, 1) for p in covered), *((p, 0) for p in zero)]:
+        rows.append(f"{MODULE}/{path[len('engine/'):]}:{span[0]}.1,{span[1]}.2 1 {count}")
+    return "\n".join(rows) + "\n"
+
+
+def _fake_go(normal="pass", perturbed="fail", calls=None, capture_name=CAPTURE_NAME,
+             covered=(ENGINE_FILE,), zero=(), span=(1, 10000), write_profile=True, pkgs=None):
+    def run_go(root, package, test, env=None, cover_profile=None, cover_pkgs=()):
         if calls is not None:
             calls.append(env)
         if env:
             moved = Path(env["JSB_TRACE_CAPTURE_DIR"]) / capture_name
             assert moved.read_text() != (Path(root) / tp.CAPTURE_DIR / capture_name).read_text()
             return perturbed
+        if pkgs is not None and cover_profile:
+            pkgs.append(list(cover_pkgs))
+        if cover_profile and write_profile:
+            Path(cover_profile).write_text(_profile(covered, zero, span))
         return normal
     return run_go
 
@@ -502,3 +515,81 @@ def test_record_refuses_empty_ported_item(tmp_path, capsys):
                      ported_specs=[f"{ENGINE_FILE},"]) == 1
     assert "ported-bad-path: " in capsys.readouterr().err
     assert not (root / EVIDENCE).exists()
+
+
+def test_declared_unrelated_edit_unexercised_holds(repo):
+    root, base = repo
+    _write(root, UNRELATED, "package backup\n\nfunc assemble() int { return 2 }\n")
+    _write_evidence(root, ported_files=[ENGINE_FILE, UNRELATED])
+    assert _verdict(root, base, changed=[*CHANGED, UNRELATED]) == f"unexercised-change: {UNRELATED}"
+
+
+def test_change_outside_covered_block_holds(repo):
+    root, base = repo
+    assert _verdict(root, base, run_go=_fake_go(span=(50, 60))) == f"unexercised-change: {ENGINE_FILE}"
+
+
+def test_zero_count_block_holds(repo):
+    root, base = repo
+    go = _fake_go(covered=(), zero=(ENGINE_FILE,))
+    assert _verdict(root, base, run_go=go) == f"unexercised-change: {ENGINE_FILE}"
+
+
+def test_missing_cover_profile_holds(repo):
+    root, base = repo
+    assert _verdict(root, base, run_go=_fake_go(write_profile=False)) == "coverage-unreadable"
+
+
+def test_added_lines_reads_zero_context_hunks(repo):
+    root, base = repo
+    assert tp.added_lines(root, base, ENGINE_FILE) == {3}   # git prints "@@ -3 +3 @@"
+    _write(root, ENGINE_FILE, "package sim\n\n")            # pure deletion of line 3
+    assert tp.added_lines(root, base, ENGINE_FILE) == set()
+    assert _verdict(root, base) == f"unexercised-change: {ENGINE_FILE}"
+
+
+def test_added_lines_new_file_counts_every_line(repo):
+    root, base = repo
+    fresh = "engine/internal/sim/fresh.go"
+    _write(root, fresh, "package sim\n\nfunc fresh() int {\n\treturn 4\n}\n")
+    assert tp.added_lines(root, base, fresh) == {1, 2, 3, 4, 5}
+
+
+def test_parse_cover_profile_reads_real_profile():
+    text = (FIXTURES / "cover-real-set.out").read_text()
+    blocks = tp.parse_cover_profile(text, MODULE)
+    assert blocks
+    assert all(k.startswith("engine/internal/") and k.endswith(".go") for k in blocks)
+    assert sum(len(v) for v in blocks.values()) == len(text.strip().splitlines()) - 1
+    assert any(c > 0 for v in blocks.values() for _, _, c in v)
+
+
+def test_parse_cover_profile_rejects_near_miss_lines():
+    line = f"{MODULE}/internal/sim/foul.go:3.1,4.2 1 1"
+    assert tp.parse_cover_profile(f"mode: set\n{line[:-2]}\n", MODULE) is None   # count missing
+    assert tp.parse_cover_profile(f"{line}\n", MODULE) is None                   # no mode header
+    other = "example.com/other/x.go:1.1,2.2 1 1"
+    assert tp.parse_cover_profile(f"mode: set\n{other}\n{line}\n", MODULE) \
+        == {"engine/internal/sim/foul.go": [(3, 4, 1)]}
+
+
+def test_run_go_test_passes_cover_flags(monkeypatch, tmp_path):
+    seen = []
+    monkeypatch.setattr(tp.shutil, "which", lambda name: "/usr/local/bin/go")
+    monkeypatch.setattr(tp.subprocess, "run", lambda argv, **kw: seen.append(argv) or
+                        subprocess.CompletedProcess(argv, 0, stdout="", stderr=""))
+    tp.run_go_test(tmp_path, PACKAGE, TEST, cover_profile="/tmp/c.out",
+                   cover_pkgs=[f"{MODULE}/internal/sim"])
+    tp.run_go_test(tmp_path, PACKAGE, TEST)
+    assert seen[0][-1] == PACKAGE and "-covermode=set" in seen[0]
+    assert f"-coverpkg={MODULE}/internal/sim" in seen[0] and "-coverprofile=/tmp/c.out" in seen[0]
+    assert not any(a.startswith("-cover") for a in seen[1])
+
+
+def test_cover_pkgs_follow_declared_files(repo):
+    root, base = repo
+    pkgs = []
+    assert _verdict(root, base, run_go=_fake_go(pkgs=pkgs)) == "ok"
+    assert pkgs == [[f"{MODULE}/internal/sim"]]
+    assert tp._cover_pkgs(MODULE, ["engine/internal/sim/a.go", "engine/internal/sim/b.go",
+                                   "engine/main.go"]) == [MODULE, f"{MODULE}/internal/sim"]

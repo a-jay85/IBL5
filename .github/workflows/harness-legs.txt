@@ -150,6 +150,7 @@
 2 bin/test-vr-apply-baselines
 2 bin/test-check-pr-manual-testing
 2 bin/test-post-merge-rows
+2 bin/test-post-merge-run
 2 bin/test-playwright-version
 2 bin/test-check-workflow-checkout
 2 bin/test-check-workflow-run-interpolation

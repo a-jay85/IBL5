@@ -1,0 +1,216 @@
+#!/usr/bin/env bash
+# test-post-merge-run — contract harness for bin/post-merge-run (ADR-0198).
+#
+# Usage: bin/test-post-merge-run
+#
+# Each case builds a throwaway git repo that holds a copy of the executor, the two libs it
+# sources, a stub bin/discord-dm, and a few step files. PR lists come in through
+# --prs-json, so no case touches gh or the network. HOME points at the case dir, so
+# state lands in $T/home/.ibl5-post-merge-run and never in the real home.
+# PMR_RUN_SRC overrides the executor source so a mutated scratch copy can be checked.
+
+set -uo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=bin/lib/harness.sh
+. "$SCRIPT_DIR/lib/harness.sh"
+H_FAIL_FD=2  # FAIL: lines stay on stderr, as in the sibling harnesses
+
+RUN_SRC="${PMR_RUN_SRC:-$SCRIPT_DIR/post-merge-run}"
+[ -f "$RUN_SRC" ] || { echo "STOP: no executor at $RUN_SRC" >&2; exit 1; }
+
+h_tmp SCRATCH
+trap 'h_cleanup' EXIT
+
+OID_MISSING="0123456789abcdef0123456789abcdef01234567"
+T=""; STATE=""; OUT=""; RC=0; HEAD_OID=""
+
+# mk_case <name>: fresh repo with executor, libs, stub DM and committed steps.
+mk_case() {
+    T="$SCRATCH/$1"
+    mkdir -p "$T/bin/lib" "$T/bin/post-merge-steps" "$T/home"
+    cp "$RUN_SRC" "$T/bin/post-merge-run"
+    cp "$SCRIPT_DIR/lib/post-merge-rows.sh" "$SCRIPT_DIR/lib/claim-file.sh" "$T/bin/lib/"
+    printf '#!/bin/bash\ncat >> "$HOME/dm.txt"\n' > "$T/bin/discord-dm"
+    printf '#!/bin/bash\necho "$*|${CLAUDE_HEADLESS:-}" >> "$HOME/calls"\n' > "$T/bin/post-merge-steps/ok-step"
+    printf '#!/bin/bash\nexit 3\n' > "$T/bin/post-merge-steps/fail-step"
+    printf '#!/bin/bash\nsleep 5\n' > "$T/bin/post-merge-steps/slow-step"
+    ln -s ok-step "$T/bin/post-merge-steps/link-step"
+    (
+        cd "$T" || exit 1
+        git init -q . && git config user.email t@t && git config user.name t
+        git add -A && git commit -q -m init
+    ) >/dev/null 2>&1
+    printf '#!/bin/bash\necho "ran" >> "$HOME/calls"\n' > "$T/bin/post-merge-steps/untracked-step"
+    HEAD_OID="$(git -C "$T" rev-parse HEAD)"
+    STATE="$T/home/.ibl5-post-merge-run"
+}
+
+set_since() { mkdir -p "$STATE" && printf '%s\n' "$1" > "$STATE/since"; }
+
+# mk_prs <num> <oid> <merged-epoch> <body> > $T/prs.json
+mk_prs() {
+    jq -n --argjson n "$1" --arg oid "$2" --argjson m "$3" --arg body "$4" \
+        '[{number: $n, mergedAt: ($m | todate), mergeCommit: {oid: $oid}, body: $body}]' > "$T/prs.json"
+}
+
+body_rows() {  # each arg is one row line
+    printf '## Behavior\n\nstuff\n\n## After merge\n\n'
+    local r
+    for r in "$@"; do printf '%s\n' "$r"; done
+}
+
+run_exec() {  # extra args after --tick; feeds $T/prs.json when the case wrote one
+    local feed=()
+    [ -f "$T/prs.json" ] && feed=(--prs-json "$T/prs.json")
+    OUT="$(HOME="$T/home" bash "$T/bin/post-merge-run" --tick ${feed[@]+"${feed[@]}"} "$@" 2>&1)"; RC=$?
+}
+
+calls() { cat "$T/home/calls" 2>/dev/null || true; }
+dms() { cat "$T/home/dm.txt" 2>/dev/null || true; }
+count_lines() { if [ -z "$1" ]; then echo 0; else printf '%s\n' "$1" | wc -l | tr -d ' '; fi; }
+
+NOW="$(date +%s)"
+
+# --- 16: a row runs once, with exactly --pr N and CLAUDE_HEADLESS=1 ------------------
+mk_case run_once; set_since 0
+mk_prs 7 "$HEAD_OID" "$NOW" "$(body_rows '- **Row 1** [auto:mac ok-step] — run the step')"
+run_exec; h_eq "run_once: first run exits 0" 0 "$RC"
+run_exec; h_eq "run_once: second run exits 0" 0 "$RC"
+h_eq "run_once: step ran exactly once" 1 "$(count_lines "$(calls)")"
+h_eq "run_once: argv is --pr 7 and CLAUDE_HEADLESS=1" "--pr 7|1" "$(calls | head -n 1)"
+h_exists "run_once: done marker written" "$STATE/done/7.row1"
+h_eq "run_once: a passing step sends no DM" "" "$(dms)"
+
+# --- 17: --dry-run runs nothing and writes no marker --------------------------------
+mk_case dry_run; set_since 0
+mk_prs 7 "$HEAD_OID" "$NOW" "$(body_rows '- **Row 1** [auto:mac ok-step] — run the step')"
+run_exec --dry-run
+h_eq "dry_run: exits 0" 0 "$RC"
+h_contains "dry_run: says what would run" "$OUT" "would run ok-step"
+h_eq "dry_run: step did not run" "" "$(calls)"
+h_absent "dry_run: no done marker" "$STATE/done/7.row1"
+h_absent "dry_run: no lock left" "$STATE/lock"
+
+# --- 18: allowlist ------------------------------------------------------------------
+mk_case allowlist; set_since 0
+mk_prs 7 "$HEAD_OID" "$NOW" "$(body_rows \
+    '- **Row 1** [auto:mac untracked-step] — x' \
+    '- **Row 2** [auto:mac link-step] — x' \
+    '- **Row 3** [auto:mac ../ok-step] — x' \
+    '- **Row 4** [auto:mac ok-step;touch-x] — x' \
+    '- **Row 5** [auto:mac missing-step] — x' \
+    '- **Row 6** [auto:mac ok-step] — $(touch '"$T"'/home/pwned) `touch '"$T"'/home/pwned2` --flag-from-body')"
+run_exec
+h_eq "allowlist: only the tracked regular step ran" 1 "$(count_lines "$(calls)")"
+h_eq "allowlist: argv is exactly --pr 7, headless set" "--pr 7|1" "$(calls | head -n 1)"
+h_absent "allowlist: body text never executed (\$())" "$T/home/pwned"
+h_absent "allowlist: body text never executed (backticks)" "$T/home/pwned2"
+h_absent "allowlist: untracked step has no marker as ok" "$STATE/done/7.row3"
+h_contains "allowlist: untracked step is reported" "$(dms)" "Row 1 [auto:mac untracked-step]: unknown-step"
+h_contains "allowlist: symlink step is reported" "$(dms)" "Row 2 [auto:mac link-step]: unknown-step"
+h_contains "allowlist: missing step is reported" "$(dms)" "Row 5 [auto:mac missing-step]: unknown-step"
+h_not_contains "allowlist: path-escape name is not a row" "$(dms)" "../ok-step"
+h_not_contains "allowlist: shell-metachar name is not a row" "$(dms)" "ok-step;touch-x"
+
+# --- 19: failures DM; a rerun does not repeat them ----------------------------------
+mk_case failure; set_since 0
+mk_prs 9 "$HEAD_OID" "$NOW" "$(body_rows '- **Row 1** [auto:mac fail-step] — x')"
+run_exec
+h_contains "failure: DM names the PR" "$(dms)" "PR #9"
+h_contains "failure: DM names the exit code" "$(dms)" "exit-3"
+h_contains "failure: DM names the log" "$(dms)" "$STATE/logs/9.row1.log"
+h_exists "failure: log written" "$STATE/logs/9.row1.log"
+run_exec
+h_eq "failure: rerun sends no second DM" 1 "$(dms | grep -c 'PR #9')"
+
+# unparseable row: no run, no DM
+mk_case unparseable; set_since 0
+mk_prs 9 "$HEAD_OID" "$NOW" "$(body_rows '- **Row 1** [auto:mac bad name] — x' '- **Row 2** [auto:nope ok-step] — x')"
+run_exec
+h_eq "unparseable: nothing ran" "" "$(calls)"
+h_eq "unparseable: no DM" "" "$(dms)"
+
+# pending: merge commit not in the checkout yet, under 24h
+mk_case pending; set_since 0
+mk_prs 11 "$OID_MISSING" "$NOW" "$(body_rows '- **Row 1** [auto:mac ok-step] — x')"
+run_exec
+h_contains "pending: says pending" "$OUT" "pending"
+h_eq "pending: recent merge sends no DM" "" "$(dms)"
+h_absent "pending: no marker" "$STATE/done/11.row1"
+h_eq "pending: step did not run" "" "$(calls)"
+
+# checkout-behind: still missing after 24h
+mk_case behind; set_since 0
+mk_prs 11 "$OID_MISSING" "$((NOW - 2 * 86400))" "$(body_rows '- **Row 1** [auto:mac ok-step] — x')"
+run_exec
+h_contains "behind: DM says checkout-behind" "$(dms)" "checkout-behind"
+h_exists "behind: marker written so it does not repeat" "$STATE/done/11.row1"
+h_eq "behind: step did not run" "" "$(calls)"
+
+# --- 20: no back-fill; unrelated PR leaves state byte-identical ---------------------
+mk_case first_run
+mk_prs 7 "$HEAD_OID" "$NOW" "$(body_rows '- **Row 1** [auto:mac ok-step] — x')"
+run_exec
+h_eq "first_run: exits 0" 0 "$RC"
+h_exists "first_run: since recorded" "$STATE/since"
+h_contains "first_run: says no back-fill" "$OUT" "not back-filled"
+h_eq "first_run: nothing ran" "" "$(calls)"
+mk_case first_run_dry
+run_exec --dry-run
+h_absent "first_run: --dry-run records no since" "$STATE/since"
+
+mk_case before_since; set_since "$((NOW + 3600))"
+mk_prs 7 "$HEAD_OID" "$NOW" "$(body_rows '- **Row 1** [auto:mac ok-step] — x')"
+run_exec
+h_eq "before_since: PR merged before since is skipped" "" "$(calls)"
+
+mk_case unknown_pr; set_since 0
+mk_prs 7 "$HEAD_OID" "$NOW" "$(body_rows '- **Row 1** [manual] — click it')"
+run_exec   # builds done/ and logs/ once
+BEFORE="$(cd "$STATE" && find . | LC_ALL=C sort; cat "$STATE/since")"
+mk_prs 424242 "$HEAD_OID" "$NOW" "$(body_rows '- **Row 1** [manual] — other')"
+run_exec
+AFTER="$(cd "$STATE" && find . | LC_ALL=C sort; cat "$STATE/since")"
+h_eq "unknown_pr: state byte-identical" "$BEFORE" "$AFTER"
+h_eq "unknown_pr: nothing ran" "" "$(calls)"
+
+# --- 21: usage errors, watchdog, concurrent lock ------------------------------------
+mk_case usage; set_since 0
+run_exec --bogus
+h_eq "usage: --bogus exits 2" 2 "$RC"
+h_contains "usage: --bogus is named" "$OUT" "unknown option: --bogus"
+run_exec --step-timeout=5
+h_eq "usage: --step-timeout=5 (equals form) exits 2" 2 "$RC"
+h_contains "usage: equals form is unknown" "$OUT" "unknown option: --step-timeout=5"
+OUT="$(HOME="$T/home" bash "$T/bin/post-merge-run" 2>&1)"; RC=$?
+h_eq "usage: missing --tick exits 2" 2 "$RC"
+OUT="$(HOME="$T/home" bash "$T/bin/post-merge-run" --help 2>&1)"; RC=$?
+h_eq "usage: --help exits 0" 0 "$RC"
+h_contains "usage: --help lists --dry-run" "$OUT" "--dry-run"
+
+mk_case watchdog; set_since 0
+mk_prs 13 "$HEAD_OID" "$NOW" "$(body_rows '- **Row 1** [auto:mac slow-step] — x')"
+T0=$SECONDS
+run_exec --step-timeout 1
+h_contains "watchdog: hung step reported as timeout" "$(dms)" "timeout"
+h_eq "watchdog: run ended well before the step would have" 1 "$([ $((SECONDS - T0)) -lt 5 ] && echo 1 || echo 0)"
+
+mk_case lock_live; set_since 0
+mk_prs 7 "$HEAD_OID" "$NOW" "$(body_rows '- **Row 1** [auto:mac ok-step] — x')"
+sleep 30 & HOLDER=$!
+mkdir -p "$STATE/lock" && printf '%s\n' "$HOLDER" > "$STATE/lock/pid"
+run_exec
+kill "$HOLDER" 2>/dev/null; wait "$HOLDER" 2>/dev/null
+h_eq "lock_live: second sweep exits 0" 0 "$RC"
+h_contains "lock_live: says another run holds the lock" "$OUT" "another run holds the lock"
+h_eq "lock_live: step did not run" "" "$(calls)"
+h_exists "lock_live: holder's lock left alone" "$STATE/lock/pid"
+
+mk_case lock_stale; set_since 0
+mk_prs 7 "$HEAD_OID" "$NOW" "$(body_rows '- **Row 1** [auto:mac ok-step] — x')"
+mkdir -p "$STATE/lock" && printf '%s\n' 2147483646 > "$STATE/lock/pid"
+run_exec
+h_eq "lock_stale: dead holder is reaped and the step runs" 1 "$(count_lines "$(calls)")"
+h_absent "lock_stale: lock released at exit" "$STATE/lock"
+
+h_done

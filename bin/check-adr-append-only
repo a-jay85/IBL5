@@ -1,0 +1,372 @@
+#!/bin/bash
+#
+# bin/check-adr-append-only — fail a diff that rewrites or removes frozen ADR text.
+#
+# .claude/rules/adr-append-only.md says an accepted ADR's Context, Decision,
+# Rationale and Alternatives sections are frozen. A change of mind goes in a dated
+# `## Addendum`. Until this gate existed the rule was prose only, and two PRs
+# rewrote Decision text in place anyway.
+#
+# The gate reads `git diff -U0` against the merge-base of --since and the head,
+# maps each changed OLD-side line to its nearest preceding `## ` heading on the BASE
+# blob, and flags a rewrite or removal that lands inside the frozen set. Pure
+# insertions always pass, so appending an Addendum never trips it.
+#
+# Frozen set:
+#   - `## ` headings Context, Decision, Rationale, Alternatives Considered,
+#     Alternatives. The heading is lowercased and cut at the first "(", ":", " - "
+#     or " —" before it is matched exactly. A heading that contains "addendum",
+#     "update" or "correction" is never frozen. `### ` subheadings inherit their
+#     `## ` parent.
+#   - The frontmatter `description:` key. It summarises the decision.
+#   Everything else is free: the preamble (title, Status, Date, Deciders, Lineage),
+#   Consequences, References, every other heading, and the other frontmatter keys
+#   (so a `last_verified:` bump passes).
+#
+# Allowed edits inside the frozen set (the rule doc's list, nothing wider):
+#   - whitespace-only changes and blank-line removal,
+#   - an appended `[CORRECTED ...]` / `[SUPERSEDED ...]` / `**Superseded by:**` stamp,
+#   - a dead-path repair: backtick spans swapped where the old span names a path
+#     that no longer exists at the head side, or ` (example)` appended to one.
+# A typo or wording fix is flagged. Put it in an Addendum or use the bypass.
+#
+# File status: a new ADR passes. A deleted ADR fails. A pure rename (R100) passes.
+# A rename with edits is diffed from the old path to the new path.
+#
+# Bypass: add `<!-- adr-edit-ok: NNNN <reason, 15+ chars> -->` to the PR body, one
+# marker per ADR number, passed to this script as the PR_BODY env var. PR_BODY
+# unset and PR_BODY empty both mean no bypass. A reason shorter than 15 chars
+# prints a WARN line and does not bypass. The marker lives in the PR body, not the
+# file, so it never exempts a later edit.
+#
+# docfix interaction: this gate also fails the same-line numeric ADR corrections
+# that bin/docfix-check-veronly arms. The rule forbids them. The docfix prompt
+# already says to append an Addendum, so a red run only stops edits that ignored it.
+#
+# Usage: bin/check-adr-append-only --since=<base-ref> [--head=<rev>]
+#   --since=<base-ref>  required; CI passes the PR base SHA (the parent branch head
+#                       for a stacked PR). Never derived from repo state.
+#   --head=<rev>        optional; default compares against the working tree
+#                       (staged plus unstaged), the same view bin/check-docs uses.
+#
+# The script writes nothing inside the repo.
+#
+# Exit codes: 0 = pass, 1 = frozen-section change found, 2 = usage error.
+
+set -euo pipefail
+
+MIN_REASON_LEN=15
+MARKER_RE='<!--[[:space:]]*adr-edit-ok:[[:space:]]*[0-9]{4}[[:space:]][^>]*-->'
+STAMP_RE='\[(CORRECTED|SUPERSEDED)[^]]*\]|\*\*Superseded by:\*\*'
+HUNK_RE='^@@ -([0-9]+)(,([0-9]+))? \+([0-9]+)(,([0-9]+))? @@'
+
+SINCE=""
+HEAD_REV=""
+
+die_usage() {
+    echo "check-adr-append-only: $1" >&2
+    exit 2
+}
+
+usage() {
+    echo "Usage: bin/check-adr-append-only --since=<base-ref> [--head=<rev>]"
+    echo "  Fails when a diff rewrites or removes frozen ADR text (Context, Decision,"
+    echo "  Rationale, Alternatives, frontmatter description). See .claude/rules/adr-append-only.md."
+}
+
+for arg in "$@"; do
+    case "$arg" in
+        -h|--help) usage; exit 0 ;;
+        --since=?*) SINCE="${arg#--since=}" ;;
+        --head=?*) HEAD_REV="${arg#--head=}" ;;
+        *) echo "check-adr-append-only: unknown argument '$arg' (flags take --flag=value form)" >&2; exit 2 ;;
+    esac
+done
+
+TOP=$(git rev-parse --show-toplevel 2>/dev/null) || die_usage "not inside a git repository"
+[ -n "$SINCE" ] || die_usage "--since=<base-ref> is required"
+git -C "$TOP" rev-parse --verify --quiet "$SINCE^{commit}" >/dev/null || die_usage "cannot resolve --since ref '$SINCE'"
+if [ -n "$HEAD_REV" ]; then
+    git -C "$TOP" rev-parse --verify --quiet "$HEAD_REV^{commit}" >/dev/null || die_usage "cannot resolve --head rev '$HEAD_REV'"
+fi
+
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
+
+MB=$(git -C "$TOP" merge-base "$SINCE" "${HEAD_REV:-HEAD}") || die_usage "no merge base between '$SINCE' and '${HEAD_REV:-HEAD}'"
+set -- "$MB" ${HEAD_REV:+"$HEAD_REV"}
+
+RAW="$WORK/raw"
+NAMES="$WORK/names"
+git -C "$TOP" diff --name-status -M "$@" -- ibl5/docs/decisions/ >"$RAW" || die_usage "git diff --name-status failed"
+# Keep top-level NNNN-*.md files only (README.md and nested dirs are skipped).
+awk -F'\t' '$NF ~ /^ibl5\/docs\/decisions\/[0-9][0-9][0-9][0-9]-[^\/]*\.md$/ { print }' "$RAW" >"$NAMES"
+[ -s "$NAMES" ] || { echo "check-adr-append-only: OK (no ADR modifications in range)"; exit 0; }
+
+# Section map of one ADR: "<line>\t<section key>" per line. Frontmatter lines map to
+# fm:description or fm:other; body lines map to the lowercased text of the nearest
+# preceding `## ` heading ("preamble" before the first one).
+cat >"$WORK/sec.awk" <<'AWK'
+BEGIN { sec = "preamble"; key = "other" }
+  NR == 1 && $0 == "---" { fm = 1; print NR "\tfm:other"; next }
+  fm == 1 && $0 == "---" { fm = 2; print NR "\tfm:other"; next }
+  fm == 1 && /^description:/ { key = "description" }
+  fm == 1 && !/^description:/ && /^[A-Za-z_]+:/ { key = "other" }
+  fm == 1 { print NR "\tfm:" key; next }
+  /^## / { sec = tolower(substr($0, 4)) }
+  { print NR "\t" sec }
+AWK
+
+FROZEN_NAME=""
+BYPASS_REASON=""
+FILE_FINDINGS=""
+ALL_FINDINGS=""
+FAIL_COUNT=0
+CHECKED=0
+
+record() {
+    # $1 path, $2 old line number, $3 section, $4 kind, $5 old line text
+    FILE_FINDINGS="${FILE_FINDINGS}FAIL $1:$2 [$3] $4: ${5:0:120}"$'\n'
+}
+
+is_frozen_section() {
+    local s="$1"
+    FROZEN_NAME="$s"
+    case "$s" in
+        fm:description) return 0 ;;
+        fm:*|preamble) return 1 ;;
+        *addendum*|*update*|*correction*) return 1 ;;
+    esac
+    s="${s%"${s##*[![:space:]]}"}"
+    s="${s%%\(*}"
+    s="${s%%:*}"
+    s="${s%% - *}"
+    s="${s%% —*}"
+    s="${s%"${s##*[![:space:]]}"}"
+    FROZEN_NAME="$s"
+    case "$s" in
+        context|decision|rationale|"alternatives considered"|alternatives) return 0 ;;
+    esac
+    return 1
+}
+
+path_exists_at_head() {
+    local p="$1"
+    if [ -n "$HEAD_REV" ]; then
+        git -C "$TOP" cat-file -e "$HEAD_REV:$p" 2>/dev/null
+    else
+        [ -e "$TOP/$p" ]
+    fi
+}
+
+# Normalise one span: backticks off, trailing " (example)" off, trailing "/" and ":NN" off.
+span_path() {
+    local p="$1"
+    p="${p%\` \(example\)}"
+    p="${p#\`}"
+    p="${p%\`}"
+    p="${p%/}"
+    p=$(printf '%s' "$p" | sed -E 's/:[0-9]+(-[0-9]+)?$//')
+    printf '%s' "$p"
+}
+
+# True when every changed backtick span is a path that no longer exists at the head side.
+dead_path_repair() {
+    local old_line="$1" new_line="$2"
+    local span_re='`[^`]*`( \(example\))?'
+    local skel_old skel_new
+    skel_old=$(printf '%s' "$old_line" | sed -E "s/$span_re/\`@\`/g")
+    skel_new=$(printf '%s' "$new_line" | sed -E "s/$span_re/\`@\`/g")
+    [ "$skel_old" = "$skel_new" ] || return 1
+    printf '%s\n' "$old_line" | grep -oE "$span_re" >"$WORK/spans.old" || true
+    printf '%s\n' "$new_line" | grep -oE "$span_re" >"$WORK/spans.new" || true
+    local touched=0 o n p
+    local -a OSPANS=() NSPANS=()
+    while IFS= read -r o; do OSPANS[${#OSPANS[@]}]="$o"; done <"$WORK/spans.old"
+    while IFS= read -r n; do NSPANS[${#NSPANS[@]}]="$n"; done <"$WORK/spans.new"
+    [ "${#OSPANS[@]}" -eq "${#NSPANS[@]}" ] || return 1
+    local i=0
+    while [ "$i" -lt "${#OSPANS[@]}" ]; do
+        o="${OSPANS[$i]}"
+        n="${NSPANS[$i]}"
+        i=$((i + 1))
+        [ "$o" = "$n" ] && continue
+        touched=1
+        p=$(span_path "$o")
+        case "$p" in
+            */*) ;;
+            *) return 1 ;;
+        esac
+        case "$p" in
+            '~'*|/*|*://*|*[[:space:]]*) return 1 ;;
+        esac
+        o="$p"
+        path_exists_at_head "$o" && return 1  # live path: not a repair
+    done
+    [ "$touched" -eq 1 ] || return 1
+    return 0  # every changed span was a dead path
+}
+
+# True when the change from old line $1 to new line $2 is on the rule doc's allowed list.
+allowed_change() {
+    local o="$1" n="$2" o_r n_r suffix
+    o_r="${o%"${o##*[![:space:]]}"}"
+    n_r="${n%"${n##*[![:space:]]}"}"
+    [ "$o_r" = "$n_r" ] && return 0  # whitespace-only
+    case "$n" in "$o_r"*) suffix="${n#"$o_r"}"; grep -qE "$STAMP_RE" <<<"$suffix" && return 0 ;; esac  # stamp must extend the old line
+    dead_path_repair "$o" "$n" && return 0
+    return 1
+}
+
+# True (and sets BYPASS_REASON) when PR_BODY carries a valid marker for ADR number $1.
+bypassed() {
+    [ -n "${PR_BODY:-}" ] || return 1
+    local m body num reason
+    while IFS= read -r m; do
+        body="${m#<!--}"
+        body="${body%-->}"
+        body="${body#"${body%%[![:space:]]*}"}"
+        body="${body#adr-edit-ok:}"
+        body="${body#"${body%%[![:space:]]*}"}"
+        num="${body:0:4}"
+        [ "$num" = "$1" ] || continue
+        reason="${body:4}"
+        reason="${reason#"${reason%%[![:space:]]*}"}"
+        reason="${reason%"${reason##*[![:space:]]}"}"
+        if [ "${#reason}" -lt "$MIN_REASON_LEN" ]; then
+            echo "WARN short adr-edit-ok reason for $1 (need $MIN_REASON_LEN+ chars)"
+            continue
+        fi
+        BYPASS_REASON="$reason"
+        return 0
+    done <"$WORK/markers"
+    return 1
+}
+
+: >"$WORK/markers"
+if [ -n "${PR_BODY:-}" ]; then
+    printf '%s\n' "$PR_BODY" | grep -oE "$MARKER_RE" >"$WORK/markers" || true
+fi
+
+# Settle the findings of the file just processed: bypass them or keep them for the report.
+flush_file() {
+    [ -n "$FILE_FINDINGS" ] || return 0
+    local adr_num
+    adr_num="${FILE_PATH##*/}"
+    adr_num="${adr_num:0:4}"
+    if bypassed "$adr_num"; then
+        echo "BYPASSED $FILE_PATH ($BYPASS_REASON)"
+    else
+        ALL_FINDINGS="${ALL_FINDINGS}${FILE_FINDINGS}"
+        FAIL_COUNT=$((FAIL_COUNT + 1))
+    fi
+    FILE_FINDINGS=""
+}
+
+FILE_PATH=""
+while IFS=$'\t' read -r status a b; do
+    flush_file
+    if [ "${status#R}" != "$status" ]; then
+        src="$a"
+        path="$b"
+    else
+        src=""
+        path="$a"
+    fi
+    old_path="$path"
+    FILE_PATH="$path"
+    case "$status" in
+        A*) continue ;;  # new ADR file: nothing frozen yet
+        D*) record "$path" 0 "file" "deleted-file" "ADR file deleted"; continue ;;
+        R100*) continue ;;  # pure rename keeps every byte
+        R*) old_path="$src" ;;
+    esac
+    CHECKED=$((CHECKED + 1))
+
+    # Section map of the BASE blob, loaded into SEC[line].
+    SEC=()
+    git -C "$TOP" show "$MB:$old_path" >"$WORK/base.md" || die_usage "cannot read $old_path at $MB"
+    awk -f "$WORK/sec.awk" "$WORK/base.md" >"$WORK/map"
+    while IFS=$'\t' read -r mn ms; do
+        SEC[$mn]="$ms"
+    done <"$WORK/map"
+
+    # Collect hunks into flat arrays (bash 3.2 has no nested arrays).
+    git -C "$TOP" diff -U0 --no-color --no-ext-diff -M "$@" -- "$old_path" "$path" >"$WORK/diff" || die_usage "git diff failed for $path"
+    LK=()
+    LT=()
+    HOS=()
+    HOC=()
+    HFIRST=()
+    HEND=()
+    nl=0
+    h=0
+    while IFS= read -r line || [ -n "$line" ]; do
+        if [[ "$line" =~ $HUNK_RE ]]; then
+            h=$((h + 1))
+            HOS[$h]="${BASH_REMATCH[1]}"
+            HOC[$h]="${BASH_REMATCH[3]:-1}"
+            HFIRST[$h]="$nl"
+            HEND[$h]="$nl"
+            continue
+        fi
+        [ "$h" -gt 0 ] || continue
+        case "${line:0:1}" in
+            -) LK[$nl]="o" ;;
+            +) LK[$nl]="n" ;;
+            *) continue ;;
+        esac
+        LT[$nl]="${line:1}"
+        nl=$((nl + 1))
+        HEND[$h]="$nl"
+    done <"$WORK/diff"
+
+    for ((hh = 1; hh <= h; hh++)); do
+        old_start="${HOS[$hh]}"
+        old_count="${HOC[$hh]}"
+        OLD=()
+        NEW=()
+        no=0
+        nn=0
+        for ((k = HFIRST[hh]; k < HEND[hh]; k++)); do
+            if [ "${LK[$k]}" = "o" ]; then
+                OLD[$no]="${LT[$k]}"
+                no=$((no + 1))
+            else
+                NEW[$nn]="${LT[$k]}"
+                nn=$((nn + 1))
+            fi
+        done
+        [ "$old_count" -eq 0 ] && continue  # pure insertion
+        for ((i = 0; i < old_count; i++)); do
+            o="${OLD[$i]:-}"
+            ln=$((old_start + i))
+            sec="${SEC[$ln]:-preamble}"
+            is_frozen_section "$sec" || continue
+            sec="$FROZEN_NAME"
+            if [ "$i" -ge "$nn" ]; then
+                o_r="${o%"${o##*[![:space:]]}"}"
+                [ -n "$o_r" ] || continue
+                record "$path" "$ln" "$sec" "removal" "$o"
+            else
+                allowed_change "$o" "${NEW[$i]}" || record "$path" "$ln" "$sec" "rewrite" "$o"
+            fi
+        done
+    done
+
+done <"$NAMES"
+flush_file
+
+if [ -n "$ALL_FINDINGS" ]; then
+    printf '%s' "$ALL_FINDINGS"
+    echo ""
+    echo "check-adr-append-only: $FAIL_COUNT ADR file(s) changed frozen text."
+    echo "Frozen sections are Context, Decision, Rationale, Alternatives and the frontmatter description."
+    echo "See .claude/rules/adr-append-only.md. Restore the original text and append a dated"
+    echo "'## Addendum — <topic> (YYYY-MM-DD)' instead. If the edit is intended, add"
+    echo "'<!-- adr-edit-ok: NNNN <reason, 15+ chars> -->' to the PR body."
+    exit 1
+fi
+
+echo "check-adr-append-only: OK ($CHECKED ADR file(s) checked)"
+exit 0

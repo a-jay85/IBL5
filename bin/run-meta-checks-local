@@ -540,6 +540,7 @@ if [ "$STAGE" = "pre-push" ]; then
     queue_step "test-check-pipefail-assignment-guard" hard "$BIN/test-check-pipefail-assignment-guard"
     queue_step "check-pipefail-assignment-guard" hard "$BIN/check-pipefail-assignment-guard" "--since=$BASE"
     queue_step "check-exit-code-handling"      hard "$BIN/check-exit-code-handling" "--since=$BASE"
+    queue_step "check-adr-append-only"         hard "$BIN/check-adr-append-only" "--since=$BASE"
     queue_step "test-check-shell-portability"  hard "$BIN/test-check-shell-portability"
     queue_step "check-shell-portability"       hard "$BIN/check-shell-portability"
     queue_step "test-check-design-system"      hard "$BIN/test-check-design-system"

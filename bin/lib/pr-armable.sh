@@ -139,17 +139,25 @@ pr_manual_testing_clearance() {
 
 # pr_golden_hold <files_json>
 #   Phase 6.5 condition (5), detection only. Reports the raw FACT that the PR's
-#   `--json files` array touches the engine golden snapshot; the CALLER applies
+#   REST file list touches the engine golden snapshot (new or old path); the CALLER applies
 #   the mode policy (Phase 6.5: hold only when headless; pr-triage --arm: always
 #   hold). Echoes `golden-changed` when present, nothing otherwise.
 #   It also covers golden_seeds.sha256 and raw JSB captures, to match classify.py.
 #   The trace-pinned clearance lives only in harness.trace_pinned, so pr-triage --arm still holds every golden change for the owner.
-#   Pass the `.files` array, e.g. `gh pr view N --json files --jq '.files'`.
+#   Pass the REST list: gh api "repos/{o}/{r}/pulls/N/files?per_page=100" --paginate --slurp | jq -c 'add // []'
+#   `gh pr view N --json files` drops a rename's old path and caps at 100, so its shape holds.
 pr_golden_hold() {
     local files_json="$1"
-    if printf '%s' "$files_json" \
-        | jq -e 'any(.[]?; .path == "engine/internal/sim/testdata/golden.json" or .path == "engine/internal/sim/testdata/golden_seeds.sha256" or (.path | startswith("engine/testdata/jsb-captures/")))' \
-            >/dev/null 2>&1; then
+    # Wrong shape fails closed: not an array, 3000+ entries (the REST cap), an entry
+    # with no string .filename (the `gh pr view --json files` .path shape), or a
+    # rename with no old path. The existing token keeps every caller's hold logic.
+    if ! jq -e 'type == "array" and length < 3000 and all(.[]; (.filename | type) == "string" and (.status != "renamed" or ((.previous_filename // "") != "")))' \
+            <<< "$files_json" >/dev/null 2>&1; then
+        echo "golden-changed"
+        return
+    fi
+    if jq -e 'any(.[] | (.filename, (.previous_filename // empty)); . == "engine/internal/sim/testdata/golden.json" or . == "engine/internal/sim/testdata/golden_seeds.sha256" or startswith("engine/testdata/jsb-captures/"))' \
+            <<< "$files_json" >/dev/null 2>&1; then
         echo "golden-changed"
     fi
 }
@@ -473,7 +481,8 @@ pr_docs_refresh_rules_date_only() {
 #     docs-refresh:paths:<path>            first changed path pr_docs_refresh_path_ok rejects
 #     docs-refresh:merge-danger:<STATE>    state is anything other than TWO-WAY
 #     docs-refresh:verdict:<word>          selected verdict is anything other than READY
-#   <files_json> is the `.files` array (same shape pr_golden_hold reads).
+#   <files_json> is the REST pulls/N/files list (same shape pr_golden_hold reads).
+#     docs-refresh:paths:bad-shape         the list is not the REST shape (fail closed)
 #   <diff_file> (optional 5th arg) is a path to the PR's unified diff (any context
 #   width, e.g. `gh pr diff` output). A rules path passes the paths clause only
 #   when pr_docs_refresh_rules_date_only accepts it; absent, empty, or unreadable
@@ -489,8 +498,15 @@ pr_docs_refresh_hold() {
         *) echo "docs-refresh:branch:${head_ref:-<empty>}" ;;
     esac
     # `|| true`: jq exits non-zero on malformed JSON; an empty path list holds below.
-    paths=$(printf '%s' "$files_json" | jq -r '.[]?.path // empty' 2>/dev/null || true)
-    if [ -z "$paths" ]; then
+    # Wrong shape fails closed (same check as pr_golden_hold): gh's .path objects
+    # carry no rename old path, so a rename away from a non-docs path would pass.
+    local shape_ok=1
+    jq -e 'type == "array" and length < 3000 and all(.[]; (.filename | type) == "string" and (.status != "renamed" or ((.previous_filename // "") != "")))' \
+        <<< "$files_json" >/dev/null 2>&1 || shape_ok=0
+    paths=$(printf '%s' "$files_json" | jq -r '.[]? | (.filename // empty), (.previous_filename // empty)' 2>/dev/null || true)
+    if [ "$shape_ok" -eq 0 ]; then
+        echo "docs-refresh:paths:bad-shape"
+    elif [ -z "$paths" ]; then
         echo "docs-refresh:paths:empty"
     else
         while IFS= read -r p; do

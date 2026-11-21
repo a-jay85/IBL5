@@ -209,15 +209,25 @@ def test_run_arming_stacked_passes_review_base_inputs(tmp_path, monkeypatch):
     h = Harness(tmp_path, monkeypatch)
     stacked = _section("B.txt", 1, "x")
 
+    master_files, master_diffs = [], []
+
     class StackedGit(gitad.ReplayGit):
         def review_base(self):
             return ReviewBase(SHA, "parent")
 
         def diff_vs_base(self, base="origin/master"):
-            return stacked if base == SHA else super().diff_vs_base(base)
+            if base == SHA:
+                return stacked
+            out = super().diff_vs_base(base)
+            master_diffs.append(out)
+            return out
 
         def conformance_files(self, base="origin/master"):
-            return ["child.py"] if base == SHA else super().conformance_files(base)
+            if base == SHA:
+                return ["child.py"]
+            out = super().conformance_files(base)
+            master_files.append(out)
+            return out
 
     calls = _arming_spy(monkeypatch)
     monkeypatch.setattr(runner, "ReplayGit", StackedGit)
@@ -225,8 +235,8 @@ def test_run_arming_stacked_passes_review_base_inputs(tmp_path, monkeypatch):
     assert len(calls) == 1
     args, kwargs = calls[0]
     assert kwargs["review_inputs"] == (["child.py"], stacked)
-    assert args[1] != ["child.py"]
-    assert args[2] != stacked
+    assert args[1] in master_files and args[1] != ["child.py"]
+    assert args[2] in master_diffs and args[2] != stacked
 
 
 def test_run_arming_master_base_passes_no_review_inputs(tmp_path, monkeypatch):

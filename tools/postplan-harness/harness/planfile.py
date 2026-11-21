@@ -538,6 +538,28 @@ def parse_matrix(
     return planned, manual, post_merge
 
 
+_AM_HEAD_RE = re.compile(r"^## After merge[ \t]*$")
+_AM_ROW_RE = re.compile(
+    r"^- \*\*Row (?P<num>[0-9]+)\*\*\s*(?:\[(?P<tag>[^\]]*)\](?!\())?\s*(?:—\s*)?(?P<text>.*)$")
+
+
+def parse_after_merge_section(content: str) -> list[manual_rows.ManualRow]:
+    """Rows of the plan's own `## After merge` section (ADR-0198 grammar). Fenced blocks are
+    skipped; the section ends at the next `## ` heading. A leading `[text](url)` link is text."""
+    rows: list[manual_rows.ManualRow] = []
+    inside = False
+    for line in _strip_fenced(content):
+        if line.startswith("## "):
+            inside = bool(_AM_HEAD_RE.match(line))
+            continue
+        m = _AM_ROW_RE.match(line.rstrip()) if inside else None
+        if m:
+            rows.append(manual_rows.ManualRow(
+                number=m["num"], text=m["text"].strip(), raw=line.rstrip(),
+                post_merge_reason="plan After merge section", tag=(m["tag"] or "").strip()))
+    return rows
+
+
 _EXECUTABLE_TYPE = re.compile(
     r"\b(PHPUnit|API.?test|E2E|Visual.?regression|CLI.?executable)\b", re.IGNORECASE)
 _TABLE_SEP = re.compile(r"^\s*\|[\s:|-]+\|?\s*$")
@@ -1198,6 +1220,7 @@ def locate_plan(slug: str, plans_dir: str | None = None, explicit_path: str | No
         info.no_change_test_paths = parse_no_change_test_paths(content)
         info.run_only_test_paths = parse_run_only_test_paths(content)
         info.reference_only_test_paths, info.reference_only_refusals = parse_reference_only_test_paths(content)
+    info.post_merge_rows = list(info.post_merge_rows) + parse_after_merge_section(content)
     info.critical_files = parse_critical_files(content)
     info.required_test_methods = parse_required_test_methods(content)
     info.backlog_issues = parse_backlog_issues(content)

@@ -31,6 +31,7 @@ class ManualRow:
     text: str
     raw: str
     post_merge_reason: str = ""
+    tag: str = ""
 
 
 LOC_CELL_INDEX = 4  # `| # | What | Type | Timing | Location |`, as bin/check-plan's MC_LOC
@@ -63,9 +64,14 @@ def render_rows(rows: list[ManualRow]) -> str:
     return result
 
 
+def _after_merge_line(r: ManualRow) -> str:
+    tag = f" [{r.tag}]" if r.tag else ""
+    return f"- **Row {r.number}**{tag} — {r.text}"
+
+
 def render_after_merge(rows: list[ManualRow]) -> str:
     """Plain bullets for the ## After merge section; no checkbox brackets."""
-    result = "\n".join(f"- **Row {r.number}** — {r.text}" for r in rows)
+    result = "\n".join(_after_merge_line(r) for r in rows)
     _assert_no_sentinel(result)
     return result
 

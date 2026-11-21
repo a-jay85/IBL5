@@ -140,3 +140,4 @@ The CI workflow `pr-meta-checks.yml` runs `bin/adr-check` (the `adr-check` step)
 - [`bin/adr-check`](../../../bin/adr-check): the CI gate. Locally, `--staged` judges the index alone, and `--commit` judges the commit-time view: this branch's commits since the merge-base, union the index. `--commit` is the mode `bin/pre-commit-hook` runs on every commit.
 - [`bin/check-docs`](../../../bin/check-docs) — enforces frontmatter freshness on every ADR and verifies bidirectional `Supersedes` integrity.
 - [`.claude/rules/doc-freshness.md`](../../../.claude/rules/doc-freshness.md) — the frontmatter schema every ADR must satisfy.
+- [`bin/check-adr-append-only`](../../../bin/check-adr-append-only): fails a PR that rewrites or removes frozen ADR text; see [ADR-0272](0272-adr-append-only-gate.md).

@@ -234,3 +234,7 @@ services:
         class: PHPStanRules\BanUnguardedArgvFlagRule
         tags:
             - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanFactoryRequestReadRule
+        tags:
+            - phpstan.rules.rule

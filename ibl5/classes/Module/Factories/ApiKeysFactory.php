@@ -23,7 +23,7 @@ final class ApiKeysFactory implements \Module\Contracts\ModuleFactoryInterface
         return $this->services->request();
     }
 
-    public function controller(): ApiKeysController
+    public function controller(string $host, bool $https): ApiKeysController
     {
         $db = $this->services->db();
         $repository = new ApiKeysRepository($db);
@@ -34,12 +34,7 @@ final class ApiKeysFactory implements \Module\Contracts\ModuleFactoryInterface
         $googleExport = null;
         if (\GoogleSheets\GoogleOAuthConfig::isConfigured()) {
             try {
-                $host = $this->services->request()->server('HTTP_HOST');
-                $https = $this->services->request()->server('HTTPS');
-                $googleConfig = \GoogleSheets\GoogleOAuthConfig::fromEnv(
-                    is_string($host) ? $host : '',
-                    ($https ?? 'off') !== 'off'
-                );
+                $googleConfig = \GoogleSheets\GoogleOAuthConfig::fromEnv($host, $https);
                 $googleHttp = new \GoogleSheets\CurlGoogleHttpClient();
                 $googleOAuth = new \GoogleSheets\GoogleOAuthClient($googleConfig, $googleHttp);
                 $googleExport = new \GoogleSheets\GoogleSheetExportService(

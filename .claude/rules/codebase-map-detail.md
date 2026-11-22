@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand only (no auto-attach trigger). Auto-generated cross-module dependency list for ibl5/classes/, the companion to codebase-map.md.
-last_verified: 2026-11-17
+last_verified: 2026-11-22
 paths: "~/.claude/hooks/plan-gate-edit.sh"
 ---
 
@@ -85,7 +85,7 @@ Security -> Clock
 Settings -> Season
 SimRecap -> JsbParser LastSimRecap League LeagueControlPanel PageLayout RecordHolders Repositories Season Security
 Standings -> League Security UI
-Team -> Auth BasketballStats Discord Extension Http League Player Repositories Rivalries Season Security Trading UI
+Team -> Auth BasketballStats Cache Discord Extension Http League Player Repositories Rivalries Season Security Trading UI
 TeamOffDefStats -> BasketballStats League Season Security UI
 TeamSchedule -> BasketballStats League LeagueSchedule Season Security Team
 Topics -> Database Search Security
@@ -93,7 +93,7 @@ Trading -> Auth BasketballStats Database Discord EventLog League Player Reposito
 TrainingCampRatingsDiff -> Database Player Repositories Security UI
 TransactionHistory -> Security
 UI -> League Player Season Security Team
-Updater -> BasketballStats Boxscore BulkImport DepthChartSnapshot Discord GoogleSheets JsbParser League LeagueConfig LeagueControlPanel PageLayout PlrParser Season Security Settings Standings Trading Utilities
+Updater -> BasketballStats Boxscore BulkImport DepthChartSnapshot Discord GoogleSheets JsbParser League LeagueConfig LeagueControlPanel PageLayout PlrParser Repositories Season Security Settings Standings Team Trading Utilities
 Utilities -> Security
 Voting -> League Player Season Security
 Waivers -> Auth Database Discord EventLog Http League Player Repositories Season Team UI Validation

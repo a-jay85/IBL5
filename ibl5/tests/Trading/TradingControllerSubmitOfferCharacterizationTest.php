@@ -255,6 +255,35 @@ class TradingControllerSubmitOfferCharacterizationTest extends TestCase
         $this->submitUntilHalt($controller, ['listeningTeam' => 'Stars']);
     }
 
+    public function testInvalidCsrfTokenRedirectsBeforeCreatingOffer(): void
+    {
+        $_POST['_csrf_token'] = 'not-the-issued-token';
+
+        $tradeOffer = self::createStub(TradeOfferInterface::class);
+        $tradeOffer->method('createTradeOffer')->willThrowException(new \Error('createTradeOffer reached'));
+
+        // HtmxHelper::redirect() checks HTTP_HX_REQUEST right before exit; halt there.
+        $originalServer = $_SERVER;
+        $_SERVER = new class ($originalServer) extends \ArrayObject {
+            public function offsetExists(mixed $key): bool
+            {
+                if ($key === 'HTTP_HX_REQUEST') {
+                    throw new \Error(TradingControllerSubmitOfferCharacterizationTest::HALT);
+                }
+                return parent::offsetExists($key);
+            }
+        };
+
+        try {
+            $this->buildController($tradeOffer)->submitTradeOffer(null, ['listeningTeam' => 'Stars']);
+            self::fail('submitTradeOffer returned despite an invalid CSRF token');
+        } catch (\Error $e) {
+            self::assertSame(self::HALT, $e->getMessage());
+        } finally {
+            $_SERVER = $originalServer;
+        }
+    }
+
     public function testFailedOfferStoresCheckedItemsAndCashInSession(): void
     {
         $trap = new class ([]) extends \ArrayObject {

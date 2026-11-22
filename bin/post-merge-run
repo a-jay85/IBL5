@@ -118,7 +118,9 @@ run_step() {       # <path> <pr> <log> -> ok | timeout | exit-<rc>
 }
 process_pr() {     # <pr> <merge-oid> <merged-epoch>; body already in $TMP/body.txt
     local pr="$1" oid="$2" merged="$3" line n step res fails=""
-    pmr_rows "$TMP/body.txt" > "$TMP/rows.txt"
+    # Drop fenced code blocks first: a row inside a fence is documentation, not a step to run.
+    awk '/^[[:space:]]*(```|~~~)/ { f = !f; next } !f' "$TMP/body.txt" > "$TMP/body-nofence.txt"
+    pmr_rows "$TMP/body-nofence.txt" > "$TMP/rows.txt"
     while IFS= read -r line; do
         pmr_parse_row "$line"
         [ "$PMR_KIND" = auto:mac ] && [ "$PMR_VALID" -eq 1 ] || continue

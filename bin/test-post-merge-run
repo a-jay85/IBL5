@@ -113,6 +113,13 @@ h_contains "allowlist: missing step is reported" "$(dms)" "Row 5 [auto:mac missi
 h_not_contains "allowlist: path-escape name is not a row" "$(dms)" "../ok-step"
 h_not_contains "allowlist: shell-metachar name is not a row" "$(dms)" "ok-step;touch-x"
 
+# --- 18b: a row inside a fenced code block is documentation, never run -------------
+mk_case fenced; set_since 0
+mk_prs 7 "$HEAD_OID" "$NOW" "$(printf '## Notes\n\n```\n## After merge\n- **Row 1** [auto:mac ok-step] — demo\n```\n')"
+run_exec
+h_eq "fenced: example row did not run" "" "$(calls)"
+h_absent "fenced: no done marker" "$STATE/done/7.row1"
+
 # --- 19: failures DM; a rerun does not repeat them ----------------------------------
 mk_case failure; set_since 0
 mk_prs 9 "$HEAD_OID" "$NOW" "$(body_rows '- **Row 1** [auto:mac fail-step] — x')"

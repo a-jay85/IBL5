@@ -44,6 +44,10 @@ want_cnt() { # <counter> <n>
 cnt() {
     if [ -f "$CNT/$1" ]; then wc -l < "$CNT/$1" | tr -d ' '; else echo 0; fi
 }
+want_targets() { # <space-separated probe targets, in order>
+    local got; got=$(tr '\n' ' ' < "$CNT/probe_targets" 2>/dev/null); got="${got% }"
+    [ "$got" = "$1" ] || note "probe targets expected '$1', got '$got'"
+}
 want_args() { # <exact last argv line the phpunit stub recorded>
     local got; got=$(tail -n 1 "$CNT/phpunit_args" 2>/dev/null)
     [ "$got" = "$1" ] || note "phpunit args expected '$1', got '$got'"
@@ -72,7 +76,16 @@ printf '%s:%s\n' "$#" "$*" >> "$CNT/phpunit_args"
 exit "${STUB_PHPUNIT_RC:-0}"
 EOF
     printf '#!/usr/bin/env bash\necho run >> "$CNT/mutation"\nexit 0\n' > "$D/stubs/mutation"
-    printf '#!/usr/bin/env bash\necho run >> "$CNT/probe"\nexit "${STUB_PROBE_RC:-0}"\n' > "$D/stubs/probe"
+    cat > "$D/stubs/probe" <<'EOF'
+#!/usr/bin/env bash
+echo run >> "$CNT/probe"
+printf '%s\n' "${PREFIRE_DB_PROBE_TARGET:-}" >> "$CNT/probe_targets"
+if [ -n "${STUB_PROBE_FAIL_TARGET:-}" ]; then
+    [ "${PREFIRE_DB_PROBE_TARGET:-}" = "$STUB_PROBE_FAIL_TARGET" ] && exit 3
+    exit 0
+fi
+exit "${STUB_PROBE_RC:-0}"
+EOF
     printf '#!/usr/bin/env bash\necho run >> "$CNT/excludes"\nexit 0\n' > "$D/stubs/excludes"
     cat > "$D/stubs/pytest" <<'EOF'
 #!/usr/bin/env bash
@@ -598,6 +611,71 @@ test_db_down_background_amp_row_still_probes() {
     want_rc 3
     want_out "DB unreachable; matrix row 1 needs it"
     unset STUB_PROBE_RC
+}
+
+# A row that only reaches the main container probes main, never the worktree DB.
+test_db_main_only_row_skips_worktree_probe() {
+    new_case
+    write_plan "$(row 1 "true # docker exec -i ibl5-mariadb mariadb -e 'SELECT 1'")"
+    export STUB_PROBE_FAIL_TARGET=worktree
+    run_gate --plan "$PLAN"
+    want_rc 0
+    refute_out "DB unreachable"
+    want_targets "main"
+    unset STUB_PROBE_FAIL_TARGET
+}
+
+test_db_main_only_row_main_down_fails() {
+    new_case
+    write_plan "$(row 1 true)" "$(row 2 "true # docker exec -i ibl5-mariadb mariadb")"
+    export STUB_PROBE_FAIL_TARGET=main
+    run_gate --plan "$PLAN"
+    want_rc 3
+    want_out "DB unreachable; matrix row 2 needs it (main DB:"
+    want_out "Start the main stack"
+    unset STUB_PROBE_FAIL_TARGET
+}
+
+# DB_QUERY_TARGET=main routes bin/db-query to the main stack.
+test_db_query_target_main_row_probes_main() {
+    new_case
+    write_plan "$(row 1 "true # DB_QUERY_TARGET=main bin/db-query 'SELECT 1'")"
+    export STUB_PROBE_FAIL_TARGET=worktree
+    run_gate --plan "$PLAN"
+    want_rc 0
+    want_targets "main"
+    unset STUB_PROBE_FAIL_TARGET
+}
+
+# A row that touches both DBs probes both, and a down worktree DB still fails.
+test_db_mixed_row_probes_both() {
+    new_case
+    write_plan "$(row 1 "true # bin/db-query 'SELECT 1' && docker exec ibl5-mariadb mariadb")"
+    export STUB_PROBE_FAIL_TARGET=worktree
+    run_gate --plan "$PLAN"
+    want_rc 3
+    want_out "DB unreachable; matrix row 1 needs it (worktree DB:"
+    want_out "Start the worktree stack"
+    unset STUB_PROBE_FAIL_TARGET
+}
+
+# Rows split across the two DBs: each DB gets one probe.
+test_db_split_rows_probe_each() {
+    new_case
+    write_plan "$(row 1 "true # docker exec ibl5-mariadb mariadb")" \
+               "$(row 2 "true # bin/db-query 'SELECT 1'")"
+    run_gate --plan "$PLAN"
+    want_rc 0
+    want_targets "worktree main"
+}
+
+# A longer container name is not the main container.
+test_db_main_name_needs_boundary() {
+    new_case
+    write_plan "$(row 1 "true # docker exec ibl5-mariadb-other mariadb")"
+    run_gate --plan "$PLAN"
+    want_rc 0
+    want_targets "worktree"
 }
 
 test_all_green_passes_and_records() {
@@ -1650,6 +1728,17 @@ test_local_mutations_db_down_fails_closed() {
     unset STUB_PROBE_RC
 }
 
+# A mutation check that only reaches ibl5-mariadb probes main, not the worktree DB.
+test_local_mutations_main_only_skips_worktree_probe() {
+    new_case
+    lm_plan 'docker exec -i ibl5-mariadb mariadb -e "SELECT 1"'
+    export STUB_PROBE_FAIL_TARGET=worktree
+    run_gate --plan "$PLAN" --stage local-mutations
+    refute_out "needs the DB"
+    want_targets "main"
+    unset STUB_PROBE_FAIL_TARGET
+}
+
 test_local_mutations_default_probe_fails_closed() {
     new_case
     lm_plan 'bin/db-query "SELECT 1"'
@@ -2665,6 +2754,12 @@ test_db_down_fails_closed_naming_row
 test_db_down_parse_only_row_skips_probe
 test_db_down_chained_parse_row_still_probes
 test_db_down_background_amp_row_still_probes
+test_db_main_only_row_skips_worktree_probe
+test_db_main_only_row_main_down_fails
+test_db_query_target_main_row_probes_main
+test_db_mixed_row_probes_both
+test_db_split_rows_probe_each
+test_db_main_name_needs_boundary
 test_all_green_passes_and_records
 test_cache_hit_skips_rerun
 test_tree_change_invalidates_cache
@@ -2707,6 +2802,7 @@ test_xm_locked_recover
 test_xm_bad_stage_rejected
 test_local_mutations_runs_dropped_record
 test_local_mutations_db_down_fails_closed
+test_local_mutations_main_only_skips_worktree_probe
 test_local_mutations_default_probe_fails_closed
 test_local_mutations_non_db_skips_probe
 test_local_mutations_ci_records_skip

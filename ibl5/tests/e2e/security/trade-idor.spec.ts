@@ -273,6 +273,31 @@ authTest.describe('Trade reject IDOR: a non-party cannot delete an offer (D-05)'
 });
 
 // ---------------------------------------------------------------------------
+// CSRF: a logged-in submit with an invalid token is refused before any write
+// ---------------------------------------------------------------------------
+
+authTest.describe('Trade submit refuses an invalid CSRF token', () => {
+  authTest.afterAll(async ({ request }) => {
+    await resetTradeOffers(request);
+  });
+
+  authTest('submit with an invalid CSRF token is refused before any write', async ({ page }) => {
+    const response = await page.request.post(MAKE_ENDPOINT, {
+      form: {
+        _csrf_token: 'invalid-characterization-token',
+        offeringTeam: 'Metros',
+        listeningTeam: 'Stars',
+        fieldsCounter: '0',
+      },
+      maxRedirects: 0,
+    });
+    const location = response.headers()['location'] ?? '';
+    expect(location).toContain('error=Invalid%20or%20expired%20form%20submission.');
+    expect(location).not.toContain('result=offer_sent');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 

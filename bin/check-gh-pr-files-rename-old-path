@@ -15,6 +15,9 @@
 # Whole-tree, never diff-scoped: the live callers sat in files the fixing PR
 # did not touch. A call line may end `# files-json-ok: <reason>` (15+ chars).
 #
+# gate-backtest-argv:
+# gate-backtest-reads: bin/* .claude/review-shared/* .github/*
+#
 # Exit codes: 0 = pass, 1 = findings, 2 = usage error or missing anchor.
 
 set -euo pipefail

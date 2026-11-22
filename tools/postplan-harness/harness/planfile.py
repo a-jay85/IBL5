@@ -800,6 +800,8 @@ def _leading_path_list(text: str) -> tuple[str, bool]:
             elif bare:
                 raw = bare.group(0)
                 tok, end_sentence = raw.rstrip(".:"), raw.endswith(".")
+                # Drop a pytest node id and a line suffix, as _phase_evidence_paths does.
+                tok = _LINE_SUFFIX_RE.sub("", tok.split("::", 1)[0])
                 if not _FILES_BARE_PATH_RE.match(tok):
                     return " ".join(parts), False  # prose ends the list
                 pos = bare.end()

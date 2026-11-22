@@ -91,7 +91,15 @@ pmr_is_count() { local _re='^[0-9]+$'; [[ "${1-}" =~ $_re ]]; }
 # KEEP_COMMENTS=1 the comments stay, so pmr_waiver can read its marker.
 pmr_prose_text() {
     awk -v keep="${2-0}" '
-        /^[[:space:]]*(```|~~~)/ { infence = !infence; next }
+        /^[[:space:]]*(```|~~~)/ {
+            # Width-aware like planfile.py _strip_fenced: a closing fence uses the same
+            # character, is at least as long as the opener, and has no text after it.
+            s = $0; sub(/^[[:space:]]*/, "", s); c = substr(s, 1, 1); n = 0
+            while (substr(s, n + 1, 1) == c) n++
+            if (!infence) { infence = 1; fc = c; fl = n }
+            else if (c == fc && n >= fl && substr(s, n + 1) ~ /^[[:space:]]*$/) infence = 0
+            next
+        }
         infence { next }
         /^[[:space:]]*>/ { next }
         {

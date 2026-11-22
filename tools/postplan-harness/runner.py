@@ -1629,12 +1629,21 @@ def _notes_body_round(llm, git, gh, out_dir, worktree, plan, master_sha, pr, res
     body = strip_change_blocks(fixed)
     body = _apply_backlog_closes(body, plan, log)
     body = _upsert_no_adr_markers(body, plan)
+    name_status = name_status_text(git.diff_vs_base())
     gh.pr_edit_body(pr, body)
-    v_n, _tree, path_n, reason = fidelity.body_recheck(
-        llm, git, out_dir, worktree or ".", plan, master_sha, body, prior_body,
-        pr, prior_verdict_path, name_status_text(git.diff_vs_base()),
-        res.fidelity.get("plan_hash"), _plan_hash(plan),
-        round_num=round_num, log=log, notes=findings)
+    try:
+        v_n, _tree, path_n, reason = fidelity.body_recheck(
+            llm, git, out_dir, worktree or ".", plan, master_sha, body, prior_body,
+            pr, prior_verdict_path, name_status,
+            res.fidelity.get("plan_hash"), _plan_hash(plan),
+            round_num=round_num, log=log, notes=findings)
+    except BaseException:
+        rec["outcome"] = "recheck-raised"
+        try:
+            gh.pr_edit_body(pr, raw_before)
+        except Exception as restore_err:  # keep the original error visible
+            log(f"phase5.5 notes round: body restore failed after recheck error: {restore_err}")
+        raise
     if v_n == "READY":
         rec["outcome"] = "ready"
         return v_n, path_n

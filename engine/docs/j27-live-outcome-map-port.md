@@ -113,6 +113,7 @@ Each player dump pairs with the steal roll logged just before it, because the `t
 | offense pool at `+0xDD8`, capped fatigue, median error | 37.700% |
 
 The plan fixed the offense slot at `+0xDE0` before the run, because `tovRate` cites that offset. At `+0xDE0` the uncapped reading misses the 1% bar (6.961%), so the port rule failed and this PR ports nothing. The pool-check output is `~/claude-plans/_reports/2026-11-21-steal-share-1919-pool-check.txt`.
+
 ### Archive walk before/after (backlog#1923)
 
 `TestRealArchive_FTADecomp` (build tag `archive`) produced these rows on 2026-11-20 at its defaults: 60 games per snapshot, every snapshot, seed 20240601. Both walk binaries were built from master with the walk patch from PR #4089 applied, because master's walk does not print STL. Each walk read 113 matched recent-era snapshots and skipped one, giving 13,284 engine team-games and 12,056 `.sco` team-games. Values come from the `WALK side=` lines, per team-game. The before row matches the PR #4089 BEFORE row.
@@ -133,6 +134,7 @@ The engine code did not change, so there is one engine row. `TestRealArchive_FTA
 |------|-----|-----|-----|----|
 | `.sco` | 9.131 | 13.762 | 18.587 | 17.116 |
 | engine (code unchanged) | 7.346 | 14.914 | 19.851 | 17.886 |
+
 | code-2 four-point plays | 29 | not traced |
 
 ## Re-pinned literals

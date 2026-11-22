@@ -885,7 +885,8 @@ def parse_phases(content: str) -> list[PhaseInfo]:
     a plan with a duplicated heading yields one entry per number. A body line
     `**No diff:** <reason>` of NO_DIFF_MIN_REASON or more characters sets `no_diff_reason`;
     a shorter reason sets `no_diff_rejected` instead. Bare heading tokens land in
-    `heading_words` (see state.PhaseInfo); they are never evidence.
+    `heading_words` (see state.PhaseInfo); they are never evidence. A `**Files:**` line's
+    leading paths land in `files_line_paths` (see `_files_line_paths`).
     """
     lines = _strip_fenced(content)
     phases: list[PhaseInfo] = []
@@ -898,6 +899,9 @@ def parse_phases(content: str) -> list[PhaseInfo]:
             for p in _phase_evidence_paths("\n".join(buf)):
                 if p not in current.evidence_paths:
                     current.evidence_paths.append(p)
+            for p in _files_line_paths(buf):
+                if p not in current.files_line_paths:
+                    current.files_line_paths.append(p)
 
     for line in lines:
         if re.match(r"^##\s", line):

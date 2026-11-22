@@ -126,3 +126,96 @@ def test_files_line_normalisation_reuses_evidence_rules():
         "tools/postplan-harness/harness/conformance.py",
         "tools/postplan-harness/tests/test_conformance_nondiff.py",
     ]
+
+
+# ---------------------------------------------------------------------------
+# Conformance: a Files line narrows MISSING-PHASE to its own paths.
+# ---------------------------------------------------------------------------
+
+def test_files_line_target_missing_holds_despite_touched_body_path():
+    text = (
+        "# Plan\n\n"
+        "## Phase 1: Wire the gate\n\n"
+        "**Files:** `bin/alpha`\n\n"
+        "Read `bin/beta` for the pattern.\n"
+    )
+    items = _check(text, ["bin/beta"], ["bin/alpha", "bin/beta"])
+    assert len(items) == 1
+    assert "(Files line only; phase cites bin/alpha;" in items[0]
+
+
+def test_heading_cited_path_ignored_when_files_line_present():
+    text = (
+        "# Plan\n\n"
+        "## Phase 1: Edit `bin/head`\n\n"
+        "**Files:** `bin/alpha`\n"
+    )
+    items = _check(text, ["bin/head"], ["bin/alpha", "bin/head"])
+    assert len(items) == 1
+    assert items[0].startswith("MISSING-PHASE: 1")
+
+
+def test_bare_files_line_path_touched_clears():
+    text = (
+        "# Plan\n\n"
+        "## Phase 1: Wire the gate\n\n"
+        "**Files:** bin/alpha\n\n"
+        "Read `bin/beta` for the pattern.\n"
+    )
+    assert _check(text, ["bin/alpha"], ["bin/alpha", "bin/beta"]) == []
+
+
+def test_bare_only_files_line_phase_is_checked():
+    text = (
+        "# Plan\n\n"
+        "## Phase 1: Wire the gate\n\n"
+        "**Files:** bin/alpha\n\n"
+        "Make the change described above.\n"
+    )
+    items = _check(text, ["README.md"], ["bin/alpha", "README.md"])
+    assert len(items) == 1
+    assert items[0].startswith("MISSING-PHASE: 1")
+    assert "bin/alpha" in items[0]
+
+
+def test_files_line_prose_only_falls_back_to_mention_scan():
+    text = (
+        "# Plan\n\n"
+        "## Phase 1: Wire the gate\n\n"
+        "**Files:** None of these files change; see `bin/other` for context.\n\n"
+        "Edit `bin/real`.\n"
+    )
+    items = _check(text, ["README.md"], ["bin/other", "bin/real", "README.md"])
+    assert len(items) == 1
+    assert "(phase cites bin/other, bin/real;" in items[0]
+    assert "Files line only" not in items[0]
+
+
+def test_files_line_non_repo_paths_fall_back_to_mention_scan():
+    text = (
+        "# Plan\n\n"
+        "## Phase 1: Wire the gate\n\n"
+        "**Files:** `~/claude-plans/x.md`\n\n"
+        "Edit `bin/real`.\n"
+    )
+    notes: list[str] = []
+    items = _check(text, ["README.md"], ["bin/real", "README.md"], notes=notes)
+    assert len(items) == 1
+    assert "bin/real" in items[0]
+    assert "Files line only" not in items[0]
+    assert any(n.startswith("FILES-LINE-FALLBACK: 1") for n in notes)
+
+
+def test_files_line_phase_keeps_existing_exemptions():
+    text = (
+        "# Plan\n\n"
+        "## Phase 1: Close the backlog issue [phases: S]\n\n"
+        "**Files:** `bin/alpha`\n\n"
+        "## Phase 2: Record the baseline\n\n"
+        "**No diff:** records the baseline only, no edits.\n\n"
+        "**Files:** `bin/alpha`\n"
+    )
+    notes: list[str] = []
+    items = _check(text, ["README.md"], ["bin/alpha", "README.md"], notes=notes)
+    assert items == []
+    assert any(n.startswith("NO-DIFF-PHASE: 2") for n in notes)

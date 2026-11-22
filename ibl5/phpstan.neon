@@ -73,6 +73,10 @@ services:
         tags:
             - phpstan.rules.rule
     -
+        class: PHPStanRules\RequireLeagueContextInFactoryRule
+        tags:
+            - phpstan.rules.rule
+    -
         class: PHPStanRules\BanBeginTransactionInRepositoryRule
         tags:
             - phpstan.rules.rule
@@ -232,5 +236,9 @@ services:
             - phpstan.rules.rule
     -
         class: PHPStanRules\BanUnguardedArgvFlagRule
+        tags:
+            - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanFactoryRequestReadRule
         tags:
             - phpstan.rules.rule

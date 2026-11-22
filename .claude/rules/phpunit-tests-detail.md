@@ -1,6 +1,6 @@
 ---
-description: Read-on-demand only (no auto-attach trigger). Golden snapshot rules (GoldenSnapshotTrait, UPDATE_SNAPSHOTS=1, the five golden helpers that skip the trait) plus the long-form sections moved from phpunit-tests.md: WideUnit + MockDatabase, module entry point tests, PHPStan test-neon suppressions, and the Season class alias.
-last_verified: 2026-11-13
+description: Read-on-demand only (no auto-attach trigger). Golden snapshot rules (GoldenSnapshotTrait, UPDATE_SNAPSHOTS=1, the five golden helpers that skip the trait) plus the long-form sections moved from phpunit-tests.md: WideUnit + MockDatabase, module entry point tests, PHPStan test-neon suppressions, and the Season class alias. Also when to write an Eris property test and how to replay its seed.
+last_verified: 2026-11-21
 paths: "~/.claude/hooks/plan-gate-edit.sh"
 ---
 
@@ -36,6 +36,17 @@ Five other golden helpers do not use the trait. Each already fails on a missing 
 Thresholds: **100% MSI / 100% Covered MSI** (`ibl5/infection.json5`, `.github/workflows/mutation-pr.yml`). Config: `phpunit-mutation.xml`; per-file deferrals live in `infection.json5`.
 
 **Local run.** Only after CI's Infection check fails on the PR. Details are in `.claude/rules/phpstan-invocation.md` § Running Infection locally.
+
+## Property tests (Eris)
+
+Write a property test when a pure, DB-free function has a rule that holds for every input in a range, and the rule is stated in `ibl5/docs/LEAGUE_RULES.md` or `.claude/rules/contract-rules.md`. Keep example tests for named league cases. Examples: `ibl5/tests/League/ContractRulesPropertyTest.php`, `ibl5/tests/Standings/AggregateTiebreakerPropertyTest.php`.
+
+- Use the `Tests\Support\PinnedErisSeed` trait and call `pinErisSeed(<iterations>)` first in each test. It pins the seed to 20261120 unless `ERIS_SEED` holds digits, so CI runs are deterministic. Cap iterations at 200.
+- Draw scalars only (`Generators::choose`, `Generators::elements`). When a `vector` or nested `tuple` input fails, Eris builds every shrink candidate and can exhaust the 128 MB memory limit before it prints the replay line. Build a composite input from one scalar seed with `new Random\Randomizer(new Random\Engine\Mt19937($seed))`, which leaves the global `mt_rand` state alone.
+- Compute the expected value from the doc's figures with test-side arithmetic. Calling the production helper or reading its constants makes the property pass against a broken implementation.
+- To replay a failure, copy the `Reproduce with:` line the run prints and run it from `ibl5/`: `ERIS_SEED=<n> vendor/bin/phpunit --filter '<Class>::<method>'`. To explore new inputs locally, set any other digits. A non-digit `ERIS_SEED` fails the test with `InvalidArgumentException`.
+- Property tests sit in registered suite directories, so they also run under `ibl5/phpunit-mutation.xml`. The pinned seed keeps Infection results stable from run to run.
+- Other seeded loops (`mt_srand` in `ibl5/tests/OneOnOneGame/OneOnOneGameEngineTest.php`) keep their own seeds. `ERIS_SEED` reaches only tests that use the trait.
 
 ## WideUnit + MockDatabase
 

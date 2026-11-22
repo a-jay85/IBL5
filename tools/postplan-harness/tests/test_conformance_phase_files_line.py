@@ -74,6 +74,7 @@ def _files(text):
 
 
 def test_files_line_inline_multi_path_separators():
+    """Mutation: shrink the `_FILES_SEP_RE` alternation to `,|;|and\b` => `&` and `+` end the list, fails."""
     text = "**Files:** `bin/a`, `bin/b` and `bin/c` & `bin/d` + `bin/e`; `bin/f`"
     assert _files(text) == ["bin/a", "bin/b", "bin/c", "bin/d", "bin/e", "bin/f"]
 
@@ -84,6 +85,7 @@ def test_files_line_bare_paths_without_backticks():
 
 
 def test_files_line_bullet_form_takes_leading_path_only():
+    """Mutation: `spans.append(bm.group(1))` keeps the whole bullet => `bin/z` leaks in, fails."""
     text = (
         "**Files:**\n"
         "- `bin/a` — NEW (adds `bin/z`)\n"
@@ -119,6 +121,7 @@ def test_non_files_labels_keep_mention_scan():
 
 
 def test_files_line_normalisation_reuses_evidence_rules():
+    """A line suffix and a pytest `path::fn` node id are stripped; a glob and an `(example)` token are skipped."""
     text = (
         "**Files:** `tools/postplan-harness/harness/conformance.py:410`, "
         "`tools/postplan-harness/tests/test_conformance_nondiff.py::test_no_evidence_phase_skipped`, "

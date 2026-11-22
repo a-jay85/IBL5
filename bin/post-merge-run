@@ -113,9 +113,10 @@ resolve_step() {   # <name> -> path of an allowlisted, tracked, regular step fil
     printf '%s\n' "$p"
 }
 run_step() {       # <path> <pr> <log> -> ok | timeout | exit-<rc>
-    ( cd "$ROOT" && CLAUDE_HEADLESS=1 exec bash "$1" --pr "$2" ) </dev/null >"$3" 2>&1 &
+    ( cd "$ROOT" && CLAUDE_HEADLESS=1 exec perl -e 'setpgrp(0, 0); exec @ARGV or exit 127' bash "$1" --pr "$2" ) </dev/null >"$3" 2>&1 &
     local pid=$! rc wd
-    ( sleep "$STEP_TIMEOUT"; kill -TERM "$pid" 2>/dev/null ) </dev/null >/dev/null 2>&1 &
+    # The step is its own process group leader (pgid = pid), so the timeout signals the whole group, children included.
+    ( sleep "$STEP_TIMEOUT"; kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null ) </dev/null >/dev/null 2>&1 &
     wd=$!; wait "$pid"; rc=$?
     pkill -P "$wd" 2>/dev/null; kill "$wd" 2>/dev/null; wait "$wd" 2>/dev/null
     case "$rc" in 0) echo ok ;; 143) echo timeout ;; *) echo "exit-$rc" ;; esac

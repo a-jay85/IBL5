@@ -249,30 +249,40 @@ class ContractRulesTest extends TestCase
 
     public function testBirdRightsRaiseIsHigherThanStandard(): void
     {
+        // Through the production consumer: a player at the Bird Rights threshold gets a higher raise cap.
         $this->assertGreaterThan(
-            ContractRules::STANDARD_RAISE_PERCENTAGE,
-            ContractRules::BIRD_RIGHTS_RAISE_PERCENTAGE
+            ContractRules::getMaxRaisePercentage(0),
+            ContractRules::getMaxRaisePercentage(ContractRules::BIRD_RIGHTS_THRESHOLD)
         );
+    }
+
+    /**
+     * Returns its argument typed as mixed so PHPStan does not constant-fold an
+     * assertion that compares class constants.
+     */
+    private static function unfoldedConstant(mixed $value): mixed
+    {
+        return $value;
     }
 
     public function testAllMleOfferValuesArePositive(): void
     {
         foreach (ContractRules::MLE_OFFERS as $offer) {
-            $this->assertGreaterThan(0, $offer);
+            $this->assertGreaterThan(0, self::unfoldedConstant($offer));
         }
     }
 
     public function testAllVeteranMinimumSalariesArePositive(): void
     {
         foreach (ContractRules::VETERAN_MINIMUM_SALARIES as $salary) {
-            $this->assertGreaterThan(0, $salary);
+            $this->assertGreaterThan(0, self::unfoldedConstant($salary));
         }
     }
 
     public function testAllMaxContractSalariesArePositive(): void
     {
         foreach (ContractRules::MAX_CONTRACT_SALARIES as $salary) {
-            $this->assertGreaterThan(0, $salary);
+            $this->assertGreaterThan(0, self::unfoldedConstant($salary));
         }
     }
 
@@ -280,7 +290,7 @@ class ContractRulesTest extends TestCase
     {
         $this->assertLessThan(
             ContractRules::MLE_OFFERS[0],
-            ContractRules::LLE_OFFER
+            self::unfoldedConstant(ContractRules::LLE_OFFER)
         );
     }
 

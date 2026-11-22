@@ -395,7 +395,25 @@ jobs:
           echo "No schema changes"
         else
           git commit -m "ci: regenerate current-schema.sql [auto]"
-          git push
+          attempt=1
+          while [ "$attempt" -le 3 ]; do
+            if git fetch --depth=50 origin master && git rebase origin/master; then
+              if git push origin HEAD:master; then
+                echo "Pushed regenerated schema on attempt $attempt"
+                exit 0
+              fi
+            elif [ -n "$(git ls-files --unmerged)" ]; then
+              git rebase --abort
+              echo "::warning::rebase onto origin/master conflicted; a later run regenerates the schema"; exit 0
+            else
+              git rebase --abort 2>/dev/null || true
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              sleep 2
+            fi
+            attempt=$((attempt + 1))
+          done
+          echo "::error::could not push the regenerated schema after 3 attempts"; exit 1
         fi
 
   old-code-compat-selftest:

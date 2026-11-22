@@ -1,6 +1,6 @@
 ---
 description: J27 live outcome-map port. The Go engine now reads play-outcome codes 1-4 the way live JSB 5.60 does. Code 3 is the foul handler, and code 4 is the turnover path with a 10% offensive foul and the FUN_004e2fc0 steal split. Lists the removed scales, before/after aggregates, re-pinned test literals, the open residuals, an archive walk against .sco and a per-type foul table against the live trace.
-last_verified: 2026-11-17
+last_verified: 2026-11-20
 ---
 
 # J27: live outcome-map port
@@ -17,7 +17,7 @@ This doc records the move of the Go engine to the live JSB 5.60 play-outcome map
 | 4 | turnover path | `outcomeTurnover`, `resolveTurnoverPath` in `engine/internal/sim/steal.go`. 10% are offensive fouls (const 0.1 at 0x4da7a0). The rest split into steal or plain turnover by the FUN_004e2fc0 roll. |
 | 5 | 0.08% override that makes no turnover | Not ported. The picker returns only codes 1-4. |
 
-On the steal split, the roll is `Float64() × turnoverPool(offense)`. The turnover pool is Σ (2.0 − fatigue) × tovRate over the five offensive players. The play is a steal when the roll lands below `stealPool(defense)`. That pool is Σ stlRate × fatigue over the five defenders, capped at 1.5 × 5 × leagueSTL48. An offensive foul charges the ball handler a turnover and a personal foul tagged `FoulSiteOffensiveTurnover`. It adds one team foul and shoots no free throws.
+On the steal split, the roll is `Float64() × turnoverPool(offense)`. The turnover pool is Σ (2.0 − fatigue) × tovRate over the five offensive players. The play is a steal when the roll lands below `stealPool(defense)`. That pool is Σ stlRate × fatigue over the five defenders, capped at 1.5 × 5 × `stealCapLeagueSTL48` (2.043, the league STL/48 that the live trace read at `+0x68A8`). On a steal, `pickStealerFromRoll` picks the stealer from the same roll. Each defender owns a bin of width stlRate × fatigue in lineup order, and the bin that holds the roll wins. When the uncapped total passes the cap, every bin edge is scaled by pool/total, the way the decompile does it at `jsb560_decompiled.c:97880-97889`. The pick draws no RNG. An offensive foul charges the ball handler a turnover and a personal foul tagged `FoulSiteOffensiveTurnover`. It adds one team foul and shoots no free throws.
 
 ## Removed scales and old values
 
@@ -94,7 +94,21 @@ Every gap is under 0.03, so this PR ports no foul rate. The largest gap is the o
 | code-3 share of picks | 10.53% | 9.37% (610/6507) |
 | code-4 share of picks | 13.32% | 11.02% (717/6507) |
 | offensive-foul share of code 4 | 10.26% | const 0.1 (82/926 observed) |
-| steal share of non-offensive-foul code 4 | 56.61% | 84.2% observed, 74.5% predicted |
+| steal share of non-offensive-foul code 4 | 56.79% | 84.2% observed, 74.5% predicted |
+
+The steal row comes from the backlog#1923 run. The other rows come from the port run. The backlog#1923 run removed one RNG draw per steal, so the stream shifted. In that run the code-4 share printed 13.2680% and the offensive-foul share printed 9.4397%.
+
+### Archive walk before/after (backlog#1923)
+
+`TestRealArchive_FTADecomp` (build tag `archive`) produced these rows on 2026-11-20 at its defaults: 60 games per snapshot, every snapshot, seed 20240601. Both walk binaries were built from master with the walk patch from PR #4089 applied, because master's walk does not print STL. Each walk read 113 matched recent-era snapshots and skipped one, giving 13,284 engine team-games and 12,056 `.sco` team-games. Values come from the `WALK side=` lines, per team-game. The before row matches the PR #4089 BEFORE row.
+
+| Side | STL | TOV | FTA | PF |
+|------|-----|-----|-----|----|
+| `.sco` | 9.131 | 13.762 | 18.587 | 17.116 |
+| engine before (master) | 7.203 | 14.662 | 19.983 | 18.089 |
+| engine after (this port) | 7.346 | 14.914 | 19.851 | 17.886 |
+
+STL rose by 2.0%, which is below the 11.4% bound the cap raise allows. TOV rose by 1.7% and FTA fell by 0.7%.
 | code-2 four-point plays | 29 | not traced |
 
 ## Re-pinned literals
@@ -123,10 +137,11 @@ The `foulRateBands` width rule stays at ±10% with a floor of ±0.05. The path-m
 These stay open. This doc sets no target and proposes no scale.
 
 - Code 5 is not ported. Live JSB fires it on 0.08% of picks and makes no turnover there.
-- The engine picks the stealer with `selectStealer`, which draws its own roll. JSB reuses the steal-split roll to pick the stealer. Moved to the steal follow-up item, [backlog#1923](https://github.com/a-jay85/IBL5-backlog/issues/1923).
-- `leagueSTL48` is 1.834 in the engine. The live value is 2.043, so the steal-pool cap sits lower than live. Moved to the steal follow-up item, [backlog#1923](https://github.com/a-jay85/IBL5-backlog/issues/1923).
+- Closed by backlog#1923: the stealer pick now reuses the steal roll through `pickStealerFromRoll`, and the second draw is gone. The decompile scales the bins to the capped pool, so every steal credits a defender.
+- Closed for the steal cap only by backlog#1923: the cap reads `stealCapLeagueSTL48 = 2.043`. The foul-bucket baseline in `bucketweights.go` still reads `leagueSTL48 = 1.834`. JSB keeps one value, so the two constants should merge once that file's owner moves it. The foul baseline probably reads the same `+0x68A8` global, which nobody has confirmed.
 - The offensive foul counts as a team foul, which can push the offense toward the bonus. The trace does not show whether JSB counts it.
-- The steal split is 56.6% in the engine against 84.2% observed and 74.5% predicted by the trace. Moved to the steal follow-up item, [backlog#1923](https://github.com/a-jay85/IBL5-backlog/issues/1923).
+- The steal split is 56.79% in the engine after backlog#1923, against 74.5% predicted and 84.2% observed by the trace. That port moved the share through cited values only and did not close the gap. On `bundle_reallife.json` the cap rarely binds, so the cap raise moved the share by 0.18 points. On the archive walk the cap raise moved STL from 7.203 to 7.346 per team-game, against 9.131 in `.sco`.
+- After backlog#1923 the archive TOV rose from 14.662 to 14.914 per team-game, more than the 1% the plan expected. A steal is a subset of code-4 turnovers, so the rise likely comes from more possessions after steals through the fast break. Nobody has measured that.
 - Code 2 made 29 four-point plays over 200 real-life games. They carry `FoulSiteAndOne`, the tag the old and-one bucket used.
 - On bundle.json the home/away FTA ratio is 2.03. That fixture runs the rating fallback path. On bundle_reallife.json the ratio is 1.105.
 - The calibrate stand-ins `steal_turnover_scale` and `non_steal_turnover_scale` no longer drive anything. The archive-tagged research test that varies them would see no change.

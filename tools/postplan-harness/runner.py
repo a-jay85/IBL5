@@ -1587,6 +1587,74 @@ def _round_model(round_num: int) -> str:
     an Opus spawn.
     """
     return "sonnet" if round_num == 1 else "opus"
+
+
+def _protected_lines_dropped(before: str, after: str) -> bool:
+    """True when the fixer removed a heading or HTML comment line the body had."""
+    keep = [ln for ln in (before or "").splitlines()
+            if ln.lstrip().startswith(("#", "<!--"))]
+    have = set((after or "").splitlines())
+    return any(ln not in have for ln in keep)
+
+
+def _notes_body_round(llm, git, gh, out_dir, worktree, plan, master_sha, pr, res,
+                      prior_verdict_path, findings, round_num, log):
+    """One PR-body-only pass for a READY WITH NOTES verdict whose notes are all pr-copy.
+
+    ("READY", verdict_path) on a passed bounded recheck; (None, None) otherwise. On
+    (None, None) the PR body reads what the READY WITH NOTES review read."""
+    rec = {"findings": len(findings), "outcome": None}
+    res.fidelity["notes_round"] = rec
+    if not res.fidelity.get("plan_hash") or not _plan_hash(plan):
+        # body_recheck declines a plan-blind run; skip the fix call it would waste.
+        rec["outcome"] = "plan-hash-missing"
+        return None, None
+    raw_before = gh.pr_body_fresh()
+    prior_body = _prior_packet_body(out_dir, round_num)
+    if not raw_before or prior_body is None:
+        rec["outcome"] = "body-unreadable"
+        return None, None
+    fixed = fidelity.fix_pr_copy_notes(llm, raw_before, findings, out_dir,
+                                       round_num=round_num, log=log)
+    if fixed is None:
+        rec["outcome"] = "fix-unavailable"
+        return None, None
+    fixed, restored = restore_manual_testing_section(fixed, raw_before)
+    if restored:
+        log("phase5.5 notes round: reverted fixer edit to ## Manual Testing")
+    if _protected_lines_dropped(raw_before, fixed):
+        rec["outcome"] = "protected-line-dropped"
+        log("phase5.5 notes round: fixer dropped a heading or marker line; body left as is")
+        return None, None
+    body = strip_change_blocks(fixed)
+    body = _apply_backlog_closes(body, plan, log)
+    body = _upsert_no_adr_markers(body, plan)
+    name_status = name_status_text(git.diff_vs_base())
+    gh.pr_edit_body(pr, body)
+    # try/finally (no BaseException handler): any error, a UsagePause included,
+    # restores the original body and still propagates unchanged.
+    recheck_done = False
+    try:
+        v_n, _tree, path_n, reason = fidelity.body_recheck(
+            llm, git, out_dir, worktree or ".", plan, master_sha, body, prior_body,
+            pr, prior_verdict_path, name_status,
+            res.fidelity.get("plan_hash"), _plan_hash(plan),
+            round_num=round_num, log=log, notes=findings)
+        recheck_done = True
+    finally:
+        if not recheck_done:
+            rec["outcome"] = "recheck-raised"
+            try:
+                gh.pr_edit_body(pr, raw_before)
+            except Exception as restore_err:  # keep the original error visible
+                log(f"phase5.5 notes round: body restore failed after recheck error: {restore_err}")
+    if v_n == "READY":
+        rec["outcome"] = "ready"
+        return v_n, path_n
+    rec["outcome"] = reason or "recheck-declined"
+    gh.pr_edit_body(pr, raw_before)
+    log(f"phase5.5 notes round: recheck declined ({rec['outcome']}); body restored, notes file as before")
+    return None, None
 _MAX_BEHIND_RETRIES = 3
 _DEP_CATCHUP_KEY = 9   # lost-work key outside the 1..3 push/BEHIND attempt keys
 # Expected length of one BEHIND re-rebase pass (rebase, push, full CI watch).
@@ -4433,11 +4501,28 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
     # a re-review round. current_verdict_path tracks that review's verdict file.
     if final_verdict == "READY WITH NOTES":
         notes = fidelity.extract_notes(llm, current_verdict_path, log=log, pr_number=pr)
-        filed_notes: list = []
-        nums = fidelity.file_note_issues(gh, notes, pr, log=log, filed=filed_notes)
-        res.fidelity["filed_notes"] = filed_notes
-        res.fidelity["backlog_issue_numbers"] = nums
-        log(f"phase5.5 notes: {len(notes)} extracted, {len(nums)} backlog issues filed")
+        note_findings = fidelity.pr_copy_round_findings(notes) if pr else None
+        if note_findings is not None:
+            v_notes, path_notes = _notes_body_round(
+                llm, git, gh, out_dir, worktree, plan, master_sha, pr, res,
+                current_verdict_path, note_findings, len(rounds) + 1, log)
+            if v_notes == "READY":
+                final_verdict = "READY"
+                current_verdict_path = path_notes
+                # Arming reads verdict 2 (tree-gated) over verdict 1, so a READY here
+                # has to land in the verdict-2 slots the way a re-review round's does.
+                res.fidelity["verdict_2"] = v_notes
+                res.fidelity["reviewed_tree_2"] = fidelity.read_reviewed_tree(path_notes)
+                res.fidelity["verdict_path"] = path_notes
+                res.fidelity["review_items"].append(
+                    {**fidelity.verdict_items(path_notes), "remediation_sha": BODY_ONLY_SHA})
+                log("phase5.5 notes round: every pr-copy note resolved; verdict READY")
+        if final_verdict == "READY WITH NOTES":
+            filed_notes: list = []
+            nums = fidelity.file_note_issues(gh, notes, pr, log=log, filed=filed_notes)
+            res.fidelity["filed_notes"] = filed_notes
+            res.fidelity["backlog_issue_numbers"] = nums
+            log(f"phase5.5 notes: {len(notes)} extracted, {len(nums)} backlog issues filed")
     fidelity_delta.record_outcome(state_dir, slug, res.fidelity, pr_number=pr,
                                   run_id=os.path.basename(os.path.normpath(out_dir)),
                                   version=cache_version, diff=diff,

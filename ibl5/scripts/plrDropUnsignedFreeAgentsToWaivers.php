@@ -33,18 +33,22 @@ echo $session->isDryRun()
     : 'Backup written and verified: ' . $session->backupPath() . "\n";
 while (!feof($plrFile)) {
     $line = fgets($plrFile);
+    if ($line === false) {
+        break;
+    }
 
-    $name = trim(addslashes(substr($line, 4, 32)));
+    $name = trim(substr($line, 4, 32));
     $pid = substr($line, 38, 6);
     $teamid = (int) substr($line, 44, 2); // Ensure teamid is an integer
     $currentContractYear = substr($line, 290, 2);
     $totalContractYears = substr($line, 292, 2);
     $contractOwnedBy = substr($line, 331, 2);
 
-    if ($teamid != 0
-        AND is_numeric($teamid)
-        AND $currentContractYear == 0
-        AND $currentContractYear == $totalContractYears
+    if ($teamid !== 0
+        AND is_numeric($currentContractYear)
+        AND is_numeric($totalContractYears)
+        AND (int) $currentContractYear === 0
+        AND (int) $totalContractYears === 0
     ) {
         echo $line . "<br>";
         

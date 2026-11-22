@@ -496,8 +496,8 @@ class TradeExecutionServiceTest extends TestCase
         $heat2    = $this->deltaFor($deltas2, 'Heat');
         $heatPost2 = $heat2['currentSeasonCapTotal'] - $heat2['capSent'] + $heat2['capReceived'];
 
-        self::assertSame(7232, $heatPost2);
-        self::assertGreaterThan(League::HARD_CAP_MAX, $heatPost2);
+        // Pre-fix basis overshoots the hard cap by exactly 232 (the false-rejection case).
+        self::assertSame(League::HARD_CAP_MAX + 232, $heatPost2);
     }
 
     /**

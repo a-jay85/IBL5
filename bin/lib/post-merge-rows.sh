@@ -138,7 +138,7 @@ pmr_waiver() {
 # pmr_plan_check PLAN STEPS_DIR [TAKEN] -- one `[AM] ...` line per violation; 0 iff none.
 # TAKEN is a space-separated list of Verification Matrix row numbers.
 pmr_plan_check() {
-    local _plan="$1" _steps="$2" _taken=" ${3-} " _out="" _line _n _rows _w=0
+    local _plan="$1" _steps="$2" _taken=" ${3-} " _out="" _line _n _rows _w=0 _seen=" "
     _rows="$(pmr_rows "$_plan")"
     while IFS= read -r _line; do
         [ -n "$_line" ] || continue
@@ -147,6 +147,8 @@ pmr_plan_check() {
         if [ "$PMR_VALID" -ne 1 ]; then
             _out+="[AM] unparseable After merge row (tag must be manual, auto:mac <name> or auto:ci <name>): $_line"$'\n'; continue
         fi
+        case "$_seen" in *" $_n "*) _out+="[AM] After merge row $_n repeats an earlier After merge row number (bin/post-merge-run keys its done marker by number, so the second row would be skipped): $_line"$'\n' ;; esac
+        _seen+="$_n "
         case "$_taken" in *" $_n "*) _out+="[AM] After merge row $_n repeats a Verification Matrix row number: $_line"$'\n' ;; esac
         if [ "$PMR_KIND" = auto:ci ] && ! pmr_executor_ready auto:ci; then
             _out+="[AM] auto:ci has no executor on this checkout; write the row as manual: $_line"$'\n'

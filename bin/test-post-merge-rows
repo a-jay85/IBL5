@@ -233,4 +233,9 @@ _o="$(pmr_plan_check "$SCRATCH/p-unparse.md" "$STEPS" "")"; _rc=$?
 h_eq "plan-check unparseable row fails" 1 "$_rc"
 h_eq "plan-check unparseable row names it" 1 "$(grep -c 'unparseable After merge row' <<< "$_o")"
 
+printf '# Plan\n\n## After merge\n\n- **Row 1** [auto:mac real-step] — a\n- **Row 1** [auto:mac real-step] — b\n' > "$SCRATCH/p-dup.md"
+_o="$(pmr_plan_check "$SCRATCH/p-dup.md" "$STEPS" "")"; _rc=$?
+h_eq "plan-check repeated After merge row number fails" 1 "$_rc"
+h_eq "plan-check repeated row names the repeat" 1 "$(grep -c 'repeats an earlier After merge row number' <<< "$_o")"
+
 h_done

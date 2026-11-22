@@ -264,7 +264,21 @@ def review_pass(inp, pr, head_tree, diff, plan, log, spawn):
         now = head_tree()
         if now != tree:              # the head moved during the spawn, so the verdict is stale
             current_tree = now
+    why = reject_reason(verdict_path(pr))
+    if word is None and fresh is None:
+        why = oversize_note(diff)
+        if why:
+            log(f"second-review: not spawned ({why})")
     return dataclasses.replace(
         inp, current_tree=current_tree, second_review_verdict=word, second_review_tree=tree,
-        second_review_clears=clears,
-        second_review_reject_reason=reject_reason(verdict_path(pr)))
+        second_review_clears=clears, second_review_reject_reason=why)
+
+
+def oversize_note(diff: Callable[[], str]) -> str:
+    """Why the seat skipped an over-cap diff, or "" when the diff fits or cannot be read."""
+    try:
+        size = len((diff() or "").encode())
+    except Exception:  # noqa: BLE001 - the note is advisory; the hold stands either way
+        return ""
+    cap = fidelity.REMEDIATION_DIFF_INLINE_CAP
+    return f"diff too big ({size} bytes > {cap} cap)" if size > cap else ""

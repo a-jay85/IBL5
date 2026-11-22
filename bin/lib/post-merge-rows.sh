@@ -14,7 +14,7 @@ PMR_END_ANCHOR='<!-- after-merge:end -->'
 PMR_NAME_RE='^[A-Za-z0-9][A-Za-z0-9._-]*$'
 # Owner-after-merge prose (ADR-0198 update 2026-11-20). Case-insensitive ERE, one line at a
 # time. Calibrated 2026-11-20: 2 hits in 250 merged bodies (#4046, #4035), 0 false positives.
-PMR_PROSE_RE='(owner|you|someone|a person)[^.]{0,40}(run|runs|must run|needs to run|install|installs)[^.]{0,80}(after (the )?merge|once merged|by hand|manually)|not installed by (merging|the merge)|(after|once) (the )?(this )?(pr )?(is )?merg(e|ed)[^.]{0,60}(owner|you) (run|runs|must|install)|(owner|you) (run|runs|must run)[^.]{0,60}by hand'
+PMR_PROSE_RE='(^|[^[:alnum:]_])(owner|you|someone|a person)([^[:alnum:]_]|$)[^.]{0,40}(run|runs|must run|needs to run|install|installs)[^.]{0,80}(after (the )?merge|once merged|by hand|manually)|not installed by (merging|the merge)|(after|once) (the )?(this )?(pr )?(is )?merg(e|ed)[^.]{0,60}(^|[^[:alnum:]_])(owner|you) (run|runs|must|install)|(^|[^[:alnum:]_])(owner|you) (run|runs|must run)[^.]{0,60}by hand'
 PMR_WAIVER_TAG='after-merge-prose-ok:'
 # The bin/ directory that holds this lib. Executors are looked up here, so a checkout
 # that carries the executor file turns its rows automatic and one that lacks it does not.

@@ -27,6 +27,7 @@
 #   lock/                 one sweep at a time (mkdir plus a claim file holding the pid)
 #   done/<pr>.row<N>      marker per row, so a rerun never repeats a row
 #   logs/<pr>.row<N>.log  step output
+#   pending-dm/*.txt      failure DMs that did not send; each tick retries them
 #
 # Exit codes: 0 done or nothing to do, 1 gh or state failure, 2 usage error.
 #
@@ -75,7 +76,7 @@ SINCE="$(cat "$STATE/since")"; pmr_is_count "$SINCE" || { log "corrupt $STATE/si
 
 # take_lock: mkdir makes room, claim_file owns it. A lock whose pid is dead is reaped.
 take_lock() {
-    mkdir -p "$STATE" "$STATE/done" "$STATE/logs" || return 1
+    mkdir -p "$STATE" "$STATE/done" "$STATE/logs" "$STATE/pending-dm" || return 1
     if mkdir "$STATE/lock" 2>/dev/null && claim_file "$STATE/lock/pid" printf '%s\n' "$$"; then
         return 0
     fi
@@ -140,10 +141,24 @@ process_pr() {     # <pr> <merge-oid> <merged-epoch>; body already in $TMP/body.
         [ "$res" = ok ] || fails="$fails"$'\n'"Row $n [auto:mac $PMR_NAME]: $res (log: $STATE/logs/$pr.row$n.log)"
     done < "$TMP/rows.txt"
     [ -n "$fails" ] && [ "$DRY_RUN" -eq 0 ] || return 0
-    printf 'post-merge-run: PR #%s has auto:mac rows that did not succeed. Run them by hand.%s\n' "$pr" "$fails" \
-        | bash "$ROOT/bin/discord-dm" - || log "PR $pr: discord-dm failed"
+    printf 'post-merge-run: PR #%s has auto:mac rows that did not succeed. Run them by hand.%s\n' "$pr" "$fails" > "$TMP/dm.txt"
+    # The done markers are already written, so a failed DM is saved and retried on the next tick.
+    if ! bash "$ROOT/bin/discord-dm" - < "$TMP/dm.txt"; then
+        log "PR $pr: discord-dm failed; saved for retry"
+        cp "$TMP/dm.txt" "$STATE/pending-dm/$pr.$NOW.txt" || log "PR $pr: could not save the pending DM"
+    fi
+}
+retry_pending_dms() {
+    local f
+    [ "$DRY_RUN" -eq 0 ] || return 0
+    for f in "$STATE"/pending-dm/*.txt; do
+        [ -f "$f" ] || continue
+        if bash "$ROOT/bin/discord-dm" - < "$f"; then rm -f "$f"; log "resent pending DM $(basename "$f")"
+        else log "pending DM $(basename "$f") still failing"; fi
+    done
 }
 
+retry_pending_dms
 while IFS= read -r _pr_json; do
     [ -n "$_pr_json" ] || continue
     _pr="$(jq -r '.number' <<< "$_pr_json")"

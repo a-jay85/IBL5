@@ -7,6 +7,9 @@
 -- filters ~98% of the rows away. This index leads with the pair and carries
 -- game_type and season_year, so those filters run inside the index.
 --
+-- Index idx_visitor_home_gt_season, columns in order: visitor_teamid,home_teamid,game_type,season_year
+-- (information_schema.STATISTICS lists them in that order on both tables).
+--
 -- ADDITIVE ONLY — no DROP, no rewrite. Old code ignores the index, so
 -- auto-rollback is safe (ibl5/migrations/README.md § Auto-Rollback Compatibility).
 --

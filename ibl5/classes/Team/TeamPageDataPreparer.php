@@ -39,13 +39,16 @@ class TeamPageDataPreparer
     private TeamRepositoryInterface $repository;
     private TeamQueryRepositoryInterface $teamQueryRepository;
     private League $league;
+    private ?TeamAccomplishmentsCache $accomplishmentsCache;
 
     public function __construct(
         \mysqli $db,
         TeamRepositoryInterface $repository,
         TeamQueryRepositoryInterface $teamQueryRepository,
         League $league,
+        ?TeamAccomplishmentsCache $accomplishmentsCache = null,
     ) {
+        $this->accomplishmentsCache = $accomplishmentsCache;
         $this->db = $db;
         $this->repository = $repository;
         $this->teamQueryRepository = $teamQueryRepository;
@@ -422,7 +425,9 @@ class TeamPageDataPreparer
         return [
             'tenures' => $this->repository->getGMTenures($team->teamid),
             'gmAwards' => $this->repository->getGMAwards($team->ownerName),
-            'teamAccomplishments' => $this->repository->getTeamAccomplishments($team->name),
+            'teamAccomplishments' => $this->accomplishmentsCache !== null
+                ? $this->accomplishmentsCache->get($team->name)
+                : $this->repository->getTeamAccomplishments($team->name),
         ];
     }
 

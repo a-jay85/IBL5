@@ -61,3 +61,68 @@ def test_fp2_shape_no_files_line_no_diff_marker_exempt():
     )
     assert items == []
     assert any(n.startswith("NO-DIFF-PHASE: 1") for n in notes)
+
+
+# ---------------------------------------------------------------------------
+# Parser: planfile._files_line_paths reads the leading path list of a Files line.
+# ---------------------------------------------------------------------------
+
+def _files(text):
+    return planfile._files_line_paths(text.splitlines())
+
+
+def test_files_line_inline_multi_path_separators():
+    text = "**Files:** `bin/a`, `bin/b` and `bin/c` & `bin/d` + `bin/e`; `bin/f`"
+    assert _files(text) == ["bin/a", "bin/b", "bin/c", "bin/d", "bin/e", "bin/f"]
+
+
+def test_files_line_bare_paths_without_backticks():
+    text = "**Files:** bin/foo and tools/postplan-harness/harness/state.py"
+    assert _files(text) == ["bin/foo", "tools/postplan-harness/harness/state.py"]
+
+
+def test_files_line_bullet_form_takes_leading_path_only():
+    text = (
+        "**Files:**\n"
+        "- `bin/a` — NEW (adds `bin/z`)\n"
+        "- `bin/b` (modify)\n"
+        "\n"
+        "- `bin/later`\n"
+    )
+    assert _files(text) == ["bin/a", "bin/b"]
+
+
+def test_files_line_wrapped_continuation_after_separator():
+    assert _files("**Files:** `bin/a`, `bin/b`,\n`bin/c`.\n") == ["bin/a", "bin/b", "bin/c"]
+    assert _files("**Files:** `bin/a`\n`bin/c` is next\n") == ["bin/a"]
+
+
+_FP1_FILES_LINE = (
+    "**Files:** `bin/run-shell-harnesses` and `bin/lib/harness-select.sh`. The names "
+    "`bin/test-burndown` and `bin/test-burndown-loop` below are fixture entries in the "
+    "self-test, not files this phase edits."
+)
+
+
+def test_files_line_stops_at_trailing_prose():
+    assert _files(_FP1_FILES_LINE) == ["bin/run-shell-harnesses", "bin/lib/harness-select.sh"]
+
+
+def test_non_files_labels_keep_mention_scan():
+    for text in ("**File:** `bin/a`",
+                 "**Files.** `bin/a`",
+                 "**Files touched:** `bin/a`",
+                 "See the **Files:** line `bin/a`"):
+        assert _files(text) == [], text
+
+
+def test_files_line_normalisation_reuses_evidence_rules():
+    text = (
+        "**Files:** `tools/postplan-harness/harness/conformance.py:410`, "
+        "`tools/postplan-harness/tests/test_conformance_nondiff.py::test_no_evidence_phase_skipped`, "
+        "`bin/*.sh`, `bin/gone` (example)"
+    )
+    assert _files(text) == [
+        "tools/postplan-harness/harness/conformance.py",
+        "tools/postplan-harness/tests/test_conformance_nondiff.py",
+    ]

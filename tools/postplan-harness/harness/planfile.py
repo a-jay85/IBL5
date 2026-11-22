@@ -765,6 +765,99 @@ def _phase_evidence_paths(body: str) -> list[str]:
     return out
 
 
+_FILES_LABEL_RE = re.compile(r"^\s*(?:[-*]\s+)?\*\*Files:\*\*[ \t]*(.*)$")
+_FILES_BULLET_RE = re.compile(r"^\s*[-*]\s+(.*)$")
+_FILES_TICK_RE = re.compile(r"`([^`\n]+)`")
+_FILES_BARE_RE = re.compile(r"[^\s`,;&+()]+")
+_FILES_PAREN_RE = re.compile(r"\s*\(([^)\n]*)\)")
+_FILES_SEP_RE = re.compile(r"\s*(?:,\s*and\b|,|;|&|\+|and\b)", re.I)
+_FILES_BARE_PATH_RE = re.compile(r"^(?:[\w.~-]+/[\w./-]*[\w-]|[\w-]+\.[A-Za-z0-9]{1,8})$")
+
+
+def _leading_path_list(text: str) -> tuple[str, bool]:
+    """The list of path tokens that opens `text`, re-emitted as backticked text for
+    _phase_evidence_paths, and True when `text` ends on a separator (the list wraps).
+
+    A token is a backticked span or a bare path (a `/` or a file extension). Tokens are
+    joined by `,` `;` `&` `+` or `and`. A parenthesised group right after a token is
+    skipped, except `(example)`, which is kept so _phase_evidence_paths drops the token.
+    The list stops at the first thing that is neither a token nor a separator, and at a
+    bare token ending in `.` (sentence end), so trailing prose never contributes a path.
+    """
+    parts: list[str] = []
+    pos, want_token = 0, True
+    while True:
+        while pos < len(text) and text[pos].isspace():
+            pos += 1
+        if pos >= len(text):
+            return " ".join(parts), want_token and bool(parts)
+        if want_token:
+            tick = _FILES_TICK_RE.match(text, pos)
+            bare = _FILES_BARE_RE.match(text, pos)
+            end_sentence = False
+            if tick:
+                tok, pos = tick.group(1), tick.end()
+            elif bare:
+                raw = bare.group(0)
+                tok, end_sentence = raw.rstrip(".:"), raw.endswith(".")
+                if not _FILES_BARE_PATH_RE.match(tok):
+                    return " ".join(parts), False  # prose ends the list
+                pos = bare.end()
+            else:
+                return " ".join(parts), False
+            suffix = ""
+            paren = _FILES_PAREN_RE.match(text, pos)
+            if paren:
+                pos = paren.end()
+                if paren.group(1).strip().lower() == "example":
+                    suffix = " (example)"
+            parts.append(f"`{tok}`{suffix}")
+            if end_sentence:
+                return " ".join(parts), False
+            want_token = False
+        else:
+            sep = _FILES_SEP_RE.match(text, pos)
+            if not sep:
+                return " ".join(parts), False  # prose ends the list
+            pos, want_token = sep.end(), True
+
+
+def _files_line_paths(lines: list[str]) -> list[str]:
+    """Paths a phase lists on its `**Files:**` line(s), deduped, first-seen order.
+
+    Only the exact label `**Files:**` at line start (optionally as a bullet) counts.
+    Inline form: the leading list after the label; when that list ends on a separator,
+    the next non-blank, non-bullet line continues it. Bullet form (label alone): each
+    following `- ` bullet contributes its leading list, until the first non-bullet line.
+    Several `**Files:**` lines in one phase are unioned. Empty = no Files line, or one
+    whose leading list holds no repo path; conformance then keeps the mention scan.
+    """
+    spans: list[str] = []
+    i = 0
+    while i < len(lines):
+        m = _FILES_LABEL_RE.match(lines[i])
+        i += 1
+        if not m:
+            continue
+        rest = m.group(1).strip()
+        if not rest:
+            while i < len(lines):
+                bm = _FILES_BULLET_RE.match(lines[i])
+                if not bm:
+                    break
+                spans.append(_leading_path_list(bm.group(1))[0])
+                i += 1
+            continue
+        span, ended_on_sep = _leading_path_list(rest)
+        spans.append(span)
+        while ended_on_sep and i < len(lines) and lines[i].strip() \
+                and not _FILES_BULLET_RE.match(lines[i]):
+            span, ended_on_sep = _leading_path_list(lines[i])
+            spans.append(span)
+            i += 1
+    return _phase_evidence_paths("\n".join(spans))
+
+
 _HEADING_PREFIX_RE = re.compile(r"^(?:Phase|Step)\s*\d+\s*:?\s*", re.I)
 _HEADING_WORD_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]*$")
 

@@ -1734,9 +1734,39 @@ test_local_mutations_main_only_skips_worktree_probe() {
     lm_plan 'docker exec -i ibl5-mariadb mariadb -e "SELECT 1"'
     export STUB_PROBE_FAIL_TARGET=worktree
     run_gate --plan "$PLAN" --stage local-mutations
+    # Probe passes; the stub-less docker check then fails its baseline (exit 1), never the probe (exit 3).
+    want_rc 1
     refute_out "needs the DB"
     want_targets "main"
     unset STUB_PROBE_FAIL_TARGET
+}
+
+# The main probe in the local-mutations stage fails closed with the main-stack hint.
+test_local_mutations_main_down_fails_closed() {
+    new_case
+    lm_plan 'docker exec -i ibl5-mariadb mariadb -e "SELECT 1"'
+    export STUB_PROBE_FAIL_TARGET=main
+    run_gate --plan "$PLAN" --stage local-mutations
+    want_rc 3
+    want_out "Start the main stack"
+    want_cnt xm 0
+    unset STUB_PROBE_FAIL_TARGET
+}
+
+# With no seam, the main probe runs bin/db-query with DB_QUERY_TARGET=main.
+test_local_mutations_default_main_probe_fails_closed() {
+    new_case
+    lm_plan 'docker exec -i ibl5-mariadb mariadb -e "SELECT 1"'
+    mkdir -p "$R/bin"
+    printf '#!/usr/bin/env bash\n[ "${DB_QUERY_TARGET:-}" = main ] && exit 1\nexit 0\n' > "$R/bin/db-query"
+    chmod +x "$R/bin/db-query"
+    local saved="$PREFIRE_DB_PROBE_CMD"
+    unset PREFIRE_DB_PROBE_CMD
+    run_gate --plan "$PLAN" --stage local-mutations
+    export PREFIRE_DB_PROBE_CMD="$saved"
+    want_rc 3
+    want_out "Start the main stack"
+    want_cnt xm 0
 }
 
 test_local_mutations_default_probe_fails_closed() {
@@ -2803,6 +2833,8 @@ test_xm_bad_stage_rejected
 test_local_mutations_runs_dropped_record
 test_local_mutations_db_down_fails_closed
 test_local_mutations_main_only_skips_worktree_probe
+test_local_mutations_main_down_fails_closed
+test_local_mutations_default_main_probe_fails_closed
 test_local_mutations_default_probe_fails_closed
 test_local_mutations_non_db_skips_probe
 test_local_mutations_ci_records_skip

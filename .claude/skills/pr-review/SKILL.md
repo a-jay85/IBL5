@@ -133,6 +133,7 @@ See `.claude/review-shared/_posting-procedure.md` § Dispositioning open threads
 
 ### Notes:
 - Do not check build signal or attempt to build or typecheck the app. These will run separately.
+- Never check out the PR in the session's starting directory. `bin/pr-review-now` starts this session in the main checkout, and other jobs read `master` from it. Read a file at the PR head with `git show <headRefOid>:<path>`. To run a script or test against the PR's code, run it in the PR's own worktree. Find it with `git worktree list | grep <headRefName>` and run `(cd <path> && <cmd>)`. With no worktree, make a throwaway one: `git fetch origin pull/<N>/head && git worktree add --detach /tmp/pr-<N> FETCH_HEAD`, then `git worktree remove --force /tmp/pr-<N>` when done. `~/.claude/hooks/bash-guard.sh` Check 26 denies `gh pr checkout` and `git checkout`/`git switch` off `master` in the main checkout.
 - Use `gh` to interact with GitHub, not web fetch.
 - Make a todo list first.
 - You must cite and link each bug (e.g. if referring to a project rule, you must link its `.claude/rules/*.md` file).

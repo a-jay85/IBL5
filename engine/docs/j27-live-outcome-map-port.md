@@ -1,6 +1,6 @@
 ---
 description: J27 live outcome-map port. The Go engine now reads play-outcome codes 1-4 the way live JSB 5.60 does. Code 3 is the foul handler, and code 4 is the turnover path with a 10% offensive foul and the FUN_004e2fc0 steal split. Lists the removed scales, before/after aggregates, re-pinned test literals, the open residuals, an archive walk against .sco and a per-type foul table against the live trace.
-last_verified: 2026-11-20
+last_verified: 2026-11-21
 ---
 
 # J27: live outcome-map port
@@ -98,6 +98,22 @@ Every gap is under 0.03, so this PR ports no foul rate. The largest gap is the o
 
 The steal row comes from the backlog#1923 run. The other rows come from the port run. The backlog#1923 run removed one RNG draw per steal, so the stream shifted. In that run the code-4 share printed 13.2680% and the offensive-foul share printed 9.4397%.
 
+The backlog#1919 run changed no engine code. It re-measured the steal share at 56.7879% on the same 200 games, then tested one candidate cause offline against `ev2.jsonl` (the 2026-11-16 live trace, 650 steal rolls, 17 player dumps). The candidate: JSB caps fatigue at 1.0 on the defender side of the steal roll only (decompile 97858-97867), and leaves it uncapped on the offense side (97878-97890). Live `+0x24` ran 51 to 2,285, so live offense fatigue ran 1.017 to 1.762 and shrinks the turnover pool, which raises the steal share.
+
+Each player dump pairs with the steal roll logged just before it, because the `tvhook.js` callback at `0x4e3388` pushes the `S` row and then calls `dump()`. With that pairing the check reproduces the trace's inputs:
+
+| Check | Result |
+|-------|--------|
+| all-event share `mean(min(1, pool/range))` over 650 rolls | 74.492% (trace report 74.5%) |
+| dumps paired with a roll | 17 of 17 |
+| defense pool, capped fatigue, median error | 0.000% |
+| offense pool at `+0xDE0`, uncapped fatigue, median error | 6.961% |
+| offense pool at `+0xDE0`, capped fatigue, median error | 29.038% |
+| offense pool at `+0xDD8`, uncapped fatigue, median error | 0.000% |
+| offense pool at `+0xDD8`, capped fatigue, median error | 37.700% |
+
+The plan fixed the offense slot at `+0xDE0` before the run, because `tovRate` cites that offset. At `+0xDE0` the uncapped reading misses the 1% bar (6.961%), so the port rule failed and this PR ports nothing. The pool-check output is `~/claude-plans/_reports/2026-11-21-steal-share-1919-pool-check.txt`.
+
 ### Archive walk before/after (backlog#1923)
 
 `TestRealArchive_FTADecomp` (build tag `archive`) produced these rows on 2026-11-20 at its defaults: 60 games per snapshot, every snapshot, seed 20240601. Both walk binaries were built from master with the walk patch from PR #4089 applied, because master's walk does not print STL. Each walk read 113 matched recent-era snapshots and skipped one, giving 13,284 engine team-games and 12,056 `.sco` team-games. Values come from the `WALK side=` lines, per team-game. The before row matches the PR #4089 BEFORE row.
@@ -109,6 +125,16 @@ The steal row comes from the backlog#1923 run. The other rows come from the port
 | engine after (this port) | 7.346 | 14.914 | 19.851 | 17.886 |
 
 STL rose by 2.0%, which is below the 11.4% bound the cap raise allows. TOV rose by 1.7% and FTA fell by 0.7%.
+
+### Archive walk before/after (backlog#1919)
+
+The engine code did not change, so there is one engine row. `TestRealArchive_FTADecomp` ran on 2026-11-21 at its defaults and printed these `WALK side=` lines per team-game. The engine row matches the "after this port" row of the backlog#1923 table.
+
+| Side | STL | TOV | FTA | PF |
+|------|-----|-----|-----|----|
+| `.sco` | 9.131 | 13.762 | 18.587 | 17.116 |
+| engine (code unchanged) | 7.346 | 14.914 | 19.851 | 17.886 |
+
 | code-2 four-point plays | 29 | not traced |
 
 ## Re-pinned literals
@@ -141,6 +167,7 @@ These stay open. This doc sets no target and proposes no scale.
 - Closed for the steal cap only by backlog#1923: the cap reads `stealCapLeagueSTL48 = 2.043`. The foul-bucket baseline in `bucketweights.go` still reads `leagueSTL48 = 1.834`. JSB keeps one value, so the two constants should merge once that file's owner moves it. The foul baseline probably reads the same `+0x68A8` global, which nobody has confirmed.
 - The offensive foul counts as a team foul, which can push the offense toward the bonus. The trace does not show whether JSB counts it.
 - The steal split is 56.79% in the engine after backlog#1923, against 74.5% predicted and 84.2% observed by the trace. That port moved the share through cited values only and did not close the gap. On `bundle_reallife.json` the cap rarely binds, so the cap raise moved the share by 0.18 points. On the archive walk the cap raise moved STL from 7.203 to 7.346 per team-game, against 9.131 in `.sco`.
+- Open after backlog#1919: the steal share is still 56.7879% (the engine's `turnoverPool` in `steal.go` still uses the capped fatigue curve). The offline check on `ev2.jsonl` found the live turnover pool reproduces to a 0.000% median error over 17 pairs when each offense player's fatigue is uncapped and the rate is `+0xDD8`. The capped reading misses by 37.700% at `+0xDD8`. At `+0xDE0` the uncapped reading misses by 6.961% and the capped one by 29.038%. `00_MASTER_REFERENCE.md:529` says `+0xDD8` and `+0xDE0` start as one TOV/MIN×48 value, and `+0xDE0` is then usage-shrunk in the second pass while `+0xDD8` stays raw (store at `4d4509-4d451e`, line 1526). The engine's `tovRate` implements the unshrunk form. The next attempt can fix the slot at `+0xDD8` before it runs the check, port an uncapped fatigue helper into `turnoverPool` only (decompile 97878-97890), and then test whether the engine's on-court energy range covers live `+0x24` of 51 to 2,285. The engine's energy scale may differ from `+0x24`, so the share could move only part of the way. The defender side stays capped at 1.0 (97858-97867).
 - After backlog#1923 the archive TOV rose from 14.662 to 14.914 per team-game, more than the 1% the plan expected. A steal is a subset of code-4 turnovers, so the rise likely comes from more possessions after steals through the fast break. Nobody has measured that.
 - Code 2 made 29 four-point plays over 200 real-life games. They carry `FoulSiteAndOne`, the tag the old and-one bucket used.
 - On bundle.json the home/away FTA ratio is 2.03. That fixture runs the rating fallback path. On bundle_reallife.json the ratio is 1.105.

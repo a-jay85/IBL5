@@ -79,6 +79,51 @@ final class PlrBulkScriptsTest extends TestCase
     }
 
     /**
+     * @return array<string, array{int, int}>
+     */
+    public static function blankDropContractFieldProvider(): array
+    {
+        return [
+            'blank current contract year' => [290, 2],
+            'blank total contract years' => [292, 2],
+        ];
+    }
+
+    #[DataProvider('blankDropContractFieldProvider')]
+    public function testDropUnsignedSkipsRowWithBlankContractField(int $offset, int $width): void
+    {
+        $row = substr_replace(SyntheticPlrCorpus::line(101, 5, 3, 2, 0, 0, 100, 5), str_repeat(' ', $width), $offset, $width);
+        file_put_contents($this->tmpDir . '/IBL5.plr', $row);
+
+        $result = $this->runScript('plrDropUnsignedFreeAgentsToWaivers');
+
+        self::assertSame(0, $result['exit']);
+        self::assertSame($row, file_get_contents($this->tmpDir . '/IBL5.plr'));
+    }
+
+    public function testAdvanceYearsOfExperienceTreatsBlankPidAsNonZero(): void
+    {
+        $row = substr_replace(SyntheticPlrCorpus::line(101, 5, 3, 2, 1, 2, 100, 5), str_repeat(' ', 6), 38, 6);
+        file_put_contents($this->tmpDir . '/IBL5.plr', $row);
+
+        $result = $this->runScript('plrAdvanceYearsOfExperience');
+
+        self::assertSame(0, $result['exit']);
+        self::assertSame(substr_replace($row, ' 4', 286, 2), file_get_contents($this->tmpDir . '/IBL5.plr'));
+    }
+
+    public function testAdvanceBirdYearsTreatsBlankContractYear1AsNonZero(): void
+    {
+        $row = substr_replace(SyntheticPlrCorpus::line(101, 5, 3, 2, 1, 2, 100, 5), str_repeat(' ', 4), 298, 4);
+        file_put_contents($this->tmpDir . '/IBL5.plr', $row);
+
+        $result = $this->runScript('plrAdvanceBirdYears');
+
+        self::assertSame(0, $result['exit']);
+        self::assertSame(substr_replace($row, ' 3', 288, 2), file_get_contents($this->tmpDir . '/IBL5.plr'));
+    }
+
+    /**
      * @return array<string, array{string, string, string}>
      */
     public static function scriptProvider(): array
@@ -100,6 +145,32 @@ final class PlrBulkScriptsTest extends TestCase
                 "Player 101's new bird years =  3",
             ],
         ];
+    }
+
+    /**
+     * @return array<string, array{string, string}>
+     */
+    public static function apostropheNameProvider(): array
+    {
+        return [
+            'advance experience' => ['plrAdvanceYearsOfExperience', "O'Neal's new years of experience =  4"],
+            'drop unsigned free agents' => ['plrDropUnsignedFreeAgentsToWaivers', "O'Neal's new teamid =  0"],
+            'advance bird years' => ['plrAdvanceBirdYears', "O'Neal's new bird years =  3"],
+        ];
+    }
+
+    #[DataProvider('apostropheNameProvider')]
+    public function testDryRunEchoesNameWithApostropheUnescaped(string $scriptName, string $needle): void
+    {
+        $row = substr_replace(SyntheticPlrCorpus::line(101, 5, 3, 2, 0, 0, 100, 5), str_pad("O'Neal", 32), 4, 32);
+        file_put_contents($this->tmpDir . '/IBL5.plr', $row);
+
+        $result = $this->runScript($scriptName, ['--dry-run']);
+
+        self::assertSame(0, $result['exit']);
+        self::assertStringContainsString($needle, $result['stdout']);
+        self::assertStringNotContainsString('O\\\'Neal', $result['stdout']);
+        self::assertSame($row, file_get_contents($this->tmpDir . '/IBL5.plr'));
     }
 
     #[DataProvider('scriptProvider')]

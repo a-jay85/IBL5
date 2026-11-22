@@ -921,6 +921,20 @@ class TeamPageDataPreparerTest extends TestCase
         $this->assertSame(['tenures' => [], 'gmAwards' => [], 'teamAccomplishments' => []], $result);
     }
 
+    public function testPrepareAwardsDataWithNullCacheQueriesRepositoryOnce(): void
+    {
+        $rows = [['year' => 2011, 'name' => 'Bulls', 'award' => 'IBL Champions', 'id' => 0]];
+
+        $repo = self::createMock(TeamRepositoryInterface::class);
+        $repo->method('getGMTenures')->willReturn([]);
+        $repo->method('getGMAwards')->willReturn([]);
+        $repo->expects($this->once())->method('getTeamAccomplishments')->with('Bulls')->willReturn($rows);
+
+        $result = $this->buildPreparer($repo, accomplishmentsCache: null)->prepareAwardsData(self::bullsTeam());
+
+        $this->assertSame($rows, $result['teamAccomplishments']);
+    }
+
     public function testPrepareAwardsDataServesAccomplishmentsFromCacheWhenProvided(): void
     {
         $rows = [

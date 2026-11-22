@@ -12,6 +12,13 @@ use Team\TeamAccomplishmentsCache;
 use Team\TeamRepository;
 use Updater\Steps\RefreshTeamAccomplishmentsStep;
 
+/**
+ * Cold and warm cache reads must equal the repository rows for every real franchise. The byte
+ * comparison fails if get() reorders rows, for example by returning array_reverse($fresh).
+ *
+ * The page reads Team::initialize()->name and the step rebuilds the names from
+ * realTeamNames(), which the plan called teamNamesFromDb(). The two must agree for every teamid.
+ */
 #[Group('database')]
 class TeamAccomplishmentsCacheTest extends DatabaseTestCase
 {

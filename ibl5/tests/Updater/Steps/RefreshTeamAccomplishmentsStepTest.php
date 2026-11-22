@@ -41,6 +41,57 @@ final class RefreshTeamAccomplishmentsStepTest extends TestCase
         self::assertStringContainsString('2 teams', $result->detail);
     }
 
+    public function testReportsRebuildDurationFromClockDelta(): void
+    {
+        $repository = self::createStub(TeamRepositoryInterface::class);
+        $repository->method('getTeamAccomplishments')->willReturn([]);
+        $cache = self::createStub(DatabaseCacheInterface::class);
+
+        // microtime() calls: budget check, rebuild start, rebuild end.
+        $clock = new class ([1010.0, 1010.0, 1013.5]) implements \Clock\ClockInterface {
+            /** @param list<float> $ticks */
+            public function __construct(private array $ticks)
+            {
+            }
+
+            public function now(): int
+            {
+                return 0;
+            }
+
+            public function microtime(): float
+            {
+                return array_shift($this->ticks) ?? 0.0;
+            }
+        };
+
+        $step = new RefreshTeamAccomplishmentsStep(
+            static fn (): TeamAccomplishmentsCache => new TeamAccomplishmentsCache($repository, $cache),
+            static fn (): array => ['Bulls', 'Aces'],
+            $clock,
+            self::STARTED_AT,
+        );
+
+        $result = $step->execute();
+
+        self::assertTrue($result->success);
+        self::assertSame('2 teams in 3.5 s', $result->detail);
+    }
+
+    public function testElapsedExactlyAtBudgetStillRebuilds(): void
+    {
+        $repository = self::createMock(TeamRepositoryInterface::class);
+        $repository->expects($this->exactly(2))->method('getTeamAccomplishments')->willReturn([]);
+        $cache = self::createMock(DatabaseCacheInterface::class);
+        $cache->expects($this->never())->method('delete');
+
+        $now = self::STARTED_AT + RefreshTeamAccomplishmentsStep::DEFAULT_BUDGET_SECONDS;
+        $result = $this->buildStep($repository, $cache, ['Bulls', 'Aces'], $now)->execute();
+
+        self::assertTrue($result->success);
+        self::assertFalse($result->skipped);
+    }
+
     public function testOverBudgetInvalidatesEveryTeamAndSkips(): void
     {
         $repository = self::createMock(TeamRepositoryInterface::class);

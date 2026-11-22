@@ -236,11 +236,14 @@ SPAWNED_PIDS="$SPAWNED_PIDS $PP_PID"
 # PID, or its runner's, can land on a stub row PID (6001-6005). The ancestry
 # walk then counts the orphan as tracked and hides it, and every orphan check
 # fails together.
+# Spawn it from a subshell that exits at once, so the orphan is reparented and
+# its ancestry no longer includes this script. CI can hand THIS script a stub
+# row's PID (6001-6005); a direct child would then be deduped as that job's
+# descendant and vanish from the orphan section.
 while :; do
-    ORPHAN_PID="$(
-        "$STUBBIN/claude" -p --name fixture-orphan >/dev/null 2>&1 &
-        printf '%s\n' "$!"
-    )"
+    ( "$STUBBIN/claude" -p --name fixture-orphan >/dev/null 2>&1 &
+      printf '%s\n' "$!" > "$TMP/orphan.pid" )
+    ORPHAN_PID="$(tr -dc '0-9' < "$TMP/orphan.pid")"
     fixture_pid "$ORPHAN_PID" || break
     kill "$ORPHAN_PID" 2>/dev/null
 done
@@ -254,12 +257,12 @@ mkdir -p "$TMP/IBL5-worktrees/fixture-wt-slug/ibl5"
 git -C "$TMP/IBL5-worktrees/fixture-wt-slug/ibl5" init -q 2>/dev/null
 git -C "$TMP/IBL5-worktrees/fixture-wt-slug/ibl5" symbolic-ref HEAD refs/heads/fixture-wt-branch
 while :; do
-    PROMPT_ORPHAN_PID="$(
-        cd "$TMP/IBL5-worktrees/fixture-wt-slug/ibl5" || exit 1
-        "$STUBBIN/claude" -p "Fix the fixture widget
+    # Same detach as the first orphan, so its ancestry skips this script.
+    (cd "$TMP/IBL5-worktrees/fixture-wt-slug/ibl5" \
+        && { "$STUBBIN/claude" -p "Fix the fixture widget
 SECOND PROMPT LINE" >/dev/null 2>&1 &
-        printf '%s\n' "$!"
-    )"
+            printf '%s\n' "$!" > "$TMP/prompt-orphan.pid"; })
+    PROMPT_ORPHAN_PID="$(tr -dc '0-9' < "$TMP/prompt-orphan.pid")"
     fixture_pid "$PROMPT_ORPHAN_PID" || break
     kill "$PROMPT_ORPHAN_PID" 2>/dev/null
 done

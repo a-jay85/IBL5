@@ -178,6 +178,7 @@ class TradingControllerSubmitOfferCharacterizationTest extends TestCase
             'type2' => ['bad'],
         ]);
 
+        // contract[2], index[2] and type[2] hold arrays, so each coerces to '0'.
         self::assertSame([
             'offeringTeam' => 'Metros',
             'listeningTeam' => 'Stars',
@@ -241,6 +242,7 @@ class TradingControllerSubmitOfferCharacterizationTest extends TestCase
         $tradeOffer = self::createStub(TradeOfferInterface::class);
         $tradeOffer->method('createTradeOffer')->willReturn(['success' => true]);
 
+        // Logging through ->notice( instead of info would skip this halt and run on into exit.
         $auditLogger = self::createMock(LoggerInterface::class);
         $auditLogger->expects(self::once())
             ->method('info')
@@ -290,6 +292,7 @@ class TradingControllerSubmitOfferCharacterizationTest extends TestCase
             'partnerSendsCash3' => '75',
         ]);
 
+        // checkedItems is keyed type:index, so type 1 + index 11 gives '1:11'.
         self::assertSame([
             'checkedItems' => ['1:11' => true],
             'userSendsCash' => [150, 0, 0, 0, 0, 0, 0],

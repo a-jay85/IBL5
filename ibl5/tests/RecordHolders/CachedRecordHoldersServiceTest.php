@@ -156,12 +156,9 @@ final class CachedRecordHoldersServiceTest extends TestCase
 
     public function testImplementsRecordHoldersCacheInterface(): void
     {
-        $service = new \RecordHolders\CachedRecordHoldersService(
-            $this->createStub(\RecordHolders\Contracts\RecordHoldersServiceInterface::class),
-            $this->createStub(\Cache\Contracts\DatabaseCacheInterface::class),
-        );
+        $cached = new \ReflectionClass(\RecordHolders\CachedRecordHoldersService::class);
 
-        $this->assertInstanceOf(\RecordHolders\Contracts\RecordHoldersCacheInterface::class, $service);
+        $this->assertTrue($cached->implementsInterface(\RecordHolders\Contracts\RecordHoldersCacheInterface::class));
     }
 
     public function testCacheInterfaceDeclaresOnlyRebuildAndInvalidate(): void

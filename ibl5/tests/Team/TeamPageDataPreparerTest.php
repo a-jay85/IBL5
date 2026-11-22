@@ -925,6 +925,7 @@ class TeamPageDataPreparerTest extends TestCase
     {
         $rows = [['year' => 2011, 'name' => 'Bulls', 'award' => 'IBL Champions', 'id' => 0]];
 
+        // With no cache, getTeamAccomplishments('Bulls') runs on the repository exactly once.
         $repo = self::createMock(TeamRepositoryInterface::class);
         $repo->method('getGMTenures')->willReturn([]);
         $repo->method('getGMAwards')->willReturn([]);

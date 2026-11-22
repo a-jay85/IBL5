@@ -90,8 +90,8 @@ Each row is one scored deal the engine built for that team in the current sim. T
 | Partner | The other team. |
 | Shape | The deal shape that built it. |
 | Weaker side | The total gain of the side that gains less. |
-| Your gain by season | The `SideGain` parts for this team, one cell per season. |
-| Partner gain by season | The same parts for the partner. |
+| Your gain by season | This team's `SideGain` total for each season, all in one cell, split by ` / ` (this season first). |
+| Partner gain by season | The same per-season totals for the partner, in the same cell format. |
 | Vetoes | The veto ids that fired. |
 | Detail | The gate that dropped the deal, such as the validator fail code, the exposure cap or the lopsided ratio. |
 | Exposure | Whether the partner may be shown to this team. |

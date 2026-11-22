@@ -5,8 +5,8 @@
 #   - **Row N** [<tag>] — text
 # where <tag> is `manual`, `auto:ci <name>`, or `auto:mac <name>`. A row with no tag is
 # manual. Consumers: bin/after-merge-checklist, bin/digest-dm-build, bin/check-plan gate [AM],
-# bin/check-post-merge-recipe and bin/post-merge-run. Later units add the
-# executors (see pmr_executor_ready) and the writer gates. Tested by bin/test-post-merge-rows.
+# bin/check-post-merge-recipe and bin/post-merge-run. The auto:mac executor exists; a later
+# unit adds the auto:ci executor (see pmr_executor_ready). Tested by bin/test-post-merge-rows.
 #
 # Portable to bash 3.2: no associative arrays, no ${v,,}, no mapfile, no declare -n.
 

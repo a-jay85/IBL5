@@ -94,9 +94,11 @@ if [ -n "$PRS_JSON" ]; then
     [ -r "$PRS_JSON" ] || { log "--prs-json not readable: $PRS_JSON"; exit 1; }
     cp "$PRS_JSON" "$TMP/prs.json"
 else
-    _since_day="$(jq -rn --argjson n "$NOW" '($n - 7 * 86400) | strftime("%Y-%m-%d")')" || { log "jq failed"; exit 1; }
-    gh pr list --state merged --author @me --limit 100 --search "merged:>=$_since_day" \
+    # Lower bound is the day of `since` (minus a day for timezone slack), so a long-off Mac still sees every merge.
+    _since_day="$(jq -rn --argjson s "$SINCE" '($s - 86400) | strftime("%Y-%m-%d")')" || { log "jq failed"; exit 1; }
+    gh pr list --state merged --author @me --limit 500 --search "merged:>=$_since_day" \
         --json number,mergedAt,mergeCommit,body > "$TMP/prs.json" || { log "gh pr list failed"; exit 1; }
+    if [ "$(jq 'length' "$TMP/prs.json")" -ge 500 ]; then log "WARNING: PR list hit the 500 limit; older merges may be skipped"; fi
 fi
 jq -c --argjson since "$SINCE" '.[] | select((.number | type) == "number")
     | select(.mergedAt != null and ((.mergeCommit.oid // "") | test("^[0-9a-f]{40}$")))

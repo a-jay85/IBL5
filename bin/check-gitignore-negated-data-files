@@ -11,6 +11,9 @@
 # Scope: the extensions in JSB_EXTS, ibl5/ root only, extension case-insensitive.
 # Fixtures under ibl5/tests/ are out of scope.
 # Exits 0 (clean), 1 (tracked data file not allowlisted), 2 (usage or setup error).
+#
+# CI (tests.yml) runs it with no arguments; the script finds the repo from its own path.
+# gate-backtest-argv:
 set -euo pipefail
 
 JSB_EXTS="lge sch plr sco car trn his asw rcb awa dra ret hof plb"

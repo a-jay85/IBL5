@@ -1,6 +1,6 @@
 ---
 description: Wraps Discord API interactions for guild membership checks, lookups, and webhook notifications.
-last_verified: 2026-09-22
+last_verified: 2026-11-21
 ---
 
 # Discord

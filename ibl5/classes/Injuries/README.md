@@ -1,6 +1,6 @@
 ---
 description: Current player injury report display for all league teams.
-last_verified: 2026-09-22
+last_verified: 2026-11-21
 ---
 
 # Injuries

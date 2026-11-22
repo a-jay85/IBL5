@@ -551,6 +551,12 @@ HTML), self::sections($html)[2]);
         $parts = preg_split(self::SECTION_SPLIT, $html, -1, PREG_SPLIT_NO_EMPTY);
         self::assertIsArray($parts);
 
-        return array_values($parts);
+        $sections = [];
+        foreach ($parts as $part) {
+            self::assertIsString($part);
+            $sections[] = $part;
+        }
+
+        return $sections;
     }
 }

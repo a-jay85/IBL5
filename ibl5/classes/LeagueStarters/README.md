@@ -1,6 +1,6 @@
 ---
 description: Starting lineup data for all league teams with API support.
-last_verified: 2026-09-22
+last_verified: 2026-11-21
 ---
 
 # LeagueStarters

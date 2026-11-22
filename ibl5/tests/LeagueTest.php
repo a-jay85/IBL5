@@ -60,9 +60,18 @@ class LeagueTest extends TestCase
         $this->assertCount(14, League::WESTERN_CONFERENCE_TEAMIDS);
     }
 
+    /**
+     * Returns its argument typed as mixed so PHPStan does not constant-fold an
+     * assertion that compares class constants.
+     */
+    private static function unfoldedConstant(mixed $value): mixed
+    {
+        return $value;
+    }
+
     public function testSoftCapMaxIsLessThanHardCapMax(): void
     {
-        $this->assertLessThan(League::HARD_CAP_MAX, League::SOFT_CAP_MAX);
+        $this->assertLessThan(League::HARD_CAP_MAX, self::unfoldedConstant(League::SOFT_CAP_MAX));
     }
 
     public function testFreeAgentsTeamIdIsNotARealFranchise(): void

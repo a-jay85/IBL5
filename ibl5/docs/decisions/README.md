@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-11-20
+last_verified: 2026-11-21
 ---
 
 # IBL5 Architecture Decision Records
@@ -119,6 +119,8 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0260](0260-weekly-mutation-sharding.md) | Weekly mutation testing runs as shards with one aggregate bar | Accepted | A committed map `ibl5/infection-shards.json` with a `check` gate, one shared coverage run, shards at `--min-msi=0`, one `MUTATION_MIN_MSI` bar over summed summary counts, and a report-only `module` dispatch. |
 | [0257](0257-css-token-gate.md) | Component CSS uses the token aliases and every UI class is in the catalog | Accepted | `bin/check-design-system` fails a PR on `var(--color-*)`, a numeric `z-index`, or a numeric `font-weight` in `ibl5/design/components/*.css`, and on a class under `ibl5/classes/UI/` with no row in its README; `Meta checks` runs it with `bin/test-check-design-system` |
 | [0266](0266-trace-pinned-golden-clearance.md) | Trace-pinned tests clear the engine golden hold | Accepted | A plan whose only token is `trace-pinned` gets arming conditions 5 and 7 lifted when `harness.trace_pinned` verifies a Go test that pins a raw JSB capture on the base branch and fails on a perturbed copy; the second reviewer never sees it. |
+| [0271](0271-require-league-context-in-factory.md) | A factory that holds a LeagueContext must forward it | Accepted | `RequireLeagueContextInFactoryRule` (`ibl.factoryOmitsLeagueContext`) flags `new X(...)` in a `*Factory.php` method when the method holds a LeagueContext and X's effective constructor takes one that the call omits; exemptions are inline `@phpstan-ignore` with a reason naming the IBL-only tables. |
+| [0273](0273-property-based-testing-with-eris.md) | Property tests use Eris with a pinned seed | Accepted | `giorgiosironi/eris` is a dev-only dependency wrapped in `Tests\Support\PinnedErisSeed`, which pins the seed to 20261120 and replays through `ERIS_SEED`; tests draw scalars only and cap iterations at 200. |
 
 ## When an ADR is Required
 

@@ -10,6 +10,8 @@ use PHPUnit\Framework\TestCase;
  * Source-content pins for the record-holders step wiring in updateAllTheThings.php.
  * Asserts on the script's SOURCE and never runs it: a real run would touch
  * live data. The step behavior itself is covered by RefreshRecordHoldersStepTest.
+ * RefreshTeamAccomplishmentsStep registers after this step, so this step is second to last;
+ * UpdateAllTheThingsTeamAccomplishmentsWiringTest pins that later registration.
  */
 final class UpdateAllTheThingsRecordHoldersWiringTest extends TestCase
 {

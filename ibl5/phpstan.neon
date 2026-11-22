@@ -73,6 +73,10 @@ services:
         tags:
             - phpstan.rules.rule
     -
+        class: PHPStanRules\RequireLeagueContextInFactoryRule
+        tags:
+            - phpstan.rules.rule
+    -
         class: PHPStanRules\BanBeginTransactionInRepositoryRule
         tags:
             - phpstan.rules.rule

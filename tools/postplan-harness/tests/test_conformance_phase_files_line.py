@@ -6,13 +6,15 @@ body. Every conformance test drives the real parser (`planfile.parse_phases`), s
 same tests also run against master's sources for the counterfactual row.
 """
 import os
+import re
+import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness import conformance
 from harness import planfile
-from harness.state import PhaseInfo, PlanInfo  # noqa: F401  (PhaseInfo kept for parity with sibling suites)
+from harness.state import PlanInfo
 
 
 def _check(text, changed, tracked, notes=None):
@@ -219,3 +221,111 @@ def test_files_line_phase_keeps_existing_exemptions():
     items = _check(text, ["README.md"], ["bin/alpha", "README.md"], notes=notes)
     assert items == []
     assert any(n.startswith("NO-DIFF-PHASE: 2") for n in notes)
+
+
+# ---------------------------------------------------------------------------
+# Replays of the two reported false-positive shapes.
+# ---------------------------------------------------------------------------
+
+_FP1_PLAN = (
+    "# Plan\n\n"
+    "## Phase 5: Add per-leg selected-list filtering to bin/run-shell-harnesses\n\n"
+    + _FP1_FILES_LINE + "\n\n"
+    "1. Add `bin/test-burndown` and `bin/test-burndown-loop` to the self-test fixture list.\n"
+)
+_FP1_TRACKED = ["bin/run-shell-harnesses", "bin/lib/harness-select.sh",
+                "bin/test-burndown", "bin/test-burndown-loop", "README.md"]
+
+
+def test_fp1_shape_item_names_only_files_line_paths():
+    items = _check(_FP1_PLAN, ["README.md"], _FP1_TRACKED)
+    assert len(items) == 1
+    assert ("(Files line only; phase cites bin/run-shell-harnesses, "
+            "bin/lib/harness-select.sh;") in items[0]
+    assert "bin/test-burndown" not in items[0]
+
+
+def test_fp1_shape_files_target_touched_clears():
+    assert _check(_FP1_PLAN, ["bin/run-shell-harnesses"], _FP1_TRACKED) == []
+
+
+def test_reference_only_body_citation_with_files_target_touched_clears():
+    text = (
+        "# Plan\n\n"
+        "## Phase 1: Fix the replay\n\n"
+        "**Files:** `tools/postplan-harness/harness/gate_backtest_replay.py`\n\n"
+        "3. Record the baseline with per-file runs (`.claude/rules/postplan-harness-tests.md`).\n"
+    )
+    changed = ["tools/postplan-harness/harness/gate_backtest_replay.py"]
+    tracked = changed + [".claude/rules/postplan-harness-tests.md"]
+    assert _check(text, changed, tracked) == []
+
+
+# ---------------------------------------------------------------------------
+# The real `--phases` CLI, run the way bin/lib/prefire-verify runs it.
+# ---------------------------------------------------------------------------
+
+_HARNESS_HOME = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+_CLI_PLAN = (
+    "---\nauto_merge: false\n---\n\n"
+    "# Files-line CLI plan\n\n"
+    "## Phase 1: Edit the alpha gate\n\n"
+    "**Files:** `bin/alpha`\n\n"
+    "1. Copy the pattern from `bin/beta`.\n"
+)
+
+
+def _run_git(repo, *args):
+    subprocess.run(["git", "-c", "user.email=t@example.com",
+                    "-c", "user.name=Files Line Test", *args],
+                   cwd=repo, check=True, capture_output=True, text=True)
+
+
+def _make_repo(tmp_path, edit):
+    """Base commit tracks bin/alpha and bin/beta; HEAD commits a change to `edit` only."""
+    repo = tmp_path / "repo"
+    (repo / "bin").mkdir(parents=True)
+    (repo / "bin" / "alpha").write_text("alpha\n")
+    (repo / "bin" / "beta").write_text("beta\n")
+    _run_git(repo, "init", "-q", ".")
+    _run_git(repo, "add", "bin/alpha", "bin/beta")
+    _run_git(repo, "commit", "-qm", "seed")
+    _run_git(repo, "update-ref", "refs/remotes/origin/master", "HEAD")
+    (repo / "bin" / edit).write_text(f"{edit}\nedited\n")
+    _run_git(repo, "add", f"bin/{edit}")
+    _run_git(repo, "commit", "-qm", f"edit {edit}")
+    return repo
+
+
+def _write_plan(tmp_path):
+    from harness.planfile import locate_plan
+    plan_path = tmp_path / "plans" / "files-line.md"
+    plan_path.parent.mkdir(parents=True)
+    plan_path.write_text(_CLI_PLAN)
+    parsed = locate_plan(slug=None, plans_dir=None, explicit_path=str(plan_path))
+    assert parsed.found and len(parsed.phases) == 1, "fixture plan did not parse"
+    return plan_path
+
+
+def _run_phases_cli(plan, repo):
+    env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
+    return subprocess.run([sys.executable, "-m", "harness.conformance", "--phases",
+                           str(plan), str(repo)],
+                          cwd=_HARNESS_HOME, env=env, capture_output=True, text=True)
+
+
+def test_phases_cli_files_line_target_missing_exits_1(tmp_path):
+    repo = _make_repo(tmp_path, "beta")
+    proc = _run_phases_cli(_write_plan(tmp_path), repo)
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    lines = [ln for ln in proc.stdout.splitlines() if re.match(r"^MISSING-PHASE: 1 ", ln)]
+    assert len(lines) == 1, proc.stdout
+    assert "Files line only" in lines[0]
+
+
+def test_phases_cli_files_line_target_touched_exits_0(tmp_path):
+    repo = _make_repo(tmp_path, "alpha")
+    proc = _run_phases_cli(_write_plan(tmp_path), repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "MISSING-PHASE:" not in proc.stdout

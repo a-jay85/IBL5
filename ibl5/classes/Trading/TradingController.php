@@ -287,12 +287,12 @@ class TradingController implements TradingControllerInterface
      */
     private function finishSubmittedOffer(array $tradeData): never
     {
-            $this->auditLogger->info('trade_offer_created', [
-                'offering_team' => $tradeData['offeringTeam'],
-                'listening_team' => $tradeData['listeningTeam'],
-            ]);
-            EventLogger::setAction('trade_offer_submitted');
-            \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=offer_sent');
+        $this->auditLogger->info('trade_offer_created', [
+            'offering_team' => $tradeData['offeringTeam'],
+            'listening_team' => $tradeData['listeningTeam'],
+        ]);
+        EventLogger::setAction('trade_offer_submitted');
+        \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=offer_sent');
     }
 
     /**

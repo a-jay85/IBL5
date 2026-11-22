@@ -133,9 +133,18 @@ class WaiversControllerTest extends TestCase
         $controller->handleWaiverRequest('gm');
     }
 
+    /**
+     * Returns its argument typed as mixed so PHPStan does not constant-fold an
+     * assertion that compares class constants.
+     */
+    private static function unfoldedConstant(mixed $value): mixed
+    {
+        return $value;
+    }
+
     public function testWaiverPoolMovesCategoryIdIsPositive(): void
     {
-        $this->assertGreaterThan(0, WaiversController::WAIVER_POOL_MOVES_CATEGORY_ID);
+        $this->assertGreaterThan(0, self::unfoldedConstant(WaiversController::WAIVER_POOL_MOVES_CATEGORY_ID));
     }
 
     public function testHandleWaiverRequestForwardsAuthServiceUsername(): void

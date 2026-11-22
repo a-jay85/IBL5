@@ -425,7 +425,7 @@ def phase_omission_items(plan: PlanInfo, changed_files: list[str],
     keeps the hold (fail closed, today's behaviour).
 
     When the phase carries a `**Files:**` line with at least one repo-path candidate, only
-    those paths are checked and the item reads `(Files line only; phase cites ...`. A Files
+    those paths are checked and the item ends with a `[Files line only]` tag after the closing paren. A Files
     line with no candidate falls back to every cited path and appends a
     `FILES-LINE-FALLBACK:` note.
 
@@ -500,9 +500,9 @@ def phase_omission_items(plan: PlanInfo, changed_files: list[str],
             continue
         sample = ", ".join(cands[:3])
         more = f" (+{len(cands) - 3} more)" if len(cands) > 3 else ""
-        scope = "Files line only; " if files_only else ""
+        scope = " [Files line only]" if files_only else ""
         items.append(f"MISSING-PHASE: {ph.number} — {ph.heading[:80]} "
-                     f"({scope}phase cites {sample}{more}; none appeared in the diff)")
+                     f"(phase cites {sample}{more}; none appeared in the diff){scope}")
     return items
 
 

@@ -146,7 +146,8 @@ def test_files_line_target_missing_holds_despite_touched_body_path():
     )
     items = _check(text, ["bin/beta"], ["bin/alpha", "bin/beta"])
     assert len(items) == 1
-    assert "(Files line only; phase cites bin/alpha;" in items[0]
+    assert "(phase cites bin/alpha;" in items[0]
+    assert items[0].endswith(") [Files line only]")
 
 
 def test_heading_cited_path_ignored_when_files_line_present():
@@ -243,8 +244,9 @@ _FP1_TRACKED = ["bin/run-shell-harnesses", "bin/lib/harness-select.sh",
 def test_fp1_shape_item_names_only_files_line_paths():
     items = _check(_FP1_PLAN, ["README.md"], _FP1_TRACKED)
     assert len(items) == 1
-    assert ("(Files line only; phase cites bin/run-shell-harnesses, "
+    assert ("(phase cites bin/run-shell-harnesses, "
             "bin/lib/harness-select.sh;") in items[0]
+    assert items[0].endswith("[Files line only]")
     assert "bin/test-burndown" not in items[0]
 
 

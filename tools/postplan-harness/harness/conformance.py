@@ -402,8 +402,8 @@ def phase_omission_items(plan: PlanInfo, changed_files: list[str],
 
     Exempt, in order: a phase whose heading carries an all-S `[phases: S]` marker
     (bookkeeping), a phase number named in `## Out of Scope` (declared deferred), a phase
-    carrying an honoured `**No diff:**` marker, a phase whose heading and body cite no
-    path at all (no evidence = cannot verify = skip), and a phase none of whose citations
+    carrying an honoured `**No diff:**` marker, a phase whose heading, body and Files line
+    cite no path at all (no evidence = cannot verify = skip), and a phase none of whose citations
     can name a repo path (uncheckable). A citation is a repo-path candidate when `_touched`
     matches it against the diff or against `git ls-files`; a mixed phase is checked on its
     candidates alone. A phase that would hold is cleared when a bare word in its HEADING

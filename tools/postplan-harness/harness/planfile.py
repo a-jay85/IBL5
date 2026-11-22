@@ -538,9 +538,9 @@ def parse_matrix(
     return planned, manual, post_merge
 
 
-_AM_HEAD_RE = re.compile(r"^## After merge[ \t]*$")
+_AM_HEAD_RE = re.compile(r"^## After merge")
 _AM_ROW_RE = re.compile(
-    r"^- \*\*Row (?P<num>[0-9]+)\*\*\s*(?:\[(?P<tag>[^\]]*)\](?!\())?\s*(?:—\s*)?(?P<text>.*)$")
+    r"^- (?:\[ \] )?\*\*Row (?P<num>[0-9]+)\*\*\s*(?:\[(?P<tag>[^\]]*)\](?!\())?\s*(?:—\s*)?(?P<text>.*)$")
 
 
 def parse_after_merge_section(content: str) -> list[manual_rows.ManualRow]:

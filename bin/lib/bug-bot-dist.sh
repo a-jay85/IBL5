@@ -16,7 +16,8 @@ bug_bot_src_ct() {
 }
 
 # bug_bot_dist_newest <repo-root> — newest file mtime under
-# ibl5/IBLbot/dist/bug-bot. Prints nothing when the dist is absent or empty.
+# the bug-bot folder in ibl5/IBLbot/dist/ (built, gitignored). Prints
+# nothing when the dist is absent or empty.
 bug_bot_dist_newest() {
     local dist="$1/ibl5/IBLbot/dist/bug-bot" newest="" m f
     [ -d "$dist" ] || return 0

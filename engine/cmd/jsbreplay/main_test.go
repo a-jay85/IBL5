@@ -239,3 +239,131 @@ func TestRunRejectsWrongReplayFormat(t *testing.T) {
 		t.Errorf("stderr %q does not name the format error", errb.String())
 	}
 }
+
+func TestWriteDayWritesAllOutputs(t *testing.T) {
+	b := loadBundle(t)
+	g0 := b.Schedule[0]
+	day := []backup.ScoGame{
+		{VisitorTeamID: g0.VisitorTeamID, HomeTeamID: g0.HomeTeamID, VisitorScore: 90, HomeScore: 88,
+			Boxes: []backup.ScoBox{{TeamID: g0.VisitorTeamID, PlayerID: 7, Min: 30}}},
+		{VisitorTeamID: g0.VisitorTeamID, HomeTeamID: g0.HomeTeamID},
+	}
+	games := [][]int{rawValues(11, 200000), rawValues(11, 10)}
+	// The second game reuses the same pairing, so it needs a second schedule
+	// entry; matchSchedule must not hand game 0's entry out twice.
+	b.Schedule = append(b.Schedule[:1:1], g0)
+	out := filepath.Join(t.TempDir(), "out")
+	if err := writeDay(b, day, games, out); err != nil {
+		t.Fatalf("writeDay: %v", err)
+	}
+
+	draws, err := os.ReadFile(filepath.Join(out, "engine_draws.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(draws), `"game":1,"i":10,"exhausted":true`) {
+		t.Errorf("draw log has no exhausted marker for game 1")
+	}
+
+	var jsb []gameBox
+	data, err := os.ReadFile(filepath.Join(out, "jsb_box.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &jsb); err != nil {
+		t.Fatal(err)
+	}
+	if len(jsb) != 2 || jsb[0].VisitorScore != 90 || len(jsb[0].Players) != 1 {
+		t.Errorf("jsb_box = %+v", jsb)
+	}
+
+	var eng []*gameBox
+	data, err = os.ReadFile(filepath.Join(out, "engine_box.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &eng); err != nil {
+		t.Fatal(err)
+	}
+	if len(eng) != 2 || eng[0] == nil || eng[1] != nil {
+		t.Fatalf("engine_box = %+v, want one played game then null", eng)
+	}
+	if eng[0].VisitorScore+eng[0].HomeScore == 0 || len(eng[0].Players) == 0 {
+		t.Errorf("engine game 0 has no score or players: %+v", eng[0])
+	}
+}
+
+func TestWriteDayRejectsUnscheduledGame(t *testing.T) {
+	b := loadBundle(t)
+	day := []backup.ScoGame{{VisitorTeamID: -1, HomeTeamID: -2}}
+	err := writeDay(b, day, [][]int{{1}}, t.TempDir())
+	if err == nil || !strings.Contains(err.Error(), "game 0 not in schedule") {
+		t.Errorf("err = %v, want game 0 not in schedule", err)
+	}
+}
+
+func TestWriteDayFailsOnUnwritableOutDir(t *testing.T) {
+	b := loadBundle(t)
+	g0 := b.Schedule[0]
+	day := []backup.ScoGame{{VisitorTeamID: g0.VisitorTeamID, HomeTeamID: g0.HomeTeamID}}
+	file := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(file, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeDay(b, day, [][]int{rawValues(11, 10)}, filepath.Join(file, "out")); err == nil {
+		t.Error("writeDay into a path under a file succeeded")
+	}
+}
+
+func TestWriteJSONReportsWriteError(t *testing.T) {
+	err := writeJSON(filepath.Join(t.TempDir(), "missing", "x.json"), []int{1})
+	if err == nil || !strings.Contains(err.Error(), "write") {
+		t.Errorf("err = %v, want a write error", err)
+	}
+	if err := writeJSON(filepath.Join(t.TempDir(), "x.json"), func() {}); err == nil || !strings.Contains(err.Error(), "marshal") {
+		t.Errorf("err = %v, want a marshal error", err)
+	}
+}
+
+func TestSortLinesOrdersByTeamThenPID(t *testing.T) {
+	got := sortLines([]boxLine{{Team: 2, PID: 1}, {Team: 1, PID: 9}, {Team: 1, PID: 3}})
+	want := []boxLine{{Team: 1, PID: 3}, {Team: 1, PID: 9}, {Team: 2, PID: 1}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+func TestReplayDayInputErrors(t *testing.T) {
+	dir := t.TempDir()
+	sco := filepath.Join(dir, "empty.sco")
+	if err := os.WriteFile(sco, make([]byte, 1_000_000), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	write := func(name, body string) string {
+		p := filepath.Join(dir, name)
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	empty := write("empty.json", `{"format":"jsb-replay/1","games":[]}`)
+	one := write("one.json", `{"format":"jsb-replay/1","games":[[1]]}`)
+	bad := write("bad.json", `{`)
+	cases := []struct {
+		name, replay, scoPost, want string
+	}{
+		{"missing replay", filepath.Join(dir, "nope.json"), sco, "open"},
+		{"unparsable replay", bad, sco, "parse"},
+		{"missing sco", empty, filepath.Join(dir, "nope.sco"), "open"},
+		{"game count mismatch", one, sco, "replay has 1 games, sco day has 0"},
+		{"missing plr", empty, sco, "open"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			err := replayDay(filepath.Join(dir, "nope.plr"), "", sco, c.scoPost, c.replay, dir)
+			if err == nil || !strings.Contains(err.Error(), c.want) {
+				t.Errorf("err = %v, want %q", err, c.want)
+			}
+		})
+	}
+}

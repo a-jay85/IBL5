@@ -188,6 +188,12 @@ func replayDay(plrPath, schPath, scoPre, scoPost, replayPath, outDir string) err
 	if err != nil {
 		return err
 	}
+	return writeDay(b, day, rf.Games, outDir)
+}
+
+// writeDay replays each day game from its recorded values and writes the draw
+// log and both box-score files to outDir.
+func writeDay(b bundle.Bundle, day []backup.ScoGame, games [][]int, outDir string) error {
 	idx, err := matchSchedule(b, day)
 	if err != nil {
 		return err
@@ -201,11 +207,11 @@ func replayDay(plrPath, schPath, scoPre, scoPost, replayPath, outDir string) err
 	jsbBoxes := make([]gameBox, 0, len(day))
 	engBoxes := make([]*gameBox, 0, len(day))
 	for k, sg := range day {
-		out, err := replayGame(b, b.Schedule[idx[k]], rf.Games[k])
+		out, err := replayGame(b, b.Schedule[idx[k]], games[k])
 		if err != nil {
 			return fmt.Errorf("game %d: %w", k, err)
 		}
-		if err := writeDrawLines(&draws, k, rf.Games[k], out); err != nil {
+		if err := writeDrawLines(&draws, k, games[k], out); err != nil {
 			return err
 		}
 		jsbBoxes = append(jsbBoxes, fromSco(sg))

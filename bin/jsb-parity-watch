@@ -72,7 +72,9 @@ SCHEDULE_DELAY_S=120
 FAILED_CONCLUSIONS='["FAILURE","CANCELLED","TIMED_OUT","ACTION_REQUIRED","STARTUP_FAILURE","ERROR"]'
 INFLIGHT_FILTER='.rows[] | select(.status == "captured" and (.plan_slug // "") != "") | "\(.id) \(.plan_slug)"'
 PR_PICK='(map(select(.state == "OPEN")) + map(select(.state == "MERGED")) + map(select(.state == "CLOSED")))[0] // empty'
-CHECK_FILTER='[.statusCheckRollup[]? | ((.conclusion // .state // "") | ascii_upcase) as $c | (.status // "COMPLETED") as $s | if any($failed[]; . == $c) then "failed" elif ($s != "COMPLETED" or $c == "" or $c == "PENDING" or $c == "EXPECTED") then "pending" else "green" end] | if any(.[]; . == "failed") then "failed" elif (length == 0 or any(.[]; . == "pending")) then "pending" else "green" end'
+# GitHub keeps superseded runs of a check on one head SHA (a re-run leaves the old
+# CANCELLED entry). Keep only the latest run per (workflow, check) before classifying.
+CHECK_FILTER='[.statusCheckRollup[]?] | group_by([(.workflowName // ""), (.name // .context // "")]) | map(max_by(.startedAt // .completedAt // "")) | [.[] | ((.conclusion // .state // "") | ascii_upcase) as $c | (.status // "COMPLETED") as $s | if any($failed[]; . == $c) then "failed" elif ($s != "COMPLETED" or $c == "" or $c == "PENDING" or $c == "EXPECTED") then "pending" else "green" end] | if any(.[]; . == "failed") then "failed" elif (length == 0 or any(.[]; . == "pending")) then "pending" else "green" end'
 PARITY_DIR="${JSB_WATCH_PARITY_DIR:-$MAIN_WT/jsb-native/parity}"
 JSB_BIN="${JSB_WATCH_BIN:-$SCRIPT_DIR}"
 PLANNOW_DIR="${JSB_WATCH_PLANNOW_DIR:-/tmp}"

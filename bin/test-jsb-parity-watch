@@ -22,6 +22,8 @@ ROLL_FAILED='[{"__typename":"CheckRun","status":"COMPLETED","conclusion":"FAILUR
 PENDING='[{"__typename":"CheckRun","status":"IN_PROGRESS","conclusion":"","name":"a"},{"__typename":"StatusContext","context":"x","state":"EXPECTED"}]'
 NEAR_MISS='[{"__typename":"CheckRun","status":"COMPLETED","conclusion":"SKIPPED","name":"a"},{"__typename":"CheckRun","status":"COMPLETED","conclusion":"NEUTRAL","name":"b"},{"__typename":"CheckRun","status":"COMPLETED","conclusion":"SUCCESS","name":"c"}]'
 ERROR_CTX='[{"__typename":"StatusContext","context":"ci","state":"ERROR"}]'
+SUPERSEDED_OK='[{"__typename":"CheckRun","status":"COMPLETED","conclusion":"CANCELLED","name":"m","workflowName":"w","startedAt":"2026-01-01T00:00:01Z"},{"__typename":"CheckRun","status":"COMPLETED","conclusion":"SUCCESS","name":"m","workflowName":"w","startedAt":"2026-01-01T00:00:09Z"}]'
+SUPERSEDED_BAD='[{"__typename":"CheckRun","status":"COMPLETED","conclusion":"SUCCESS","name":"m","workflowName":"w","startedAt":"2026-01-01T00:00:01Z"},{"__typename":"CheckRun","status":"COMPLETED","conclusion":"FAILURE","name":"m","workflowName":"w","startedAt":"2026-01-01T00:00:09Z"}]'
 
 S=""
 
@@ -250,6 +252,15 @@ case_check_verdict_near_miss() {
     gh_pr jsb-port-pl-0001 42 OPEN no aaa "$ERROR_CTX"
     run_watch
     h_eq "ERROR context counts as failed: webhook" 1 "$(cnt curl)"
+    sandbox superseded_ok
+    gh_pr jsb-port-pl-0001 42 OPEN no aaa "$SUPERSEDED_OK"
+    run_watch
+    h_eq "superseded CANCELLED run, later SUCCESS: held-for-owner DM" 1 "$(cnt discord-dm)"
+    h_eq "superseded CANCELLED run, later SUCCESS: no webhook" 0 "$(cnt curl)"
+    sandbox superseded_bad
+    gh_pr jsb-port-pl-0001 42 OPEN no aaa "$SUPERSEDED_BAD"
+    run_watch
+    h_eq "earlier SUCCESS, later FAILURE of one check: webhook" 1 "$(cnt curl)"
 }
 
 case_open_green_armed_waits() {

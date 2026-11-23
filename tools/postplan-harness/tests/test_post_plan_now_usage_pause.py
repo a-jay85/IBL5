@@ -293,7 +293,10 @@ def test_resume_replays_marker_argv_and_clears_marker(tmp_path):
     assert not marker_file.exists(), "the resume must clear the pause marker"
 
     cmd = ppn_launch.launched_cmd(resume.stdout, tmp_path / "home")
-    launched = subprocess.run(["/bin/bash", "-lc", cmd], cwd=marker["resume_cwd"], env=run.env,
+    # Run it under the bash the launch script names (bash 4+); macOS /bin/bash is 3.2.
+    shebang = pathlib.Path(re.search(r"^  script: (\S+)", resume.stdout, re.M)[1]).read_text()
+    interp = shebang.partition("\n")[0][2:]
+    launched = subprocess.run([interp, "-lc", cmd], cwd=marker["resume_cwd"], env=run.env,
                               capture_output=True, text=True)
     assert launched.returncode == 0, f"stdout={launched.stdout!r} stderr={launched.stderr!r}"
 

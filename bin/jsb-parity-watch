@@ -40,6 +40,25 @@ export PATH="$PATH:/usr/local/bin:/opt/homebrew/bin:/opt/homebrew/opt/mariadb/bi
 log() { printf '%s jsb-parity-watch: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"; }
 trap 'log "error at line $LINENO; no action taken"; exit 0' ERR
 
+# Parse arguments before any side effect, so --help touches nothing (bin/test-bin-help).
+DRY_RUN=0
+
+usage() {
+    cat <<'USAGE'
+Usage: bin/jsb-parity-watch [--dry-run]
+  --dry-run   print config, row and decision lines; take no action
+  -h, --help  show this help
+USAGE
+}
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --dry-run) DRY_RUN=1; shift ;;
+        -h|--help) usage; exit 0 ;;
+        *) echo "jsb-parity-watch: unknown argument: $1" >&2; usage >&2; exit 2 ;;
+    esac
+done
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$SCRIPT_DIR/.."
 # shellcheck source=bin/lib/launchd-sched.sh
@@ -66,7 +85,6 @@ LAST="$CACHE_DIR/jsb-parity-watch.last"
 WEBHOOK_FILE="$HOME/.config/jsb-parity/webhook-url"
 AUTOMOUSE_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse"
 
-DRY_RUN=0
 FIRE_REASONS=""
 STALL_KEYS=""
 KICK=0
@@ -74,22 +92,6 @@ GH_ERROR=""
 FACTS=""
 ROW_LINES=""
 fp=""
-
-usage() {
-    cat <<'USAGE'
-Usage: bin/jsb-parity-watch [--dry-run]
-  --dry-run   print config, row and decision lines; take no action
-  -h, --help  show this help
-USAGE
-}
-
-while [ $# -gt 0 ]; do
-    case "$1" in
-        --dry-run) DRY_RUN=1; shift ;;
-        -h|--help) usage; exit 0 ;;
-        *) echo "jsb-parity-watch: unknown argument: $1" >&2; usage >&2; exit 2 ;;
-    esac
-done
 
 quiet_exit() { log "$1"; exit 0; }
 
@@ -298,7 +300,10 @@ main() {
     if ! jq -e '.rows | type == "array"' "$ledger" >/dev/null 2>&1; then
         quiet_exit "ledger unreadable at $ledger; no action taken"
     fi
-    inflight=$(jq -r "$INFLIGHT_FILTER" "$ledger")
+    # set -E hands the ERR trap to this subshell. There it would print its log line
+    # into $inflight and exit 0, so the log line would parse as a row. Clear it, so a
+    # jq failure fails the assignment and the main shell's trap ends the run.
+    inflight=$(trap - ERR; jq -r "$INFLIGHT_FILTER" "$ledger")
     recording="none"
     if [ -f "$PARITY_DIR/recordings/index.json" ]; then
         recording=$(jq -r '.current // "none"' "$PARITY_DIR/recordings/index.json" 2>/dev/null || echo "none")

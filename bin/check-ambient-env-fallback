@@ -10,7 +10,7 @@
 # and never flagged. TMP is left out because harnesses assign it from mktemp.
 # Comment text and single-quoted spans are stripped first (quote-blind: the first
 # # at line start or after whitespace starts a comment, as in
-# bin/check-bashpid-under-set-u). Waive one line with a trailing
+# bin/check-shell-portability). Waive one line with a trailing
 # "# ambient-env-ok: <reason of 15+ chars>". The waiver is read from the raw line.
 # Scope: every file under bin/ ending in .sh or .bash, or with a shell shebang.
 # --files exists for the harness. Whole-tree scan, so no base ref.

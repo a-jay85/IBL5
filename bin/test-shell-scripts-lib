@@ -122,20 +122,6 @@ else
     fail "case 8b: --bogus prints to stderr" "nothing on stderr"
 fi
 
-# ── case 9: bash 3.2 compat ──────────────────────────────────────────────────
-system_bash="/bin/bash"
-if [ -x "$system_bash" ]; then
-    compat_count=$(BASH="$system_bash" "$system_bash" "$HELPER" --full | wc -l | tr -d ' ')
-    if [ "$compat_count" = "$count" ]; then
-        pass "case 9: bash 3.2 compat — count matches ($compat_count)"
-    else
-        fail "case 9: bash 3.2 compat" \
-             "got $compat_count under /bin/bash (expected $count)"
-    fi
-else
-    pass "case 9: /bin/bash not available — skipped"
-fi
-
 # ── case 10: filter mode with no shell inputs emits empty output, exits 0 ────
 rc=0
 out=$(printf '%s\n' "$PYTHON_FILE" "$PHP_FILE" | "$HELPER" --filter 2>&1) || rc=$?

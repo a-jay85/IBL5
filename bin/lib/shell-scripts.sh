@@ -18,8 +18,6 @@
 # Shebang patterns recognised:
 #   #!/bin/sh  #!/bin/bash  #!/usr/bin/sh  #!/usr/bin/bash
 #   #!/usr/bin/env sh  #!/usr/bin/env bash
-#
-# Bash 3.2 compatible (no mapfile, no declare -A, no ${var^^}).
 
 # ── helpers ─────────────────────────────────────────────────────────────────
 

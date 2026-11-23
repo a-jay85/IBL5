@@ -358,18 +358,18 @@ case_empty_env() {
   reset_case; mk_prs_mixed
   local out rc=0 jqdir
   jqdir="$(dirname "$(command -v jq)")"
-  out=$(env -i PATH="/usr/bin:/bin:$jqdir" COMPREHENSION_DIGEST_GH="$BINSTUB/gh" \
+  out=$(env -i PATH="$(harness_bare_path "$T"):$jqdir" COMPREHENSION_DIGEST_GH="$BINSTUB/gh" \
     "$SCRIPT" --dry-run --date 2026-10-03 2>&1) || rc=$?
   assert_eq "empty env: exit" 0 "$rc"
   assert_contains "empty env: Merged line" "Merged:" "$out"
   rc=0
-  out=$(env -i PATH="/usr/bin:/bin:$jqdir" COMPREHENSION_DIGEST_GH=/nonexistent/gh \
+  out=$(env -i PATH="$(harness_bare_path "$T"):$jqdir" COMPREHENSION_DIGEST_GH=/nonexistent/gh \
     "$SCRIPT" --dry-run --date 2026-10-03 2>&1) || rc=$?
   assert_eq "empty env, bad gh: exit" 1 "$rc"
   assert_contains "empty env, bad gh: message" "gh binary not found" "$out"
   # A real send with neither HOME nor a report dir is a loud failure, not an unbound variable.
   rc=0
-  out=$(env -i PATH="/usr/bin:/bin:$jqdir" COMPREHENSION_DIGEST_GH="$BINSTUB/gh" DISCORD_DM_BIN="$BINSTUB/discord-dm" \
+  out=$(env -i PATH="$(harness_bare_path "$T"):$jqdir" COMPREHENSION_DIGEST_GH="$BINSTUB/gh" DISCORD_DM_BIN="$BINSTUB/discord-dm" \
     "$SCRIPT" --date 2026-10-03 2>&1) || rc=$?
   assert_eq "no HOME, no report dir: exit" 1 "$rc"
   assert_contains "no HOME, no report dir: DM" "comprehension-digest DEGRADED: no report dir" "$(cat "$T/dm.out" 2>/dev/null)"

@@ -695,7 +695,7 @@ printf '%s' "$PATH_LINE" | grep -q '^export PATH="\$PATH:' \
 # end to end and fires the launcher, via the shims that stay ahead of the append.
 SB="$(build_sandbox)"
 ( IBL5_MAIN="$SB" HOME="$SB/home" \
-  PATH="$SB/shim:$SB/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
+  PATH="$SB/shim:$SB/bin:$(harness_bare_path "$SB"):/usr/sbin:/sbin" \
   SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" SHIM_PR_CLOSED='[]' \
   "$REAL_POLL" >/dev/null 2>&1 ) || true
 { [ -f "$SB/docfix-calls" ] && grep -qF "77|a.md" "$SB/docfix-calls"; } \

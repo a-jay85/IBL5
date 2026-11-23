@@ -650,7 +650,7 @@ case_plist_generated() {
 
     odd="$TMP/odd"; mkdir -p "$odd"
     cp "$base/stub-bin/bunx" "$odd/bunx"
-    out="$(cd "$mike" && PATH="$odd:/usr/bin:/bin" \
+    out="$(cd "$mike" && PATH="$odd:$(harness_bare_path "$TMP")" \
         bash -c '. bin/lib/launchd-job.sh; . bin/lib/wt-pool.sh; pool_plist_print "$1"' _ "$base/IBL5" 2>&1)"
     assert_match "plist: odd bunx warned" 'bunx at .* is outside the job PATH' "$out"
 
@@ -690,7 +690,7 @@ case_consumer_slot_invariants() {
 case_refill_empty_env() {
     local base out rc
     base="$(new_pool_env)"
-    out="$(cd "$base/IBL5" && env -i PATH="$base/stub-bin:/usr/bin:/bin" HOME="$HOME" \
+    out="$(cd "$base/IBL5" && env -i PATH="$base/stub-bin:$(harness_bare_path "$TMP")" HOME="$HOME" \
         GIT_CONFIG_NOSYSTEM=1 GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t \
         GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t \
         WT_POOL_KICK=none "$base/IBL5/bin/wt-new" --pool-refill 2>&1)"; rc=$?

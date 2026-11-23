@@ -141,7 +141,7 @@ gate_denied_report "denies other scripts"
 
 # ── 8. empty env denied without spawning php ──────────────────────────────────
 rm -f "$STUB/php.argv" "$STUB/err"
-env -i SIM_RECAP_GATE_PHP_BIN="$STUB/php" bash "$GATE" </dev/null >/dev/null 2>"$STUB/err"
+env -i SIM_RECAP_GATE_PHP_BIN="$STUB/php" "$BASH" "$GATE" </dev/null >/dev/null 2>"$STUB/err"
 rc=$?
 if [ "$rc" -eq 2 ] && grep -qF "denied: no command" "$STUB/err" && [ ! -e "$STUB/php.argv" ]; then
     srt_ok "empty env denied without spawning php"

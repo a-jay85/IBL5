@@ -56,7 +56,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
 
 log() { echo "events-review: $*" >&2; }
 
-usage() { awk 'NR<=2{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"; }
+usage() { awk 'NR<=3{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"; }
 
 # ── Flags ─────────────────────────────────────────────────────────────────────
 DAYS=7

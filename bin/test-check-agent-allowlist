@@ -64,6 +64,13 @@ file_case case_allow_then_disallow_lines 0 '' \
 file_case case_allow_then_disallow_same_line 0 '' \
     'claude -p "$p" --allowedTools Read --disallowedTools \' \
     '    "Bash(mysql:*)"'
+# the Bash(...) scan stops at a deny flag on the same line, as the bare-Bash scan does
+file_case case_allow_then_disallow_rule_one_line 0 '' \
+    'claude -p "$p" --allowedTools "Read" --disallowedTools "Bash(mysql:*)" "Bash(env:*)"'
+file_case case_allow_then_disallow_rule_continued 0 '' \
+    'claude -p "$p" --allowedTools \' \
+    '    "Read" --disallowedTools "Bash(ssh:*)" \' \
+    '    "Bash(bash:*)"'
 file_case case_disallow_then_allow_rule_one_line 1 'bin/fx:1: shell-client-rule: Bash(psql:*)' \
     'claude -p "$p" --disallowedTools "Bash(env:*)" --allowedTools "Bash(psql:*)"'
 # a Bash(...) rule that holds a --word is still checked for a shell client

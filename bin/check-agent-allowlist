@@ -99,6 +99,18 @@ function allow_text(s, on,   out, f) {
     if (on) out = out " " s
     return out
 }
+# hide_flags: s with each -- inside a Bash(...) token swapped for SUBSEP
+# pairs, so allow_text does not read a --word inside a rule as a flag.
+function hide_flags(s,   out, tok) {
+    out = ""
+    while (match(s, /Bash\([^)]*\)/)) {
+        tok = substr(s, RSTART, RLENGTH)
+        gsub(/--/, SUBSEP SUBSEP, tok)
+        out = out substr(s, 1, RSTART - 1) tok
+        s = substr(s, RSTART + RLENGTH)
+    }
+    return out s
+}
 { line[NR] = $0 }
 END {
     carry = 0
@@ -118,7 +130,11 @@ END {
         else carry = carry && allow
         if (t !~ /\\[[:space:]]*$/) carry = 0
         if (!allow) continue
-        rest = t
+        # Scan only the allow segment, so a deny list on the same line is
+        # not read as a grant.
+        seg = allow_text(hide_flags(t), cin)
+        gsub(SUBSEP SUBSEP, "--", seg)
+        rest = seg
         while (match(rest, /Bash\([^)]*\)/)) {
             tok = substr(rest, RSTART, RLENGTH)
             rest = substr(rest, RSTART + RLENGTH)
@@ -142,7 +158,6 @@ END {
         }
         # A bare Bash word after an allow flag grants every shell command.
         # Bash(...) tokens are blanked first so their first word is not read.
-        seg = allow_text(t, cin)
         gsub(/Bash\([^)]*\)/, " ", seg)
         nw = split(seg, w, "[[:space:],\"" sq "=()]+")
         for (i = 1; i <= nw; i++)

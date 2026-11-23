@@ -44,8 +44,8 @@ The harness `bin/test-check-adr-append-only` runs in the `static-guards` job of 
 - Positive: the gate is diff-only, so the historical violations never block a PR.
 - Negative: a docfix PR that rewrites frozen numerics now fails `Meta checks` until it appends an Addendum or carries the bypass marker.
 - Negative: an insertion inside a frozen section passes, so a new line spliced into the middle of a Decision is not caught.
-- Corpus replay: 502 commit-by-file ADR modifications on first-parent master. The gate ran once per commit that modified an ADR: 279 commits, 198 pass (exit 0), 81 fail (exit 1), none exit 2. The 156 findings split into 142 rewrites and 14 removals, by section: 57 frontmatter `description`, 64 Decision, 18 Context, 17 Alternatives Considered.
-- Corpus audit: About 16 sampled flagged commits were read. All were true positives, meaning frozen text rewritten or removed with no allowed shape. The 57 description findings are the largest class, and all are real edits of a line the rule freezes, so they need the bypass marker or an Addendum.
+- Corpus replay: the gate ran once per first-parent master commit that modified a top-level ADR file, 525 commits, with `PR_BODY` unset. 442 pass (exit 0), 83 fail (exit 1), none exit 2. The 158 findings split into 143 rewrites, 14 removals and 1 deleted file, and the 157 rewrite and removal findings split by section: 57 frontmatter `description`, 65 Decision, 18 Context, 17 Alternatives Considered.
+- Corpus audit: 66 flagged commits were read, which is all 56 whose only finding is one line plus 10 random others from the 27 with more. 0 were false positives. Every one rewrote or removed frozen text with no allowed shape. The 57 description findings are the largest class, and all are real edits of a line the rule freezes, so they need the bypass marker or an Addendum.
 
 ## References
 

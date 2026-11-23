@@ -667,6 +667,36 @@ case_joined_words_flagged() {
     run_case "$CASE_NAME" 1 '[context] rewrite' --since=master
 }
 
+# insert_above <file> <prefix> <new line>: put a new line above the line starting with <prefix>.
+insert_above() {
+    P="$2" L="$3" awk 'index($0, ENVIRON["P"]) == 1 { print ENVIRON["L"] } { print }' "$1" >"$1.new"
+    mv "$1.new" "$1"
+}
+
+# Review finding on PR 4155: prose inserted above a stamped line makes one mixed hunk
+# (1 old line, 2 new). Each edit passes alone, so the pair must pass too. Pairing by
+# position matched the old line to the inserted prose and failed this case.
+case_insert_above_stamp_pass() {
+    new_case a
+    insert_above "$CASE_DIR/$ADR104" '4. Fourth decision item' 'Inserted decision note.'
+    edit_file "$CASE_DIR/$ADR104" 'for the current helper.' 'for the current helper. [CORRECTED 2026-11-20: see Addendum]'
+    commit_pr
+    run_case "$CASE_NAME" 0 'OK' --since=master
+}
+
+# Same mixed hunk, but the old line is reworded. The inserted line must not hide it.
+case_insert_above_rewrite_flagged() {
+    new_case a
+    insert_above "$CASE_DIR/$ADR104" '4. Fourth decision item' 'Inserted decision note.'
+    edit_file "$CASE_DIR/$ADR104" 'for the current helper.' 'for the newer helper.'
+    commit_pr
+    _run 1 '[decision] rewrite' --since=master || true
+    if ! grep -qF 'for the current helper.' <<<"$RESULT_OUT"; then
+        RESULT_MSG="${RESULT_MSG:+$RESULT_MSG; }finding does not quote the reworded line"
+    fi
+    report "$CASE_NAME"
+}
+
 # ---- dispatch --------------------------------------------------------------
 
 ALL_CASES=(
@@ -689,6 +719,7 @@ ALL_CASES=(
     case_heading_decision_numbered case_heading_decisions case_heading_alternatives_rejected
     case_joined_words_flagged case_blank_removal_with_stamp_pass
     case_blank_removal_with_rewrite_flagged
+    case_insert_above_stamp_pass case_insert_above_rewrite_flagged
 )
 
 SELECTED=("$@")

@@ -391,18 +391,37 @@ while IFS=$'\t' read -r status a b; do
             echo "check-adr-append-only: hunk parse error in $path at base line $old_start: header says $old_count old line(s), read $oi" >&2
             exit 2
         fi
+        # Match each old line to any unused new line that is an allowed edit of it,
+        # and consume that new line. Pairing by position would match an old line to
+        # prose inserted above its stamped copy. New lines left over are insertions.
+        USED=()
+        MATCHED=()
         for ((i = 0; i < no; i++)); do
+            MATCHED[$i]=0
+            for ((j = 0; j < nn; j++)); do
+                [ "${USED[$j]:-0}" = 1 ] && continue
+                if allowed_change "${OLD[$i]}" "${NEW[$j]}"; then
+                    USED[$j]=1
+                    MATCHED[$i]=1
+                    break
+                fi
+            done
+        done
+        left=0
+        for ((j = 0; j < nn; j++)); do
+            [ "${USED[$j]:-0}" = 1 ] || left=$((left + 1))
+        done
+        for ((i = 0; i < no; i++)); do
+            [ "${MATCHED[$i]}" = 1 ] && continue
             o="${OLD[$i]}"
             ln="${OLDLN[$i]}"
             sec="${SEC[$ln]:-preamble}"
             is_frozen_section "$sec" || continue
             sec="$FROZEN_NAME"
-            if [ "$i" -ge "$nn" ]; then
-                o_r="${o%"${o##*[![:space:]]}"}"
-                [ -n "$o_r" ] || continue
+            if [ "$left" -eq 0 ]; then
                 record "$path" "$ln" "$sec" "removal" "$o"
             else
-                allowed_change "$o" "${NEW[$i]}" || record "$path" "$ln" "$sec" "rewrite" "$o"
+                record "$path" "$ln" "$sec" "rewrite" "$o"
             fi
         done
     done

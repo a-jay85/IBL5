@@ -65,3 +65,11 @@ The divergence finder compares the two draw logs game by game and names the firs
 A port reads `Raw()` and copies JSB's arithmetic on the raw value. It never wraps that value in `Float64` or `IntN`, because the replay source logs those as `value-use`.
 
 `sim.DrawSites` takes its address for a function from that function's own doc comment, and only when the comment holds exactly one `FUN_` token. A function that cites two tokens, or none, maps to an empty string. `TestDrawSitesCoverEveryCallSite` fails until the table lists every function that draws.
+
+The jsb-native loop reads this tool only through the flags above, and it waits or stops in three cases:
+
+- `begin` idles with `ibl5-replay-unmerged` while the IBL5 checkout has no `engine/cmd/jsbreplay`.
+- The recorder raises `game-boundary-unknown` when no candidate game probe enters as many times per day as `-count-games` reports. It never falls back to the first probe.
+- `run_day` in `diverge.py` replays one recorded day through this tool and raises when the tool exits nonzero.
+
+On the recorder side, `record_hook.js` flushes every second, well inside the 16 s idle window that ends a Sim Day in `simdays.py`. `tracehost.py` keeps only payloads that carry an `in`, `d` or `mark` key and drops the rest.

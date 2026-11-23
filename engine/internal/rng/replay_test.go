@@ -87,13 +87,18 @@ func TestReplayFloat64AndIntNAreTagged(t *testing.T) {
 }
 
 func TestNormalizeCaller(t *testing.T) {
+	// A regexp that strips only one trailing .funcN leaves the nested cases below
+	// with a closure suffix, so they pin the repeated-suffix strip.
 	cases := map[string]string{
-		"github.com/a-jay85/IBL5/engine/internal/sim.(*gameState).rebound.func1":   "sim.(*gameState).rebound",
-		"github.com/a-jay85/IBL5/engine/internal/sim.(*gameState).rebound.func1.2": "sim.(*gameState).rebound",
-		"github.com/a-jay85/IBL5/engine/internal/sim.runGame.gowrap1":              "sim.runGame",
-		"github.com/a-jay85/IBL5/engine/internal/sim.(*gameState).shoot":           "sim.(*gameState).shoot",
-		"github.com/a-jay85/IBL5/engine/internal/sim.funcWeight":                   "sim.funcWeight",
-		"github.com/a-jay85/IBL5/engine/internal/sim.applyFunc2":                   "sim.applyFunc2",
+		"github.com/a-jay85/IBL5/engine/internal/sim.(*state).roll.func1":              "sim.(*state).roll",
+		"github.com/a-jay85/IBL5/engine/internal/sim.roll":                             "sim.roll",
+		"github.com/a-jay85/IBL5/engine/internal/sim.(*gameState).rebound.func2.func1": "sim.(*gameState).rebound",
+		"github.com/a-jay85/IBL5/engine/internal/sim.(*gameState).rebound.func1":       "sim.(*gameState).rebound",
+		"github.com/a-jay85/IBL5/engine/internal/sim.(*gameState).rebound.func1.2":     "sim.(*gameState).rebound",
+		"github.com/a-jay85/IBL5/engine/internal/sim.runGame.gowrap1":                  "sim.runGame",
+		"github.com/a-jay85/IBL5/engine/internal/sim.(*gameState).shoot":               "sim.(*gameState).shoot",
+		"github.com/a-jay85/IBL5/engine/internal/sim.funcWeight":                       "sim.funcWeight",
+		"github.com/a-jay85/IBL5/engine/internal/sim.applyFunc2":                       "sim.applyFunc2",
 	}
 	for in, want := range cases {
 		if got := rng.NormalizeCaller(in); got != want {

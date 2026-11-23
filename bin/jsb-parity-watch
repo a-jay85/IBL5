@@ -151,8 +151,9 @@ lock_is_stale() {
 row_verdict() {
     local id="$1" slug="$2" prs pr state number sha check armed f b log label newest r slug_re
     # Runs in a command-substitution subshell. The inherited ERR trap would print its
-    # log line into the captured output and exit 0, which hides a failed gh or jq call.
-    # Cleared here, a failure exits the subshell non-zero and main's own trap handles it.
+    # log line into the captured output and exit 0. Cleared here, nothing leaks into
+    # the output. Bash drops -e inside $(...), so a failed command just keeps going;
+    # main instead checks that line 1 starts with a known verdict prefix.
     trap - ERR
     slug_re="${slug}([^A-Za-z0-9]|\$)"
     if ! prs=$(gh pr list --repo a-jay85/IBL5 --head "$slug" --state all --json number,state,mergedAt,url,autoMergeRequest,statusCheckRollup,headRefOid 2>/dev/null) \

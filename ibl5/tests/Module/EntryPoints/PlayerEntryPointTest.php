@@ -176,15 +176,21 @@ class PlayerEntryPointTest extends ModuleEntryPointTestCase
         $this->authenticateWithSentinel('', false, 'isAuthenticated');
         $this->mockDb->setMockData([]);
 
-        $this->assertSentinelThrown('isAuthenticated', function (): void {
+        $token = \Security\CsrfGuard::generateRawToken('extension');
+
+        $this->assertSentinelThrown('isAuthenticated', function () use ($token): void {
             $this->runModule(
                 'Player',
                 [],
-                ['_csrf_token' => \Security\CsrfGuard::generateRawToken('extension')],
+                ['_csrf_token' => $token],
                 array_merge($this->dbGlobals(), ['user' => $GLOBALS['user']]),
                 'extension.php',
             );
         });
+
+        // A valid token is single-use. It is gone only if the CSRF gate ran before
+        // the user check threw; a swapped gate order leaves it in the session.
+        self::assertFalse(\Security\CsrfGuard::validateToken($token, 'extension'));
     }
 
     public function testExtensionAuthenticatedDecodesCookieBeforeUsername(): void

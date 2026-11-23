@@ -164,7 +164,7 @@ abstract class ModuleEntryPointTestCase extends WideUnitTestCase
      * through the production registrar. Entries resolve lazily, so they read
      * the globals and auth stub as they stand at include time.
      */
-    private function buildModuleContainer(): \Bootstrap\Contracts\ContainerInterface
+    protected function buildModuleContainer(): \Bootstrap\Contracts\ContainerInterface
     {
         $c = new \Bootstrap\Container();
         $c->set('mysqli_db', static fn (): mixed => $GLOBALS['mysqli_db']);

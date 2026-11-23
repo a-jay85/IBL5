@@ -35,13 +35,8 @@
     padding-inline: var(--space-2);
 }
 
-/* Inside the hub .ibl-tab-card: the filter form lines up with the title
-   (16px inset), and the sorted header cell keeps its column tint on the
-   light card header. */
-.leaderboards-page .ibl-tab-card .ibl-filter-form {
-    margin-inline: var(--space-4);
-}
-
+/* Inside the hub .ibl-tab-card: the sorted header cell keeps its column
+   tint on the light card header. */
 .leaderboards-page .ibl-tab-card .ibl-data-table thead th.sorted-col {
     background: var(--accent-100);
 }

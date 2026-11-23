@@ -73,6 +73,44 @@ row_runs_shellcheck() { [[ $1 =~ $SC_ROW_RE ]]; }
 say() { printf 'prefire-verify: %s\n' "$*"; }
 die() { local rc="$1"; shift; printf 'prefire-verify: %s\n' "$*" >&2; exit "$rc"; }
 
+# --- DB probe target --------------------------------------------------------
+# A DB row reaches the main stack's container (ibl5-mariadb) or this worktree's
+# DB (bin/db-query's default route). row_db_targets prints `main` and/or
+# `worktree` for a command that matches PLAN_ROW_DB_RE, and the probe checks
+# each DB a row needs. A row that names no main reference keeps the worktree
+# probe. A row naming ibl5-mariadb also gets the worktree probe when it has a
+# worktree-DB call too (bin/db-query without DB_QUERY_TARGET=main, db-test-up,
+# the DB test group, run-migrations, or an ibl5-db-<slug> container).
+DB_MAIN_RE='ibl5-mariadb([^-[:alnum:]_]|$)|DB_QUERY_TARGET=main'
+DB_WT_RE='db-query|db-test-up|--group[= ]database|DatabaseIntegration|run-migrations|ibl5-db-'
+row_db_targets() { # <cmd>
+    local stripped
+    if ! grep -Eq -- "$DB_MAIN_RE" <<< "$1"; then
+        echo worktree; return 0
+    fi
+    echo main
+    stripped=$(sed -E 's#DB_QUERY_TARGET=main[[:space:]]+(\./)?bin/db-query##g' <<< "$1")
+    if grep -Eq -- "$DB_WT_RE" <<< "$stripped"; then echo worktree; fi
+    return 0
+}
+# PREFIRE_DB_PROBE_CMD is the test seam. It sees PREFIRE_DB_PROBE_TARGET.
+db_probe() { # <main|worktree>
+    if [ -n "${PREFIRE_DB_PROBE_CMD:-}" ]; then
+        PREFIRE_DB_PROBE_TARGET="$1" bash -c "$PREFIRE_DB_PROBE_CMD" </dev/null >/dev/null 2>&1
+    elif [ "$1" = main ]; then
+        DB_QUERY_TARGET=main bin/db-query "SELECT 1" >/dev/null 2>&1
+    else
+        bin/db-query "SELECT 1" >/dev/null 2>&1
+    fi
+}
+db_probe_hint() { # <main|worktree>
+    if [ "$1" = main ]; then
+        printf 'Start the main stack (docker compose up -d in the main checkout)'
+    else
+        printf 'Start the worktree stack (bin/wt-stack start <slug>)'
+    fi
+}
+
 PLAN=""
 STAGE="all"
 BASE_OPT=""
@@ -226,8 +264,9 @@ stage_matrix() {
 
     # DB probe, once, before the first DB-touching row. A parse-only row
     # (`bash -n bin/db-test-up`) names a DB script without running it.
-    local db_re="$PLAN_ROW_DB_RE"
-    local first_db_num="" first_db_cmd=""
+    # Each DB is probed against the first row that needs it.
+    local db_re="$PLAN_ROW_DB_RE" t tgt
+    local main_num="" main_cmd="" wt_num="" wt_cmd=""
     while IFS=$'\t' read -r num cmd; do
         [ -n "$num" ] || continue
         is_parse_only_cmd "$cmd" && continue
@@ -235,19 +274,20 @@ stage_matrix() {
         is_whole_suite_cmd "$cmd" && continue
         # A DB row the Plan checks job runs never needs the local DB.
         row_runs_in_ci "$cmd" && continue
-        if grep -Eq -- "$db_re" <<< "$cmd"; then first_db_num="$num"; first_db_cmd="$cmd"; break; fi
+        grep -Eq -- "$db_re" <<< "$cmd" || continue
+        while IFS= read -r t; do
+            if [ "$t" = main ] && [ -z "$main_num" ]; then main_num="$num"; main_cmd="$cmd"; fi
+            if [ "$t" = worktree ] && [ -z "$wt_num" ]; then wt_num="$num"; wt_cmd="$cmd"; fi
+        done < <(row_db_targets "$cmd")
     done <<< "$rows"
-    if [ -n "$first_db_num" ]; then
-        if [ -n "${PREFIRE_DB_PROBE_CMD:-}" ]; then
-            bash -c "$PREFIRE_DB_PROBE_CMD" </dev/null >/dev/null 2>&1; rc=$?
-        else
-            bin/db-query "SELECT 1" >/dev/null 2>&1; rc=$?
-        fi
-        if [ "$rc" -ne 0 ]; then
-            say "FAIL DB unreachable; matrix row $first_db_num needs it ($first_db_cmd). Start the worktree stack, then re-run" >&2
+    for tgt in worktree main; do
+        if [ "$tgt" = main ]; then num="$main_num"; cmd="$main_cmd"; else num="$wt_num"; cmd="$wt_cmd"; fi
+        [ -n "$num" ] || continue
+        if ! db_probe "$tgt"; then
+            say "FAIL DB unreachable; matrix row $num needs it ($tgt DB: $cmd). $(db_probe_hint "$tgt"), then re-run" >&2
             return 3
         fi
-    fi
+    done
 
     log="$STATE_DIR/$TREE.matrix.log"
     : > "$log"
@@ -970,25 +1010,23 @@ stage_local_mutations() {
         say "SKIP local-mutations: every Executable Mutations record runs in the Plan checks CI job"
         return 0
     fi
+    local t tgt main_row="" wt_row=""
     while IFS= read -r -d '' rrow && IFS= read -r -d '' rfile && IFS= read -r -d '' rcheck \
         && IFS= read -r -d '' rmatch && IFS= read -r rrepl; do
-        if [ -z "$db_row" ] && grep -qE -- "$PLAN_ROW_DB_RE" <<< "$rcheck"; then db_row="$rrow"; fi
+        grep -qE -- "$PLAN_ROW_DB_RE" <<< "$rcheck" || continue
+        while IFS= read -r t; do
+            if [ "$t" = main ] && [ -z "$main_row" ]; then main_row="$rrow"; fi
+            if [ "$t" = worktree ] && [ -z "$wt_row" ]; then wt_row="$rrow"; fi
+        done < <(row_db_targets "$rcheck")
     done < "$recs"
-    if [ -n "$db_row" ] && [ -n "${PREFIRE_DB_PROBE_CMD:-}" ]; then
-        bash -c "$PREFIRE_DB_PROBE_CMD" </dev/null >/dev/null 2>&1; rc=$?
-        if [ "$rc" -ne 0 ]; then
-            say "FAIL local-mutations prerequisite missing: mutation row $db_row needs the DB and the probe ($PREFIRE_DB_PROBE_CMD) failed; start the stack with bin/wt-stack start <slug>, then re-run" >&2
+    for tgt in worktree main; do
+        if [ "$tgt" = main ]; then db_row="$main_row"; else db_row="$wt_row"; fi
+        [ -n "$db_row" ] || continue
+        if ! db_probe "$tgt"; then
+            say "FAIL local-mutations prerequisite missing: mutation row $db_row needs the DB ($tgt) and the probe failed. $(db_probe_hint "$tgt"), then re-run" >&2
             rm -f "$recs"; return 3
         fi
-    fi
-    # No seam set (the production case): probe with the matrix stage's default.
-    if [ -n "$db_row" ] && [ -z "${PREFIRE_DB_PROBE_CMD:-}" ]; then
-        bin/db-query "SELECT 1" >/dev/null 2>&1; rc=$?
-        if [ "$rc" -ne 0 ]; then
-            say "FAIL local-mutations prerequisite missing: mutation row $db_row needs the DB and the probe (bin/db-query \"SELECT 1\") failed; start the stack with bin/wt-stack start <slug>, then re-run" >&2
-            rm -f "$recs"; return 3
-        fi
-    fi
+    done
     xm_run_judged local-mutations --records "$recs"; rc=$?
     rm -f "$recs"
     [ "$rc" -eq 0 ] || return "$rc"

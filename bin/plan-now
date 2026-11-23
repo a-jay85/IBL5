@@ -7,6 +7,8 @@
 # Usage:
 #   bin/plan-now <prompt-file>              # run it, then queue for automouse if the
 #                                           #   run exits clean AND check-plan passes
+#                                           #   (a queued jsb-port-pl-<n> plan also starts
+#                                           #   bin/automouse/run plan <slug> right away)
 #   bin/plan-now --implement <prompt-file>  # ... but leave the plan on disk, unqueued
 #   bin/plan-now --queue <prompt-file>      # explicit form of the default
 #   bin/plan-now --model opus <prompt-file> # orchestrator model (default claude-sonnet-5-5)
@@ -543,6 +545,16 @@ REVIEW_ROUTE_DEFAULT=$(grep -oE "'/discordPlanReviewDM'" \
     # queue seam is what lets bin/test-plan-now reach the queued-vs-not fork at all.
     # AUTOMOUSE_LOGIN_PROBE_CMD and LOGIN_PROBE_* stub the login probe the same way.
     printf 'AUTOMOUSE_QUEUE=%q\n' "${PLAN_NOW_AUTOMOUSE_QUEUE:-$ROOT/bin/automouse/queue}"
+    # Test seams for the parity-port kick. Unset and empty both mean the real
+    # launch through ljob_submit. They are baked so a stub survives launchd's
+    # empty env.
+    printf 'AUTOMOUSE_KICK=%q\n' "${PLAN_NOW_AUTOMOUSE_KICK:-}"
+    printf 'KICK_RUN_BIN=%q\n' "$ROOT/bin/automouse/run"
+    printf 'KICK_DRY_RUN=%q\n' "${PLAN_NOW_DRY_RUN:-0}"
+    printf 'KICK_STATE_DIR=%q\n' "${AUTOMOUSE_STATE_DIR:-$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse}"
+    printf 'KICK_LAUNCHCTL=%q\n' "${PLAN_NOW_KICK_LAUNCHCTL:-launchctl}"
+    printf 'KICK_PGREP=%q\n' "${PLAN_NOW_KICK_PGREP:-pgrep}"
+    printf 'KICK_LAUNCHD_LIB=%q\n' "$PLAN_NOW_LIB_DIR/launchd-job.sh"
     printf 'DISCORD_DM=%q\n' "$(dm_bin "$ROOT/bin" PLAN_NOW_DISCORD_DM)"
     printf 'CLAUDE_BIN=%q\n' "${PLAN_NOW_CLAUDE:-claude}"
     printf 'PLAN_SLUG_RE=%q\n' "$PLAN_SLUG_RE"
@@ -560,6 +572,66 @@ REVIEW_ROUTE_DEFAULT=$(grep -oE "'/discordPlanReviewDM'" \
     printf 'REVIEW_ROUTE=%q\n' "${PLAN_NOW_REVIEW_ROUTE:-$REVIEW_ROUTE_DEFAULT}"
     declare -f ljob_dm_ready ljob_dm_send
     cat <<'RUNNER_EOF'
+# --- automouse kick for JSB parity port plans --------------------------------
+# A queued jsb-port-pl-<digits>[-<n>] plan starts `bin/automouse/run plan <slug>`
+# right away, detached under its own launchd label, instead of waiting for the
+# nightly run. Every skip leaves the plan queued, so the nightly run still takes it.
+# Returns 0 on launch or skip; nonzero only when the launch itself failed.
+KICK_PORT_RE='^jsb-port-pl-[0-9]+(-[0-9]+)?$'
+KICK_RUNNER_RE='bin/automouse/run( |$)'
+KICK_LAUNCHED=""
+plan_now_kick_port() {
+    local kplan="$1" kslug know kout kpid krearm klabel klog kscript krc
+    kslug=$(basename "${kplan%.md}")
+    # Guard 1: a dry-run runner with no stub never launches a real run.
+    if [ "$KICK_DRY_RUN" = "1" ] && [ -z "$AUTOMOUSE_KICK" ]; then return 0; fi
+    # Guard 2: only parity port plans kick. Silent, so non-port logs are unchanged.
+    [[ "$kslug" =~ $KICK_PORT_RE ]] || return 0
+    # Guard 3: never override a disarm. An unreadable epoch fails safe (skip).
+    if [ -f "$KICK_STATE_DIR/.disarmed-until" ]; then
+        krearm=$(awk '/^rearm_epoch=/ && !f {sub(/^rearm_epoch=/, ""); print; f=1}' "$KICK_STATE_DIR/.disarmed-until")
+        case "$krearm" in
+            ''|*[!0-9]*)
+                echo "plan-now: automouse kick skipped: unreadable disarm breadcrumb; the plan stays queued."
+                return 0 ;;
+        esac
+        know=$(date +%s)
+        if [ "$krearm" -gt "$know" ]; then
+            echo "plan-now: automouse kick skipped: automouse is disarmed until epoch $krearm; the plan stays queued."
+            return 0
+        fi
+    fi
+    # Guard 4a: the nightly job is mid-run (same probe as automouse_running_pid).
+    kout=$("$KICK_LAUNCHCTL" list com.ibl5.automouse 2>/dev/null || true)
+    kpid=$(printf '%s\n' "$kout" | sed -n 's/.*"PID"[[:space:]]*=[[:space:]]*\([0-9][0-9]*\);.*/\1/p' | head -1)
+    if [ -n "$kpid" ]; then
+        echo "plan-now: automouse kick skipped: the nightly automouse run is live (PID $kpid); the plan stays queued."
+        return 0
+    fi
+    # Guard 4b: any other runner (manual run plan, a run schedule one-shot, an
+    # earlier kick). pgrep exit 1 = provably none; any other exit = undecidable = skip,
+    # the same convention as ljob_pgrep_alive in bin/lib/launchd-job.sh.
+    if "$KICK_PGREP" -f "$KICK_RUNNER_RE" >/dev/null 2>&1; then krc=0; else krc=$?; fi
+    if [ "$krc" -ne 1 ]; then
+        echo "plan-now: automouse kick skipped: another automouse runner is live (pgrep exit $krc); the plan stays queued."
+        return 0
+    fi
+    if [ -n "$AUTOMOUSE_KICK" ]; then
+        "$AUTOMOUSE_KICK" "$kslug" || return 1
+    else
+        . "$KICK_LAUNCHD_LIB" || return 1
+        klabel="com.ibl5.automouse-kick-$(ljob_safe_slug "$kslug")"
+        mkdir -p "$KICK_STATE_DIR/logs" || return 1
+        klog="$KICK_STATE_DIR/logs/kick-$kslug.log"
+        kscript=$(mktemp "${TMPDIR:-/tmp}/plan-now-kick.XXXXXX") || return 1
+        printf '#!/bin/bash\nrm -f -- "$0"\nexec %q plan %q\n' "$KICK_RUN_BIN" "$kslug" > "$kscript" || return 1
+        chmod +x "$kscript" || return 1
+        ljob_submit "$klabel" "$klog" "$kscript" || return 1
+    fi
+    KICK_LAUNCHED="$kslug"
+    echo "plan-now: automouse kick started: run plan $kslug, detached; the plan stays queued until that run claims it."
+}
+# --- end automouse kick -------------------------------------------------------
 # launchd runs with a minimal env — same PATH prelude bin/automouse/run uses.
 export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:$PATH"
 cd "$ROOT" || exit 1
@@ -893,6 +965,11 @@ elif [ -n "$plan" ]; then
                 echo "plan-now: queued for automouse — it will implement this plan and open its PR."
                 echo "plan-now: to pull it back out: bin/automouse/queue remove $(basename "${plan%.md}")"
                 DM_NEXT="queued for automouse"
+                if ! plan_now_kick_port "$plan"; then
+                    echo "plan-now: WARNING — kick failed; the plan stays queued for the nightly automouse run."
+                elif [ -n "$KICK_LAUNCHED" ]; then
+                    DM_NEXT="queued for automouse; kicked run plan $KICK_LAUNCHED"
+                fi
             else
                 echo "plan-now: WARNING — check-plan passed but automouse-queue failed; the plan is on disk, unqueued."
                 DM_ICON="⚠️"; DM_VERDICT="ok — check-plan PASSED, but automouse-queue FAILED"
@@ -1046,6 +1123,11 @@ else
                     echo "plan-now: queued for automouse (recovered plan) — it will implement this plan and open its PR."
                     echo "plan-now: to pull it back out: bin/automouse/queue remove $(basename "${recovered%.md}")"
                     DM_NEXT="queued for automouse"
+                    if ! plan_now_kick_port "$recovered"; then
+                        echo "plan-now: WARNING — kick failed; the plan stays queued for the nightly automouse run."
+                    elif [ -n "$KICK_LAUNCHED" ]; then
+                        DM_NEXT="queued for automouse; kicked run plan $KICK_LAUNCHED"
+                    fi
                 else
                     echo "plan-now: WARNING — check-plan passed but automouse-queue failed; the recovered plan is on disk, unqueued."
                     DM_VERDICT="degraded (recovered) — check-plan PASSED, but automouse-queue FAILED"

@@ -2308,6 +2308,247 @@ else
     fail "L-7 probe precedes the spawn (probe=$l7_probe spawn=$l7_spawn)"
 fi
 
+# === automouse kick cases (plan-now-kick-automouse-parity-ports) ===
+# A queued jsb-port-pl-<n> plan starts `bin/automouse/run plan <slug>` right away.
+# Every launch goes through a stub (PLAN_NOW_AUTOMOUSE_KICK), so no case starts a
+# real automouse run. A PATH-first launchctl recorder catches a guard that regresses
+# into the real launchd path.
+echo "── automouse kick: a queued parity port plan starts its own run ──"
+
+KT=$(mktemp -d "$TMP/kick.XXXXXX")
+mkdir -p "$KT/bin" "$KT/state"
+cat > "$KT/bin/launchctl" <<KT_LCTL_EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$KT/launchctl.calls"
+exit 1
+KT_LCTL_EOF
+KICK_STUB="$KT/kick-ok"
+cat > "$KICK_STUB" <<KT_OK_EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$1" >> "$KT/kick.args"
+exit 0
+KT_OK_EOF
+KICK_FAIL_STUB="$KT/kick-fail"
+printf '#!/usr/bin/env bash\nexit 7\n' > "$KICK_FAIL_STUB"
+LAUNCHCTL_IDLE="$KT/lc-idle"
+printf '#!/usr/bin/env bash\nexit 113\n' > "$LAUNCHCTL_IDLE"
+LAUNCHCTL_BUSY="$KT/lc-busy"
+cat > "$LAUNCHCTL_BUSY" <<'KT_BUSY_EOF'
+#!/usr/bin/env bash
+printf '{\n\t"PID" = 4242;\n\t"Label" = "com.ibl5.automouse";\n};\n'
+exit 0
+KT_BUSY_EOF
+PGREP_STUB="$KT/pgrep"
+cat > "$PGREP_STUB" <<KT_PGREP_EOF
+#!/usr/bin/env bash
+[ "\$1" = "-f" ] || exit 3
+grep -qE -- "\$2" "$KT/procs"
+KT_PGREP_EOF
+chmod +x "$KT/bin/launchctl" "$KICK_STUB" "$KICK_FAIL_STUB" "$LAUNCHCTL_IDLE" "$LAUNCHCTL_BUSY" "$PGREP_STUB"
+printf '# stub plan\n' > "$KT/one-liner.plan.md"
+KICK_STALE_PLAN="$KT/stale-port.plan.md"
+cp "$GOOD_PLAN" "$KICK_STALE_PLAN"
+printf '\nThe sweep also touches `ibl5/no-such-file-for-kick-test.php` in passing.\n' >> "$KICK_STALE_PLAN"
+KICK_PROMPT="$KT/port-prompt.md"
+{
+    printf '/plan Port JSB routine for the kick test\n'
+    printf -- '- Branch slug: `jsb-port-pl-0042`. Base: `master`.\n'
+} > "$KICK_PROMPT"
+
+# Defaults for every kick case. A case overrides one through the extra VAR=value
+# arguments of kick_run, which reach the dry-run call where the seams are baked.
+export PLAN_NOW_AUTOMOUSE_KICK="$KICK_STUB" PLAN_NOW_KICK_LAUNCHCTL="$LAUNCHCTL_IDLE"
+export PLAN_NOW_KICK_PGREP="$PGREP_STUB" AUTOMOUSE_STATE_DIR="$KT/state"
+KICK_SAVE_PATH="$PATH"
+KICK_SAVE_TMPDIR="${TMPDIR:-}"
+export PATH="$KT/bin:$PATH" TMPDIR="$KT"
+
+kick_reset() {
+    rm -f "$KT/kick.args" "$KT/launchctl.calls"
+    : > "$KT/procs"
+    rm -rf "$KT/state"; mkdir -p "$KT/state"
+}
+kick_ran() { [ -f "$KT/kick.args" ]; }
+kick_args() { cat "$KT/kick.args" 2>/dev/null; }
+
+# kick_run <slug> [VAR=value | -u VAR ...] -> KOUT (runner output), KRC (runner exit
+# status), KRUNNER_TEXT (the generated runner). $KSRC picks the plan the stub model
+# writes (default: one that passes check-plan); $KQFAIL=1 makes the queue stub fail.
+kick_run() {
+    local slug="$1"; shift
+    local plan="$PLANS/$slug.md" dry runner
+    rm -f "$PLANS"/*.md
+    : > "$DM_LOG"
+    dry=$(env "$@" PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \
+              PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+              "$PLAN_NOW" --queue "$PROMPT" 2>&1)
+    runner=$(printf '%s\n' "$dry" | sed -n 's/^  runner: //p')
+    [ -x "$runner" ] || { KOUT="no runner: $dry"; KRC=99; return 1; }
+    rm -f "$KT/launchctl.calls"
+    KRUNNER_TEXT=$(cat "$runner")
+    KRC=0
+    KOUT=$(STUB_PLAN="$plan" STUB_TAIL="PLAN_FILE: $plan" STUB_PLAN_SRC="${KSRC:-$GOOD_PLAN}" \
+        QUEUE_FAIL="${KQFAIL:-}" bash "$runner" 2>&1) || KRC=$?
+    rm -f "$runner"
+}
+# kick_run_recovered <plan-basename> [VAR=value ...]: the leg-B recovery path, where the
+# run omitted PLAN_FILE: and the runner adopts the plan the run left in $PLANS.
+kick_run_recovered() {
+    local name="$1"; shift
+    local dry runner
+    plans_reset
+    : > "$DM_LOG"
+    dry=$(env "$@" PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \
+              PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+              "$PLAN_NOW" --queue "$KICK_PROMPT" 2>&1)
+    runner=$(printf '%s\n' "$dry" | sed -n 's/^  runner: //p')
+    [ -x "$runner" ] || { KOUT="no runner: $dry"; KRC=99; return 1; }
+    rm -f "$KT/launchctl.calls"
+    KRC=0
+    KOUT=$(STUB_NO_PLAN=1 STUB_TAIL="" STUB_PLANFILE="$PLANS/$name" STUB_PLANFILE_SRC="$GOOD_PLAN" \
+        bash "$runner" 2>&1) || KRC=$?
+    rm -f "$runner"
+}
+
+KICK_STARTED_0042="plan-now: automouse kick started: run plan jsb-port-pl-0042, detached; the plan stays queued until that run claims it."
+
+# K1 a port plan that queues kicks once.
+kick_reset
+kick_run jsb-port-pl-0042
+want    "K1 port plan: log names the kick"           "$KOUT" "$KICK_STARTED_0042"
+want    "K1 port plan: the queue stub saw the plan"  "$KOUT" "automouse-queue (stub): queued $PLANS/jsb-port-pl-0042.md"
+want    "K1 port plan: DM names the kicked run"      "$(dm)" "queued for automouse; kicked run plan jsb-port-pl-0042"
+[ "$(kick_args)" = "jsb-port-pl-0042" ] && ok "K1 port plan: exactly one kick for the slug" \
+    || fail "K1 port plan: exactly one kick for the slug (got: $(kick_args))"
+K1_RC="$KRC"
+kick_reset
+kick_run jsb-port-pl-7
+[ "$(kick_args)" = "jsb-port-pl-7" ] && ok "K1 single-digit port slug kicks once" \
+    || fail "K1 single-digit port slug kicks once (got: $(kick_args))"
+
+# K2 a non-port plan queues and never kicks.
+kick_reset
+kick_run demo-slug
+want    "K2 non-port plan still queues"      "$KOUT" "automouse-queue (stub): queued $PLANS/demo-slug.md"
+want_no "K2 non-port plan: no kick in the log" "$KOUT" "automouse kick"
+want    "K2 non-port plan: DM says queued"   "$(dm)" "queued for automouse"
+want_no "K2 non-port plan: DM names no kick" "$(dm)" "kicked"
+kick_ran && fail "K2 non-port plan: the kick stub ran" || ok "K2 non-port plan: the kick stub never ran"
+
+# K3 a port plan that never reaches the queue is never kicked.
+kick_reset
+KSRC="$KT/one-liner.plan.md" kick_run jsb-port-pl-0042
+want    "K3 check-plan FAILED: not queued"   "$KOUT" "NOT queued"
+kick_ran && fail "K3 check-plan FAILED: kicked" || ok "K3 check-plan FAILED: never kicked"
+kick_reset
+KSRC="$KICK_STALE_PLAN" kick_run jsb-port-pl-0042
+want    "K3 staleness FAILED: named in the log" "$KOUT" "check-plan-staleness FAILED"
+kick_ran && fail "K3 staleness FAILED: kicked" || ok "K3 staleness FAILED: never kicked"
+kick_reset
+KQFAIL=1 kick_run jsb-port-pl-0042
+want    "K3 queue call FAILED: named in the log" "$KOUT" "automouse-queue failed"
+kick_ran && fail "K3 queue call FAILED: kicked" || ok "K3 queue call FAILED: never kicked"
+
+# K4a the nightly job is mid-run: skip, the plan stays queued.
+kick_reset
+kick_run jsb-port-pl-0042 PLAN_NOW_KICK_LAUNCHCTL="$LAUNCHCTL_BUSY"
+want    "K4a nightly live: skip line"        "$KOUT" "plan-now: automouse kick skipped: the nightly automouse run is live (PID 4242); the plan stays queued."
+want    "K4a nightly live: plan still queued" "$KOUT" "automouse-queue (stub): queued $PLANS/jsb-port-pl-0042.md"
+kick_ran && fail "K4a nightly live: kicked" || ok "K4a nightly live: no kick"
+
+# K4b any other runner is live: skip. pgrep exit 1 means none; any other exit skips.
+kick_reset
+printf '/bin/bash /Users/x/GitHub/IBL5/bin/automouse/run plan jsb-port-pl-0007\n' > "$KT/procs"
+kick_run jsb-port-pl-0042
+want    "K4b runner live: skip line"         "$KOUT" "plan-now: automouse kick skipped: another automouse runner is live (pgrep exit 0); the plan stays queued."
+kick_ran && fail "K4b runner live: kicked" || ok "K4b runner live: no kick"
+kick_reset
+kick_run jsb-port-pl-0042 PLAN_NOW_KICK_PGREP="$KT/no-such-pgrep"
+want    "K4b pgrep missing: skip line"       "$KOUT" "another automouse runner is live (pgrep exit 127); the plan stays queued."
+kick_ran && fail "K4b pgrep missing: kicked" || ok "K4b pgrep missing: no kick"
+kick_reset
+printf 'bash bin/automouse/runner-old\nbash bin/test-automouse-single\n' > "$KT/procs"
+kick_run jsb-port-pl-0042
+[ "$(kick_args)" = "jsb-port-pl-0042" ] && ok "K4b near-miss process lines still kick once" \
+    || fail "K4b near-miss process lines still kick once (got: $(kick_args))"
+
+# K5 a failed kick is logged, and nothing else about the run changes.
+kick_reset
+kick_run jsb-port-pl-0042 PLAN_NOW_AUTOMOUSE_KICK="$KICK_FAIL_STUB"
+want    "K5 kick failed: warning line"       "$KOUT" "plan-now: WARNING — kick failed; the plan stays queued for the nightly automouse run."
+want    "K5 kick failed: plan still queued"  "$KOUT" "automouse-queue (stub): queued $PLANS/jsb-port-pl-0042.md"
+want    "K5 kick failed: DM says queued"     "$(dm)" "queued for automouse"
+want_no "K5 kick failed: DM names no kick"   "$(dm)" "kicked"
+[ "$KRC" = "$K1_RC" ] && ok "K5 kick failed: runner exit status unchanged ($KRC)" \
+    || fail "K5 kick failed: runner exit status unchanged (got $KRC, K1 had $K1_RC)"
+
+# K6 never override a disarm.
+kick_reset
+KT_FUTURE=$(( $(date +%s) + 3600 ))
+printf 'rearm_epoch=%s\n' "$KT_FUTURE" > "$KT/state/.disarmed-until"
+kick_run jsb-port-pl-0042
+want    "K6 disarmed: skip line"             "$KOUT" "plan-now: automouse kick skipped: automouse is disarmed until epoch $KT_FUTURE; the plan stays queued."
+kick_ran && fail "K6 disarmed: kicked" || ok "K6 disarmed: no kick"
+kick_reset
+printf 'rearm_epoch=1\n' > "$KT/state/.disarmed-until"
+kick_run jsb-port-pl-0042
+[ "$(kick_args)" = "jsb-port-pl-0042" ] && ok "K6 a past rearm_epoch does not block" \
+    || fail "K6 a past rearm_epoch does not block (got: $(kick_args))"
+kick_reset
+printf 'rearm_epoch=soon\n' > "$KT/state/.disarmed-until"
+kick_run jsb-port-pl-0042
+want    "K6 garbage epoch: skip line"        "$KOUT" "plan-now: automouse kick skipped: unreadable disarm breadcrumb; the plan stays queued."
+kick_ran && fail "K6 garbage epoch: kicked" || ok "K6 garbage epoch: no kick"
+
+# K7 a recovered port plan kicks too.
+kick_reset
+kick_run_recovered jsb-port-pl-0042-2.md
+want    "K7 recovered plan: queued"          "$KOUT" "queued for automouse (recovered plan)"
+want    "K7 recovered plan: log names the kick" "$KOUT" "plan-now: automouse kick started: run plan jsb-port-pl-0042-2, detached"
+[ "$(kick_args)" = "jsb-port-pl-0042-2" ] && ok "K7 recovered plan: exactly one kick for the slug" \
+    || fail "K7 recovered plan: exactly one kick for the slug (got: $(kick_args))"
+
+# K8 near-miss slugs reach the queue and never kick.
+for k8_slug in jsb-port-pl-12a x-jsb-port-pl-12 jsb-port-pl-12-final; do
+    kick_reset
+    kick_run "$k8_slug"
+    want "K8 $k8_slug: reached the queue" "$KOUT" "automouse-queue (stub): queued $PLANS/$k8_slug.md"
+    kick_ran && fail "K8 $k8_slug: kicked" || ok "K8 $k8_slug: no kick"
+done
+# The regex keeps its optional -<n> tail and its end anchor.
+want_no "K8 the port regex is not the tail-less form" "$KRUNNER_TEXT" "'^jsb-port-pl-[0-9]+'"
+
+# K9 the env seam: unset and empty both bake an empty value, and a dry-run runner
+# with no stub never reaches launchd.
+kick_reset
+kick_run jsb-port-pl-0042 -u PLAN_NOW_AUTOMOUSE_KICK -u PLAN_NOW_KICK_LAUNCHCTL -u PLAN_NOW_KICK_PGREP
+want    "K9 seam unset bakes an empty value" "$KRUNNER_TEXT" "AUTOMOUSE_KICK=''"
+[ ! -e "$KT/launchctl.calls" ] && ok "K9 seam unset: launchctl untouched" || fail "K9 seam unset: launchctl untouched"
+want_no "K9 seam unset: no kick in the log"  "$KOUT" "automouse kick"
+kick_reset
+kick_run jsb-port-pl-0042 PLAN_NOW_AUTOMOUSE_KICK= -u PLAN_NOW_KICK_LAUNCHCTL -u PLAN_NOW_KICK_PGREP
+want    "K9 seam empty bakes an empty value" "$KRUNNER_TEXT" "AUTOMOUSE_KICK=''"
+[ ! -e "$KT/launchctl.calls" ] && ok "K9 seam empty: launchctl untouched" || fail "K9 seam empty: launchctl untouched"
+want_no "K9 seam empty: no kick in the log"  "$KOUT" "automouse kick"
+if ls "$KT"/plan-now-kick.* >/dev/null 2>&1; then
+    fail "K9 dry-run guard: a plan-now-kick script was written"
+else
+    ok "K9 dry-run guard: no plan-now-kick script written"
+fi
+kick_reset
+kick_run jsb-port-pl-0042
+want    "K9 a stub value bakes its path"     "$KRUNNER_TEXT" "AUTOMOUSE_KICK=$KICK_STUB"
+# The bake treats unset and empty alike. The -unset and +set forms would not.
+PLAN_NOW_SRC_TEXT=$(cat "$PLAN_NOW")
+want_no "K9 the bake never defaults an unset seam to a word" "$PLAN_NOW_SRC_TEXT" '${PLAN_NOW_AUTOMOUSE_KICK-unset}'
+want_no "K9 the bake never keys on the seam being set"       "$PLAN_NOW_SRC_TEXT" '${PLAN_NOW_AUTOMOUSE_KICK+set}'
+
+export PATH="$KICK_SAVE_PATH"
+if [ -n "$KICK_SAVE_TMPDIR" ]; then export TMPDIR="$KICK_SAVE_TMPDIR"; else unset TMPDIR; fi
+unset PLAN_NOW_AUTOMOUSE_KICK PLAN_NOW_KICK_LAUNCHCTL PLAN_NOW_KICK_PGREP AUTOMOUSE_STATE_DIR
+rm -rf "$KT"
+# === end automouse kick cases ===
+
 # Whole-run check: the sandbox agents dir stayed empty across every dry-run call site.
 sandbox_agents_files=$(find "$HOME/Library/LaunchAgents" -type f 2>/dev/null)
 if [ -z "$sandbox_agents_files" ]; then

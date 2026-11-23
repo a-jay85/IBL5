@@ -21,8 +21,10 @@ PMR_WAIVER_TAG='after-merge-prose-ok:'
 PMR_BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # pmr_strip_fences FILE -- print FILE with fenced code blocks (fence lines included) dropped.
-# Width-aware like planfile.py _strip_fenced: a closing fence uses the opener's character, is at
-# least as long, and has no text after it. A 3-backtick block inside a 4-backtick block stays fenced.
+# A fence opens on ``` or ~~~; it closes on a run of the opener's character, at least as long,
+# with no text after it. A 3-backtick block inside a 4-backtick block stays fenced.
+# The Python copy is planfile.py _strip_fenced_after_merge (parse_after_merge_section copies
+# pmr_rows' section bounds); test_after_merge_parsers_agree in the harness tests checks both.
 pmr_strip_fences() {
     awk '/^[[:space:]]*(```|~~~)/ {
             s = $0; sub(/^[[:space:]]*/, "", s); c = substr(s, 1, 1); n = 0
@@ -107,7 +109,7 @@ pmr_is_count() { local _re='^[0-9]+$'; [[ "${1-}" =~ $_re ]]; }
 pmr_prose_text() {
     awk -v keep="${2-0}" '
         /^[[:space:]]*(```|~~~)/ {
-            # Width-aware like planfile.py _strip_fenced: a closing fence uses the same
+            # Same fence walk as pmr_strip_fences: a closing fence uses the same
             # character, is at least as long as the opener, and has no text after it.
             s = $0; sub(/^[[:space:]]*/, "", s); c = substr(s, 1, 1); n = 0
             while (substr(s, n + 1, 1) == c) n++

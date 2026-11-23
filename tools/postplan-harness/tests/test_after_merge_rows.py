@@ -206,3 +206,43 @@ def test_after_merge_section_stops_at_next_heading():
     rows = parse_after_merge_section(
         "## After merge\n\n- **Row 1** [manual] — in\n\n## Other\n\n- **Row 2** [manual] — out\n")
     assert [r.number for r in rows] == ["1"]
+
+
+# --- Parser parity: planfile.py and bin/lib/post-merge-rows.sh read the same rows ------
+# bin/post-merge-run calls pmr_rows, so the bash side below covers it too.
+
+_PARITY_BODIES = {
+    "tilde-fence": ("~~~\n## After merge\n- **Row 3** [auto:mac foo] — x\n~~~\n"
+                    "## After merge\n- **Row 4** [manual] — real\n"),
+    "info-string-inside-backticks": ("## After merge\n```\n- **Row 1** [manual] — fenced\n"
+                                     "```python\n- **Row 2** [manual] — still fenced\n```\n"
+                                     "- **Row 3** [manual] — real\n"),
+    "nested-4-backtick": ("## After merge\n````\n```\n- **Row 1** [manual] — fenced\n```\n"
+                          "- **Row 2** [manual] — fenced\n````\n- **Row 3** [manual] — real\n"),
+    "tilde-closes-only-tilde": ("## After merge\n~~~\n```\n- **Row 1** [manual] — fenced\n~~~\n"
+                                "- **Row 2** [manual] — real\n"),
+    "end-anchor": ("## After merge\n- **Row 1** [manual] — in\n<!-- after-merge:end -->\n"
+                   "- **Row 2** [manual] — after the anchor\n"
+                   "## After merge\n- **Row 3** [manual] — second section after anchor\n"),
+    "next-heading-closes": ("## After merge\n- **Row 1** [manual] — in\n## Other\n"
+                            "- **Row 2** [manual] — out\n## After merge\n- **Row 3** [manual] — in again\n"),
+    "back-to-back-headings": ("## After merge\n- **Row 1** [manual] — in\n## After merge\n"
+                              "- **Row 2** [manual] — sed closed the range here\n"),
+    "blockquote-fence": "## After merge\n> ```\n- **Row 1** [manual] — real\n> ```\n",
+    "checkbox-and-link": ("## After merge\n- [ ] **Row 1** [manual] — box\n"
+                          "- **Row 2** [see](https://example.com) — link\n"),
+}
+
+
+@pytest.mark.parametrize("name", sorted(_PARITY_BODIES))
+def test_after_merge_parsers_agree(tmp_path, name):
+    body = _PARITY_BODIES[name]
+    f = tmp_path / "body.md"
+    f.write_text(body)
+    bash_rows = subprocess.run(
+        ["bash", "-c", '. bin/lib/post-merge-rows.sh; pmr_rows "$1"', "_", str(f)],
+        cwd=REPO_ROOT, capture_output=True, text=True, check=True).stdout.splitlines()
+    py_rows = [r.raw for r in parse_after_merge_section(body)]
+    assert py_rows == bash_rows
+    if name == "tilde-fence":
+        assert py_rows == ["- **Row 4** [manual] — real"]

@@ -277,6 +277,7 @@ case_open_green_unarmed_stall_dm() {
     run_watch
     h_eq "green unarmed: one DM" 1 "$(cnt discord-dm)"
     h_contains "DM names the PR" "$(slurp "$S/log/discord-dm.stdin")" "pull/42"
+    h_contains "stall DM goes to #errors" "$(slurp "$S/log/discord-dm.argv")" "--error"
     h_eq "stall key recorded" "pl-0001:held-for-owner:42" "$(slurp "$S/home/.cache/jsb-parity-stalls.txt")"
     reset_logs
     run_watch

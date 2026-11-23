@@ -352,7 +352,7 @@ Act on the `MATRIX_VERDICT=` line, the last line it prints:
 - `skipped`: there is no plan file. Proceed to Step 7.
 - `clean`: proceed to Step 7.
 - `uncommitted`: commit a checkpoint and re-run the command.
-- `unrealised`: each `UNREALISED-ASSERTION: row <id> -- <cell>` line is followed by a `missing:` line naming the backtick tokens the diff never added. For each row, write the missing test (method, assertion, or fixture) in the file that matrix row names, run it until it passes, commit a checkpoint, and re-run the command. Repeat until the verdict is `clean`.
+- `unrealised`: each `UNREALISED-ASSERTION: row <id> -- <cell>` line is followed by a `missing:` line naming the backtick tokens the diff never added. For each row, write the missing test (method, assertion, or fixture) in the file that matrix row names, run it until it passes, commit a checkpoint, and re-run the command. Repeat until the verdict is `clean`. A row with an `EXTERNAL-REPO: row <id>` line runs in a separate repo, and the check also reads that repo's tracked files, so commit the test there too: an untracked file in that repo still counts as missing.
 - `unavailable`: the checker could not run. The printed output says why. Treat it as unresolved.
 
 When the verdict is still `unrealised` or `unavailable` after your fix attempts, or you are near the time budget with rows still open:

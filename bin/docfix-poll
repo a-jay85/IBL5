@@ -85,6 +85,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib/docfix-health.sh"
 # NOT-FOUND for a live job once the table outgrows the pipe buffer (SIGPIPE, 141).
 # shellcheck source=bin/lib/launchd-job.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib/launchd-job.sh"
+# shellcheck source=bin/lib/launchd-sched.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/launchd-sched.sh"
 
 # Single source of truth for the plist — shared by --print-schedule and
 # --install-schedule, so the MAIN-checkout derivation is exercised by tests.
@@ -123,6 +125,7 @@ build_plist() {
 	<string>${PLIST_LABEL}</string>
 	<key>Program</key>
 	<string>${PROGRAM}</string>
+$(lsched_env_path "$LSCHED_JOB_PATH")
 	<key>StartCalendarInterval</key>
 	<dict>
 		<key>Hour</key>

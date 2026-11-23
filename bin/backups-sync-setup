@@ -70,6 +70,7 @@ if [ -n "$SCHEDULE_ACTION" ]; then
   plist_body() {
     lsched_key_string Label "$PLIST_LABEL"
     lsched_key_string Program "$PROGRAM"
+    lsched_env_path "$LSCHED_JOB_PATH"
     lsched_calendar Hour=3 Minute=0
     lsched_key_string WorkingDirectory "$MAIN_WT"
     lsched_key_string StandardOutPath "${LOG_DIR}/launchd-stdout.log"

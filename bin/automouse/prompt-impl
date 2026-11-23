@@ -458,8 +458,23 @@ The runner ships this branch through `post-plan-now`, which refuses to fire unle
 you can fix what it finds. Its pass records are keyed by tree hash, so the runner's
 fire-time call is a cache hit when you change nothing afterwards.
 
-Run each stage as its own foreground Bash call with `timeout: 600000`:
+Run each stage as its own foreground Bash call with `timeout: 600000`, in this order.
+These are the stages the fire point runs. `exec-mutations` runs every mutation row,
+so it covers the fire point's `local-mutations` stage.
 
+```bash
+# Bash calls do not share variables, so rebuild the plan path from the queue entry
+NIGHTLY_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse"
+PLAN_FILE="<the PLAN_FILE value from the end of this prompt>"
+# Queue entries are NNN-<slug>.md, so resolve the entry by slug, as the top of this prompt does
+if [ -z "${PLAN_PATH:-}" ]; then
+    source /Users/ajaynicolas/GitHub/IBL5/bin/lib/automouse-queue-order.sh
+    PLAN_ENTRY=$(queue_entry_for_slug "$NIGHTLY_DIR/queue" "$PLAN_FILE") && PLAN_PATH="$NIGHTLY_DIR/queue/$PLAN_ENTRY"
+fi
+PLAN_PATH="$(readlink -f "$PLAN_PATH" 2>/dev/null || echo "$PLAN_PATH")"
+GATE="$(git rev-parse --path-format=absolute --git-common-dir)/../bin/lib/prefire-verify"
+"$GATE" --plan "$PLAN_PATH" --stage phases
+```
 ```bash
 # Bash calls do not share variables, so rebuild the plan path from the queue entry
 NIGHTLY_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse"
@@ -497,17 +512,49 @@ if [ -z "${PLAN_PATH:-}" ]; then
 fi
 PLAN_PATH="$(readlink -f "$PLAN_PATH" 2>/dev/null || echo "$PLAN_PATH")"
 GATE="$(git rev-parse --path-format=absolute --git-common-dir)/../bin/lib/prefire-verify"
+"$GATE" --plan "$PLAN_PATH" --stage pytest
+```
+```bash
+# Bash calls do not share variables, so rebuild the plan path from the queue entry
+NIGHTLY_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse"
+PLAN_FILE="<the PLAN_FILE value from the end of this prompt>"
+# Queue entries are NNN-<slug>.md, so resolve the entry by slug, as the top of this prompt does
+if [ -z "${PLAN_PATH:-}" ]; then
+    source /Users/ajaynicolas/GitHub/IBL5/bin/lib/automouse-queue-order.sh
+    PLAN_ENTRY=$(queue_entry_for_slug "$NIGHTLY_DIR/queue" "$PLAN_FILE") && PLAN_PATH="$NIGHTLY_DIR/queue/$PLAN_ENTRY"
+fi
+PLAN_PATH="$(readlink -f "$PLAN_PATH" 2>/dev/null || echo "$PLAN_PATH")"
+GATE="$(git rev-parse --path-format=absolute --git-common-dir)/../bin/lib/prefire-verify"
+"$GATE" --plan "$PLAN_PATH" --stage shell
+```
+```bash
+# Bash calls do not share variables, so rebuild the plan path from the queue entry
+NIGHTLY_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse"
+PLAN_FILE="<the PLAN_FILE value from the end of this prompt>"
+# Queue entries are NNN-<slug>.md, so resolve the entry by slug, as the top of this prompt does
+if [ -z "${PLAN_PATH:-}" ]; then
+    source /Users/ajaynicolas/GitHub/IBL5/bin/lib/automouse-queue-order.sh
+    PLAN_ENTRY=$(queue_entry_for_slug "$NIGHTLY_DIR/queue" "$PLAN_FILE") && PLAN_PATH="$NIGHTLY_DIR/queue/$PLAN_ENTRY"
+fi
+PLAN_PATH="$(readlink -f "$PLAN_PATH" 2>/dev/null || echo "$PLAN_PATH")"
+GATE="$(git rev-parse --path-format=absolute --git-common-dir)/../bin/lib/prefire-verify"
 "$GATE" --plan "$PLAN_PATH" --stage exec-mutations
 ```
 
 Act on each exit code:
 
-- `0`: next stage. When all three return 0, proceed to Step 7.
+- `0`: next stage. When all six return 0, proceed to Step 7.
 - `1`: a check failed. The output names the matrix row or stage. Fix the production
   code or the test the plan asked for. Never edit the plan's Verification Matrix, and
-  never weaken an assertion. Commit a checkpoint and rerun all three stages, because
+  never weaken an assertion. Commit a checkpoint and rerun all six stages, because
   the fix changed the tree. A stage still at `1` never proceeds to Step 7. At the
   budget wall, take the Step 6.7 no-handoff STOP path.
+- `1` from `phases`: each `MISSING-PHASE: <n>` line names a plan phase whose cited files
+  the diff never touched. Do that phase's work now. Only when the phase really changes no
+  repo file (setup, a test run, files under `/tmp`), or its work already landed on master,
+  add one line to that phase's body in the plan: `**No diff:** <why>`. Never add it to a
+  phase that has work left, never move a phase to `## Out of Scope`, and never edit the
+  Verification Matrix to clear this.
 - `1` from `exec-mutations`: each failing row prints a `NEXT-STEP row <id>` line. Follow it.
   NOT-APPLIED means the row's `match:` text is not in the file exactly once; edit only that
   block's `match:`/`replace:` lines to the code as written. HELD means the check still passes
@@ -532,7 +579,7 @@ Act on each exit code:
 - `2`: usage error. Use the Error Handling path in Step 8.
 
 Never pass `--bypass`; the gate refuses it under `CLAUDE_HEADLESS`. If there is no
-plan file, drop `--plan "$PLAN_PATH"`. The matrix and exec-mutations stages then skip and the phpunit stage still runs.
+plan file, drop `--plan "$PLAN_PATH"`. The phases, matrix and exec-mutations stages then skip, and the phpunit, pytest and shell stages still run.
 
 ## Step 7: Write Handoff File
 

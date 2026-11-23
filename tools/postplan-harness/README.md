@@ -162,7 +162,7 @@ intent log, without touching GitHub.
 
 - **Plan-hold label.** After the PR opens or updates, a live run syncs the orange `auto-merge-held-by-plan` label (`harness/plan_hold_label.py`). The harness adds it when the plan says `auto_merge: false` and at least one `hold_trigger:` token is owner-held, or no token is listed. Those PRs can never auto-merge without the owner. A plan whose tokens are all reviewer-clearable gets no label, because the second reviewer may clear it. A found plan with no hold loses the label, and a plan-blind run leaves it alone.
 
-- **Shadow fields only add holds.** `ArmInputs.reviewer_arming_holds` is the one field fed from the record, through `fidelity.reviewer_arming_holds`. `tests/test_fidelity_shadow.py` asserts that a hold adds condition (21) and leaves every other condition as it was, and that a clear, missing or invalid block changes nothing.
+- **Shadow fields only add holds.** `ArmInputs.reviewer_arming_holds` is the one field fed from the record, through `fidelity.reviewer_arming_holds`. `tests/test_fidelity_shadow.py` asserts that a hold adds condition (21) and leaves every other condition as it was, and that a clear, missing or invalid block changes nothing. On a stacked branch, a MISSING item counts as landed later only when it landed in both the `origin/master` diff and the review-base diff that the Phase 5.5 reviewer judged, so a file only the parent changed keeps the hold. `runner._landed_later_review_inputs` reads the review-base inputs and returns empty inputs on a git error, which keeps every hold. `bench/landed_later_base_corpus_diff.py` replays stored shadow records under both rules.
 
 ### Delta re-review (Phase 5.5)
 

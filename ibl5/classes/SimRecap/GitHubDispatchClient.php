@@ -14,8 +14,8 @@ use Psr\Log\LoggerInterface;
  */
 final class GitHubDispatchClient
 {
-    /** @var callable(string, list<string>, string): int */
-    private $transport;
+    /** @var \Closure(string, list<string>, string): int */
+    private \Closure $transport;
 
     /**
      * @param null|callable(string, list<string>, string): int $transport (url, headers, body) -> HTTP status, 0 on transport error
@@ -27,7 +27,7 @@ final class GitHubDispatchClient
         ?callable $transport = null,
         private readonly ?LoggerInterface $logger = null,
     ) {
-        $this->transport = $transport ?? self::defaultTransport();
+        $this->transport = \Closure::fromCallable($transport ?? self::defaultTransport());
     }
 
     /**

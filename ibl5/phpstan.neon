@@ -57,6 +57,10 @@ parameters:
 
 services:
     -
+        class: PHPStanRules\RequireNativeTypeDeclarationsRule
+        tags:
+            - phpstan.rules.rule
+    -
         class: PHPStanRules\BanNumberFormatRule
         tags:
             - phpstan.rules.rule

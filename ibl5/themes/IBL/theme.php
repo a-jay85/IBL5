@@ -290,7 +290,7 @@ function themearticle(string $aid, string $informant, int|string $datetime, stri
  * @param string|null $type Explicit block type: 'leaders', 'injury', or null to fall back to
  *                          content-sniffing for unmigrated callers (byte-identical output)
  */
-function themecenterbox($title, $content, ?string $type = null): void
+function themecenterbox(string|bool $title, string $content, ?string $type = null): void
 {
     if ($type !== null) {
         // Explicit type: select branch directly without content inspection

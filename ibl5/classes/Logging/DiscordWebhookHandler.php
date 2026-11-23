@@ -12,8 +12,8 @@ class DiscordWebhookHandler extends AbstractProcessingHandler
 {
     private string $webhookUrl;
 
-    /** @var callable(string, string): void */
-    private $transport;
+    /** @var \Closure(string, string): void */
+    private \Closure $transport;
 
     /**
      * @param callable(string, string): void|null $transport Custom transport for testing. Receives (url, jsonPayload).
@@ -22,7 +22,7 @@ class DiscordWebhookHandler extends AbstractProcessingHandler
     {
         parent::__construct($level, $bubble);
         $this->webhookUrl = $webhookUrl;
-        $this->transport = $transport ?? self::defaultTransport();
+        $this->transport = \Closure::fromCallable($transport ?? self::defaultTransport());
     }
 
     protected function write(LogRecord $record): void

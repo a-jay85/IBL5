@@ -460,7 +460,10 @@ _expect_run "older-head marker"
 # helper envelope with current-head marker -> skips
 _run_runner '{"headRefOid":"@H1@","comments":[{"author":{"login":"me"},"body":"<details><summary>✅ Code review — no issues found</summary>\n\n### Code review\n\nNo issues found.\n\n</details>\n<!-- reviewed-head: @H1@ -->"}],"reviews":[]}'
 _expect_skip "helper envelope with current marker"
-# short-prefix near-miss marker -> runs
+# misspelled marker key (reviewed-headX:) -> runs
+_run_runner '{"headRefOid":"@H1@","comments":[{"author":{"login":"me"},"body":"## Code review\n\n<!-- reviewed-headX: @H1@ -->"}],"reviews":[]}'
+_expect_run "misspelled marker key"
+# short-prefix near-miss marker -> runs; comparing only the first 7 chars ($h[0:7]) would skip here
 _run_runner '{"headRefOid":"@H1@","comments":[{"author":{"login":"me"},"body":"## Code review\n\n<!-- reviewed-head: 1111111 -->"}],"reviews":[]}'
 _expect_run "short-prefix marker"
 # missing headRefOid -> runs (fails toward running)

@@ -1,6 +1,6 @@
 ---
 description: Diff-scoped gate bin/check-adr-append-only fails a PR that rewrites or removes frozen ADR text (Context, Decision, Rationale, Alternatives, frontmatter description), with a PR-body bypass marker and a CI split between the harness and the PR-diff run.
-last_verified: 2026-11-21
+last_verified: 2026-11-22
 ---
 
 # ADR-0272: ADR append-only gate
@@ -11,7 +11,7 @@ last_verified: 2026-11-21
 
 ## Context
 
-`.claude/rules/adr-append-only.md` freezes the Context, Decision, Rationale and Alternatives sections of an accepted ADR. Enforcement was prompt-only: the docfix prompt and the rule doc told agents to append an Addendum, and nothing in CI checked it. The rule failed in practice. PR 3367 rewrote ADR-0104 Decision item 2 in place. PR 3373 rewrote the Decision text of ADR-0013 and ADR-0169. PR 3637 rewrote the ADR-0169 frontmatter `description`. A replay of this gate over master history found frozen text changed in 81 of the 279 first-parent commits that modified an ADR file.
+`.claude/rules/adr-append-only.md` freezes the Context, Decision, Rationale and Alternatives sections of an accepted ADR. Enforcement was prompt-only: the docfix prompt and the rule doc told agents to append an Addendum, and nothing in CI checked it. The rule failed in practice. PR 3367 rewrote ADR-0104 Decision item 2 in place. PR 3373 rewrote the Decision text of ADR-0013 and ADR-0169. PR 3637 rewrote the ADR-0169 frontmatter `description`. A replay of this gate over master history found frozen text changed in 83 of the 525 first-parent commits that modified a top-level ADR file.
 
 ## Decision
 

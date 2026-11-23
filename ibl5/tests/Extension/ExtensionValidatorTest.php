@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Extension\ExtensionValidator;
 use FreeAgency\CommonContractValidator;
+use Team\Team;
 
 /**
  * Comprehensive tests for contract extension validation logic
@@ -129,10 +130,9 @@ class ExtensionValidatorTest extends TestCase
     public function testRejectsExtensionWhenAlreadyUsedThisSeason(): void
     {
         // Arrange - Create a mock team object with used extension flag
-        $team = (object) [
-            'hasUsedExtensionThisSeason' => 1,
-            'hasUsedExtensionThisSim' => 0
-        ];
+        $team = self::createStub(Team::class);
+        $team->hasUsedExtensionThisSeason = 1;
+        $team->hasUsedExtensionThisSim = 0;
 
         // Act
         $result = $this->extensionValidator->validateExtensionEligibility($team);
@@ -149,10 +149,9 @@ class ExtensionValidatorTest extends TestCase
     public function testRejectsExtensionWhenAlreadyUsedThisSim(): void
     {
         // Arrange - Create a mock team object with used extension flag
-        $team = (object) [
-            'hasUsedExtensionThisSeason' => 0,
-            'hasUsedExtensionThisSim' => 1
-        ];
+        $team = self::createStub(Team::class);
+        $team->hasUsedExtensionThisSeason = 0;
+        $team->hasUsedExtensionThisSim = 1;
 
         // Act
         $result = $this->extensionValidator->validateExtensionEligibility($team);
@@ -169,10 +168,9 @@ class ExtensionValidatorTest extends TestCase
     public function testAcceptsExtensionWhenNotYetUsed(): void
     {
         // Arrange - Create a mock team object with no extensions used
-        $team = (object) [
-            'hasUsedExtensionThisSeason' => 0,
-            'hasUsedExtensionThisSim' => 0
-        ];
+        $team = self::createStub(Team::class);
+        $team->hasUsedExtensionThisSeason = 0;
+        $team->hasUsedExtensionThisSim = 0;
 
         // Act
         $result = $this->extensionValidator->validateExtensionEligibility($team);
@@ -195,11 +193,10 @@ class ExtensionValidatorTest extends TestCase
     {
         // Clean extension flags + arbitrary team-identity context the validator
         // must ignore (it receives no session identity to compare against).
-        $team = (object) [
-            'hasUsedExtensionThisSeason' => 0,
-            'hasUsedExtensionThisSim' => 0,
-            'teamName' => 'Some Other Team',
-        ];
+        $team = self::createStub(Team::class);
+        $team->hasUsedExtensionThisSeason = 0;
+        $team->hasUsedExtensionThisSim = 0;
+        $team->name = 'Some Other Team';
 
         $result = $this->extensionValidator->validateExtensionEligibility($team);
 

@@ -64,7 +64,7 @@ const EXPECTED_CHIPS: Record<string, Styles> = {
   txn: {
     display: 'inline-block', borderTopLeftRadius: '4.5px', fontWeight: '600', whiteSpace: 'nowrap',
     textTransform: 'none', paddingTop: '2.25px', paddingLeft: '9px', backgroundColor: 'rgb(255, 243, 224)',
-    color: 'rgb(230, 81, 0)', fontSize: '15.75px', letterSpacing: '0.63px', fontFamily: BARLOW,
+    color: 'rgb(184, 67, 0)', fontSize: '15.75px', letterSpacing: '0.63px', fontFamily: BARLOW,
   },
   dc: {
     display: 'block', borderTopLeftRadius: '4.5px', fontWeight: '700', whiteSpace: 'normal',

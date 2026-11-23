@@ -68,6 +68,43 @@ class TeamServiceTest extends TestCase
         $this->assertStringContainsString('draft-picks-list', $result['draftPicksTable']);
     }
 
+    public function testGetTeamPageDataUsesInjectedPreparer(): void
+    {
+        $mockDb = new MockDatabase();
+        $mockDb->onQuery('ibl_team_info', [
+            TestDataFactory::createTeam([
+                'teamid' => 1,
+                'team_name' => 'Bulls',
+                'team_city' => 'Chicago',
+            ]),
+        ]);
+
+        $repository = self::createStub(TeamRepositoryInterface::class);
+        $leagueContext = self::createStub(\League\LeagueContext::class);
+        $leagueContext->method('getConfig')->willReturn(['images_path' => '/images']);
+
+        $preparer = $this->createMock(TeamPageDataPreparer::class);
+        $preparer->expects($this->once())
+            ->method('prepareDraftPicksData')
+            ->willThrowException(new \RuntimeException('injected preparer used'));
+
+        $service = new TeamService(
+            $mockDb,
+            $repository,
+            $leagueContext,
+            self::createStub(TeamQueryRepositoryInterface::class),
+            self::createStub(League::class),
+            $preparer,
+        );
+
+        try {
+            $service->getTeamPageData(1, null, 'ratings');
+            self::fail('getTeamPageData() did not call the injected preparer');
+        } catch (\RuntimeException $e) {
+            self::assertSame('injected preparer used', $e->getMessage());
+        }
+    }
+
     // -------------------------------------------------------------------------
     // TeamPageDataPreparer unit assertions
     // -------------------------------------------------------------------------

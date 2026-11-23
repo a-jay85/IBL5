@@ -1,6 +1,6 @@
 ---
 description: Projects end-of-season draft order by simulating playoff seedings and resolving tiebreakers.
-last_verified: 2026-09-22
+last_verified: 2026-11-21
 ---
 
 # ProjectedDraftOrder

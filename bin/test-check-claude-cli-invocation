@@ -22,7 +22,10 @@ trap 'rm -rf "$T"' EXIT
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # The fixtures name usage-gated entry points (bin/test-harness-lib scans for them).
-. "$HERE/lib/usage-test-isolation.sh"; usage_test_isolate "$T/usage"
+# A scratch copy of this harness (a counterfactual run) has no lib/ beside it; fall back to the repo's.
+ISOLATION_LIB="$HERE/lib/usage-test-isolation.sh"
+[ -f "$ISOLATION_LIB" ] || ISOLATION_LIB="$(git rev-parse --show-toplevel)/bin/lib/usage-test-isolation.sh"
+. "$ISOLATION_LIB"; usage_test_isolate "$T/usage"
 SCRIPT="$HERE/check-claude-cli-invocation"
 
 OUT=""
@@ -283,6 +286,7 @@ esac
 # ------------------------------------------- mutated copies of the real good file
 
 PFSRC="$HERE/postplan-fix"
+[ -f "$PFSRC" ] || PFSRC="$(git rev-parse --show-toplevel)/bin/postplan-fix"
 cp "$PFSRC" "$T/pf0"
 expect "[pf_baseline_clean]" "$T/pf0" 0
 
@@ -495,7 +499,7 @@ cat > "$T/perm_var_list_fail.sh" <<'FIX'
 ALLOWED="Read,Bash"
 timeout 600 claude -p "$p" --allowedTools "$ALLOWED"
 FIX
-expect_class "perm_var_list_fail" "$T/perm_var_list_fail.sh" permission
+expect_class perm_var_list_fail "$T/perm_var_list_fail.sh" permission
 
 cat > "$T/perm_multiline_rule_fail.sh" <<'FIX'
 #!/bin/bash
@@ -503,7 +507,7 @@ timeout 600 claude -p "$p" --allowedTools 'Read,
 Grep,
 Bash(python3:*)'
 FIX
-expect_class "perm_multiline_rule_fail" "$T/perm_multiline_rule_fail.sh" permission
+expect_class perm_multiline_rule_fail "$T/perm_multiline_rule_fail.sh" permission
 
 cat > "$T/perm_printf_runner_fail.sh" <<'FIX'
 #!/bin/bash
@@ -512,7 +516,7 @@ cat > "$T/perm_printf_runner_fail.sh" <<'FIX'
         "$(shq "$WT_ROOT")" "$(shq "$PROMPT")"
 } > "$RUNNER"
 FIX
-expect_class "perm_printf_runner_fail" "$T/perm_printf_runner_fail.sh" permission
+expect_class perm_printf_runner_fail "$T/perm_printf_runner_fail.sh" permission
 
 # Strings from the PR #3379 history, wrapped as the call's tool grant.
 perm_fix hist_1 "--permission-mode acceptEdits --allowedTools Read"

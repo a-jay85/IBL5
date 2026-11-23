@@ -118,11 +118,134 @@ def test_check_script_without_spec_is_unspecified():
     assert state == "unspecified" and spec is None
 
 
-def test_header_opt_out_on_check_script_holds():
+def test_header_opt_out_with_reason_is_not_replayable():
     state, spec, reason = resolve_spec(
         "bin/check-zzz", "# gate-backtest: not-replayable because it is hard to replay here\n")
-    assert state == "unspecified" and spec is None
-    assert "self-declared" in reason
+    assert state == "not-replayable" and spec is None
+    assert reason == "self-declared not replayable: because it is hard to replay here"
+
+
+def test_header_opt_out_without_reason_stays_unspecified():
+    for text in ("# gate-backtest: not-replayable\n", "# gate-backtest: not-replayable   \n"):
+        state, spec, reason = resolve_spec("bin/check-zzz", text)
+        assert state == "unspecified" and spec is None, text
+        assert "no reason" in reason, text
+
+
+def test_header_opt_out_with_placeholder_reason_stays_unspecified():
+    rel = "bin/check-zz-placeholder"
+    for placeholder in ("<reason>", "<why it cannot replay>"):
+        text = f"# gate-backtest: not-replayable {placeholder}\n"
+        g = _detect([("A", rel)], {rel: text})[0]
+        assert g.state == "unspecified" and g.spec is None, placeholder
+        assert "placeholder" in g.reason, placeholder
+    # Brackets inside a real reason are fine.
+    state, _, _ = resolve_spec(rel, "# gate-backtest: not-replayable reads <prod> db\n")
+    assert state == "not-replayable"
+
+
+def test_detect_header_opt_out_matches_registry_string_entry():
+    # A header opt-out must classify a check-script change the same way a REPLAY_SPECS
+    # string entry does: kind check-script, state not-replayable, no spec.
+    registry_path = next(p for p, v in REPLAY_SPECS.items()
+                         if isinstance(v, str) and p.startswith("bin/check-"))
+    via_registry = _detect([("M", registry_path)], {registry_path: "#!/bin/bash\n"})[0]
+    via_header = _detect([("A", "bin/check-zz-header-opt-out")],
+                         {"bin/check-zz-header-opt-out":
+                          "#!/bin/bash\n# gate-backtest: not-replayable reads live gh state\n"})[0]
+    assert (via_header.kind, via_header.state, via_header.spec) == (
+        via_registry.kind, via_registry.state, via_registry.spec) == (
+        "check-script", "not-replayable", None)
+
+
+_OPT_OUT_TEXT = "#!/bin/bash\n# gate-backtest: not-replayable dodging the backtest\n"
+
+
+def test_registered_gate_ignores_opt_out_header():
+    # An existing gate with a ReplaySpec keeps it when a PR adds the opt-out header.
+    state, spec, reason = resolve_spec("bin/check-docs", _OPT_OUT_TEXT)
+    assert state == "replayable" and reason == "registry"
+    assert spec is REPLAY_SPECS["bin/check-docs"]
+    # An empty-reason opt-out on a registered gate also keeps the registry spec.
+    state, spec, _ = resolve_spec("bin/check-docs", "# gate-backtest: not-replayable\n")
+    assert state == "replayable" and spec is REPLAY_SPECS["bin/check-docs"]
+    # The detector agrees for a modified and for an added registered gate.
+    for status in ("M", "A"):
+        g = _detect([(status, "bin/check-docs")], {"bin/check-docs": _OPT_OUT_TEXT})[0]
+        assert (g.state, g.spec) == ("replayable", REPLAY_SPECS["bin/check-docs"]), status
+
+
+def test_registered_gate_with_opt_out_still_reads_argv_header():
+    text = "# gate-backtest: not-replayable x\n# gate-backtest-argv: --since={base} --strict\n"
+    state, spec, reason = resolve_spec("bin/check-docs", text)
+    assert (state, reason) == ("replayable", "header")
+    assert spec.argv == ("--since={base}", "--strict")
+
+
+def test_new_unregistered_gate_honors_opt_out_header():
+    rel = "bin/check-zz-new-opt-out"
+    assert rel not in REPLAY_SPECS
+    g = _detect([("A", rel)], {rel: _OPT_OUT_TEXT})[0]
+    assert g.state == "not-replayable" and g.spec is None
+    assert g.reason == "self-declared not replayable: dodging the backtest"
+
+
+def test_existing_unregistered_gate_ignores_opt_out_header():
+    # A modified or renamed gate existed at the merge-base, so a header added now cannot
+    # exempt it. With no argv header it falls to unspecified (UNKNOWN), never NOT-APPLICABLE.
+    rel = "bin/check-zz-existing-header-gate"
+    assert rel not in REPLAY_SPECS
+    for status in ("M", "R100"):
+        g = _detect([(status, rel)], {rel: _OPT_OUT_TEXT})[0]
+        assert g.state == "unspecified" and g.spec is None, status
+        assert "only a new gate" in g.reason, status
+    argv_text = _OPT_OUT_TEXT + "# gate-backtest-argv: --since={base}\n"
+    g = _detect([("M", rel)], {rel: argv_text})[0]
+    assert g.state == "replayable" and g.spec.argv == ("--since={base}",)
+
+
+def test_later_edit_keeps_opt_out_header_the_merge_base_had():
+    # A header-only gate keeps its opt-out on a later edit when its merge-base copy had it.
+    # A header the diff adds is still ignored, and no read_base keeps the strict default.
+    rel = "bin/check-zz-header-only"
+    lib = "bin/lib/zz-helper.sh"
+    src = _OPT_OUT_TEXT + 'source "$here/lib/zz-helper.sh"\n'
+    base = {rel: _OPT_OUT_TEXT}
+    g = detect_gate_changes([("M", rel)], {rel: src}.get, {}, base.get)[0]
+    assert (g.state, g.reason) == (
+        "not-replayable", "self-declared not replayable: dodging the backtest")
+    g = next(x for x in detect_gate_changes(
+        [("M", lib), ("M", rel)], {rel: src}.get, {rel: src}, base.get) if x.path == rel)
+    assert g.state == "not-replayable"
+    plain = {rel: "#!/bin/bash\nexit 0\n"}
+    g = detect_gate_changes([("M", rel)], {rel: src}.get, {}, plain.get)[0]
+    assert g.state == "unspecified" and "only a new gate" in g.reason
+    g = detect_gate_changes([("M", rel)], {rel: src}.get, {})[0]
+    assert g.state == "unspecified"
+
+
+def test_transitive_gate_opt_out_honored_only_when_script_unchanged():
+    rel = "bin/check-zz-lib-user"
+    lib = "bin/lib/zz-helper.sh"
+    src = _OPT_OUT_TEXT + 'source "$here/lib/zz-helper.sh"\n'
+    # Only the lib changed: the script's header predates this diff, so it stands.
+    g = _detect([("M", lib)], {}, {rel: src})[0]
+    assert (g.kind, g.state) == ("transitive", "not-replayable")
+    # The script changed too, in either order: the header cannot exempt it.
+    for changed in ([("M", lib), ("M", rel)], [("M", rel), ("M", lib)]):
+        g = next(x for x in _detect(changed, {rel: src}, {rel: src}) if x.path == rel)
+        assert g.state == "unspecified", changed
+
+
+def test_modified_header_only_gate_keeps_opt_out_from_base():
+    rel = "bin/check-zz-header-only-gate"
+    assert rel not in REPLAY_SPECS
+    base = {rel: _OPT_OUT_TEXT}.get
+    g = detect_gate_changes([("M", rel)], {rel: _OPT_OUT_TEXT + "echo more\n"}.get, {}, base)[0]
+    assert g.state == "not-replayable" and g.spec is None
+    # A header the diff adds is still ignored.
+    g = detect_gate_changes([("M", rel)], {rel: _OPT_OUT_TEXT}.get, {}, {rel: "#!/bin/bash\n"}.get)[0]
+    assert g.state == "unspecified"
 
 
 def test_header_flag_forms():
@@ -185,13 +308,40 @@ def test_plan_gates_carry_plan_replay_timeout():
             assert spec.timeout == 0, path
 
 
+def _assert_check_script_covered(rel, text):
+    state, _, reason = resolve_spec(rel, text)
+    assert state in ("replayable", "not-replayable"), (
+        f"{rel} unspecified: {reason}. Put a '# gate-backtest-argv: <argv>' "
+        "header (or '# gate-backtest: not-replayable <reason>') in the script. "
+        "Do not add a REPLAY_SPECS line to gate_backtest.py."
+    )
+
+
 def test_registry_covers_every_check_script():
     scripts = sorted(glob.glob(os.path.join(REPO_ROOT, "bin", "check-*")))
     assert scripts, "no bin/check-* found; REPO_ROOT is wrong"
     for script in scripts:
         rel = "bin/" + os.path.basename(script)
-        state, _, reason = resolve_spec(rel, "")
-        assert state in ("replayable", "not-replayable"), f"{rel} unspecified: {reason}"
+        with open(script, encoding="utf-8", errors="replace") as fh:
+            text = fh.read()
+        _assert_check_script_covered(rel, text)
+
+
+def test_opt_out_header_alone_passes_registry_coverage():
+    rel = "bin/check-zz-opt-out-not-in-registry"
+    assert rel not in REPLAY_SPECS
+    _assert_check_script_covered(
+        rel, "#!/usr/bin/env bash\n# gate-backtest: not-replayable reads live CI state\n")
+
+
+def test_header_only_script_resolves_without_registry_line():
+    rel = "bin/check-zz-not-in-registry"
+    assert rel not in REPLAY_SPECS
+    state, spec, _ = resolve_spec(rel, "#!/usr/bin/env bash\n# gate-backtest-argv: --since={base}\n")
+    assert state == "replayable"
+    assert spec.argv == ("--since={base}",)
+    state, _, reason = resolve_spec(rel, "")
+    assert state == "unspecified", reason
 
 
 def test_body_file_gates_replay_from_body_file():

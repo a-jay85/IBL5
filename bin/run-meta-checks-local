@@ -561,6 +561,8 @@ if [ "$STAGE" = "pre-push" ]; then
     queue_step "check-pipefail-grep-q"         hard "$BIN/check-pipefail-grep-q" "--since=$BASE"
     queue_step "test-check-pipefail-assignment-guard" hard "$BIN/test-check-pipefail-assignment-guard"
     queue_step "check-pipefail-assignment-guard" hard "$BIN/check-pipefail-assignment-guard" "--since=$BASE"
+    queue_step "test-check-replay-spec-registry-additions" hard "$BIN/test-check-replay-spec-registry-additions"
+    queue_step "check-replay-spec-registry-additions" hard "$BIN/check-replay-spec-registry-additions" "--since=$BASE"
     queue_step "check-exit-code-handling"      hard "$BIN/check-exit-code-handling" "--since=$BASE"
     adr_append_only_step queue  # hard only when a PR body is available
     queue_step "test-check-shell-portability"  hard "$BIN/test-check-shell-portability"

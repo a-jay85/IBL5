@@ -1,0 +1,138 @@
+#!/bin/bash
+#
+# bin/check-replay-spec-registry-additions: keep new gates out of the REPLAY_SPECS registry.
+#
+# Fails when the working tree's REPLAY_SPECS in tools/postplan-harness/harness/gate_backtest.py
+# holds a key the merge-base copy lacks. gate_backtest.py is an arming path, so a registry edit
+# holds the PR as SELF-GOVERNING. A new gate declares its replay in its own script instead,
+# with a comment header:
+#   # gate-backtest-argv: <argv>
+#   # gate-backtest: not-replayable <reason>
+# Existing keys never block: value edits, reformatting and removals pass. A key line ending in
+# "# replay-spec-ok: <reason>" with a non-empty reason is exempt, for a spec field a header
+# cannot carry. A string-valued key (a not-replayable string in place of a spec) fails too.
+#
+# The key scan is an awk line match. Inside the REPLAY_SPECS block it reads a line that opens
+# with a quoted bin/ key, takes every key on that line (two keys on one line both count), and
+# also takes a key left alone on its line with its colon on the next one. Outside the block it
+# reads a line-start subscript assignment: REPLAY_SPECS["<key>"] = ... It exits 2 when the block
+# is missing, so a renamed dict fails loudly and never passes silently. It does not parse
+# Python: a key built at run time, REPLAY_SPECS.update(...) and REPLAY_SPECS |= {...} get past
+# it. gate_backtest.py stays an arming path, so the owner hold still covers those.
+#
+# Extend-before-add (meta-tooling-bar.md): distinct trigger (one registry dict in one Python file); no sibling check reads gate_backtest.py.
+#
+# gate-backtest-argv: --since={base}
+#
+# Bash 3.2 safe (macOS /bin/bash): no mapfile, no associative arrays, no ${x,,}.
+#
+# Exit codes: 0 = pass, 1 = new key found, 2 = usage or git error.
+
+set -euo pipefail
+
+usage() {
+    echo "usage: bin/check-replay-spec-registry-additions --since=<ref>"
+}
+
+die() {
+    echo "check-replay-spec-registry-additions: $1" >&2
+    exit 2
+}
+
+since=""
+if [ "$#" -eq 0 ]; then
+    usage >&2
+    die "use --since=<ref>"
+fi
+for arg in "$@"; do
+    case "$arg" in
+        -h|--help) usage; exit 0 ;;
+        --since=?*) since="${arg#--since=}" ;;
+        --since=) die "use --since=<ref>" ;;
+        --since) die "use --since=<ref> (the = form is required)" ;;
+        -*) die "unknown option: $arg" ;;
+        *) die "use --since=<ref> (unexpected argument: $arg)" ;;
+    esac
+done
+[ -n "$since" ] || die "use --since=<ref>"
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) || die "not inside a git repository"
+cd "$root"
+
+git rev-parse --verify --quiet "${since}^{commit}" >/dev/null || die "cannot resolve ref: $since"
+mb=$(git merge-base "$since" HEAD 2>/dev/null) || die "no merge-base (shallow clone?)"
+
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
+P=tools/postplan-harness/harness/gate_backtest.py
+
+# List the REPLAY_SPECS keys found on stdin, one per line, sorted.
+# A key line opens (after indentation) with a quoted bin/ path followed by a colon or by
+# nothing. Every quoted bin/ path on that line followed by a colon, or ending the line, is a
+# key. Outside the block, a line-start REPLAY_SPECS["bin/..."] subscript is a key too.
+# Comment lines never match. A line ending in "# replay-spec-ok: <non-empty reason>" is skipped.
+extract_keys() {
+    awk '
+        function exempt(line) {
+            return line ~ /#[[:space:]]*replay-spec-ok:[[:space:]]*[^[:space:]]/
+        }
+        /^REPLAY_SPECS([: ].*)?=[[:space:]]*\{[[:space:]]*$/ { inblk = 1; found = 1; next }
+        inblk && /^\}/ { inblk = 0; next }
+        inblk && /^[[:space:]]*["'\'']bin\/[^"'\'']+["'\''][[:space:]]*(:.*)?$/ {
+            if (exempt($0)) next
+            rest = $0
+            while (match(rest, /["'\'']bin\/[^"'\'']+["'\'']/)) {
+                s = substr(rest, RSTART + 1, RLENGTH - 2)
+                rest = substr(rest, RSTART + RLENGTH)
+                if (rest ~ /^[[:space:]]*:/ || rest ~ /^[[:space:]]*$/) print s
+            }
+            next
+        }
+        /^REPLAY_SPECS\[[[:space:]]*["'\'']bin\// {
+            if (exempt($0)) next
+            k = $0; sub(/^REPLAY_SPECS\[[[:space:]]*["'\'']/, "", k); sub(/["'\''].*$/, "", k)
+            print k
+        }
+        END { if (!found) exit 3 }
+    ' | LC_ALL=C sort -u
+}
+
+if [ ! -f "$P" ]; then
+    echo "check-replay-spec-registry-additions: $P absent; nothing to check"
+    exit 0
+fi
+
+if ! extract_keys < "$P" > "$tmp/head.keys"; then
+    die "no REPLAY_SPECS block in $P (renamed?)"
+fi
+
+if git cat-file -e "$mb:$P" 2>/dev/null; then
+    git show "$mb:$P" > "$tmp/base.src" || die "cannot read $P at $mb"
+    if ! extract_keys < "$tmp/base.src" > "$tmp/base.keys"; then
+        die "no REPLAY_SPECS block in $P at the merge-base"
+    fi
+else
+    : > "$tmp/base.keys"
+fi
+
+added=$(comm -13 "$tmp/base.keys" "$tmp/head.keys")
+
+if [ -z "$added" ]; then
+    echo "check-replay-spec-registry-additions: no new REPLAY_SPECS keys"
+    exit 0
+fi
+
+{
+    echo "check-replay-spec-registry-additions: this change adds REPLAY_SPECS key(s) to $P:"
+    echo "$added" | sed 's/^/  /'
+    cat <<'DENY_EOF'
+Declare the replay in the gate script itself, as a comment header:
+  # gate-backtest-argv: <argv, e.g. --since={base}>
+or, for a gate the replay cannot run:
+  # gate-backtest: not-replayable <reason>
+Then drop the registry line. gate_backtest.py is an arming path, so editing it holds the PR as SELF-GOVERNING.
+If the entry needs a field a header cannot carry, end its line with: # replay-spec-ok: <reason>
+DENY_EOF
+} >&2
+exit 1

@@ -112,8 +112,10 @@ _PR_BODY = ReplaySpec(argv=("--body-file", "{body_file}"))
 _BYPASS_SINCE = ReplaySpec(argv=("--since={base}", "--bypass-from-stdin"), stdin="{body_file}")
 _LIVE_CI = "reads live CI state through gh"
 
-# A string value is a not-replayable reason. Only an entry here can mark a script
-# not-replayable, so the choice shows up in a reviewed diff.
+# A string value is a not-replayable reason. A `# gate-backtest: not-replayable <reason>`
+# header marks only a NEW gate: a script with no entry here that the diff adds. A gate with
+# an entry here keeps its entry, and a script that existed at the merge-base keeps its
+# replay, so a PR that edits an existing gate cannot add the header to exempt itself.
 REPLAY_SPECS: dict[str, ReplaySpec | str] = {
     # Range-aware: replay over the historical PR's own range.
     # CHECK_DOCS_EDIT_DATE_REF points check-docs' edit-date lookup at the PR's
@@ -256,17 +258,31 @@ def _bad_placeholders(tokens: list[str]) -> list[str]:
     return bad
 
 
-def _parse_header(text: str) -> tuple[str, ReplaySpec | None, str] | None:
-    """Return a resolution when the candidate file carries a header, else None."""
+def _parse_header(text: str, honor_opt_out: bool = True
+                  ) -> tuple[str, ReplaySpec | None, str] | None:
+    """Return a resolution when the candidate file carries a header, else None.
+
+    With honor_opt_out False, a `# gate-backtest: not-replayable` line is skipped and the
+    scan goes on, so an argv header further down still applies."""
     argv_tokens: list[str] | None = None
     flag_exits = frozenset({1})
     flag_re = ""
     reads: tuple[str, ...] = ()
     for line in text.splitlines()[:HEADER_SCAN_LINES]:
         m = _HEADER_OPT_OUT_RE.match(line)
+        if m and not honor_opt_out:
+            continue
         if m:
-            return ("unspecified", None,
-                    "self-declared not replayable: " + m.group(1).strip())
+            reason = m.group(1).strip()
+            if not reason:
+                return ("unspecified", None,
+                        "not-replayable header has no reason: write "
+                        "'# gate-backtest: not-replayable <reason>'")
+            if re.fullmatch(r"<[^<>]*>", reason):
+                return ("unspecified", None,
+                        f"not-replayable header still has the placeholder {reason}: "
+                        "replace it with the real reason")
+            return ("not-replayable", None, "self-declared not replayable: " + reason)
         m = _HEADER_ARGV_RE.match(line)
         if m and argv_tokens is None:
             try:
@@ -310,16 +326,27 @@ def _parse_header(text: str) -> tuple[str, ReplaySpec | None, str] | None:
     return ("replayable", spec, "header")
 
 
-def resolve_spec(path: str, text: str) -> tuple[str, ReplaySpec | None, str]:
-    """Header in the candidate file wins, then the built-in registry, then unspecified."""
-    header = _parse_header(text)
+def resolve_spec(path: str, text: str, *, is_new: bool = True
+                 ) -> tuple[str, ReplaySpec | None, str]:
+    """Header in the candidate file wins, then the built-in registry, then unspecified.
+
+    The `not-replayable` opt-out header counts only for a new gate: a path with no
+    REPLAY_SPECS entry that did not exist at the merge-base. Callers that know the script
+    existed there pass is_new=False. Any other caller keeps the default, and the registry
+    check still applies."""
+    entry = REPLAY_SPECS.get(path)
+    honor = is_new and entry is None
+    header = _parse_header(text, honor_opt_out=honor)
     if header is not None:
         return header
-    entry = REPLAY_SPECS.get(path)
     if isinstance(entry, str):
         return ("not-replayable", None, entry)
     if entry is not None:
         return ("replayable", entry, "registry")
+    if not honor and _parse_header(text) is not None:
+        return ("unspecified", None,
+                "not-replayable header ignored: only a new gate may opt out; "
+                "add a '# gate-backtest-argv:' header")
     return ("unspecified", None,
             "no replay spec: add a '# gate-backtest-argv:' header")
 
@@ -380,20 +407,39 @@ def _references_lib(text: str, needle: str) -> bool:
     return re.search(_REF_BEFORE + re.escape(needle) + _REF_AFTER, code) is not None
 
 
-def detect_gate_changes(changed, read_candidate, check_sources) -> list[GateChange]:
+def base_had_opt_out(base_text: str | None) -> bool:
+    """True when the merge-base copy of a script already carried a reasoned opt-out header."""
+    if not base_text:
+        return False
+    header = _parse_header(base_text)
+    return header is not None and header[0] == "not-replayable"
+
+
+def detect_gate_changes(changed, read_candidate, check_sources,
+                        read_base=None) -> list[GateChange]:
     """Classify a diff's changed paths into gate changes. `[]` means no gate was touched.
 
     changed: (status, path) pairs from `git diff --name-status`; a rename carries its new path.
     read_candidate(path) -> text of the candidate branch's file, or None.
     check_sources: every `bin/check-*` path on the candidate tree mapped to its text.
+    read_base(path) -> text of the merge-base copy, or None. A modified script whose base copy
+    already had the opt-out header keeps it; a header added by this diff is not honored.
     """
     out: dict[str, GateChange] = {}
+    # A script this diff touches without adding it existed at the merge-base, so its
+    # opt-out header is not honored (resolve_spec is_new). A transitive hit on a script the
+    # diff leaves alone keeps the header it already had.
+    touched = {path for status, path in changed if not status.startswith("D")}
+    added = {path for status, path in changed if status.startswith("A")}
 
     def add(change: GateChange) -> None:
         out.setdefault(change.path, change)
 
     def resolved(path: str, kind: str, text: str | None) -> GateChange:
-        state, spec, reason = resolve_spec(path, text or "")
+        is_new = path in added or path not in touched
+        if not is_new and read_base is not None and base_had_opt_out(read_base(path)):
+            is_new = True
+        state, spec, reason = resolve_spec(path, text or "", is_new=is_new)
         return GateChange(path, kind, state, spec, reason)
 
     for status, path in changed:

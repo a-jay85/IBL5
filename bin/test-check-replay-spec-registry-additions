@@ -1,0 +1,223 @@
+#!/usr/bin/env bash
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
+set -euo pipefail
+
+# Test harness for bin/check-replay-spec-registry-additions (the REPLAY_SPECS additions gate).
+# Follows bin/test-check-pipefail-assignment-guard style.
+#
+# Each case builds a throwaway repo under a mktemp dir. The repo holds a fixture
+# tools/postplan-harness/harness/gate_backtest.py committed as the base. The case edits the
+# working tree, runs the gate by absolute path with --since=<base sha>, and asserts the exit
+# code plus an output substring. Nothing is written inside the IBL5 tree.
+
+PASS=0
+FAIL=0
+CHK="$(cd "$(dirname "$0")" && pwd)/check-replay-spec-registry-additions"
+GB=tools/postplan-harness/harness/gate_backtest.py
+
+pass() { echo "PASS $1"; PASS=$((PASS + 1)); }
+fail() { echo "FAIL $1"; FAIL=$((FAIL + 1)); }
+
+T=$(mktemp -d)
+trap 'rm -rf "$T"' EXIT
+
+N=0
+R=""
+BASE=""
+
+# Build a fresh fixture repo in $R and record the base commit in $BASE.
+fresh() {
+    N=$((N + 1))
+    R="$T/repo$N"
+    mkdir -p "$R/$(dirname "$GB")" "$R/bin"
+    cat > "$R/$GB" <<'FIXTURE_EOF'
+"""fixture"""
+REPLAY_SPECS: dict[str, object] = {
+    "bin/check-a": _SINCE,
+    "bin/check-b": _TREE,
+    "bin/check-c": ReplaySpec(
+        argv=("x",),
+    ),
+}
+
+_OTHER = {
+    "bin/check-z": 1,
+}
+FIXTURE_EOF
+    git -C "$R" init -q
+    git -C "$R" config gc.auto 0
+    git -C "$R" config maintenance.auto false
+    git -C "$R" config commit.gpgsign false
+    git -C "$R" add -A
+    git -C "$R" -c user.name=t -c user.email=t@t commit -qm base
+    BASE=$(git -C "$R" rev-parse HEAD)
+}
+
+# Insert a line after the first line containing the literal text $1 (fixed string).
+add_after() {
+    awk -v pat="$1" -v add="$2" '{ print } index($0, pat) && !done { print add; done = 1 }' \
+        "$R/$GB" > "$R/$GB.new"
+    mv "$R/$GB.new" "$R/$GB"
+}
+
+# Run a check script ($1) with the remaining args inside $R. Sets RC and OUT.
+run_with() {
+    local script="$1"
+    shift
+    RC=0
+    OUT=$(cd "$R" && "$script" "$@" 2>&1) || RC=$?
+}
+
+# Assert the exit code ($2) and, when given, an output substring ($3).
+expect() {
+    local name="$1" want_rc="$2" want_sub="${3:-}"
+    if [ "$RC" != "$want_rc" ]; then
+        fail "$name (exit $RC, wanted $want_rc: $OUT)"
+        return
+    fi
+    if [ -n "$want_sub" ] && ! grep -qF -- "$want_sub" <<< "$OUT"; then
+        fail "$name (output lacks '$want_sub': $OUT)"
+        return
+    fi
+    pass "$name"
+}
+
+# ---- cases that must fail (exit 1) ----
+
+fresh
+add_after '"bin/check-a": _SINCE,' '    "bin/check-new": _SINCE,'
+run_with "$CHK" "--since=$BASE"
+if [ "$RC" = 1 ] && grep -qF -- 'bin/check-new' <<< "$OUT" && grep -qF -- '# gate-backtest-argv:' <<< "$OUT"; then
+    pass added_key_fails
+else
+    fail "added_key_fails (exit $RC: $OUT)"
+fi
+
+fresh
+add_after '"bin/check-a": _SINCE,' '    "bin/check-new": "not-replayable: reads prod",'
+run_with "$CHK" "--since=$BASE"
+expect string_valued_addition_fails 1 'bin/check-new'
+
+fresh
+add_after '"bin/check-a": _SINCE,' "    'bin/check-new': _TREE,"
+run_with "$CHK" "--since=$BASE"
+expect single_quoted_key_fails 1 'bin/check-new'
+
+fresh
+add_after '"bin/check-a": _SINCE,' '    "bin/check-new": _SINCE,  # replay-spec-ok:'
+run_with "$CHK" "--since=$BASE"
+expect exempt_marker_empty_reason_fails 1 'bin/check-new'
+
+fresh
+awk '{ sub(/"bin\/check-b": _TREE,/, "\"bin/check-b\": _TREE, \"bin/check-new\": _SINCE,"); print }' \
+    "$R/$GB" > "$R/$GB.new"
+mv "$R/$GB.new" "$R/$GB"
+run_with "$CHK" "--since=$BASE"
+expect second_key_on_line_fails 1 'bin/check-new'
+
+fresh
+printf '%s\n' 'REPLAY_SPECS["bin/check-new"] = _SINCE' >> "$R/$GB"
+run_with "$CHK" "--since=$BASE"
+expect subscript_assignment_fails 1 'bin/check-new'
+
+fresh
+add_after '"bin/check-a": _SINCE,' '    "bin/check-new"'
+add_after '    "bin/check-new"' '        : _SINCE,'
+run_with "$CHK" "--since=$BASE"
+expect split_key_fails 1 'bin/check-new'
+
+fresh
+printf '%s\n' '# REPLAY_SPECS["bin/check-new"] = _SINCE' >> "$R/$GB"
+run_with "$CHK" "--since=$BASE"
+expect commented_subscript_passes 0
+
+# ---- cases that must pass (exit 0) ----
+
+fresh
+printf '%s\n' '#!/bin/bash' '# gate-backtest-argv: --since={base}' > "$R/bin/check-new"
+run_with "$CHK" "--since=$BASE"
+expect header_only_gate_passes 0
+
+fresh
+awk '{ sub(/"bin\/check-a": _SINCE,/, "\"bin/check-a\": _TREE,"); print }' "$R/$GB" > "$R/$GB.new"
+mv "$R/$GB.new" "$R/$GB"
+run_with "$CHK" "--since=$BASE"
+expect value_edit_passes 0
+
+fresh
+add_after '"bin/check-a": _SINCE,' '    # "bin/check-new": _SINCE,'
+run_with "$CHK" "--since=$BASE"
+expect comment_line_passes 0
+
+fresh
+awk '!/bin\/check-b/' "$R/$GB" > "$R/$GB.new"
+mv "$R/$GB.new" "$R/$GB"
+run_with "$CHK" "--since=$BASE"
+expect removal_passes 0
+
+fresh
+awk '
+    /"bin\/check-c": ReplaySpec\(/ { print "    \"bin/check-c\": _SINCE,"; skip = 1; next }
+    skip && /^    \),/ { skip = 0; next }
+    skip { next }
+    { print }
+' "$R/$GB" > "$R/$GB.new"
+mv "$R/$GB.new" "$R/$GB"
+run_with "$CHK" "--since=$BASE"
+expect reformat_passes 0
+
+fresh
+add_after '"bin/check-z": 1,' '    "bin/check-y": 2,'
+run_with "$CHK" "--since=$BASE"
+expect other_dict_key_passes 0
+
+fresh
+add_after '"bin/check-a": _SINCE,' '    "bin/check-new": _SINCE,  # replay-spec-ok: needs timeout field'
+run_with "$CHK" "--since=$BASE"
+expect exempt_marker_passes 0
+
+# ---- error paths (exit 2) ----
+
+fresh
+awk '{ sub(/REPLAY_SPECS/, "REPLAY_TABLE"); print }' "$R/$GB" > "$R/$GB.new"
+mv "$R/$GB.new" "$R/$GB"
+run_with "$CHK" "--since=$BASE"
+expect missing_block_errors 2 'no REPLAY_SPECS block'
+
+fresh
+usage_ok=1
+run_with "$CHK"
+[ "$RC" = 2 ] || usage_ok=0
+run_with "$CHK" --since "$BASE"
+[ "$RC" = 2 ] || usage_ok=0
+run_with "$CHK" "--since=nosuchref"
+[ "$RC" = 2 ] || usage_ok=0
+if [ "$usage_ok" = 1 ]; then
+    pass usage_errors
+else
+    fail "usage_errors (a bad invocation did not exit 2)"
+fi
+
+# ---- mutation proof ----
+
+fresh
+add_after '"bin/check-a": _SINCE,' '    "bin/check-new": _SINCE,'
+MUT="$T/mutated"
+sed -E 's/comm -13 /comm -12 /' "$CHK" > "$MUT"
+chmod +x "$MUT"
+if cmp -s "$CHK" "$MUT"; then
+    fail "mutation_proof (the sed mutation did not change the check)"
+else
+    # comm -12 lists the keys both sides share, so the mutated gate flags the old keys and
+    # never names the added one. The real gate names it (case added_key_fails).
+    run_with "$MUT" "--since=$BASE"
+    if grep -qF -- 'bin/check-new' <<< "$OUT"; then
+        fail "mutation_proof (the mutated gate still names the added key: $OUT)"
+    else
+        pass mutation_proof
+    fi
+fi
+
+echo ""
+echo "$PASS passed, $FAIL failed"
+[ "$FAIL" -eq 0 ]

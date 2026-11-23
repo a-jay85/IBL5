@@ -829,6 +829,53 @@ def test_forced_gate_new_at_base_is_absent(monkeypatch, tmp_path):
     assert seen["base_overlay"] == {"bin/check-new": None}
 
 
+def test_forced_gate_existing_at_base_ignores_added_opt_out_header(monkeypatch, tmp_path):
+    optout = "#!/bin/sh\n# gate-backtest: not-replayable dodging the backtest\nexit 0\n"
+    repo, shas = _feature_repo(tmp_path, rel="bin/check-fake", content=optout)
+    gbr, _ = _record_run_backtest(monkeypatch)
+    out = gbr.backtest_changes(str(repo), "feature", [], gh_json=fake_gh(shas), fetch=False,
+                               base="master", now=T0 + timedelta(days=30),
+                               forced_gate=("bin/check-fake", "feature"))
+    assert out.gates[0].state == "unspecified"
+
+
+def test_forced_gate_fails_closed_when_merge_base_fails(monkeypatch, tmp_path):
+    optout = "#!/bin/sh\n# gate-backtest: not-replayable dodging the backtest\nexit 0\n"
+    repo, shas = _feature_repo(tmp_path, rel="bin/check-new", content=optout)
+    gbr, _ = _record_run_backtest(monkeypatch)
+    out = gbr.backtest_changes(str(repo), "feature", [], gh_json=fake_gh(shas), fetch=False,
+                               base="no-such-ref", now=T0 + timedelta(days=30),
+                               forced_gate=("bin/check-new", "feature"))
+    assert out.gates[0].state == "unspecified"
+
+
+def test_forced_gate_new_at_base_honors_opt_out_header(monkeypatch, tmp_path):
+    optout = "#!/bin/sh\n# gate-backtest: not-replayable reads live state\nexit 0\n"
+    repo, shas = _feature_repo(tmp_path, rel="bin/check-new", content=optout)
+    gbr, _ = _record_run_backtest(monkeypatch)
+    out = gbr.backtest_changes(str(repo), "feature", [], gh_json=fake_gh(shas), fetch=False,
+                               base="master", now=T0 + timedelta(days=30),
+                               forced_gate=("bin/check-new", "feature"))
+    assert out.gates[0].state == "not-replayable"
+
+
+def test_detect_modified_gate_keeps_opt_out_header_from_merge_base(tmp_path):
+    # A gate whose only spec is the opt-out header keeps it on a later edit when the
+    # merge-base copy already had it. A header the feature branch adds is still ignored.
+    rel = "bin/check-zz-base-opt-out"
+    optout = "#!/bin/sh\n# gate-backtest: not-replayable reads live state\nexit 0\n"
+    repo, _ = build_repo(tmp_path)
+    commit_file(repo, rel, optout, "header-only gate on master", mode=0o755)
+    commit_file(repo, "bin/check-zz-plain", "#!/bin/sh\nexit 0\n", "plain gate", mode=0o755)
+    sh(repo, "checkout", "-q", "-b", "feature")
+    commit_file(repo, rel, optout + "echo edited\n", "edit gate", mode=0o755)
+    commit_file(repo, "bin/check-zz-plain", optout, "add opt-out", mode=0o755)
+    gates = {g.path: g for g in gbr._detect(
+        str(repo), "feature", [("M", rel), ("M", "bin/check-zz-plain")], base="master")}
+    assert gates[rel].state == "not-replayable"
+    assert gates["bin/check-zz-plain"].state == "unspecified"
+
+
 def test_backtest_changes_passes_fix_patch_to_run_backtest(monkeypatch, tmp_path):
     repo, shas = _fix_repo(tmp_path)
     gbr, seen = _record_run_backtest(monkeypatch)

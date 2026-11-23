@@ -238,6 +238,18 @@ jobs:
           bin/test-check-pipefail-assignment-guard
           bin/check-pipefail-assignment-guard --since="$BASE_SHA"
 
+      # --- Replay-spec registry additions: a PR may not add a REPLAY_SPECS key to
+      # tools/postplan-harness/harness/gate_backtest.py. New gates carry a
+      # '# gate-backtest-argv:' header in the script instead. Diff-only, so
+      # existing keys never block. The harness runs first. Hard gate. ---
+      - name: Run bin/check-replay-spec-registry-additions (harness + PR diff)
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          bin/test-check-replay-spec-registry-additions
+          bin/check-replay-spec-registry-additions --since="$BASE_SHA"
+
       # --- Exit-code-handling guard: no ADDED bin/ shell line or skill bash-fence
       # line may hide a git capture's exit status behind process substitution or
       # a missing check, or remove a marker after an unchecked teardown

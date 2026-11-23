@@ -27,7 +27,7 @@ from harness.gate_backtest import (GATE_BACKTEST_BEGIN, GATE_BACKTEST_END, HEAD_
                                    changes_from_unified_diff, classify_truth, compute_verdict,
                                    detect_gate_changes, flag_lines, lines_introduced, lines_not_in_base,
                                    parse_head_oid, expand_argv, expand_env, expand_stdin, is_check_script, is_tree_wide,
-                                   render_gate_backtest, resolve_spec)
+                                   render_gate_backtest, resolve_spec, base_had_opt_out)
 
 REPO_SLUG = "a-jay85/IBL5"
 PER_REPLAY_TIMEOUT = 60
@@ -748,7 +748,7 @@ def _fix_patch(repo: str, base: str, head: str, exclude) -> bytes | None:
 
 
 def _detect(repo: str, head: str, changes: list[tuple[str, str]], *,
-            read: bool = True) -> list[GateChange]:
+            read: bool = True, base: str = "origin/master") -> list[GateChange]:
     """The gates `changes` touch. `read=False` skips every `git show` (replay-mode runner)."""
     def read_candidate(path: str) -> str | None:
         if not read:
@@ -766,7 +766,16 @@ def _detect(repo: str, head: str, changes: list[tuple[str, str]], *,
                 text = read_candidate(p)
                 if text is not None:
                     check_sources[p] = text
-    return detect_gate_changes(changes, read_candidate, check_sources)
+    def read_base(path: str) -> str | None:
+        if not read:
+            return None
+        try:
+            rev = make_git(repo)(["merge-base", base, head]).strip()
+            return _git_bytes(repo, ["show", f"{rev}:{path}"]).decode("utf-8", "replace")
+        except (subprocess.CalledProcessError, OSError):
+            return None
+
+    return detect_gate_changes(changes, read_candidate, check_sources, read_base)
 
 
 def backtest_changes(repo: str, head: str, changes: list[tuple[str, str]], *,
@@ -789,13 +798,26 @@ def backtest_changes(repo: str, head: str, changes: list[tuple[str, str]], *,
             data = _git_bytes(repo, ["show", f"{rev}:{path}"])
         except subprocess.CalledProcessError:
             raise GateReadError(f"cannot read {path}@{rev}")
-        state, spec, reason = resolve_spec(path, data.decode("utf-8", "replace"))
+        try:
+            mb = make_git(repo)(["merge-base", base, head]).strip()
+        except (subprocess.CalledProcessError, OSError):
+            mb = None  # no merge-base (shallow clone?): fail closed, treat as an existing gate
+        if mb is None:
+            is_new = False
+        else:
+            try:
+                base_text = _git_bytes(repo, ["show", f"{mb}:{path}"]).decode("utf-8", "replace")
+            except (subprocess.CalledProcessError, OSError):
+                base_text = None  # absent at a known merge-base: a new gate
+            is_new = base_text is None or base_had_opt_out(base_text)
+        state, spec, reason = resolve_spec(path, data.decode("utf-8", "replace"),
+                                           is_new=is_new)
         kind = "check-script" if is_check_script(path) else "lib-gate"
         gates = [GateChange(path, kind, state, spec, reason)]
         overlay_files[path] = (data, 0o100755)
     else:
         changed = changes
-        gates = _detect(repo, head, changed)
+        gates = _detect(repo, head, changed, base=base)
         if not gates:
             return BacktestOutcome(compute_verdict([], [], {}), [], [], {}, 0, "")
         for status, path in changed:

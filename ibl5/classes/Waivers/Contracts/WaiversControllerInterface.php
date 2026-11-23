@@ -31,7 +31,7 @@ interface WaiversControllerInterface
      * - Renders "waivers closed" message if season phase doesn't allow waivers
      * - Delegates to executeWaiverOperation() for authenticated users
      */
-    public function handleWaiverRequest($user): void;
+    public function handleWaiverRequest(mixed $user): void;
 
     /**
      * Executes waiver wire operations (add or drop)

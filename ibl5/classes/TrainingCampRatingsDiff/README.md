@@ -1,6 +1,6 @@
 ---
 description: Displays player rating changes from training camp for GMs.
-last_verified: 2026-09-22
+last_verified: 2026-11-21
 ---
 
 # TrainingCampRatingsDiff

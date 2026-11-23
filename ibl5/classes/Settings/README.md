@@ -1,6 +1,6 @@
 ---
 description: Typed accessors for league-wide on/off settings stored in the ibl_settings database table.
-last_verified: 2026-09-22
+last_verified: 2026-11-21
 ---
 
 # Settings

@@ -76,6 +76,7 @@ runs:
         chmod 600 ~/.ssh/config
         # Retry the keyscan too: an empty known_hosts makes every later ssh fail.
         # ssh-keyscan exits 0 even when it gets no keys, so check its output.
+        START=$SECONDS
         KEYS=''
         for _ in 1 2 3 4 5 6; do
           KEYS=$(ssh-keyscan -T 30 -p "$PORT" "$HOST" 2>/dev/null || true)
@@ -85,6 +86,7 @@ runs:
           fi
           sleep 10
         done
+        ELAPSED=$((SECONDS - START))
         # Without this check an empty scan passed silently, and the next ssh call
         # failed later with a confusing "Host key verification failed".
         # Run 44411988785 hit that after the host blocked one runner for ~7 min.
@@ -98,7 +100,7 @@ runs:
           esac
           echo "blocked-ip=${RUNNER_IP}" >> "$GITHUB_OUTPUT"
           echo "Prod SSH unreachable from runner IP ${RUNNER_IP} at $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_STEP_SUMMARY"
-          echo "::error title=Prod SSH unreachable::ssh-keyscan got no host keys after 6 tries over ~4 min. This runner (public IP ${RUNNER_IP}) could not reach the SSH host. Other runners may still reach it, so a rerun (new runner, new IP) often passes."
+          echo "::error title=Prod SSH unreachable::ssh-keyscan got no host keys after 6 tries over ${ELAPSED}s. This runner (public IP ${RUNNER_IP}) could not reach the SSH host. Other runners may still reach it, so a rerun (new runner, new IP) often passes."
           if [ "$FAIL_ON_UNREACHABLE" = "true" ]; then
             exit 1
           fi

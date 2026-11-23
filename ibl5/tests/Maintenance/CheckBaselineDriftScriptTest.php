@@ -133,13 +133,16 @@ final class CheckBaselineDriftScriptTest extends TestCase
     #[Test]
     public function testSyncLowersStaleHighSnapshot(): void
     {
-        $this->writeStaleHighSnapshot();
+        $stale = $this->writeStaleHighSnapshot();
 
         $result = $this->runScript(['--sync']);
 
         self::assertSame(0, $result['code']);
+        // The live baseline may hold zero argument.type entries; --sync then drops the key.
         $live = (new PhpstanBaselineCounter())->countByIdentifier($this->ibl5Dir . '/phpstan-baseline.neon');
-        self::assertSame($live['argument.type'], $this->readSnapshot()['phpstan-baseline.neon']['argument.type']);
+        $synced = $this->readSnapshot()['phpstan-baseline.neon']['argument.type'] ?? 0;
+        self::assertSame($live['argument.type'] ?? 0, $synced);
+        self::assertLessThan($stale, $synced);
     }
 
     #[Test]

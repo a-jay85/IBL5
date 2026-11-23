@@ -17,8 +17,10 @@
 #   --help, -h    Print this usage and exit 0.
 #
 # WARNING: Run from the main checkout, not a worktree. The launched session must start
-# from the main checkout so /pr-review Phase 0 resolves the target PR's own worktree.
-# This script pins the main checkout itself (see ROOT below).
+# from the main checkout so /pr-review can find the target PR's own worktree.
+# This script pins the main checkout itself (see ROOT below). The review must never
+# check out the PR there: /pr-review's Notes send PR-code runs to the PR's worktree,
+# and ~/.claude/hooks/bash-guard.sh Check 26 denies the checkout.
 #
 # Env seams:
 #   PR_REVIEW_NOW_CLAUDE     Override the claude binary (stub for tests). Unset = auto-detect.

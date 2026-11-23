@@ -1,6 +1,6 @@
 ---
 description: Full league game schedule with results, used by the Schedule module.
-last_verified: 2026-09-22
+last_verified: 2026-11-21
 ---
 
 # LeagueSchedule

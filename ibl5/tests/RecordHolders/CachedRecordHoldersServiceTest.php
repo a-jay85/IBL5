@@ -154,6 +154,31 @@ final class CachedRecordHoldersServiceTest extends TestCase
         $this->assertNull($this->cache->get('record_holders'));
     }
 
+    public function testImplementsRecordHoldersCacheInterface(): void
+    {
+        $cached = new \ReflectionClass(\RecordHolders\CachedRecordHoldersService::class);
+
+        $this->assertTrue($cached->implementsInterface(\RecordHolders\Contracts\RecordHoldersCacheInterface::class));
+    }
+
+    public function testCacheInterfaceDeclaresOnlyRebuildAndInvalidate(): void
+    {
+        $names = array_map(
+            static fn (\ReflectionMethod $method): string => $method->getName(),
+            (new \ReflectionClass(\RecordHolders\Contracts\RecordHoldersCacheInterface::class))->getMethods(),
+        );
+        sort($names);
+
+        $this->assertSame(['invalidateCache', 'rebuildCache'], $names);
+    }
+
+    public function testInnerServiceDoesNotImplementCacheInterface(): void
+    {
+        $inner = new \ReflectionClass(\RecordHolders\RecordHoldersService::class);
+
+        $this->assertFalse($inner->implementsInterface(\RecordHolders\Contracts\RecordHoldersCacheInterface::class));
+    }
+
     public function testEmptyCacheCallsInnerService(): void
     {
         $mockInner = $this->createMock(RecordHoldersServiceInterface::class);

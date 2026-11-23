@@ -757,6 +757,7 @@ CREATE TABLE `ibl_box_scores_teams` (
   KEY `idx_gt_3gm` (`game_type`,`game_3gm`),
   KEY `idx_gt_date_teams` (`game_type`,`game_date`,`visitor_teamid`,`home_teamid`),
   KEY `idx_gt_name_season` (`game_type`,`name`,`season_year`),
+  KEY `idx_visitor_home_gt_season` (`visitor_teamid`,`home_teamid`,`game_type`,`season_year`),
   CONSTRAINT `fk_boxscoreteam_home` FOREIGN KEY (`home_teamid`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE,
   CONSTRAINT `fk_boxscoreteam_visitor` FOREIGN KEY (`visitor_teamid`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -1953,6 +1954,7 @@ CREATE TABLE `ibl_olympics_box_scores_teams` (
   KEY `idx_date_visitor_home_gotd` (`game_date`,`visitor_teamid`,`home_teamid`,`game_of_that_day`),
   KEY `idx_gt_date_teams` (`game_type`,`game_date`,`visitor_teamid`,`home_teamid`),
   KEY `idx_gt_name_season` (`game_type`,`name`,`season_year`),
+  KEY `idx_visitor_home_gt_season` (`visitor_teamid`,`home_teamid`,`game_type`,`season_year`),
   CONSTRAINT `fk_olympics_boxscoreteam_home` FOREIGN KEY (`home_teamid`) REFERENCES `ibl_olympics_team_info` (`teamid`) ON UPDATE CASCADE,
   CONSTRAINT `fk_olympics_boxscoreteam_visitor` FOREIGN KEY (`visitor_teamid`) REFERENCES `ibl_olympics_team_info` (`teamid`) ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Team-level statistics for Olympics games';

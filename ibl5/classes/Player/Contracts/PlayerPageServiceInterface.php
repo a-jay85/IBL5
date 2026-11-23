@@ -26,11 +26,11 @@ interface PlayerPageServiceInterface
      * - Season phase is NOT "Draft" or "Free Agency"
      * 
      * @param Player $player The player being viewed
-     * @param object $userTeam The viewing user's team object with name and hasUsedExtensionThisSeason properties
-     * @param object $season Current season with phase property
+     * @param \Team\Team $userTeam The viewing user's team object with name and hasUsedExtensionThisSeason properties
+     * @param \Season\Season $season Current season with phase property
      * @return bool True if renegotiation button should be displayed
      */
-    public function canShowRenegotiationButton(Player $player, object $userTeam, object $season): bool;
+    public function canShowRenegotiationButton(Player $player, \Team\Team $userTeam, \Season\Season $season): bool;
 
     /**
      * Determine if rookie option used message should be shown
@@ -52,9 +52,9 @@ interface PlayerPageServiceInterface
      * - Player is on the viewing user's team (teamName matches)
      * 
      * @param Player $player The player being viewed
-     * @param object $userTeam The viewing user's team object with name property
-     * @param object $season Current season with phase property
+     * @param \Team\Team $userTeam The viewing user's team object with name property
+     * @param \Season\Season $season Current season with phase property
      * @return bool True if rookie option button should be displayed
      */
-    public function canShowRookieOptionButton(Player $player, object $userTeam, object $season): bool;
+    public function canShowRookieOptionButton(Player $player, \Team\Team $userTeam, \Season\Season $season): bool;
 }

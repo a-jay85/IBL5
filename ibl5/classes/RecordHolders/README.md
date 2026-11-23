@@ -1,6 +1,6 @@
 ---
 description: Tracks all-time IBL statistical records, detects record-breaking performances after each sim, and sends Discord notifications.
-last_verified: 2026-10-23
+last_verified: 2026-11-21
 ---
 
 # RecordHolders
@@ -12,7 +12,7 @@ The `record_holders` cache row has two refreshers. `RefreshRecordHoldersStep` re
 | Class | Role |
 |---|---|
 | `RecordBreakingDetector` | Detects broken/tied records post-sim; triggers Discord |
-| `CachedRecordHoldersService` | Cache-backed decorator for the live service |
+| `CachedRecordHoldersService` | Cache-backed decorator for the live service; implements `RecordHoldersCacheInterface` (`rebuildCache`, `invalidateCache`) |
 | `RecordStatDefinitions` | Canonical list of all tracked record categories |
 | `RecordHoldersService` | Live record retrieval and assembly |
 | `RecordHoldersRepository` | Database queries for record data |

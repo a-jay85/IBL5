@@ -1,6 +1,6 @@
 ---
 description: Orchestrates bulk import of JSB sim files from season archives into the database.
-last_verified: 2026-09-22
+last_verified: 2026-11-21
 ---
 
 # BulkImport

@@ -785,6 +785,13 @@ jobs:
         run: |
           bin/test-check-bashpid-under-set-u
           bin/check-bashpid-under-set-u
+      # ambient-env-fallback: a default chain that reads REPO after REPO_DIR lets an
+      # undocumented exported var pick the target (backlog#1610, PR #3350).
+      - name: Check bin/ scripts never fall back to an undocumented ambient var
+        if: ${{ !cancelled() }}
+        run: |
+          bin/test-check-ambient-env-fallback
+          bin/check-ambient-env-fallback
       # rules-byte-budget: a path-unscoped .claude/rules/*.md file (always loaded
       # into every session's context) can grow past its token budget via an edit
       # that no path filter covers. bin/check-rules-byte-budget (NEW,

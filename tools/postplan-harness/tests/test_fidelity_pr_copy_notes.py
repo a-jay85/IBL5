@@ -80,6 +80,48 @@ def test_misstated_tooling_pr_copy_note_bypasses_tooling_filter(tmp_path):
     assert _titles(tmp_path, [note]) == [note["title"]]
 
 
+def test_tooling_path_near_misses_stay_unmatched():
+    for text in ("/usr/bin/env python3", "foo/bin/x", "../bin/x", "~/claude-plans/x.md"):
+        assert fidelity._TOOLING_PATH_RE.search(text) is None, text
+    assert fidelity._TOOLING_PATH_RE.search("bin/check-plan")
+
+
+def test_website_path_existing_forms_match():
+    for text in ("classes/Waivers/WaiversView.php", "`classes/Waivers/WaiversView.php`"):
+        assert fidelity._WEBSITE_PATH_RE.search(text), text
+    for text in ("/Users/x/IBL5/ibl5/docs/x.md", "ibl5/docs/x.md",
+                 "tools/x/tests/fixtures/classes/y.py"):
+        assert fidelity._WEBSITE_PATH_RE.search(text) is None, text
+
+
+_HOME_HOOK_NOTE = {"title": "Hook guard misses a case", "kind": "follow-up", "harm": "none",
+                   "detail": "~/.claude/hooks/x.sh skips the empty-input branch."}
+
+
+def test_tooling_path_matches_home_and_dot_relative():
+    for text in ("see ~/.claude/hooks/x.sh", "run ./bin/x"):
+        assert fidelity._TOOLING_PATH_RE.search(text), text
+
+
+def test_home_hook_note_is_harmless_tooling():
+    assert fidelity._is_harmless_tooling(dict(_HOME_HOOK_NOTE)) is True
+
+
+def test_home_hook_note_with_listed_harm_is_kept():
+    note = dict(_HOME_HOOK_NOTE, harm="wrong-value")
+    assert fidelity._is_harmless_tooling(note) is False
+
+
+def test_website_path_matches_absolute_ibl5():
+    assert fidelity._WEBSITE_PATH_RE.search("/Users/x/IBL5/ibl5/classes/Foo.php")
+
+
+def test_mixed_tooling_and_website_note_is_kept():
+    note = dict(_HOME_HOOK_NOTE,
+                detail="~/.claude/hooks/x.sh and ./classes/Waivers/WaiversView.php disagree.")
+    assert fidelity._is_harmless_tooling(note) is False
+
+
 def test_already_done_pr_copy_note_is_dropped(tmp_path):
     note = {"title": "Correct the stale robots.txt scope claim in the PR body",
             "kind": "pr-copy",

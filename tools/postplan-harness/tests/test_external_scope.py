@@ -1,12 +1,14 @@
 """Unit tests for harness/external_scope.py, the changed-hunk test behind trigger 2's
 non-workflow external paths."""
 import os
+import re
 import sys
 
 import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import harness.external_scope as external_scope
 from harness.external_scope import (
     _R_DM_FLOW,
     _R_DM_REDIRECT,
@@ -443,6 +445,73 @@ def test_dm_comment_trailing_backslash_does_not_hide_next_line():
 def test_dm_new_function_named_like_external_command_is_one_way():
     for name in ("sleep", "rm", "mv"):
         assert external_send_change(DM, _dm(350, f"+{name}() {{ :; }}")) == _R_SEND
+
+
+def test_dm_new_function_verdict_ignores_path(monkeypatch, tmp_path):
+    monkeypatch.setenv("PATH", str(tmp_path))
+    for name in ("log", "LOG"):
+        assert external_send_change(DM, _dm(350, f"+{name}() {{ :; }}")) == _R_SEND
+
+
+def test_dm_unlisted_function_name_ignores_path_executable(monkeypatch, tmp_path):
+    probe = tmp_path / "zzprobe"
+    probe.write_text("#!/bin/sh\nexit 0\n")
+    probe.chmod(0o755)
+    monkeypatch.setenv("PATH", str(tmp_path))
+    assert external_scope._dm_reason([(350, 350, ["+zzprobe() { :; }"])]) == external_scope._R_CONTINUATION
+
+
+def test_dm_function_name_match_is_case_sensitive(monkeypatch, tmp_path):
+    monkeypatch.setenv("PATH", str(tmp_path))
+    assert external_scope._dm_reason([(350, 350, ["+Sleep() { :; }"])]) == external_scope._R_CONTINUATION
+    assert external_send_change(DM, _dm(350, "+sleep() { :; }")) == _R_SEND
+
+
+def test_dm_new_function_named_like_listed_command_is_one_way(monkeypatch, tmp_path):
+    monkeypatch.setenv("PATH", str(tmp_path))
+    for name in ("gh", "caffeinate", "reset", "jq", "perl"):
+        assert external_send_change(DM, _dm(350, f"+{name}() {{ :; }}")) == _R_SEND
+
+
+def test_dm_every_invoked_command_word_is_listed():
+    root = os.path.abspath(__file__)
+    for _ in range(4):
+        root = os.path.dirname(root)
+    with open(os.path.join(root, "bin", "discord-dm"), errors="replace") as fh:
+        text = fh.read()
+    lines = text.split("\n")
+    body = [" " + ln for ln in lines]
+    words = set()
+    for idx in range(len(body)):
+        joined = external_scope._dm_join(body, idx, 1)
+        if isinstance(joined, str):
+            continue
+        for raw, masked, _conn in external_scope._dm_split(joined[0]) or []:
+            w = external_scope._dm_words(raw, masked)[3]
+            if w is not None and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.-]*", w):
+                words.add(w)
+    defined = set()
+    for ln in lines:
+        m = external_scope._DM_FUNC_RE.match(ln)
+        if m is not None:
+            defined.add(m.group(1))
+    # The parse must find real commands, or the assertion below proves nothing.
+    assert {"jq", "sleep", "mktemp"} <= words
+    # "EOF" and "c" are non-command tokens captured from the 2026-11-21 run: a heredoc
+    # terminator and a subshell fragment.
+    unlisted = (
+        words
+        - external_scope._DM_NAMED_COMMANDS
+        - external_scope._DM_EXISTING_FUNCS
+        - external_scope._DM_RESERVED
+        - defined
+        - {"EOF", "c"}
+    )
+    assert unlisted == set()
+
+
+def test_external_scope_imports_no_shutil():
+    assert not hasattr(external_scope, "shutil")
 
 
 def test_dm_exit_in_new_function_is_one_way():

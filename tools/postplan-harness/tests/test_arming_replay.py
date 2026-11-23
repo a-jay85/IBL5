@@ -770,6 +770,24 @@ def test_side_effect_line_stays_held(tmp_path):
     assert "fidelity-side-effect-change" in text
 
 
+def test_parameter_write_in_sticky_terminal_stays_held(tmp_path):
+    v, text = _fid_replay(tmp_path, lambda s: _insert_first_line(
+        s, "sticky_terminal", 'fid["k"] = 1'))
+    assert v.cleared is False
+    assert "fidelity-side-effect-change" in text
+
+
+def test_parameter_mutation_is_a_side_effect():
+    import ast
+
+    src = "def f(fid, n):\n    fid['k'] = n\n    fid.pop('a')\n    x = {}\n    x['k'] = n\n    return n\n"
+    tree = ast.parse(src)
+    fn = tree.body[0]
+    assert fidelity_replay.side_effect(fn, 2, tree) is True
+    assert fidelity_replay.side_effect(fn, 3, tree) is True
+    assert fidelity_replay.side_effect(fn, 5, tree) is False
+
+
 _SIDE_EFFECT_SRC = '''\
 import os
 _STATE = {}

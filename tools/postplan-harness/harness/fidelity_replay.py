@@ -709,15 +709,18 @@ def _stmt_nodes(stmt):
 
 
 def _fn_locals(fn) -> tuple[set[str], set[str]]:
-    """(names local to `fn`, names `fn` declares global or nonlocal). A declared name is never
-    local, even when `fn` assigns it."""
-    a = fn.args
-    local = {x.arg for x in a.posonlyargs + a.args + a.kwonlyargs}
-    local |= {x.arg for x in (a.vararg, a.kwarg) if x is not None}
-    local |= {n.id for n in ast.walk(fn) if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store)}
+    """(names `fn` binds by assignment, names `fn` declares global or nonlocal). Parameters are not
+    local. A declared name is never local, even when `fn` assigns it."""
+    # Parameters are not local: a write into one reaches the caller's object (bypass class 17).
+    local = {n.id for n in ast.walk(fn) if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store)}
     declared = {name for n in ast.walk(fn) if isinstance(n, (ast.Global, ast.Nonlocal))
                 for name in n.names}
-    return local - declared, declared
+    a = fn.args
+    params = {x.arg for x in a.posonlyargs + a.args + a.kwonlyargs}
+    params |= {x.arg for x in (a.vararg, a.kwarg) if x is not None}
+    # A rebind such as `fid = fid or {}` can still alias the caller's object, so a parameter name
+    # stays non-local even when `fn` assigns it.
+    return local - declared - params, declared
 
 
 def _stmt_effect(stmt, local, declared, defs, seen) -> bool:

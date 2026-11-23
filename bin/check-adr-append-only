@@ -362,23 +362,33 @@ while IFS=$'\t' read -r status a b; do
     for ((hh = 1; hh <= h; hh++)); do
         old_start="${HOS[$hh]}"
         old_count="${HOC[$hh]}"
+        [ "$old_count" -eq 0 ] && continue  # pure insertion
+        # Pair old and new lines by position, skipping blank lines on both sides.
+        # Blank-line removal and insertion are allowed, and a blank line left in
+        # would shift every later pair in a mixed hunk.
         OLD=()
+        OLDLN=()
         NEW=()
         no=0
         nn=0
+        oi=0
         for ((k = HFIRST[hh]; k < HEND[hh]; k++)); do
+            t="${LT[$k]}"
             if [ "${LK[$k]}" = "o" ]; then
-                OLD[$no]="${LT[$k]}"
+                oi=$((oi + 1))
+                [[ "$t" =~ ^[[:space:]]*$ ]] && continue
+                OLD[$no]="$t"
+                OLDLN[$no]=$((old_start + oi - 1))
                 no=$((no + 1))
             else
-                NEW[$nn]="${LT[$k]}"
+                [[ "$t" =~ ^[[:space:]]*$ ]] && continue
+                NEW[$nn]="$t"
                 nn=$((nn + 1))
             fi
         done
-        [ "$old_count" -eq 0 ] && continue  # pure insertion
-        for ((i = 0; i < old_count; i++)); do
-            o="${OLD[$i]:-}"
-            ln=$((old_start + i))
+        for ((i = 0; i < no; i++)); do
+            o="${OLD[$i]}"
+            ln="${OLDLN[$i]}"
             sec="${SEC[$ln]:-preamble}"
             is_frozen_section "$sec" || continue
             sec="$FROZEN_NAME"

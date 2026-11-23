@@ -228,17 +228,15 @@ def _caps(worktree: str) -> dict[str, tuple[str, int, int, int]]:
 
 
 def _deleted_bytes(worktree: str, base_sha: str, path: str) -> int:
-    """Bytes the PR removed from path: sum of len(line[1:].encode()) + 1 over '-' lines
-    of `git diff -U0 <base_sha> HEAD -- <path>`, skipping the '---' header."""
-    out = _git(worktree, "diff", "-U0", "--no-renames", base_sha, "HEAD", "--", path)
-    total = 0
-    in_hunk = False                     # the '---' file header precedes the first hunk
-    for line in out.splitlines():
-        if line.startswith("@@"):
-            in_hunk = True
-        elif in_hunk and line.startswith("-"):
-            total += len(line[1:].encode()) + 1
-    return total
+    """Net bytes the PR removed from path: size at base_sha minus size at HEAD, floored at 0.
+    A line the PR rewrote still has new text in HEAD, so restoring the old wording costs
+    only the size difference, not the full old line. A file absent at either end counts 0."""
+    try:
+        before = int(_git(worktree, "cat-file", "-s", f"{base_sha}:{path}").strip())
+        after = int(_git(worktree, "cat-file", "-s", f"HEAD:{path}").strip())
+    except subprocess.CalledProcessError:
+        return 0
+    return max(0, before - after)
 
 
 def budget_forced_paths(worktree: str, base_sha: str, paths) -> frozenset[str]:

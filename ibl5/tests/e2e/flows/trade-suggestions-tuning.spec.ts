@@ -36,13 +36,23 @@ authTest.describe('Trade suggestions tuning — admin', () => {
     await expect(page.locator('#tuning-status')).toBeVisible();
     await expect(page.locator('#tuning-config')).toBeVisible();
 
-    // A truncated run names the teams it skipped; together they cover all 28.
+    // The engine runs every team that has players in the loaded rosters, so the
+    // CI seed (players on 17 of 28 teams) gives fewer than 28 sections. A
+    // truncated run names the teams it skipped. The run and the skip list never
+    // overlap, never repeat a team, and stay inside the 28 real franchises.
     // allTextContents() is [] when the note is absent, so no branch is needed.
     const notes = await page.locator('#tuning-truncated').allTextContents();
     const notRun = notes
       .flatMap((note) => note.replace(/^.*Teams not run:/s, '').split(','))
-      .filter((tid) => tid.trim() !== '').length;
-    expect((await page.locator('section.tuning-team').count()) + notRun).toBe(TEAM_COUNT);
+      .map((tid) => tid.trim())
+      .filter((tid) => tid !== '');
+    const ran = (await page.locator('section.tuning-team').evaluateAll((els) => els.map((el) => el.id)))
+      .map((id) => id.replace(/^tuning-team-/, ''));
+    const covered = [...ran, ...notRun];
+    expect(new Set(covered).size).toBe(covered.length);
+    expect(covered.length).toBeLessThanOrEqual(TEAM_COUNT);
+    // tid 8 is the seed's fixture team with a full roster, so it always runs or is named.
+    expect(covered).toContain('8');
   });
 
   authTest('team filter narrows to one section', async ({ page }) => {

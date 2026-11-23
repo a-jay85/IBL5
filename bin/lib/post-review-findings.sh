@@ -8,7 +8,7 @@
 #
 # Public API:
 #   post_review_findings     PR_NUMBER HEAD_SHA REVIEW_TITLE FINDINGS_FILE
-#   post_review_summary      PR_NUMBER REVIEW_TITLE BODY
+#   post_review_summary      PR_NUMBER REVIEW_TITLE BODY [HEAD_SHA]
 #   list_open_review_findings PR_NUMBER
 #   resolve_review_finding   PR_NUMBER COMMENT_ID BODY
 #
@@ -235,14 +235,16 @@ ${PRF_FOOTER}"
     fi
 }
 
-# post_review_summary PR_NUMBER REVIEW_TITLE BODY
+# post_review_summary PR_NUMBER REVIEW_TITLE BODY [HEAD_SHA]
+#   A 40-hex lowercase HEAD_SHA appends a hidden reviewed-head marker after
+#   </details>, read by bin/lib/prior-review.sh.
 #   Posts a single issue comment for the no-issues path (no findings survived the
 #   filter).  The heading and footer are emitted by this function; callers pass
 #   only the evidence body (e.g. "No issues found. Architecture clean.").
 #   This is always the clean path, so the comment is wrapped in a collapsed
 #   <details> (affirmative one-line summary) to save PR scroll space.
 post_review_summary() {
-    local pr="$1" title="$2" body="$3"
+    local pr="$1" title="$2" body="$3" head="${4:-}"
     local tmp; tmp="$(mktemp -d)"
     # Shell-branched cleanup — see post_review_findings for why RETURN alone leaks.
     # shellcheck disable=SC2064
@@ -255,6 +257,9 @@ post_review_summary() {
     local out="$tmp/summary.txt"
     printf '<details><summary>✅ %s — no issues found</summary>\n\n### %s\n\n%s\n\n%s\n\n</details>\n' \
         "$title" "$title" "$body" "$PRF_FOOTER" > "$out"
+    if [[ "$head" =~ ^[0-9a-f]{40}$ ]]; then
+        printf '<!-- reviewed-head: %s -->\n' "$head" >> "$out"
+    fi
     "$GH_CMD" pr comment "$pr" --body-file "$out"
 }
 

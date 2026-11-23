@@ -980,8 +980,13 @@ if ($method === 'GET' && $action === 'get-trade-mode') {
 // = 'Yes' (the CI seed ships 'No', which hides the panel). The settings write is
 // the same upsert the plain settings POST branch uses. Called by the E2E
 // beforeEach and the VR `setup=` clause. No body or params are read.
+// It also pins ibl_trade_info.updated_at to the CI seed's value. The snapshot key
+// reads MAX(updated_at) and seeds the exposure filter's partner pick, and earlier
+// specs rewrite those rows at wall-clock time. Unpinned, the acting team's cards
+// depend on when the run happened.
 if ($method === 'POST' && $action === 'trade-suggestions-fixture') {
     $db->query("UPDATE ibl_team_info SET trade_mode = 'auto'");
+    $db->query("UPDATE ibl_trade_info SET updated_at = '2026-01-01 00:00:00'");
     $upsert = $db->prepare(
         'INSERT INTO ibl_settings (setting_key, setting_value, league) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)'
     );

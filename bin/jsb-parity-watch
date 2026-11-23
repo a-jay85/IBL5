@@ -1,0 +1,371 @@
+#!/usr/bin/env bash
+# bin/jsb-parity-watch — hourly zero-token watcher for the JSB parity loop.
+#
+# Run by the com.ibl5.jsb-parity-watch LaunchAgent (bin/jsb-parity-watch-setup).
+# It reads the parity ledger and GitHub PR state, picks one verdict per in-flight
+# ledger row, computes every verdict first, then acts once per run:
+#
+#   row state                                         verdict
+#   ------------------------------------------------  ------------------------------
+#   PR merged                                         FIRE webhook
+#   PR closed without merge                           FIRE webhook
+#   PR open, a check failed (new head SHA)            FIRE webhook (once per SHA)
+#   PR open, checks pending                           wait
+#   PR open, green, auto-merge armed                  wait
+#   PR open, green, auto-merge not armed              STALL (DM: held for owner)
+#   no PR, plan queued, automouse idle                KICK (schedule a run)
+#   no PR, plan queued, automouse running             wait
+#   no PR, a loaded plan-now job may own the slug     wait
+#   no PR, plan in done/ or skipped/                  STALL (DM)
+#   no PR, failure report names the slug              STALL (DM)
+#   no PR, nothing found                              STALL (DM: no trace)
+#   no row in flight                                  FIRE webhook
+#
+# One webhook POST, one automouse kick and one DM per new stall key per run.
+# A gh failure on any row aborts the run before any action. Any unexpected error
+# logs one line and exits 0, so launchd never throttles the job.
+#
+# Usage:
+#   bin/jsb-parity-watch             # act
+#   bin/jsb-parity-watch --dry-run   # print config, row and decision lines; act on nothing
+#
+# Env seams (all optional; empty means the default): JSB_WATCH_PARITY_DIR,
+# JSB_WATCH_BIN, JSB_WATCH_PLANNOW_DIR, JSB_WATCH_NOW (epoch seconds).
+#
+# The watcher writes only under $HOME/.cache. It never writes under the parity
+# dir, never runs parity_loop.py, and calls gh only as `pr list`.
+set -Eeuo pipefail
+export PATH="$PATH:/usr/local/bin:/opt/homebrew/bin:/opt/homebrew/opt/mariadb/bin:$HOME/.bun/bin:$HOME/.local/bin:/usr/bin:/bin"
+
+log() { printf '%s jsb-parity-watch: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"; }
+trap 'log "error at line $LINENO; no action taken"; exit 0' ERR
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$SCRIPT_DIR/.."
+# shellcheck source=bin/lib/launchd-sched.sh
+. "$SCRIPT_DIR/lib/launchd-sched.sh"
+MAIN_WT="$(lsched_main_wt "$REPO_ROOT")"
+
+STALE_AGE_S=14400
+MUTEX_STALE_S=60
+REFIRE_S=21600
+SCHEDULE_DELAY_S=120
+FAILED_CONCLUSIONS='["FAILURE","CANCELLED","TIMED_OUT","ACTION_REQUIRED","STARTUP_FAILURE","ERROR"]'
+INFLIGHT_FILTER='.rows[] | select(.status == "captured" and (.plan_slug // "") != "") | "\(.id) \(.plan_slug)"'
+PR_PICK='(map(select(.state == "OPEN")) + map(select(.state == "MERGED")) + map(select(.state == "CLOSED")))[0] // empty'
+CHECK_FILTER='[.statusCheckRollup[]? | ((.conclusion // .state // "") | ascii_upcase) as $c | (.status // "COMPLETED") as $s | if any($failed[]; . == $c) then "failed" elif ($s != "COMPLETED" or $c == "" or $c == "PENDING" or $c == "EXPECTED") then "pending" else "green" end] | if any(.[]; . == "failed") then "failed" elif (length == 0 or any(.[]; . == "pending")) then "pending" else "green" end'
+PARITY_DIR="${JSB_WATCH_PARITY_DIR:-$MAIN_WT/jsb-native/parity}"
+JSB_BIN="${JSB_WATCH_BIN:-$SCRIPT_DIR}"
+PLANNOW_DIR="${JSB_WATCH_PLANNOW_DIR:-/tmp}"
+NOW="${JSB_WATCH_NOW:-$(date +%s)}"
+case "$NOW" in ''|*[!0-9]*) echo "jsb-parity-watch: JSB_WATCH_NOW must be epoch seconds" >&2; exit 2 ;; esac
+CACHE_DIR="$HOME/.cache"
+FIRED_SHAS="$CACHE_DIR/jsb-parity-watch.fired-shas"
+STALLS="$CACHE_DIR/jsb-parity-stalls.txt"
+LAST="$CACHE_DIR/jsb-parity-watch.last"
+WEBHOOK_FILE="$HOME/.config/jsb-parity/webhook-url"
+AUTOMOUSE_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse"
+
+DRY_RUN=0
+FIRE_REASONS=""
+STALL_KEYS=""
+KICK=0
+GH_ERROR=""
+FACTS=""
+ROW_LINES=""
+fp=""
+
+usage() {
+    cat <<'USAGE'
+Usage: bin/jsb-parity-watch [--dry-run]
+  --dry-run   print config, row and decision lines; take no action
+  -h, --help  show this help
+USAGE
+}
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --dry-run) DRY_RUN=1; shift ;;
+        -h|--help) usage; exit 0 ;;
+        *) echo "jsb-parity-watch: unknown argument: $1" >&2; usage >&2; exit 2 ;;
+    esac
+done
+
+quiet_exit() { log "$1"; exit 0; }
+
+# dry_guard <action>: returns 0 when the action may run, 1 (after saying so) in dry-run.
+dry_guard() {
+    [ "$DRY_RUN" = 0 ] || { echo "dry-run: would $1"; return 1; }
+}
+
+fmt_epoch() {
+    if date -d @0 +%s >/dev/null 2>&1; then
+        date -d "@$1" '+%Y-%m-%d %H:%M'
+    else
+        date -r "$1" '+%Y-%m-%d %H:%M'
+    fi
+}
+
+sha256_of() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | cut -d' ' -f1
+    else
+        shasum -a 256 "$1" | cut -d' ' -f1
+    fi
+}
+
+# match_plan <dir> <slug>: print the basename of the first plan file for the slug.
+# A dangling queue symlink counts.
+match_plan() {
+    local dir="$1" slug="$2" f
+    for f in "$dir/$slug.md" "$dir"/*-"$slug".md; do
+        if [ -e "$f" ] || [ -L "$f" ]; then
+            basename "$f"
+            return 0
+        fi
+    done
+    return 0
+}
+
+# lock_is_stale <lockdir>: returns 0 when stale. Mirrors
+# jsb-native/tools/parity_loop/lock.py in the main checkout.
+lock_is_stale() {
+    local lockdir="$1" pid="" epoch="" host="" mtime
+    if [ -r "$lockdir/pid" ]; then
+        read -r pid epoch host < "$lockdir/pid" || true
+        case "$pid" in ''|*[!0-9]*) pid="" ;; esac
+        case "$epoch" in ''|*[!0-9]*) pid="" ;; esac
+    fi
+    if [ -n "$pid" ]; then
+        if [ "$pid" -gt 0 ] && ! kill -0 "$pid" 2>/dev/null; then return 0; fi
+        if [ $((NOW - epoch)) -gt "$STALE_AGE_S" ]; then return 0; fi
+        return 1
+    fi
+    mtime=$(stat -c %Y "$lockdir" 2>/dev/null || stat -f %m "$lockdir" 2>/dev/null || echo 0)
+    if [ $((NOW - mtime)) -gt "$MUTEX_STALE_S" ]; then return 0; fi
+    return 1
+}
+
+# row_verdict <id> <slug>: line 1 is the verdict; line 2 is the fingerprint fact
+# (absent when the row has no PR).
+row_verdict() {
+    local id="$1" slug="$2" prs pr state number sha check armed f b log label newest r slug_re
+    slug_re="${slug}([^A-Za-z0-9]|\$)"
+    if ! prs=$(gh pr list --repo a-jay85/IBL5 --head "$slug" --state all --json number,state,mergedAt,url,autoMergeRequest,statusCheckRollup,headRefOid 2>/dev/null); then
+        echo "ERROR:gh"; return 0
+    fi
+    if ! pr=$(printf '%s' "$prs" | jq -c "$PR_PICK" 2>/dev/null); then
+        echo "ERROR:gh"; return 0
+    fi
+
+    if [ -n "$pr" ]; then
+        state=$(printf '%s' "$pr" | jq -r '.state')
+        number=$(printf '%s' "$pr" | jq -r '.number')
+        sha=$(printf '%s' "$pr" | jq -r '.headRefOid // ""')
+        check="-"
+        case "$state" in
+            MERGED) echo "FIRE:merged" ;;
+            CLOSED) echo "FIRE:closed" ;;
+            OPEN)
+                check=$(printf '%s' "$pr" | jq -r --argjson failed "$FAILED_CONCLUSIONS" "$CHECK_FILTER")
+                armed=$(printf '%s' "$pr" | jq -r 'if .autoMergeRequest == null then "no" else "yes" end')
+                case "$check" in
+                    failed) if grep -qxF -- "$id:$sha" "$FIRED_SHAS" 2>/dev/null; then echo "WAIT:check-failed-seen"; else echo "FIRE:check-failed:$sha"; fi ;;
+                    pending) echo "WAIT:checks-pending" ;;
+                    green) if [ "$armed" = "yes" ]; then echo "WAIT:auto-merge-armed"; else echo "STALL:held-for-owner:$number"; fi ;;
+                    *) echo "WAIT:check-unknown" ;;
+                esac ;;
+            *) echo "WAIT:pr-state-unknown" ;;
+        esac
+        printf '%s=%s:%s:%s:%s\n' "$id" "$number" "$state" "$sha" "$check"
+        return 0
+    fi
+
+    f=$(match_plan "$AUTOMOUSE_DIR/queue" "$slug")
+    if [ -n "$f" ]; then
+        if pgrep -f 'bin/automouse/run' >/dev/null 2>&1; then echo "WAIT:automouse-running"; else echo "KICK:schedule"; fi
+        return 0
+    fi
+
+    for label in $(launchctl list 2>/dev/null | grep -oE 'com\.ibl5\.plan-now-[0-9-]+' || true); do
+        log="$PLANNOW_DIR/plan-now-${label#com.ibl5.plan-now-}.log"
+        if grep -qE "$slug_re" "$log" 2>/dev/null; then
+            echo "WAIT:plan-now-running"; return 0
+        fi
+        if [ ! -f "$log" ] || ! grep -qE 'jsb-port-' "$log"; then echo "WAIT:plan-now-unattributed"; return 0; fi
+    done
+
+    f=$(match_plan "$AUTOMOUSE_DIR/done" "$slug")
+    if [ -n "$f" ]; then echo "STALL:plan-done:$f"; return 0; fi
+    f=$(match_plan "$AUTOMOUSE_DIR/skipped" "$slug")
+    if [ -n "$f" ]; then echo "STALL:plan-skipped:$f"; return 0; fi
+
+    for r in "$AUTOMOUSE_DIR"/reports/*"$slug"*; do
+        [ -e "$r" ] || continue
+        b=$(basename "$r")
+        case "$b" in *-done-*) continue ;; esac
+        grep -qE "$slug_re" <<< "$b" || continue
+        echo "STALL:plan-failed:$b"; return 0
+    done
+
+    newest=""
+    for f in "$PLANNOW_DIR"/plan-now-*.log; do
+        [ -e "$f" ] || continue
+        if grep -qE "$slug_re" "$f" 2>/dev/null; then newest="$f"; fi
+    done
+    if [ -n "$newest" ]; then
+        echo "STALL:no-trace:$(basename "$newest")"
+    else
+        echo "STALL:no-trace:none"
+    fi
+    return 0
+}
+
+# stall_message <key>: the DM text for one stall key (<id>:<stage>:<ref>).
+stall_message() {
+    local key="$1" id rest stage ref slug
+    id="${key%%:*}"; rest="${key#*:}"; stage="${rest%%:*}"; ref="${rest#*:}"
+    slug=$(jq -r --arg id "$id" '[.rows[] | select(.id == $id) | .plan_slug][0] // ""' "$PARITY_DIR/ledger.json")
+    case "$stage" in
+        held-for-owner)
+            printf 'JSB parity watch: %s (%s) has PR https://github.com/a-jay85/IBL5/pull/%s. It is green and auto-merge is not armed.\n' "$id" "$slug" "$ref" ;;
+        plan-done)
+            printf 'JSB parity watch: %s (%s) has no PR, but its plan is in done/: %s.\n' "$id" "$slug" "$ref" ;;
+        plan-skipped)
+            printf 'JSB parity watch: %s (%s) has no PR, but its plan is in skipped/: %s.\n' "$id" "$slug" "$ref" ;;
+        plan-failed)
+            printf 'JSB parity watch: %s (%s) has no PR and a failure report names it: %s.\n' "$id" "$slug" "$ref" ;;
+        no-trace)
+            if [ "$ref" = "none" ]; then
+                printf 'JSB parity watch: %s (%s) has no PR, no queued plan and no plan-now log naming it.\n' "$id" "$slug"
+            else
+                printf 'JSB parity watch: %s (%s) has no PR and no queued plan. Newest plan-now log naming it is %s:\n%s\n' \
+                    "$id" "$slug" "$ref" "$(tail -n 5 "$PLANNOW_DIR/$ref" 2>/dev/null || true)"
+            fi ;;
+        *)
+            printf 'JSB parity watch: %s (%s) is stalled (%s).\n' "$id" "$slug" "$key" ;;
+    esac
+}
+
+# fire_webhook <reasons>: POST once. The URL goes to curl only through its stdin config.
+fire_webhook() {
+    local reasons="$1" url body code r
+    dry_guard "fire webhook ($reasons)" || return 0
+    url=$(head -n 1 "$WEBHOOK_FILE" 2>/dev/null || true)
+    case "$url" in
+        https://*) ;;
+        *) log "webhook file unusable; no action taken"; return 0 ;;
+    esac
+    case "$url" in
+        *'"'*) log "webhook file unusable; no action taken"; return 0 ;;
+    esac
+    body='{"source":"jsb-parity-watch","reasons":"'"$reasons"'"}'
+    code=$(printf 'url = "%s"\n' "$url" | curl -sS -o /dev/null -w '%{http_code}' --max-time 20 -X POST -H 'Content-Type: application/json' --data "$body" -K - 2>/dev/null) || code=000
+    case "$code" in 2??) ;; *) log "webhook POST failed (HTTP $code)"; return 0 ;; esac
+    mkdir -p "$CACHE_DIR"
+    printf '%s %s\n' "$fp" "$NOW" > "$LAST.tmp"
+    mv "$LAST.tmp" "$LAST"
+    for r in $reasons; do
+        case "$r" in
+            *:check-failed:*) printf '%s:%s\n' "${r%%:*}" "${r##*:}" >> "$FIRED_SHAS" ;;
+        esac
+    done
+    log "webhook POST ok (HTTP $code) reasons=$reasons"
+}
+
+main() {
+    local lockdir ledger inflight recording id slug out verdict fact key msg when last_fp="" last_at=0
+
+    if [ "$DRY_RUN" = 1 ]; then
+        echo "config: parity_dir=$PARITY_DIR bin=$JSB_BIN plannow_dir=$PLANNOW_DIR now=$NOW"
+    fi
+
+    lockdir="$PARITY_DIR/state/loop.lock"
+    if [ -d "$lockdir" ]; then
+        if ! lock_is_stale "$lockdir"; then
+            quiet_exit "run lock held; no action taken"
+        fi
+    fi
+
+    ledger="$PARITY_DIR/ledger.json"
+    if [ ! -f "$ledger" ]; then
+        quiet_exit "ledger missing at $ledger; no action taken"
+    fi
+    inflight=$(jq -r "$INFLIGHT_FILTER" "$ledger")
+    recording="none"
+    if [ -f "$PARITY_DIR/recordings/index.json" ]; then
+        recording=$(jq -r '.current // "none"' "$PARITY_DIR/recordings/index.json")
+    fi
+
+    while read -r id slug; do
+        [ -n "$id" ] || continue
+        out=$(row_verdict "$id" "$slug")
+        verdict="${out%%$'\n'*}"
+        case "$verdict" in
+            ERROR:*|FIRE:*|KICK:*|STALL:*|WAIT:*) ;;
+            *) quiet_exit "no verdict for $id; no action taken" ;;
+        esac
+        case "$out" in
+            *$'\n'*) fact="${out#*$'\n'}"; fact="${fact%%$'\n'*}" ;;
+            *) fact="" ;;
+        esac
+        [ -n "$fact" ] || fact="$id=none"
+        ROW_LINES="${ROW_LINES}row $id $slug $verdict"$'\n'
+        FACTS="${FACTS:+$FACTS,}$fact"
+        case "$verdict" in
+            ERROR:*) GH_ERROR="$slug" ;;
+            FIRE:*) FIRE_REASONS="${FIRE_REASONS:+$FIRE_REASONS }$id:${verdict#FIRE:}" ;;
+            KICK:*) KICK=1 ;;
+            STALL:*) STALL_KEYS="${STALL_KEYS:+$STALL_KEYS }$id:${verdict#STALL:}" ;;
+            WAIT:*) ;;
+        esac
+    done <<< "$inflight"
+
+    if [ -n "$GH_ERROR" ]; then
+        quiet_exit "gh pr list failed for $GH_ERROR; no action taken"
+    fi
+    if [ -z "$inflight" ]; then FIRE_REASONS="no-row-in-flight"; fi
+
+    printf '%s' "$ROW_LINES"
+
+    if [ "$KICK" = 1 ]; then
+        if dry_guard "schedule an automouse run"; then
+            when=$(fmt_epoch $((NOW + SCHEDULE_DELAY_S)))
+            log "scheduling automouse run at $when"
+            "$JSB_BIN/automouse/run" schedule "$when" >/dev/null 2>&1 || log "automouse schedule failed"
+        fi
+    fi
+
+    for key in $STALL_KEYS; do
+        if grep -qxF -- "$key" "$STALLS" 2>/dev/null; then
+            continue
+        fi
+        if dry_guard "send stall DM $key"; then
+            msg=$(stall_message "$key")
+            if printf '%s' "$msg" | "$JSB_BIN/discord-dm" --quiet - >/dev/null 2>&1; then
+                mkdir -p "$CACHE_DIR"
+                printf '%s\n' "$key" >> "$STALLS"
+            else
+                log "discord-dm failed for $key; will retry next run"
+            fi
+        fi
+    done
+
+    if [ -z "$FIRE_REASONS" ]; then
+        echo "decision: no fire"
+        return 0
+    fi
+    fp="$(sha256_of "$ledger")|${recording// /_}|$FACTS"
+    if [ -f "$LAST" ]; then
+        read -r last_fp last_at < "$LAST" || true
+    fi
+    case "$last_at" in ''|*[!0-9]*) last_at=0 ;; esac
+    if [ "$fp" = "$last_fp" ] && [ $((NOW - last_at)) -lt "$REFIRE_S" ]; then
+        echo "decision: fire suppressed (unchanged state, last fire $((NOW - last_at))s ago)"
+        return 0
+    fi
+    echo "decision: fire ($FIRE_REASONS)"
+    fire_webhook "$FIRE_REASONS"
+}
+
+main

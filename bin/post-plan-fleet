@@ -1277,7 +1277,10 @@ if [[ "$WAIT" -eq 1 && "$GO" -eq 1 ]]; then
                     "$(date '+%Y-%m-%dT%H:%M:%S')" "$n"
                 _wait_last_n="$n"
             fi
-            sleep "$WAIT_POLL_SECS"
+            # A stray `pkill -f "sleep 20"` from another session once killed this sleep, and
+            # errexit then ended the whole run with exit 143 while its session kept going.
+            # A signal sent to this script itself still ends it; only a lost sleep is ignored.
+            sleep "$WAIT_POLL_SECS" || true
             _wait_elapsed=$((_wait_elapsed + WAIT_POLL_SECS))
             if [[ $_wait_elapsed -ge $CEILING_SECS ]]; then
                 echo "TIMED OUT waiting for $n session(s); leaving them running." >&2

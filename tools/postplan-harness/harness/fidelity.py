@@ -1128,8 +1128,9 @@ def re_review(llm, gitad, out_dir: str, worktree: str, plan, master_sha: str,
         "A last_verified date bump in a touched doc is the harness clearing the\n"
         "doc-staleness commit hook, not a new finding.\n"
     )
+    packet_tree = gitad.head_tree()
     try:
-        packet = build_packet(out_dir, master_sha, gitad.head_tree(), plan, diff,
+        packet = build_packet(out_dir, master_sha, packet_tree, plan, diff,
                               pr_body, pr_number, phase4b_ran, worktree=worktree,
                               packet_name=f"fidelity-packet-{round_num + 1}",
                               extra_context=extra, shadow_request=shadow_request)
@@ -1150,8 +1151,8 @@ def re_review(llm, gitad, out_dir: str, worktree: str, plan, master_sha: str,
             fh.write(text if text.endswith("\n") else text + "\n")
     except OSError:
         return None, None, None
-    # the tree is read after the push, so the recorded tree is the one the reviewer saw
-    record_reviewed_tree(path2, gitad.head_tree())
+    # the recorded tree is the one the packet was built from, read once after the push
+    record_reviewed_tree(path2, packet_tree)
     # read back from the file, never the in-memory value: a reviewer-written line with
     # prose after the hash must yield None here exactly as the skill's parser does
     return parse_verdict(path2), read_reviewed_tree(path2), path2
@@ -1888,7 +1889,13 @@ def verdict_file_usable(path: str) -> bool:
     return bool(findings_excerpt(path, True))
 
 
-def terminal_line(v1, error_kind, remediation_sha, v2, tree_2, rounds_completed) -> str:
+def _fix_round_sha(fid):
+    repin = (fid or {}).get("same_run_repin") or {}
+    return repin.get("sha") if repin.get("kind") == "fix-round" else None
+
+
+def terminal_line(v1, error_kind, remediation_sha, v2, tree_2, rounds_completed,
+                  fix_round_sha=None) -> str:
     """The last prose line of the sticky comment. First matching row wins.
 
     An indeterminate verdict 1 (None) never yields a READY prefix — a missing verdict is
@@ -1897,6 +1904,16 @@ def terminal_line(v1, error_kind, remediation_sha, v2, tree_2, rounds_completed)
     if v1 is None:
         return ("NOT READY — plan-fidelity review produced no verdict "
                 f"({error_kind}); re-run /post-plan")
+    if fix_round_sha and v2 is not None:
+        # verdict 2 came from the fix round's re-judge of a code-fix commit
+        if v2 == "READY":
+            return (f"READY (re-review) — fix-round commit {fix_round_sha} re-reviewed clean "
+                    f"on tree {tree_2 or 'unrecorded'}")
+        if v2 == "READY WITH NOTES":
+            return (f"READY WITH NOTES (re-review) — fix-round commit {fix_round_sha} "
+                    f"re-reviewed on tree {tree_2 or 'unrecorded'}")
+        return (f"NOT READY — the fix-round re-review on tree {tree_2 or 'unrecorded'} "
+                "found blocking findings; remediate and re-run /post-plan")
     if v1 == "READY":
         return "READY"
     if v1 == "READY WITH NOTES":
@@ -2214,7 +2231,8 @@ def sticky_terminal(fid: dict) -> str:
     fid = fid or {}
     return owner_scope_terminal(fid) or terminal_line(
         fid.get("verdict_1"), fid.get("error_kind"), fid.get("remediation_sha"),
-        fid.get("verdict_2"), fid.get("reviewed_tree_2"), fid.get("rounds_completed", 0))
+        fid.get("verdict_2"), fid.get("reviewed_tree_2"), fid.get("rounds_completed", 0),
+        fix_round_sha=_fix_round_sha(fid))
 
 
 def _kept_scope_line(item: dict) -> str:

@@ -770,6 +770,63 @@ def test_side_effect_line_stays_held(tmp_path):
     assert "fidelity-side-effect-change" in text
 
 
+_SIDE_EFFECT_SRC = '''\
+import os
+_STATE = {}
+_X = 0
+
+
+def _writer(path):
+    os.remove(path)
+
+
+def _relay(path):
+    return _writer(path)
+
+
+def _pure(n):
+    return n + 1
+
+
+def target(path, n):
+    global _X
+    if n > 0:
+        os.remove(path)
+    _relay(path)
+    _pure(n)
+    _X = n
+    return n
+'''
+
+
+def _side_effect_at(snippet: str) -> bool:
+    import ast
+
+    tree = ast.parse(_SIDE_EFFECT_SRC)
+    fn = next(st for st in tree.body if getattr(st, "name", None) == "target")
+    line = next(i for i, text in enumerate(_SIDE_EFFECT_SRC.splitlines(), 1)
+                if text.strip() == snippet)
+    return fidelity_replay.side_effect(fn, line, tree)
+
+
+@pytest.mark.parametrize("snippet", ["_relay(path)", "if n > 0:", "_X = n"])
+def test_side_effect_follows_callees_guarded_bodies_and_globals(snippet):
+    assert _side_effect_at(snippet) is True
+
+
+def test_side_effect_pure_callee_is_clean():
+    assert _side_effect_at("_pure(n)") is False
+    assert _side_effect_at("return n") is False
+
+
+def test_corpus_carries_no_decompile_tokens():
+    text = fidelity_replay.CORPUS_PATH.read_text(encoding="utf-8")
+    assert fidelity_replay._DECOMPILE_TOKEN_RE.search(text) is None
+    assert fidelity_replay.redact_decompile_tokens(
+        "FUN" "_004e3860 DAT" "_00669f58 jsb560" "_decompiled" ".c +" "0x6BA8") == (
+        "FUN-004e3860 DAT-00669f58 jsb560-decompiled-c +0X6BA8")
+
+
 def test_missing_fidelity_corpus_stays_held(tmp_path, monkeypatch):
     monkeypatch.setattr(fidelity_replay, "CORPUS_PATH", tmp_path / "absent.json")
     v, text = _fid_replay(tmp_path, lambda s: _insert_first_line(s, "_landed_later", "return False"))

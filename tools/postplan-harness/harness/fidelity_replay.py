@@ -191,6 +191,20 @@ def _fixture_record(rel: str) -> dict | None:
     }
 
 
+# bin/check-engine-freeze refuses these tokens outside engine/ and jsb-native/. Harvested engine
+# diffs carry them, so the corpus stores each one with `_` as `-` and `0x` as `0X`.
+_DECOMPILE_TOKEN_RE = re.compile(r"(?:FUN|DAT|LAB)_[0-9A-Fa-f]{6,}|decompiled\.c|jsb560_decompile[d]"
+                                 r"|00_MASTER_REFERENCE\.md|\+0x[0-9A-Fa-f]{2,}")
+
+
+def redact_decompile_tokens(text: str) -> str:
+    # The decompile source file name holds two tokens that overlap, so substitute until nothing matches.
+    while _DECOMPILE_TOKEN_RE.search(text):
+        text = _DECOMPILE_TOKEN_RE.sub(
+            lambda m: m.group(0).replace("_", "-").replace(".c", "-c").replace("0x", "0X"), text)
+    return text
+
+
 def harvest(out_dir: Path, dest: Path, window: int | None = HARVEST_WINDOW) -> int:
     """Write the fidelity replay corpus from real run dirs. Returns 1 when the result fails
     `corpus_problems`, else 0."""
@@ -236,7 +250,8 @@ def harvest(out_dir: Path, dest: Path, window: int | None = HARVEST_WINDOW) -> i
         variants += [empty, same]
     fixtures = [f for f in (_fixture_record(rel) for rel in TRACKED_FIXTURES) if f is not None]
     records = picked + variants + fixtures
-    Path(dest).write_text(json.dumps(records, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+    Path(dest).write_text(redact_decompile_tokens(json.dumps(records, indent=1, sort_keys=True)) + "\n",
+                          encoding="utf-8")
     for w in VERDICT_WORDS:
         print(f"{w}: {sum(1 for r in picked if r['fid']['verdict_1'] == w)}")
     print(f"planned-landed missing: {sum(1 for r in picked if _missing_items(r['shadow']))}")
@@ -668,39 +683,45 @@ def _stmt_nodes(stmt):
                 stack.append(child)
 
 
-def side_effect(fn, line, tree) -> bool:
-    """True when the innermost statement covering `line` writes state outside `fn`'s locals."""
-    del tree  # the statement lookup needs only the function node
-    best = None
-    for node in ast.walk(fn):
-        if isinstance(node, ast.stmt) and node is not fn and node.lineno <= line <= node.end_lineno:
-            if best is None or (node.end_lineno - node.lineno) <= (best.end_lineno - best.lineno):
-                best = node
-    if best is None:
-        return False
+def _fn_locals(fn) -> tuple[set[str], set[str]]:
+    """(names local to `fn`, names `fn` declares global or nonlocal). A declared name is never
+    local, even when `fn` assigns it."""
     a = fn.args
     local = {x.arg for x in a.posonlyargs + a.args + a.kwonlyargs}
     local |= {x.arg for x in (a.vararg, a.kwarg) if x is not None}
     local |= {n.id for n in ast.walk(fn) if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store)}
-    if isinstance(best, (ast.Global, ast.Nonlocal)):
+    declared = {name for n in ast.walk(fn) if isinstance(n, (ast.Global, ast.Nonlocal))
+                for name in n.names}
+    return local - declared, declared
+
+
+def _stmt_effect(stmt, local, declared, defs, seen) -> bool:
+    """True when `stmt`'s own targets or header calls write state outside the locals, or call a
+    top-level def in `defs` that does."""
+    if isinstance(stmt, (ast.Global, ast.Nonlocal)):
         return True
     targets = []
-    if isinstance(best, ast.Assign):
-        targets = list(best.targets)
-    elif isinstance(best, (ast.AugAssign, ast.AnnAssign)):
-        targets = [best.target]
-    elif isinstance(best, ast.Delete):
-        targets = list(best.targets)
+    if isinstance(stmt, ast.Assign):
+        targets = list(stmt.targets)
+    elif isinstance(stmt, (ast.AugAssign, ast.AnnAssign)):
+        targets = [stmt.target]
+    elif isinstance(stmt, ast.Delete):
+        targets = list(stmt.targets)
     for t in targets:
         for sub in ast.walk(t):
             if isinstance(sub, (ast.Subscript, ast.Attribute)) and _root_name(sub) not in local:
                 return True
-    for node in _stmt_nodes(best):
+            if isinstance(sub, ast.Name) and sub.id in declared:
+                return True
+    for node in _stmt_nodes(stmt):
         if not isinstance(node, ast.Call):
             continue
         f = node.func
-        if isinstance(f, ast.Name) and f.id in SIDE_EFFECT_NAMES:
-            return True
+        if isinstance(f, ast.Name):
+            if f.id in SIDE_EFFECT_NAMES:
+                return True
+            if f.id in defs and _def_effect(f.id, defs, seen):
+                return True
         if isinstance(f, ast.Attribute):
             if _root_name(f.value) in SIDE_EFFECT_MODULES:
                 return True
@@ -708,7 +729,41 @@ def side_effect(fn, line, tree) -> bool:
                 return True
             if f.attr in MUTATING_METHODS and _root_name(f.value) not in local:
                 return True
+            if f.attr in defs and _def_effect(f.attr, defs, seen):
+                return True
     return False
+
+
+def _def_effect(name, defs, seen) -> bool:
+    """True when any statement of top-level def `name`, or of a def it calls, has a side effect.
+    A def already on the walk counts as clean here; its own statements decide it."""
+    if name in seen:
+        return False
+    seen.add(name)
+    fn = defs[name]
+    local, declared = _fn_locals(fn)
+    return any(_stmt_effect(st, local, declared, defs, seen)
+               for st in ast.walk(fn) if isinstance(st, ast.stmt) and st is not fn)
+
+
+def side_effect(fn, line, tree) -> bool:
+    """True when the innermost statement covering `line` writes state outside `fn`'s locals.
+
+    A compound statement counts with every statement it guards, and a call to a top-level def
+    of `tree` counts with that def's own side effects, followed through its callees."""
+    best = None
+    for node in ast.walk(fn):
+        if isinstance(node, ast.stmt) and node is not fn and node.lineno <= line <= node.end_lineno:
+            if best is None or (node.end_lineno - node.lineno) <= (best.end_lineno - best.lineno):
+                best = node
+    if best is None:
+        return False
+    defs = {st.name: st for st in tree.body
+            if isinstance(st, (ast.FunctionDef, ast.AsyncFunctionDef))}
+    local, declared = _fn_locals(fn)
+    seen: set[str] = set()
+    return any(_stmt_effect(st, local, declared, defs, seen)
+               for st in ast.walk(best) if isinstance(st, ast.stmt))
 
 
 @dataclasses.dataclass(frozen=True)

@@ -79,9 +79,9 @@ final class AwardHistoryViewTest extends TestCase
         
         $result = $this->view->renderSearchForm($params);
 
-        $this->assertStringContainsString('Johnson', $result);
-        $this->assertStringContainsString('MVP', $result);
-        $this->assertStringContainsString('2025', $result);
+        $this->assertStringContainsString('<label class="d-label" for="aw_name">Name</label><input type="text" name="aw_name" id="aw_name" value="Johnson" placeholder="Player name..." class="d-input d-input-sm w-40"></div>', $result);
+        $this->assertStringContainsString('<label class="d-label" for="aw_Award">Award</label><input type="text" name="aw_Award" id="aw_Award" value="MVP" placeholder="Award name..." class="d-input d-input-sm w-40"></div>', $result);
+        $this->assertStringContainsString('<label class="d-label" for="aw_year">Year</label><input type="text" name="aw_year" id="aw_year" value="2025" placeholder="Year" class="d-input d-input-sm w-20"></div>', $result);
     }
 
     public function testRenderSearchFormIncludesSubmitButton(): void

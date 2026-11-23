@@ -120,8 +120,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 	replayPath := fs.String("replay", "", "jsb-replay/1 draw file")
 	outDir := fs.String("out", "", "output directory")
 	countGames := fs.Bool("count-games", false, "print the day's game count as JSON and exit")
+	warn := func(format string, a ...any) { _, _ = fmt.Fprintf(stderr, "jsbreplay: "+format+"\n", a...) }
 	if err := fs.Parse(args); err != nil {
-		fmt.Fprintln(stderr, "jsbreplay:", err)
+		warn("%v", err)
 		return exitUsage
 	}
 
@@ -134,7 +135,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 	for _, r := range required {
 		if r.val == "" {
-			fmt.Fprintf(stderr, "jsbreplay: missing -%s\n", r.name)
+			warn("missing -%s", r.name)
 			return exitUsage
 		}
 	}
@@ -142,18 +143,18 @@ func run(args []string, stdout, stderr io.Writer) int {
 	if *countGames {
 		day, err := readDay(*scoPre, *scoPost)
 		if err != nil {
-			fmt.Fprintln(stderr, "jsbreplay:", err)
+			warn("%v", err)
 			return exitInput
 		}
 		if _, err := fmt.Fprintf(stdout, "{\"games\":%d}\n", len(day)); err != nil {
-			fmt.Fprintln(stderr, "jsbreplay:", err)
+			warn("%v", err)
 			return exitInput
 		}
 		return exitOK
 	}
 
 	if err := replayDay(*plrPath, *schPath, *scoPre, *scoPost, *replayPath, *outDir); err != nil {
-		fmt.Fprintln(stderr, "jsbreplay:", err)
+		warn("%v", err)
 		return exitInput
 	}
 	return exitOK

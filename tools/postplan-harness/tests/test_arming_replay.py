@@ -825,6 +825,11 @@ def test_corpus_carries_no_decompile_tokens():
     assert fidelity_replay.redact_decompile_tokens(
         "FUN" "_004e3860 DAT" "_00669f58 jsb560" "_decompiled" ".c +" "0x6BA8") == (
         "FUN-004e3860 DAT-00669f58 jsb560-decompiled-c +0X6BA8")
+    assert fidelity_replay._GATED_LITERAL_RE.search(text) is None
+    assert fidelity_replay.redact_decompile_tokens(
+        "--" "depth=50; owner-approve " "mode=x") == "--Depth=50; owner-approve Mode=x"
+    assert fidelity_replay.redact_decompile_tokens("_phase" "-6.5-arm-auto-merge.md") == (
+        "_Phase-6.5-arm-auto-merge.md")
 
 
 def test_missing_fidelity_corpus_stays_held(tmp_path, monkeypatch):

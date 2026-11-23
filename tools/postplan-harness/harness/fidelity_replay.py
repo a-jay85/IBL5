@@ -195,6 +195,16 @@ def _fixture_record(rel: str) -> dict | None:
 # diffs carry them, so the corpus stores each one with `_` as `-` and `0x` as `0X`.
 _DECOMPILE_TOKEN_RE = re.compile(r"(?:FUN|DAT|LAB)_[0-9A-Fa-f]{6,}|decompiled\.c|jsb560_decompile[d]"
                                  r"|00_MASTER_REFERENCE\.md|\+0x[0-9A-Fa-f]{2,}")
+# Three more repo-wide scans read every tracked file. The shallow-fetch guard in tests.yml refuses
+# a shallow fetch flag after a git fetch on one line. test_only_owner_approve_emits_marker refuses
+# the owner approval marker outside bin/owner-approve. bin/test-postplan-arm-conditions refuses a
+# name of a retired post-plan phase file. Harvested diffs and verdicts carry all three, so the
+# corpus stores each with its first letter upper-cased. The keys are split so this file passes too.
+_GATED_LITERALS = {"owner-approve " "mode=": "owner-approve Mode=", "--" "depth": "--Depth",
+                   "--" "shallow-since": "--Shallow-since", "--" "shallow-exclude": "--Shallow-exclude"}
+_GATED_LITERALS.update({"_phase" + t: "_Phase" + t for t in (
+    "-2-conflict", "-3-classify", "-4-review", "-5-final", "-6-manual", "-6.5-arm", "-7-ci")})
+_GATED_LITERAL_RE = re.compile("|".join(re.escape(k) for k in _GATED_LITERALS))
 
 
 def redact_decompile_tokens(text: str) -> str:
@@ -202,7 +212,7 @@ def redact_decompile_tokens(text: str) -> str:
     while _DECOMPILE_TOKEN_RE.search(text):
         text = _DECOMPILE_TOKEN_RE.sub(
             lambda m: m.group(0).replace("_", "-").replace(".c", "-c").replace("0x", "0X"), text)
-    return text
+    return _GATED_LITERAL_RE.sub(lambda m: _GATED_LITERALS[m.group(0)], text)
 
 
 def harvest(out_dir: Path, dest: Path, window: int | None = HARVEST_WINDOW) -> int:

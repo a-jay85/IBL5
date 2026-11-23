@@ -149,6 +149,6 @@ final class SeasonLeaderboardsViewTest extends TestCase
         $this->assertStringContainsString('<div class="flex justify-center mt-4">', $html);
         $this->assertStringContainsString('<select id="sl-team" name="team" class="d-select d-select-sm w-auto">', $html);
         $this->assertStringContainsString('<button type="submit" class="d-btn d-btn-primary d-btn-sm">Search</button>', $html);
-        $this->assertStringNotContainsString('ibl-filter-form', $html);
+        $this->assertDoesNotMatchRegularExpression('/ibl-filter-(form|fieldset)/', $html);
     }
 }

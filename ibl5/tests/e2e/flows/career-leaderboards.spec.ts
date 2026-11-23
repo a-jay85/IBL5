@@ -11,7 +11,7 @@ test.describe('Career Leaderboards flow', () => {
   });
 
   test('page loads with filter form', async ({ page }) => {
-    const form = page.locator('.ibl-filter-form');
+    const form = page.locator('form[name="CareerLeaderboards"]');
     await expect(form).toBeVisible();
 
     await expect(page.locator('select[name="phase"]')).toBeVisible();
@@ -20,11 +20,11 @@ test.describe('Career Leaderboards flow', () => {
     await expect(page.locator('select[name="sortby"]')).toBeVisible();
     await expect(page.locator('input[name="retirees"][role="switch"]')).toBeChecked();
     await expect(page.locator('input[name="display"]')).toBeVisible();
-    await expect(page.locator('.ibl-filter-form__submit')).toHaveText('Search');
+    await expect(page.locator('form[name="CareerLeaderboards"]').getByRole('button', { name: 'Search', exact: true })).toHaveText('Search');
   });
 
   test('first visit shows the form without running a search', async ({ page }) => {
-    await expect(page.locator('.ibl-filter-form')).toBeVisible();
+    await expect(page.locator('form[name="CareerLeaderboards"]')).toBeVisible();
     await expect(page.locator('.ibl-data-table')).toHaveCount(0);
   });
 
@@ -120,7 +120,7 @@ test.describe('Career Leaderboards flow', () => {
     await page.locator('select[name="sortby"]').selectOption('FGP');
     await Promise.all([
       page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'GET'),
-      page.locator('.ibl-filter-form__submit').click(),
+      page.locator('form[name="CareerLeaderboards"]').getByRole('button', { name: 'Search', exact: true }).click(),
     ]);
 
     await expect(page).toHaveURL(/sortby=FGP/);
@@ -130,7 +130,7 @@ test.describe('Career Leaderboards flow', () => {
   });
 
   test('form submission shows results', async ({ page }) => {
-    await page.locator('.ibl-filter-form__submit').click();
+    await page.locator('form[name="CareerLeaderboards"]').getByRole('button', { name: 'Search', exact: true }).click();
 
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
     const rows = page.locator('.ibl-data-table').first().locator('tbody tr');
@@ -138,7 +138,7 @@ test.describe('Career Leaderboards flow', () => {
   });
 
   test('table has sticky rank and name columns', async ({ page }) => {
-    await page.locator('.ibl-filter-form__submit').click();
+    await page.locator('form[name="CareerLeaderboards"]').getByRole('button', { name: 'Search', exact: true }).click();
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
 
     const table = page.locator('.ibl-data-table').first();
@@ -147,7 +147,7 @@ test.describe('Career Leaderboards flow', () => {
   });
 
   test('sorted column is highlighted', async ({ page }) => {
-    await page.locator('.ibl-filter-form__submit').click();
+    await page.locator('form[name="CareerLeaderboards"]').getByRole('button', { name: 'Search', exact: true }).click();
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
 
     const sortedCol = page.locator('.ibl-data-table').first().locator('th.sorted-col');
@@ -159,7 +159,7 @@ test.describe('Career Leaderboards flow', () => {
     await page.locator('select[name="sortby"]').selectOption('PPG');
     await Promise.all([
       page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'GET'),
-      page.locator('.ibl-filter-form__submit').click(),
+      page.locator('form[name="CareerLeaderboards"]').getByRole('button', { name: 'Search', exact: true }).click(),
     ]);
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
     const firstSortedText = await page.locator('.ibl-data-table th.sorted-col').first().innerText();
@@ -168,7 +168,7 @@ test.describe('Career Leaderboards flow', () => {
     await page.locator('select[name="sortby"]').selectOption('REB');
     await Promise.all([
       page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'GET'),
-      page.locator('.ibl-filter-form__submit').click(),
+      page.locator('form[name="CareerLeaderboards"]').getByRole('button', { name: 'Search', exact: true }).click(),
     ]);
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
     const secondSortedText = await page.locator('.ibl-data-table th.sorted-col').first().innerText();
@@ -181,7 +181,7 @@ test.describe('Career Leaderboards flow', () => {
     await page.locator('input[name="display"]').fill('3');
     await Promise.all([
       page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'GET'),
-      page.locator('.ibl-filter-form__submit').click(),
+      page.locator('form[name="CareerLeaderboards"]').getByRole('button', { name: 'Search', exact: true }).click(),
     ]);
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
     const rowCount = await page.locator('.ibl-data-table tbody tr').count();
@@ -193,7 +193,7 @@ test.describe('Career Leaderboards flow', () => {
     await page.locator('select[name="phase"]').selectOption('regular');
     await Promise.all([
       page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'GET'),
-      page.locator('.ibl-filter-form__submit').click(),
+      page.locator('form[name="CareerLeaderboards"]').getByRole('button', { name: 'Search', exact: true }).click(),
     ]);
     await expect(page.locator('.ibl-data-table tbody tr').first()).toBeVisible();
     const regularSeasonRows = await page.locator('.ibl-data-table tbody tr').count();
@@ -201,7 +201,7 @@ test.describe('Career Leaderboards flow', () => {
     await page.locator('select[name="phase"]').selectOption('playoffs');
     await Promise.all([
       page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'GET'),
-      page.locator('.ibl-filter-form__submit').click(),
+      page.locator('form[name="CareerLeaderboards"]').getByRole('button', { name: 'Search', exact: true }).click(),
     ]);
     await expect(page.locator('.ibl-data-table tbody tr').first()).toBeVisible();
     const playoffRows = await page.locator('.ibl-data-table tbody tr').count();
@@ -221,7 +221,7 @@ test.describe('Career Leaderboards flow', () => {
     await page.locator('input[name="retirees"]').setChecked(true);
     await Promise.all([
       page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'GET'),
-      page.locator('.ibl-filter-form__submit').click(),
+      page.locator('form[name="CareerLeaderboards"]').getByRole('button', { name: 'Search', exact: true }).click(),
     ]);
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
     const withRetireesCount = await page.locator('.ibl-data-table').first().locator('tbody tr').count();
@@ -230,7 +230,7 @@ test.describe('Career Leaderboards flow', () => {
     await page.locator('input[name="retirees"]').setChecked(false);
     await Promise.all([
       page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'GET'),
-      page.locator('.ibl-filter-form__submit').click(),
+      page.locator('form[name="CareerLeaderboards"]').getByRole('button', { name: 'Search', exact: true }).click(),
     ]);
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
     // Poll the row count to let HTMX finish the swap before we read.
@@ -252,7 +252,7 @@ test.describe('Career Leaderboards flow', () => {
     await page.locator('input[name="mode"][value="averages"]').check();
     await Promise.all([
       page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'GET'),
-      page.locator('.ibl-filter-form__submit').click(),
+      page.locator('form[name="CareerLeaderboards"]').getByRole('button', { name: 'Search', exact: true }).click(),
     ]);
 
     await expect(page).toHaveURL(/tab=career/);
@@ -264,7 +264,7 @@ test.describe('Career Leaderboards flow', () => {
   test('no PHP errors on career leaderboards', async ({ page }) => {
     await assertNoPhpErrors(page, 'on Career Leaderboards form page');
 
-    await page.locator('.ibl-filter-form__submit').click();
+    await page.locator('form[name="CareerLeaderboards"]').getByRole('button', { name: 'Search', exact: true }).click();
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
     await assertNoPhpErrors(page, 'on Career Leaderboards results page');
   });

@@ -103,7 +103,7 @@ final class OneOnOneGameViewTest extends TestCase
         $this->assertStringContainsString("<div class=\"flex flex-wrap items-center justify-center gap-4\">\n<div class=\"flex items-center gap-2\">\n<label class=\"d-label\" for=\"pid1\">Player One</label>\n<select name=\"pid1\" id=\"pid1\" class=\"d-select d-select-sm w-auto\">\n", $html);
         $this->assertStringContainsString("<div class=\"flex items-center gap-2\">\n<label class=\"d-label\" for=\"pid2\">Player Two</label>\n<select name=\"pid2\" id=\"pid2\" class=\"d-select d-select-sm w-auto\">\n", $html);
         $this->assertStringContainsString("<button type=\"submit\" class=\"d-btn d-btn-primary d-btn-sm\">Begin One-on-One Match</button>\n</div>\n</form>\n", $html);
-        $this->assertStringNotContainsString('ibl-filter-form', $html);
+        $this->assertDoesNotMatchRegularExpression('/ibl-filter-(form|fieldset)/', $html);
         $this->assertStringNotContainsString('ibl-select', $html);
     }
 

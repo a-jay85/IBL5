@@ -58,7 +58,7 @@ final class AwardHistoryViewTest extends TestCase
         $this->assertStringContainsString('<div class="flex flex-wrap items-center justify-center gap-4 mt-3"><div class="flex items-center gap-2"><span class="d-label">Sort by</span>', $html);
         $this->assertStringContainsString('</div><button type="submit" class="d-btn d-btn-primary d-btn-sm">Search</button></div></form>', $html);
         $this->assertStringContainsString('<label class="player-awards-sort__option" for="sort-', $html);
-        $this->assertStringNotContainsString('ibl-filter-form', $html);
+        $this->assertDoesNotMatchRegularExpression('/ibl-filter-(form|fieldset)/', $html);
     }
 
     public function testRenderSearchFormIncludesFormFields(): void

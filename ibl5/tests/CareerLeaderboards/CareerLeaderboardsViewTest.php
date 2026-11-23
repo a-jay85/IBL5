@@ -381,7 +381,7 @@ final class CareerLeaderboardsViewTest extends TestCase
         $this->assertStringContainsString('name="display" class="d-input d-input-sm w-20"', $html);
         $this->assertStringContainsString('<fieldset class="ibl-segmented">', $html);
         $this->assertStringContainsString('class="ibl-switch__input"', $html);
-        $this->assertStringNotContainsString('ibl-filter-form', $html);
+        $this->assertDoesNotMatchRegularExpression('/ibl-filter-(form|fieldset)/', $html);
         $this->assertStringContainsString('<script src="jslib/career-leaderboards-form.js" defer></script>', $html);
     }
 }

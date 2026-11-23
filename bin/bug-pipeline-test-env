@@ -212,6 +212,7 @@ export BUG_PIPELINE_API_BASE_URL="${API_BASE}"
 export API_KEY="${API_KEY_VAL}"
 export BUG_PIPELINE_TICK_HEARTBEAT="/tmp/bug-pipeline-test-tick-heartbeat"
 export BUG_PIPELINE_CI_AUTOFIX_ENABLED="0"
+export BUG_BOT_AUTO_REBUILD="0"   # never rebuild a dist or restart the live bot from a test tick
 export BUG_PIPELINE_CI_AUTOFIX_LEDGER="/tmp/bug-pipeline-test-ci-autofix-ledger.json"
 export BUG_PIPELINE_CI_AUTOFIX_LOG="/tmp/bug-pipeline-test-ci-autofix.log"
 export BUG_PIPELINE_CI_AUTOFIX_LOCK="/tmp/bug-pipeline-test-ci-autofix.lock"

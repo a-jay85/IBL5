@@ -352,19 +352,19 @@ perm_fix() {
     printf '#!/bin/bash\ntimeout 600 claude -p "$p" %s\n' "$2" > "$T/perm_$1.sh"
 }
 
-# perm_pass NAME TAIL  -- a clean call that must pass the whole gate
-perm_pass() { perm_fix "$1" "$2"; expect "perm_${1}_pass" "$T/perm_$1.sh" 0; }
+# perm_pass CASE_NAME TAIL  -- a clean call that must pass the whole gate
+perm_pass() { printf '#!/bin/bash\ntimeout 600 claude -p "$p" %s\n' "$2" > "$T/$1.sh"; expect "$1" "$T/$1.sh" 0; }
 
-perm_pass mode_plan "--permission-mode plan"
-perm_pass mode_eq_dontask "--permission-mode=dontAsk"
-perm_pass bash_gh "--allowedTools 'Bash(gh pr view:*),Bash(gh pr diff:*)'"
-perm_pass bash_bin '--allowedTools "Bash(bin/plan-tier-hint:*) Bash(bin/lib/claim-file.sh:*)"'
-perm_pass bash_gh_bare_args "--allowed-tools 'Bash(gh)'"
-perm_pass tools_empty '--tools ""'
-perm_pass allowed_empty "--allowedTools ''"
-perm_pass tools_readonly "--tools Read,Grep,Glob"
-perm_pass allow_ends_at_next_flag "--allowedTools Read --disallowedTools 'Bash(python3:*)'"
-perm_pass strict_mcp "--strict-mcp-config"
+perm_pass perm_mode_plan_pass "--permission-mode plan"
+perm_pass perm_mode_eq_dontask_pass "--permission-mode=dontAsk"
+perm_pass perm_bash_gh_pass "--allowedTools 'Bash(gh pr view:*),Bash(gh pr diff:*)'"
+perm_pass perm_bash_bin_pass '--allowedTools "Bash(bin/plan-tier-hint:*) Bash(bin/lib/claim-file.sh:*)"'
+perm_pass perm_bash_gh_bare_args_pass "--allowed-tools 'Bash(gh)'"
+perm_pass perm_tools_empty_pass '--tools ""'
+perm_pass perm_allowed_empty_pass "--allowedTools ''"
+perm_pass perm_tools_readonly_pass "--tools Read,Grep,Glob"
+perm_pass perm_allow_ends_at_next_flag_pass "--allowedTools Read --disallowedTools 'Bash(python3:*)'"
+perm_pass perm_strict_mcp_pass "--strict-mcp-config"
 
 cat > "$T/perm_deny_assignment_pass.sh" <<'FIX'
 #!/bin/bash
@@ -393,7 +393,7 @@ timeout 600 claude -p "$p"
 FIX
 expect "perm_comment_mention_pass" "$T/perm_comment_mention_pass.sh" 0
 
-perm_pass marker_reason "--dangerously-skip-permissions # claude-perm-ok: unattended run in a throwaway worktree"
+perm_pass perm_marker_reason_pass "--dangerously-skip-permissions # claude-perm-ok: unattended run in a throwaway worktree"
 # A marker on the redirect line after a subshell's closing paren belongs to the statement.
 cat > "$T/perm_subshell_redirect_marker_pass.sh" <<'FIX'
 #!/bin/bash
@@ -404,7 +404,7 @@ cat > "$T/perm_subshell_redirect_marker_pass.sh" <<'FIX'
 FIX
 expect "perm_subshell_redirect_marker_pass" "$T/perm_subshell_redirect_marker_pass.sh" 0
 
-perm_pass cli_ok_marker "--dangerously-skip-permissions # claude-cli-ok: all-class escape still covers permission"
+perm_pass perm_cli_ok_marker_pass "--dangerously-skip-permissions # claude-cli-ok: all-class escape still covers permission"
 
 cat > "$T/perm_marker_multiline_pass.sh" <<'FIX'
 #!/bin/bash

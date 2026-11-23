@@ -29,7 +29,9 @@ func unsetCaptureDir(t *testing.T) {
 	}
 	t.Cleanup(func() {
 		if had {
-			os.Setenv("JSB_TRACE_CAPTURE_DIR", old)
+			if err := os.Setenv("JSB_TRACE_CAPTURE_DIR", old); err != nil {
+				t.Error(err)
+			}
 		}
 	})
 }

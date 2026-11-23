@@ -19,7 +19,10 @@ import re
 
 OWNER_REQUEST_CAP = 4_000
 HEADER_RE = re.compile(r"^<!-- capture-intent v1 sha256=([0-9a-f]{64}) -->$")
-BRANCH_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+# One or more `/`-separated parts, each starting with a letter or digit, so a
+# branch like `t3/foo` maps to `_intent/t3/foo.md`. No empty part, no leading
+# `/` or `.`, and the `..` check below keeps the path inside `_intent/`.
+BRANCH_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9][A-Za-z0-9._-]*)*$")
 PR_MARKER = "<!-- owner-request: harness-written -->"
 HEADING = "## Owner request"
 

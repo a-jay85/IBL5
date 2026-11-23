@@ -777,6 +777,66 @@ def test_parameter_write_in_sticky_terminal_stays_held(tmp_path):
     assert "fidelity-side-effect-change" in text
 
 
+def test_augmented_assign_on_parameter_stays_held(tmp_path):
+    v, text = _fid_replay(tmp_path, lambda s: _insert_first_line(
+        s, "sticky_terminal", 'fid |= {"zz": 1}'))
+    assert v.cleared is False, text
+
+
+def test_aliased_parameter_write_stays_held(tmp_path):
+    v, text = _fid_replay(tmp_path, lambda s: _insert_first_line(
+        s, "sticky_terminal", '_a = fid; _a["zz"] = 1'))
+    assert v.cleared is False, text
+
+
+def test_lambda_parameter_write_stays_held(tmp_path):
+    v, text = _fid_replay(tmp_path, lambda s: _insert_first_line(
+        s, "sticky_terminal", '(lambda d: d.__setitem__("zz", 1))(fid)'))
+    assert v.cleared is False, text
+
+
+def test_call_through_bound_method_stays_held(tmp_path):
+    v, text = _fid_replay(tmp_path, lambda s: _insert_first_line(
+        s, "sticky_terminal", '_set = fid.__setitem__; _set("zz", 1)'))
+    assert v.cleared is False, text
+
+
+def test_aliased_environ_write_stays_held(tmp_path):
+    v, text = _fid_replay(tmp_path, lambda s: _insert_first_line(
+        s, "parse_verdict", 'import os as _os; _e = _os.environ; _e["FID_PROBE"] = "1"'))
+    assert v.cleared is False, text
+
+
+def test_environ_data_write_stays_held(tmp_path):
+    v, text = _fid_replay(tmp_path, lambda s: _insert_first_line(
+        s, "parse_verdict", 'import os as _os; _d = _os.environ._data; _d[b"FID_PROBE"] = b"1"'))
+    assert v.cleared is False, text
+
+
+def test_aliased_open_for_append_stays_held(tmp_path):
+    v, text = _fid_replay(tmp_path, lambda s: _insert_first_line(
+        s, "parse_verdict", '_o = open; _fh = _o(path, "a"); _fh.write(""); _fh.close()'))
+    assert v.cleared is False, text
+
+
+def test_pathlib_open_for_append_stays_held(tmp_path):
+    v, text = _fid_replay(tmp_path, lambda s: _insert_first_line(
+        s, "parse_verdict", 'import pathlib as _pl; _pl.Path(path).open("a").close()'))
+    assert v.cleared is False, text
+
+
+def test_module_global_write_stays_held(tmp_path):
+    v, text = _fid_replay(tmp_path, lambda s: _insert_first_line(
+        s, "parse_verdict", 'import harness.second_review as _sr; _m = _sr; _m._FID_PROBE = 1'))
+    assert v.cleared is False, text
+
+
+def test_changed_line_compile_call_stays_held(tmp_path):
+    v, text = _fid_replay(tmp_path, lambda s: _insert_first_line(
+        s, "parse_verdict", 'compile("1", "<p>", "eval")'))
+    assert v.cleared is False, text
+
+
 def test_parameter_mutation_is_a_side_effect():
     import ast
 

@@ -61,6 +61,16 @@
 #   - expansion `${VAR}`      -> after arms 1-3 miss, retry with the trailing `}`
 #                                stripped, so `${VAR:-}` in the code realises it
 #
+# External-repo rows: when a row's location cell runs `cd /<abs dir> && ...` and <dir>
+#   is a git repo other than the tree-grep root (a different git common dir, so a
+#   linked worktree of the same repo never counts), arms 2c and 3 and the prefix
+#   fallbacks also look in <dir>'s tracked files (arm 3x), for that row only.
+#   `EXTERNAL-REPO: row <id> -- also checked in <toplevel>` goes to stdout. A token
+#   found in neither repo is still missing. A missing <dir>, a non-repo <dir>, or an
+#   unset root leaves the row checked as before. This covers tests that live in a
+#   separate repo (a gitignored nested repo such as jsb-native), which the branch
+#   diff can never carry.
+#
 # Waiver format: `WAIVE-MATRIX-ROW: <id>` on any line in the PR body file.
 #
 # One-time-check tag: a row whose "What to verify" cell ENDS with
@@ -223,8 +233,10 @@ fi
 # --- extract rows from the Verification Matrix (awk, BSD-awk safe) ---
 # Skips rows inside fenced blocks (``` or ~~~).
 # Skips duplicate row ids (same row can appear multiple times in the plan).
-# Output: id TAB tag TAB cell TAB space-joined qualifying tokens
+# Output: id TAB tag TAB ext TAB cell TAB space-joined qualifying tokens
 # tag is "none", "skip:<reason>" or "warn:<why>" (one-time-check tag, see header).
+# ext is the absolute dir of the first `cd /<dir> &&` in the cells after "What to
+# verify" (the row's location), or "none" (external-repo rows, see header).
 # Rows with zero qualifying tokens and no tag are not printed.
 awk -F'|' '
 BEGIN { fence=0; inm=0; }
@@ -301,9 +313,13 @@ inm && /^[[:space:]]*\|/ {
         if (t == "") continue;
         toks = (toks == "") ? t : toks " " t;
     }
-    # tag is never empty on the wire ("none"): tab is IFS whitespace, so an empty
-    # field would collapse in `read` and shift the later fields left.
-    if (toks != "" || tag != "") print id "\t" (tag == "" ? "none" : tag) "\t" cell "\t" toks;
+    # external-repo location: the first `cd /<abs dir> &&` after the What-to-verify cell
+    ext = "none"; loc = "";
+    for (j = 4; j <= n; j++) loc = loc "|" f[j];
+    if (match(loc, /`cd \/[^ `;&|]+ &&/)) ext = substr(loc, RSTART + 4, RLENGTH - 7);
+    # tag and ext are never empty on the wire ("none"): tab is IFS whitespace, so an
+    # empty field would collapse in `read` and shift the later fields left.
+    if (toks != "" || tag != "") print id "\t" (tag == "" ? "none" : tag) "\t" ext "\t" cell "\t" toks;
     next;
 }
 inm && !/^[[:space:]]*\|/ { inm=0; }
@@ -318,8 +334,38 @@ _prefix_realised() {
     if [ -n "$ROOT" ]; then
         if git -C "$ROOT" grep -qF -e "$p" -- 2>/dev/null; then return 0; fi
     fi
+    if [ -n "$EXT" ]; then
+        if git -C "$EXT" grep -qF -e "$p" -- 2>/dev/null; then return 0; fi
+    fi
     return 1
 }
+
+# --- external-repo rows ---
+# _common_dir <dir>: the physical path of <dir>'s git common dir, so a linked
+# worktree and its main checkout give the same answer. Fails outside a repo.
+_common_dir() {
+    local c
+    c=$(git -C "$1" rev-parse --git-common-dir 2>/dev/null) || return 1
+    case "$c" in /*) ;; *) c="$1/$c" ;; esac
+    (cd "$c" 2>/dev/null && pwd -P)
+}
+ROOT_COMMON=""
+if [ -n "$ROOT" ]; then
+    ROOT_COMMON=$(_common_dir "$ROOT") || ROOT_COMMON=""
+fi
+# _ext_root <dir>: print the toplevel of <dir> when it is a git repo other than
+# ROOT's (a different common dir). Same repo, missing dir, no repo, or no ROOT:
+# print nothing, so the row is checked as before (fail-closed).
+_ext_root() {
+    local d="$1" c
+    [ -n "$ROOT_COMMON" ] || return 0
+    [ -d "$d" ] || return 0
+    c=$(_common_dir "$d") || return 0
+    [ "$c" != "$ROOT_COMMON" ] || return 0
+    git -C "$d" rev-parse --show-toplevel 2>/dev/null || true
+}
+EXT=""
+EXT_FOR=
 
 # --- deleted-file arm: a token realised by a deletion header ---
 # Match is path-component aligned: equal, `/`+tok at the end, tok+`/` at the
@@ -349,17 +395,33 @@ _path_realised() {
         */* | *.* ) ;;
         * ) return 1 ;;
     esac
-    [ -s "$TMP/paths" ] || return 1
-    while IFS= read -r p; do
-        case "$p" in
-            "$t" | */"$t" ) return 0 ;;
-        esac
-    done < "$TMP/paths"
+    local f
+    for f in "$TMP/paths" ${EXT:+"$TMP/extpaths"}; do
+        [ -s "$f" ] || continue
+        while IFS= read -r p; do
+            case "$p" in
+                "$t" | */"$t" ) return 0 ;;
+            esac
+        done < "$f"
+    done
     return 1
 }
 
 # --- per-row check ---
-while IFS=$'\t' read -r id tag cell toks; do
+while IFS=$'\t' read -r id tag ext cell toks; do
+    # external-repo row: its tokens may also live in the repo its location cd's into
+    EXT=""
+    if [ "$ext" != "none" ]; then
+        if [ "$ext" != "$EXT_FOR" ]; then
+            EXT_FOR="$ext"
+            EXT_ROOT=$(_ext_root "$ext")
+            : > "$TMP/extpaths"
+            if [ -n "$EXT_ROOT" ]; then
+                git -C "$EXT_ROOT" -c core.quotePath=false ls-files > "$TMP/extpaths" 2>/dev/null || true
+            fi
+        fi
+        EXT="$EXT_ROOT"
+    fi
     # check waiver
     if grep -qxF -e "$id" "$TMP/waived" 2>/dev/null; then
         continue
@@ -422,6 +484,13 @@ while IFS=$'\t' read -r id tag cell toks; do
             fi
         fi
 
+        # arm 3x: an external-repo row's token in that repo's tracked tree
+        if [ -n "$EXT" ]; then
+            if git -C "$EXT" grep -qF -e "$tok" -- 2>/dev/null; then
+                continue
+            fi
+        fi
+
         # class 1: multi-arg call. `name(a)` is realised by `name(a, b)`;
         # retry the three arms with the trailing `)` stripped.
         case "$tok" in
@@ -446,6 +515,9 @@ while IFS=$'\t' read -r id tag cell toks; do
         missing="$missing $tok"
     done
 
+    if [ -n "$EXT" ]; then
+        printf $'EXTERNAL-REPO: row %s \xe2\x80\x94 also checked in %s\n' "$id" "$EXT"
+    fi
     if [ -n "$missing" ]; then
         printf $'UNREALISED-ASSERTION: row %s \xe2\x80\x94 %s\n' "$id" "$cell"
         printf '  missing:%s\n' "$missing" >&2

@@ -48,6 +48,17 @@ plan_fixture() {
     printf '%s\n' "$@"
 }
 
+# ext_repo_fixture <dir> <relpath> <content>
+# Makes <dir> a separate git repo with one committed file <relpath> holding <content>.
+ext_repo_fixture() {
+    local dir="$1" rel="$2"
+    git init -q "$dir"
+    mkdir -p "$(dirname "$dir/$rel")"
+    printf '%s\n' "$3" > "$dir/$rel"
+    git -C "$dir" add -- "$rel"
+    git -C "$dir" commit -qm fixture
+}
+
 # deleted_diff_fixture <path> [<path>...]
 # Prints one git deletion header per path, exactly as `git diff` renders a removed
 # binary: diff --git, deleted file mode, index, Binary files ... differ. No `+` lines,
@@ -1616,9 +1627,118 @@ replay-false-stop-canary)
     fi
     ;;
 
+ext-repo-token-realised)
+    # A row whose location cd's into a separate repo: a token committed there is realised.
+    ext_repo_fixture "$root/ext" t.py 'FIXTURE_EXT_TOKEN'
+    plan_fixture "| 7 | \`FIXTURE_EXT_TOKEN\` passes | CLI-executable | post-impl | \`cd $root/ext && python3 t.py\` |" > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] && ! grep -qF 'UNREALISED-ASSERTION' <<< "$out" \
+        && grep -qF 'EXTERNAL-REPO: row 7' <<< "$out"; then
+        ok "ext-repo-token-realised"
+    else
+        fail "ext-repo-token-realised (rc=$rc, out=$out)"
+    fi
+    ;;
+
+ext-repo-token-missing-flags)
+    # The same external row with a token found in neither repo still flags.
+    ext_repo_fixture "$root/ext" t.py 'other'
+    plan_fixture "| 7 | \`FIXTURE_EXT_NOWHERE\` passes | CLI-executable | post-impl | \`cd $root/ext && python3 t.py\` |" > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    if grep -qF 'UNREALISED-ASSERTION: row 7' <<< "$out"; then
+        ok "ext-repo-token-missing-flags"
+    else
+        fail "ext-repo-token-missing-flags (out=$out)"
+    fi
+    ;;
+
+ext-repo-untracked-token-flags)
+    # A token only in an untracked file of the external repo is not realised: tracked files only.
+    ext_repo_fixture "$root/ext" t.py 'other'
+    printf 'FIXTURE_EXT_UNTRACKED\n' > "$root/ext/u.py"
+    plan_fixture "| 7 | \`FIXTURE_EXT_UNTRACKED\` passes | CLI-executable | post-impl | \`cd $root/ext && python3 u.py\` |" > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    if grep -qF 'UNREALISED-ASSERTION: row 7' <<< "$out"; then
+        ok "ext-repo-untracked-token-flags"
+    else
+        fail "ext-repo-untracked-token-flags (out=$out)"
+    fi
+    ;;
+
+ext-repo-missing-dir-flags)
+    # A location dir that does not exist (row 7) or is not a git repo (row 8) leaves the
+    # row checked as before.
+    mkdir -p "$root/plain"
+    printf 'FIXTURE_EXT_PLAIN\n' > "$root/plain/t.py"
+    plan_fixture "| 7 | \`FIXTURE_EXT_GONE\` passes | CLI-executable | post-impl | \`cd $root/nope && python3 t.py\` |" \
+        "| 8 | \`FIXTURE_EXT_PLAIN\` passes | CLI-executable | post-impl | \`cd $root/plain && python3 t.py\` |" > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    if grep -qF 'UNREALISED-ASSERTION: row 7' <<< "$out" && grep -qF 'UNREALISED-ASSERTION: row 8' <<< "$out" \
+        && ! grep -qF 'EXTERNAL-REPO' <<< "$out"; then
+        ok "ext-repo-missing-dir-flags"
+    else
+        fail "ext-repo-missing-dir-flags (out=$out)"
+    fi
+    ;;
+
+ext-repo-same-repo-worktree-not-external)
+    # A location that cd's into a linked worktree of the same repo is not external: a token
+    # committed only on that worktree's branch does not realise the row.
+    printf 'base\n' > "$root/a.txt"
+    git -C "$root" add a.txt
+    git -C "$root" commit -qm base
+    wt="$root-wt"
+    git -C "$root" worktree add -q -b side "$wt"
+    printf 'FIXTURE_EXT_SIDE\n' > "$wt/b.txt"
+    git -C "$wt" add b.txt
+    git -C "$wt" commit -qm side
+    plan_fixture "| 7 | \`FIXTURE_EXT_SIDE\` passes | CLI-executable | post-impl | \`cd $wt && cat b.txt\` |" > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    rm -rf "$wt"
+    if grep -qF 'UNREALISED-ASSERTION: row 7' <<< "$out" && ! grep -qF 'EXTERNAL-REPO' <<< "$out"; then
+        ok "ext-repo-same-repo-worktree-not-external"
+    else
+        fail "ext-repo-same-repo-worktree-not-external (out=$out)"
+    fi
+    ;;
+
+ext-repo-scoped-to-row)
+    # Only the row that cd's into the external repo looks there: row 8 has the same token
+    # and an in-repo location, and still flags.
+    ext_repo_fixture "$root/ext" t.py 'FIXTURE_EXT_SCOPED'
+    plan_fixture "| 7 | \`FIXTURE_EXT_SCOPED\` passes | CLI-executable | post-impl | \`cd $root/ext && python3 t.py\` |" \
+        '| 8 | `FIXTURE_EXT_SCOPED` passes | CLI-executable | post-impl | `bin/test-it` |' > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    if ! grep -qF 'UNREALISED-ASSERTION: row 7' <<< "$out" && grep -qF 'UNREALISED-ASSERTION: row 8' <<< "$out"; then
+        ok "ext-repo-scoped-to-row"
+    else
+        fail "ext-repo-scoped-to-row (out=$out)"
+    fi
+    ;;
+
+ext-repo-path-token)
+    # A path-shaped token naming a tracked file of the external repo is realised (arm 2c).
+    ext_repo_fixture "$root/ext" tools/t/test_loop.py 'x'
+    plan_fixture "| 7 | \`tools/t/test_loop.py\` passes | CLI-executable | post-impl | \`cd $root/ext && python3 -m unittest\` |" > "$root/plan.md"
+    printf '+unrelated line\n' > "$root/diff.txt"
+    out=$(MATRIX_ASSERT_ROOT="$root" "$HELPER" "$root/plan.md" "$root/diff.txt" 2>/dev/null)
+    if ! grep -qF 'UNREALISED-ASSERTION' <<< "$out" && grep -qF 'EXTERNAL-REPO: row 7' <<< "$out"; then
+        ok "ext-repo-path-token"
+    else
+        fail "ext-repo-path-token (out=$out)"
+    fi
+    ;;
+
 *)
     printf 'Unknown case: %s\n' "$case" >&2
-    printf 'Valid cases: absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-token-skipped glob-token-skipped-shapes glob-row-plain-token-still-flags deleted-file-exact-path deleted-file-basename deleted-file-dir-component deleted-file-leading-dir deleted-file-trailing-slash deleted-file-substring-not-aligned deleted-file-not-deleted deleted-file-space-path deleted-file-quoted-path-skipped plain-missing-canary glob-only-row-silent skip-equals-class4 skip-equals-class5 replay-2578-untagged replay-calibration-fp tag-skips-row tag-untagged-same-row-flags tag-malformed-checked tag-short-reason-checked tag-wrong-type-checked tag-line-prefix replay-2578-tagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing step67-plain-fences step67-no-plan-arg step67-no-origin-master prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised removed-line-token diff-header-not-context plus-header-not-realised ctx-mixed-row path-token-tracked-exact path-token-tracked-suffix path-token-diff-header-binary path-token-absent-still-flags path-token-not-aligned-still-flags path-token-bare-word-not-path-shaped path-token-deletion-row-passes-if-tracked mutation-clause-token-excluded mutation-clause-no-arrow-sentence-end mutation-clause-token-both-sides-checked mutation-clause-after-arrow-checked mutation-clause-label-variants mutation-clause-dot-inside-backticks mutation-clause-plain-token-still-flags replay-false-stop-reports replay-false-stop-canary step67 prefire all\n' >&2
+    printf 'Valid cases: absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-token-skipped glob-token-skipped-shapes glob-row-plain-token-still-flags deleted-file-exact-path deleted-file-basename deleted-file-dir-component deleted-file-leading-dir deleted-file-trailing-slash deleted-file-substring-not-aligned deleted-file-not-deleted deleted-file-space-path deleted-file-quoted-path-skipped plain-missing-canary glob-only-row-silent skip-equals-class4 skip-equals-class5 replay-2578-untagged replay-calibration-fp tag-skips-row tag-untagged-same-row-flags tag-malformed-checked tag-short-reason-checked tag-wrong-type-checked tag-line-prefix replay-2578-tagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing step67-plain-fences step67-no-plan-arg step67-no-origin-master prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised removed-line-token diff-header-not-context plus-header-not-realised ctx-mixed-row path-token-tracked-exact path-token-tracked-suffix path-token-diff-header-binary path-token-absent-still-flags path-token-not-aligned-still-flags path-token-bare-word-not-path-shaped path-token-deletion-row-passes-if-tracked mutation-clause-token-excluded mutation-clause-no-arrow-sentence-end mutation-clause-token-both-sides-checked mutation-clause-after-arrow-checked mutation-clause-label-variants mutation-clause-dot-inside-backticks mutation-clause-plain-token-still-flags replay-false-stop-reports replay-false-stop-canary ext-repo-token-realised ext-repo-token-missing-flags ext-repo-untracked-token-flags ext-repo-missing-dir-flags ext-repo-same-repo-worktree-not-external ext-repo-scoped-to-row ext-repo-path-token step67 prefire all\n' >&2
     exit 2
     ;;
 esac
@@ -1630,7 +1750,7 @@ rm -rf "$root"
 
 ARG="${1:-all}"
 
-CASES="absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-token-skipped glob-token-skipped-shapes glob-row-plain-token-still-flags deleted-file-exact-path deleted-file-basename deleted-file-dir-component deleted-file-leading-dir deleted-file-trailing-slash deleted-file-substring-not-aligned deleted-file-not-deleted deleted-file-space-path deleted-file-quoted-path-skipped plain-missing-canary glob-only-row-silent skip-equals-class4 skip-equals-class5 replay-2578-untagged replay-calibration-fp tag-skips-row tag-untagged-same-row-flags tag-malformed-checked tag-short-reason-checked tag-wrong-type-checked tag-line-prefix replay-2578-tagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing step67-plain-fences step67-no-plan-arg step67-no-origin-master prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised removed-line-token diff-header-not-context plus-header-not-realised ctx-mixed-row path-token-tracked-exact path-token-tracked-suffix path-token-diff-header-binary path-token-absent-still-flags path-token-not-aligned-still-flags path-token-bare-word-not-path-shaped path-token-deletion-row-passes-if-tracked mutation-clause-token-excluded mutation-clause-no-arrow-sentence-end mutation-clause-token-both-sides-checked mutation-clause-after-arrow-checked mutation-clause-label-variants mutation-clause-dot-inside-backticks mutation-clause-plain-token-still-flags replay-false-stop-reports replay-false-stop-canary"
+CASES="absent-new-token present-in-plus no-single-word-tokens waived waived-exact fenced preexisting-tree-token context-line-token dup-guard-regression empty-env usage bad-flags empty-range multi-arg-call multi-arg-call-mutation shell-var-default shell-var-default-mutation glob-token-skipped glob-token-skipped-shapes glob-row-plain-token-still-flags deleted-file-exact-path deleted-file-basename deleted-file-dir-component deleted-file-leading-dir deleted-file-trailing-slash deleted-file-substring-not-aligned deleted-file-not-deleted deleted-file-space-path deleted-file-quoted-path-skipped plain-missing-canary glob-only-row-silent skip-equals-class4 skip-equals-class5 replay-2578-untagged replay-calibration-fp tag-skips-row tag-untagged-same-row-flags tag-malformed-checked tag-short-reason-checked tag-wrong-type-checked tag-line-prefix replay-2578-tagged step67-skipped-no-plan step67-unrealised step67-clean step67-uncommitted step67-unavailable step67-routing step67-plain-fences step67-no-plan-arg step67-no-origin-master prefire-rule-staged-new-file-realised prefire-rule-missing-token-unrealised removed-line-token diff-header-not-context plus-header-not-realised ctx-mixed-row path-token-tracked-exact path-token-tracked-suffix path-token-diff-header-binary path-token-absent-still-flags path-token-not-aligned-still-flags path-token-bare-word-not-path-shaped path-token-deletion-row-passes-if-tracked mutation-clause-token-excluded mutation-clause-no-arrow-sentence-end mutation-clause-token-both-sides-checked mutation-clause-after-arrow-checked mutation-clause-label-variants mutation-clause-dot-inside-backticks mutation-clause-plain-token-still-flags replay-false-stop-reports replay-false-stop-canary ext-repo-token-realised ext-repo-token-missing-flags ext-repo-untracked-token-flags ext-repo-missing-dir-flags ext-repo-same-repo-worktree-not-external ext-repo-scoped-to-row ext-repo-path-token"
 
 if [ "$ARG" = "all" ]; then
     for c in $CASES; do

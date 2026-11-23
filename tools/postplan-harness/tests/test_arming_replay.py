@@ -440,3 +440,441 @@ def test_worktree_phase2_and_arm_time_agree(tmp_path):
     assert merge_danger.derive_from_worktree(kept_tree, diff) == kept
     stripped = merge_danger.render_merge_danger(kept).replace(" · Self-governing: yes", "")
     assert merge_danger.classify_with_floor(stripped, kept) != "TWO-WAY"
+
+
+# --- fidelity replay stage (harness/fidelity_replay.py) -------------------------------------------
+
+import ast  # noqa: E402
+import textwrap  # noqa: E402
+
+from harness import fidelity_replay  # noqa: E402
+from harness.fidelity_replay import (ORDERING, REPLAYED_ROOTS, Unresolvable,  # noqa: E402
+                                     check_resolvable, line_owner, looser_output,
+                                     production_roots, top_defs)
+
+PKG = REPO / "tools" / "postplan-harness"
+FIDELITY = fidelity_replay.FIDELITY_PATH
+
+
+def _fid_records():
+    return json.loads(fidelity_replay.CORPUS_PATH.read_text(encoding="utf-8"))
+
+
+def _ready_text():
+    for rec in _fid_records():
+        if rec["fid"].get("verdict_1") == "READY" and not rec["id"].startswith("fixture:"):
+            return rec["verdict_1"]
+    raise AssertionError("corpus has no live READY record")
+
+
+def _fake_run(out_dir, name, stored, raw, pr):
+    run = out_dir / name
+    (run / "fidelity-packet").mkdir(parents=True)
+    (run / "fidelity-packet" / "diff.patch").write_text(
+        "diff --git a/x.py b/x.py\n--- a/x.py\n+++ b/x.py\n@@ -1 +1 @@\n-a\n+b\n")
+    (run / "raw-plan-fidelity-review-attempt0.txt").write_text(raw)
+    (run / "result.json").write_text(json.dumps({
+        "pr_number": pr, "plan": "p.md",
+        "fidelity": {"verdict_1": stored, "verdict_2": None, "reviewed_tree": None}}))
+
+
+def _live_ids(dest):
+    return [r["id"] for r in json.loads(dest.read_text()) if r["id"].startswith("live-")]
+
+
+def test_harvest_rejects_mismatched_verdict(tmp_path):
+    out, dest = tmp_path / "out", tmp_path / "corpus.json"
+    _fake_run(out, "live-mismatch-1", "NOT READY", _ready_text(), 990001)
+    fidelity_replay.harvest(out, dest)
+    assert _live_ids(dest) == []
+    _fake_run(out, "live-match-1", "READY", _ready_text(), 990002)
+    fidelity_replay.harvest(out, dest)
+    assert _live_ids(dest) == ["live-match-1"]
+
+
+def test_committed_corpus_has_no_problems():
+    assert fidelity_replay.corpus_problems(_fid_records()) == []
+
+
+def test_corpus_problems_flags_small_corpus():
+    small = _fid_records()[:fidelity_replay.MIN_FIDELITY_RECORDS - 1]
+    assert any("fewer than" in p for p in fidelity_replay.corpus_problems(small))
+
+
+def test_cli_rejects_unknown_subcommand():
+    assert fidelity_replay.main(["harvst"]) == 2
+    assert fidelity_replay.main(["harvest", "only-one"]) == 2
+    assert fidelity_replay.main([]) == 2
+
+
+def _run_fid_driver(corpus, side_root):
+    pkg = side_root / "tools" / "postplan-harness"
+    return subprocess.run([sys.executable, str(fidelity_replay.DRIVER_PATH), str(corpus), str(pkg),
+                           str(side_root)], capture_output=True, text=True, timeout=300,
+                          cwd=str(pkg))
+
+
+def test_driver_runs_committed_corpus():
+    proc = _run_fid_driver(fidelity_replay.CORPUS_PATH, REPO)
+    assert proc.returncode == 0, proc.stderr
+    payload = json.loads(proc.stdout)
+    assert [r["id"] for r in payload["results"]] == [r["id"] for r in _fid_records()]
+    assert all("ok" in r["out"]["v1.parse_verdict"] for r in payload["results"])
+    fn = top_defs(ast.parse((REPO / FIDELITY).read_text(encoding="utf-8")))["reviewer_arming_holds"]
+    body = set(range(fn.body[0].lineno, fn.end_lineno + 1))
+    assert body & set(payload["executed"][FIDELITY])
+
+
+def test_driver_exits_nonzero_on_empty_verdict_text(tmp_path):
+    corpus = tmp_path / "c.json"
+    corpus.write_text(json.dumps([dict(_fid_records()[0], verdict_1="")]))
+    proc = _run_fid_driver(corpus, REPO)
+    assert proc.returncode == 4
+    assert proc.stdout == ""
+
+
+def _delete_def(source, name):
+    node = top_defs(ast.parse(source))[name]
+    start = min([node.lineno] + [d.lineno for d in node.decorator_list])
+    lines = source.splitlines(keepends=True)
+    del lines[start - 1:node.end_lineno]
+    return "".join(lines)
+
+
+def test_driver_marks_missing_root_absent(tmp_path):
+    side = tmp_path / "side"
+    shutil.copytree(PKG / "harness", side / arming_replay.HARNESS_DIR,
+                    ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    fid = side / FIDELITY
+    fid.write_text(_delete_def(fid.read_text(encoding="utf-8"), "sticky_terminal"),
+                   encoding="utf-8")
+    corpus = tmp_path / "c.json"
+    corpus.write_text(json.dumps(_fid_records()[:3]))
+    proc = _run_fid_driver(corpus, side)
+    assert proc.returncode == 0, proc.stderr
+    outs = [r["out"] for r in json.loads(proc.stdout)["results"]]
+    assert all(o["sticky_terminal"] == {"absent": True} for o in outs)
+    assert all("ok" in o["v1.parse_verdict"] for o in outs)
+
+
+def test_looser_output_verdict_ordering():
+    def looser(old, new):
+        return looser_output("verdict", {"ok": old}, {"ok": new})
+    assert looser("NOT READY", "READY") is True
+    assert looser(None, "NOT READY") is True
+    assert looser("NOT READY", "READY WITH NOTES") is True
+    assert looser("READY", "NOT READY") is False
+    assert looser("READY", "READY") is False
+    assert looser("READY", "READY (sticky)") is True
+
+
+def test_looser_output_sets_flags_errors():
+    def s(old, new):
+        return looser_output("set", {"ok": old}, {"ok": new})
+    assert s(["a", "b"], ["a"]) is True
+    assert s(["a"], ["a reworded"]) is True
+    assert s(["a"], ["a", "b"]) is False
+    assert looser_output("flag", {"ok": False}, {"ok": True}) is True
+    assert looser_output("flag", {"ok": True}, {"ok": False}) is False
+    assert looser_output("set", {"ok": []}, {"raise": "KeyError"}) is True
+    assert looser_output("set", {"raise": "KeyError"}, {"ok": []}) is True
+    assert looser_output("set", {"raise": "KeyError"}, {"raise": "KeyError"}) is False
+
+
+def test_ordering_and_roots_match_driver():
+    tree = ast.parse(fidelity_replay.DRIVER_PATH.read_text(encoding="utf-8"))
+    keys = [ast.literal_eval(n.value) for n in tree.body if isinstance(n, ast.Assign)
+            and isinstance(n.targets[0], ast.Name) and n.targets[0].id == "OUTPUT_KEYS"]
+    assert keys == [tuple(ORDERING)]
+    attrs = {n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)
+             and isinstance(n.value, ast.Name) and n.value.id == "fidelity"}
+    assert attrs - {"verdict_path", "STICKY_MARKER"} == set(REPLAYED_ROOTS)
+
+
+def test_static_analyzer_near_misses():
+    check_resolvable(ast.parse("def f(x):\n    return getattr(x, 'a')\n"))
+    for src in ("def f(x, a):\n    return getattr(x, a)\n",
+                "def f():\n    return globals()\n",
+                "import sys\ndef f():\n    return sys.modules\n"):
+        with pytest.raises(Unresolvable):
+            check_resolvable(ast.parse(src))
+    owner = line_owner(top_defs(ast.parse("def f(a=None,\n      b=-1):\n    return a\n")))
+    assert owner[1] == ("f", "header") and owner[2] == ("f", "header")
+    assert 2 not in line_owner(top_defs(ast.parse("def f(a=None,\n      b=g()):\n    return a\n")))
+    with pytest.raises(Unresolvable):
+        production_roots({"tools/x.py": "from harness import fidelity\nx = fidelity\n"})
+    assert production_roots({"tools/x.py": "from harness import fidelity\nfidelity.y()\n"}) == {
+        "y": {"tools/x.py"}}
+    lazy = "def f():\n    from harness import fidelity\n    return fidelity.y()\n"
+    shadowed = lazy + "def g(fidelity=None):\n    return {'k': fidelity}\n"
+    assert production_roots({"tools/x.py": shadowed}) == {"y": {"tools/x.py"}}
+    with pytest.raises(Unresolvable):
+        production_roots({"tools/x.py": lazy + "def h():\n    from harness import fidelity\n"
+                                               "    return [fidelity]\n"})
+    master = ast.parse((REPO / FIDELITY).read_text(encoding="utf-8"))
+    check_resolvable(master)
+    top_defs(master)
+    files = {p.relative_to(REPO).as_posix(): p.read_text(encoding="utf-8")
+             for p in sorted(PKG.glob("*.py")) + sorted((PKG / "harness").glob("*.py"))}
+    assert "tools/postplan-harness/runner.py" in production_roots(files)["reviewer_arming_holds"]
+
+
+def _insert_first_line(source, func, stmt):
+    first = top_defs(ast.parse(source))[func].body[0]
+    lines = source.splitlines(keepends=True)
+    block = textwrap.indent(textwrap.dedent(stmt).strip("\n") + "\n", " " * first.col_offset)
+    lines.insert(first.lineno - 1, block)
+    return "".join(lines)
+
+
+def _fid_append(source, text):
+    return source.rstrip("\n") + "\n\n\n" + text.strip("\n") + "\n"
+
+
+def _fid_tree(tmp_path):
+    tree = tmp_path / "fidtree"
+    for d in arming_replay.COPY_DIRS:
+        shutil.copytree(REPO / d, tree / d, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    for py in sorted(PKG.glob("*.py")):
+        shutil.copy2(py, tree / "tools" / "postplan-harness" / py.name)
+    _git(tree, "init", "-q")
+    _git(tree, "add", "-A")
+    _git(tree, "commit", "-q", "-m", "base")
+    return tree
+
+
+def _fid_edit(tree, edit):
+    p = tree / FIDELITY
+    p.write_text(edit(p.read_text(encoding="utf-8")), encoding="utf-8")
+    return _git(tree, "diff")
+
+
+def _fid_replay(tmp_path, edit):
+    tree = _fid_tree(tmp_path)
+    v = _replay(tree, _fid_edit(tree, edit))
+    return v, f"{v.note} {v.reason}"
+
+
+def test_dropping_a_reviewer_hold_stays_held(tmp_path):
+    v, text = _fid_replay(tmp_path, lambda s: _insert_first_line(s, "_landed_later", "return True"))
+    assert v.cleared is False
+    assert "fidelity-loosened" in text and "holds." in text
+
+
+def _landed_corpus(tmp_path):
+    """The committed corpus plus, per record with a missing file item, a copy whose diff lands
+    that file, so the base `_landed_later` returns True and drops the hold."""
+    records = _fid_records()
+    extra = []
+    for rec in records:
+        items = [i for i in fidelity_replay._missing_items(rec.get("shadow"))
+                 if isinstance(i, dict) and i.get("kind") in ("file", "test") and i.get("token")]
+        if items:
+            landed = json.loads(json.dumps(rec))
+            landed["id"] = rec["id"] + "~landed"
+            landed["changed_files"] = list(rec["changed_files"]) + [i["token"].strip("`") for i in items]
+            landed["review_inputs"] = None
+            extra.append(landed)
+    assert extra, "corpus has no record with a missing file item"
+    path = tmp_path / "landed-corpus.json"
+    path.write_text(json.dumps(records + extra), encoding="utf-8")
+    return path
+
+
+def _driver_side(corpus, tree):
+    proc = _run_fid_driver(corpus, tree)
+    assert proc.returncode == 0, proc.stderr
+    return fidelity_replay._fid_side(json.loads(proc.stdout))
+
+
+def test_adding_a_reviewer_hold_clears(tmp_path, monkeypatch):
+    corpus = _landed_corpus(tmp_path)
+    monkeypatch.setattr(fidelity_replay, "CORPUS_PATH", corpus)
+    tree = _fid_tree(tmp_path)
+    base = _driver_side(corpus, tree)
+    probe = "tools/postplan-harness/tests/test_probe.py"  # never copied into the replay sides
+    (tree / probe).parent.mkdir(parents=True, exist_ok=True)
+    (tree / probe).write_text("X = 1\n")
+    _git(tree, "add", "-A")
+    _git(tree, "commit", "-q", "-m", "probe")
+    _append(tree, probe, "Y = 2\n")
+    diff = _fid_edit(tree, lambda s: _insert_first_line(s, "_landed_later", "return False"))
+    cand = _driver_side(corpus, tree)
+    # The candidate keeps holds the base dropped: a strict superset on at least one record.
+    grew = [rid for (rid, o), (_, n) in zip(base.results, cand.results)
+            if o["holds.stored_shadow"] != n["holds.stored_shadow"]]
+    assert grew, "the landed records did not change any hold"
+    v = _replay(tree, diff)
+    text = f"{v.note} {v.reason}"
+    assert v.cleared is True, text
+    assert "fidelity replay cleared" in text
+
+
+def test_verdict_promotion_stays_held(tmp_path):
+    tree = _fid_tree(tmp_path)
+    base = _driver_side(fidelity_replay.CORPUS_PATH, tree)
+    diff = _fid_edit(tree, lambda s: _insert_first_line(s, "parse_verdict", 'return "READY"'))
+    cand = _driver_side(fidelity_replay.CORPUS_PATH, tree)
+    loosened, _ = fidelity_replay.compare_sides(base, cand, set())
+    # The verdict ordering itself must flag the NOT READY -> READY promotion.
+    assert any(k.endswith(":v1.parse_verdict") for k in loosened)
+    v = _replay(tree, diff)
+    assert v.cleared is False
+    assert "fidelity-loosened" in f"{v.note} {v.reason}"
+
+
+def test_unreplayed_channel_change_stays_held(tmp_path):
+    v, text = _fid_replay(tmp_path, lambda s: _insert_first_line(s, "re_review", "_probe = 0"))
+    assert v.cleared is False
+    assert "fidelity-unreplayed-channel: re_review" in text
+
+
+def test_module_level_change_stays_held(tmp_path):
+    v, text = _fid_replay(tmp_path, lambda s: _fid_append(s, "_PROBE = 1"))
+    assert v.cleared is False
+    assert "fidelity-module-level-change" in text
+
+
+def test_duplicate_def_stays_held(tmp_path):
+    v, text = _fid_replay(tmp_path, lambda s: _fid_append(
+        s, "def parse_verdict(path):\n    return None"))
+    assert v.cleared is False
+    assert "fidelity-duplicate-def" in text
+
+
+def test_computed_getattr_stays_held(tmp_path):
+    v, text = _fid_replay(tmp_path, lambda s: _insert_first_line(
+        s, "parse_verdict", "getattr(path, str(path)[:0] or 'strip')"))
+    assert v.cleared is False
+    assert "fidelity-unresolvable-dispatch" in text
+
+
+def test_dead_function_change_clears(tmp_path):
+    v, text = _fid_replay(tmp_path, lambda s: _fid_append(s, "def _probe_dead():\n    return 1"))
+    assert v.cleared is True, text
+    assert "fidelity replay cleared" in text
+    assert any("dead _probe_dead" in line for line in fidelity_replay.LAST_DETAIL)
+
+
+def test_unexercised_change_stays_held(tmp_path):
+    v, text = _fid_replay(tmp_path, lambda s: _insert_first_line(
+        s, "parse_verdict", 'if path == "/never/":\n    return "READY"'))
+    assert v.cleared is False
+    assert "fidelity-unexercised-change" in text
+
+
+def test_side_effect_line_stays_held(tmp_path):
+    v, text = _fid_replay(tmp_path, lambda s: _insert_first_line(
+        s, "parse_verdict", "open(path).close()"))
+    assert v.cleared is False
+    assert "fidelity-side-effect-change" in text
+
+
+def test_parameter_write_in_sticky_terminal_stays_held(tmp_path):
+    v, text = _fid_replay(tmp_path, lambda s: _insert_first_line(
+        s, "sticky_terminal", 'fid["k"] = 1'))
+    assert v.cleared is False
+    assert "fidelity-side-effect-change" in text
+
+
+def test_parameter_mutation_is_a_side_effect():
+    import ast
+
+    src = "def f(fid, n):\n    fid['k'] = n\n    fid.pop('a')\n    x = {}\n    x['k'] = n\n    return n\n"
+    tree = ast.parse(src)
+    fn = tree.body[0]
+    assert fidelity_replay.side_effect(fn, 2, tree) is True
+    assert fidelity_replay.side_effect(fn, 3, tree) is True
+    assert fidelity_replay.side_effect(fn, 5, tree) is False
+
+
+_SIDE_EFFECT_SRC = '''\
+import os
+_STATE = {}
+_X = 0
+
+
+def _writer(path):
+    os.remove(path)
+
+
+def _relay(path):
+    return _writer(path)
+
+
+def _pure(n):
+    return n + 1
+
+
+def target(path, n):
+    global _X
+    if n > 0:
+        os.remove(path)
+    _relay(path)
+    _pure(n)
+    _X = n
+    return n
+'''
+
+
+def _side_effect_at(snippet: str) -> bool:
+    import ast
+
+    tree = ast.parse(_SIDE_EFFECT_SRC)
+    fn = next(st for st in tree.body if getattr(st, "name", None) == "target")
+    line = next(i for i, text in enumerate(_SIDE_EFFECT_SRC.splitlines(), 1)
+                if text.strip() == snippet)
+    return fidelity_replay.side_effect(fn, line, tree)
+
+
+@pytest.mark.parametrize("snippet", ["_relay(path)", "if n > 0:", "_X = n"])
+def test_side_effect_follows_callees_guarded_bodies_and_globals(snippet):
+    assert _side_effect_at(snippet) is True
+
+
+def test_side_effect_pure_callee_is_clean():
+    assert _side_effect_at("_pure(n)") is False
+    assert _side_effect_at("return n") is False
+
+
+def test_corpus_carries_no_decompile_tokens():
+    text = fidelity_replay.CORPUS_PATH.read_text(encoding="utf-8")
+    assert fidelity_replay._DECOMPILE_TOKEN_RE.search(text) is None
+    assert fidelity_replay.redact_decompile_tokens(
+        "FUN" "_004e3860 DAT" "_00669f58 jsb560" "_decompiled" ".c +" "0x6BA8") == (
+        "FUN-004e3860 DAT-00669f58 jsb560-decompiled-c +0X6BA8")
+    assert fidelity_replay._GATED_LITERAL_RE.search(text) is None
+    assert fidelity_replay.redact_decompile_tokens(
+        "--" "depth=50; owner-approve " "mode=x") == "--Depth=50; owner-approve Mode=x"
+    assert fidelity_replay.redact_decompile_tokens("_phase" "-6.5-arm-auto-merge.md") == (
+        "_Phase-6.5-arm-auto-merge.md")
+
+
+def test_missing_fidelity_corpus_stays_held(tmp_path, monkeypatch):
+    monkeypatch.setattr(fidelity_replay, "CORPUS_PATH", tmp_path / "absent.json")
+    v, text = _fid_replay(tmp_path, lambda s: _insert_first_line(s, "_landed_later", "return False"))
+    assert v.cleared is False
+    assert "fidelity-corpus-missing" in text
+
+
+def test_self_edit_stays_held(tmp_path):
+    tree = _fid_tree(tmp_path)
+    _fid_edit(tree, lambda s: _insert_first_line(s, "_landed_later", "return False"))
+    diff = _append(tree, arming_replay.HARNESS_DIR + "/fidelity_replay.py", "# probe\n")
+    # Only fidelity.py's section goes in, so the base judge has no fidelity_replay.py line to
+    # hold on and the stage's own self-edit check is what keeps the flag.
+    section = merge_danger._section_for(diff, FIDELITY)
+    v = arming_replay.replay_worktree(tree, diff, {FIDELITY: section}, frozenset({FIDELITY}))
+    assert v.cleared is False
+    assert "fidelity-replay-self-edit" in f"{v.note} {v.reason}"
+
+
+def test_non_fidelity_diff_skips_stage(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(fidelity_replay, "replay_sides",
+                        lambda *a, **k: calls.append(a) or (True, "x", []))
+    tree = _fid_tree(tmp_path)
+    diff = _append(tree, arming_replay.HARNESS_DIR + "/second_review.py", "\n_PROBE = 1\n")
+    assert FIDELITY not in _sections(diff)
+    _replay(tree, diff)
+    assert calls == []

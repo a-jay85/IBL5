@@ -283,7 +283,12 @@ def _replay(root: Path, diff_text: str, sections: dict, arming: frozenset) -> Re
         return _kept("corpus-too-small")
     if not all((root / d).is_dir() for d in COPY_DIRS):
         return _kept("tree-missing")
-    key = _cache_key(root, diff_text, corpus)
+    from harness import fidelity_replay
+    try:
+        fid_bytes = fidelity_replay.CORPUS_PATH.read_bytes()
+    except OSError:
+        fid_bytes = b""
+    key = _cache_key(root, diff_text, corpus + fid_bytes)
     if key in _CACHE:
         return _CACHE[key]
     verdict = _replay_uncached(root, diff_text, sections, arming)
@@ -338,7 +343,22 @@ def _replay_uncached(root: Path, diff_text: str, sections: dict,
             if path in arming or old.executed.get(path) or new.executed.get(path):
                 kept_sections[path] = section
                 sources[path] = (_read_text(sides["old"] / path), _read_text(sides["new"] / path))
-        return judge(old, new, kept_sections, sources)
+        from harness import fidelity_replay
+        fid_path = fidelity_replay.FIDELITY_PATH
+        if fid_path not in kept_sections:
+            return judge(old, new, kept_sections, sources)
+        fid_section = kept_sections.pop(fid_path)
+        sources.pop(fid_path, None)
+        note = "fidelity only"
+        if kept_sections:
+            base = judge(old, new, kept_sections, sources)
+            if not base.cleared:
+                return base
+            note = base.note
+        fv = fidelity_replay.replay_sides(Path(tmp), Path(root), diff_text, fid_section, _env(tmp))
+        if not fv[0]:
+            return _kept(fv[1])
+        return ReplayVerdict(True, f"{note}; {fv[1]}", "clean")
 
 
 def replay_worktree(worktree, diff_text: str, sections: dict, arming) -> ReplayVerdict:

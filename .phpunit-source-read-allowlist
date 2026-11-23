@@ -50,5 +50,7 @@ ibl5/tests/WideUnit/Scripts/UpdateAllTheThingsRolloverWiringTest.php
 ibl5/tests/WideUnit/Scripts/UpdateAllTheThingsRecordHoldersWiringTest.php
 # updateAllTheThings.php registers RefreshSeasonHighsCacheStep after ProcessBoxscoresStep and RefreshHeadToHeadRecordsStep, inside the non-Olympics block, before RefreshRecordHoldersStep, sharing the updater clock; the script requires mainfile.php at top level, so there is no seam (behavior: RefreshSeasonHighsCacheStepTest)
 ibl5/tests/WideUnit/Scripts/UpdateAllTheThingsSeasonHighsWiringTest.php
+# updateAllTheThings.php registers RefreshTeamAccomplishmentsStep after the box-score, playoff-series, ibl_hist, record-holders and season-awards writers, inside the non-Olympics block; the script requires mainfile.php at top level, so there is no seam (behavior: RefreshTeamAccomplishmentsStepTest)
+ibl5/tests/WideUnit/Scripts/UpdateAllTheThingsTeamAccomplishmentsWiringTest.php
 # IBL/Olympics primary color constants must equal the --color-*-primary @theme tokens in design/input.css; a CSS token has no PHP execution seam
 ibl5/tests/League/LeagueContextTest.php

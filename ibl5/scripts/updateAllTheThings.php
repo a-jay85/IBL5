@@ -355,9 +355,17 @@ try {
         $updaterService->addStep(Updater\Steps\RebuildOnThisDayMomentsStep::fromDb($mysqli_db, $updaterClock, $updaterStartedAt));
         $updaterService->addStep(\OnThisDay\OnThisDayFactory::createRecordShownStep($mysqli_db));
         $updaterService->addStep(\OnThisDay\OnThisDayFactory::createPostStep($mysqli_db));
-        // Dead last: a slow rebuild can only starve itself, never the steps above. It reads box scores and
+        // Second to last: a slow rebuild can only starve itself, never the steps above. It reads box scores and
         // vw_playoff_series_results, both refreshed earlier in the pipeline.
         $updaterService->addStep(Updater\Steps\RefreshRecordHoldersStep::fromDb($mysqli_db, $updaterClock, $updaterStartedAt));
+        // Last: rebuilds the team-page accomplishments rows from box scores (HEAT), vw_playoff_series_results
+        // and ibl_team_awards, all written earlier in this block. Over budget it clears the rows instead.
+        $updaterService->addStep(Updater\Steps\RefreshTeamAccomplishmentsStep::fromDb(
+            $mysqli_db,
+            $updaterClock,
+            $updaterStartedAt,
+            new Repositories\TeamIdentityRepository($mysqli_db),
+        ));
     }
 
     $controller = new Updater\UpdaterController($updaterService, $view);

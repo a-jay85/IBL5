@@ -23,5 +23,5 @@ interface RatingsInterface
      * @param bool $markExpiringRows When true, rows whose player has an expiring contract get the player-fa-expiring-row class (Team page during Draft/Free Agency only)
      * @return string HTML table
      */
-    public static function render($db, $data, $team, string $yr, $season, string $moduleName = "", array $starterPids = [], string $ariaLabel = '', bool $markExpiringRows = false): string;
+    public static function render(\mysqli $db, iterable $data, \Team\Team $team, string $yr, \Season\Season $season, string $moduleName = "", array $starterPids = [], string $ariaLabel = '', bool $markExpiringRows = false): string;
 }

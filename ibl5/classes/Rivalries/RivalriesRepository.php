@@ -33,6 +33,12 @@ final class RivalriesRepository extends \Database\BaseMysqliRepository implement
     // Pre-dedupe pair filter: lets unique_games group only this pair's rows. Binds 4 `i` params.
     private const FRANCHISE_PAIR_FILTER = ' AND ((b.visitor_teamid = ? AND b.home_teamid = ?) OR (b.visitor_teamid = ? AND b.home_teamid = ?))';
 
+    // unique_games scan hint per pair path. Chosen from local ANALYZE on 54K rows; see migration 222.
+    // With idx_visitor_home_gt_season in place the planner picks it unhinted on both paths
+    // (GM: 5,942 -> 116 rows read; franchise: 96 rows either way), so no hint is needed.
+    private const GM_PAIR_INDEX_HINT = '';
+    private const FRANCHISE_PAIR_INDEX_HINT = '';
+
     private const GM_SIDE_EXPR = 'IF(bs.teamid = g.visitor_teamid, g.v_gm, g.h_gm)';
 
     private const TEAM_SIDE_EXPR = 'CAST(bs.teamid AS CHAR)';
@@ -130,7 +136,7 @@ ORDER BY a, b',
      */
     public function getFranchisePairGames(int $a, int $b): array
     {
-        $sql = $this->gamesCte(self::FRANCHISE_PAIR_FILTER)
+        $sql = $this->gamesCte(self::FRANCHISE_PAIR_FILTER, self::FRANCHISE_PAIR_INDEX_HINT)
             // @phpstan-ignore ibl.orderByMissingTiebreaker (no doubleheaders: game_date + game_of_that_day + visitor_teamid is unique)
             . ' SELECT ' . self::gameListColumns() . ',
        CAST(visitor_teamid AS CHAR) AS visitor_side, CAST(home_teamid AS CHAR) AS home_side
@@ -226,7 +232,7 @@ ORDER BY year ASC, round ASC, winner_tid ASC, loser_tid ASC',
             return $memo;
         }
 
-        $pairCte = $this->gamesCte(self::FRANCHISE_PAIR_FILTER) . ',
+        $pairCte = $this->gamesCte(self::FRANCHISE_PAIR_FILTER, self::FRANCHISE_PAIR_INDEX_HINT) . ',
 pair_games AS (
     SELECT * FROM games
     WHERE (visitor_teamid = ? AND home_teamid = ?) OR (visitor_teamid = ? AND home_teamid = ?)
@@ -302,7 +308,7 @@ pair_games AS (
      * H2H `unique_games` + `games` CTEs, phase `all` (HEAT counts), plus dates and era labels.
      *
      * @param string $extraWhere Extra `AND ...` filter on `ibl_box_scores_teams b`, applied before the dedupe.
-     * @param string $indexHint Optional index hint for the dedupe scan, e.g. ` FORCE INDEX (`idx_visitor_team`)`.
+     * @param string $indexHint Optional index hint for the dedupe scan, e.g. ` FORCE INDEX (`idx_visitor_home_gt_season`)`.
      */
     private function gamesCte(string $extraWhere = '', string $indexHint = ''): string
     {
@@ -448,9 +454,7 @@ ORDER BY t.start_season_year ASC, t.id ASC',
      */
     private function gmPairCte(array $resolution): string
     {
-        // Up to a dozen-plus franchise tuples make the planner pick a full scan of the 53K-row
-        // date index; the team index narrows the dedupe to the pair's franchises (33 ms -> 8 ms).
-        return $this->gamesCte($resolution['filter'], ' FORCE INDEX (`idx_visitor_team`)') . ',
+        return $this->gamesCte($resolution['filter'], self::GM_PAIR_INDEX_HINT) . ',
 gm_games AS (
     SELECT g.*,
         ' . $resolution['vCase'] . ' AS v_gm,

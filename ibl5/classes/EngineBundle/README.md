@@ -1,6 +1,6 @@
 ---
 description: Builds and serializes the engine input bundle JSON from the live database for a sim window.
-last_verified: 2026-09-22
+last_verified: 2026-11-21
 ---
 
 # EngineBundle

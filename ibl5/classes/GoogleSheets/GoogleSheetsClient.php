@@ -196,10 +196,10 @@ class GoogleSheetsClient
     }
 
     /**
-     * @param array<string, mixed>|object|null $payload
+     * @param array<string, mixed>|\stdClass|null $payload
      * @return array<mixed>
      */
-    private function send(#[\SensitiveParameter] string $accessToken, string $method, string $url, array|object|null $payload, bool $notFoundMeansMissing): array
+    private function send(#[\SensitiveParameter] string $accessToken, string $method, string $url, array|\stdClass|null $payload, bool $notFoundMeansMissing): array
     {
         $body = $payload === null ? null : json_encode($payload, JSON_THROW_ON_ERROR);
         $response = $this->http->request($method, $url, [

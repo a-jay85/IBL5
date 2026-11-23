@@ -47,7 +47,7 @@ class ExtensionValidator implements ExtensionValidatorInterface
      *
      * @return array{valid: bool, error: string|null}
      */
-    public function validateExtensionEligibility(object $team): array
+    public function validateExtensionEligibility(Team $team): array
     {
         /** @var Team $team */
         if ($team->hasUsedExtensionThisSeason === 1) {

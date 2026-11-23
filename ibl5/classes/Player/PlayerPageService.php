@@ -17,7 +17,7 @@ class PlayerPageService implements PlayerPageServiceInterface
     /**
      * @see PlayerPageServiceInterface::canShowRenegotiationButton()
      */
-    public function canShowRenegotiationButton(Player $player, object $userTeam, object $season): bool
+    public function canShowRenegotiationButton(Player $player, Team $userTeam, Season $season): bool
     {
         if ($player->wasRookieOptioned()) {
             return false;
@@ -44,7 +44,7 @@ class PlayerPageService implements PlayerPageServiceInterface
     /**
      * @see PlayerPageServiceInterface::canShowRookieOptionButton()
      */
-    public function canShowRookieOptionButton(Player $player, object $userTeam, object $season): bool
+    public function canShowRookieOptionButton(Player $player, Team $userTeam, Season $season): bool
     {
         /** @var Team $userTeam */
         /** @var Season $season */

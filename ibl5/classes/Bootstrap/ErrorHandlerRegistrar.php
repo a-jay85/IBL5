@@ -24,11 +24,11 @@ final class ErrorHandlerRegistrar
 
     private LoggerInterface $logger;
 
-    /** @var callable(int): void */
-    private $renderer;
+    /** @var \Closure(int): void */
+    private \Closure $renderer;
 
-    /** @var callable(): (array{type: int, message: string, file: string, line: int, ...}|null) */
-    private $lastErrorProvider;
+    /** @var \Closure(): (array{type: int, message: string, file: string, line: int, ...}|null) */
+    private \Closure $lastErrorProvider;
 
     /**
      * @param callable(int $statusCode): void|null $renderer Emits a client-facing
@@ -44,9 +44,9 @@ final class ErrorHandlerRegistrar
         ?callable $lastErrorProvider = null
     ) {
         $this->logger = $logger;
-        $this->renderer = $renderer ?? static function (int $statusCode): void {
-        };
-        $this->lastErrorProvider = $lastErrorProvider ?? static fn (): ?array => error_get_last();
+        $this->renderer = \Closure::fromCallable($renderer ?? static function (int $statusCode): void {
+        });
+        $this->lastErrorProvider = \Closure::fromCallable($lastErrorProvider ?? static fn (): ?array => error_get_last());
     }
 
     /**

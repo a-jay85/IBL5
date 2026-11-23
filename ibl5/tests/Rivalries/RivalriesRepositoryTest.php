@@ -103,7 +103,9 @@ final class RivalriesRepositoryTest extends TestCase
         $queries = $this->mockDb->getPreparedQueries();
         $query = $queries[array_key_last($queries)];
         self::assertStringNotContainsString('LIMIT 1', $query);
-        self::assertStringContainsString('FROM `ibl_box_scores_teams` b FORCE INDEX (`idx_visitor_team`)', $query);
+        // No index hint: with idx_visitor_home_gt_season the planner picks the index unaided, and the
+        // WHERE line right after the alias fails on a doubled or stale hint (e.g. the old idx_visitor_team one).
+        self::assertStringContainsString("FROM `ibl_box_scores_teams` b\n    WHERE b.game_type IN (1, 2, 3)", $query);
         // The non-pair GM C still gets a CASE branch, so a side C ran resolves to C and not to the pair GM.
         $filter = "AND ((b.visitor_teamid = ? AND b.home_teamid = ?) OR (b.visitor_teamid = ? AND b.home_teamid = ?))\n"
             . "      AND ((b.visitor_teamid = ? AND b.season_year BETWEEN ? AND ?) OR (b.visitor_teamid = ? AND b.season_year BETWEEN ? AND ?))\n"
@@ -127,6 +129,30 @@ final class RivalriesRepositoryTest extends TestCase
             ],
             $this->mockDb->getLastBoundParams(),
         );
+    }
+
+    public function testFranchisePairGamesPinsIndexHint(): void
+    {
+        $this->repo->getFranchisePairGames(5, 18);
+
+        $queries = $this->mockDb->getPreparedQueries();
+        self::assertNotSame([], $queries);
+        $query = $queries[array_key_last($queries)];
+        // The franchise path carries no hint: the planner picks idx_visitor_home_gt_season on its own.
+        self::assertStringContainsString("FROM `ibl_box_scores_teams` b\n    WHERE b.game_type IN (1, 2, 3)", $query);
+        self::assertSame('iiiiiiii', $this->mockDb->getLastBoundTypes());
+    }
+
+    public function testGmPairGamesSkipsBoxScoreQueryWhenAGmHasNoTenure(): void
+    {
+        $this->mockDb->onQuery('gm_display_name IN', [
+            ['gm_display_name' => 'A Gm', 'franchise_id' => 1, 'from_year' => 2000, 'to_year' => 2005, 'is_pair' => 1],
+        ]);
+
+        self::assertSame([], $this->repo->getGmPairGames('A Gm', 'B Gm'));
+        foreach ($this->mockDb->getPreparedQueries() as $query) {
+            self::assertStringNotContainsString('ibl_box_scores_teams', $query);
+        }
     }
 
     public function testGmPairGamesSkipsQueryWhenOneGmHasNoTenure(): void

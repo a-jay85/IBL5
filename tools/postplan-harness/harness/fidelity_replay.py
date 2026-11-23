@@ -827,9 +827,12 @@ def replay_sides(tmp: Path, root: Path, diff_text: str, section: str | None, env
     patch = Path(tmp) / "fid-diff.patch"
     patch.write_text(diff_text, encoding="utf-8", errors="surrogateescape")
     try:
+        # git apply's `*` crosses `/` and the first matching pattern wins, so the exclude keeps
+        # tests/ and other subdirectories (never copied) out of the top-level *.py include.
         applied = subprocess.run(
             ["git", "apply", "-R", "--include=tools/postplan-harness/harness/*",
-             "--include=tools/postplan-harness/*.py", "--include=bin/lib/*", str(patch)],
+             "--exclude=tools/postplan-harness/*/*", "--include=tools/postplan-harness/*.py",
+             "--include=bin/lib/*", str(patch)],
             cwd=str(sides["old"]), env=env, timeout=arming_replay.GIT_APPLY_TIMEOUT,
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except subprocess.TimeoutExpired:

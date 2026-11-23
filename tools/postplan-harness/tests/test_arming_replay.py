@@ -662,7 +662,15 @@ def test_dropping_a_reviewer_hold_stays_held(tmp_path):
 
 
 def test_adding_a_reviewer_hold_clears(tmp_path):
-    v, text = _fid_replay(tmp_path, lambda s: _insert_first_line(s, "_landed_later", "return False"))
+    tree = _fid_tree(tmp_path)
+    probe = "tools/postplan-harness/tests/test_probe.py"  # never copied into the replay sides
+    (tree / probe).parent.mkdir(parents=True, exist_ok=True)
+    (tree / probe).write_text("X = 1\n")
+    _git(tree, "add", "-A")
+    _git(tree, "commit", "-q", "-m", "probe")
+    _append(tree, probe, "Y = 2\n")
+    v = _replay(tree, _fid_edit(tree, lambda s: _insert_first_line(s, "_landed_later", "return False")))
+    text = f"{v.note} {v.reason}"
     assert v.cleared is True, text
     assert "fidelity replay cleared" in text
 

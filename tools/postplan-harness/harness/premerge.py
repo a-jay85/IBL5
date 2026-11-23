@@ -87,10 +87,31 @@ def _git(worktree: str, *args: str) -> tuple[int, str]:
     return proc.returncode, proc.stdout
 
 
+def _require_paths_from_pre_sha(worktree: str, head_sha: str, parent1: str,
+                                pre_sha: str, base: str) -> None:
+    """A rebased HEAD is a new commit, so --pre-sha is not its parent. Bind them by
+    content: every path the rebased commit changes must be a path --pre-sha's own commits
+    (merge-base(pre_sha, base)..pre_sha) changed. A replay onto a newer base keeps that set."""
+    if not _SHA.match(pre_sha):
+        raise PremergeError("not a full SHA")
+    rc, fork = _git(worktree, "merge-base", pre_sha, base)
+    if rc != 0 or not fork.strip():
+        raise PremergeError("--pre-sha shares no history with base")
+    rc_head, head_paths = _git(worktree, "diff", "--name-only", "--no-renames", parent1, head_sha)
+    rc_own, own_paths = _git(worktree, "diff", "--name-only", "--no-renames", fork.strip(), pre_sha)
+    if rc_head != 0 or rc_own != 0:
+        raise PremergeError("could not diff --pre-sha against HEAD")
+    extra = sorted(set(head_paths.splitlines()) - set(own_paths.splitlines()) - {""})
+    if extra:
+        raise PremergeError("rebased HEAD changes paths --pre-sha never touched: "
+                            + ", ".join(extra[:5]))
+
+
 def record(worktree: str, branch: str, pre_sha: str, files: tuple[str, ...],
            tmp_dir: str = "/tmp", base: str = "origin/master") -> Premerged:
     """Validate that HEAD is the bot's resolution of `base` (origin/master, or a stacked PR's
-    declared parent): a single commit rebased onto `base` (one parent, inside `base`), or
+    declared parent): a single commit rebased onto `base` (one parent, inside `base`, changing
+    only paths --pre-sha's own commits changed), or
     a legacy two-parent merge of `base` onto pre_sha. Then write the manifest and, last, the condition-(14)
     flag. The flag goes last so a crash between the
     two leaves a manifest with no flag, which the harness still proves and reviews."""
@@ -108,6 +129,7 @@ def record(worktree: str, branch: str, pre_sha: str, files: tuple[str, ...],
             raise PremergeError("HEAD is not a rebased commit or a two-parent merge")
         if _git(worktree, "merge-base", "--is-ancestor", parent1, base)[0] != 0:
             raise PremergeError(f"rebased parent is not in {base}")
+        _require_paths_from_pre_sha(worktree, head_sha, parent1, pre_sha, base)
     else:
         head_sha, parent1, parent2 = parts
         if parent1 != pre_sha:

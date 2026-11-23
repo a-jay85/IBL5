@@ -800,3 +800,200 @@ def test_runner_second_round_push_failure_keeps_round_one(rig, monkeypatch):
     assert rounds[1]["reason"] == "push-failed"
     assert rig.git.head() == rounds[0]["sha"]
     assert rig.git.drops == [rounds[1]["head_before"]]
+
+
+# ---- fix-round fidelity re-judge (verdict 2 on the post-fix tree) ----
+
+TREE_A = "a" * 40
+TREE_B = "b" * 40
+FIX_SHA = "c" * 40
+
+
+class _TreeGit:
+    """A git whose head tree is fixed (or scripted) for the re-judge unit tests."""
+
+    def __init__(self, *trees):
+        self.trees = list(trees)
+        self.calls = 0
+
+    def head_tree(self):
+        tree = self.trees[min(self.calls, len(self.trees) - 1)]
+        self.calls += 1
+        return tree
+
+
+class _PrGh:
+    def pr_body_fresh(self):
+        return "body"
+
+
+def test_repin_without_verdict_2_still_skips_for_stale_base_caller(monkeypatch):
+    seen = []
+    monkeypatch.setattr(runner.fidelity, "re_review", lambda *a, **k: seen.append(a) or ("READY", TREE_B, "p"))
+    res = SimpleNamespace(fidelity={"verdict_1": "READY WITH NOTES", "reviewed_tree": TREE_A}, slug="")
+    runner._repin_fidelity_after_same_run(None, _TreeGit(TREE_B), _PrGh(), "out", "wt", None,
+                                          "m", "body", 7, FIX_SHA, res, lambda *_: None)
+    assert seen == []
+    assert "verdict_2" not in res.fidelity
+
+
+def _rejudge(monkeypatch, fid, *, head=TREE_B, fix_sha=FIX_SHA, returns=("READY", TREE_B, "/tmp/p")):
+    seen = []
+
+    def rec(*a, **k):
+        seen.append((a, k))
+        return returns
+
+    monkeypatch.setattr(runner.fidelity, "re_review", rec)
+    res = SimpleNamespace(fidelity=fid, slug="")
+    runner._rejudge_fidelity_after_fix_round(None, _TreeGit(head), _PrGh(), "out", "wt", None,
+                                             "m", "body", 7, fix_sha, res, lambda *_: None)
+    return res, seen
+
+
+def _fid(verdict="READY WITH NOTES"):
+    return {"verdict_1": verdict, "reviewed_tree": TREE_A, "verdict_path": "/tmp/v1"}
+
+
+def test_re_review_records_packet_tree_when_head_moves(tmp_path, monkeypatch):
+    class MovingGit:
+        def __init__(self):
+            self.calls = 0
+
+        def head_tree(self):
+            self.calls += 1
+            return TREE_A if self.calls == 1 else TREE_B
+
+        def diff_vs_base(self, base="origin/master"):
+            return ""
+
+    class Llm:
+        def call_tooled(self, *a, **k):
+            return _fid_doc("READY")
+
+    packet_trees = []
+
+    def build_packet(out_dir, master_sha, tree, *a, **k):
+        packet_trees.append(tree)
+        return str(tmp_path)
+
+    monkeypatch.setattr(runner.fidelity, "build_packet", build_packet)
+    monkeypatch.setattr(runner.fidelity, "verdict_path", lambda pr: str(tmp_path / f"v-{pr}.md"))
+    verdict, tree, _ = runner.fidelity.re_review(Llm(), MovingGit(), str(tmp_path), str(tmp_path), None,
+                                                 "m", "body", 7, FIX_SHA, "/tmp/v1", round_num=1)
+    assert verdict == "READY"
+    assert packet_trees == [TREE_A]
+    assert tree == TREE_A
+
+
+def test_fix_round_rejudge_sets_verdict_2_on_post_fix_tree(monkeypatch):
+    res, seen = _rejudge(monkeypatch, _fid())
+    fid = res.fidelity
+    assert len(seen) == 1
+    assert seen[0][0][8] == FIX_SHA   # remediation_sha positional
+    assert fid["verdict_2"] == "READY"
+    assert fid["reviewed_tree_2"] == TREE_B
+    assert fid["same_run_repin"]["kind"] == "fix-round"
+    assert fid["same_run_repin"]["sha"] == FIX_SHA
+
+
+def test_fix_round_rejudge_never_sets_remediation_sha(monkeypatch):
+    res, _ = _rejudge(monkeypatch, _fid())
+    assert "remediation_sha" not in res.fidelity
+
+
+def test_fix_round_rejudge_none_verdict_leaves_verdict_2_unset(monkeypatch):
+    res, seen = _rejudge(monkeypatch, _fid(), returns=(None, TREE_B, "/tmp/p"))
+    assert len(seen) == 1
+    for key in ("verdict_2", "reviewed_tree_2", "same_run_repin"):
+        assert key not in res.fidelity
+
+
+def test_fix_round_rejudge_none_tree_leaves_verdict_2_unset(monkeypatch):
+    res, seen = _rejudge(monkeypatch, _fid(), returns=("READY", None, "/tmp/p"))
+    assert len(seen) == 1
+    for key in ("verdict_2", "reviewed_tree_2", "same_run_repin"):
+        assert key not in res.fidelity
+
+
+def test_fix_round_rejudge_skips_when_head_tree_unchanged(monkeypatch):
+    res, seen = _rejudge(monkeypatch, _fid(), head=TREE_A)
+    assert seen == []
+    assert "verdict_2" not in res.fidelity
+
+
+def test_fix_round_rejudge_skips_without_fix_sha(monkeypatch):
+    res, seen = _rejudge(monkeypatch, _fid(), fix_sha=None)
+    assert seen == []
+    assert "verdict_2" not in res.fidelity
+
+
+def test_fix_round_rejudge_skips_not_ready_verdict_1(monkeypatch):
+    res, seen = _rejudge(monkeypatch, _fid("NOT READY"))
+    assert seen == []
+    assert "verdict_2" not in res.fidelity
+
+
+def test_second_fix_round_repin_keeps_fix_round_kind(monkeypatch):
+    """Round 2's repin rewrites same_run_repin with no kind; the fix-round wording must survive."""
+    from harness import fidelity
+    fid = dict(_fid(), verdict_2="READY", reviewed_tree_2=TREE_B,
+               same_run_repin={"sha": FIX_SHA, "verdict": "READY", "verdict_path": "/tmp/p",
+                               "kind": "fix-round"})
+    res = SimpleNamespace(fidelity=fid, slug="")
+    prior = dict(fid["same_run_repin"])
+    monkeypatch.setattr(runner.fidelity, "re_review", lambda *a, **k: ("NOT READY", TREE_A, "/tmp/p2"))
+    runner._repin_fidelity_after_same_run(None, _TreeGit(TREE_A), _PrGh(), "out", "wt", None,
+                                          "m", "body", 7, "d" * 40, res, lambda *_: None)
+    assert "kind" not in res.fidelity["same_run_repin"]  # the shared helper stays untouched
+    runner._keep_fix_round_kind(res, prior)
+    assert res.fidelity["same_run_repin"]["kind"] == "fix-round"
+    assert res.fidelity["same_run_repin"]["sha"] == "d" * 40
+    assert fidelity.sticky_terminal(res.fidelity).startswith("NOT READY")
+
+
+def test_keep_fix_round_kind_leaves_pr_copy_repin_alone():
+    res = SimpleNamespace(fidelity={"same_run_repin": {"sha": FIX_SHA, "verdict": "READY"}})
+    runner._keep_fix_round_kind(res, {"sha": "x", "verdict": "READY"})
+    assert "kind" not in res.fidelity["same_run_repin"]
+
+
+def _rejudge_rig_llm(rig, **kw):
+    llm = rig.llm(**kw)
+    llm.canned["plan-fidelity-review"] = _fid_doc("READY WITH NOTES")
+    return llm
+
+
+def test_fix_round_rejudges_fidelity_on_post_fix_tree(rig, monkeypatch, fid_pr):
+    pr = fid_pr(7311)
+    calls = []
+
+    def rejudge(*a, **k):
+        calls.append(rig.git.head_tree())
+        return "READY", rig.git.head_tree(), f"/tmp/post-plan-fidelity-verdict-{pr}-2.md"
+
+    monkeypatch.setattr(runner.fidelity, "re_review", rejudge)
+    seen = []
+    real_evaluate = runner.evaluate
+
+    def spy(inputs):
+        seen.append(inputs.fidelity_verdict_2)
+        return real_evaluate(inputs)
+
+    monkeypatch.setattr(runner, "evaluate", spy)
+    res = rig.run(_rejudge_rig_llm(rig, later=[]), extra=_pr_extra(pr))
+    assert res.fix_round["status"] == "accepted"
+    assert len(calls) == 1
+    assert res.fidelity["reviewed_tree_2"] == rig.git.head_tree() == calls[0]
+    assert res.fidelity["reviewed_tree_2"] != res.fidelity["reviewed_tree"]
+    assert seen[-1] == "READY"
+
+
+def test_no_change_fix_round_runs_no_fidelity_judge(rig, monkeypatch, fid_pr):
+    pr = fid_pr(7312)
+    calls = []
+    monkeypatch.setattr(runner.fidelity, "re_review", lambda *a, **k: calls.append(a) or ("READY", TREE_B, "p"))
+    res = rig.run(_rejudge_rig_llm(rig, later=[OTHER]), extra=_pr_extra(pr))
+    assert res.fix_round["status"] == "rejected"
+    assert calls == []
+    assert "verdict_2" not in res.fidelity or res.fidelity["verdict_2"] is None

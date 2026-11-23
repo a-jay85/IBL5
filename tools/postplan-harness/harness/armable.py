@@ -339,7 +339,8 @@ def _apply_second_review(inp, cs, cands) -> list[str]:
     by_number = {c.number: c for c in cs}
     fresh = bool(inp.current_tree) and inp.second_review_tree == inp.current_tree
     if inp.second_review_verdict is None:
-        note = "absent"
+        why = inp.second_review_reject_reason
+        note = f"absent, {why}" if why else "absent"
     elif not fresh:
         note = "stale tree"
     elif inp.second_review_verdict == "CLEAN":
@@ -424,7 +425,7 @@ class ArmInputs:
     second_review_verdict: Optional[str] = None   # "CLEAN"/"REJECT"; None = the seat gave no verdict
     second_review_tree: Optional[str] = None      # tree the seat reviewed; must equal current_tree
     second_review_clears: dict = field(default_factory=dict)  # condition number -> reviewer reason
-    second_review_reject_reason: str = ""         # REJECT text, surfaced in the hold line
+    second_review_reject_reason: str = ""         # REJECT text, or why the seat never ran; surfaced in the hold line
     fidelity_blocking_findings: tuple = ()        # hold (12) BLOCKING finding texts for the seat
     branch: str = ""                              # git.branch(); "" fails the docs-refresh branch clause (fail-closed)
     retried_stages: list[str] = field(default_factory=list)   # RunResult.retries keys; only decorates a no-verdict hold reason, never clears one

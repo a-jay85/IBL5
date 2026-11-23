@@ -2163,6 +2163,20 @@ test_window_unblock_honours() {
     assert_not_contains window_unblock:no-pr-list "$(cat "$T/gh.calls" 2>/dev/null)" "pr list"
 }
 
+test_unblock_prompt_parent_tip() {
+    local prompt_line
+    prompt_line=$(grep '^BL_UNBLOCK_PROMPT=' "$LOOP")
+    assert_contains unblock_prompt:declared-parent "$prompt_line" 'Read the declared parent with `git config --get branch.<branch>.iblBase`.'
+    assert_contains unblock_prompt:squash-merged-parent "$prompt_line" 'the parent was squash-merged and its own commits never reached master, so set <up> to <ptip>'
+    assert_contains unblock_prompt:pre-squash "$prompt_line" 'squash the commits of this branch into one with `git reset --soft <up>` followed by `git commit -C ORIG_HEAD`'
+    assert_contains unblock_prompt:rebase-onto-target "$prompt_line" 'Then run `git rebase --onto <target> <up>`; at each stop resolve every conflict keeping the intent of both sides'
+    assert_contains unblock_prompt:hard-rules "$prompt_line" 'Hard rules: never enable auto-merge; never run `gh pr merge` or `gh api` in any form;'
+    assert_contains unblock_prompt:published-guard "$prompt_line" 'record <sha> as `git rev-parse origin/<branch>` and run `git merge-base --is-ancestor origin/<branch> HEAD`'
+    assert_contains unblock_prompt:last-line "$prompt_line" 'end your final message with exactly one of these lines: BURNDOWN-UNBLOCK: pushed <n> (n = PRs you pushed a fix to), or BURNDOWN-UNBLOCK: none'
+    assert_eq unblock_prompt:old-upstream 0 "$(printf '%s\n' "$prompt_line" | grep -cF 'git rebase --onto origin/master "$(git merge-base HEAD origin/master)"')"
+    assert_eq unblock_prompt:quotes 2 "$(printf '%s' "$prompt_line" | tr -cd "'" | wc -c | tr -d ' ')"
+}
+
 # ---------------------------------------------------------------- runner
 
 TESTS=$(grep -E '^test_[a-z0-9_]+\(\)' "$0" | sed 's/().*//')

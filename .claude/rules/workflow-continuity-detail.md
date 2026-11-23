@@ -1,18 +1,16 @@
 ---
-description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made. Lazy companion to workflow-continuity.md; loads only when a post-plan surface is in play.
-last_verified: 2026-11-19
+description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made.
+last_verified: 2026-11-20
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
   - "tools/postplan-harness/**"
-no-adr: lazy-load companion relocating existing guidance out of workflow-continuity.md behind a glob; introduces no new decision surface, mechanism, or default — exactly mirrors agent-tiering-detail.md and work-triage-detail.md
+no-adr: lazy companion relocating existing workflow-continuity.md guidance behind a glob; no new decision surface
 ---
 
 # Workflow Continuity: Post-Plan Detail
 
-Companion to `.claude/rules/workflow-continuity.md` § Post-Plan. That rule carries the
-triggers. This file carries the internals. Read it before debugging or changing a
-post-plan run.
+Internals behind `.claude/rules/workflow-continuity.md` § Post-Plan. Read before debugging or changing a post-plan run.
 
 ## Engine
 
@@ -27,8 +25,7 @@ branch; it survives you closing Claude Code. Engine selection:
   `POST_PLAN_SKILL=1` forces it.
 - **No partial resume.** The harness runs Phase 5.5's plan-intent review itself
   (`harness/fidelity.py`), posts the sticky `<!-- pr-ready-verdict -->` comment, and feeds the
-  verdict to arming condition (12). It exits **0**, **1** or **3** only (**7** is
-  `bin/post-plan-now`'s main-checkout refusal). It has no exit 4 and no Phase-5.5 re-entry.
+  verdict to arming condition (12). It exits **0**, **1** or **3** only. It has no exit 4 and no Phase-5.5 re-entry.
   Exit **3** is the fail-closed sentinel and suppresses the skill fallback.
   These reach it: a rebase conflict, a **diverged remote head** (the PR branch was rewritten
   on GitHub), a **local gate denial** (a `bin/pre-commit-hook` or `bin/pre-push-adr-hook`
@@ -69,10 +66,7 @@ branch; it survives you closing Claude Code. Engine selection:
   `postplan: conflict flag dropped as stale`. A marker whose commit is still in history
   keeps the hold until a `CONFLICT-REVIEW=CLEAN` verdict covers the current head.
   Detail and the empty-marker rule: `tools/postplan-harness/README.md` § Safety model.
-  On exit 3 the harness writes a plain-words block to `blocked-ship.txt` in its run dir: what stopped the ship, the offending paths when the hook output names them, and numbered copy-paste fix commands ending in `bin/post-plan-now`. `bin/post-plan-now` prints that block between `=== post-plan blocked ship ===` marker lines, or a plain block of the same shape when the file is missing. The DM below and the `bin/automouse/run` skip report carry the same block. When a command failed, the one-line `RESULT:` verdict and the block name it and quote the last few lines of its error, with credentials redacted. Otherwise they name the stage where the run stopped. The block ends with a paste line, `<main checkout>/bin/postplan-fix <PR|slug>`, which opens an interactive Claude session in the worktree with the failing stage, the error text, and the log paths in its opening prompt. It does not ship. With `--headless` it instead fetches, rebases onto `origin/master`, runs one Sonnet 5.5 session with the rung's denied-tool list to resolve the markers and fix tests, leaves the rebased commit locally (it never pushes), and prints the `bin/post-plan-now` paste line. `--headless --dry-run` prints the argv and prompt without touching git. The post-plan-fleet failure DMs and the pr-cycle-tick retry-cap DM end with the same line.
-  `bin/post-plan-fail-dm` sends the DM at once when no live interactive Claude session
-  (headless `claude -p` does not count) is in the worktree. Otherwise it holds the DM 15 min
-  and sends it only if nobody re-fired the branch.
+  On exit 3 the harness writes `blocked-ship.txt` in its run dir. What it holds, the `bin/postplan-fix` paste line and the `bin/post-plan-fail-dm` hold: `.claude/rules/workflow-continuity-blocked-ship.md`.
 
 On the commit path that detection is structural: any non-zero `git commit` is treated as a
 gate denial, so a hook message nobody enumerated in `_LOCAL_GATE_MARKERS` is still caught.
@@ -150,9 +144,7 @@ human signoff.
 The per-branch arming marker is `$(git rev-parse --absolute-git-dir)/postplan-ready`. Only
 `~/.claude/hooks/auto-commit-reminder.sh` reads it, using it to decide which nudge to show
 at turn-end: unarmed tells the model to commit and, if the work verified clean, end its reply with the `cd <worktree> && bin/post-plan-now` paste line; the model must not run `bin/post-plan-now` or /post-plan, as the branch is unarmed (unless the creator-session marker below matches); armed shows `bin/post-plan-now --auto`. Nothing else
-watches the marker or fires post-plan when it appears. The arming requirement was added after
-PR [#2340](https://github.com/a-jay85/IBL5/pull/2340) (2026-09-22), where a post-plan nudge
-caused a model to ship half-done ad-hoc work.
+watches the marker or fires post-plan when it appears.
 
 The creator-session marker is `$(git rev-parse --absolute-git-dir)/wt-new-session`. `bin/wt-new`
 writes `$CLAUDE_CODE_SESSION_ID` into it when it creates a new branch. It writes nothing for a
@@ -160,7 +152,7 @@ human run or for `--existing`, whose branch can carry earlier work. The same hoo
 the marker matches the Stop payload's `session_id`, the nudge says ship with
 `bin/post-plan-now --auto` once the whole task verified clean. Any other session gets the hold
 text. The marker is session-scoped by content, so a later session in the same worktree never
-inherits the ship default the way it would inherit `postplan-ready`. Added 2026-09-25.
+inherits the ship default the way it would inherit `postplan-ready`.
 
 ## No deadlock
 

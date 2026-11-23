@@ -58,7 +58,7 @@ func (r *RNG) Draws() []Draw {
 
 func (p *replay) next(api string, n int) int {
 	caller := callerName()
-	if p.pos >= len(p.values) {
+	if p.pos == len(p.values) {
 		panic(&ExhaustedError{Index: p.pos, API: api, Caller: caller})
 	}
 	v := p.values[p.pos]

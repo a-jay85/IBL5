@@ -1,8 +1,8 @@
 package sim
 
 // DrawSites maps each function that makes an RNG draw to the JSB address it
-// ports. Keys are rng.NormalizeCaller forms ("sim.selectRebounder",
-// "sim.(*gameState).maybeInjure"). A value is set only when the function's own
+// ports. Keys are rng.NormalizeCaller forms (sim.selectRebounder or
+// sim.(*gameState).maybeInjure, in quotes). A value is set only when the function's own
 // doc comment holds exactly one FUN_xxxxxxxx token, and is "" otherwise.
 // TestDrawSitesCoverEveryCallSite regenerates the key set from the AST and
 // TestDrawSitesAddressesMatchDocComments pins each value to the doc comment.

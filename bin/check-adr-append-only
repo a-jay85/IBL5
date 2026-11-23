@@ -386,6 +386,11 @@ while IFS=$'\t' read -r status a b; do
                 nn=$((nn + 1))
             fi
         done
+        # The header's old count must match the '-' lines read, or the line numbers are wrong.
+        if [ "$oi" -ne "$old_count" ]; then
+            echo "check-adr-append-only: hunk parse error in $path at base line $old_start: header says $old_count old line(s), read $oi" >&2
+            exit 2
+        fi
         for ((i = 0; i < no; i++)); do
             o="${OLD[$i]}"
             ln="${OLDLN[$i]}"

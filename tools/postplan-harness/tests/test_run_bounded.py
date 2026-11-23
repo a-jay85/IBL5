@@ -77,6 +77,11 @@ def test_reap_live_groups_kills_inflight_child(tmp_path):
         target=lambda: run_bounded(["bash", script], step="probe", timeout=60), daemon=True)
     t.start()
     pid = _wait_for(pidfile, 5)
+    # The child can write its pidfile before the worker thread registers its pgid,
+    # so wait for the registration before reaping.
+    deadline = time.monotonic() + 5
+    while pid not in _LIVE_PGIDS and time.monotonic() < deadline:
+        time.sleep(0.01)
     reap_live_groups()
     t.join(10)
     assert not t.is_alive()

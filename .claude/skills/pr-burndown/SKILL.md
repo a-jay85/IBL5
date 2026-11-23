@@ -424,6 +424,6 @@ When the owner stops or the list ends, list:
   with its open threads.
 - PRs prepped and armed with no owner call
 - PRs still running, with their `.result` paths and who picks each one up (a watcher log
-  or a thread link)
+  or the next `/pr-burndown` run)
 - PRs waiting on the owner, and the decision each needs
 - PRs held, and why

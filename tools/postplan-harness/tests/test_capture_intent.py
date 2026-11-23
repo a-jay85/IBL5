@@ -238,3 +238,23 @@ def test_writes_outside_repo(tmp_path):
     assert header == f"<!-- capture-intent v1 sha256={digest} -->"
     data = json.loads(payload)
     assert data["version"] == 1 and data["session"] == SID and data["branch"] == BRANCH
+
+
+def test_slash_branch_writes_nested_file(tmp_path):
+    home, cwd = _dirs(tmp_path)
+    _write_session(home, [_user("ship it")])
+    r = _run(home, cwd, "--branch", "t3/some-branch", "1")
+    assert r.returncode == 0, r.stderr
+    _, data = _payload(home, "t3/some-branch")
+    assert data["branch"] == "t3/some-branch"
+
+
+def test_bad_branch_names_refused(tmp_path):
+    home, cwd = _dirs(tmp_path)
+    _write_session(home, [_user("ship it")])
+    for bad in ("/abs", "t3/", "a//b", "a/../b", "a/.hidden", "..", "HEAD", "master"):
+        r = _run(home, cwd, "--branch", bad, "1")
+        assert r.returncode == 2, bad
+        assert "bad branch name" in r.stderr, bad
+    assert not (home / "claude-plans" / "_intent").exists() or \
+        not any((home / "claude-plans" / "_intent").rglob("*.md"))

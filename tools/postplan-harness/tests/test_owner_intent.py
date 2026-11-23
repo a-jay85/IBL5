@@ -87,6 +87,15 @@ def test_branch_mismatch(home):
     assert owner_intent.load("a/../b") is None
 
 
+def test_slash_branch_round_trip(home):
+    _capture(home, ["please ship the seat fix"], branch="t3/some-branch")
+    data = owner_intent.load("t3/some-branch")
+    assert data is not None
+    assert data["branch"] == "t3/some-branch"
+    assert owner_intent.load("t3//some-branch") is None
+    assert owner_intent.load("/t3/some-branch") is None
+
+
 def test_load_rejects_over_cap(home):
     _forge(home, {"version": 1, "session": SID, "branch": BRANCH,
                   "turns": [_turn("x" * 2000), _turn("y" * 2001, index=2)]})

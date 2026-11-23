@@ -33,7 +33,10 @@ WRAPPER_RE = re.compile(
     r"<(system-reminder|t3_context)\b[^>]*>(?:(?!<\1\b).)*?</\1>\n?", re.S)
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}")
 TOKEN_RE = re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{20,}|xox[abprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,})")
-BRANCH_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+# One or more `/`-separated parts, each starting with a letter or digit, so a
+# branch like `t3/foo` maps to `_intent/t3/foo.md`. No empty part, no leading
+# `/` or `.`, and the `..` check below keeps the path inside `_intent/`.
+BRANCH_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9][A-Za-z0-9._-]*)*$")
 CAP = 4000
 
 

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # bin/check-shell-portability — keep BSD-first stat calls out of bin/ shell scripts.
 #
@@ -10,6 +10,12 @@
 #
 # What the gate flags: a stat call with -f and a format operand (a % after the flag,
 # optionally quoted) when no stat -c call comes earlier in the same statement.
+# It also flags two bash-floor problems (.claude/rules/shell-portability.md):
+#   - an absolute-path bash shebang on line 1, such as /bin/bash or /usr/bin/bash.
+#     macOS /bin/bash is 3.2; use #!/usr/bin/env bash so PATH finds Homebrew bash 5.
+#   - an executable #!/usr/bin/env bash script whose first line that is neither blank
+#     nor a comment is not the exact bash-version guard line. Exempt: files without
+#     the exec bit (sourced libs), bin/hooks/, any fixtures/ dir, and .github/.
 #
 # Statements: a backslash-continued line is joined to the next one, so a GNU-first call
 # on line 1 covers a BSD call on a continuation line. A hit is reported at the first
@@ -20,29 +26,78 @@
 # A marker with no reason, or without the colon, does not count. Use it when the site
 # is correct another way, such as a caller that validates the value.
 #
-# Scope: every file under bin/ whose name ends in .sh or .bash, or whose first line is
-# a shebang naming a shell. Python and other scripts are skipped. The scan is the whole
-# tree, not a diff, so the gate takes no base ref. --files exists for the harness.
+# Scope: the stat check reads every file under bin/ whose name ends in .sh or .bash, or
+# whose first line is a shebang naming a shell. The shebang and guard checks read every
+# tracked file under bin, ibl5/bin, tools and .github whose first line is a #! naming
+# bash. Python and other scripts are skipped. The scan is the whole tree, not a diff,
+# so the gate takes no base ref. --files runs every check on the given paths.
 #
 # Limit: comment stripping is quote-blind. The first # at line start or after
 # whitespace starts a comment, even inside a quoted string. Comment-only lines are never
 # scanned, so this header may describe the pattern.
 #
-# Bash 3.2 safe (macOS /bin/bash): no mapfile, no associative arrays, no ${x,,}.
+# Needs bash 4+; the version guard below stops it early under macOS /bin/bash 3.2.
 #
 # Exit codes: 0 = pass, 1 = violation found, 2 = usage error.
 #
 # gate-backtest-argv:
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 usage() { echo "usage: bin/check-shell-portability [--files <path>...]"; }
-die() { echo "check-shell-portability: $*" >&2; exit 2; }
+die() {
+    echo "check-shell-portability: $*" >&2
+    exit 2
+}
 
 # An invocation: stat as its own word, optional other flags, then -f and a format
 # operand (optional space, optional quote, then %). Covers the attached -f%z form.
 BSD_RE="(^|[^[:alnum:]_.-])stat[[:space:]]+(-[[:alpha:]]+[[:space:]]+)*-f[[:space:]]*[\"']?%"
 GNU_RE="(^|[^[:alnum:]_.-])stat[[:space:]]+(-[[:alpha:]]+[[:space:]]+)*-c"
+
+# Any absolute-path bash on line 1. #!/usr/bin/env bash never matches: its path ends in /env.
+SHEBANG_RE='^#![[:space:]]*/[^[:space:]]*/bash([[:space:]]|$)'
+ENV_BASH_RE='^#!/usr/bin/env bash([[:space:]]|$)'
+
+# The exact guard every executable env-bash script carries before its first command.
+# The template holds @MIN@ and @RC@ placeholders so this file has only one literal copy
+# of the guard: its own line near the top.
+GUARD_TMPL=$(cat <<'GUARD'
+[ "${BASH_VERSINFO[0]:-0}" -ge @MIN@ ] || { printf '%s: bash @MIN@+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit @RC@; }
+GUARD
+)
+GUARD_LINE=${GUARD_TMPL//@MIN@/4}
+GUARD_LINE=${GUARD_LINE//@RC@/2}
+
+bash_hits=0
+# check_shebang <file>: flag an absolute-path bash shebang on line 1.
+check_shebang() {
+    local first=""
+    IFS= read -r first < "$1" || true
+    if [[ "$first" =~ $SHEBANG_RE ]]; then
+        echo "$1:1: absolute bash shebang; use #!/usr/bin/env bash"
+        bash_hits=$((bash_hits + 1))
+    fi
+}
+# check_guard <file>: an executable env-bash script outside bin/hooks/ and fixtures/
+# must have GUARD_LINE as its first line that is neither blank nor a # comment.
+check_guard() {
+    local f="$1" first="" line="" found=""
+    case "$f" in *bin/hooks/* | */fixtures/*) return 0 ;; esac
+    IFS= read -r first < "$f" || true
+    [[ "$first" =~ $ENV_BASH_RE ]] || return 0
+    [ -x "$f" ] || return 0
+    while IFS= read -r line || [ -n "$line" ]; do
+        if [[ "$line" =~ ^[[:space:]]*(#|$) ]]; then continue; fi
+        found="$line"
+        break
+    done < <(tail -n +2 "$f")
+    if [ "$found" != "$GUARD_LINE" ]; then
+        echo "$f:1: missing bash-version guard before the first command"
+        bash_hits=$((bash_hits + 1))
+    fi
+}
 
 FILES_MODE=0
 files=()
@@ -58,21 +113,50 @@ while [ $# -gt 0 ]; do
     esac
 done
 
+# bash_files: candidates for the shebang and guard checks. guard_files: the subset the
+# guard check reads (tree mode leaves out .github/, which runs only on Linux bash 5).
+bash_files=()
+guard_files=()
 if [ "$FILES_MODE" -eq 1 ]; then
     [ "${#files[@]}" -gt 0 ] || die "--files needs at least one path"
     for f in "${files[@]}"; do
         [ -f "$f" ] || die "no such file: $f"
     done
+    bash_files=("${files[@]}")
+    guard_files=("${files[@]}")
 else
     cd "$(dirname "$0")/.."
     if list=$(git ls-files -- bin 2>/dev/null) && [ -n "$list" ]; then :; else list=$(find bin -type f); fi
     while IFS= read -r f; do
         if [ -f "$f" ]; then files+=("$f"); fi
     done <<< "$list"
+    if blist=$(git ls-files -- bin ibl5/bin tools .github 2>/dev/null) && [ -n "$blist" ]; then :; else
+        blist=$(find bin ibl5/bin tools .github -type f 2>/dev/null || true)
+    fi
+    while IFS= read -r f; do
+        [ -f "$f" ] && [ ! -L "$f" ] || continue
+        first=""
+        IFS= read -r first < "$f" || true
+        case "$first" in '#!'*bash*) ;; *) continue ;; esac
+        bash_files+=("$f")
+        case "$f" in .github/*) ;; *) guard_files+=("$f") ;; esac
+    done <<< "$blist"
 fi
 
-# Bash 3.2 + set -u: expanding an empty array errors, so stop before awk.
-if [ "${#files[@]}" -eq 0 ]; then echo "check-shell-portability: OK (0 files scanned)"; exit 0; fi
+for f in ${bash_files[@]+"${bash_files[@]}"}; do check_shebang "$f"; done
+for f in ${guard_files[@]+"${guard_files[@]}"}; do check_guard "$f"; done
+if [ "$bash_hits" -gt 0 ]; then
+    echo "fix: start the script with #!/usr/bin/env bash, then put this line before its first command:"
+    printf '%s\n' "$GUARD_LINE"
+    echo "see .claude/rules/shell-portability.md"
+fi
+
+# An empty array errors under set -u on old bash, so stop before awk.
+if [ "${#files[@]}" -eq 0 ]; then
+    [ "$bash_hits" -eq 0 ] || exit 1
+    echo "check-shell-portability: OK (0 files scanned)"
+    exit 0
+fi
 
 read -r -d '' AWK_PROG <<'AWK' || true
 function report(f, n, t) { printf "%s:%d: %s\n", f, n, t; hits++ }
@@ -112,6 +196,7 @@ END {
 AWK
 
 if out=$(awk -v bsd_re="$BSD_RE" -v gnu_re="$GNU_RE" "$AWK_PROG" "${files[@]}"); then rc=0; else rc=$?; fi
+if [ "$rc" -eq 0 ] && [ "$bash_hits" -gt 0 ]; then exit 1; fi
 case "$rc" in
     0) echo "check-shell-portability: OK (${#files[@]} files scanned)"; exit 0 ;;
     1)

@@ -25,6 +25,14 @@ from .classify import slice_spec_diffs
 from .review_depth import DEEP, STANDARD, max_depth
 from .gate_backtest import FIX_TITLE_RE
 
+
+_REVIEWED_HEAD_RE = re.compile(r"[0-9a-f]{40}")
+
+
+def _reviewed_head_marker(sha: str) -> str:
+    """Hidden marker naming the head a clean Code review covered; bin/lib/prior-review.sh reads it."""
+    return f"\n\n<!-- reviewed-head: {sha} -->" if _REVIEWED_HEAD_RE.fullmatch(sha or "") else ""
+
 # The fan-out below keeps the purpose strings as literals, because
 # test_model_pins_match_source greps them. This keeps them in step with the one registry.
 _FANOUT_PURPOSES = {"A": "review-agent-a", "D": "review-agent-d", "security": "security-audit"}
@@ -626,6 +634,10 @@ class ReviewPhase:
 
         pr = meta.get("number") or 0
         sha = meta.get("headRefOid") or meta.get("sha") or ""
+
+        def _post_code_review_summary(body: str) -> None:
+            self.gh.post_review_summary(pr, "Code review", body + _reviewed_head_marker(sha))
+
         code = labels.sort_by_severity([f for f in surviving if f.source == "code-review"])
         sec = labels.sort_by_severity([f for f in surviving if f.source == "security-audit"])
         code_degraded = [p for p in degraded_agents if p.startswith("review-agent-")]
@@ -636,13 +648,12 @@ class ReviewPhase:
         if code:
             self.gh.post_review_findings(pr, sha, "Code review", code)
         elif code_degraded:
-            self.gh.post_review_summary(pr, "Code review",
-                                        "Review unavailable - unparseable output from: "
-                                        + ", ".join(code_degraded) + _reused_note(reused_code))
+            _post_code_review_summary("Review unavailable - unparseable output from: "
+                                      + ", ".join(code_degraded) + _reused_note(reused_code))
         elif reused_code:
-            self.gh.post_review_summary(pr, "Code review", _reused_note(reused_code).strip())
+            _post_code_review_summary(_reused_note(reused_code).strip())
         else:
-            self.gh.post_review_summary(pr, "Code review", "No issues found.")
+            _post_code_review_summary("No issues found.")
         if run_sec:
             if sec:
                 self.gh.post_review_findings(pr, sha, "Security audit", sec)

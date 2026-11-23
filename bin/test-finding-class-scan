@@ -226,7 +226,7 @@ seed_class() {
 # ── Cases: flags, env and state dir (Phase 1) ─────────────────────────────────
 case_help_without_home() {
     local out rc=0
-    out="$(env -i PATH=/usr/bin:/bin bash -c 'set -euo pipefail; bash "$1" --help' _ "$FCS" 2>&1)" || rc=$?
+    out="$(env -i PATH="$(harness_bare_path "$T")" bash -c 'set -euo pipefail; bash "$1" --help' _ "$FCS" 2>&1)" || rc=$?
     expect_eq "row 3: --help under env -i exits 0" 0 "$rc"
     expect_has "row 3: help prints the usage" "$out" "Usage: bin/finding-class-scan"
     expect_has "row 3: help keeps the text after the bridge" "$out" "Exit codes"
@@ -234,11 +234,11 @@ case_help_without_home() {
 
 case_state_dir_resolution() {
     local out rc=0
-    out="$(env -i PATH=/usr/bin:/bin bash "$FCS" --dry-run 2>&1)" || rc=$?
+    out="$(env -i PATH="$(harness_bare_path "$T")" bash "$FCS" --dry-run 2>&1)" || rc=$?
     expect_eq "row 4: no HOME and no state dir exits 1" 1 "$rc"
     expect_has "row 4: names the state dir problem" "$out" "cannot resolve state dir"
     rc=0
-    env -u FCS_STATE_DIR HOME= PATH=/usr/bin:/bin bash "$FCS" --dry-run >/dev/null 2>&1 || rc=$?
+    env -u FCS_STATE_DIR HOME= PATH="$(harness_bare_path "$T")" bash "$FCS" --dry-run >/dev/null 2>&1 || rc=$?
     expect_eq "row 5: empty HOME exits 1" 1 "$rc"
 }
 

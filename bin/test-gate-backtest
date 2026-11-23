@@ -721,7 +721,7 @@ case_stacked_base() {
 case_minimal_env() {
     setup_hist
     RC=0
-    OUT=$(env -i PATH=/usr/bin:/bin BRANCH_BASE_OFFLINE=1 TMPDIR="$TMPDIR" \
+    OUT=$(env -i PATH="$(harness_bare_path "$T")" BRANCH_BASE_OFFLINE=1 TMPDIR="$TMPDIR" \
         GIT_AUTHOR_NAME=T GIT_AUTHOR_EMAIL=t@t.com GIT_COMMITTER_NAME=T GIT_COMMITTER_EMAIL=t@t.com \
         "$GB" "--repo=$H" "--base=master" "--head=cand-noisy" "--fixture-history=$J" \
         "--now=$NOW" 2>"$T/err") || RC=$?

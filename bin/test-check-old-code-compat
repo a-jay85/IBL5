@@ -146,7 +146,7 @@ run_case() {
     shift 4
     printf '%s' "$STDIN_TEXT" > "$WORK/stdin"
     if [ "$RUN_ENV_I" = "1" ]; then
-        out="$(env -i PATH=/usr/bin:/bin "$SUT" "$@" < "$WORK/stdin" 2>&1)"
+        out="$(env -i PATH="$(harness_bare_path "$WORK")" "$SUT" "$@" < "$WORK/stdin" 2>&1)"
         rc=$?
     else
         out="$("$SUT" "$@" < "$WORK/stdin" 2>&1)"

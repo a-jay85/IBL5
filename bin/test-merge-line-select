@@ -758,7 +758,7 @@ fi
 
 # --- G17: empty environment, strict mode, macOS system bash ---
 
-OUT=$(cd "$REPO_ROOT" && env -i PATH=/usr/bin:/bin /bin/bash -c \
+OUT=$(cd "$REPO_ROOT" && env -i PATH="$(harness_bare_path "$TMP")" "$BASH" -c \
     'set -euo pipefail; bin/merge-line-select --input - < bin/fixtures/merge-line/live-snapshot.json' 2>&1)
 RC=$?
 if [ "$RC" = 0 ] && grep -q '^action=' <<< "$OUT"; then

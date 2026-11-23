@@ -569,7 +569,7 @@ for t in git awk sed grep tr cat rm mkdir mktemp python3 sort head tail wc cut d
     p=$(command -v "$t" 2>/dev/null) || continue
     case "$p" in /*) ln -sf "$p" "$NT/$t" ;; esac
 done
-OUT=$(PATH="$NT" /bin/bash "$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+OUT=$(PATH="$NT" "$BASH" "$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
 chk "NO-TIMEOUT exits 1" eq "$RC" 1
 chk "NO-TIMEOUT reported" has "$OUT" "NO-TIMEOUT"
 chk "NO-TIMEOUT leaves target" eq "$(sha "$R/target.txt")" "$BEFORE"

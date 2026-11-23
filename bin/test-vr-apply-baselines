@@ -43,7 +43,8 @@ run_script() {
   local args=("--gallery=$FIX/g.json" "--actuals=$FIX/actuals" "--snapshot-dir=$FIX/snaps" "--list-out=$FIX/list.txt")
   RC=0
   if [ "$mode" = clean ]; then
-    env -i PATH=/usr/bin:/bin bash "$script" "${args[@]}" > "$FIX/out" 2> "$FIX/err" || RC=$?
+    mkdir -p "$FIX/hb5-bash" && ln -sf "$BASH" "$FIX/hb5-bash/bash"
+    env -i PATH="$FIX/hb5-bash:/usr/bin:/bin" bash "$script" "${args[@]}" > "$FIX/out" 2> "$FIX/err" || RC=$?
   else
     bash "$script" "${args[@]}" > "$FIX/out" 2> "$FIX/err" || RC=$?
   fi

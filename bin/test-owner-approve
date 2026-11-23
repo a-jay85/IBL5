@@ -335,10 +335,10 @@ live_crash_fails_closed() {
     refute_gh "pr edit"
     refute_gh "pr merge"
 }
-# Runs the pgrep cases under /bin/bash, which is 3.2 on macOS and has no BASHPID.
+# Runs the pgrep cases under the running bash (bash 4+; /bin/bash 3.2 is refused by the version guard).
 live_ok_bin_bash() { # <signal text>
     seed_ready
-    run_oa_env /bin/bash "$OA" "$PR" "ok" --poll=0 --timeout=30
+    run_oa_env "$BASH" "$OA" "$PR" "ok" --poll=0 --timeout=30
     want_rc 0
     want_out "waiting 0s: $1"
     want_gh "pr merge $PR -R a-jay85/IBL5 --squash --auto --match-head-commit $H"

@@ -41,6 +41,9 @@ row_result() {
 . "$REPO_ROOT/bin/lib/claim-file.sh"
 
 TMPROOT=$(mktemp -d)
+# Shim dir holding only a `bash` symlink: `env bash` finds bash 4+ under the bare PATH.
+mkdir -p "$TMPROOT/hb5-bash" && ln -sf "$BASH" "$TMPROOT/hb5-bash/bash"
+BARE_PATH="$TMPROOT/hb5-bash:/usr/bin:/bin"
 trap 'rm -rf "$TMPROOT"' EXIT
 
 # make_stub_bin <dir> <token|""> <curl-body> [curl-exit]
@@ -1655,7 +1658,7 @@ test_coord_empty_launchd_env() {
     new_env
     local h out rc
     h=$(mktemp -d "$TMPROOT/home.XXXXXX")
-    out=$(env -i HOME="$h" PATH=/usr/bin:/bin IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" \
+    out=$(env -i HOME="$h" PATH="$BARE_PATH" IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" \
         "$REPO_ROOT/bin/usage-gate-coordinator" --once --dry-run 2>&1); rc=$?
     assert_eq coord_launchd_env:rc 0 "$rc"
     assert_contains coord_launchd_env:zone "$out" "ZONE"
@@ -1722,7 +1725,7 @@ test_setup_empty_launchd_env() {
     new_env
     local h out rc
     h=$(mktemp -d "$TMPROOT/home.XXXXXX")
-    out=$(env -i HOME="$h" PATH=/usr/bin:/bin "$SETUP" --print 2>&1); rc=$?
+    out=$(env -i HOME="$h" PATH="$BARE_PATH" "$SETUP" --print 2>&1); rc=$?
     assert_eq setup_launchd_env:rc 0 "$rc"
     assert_contains setup_launchd_env:homebrew "$out" "/opt/homebrew/bin"
 }

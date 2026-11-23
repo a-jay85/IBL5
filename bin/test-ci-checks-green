@@ -580,7 +580,7 @@ done
 set --
 if [ "$p10_ok" -eq 1 ]; then ok "P10 rejected flag forms"; else fail "P10 rejected flag forms"; fi
 
-p11_out="$(env -i PATH=/usr/bin:/bin bash -euo pipefail "$POLL" --help 2>&1)"; p11_rc=$?
+p11_out="$(env -i PATH="$(harness_bare_path "$TMP")" bash -euo pipefail "$POLL" --help 2>&1)"; p11_rc=$?
 if [ "$p11_rc" -eq 0 ] && [[ "$p11_out" == *"Usage: bin/check-pr-checks-green"* ]]; then
     ok "P11 bare-environment help"
 else fail "P11 bare-environment help (rc=$p11_rc)"; fi

@@ -649,7 +649,7 @@ chk_eq "output" "rc=3" "$OUT"
 case_end
 
 new_unit
-OUT="$(env -i PATH=/usr/bin:/bin bash -c 'set -euo pipefail; . "$1"; echo sourced' _ "$LIB_SRC" 2>&1)" && RC=$? || RC=$?
+OUT="$(env -i PATH="$(harness_bare_path "$TMP")" bash -c 'set -euo pipefail; . "$1"; echo sourced' _ "$LIB_SRC" 2>&1)" && RC=$? || RC=$?
 case_begin "unit: sourcing is side-effect free"
 chk_eq "exit code" 0 "$RC"
 chk_eq "output" "sourced" "$OUT"

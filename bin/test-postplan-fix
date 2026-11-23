@@ -355,7 +355,7 @@ has "11: main out dir searched" "$PROMPT" "BLOCKMARK"
 rm -f "$TMP/claude.prompt"
 env -i POSTPLAN_LOG_DIR="$POSTPLAN_LOG_DIR" \
     IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" IBL5_USAGE_CLAUDE_PROJECTS="$IBL5_USAGE_CLAUDE_PROJECTS" IBL5_USAGE_GATE_TEST_MODE="$IBL5_USAGE_GATE_TEST_MODE" \
-    PATH="$STUB:/usr/bin:/bin" /bin/bash -c 'set -euo pipefail; "$1" "$2"' _ "$SUT" "$B_BLOCK" \
+    PATH="$STUB:$(harness_bare_path "$TMP")" "$BASH" -c 'set -euo pipefail; "$1" "$2"' _ "$SUT" "$B_BLOCK" \
     >/dev/null 2>"$TMP/err"; RC=$?
 rc_is "12: env -i probe exits 0" "$RC" 0
 PROMPT=""; [ -f "$TMP/claude.prompt" ] && PROMPT=$(cat "$TMP/claude.prompt")
@@ -879,7 +879,7 @@ fi
 if should_run "headless-env-i"; then
 hl_reset
 mkdir -p "$TMP/home"
-env -i PATH=/usr/bin:/bin HOME="$TMP/home" POSTPLAN_LOG_DIR="$RUNLOG" \
+env -i PATH="$(harness_bare_path "$TMP")" HOME="$TMP/home" POSTPLAN_LOG_DIR="$RUNLOG" \
     bash -o pipefail "$SUT" --headless --dry-run "$B_CONFLICT" >/dev/null 2>"$TMP/err"; RC=$?
 ERR=$(cat "$TMP/err")
 need "rc 0 (stderr: $ERR)" test "$RC" = 0

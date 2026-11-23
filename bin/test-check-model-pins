@@ -160,7 +160,7 @@ want_rc "10 non-repo" 2 "$rc"
 want "10 says git grep failed" "$out" "git grep failed"
 
 # 11. Empty env still catches a stale id (gate 17). Reuses case 2's tree.
-out=$(env -i /bin/bash "$D2/bin/check-model-pins" 2>&1); rc=$?
+out=$(env -i "$BASH" "$D2/bin/check-model-pins" 2>&1); rc=$?
 want_rc "11 empty env" 1 "$rc"
 want "11 empty env names the id" "$out" "$STALE_SONNET"
 

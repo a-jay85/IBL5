@@ -352,7 +352,7 @@ mk_doc "$TMP/e.o" 2026-10-14 base base
 mk_doc "$TMP/e.a" 2026-10-15 base base
 mk_doc "$TMP/e.b" 2026-10-18 base base
 rc=0
-env -i PATH=/usr/bin:/bin bash -c 'set -euo pipefail; "$1" "$2" "$3" "$4" 7 x' _ \
+env -i PATH="$(harness_bare_path "$TMP")" bash -c 'set -euo pipefail; "$1" "$2" "$3" "$4" 7 x' _ \
     "$DRIVER" "$TMP/e.o" "$TMP/e.a" "$TMP/e.b" > /dev/null 2>&1 || rc=$?
 h_eq "empty-env-driver: rc" "0" "$rc"
 ok_if "empty-env-driver: date" has_line "$TMP/e.a" "last_verified: 2026-10-18"

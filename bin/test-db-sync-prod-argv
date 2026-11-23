@@ -84,7 +84,7 @@ printf 'SELECT 1;\n' | gzip -c > "$TMP/snap.sql.gz"
 run_sync() {   # usage: run_sync [VAR=value ...] — extra env assignments for a case
     : > "$STUB_ARGV_LOG.docker"
     set +e
-    OUT=$(cd "$TMP" && env -i PATH="$STUBBIN:/usr/bin:/bin" HOME="$TMP" TMPDIR="$TMP" \
+    OUT=$(cd "$TMP" && env -i PATH="$STUBBIN:$(harness_bare_path "$TMP")" HOME="$TMP" TMPDIR="$TMP" \
           STUB_ARGV_LOG="$STUB_ARGV_LOG" "$@" \
           "$MAIN/bin/db-sync-prod" --snapshot "$TMP/snap.sql.gz" 2>"$TMP/err")
     RC=$?
@@ -203,10 +203,10 @@ assert_eq "L4 stdout empty" "" "$L4_OUT"
 
 # Library constants: defaults, override, ambient DB_NAME, not exported.
 assert_eq "L5 defaults" "root|root|iblhoops_ibl5" "$DB_ROOT_USER|$DB_ROOT_PASS|$DB_DEFAULT_NAME"
-L6=$(env -i PATH=/usr/bin:/bin DB_NAME=other DB_DEFAULT_NAME=alt DB_ROOT_USER=u1 \
+L6=$(env -i PATH="$(harness_bare_path "$TMP")" DB_NAME=other DB_DEFAULT_NAME=alt DB_ROOT_USER=u1 \
     bash -c ". '$MAIN/bin/lib/db-helpers.sh'; printf '%s|%s|%s' \"\$DB_DEFAULT_NAME\" \"\$DB_ROOT_USER\" \"\$DB_ROOT_PASS\"")
 assert_eq "L6 override honored, ambient DB_NAME ignored" "alt|u1|root" "$L6"
-L7=$(env -i PATH=/usr/bin:/bin bash -c ". '$MAIN/bin/lib/db-helpers.sh'; env | grep -c '^DB_ROOT_PASS=' || true")
+L7=$(env -i PATH="$(harness_bare_path "$TMP")" bash -c ". '$MAIN/bin/lib/db-helpers.sh'; env | grep -c '^DB_ROOT_PASS=' || true")
 assert_eq "L7 constants not exported" "0" "$L7"
 
 # M1-M3: the DB_CMD= line of each script, evaluated against the real library.
@@ -217,7 +217,7 @@ compose_db_cmd() {  # <script> [VAR=value ...]
     cmd_line=$(grep -m1 '^DB_CMD=' "$REPO_ROOT/bin/$script")
     body=$(printf '%s\n' "set --" ". '$REPO_ROOT/bin/lib/db-helpers.sh'" "$name_line" "$cmd_line" \
         'printf "%s" "$DB_CMD"')
-    env -i PATH=/usr/bin:/bin "$@" bash -c "$body"
+    env -i PATH="$(harness_bare_path "$TMP")" "$@" bash -c "$body"
 }
 OVR=(DB_ROOT_USER=u1 DB_ROOT_PASS=sekret99 DB_DEFAULT_NAME=altdb)
 assert_eq "M1 db-migrate" "mariadb -u root -proot iblhoops_ibl5" "$(compose_db_cmd db-migrate)"

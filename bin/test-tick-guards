@@ -172,7 +172,7 @@ if grep -Fq 'command not found' <<< "$OUT"; then fail "GC release no command-not
 LIB="$SCRIPT_DIR/lib/tick-guards.sh"
 
 strict() {  # <snippet> <args...>
-    env -i PATH=/usr/bin:/bin bash -euo pipefail -c "$1" _ "${@:2}"
+    env -i PATH="$(harness_bare_path "$T")" bash -euo pipefail -c "$1" _ "${@:2}"
 }
 
 mk_reader() {  # <name> <body> -> path of an executable stub reader

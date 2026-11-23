@@ -1008,13 +1008,14 @@ if [ "$FOREGROUND" -eq 1 ]; then
     echo "post-plan-now: plan: $PLAN_FILE"
     # exec, not a call: `timeout` signals the whole process group, and a surviving
     # wrapper shell would outlive the SIGTERM its child just took. The launchd form
-    # runs $CMD from the $SCRIPT file (#!/bin/bash); both parse it as one bash script.
-    exec /bin/bash -lc "$CMD"
+    # runs $CMD from the $SCRIPT file. Both use this script's own bash ($BASH, 4+), because
+    # $CMD sources guarded libs that exit 2 under macOS /bin/bash 3.2.
+    exec "$BASH" -lc "$CMD"
 fi
 
 # $CMD goes to a private per-run file, never onto the submit argv (size). The file
 # is mode 700: it carries the prompt.
-( umask 077; printf '#!/bin/bash\n%s\n' "$CMD" > "$SCRIPT" ) \
+( umask 077; printf '#!%s\n%s\n' "$BASH" "$CMD" > "$SCRIPT" ) \
     || { echo "post-plan-now: could not write $SCRIPT." >&2; exit 1; }
 chmod 700 "$SCRIPT"
 if ! ljob_submit "$LABEL" "$LOG" "$SCRIPT"; then

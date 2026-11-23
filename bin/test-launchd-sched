@@ -66,6 +66,9 @@ approve-click|bin/approve-click-cron-setup"
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
+# Shim dir holding only a `bash` symlink: `env bash` finds bash 4+ under the bare PATH.
+mkdir -p "$TMP/hb5-bash" && ln -sf "$BASH" "$TMP/hb5-bash/bash"
+BARE_PATH="$TMP/hb5-bash:/usr/bin:/bin"
 # shellcheck source=bin/lib/usage-test-isolation.sh
 . "$REPO_ROOT/bin/lib/usage-test-isolation.sh"; usage_test_isolate "$TMP/usage"
 
@@ -92,7 +95,7 @@ RC=0
 run_case() {
   local script="$1" args="$2" extra="$3" out
   # shellcheck disable=SC2086  # args and extra are deliberately word-split
-  out="$(env -i HOME="$GOLDEN_HOME" PATH=/usr/bin:/bin $extra bash "$REPO_ROOT/$script" $args 2>/dev/null)"
+  out="$(env -i HOME="$GOLDEN_HOME" PATH="$BARE_PATH" $extra bash "$REPO_ROOT/$script" $args 2>/dev/null)"
   RC=$?
   normalise_stdout "$out"
 }
@@ -101,7 +104,7 @@ run_case() {
 run_cli() {
   local script="$1" args="$2" err code
   # shellcheck disable=SC2086
-  err="$(env -i HOME="$GOLDEN_HOME" PATH=/usr/bin:/bin bash "$REPO_ROOT/$script" $args 2>&1 >/dev/null)"
+  err="$(env -i HOME="$GOLDEN_HOME" PATH="$BARE_PATH" bash "$REPO_ROOT/$script" $args 2>&1 >/dev/null)"
   code=$?
   err="${err//"$REPO_ROOT"/@REPO_ROOT@}"
   err="${err//"$MAIN_WT"/@MAIN_WT@}"
@@ -205,6 +208,18 @@ else
   fail "harness-coverage"
 fi
 
+# docfix-poll: the generated unit puts brew first on PATH, with nothing left for
+# launchd to expand and no empty value.
+dfp="$(env -i HOME="$GOLDEN_HOME" PATH="$BARE_PATH" bash "$REPO_ROOT/bin/docfix-poll" --print-schedule 2>/dev/null)" || dfp=""
+if grep -qF '<key>PATH</key><string>/opt/homebrew/bin:' <<<"$dfp" \
+   && ! grep -qF '$HOME' <<<"$dfp" \
+   && ! grep -qF '${' <<<"$dfp" \
+   && ! grep -qF '<string></string>' <<<"$dfp"; then
+  pass "docfix-poll-brew-path"
+else
+  fail "docfix-poll-brew-path"
+fi
+
 # Secret: sim-recap's password is masked in print mode.
 if grep -qF '<string>***</string>' "$FIXTURES/sim-recap.plist.golden" 2>/dev/null \
    && ! grep -qF 'golden-secret' "$FIXTURES/sim-recap.plist.golden" 2>/dev/null; then
@@ -260,7 +275,7 @@ cp "$REPO_ROOT/bin/wt-gc-cron-setup" "$T/bin/"
 cp "$REPO_ROOT/bin/lib/launchd-sched.sh" "$REPO_ROOT/bin/lib/launchd-job.sh" \
    "$REPO_ROOT/bin/lib/claim-file.sh" "$T/bin/lib/"
 rc=0
-got="$(env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" HOME="$GOLDEN_HOME" PATH=/usr/bin:/bin bash "$T/bin/wt-gc-cron-setup" --print-schedule 2>&1)" || rc=$?
+got="$(env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" HOME="$GOLDEN_HOME" PATH="$BARE_PATH" bash "$T/bin/wt-gc-cron-setup" --print-schedule 2>&1)" || rc=$?
 if [ "$rc" = "0" ] && grep -qF "$T/bin/wt-gc-tick" <<< "$got"; then
   pass "wt-gc-non-git-tree-prints-plist"
 else
@@ -393,7 +408,7 @@ run_install() {
   shift 2
   : > "$ILOG"
   # shellcheck disable=SC2086
-  env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" HOME="$IHOME" PATH="$ISTUB:/usr/bin:/bin" LSCHED_ISTUB_LOG="$ILOG" "$@" \
+  env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" HOME="$IHOME" PATH="$ISTUB:$BARE_PATH" LSCHED_ISTUB_LOG="$ILOG" "$@" \
     bash "$REPO_ROOT/$script" $args > "$TMP/iout" 2> "$TMP/ierr"
   IRC=$?
   IOUT="$(cat "$TMP/iout")"

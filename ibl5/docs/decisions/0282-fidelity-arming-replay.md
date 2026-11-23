@@ -65,7 +65,7 @@ The stage defends 21 bypass classes:
 
 - Positive: a fidelity.py edit that only tightens reviewer holds, or that touches dead code, can merge without the owner.
 - Negative: edits to `re_review`, `build_packet`, `body_recheck` or module constants still hold. #4192, #4143 and #4067 stay held.
-- Negative: #4148 also stays held as `fidelity-unexercised-change`. Its edited docstring lines never run, and no corpus record reaches `_landed_for_arming`.
+- Negative: #4148 also stays held as `fidelity-unexercised-change`. The replay runs `_landed_for_arming`, but its new docstring lines (1774 and 1775 on the candidate) never fire a trace event, so the line-ran check keeps the flag.
 
 ## References
 

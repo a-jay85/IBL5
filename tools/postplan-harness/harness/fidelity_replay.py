@@ -912,6 +912,7 @@ def _git(args, cwd) -> subprocess.CompletedProcess:
 def prs(numbers) -> int:
     """Replay each merged PR's diff through `arming_replay.replay_worktree` and print the result."""
     from harness import arming_replay, merge_danger
+    from harness import fidelity_replay as stage  # `-m` runs this file as __main__; the stage fills the imported copy
     from harness.gate_backtest import _ARMING_PATHS
 
     repo = _PKG_DIR.parent.parent
@@ -934,10 +935,10 @@ def prs(numbers) -> int:
                 diff_text = _git(["diff", f"{oid}^", oid], repo).stdout
                 arming = {p for p in _diff_paths(diff_text) if p in _ARMING_PATHS}
                 sections = {p: merge_danger._section_for(diff_text, p) for p in arming}
-                LAST_DETAIL.clear()
+                stage.LAST_DETAIL.clear()
                 v = arming_replay.replay_worktree(wt, diff_text, sections, frozenset(arming))
                 print(f"PR {n}: {'cleared' if v.cleared else 'kept'}: {v.note}")
-                for line in LAST_DETAIL:
+                for line in stage.LAST_DETAIL:
                     print(f"  {line}")
             finally:
                 _git(["worktree", "remove", "--force", str(wt)], repo)

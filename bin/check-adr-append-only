@@ -3,6 +3,7 @@
 # bin/check-adr-append-only — fail a diff that rewrites or removes frozen ADR text.
 #
 # gate-backtest-argv: --since={base}
+# gate-backtest-reads: ibl5/docs/decisions/*
 #
 # .claude/rules/adr-append-only.md says an accepted ADR's Context, Decision,
 # Rationale and Alternatives sections are frozen. A change of mind goes in a dated

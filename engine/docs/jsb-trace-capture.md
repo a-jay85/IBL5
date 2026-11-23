@@ -1,6 +1,6 @@
 ---
 description: Runbook for capturing per-call (input, output) pairs from the original JSB binary into a jsb-trace/1 JSONL file.
-last_verified: 2026-11-22
+last_verified: 2026-11-23
 ---
 
 # JSB per-call trace capture
@@ -73,3 +73,9 @@ The jsb-native loop reads this tool only through the flags above, and it waits o
 - `run_day` in `diverge.py` replays one recorded day through this tool and raises when the tool exits nonzero.
 
 On the recorder side, `record_hook.js` flushes every second, well inside the 16 s idle window that ends a Sim Day in `simdays.py`. `tracehost.py` keeps only payloads that carry an `in`, `d` or `mark` key and drops the rest.
+
+## Rows blocked on a richer capture
+
+A capture can be too thin to pin a port. Some records hold only the call's raw `args` and its `rand` draws in `in`, and only `ret` in `out`. Those records carry none of the record values the routine reads or writes. No Go port can be checked against such a capture, so the row stays at `captured` and gets no trace-pinned evidence.
+
+- **pl-0027.** The routine updates a set of league records once per sim day, and each pass scales a draw by a record value. The capture carries none of those record values, and its `out` carries no updated values. The Go engine also has no sim-day record loop to host a port: every draw site in `engine/internal/sim/` runs inside a game. `TestCaptureLimitPl0027NoFieldInputs` in `engine/internal/sim/capturelimit_pl0027_test.go` fails when a recapture adds field keys, which marks the row ready for a real port. The fix belongs on the jsb-native side: recapture with the record values read on entry and written on exit.

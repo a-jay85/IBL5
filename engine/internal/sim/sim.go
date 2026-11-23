@@ -39,6 +39,9 @@ func SimulateWith(b bundle.Bundle, seed uint64, opts Options) (result.Result, er
 		return result.Result{}, err
 	}
 	r := rng.New(seed)
+	if opts.RNG != nil {
+		r = opts.RNG
+	}
 	res := result.Result{Seed: seed, Games: make([]result.GameResult, 0, len(b.Schedule))}
 	for _, g := range b.Schedule {
 		gr, _, _, _ := simGameWith(b, g, r, opts)

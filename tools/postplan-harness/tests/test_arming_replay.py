@@ -661,26 +661,66 @@ def test_dropping_a_reviewer_hold_stays_held(tmp_path):
     assert "fidelity-loosened" in text and "holds." in text
 
 
-def test_adding_a_reviewer_hold_clears(tmp_path):
+def _landed_corpus(tmp_path):
+    """The committed corpus plus, per record with a missing file item, a copy whose diff lands
+    that file, so the base `_landed_later` returns True and drops the hold."""
+    records = _fid_records()
+    extra = []
+    for rec in records:
+        items = [i for i in fidelity_replay._missing_items(rec.get("shadow"))
+                 if isinstance(i, dict) and i.get("kind") in ("file", "test") and i.get("token")]
+        if items:
+            landed = json.loads(json.dumps(rec))
+            landed["id"] = rec["id"] + "~landed"
+            landed["changed_files"] = list(rec["changed_files"]) + [i["token"].strip("`") for i in items]
+            landed["review_inputs"] = None
+            extra.append(landed)
+    assert extra, "corpus has no record with a missing file item"
+    path = tmp_path / "landed-corpus.json"
+    path.write_text(json.dumps(records + extra), encoding="utf-8")
+    return path
+
+
+def _driver_side(corpus, tree):
+    proc = _run_fid_driver(corpus, tree)
+    assert proc.returncode == 0, proc.stderr
+    return fidelity_replay._fid_side(json.loads(proc.stdout))
+
+
+def test_adding_a_reviewer_hold_clears(tmp_path, monkeypatch):
+    corpus = _landed_corpus(tmp_path)
+    monkeypatch.setattr(fidelity_replay, "CORPUS_PATH", corpus)
     tree = _fid_tree(tmp_path)
+    base = _driver_side(corpus, tree)
     probe = "tools/postplan-harness/tests/test_probe.py"  # never copied into the replay sides
     (tree / probe).parent.mkdir(parents=True, exist_ok=True)
     (tree / probe).write_text("X = 1\n")
     _git(tree, "add", "-A")
     _git(tree, "commit", "-q", "-m", "probe")
     _append(tree, probe, "Y = 2\n")
-    v = _replay(tree, _fid_edit(tree, lambda s: _insert_first_line(s, "_landed_later", "return False")))
+    diff = _fid_edit(tree, lambda s: _insert_first_line(s, "_landed_later", "return False"))
+    cand = _driver_side(corpus, tree)
+    # The candidate keeps holds the base dropped: a strict superset on at least one record.
+    grew = [rid for (rid, o), (_, n) in zip(base.results, cand.results)
+            if o["holds.stored_shadow"] != n["holds.stored_shadow"]]
+    assert grew, "the landed records did not change any hold"
+    v = _replay(tree, diff)
     text = f"{v.note} {v.reason}"
     assert v.cleared is True, text
     assert "fidelity replay cleared" in text
 
 
 def test_verdict_promotion_stays_held(tmp_path):
-    v, text = _fid_replay(tmp_path, lambda s: _insert_first_line(s, "parse_verdict", 'return "READY"'))
+    tree = _fid_tree(tmp_path)
+    base = _driver_side(fidelity_replay.CORPUS_PATH, tree)
+    diff = _fid_edit(tree, lambda s: _insert_first_line(s, "parse_verdict", 'return "READY"'))
+    cand = _driver_side(fidelity_replay.CORPUS_PATH, tree)
+    loosened, _ = fidelity_replay.compare_sides(base, cand, set())
+    # The verdict ordering itself must flag the NOT READY -> READY promotion.
+    assert any(k.endswith(":v1.parse_verdict") for k in loosened)
+    v = _replay(tree, diff)
     assert v.cleared is False
-    assert "fidelity-loosened" in text
-    first_key = v.reason.rsplit(":", 1)[1].rstrip(")")
-    assert ORDERING[first_key][1] == "verdict", v.reason  # a verdict ordering caught it
+    assert "fidelity-loosened" in f"{v.note} {v.reason}"
 
 
 def test_unreplayed_channel_change_stays_held(tmp_path):

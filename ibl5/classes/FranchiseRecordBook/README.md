@@ -1,6 +1,6 @@
 ---
 description: Franchise single-game and season record display with API support.
-last_verified: 2026-09-22
+last_verified: 2026-11-21
 ---
 
 # FranchiseRecordBook

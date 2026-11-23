@@ -2098,6 +2098,48 @@ dp_reset; DP_L_EXTRA="\"@types/node\": [\"node@1.0.0\", \"\", {}, \"sha512-$DP_S
 dp_verdict_is dp_lock_scoped_key_unscoped_name_holds ui-paths "$BOT" synchronize "" "$L" "$P"
 dp_reset; dp_head_3920; mv "$DP/head/ibl5/package.json" "$DP/real.json"; ln -s "$DP/real.json" "$DP/head/ibl5/package.json"
 dp_verdict_is dp_symlink_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+# bun writes a peerDependencies npm alias for @typescript-eslint/typescript-estree
+# 8.73.0 (PR #4078): "@typescript/native": "npm:typescript@<range>". The shape check
+# accepts npm:<name>@<semver range> in peerDependencies only. dependencies and
+# optionalDependencies stay strict, and any other alias form fails closed.
+# dp_alias_entry <key-and-name> <map> <spec> prints one lock entry line body.
+dp_alias_entry() {
+    printf '"%s": ["%s@8.73.0", "", { "%s": { "@typescript/native": "%s", "typescript": ">=4.8.4 <6.1.0" }, "optionalPeers": ["@typescript/native"] }, "sha512-%s"],' \
+        "$1" "$1" "$2" "$3" "$DP_SHA_B"
+}
+# dp_shape_rc <case> <want_rc> <map> <spec> runs the live _ui_lock_entry_name on one entry.
+dp_shape_rc() {
+    local rc=0
+    # shellcheck disable=SC2016  # $1.. expand inside the child bash
+    bash -c 'set -euo pipefail; source "$1"; _ui_lock_entry_name "$2" > /dev/null' \
+        _ "$UI_LIB" "    $(dp_alias_entry @typescript-eslint/typescript-estree "$3" "$4")" || rc=$?
+    expect "$1" "$2" "$rc"
+}
+DP_ALIAS='npm:typescript@>=7.1.0-dev.20261009.1 || >=7.1.0-beta <7.1.0-dev'
+dp_shape_rc dp_shape_peer_npm_alias_passes 0 peerDependencies "$DP_ALIAS"
+dp_shape_rc dp_shape_peer_scoped_npm_alias_passes 0 peerDependencies 'npm:@typescript/native-preview@^7.1.0'
+dp_shape_rc dp_shape_dependencies_npm_alias_fails 1 dependencies "$DP_ALIAS"
+dp_shape_rc dp_shape_optional_npm_alias_fails 1 optionalDependencies "$DP_ALIAS"
+dp_shape_rc dp_shape_peer_npm_url_alias_fails 1 peerDependencies 'npm:typescript@https://registry.example/typescript-7.1.0.tgz'
+dp_shape_rc dp_shape_peer_git_alias_fails 1 peerDependencies 'git+https://github.com/microsoft/TypeScript.git'
+dp_shape_rc dp_shape_peer_github_alias_fails 1 peerDependencies 'github:microsoft/TypeScript'
+dp_shape_rc dp_shape_peer_file_alias_fails 1 peerDependencies 'file:../typescript'
+dp_shape_rc dp_shape_peer_jsr_alias_fails 1 peerDependencies 'jsr:@std/path@^1.0.0'
+dp_shape_rc dp_shape_peer_npm_empty_range_fails 1 peerDependencies 'npm:typescript@'
+dp_shape_rc dp_shape_peer_npm_blank_range_fails 1 peerDependencies 'npm:typescript@ '
+dp_shape_rc dp_shape_peer_npm_no_range_fails 1 peerDependencies 'npm:typescript'
+dp_shape_rc dp_shape_peer_npm_tag_range_fails 1 peerDependencies 'npm:typescript@latest'
+dp_shape_rc dp_shape_peer_npm_hash_range_fails 1 peerDependencies 'npm:typescript@>=1.0.0 #x'
+dp_shape_rc dp_shape_peer_npm_nested_alias_fails 1 peerDependencies 'npm:typescript@npm:typescript@>=1.0.0'
+dp_shape_rc dp_shape_peer_npm_uppercase_prefix_fails 1 peerDependencies 'NPM:typescript@>=1.0.0'
+dp_shape_rc dp_shape_peer_npm_subshell_name_fails 1 peerDependencies 'npm:type$(id)script@>=1.0.0'
+dp_shape_rc dp_shape_peer_npm_backtick_name_fails 1 peerDependencies 'npm:type`id`script@>=1.0.0'
+dp_shape_rc dp_shape_peer_npm_semicolon_name_fails 1 peerDependencies 'npm:typescript;id@>=1.0.0'
+dp_shape_rc dp_shape_peer_npm_regex_name_fails 1 peerDependencies 'npm:type.*script@>=1.0.0'
+dp_reset; DP_L_EXTRA="$(dp_alias_entry @acme/peer-alias peerDependencies "$DP_ALIAS")" dp_head_3920
+dp_verdict_is dp_peer_npm_alias_entry_passes not-ui "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_L_EXTRA="$(dp_alias_entry @acme/peer-alias dependencies "$DP_ALIAS")" dp_head_3920
+dp_verdict_is dp_dependencies_npm_alias_entry_holds ui-paths "$BOT" synchronize "" "$L" "$P"
 # Every registry entry in the real ibl5/bun.lock fits the entry shape, so the
 # exemption cannot hold a PR only because bun writes a shape it does not know.
 # shellcheck disable=SC2016  # $1.. expand inside the child bash

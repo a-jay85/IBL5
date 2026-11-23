@@ -160,7 +160,7 @@ fi
 
 export PYTHONPATH="$ROOT/tools/postplan-harness${PYTHONPATH:+:$PYTHONPATH}"
 exec python3 -m harness.reviewer_eval check-claim \
-    --repo "${REPO_DIR:-${REPO:-$ROOT}}" \
+    --repo "${REPO_DIR:-$ROOT}" \
     --gh "$GH_CMD" \
     --base "$BASE_REF" \
     --head "$HEAD_REF" \

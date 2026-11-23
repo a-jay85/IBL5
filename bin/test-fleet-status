@@ -231,10 +231,19 @@ SPAWNED_PIDS="$SPAWNED_PIDS $PP_PID"
 # should ever show.
 # Respawn until its PID misses the launchd stub list (see fixture_pid): CI once
 # handed it 6001, so it matched a stub row and left the orphan section.
+# Each orphan starts from a subshell that exits at once, so the orphan's parent
+# becomes PID 1. Without that, its parent is this script. On CI this script's
+# PID, or its runner's, can land on a stub row PID (6001-6005). The ancestry
+# walk then counts the orphan as tracked and hides it, and every orphan check
+# fails together.
+# Spawn it from a subshell that exits at once, so the orphan is reparented and
+# its ancestry no longer includes this script. CI can hand THIS script a stub
+# row's PID (6001-6005); a direct child would then be deduped as that job's
+# descendant and vanish from the orphan section.
 while :; do
-    "$STUBBIN/claude" -p --name fixture-orphan >/dev/null 2>&1 &
-    ORPHAN_PID=$!
-    disown "$ORPHAN_PID" 2>/dev/null
+    ( "$STUBBIN/claude" -p --name fixture-orphan >/dev/null 2>&1 &
+      printf '%s\n' "$!" > "$TMP/orphan.pid" )
+    ORPHAN_PID="$(tr -dc '0-9' < "$TMP/orphan.pid")"
     fixture_pid "$ORPHAN_PID" || break
     kill "$ORPHAN_PID" 2>/dev/null
 done
@@ -248,11 +257,12 @@ mkdir -p "$TMP/IBL5-worktrees/fixture-wt-slug/ibl5"
 git -C "$TMP/IBL5-worktrees/fixture-wt-slug/ibl5" init -q 2>/dev/null
 git -C "$TMP/IBL5-worktrees/fixture-wt-slug/ibl5" symbolic-ref HEAD refs/heads/fixture-wt-branch
 while :; do
+    # Same detach as the first orphan, so its ancestry skips this script.
     (cd "$TMP/IBL5-worktrees/fixture-wt-slug/ibl5" \
-        && exec "$STUBBIN/claude" -p "Fix the fixture widget
-SECOND PROMPT LINE") >/dev/null 2>&1 &
-    PROMPT_ORPHAN_PID=$!
-    disown "$PROMPT_ORPHAN_PID" 2>/dev/null
+        && { "$STUBBIN/claude" -p "Fix the fixture widget
+SECOND PROMPT LINE" >/dev/null 2>&1 &
+            printf '%s\n' "$!" > "$TMP/prompt-orphan.pid"; })
+    PROMPT_ORPHAN_PID="$(tr -dc '0-9' < "$TMP/prompt-orphan.pid")"
     fixture_pid "$PROMPT_ORPHAN_PID" || break
     kill "$PROMPT_ORPHAN_PID" 2>/dev/null
 done

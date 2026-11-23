@@ -131,6 +131,7 @@ REPLAY_SPECS: dict[str, ReplaySpec | str] = {
     "bin/check-exit-code-handling": _SINCE,
     "bin/check-destructive-migrations": _BYPASS_SINCE,
     # Whole-tree scans with no required argument.
+    "bin/check-ambient-env-fallback": _TREE,
     "bin/check-bashpid-under-set-u": _TREE,
     "bin/check-ci-image-registry": _TREE,
     "bin/check-claude-cli-invocation": _TREE,

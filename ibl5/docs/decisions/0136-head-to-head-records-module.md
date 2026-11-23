@@ -1,6 +1,6 @@
 ---
 description: Replace SeriesRecords with a Teams/Franchises/GMs head-to-head matrix, a slim retired-era branding table, and a 24-key cache.
-last_verified: 2026-09-22
+last_verified: 2026-11-21
 ---
 
 # ADR-0136: Head-to-Head Records Module

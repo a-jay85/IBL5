@@ -63,24 +63,33 @@ class SeasonTest extends \PHPUnit\Framework\TestCase
         $this->assertLessThanOrEqual(31, Season::IBL_ALL_STAR_BREAK_START_DAY);
     }
 
+    /**
+     * Returns its argument typed as mixed so PHPStan does not constant-fold an
+     * assertion that compares class constants.
+     */
+    private static function unfoldedConstant(mixed $value): mixed
+    {
+        return $value;
+    }
+
     public function testIblRisingStarsGameDayConstant(): void
     {
-        $this->assertGreaterThan(Season::IBL_ALL_STAR_BREAK_START_DAY, Season::IBL_RISING_STARS_GAME_DAY);
+        $this->assertGreaterThan(Season::IBL_ALL_STAR_BREAK_START_DAY, self::unfoldedConstant(Season::IBL_RISING_STARS_GAME_DAY));
     }
 
     public function testIblAllStarGameDayConstant(): void
     {
-        $this->assertGreaterThan(Season::IBL_RISING_STARS_GAME_DAY, Season::IBL_ALL_STAR_GAME_DAY);
+        $this->assertGreaterThan(Season::IBL_RISING_STARS_GAME_DAY, self::unfoldedConstant(Season::IBL_ALL_STAR_GAME_DAY));
     }
 
     public function testIblAllStarBreakEndDayConstant(): void
     {
-        $this->assertGreaterThan(Season::IBL_ALL_STAR_GAME_DAY, Season::IBL_ALL_STAR_BREAK_END_DAY);
+        $this->assertGreaterThan(Season::IBL_ALL_STAR_GAME_DAY, self::unfoldedConstant(Season::IBL_ALL_STAR_BREAK_END_DAY));
     }
 
     public function testIblPostAllStarFirstDayConstant(): void
     {
-        $this->assertGreaterThan(Season::IBL_ALL_STAR_BREAK_END_DAY, Season::IBL_POST_ALL_STAR_FIRST_DAY);
+        $this->assertGreaterThan(Season::IBL_ALL_STAR_BREAK_END_DAY, self::unfoldedConstant(Season::IBL_POST_ALL_STAR_FIRST_DAY));
     }
 
     // ============================================

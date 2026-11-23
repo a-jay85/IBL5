@@ -1,6 +1,6 @@
 ---
 description: Side-by-side comparison of two players' ratings, current season stats, and career stats with jQuery UI autocomplete search.
-last_verified: 2026-09-22
+last_verified: 2026-11-21
 ---
 
 # ComparePlayers Module

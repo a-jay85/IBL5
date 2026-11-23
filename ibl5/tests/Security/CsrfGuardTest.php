@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Security;
 
+use PHPUnit\Framework\Attributes\PreserveGlobalState;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 use Security\CsrfGuard;
 use Tests\Clock\FixedClock;
@@ -70,6 +72,60 @@ class CsrfGuardTest extends TestCase
     }
 
     // ============================================
+    // SESSION START
+    // ============================================
+
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
+    public function testGenerateRawTokenStartsSession(): void
+    {
+        $this->assertCallStartsSession(static fn () => CsrfGuard::generateRawToken('form'));
+    }
+
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
+    public function testGenerateTokenStartsSession(): void
+    {
+        $this->assertCallStartsSession(static fn () => CsrfGuard::generateToken('form'));
+    }
+
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
+    public function testValidateTokenStartsSession(): void
+    {
+        $this->assertCallStartsSession(static fn () => CsrfGuard::validateToken('not-a-real-token', 'form'));
+    }
+
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
+    public function testClearTokensStartsSession(): void
+    {
+        $this->assertCallStartsSession(static fn () => CsrfGuard::clearTokens('form'));
+    }
+
+    /**
+     * Runs $call in a fresh process with no active session and asserts the
+     * call itself started one. Cookies and cache headers are off so a CLI
+     * session_start() emits nothing.
+     */
+    private function assertCallStartsSession(callable $call): void
+    {
+        ini_set('session.use_cookies', '0');
+        ini_set('session.cache_limiter', '');
+        $statusBefore = session_status();
+        $this->assertSame(PHP_SESSION_NONE, $statusBefore);
+
+        try {
+            $call();
+            $this->assertSame(PHP_SESSION_ACTIVE, session_status());
+        } finally {
+            if (session_status() === PHP_SESSION_ACTIVE) {
+                session_destroy();
+            }
+        }
+    }
+
+    // ============================================
     // TOKEN VALIDATION
     // ============================================
 
@@ -107,6 +163,31 @@ class CsrfGuardTest extends TestCase
         CsrfGuard::generateRawToken();
 
         $this->assertFalse(CsrfGuard::validateToken('not-a-real-token'));
+    }
+
+    public function testGenerateTokenStoresTokenThatValidates(): void
+    {
+        CsrfGuard::setTestClock(new FixedClock(1_000_000));
+
+        $html = CsrfGuard::generateToken('testform');
+
+        $this->assertSame(1, preg_match('/value="([0-9a-f]{64})"/', $html, $matches));
+        $this->assertSame($matches[1], $_SESSION['_csrf_tokens']['testform'][0]['token']);
+        $this->assertTrue(CsrfGuard::validateToken($matches[1], 'testform'));
+    }
+
+    /**
+     * Negative path: an empty submitted token is rejected before the stored
+     * list is scanned, even when a stored entry's token is also empty.
+     */
+    public function testEmptyTokenRejectedEvenWhenStoredTokenIsEmpty(): void
+    {
+        CsrfGuard::setTestClock(new FixedClock(1_000_000));
+        CsrfGuard::generateRawToken('form');
+        $_SESSION['_csrf_tokens']['form'][0]['token'] = '';
+
+        $this->assertFalse(CsrfGuard::validateToken('', 'form'));
+        $this->assertCount(1, $_SESSION['_csrf_tokens']['form']);
     }
 
     // ============================================
@@ -154,6 +235,24 @@ class CsrfGuardTest extends TestCase
         $this->assertFalse(CsrfGuard::validateToken($token, 'form'));
     }
 
+    /**
+     * An expired token earlier in the list is skipped; the scan continues
+     * and still accepts a valid token stored after it.
+     */
+    public function testValidTokenAfterExpiredTokenInSameFormStillValidates(): void
+    {
+        $clock = new FixedClock(1_000_000);
+        CsrfGuard::setTestClock($clock);
+
+        CsrfGuard::generateRawToken('form');              // index 0, expires 1_014_400
+        $clock->setNow(1_000_100);
+        $valid = CsrfGuard::generateRawToken('form');     // index 1, expires 1_014_500
+        $this->assertCount(2, $_SESSION['_csrf_tokens']['form']);
+
+        $clock->setNow(1_014_401);                        // index 0 expired, index 1 valid
+        $this->assertTrue(CsrfGuard::validateToken($valid, 'form'));
+    }
+
     // ============================================
     // MAX TOKENS LIMIT
     // ============================================
@@ -165,6 +264,77 @@ class CsrfGuardTest extends TestCase
         }
 
         $this->assertCount(10, $_SESSION['_csrf_tokens']['form']);
+    }
+
+    /**
+     * Negative path: storing a new token drops same-form tokens already past
+     * their expiry.
+     */
+    public function testStoreTokenDropsExpiredTokensForSameForm(): void
+    {
+        $clock = new FixedClock(1_000_000);
+        CsrfGuard::setTestClock($clock);
+        CsrfGuard::generateRawToken('form');                  // expires 1_014_400
+        $clock->setNow(1_014_401);
+
+        $fresh = CsrfGuard::generateRawToken('form');
+
+        $this->assertSame([$fresh], array_column($_SESSION['_csrf_tokens']['form'], 'token'));
+    }
+
+    /**
+     * Boundary: cleanup keeps a token whose expiry equals the current second.
+     */
+    public function testStoreTokenKeepsTokenAtExactExpiry(): void
+    {
+        $clock = new FixedClock(1_000_000);
+        CsrfGuard::setTestClock($clock);
+        $old = CsrfGuard::generateRawToken('form');           // expires 1_014_400
+        $clock->setNow(1_014_400);
+
+        $fresh = CsrfGuard::generateRawToken('form');
+
+        $this->assertSame([$old, $fresh], array_column($_SESSION['_csrf_tokens']['form'], 'token'));
+    }
+
+    public function testCleanupRepacksKeysAfterDroppingExpiredToken(): void
+    {
+        $clock = new FixedClock(1_000_000);
+        CsrfGuard::setTestClock($clock);
+        CsrfGuard::generateRawToken('form');
+        $clock->setNow(1_014_401);
+
+        CsrfGuard::generateRawToken('form');
+
+        $this->assertSame([0], array_keys($_SESSION['_csrf_tokens']['form']));
+    }
+
+    /**
+     * Boundary: exactly MAX_TOKENS tokens are all kept, in order.
+     */
+    public function testTenTokensAreAllKept(): void
+    {
+        CsrfGuard::setTestClock(new FixedClock(1_000_000));
+        $generated = [];
+        for ($i = 0; $i < 10; $i++) {
+            $generated[] = CsrfGuard::generateRawToken('form');
+        }
+
+        $this->assertSame($generated, array_column($_SESSION['_csrf_tokens']['form'], 'token'));
+    }
+
+    /**
+     * Boundary: the 11th token pushes out only the oldest one.
+     */
+    public function testCapKeepsTenNewestTokens(): void
+    {
+        CsrfGuard::setTestClock(new FixedClock(1_000_000));
+        $generated = [];
+        for ($i = 0; $i < 11; $i++) {
+            $generated[] = CsrfGuard::generateRawToken('form');
+        }
+
+        $this->assertSame(array_slice($generated, 1), array_column($_SESSION['_csrf_tokens']['form'], 'token'));
     }
 
     // ============================================
@@ -228,5 +398,28 @@ class CsrfGuardTest extends TestCase
         CsrfGuard::clearTokens('all');
 
         $this->assertArrayNotHasKey('_csrf_tokens', $_SESSION);
+    }
+
+    /**
+     * Negative path: clearing one form on a session with no token store
+     * returns before writing anything.
+     */
+    public function testClearTokensForSpecificFormOnEmptySessionWritesNothing(): void
+    {
+        CsrfGuard::clearTokens('formA');
+
+        $this->assertSame([], $_SESSION);
+    }
+
+    public function testValidatedTokenRemovalRepacksKeys(): void
+    {
+        CsrfGuard::setTestClock(new FixedClock(1_000_000));
+        $first = CsrfGuard::generateRawToken('form');
+        $second = CsrfGuard::generateRawToken('form');
+
+        $this->assertTrue(CsrfGuard::validateToken($first, 'form'));
+
+        $this->assertSame([0], array_keys($_SESSION['_csrf_tokens']['form']));
+        $this->assertSame($second, $_SESSION['_csrf_tokens']['form'][0]['token']);
     }
 }

@@ -1,6 +1,6 @@
 ---
 description: Player and team search across the league database.
-last_verified: 2026-09-22
+last_verified: 2026-11-21
 ---
 
 # Search

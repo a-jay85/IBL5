@@ -355,6 +355,14 @@ func bucket3E88(in bucket3Inputs) (float64, bool) {
 	return (v / in.lineupD78) * in.bhD78 * bucket3E88Initial(in.energy), true
 }
 
+// scaledDraw scales one uniform draw u by scale. JSB uses this one-draw scaled
+// uniform at many call sites; each caller takes the draw itself, so the
+// DrawSites table keeps naming the real call site. The trace-pinned test
+// checks the draw count and the raw value against the native capture.
+func scaledDraw(u, scale float64) float64 {
+	return u * scale
+}
+
 // bucket3Weight: half-court adds the raw signed hca, then e90 = mq*0.25 + e88,
 // redrawn U[0, 0.03) when e90 is not positive (asm 4e1e47-4e1e69).
 func bucket3Weight(e88, mq, hcaRaw float64, halfCourt bool, r *rng.RNG) float64 {
@@ -363,7 +371,7 @@ func bucket3Weight(e88, mq, hcaRaw float64, halfCourt bool, r *rng.RNG) float64 
 	}
 	e90 := mq*d90MakeShareQuarter + e88 // _DAT_00669f58
 	if e90 <= 0 {                       // _DAT_00669f00 = 0.0
-		return r.Float64() * andOneBucketFloor // FUN_005c6100(0.03)
+		return scaledDraw(r.Float64(), andOneBucketFloor) // floor redraw: U[0, andOneBucketFloor)
 	}
 	return e90
 }

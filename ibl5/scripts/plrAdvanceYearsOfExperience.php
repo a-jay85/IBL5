@@ -33,11 +33,14 @@ echo $session->isDryRun()
     : 'Backup written and verified: ' . $session->backupPath() . "\n";
 while (!feof($plrFile)) {
     $line = fgets($plrFile);
+    if ($line === false) {
+        break;
+    }
 
-    $name = trim(addslashes(substr($line, 4, 32)));
+    $name = trim(substr($line, 4, 32));
     $pid = substr($line, 38, 6);
     $exp = substr($line, 286, 2);
-    if ($pid != 0 AND is_numeric($exp)) {
+    if ((!is_numeric($pid) || (int) $pid !== 0) AND is_numeric($exp)) {
         echo $line . "<br>";
         echo "$name's original years of experience = " . $exp . "<br>";
         

@@ -1,14 +1,9 @@
 {
     "phpstan-baseline.neon": {
-        "argument.type": 3,
         "booleanNot.exprNotBoolean": 2,
-        "equal.notAllowed": 2,
-        "function.alreadyNarrowedType": 1,
-        "ibl.bannedAddslashes": 3,
         "ibl.bannedNukeGlobal": 3,
         "ibl.directHeader": 1,
         "ibl.hardcodedEnvString": 8,
-        "notEqual.notAllowed": 4,
         "variable.undefined": 1
     },
     "phpstan-tests-baseline.neon": {

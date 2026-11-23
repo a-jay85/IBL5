@@ -27,7 +27,7 @@ final class DepthChartEntryFactory implements ModuleFactoryInterface
         $repository = new \DepthChart\DepthChartRepository($db);
         $service = new \DepthChart\DepthChartService();
         $view = new \DepthChart\DepthChartView($this->services->leagueContext(), $service);
-        $teamRepository = new \Team\TeamRepository($db);
+        $teamRepository = new \Team\TeamRepository($db, $this->services->leagueContext());
         $teamTableService = new \Team\TeamTableService($db, $teamRepository);
         $submissionHandler = new \DepthChart\DepthChartSubmissionHandler($db, $commonRepo);
 

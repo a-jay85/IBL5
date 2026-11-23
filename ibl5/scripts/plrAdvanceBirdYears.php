@@ -33,16 +33,19 @@ echo $session->isDryRun()
     : 'Backup written and verified: ' . $session->backupPath() . "\n";
 while (!feof($plrFile)) {
     $line = fgets($plrFile);
+    if ($line === false) {
+        break;
+    }
 
-    $name = trim(addslashes(substr($line, 4, 32)));
+    $name = trim(substr($line, 4, 32));
     $pid = substr($line, 38, 6);
     $teamid = (int) substr($line, 44, 2); // Ensure teamid is an integer
     $exp = substr($line, 286, 2);
     $bird = substr($line, 288, 2);
     $contractYear1 = substr($line, 298, 4);
-    if ($pid != 0 
-        AND $teamid != 0
-        AND $contractYear1 != 0
+    if ((!is_numeric($pid) || (int) $pid !== 0)
+        AND $teamid !== 0
+        AND (!is_numeric($contractYear1) || (int) $contractYear1 !== 0)
         AND $bird <= $exp
     ) {
         echo $line . "<br>";

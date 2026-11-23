@@ -44,12 +44,14 @@ class TeamPageDataPreparerTest extends TestCase
         TeamRepositoryInterface $repo,
         ?TeamQueryRepositoryInterface $queryRepo = null,
         ?League $league = null,
+        ?\Team\TeamAccomplishmentsCache $accomplishmentsCache = null,
     ): TeamPageDataPreparer {
         return new TeamPageDataPreparer(
             new MockDatabase(),
             $repo,
             $queryRepo ?? self::createStub(TeamQueryRepositoryInterface::class),
             $league ?? self::createStub(League::class),
+            $accomplishmentsCache,
         );
     }
 
@@ -917,6 +919,42 @@ class TeamPageDataPreparerTest extends TestCase
         $result = $this->buildPreparer($repo)->prepareAwardsData(self::bullsTeam());
 
         $this->assertSame(['tenures' => [], 'gmAwards' => [], 'teamAccomplishments' => []], $result);
+    }
+
+    public function testPrepareAwardsDataWithNullCacheQueriesRepositoryOnce(): void
+    {
+        $rows = [['year' => 2011, 'name' => 'Bulls', 'award' => 'IBL Champions', 'id' => 0]];
+
+        // With no cache, getTeamAccomplishments('Bulls') runs on the repository exactly once.
+        $repo = self::createMock(TeamRepositoryInterface::class);
+        $repo->method('getGMTenures')->willReturn([]);
+        $repo->method('getGMAwards')->willReturn([]);
+        $repo->expects($this->once())->method('getTeamAccomplishments')->with('Bulls')->willReturn($rows);
+
+        $result = $this->buildPreparer($repo, accomplishmentsCache: null)->prepareAwardsData(self::bullsTeam());
+
+        $this->assertSame($rows, $result['teamAccomplishments']);
+    }
+
+    public function testPrepareAwardsDataServesAccomplishmentsFromCacheWhenProvided(): void
+    {
+        $rows = [
+            ['year' => 2011, 'name' => 'Bulls', 'award' => 'IBL Champions', 'id' => 0],
+            ['year' => 2011, 'name' => 'Bulls', 'award' => 'IBL Champions', 'id' => 0],
+        ];
+
+        $repo = self::createMock(TeamRepositoryInterface::class);
+        $repo->expects($this->once())->method('getGMTenures')->with(1)->willReturn([]);
+        $repo->expects($this->once())->method('getGMAwards')->with('JohnGM')->willReturn([]);
+        $repo->expects($this->never())->method('getTeamAccomplishments');
+
+        $cacheStub = self::createStub(\Cache\Contracts\DatabaseCacheInterface::class);
+        $cacheStub->method('get')->willReturn($rows);
+        $cache = new \Team\TeamAccomplishmentsCache($repo, $cacheStub);
+
+        $result = $this->buildPreparer($repo, accomplishmentsCache: $cache)->prepareAwardsData(self::bullsTeam());
+
+        $this->assertSame($rows, $result['teamAccomplishments']);
     }
 
     public function testPrepareAwardsDataReturnsRepositoryListsUnchangedUnderTheirKeys(): void

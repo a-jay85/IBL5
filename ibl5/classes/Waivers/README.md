@@ -1,6 +1,6 @@
 ---
 description: Waiver claim submission and processing with eligibility validation.
-last_verified: 2026-09-22
+last_verified: 2026-11-21
 ---
 
 # Waivers

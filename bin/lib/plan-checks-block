@@ -23,12 +23,12 @@
 #         Exit 3 as for encode.
 # decode  write <outdir>/rows.tsv (num TAB cmd) and <outdir>/records.nul (the
 #         exact parse byte format). Exit 0 ok; 4 no begin marker; 3 corrupt.
-# needs   print db=, web=, bun=, actionlint=, go= lines (0 or 1): the stacks the
+# needs   print db=, web=, bun=, actionlint=, go=, node= lines (0 or 1): the stacks the
 #         block's rows need (row_ci_needs). The workflow gates its stack steps
-#         on them. An absent or corrupt block prints five =0 lines. Exit 0.
+#         on them. An absent or corrupt block prints six =0 lines. Exit 0.
 # ci      the CI driver. The PR is plan-driven when the labels file has a line
 #         exactly `plan-checks`. Rewrites localhost URLs (ci_host_rewrite) and
-#         fails a row whose stack's IBL_CI_<DB|WEB|BUN|GO>_READY is not 1.
+#         fails a row whose stack's IBL_CI_<DB|WEB|BUN|GO|NODE>_READY is not 1.
 #         Exit 0 pass; 1 fail.
 # All five exit 2 on a usage error.
 
@@ -262,8 +262,8 @@ do_local() {
 }
 
 # ci_stacks_ready <what> <needs tokens> — the readiness guard. Each db, web,
-# bun or go token needs IBL_CI_DB_READY, IBL_CI_WEB_READY, IBL_CI_BUN_READY or
-# IBL_CI_GO_READY set to
+# bun, go or node token needs IBL_CI_DB_READY, IBL_CI_WEB_READY, IBL_CI_BUN_READY,
+# IBL_CI_GO_READY or IBL_CI_NODE_READY set to
 # exactly 1 by the workflow step that started that stack. Unset or empty fails,
 # so a row whose stack the job skipped fails red instead of passing by luck.
 # (The names avoid the PLAN substring, which PLAN_ROW_LOCAL_RE matches.)
@@ -275,6 +275,7 @@ ci_stacks_ready() {
             web) var=IBL_CI_WEB_READY ;;
             bun) var=IBL_CI_BUN_READY ;;
             go) var=IBL_CI_GO_READY ;;
+            node) var=IBL_CI_NODE_READY ;;
             *) continue ;;
         esac
         val="${!var:-}"
@@ -286,31 +287,31 @@ ci_stacks_ready() {
     return 0
 }
 
-# do_needs <body-file> — print db=, web=, bun=, actionlint=, go= (0 or 1), the union
+# do_needs <body-file> — print db=, web=, bun=, actionlint=, go=, node= (0 or 1), the union
 # of row_ci_needs over the block's rows and mutation check fields. An absent
-# or corrupt block prints five =0 lines and exits 0: the ci step reports the
+# or corrupt block prints six =0 lines and exits 0: the ci step reports the
 # real failure, and a corrupt block must not start containers.
 do_needs() {
-    local body="$1" tmp db=0 web=0 bun=0 al=0 gon=0 n c tok
+    local body="$1" tmp db=0 web=0 bun=0 al=0 gon=0 node_n=0 n c tok
     local rrow rfile rcheck rmatch rrepl
     tmp=$(mktemp -d "${TMPDIR:-/tmp}/plan-checks.XXXXXX") || return 1
     if codec decode "$body" "$tmp" >/dev/null 2>&1; then
         while IFS=$'\t' read -r n c; do
             [ -n "$n" ] || continue
             for tok in $(row_ci_needs "$c"); do
-                case "$tok" in db) db=1 ;; web) web=1 ;; bun) bun=1 ;; actionlint) al=1 ;; go) gon=1 ;; esac
+                case "$tok" in db) db=1 ;; web) web=1 ;; bun) bun=1 ;; actionlint) al=1 ;; go) gon=1 ;; node) node_n=1 ;; esac
             done
         done < "$tmp/rows.tsv"
         while IFS= read -r -d '' rrow <&3 \
             && IFS= read -r -d '' rfile <&3 && IFS= read -r -d '' rcheck <&3 \
             && IFS= read -r -d '' rmatch <&3 && IFS= read -r rrepl <&3; do
             for tok in $(row_ci_needs "$rcheck"); do
-                case "$tok" in db) db=1 ;; web) web=1 ;; bun) bun=1 ;; actionlint) al=1 ;; go) gon=1 ;; esac
+                case "$tok" in db) db=1 ;; web) web=1 ;; bun) bun=1 ;; actionlint) al=1 ;; go) gon=1 ;; node) node_n=1 ;; esac
             done
         done 3< "$tmp/records.nul"
     fi
     rm -rf "$tmp"
-    printf 'db=%s\nweb=%s\nbun=%s\nactionlint=%s\ngo=%s\n' "$db" "$web" "$bun" "$al" "$gon"
+    printf 'db=%s\nweb=%s\nbun=%s\nactionlint=%s\ngo=%s\nnode=%s\n' "$db" "$web" "$bun" "$al" "$gon" "$node_n"
     return 0
 }
 

@@ -33,7 +33,7 @@ interface DepthChartRepositoryInterface
      * - Ordered by player ordinal for consistent display
      * - Team ID is cast to int for safety
      */
-    public function getPlayersOnTeam(int $teamid);
+    public function getPlayersOnTeam(int $teamid): array;
 
     /**
      * Single prepared UPDATE ibl_plr keyed by pid AND teamid.

@@ -138,6 +138,17 @@ h_eq "case a: unchanged surface exit code" 0 "$RC"
 h_contains "case a: unchanged surface token" "$OUT" "review surface unchanged"
 h_absent "case a: gh never called" "$MARKER"
 
+# (a2) ambient REPO is ignored (backlog#1610): an exported REPO never picks the repo.
+RC=0
+OUT="$(env PATH="$STUBS:$PATH" GH_CMD= GH_MARKER="$MARKER" GH_STUB_BODY="$BODY" REPO="$WORK/no-such-decoy" \
+    "$CHECK" --pr 1 --base base --head head_same --repo "$FIX" 2>&1)" || RC=$?
+h_eq "case a2: explicit --repo beats a decoy REPO exit code" 0 "$RC"
+h_contains "case a2: explicit --repo beats a decoy REPO token" "$OUT" "review surface unchanged"
+RC=0
+OUT="$(env PATH="$STUBS:$PATH" GH_CMD= GH_MARKER="$MARKER" GH_STUB_BODY="$BODY" REPO="$FIX" \
+    "$CHECK" --pr 1 --base base --head head_same 2>&1)" || RC=$?
+h_eq "case a2: exported REPO does not select the repo" 0 "$(printf '%s\n' "$OUT" | grep -c 'review surface unchanged' || true)"
+
 # (b) changed surface, no lines
 printf 'Summary only\n' > "$BODY"
 run_check "case b: no claim lines" 1 "exactly one" \

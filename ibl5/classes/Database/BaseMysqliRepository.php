@@ -237,6 +237,7 @@ abstract class BaseMysqliRepository
      * }
      * $stmt->close();
      */
+    // @phpstan-ignore ibl.bareObjectType (MockDatabase::prepare() returns MockPreparedStatement, which is not a mysqli_stmt)
     protected function executeQuery(string $query, string $types = '', mixed ...$params): object
     {
         // Validate parameter count matches type string length
@@ -428,6 +429,7 @@ abstract class BaseMysqliRepository
      * since mysqli_stmt::$affected_rows is a virtual/readonly property
      * that cannot be set on mock objects.
      */
+    // @phpstan-ignore ibl.bareObjectType (MockDatabase::prepare() returns MockPreparedStatement, which is not a mysqli_stmt)
     protected function getAffectedRows(object $stmt): int
     {
         /** @var \mysqli_stmt $stmt */
@@ -627,6 +629,7 @@ abstract class BaseMysqliRepository
      * @param \mysqli_stmt $stmt
      * @return \mysqli_result|false
      */
+    // @phpstan-ignore ibl.bareObjectType (MockDatabase::prepare() returns MockPreparedStatement, which is not a mysqli_stmt)
     private function getResultLoggingTimeout(object $stmt, string $query): mixed
     {
         /** @var \mysqli_stmt $stmt */

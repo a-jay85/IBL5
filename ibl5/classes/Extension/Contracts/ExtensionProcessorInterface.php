@@ -51,5 +51,5 @@ interface ExtensionProcessorInterface
      * - Returns success=false with error message for validation failures
      * - Returns success=false if player or team not found
      */
-    public function processExtension($extensionData);
+    public function processExtension(array $extensionData): array;
 }

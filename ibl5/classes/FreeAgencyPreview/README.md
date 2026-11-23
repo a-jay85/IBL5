@@ -1,6 +1,6 @@
 ---
 description: Pre-window free agent list display before the free agency period opens.
-last_verified: 2026-09-22
+last_verified: 2026-11-21
 ---
 
 # FreeAgencyPreview

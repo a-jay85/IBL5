@@ -28,7 +28,7 @@ class Per36Minutes
      * @param string $ariaLabel Optional aria-label for the table scroll region (empty = no attribute)
      * @return string HTML table
      */
-    public static function render(\mysqli $db, $result, Team $team, string $yr, array $starterPids = [], string $moduleName = "", string $ariaLabel = ''): string
+    public static function render(\mysqli $db, iterable $result, Team $team, string $yr, array $starterPids = [], string $moduleName = "", string $ariaLabel = ''): string
     {
         $playerRows = PlayerRowTransformer::resolveWithStats($db, $result, $yr);
 

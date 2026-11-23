@@ -1,6 +1,6 @@
 ---
 description: Email delivery with three transports (SMTP, PHP native, log) and header-injection sanitization.
-last_verified: 2026-09-22
+last_verified: 2026-11-21
 ---
 
 # Mail

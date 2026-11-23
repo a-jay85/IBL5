@@ -9,15 +9,18 @@ always runs the main-checkout copy of this file; the side only supplies `harness
 Exit 4 (before any output) when a record has no verdict-1 text: two empty results are never
 compared. Each output is `{"ok": value}`, `{"raise": name}` or `{"absent": true}`.
 """
+import __future__
 import sys
 if __name__ == "__main__" and len(sys.argv) == 4:
     sys.path[0] = sys.argv[2]      # side package root; must precede every other import
+    sys.dont_write_bytecode = True  # a side import must not write __pycache__ (a write-mode open)
 import copy
 import dataclasses
 import inspect
 import json
 import os
 import tempfile
+import types
 
 OUTPUT_KEYS = (
     "v1.parse_verdict", "v2.parse_verdict", "v1.read_reviewed_tree", "v2.read_reviewed_tree",
@@ -28,6 +31,148 @@ OUTPUT_KEYS = (
     "selected_gate_edit_only", "selected_blocking_findings", "select_fidelity_verdict",
 )
 ABSENT = {"absent": True}
+
+# --- runtime side-effect watch (ADR bypass class 17) --------------------------------------
+DENY_PREFIXES = ("os.", "shutil.", "subprocess.", "socket.", "tempfile.", "ctypes.", "sqlite3.",
+                 "http.", "urllib.", "smtplib.", "ftplib.", "poplib.", "imaplib.", "nntplib.",
+                 "telnetlib.", "fcntl.", "mmap.", "resource.", "signal.", "syslog.",
+                 "webbrowser.", "winreg.", "_winapi.", "msvcrt.", "builtins.input",
+                 "builtins.breakpoint")
+READ_ONLY_EVENTS = frozenset({"os.listdir", "os.scandir", "os.walk", "os.fwalk", "os.getxattr",
+                              "os.listxattr", "os.listdrives", "os.listmounts", "os.listvolumes"})
+CALL_ONLY_EVENTS = frozenset({"object.__setattr__", "object.__delattr__", "sys.settrace",
+                              "sys.setprofile", "sys.addaudithook"})
+_WRITE_FLAGS = os.O_WRONLY | os.O_RDWR | os.O_APPEND | os.O_CREAT | os.O_TRUNC
+_WATCH = {"phase": None, "record": "-", "where": "import", "hits": []}
+MAX_HITS = 50
+_UNCOPYABLE = object()
+
+
+def _hit(kind):
+    if len(_WATCH["hits"]) < MAX_HITS:
+        _WATCH["hits"].append(f"{_WATCH['record']} {_WATCH['where']} {kind}")
+
+
+def _write_open(args):
+    """True when an `open` audit event's (path, mode, flags) can write. Unknown shapes write."""
+    try:
+        _path, mode, flags = args
+    except (TypeError, ValueError):
+        return True
+    if isinstance(mode, str):
+        return any(c in mode for c in "wax+") or (isinstance(flags, int) and bool(flags & _WRITE_FLAGS))
+    if mode is None and isinstance(flags, int):
+        return bool(flags & _WRITE_FLAGS)
+    return True
+
+
+def _denied(event, phase):
+    if event in CALL_ONLY_EVENTS:
+        return phase == "call"
+    return event.startswith(DENY_PREFIXES) and event not in READ_ONLY_EVENTS
+
+
+def _in_module_load():
+    """True while importlib runs a module body: a lazy import inside a replayed call is import
+    work (`@dataclass` sets class attributes there), so call-only events count as import."""
+    frame = sys._getframe(1)
+    while frame is not None:
+        code = frame.f_code
+        if code.co_filename == "<frozen importlib._bootstrap>" and code.co_name == "_load_unlocked":
+            return True
+        frame = frame.f_back
+    return False
+
+
+def _audit(event, args):
+    phase = _WATCH["phase"]
+    if phase is None:
+        return
+    try:
+        if phase == "call" and event in CALL_ONLY_EVENTS and _in_module_load():
+            phase = "import"
+        if event == "open":
+            if _write_open(args):
+                _hit("audit:open-write")
+        elif _denied(event, phase):
+            _hit(f"audit:{event}")
+    except BaseException:  # noqa: BLE001 — a raising hook would abort the replayed call
+        _hit("audit:hook-error")
+
+
+def _untraced(fn, *args):
+    prior = sys.gettrace()
+    sys.settrace(None)  # a side __eq__/__deepcopy__ run by the watch must not count as executed
+    try:
+        return fn(*args)
+    finally:
+        sys.settrace(prior)
+
+
+def _same(a, b):
+    try:
+        return bool(a == b)
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _arg_copy(args, kw):
+    try:
+        before = copy.deepcopy((args, kw))
+    except Exception:  # noqa: BLE001 — fail closed: an argument the watch cannot copy holds
+        _hit("argument-uncopyable")
+        return _UNCOPYABLE
+    if not _same(before, (args, kw)):
+        _hit("argument-uncomparable")
+        return _UNCOPYABLE
+    return before
+
+
+def _arg_check(args, kw, before):
+    if before is not _UNCOPYABLE and not _same(before, (args, kw)):
+        _hit("argument-mutated")
+
+
+def _side_modules(root):
+    mods = {}
+    own = os.path.realpath(__file__)
+    for name, mod in list(sys.modules.items()):
+        f = getattr(mod, "__file__", None)
+        if not isinstance(f, str):
+            continue
+        path = os.path.realpath(f)
+        if path.startswith(root + os.sep) and path != own:  # never watch the driver's own state
+            mods[name] = mod
+    return mods
+
+
+def _freeze_globals(mods):
+    """{(module, name): ("val", deepcopy) or ("id", id)} over non-dunder, non-module globals."""
+    snap = {}
+    for name, mod in mods.items():
+        for attr, value in list(vars(mod).items()):
+            if attr.startswith("__") or isinstance(value, (types.ModuleType, __future__._Feature)):
+                continue  # `from __future__ import annotations` binds a fixed, identity-equal flag
+            if callable(value):
+                snap[(name, attr)] = ("id", id(value))
+                continue
+            try:
+                frozen = copy.deepcopy(value)
+            except Exception:  # noqa: BLE001
+                frozen = _UNCOPYABLE
+            if frozen is _UNCOPYABLE or not _same(frozen, value):
+                _hit(f"global-uncopyable:{name}.{attr}")
+                snap[(name, attr)] = ("id", id(value))
+            else:
+                snap[(name, attr)] = ("val", frozen)
+    return snap
+
+
+def _check_globals(mods, before):
+    after = _freeze_globals(mods)
+    for key in sorted(set(before) | set(after)):
+        if key not in before or key not in after or not _same(before[key], after[key]):
+            _hit(f"global:{key[0]}.{key[1]}")
 
 
 def _default(o):
@@ -52,11 +197,24 @@ def _call(fn_lookup, *args, **optional):
         return dict(ABSENT), None
     try:
         params = inspect.signature(fn).parameters
-        var_kw = any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values())
-        kw = {k: v for k, v in optional.items() if var_kw or k in params}
+    except Exception as exc:  # noqa: BLE001
+        return {"raise": type(exc).__name__}, None
+    var_kw = any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values())
+    kw = {k: v for k, v in optional.items() if var_kw or k in params}
+    _WATCH["where"] = getattr(fn, "__qualname__", "?")
+    before = _untraced(_arg_copy, args, kw)
+    _WATCH["phase"] = "call"
+    try:
         value = fn(*args, **kw)
     except Exception as exc:  # noqa: BLE001 — a raise is an output, compared as looser
-        return {"raise": type(exc).__name__}, None
+        value, raised = None, {"raise": type(exc).__name__}
+    else:
+        raised = None
+    finally:
+        _WATCH["phase"] = None
+    _untraced(_arg_check, args, kw, before)
+    if raised is not None:
+        return raised, None
     try:
         return {"ok": _norm(value)}, value
     except Exception as exc:  # noqa: BLE001
@@ -80,9 +238,14 @@ def main(argv):                    # argv: driver, corpus path, side package roo
         if not isinstance(text, str) or not text:
             return 4
     global fidelity, second_review, armable  # _record reads the side's modules as globals
-    import harness.fidelity as fidelity
-    import harness.second_review as second_review
-    import harness.armable as armable
+    sys.addaudithook(_audit)
+    _WATCH["phase"] = "import"
+    try:
+        import harness.fidelity as fidelity
+        import harness.second_review as second_review
+        import harness.armable as armable
+    finally:
+        _WATCH["phase"] = None
 
     current = {"v1": None}
 
@@ -124,12 +287,23 @@ def main(argv):                    # argv: driver, corpus path, side package roo
                     with open(v2, "w", encoding="utf-8") as fh:
                         fh.write(rec["verdict_2"])
                 current["v1"] = v1
-                results.append({"id": rec["id"],
-                                "out": _record(rec, v1, v2, marker)})
+                mods = _side_modules(root)
+                snap, env_before = _untraced(_freeze_globals, mods), dict(os.environ)
+                _WATCH["record"] = str(rec["id"])
+                out_rec = _record(rec, v1, v2, marker)
+                _WATCH["where"] = "record-state"
+                _untraced(_check_globals, mods, snap)
+                env_after = dict(os.environ)
+                if dict(os.environ) != env_before:
+                    key = next(k for k in sorted(set(env_before) | set(env_after))
+                               if env_before.get(k) != env_after.get(k))
+                    _hit(f"environ:{key}")
+                results.append({"id": rec["id"], "out": out_rec})
     finally:
         sys.settrace(None)
     json.dump({"schema": "fidelity-replay/1", "results": results,
-               "executed": {k: sorted(v) for k, v in hits.items()}}, sys.stdout)
+               "executed": {k: sorted(v) for k, v in hits.items()},
+               "side_effects": list(_WATCH["hits"])}, sys.stdout)
     return 0
 
 

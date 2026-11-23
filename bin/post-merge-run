@@ -69,14 +69,16 @@ pmr_is_count "$STEP_TIMEOUT" && [ "$STEP_TIMEOUT" -gt 0 ] || { echo "post-merge-
 PENDING_MAX=86400
 NOW="$(date +%s)"; STATE="${HOME:?HOME is unset}/.ibl5-post-merge-run"
 if [ ! -f "$STATE/since" ]; then   # first run: earlier merges are never back-filled
-    if [ "$DRY_RUN" -eq 0 ]; then mkdir -p "$STATE" && printf '%s\n' "$NOW" > "$STATE/since"; fi
+    if [ "$DRY_RUN" -eq 0 ]; then
+        mkdir -p "$STATE" && printf '%s\n' "$NOW" > "$STATE/since" || { log "cannot record $STATE/since"; exit 1; }
+    fi
     log "first run: since=$NOW recorded; earlier merges are not back-filled"; exit 0
 fi
 SINCE="$(cat "$STATE/since")"; pmr_is_count "$SINCE" || { log "corrupt $STATE/since"; exit 1; }
 
 # take_lock: mkdir makes room, claim_file owns it. A lock whose pid is dead is reaped.
 take_lock() {
-    mkdir -p "$STATE" "$STATE/done" "$STATE/logs" "$STATE/pending-dm" || return 1
+    mkdir -p "$STATE" "$STATE/done" "$STATE/logs" "$STATE/pending-dm" || { log "cannot create state dirs under $STATE"; exit 1; }
     if mkdir "$STATE/lock" 2>/dev/null && claim_file "$STATE/lock/pid" printf '%s\n' "$$"; then
         return 0
     fi

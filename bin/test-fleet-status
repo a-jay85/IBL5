@@ -225,14 +225,10 @@ PP_PID=$!
 disown "$PP_PID" 2>/dev/null
 SPAWNED_PIDS="$SPAWNED_PIDS $PP_PID"
 
-# An ORPHAN: a `claude -p` with no job above it — the state of a headless run
-# whose supervisor died, and the only thing case 10's section should ever show.
-# A double fork makes it a real orphan: the foreground subshell backgrounds the
-# stub, writes its PID, and exits, so the stub is reparented away from this
-# script. Spawned as a plain child, its ancestry ran through this script and the
-# CI runner above it. CI hands out small PIDs, so one of those ancestors can get
-# a launchd stub row's PID (6001-6005); fleet-status then counts the orphan as
-# that row's child and hides it, failing every orphan case at once.
+# An ORPHAN: a `claude -p` with no job above it. Spawned by this script, so its
+# ancestry never reaches a PID fleet-status printed — which is exactly the state
+# of a headless run whose supervisor died, and the only thing case 10's section
+# should ever show.
 # Respawn until its PID misses the launchd stub list (see fixture_pid): CI once
 # handed it 6001, so it matched a stub row and left the orphan section.
 # Each orphan starts from a subshell that exits at once, so the orphan's parent
@@ -260,13 +256,12 @@ mkdir -p "$TMP/IBL5-worktrees/fixture-wt-slug/ibl5"
 # A real (unborn) branch, so the row's PR slot can match it by branch name.
 git -C "$TMP/IBL5-worktrees/fixture-wt-slug/ibl5" init -q 2>/dev/null
 git -C "$TMP/IBL5-worktrees/fixture-wt-slug/ibl5" symbolic-ref HEAD refs/heads/fixture-wt-branch
-# Double-forked like the first orphan, for the same reason.
 while :; do
     # Same detach as the first orphan, so its ancestry skips this script.
-    ( cd "$TMP/IBL5-worktrees/fixture-wt-slug/ibl5" || exit 1
-      "$STUBBIN/claude" -p "Fix the fixture widget
+    (cd "$TMP/IBL5-worktrees/fixture-wt-slug/ibl5" \
+        && { "$STUBBIN/claude" -p "Fix the fixture widget
 SECOND PROMPT LINE" >/dev/null 2>&1 &
-      printf '%s\n' "$!" > "$TMP/prompt-orphan.pid" )
+            printf '%s\n' "$!" > "$TMP/prompt-orphan.pid"; })
     PROMPT_ORPHAN_PID="$(tr -dc '0-9' < "$TMP/prompt-orphan.pid")"
     fixture_pid "$PROMPT_ORPHAN_PID" || break
     kill "$PROMPT_ORPHAN_PID" 2>/dev/null

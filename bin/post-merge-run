@@ -124,7 +124,12 @@ run_step() {       # <path> <pr> <log> -> ok | timeout | exit-<rc>
     local mark="$TMP/timedout.$2"; rm -f "$mark"
     ( pid="-$pid"; sleep "$STEP_TIMEOUT"; : > "$mark"; kill -TERM "$pid" 2>/dev/null; sleep 5; kill -KILL "$pid" 2>/dev/null ) </dev/null >/dev/null 2>&1 &
     wd=$!; wait "$pid"; rc=$?
-    pkill -P "$wd" 2>/dev/null; kill "$wd" 2>/dev/null; wait "$wd" 2>/dev/null
+    # Stop the watchdog before its sleep: killing the sleep first lets the watchdog run on to write the marker and send TERM.
+    # Read the sleep's pid first, since it is orphaned (ppid 1) once the watchdog dies.
+    local _kid
+    local _kids; _kids="$(pgrep -P "$wd" 2>/dev/null || true)"
+    kill "$wd" 2>/dev/null; wait "$wd" 2>/dev/null
+    for _kid in $_kids; do kill "$_kid" 2>/dev/null; done
     if [ -e "$mark" ] && [ "$rc" -ne 0 ]; then rm -f "$mark"; echo timeout
     elif [ "$rc" -eq 0 ]; then echo ok
     else echo "exit-$rc"; fi

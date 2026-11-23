@@ -151,6 +151,13 @@ def test_variant_reasons(cond, want):
     assert hold_text.plain_hold(cond) == want
 
 
+def test_files_line_missing_phase_piece_strips_marker():
+    item = "MISSING-PHASE: 1 — Phase 1: Add the thing (Files line only"
+    assert hold_text._missing_item(item) == "Phase 1: Add the thing"
+    old = "MISSING-PHASE: 1 — Phase 1: Add the thing (phase cites bin/x"
+    assert hold_text._missing_item(old) == "Phase 1: Add the thing"
+
+
 def test_condition_19_plan_checks_wording():
     cond = ConditionResult(19, "exec-mutations", True,
                            "Plan checks CI job concluded FAILURE; "

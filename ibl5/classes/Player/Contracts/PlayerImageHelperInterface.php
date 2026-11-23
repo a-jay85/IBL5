@@ -38,7 +38,7 @@ interface PlayerImageHelperInterface
      * 
      * @see https://www.w3schools.com/CSS/css_rwd_images.asp - Responsive images best practices
      */
-    public static function getImageUrl($playerID, string $basePath = './images/player/'): string;
+    public static function getImageUrl(int|float|string|null $playerID, string $basePath = './images/player/'): string;
 
     /**
      * Whether a URL from getImageUrl() is the no-photo placeholder
@@ -58,7 +58,7 @@ interface PlayerImageHelperInterface
      * @param string $basePath Optional base path prefix (default: './images/player/')
      * @return string Complete <img> HTML tag
      */
-    public static function renderThumbnail($playerID, string $basePath = './images/player/'): string;
+    public static function renderThumbnail(int|float|string|null $playerID, string $basePath = './images/player/'): string;
 
     /**
      * Render a complete player name table cell with photo thumbnail

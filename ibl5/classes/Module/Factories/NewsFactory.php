@@ -49,7 +49,7 @@ final class NewsFactory implements ModuleFactoryInterface
             $this->services->auth(),
             $this->services->teamIdentity(),
             new \LastSimRecap\LastSimRecapService(
-                new \LastSimRecap\LastSimRecapRepository($db),
+                new \LastSimRecap\LastSimRecapRepository($db, $this->services->leagueContext()),
                 $this->services->playerLookup(),
             ),
             new \LastSimRecap\LastSimRecapView(),

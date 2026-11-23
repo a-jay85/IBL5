@@ -33,7 +33,7 @@ class PeriodAverages
      * @return string HTML table
      * @throws \Exception If database connection is invalid
      */
-    public static function render(\mysqli $db, $team, $season, $startDate = null, $endDate = null, array $starterPids = [], array $pidFilter = []): string
+    public static function render(\mysqli $db, \Team\Team $team, \Season\Season $season, string|\DateTime|null $startDate = null, string|\DateTime|null $endDate = null, array $starterPids = [], array $pidFilter = []): string
     {
         if ($startDate === null && $endDate === null) {
             // default to last simulated period
@@ -52,7 +52,7 @@ class PeriodAverages
         $offDefRepo = new TeamOffDefStatsRepository($db);
         $bothStats = $offDefRepo->getTeamBothStatsForDateRange($team->name, (string) $startDate, (string) $endDate);
 
-        $teamid = (int)$team->teamid;
+        $teamid = $team->teamid;
 
         $splitStatsRepository = new SplitStatsRepository($db);
         $resultPlayerSimBoxScores = $splitStatsRepository->getPeriodStats($teamid, is_string($startDate) ? $startDate : null, is_string($endDate) ? $endDate : null, $pidFilter);

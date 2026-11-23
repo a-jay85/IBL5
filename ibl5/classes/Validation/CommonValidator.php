@@ -18,7 +18,7 @@ class CommonValidator
      * @param object&\Player\Player $player Player object with teamName, position, and name properties
      * @param string $userTeamName The team name to validate against
      */
-    public static function validatePlayerOwnership(object $player, string $userTeamName): ValidationResult
+    public static function validatePlayerOwnership(\Player\Player $player, string $userTeamName): ValidationResult
     {
         /** @var \Player\Player $player */
         if ($player->getTeamName() !== $userTeamName) {

@@ -35,6 +35,7 @@ class TeamService implements TeamServiceInterface
         ?TeamPageDataPreparer $preparer = null,
         ?TeamCardRenderer $cardRenderer = null,
         ?RivalsCardBuilder $rivalsCardBuilder = null,
+        ?TeamAccomplishmentsCache $accomplishmentsCache = null,
     ) {
         $this->rivalsCardBuilder = $rivalsCardBuilder;
         $this->db = $db;
@@ -47,6 +48,7 @@ class TeamService implements TeamServiceInterface
             $this->repository,
             $this->teamQueryRepository,
             $this->league,
+            $accomplishmentsCache,
         );
         $this->cardRenderer = $cardRenderer ?? new TeamCardRenderer();
     }

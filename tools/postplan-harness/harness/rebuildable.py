@@ -23,6 +23,7 @@ CACHE_ONLY_REFRESH_STEPS: tuple[str, ...] = (
     "RefreshHeadToHeadRecordsStep",
     "RefreshRecordHoldersStep",
     "RefreshSeasonHighsCacheStep",
+    "RefreshTeamAccomplishmentsStep",
 )
 STEPS_GLOB = "ibl5/classes/Updater/Steps/Refresh*Step.php"
 

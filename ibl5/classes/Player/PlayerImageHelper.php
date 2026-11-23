@@ -57,7 +57,7 @@ class PlayerImageHelper implements PlayerImageHelperInterface
      * echo PlayerImageHelper::getImageUrl('');    // data:image/png;base64,...
      * echo PlayerImageHelper::getImageUrl(0);     // data:image/png;base64,...
      */
-    public static function getImageUrl($playerID, string $basePath = './images/player/'): string
+    public static function getImageUrl(int|float|string|null $playerID, string $basePath = './images/player/'): string
     {
         // Validate playerID is a positive integer
         if (!self::isValidPlayerID($playerID)) {
@@ -137,7 +137,7 @@ class PlayerImageHelper implements PlayerImageHelperInterface
     /**
      * @see PlayerImageHelperInterface::renderThumbnail()
      */
-    public static function renderThumbnail($playerID, string $basePath = './images/player/'): string
+    public static function renderThumbnail(int|float|string|null $playerID, string $basePath = './images/player/'): string
     {
         $url = self::getImageUrl($playerID, $basePath);
 

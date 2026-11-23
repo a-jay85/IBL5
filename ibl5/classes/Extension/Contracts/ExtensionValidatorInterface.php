@@ -49,7 +49,7 @@ interface ExtensionValidatorInterface
      * Checks if the team is allowed to make extension offers based on
      * usage flags for the current season and sim.
      * 
-     * @param object $team Team object with extension flags:
+     * @param \Team\Team $team Team object with extension flags:
      *        - hasUsedExtensionThisSeason: int (0 or 1)
      *        - hasUsedExtensionThisSim: int (0 or 1)
      * @return array{valid: bool, error: string|null} Validation result:
@@ -61,5 +61,5 @@ interface ExtensionValidatorInterface
      *  - Cannot extend if hasUsedExtensionThisSeason == 1
      *  - Cannot extend if hasUsedExtensionThisSim == 1
      */
-    public function validateExtensionEligibility(object $team): array;
+    public function validateExtensionEligibility(\Team\Team $team): array;
 }

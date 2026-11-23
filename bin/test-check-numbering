@@ -290,6 +290,72 @@ expect "union-merge-corruption rebases clean" 0 $?
 run_gate --all; expect "union-merge-corruption-is-caught" 1 $?
 expect_out "union-merge-corruption names a duplicated row" 'duplicated row'
 
+echo "== ADR index order =="
+
+# 12b. The PR #3389 shape: merge=union appended a lower number after higher
+#      ones. Check 4 fails it and names the row that broke the order.
+new_repo
+index 0400 0401 0403
+gadd ibl5/docs/decisions/README.md; gcommit base-index
+origin_master
+echo '| [0402](0402-placeholder.md) | Placeholder 0402 | Accepted | Because. |' >> "$REPO/ibl5/docs/decisions/README.md"
+gadd ibl5/docs/decisions/README.md; gcommit append-0402-late
+run_gate --since=refs/remotes/origin/master; expect "index-order-descent-is-caught" 1 $?
+expect_line "index-order-descent names the row" "  0402: line 10 follows 0403 in ibl5/docs/decisions/README.md"
+expect_out "index-order fix hint says move rows verbatim" 'Move rows verbatim'
+if grep -qF 'Numbering collision' "$OUT"; then
+    h_fail "index-order finding omits the collision header" "collision header printed for an order-only finding"
+else
+    h_pass "index-order finding omits the collision header"
+fi
+run_gate --all; expect "index-order-descent-is-caught under --all" 1 $?
+
+# 12c. Ascending appends, the normal merge=union outcome, pass.
+new_repo
+index 0400 0401
+gadd ibl5/docs/decisions/README.md; gcommit base-index
+origin_master
+echo '| [0402](0402-placeholder.md) | Placeholder 0402 | Accepted | Because. |' >> "$REPO/ibl5/docs/decisions/README.md"
+echo '| [0403](0403-placeholder.md) | Placeholder 0403 | Accepted | Because. |' >> "$REPO/ibl5/docs/decisions/README.md"
+gadd ibl5/docs/decisions/README.md; gcommit append-ascending
+run_gate --since=refs/remotes/origin/master; expect "index-order-ascending-appends-pass" 0 $?
+
+# 12d. Check 4 shares Check 3's scope: under --since, an out-of-order index
+#      that the diff does not touch is not judged.
+new_repo
+index 0401 0400
+gadd ibl5/docs/decisions/README.md; gcommit base-index-unsorted
+origin_master
+seed ibl5/docs/decisions/0402-c.md
+gadd ibl5/docs/decisions/0402-c.md; gcommit add-0402-file
+run_gate --since=refs/remotes/origin/master; expect "index-order-out-of-scope-under-since" 0 $?
+
+# 12e. A duplicated number is Check 3's finding only. Check 4 skips it, so
+#      the same row is not reported twice.
+new_repo
+index 0400 0401 0400
+gadd ibl5/docs/decisions/README.md; gcommit dup-out-of-place
+run_gate --all; expect "index-dup-row-still-fails" 1 $?
+expect_out "index-dup-row is reported as duplicated" 'duplicated row'
+if grep -qF 'out of number order' "$OUT"; then
+    h_fail "index-dup-row is not double-reported" "order finding printed for a duplicated number"
+else
+    h_pass "index-dup-row is not double-reported"
+fi
+
+# 12f. Near-miss lines are not rows: prose citing a lower ADR after the table,
+#      a bracketed number with no link, and a row with two leading spaces.
+new_repo
+index 0400 0401
+{
+    echo
+    echo 'See [0100](0100-placeholder.md) for history.'
+    echo '| [0099] | no link | Accepted | Because. |'
+    echo '|  [0098](0098-placeholder.md) | two spaces | Accepted | Because. |'
+} >> "$REPO/ibl5/docs/decisions/README.md"
+gadd ibl5/docs/decisions/README.md; gcommit near-miss-lines
+run_gate --all; expect "index-order-ignores-non-row-lines" 0 $?
+
 echo "== allocators =="
 
 # 13. bin/next-adr sees a number that exists only on an origin ref.

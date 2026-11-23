@@ -1,7 +1,7 @@
 ---
 name: pr-burndown
 description: "Burn down the open PRs that wait on the owner. Background headless jobs do the prep that needs no owner call (rebase, regenerate snapshots, write promised tests, fix review findings, re-fire post-plan). The owner sees only the decisions that are theirs: a status card per PR (CI on the current head, review threads, post-plan verdict, door and blast radius, conflicts, hold reasons, visual links) with a recommended option, answered in a batch."
-last_verified: 2026-11-20
+last_verified: 2026-11-23
 ---
 
 # /pr-burndown
@@ -397,14 +397,12 @@ can do it, and stop any watcher this session started (`TaskStop`).
   case. Never hand-write a waiter or wait with Monitor here.
   `~/.claude/hooks/wait-guard.py` blocks a Monitor or background Bash wait on a
   `$D/jobs/` file.
-- **New T3 thread.** Use it when the follow-up needs judgment and no owner call, such as
-  reading a new verdict to decide between a re-fire and a fix job. Call
-  `t3_thread_launch` with a title like "PR #N: <goal>" and a `clientRequestId` like
-  `prb-<run>-N`. The brief holds only what that PR needs: the goal, the owner's words and
-  date, why it's held, the `.result` path and job pid, and numbered steps. The steps: wait
-  with its own background Monitor (end the command with `# wake-ok: thread follow-up`), re-fire post-plan, wait for its `RESULT:` line, then
-  run `bin/owner-approve N --finish` or start the fix job the verdict calls for.
-  Name each thread by its `link` in your reply.
+- **The next `/pr-burndown` run.** Use it when the follow-up needs judgment and no owner
+  call, such as reading a new verdict to decide between a re-fire and a fix job, or
+  running `bin/owner-approve N --finish` once post-plan lands. Start the shell watcher
+  above for the re-fire. The next run reads the new verdict and runs `--finish` on any PR
+  with an approval marker (§ Rules). Never launch a new T3 thread for a follow-up. The
+  owner turned that off on 2026-11-23.
 - **This session.** Use it only while the owner is still answering cards and the job will
   land inside the hour.
 

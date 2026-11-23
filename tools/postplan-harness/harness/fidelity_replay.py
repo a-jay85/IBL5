@@ -480,6 +480,7 @@ def _is_test_or_bench(rel: str) -> bool:
 def _file_roots(rel: str, tree, out: dict) -> None:
     aliases: set[str] = set()
     pkgs: set[str] = set()
+    fid_imports: set[int] = set()  # ids of the import nodes that bind a fidelity alias
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for a in node.names:
@@ -488,6 +489,7 @@ def _file_roots(rel: str, tree, out: dict) -> None:
                 if a.name == "harness.fidelity":
                     if a.asname:
                         aliases.add(a.asname)
+                        fid_imports.add(id(node))
                     else:
                         pkgs.add("harness")
         elif isinstance(node, ast.ImportFrom):
@@ -505,6 +507,7 @@ def _file_roots(rel: str, tree, out: dict) -> None:
                         raise Unresolvable(f"fidelity-unresolvable-reference: {rel}")
                     if a.name == "fidelity":
                         aliases.add(a.asname or "fidelity")
+                        fid_imports.add(id(node))
     if not aliases and not pkgs:
         return
     values = {id(n.value) for n in ast.walk(tree) if isinstance(n, ast.Attribute)}
@@ -520,8 +523,72 @@ def _file_roots(rel: str, tree, out: dict) -> None:
                   and id(node) not in values):
                 raise Unresolvable(f"fidelity-unresolvable-reference: {rel}")
         elif (isinstance(node, ast.Name) and node.id in aliases
-              and isinstance(node.ctx, ast.Load) and id(node) not in values):
+              and isinstance(node.ctx, ast.Load) and id(node) not in values
+              and _loads_fidelity(tree, node, fid_imports)):
             raise Unresolvable(f"fidelity-unresolvable-reference: {rel}")
+
+
+_SCOPES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)
+
+
+def _own_nodes(scope):
+    """Nodes of `scope`, without the bodies of nested functions and lambdas."""
+    stack = list(ast.iter_child_nodes(scope))
+    while stack:
+        node = stack.pop()
+        yield node
+        if not isinstance(node, _SCOPES):
+            stack.extend(ast.iter_child_nodes(node))
+
+
+def _binds(scope, name, fid_imports) -> tuple[bool, bool, bool]:
+    """(bound by a fidelity import, bound some other way, declared global) in `scope`."""
+    fid = other = glob = False
+    if isinstance(scope, _SCOPES):
+        a = scope.args
+        params = a.posonlyargs + a.args + a.kwonlyargs + [x for x in (a.vararg, a.kwarg) if x]
+        other = any(p.arg == name for p in params)
+    for node in _own_nodes(scope):
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            for a in node.names:
+                if (a.asname or a.name.split(".")[0]) == name:
+                    if id(node) in fid_imports:
+                        fid = True
+                    else:
+                        other = True
+        elif isinstance(node, ast.Name) and node.id == name and isinstance(node.ctx, (ast.Store, ast.Del)):
+            other = True
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and node.name == name:
+            other = True
+        elif isinstance(node, ast.ExceptHandler) and node.name == name:
+            other = True
+        elif isinstance(node, (ast.Global, ast.Nonlocal)) and name in node.names:
+            glob = True
+    return fid, other, glob
+
+
+def _loads_fidelity(tree, load, fid_imports) -> bool:
+    """True when the name `load` reads resolves to a fidelity import: the innermost enclosing
+    function that binds the name decides, then the module. A scope that binds it both ways
+    counts as fidelity (fail closed)."""
+    chain = []
+    for scope in ast.walk(tree):
+        if isinstance(scope, _SCOPES) and any(n is load for n in _own_nodes(scope)):
+            chain = [scope]
+            break
+    while chain and chain[-1] is not None:
+        parent = next((s for s in ast.walk(tree) if isinstance(s, _SCOPES)
+                       and any(n is chain[-1] for n in _own_nodes(s))), None)
+        chain.append(parent)
+    for scope in [s for s in chain if s is not None]:
+        fid, other, glob = _binds(scope, load.id, fid_imports)
+        if glob:
+            break
+        if fid:
+            return True
+        if other:
+            return False
+    return _binds(tree, load.id, fid_imports)[0]
 
 
 def production_roots(files: dict) -> dict:

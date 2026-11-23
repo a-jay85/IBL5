@@ -108,7 +108,9 @@ class TopicsRepository extends BaseMysqliRepository implements TopicsRepositoryI
     {
         $sql = "SELECT s.sid, s.catid, s.title, COALESCE(c.title, '') AS cat_title
                 FROM " . $this->prefix . "_stories s
-                LEFT JOIN " . $this->prefix . "_stories_cat c ON s.catid = c.catid
+                LEFT JOIN " . $this->prefix
+                // @phpstan-ignore ibl.orderByMissingTiebreaker (sid is the nuke_stories primary key; query shape is outside the resolver)
+                . "_stories_cat c ON s.catid = c.catid
                 WHERE s.topic = ?
                 ORDER BY s.sid DESC
                 LIMIT 10";

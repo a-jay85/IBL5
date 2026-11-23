@@ -17,6 +17,9 @@ parameters:
     # for reflection only (not analysed), so it surfaces no new errors.
     scanDirectories:
         - classes
+        # Same reason for the custom rules: rule tests construct rule classes, and
+        # a branch that changes a rule constructor must reflect its own copy.
+        - phpstan-rules
     excludePaths:
         - tests/TeamOffDefStats/TeamOffDefStatsRepositoryTest.php
         # Rule-test fixtures are deliberately-broken inputs to RuleTestCase

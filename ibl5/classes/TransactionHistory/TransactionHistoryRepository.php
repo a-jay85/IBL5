@@ -81,6 +81,7 @@ class TransactionHistoryRepository extends \Database\BaseMysqliRepository implem
             $params[] = $month;
         }
 
+        // @phpstan-ignore ibl.orderByMissingTiebreaker (sid is the nuke_stories primary key; query shape is outside the resolver)
         $query = "SELECT sid, catid, title, time FROM nuke_stories WHERE catid IN (" . self::CATEGORY_IDS . ")" . $catidClause . $timeClause . " ORDER BY time DESC, sid DESC LIMIT 500";
 
         /** @var array<int, array{sid: string, catid: string, title: string, time: string}> */

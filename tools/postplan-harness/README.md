@@ -56,6 +56,12 @@ under `harness/` drops the segment when the arming replay (ADR-0246) shows no lo
 over `harness/arming_replay_corpus.json`. Any replay failure keeps the segment, and the Why
 records the record counts. The arm step re-checks a two-way body against the
 diff floor, so a stripped segment or a hand-lowered Door still holds.
+When the diff touches `harness/fidelity.py`, a second stage (`harness/fidelity_replay.py`,
+ADR-0282) replays both sides' fidelity readers over `harness/fidelity_replay_corpus.json`. It
+clears a changed line only when no production code reaches it, or when only replayed roots reach
+it, the line ran, and no output got looser. `python3 -m harness.fidelity_replay harvest <out>
+<dest>` rebuilds the corpus from `out/live-*` run dirs. `python3 -m harness.fidelity_replay prs
+<N>...` replays merged PRs and prints `cleared` or `kept` with the reason.
 
 **Second-reviewer clear (ADR-0231).** A blind Opus seat may clear conditions 7, 10, 12 and 17. It runs only when every blocked condition is one of those four, and a floor keeps one-way and merge-rule changes with the owner. The UI path floor covers all four conditions: a PR that changes a UI file gets no seat. Condition 21 is never clearable, so a reviewer-added hold keeps the seat from running. Condition 7 also needs every `hold_trigger` token to be reviewer-clearable (`security-surface`, `gate-weakening`, `golden-snapshot`). The owner-held tokens include `bootstrap-hazard`, `security-irreducible` and `golden-new`, the must-ask shapes of gate 14. The verdict binds to the tree captured before the spawn, so any later push makes it stale. Each clear prints in the merge digest with the condition and the reviewer's reason.
 

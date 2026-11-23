@@ -180,7 +180,9 @@ pmr_plan_check() {
             _out+="[AM] auto:mac $PMR_NAME: no bin/post-merge-steps/$PMR_NAME on disk and no creation-cue line in the plan: $_line"$'\n'
         fi
     done <<< "$_rows"
-    if [ -z "$_rows" ] && ! pmr_prose_text "$_plan" | grep -qiE '(^|[^a-z-])post-merge:'; then
+    # Herestring, not a pipe: under pipefail an early grep -q exit SIGPIPEs the producer and
+    # flips the test (.claude/rules/shell-pipefail-grep.md).
+    if [ -z "$_rows" ] && ! grep -qiE '(^|[^a-z-])post-merge:' <<< "$(pmr_prose_text "$_plan")"; then
         pmr_waiver "$_plan" || _w=$?
         if [ "$_w" -eq 2 ]; then
             _out+="[AM] after-merge-prose-ok waiver needs a reason of at least 15 characters"$'\n'

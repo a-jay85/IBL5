@@ -260,4 +260,15 @@ _o="$(pmr_plan_check "$SCRATCH/p-dup.md" "$STEPS" "")"; _rc=$?
 h_eq "plan-check repeated After merge row number fails" 1 "$_rc"
 h_eq "plan-check repeated row names the repeat" 1 "$(grep -c 'repeats an earlier After merge row number' <<< "$_o")"
 
+# A post-merge: matrix row near the top, then about 1 MB of prose. Piping pmr_prose_text into
+# grep -q under pipefail SIGPIPEs the producer after the first match and reads as "no
+# post-merge: row", a false [AM] prose violation. awk, not `yes | head`: no pipe here either.
+awk -v p="$PROSE" 'BEGIN {
+    print "# Plan\n\n| 1 | x | Truly-manual | post-impl | post-merge: live host only |\n"; print p
+    for (i = 0; i < 20000; i++) print "filler prose line " i " that keeps the producer writing"
+}' > "$SCRATCH/p-big.md"
+_o="$(set -o pipefail; pmr_plan_check "$SCRATCH/p-big.md" "$STEPS" "")"; _rc=$?
+h_eq "plan-check large plan with post-merge: row passes under pipefail" 0 "$_rc"
+h_eq "plan-check large plan prints no [AM]" "" "$_o"
+
 h_done

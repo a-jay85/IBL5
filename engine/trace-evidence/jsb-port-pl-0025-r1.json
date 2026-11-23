@@ -1,0 +1,20 @@
+{
+  "branch": "jsb-port-pl-0025-r1",
+  "schema": 2,
+  "tests": [
+    {
+      "capture": "captures/pl-0025.jsonl",
+      "capture_commit": "66351f84a4e7b88060130fa7e5bfa691a6f5898b",
+      "capture_host": "jsb-native",
+      "capture_sha256": "aede10e35aaf38d39623e6937d01c79239ad8cddb4bafb675275162ed41b4594",
+      "file": "engine/internal/sim/tracepinned_pl0025_exact_test.go",
+      "package": "./internal/sim",
+      "ported_files": [
+        "engine/internal/sim/bucketweights.go"
+      ],
+      "test": "TestTracePinnedPl0025ExactValue",
+      "test_blob": "65c2d5a836206b51612153b5400514b8d41d68e4"
+    }
+  ],
+  "token": "trace-pinned"
+}

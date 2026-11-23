@@ -934,6 +934,30 @@ def test_fix_round_rejudge_skips_not_ready_verdict_1(monkeypatch):
     assert "verdict_2" not in res.fidelity
 
 
+def test_second_fix_round_repin_keeps_fix_round_kind(monkeypatch):
+    """Round 2's repin rewrites same_run_repin with no kind; the fix-round wording must survive."""
+    from harness import fidelity
+    fid = dict(_fid(), verdict_2="READY", reviewed_tree_2=TREE_B,
+               same_run_repin={"sha": FIX_SHA, "verdict": "READY", "verdict_path": "/tmp/p",
+                               "kind": "fix-round"})
+    res = SimpleNamespace(fidelity=fid, slug="")
+    prior = dict(fid["same_run_repin"])
+    monkeypatch.setattr(runner.fidelity, "re_review", lambda *a, **k: ("NOT READY", TREE_A, "/tmp/p2"))
+    runner._repin_fidelity_after_same_run(None, _TreeGit(TREE_A), _PrGh(), "out", "wt", None,
+                                          "m", "body", 7, "d" * 40, res, lambda *_: None)
+    assert "kind" not in res.fidelity["same_run_repin"]  # the shared helper stays untouched
+    runner._keep_fix_round_kind(res, prior)
+    assert res.fidelity["same_run_repin"]["kind"] == "fix-round"
+    assert res.fidelity["same_run_repin"]["sha"] == "d" * 40
+    assert fidelity.sticky_terminal(res.fidelity).startswith("NOT READY")
+
+
+def test_keep_fix_round_kind_leaves_pr_copy_repin_alone():
+    res = SimpleNamespace(fidelity={"same_run_repin": {"sha": FIX_SHA, "verdict": "READY"}})
+    runner._keep_fix_round_kind(res, {"sha": "x", "verdict": "READY"})
+    assert "kind" not in res.fidelity["same_run_repin"]
+
+
 def _rejudge_rig_llm(rig, **kw):
     llm = rig.llm(**kw)
     llm.canned["plan-fidelity-review"] = _fid_doc("READY WITH NOTES")

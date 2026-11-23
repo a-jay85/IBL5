@@ -1233,8 +1233,10 @@ def _run_pass(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                     _write_conformance_handoff(out_dir, unresolved)
                     if fr.get("status") == "accepted":
                         sha = git.head()
+                        _prior_repin = dict((res.fidelity or {}).get("same_run_repin") or {})
                         _repin_fidelity_after_same_run(llm, git, gh, out_dir, worktree, plan,
                                                        master_sha, body, pr, pushed or sha, res, log)
+                        _keep_fix_round_kind(res, _prior_repin)
                         _rejudge_fidelity_after_fix_round(llm, git, gh, out_dir, worktree, plan,
                                                           master_sha, body, pr, pushed or sha,
                                                           res, log)
@@ -3976,6 +3978,18 @@ def _repin_fidelity_after_same_run(llm, git, gh, out_dir, worktree, plan, master
 
 
 FIX_ROUND_REJUDGE_VERDICTS = ("READY", "READY WITH NOTES")
+
+
+def _keep_fix_round_kind(res, prior_repin) -> None:
+    """Keep `kind: "fix-round"` when a later round's repin rewrote the record without it.
+
+    Round 2 re-pins a verdict 2 that round 1's re-judge set. The repin helper writes a
+    new `same_run_repin` with no `kind`, so the sticky would lose the fix-round wording.
+    """
+    fid = res.fidelity or {}
+    repin = fid.get("same_run_repin")
+    if prior_repin.get("kind") == "fix-round" and repin and "kind" not in repin:
+        repin["kind"] = "fix-round"
 
 
 def _rejudge_fidelity_after_fix_round(llm, git, gh, out_dir, worktree, plan, master_sha, body, pr,

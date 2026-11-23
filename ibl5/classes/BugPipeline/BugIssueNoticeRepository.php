@@ -68,7 +68,6 @@ class BugIssueNoticeRepository extends \Database\BaseMysqliRepository implements
     {
         $limit = max(self::MIN_LIMIT, min(self::MAX_LIMIT, $limit));
         $rows = $this->fetchAll(
-            // @phpstan-ignore ibl.orderByMissingTiebreaker (issue_number is the PK of ibl_bug_issue_notices — inherently unique)
             "SELECT issue_number, reporter_discord_id, thread_id, original_message_id
              FROM `ibl_bug_issue_notices`
              WHERE notice_state = 'pending' AND issue_number > ?
@@ -164,7 +163,6 @@ class BugIssueNoticeRepository extends \Database\BaseMysqliRepository implements
     public function listStaleClaims(int $olderThanMinutes): array
     {
         $rows = $this->fetchAll(
-            // @phpstan-ignore ibl.orderByMissingTiebreaker (issue_number is the PK of ibl_bug_issue_notices — inherently unique)
             "SELECT issue_number FROM `ibl_bug_issue_notices`
              WHERE notice_state = 'claimed' AND claimed_at < NOW() - INTERVAL ? MINUTE
              ORDER BY issue_number",

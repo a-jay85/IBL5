@@ -1,6 +1,6 @@
 ---
 description: Module registry and access-control logic for URL routing and season-phase availability.
-last_verified: 2026-10-04
+last_verified: 2026-11-21
 ---
 
 # Module
@@ -10,6 +10,8 @@ Controls which application modules are accessible at any given time. `ModuleRegi
 ## Module composition
 
 `ibl5/modules.php` publishes one request-scoped `Module\ModuleServices` after the page-cache exit and before `ModuleAccessControl`. A module `index.php` holds its file guard, its auth/CSRF gates, its input parsing and one wiring call. It never uses `new` and never reads `$mysqli_db`. `ibl5/tests/Module/ModuleCompositionRootRatchetTest.php` enforces both, and `ibl5/tests/Security/ModuleFactorySecuritySurfaceTest.php` keeps factories free of auth and request state.
+
+The rule covers every PHP file directly under `modules/<dir>/`, including the `?file=` siblings such as `News/article.php` and `Trading/maketradeoffer.php`. Siblings that `modules.php` includes call `ModuleServices::current()`. Direct-access scripts that require `mainfile.php` themselves (the three Trading trade-offer scripts and `Player/extension.php`) call `ModuleServices::currentOrPublish()`, which reuses published services and otherwise publishes new ones over the boot container.
 
 Converted shape:
 

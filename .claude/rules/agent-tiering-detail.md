@@ -1,16 +1,13 @@
 ---
-description: Read-on-demand detail for agent-tiering: skip-vs-spawn heuristic, fan-out and nesting rationale, task-type boundary, orchestrator context economics, /plan orchestrator evidence, prompt style, Haiku 5.5 measurement and price cliff, 2026-10 review-seat measurement, extra Sonnet pins. Fable test and bounded checklist live in their own files.
-last_verified: 2026-11-16
+description: Rationale behind agent-tiering.md: direct tool calls vs. spawns, nested sub-agents, fan-out, Sonnet pins, Explore tiers, and the /plan orchestrator.
+last_verified: 2026-11-20
 paths:
   - ".claude/agents/*.md"
 ---
 
 # Agent Tiering — Detail
 
-Read-on-demand companion to `agent-tiering.md` (always-loaded). The parent holds the
-operative Tier table. This file holds the longer rationale: the skip-vs-spawn heuristic,
-flat-fan-out and orchestrator context economics, and prompt style. The Fable test is in
-`agent-tiering-fable.md`.
+Rationale behind `.claude/rules/agent-tiering.md`. Fable criteria: `agent-tiering-fable.md`.
 
 ## Skip the Agent — Direct Tool Calls
 
@@ -22,7 +19,7 @@ Delegatable tool results: 8,292 calls / 4.73 Mtok. p50 result 194 tokens, p90 1,
 
 **This gives the "~50 lines" threshold below a measured basis.** ~50 lines of output lands right around the measured p50 of 194 tokens — roughly 90× cheaper than the 17–23K a spawn costs before it does any work. The figure stands exactly as written; it was an estimate and is now an estimate the data agrees with.
 
-**The fat-tail batching rule names *which* calls are worth a spawn at all.** Not how few spawns to make. `agent-tiering.md` § Fat-tail delegation lets two fat calls per turn through and denies the 3rd, routing it and the rest into one Haiku digest spawn. A call is **fat** when it is a `Read` ≥ 8 KB, or a Bash command in: bare `cat`, `git log` with no bound, `find` with no limit, a full Playwright run (hook `output-guard.sh` Check F; fails open; the deny message names the one-off override). It identifies the tail worth delegating (the 5.2% carrying 43.6% of the residue). **One spawn is the default for wall-clock reasons:** those calls are cheap to *run*, so serializing them in one agent costs almost no wall-clock. When a batched item is genuinely long-running and independent (a full Playwright run beside an unbounded log dump), fan out instead. See § Fan out by independence.
+**The fat-tail batching rule names *which* calls are worth a spawn at all.** Not how few spawns to make. A call is **fat** when it is a `Read` ≥ 8 KB, or a Bash command in: bare `cat`, `git log` with no bound, `find` with no limit, a full Playwright run (hook `output-guard.sh` Check F; fails open; the deny message names the one-off override). It identifies the tail worth delegating (the 5.2% carrying 43.6% of the residue). **One spawn is the default for wall-clock reasons:** those calls are cheap to *run*, so serializing them in one agent costs almost no wall-clock. When a batched item is genuinely long-running and independent (a full Playwright run beside an unbounded log dump), fan out instead. See § Fan out by independence.
 
 **Treat this as unused headroom.** The 2026-08-25 spawn-count comparison (135 spawns against a ~353 break-even) was corrected on 2026-09-23 by `bin/measure-delegate-cost`: a Sonnet automouse impl session costs $2.65 at p50 against $4.33 for Opus (`work-triage-detail.md` § Inline vs. delegated). The finding is room to route more of the fat tail through a sub-agent, which no token saving has banked.
 
@@ -32,11 +29,9 @@ Delegatable tool results: 8,292 calls / 4.73 Mtok. p50 result 194 tokens, p90 1,
 
 **PHPUnit and PHPStan are always direct Bash calls** — passing output is ~5 lines, failures usually under 50; agent overhead dwarfs it. Use `run_in_background` for parallelism without an agent — **but only in the interactive harness**, where a finished background task re-invokes you. In a **headless** run (`claude -p`, e.g. `/post-plan` under automouse) there is no re-invocation: a live background task at turn-end stall-kills the run — run blocking, or poll `BashOutput` to completion in-turn (post-plan `SKILL.md` Phase 5).
 
-> When to use Fable (asm-level static RE included) lives in `agent-tiering-fable.md`.
-
 ### Fan out by independence
 
-When you spawn, the discriminator is independence. The old "token spend outranks wall-clock time; batch N related tasks into one agent" priority is **retired** (2026-09-08, explicit user decision): the measured cost basis (see the headroom note above) makes (N-1) × 17-23K of extra spawns negligible. Wall-clock time is the scarce resource; token spend is not.
+When you spawn, the discriminator is independence. The old "token spend outranks wall-clock time; batch N related tasks into one agent" priority is **retired** (explicit user decision): the measured cost basis (see the headroom note above) makes (N-1) × 17-23K of extra spawns negligible. Wall-clock time is the scarce resource; token spend is not.
 
 - **Fan out** when the tasks are **mutually independent** — issue every `Agent` call in one message so they run concurrently, collapsing a serial chain into one wall-clock unit. Work that would otherwise run serially and *can* run concurrently should; "that costs another spawn" is no longer a reason not to.
 - **Batch into one agent** when the tasks are **sequential or dependent** — splitting those re-pays the spawn overhead for **zero** wall-clock gain, and hands each agent a partial view of a coherent change.
@@ -61,19 +56,17 @@ The resident file lists Explore and `sonnet-5-5`. The rest, each carrying its ow
 
 ## Boundary keys on task type, not model capability
 
-Re-validated 2026-06-30 against Sonnet 5. The Opus-only column (final code review, diff-triage, rule/ADR authoring, novel reasoning, ambiguous failures) stays Opus because **"never delegate understanding" is a delegation rule**, and waiting for a smarter model does not change it. The cost was never Sonnet's raw ability. It is that the orchestrator loses the findings it would otherwise filter (`feedback_sonnet_proving_negatives`, re-tested 2026-10-08 on Sonnet 5.5: INCONCLUSIVE; `feedback_review_agent_full_diff`). A larger Sonnet context only strengthens the "spawn Sonnet to absorb verbose output" rationale. **Tripwire to revisit:** a model generation where the delegation failure mode itself changes (e.g. a coordinator that can surface its own filtered-out findings). A higher capability score alone does not count.
+The Opus-only column (final code review, diff-triage, rule/ADR authoring, novel reasoning, ambiguous failures) stays Opus because **"never delegate understanding" is a delegation rule**, and waiting for a smarter model does not change it. The cost was never Sonnet's raw ability. It is that the orchestrator loses the findings it would otherwise filter (`feedback_sonnet_proving_negatives`, re-tested 2026-10-08 on Sonnet 5.5: INCONCLUSIVE; `feedback_review_agent_full_diff`). A larger Sonnet context only strengthens the "spawn Sonnet to absorb verbose output" rationale. **Tripwire to revisit:** a model generation where the delegation failure mode itself changes (e.g. a coordinator that can surface its own filtered-out findings). A higher capability score alone does not count.
 
 ## Nested Sub-Agents — One Carve-Out, Otherwise Unused
 
-Sub-agents can spawn sub-agents. `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` is **3** in `~/.claude/settings.json` (the rule previously claimed 5). We keep **flat fan-out**: the orchestrator session owns every fan-out and absorbs every agent's output. Do not nest in `/pr-review`, `/security-audit`, `/post-plan`, or automouse. **One carve-out, in `/plan` only:** `plan-architect` and `plan-architect-xhigh` may spawn at most **one** `Explore` for a question that surfaces mid-design (`.claude/skills/plan/_architect-contract.md` § Mid-design exploration). That subtree terminates. `Explore` denies `Agent`, adding a depth rather than a tree. Every other in-repo def (`plan-architect-sonnet`, `sonnet-5-5`, `automouse-delegate`) and `~/.claude/agents/Explore.md` denies `Agent` outright, which is what keeps the carve-out a carve-out rather than a general loosening. Budget: ≤1 `Explore` per architect invocation, on top of the `/plan` Step-2 cap of 2. Run-wide ceiling: **3**. The orchestrator owns triage: the pipelines keep review/triage **in the orchestrator session** by design, whatever tier it runs at, because a coordinator would blind the orchestrator to the findings it filtered and delegated judgment degrades (see § Boundary keys). `/post-plan` is a single-context state machine whose Phase 3/5/6.5 gates read from main-session context.
+Sub-agents can spawn sub-agents. `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` is **3** in `~/.claude/settings.json`. We keep **flat fan-out**: the orchestrator session owns every fan-out and absorbs every agent's output. Do not nest in `/pr-review`, `/security-audit`, `/post-plan`, or automouse. **One carve-out, in `/plan` only:** `plan-architect` and `plan-architect-xhigh` may spawn at most **one** `Explore` for a question that surfaces mid-design (`.claude/skills/plan/_architect-contract.md` § Mid-design exploration). That subtree terminates. `Explore` denies `Agent`, adding a depth rather than a tree. Every other in-repo def (`plan-architect-sonnet`, `sonnet-5-5`, `automouse-delegate`) and `~/.claude/agents/Explore.md` denies `Agent` outright, which is what keeps the carve-out a carve-out rather than a general loosening. Budget: ≤1 `Explore` per architect invocation, on top of the `/plan` Step-2 cap of 2. Run-wide ceiling: **3**. The orchestrator owns triage: the pipelines keep review/triage **in the orchestrator session** by design, whatever tier it runs at, because a coordinator would blind the orchestrator to the findings it filtered and delegated judgment degrades (see § Boundary keys). `/post-plan` is a single-context state machine whose Phase 3/5/6.5 gates read from main-session context.
 
 **Depth, not width.** This constrains *nesting*, not how many agents one level runs at once. § Fan out by independence governs width and leaves this untouched. Width is explicitly allowed; the load-bearing reason is orchestrator-owns-triage, which is width-independent.
 
 **Tripwire to revisit** (still live, for the surfaces above): a *measured* post-plan context-window problem, or a new workflow with genuinely wide fan-out and verbose per-agent intermediates.
 
-The `/plan` carve-out did not come from the tripwire. It was an explicit user decision: the architect could see an unknown mid-design and had no way to close it, because Step-2's fan-out is spent before the architect starts. That is a capability gap, and the tripwire's bar is not retroactively claimed to have been met.
-
-> The bounded-checklist rationale for `/post-plan` Phase 6.5 condition (9) has moved to `agent-tiering-bounded-checklist.md`.
+The `/plan` carve-out is an explicit user decision: the architect can hit an unknown mid-design after Step-2's fan-out is spent.
 
 ## Orchestrator context economics — delegate to never-hold, split don't self-clear
 
@@ -87,20 +80,7 @@ The context saving from a sub-agent comes from **delegation, not dismissal**. A 
 
 ## Haiku 5.5 measurement
 
-A/B on 2026-10-08 (Sonnet twice, Haiku once, bar sealed first): `~/claude-plans/_reports/2026-10-08-haiku-5-5-vs-sonnet-5-5-ab.md`.
-
-| Surface | Tasks | Verdict | $/task S, H |
-|---|---|---|---|
-| `explore` | 8 | PASS | 0.154, 0.010 |
-| `manual_test` | 8 | FAIL | 0.059, 0.003 |
-| `fat_tail_digest` | 6 | PASS | 0.082, 0.005 |
-| `security_probe` | 5 | PASS (on Haiku) | n/a, 0.007 |
-| `backlog_housekeeping` | 0 | NO-LIVE-SURFACE | n/a |
-| `agent_d` | 0 | TRIGGER-UNMET | n/a |
-
-Only parity moves a surface. Cost never offsets a quality drop; a refusal fails it. Agent D stays on Sonnet until its trigger holds (20+ examples per category, 4 weeks of precision data).
-
-**Price cliff.** Haiku bills $0.10/$0.50 per MTok to 100K prompt tokens per request (cache included), $0.50/$2.50 above, 1/4 of Sonnet's input rate. A multi-turn agent's prompt grows each turn and can cross 100K late. Send those jobs to Sonnet.
+Table and price cliff: `agent-tiering-fable.md` § Haiku 5.5 measurement.
 
 ## Prompt Style by Tier
 
@@ -134,5 +114,3 @@ Two actors spawn Explore in a `/plan` run: the orchestrator at Step 2 (≤2) and
 | **Sonnet 5.5** | *omit `model`* | Multi-hop traces, cross-module synthesis, open-ended investigation | "trace the encoding pipeline from .plr read to Team page" |
 
 **Heuristic:** notice connections / judge relevance / trace data flow → omit `model` (Sonnet 5.5). Answerable by grep + format → `model: "haiku"`.
-
-Measured 2026-10-08: Haiku 5.5 matched Sonnet 5.5 on 8 grep-and-list tasks (§ Haiku 5.5 measurement).

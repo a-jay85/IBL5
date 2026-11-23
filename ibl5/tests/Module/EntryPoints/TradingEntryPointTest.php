@@ -147,4 +147,79 @@ class TradingEntryPointTest extends ModuleEntryPointTestCase
 
         $this->assertNotSame('', $output);
     }
+
+    /**
+     * The three trade-offer scripts build their controller through TradingFactory::controller(),
+     * so the container auth object must be the one the controller checks first.
+     */
+    public function testMakeTradeOfferScriptReachesControllerAuth(): void
+    {
+        $this->skipWebBoot();
+        $this->authenticateWithSentinel('testgm', true, 'isAuthenticated');
+        $this->mockDb->setMockData([]);
+
+        $this->assertSentinelThrown('isAuthenticated', function (): void {
+            $this->runModule(
+                'Trading',
+                [],
+                ['_csrf_token' => \Security\CsrfGuard::generateRawToken('trade_offer')],
+                array_merge($this->dbGlobals(), ['user' => $GLOBALS['user']]),
+                'maketradeoffer.php',
+            );
+        });
+
+        $this->assertSame($GLOBALS['authService'], \Module\ModuleServices::current()->auth());
+        $this->assertNoWriteQueryReachedMock();
+    }
+
+    public function testAcceptTradeOfferScriptReachesControllerAuth(): void
+    {
+        $this->skipWebBoot();
+        $this->authenticateWithSentinel('testgm', true, 'isAuthenticated');
+        $this->mockDb->setMockData([]);
+
+        $this->assertSentinelThrown('isAuthenticated', function (): void {
+            $this->runModule(
+                'Trading',
+                [],
+                [],
+                array_merge($this->dbGlobals(), ['user' => $GLOBALS['user']]),
+                'accepttradeoffer.php',
+            );
+        });
+
+        $this->assertSame($GLOBALS['authService'], \Module\ModuleServices::current()->auth());
+        $this->assertNoWriteQueryReachedMock();
+    }
+
+    public function testRejectTradeOfferScriptReachesControllerAuth(): void
+    {
+        $this->skipWebBoot();
+        $this->authenticateWithSentinel('testgm', true, 'isAuthenticated');
+        $this->mockDb->setMockData([]);
+
+        $this->assertSentinelThrown('isAuthenticated', function (): void {
+            $this->runModule(
+                'Trading',
+                [],
+                [],
+                array_merge($this->dbGlobals(), ['user' => $GLOBALS['user']]),
+                'rejecttradeoffer.php',
+            );
+        });
+
+        $this->assertSame($GLOBALS['authService'], \Module\ModuleServices::current()->auth());
+        $this->assertNoWriteQueryReachedMock();
+    }
+
+    private function assertNoWriteQueryReachedMock(): void
+    {
+        foreach ($this->mockDb->getExecutedQueries() as $query) {
+            $this->assertDoesNotMatchRegularExpression(
+                '/^\s*(INSERT|UPDATE|DELETE)\b/i',
+                $query,
+                'A trade-offer script wrote before reaching the controller auth check.',
+            );
+        }
+    }
 }

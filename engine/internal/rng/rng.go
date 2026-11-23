@@ -14,6 +14,7 @@ import "math/rand/v2"
 // depends only on the recorded seed.
 type RNG struct {
 	src *rand.Rand
+	rep *replay // non-nil only from NewReplay; nil keeps the PCG path byte-identical
 }
 
 // New returns an RNG seeded from the given seed. math/rand/v2's PCG is a
@@ -25,8 +26,27 @@ func New(seed uint64) *RNG {
 }
 
 // Float64 returns a deterministic value in [0, 1).
-func (r *RNG) Float64() float64 { return r.src.Float64() }
+func (r *RNG) Float64() float64 {
+	if r.rep != nil {
+		return r.rep.float64()
+	}
+	return r.src.Float64()
+}
 
 // IntN returns a deterministic value in [0, n). It panics if n <= 0, matching
 // math/rand/v2.IntN semantics.
-func (r *RNG) IntN(n int) int { return r.src.IntN(n) }
+func (r *RNG) IntN(n int) int {
+	if r.rep != nil {
+		return r.rep.intN(n)
+	}
+	return r.src.IntN(n)
+}
+
+// Raw returns one draw in 0..RawMax, the range of JSB's rand(). A ported call
+// site uses it to copy JSB's own arithmetic on the draw.
+func (r *RNG) Raw() int {
+	if r.rep != nil {
+		return r.rep.raw()
+	}
+	return int(r.src.Uint32() >> 17)
+}

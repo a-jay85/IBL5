@@ -826,6 +826,7 @@ def _run_pass(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                       cache_rec=cache_rec, cache_version=cache_key["version"],
                       conflict_only=conflict_only,
                       state_dir=_state_dir(out_dir, live, state_dir), slug=slug,
+                      packet_diff=_fidelity_packet_diff(git, review, review_diff),
                       body_hash=reviewcache.body_hash_of(copy["summary_md"]))
         _join_review()
         # A remediation loop moved the head, up to MAX_FIDELITY_ROUNDS times. Phase 7
@@ -1025,7 +1026,9 @@ def _run_pass(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 removed_guards_holds=_rg_holds,
                 reviewer_arming_holds=fidelity.reviewer_arming_holds(
                     (res.fidelity or {}).get(fidelity.SHADOW_KEY), git.conformance_files(),
-                    git.diff_vs_base(), log),
+                    git.diff_vs_base(), log,
+                    review_inputs=_landed_later_review_inputs(git, review, log),
+                ),
             )
             if not live and (fixture or {}).get("current_tree"):
                 # replay-only seam, the checks_outcome pattern: live mode never reads it
@@ -3286,6 +3289,21 @@ def _review_base(git, log=None, label="phase5.5"):
     return rb
 
 
+def _landed_later_review_inputs(git, review, log):
+    """Review-base inputs for the planned-landed arming filter, or None on the master base.
+
+    The Phase 5.5 reviewer judged the diff against ``review``. A file only the parent
+    changed must not clear the reviewer's MISSING item. A git failure returns empty
+    inputs, which keeps every planned-landed hold."""
+    if review is None or review.parent is None:
+        return None
+    try:
+        return git.conformance_files(review.ref), git.diff_vs_base(review.ref)
+    except Exception as exc:  # noqa: BLE001
+        log(f"arming: review-base landed-later inputs unreadable ({exc}); keeping planned-landed holds")
+        return (), ""  # fail closed: empty review-base inputs keep every hold
+
+
 def _unplanned_ctx(worktree, git, plan, master_sha, diff_body, log):
     """Classifier inputs for `unplanned_scope`, or None when any of them cannot be read.
 
@@ -4040,11 +4058,25 @@ def _stray_master_merges(git, log) -> tuple[str, list[str]]:
     return base, history_shape.stray_master_merges(getattr(git, "worktree", "") or "", base)
 
 
+def _fidelity_packet_diff(git, review, review_diff: str) -> str:
+    """diff.patch content: the branch diff after Phase 2's rebase (backlog#1771).
+
+    `diff` is captured before the rebase and stays the carry-forward and cache input.
+    The packet re-reads so diff.patch matches REVIEWED_TREE. A stacked review_diff is
+    already a fresh read, so it is reused."""
+    return git.diff_vs_base() if review.parent is None else review_diff
+
+
+def _packet_conflict_paths(slug: str) -> list[str] | None:
+    """Auto-resolved conflict paths for the fidelity packet (backlog#1771); None without a slug."""
+    return None if not slug else conflict.read_autoresolved_list(slug.replace("/", "-"))
+
+
 def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_sha,
                   reviewed_tree, live, log, res, before_remediation=None,
                   unresolved_conformance=(), meta_check_failures=(), scored_findings=(),
                   cache_rec=None, cache_version="", conflict_only=False, body_hash="",
-                  state_dir=None, slug=""):
+                  state_dir=None, slug="", packet_diff: str | None = None):
     """Phase 5.5. Returns (verdict_word_or_None, error_kind_or_'').
 
     `before_remediation` runs once, before `build_packet()`, so Phase 4 results are
@@ -4176,9 +4208,12 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
     review_findings = "\n".join(_lines)
     try:
         packet = fidelity.build_packet(
-            out_dir, master_sha, reviewed_tree, plan, diff, body, pr,
+            out_dir, master_sha, reviewed_tree, plan,
+            packet_diff if packet_diff is not None else diff, body, pr,
             phase4b_ran=phase4b_ran, worktree=worktree or ".",
-            review_findings=review_findings, shadow_request=True)
+            review_findings=review_findings, shadow_request=True,
+            conflict_resolved_paths=_packet_conflict_paths(slug),
+        )
     except HarnessError as e:
         log(f"phase5.5 fidelity: packet failed ({e.kind}) - verdict indeterminate")
         res.fidelity = {"verdict_1": None, "error_kind": e.kind,

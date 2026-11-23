@@ -356,6 +356,7 @@ SH
     export BUG_PIPELINE_NOTICE_CURSOR="$STUB/notices/cursor"  # bpt_reset clears notices/
     export BUG_PIPELINE_PLANS_DIR="$STUB/plans"
     export BUG_PIPELINE_ISSUE_REPO="test/bugs-fake"
+    export BUG_BOT_AUTO_REBUILD=0   # the real tick must never build or restart the live bot; the rebuild cases opt back in
     export BUG_PIPELINE_FILE_ISSUES_ONLY=''  # normal mode; per-case tests set to 1
     export BUG_PIPELINE_APPROVER_ID="770000000000000007"
     export BUG_PIPELINE_IDLE_SECS=100

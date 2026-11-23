@@ -18,7 +18,7 @@ import time
 
 from .state import HarnessError
 from . import llm_calls
-from . import fidelity_filefix
+from . import fidelity_filefix, rules_budget_carveout
 from . import schemas
 from . import hold_text
 from .classify import strip_runner_blocks
@@ -767,11 +767,19 @@ def body_only_findings(verdict_path: str) -> list[str] | None:
     return body_only_findings_text(text)
 
 
+def _conflict_paths_value(paths: list[str] | None) -> str:
+    """CONFLICT_RESOLVED_PATHS value. None means the caller did not read the run's list."""
+    if paths is None:
+        return "(not recorded for this packet)"
+    return ", ".join(paths) if paths else "(none — no rebase in this run auto-resolved a conflict)"
+
+
 def build_packet(out_dir: str, master_sha: str, reviewed_tree: str, plan, diff: str,
                  pr_body: str, pr_number: int | str, phase4b_ran: bool, *,
                  worktree: str = ".", packet_name: str = "fidelity-packet",
                  extra_context: str = "", review_findings: str = "",
-                 shadow_request: bool = False) -> str:
+                 shadow_request: bool = False,
+                 conflict_resolved_paths: list[str] | None = None) -> str:
     """Write the seven `_phase-5.5-fidelity.md` Step-2 inputs as files. Returns the dir.
 
     `shadow_request` asks the reviewer for the procedure 6f `## SHADOW-ARMING` block and adds
@@ -814,8 +822,7 @@ def build_packet(out_dir: str, master_sha: str, reviewed_tree: str, plan, diff: 
     )
     _write("context.md",
            "# Context\n\n"
-           "CONFLICT_RESOLVED_PATHS: (none — the harness path rebases cleanly or fails "
-           "closed before reaching Phase 5.5)\n"
+           f"CONFLICT_RESOLVED_PATHS: {_conflict_paths_value(conflict_resolved_paths)}\n"
            f"PHASE_4B_RAN: {'yes' if phase4b_ran else 'no'}\n"
            + findings_block
            + f"REVIEW_TIMESTAMP: {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}\n"
@@ -983,6 +990,11 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
            else f"inactive ({filefix.reason})"))
     filefix_note = (f"\n{fidelity_filefix.prompt_text(filefix.eligible)}\n"
                     if filefix.active else "")
+    # Budget-forced trims (ADR-0184 carve-out module): git and --print-caps decide, never
+    # the reviewer. Adds a fix hint to the fixer's copy of the finding; the verdict file,
+    # its severity tags and the keep-unplanned path are untouched.
+    work_list = rules_budget_carveout.annotate_work_list(
+        work_list, worktree, master_sha, skip=withheld)
 
     procedure = _find_procedure(worktree, master_sha, REMEDIATION_PATHS,
                                 "remediation-procedure-missing")
@@ -1376,10 +1388,12 @@ def _says_already_done(text: str, pr_number: int | None = None) -> bool:
 
 
 NOTE_HARMS = ("crash", "wrong-value", "lost-data", "security", "false-gate")
-_TOOLING_PATH_RE = re.compile(r"(?<![\w/.-])(?:bin|tools|\.claude|\.github|ibl5/docs)/")
+# `~/` (home) and `./` (cwd) count as path starts; ibl5/ may follow `/` in an absolute path (backlog#1771).
+_TOOLING_PATH_RE = re.compile(r"(?<![\w/.-])(?:~/|\./)?(?:bin|tools|\.claude|\.github|ibl5/docs)/")
 _WEBSITE_PATH_RE = re.compile(
-    r"(?<![\w/.-])(?:ibl5/(?!docs/)"
-    r"|(?:classes|modules|themes|migrations|includes|blocks|language|config|jslib|design)/)")
+    r"(?<![\w.-])ibl5/(?!docs/)"
+    r"|(?<![\w/.-])(?:~/|\./)?"
+    r"(?:classes|modules|themes|migrations|includes|blocks|language|config|jslib|design)/")
 
 
 def _is_harmless_tooling(note: dict) -> bool:
@@ -1770,8 +1784,22 @@ def _landed_later(item, changed_files, diff_text: str) -> bool:
     return False
 
 
-def reviewer_arming_holds(shadow, changed_files, diff_text: str, log) -> list[str]:
+def _landed_for_arming(item, changed_files, diff_text, review_inputs):
+    """True only when the item landed in the master diff and, on a stacked run, also in
+    the review-base diff the Phase 5.5 reviewer judged. Either miss keeps the hold."""
+    if not _landed_later(item, changed_files, diff_text):
+        return False
+    if review_inputs is None:
+        return True
+    review_files, review_diff = review_inputs
+    return _landed_later(item, review_files, review_diff)
+
+
+def reviewer_arming_holds(shadow, changed_files, diff_text: str, log, *,
+                           review_inputs=None) -> list[str]:
     """Condition (21) parts from the SHADOW-ARMING record. Add-only: it never clears a hold.
+
+    `review_inputs` is `(files, diff)` against the stacked review base, or None on the master base.
 
     Anything but a well-formed present or carried record is neutral: [] plus one log line.
     """
@@ -1784,7 +1812,8 @@ def reviewer_arming_holds(shadow, changed_files, diff_text: str, log) -> list[st
         parts = []
         pl = fields["planned_landed"]
         if pl["hold"] is True and not shadow.get("plan_blind"):
-            items = [i for i in pl["missing"] if not _landed_later(i, changed_files, diff_text)]
+            items = [i for i in pl["missing"]
+                     if not _landed_for_arming(i, changed_files, diff_text, review_inputs)]
             if items:
                 parts.append("planned-landed: " + ", ".join(
                     f"{_one_line(i.get('kind'))}:{_one_line(i.get('token'))}" for i in items))

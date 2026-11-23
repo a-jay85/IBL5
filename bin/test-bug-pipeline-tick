@@ -851,6 +851,74 @@ else
     bpt_named_fail close_notice_pages_one_window_per_tick "reads=$_cn_reads1/$_cn_reads2 posts=$_cn_posts1/$(_cn_posts) cursor=$_cn_cur1/$_cn_cur2"
 fi
 
+# ── maybe_rebuild_bot: rebuild a stale bug-bot dist, then restart the bot ─────
+# A throwaway repo whose one src/bug-bot commit is dated 2017-07-14 (epoch 1500000000).
+# A dist file touched in 2016 is stale; one touched now is fresh. Stub npm and launchctl
+# log their calls. The real driver runs an empty tick with the rebuild step switched on.
+_rb_repo="$STUB/botrepo"
+rm -rf "$_rb_repo"
+mkdir -p "$_rb_repo/ibl5/IBLbot/src/bug-bot"
+git -C "$_rb_repo" init -q
+echo x > "$_rb_repo/ibl5/IBLbot/src/bug-bot/index.ts"
+git -C "$_rb_repo" add -A
+GIT_COMMITTER_DATE="@1500000000 +0000" GIT_AUTHOR_DATE="@1500000000 +0000" \
+    git -C "$_rb_repo" -c user.name=t -c user.email=t@t commit -q -m src
+cat > "$STUB/bin/npm" <<'SH'
+#!/usr/bin/env bash
+echo "npm $* cwd=$PWD" >> "$STUB/npm.log"
+[ "${STUB_NPM_RC:-0}" = 0 ] || exit "$STUB_NPM_RC"
+mkdir -p dist/bug-bot && touch dist/bug-bot/index.js
+SH
+cat > "$STUB/bin/launchctl" <<'SH'
+#!/usr/bin/env bash
+echo "launchctl $*" >> "$STUB/launchctl.log"
+SH
+chmod +x "$STUB/bin/npm" "$STUB/bin/launchctl"
+
+_rb_dist() { # stale|fresh|absent
+    rm -rf "$_rb_repo/ibl5/IBLbot/dist"
+    [ "$1" = absent ] && return 0
+    mkdir -p "$_rb_repo/ibl5/IBLbot/dist/bug-bot"
+    touch "$_rb_repo/ibl5/IBLbot/dist/bug-bot/index.js"
+    [ "$1" = stale ] && touch -t 201601010000 "$_rb_repo/ibl5/IBLbot/dist/bug-bot/index.js"
+    return 0
+}
+_rb_run() {
+    BUG_BOT_AUTO_REBUILD="${_RB_SWITCH:-1}" BUG_BOT_REPO_ROOT="$_rb_repo" \
+        BUG_BOT_NPM_BIN="$STUB/bin/npm" BUG_BOT_LAUNCHCTL_BIN="$STUB/bin/launchctl" \
+        BUG_BOT_BUILD_LOG="$STUB/bot-build.log" BUG_BOT_BUILD_FAIL_MARK="$STUB/bot-build-failed" \
+        bpt_run
+}
+_rb_reset() { bpt_reset; rm -f "$STUB/npm.log" "$STUB/launchctl.log" "$STUB/bot-build.log" "$STUB/bot-build-failed"; unset STUB_NPM_RC _RB_SWITCH; }
+
+# Stale dist: build once in the IBLbot dir, then kickstart the bot's LaunchAgent.
+_rb_reset; _rb_dist stale; _rb_run
+bpt_expect_eq "rebuild: stale-dist tick exits 0" 0 "$BPT_RC"
+bpt_log_has "$STUB" npm.log "npm run build -- --noEmitOnError cwd=$_rb_repo/ibl5/IBLbot" "rebuild: stale dist runs npm run build in IBLbot"
+bpt_log_has "$STUB" launchctl.log "launchctl kickstart -k gui/$(id -u)/com.ibl5.bug-bot" "rebuild: success kickstarts the bug-bot"
+bpt_log_has "$STUB" tick.out "bug-bot rebuilt and restarted" "rebuild: success is logged"
+
+# Fresh dist: an idle tick builds nothing and restarts nothing.
+_rb_reset; _rb_dist fresh; _rb_run
+bpt_file_absent "$STUB/npm.log" "rebuild: fresh dist runs no build"
+bpt_file_absent "$STUB/launchctl.log" "rebuild: fresh dist restarts nothing"
+
+# Failed build: no restart, error logged, and the next tick does not retry the same commit.
+_rb_reset; _rb_dist stale; STUB_NPM_RC=2 _rb_run
+bpt_expect_eq "rebuild: failed build still exits 0" 0 "$BPT_RC"
+bpt_file_absent "$STUB/launchctl.log" "rebuild: failed build never restarts the bot"
+bpt_log_has "$STUB" tick.out "ERROR: bug-bot rebuild failed" "rebuild: failed build is logged"
+bpt_expect_eq "rebuild: failed build records the src commit time" 1500000000 "$(cat "$STUB/bot-build-failed" 2>/dev/null)"
+rm -f "$STUB/npm.log"; STUB_NPM_RC=2 _rb_run
+bpt_file_absent "$STUB/npm.log" "rebuild: a failed commit is not rebuilt on every tick"
+
+# Kill switch off, and no dist on this host: both leave the bot alone.
+_rb_reset; _rb_dist stale; _RB_SWITCH=0 _rb_run
+bpt_file_absent "$STUB/npm.log" "rebuild: BUG_BOT_AUTO_REBUILD=0 runs no build"
+_rb_reset; _rb_dist absent; _rb_run
+bpt_file_absent "$STUB/npm.log" "rebuild: absent dist runs no build"
+bpt_file_absent "$STUB/launchctl.log" "rebuild: absent dist restarts nothing"
+
 echo "----"
 [ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"
 h_done

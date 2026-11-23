@@ -126,6 +126,8 @@ class PhaseInfo:
     `heading_words` holds every whitespace token of the heading after the `Phase N:` prefix, with
     backticks and edge punctuation stripped, no `/`; conformance uses them for the heading-named-file
     clearance.
+    `files_line_paths` holds the paths from the phase's `**Files:**` line(s); when conformance finds a
+    repo-path candidate among them it checks only those.
     """
     number: int = 0
     heading: str = ""                                          # heading text after `## `, marker included
@@ -134,6 +136,7 @@ class PhaseInfo:
     no_diff_reason: str = ""      # honoured `**No diff:** <reason>` body marker (reason >= 15 chars); "" = none
     no_diff_rejected: bool = False  # a `**No diff:**` line was seen but its reason was under the floor
     heading_words: list[str] = field(default_factory=list)  # bare heading tokens (backticks and edge punctuation stripped); conformance decides which name a file
+    files_line_paths: list[str] = field(default_factory=list)  # leading paths of the phase's `**Files:**` line(s); [] = none, conformance keeps the mention scan
 
 
 @dataclass

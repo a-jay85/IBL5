@@ -147,7 +147,6 @@ class TeamRepository extends \Database\BaseMysqliRepository implements TeamRepos
     {
         /** @var list<GMAwardRow> */
         return $this->fetchAll(
-            // @phpstan-ignore ibl.orderByMissingTiebreaker (WHERE fixes name and uk_year_award_name makes (year, award) unique, so award completes a total order)
             "SELECT * FROM `ibl_gm_awards` WHERE name = ? ORDER BY year ASC, award ASC",
             "s",
             $gmUsername
@@ -204,7 +203,6 @@ class TeamRepository extends \Database\BaseMysqliRepository implements TeamRepos
     {
         /** @var list<WinLossRow> */
         return $this->fetchAll(
-            // @phpstan-ignore ibl.orderByMissingTiebreaker (PK is (team_id, year, game_type) and WHERE fixes game_type, so team_id completes a total order)
             "SELECT `year`, currentname, namethatyear, wins, losses
              FROM `ibl_team_season_records`
              WHERE currentname = ? AND game_type = ?

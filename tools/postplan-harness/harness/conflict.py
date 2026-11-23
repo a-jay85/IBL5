@@ -839,9 +839,24 @@ def restore_prior_verdict(key: str, head_sha: str) -> bool:
     return False
 
 
+def autoresolved_list_path(key: str) -> str:
+    """Path of this run's auto-resolved conflict list (written by gitad.py)."""
+    return f"/tmp/postplan-conflict-files-{key}-autoresolved.txt"
+
+
+def read_autoresolved_list(key: str) -> list[str]:
+    """Conflict paths this run's rebases auto-resolved, in file order; [] when none."""
+    try:
+        with open(autoresolved_list_path(key), encoding="utf-8") as fh:
+            text = fh.read()
+    except (OSError, UnicodeDecodeError):
+        return []
+    return [line.strip() for line in text.splitlines() if line.strip()]
+
+
 def purge_autoresolved_list(key: str) -> None:
     """Remove the auto-resolved files list for key. Call exactly once per harness run,
     before the first rebase, so a stale list from a previous run of the same branch is cleared."""
-    autoresolved = f"/tmp/postplan-conflict-files-{key}-autoresolved.txt"
+    autoresolved = autoresolved_list_path(key)
     if os.path.exists(autoresolved):
         os.unlink(autoresolved)

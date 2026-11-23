@@ -1384,4 +1384,22 @@ else
     fail "open-threads-clear-under-pipefail: rc $rcOTR, got: $(cat "$OT_CLR_OUT")"
 fi
 
+# ── case27: post_review_summary reviewed-head marker (optional 4th arg) ──────
+H27=1111111111111111111111111111111111111111
+reset_outputs
+post_review_summary 42 "Code review" "No issues found." "$H27"
+assert_contains "case27: marker for full head" "$COMMENT_OUT" "<!-- reviewed-head: $H27 -->"
+assert_not_contains "case27: marker key is spelled in full" "$COMMENT_OUT" "reviewed-hed:"
+if [ "$(grep -A1 -F '</details>' "$COMMENT_OUT" | tail -1)" = "<!-- reviewed-head: $H27 -->" ]; then
+    ok "case27: marker sits on the line after </details>"
+else
+    fail "case27: marker is not on the line after </details>"
+fi
+reset_outputs
+post_review_summary 42 "Code review" "No issues found."
+assert_not_contains "case27: 3-arg call" "$COMMENT_OUT" "reviewed-head"
+reset_outputs
+post_review_summary 42 "Code review" "No issues found." abc1234
+assert_not_contains "case27: short head" "$COMMENT_OUT" "reviewed-head"
+
 h_done

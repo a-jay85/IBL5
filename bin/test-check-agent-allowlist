@@ -66,6 +66,34 @@ file_case case_allow_then_disallow_same_line 0 '' \
     '    "Bash(mysql:*)"'
 file_case case_sh_client_flagged 1 'shell-client-rule: Bash(sh -c:*)' \
     'claude -p "$p" --allowedTools "Bash(sh -c:*)"'
+# PR #4149 review: a bare Bash rule or Bash(*) grants every shell command
+file_case case_bare_bash_quoted 1 'bin/fx:1: bare-bash-rule:' \
+    'claude -p "$p" --allowedTools "Bash" "Read"'
+file_case case_bare_bash_comma 1 'bin/fx:1: bare-bash-rule:' \
+    'claude -p "$p" --allowedTools "Bash,Read"'
+file_case case_bare_bash_tools_flag 1 'bin/fx:1: bare-bash-rule:' \
+    'claude -p "$p" --tools Bash'
+file_case case_bare_bash_equals 1 'bin/fx:1: bare-bash-rule:' \
+    'claude -p "$p" --allowedTools=Bash'
+file_case case_bare_bash_next_line 1 'bin/fx:3: bare-bash-rule:' \
+    'claude -p "$p" --allowedTools \' \
+    '    "Read" \' \
+    '    "Bash"'
+file_case case_bash_star 1 'bin/fx:1: bare-bash-rule: Bash(*)' \
+    'claude -p "$p" --allowedTools "Bash(*)" "Read"'
+file_case case_bash_star_star 1 'bin/fx:1: bare-bash-rule: Bash(*:*)' \
+    'claude -p "$p" --allowedTools "Bash(*:*)"'
+file_case case_bare_bash_marker 0 '' \
+    '# agent-allowlist-ok: fixture reason long enough to count' \
+    'claude -p "$p" --allowedTools "Bash" "Read"'
+file_case case_bare_bash_disallowed 0 '' \
+    'claude -p "$p" --disallowedTools "Bash"'
+file_case case_bare_bash_after_disallow 0 '' \
+    'claude -p "$p" --allowedTools "Read" --disallowedTools "Bash"'
+file_case case_bare_bash_comment 0 '' \
+    '    # never pass --allowedTools "Bash" or "Bash(*)" here'
+file_case case_bare_bash_prompt_text 0 '' \
+    'claude -p "use Bash" --allowedTools "Bash(git status:*)" "Read"'
 file_case case_marker_above_command 0 '' \
     'run_agent() {' \
     '    # The agent gets only the SQL-only wrapper, inside a temp workdir.' \

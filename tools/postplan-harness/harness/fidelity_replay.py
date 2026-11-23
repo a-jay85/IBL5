@@ -502,6 +502,10 @@ def _is_test_or_bench(rel: str) -> bool:
     return base.startswith(("test_", "test-")) or "tests" in parts or "bench" in parts
 
 
+# This file loads fidelity through importlib on purpose (see `_fidelity`); it never runs inside the arming decision.
+_SELF_DYNAMIC_OK = "harness/fidelity_replay.py"
+
+
 def _file_roots(rel: str, tree, out: dict) -> None:
     aliases: set[str] = set()
     pkgs: set[str] = set()
@@ -510,6 +514,8 @@ def _file_roots(rel: str, tree, out: dict) -> None:
         if isinstance(node, ast.Import):
             for a in node.names:
                 if a.name == "bench" or a.name.startswith("bench."):
+                    raise Unresolvable(f"fidelity-unresolvable-reference: {rel}")
+                if a.name == "fidelity" or a.name.endswith(".fidelity") and a.name != "harness.fidelity":
                     raise Unresolvable(f"fidelity-unresolvable-reference: {rel}")
                 if a.name == "harness.fidelity":
                     if a.asname:
@@ -520,6 +526,8 @@ def _file_roots(rel: str, tree, out: dict) -> None:
         elif isinstance(node, ast.ImportFrom):
             mod = node.module or ""
             if mod == "bench" or mod.startswith("bench.") or mod.endswith(".bench"):
+                raise Unresolvable(f"fidelity-unresolvable-reference: {rel}")
+            if node.level == 0 and mod == "fidelity":
                 raise Unresolvable(f"fidelity-unresolvable-reference: {rel}")
             if mod == "harness.fidelity" or (node.level == 1 and mod == "fidelity"):
                 for a in node.names:
@@ -533,6 +541,13 @@ def _file_roots(rel: str, tree, out: dict) -> None:
                     if a.name == "fidelity":
                         aliases.add(a.asname or "fidelity")
                         fid_imports.add(id(node))
+        elif isinstance(node, ast.Call) and not rel.endswith(_SELF_DYNAMIC_OK):
+            fn = node.func
+            name = fn.id if isinstance(fn, ast.Name) else fn.attr if isinstance(fn, ast.Attribute) else ""
+            if name in ("import_module", "__import__") and any(
+                    isinstance(n, ast.Constant) and isinstance(n.value, str) and "fidelity" in n.value
+                    for n in ast.walk(node)):
+                raise Unresolvable(f"fidelity-unresolvable-reference: {rel}")
     if not aliases and not pkgs:
         return
     values = {id(n.value) for n in ast.walk(tree) if isinstance(n, ast.Attribute)}

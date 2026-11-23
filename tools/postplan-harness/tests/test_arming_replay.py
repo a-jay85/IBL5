@@ -446,8 +446,11 @@ def test_worktree_phase2_and_arm_time_agree(tmp_path):
 
 import ast  # noqa: E402
 import textwrap  # noqa: E402
+import threading  # noqa: E402
+import types  # noqa: E402
 
 from harness import fidelity_replay  # noqa: E402
+from harness import fidelity_replay_driver as drv  # noqa: E402
 from harness.fidelity_replay import (ORDERING, REPLAYED_ROOTS, Unresolvable,  # noqa: E402
                                      check_resolvable, line_owner, looser_output,
                                      production_roots, top_defs)
@@ -763,138 +766,205 @@ def test_unexercised_change_stays_held(tmp_path):
     assert "fidelity-unexercised-change" in text
 
 
-def test_side_effect_line_stays_held(tmp_path):
+def test_read_only_open_clears(tmp_path):
     v, text = _fid_replay(tmp_path, lambda s: _insert_first_line(
         s, "parse_verdict", "open(path).close()"))
-    assert v.cleared is False
-    assert "fidelity-side-effect-change" in text
+    assert v.cleared is True, text
 
 
 def test_parameter_write_in_sticky_terminal_stays_held(tmp_path):
     v, text = _fid_replay(tmp_path, lambda s: _insert_first_line(
         s, "sticky_terminal", 'fid["k"] = 1'))
     assert v.cleared is False
-    assert "fidelity-side-effect-change" in text
+    assert "argument-mutated" in text
 
 
 def test_augmented_assign_on_parameter_stays_held(tmp_path):
     v, text = _fid_replay(tmp_path, lambda s: _insert_first_line(
         s, "sticky_terminal", 'fid |= {"zz": 1}'))
     assert v.cleared is False, text
+    assert "argument-mutated" in text
 
 
 def test_aliased_parameter_write_stays_held(tmp_path):
     v, text = _fid_replay(tmp_path, lambda s: _insert_first_line(
         s, "sticky_terminal", '_a = fid; _a["zz"] = 1'))
     assert v.cleared is False, text
+    assert "argument-mutated" in text
 
 
 def test_lambda_parameter_write_stays_held(tmp_path):
     v, text = _fid_replay(tmp_path, lambda s: _insert_first_line(
         s, "sticky_terminal", '(lambda d: d.__setitem__("zz", 1))(fid)'))
     assert v.cleared is False, text
+    assert "argument-mutated" in text
 
 
 def test_call_through_bound_method_stays_held(tmp_path):
     v, text = _fid_replay(tmp_path, lambda s: _insert_first_line(
         s, "sticky_terminal", '_set = fid.__setitem__; _set("zz", 1)'))
     assert v.cleared is False, text
+    assert "argument-mutated" in text
 
 
 def test_aliased_environ_write_stays_held(tmp_path):
     v, text = _fid_replay(tmp_path, lambda s: _insert_first_line(
         s, "parse_verdict", 'import os as _os; _e = _os.environ; _e["FID_PROBE"] = "1"'))
     assert v.cleared is False, text
+    assert "audit:os.putenv" in text
 
 
 def test_environ_data_write_stays_held(tmp_path):
     v, text = _fid_replay(tmp_path, lambda s: _insert_first_line(
         s, "parse_verdict", 'import os as _os; _d = _os.environ._data; _d[b"FID_PROBE"] = b"1"'))
     assert v.cleared is False, text
+    assert "environ:FID_PROBE" in text
 
 
 def test_aliased_open_for_append_stays_held(tmp_path):
     v, text = _fid_replay(tmp_path, lambda s: _insert_first_line(
         s, "parse_verdict", '_o = open; _fh = _o(path, "a"); _fh.write(""); _fh.close()'))
     assert v.cleared is False, text
+    assert "audit:open-write" in text
 
 
 def test_pathlib_open_for_append_stays_held(tmp_path):
     v, text = _fid_replay(tmp_path, lambda s: _insert_first_line(
         s, "parse_verdict", 'import pathlib as _pl; _pl.Path(path).open("a").close()'))
     assert v.cleared is False, text
+    assert "audit:open-write" in text
 
 
 def test_module_global_write_stays_held(tmp_path):
     v, text = _fid_replay(tmp_path, lambda s: _insert_first_line(
         s, "parse_verdict", 'import harness.second_review as _sr; _m = _sr; _m._FID_PROBE = 1'))
     assert v.cleared is False, text
+    assert "global:harness.second_review._FID_PROBE" in text
 
 
 def test_changed_line_compile_call_stays_held(tmp_path):
     v, text = _fid_replay(tmp_path, lambda s: _insert_first_line(
         s, "parse_verdict", 'compile("1", "<p>", "eval")'))
     assert v.cleared is False, text
+    assert "fidelity-changed-line-hazard: compile" in text
 
 
-def test_parameter_mutation_is_a_side_effect():
-    import ast
-
-    src = "def f(fid, n):\n    fid['k'] = n\n    fid.pop('a')\n    x = {}\n    x['k'] = n\n    return n\n"
-    tree = ast.parse(src)
-    fn = tree.body[0]
-    assert fidelity_replay.side_effect(fn, 2, tree) is True
-    assert fidelity_replay.side_effect(fn, 3, tree) is True
-    assert fidelity_replay.side_effect(fn, 5, tree) is False
+def test_static_side_effect_walker_removed():
+    for name in ("side_effect", "_stmt_effect", "_def_effect", "FILE_WRITE_ATTRS",
+                 "MUTATING_METHODS", "SIDE_EFFECT_NAMES", "SIDE_EFFECT_MODULES"):
+        assert not hasattr(fidelity_replay, name)
 
 
-_SIDE_EFFECT_SRC = '''\
-import os
-_STATE = {}
-_X = 0
+@pytest.fixture
+def watch():
+    drv._WATCH.update(phase=None, record="-", where="t", hits=[])
 
 
-def _writer(path):
-    os.remove(path)
+@pytest.mark.parametrize("args,expected", [
+    (("p", "r", os.O_RDONLY | os.O_CLOEXEC), False),
+    (("p", "rb", 0), False),
+    (("p", "w", 0), True),
+    (("p", "a", 0), True),
+    (("p", "r+", 0), True),
+    (("p", "x", 0), True),
+    (("p", None, os.O_RDONLY), False),
+    (("p", None, os.O_WRONLY | os.O_CREAT), True),
+    (("p", None, os.O_RDWR), True),
+    (("p", b"r", 0), True),
+    (("p", None, "0"), True),
+    (("p", "r"), True),
+])
+def test_write_mode_open_detection(args, expected):
+    assert drv._write_open(args) is expected
 
 
-def _relay(path):
-    return _writer(path)
+@pytest.mark.parametrize("event,expected", [
+    ("os.remove", True), ("os.putenv", True), ("subprocess.Popen", True),
+    ("socket.connect", True), ("tempfile.mkstemp", True), ("ctypes.dlopen", True),
+    ("os.some_future_event", True),
+    ("os.listdir", False), ("os.scandir", False), ("import", False), ("exec", False),
+    ("compile", False), ("open", False), ("sys._getframe", False), ("os_x.thing", False),
+])
+def test_audit_event_classification(event, expected):
+    assert drv._denied(event, "call") is expected
 
 
-def _pure(n):
-    return n + 1
+def test_call_only_events_ignored_at_import():
+    for event in ("object.__setattr__", "sys.settrace"):
+        assert drv._denied(event, "import") is False
+        assert drv._denied(event, "call") is True
 
 
-def target(path, n):
-    global _X
-    if n > 0:
-        os.remove(path)
-    _relay(path)
-    _pure(n)
-    _X = n
-    return n
-'''
+def test_uncopyable_argument_fails_closed(watch):
+    assert drv._arg_copy((threading.Lock(),), {}) is drv._UNCOPYABLE
+    assert drv._WATCH["hits"][-1].endswith("argument-uncopyable")
 
 
-def _side_effect_at(snippet: str) -> bool:
-    import ast
-
-    tree = ast.parse(_SIDE_EFFECT_SRC)
-    fn = next(st for st in tree.body if getattr(st, "name", None) == "target")
-    line = next(i for i, text in enumerate(_SIDE_EFFECT_SRC.splitlines(), 1)
-                if text.strip() == snippet)
-    return fidelity_replay.side_effect(fn, line, tree)
+def test_uncomparable_argument_fails_closed(watch):
+    assert drv._arg_copy((object(),), {}) is drv._UNCOPYABLE
+    assert drv._WATCH["hits"][-1].endswith("argument-uncomparable")
 
 
-@pytest.mark.parametrize("snippet", ["_relay(path)", "if n > 0:", "_X = n"])
-def test_side_effect_follows_callees_guarded_bodies_and_globals(snippet):
-    assert _side_effect_at(snippet) is True
+def test_uncopyable_module_global_fails_closed(watch):
+    m = types.ModuleType("m")
+    m.lock = threading.Lock()
+    drv._freeze_globals({"m": m})
+    assert drv._WATCH["hits"][-1].endswith("global-uncopyable:m.lock")
 
 
-def test_side_effect_pure_callee_is_clean():
-    assert _side_effect_at("_pure(n)") is False
-    assert _side_effect_at("return n") is False
+def _run_driver_in(tree):
+    pkg = tree / "tools" / "postplan-harness"
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONDONTWRITEBYTECODE"}
+    proc = subprocess.run(
+        [sys.executable, str(fidelity_replay.DRIVER_PATH), str(fidelity_replay.CORPUS_PATH),
+         str(pkg), str(tree)], capture_output=True, text=True, timeout=300, cwd=str(pkg), env=env)
+    return pkg, proc
+
+
+def test_driver_import_writes_no_bytecode(tmp_path):
+    tree = _fid_tree(tmp_path)
+    pkg, proc = _run_driver_in(tree)
+    assert proc.returncode == 0, proc.stderr
+    assert not list((pkg / "harness").glob("__pycache__"))
+    payload = json.loads(proc.stdout)
+    assert not any(" import " in e for e in payload["side_effects"])
+
+
+def test_import_time_side_effect_is_recorded(tmp_path):
+    tree = _fid_tree(tmp_path)
+    armable = tree / "tools" / "postplan-harness" / "harness" / "armable.py"
+    armable.write_text(armable.read_text(encoding="utf-8")
+                       + '\nopen(__file__ + ".probe", "a").close()\n', encoding="utf-8")
+    _, proc = _run_driver_in(tree)
+    assert proc.returncode == 0, proc.stderr
+    assert any("import audit:open-write" in e for e in json.loads(proc.stdout)["side_effects"])
+
+
+def test_driver_output_without_side_effects_is_an_error():
+    with pytest.raises(KeyError):
+        fidelity_replay._fid_side({"schema": "fidelity-replay/1", "results": [], "executed": {}})
+
+
+@pytest.mark.parametrize("src,line,token", [
+    ("def f():\n    global _X\n", 2, "global"),
+    ("def f():\n    n = 0\n    def g():\n        nonlocal n\n", 4, "nonlocal"),
+    ("x = compile('1', 's', 'eval')", 1, "compile"),
+    ("m = __import__('os')", 1, "__import__"),
+    ("importlib.reload(m)", 1, "importlib"),
+    ("from importlib import reload", 1, "importlib"),
+    ("import importlib.util", 1, "importlib"),
+    ("y = eval('1')", 1, "eval"),
+])
+def test_changed_line_hazard_flags_declarations_and_dynamic_code(src, line, token):
+    assert fidelity_replay.changed_line_hazard(ast.parse(src), line) == token
+
+
+@pytest.mark.parametrize("src", [
+    "p = re.compile('x')", "s = 'exec'", "_global = 1", "self.importlib_cache = 1",
+    "x.eval()", "# global _X",
+])
+def test_changed_line_hazard_near_misses(src):
+    assert fidelity_replay.changed_line_hazard(ast.parse(src), 1) is None
 
 
 def test_corpus_carries_no_decompile_tokens():

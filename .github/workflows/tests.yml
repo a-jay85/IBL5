@@ -740,6 +740,16 @@ jobs:
         run: |
           bin/test-check-loop-stdin-consumed-by-child
           bin/check-loop-stdin-consumed-by-child --stats
+      # agent-allowlist: a headless claude run in bin/ must not get an
+      # auto-approving permission mode, or an allow rule for a shell-capable
+      # client or a variable-named binary, unless an agent-allowlist-ok comment
+      # documents why (backlog 1609, PR #3379). The harness runs first so a
+      # broken matcher fails loudly.
+      - name: Check agent permission grants in bin/
+        if: ${{ !cancelled() }}
+        run: |
+          bin/test-check-agent-allowlist
+          bin/check-agent-allowlist
       # claude-cli: a claude -p call with no timeout hangs its caller, 2>&1 inside a
       # $(...) capture mixes stderr into the parsed verdict, a prompt after a variadic
       # tool flag is read as a tool name, and an unlisted flag aborts the run

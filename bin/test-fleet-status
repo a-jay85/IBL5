@@ -225,28 +225,50 @@ PP_PID=$!
 disown "$PP_PID" 2>/dev/null
 SPAWNED_PIDS="$SPAWNED_PIDS $PP_PID"
 
-# An ORPHAN: a `claude -p` with no job above it. Spawned by this script, so its
-# ancestry never reaches a PID fleet-status printed — which is exactly the state
-# of a headless run whose supervisor died, and the only thing case 10's section
-# should ever show.
-# Respawn until its PID misses the launchd stub list (see fixture_pid): CI once
-# handed it 6001, so it matched a stub row and left the orphan section.
-# Each orphan starts from a subshell that exits at once, so the orphan's parent
-# becomes PID 1. Without that, its parent is this script. On CI this script's
-# PID, or its runner's, can land on a stub row PID (6001-6005). The ancestry
-# walk then counts the orphan as tracked and hides it, and every orphan check
-# fails together.
-# Spawn it from a subshell that exits at once, so the orphan is reparented and
-# its ancestry no longer includes this script. CI can hand THIS script a stub
-# row's PID (6001-6005); a direct child would then be deduped as that job's
-# descendant and vanish from the orphan section.
-while :; do
-    ( "$STUBBIN/claude" -p --name fixture-orphan >/dev/null 2>&1 &
-      printf '%s\n' "$!" > "$TMP/orphan.pid" )
-    ORPHAN_PID="$(tr -dc '0-9' < "$TMP/orphan.pid")"
-    fixture_pid "$ORPHAN_PID" || break
-    kill "$ORPHAN_PID" 2>/dev/null
-done
+# True when <pid> or any of its ancestors is a launchd stub PID (fixture_pid).
+# Mirrors fleet-status's pid_is_accounted_for walk, which drops a session whose
+# ancestry reaches a printed PID.
+fixture_ancestry_collides() {
+    local pid="${1:-}" hops=0
+    while [ -n "$pid" ] && [ "$pid" != "0" ] && [ "$pid" != "1" ] && [ "$hops" -lt 24 ]; do
+        fixture_pid "$pid" && { COLLIDING_PID="$pid"; return 0; }
+        pid="$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')"
+        hops=$(( hops + 1 ))
+    done
+    return 1
+}
+
+# spawn_orphan <var> <dir> <cmd...> starts <cmd> in <dir> as a true orphan and
+# stores its PID in <var>. A throwaway subshell backgrounds the command, writes
+# its PID to a file, and exits, so the command is reparented away from this
+# script. A direct child is not enough: fleet-status walks ancestry, and on
+# Linux CI this script's own PID can equal a launchd stub row's PID (6001-6005,
+# seen in CI with orphan PIDs 6109 and 6128). The orphan then counts as that
+# row's child and leaves the orphan section. Respawns, bounded, until neither
+# the PID nor any ancestor matches a stub row.
+spawn_orphan() {
+    local var="$1" dir="$2" pidfile="$TMP/orphan.pid" try _pid=''
+    shift 2
+    COLLIDING_PID=''
+    for try in 1 2 3 4 5 6 7 8 9 10; do
+        rm -f "$pidfile"
+        (cd "$dir" && { "$@" >/dev/null 2>&1 & printf '%s\n' "$!" > "$pidfile"; }) \
+            >/dev/null 2>&1
+        _pid="$(tr -dc '0-9' < "$pidfile" 2>/dev/null)"
+        [ -n "$_pid" ] || continue
+        fixture_ancestry_collides "$_pid" || break
+        kill "$_pid" 2>/dev/null
+        _pid=''
+    done
+    [ -n "$_pid" ] || printf 'WARN: %s: every spawn hit stub PID %s in its ancestry\n' \
+        "$var" "${COLLIDING_PID:-?}" >&2
+    eval "$var=\$_pid"
+}
+
+# An ORPHAN: a `claude -p` with no job above it. Its ancestry never reaches a PID
+# fleet-status printed — which is exactly the state of a headless run whose
+# supervisor died, and the only thing case 10's section should ever show.
+spawn_orphan ORPHAN_PID "$PWD" "$STUBBIN/claude" -p --name fixture-orphan
 SPAWNED_PIDS="$SPAWNED_PIDS $ORPHAN_PID"
 
 # A second orphan that carries a prompt and runs inside a worktree, so its
@@ -256,16 +278,9 @@ mkdir -p "$TMP/IBL5-worktrees/fixture-wt-slug/ibl5"
 # A real (unborn) branch, so the row's PR slot can match it by branch name.
 git -C "$TMP/IBL5-worktrees/fixture-wt-slug/ibl5" init -q 2>/dev/null
 git -C "$TMP/IBL5-worktrees/fixture-wt-slug/ibl5" symbolic-ref HEAD refs/heads/fixture-wt-branch
-while :; do
-    # Same detach as the first orphan, so its ancestry skips this script.
-    (cd "$TMP/IBL5-worktrees/fixture-wt-slug/ibl5" \
-        && { "$STUBBIN/claude" -p "Fix the fixture widget
-SECOND PROMPT LINE" >/dev/null 2>&1 &
-            printf '%s\n' "$!" > "$TMP/prompt-orphan.pid"; })
-    PROMPT_ORPHAN_PID="$(tr -dc '0-9' < "$TMP/prompt-orphan.pid")"
-    fixture_pid "$PROMPT_ORPHAN_PID" || break
-    kill "$PROMPT_ORPHAN_PID" 2>/dev/null
-done
+spawn_orphan PROMPT_ORPHAN_PID "$TMP/IBL5-worktrees/fixture-wt-slug/ibl5" \
+    "$STUBBIN/claude" -p "Fix the fixture widget
+SECOND PROMPT LINE"
 SPAWNED_PIDS="$SPAWNED_PIDS $PROMPT_ORPHAN_PID"
 
 # Give the runners a moment to fork their children and write their pid files.

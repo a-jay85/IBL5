@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-11-21
+last_verified: 2026-11-22
 ---
 
 # IBL5 Architecture Decision Records
@@ -122,6 +122,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0271](0271-require-league-context-in-factory.md) | A factory that holds a LeagueContext must forward it | Accepted | `RequireLeagueContextInFactoryRule` (`ibl.factoryOmitsLeagueContext`) flags `new X(...)` in a `*Factory.php` method when the method holds a LeagueContext and X's effective constructor takes one that the call omits; exemptions are inline `@phpstan-ignore` with a reason naming the IBL-only tables. |
 | [0273](0273-property-based-testing-with-eris.md) | Property tests use Eris with a pinned seed | Accepted | `giorgiosironi/eris` is a dev-only dependency wrapped in `Tests\Support\PinnedErisSeed`, which pins the seed to 20261120 and replays through `ERIS_SEED`; tests draw scalars only and cap iterations at 200. |
 | [0276](0276-require-native-type-declarations.md) | PHPStan requires native type declarations and bans bare `object` | Accepted | `RequireNativeTypeDeclarationsRule` requires a native type on every method and function parameter, return (except `__construct` and `__destruct`), and property, and bans bare `object` in every position. Five sites keep `object` behind a reasoned `@phpstan-ignore ibl.bareObjectType`. |
+| [0278](0278-jsb-native-hosted-trace-captures.md) | Trace-pinned evidence may cite a jsb-native capture | Accepted | An entry with `capture_host: jsb-native` pins `capture_commit` and `capture_sha256`; `harness.trace_pinned` reads the bytes from that commit, which must be reachable from jsb-native `main`, and CI holds with `capture-host-unavailable`. |
 
 ## When an ADR is Required
 

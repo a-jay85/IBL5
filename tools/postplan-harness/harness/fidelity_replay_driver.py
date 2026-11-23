@@ -78,7 +78,7 @@ def _in_module_load():
     frame = sys._getframe(1)
     while frame is not None:
         code = frame.f_code
-        if code.co_filename == "<frozen importlib._bootstrap>" and code.co_name == "_load_unlocked":
+        if code.co_filename.startswith("<frozen importlib") and code.co_name == "_load_unlocked":
             return True
         frame = frame.f_back
     return False

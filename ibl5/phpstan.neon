@@ -57,6 +57,10 @@ parameters:
 
 services:
     -
+        class: PHPStanRules\RequireNativeTypeDeclarationsRule
+        tags:
+            - phpstan.rules.rule
+    -
         class: PHPStanRules\BanNumberFormatRule
         tags:
             - phpstan.rules.rule
@@ -70,6 +74,10 @@ services:
             - phpstan.rules.rule
     -
         class: PHPStanRules\BanDirectCommonMysqliInstantiationRule
+        tags:
+            - phpstan.rules.rule
+    -
+        class: PHPStanRules\RequireLeagueContextInFactoryRule
         tags:
             - phpstan.rules.rule
     -
@@ -185,6 +193,12 @@ services:
         tags:
             - phpstan.rules.rule
     -
+        class: PHPStanRules\RequireInterfaceDeclaresPublicMethodsRule
+        arguments:
+            receiverSuffixes: [Controller, Service, View]
+        tags:
+            - phpstan.rules.rule
+    -
         class: PHPStanRules\BanRawDbHandleInEntryPointRule
         tags:
             - phpstan.rules.rule
@@ -226,5 +240,9 @@ services:
             - phpstan.rules.rule
     -
         class: PHPStanRules\BanUnguardedArgvFlagRule
+        tags:
+            - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanFactoryRequestReadRule
         tags:
             - phpstan.rules.rule

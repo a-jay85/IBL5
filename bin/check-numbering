@@ -9,12 +9,15 @@
 # it at allocation time).
 # The key grammar lives in bin/lib/numbering.sh, shared with bin/next-number.
 #
-# Three checks:
+# Four checks:
 #   1. Duplicate within the diff   — two added files sharing one key.
 #   2. Collision with the base     — an added file whose key already exists on base.
 #   3. Duplicate ADR index rows    — the failure mode `merge=union` on
 #                                    ibl5/docs/decisions/README.md can produce
 #                                    silently (rebase-clean, same row twice).
+#   4. ADR index rows out of order: merge=union appends concurrent rows at
+#                                    the end of a hunk, so a lower number can
+#                                    land after higher ones (PR #3389).
 #
 # The COLLISION KEY keeps the letter suffix: `044b` is a deliberate "amendment to
 # migration 044" convention, NOT a collision with `044`. The allocators separately
@@ -33,7 +36,7 @@
 # mechanically detected and mechanically fixable by rerunning the allocator, so
 # there is nothing for a human to justify.
 #
-# Exit codes: 0 = pass, 1 = collision found, 2 = usage error.
+# Exit codes: 0 = pass, 1 = collision or index-order finding, 2 = usage error.
 
 set -euo pipefail
 
@@ -67,6 +70,7 @@ usage() {
 Usage: bin/check-numbering [--staged|--since=<sha>|--all] [--help|-h]
 
 Fail when a change introduces a duplicate ADR or migration number.
+Also fail when the ADR index table rows do not ascend by number.
 
 Modes:
   --staged        Scan staged changes (git diff --cached). Default.
@@ -267,18 +271,53 @@ if [ "$INDEX_IN_SCOPE" = "1" ] && [ -f "$ADR_INDEX" ]; then
 fi
 
 # ---------------------------------------------------------------------------
+# Check 4 — ADR index rows must ascend by number. merge=union appends
+# concurrent rows at the end of the hunk, so a lower number can land after
+# higher ones and every other check stays green. Same scope as Check 3. A
+# number Check 3 reported as duplicated is skipped here, so one bad row is
+# reported once; its position is judged after the duplicate is resolved.
+# Each finding names the row and the row it follows (adjacent pairs).
+# ---------------------------------------------------------------------------
+ORDER_FINDINGS=""
+if [ -f "$ADR_INDEX" ] && [ "$INDEX_IN_SCOPE" = "1" ]; then
+    ORDER_FINDINGS="$(awk -v dups="$(printf '%s\n' "${DUP_ROWS:-}" | tr '\n' ' ')" \
+        -v index_path="$ADR_INDEX" '
+        BEGIN { nd = split(dups, d, " "); for (i = 1; i <= nd; i++) skip[d[i]] = 1 }
+        /^[|] [[][0-9][0-9][0-9][0-9][]][(]/ {
+            n = substr($0, 4, 4)
+            if (n in skip) next
+            if (have && n + 0 < prev + 0) {
+                printf "%s: line %d follows %s in %s\n", n, NR, prev, index_path
+            }
+            prev = n; have = 1
+        }' "$ADR_INDEX")"
+fi
+
+# ---------------------------------------------------------------------------
 # Verdict
 # ---------------------------------------------------------------------------
-if [ -s "$FINDINGS" ]; then
-    {
-        echo ""
-        echo "Numbering collision:"
-        sort -u "$FINDINGS" | sed 's/^/  /'
-        echo ""
-        echo "ADR or migration: run 'bin/next-adr <slug>' or 'bin/next-migration' from"
-        echo "your worktree to get a free number, then 'git mv' the file."
-        echo "Do not renumber any existing file."
-    } >&2
+if [ -s "$FINDINGS" ] || [ -n "$ORDER_FINDINGS" ]; then
+    if [ -s "$FINDINGS" ]; then
+        {
+            echo ""
+            echo "Numbering collision:"
+            sort -u "$FINDINGS" | sed 's/^/  /'
+            echo ""
+            echo "ADR or migration: run 'bin/next-adr <slug>' or 'bin/next-migration' from"
+            echo "your worktree to get a free number, then 'git mv' the file."
+            echo "Do not renumber any existing file."
+        } >&2
+    fi
+    if [ -n "$ORDER_FINDINGS" ]; then
+        {
+            echo ""
+            echo "ADR index rows out of number order:"
+            printf '%s\n' "$ORDER_FINDINGS" | sed 's/^/  /'
+            echo ""
+            echo "Move each named row so the index table ascends by ADR number."
+            echo "Move rows verbatim: do not edit a row's text and do not renumber any file."
+        } >&2
+    fi
     exit 1
 fi
 

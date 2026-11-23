@@ -1,6 +1,6 @@
 ---
 description: ADR for BanBareTableIdentifierRule PHPStan custom rule enforcing backtick-quoted table names
-last_verified: 2026-09-21
+last_verified: 2026-11-20
 ---
 
 # ADR-0025: Ban Bare Table Identifiers

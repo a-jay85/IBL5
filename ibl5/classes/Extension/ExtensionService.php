@@ -83,7 +83,7 @@ class ExtensionService implements ExtensionProcessorInterface
      *
      * @see ExtensionProcessorInterface::processExtension()
      */
-    public function processExtension($extensionData)
+    public function processExtension(array $extensionData): array
     {
         // Phase 1: Resolve entities
         $offer = $extensionData['offer'];

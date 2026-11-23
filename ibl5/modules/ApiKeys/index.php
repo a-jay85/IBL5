@@ -24,6 +24,11 @@ $factory = \Module\ModuleServices::current()->factory(\Module\Factories\ApiKeysF
 $httpRequest = $factory->request();
 $op = is_string($httpRequest->request('op')) ? $httpRequest->request('op') : 'main';
 
-$controller = $factory->controller();
+$host = $httpRequest->server('HTTP_HOST');
+$https = $httpRequest->server('HTTPS');
+$controller = $factory->controller(
+    is_string($host) ? $host : '',
+    ($https ?? 'off') !== 'off'
+);
 
 $controller->handle($op, $user);

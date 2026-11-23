@@ -87,4 +87,11 @@ interface SeasonLeaderboardsViewInterface
      * @return string HTML closing </table> tag
      */
     public function renderTableFooter(): string;
+
+    /**
+     * Set the active sort key used to highlight the sorted column
+     *
+     * @param string $sortBy Sort key
+     */
+    public function setSortBy(string $sortBy): void;
 }

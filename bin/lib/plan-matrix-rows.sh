@@ -140,7 +140,17 @@ PLAN_ROW_DB_RE='db-query|docker|--group[= ]database|DatabaseIntegration|db-test-
 # Anything else stays local (fail toward local). DB, web and compose rows run
 # in CI: the Plan checks job starts the stacks row_ci_needs names for them.
 # A /tmp path the row only writes is not a marker (see _tmp_write_scrub).
+# PLAN_ROW_IBLBOT_VITEST_RE is the one npx exemption (an IBLbot vitest run).
 PLAN_ROW_LOCAL_RE='(^|[^[:alnum:]_/-])gh[[:space:]]|playwright|npx|npm|wget|bin/wt-|bin/automouse|bin/post-plan|bin/plan-now|bin/check-plan|bin/db-query|bin/db-test-up|launchctl|osascript|ssh|scp|rsync|~/|\$HOME|/Users/|/tmp/|claude-plans|PLAN|\.\./'
+# The one npx form that may reach CI: `cd ibl5/IBLbot && npx vitest run <file>`,
+# optionally inside ( ... ). The Plan checks job sets up Node and runs npm ci in
+# ibl5/IBLbot for it. Group 1 is the cd prefix, group 3 the vitest words; the
+# first vitest argument must not be a flag, so a bare whole-suite run stays
+# local. Every other npx or npm row still matches PLAN_ROW_LOCAL_RE.
+PLAN_ROW_IBLBOT_VITEST_RE='^([[:space:]]*\(?[[:space:]]*cd[[:space:]]+(\./)?ibl5/IBLbot[[:space:]]*&&[[:space:]]*)npx([[:space:]]+vitest[[:space:]]+run[[:space:]]+[^-[:space:]].*)$'
+# A chained, backgrounded, piped or substituted command, a URL, or a control
+# character (newline, CR, tab) keeps such a row local.
+PLAN_ROW_IBLBOT_VITEST_BAD_RE='&|\||;|`|\$\(|<\(|>\(|://|[[:cntrl:]]'
 # The one docker form that may reach CI. The ci step sets COMPOSE_FILE to the
 # absolute path ${{ github.workspace }}/docker-compose.ci.yml, and
 # plan-checks-block ci pins any relative value to the repo root, so a
@@ -185,16 +195,69 @@ _tmp_write_scrub() {
     return 0
 }
 
+# Prefix forms _row_first_word strips after the plain `cd <dir> &&` hops.
+# Each fails toward local: a form that does not match exactly leaves its own
+# first word in place, and no such word is on the row_runs_in_ci allowlist.
+#   NAME=value   value empty, or a literal that does not start with / ~ $ or a quote
+PLAN_ROW_ENV_ASSIGN_RE='^([A-Za-z_][A-Za-z0-9_]*)=([A-Za-z0-9_.,:@+-][A-Za-z0-9_.,:/@+=-]*)?[[:space:]]+(.*)$'
+#   env [-u NAME]... [NAME=value]...   any other env flag stops the strip
+PLAN_ROW_ENV_CMD_RE='^env[[:space:]]+(.*)$'
+PLAN_ROW_ENV_UNSET_RE='^-u[[:space:]]+[A-Za-z_][A-Za-z0-9_]*[[:space:]]+(.*)$'
+#   cd "$(git rev-parse --show-toplevel)[/sub]" &&   no sub segment starts with a dot
+PLAN_ROW_TOPCD_RE='^cd[[:space:]]+"\$\(git rev-parse --show-toplevel\)((/[A-Za-z0-9_-][A-Za-z0-9_.-]*)*)"[[:space:]]*&&[[:space:]]*(.*)$'
+#   ( ... )   one whole-command subshell that holds no other parenthesis
+PLAN_ROW_SUBSHELL_RE='^\(([^()]*)\)[[:space:]]*$'
+PLAN_ROW_CD_HOP_RE='^cd[[:space:]]+([A-Za-z0-9_./-]+)[[:space:]]*&&[[:space:]]*(.*)$'
+# The Homebrew python3 path some plans hard-code. As the command word it
+# routes like python3, and ci_row_rewrite swaps it for the runner's python3.
+PLAN_ROW_BREW_PY=/opt/homebrew/bin/python3
+# Mac-only absolute paths. A row that reaches the allowlist through a prefix
+# form or the Homebrew python3 word stays local when one of these remains.
+PLAN_ROW_MAC_ABS_RE='/opt/|/usr/local/|/Applications/|/Library/|/private/|/var/folders/|/Volumes/'
+# A go test fuzz run never ends without -fuzztime, so it stays local.
+PLAN_ROW_GO_FUZZ_RE='(^|[[:space:]])-{1,2}(test\.)?fuzz([=[:space:]]|$)'
+
 # _row_first_word <cmd> — sets _RFW_FIRST and _RFW_SECOND: the first two words
-# after any leading `cd <dir> &&` hops and a leading `!`. Shared by
-# row_runs_in_ci and row_ci_needs, so the two never disagree on the first word.
+# after any leading `cd <dir> &&` hops, a leading `!`, and the prefix forms
+# above. Also sets _RFW_REST (the command from the first word on), _RFW_NEW
+# (1 when a prefix form or the Homebrew python3 word was seen, else 0) and
+# _RFW_BREW (1 when the first word is PLAN_ROW_BREW_PY, reported as python3).
+# Shared by row_runs_in_ci, row_ci_needs, ci_row_rewrite and _tmp_write_scrub,
+# so they never disagree on the first word.
 _row_first_word() {
-    local c="$1"
+    local c="$1" in_env=0
+    _RFW_NEW=0; _RFW_BREW=0
     c="${c#"${c%%[![:space:]]*}"}"
     while [[ "$c" =~ ^cd[[:space:]]+([A-Za-z0-9_./-]+)[[:space:]]*\&\&[[:space:]]*(.*)$ ]]; do
         c="${BASH_REMATCH[2]}"
     done
     c="${c#!}"; c="${c#"${c%%[![:space:]]*}"}"
+    while :; do
+        if [ "$in_env" = 1 ] && [[ "$c" =~ $PLAN_ROW_ENV_UNSET_RE ]]; then
+            c="${BASH_REMATCH[1]}"
+        elif [[ "$c" =~ $PLAN_ROW_ENV_ASSIGN_RE ]]; then
+            case "${BASH_REMATCH[1]}" in PATH|HOME|DYLD_*|LD_*) break ;; esac
+            c="${BASH_REMATCH[3]}"
+            [ "$in_env" = 1 ] && in_env=2
+        elif [ "$in_env" = 0 ] && [[ "$c" =~ $PLAN_ROW_ENV_CMD_RE ]]; then
+            in_env=1; c="${BASH_REMATCH[1]}"
+        elif [[ "$c" =~ $PLAN_ROW_TOPCD_RE ]]; then
+            in_env=0; c="${BASH_REMATCH[3]}"
+        elif [[ "$c" =~ $PLAN_ROW_SUBSHELL_RE ]]; then
+            in_env=0; c="${BASH_REMATCH[1]}"
+        elif [ "$_RFW_NEW" = 1 ] && [[ "$c" =~ $PLAN_ROW_CD_HOP_RE ]]; then
+            c="${BASH_REMATCH[2]}"
+        else
+            break
+        fi
+        c="${c#"${c%%[![:space:]]*}"}"
+        _RFW_NEW=1
+    done
+    if [ "${c%%[[:space:]]*}" = "$PLAN_ROW_BREW_PY" ]; then
+        _RFW_BREW=1; _RFW_NEW=1
+        c="python3${c#"$PLAN_ROW_BREW_PY"}"
+    fi
+    _RFW_REST="$c"
     _RFW_FIRST="${c%%[[:space:]]*}"
     _RFW_SECOND="${c#"$_RFW_FIRST"}"; _RFW_SECOND="${_RFW_SECOND#"${_RFW_SECOND%%[![:space:]]*}"}"; _RFW_SECOND="${_RFW_SECOND%%[[:space:]]*}"
 }
@@ -203,6 +266,15 @@ row_runs_in_ci() {
     local c="$1" first second
     local lc="$c"
     _tmp_write_scrub "$c" && lc="$_TW_REST"
+    # Capture BASH_REMATCH before the second =~ overwrites it.
+    local iblbot=0 ibl_pre ibl_rest
+    if [[ "$lc" =~ $PLAN_ROW_IBLBOT_VITEST_RE ]]; then
+        ibl_pre="${BASH_REMATCH[1]}"; ibl_rest="${BASH_REMATCH[3]}"
+        if ! [[ "$ibl_rest" =~ $PLAN_ROW_IBLBOT_VITEST_BAD_RE ]]; then
+            iblbot=1
+            lc="$ibl_pre$ibl_rest"
+        fi
+    fi
     grep -Eq -- "$PLAN_ROW_LOCAL_RE" <<< "$lc" && return 1
     # A curl row aimed at a remote host stays local: ci_host_rewrite leaves
     # such a URL alone, so CI would test production instead of the PR.
@@ -237,27 +309,39 @@ row_runs_in_ci() {
     is_whole_suite_cmd "$c" && return 1
     _row_first_word "$c"
     first="$_RFW_FIRST"; second="$_RFW_SECOND"
+    # A prefix form or the Homebrew python3 word must not hide a whole-suite
+    # run or a Mac-only path. The PLAN_ROW_BREW_PY command word is the one
+    # /opt/ path allowed, and ci_row_rewrite replaces it in CI.
+    if [ "$_RFW_NEW" = 1 ]; then
+        is_whole_suite_cmd "$_RFW_REST" && return 1
+        grep -Eq -- "$PLAN_ROW_MAC_ABS_RE" <<< "${c/"$PLAN_ROW_BREW_PY"/}" && return 1
+    fi
+    # An IBLbot vitest row passed every guard above; its first word is npx.
+    [ "$iblbot" = 1 ] && return 0
     case "$first" in
         bin/test-*|bin/check-*|bin/lib/*|vendor/bin/phpunit|python3|shellcheck|grep|rg|jq) return 0 ;;
         php|actionlint|test|\[|printf|seq|diff|curl|bun|bunx|bin/run-shell-harnesses|bin/generate-codebase-map) return 0 ;;
         docker) [ "$second" = compose ] && return 0 ;;
         command) [ "$second" = grep ] && return 0 ;;
         git) case "$second" in grep|ls-files|check-ignore) return 0 ;; esac ;;
-        bash) [ "$second" = -n ] && return 0 ;;
+        bash) case "$second" in -n|bin/test-*|bin/check-*|bin/lib/*|bin/run-shell-harnesses|bin/generate-codebase-map) return 0 ;; esac ;;
+        go) [ "$second" = test ] && ! [[ "$c" =~ $PLAN_ROW_GO_FUZZ_RE ]] && return 0 ;;
     esac
     return 1
 }
 
 # row_ci_needs <cmd> — prints the space-separated subset of `db web bun
-# actionlint` that the Plan checks job must start before this row runs.
+# actionlint go node` that the Plan checks job must start before this row runs.
 # Pass it only commands row_runs_in_ci accepted.
 #   db          the command matches PLAN_ROW_DB_RE
 #   web db      it matches PLAN_ROW_WEB_RE or holds PLAN_ROW_COMPOSE_PHP (the
 #               php container depends on mariadb, and the DB step seeds first)
 #   bun         bun or bunx is a command word anywhere in the row
 #   actionlint  actionlint is a command word anywhere in the row
+#   go          go is the first word (row_runs_in_ci sends only go test)
+#   node        the row matches PLAN_ROW_IBLBOT_VITEST_RE (setup-node + npm ci)
 row_ci_needs() {
-    local c="$1" db=0 web=0 bun=0 al=0 out=""
+    local c="$1" db=0 web=0 bun=0 al=0 gon=0 node_n=0 out=""
     grep -Eq -- "$PLAN_ROW_DB_RE" <<< "$c" && db=1
     if grep -Eq -- "$PLAN_ROW_WEB_RE" <<< "$c" || [[ "$c" == *"$PLAN_ROW_COMPOSE_PHP"* ]]; then
         web=1; db=1
@@ -266,7 +350,9 @@ row_ci_needs() {
     case "$_RFW_FIRST" in
         bun|bunx) bun=1 ;;
         actionlint) al=1 ;;
+        go) gon=1 ;;
     esac
+    [[ "$c" =~ $PLAN_ROW_IBLBOT_VITEST_RE ]] && node_n=1
     # bun, bunx or actionlint as a command word later in the row, such as
     # test "$(bun ...)" = 1, needs the same stack as when it comes first.
     local i=0 pre
@@ -281,6 +367,8 @@ row_ci_needs() {
     [ "$web" -eq 1 ] && out="${out:+$out }web"
     [ "$bun" -eq 1 ] && out="${out:+$out }bun"
     [ "$al" -eq 1 ] && out="${out:+$out }actionlint"
+    [ "$gon" -eq 1 ] && out="${out:+$out }go"
+    [ "$node_n" -eq 1 ] && out="${out:+$out }node"
     printf '%s\n' "$out"
 }
 
@@ -307,21 +395,32 @@ PLAN_ROW_FETCH_SEG_RE='(^|[[:space:]|;&`!('"'"'"])curl[[:space:]]|(^|\$\(|<\(|>\
 # _FS_PRE[i] is the text before its arguments (ending with the command word)
 # and _FS_SEG[i] holds the arguments. A curl segment ends at the next | ; & )
 # < > or backtick. PHP code and bun scripts hold ; and ), so a php, bun or
-# bunx segment ends at an unquoted && || ; or |, or at the unquoted ) that
-# closes an enclosing substitution or group (see _unquoted_end).
+# bunx segment ends at an unquoted && || ; or |, at the unquoted ) that
+# closes an enclosing substitution or group, or at the backtick that closes
+# an enclosing backtick substitution (see _unquoted_end and _bt_open).
 # _FS_CURL[i] is 1 for curl.
 # _FS_TAIL is the text after the last segment; _FS_N counts the segments.
-# _unquoted_end <text> — sets _UE_LEN to the length of the leading part of text
-# that stops at the first && || ; or | outside single and double quotes.
+# _unquoted_end <text> [paren] [bt] — sets _UE_LEN to the length of the leading part
+# of text that stops at the first && || ; or | outside single and double quotes.
 # With a second argument `paren`, it also stops at an unquoted ) that has no
 # matching ( in text. In well-formed shell that ) closes a $(, <(, >( or ( that
 # opened before text began, either at the command word ($(php) or before a cd
 # hop or pipe ($(cd x && php, $(echo x | php). An expected value after it, as
 # in test "$(cd x && php -r 1)" = "<url>", stays byte-exact.
+# With a third argument `bt` (the text starts inside a backtick substitution,
+# per _bt_open), it also stops at the first backtick not preceded by a
+# backslash, inside quotes or not, so test "`cd x && php -r 1`" = "<url>"
+# keeps its expected value too.
 _unquoted_end() {
-    local s="$1" i=0 n=${#1} q="" ch nx depth=0 paren="${2:-}"
+    local s="$1" i=0 n=${#1} q="" ch nx depth=0 paren="${2:-}" bt="${3:-}"
     while [ "$i" -lt "$n" ]; do
         ch="${s:$i:1}"; nx="${s:$((i + 1)):1}"
+        # Inside a backtick substitution bash ends the substitution at the
+        # first backtick not preceded by a backslash, even inside quotes.
+        if [ "$bt" = bt ]; then
+            if [ "$ch" = "\\" ] && [ "$nx" = '`' ]; then i=$((i + 2)); continue
+            elif [ "$ch" = '`' ]; then break; fi
+        fi
         if [ -n "$q" ]; then
             if [ "$ch" = "\\" ] && [ "$q" = '"' ]; then i=$((i + 1))
             elif [ "$ch" = "$q" ]; then q=""; fi
@@ -342,8 +441,47 @@ _unquoted_end() {
     _UE_LEN=$i
 }
 
+# _bt_open <text> — sets _BT_OPEN to 1 when text ends inside a backtick
+# command substitution, else 0. It keeps a stack of open scopes: N (top
+# level), S (single quote), D (double quote), B (backtick) and P ($( or ( ).
+# A backtick inside single quotes at top level is literal. A backtick inside
+# double quotes opens a substitution, as in test "`php -r 1`" = "<url>".
+# Inside B only a backslash (it escapes the next character) and the closing
+# backtick count, because bash ends the substitution at the first backtick
+# not preceded by a backslash, even inside quotes.
+_bt_open() {
+    local s="$1" i=0 n=${#1} st=N top ch nx
+    while [ "$i" -lt "$n" ]; do
+        ch="${s:$i:1}"; nx="${s:$((i + 1)):1}"; top="${st:$(( ${#st} - 1 ))}"
+        case "$top" in
+            S) [ "$ch" = "'" ] && st="${st%?}" ;;
+            B)
+                if [ "$ch" = "\\" ]; then i=$((i + 1))
+                elif [ "$ch" = '`' ]; then st="${st%?}"; fi ;;
+            D)
+                case "$ch" in
+                    "\\") i=$((i + 1)) ;;
+                    '"') st="${st%?}" ;;
+                    '`') st="${st}B" ;;
+                    '$') if [ "$nx" = '(' ]; then st="${st}P"; i=$((i + 1)); fi ;;
+                esac ;;
+            *)
+                case "$ch" in
+                    "\\") i=$((i + 1)) ;;
+                    "'") st="${st}S" ;;
+                    '"') st="${st}D" ;;
+                    '`') st="${st}B" ;;
+                    '(') st="${st}P" ;;
+                    ')') if [ "$top" = P ]; then st="${st%?}"; fi ;;
+                esac ;;
+        esac
+        i=$((i + 1))
+    done
+    case "$st" in *B) _BT_OPEN=1 ;; *) _BT_OPEN=0 ;; esac
+}
+
 _fetch_split() {
-    local s="$1" m pre rest seg term='[|;&)<>`]*'
+    local s="$1" m pre rest seg term='[|;&)<>`]*' bt
     _FS_PRE=(); _FS_SEG=(); _FS_CURL=(); _FS_TAIL=""; _FS_N=0
     while [[ "$s" =~ $PLAN_ROW_FETCH_SEG_RE ]]; do
         m="${BASH_REMATCH[0]}"
@@ -351,7 +489,13 @@ _fetch_split() {
         rest="${s:$(( ${#pre} + ${#m} ))}"
         case "$m" in
             *curl*) seg="${rest%%$term}"; _FS_CURL[_FS_N]=1 ;;
-            *) _unquoted_end "$rest" paren; seg="${rest:0:$_UE_LEN}"; _FS_CURL[_FS_N]=0 ;;
+            *)
+                # The consumed text is everything of $1 before rest. Ask whether
+                # it ends inside a backtick substitution (backlog issue 1944).
+                _bt_open "${1:0:$(( ${#1} - ${#rest} ))}"
+                bt=""; if [ "$_BT_OPEN" = 1 ]; then bt=bt; fi
+                _unquoted_end "$rest" paren "$bt"
+                seg="${rest:0:$_UE_LEN}"; _FS_CURL[_FS_N]=0 ;;
         esac
         _FS_PRE[_FS_N]="$pre$m"; _FS_SEG[_FS_N]="$seg"
         _FS_N=$((_FS_N + 1))
@@ -384,5 +528,12 @@ ci_row_rewrite() {
         fi
         i=$((i + 1))
     done
-    printf '%s\n' "$out$_FS_TAIL"
+    out="$out$_FS_TAIL"
+    # A row whose command word is the Homebrew python3 path runs the runner's
+    # python3 in CI. Only that first occurrence changes; the same path as a
+    # later argument (a grep pattern, say) stays as written. The local
+    # mutation stage never calls this, so the Mac keeps the real path.
+    _row_first_word "$out"
+    [ "$_RFW_BREW" = 1 ] && out="${out/"$PLAN_ROW_BREW_PY"/python3}"
+    printf '%s\n' "$out"
 }

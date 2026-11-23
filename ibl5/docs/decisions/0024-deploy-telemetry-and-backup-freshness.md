@@ -1,6 +1,6 @@
 ---
 description: Adds deploy-step sentinel telemetry, enriched failure notifications, and a deploy-rehearsal HTTP probe to CI/CD workflows.
-last_verified: 2026-09-21
+last_verified: 2026-11-20
 ---
 
 # ADR-0024: Deploy Telemetry and Rehearsal HTTP Probe

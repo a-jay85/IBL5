@@ -12,8 +12,10 @@
 
 set -euo pipefail
 
-# launchd runs with minimal env — ensure our tools are findable
-export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:$PATH"
+# launchd runs with minimal env — ensure our tools are findable.
+# Homebrew leaves the mariadb client unlinked (mysql owns /opt/homebrew/bin/mysql), so its
+# keg bin goes on PATH too: plan matrix rows call bare `mariadb` (database-access.md).
+export PATH="/usr/local/bin:/opt/homebrew/bin:/opt/homebrew/opt/mariadb/bin:$HOME/.bun/bin:$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:$PATH"
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     cat <<'EOF'

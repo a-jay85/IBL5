@@ -1,6 +1,6 @@
 ---
 description: Index of shared library files sourced by bin/ scripts.
-last_verified: 2026-11-20
+last_verified: 2026-11-21
 ---
 
 # bin/lib — Shared Library Files
@@ -38,7 +38,7 @@ Sourced (not executed directly) by scripts in `bin/` and `bin/automouse/`. Each 
 | `pr-sticky.sh` | Canonical find-by-HTML-marker sticky PR comment helpers (upsert / delete); sourced by `bin/check-pr-collisions` and `bin/post-plan-now` |
 | `scan-scope.sh` | Shared `--pr` / `--base` / `--help` arg parsing, base-ref resolution and changed-file listing for `bin/check-e2e-hygiene`, `bin/check-phpunit-hygiene` and `bin/check-hot-files` |
 | `session-id.sh` | Mint, validate and persist the `claude -p --session-id` uuid for detached headless runs; writes the `${LOG%.log}.session` sidecar that `bin/fleet-status` reads to locate a live run's transcript. Sourced by `bin/plan-now`, `bin/docfix-run`, `bin/post-plan-now` and `bin/fleet-status` |
-| `plan-checks-block` | The PR-body codec for the `Plan checks` CI job (ADR-0244). `encode <plan>` prints the base64 block of the matrix rows `row_runs_in_ci` sends to CI plus the mutation records. `decode` unpacks it. `needs --body-file F` prints the `db=`, `web=`, `bun=` and `actionlint=` lines the workflow gates its stack steps on (ADR-0255). `ci --body-file F --labels-file L` is the CI driver: it rewrites localhost URLs to `localhost:8080`, fails a row whose stack's ready marker is not 1, and fails when a `plan-checks`-labelled PR has no block or a corrupt one. | Called by `tools/postplan-harness/runner.py` (`_plan_checks_step`) and `.github/workflows/plan-checks.yml` |
+| `plan-checks-block` | The PR-body codec for the `Plan checks` CI job (ADR-0244). `encode <plan>` prints the base64 block of the matrix rows `row_runs_in_ci` sends to CI plus the mutation records. `decode` unpacks it. `needs --body-file F` prints the `db=`, `web=`, `bun=`, `actionlint=`, `go=` and `node=` lines the workflow gates its stack steps on (ADR-0255). `ci --body-file F --labels-file L` is the CI driver: it rewrites localhost URLs to `localhost:8080`, fails a row whose stack's ready marker is not 1 (go rows need `IBL_CI_GO_READY`, and IBLbot `npx vitest run` rows need `IBL_CI_NODE_READY`), and fails when a `plan-checks`-labelled PR has no block or a corrupt one. | Called by `tools/postplan-harness/runner.py` (`_plan_checks_step`) and `.github/workflows/plan-checks.yml` |
 | `prefire-verify` | The pre-fire gate run by `bin/post-plan-now`. The `all` stage list is `matrix phpunit`. The matrix stage skips rows that `row_runs_in_ci` (in `plan-matrix-rows.sh`) sends to CI, DB, bun and web rows included (ADR-0255), and the DB probe skips them too. The `exec-mutations` stage runs only when asked for by name. | Called by `bin/post-plan-now` and `bin/automouse/prompt-impl`; tested by `bin/test-prefire-verify` |
 | `plan-exec-mutations` | Owner of the `## Executable Mutations` grammar (ADR-0199): `parse`, `run`, `recover`, `pending`. `run --records FILE` takes parsed records in place of a plan, for the CI job that has no plan file. | Called by `bin/check-plan`, `bin/lib/prefire-verify` and `bin/lib/plan-checks-block` |
 | `plan-autonomy-contract` | Shared `stop_condition:` / `evidence:` frontmatter validator; invoked by `bin/check-plan` gate `[K]` and the `/post-plan` Phase 5.0d skill path |

@@ -1,6 +1,6 @@
 ---
 description: Displays all-time career statistical leaderboards with a database-cache decorator for performance.
-last_verified: 2026-09-22
+last_verified: 2026-11-21
 ---
 
 # CareerLeaderboards

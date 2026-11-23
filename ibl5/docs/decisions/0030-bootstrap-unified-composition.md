@@ -1,6 +1,6 @@
 ---
 description: ADR for completing Bootstrap\Application as the single composition root for web, api, and test entry points
-last_verified: 2026-09-21
+last_verified: 2026-11-20
 ---
 
 # 0030 — Bootstrap unified composition (web/api/test)

@@ -365,7 +365,7 @@ chk "compose exec without -T stays LOCAL" routes_local 'docker compose exec php 
 chk "compose -f other.yml stays LOCAL" routes_local 'docker compose -f other.yml exec -T php php -v'
 chk "plain container exec stays LOCAL" routes_local 'docker exec php-base php -v'
 chk "compose exec into another service stays LOCAL" routes_local 'docker compose exec -T mariadb mariadb -e "SELECT 1"'
-chk "npx stays LOCAL" routes_local 'npx vitest run x.test.ts'
+chk "bare npx with no IBLbot cd stays LOCAL" routes_local 'npx vitest run x.test.ts'
 chk "mutation-diff stays LOCAL" routes_local 'bin/mutation-diff master'
 chk "unknown first word stays LOCAL" routes_local 'make test'
 chk "whole-suite phpunit stays LOCAL" routes_local 'cd ibl5 && vendor/bin/phpunit'
@@ -375,6 +375,35 @@ chk "slug curl routes CI" routes_ci 'curl -sf http://plan-checks-ci-local-rows.l
 chk "DatabaseIntegration phpunit routes CI" routes_ci 'cd ibl5 && vendor/bin/phpunit tests/DatabaseIntegration/SomeTest.php'
 end_case
 
+start_case case_iblbot_vitest_rows
+chk "IBLbot vitest file routes CI" routes_ci 'cd ibl5/IBLbot && npx vitest run tests/x.test.ts'
+chk "IBLbot vitest file with -t filter routes CI" routes_ci "cd ibl5/IBLbot && npx vitest run tests/x.test.ts -t 'rejects over-cap trade'"
+chk "IBLbot vitest in a subshell routes CI" routes_ci '(cd ibl5/IBLbot && npx vitest run tests/x.test.ts)'
+chk "IBLbot vitest with ./ prefixed dir routes CI" routes_ci 'cd ./ibl5/IBLbot && npx vitest run x.test.ts'
+chk "wrong dir (ibl5) stays LOCAL" routes_local 'cd ibl5 && npx vitest run x.test.ts'
+chk "prefix dir (IBLbotX) stays LOCAL" routes_local 'cd ibl5/IBLbotX && npx vitest run x.test.ts'
+chk "dir escaping via .. stays LOCAL" routes_local 'cd ibl5/IBLbot/../.. && npx vitest run x.test.ts'
+chk "watch mode (no run) stays LOCAL" routes_local 'cd ibl5/IBLbot && npx vitest x.test.ts'
+chk "no test file stays LOCAL" routes_local 'cd ibl5/IBLbot && npx vitest run'
+chk "flag before the file stays LOCAL" routes_local 'cd ibl5/IBLbot && npx vitest run --coverage'
+chk "npx flag before vitest stays LOCAL" routes_local 'cd ibl5/IBLbot && npx --yes vitest run x.test.ts'
+chk "npx other tool stays LOCAL" routes_local 'cd ibl5/IBLbot && npx tsc --noEmit'
+chk "npm test stays LOCAL" routes_local 'cd ibl5/IBLbot && npm test'
+chk "parent-dir file operand stays LOCAL" routes_local 'cd ibl5/IBLbot && npx vitest run ../x.test.ts'
+chk "absolute file operand stays LOCAL" routes_local 'cd ibl5/IBLbot && npx vitest run /tmp/x.test.ts'
+chk "home file operand stays LOCAL" routes_local 'cd ibl5/IBLbot && npx vitest run ~/x.test.ts'
+chk "URL file operand stays LOCAL" routes_local 'cd ibl5/IBLbot && npx vitest run https://example.com/x.test.ts'
+chk "chained rm -rf stays LOCAL" routes_local 'cd ibl5/IBLbot && npx vitest run x.test.ts && rm -rf y'
+chk "semicolon-chained npx stays LOCAL" routes_local 'cd ibl5/IBLbot && npx vitest run x.test.ts; npx tsc'
+chk "command substitution operand stays LOCAL" routes_local 'cd ibl5/IBLbot && npx vitest run $(cat list)'
+chk "process substitution <( operand stays LOCAL" routes_local 'cd ibl5/IBLbot && npx vitest run x.test.ts <(rm -rf y)'
+chk "process substitution >( operand stays LOCAL" routes_local 'cd ibl5/IBLbot && npx vitest run x.test.ts >(cat)'
+chk "subshell followed by another command stays LOCAL" routes_local '(cd ibl5/IBLbot && npx vitest run x.test.ts) && bin/test-y'
+chk "backgrounded & stays LOCAL" routes_local 'cd ibl5/IBLbot && npx vitest run x.test.ts & rm -rf y'
+chk "backgrounded subshell stays LOCAL" routes_local '(cd ibl5/IBLbot && npx vitest run x.test.ts) & echo hi'
+chk "second line stays LOCAL" routes_local "$(printf 'cd ibl5/IBLbot && npx vitest run x.test.ts\nrm -rf y')"
+end_case
+
 start_case case_needs_column
 chk "web row also needs db" eq "$(route 'curl -sf http://localhost/ibl5/')" "CI db web"
 chk "container row also needs db" eq "$(route 'docker compose exec -T php php -v')" "CI db web"
@@ -382,6 +411,7 @@ chk "DB test row needs db" eq "$(route 'cd ibl5 && vendor/bin/phpunit tests/Data
 chk "bun row" eq "$(route 'cd ibl5 && bun test x')" "CI bun"
 chk "bunx row" eq "$(route 'bunx vitest run x')" "CI bun"
 chk "actionlint row" eq "$(route 'actionlint .github/workflows/x.yml')" "CI actionlint"
+chk "iblbot vitest row" eq "$(route 'cd ibl5/IBLbot && npx vitest run x.test.ts')" "CI node"
 chk "plain row needs nothing" eq "$(route 'bin/test-x')" "CI "
 end_case
 
@@ -394,23 +424,23 @@ body_for() {
     enc "$bp" > "$TMP/nb-$name.body"
 }
 needs_of() { (cd "$R" && "$LIB" needs --body-file "$1" 2>&1); }
-ZEROS="$(printf 'db=0\nweb=0\nbun=0\nactionlint=0')"
+ZEROS="$(printf 'db=0\nweb=0\nbun=0\nactionlint=0\ngo=0\nnode=0')"
 
 start_case case_needs_zeros
 body_for plain 'bin/test-alpha-fixture'
 OUT=$(needs_of "$TMP/nb-plain.body"); RC=$?
 chk "no-stack block exits 0 (got $RC)" eq "$RC" 0
-chk "no-stack block prints four zeros" eq "$OUT" "$ZEROS"
+chk "no-stack block prints six zeros" eq "$OUT" "$ZEROS"
 OUT=$(needs_of "$TMP/hello"); RC=$?
 chk "absent block exits 0 (got $RC)" eq "$RC" 0
-chk "absent block prints four zeros" eq "$OUT" "$ZEROS"
+chk "absent block prints six zeros" eq "$OUT" "$ZEROS"
 OUT=$(needs_of "$TMP/flip"); RC=$?
 chk "corrupt block exits 0 (got $RC)" eq "$RC" 0
-chk "corrupt block prints four zeros" eq "$OUT" "$ZEROS"
-body_for stacks 'curl -sf http://localhost/ibl5/' 'cd ibl5 && bun test x' 'actionlint x.yml'
+chk "corrupt block prints six zeros" eq "$OUT" "$ZEROS"
+body_for stacks 'curl -sf http://localhost/ibl5/' 'cd ibl5 && bun test x' 'actionlint x.yml' 'cd engine && go test ./internal/sim' 'cd ibl5/IBLbot && npx vitest run x.test.ts'
 OUT=$(needs_of "$TMP/nb-stacks.body"); RC=$?
 chk "stack block exits 0 (got $RC)" eq "$RC" 0
-chk "stack block prints all ones" eq "$OUT" "$(printf 'db=1\nweb=1\nbun=1\nactionlint=1')"
+chk "stack block prints all ones" eq "$OUT" "$(printf 'db=1\nweb=1\nbun=1\nactionlint=1\ngo=1\nnode=1')"
 MP="$TMP/nb-mut.md"
 mkplan "$MP" "$(row 1 'bin/test-alpha-fixture')" -- \
     "$(printf '%smutation\nrow: 1\nfile: target.txt\nmatch: ALPHA\nreplace: BETA\ncheck: cd ibl5 && bun test x\n%s\n' "$F" "$F")"
@@ -507,6 +537,34 @@ chk "cd hop with no substitution still rewritten" eq "$(row_rewrite 'cd ibl5 && 
 chk "remote URL in cd-hop php args stays LOCAL" routes_local "test \"\$(cd x && php -r 'echo file_get_contents(\"https://iblhoops.net/\");')\" = ok"
 end_case
 
+# A backtick substitution has no ( for _unquoted_end to count. The php, bun
+# or bunx segment still ends at the backtick that closes the substitution, so
+# the expected value after it stays byte-exact (backlog issue 1944).
+start_case case_row_rewrite_backtick_hop
+BT_CD='test "`cd x && php -r 1`" = "http://localhost/"'
+BT_BARE='test "`php -r 1`" = "http://localhost/"'
+BT_UNQ='test `cd x && php -r 1` = http://localhost/'
+BT_SQ="test \"\`cd x && php -r 'echo 1;'\`\" = \"http://localhost/\""
+BT_PIPE='test "`echo http://localhost/ | php -r 1`" = "http://127.0.0.1/"'
+BT_BUN='test "`cd x && bun -e 1`" = "http://localhost/"'
+BT_ESC_IN="test \"\`php -r 'echo \\\`;' http://localhost/\`\" = \"http://localhost/\""
+BT_ESC_OUT="test \"\`php -r 'echo \\\`;' http://localhost:8080/\`\" = \"http://localhost/\""
+SQ_IN='echo '"'"'`'"'"' | php x.php `cat f` http://localhost/'
+SQ_OUT='echo '"'"'`'"'"' | php x.php `cat f` http://localhost:8080/'
+chk "cd hop in backticks keeps expected value" eq "$(row_rewrite "$BT_CD")" "$BT_CD"
+chk "bare php in backticks keeps expected value" eq "$(row_rewrite "$BT_BARE")" "$BT_BARE"
+chk "unquoted backtick hop keeps expected value" eq "$(row_rewrite "$BT_UNQ")" "$BT_UNQ"
+chk "single-quoted php code in backtick hop keeps expected value" eq "$(row_rewrite "$BT_SQ")" "$BT_SQ"
+chk "pipe hop in backticks keeps expected value" eq "$(row_rewrite "$BT_PIPE")" "$BT_PIPE"
+chk "bun hop in backticks keeps expected value" eq "$(row_rewrite "$BT_BUN")" "$BT_BUN"
+chk "bunx args in backticks rewritten, expected kept" eq "$(row_rewrite 'test "`bunx tsx x.ts http://localhost/`" = "http://localhost/"')" 'test "`bunx tsx x.ts http://localhost:8080/`" = "http://localhost/"'
+chk "two backtick subs each end at their own close" eq "$(row_rewrite 'test "`php -r 1`" = "x" && test "`php -r 2 http://localhost/`" = "http://localhost/"')" 'test "`php -r 1`" = "x" && test "`php -r 2 http://localhost:8080/`" = "http://localhost/"'
+chk "escaped backtick in a backtick sub is not the close" eq "$(row_rewrite "$BT_ESC_IN")" "$BT_ESC_OUT"
+chk "single-quoted backtick before php opens no substitution" eq "$(row_rewrite "$SQ_IN")" "$SQ_OUT"
+chk "backtick in php args outside a substitution: URL still rewritten" eq "$(row_rewrite 'php x.php `cat f` http://localhost/')" 'php x.php `cat f` http://localhost:8080/'
+chk "remote URL in backtick-hop php args stays LOCAL" routes_local "test \"\`cd x && php -r 'echo file_get_contents(\"https://iblhoops.net/\");'\`\" = ok"
+end_case
+
 start_case case_row_rewrite_skip_list
 chk "grep pattern row unchanged" eq "$(row_rewrite 'grep -q "http://localhost/ibl5/" ibl5/docs/x.md')" 'grep -q "http://localhost/ibl5/" ibl5/docs/x.md'
 chk "test \$(curl) row rewritten" eq "$(row_rewrite 'test "$(curl -s -o /dev/null -w %{http_code} http://plan-checks-ci-local-rows.localhost/ibl5/)" = 200')" 'test "$(curl -s -o /dev/null -w %{http_code} http://localhost:8080/ibl5/)" = 200'
@@ -519,6 +577,8 @@ chk "grep row naming php as a path word unchanged" eq "$(row_rewrite 'grep -q ht
 chk "grep then curl rewritten" eq "$(row_rewrite 'grep -q x f && curl -sf http://localhost/ibl5/')" 'grep -q x f && curl -sf http://localhost:8080/ibl5/'
 chk "test with backtick curl rewritten" eq "$(row_rewrite 'test "`curl -s http://localhost/ibl5/`" = ok')" 'test "`curl -s http://localhost:8080/ibl5/`" = ok'
 # Only the arguments of curl (or php, bun, bunx) are rewritten.
+chk "Homebrew python3 command word rewritten" eq "$(row_rewrite 'cd tools/postplan-harness && /opt/homebrew/bin/python3 -m pytest -q')" 'cd tools/postplan-harness && python3 -m pytest -q'
+chk "Homebrew python3 path as an argument unchanged" eq "$(row_rewrite 'grep -c /opt/homebrew/bin/python3 x.txt')" 'grep -c /opt/homebrew/bin/python3 x.txt'
 chk "grep pattern after curl unchanged" eq "$(row_rewrite "curl -s http://localhost/ | grep -q 'http://localhost/ibl5'")" "curl -s http://localhost:8080/ | grep -q 'http://localhost/ibl5'"
 chk "expected string after curl unchanged" eq "$(row_rewrite 'test "$(curl -s http://x.localhost/u)" = "http://x.localhost/ok"')" 'test "$(curl -s http://localhost:8080/u)" = "http://x.localhost/ok"'
 chk "diff <(curl) rewritten" eq "$(row_rewrite 'diff <(curl -s http://x.localhost/api) expected.json')" 'diff <(curl -s http://localhost:8080/api) expected.json'
@@ -542,10 +602,10 @@ end_case
 
 # --- Partition: encode keeps the CI records, local prints the rest -----------
 # PARTITION_PLAN has three matrix rows and one mutation record per row. Row 1
-# routes CI; row 2 (bin/db-query) and row 3 (bash bin/test-x) stay local.
+# routes CI; row 2 (bin/db-query) and row 3 (bash scripts/x.sh) stay local.
 PARTITION_PLAN="$TMP/partition.md"
 mkplan "$PARTITION_PLAN" "$(row 1 'bin/test-alpha-fixture')" "$(row 2 'bin/db-query "SELECT 1"')" \
-    "$(row 3 'bash bin/test-x')" -- \
+    "$(row 3 'bash scripts/x.sh')" -- \
     "$(mblock 1 target.txt ALPHA BETA)
 $(mblock 2 target.txt ALPHA GAMMA)
 $(mblock 3 other.txt other DELTA)"
@@ -568,7 +628,7 @@ local_out() { (cd "$R" && "$LIB" local "$1"); }
 start_case local_partition_complement
 local_out "$PARTITION_PLAN" > "$TMP/part-local.nul"; RC=$?
 chk "local exits 0 (got $RC)" eq "$RC" 0
-{ rec 2 target.txt 'bin/db-query "SELECT 1"' ALPHA GAMMA; rec 3 other.txt 'bash bin/test-x' other DELTA; } > "$TMP/part-local-want.nul"
+{ rec 2 target.txt 'bin/db-query "SELECT 1"' ALPHA GAMMA; rec 3 other.txt 'bash scripts/x.sh' other DELTA; } > "$TMP/part-local-want.nul"
 chk "local prints exactly the row 2 and row 3 records" cmp -s "$TMP/part-local.nul" "$TMP/part-local-want.nul"
 chk "the decoded block still holds only row 1" cmp -s "$TMP/part-out/records.nul" "$TMP/part-want.nul"
 (cd "$R" && "$XM" parse "$PARTITION_PLAN") | tr '\0' '\037' | sort > "$TMP/part-parse.sorted"
@@ -621,7 +681,7 @@ chmod +x "$TMP/stubbin/curl"
 # ci_env runs the ci driver with the CI stack markers and COMPOSE_FILE cleared,
 # so the offline cases mean the same inside the Plan checks job.
 ci_env() {
-    (cd "$R" && env -u IBL_CI_DB_READY -u IBL_CI_WEB_READY -u IBL_CI_BUN_READY -u COMPOSE_FILE \
+    (cd "$R" && env -u IBL_CI_DB_READY -u IBL_CI_WEB_READY -u IBL_CI_BUN_READY -u IBL_CI_GO_READY -u IBL_CI_NODE_READY -u COMPOSE_FILE \
         PATH="$TMP/stubbin:$PATH" "$@" "$LIB" ci --body-file "$BODYF" --labels-file "$TMP/nolabels" 2>&1)
 }
 
@@ -657,6 +717,47 @@ OUT=$(ci_env IBL_CI_DB_READY=1 IBL_CI_WEB_READY=1); RC=$?
 chk "marker 1: exits 0 (got $RC)" eq "$RC" 0
 chk "log line shows needs and the rewritten host" has "$OUT" "plan-checks: matrix row 1 [needs: db web]: curl -sf http://localhost:8080/ibl5/"
 chk "curl got the rewritten host" eq "$(cat "$TMP/curl.log")" "-sf http://localhost:8080/ibl5/"
+end_case
+
+# A go row needs IBL_CI_GO_READY=1 as well. Unset or empty fails before the row
+# runs, so the go command never executes.
+start_case case_readiness_guard_go
+body_for gguard 'cd engine && go test ./internal/sim'
+BODYF="$TMP/nb-gguard.body"
+OUT=$(ci_env); RC=$?
+chk "go marker unset: exits 1 (got $RC)" eq "$RC" 1
+chk "go marker unset: names the stack" has "$OUT" "needs go but the job did not start it (IBL_CI_GO_READY is not 1)"
+chk "go marker unset: the row never ran" eq "$(grep -c 'PASS plan-checks' <<< "$OUT" || true)" 0
+OUT=$(ci_env IBL_CI_GO_READY=); RC=$?
+chk "go marker empty: exits 1 (got $RC)" eq "$RC" 1
+chk "go marker empty: names the stack" has "$OUT" "needs go but the job did not start it (IBL_CI_GO_READY is not 1)"
+chk "go marker empty: the row never ran" eq "$(grep -c 'PASS plan-checks' <<< "$OUT" || true)" 0
+end_case
+
+# A node row (IBLbot vitest) needs IBL_CI_NODE_READY=1 the same way.
+start_case case_readiness_guard_node
+body_for nguard 'cd ibl5/IBLbot && npx vitest run x.test.ts'
+BODYF="$TMP/nb-nguard.body"
+OUT=$(ci_env); RC=$?
+chk "node marker unset: exits 1 (got $RC)" eq "$RC" 1
+chk "node marker unset: names the stack" has "$OUT" "needs node but the job did not start it (IBL_CI_NODE_READY is not 1)"
+chk "node marker unset: the row never ran" eq "$(grep -c 'PASS plan-checks' <<< "$OUT" || true)" 0
+OUT=$(ci_env IBL_CI_NODE_READY=); RC=$?
+chk "node marker empty: exits 1 (got $RC)" eq "$RC" 1
+chk "node marker empty: names the stack" has "$OUT" "needs node but the job did not start it (IBL_CI_NODE_READY is not 1)"
+chk "node marker empty: the row never ran" eq "$(grep -c 'PASS plan-checks' <<< "$OUT" || true)" 0
+end_case
+
+# Every readiness marker ci_stacks_ready reads must be set by a step in the
+# Plan checks workflow, or its rows fail on every CI run.
+workflow_sets() { grep -qF -- "echo $1=1" "$REPO_ROOT/.github/workflows/plan-checks.yml"; }
+start_case case_ready_markers_wired
+MARKERS=$(sed -n '/^ci_stacks_ready()/,/^}/p' "$REPO_ROOT/bin/lib/plan-checks-block" | grep -oE 'IBL_CI_[A-Z]+_READY' | sort -u)
+chk "ci_stacks_ready names at least one marker" test -n "$MARKERS"
+while IFS= read -r name; do
+    [ -n "$name" ] || continue
+    chk "workflow sets $name" workflow_sets "$name"
+done <<< "$MARKERS"
 end_case
 
 # A relative COMPOSE_FILE is pinned to the repo root, so a row that cds into a
@@ -898,7 +999,7 @@ LOCAL	-	bin/lib/plan-matrix-assertions ~/claude-plans/trade-suggestions-engine-v
 LOCAL	-	bin/mutation-diff origin/master
 CI	none	bin/run-shell-harnesses --check-coverage .github/workflows/harness-legs.txt
 CI	bun	bun ibl5/tests/e2e/vr-recorder/rendered-views-selftest.ts | grep -qx 'ok union-sorted-deduped'`; red if `.sort()` is dropped from `files
-LOCAL	-	cd "$(git rev-parse --show-toplevel)" && bin/check-prose --since=master
+CI	none	cd "$(git rev-parse --show-toplevel)" && bin/check-prose --since=master
 CI	bun	cd ibl5 && bun test tests/ts-unit/", "is_error": false}]
 CI	bun	cd ibl5 && bun test tests/ts-unit/".
 CI	bun	cd ibl5 && bun test tests/ts-unit/`
@@ -922,6 +1023,13 @@ LOCAL	-	docker compose exec php php -v
 LOCAL	-	docker compose -f other.yml exec -T php php -v
 CI	db,web	docker compose exec -T php php -v
 LOCAL	-	npx vitest run x.test.ts
+CI	node	cd ibl5/IBLbot && npx vitest run tests/x.test.ts -t 'rejects over-cap trade'
+CI	node	(cd ibl5/IBLbot && npx vitest run tests/x.test.ts)
+LOCAL	-	cd ibl5 && npx vitest run x.test.ts
+LOCAL	-	cd ibl5/IBLbot && npx vitest x.test.ts
+LOCAL	-	cd ibl5/IBLbot && npx vitest run --coverage
+LOCAL	-	cd ibl5/IBLbot && npx vitest run x.test.ts && rm -rf y
+LOCAL	-	cd ibl5/IBLbot && npm test
 CI	bun	cd ibl5 && bunx vitest run tests/ts-unit/vr-pr-body.test.ts
 LOCAL	-	bin/mutation-diff master
 LOCAL	-	make test
@@ -959,6 +1067,58 @@ CI	bun	bun test x.test.ts
 CI	bun	bunx vitest run x.test.ts
 CI	none	bin/run-shell-harnesses --list
 CI	none	bin/generate-codebase-map
+CI	none	PYTHONPATH=tools/postplan-harness python3 -m pytest -q tests/test_x.py
+CI	none	PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=tools/postplan-harness python3 -m pytest -q tests/test_x.py
+CI	none	TB_ONLY=pb bin/test-x
+CI	none	MASTER_BOT_TESTS_YML= bin/test-merge-line-watch
+CI	none	env -u PR_BODY -u MASTER_BOT_TESTS_YML bin/check-x
+CI	none	(cd ibl5 && vendor/bin/phpunit --filter testX tests/X/XTest.php)
+CI	db	(cd ibl5 && vendor/bin/phpunit tests/DatabaseIntegration/XTest.php)
+CI	none	cd "$(git rev-parse --show-toplevel)/tools/postplan-harness" && python3 -m pytest -q tests/test_x.py -k y
+CI	bun	FOO=1 bunx vitest run x.test.ts
+CI	none	PYTHONPATH=tools/postplan-harness python3 -c 'import harness'
+CI	none	(cd tools/postplan-harness && python3 -c 'import harness')
+CI	none	cd "$(git rev-parse --show-toplevel)/tools/postplan-harness" && python3 -c 'import harness'
+CI	none	env -u PR_BODY grep -q _row_first_word bin/lib/plan-matrix-rows.sh
+LOCAL	-	PYTHONPATH=/Users/x python3 -m pytest
+LOCAL	-	PYTHONPATH=a:/Users/x python3 -m pytest
+LOCAL	-	PYTHONPATH=tools/x:/opt/x python3 -m pytest
+LOCAL	-	MASTER_BOT_TESTS_YML=/nonexistent/tests.yml bin/test-merge-line-watch
+LOCAL	-	PYTHONPATH="tools/x" python3 -m pytest
+LOCAL	-	FOO=$(mktemp) bin/test-x
+LOCAL	-	PATH=bin:x bin/test-x
+LOCAL	-	FOO =1 bin/test-x
+LOCAL	-	TB_ONLY=pb gh pr view 1
+LOCAL	-	TB_ONLY=pb bin/test-x && gh pr view 1
+LOCAL	-	env -u X gh pr view 1
+LOCAL	-	env -v bin/test-x
+LOCAL	-	(cd ibl5 && vendor/bin/phpunit)
+LOCAL	-	FOO=1 vendor/bin/phpunit
+LOCAL	-	(cd ibl5 && bin/x) && (cd y && bin/test-z)
+LOCAL	-	cd "$(git rev-parse --show-toplevel)/.." && bin/test-x
+LOCAL	-	cd "$(git rev-parse --show-cdup)" && bin/test-x
+CI	none	bash bin/test-x
+CI	none	TB_ONLY=pb bash bin/test-x
+CI	go	cd engine && go test ./...
+CI	go	cd engine && go test -count=1 ./internal/sim -run TestX
+CI	go	cd engine && go test -run TestFuzzyMatch ./internal/sim
+CI	go	GOFLAGS=-count=1 go test ./internal/sim
+CI	none	/opt/homebrew/bin/python3 -m pytest -q tests/test_x.py
+CI	none	cd tools/postplan-harness && /opt/homebrew/bin/python3 -m pytest -q tests/test_x.py
+CI	none	bash bin/test-plan-checks-block
+CI	go	cd engine && go test -count=1 -run '^$' ./internal/sim
+CI	none	cd tools/postplan-harness && /opt/homebrew/bin/python3 -c 'import harness'
+LOCAL	-	bash ~/x
+LOCAL	-	bash -c 'bin/test-x'
+LOCAL	-	env bash -c 'bin/test-x'
+LOCAL	-	bash scripts/x.sh
+LOCAL	-	bash ibl5/bin/test-db-sync-now
+LOCAL	-	cd engine && go vet ./...
+LOCAL	-	cd engine && go run ./cmd/x
+LOCAL	-	cd engine && go build ./...
+LOCAL	-	cd engine && go test -run='^$' -fuzz=FuzzX ./internal/sim
+LOCAL	-	/opt/homebrew/bin/python3.12 -m pytest
+LOCAL	-	cd tools/x && /opt/homebrew/bin/python3 /opt/homebrew/lib/x.py
 ROUTING_TABLE_EOF
 
 start_case case_routing_table

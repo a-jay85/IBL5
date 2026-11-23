@@ -1,6 +1,6 @@
 ---
 description: Rationale for removing the broad *Controller* and *Handler* mutation testing exclusions and refining overly broad module-level excludes.
-last_verified: 2026-09-21
+last_verified: 2026-11-20
 ---
 
 # ADR-0020: Mutation Testing Unlock — Controllers + Handlers

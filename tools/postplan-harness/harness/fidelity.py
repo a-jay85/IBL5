@@ -1167,9 +1167,15 @@ RECHECK_DECLINE_REASONS = (
 
 def body_recheck_eligibility(prior_verdict_text: str, prior_tree: str | None,
                              current_tree: str, plan_hash_at_review: str | None,
-                             plan_hash_now: str) -> tuple[list[str] | None, str | None]:
-    """Pure. (findings, None) when eligible; (None, reason) otherwise."""
-    if _effective_verdict_word((prior_verdict_text or "").split(DIGEST_CUT, 1)[0]) != "NOT READY":
+                             plan_hash_now: str, *, notes: list[str] | None = None
+                             ) -> tuple[list[str] | None, str | None]:
+    """Pure. (findings, None) when eligible; (None, reason) otherwise.
+
+    notes=None is the NOT READY body-only round: findings come from the verdict's
+    check-4 bullets. A list is the READY WITH NOTES notes round: the prior verdict
+    must read READY WITH NOTES and the findings are the given note texts."""
+    expected = "NOT READY" if notes is None else "READY WITH NOTES"
+    if _effective_verdict_word((prior_verdict_text or "").split(DIGEST_CUT, 1)[0]) != expected:
         return None, "prior-verdict-unparsed"
     if prior_tree is None:
         return None, "prior-tree-unrecorded"
@@ -1179,7 +1185,8 @@ def body_recheck_eligibility(prior_verdict_text: str, prior_tree: str | None,
         return None, "plan-hash-missing"
     if plan_hash_at_review != plan_hash_now:
         return None, "plan-changed"
-    findings = body_only_findings_text(prior_verdict_text)
+    findings = (body_only_findings_text(prior_verdict_text) if notes is None
+                else (list(notes) or None))
     if findings is None:
         return None, "not-pure-body"
     return findings, None
@@ -1200,7 +1207,7 @@ def body_recheck(llm, gitad, out_dir: str, worktree: str, plan, master_sha: str,
                  pr_body: str, prior_body: str, pr_number: int | str,
                  prior_verdict_path: str, name_status: str,
                  plan_hash_at_review: str | None, plan_hash_now: str, *,
-                 round_num: int = 1, log=None
+                 round_num: int = 1, log=None, notes: list[str] | None = None
                  ) -> tuple[str | None, str | None, str | None, str | None]:
     """(verdict, reviewed_tree, verdict_path, decline_reason).
 
@@ -1223,7 +1230,7 @@ def body_recheck(llm, gitad, out_dir: str, worktree: str, plan, master_sha: str,
         return _decline("prior-verdict-unparsed")
     findings, reason = body_recheck_eligibility(
         prior_text, read_reviewed_tree(prior_verdict_path), current_tree,
-        plan_hash_at_review, plan_hash_now)
+        plan_hash_at_review, plan_hash_now, notes=notes)
     if reason:
         return _decline(reason)
     fids = [f"F{i}" for i in range(1, len(findings) + 1)]
@@ -1412,6 +1419,72 @@ def _is_misstated_pr_copy(note: dict) -> bool:
     if note.get("harm") in NOTE_HARMS:
         return True
     return _BODY_MISSTATES_RE.search(f"{note['title']} {note['detail']}") is not None
+
+
+def pr_copy_round_findings(notes: list[dict]) -> list[str] | None:
+    """Finding texts for the READY WITH NOTES body round, or None when it must not run.
+
+    Takes the list extract_notes returned, after its filters. The round runs only
+    when every kept note is a pr-copy note. An empty list or any followup returns
+    None, and the notes file as they do today."""
+    if not notes or any(n.get("kind") != "pr-copy" for n in notes):
+        return None
+    return [f"{n['title']}: {n['detail']}" for n in notes]
+
+
+def _is_body_fix_shape(r) -> bool:
+    return isinstance(r, dict) and isinstance(r.get("body"), str) and bool(r["body"].strip())
+
+
+def _validate_body_fix(r) -> None:
+    """llm.call validators raise on a bad reply; the CLI adapter then re-asks once."""
+    if not _is_body_fix_shape(r):
+        raise HarnessError("llm-invalid-output", "expected {\"body\": \"<non-empty text>\"}")
+
+
+def _pr_copy_fix_prompt(pr_body: str, findings: list[str]) -> str:
+    listed = "\n".join(f"F{i}: {f}" for i, f in enumerate(findings, 1))
+    return (
+        "You edit a pull request body. A plan-fidelity reviewer left non-blocking notes "
+        "saying the body states something false or stale. Fix only that.\n\n"
+        f"Notes:\n{listed}\n\n"
+        "Rules:\n"
+        "- Change only the sentences a note names.\n"
+        "- Keep every heading line, every HTML comment line, and the whole "
+        "`## Manual Testing` section byte-identical.\n"
+        "- Make no claim the diff does not support.\n"
+        "- You have no tools. Do not describe code changes.\n\n"
+        "Reply with JSON only: {\"body\": \"<the full new body>\"}\n\n"
+        "Current body:\n<<<BODY\n"
+        f"{(pr_body or '')[:150_000]}\n"
+        "BODY>>>\n"
+    )
+
+
+def fix_pr_copy_notes(llm, pr_body: str, findings: list[str], out_dir: str, *,
+                      round_num: int, log=None) -> str | None:
+    """One Sonnet call with no tools that rewrites the PR body to answer pr-copy notes.
+
+    Returns the new body, or None on an LLM failure, a wrong shape, or an unchanged
+    body. The call has no tools, so it cannot touch the tree."""
+    log = log or _noop_log
+    audit = os.path.join(out_dir, f"notes-body-fix-{round_num + 1}.json")
+    try:
+        data = llm.call(f"plan-fidelity-notes-body-fix-{round_num + 1}", "sonnet",
+                        _pr_copy_fix_prompt(pr_body, findings),
+                        validate=_validate_body_fix)
+    except HarnessError as exc:
+        _write_audit(audit, {"error": exc.kind, "detail": str(exc.detail or "")[:2000]})
+        log(f"phase5.5 notes round: body fix unavailable ({exc.kind})")
+        return None
+    _write_audit(audit, data if isinstance(data, dict) else {"raw": str(data)[:2000]})
+    if not _is_body_fix_shape(data):
+        log("phase5.5 notes round: body fix returned an unexpected shape")
+        return None
+    if data["body"].strip() == (pr_body or "").strip():
+        log("phase5.5 notes round: body fix left the body unchanged")
+        return None
+    return data["body"]
 
 
 def extract_notes(llm, verdict_path: str, log=None,
@@ -1706,8 +1779,22 @@ def _landed_later(item, changed_files, diff_text: str) -> bool:
     return False
 
 
-def reviewer_arming_holds(shadow, changed_files, diff_text: str, log) -> list[str]:
+def _landed_for_arming(item, changed_files, diff_text, review_inputs):
+    """True only when the item landed in the master diff and, on a stacked run, also in
+    the review-base diff the Phase 5.5 reviewer judged. Either miss keeps the hold."""
+    if not _landed_later(item, changed_files, diff_text):
+        return False
+    if review_inputs is None:
+        return True
+    review_files, review_diff = review_inputs
+    return _landed_later(item, review_files, review_diff)
+
+
+def reviewer_arming_holds(shadow, changed_files, diff_text: str, log, *,
+                           review_inputs=None) -> list[str]:
     """Condition (21) parts from the SHADOW-ARMING record. Add-only: it never clears a hold.
+
+    `review_inputs` is `(files, diff)` against the stacked review base, or None on the master base.
 
     Anything but a well-formed present or carried record is neutral: [] plus one log line.
     """
@@ -1720,7 +1807,8 @@ def reviewer_arming_holds(shadow, changed_files, diff_text: str, log) -> list[st
         parts = []
         pl = fields["planned_landed"]
         if pl["hold"] is True and not shadow.get("plan_blind"):
-            items = [i for i in pl["missing"] if not _landed_later(i, changed_files, diff_text)]
+            items = [i for i in pl["missing"]
+                     if not _landed_for_arming(i, changed_files, diff_text, review_inputs)]
             if items:
                 parts.append("planned-landed: " + ", ".join(
                     f"{_one_line(i.get('kind'))}:{_one_line(i.get('token'))}" for i in items))
@@ -1807,6 +1895,10 @@ def terminal_line(v1, error_kind, remediation_sha, v2, tree_2, rounds_completed)
     if v1 == "READY":
         return "READY"
     if v1 == "READY WITH NOTES":
+        if v2 == "READY":
+            # Only the PR-body notes round sets verdict 2 on a READY WITH NOTES first review.
+            return ("READY (re-review) — the pr-copy notes were fixed in the PR body and "
+                    f"re-reviewed clean on tree {tree_2 or 'unrecorded'}")
         return "READY WITH NOTES"
     if not remediation_sha:
         return ("NOT READY — the blocking findings listed above remain; "

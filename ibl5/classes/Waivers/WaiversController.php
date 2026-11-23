@@ -106,7 +106,7 @@ class WaiversController implements WaiversControllerInterface
     /**
      * @see WaiversControllerInterface::handleWaiverRequest()
      */
-    public function handleWaiverRequest($user): void
+    public function handleWaiverRequest(mixed $user): void
     {
         if (!$this->nukeCompat->isUser($user)) {
             $this->nukeCompat->loginBox();

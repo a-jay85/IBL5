@@ -87,4 +87,18 @@ interface CareerLeaderboardsViewInterface
      * @return string HTML closing tags: </table></center></td></tr>
      */
     public function renderTableFooter(): string;
+
+    /**
+     * Set the active sort column used to highlight the sorted column
+     *
+     * @param string $sortColumn Sort key
+     */
+    public function setSortColumn(string $sortColumn): void;
+
+    /**
+     * Set whether the games column is shown
+     *
+     * @param bool $showGames True to show games
+     */
+    public function setShowGames(bool $showGames): void;
 }

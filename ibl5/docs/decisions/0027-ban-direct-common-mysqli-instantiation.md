@@ -1,6 +1,6 @@
 ---
 description: ADR for BanDirectCommonMysqliInstantiationRule enforcing constructor injection of the split CommonMysqli repository interfaces
-last_verified: 2026-09-21
+last_verified: 2026-11-20
 ---
 
 # ADR-0027: Ban Direct CommonMysqliRepository Instantiation

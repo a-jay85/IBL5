@@ -84,7 +84,7 @@ Every repo script starts with `#!/usr/bin/env bash` and a guard that exits 2 und
 </dict>
 ```
 
-The value matches `LSCHED_JOB_PATH` in `bin/lib/launchd-sched.sh`. To add it to an installed plist:
+The value matches `LSCHED_JOB_PATH` in `bin/lib/launchd-sched.sh`. Launchers that start a `/bin/bash -lc` login shell get their PATH from `~/.bash_profile`, so that file must run `brew shellenv`. `ljob_job_path` puts `/usr/local/bin` early, so keep `/usr/local/bin/bash` absent or at version 4 or newer. To add it to an installed plist:
 
 ```bash
 P=~/Library/LaunchAgents/com.ibl5.automouse.plist

@@ -32,7 +32,7 @@ Repo shell scripts need bash 4 or newer. The Mac runs them on Homebrew bash at `
 ## Consequences
 
 - Positive: scripts may use bash 4 features. The Mac fails loudly with the fix named when PATH reaches the old shell.
-- Positive: `bin/check-bashpid-under-set-u` (example) and its harness are retired.
+- Positive: `bin/check-bashpid-under-set-u` (example) and its harness are retired. The comment at bin/check-ambient-env-fallback:13 now cites `bin/check-shell-portability` for its quote-blind comment stripping.
 - Negative: a Mac without Homebrew bash cannot run repo scripts until it installs it.
 - Negative: hook scripts under `bin/hooks/` and fixture files carry no guard, so a hook that runs under bash 3.2 fails without the guard's message.
 - Neutral: existing code keeps its 3.2-safe style. Nothing rewrites it to use bash 4 features.

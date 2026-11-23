@@ -125,7 +125,16 @@ run_step() {       # <path> <pr> <log> -> ok | timeout | exit-<rc>
 process_pr() {     # <pr> <merge-oid> <merged-epoch>; body already in $TMP/body.txt
     local pr="$1" oid="$2" merged="$3" line n step res fails=""
     # Drop fenced code blocks first: a row inside a fence is documentation, not a step to run.
-    awk '/^[[:space:]]*(```|~~~)/ { f = !f; next } !f' "$TMP/body.txt" > "$TMP/body-nofence.txt"
+    # Width-aware like planfile.py _strip_fenced: a closing fence uses the opener's character, is at least as long,
+    # and has no text after it. A 3-backtick block inside a 4-backtick block stays fenced.
+    awk '/^[[:space:]]*(```|~~~)/ {
+            s = $0; sub(/^[[:space:]]*/, "", s); c = substr(s, 1, 1); n = 0
+            while (substr(s, n + 1, 1) == c) n++
+            if (!f) { f = 1; fc = c; fl = n }
+            else if (c == fc && n >= fl && substr(s, n + 1) ~ /^[[:space:]]*$/) f = 0
+            next
+        }
+        !f' "$TMP/body.txt" > "$TMP/body-nofence.txt"
     pmr_rows "$TMP/body-nofence.txt" > "$TMP/rows.txt"
     while IFS= read -r line; do
         pmr_parse_row "$line"

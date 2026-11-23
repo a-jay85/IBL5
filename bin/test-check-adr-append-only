@@ -350,6 +350,24 @@ case_new_adr_file() {
     run_case "$CASE_NAME" 0 'OK' --since=master
 }
 
+# Review finding on PR 4155: a removed blank line plus a stamp on the next line make
+# one mixed hunk (2 old lines, 1 new). Both edits are allowed, so the gate must pass.
+case_blank_removal_with_stamp_pass() {
+    new_case a
+    awk '
+        { lines[NR] = $0 }
+        END {
+            for (i = 1; i <= NR; i++) {
+                if (lines[i] == "" && index(lines[i + 1], "3. Third decision item") == 1) continue
+                print lines[i]
+            }
+        }' "$CASE_DIR/$ADR104" >"$CASE_DIR/$ADR104.new"
+    mv "$CASE_DIR/$ADR104.new" "$CASE_DIR/$ADR104"
+    edit_file "$CASE_DIR/$ADR104" 'for the old helper.' 'for the old helper. [CORRECTED 2026-11-20: see Addendum]'
+    commit_pr
+    run_case "$CASE_NAME" 0 'OK' --since=master
+}
+
 case_readme_ignored() {
     new_case a
     printf '%s\n' '' 'One more index line.' >>"$CASE_DIR/$README"
@@ -644,7 +662,7 @@ ALL_CASES=(
     case_stamp_with_trailing_prose_flagged case_rename_out_of_set_with_edit_flagged
     case_pure_rename_out_of_set_flagged case_fenced_heading_flagged
     case_heading_decision_numbered case_heading_decisions case_heading_alternatives_rejected
-    case_joined_words_flagged
+    case_joined_words_flagged case_blank_removal_with_stamp_pass
 )
 
 SELECTED=("$@")

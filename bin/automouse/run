@@ -2147,8 +2147,15 @@ write_failure_report() {
 impl_failure_note() {
     _ifn_slug="${1%.md}"; _ifn_attempt="$2"; _ifn_since="$3"
     _ifn_report=""; _ifn_best=0
-    for _ifn_f in "$NIGHTLY_DIR"/reports/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-error-"$_ifn_slug".md; do
+    for _ifn_f in "$NIGHTLY_DIR"/reports/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-error-*.md; do
         [ -f "$_ifn_f" ] || continue
+        # The agent names the file from the plan title, which can differ from the
+        # plan filename. A report named for another slug counts only when it was
+        # written during this attempt (a real since-time, not 0).
+        case "$_ifn_f" in
+            *-error-"$_ifn_slug".md) ;;
+            *) [ "$_ifn_since" -gt 0 ] || continue ;;
+        esac
         _ifn_m=$(stat -c %Y "$_ifn_f" 2>/dev/null || stat -f %m "$_ifn_f" 2>/dev/null || echo 0)
         if [ "$_ifn_m" -ge "$_ifn_since" ] && [ "$_ifn_m" -ge "$_ifn_best" ]; then
             _ifn_best=$_ifn_m; _ifn_report=$_ifn_f

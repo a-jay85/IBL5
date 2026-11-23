@@ -289,4 +289,29 @@ else
     fail "f3-other-slug-report-not-matched" "got '$F3'"
 fi
 
+# f4: a report named from the plan title (slug differs from the plan filename)
+# written during this attempt is still found
+rm -f "$NIGHTLY_DIR"/reports/*.md
+FREP4="$NIGHTLY_DIR/reports/2026-11-23-error-title-slug-for-plan-h.md"
+printf '# Title slug report\n' > "$FREP4"
+F4=$(impl_failure_note plan-h.md 1 "$(( $(date +%s) - 60 ))")
+if grep -qF 'Its report says: "Title slug report"' <<< "$F4" \
+    && grep -qF "Read $FREP4" <<< "$F4"; then
+    pass "f4-title-slug-report-found"
+else
+    fail "f4-title-slug-report-found" "got '$F4'"
+fi
+
+# f5: a report with an empty first line gets the no-title note that names the path
+FREP5="$NIGHTLY_DIR/reports/2026-11-23-error-plan-i.md"
+printf '\nbody only\n' > "$FREP5"
+F5=$(impl_failure_note plan-i.md 1 0)
+if grep -qF 'stopped before shipping (try 1 of 3). It stays queued' <<< "$F5" \
+    && ! grep -qF 'report says' <<< "$F5" \
+    && grep -qF "Read $FREP5" <<< "$F5"; then
+    pass "f5-no-title-branch"
+else
+    fail "f5-no-title-branch" "got '$F5'"
+fi
+
 h_done

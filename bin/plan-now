@@ -589,7 +589,7 @@ plan_now_kick_port() {
     [[ "$kslug" =~ $KICK_PORT_RE ]] || return 0
     # Guard 3: never override a disarm. An unreadable epoch fails safe (skip).
     if [ -f "$KICK_STATE_DIR/.disarmed-until" ]; then
-        krearm=$(sed -n 's/^rearm_epoch=//p' "$KICK_STATE_DIR/.disarmed-until" | head -1)
+        krearm=$(awk '/^rearm_epoch=/ && !f {sub(/^rearm_epoch=/, ""); print; f=1}' "$KICK_STATE_DIR/.disarmed-until")
         case "$krearm" in
             ''|*[!0-9]*)
                 echo "plan-now: automouse kick skipped: unreadable disarm breadcrumb; the plan stays queued."

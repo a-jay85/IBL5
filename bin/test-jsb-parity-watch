@@ -1,0 +1,742 @@
+#!/usr/bin/env bash
+# bin/test-jsb-parity-watch — fixture harness for bin/jsb-parity-watch and
+# bin/jsb-parity-watch-setup. Drives only the CLIs. gh, curl, pgrep, launchctl,
+# discord-dm and automouse/run are stubs, so no case reaches GitHub, Discord,
+# launchd or a real model.
+#
+# Usage: bin/test-jsb-parity-watch [case_name ...]   (no arguments runs every case)
+# shellcheck disable=SC2329  # case_* and helpers are dispatched by name
+set -uo pipefail
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+h_tmp T
+
+BASE=1795430000
+SECRET="https://hooks.example.invalid/T3-SECRET-7f3a9c"
+AMDIR=".claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse"
+
+GREEN='[{"__typename":"CheckRun","status":"COMPLETED","conclusion":"SUCCESS","name":"a"}]'
+ROLL_FAILED='[{"__typename":"CheckRun","status":"COMPLETED","conclusion":"FAILURE","name":"a"}]'
+PENDING='[{"__typename":"CheckRun","status":"IN_PROGRESS","conclusion":"","name":"a"},{"__typename":"StatusContext","context":"x","state":"EXPECTED"}]'
+NEAR_MISS='[{"__typename":"CheckRun","status":"COMPLETED","conclusion":"SKIPPED","name":"a"},{"__typename":"CheckRun","status":"COMPLETED","conclusion":"NEUTRAL","name":"b"},{"__typename":"CheckRun","status":"COMPLETED","conclusion":"SUCCESS","name":"c"}]'
+ERROR_CTX='[{"__typename":"StatusContext","context":"ci","state":"ERROR"}]'
+SUPERSEDED_OK='[{"__typename":"CheckRun","status":"COMPLETED","conclusion":"CANCELLED","name":"m","workflowName":"w","startedAt":"2026-01-01T00:00:01Z"},{"__typename":"CheckRun","status":"COMPLETED","conclusion":"SUCCESS","name":"m","workflowName":"w","startedAt":"2026-01-01T00:00:09Z"}]'
+SUPERSEDED_BAD='[{"__typename":"CheckRun","status":"COMPLETED","conclusion":"SUCCESS","name":"m","workflowName":"w","startedAt":"2026-01-01T00:00:01Z"},{"__typename":"CheckRun","status":"COMPLETED","conclusion":"FAILURE","name":"m","workflowName":"w","startedAt":"2026-01-01T00:00:09Z"}]'
+
+S=""
+
+# --- Sandbox ---------------------------------------------------------------------
+
+# ledger <id:status:slug>...: write the sandbox ledger.
+ledger() {
+    local out='[]' t id st sl
+    for t in "$@"; do
+        id="${t%%:*}"; t="${t#*:}"; st="${t%%:*}"; sl="${t#*:}"
+        out=$(jq -c --arg id "$id" --arg st "$st" --arg sl "$sl" \
+            '. + [{id: $id, status: $st, plan_slug: (if $sl == "" then null else $sl end)}]' <<< "$out")
+    done
+    jq -n --argjson r "$out" '{rows: $r}' > "$S/parity/ledger.json"
+}
+
+write_stub() {
+    local name="$1"
+    cat > "$S/stub/$name"
+    chmod 755 "$S/stub/$name"
+}
+
+# sandbox <name>: build $S for one case, with one row (pl-0001) in flight.
+sandbox() {
+    S="$T/$1"
+    mkdir -p "$S/home/.config/jsb-parity" "$S/home/$AMDIR/queue" "$S/home/$AMDIR/done" \
+        "$S/home/$AMDIR/skipped" "$S/home/$AMDIR/reports" "$S/parity/recordings" \
+        "$S/parity/state" "$S/plannow" "$S/stub" "$S/bin/automouse" "$S/log" "$S/fix" "$S/main"
+    printf '%s\n' "$SECRET" > "$S/home/.config/jsb-parity/webhook-url"
+    chmod 600 "$S/home/.config/jsb-parity/webhook-url"
+    printf '{"current":"rec-1"}\n' > "$S/parity/recordings/index.json"
+    ledger "pl-0001:captured:jsb-port-pl-0001"
+
+    write_stub gh <<'STUB'
+#!/bin/sh
+echo "$*" >> "$JSB_STUB_DIR/log/gh.argv"
+[ -e "$JSB_STUB_DIR/fix/gh-fail" ] && exit 1
+slug=""
+while [ $# -gt 0 ]; do
+    [ "$1" = "--head" ] && slug="$2"
+    shift
+done
+f="$JSB_STUB_DIR/fix/gh-$slug.json"
+if [ -f "$f" ]; then cat "$f"; else echo '[]'; fi
+STUB
+    write_stub curl <<'STUB'
+#!/bin/sh
+echo "$*" >> "$JSB_STUB_DIR/log/curl.argv"
+cat >> "$JSB_STUB_DIR/log/curl.stdin"
+code=204
+[ -f "$JSB_STUB_DIR/fix/curl-code" ] && code=$(cat "$JSB_STUB_DIR/fix/curl-code")
+printf '%s' "$code"
+STUB
+    write_stub pgrep <<'STUB'
+#!/bin/sh
+echo "$*" >> "$JSB_STUB_DIR/log/pgrep.argv"
+[ -e "$JSB_STUB_DIR/fix/automouse-running" ]
+STUB
+    write_stub launchctl <<'STUB'
+#!/bin/sh
+echo "$*" >> "$JSB_STUB_DIR/log/launchctl.argv"
+if [ "$1" = "list" ]; then
+    printf 'PID\tStatus\tLabel\n'
+    [ -f "$JSB_STUB_DIR/fix/launchctl-list" ] && cat "$JSB_STUB_DIR/fix/launchctl-list"
+fi
+exit 0
+STUB
+    cat > "$S/bin/discord-dm" <<'STUB'
+#!/bin/sh
+echo "$*" >> "$JSB_STUB_DIR/log/discord-dm.argv"
+cat >> "$JSB_STUB_DIR/log/discord-dm.stdin"
+code=0
+[ -f "$JSB_STUB_DIR/fix/dm-exit" ] && code=$(cat "$JSB_STUB_DIR/fix/dm-exit")
+exit "$code"
+STUB
+    cat > "$S/bin/automouse/run" <<'STUB'
+#!/bin/sh
+echo "$*" >> "$JSB_STUB_DIR/log/automouse-run.argv"
+STUB
+    chmod 755 "$S/bin/discord-dm" "$S/bin/automouse/run"
+}
+
+# run_watch [args...]: run the watcher in the sandbox. Env seams default to the
+# sandbox when unset and pass through unchanged when empty ("VAR= run_watch").
+run_watch() {
+    local rc
+    env HOME="$S/home" PATH="$S/stub:$PATH" TZ=UTC JSB_STUB_DIR="$S" \
+        JSB_WATCH_PARITY_DIR="${JSB_WATCH_PARITY_DIR-$S/parity}" \
+        JSB_WATCH_BIN="${JSB_WATCH_BIN-$S/bin}" \
+        JSB_WATCH_PLANNOW_DIR="${JSB_WATCH_PLANNOW_DIR-$S/plannow}" \
+        JSB_WATCH_NOW="${JSB_WATCH_NOW-${NOW:-$BASE}}" \
+        "$REPO/bin/jsb-parity-watch" "$@" > "$S/out" 2> "$S/err"
+    rc=$?
+    printf '%s\n' "$rc" > "$S/rc"
+    return 0
+}
+
+# run_setup [args...]: run the installer in the sandbox.
+run_setup() {
+    local rc
+    env HOME="$S/home" PATH="$S/stub:$PATH" JSB_STUB_DIR="$S" \
+        MAIN_WT="${SETUP_MAIN_WT-$S/main}" REPO_ROOT="${SETUP_REPO_ROOT:-$REPO}" \
+        "$REPO/bin/jsb-parity-watch-setup" "$@" > "$S/out" 2> "$S/err"
+    rc=$?
+    printf '%s\n' "$rc" > "$S/rc"
+    return 0
+}
+
+reset_logs() { rm -f "$S"/log/*; }
+cnt() {
+    local f="$S/log/$1.argv"
+    if [ -f "$f" ]; then echo $(($(wc -l < "$f"))); else echo 0; fi
+}
+slurp() { if [ -f "$1" ]; then cat "$1"; fi; }
+out() { slurp "$S/out"; }
+rc_is() { h_eq "$1" "$2" "$(tr -d '[:space:]' < "$S/rc")"; }
+
+# gh_pr <slug> <number> <state> <armed yes|no> <sha> <rollup-json>
+gh_pr() {
+    jq -n --argjson n "$2" --arg st "$3" --arg armed "$4" --arg sha "$5" --argjson roll "$6" \
+        '[{number: $n, state: $st,
+           mergedAt: (if $st == "MERGED" then "2026-11-22T00:00:00Z" else null end),
+           url: ("https://github.com/a-jay85/IBL5/pull/" + ($n | tostring)),
+           autoMergeRequest: (if $armed == "yes" then {enabledAt: "2026-11-22T00:00:00Z", mergeMethod: "SQUASH"} else null end),
+           statusCheckRollup: $roll, headRefOid: $sha}]' > "$S/fix/gh-$1.json"
+}
+
+no_actions() {
+    h_eq "$1: no webhook call" 0 "$(cnt curl)"
+    h_eq "$1: no DM" 0 "$(cnt discord-dm)"
+    h_eq "$1: no schedule call" 0 "$(cnt automouse-run)"
+}
+
+AM() { printf '%s' "$S/home/$AMDIR"; }
+
+# --- Lock cases (rows 3-6) -------------------------------------------------------
+
+case_lock_held_exits_quiet() {
+    sandbox lock_held
+    mkdir -p "$S/parity/state/loop.lock"
+    printf '%s %s host\n' "$$" "$BASE" > "$S/parity/state/loop.lock/pid"
+    run_watch
+    rc_is "lock held: exit 0" 0
+    h_absent "lock held: gh never called" "$S/log/gh.argv"
+    h_contains "lock held: says so" "$(out)" "run lock held"
+}
+
+case_lock_stale_dead_pid_proceeds() {
+    local dead
+    sandbox lock_dead
+    dead=$(sh -c 'echo $$')
+    mkdir -p "$S/parity/state/loop.lock"
+    printf '%s %s host\n' "$dead" "$BASE" > "$S/parity/state/loop.lock/pid"
+    run_watch
+    rc_is "dead pid: exit 0" 0
+    h_exists "dead pid with a fresh epoch is stale: gh called" "$S/log/gh.argv"
+}
+
+case_lock_pid0_age_boundary() {
+    sandbox lock_pid0
+    mkdir -p "$S/parity/state/loop.lock"
+    printf '0 %s host\n' $((BASE - 14400)) > "$S/parity/state/loop.lock/pid"
+    run_watch
+    h_absent "pid 0 at age 14400 is held" "$S/log/gh.argv"
+    reset_logs
+    printf '0 %s host\n' $((BASE - 14401)) > "$S/parity/state/loop.lock/pid"
+    run_watch
+    h_exists "pid 0 at age 14401 is stale" "$S/log/gh.argv"
+}
+
+case_lock_no_pidfile_mtime() {
+    local real
+    sandbox lock_nopid
+    mkdir -p "$S/parity/state/loop.lock"
+    real=$(date +%s)
+    NOW=$real run_watch
+    h_absent "fresh lock dir with no pid file is held" "$S/log/gh.argv"
+    reset_logs
+    NOW=$((real + 120)) run_watch
+    h_exists "lock dir with no pid file is stale past 60 s" "$S/log/gh.argv"
+}
+
+# --- Verdict cases (rows 7-13) ---------------------------------------------------
+
+case_merged_fires() {
+    local last
+    sandbox merged
+    gh_pr jsb-port-pl-0001 7 MERGED no sha1 "$GREEN"
+    run_watch
+    rc_is "merged: exit 0" 0
+    h_eq "merged: one webhook call" 1 "$(cnt curl)"
+    last=$(slurp "$S/home/.cache/jsb-parity-watch.last")
+    h_contains "merged: fingerprint names the PR" "$last" "pl-0001=7:MERGED:sha1"
+    h_contains "merged: fingerprint ends with the run time" "$last" " $BASE"
+    h_not_contains "merged: verdict is a fire, not WAIT:merged" "$(out)" "WAIT:merged"
+}
+
+case_open_failed_fires_once_per_sha() {
+    sandbox failed_sha
+    gh_pr jsb-port-pl-0001 42 OPEN no aaa "$ROLL_FAILED"
+    run_watch
+    h_eq "failed check: fires" 1 "$(cnt curl)"
+    reset_logs
+    NOW=$((BASE + 25200)) run_watch
+    h_eq "same sha past 6 h: stays quiet" 0 "$(cnt curl)"
+    gh_pr jsb-port-pl-0001 42 OPEN no bbb "$ROLL_FAILED"
+    NOW=$((BASE + 25200)) run_watch
+    h_eq "new sha: fires again" 1 "$(cnt curl)"
+}
+
+case_open_pending_waits() {
+    sandbox pending
+    gh_pr jsb-port-pl-0001 42 OPEN no aaa "$PENDING"
+    run_watch
+    no_actions "pending checks"
+    h_contains "pending: verdict is a wait" "$(out)" "WAIT:checks-pending"
+}
+
+case_check_verdict_near_miss() {
+    sandbox near_green
+    gh_pr jsb-port-pl-0001 42 OPEN no aaa "$NEAR_MISS"
+    run_watch
+    h_eq "SKIPPED and NEUTRAL count as green: held-for-owner DM" 1 "$(cnt discord-dm)"
+    h_eq "SKIPPED and NEUTRAL count as green: no webhook" 0 "$(cnt curl)"
+    sandbox near_error
+    gh_pr jsb-port-pl-0001 42 OPEN no aaa "$ERROR_CTX"
+    run_watch
+    h_eq "ERROR context counts as failed: webhook" 1 "$(cnt curl)"
+    sandbox superseded_ok
+    gh_pr jsb-port-pl-0001 42 OPEN no aaa "$SUPERSEDED_OK"
+    run_watch
+    h_eq "superseded CANCELLED run, later SUCCESS: held-for-owner DM" 1 "$(cnt discord-dm)"
+    h_eq "superseded CANCELLED run, later SUCCESS: no webhook" 0 "$(cnt curl)"
+    sandbox superseded_bad
+    gh_pr jsb-port-pl-0001 42 OPEN no aaa "$SUPERSEDED_BAD"
+    run_watch
+    h_eq "earlier SUCCESS, later FAILURE of one check: webhook" 1 "$(cnt curl)"
+}
+
+case_open_green_armed_waits() {
+    sandbox armed
+    gh_pr jsb-port-pl-0001 42 OPEN yes aaa "$GREEN"
+    run_watch
+    no_actions "green and armed"
+    h_contains "armed: verdict is a wait" "$(out)" "WAIT:auto-merge-armed"
+}
+
+case_open_green_unarmed_stall_dm() {
+    sandbox unarmed
+    gh_pr jsb-port-pl-0001 42 OPEN no aaa "$GREEN"
+    run_watch
+    h_eq "green unarmed: one DM" 1 "$(cnt discord-dm)"
+    h_contains "DM names the PR" "$(slurp "$S/log/discord-dm.stdin")" "pull/42"
+    h_eq "stall key recorded" "pl-0001:held-for-owner:42" "$(slurp "$S/home/.cache/jsb-parity-stalls.txt")"
+    reset_logs
+    run_watch
+    h_eq "rerun sends no second DM" 0 "$(cnt discord-dm)"
+}
+
+case_closed_fires() {
+    sandbox closed
+    gh_pr jsb-port-pl-0001 9 CLOSED no aaa "$GREEN"
+    run_watch
+    h_eq "closed unmerged: webhook" 1 "$(cnt curl)"
+    h_contains "closed: reason names it" "$(slurp "$S/log/curl.argv")" "pl-0001:closed"
+    h_not_contains "closed: verdict is a fire, not WAIT:closed" "$(out)" "WAIT:closed"
+}
+
+# --- Queue and plan-now cases (rows 14-22) ----------------------------------------
+
+case_queued_idle_schedules() {
+    sandbox queued_idle
+    : > "$(AM)/queue/010-jsb-port-pl-0001.md"
+    NOW=1795429980 run_watch
+    h_eq "queued and idle: kick time is now + 120 s" "schedule 2026-11-23 10:35" "$(slurp "$S/log/automouse-run.argv" | tr -d '\r')"
+    h_eq "queued and idle: no DM" 0 "$(cnt discord-dm)"
+}
+
+case_queued_running_waits() {
+    sandbox queued_running
+    : > "$(AM)/queue/010-jsb-port-pl-0001.md"
+    : > "$S/fix/automouse-running"
+    run_watch
+    no_actions "queued and running"
+    h_contains "queued and running: verdict is a wait" "$(out)" "WAIT:automouse-running"
+}
+
+case_plannow_loaded_waits() {
+    sandbox plannow_loaded
+    printf -- '-\t0\tcom.ibl5.plan-now-20261123-012805-44230\n' > "$S/fix/launchctl-list"
+    printf 'Branch slug: jsb-port-pl-0001\n' > "$S/plannow/plan-now-20261123-012805-44230.log"
+    run_watch
+    no_actions "plan-now loaded"
+    h_contains "plan-now loaded: verdict is a wait" "$(out)" "WAIT:plan-now-running"
+}
+
+case_plannow_near_miss_slug() {
+    sandbox plannow_near
+    printf -- '-\t0\tcom.ibl5.plan-now-20261123-012805-44230\n' > "$S/fix/launchctl-list"
+    printf 'Branch slug: jsb-port-pl-00011\n' > "$S/plannow/plan-now-20261123-012805-44230.log"
+    run_watch
+    h_eq "near-miss slug: no-trace DM" 1 "$(cnt discord-dm)"
+    h_eq "near-miss slug: key" "pl-0001:no-trace:none" "$(slurp "$S/home/.cache/jsb-parity-stalls.txt")"
+}
+
+case_plannow_unattributable_waits() {
+    sandbox plannow_missing
+    printf -- '-\t0\tcom.ibl5.plan-now-20261123-012805-44230\n' > "$S/fix/launchctl-list"
+    run_watch
+    no_actions "plan-now log missing"
+    h_contains "plan-now log missing: verdict is a wait" "$(out)" "WAIT:plan-now-unattributed"
+}
+
+case_plan_done_stall() {
+    sandbox plan_done
+    : > "$(AM)/done/010-jsb-port-pl-0001.md"
+    run_watch
+    h_eq "plan in done/: key" "pl-0001:plan-done:010-jsb-port-pl-0001.md" "$(slurp "$S/home/.cache/jsb-parity-stalls.txt")"
+    h_contains "plan in done/: DM names the file" "$(slurp "$S/log/discord-dm.stdin")" "010-jsb-port-pl-0001.md"
+}
+
+case_plan_skipped_stall() {
+    sandbox plan_skipped
+    : > "$(AM)/skipped/010-jsb-port-pl-0001.md"
+    run_watch
+    h_eq "plan in skipped/: key" "pl-0001:plan-skipped:010-jsb-port-pl-0001.md" "$(slurp "$S/home/.cache/jsb-parity-stalls.txt")"
+    h_contains "plan in skipped/: DM names the file" "$(slurp "$S/log/discord-dm.stdin")" "010-jsb-port-pl-0001.md"
+}
+
+case_plan_failed_report_stall() {
+    sandbox plan_failed
+    : > "$(AM)/reports/2026-11-22-failed-jsb-port-pl-0001.md"
+    run_watch
+    h_eq "failure report: key" "pl-0001:plan-failed:2026-11-22-failed-jsb-port-pl-0001.md" "$(slurp "$S/home/.cache/jsb-parity-stalls.txt")"
+    h_contains "failure report: DM names the file" "$(slurp "$S/log/discord-dm.stdin")" "2026-11-22-failed-jsb-port-pl-0001.md"
+    sandbox plan_failed_done
+    : > "$(AM)/reports/2026-11-22-done-jsb-port-pl-0001.md"
+    run_watch
+    h_eq "a -done- report alone is not a failure: no-trace key" "pl-0001:no-trace:none" "$(slurp "$S/home/.cache/jsb-parity-stalls.txt")"
+}
+
+case_no_trace_stall_quotes_log_tail() {
+    sandbox no_trace
+    printf 'Branch slug: jsb-port-pl-0001\nFIRST-LOG-END\n' > "$S/plannow/plan-now-20261123-010000-1.log"
+    printf 'Branch slug: jsb-port-pl-0001\nmid line\nLAST-LINE-XYZ\n' > "$S/plannow/plan-now-20261123-020000-2.log"
+    run_watch
+    h_eq "no-trace: keys on the newest log" "pl-0001:no-trace:plan-now-20261123-020000-2.log" "$(slurp "$S/home/.cache/jsb-parity-stalls.txt")"
+    h_contains "no-trace: DM quotes the newest log's tail" "$(slurp "$S/log/discord-dm.stdin")" "LAST-LINE-XYZ"
+    h_not_contains "no-trace: DM does not quote the older log" "$(slurp "$S/log/discord-dm.stdin")" "FIRST-LOG-END"
+}
+
+# --- Aggregation, dedupe and failure cases (rows 23-29) ----------------------------
+
+case_no_row_in_flight_fires() {
+    sandbox no_row
+    ledger "pl-0001:pinned:jsb-port-pl-0001" "pl-0002:pinned:"
+    run_watch
+    h_eq "no row in flight: one webhook call" 1 "$(cnt curl)"
+    h_contains "no row in flight: body names the reason" "$(slurp "$S/log/curl.argv")" "no-row-in-flight"
+}
+
+case_two_rows_one_fire() {
+    local argv
+    sandbox two_fire
+    ledger "pl-0011:captured:jsb-port-pl-0011" "pl-0025:captured:jsb-port-pl-0025"
+    gh_pr jsb-port-pl-0011 11 MERGED no s11 "$GREEN"
+    gh_pr jsb-port-pl-0025 25 CLOSED no s25 "$GREEN"
+    run_watch
+    h_eq "two firing rows: exactly one POST" 1 "$(cnt curl)"
+    argv=$(slurp "$S/log/curl.argv")
+    h_contains "POST names the merged row" "$argv" "pl-0011:merged"
+    h_contains "POST names the closed row" "$argv" "pl-0025:closed"
+}
+
+case_two_rows_mixed_actions() {
+    sandbox two_mixed
+    ledger "pl-0011:captured:jsb-port-pl-0011" "pl-0025:captured:jsb-port-pl-0025"
+    : > "$(AM)/queue/010-jsb-port-pl-0011.md"
+    gh_pr jsb-port-pl-0025 25 OPEN no s25 "$GREEN"
+    run_watch
+    h_eq "mixed: one schedule call" 1 "$(cnt automouse-run)"
+    h_eq "mixed: one DM" 1 "$(cnt discord-dm)"
+    h_eq "mixed: no webhook" 0 "$(cnt curl)"
+}
+
+case_fingerprint_dedupe_6h() {
+    sandbox dedupe
+    gh_pr jsb-port-pl-0001 7 MERGED no sha1 "$GREEN"
+    run_watch
+    h_eq "first fire" 1 "$(cnt curl)"
+    reset_logs
+    NOW=$((BASE + 21599)) run_watch
+    h_eq "unchanged state at 21599 s: suppressed" 0 "$(cnt curl)"
+    h_contains "suppression is stated" "$(out)" "fire suppressed"
+    reset_logs
+    NOW=$((BASE + 21600)) run_watch
+    h_eq "unchanged state at 21600 s: fires" 1 "$(cnt curl)"
+    reset_logs
+    ledger "pl-0001:captured:jsb-port-pl-0001" "pl-0099:pinned:"
+    NOW=$((BASE + 21660)) run_watch
+    h_eq "changed ledger: fires at once" 1 "$(cnt curl)"
+}
+
+case_gh_error_no_action() {
+    sandbox gh_error
+    ledger "pl-0011:captured:jsb-port-pl-0011" "pl-0025:captured:jsb-port-pl-0025"
+    gh_pr jsb-port-pl-0011 11 MERGED no s11 "$GREEN"
+    : > "$S/fix/gh-fail"
+    run_watch
+    rc_is "gh failure: exit 0" 0
+    no_actions "gh failure"
+    h_eq "gh failure: exactly one log line" 1 "$(($(wc -l < "$S/out")))"
+    h_contains "gh failure: line says so" "$(out)" "gh pr list failed"
+}
+
+case_bad_input_quiet() {
+    sandbox bad_input
+    rm -f "$S/parity/ledger.json"
+    run_watch
+    rc_is "missing ledger: exit 0" 0
+    h_contains "missing ledger: says so" "$(out)" "ledger missing"
+    h_absent "missing ledger: gh never called" "$S/log/gh.argv"
+    printf '{not json\n' > "$S/parity/ledger.json"
+    run_watch
+    rc_is "invalid ledger: exit 0" 0
+    h_contains "invalid ledger: no action taken" "$(out)" "no action taken"
+    h_absent "invalid ledger: gh never called" "$S/log/gh.argv"
+    no_actions "invalid ledger"
+    # A rows array of numbers passes the shape check, then breaks the row filter.
+    # That failure reaches the ERR trap, which must exit 0 with a log line.
+    printf '{"rows":[1]}\n' > "$S/parity/ledger.json"
+    run_watch
+    rc_is "broken row filter: exit 0" 0
+    h_contains "broken row filter: ERR trap logs it" "$(out)" "error at line"
+    h_contains "broken row filter: no action taken" "$(out)" "no action taken"
+    h_absent "broken row filter: gh never called" "$S/log/gh.argv"
+    no_actions "broken row filter"
+}
+
+case_curl_failure_no_fingerprint() {
+    sandbox curl_fail
+    gh_pr jsb-port-pl-0001 7 MERGED no sha1 "$GREEN"
+    printf '500' > "$S/fix/curl-code"
+    run_watch
+    h_absent "HTTP 500: no fingerprint written" "$S/home/.cache/jsb-parity-watch.last"
+    h_contains "HTTP 500: logged" "$(out)" "HTTP 500"
+    rm -f "$S/fix/curl-code"
+    reset_logs
+    run_watch
+    h_eq "next run with HTTP 204 fires again" 1 "$(cnt curl)"
+    h_exists "HTTP 204: fingerprint written" "$S/home/.cache/jsb-parity-watch.last"
+}
+
+# --- Safety cases (rows 30-32) -----------------------------------------------------
+
+# no_secret_in <label>: the webhook URL appears in no output, argv, DM or cache file.
+no_secret_in() {
+    local f leak=0
+    for f in "$S/out" "$S/err" "$S"/log/*.argv "$S/log/discord-dm.stdin"; do
+        if [ -f "$f" ] && grep -qF -- "T3-SECRET" "$f"; then leak=1; h_fail "$1: secret leaked into $f"; fi
+    done
+    if [ -d "$S/home/.cache" ] && grep -rqF -- "T3-SECRET" "$S/home/.cache"; then leak=1; h_fail "$1: secret leaked into the cache"; fi
+    if [ "$leak" = 0 ]; then h_pass "$1: secret stays out of every output"; fi
+}
+
+case_secret_never_leaks() {
+    sandbox secret_merged
+    gh_pr jsb-port-pl-0001 7 MERGED no sha1 "$GREEN"
+    run_watch
+    no_secret_in "merged fire"
+    h_contains "positive control: curl stdin holds the secret" "$(slurp "$S/log/curl.stdin")" "T3-SECRET"
+    sandbox secret_held
+    gh_pr jsb-port-pl-0001 42 OPEN no aaa "$GREEN"
+    run_watch
+    no_secret_in "held-for-owner DM"
+    sandbox secret_500
+    gh_pr jsb-port-pl-0001 7 MERGED no sha1 "$GREEN"
+    printf '500' > "$S/fix/curl-code"
+    run_watch
+    no_secret_in "curl 500"
+}
+
+case_read_only_surfaces() {
+    local before after
+    sandbox read_only
+    gh_pr jsb-port-pl-0001 42 OPEN no aaa "$ROLL_FAILED"
+    before=$(find "$S/parity" -type f -exec cksum {} + | sort)
+    run_watch
+    after=$(find "$S/parity" -type f -exec cksum {} + | sort)
+    h_eq "a fire leaves the parity dir byte-identical" "$before" "$after"
+    h_eq "the check-failed fire happened" 1 "$(cnt curl)"
+}
+
+case_gh_read_only() {
+    local bad
+    sandbox gh_ro
+    gh_pr jsb-port-pl-0001 42 OPEN no aaa "$GREEN"
+    run_watch
+    h_exists "gh was called" "$S/log/gh.argv"
+    bad=$(grep -vc '^pr list' "$S/log/gh.argv" || true)
+    h_eq "every gh call is pr list" 0 "$bad"
+}
+
+# --- CLI cases (rows 33-39) ---------------------------------------------------------
+
+case_dry_run_no_action() {
+    sandbox dry_run
+    ledger "pl-0001:captured:jsb-port-pl-0001" "pl-0002:captured:jsb-port-pl-0002" "pl-0003:captured:jsb-port-pl-0003"
+    gh_pr jsb-port-pl-0001 7 MERGED no sha1 "$GREEN"
+    : > "$(AM)/queue/010-jsb-port-pl-0002.md"
+    gh_pr jsb-port-pl-0003 42 OPEN no aaa "$GREEN"
+    run_watch --dry-run
+    rc_is "dry-run: exit 0" 0
+    h_contains "dry-run: config line" "$(out)" "config: parity_dir="
+    h_eq "dry-run: one row line per row" 3 "$(grep -c '^row ' "$S/out")"
+    h_contains "dry-run: says what it would do" "$(out)" "dry-run: would"
+    h_contains "dry-run: decision line" "$(out)" "decision: "
+    no_actions "dry-run"
+    h_absent "dry-run: no cache dir" "$S/home/.cache"
+}
+
+case_unknown_flag_rejected() {
+    local a
+    sandbox unknown_flag
+    for a in --bogus --dry-run=1; do
+        run_watch "$a"
+        rc_is "$a: exit 2" 2
+        h_contains "$a: stderr says so" "$(slurp "$S/err")" "unknown argument"
+        h_absent "$a: gh never called" "$S/log/gh.argv"
+    done
+}
+
+# config_value <key>: the value of key=... on the dry-run config line.
+config_value() {
+    local line
+    line=$(grep '^config:' "$S/out" | head -n 1)
+    line="${line#*"$1"=}"
+    printf '%s' "${line%% *}"
+}
+
+main_checkout() { git -C "$REPO" worktree list --porcelain | awk '/^worktree / && !f {print $2; f=1}'; }
+
+case_env_empty_parity_dir() {
+    sandbox env_parity
+    JSB_WATCH_PARITY_DIR='' run_watch --dry-run
+    h_eq "empty parity dir falls back to the main checkout" "$(main_checkout)/jsb-native/parity" "$(config_value parity_dir)"
+}
+
+case_env_empty_bin() {
+    sandbox env_bin
+    JSB_WATCH_BIN='' run_watch --dry-run
+    h_eq "empty bin falls back to the script dir" "$REPO/bin" "$(config_value bin)"
+}
+
+case_env_empty_plannow_dir() {
+    sandbox env_plannow
+    JSB_WATCH_PLANNOW_DIR='' run_watch --dry-run
+    h_eq "empty plan-now dir falls back to /tmp" "/tmp" "$(config_value plannow_dir)"
+}
+
+case_env_empty_now() {
+    local got real diff
+    sandbox env_now
+    JSB_WATCH_NOW='' run_watch --dry-run
+    got=$(config_value now)
+    real=$(date +%s)
+    case "$got" in
+        ''|*[!0-9]*) h_fail "empty now falls back to the clock" "got [$got]"; return 0 ;;
+    esac
+    diff=$((real - got))
+    if [ "$diff" -lt 0 ]; then diff=$((0 - diff)); fi
+    if [ "$diff" -le 5 ]; then h_pass "empty now falls back to the clock"; else h_fail "empty now falls back to the clock" "off by ${diff}s"; fi
+}
+
+case_env_invalid_now() {
+    sandbox env_bad_now
+    JSB_WATCH_NOW=abc run_watch
+    rc_is "invalid now: exit 2" 2
+    h_contains "invalid now: usage message" "$(slurp "$S/err")" "epoch seconds"
+}
+
+# --- Installer cases (rows 40-49) ---------------------------------------------------
+
+# plist_get <file> <python expression over d>
+plist_get() {
+    python3 -I -c 'import plistlib, sys; d = plistlib.load(open(sys.argv[1], "rb")); print(eval(sys.argv[2]))' "$1" "$2"
+}
+
+PLIST_NAME="com.ibl5.jsb-parity-watch.plist"
+
+case_setup_print_schedule() {
+    sandbox setup_print
+    run_setup --print-schedule
+    rc_is "print-schedule: exit 0" 0
+    cp "$S/out" "$S/print.plist"
+    h_eq "label" "com.ibl5.jsb-parity-watch" "$(plist_get "$S/print.plist" 'd["Label"]')"
+    h_eq "StartInterval" 3600 "$(plist_get "$S/print.plist" 'd["StartInterval"]')"
+    h_eq "RunAtLoad" True "$(plist_get "$S/print.plist" 'd["RunAtLoad"]')"
+    h_contains "wrapper points at the main checkout" "$(plist_get "$S/print.plist" 'd["ProgramArguments"][2]')" "$S/main/bin/jsb-parity-watch"
+    h_eq "log path" "$S/home/Library/Logs/jsb-parity-watch.log" "$(plist_get "$S/print.plist" 'd["StandardOutPath"]')"
+    h_absent "no plist written" "$S/home/Library/LaunchAgents/$PLIST_NAME"
+    h_absent "launchctl never called" "$S/log/launchctl.argv"
+}
+
+case_setup_plist_no_empty_string() {
+    sandbox setup_empty
+    run_setup --print-schedule
+    h_not_contains "no empty string element" "$(out)" "<string></string>"
+}
+
+case_setup_plist_no_unexpanded_var() {
+    local hits
+    sandbox setup_var
+    run_setup --print-schedule
+    hits=$(grep -cE '\$(\{|[A-Za-z_])' "$S/out" || true)
+    h_eq "no unexpanded variable reference" 0 "$hits"
+}
+
+case_setup_install_idempotent() {
+    local a b
+    sandbox setup_install
+    run_setup
+    rc_is "first install: exit 0" 0
+    a=$(cksum < "$S/home/Library/LaunchAgents/$PLIST_NAME")
+    run_setup
+    rc_is "second install: exit 0" 0
+    b=$(cksum < "$S/home/Library/LaunchAgents/$PLIST_NAME")
+    h_eq "plist is byte-identical after the second install" "$a" "$b"
+    h_eq "a bootstrap per run" 2 "$(grep -c '^bootstrap' "$S/log/launchctl.argv")"
+    h_contains "install notes that the program is not there yet" "$(out)" "appears when the PR merges"
+}
+
+case_setup_uninstall_idempotent() {
+    sandbox setup_uninstall
+    run_setup
+    h_exists "installed first" "$S/home/Library/LaunchAgents/$PLIST_NAME"
+    run_setup --uninstall
+    rc_is "first uninstall: exit 0" 0
+    run_setup --uninstall
+    rc_is "second uninstall: exit 0" 0
+    h_absent "plist removed" "$S/home/Library/LaunchAgents/$PLIST_NAME"
+}
+
+case_setup_from_worktree_points_main() {
+    sandbox setup_worktree
+    mkdir -p "$S/wt"
+    SETUP_REPO_ROOT="$S/wt" run_setup
+    rc_is "install from a worktree: exit 0" 0
+    h_contains "wrapper names the main checkout" "$(plist_get "$S/home/Library/LaunchAgents/$PLIST_NAME" 'd["ProgramArguments"][2]')" "$S/main/bin/jsb-parity-watch"
+    h_not_contains "wrapper never names the worktree" "$(plist_get "$S/home/Library/LaunchAgents/$PLIST_NAME" 'd["ProgramArguments"][2]')" "$S/wt"
+}
+
+case_setup_wrapper_missing_target() {
+    local w rc
+    sandbox setup_wrapper
+    run_setup --print-schedule
+    cp "$S/out" "$S/print.plist"
+    w=$(plist_get "$S/print.plist" 'd["ProgramArguments"][2]')
+    /bin/sh -c "$w"
+    rc=$?
+    h_eq "missing program: wrapper exits 0" 0 "$rc"
+    mkdir -p "$S/main/bin"
+    printf '#!/bin/sh\nexit 3\n' > "$S/main/bin/jsb-parity-watch"
+    chmod 755 "$S/main/bin/jsb-parity-watch"
+    /bin/sh -c "$w"
+    rc=$?
+    h_eq "present program: wrapper passes its exit code through" 3 "$rc"
+}
+
+case_setup_unknown_flag_rejected() {
+    local a
+    sandbox setup_flag
+    for a in --bogus --uninstall=1; do
+        run_setup "$a"
+        rc_is "$a: exit 2" 2
+        h_contains "$a: stderr says so" "$(slurp "$S/err")" "unknown argument"
+        h_absent "$a: no plist written" "$S/home/Library/LaunchAgents/$PLIST_NAME"
+    done
+    run_setup --print-schedule --uninstall
+    rc_is "a second argument: exit 2" 2
+}
+
+case_setup_main_wt_empty() {
+    sandbox setup_main_empty
+    SETUP_MAIN_WT='' run_setup --print-schedule
+    cp "$S/out" "$S/print.plist"
+    h_contains "empty MAIN_WT falls back to the first worktree" "$(plist_get "$S/print.plist" 'd["ProgramArguments"][2]')" "$(main_checkout)/bin/jsb-parity-watch"
+    # An unset MAIN_WT falls back the same way. A guard written as ${MAIN_WT+set}
+    # would keep the empty value above, so the first assertion would fail.
+    env -u MAIN_WT HOME="$S/home" REPO_ROOT="$REPO" "$REPO/bin/jsb-parity-watch-setup" --print-schedule > "$S/print-unset.plist" 2> "$S/err"
+    h_contains "unset MAIN_WT falls back to the first worktree" "$(plist_get "$S/print-unset.plist" 'd["ProgramArguments"][2]')" "$(main_checkout)/bin/jsb-parity-watch"
+}
+
+# --- Dispatch ------------------------------------------------------------------------
+
+ALL_CASES=""
+while read -r _ _ fn; do
+    case "$fn" in
+        case_*) ALL_CASES="$ALL_CASES $fn" ;;
+    esac
+done < <(declare -F)
+
+if [ $# -gt 0 ]; then
+    CASES="$*"
+else
+    CASES="$ALL_CASES"
+fi
+
+for c in $CASES; do
+    case "$ALL_CASES " in
+        *" $c "*) "$c" ;;
+        *) h_fail "unknown case: $c" ;;
+    esac
+done
+
+h_done

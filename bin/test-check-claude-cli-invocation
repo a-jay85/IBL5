@@ -394,6 +394,16 @@ FIX
 expect "perm_comment_mention_pass" "$T/perm_comment_mention_pass.sh" 0
 
 perm_pass marker_reason "--dangerously-skip-permissions # claude-perm-ok: unattended run in a throwaway worktree"
+# A marker on the redirect line after a subshell's closing paren belongs to the statement.
+cat > "$T/perm_subshell_redirect_marker_pass.sh" <<'FIX'
+#!/bin/bash
+( cd "$W" && \
+    timeout 9 claude -p "$p" \
+        --permission-mode acceptEdits ) \
+    > "$W/out.json" 2>&1 # claude-perm-ok: scratch fixture runs in a temp dir
+FIX
+expect "perm_subshell_redirect_marker_pass" "$T/perm_subshell_redirect_marker_pass.sh" 0
+
 perm_pass cli_ok_marker "--dangerously-skip-permissions # claude-cli-ok: all-class escape still covers permission"
 
 cat > "$T/perm_marker_multiline_pass.sh" <<'FIX'

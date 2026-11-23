@@ -397,7 +397,18 @@ function mk_range(lo, hi,    l, r) {
         }
     }
 }
-function range_hi(e) { return (e + 1 <= ntk) ? tl[e + 1] : tl[e] }
+# range_hi: last line a marker may sit on. Redirects after a closing ")" belong to the
+# statement, so ( cd d && claude -p ... ) > out 2>&1 may carry its marker on the redirect line.
+function range_hi(e,    k) {
+    k = e + 1
+    if (k <= ntk && tt[k] == ")") {
+        while (k + 1 <= ntk && tt[k + 1] == "R") {
+            k++
+            if (tx[k] ~ /[<>|]$/ && k + 1 <= ntk && (tt[k + 1] == "W" || tt[k + 1] == "X")) k++
+        }
+    }
+    return (k <= ntk) ? tl[k] : tl[e]
+}
 
 function report(f, ln, cls, detail) {
     printf "%s:%d: %s: %s\n", f, ln, cls, detail

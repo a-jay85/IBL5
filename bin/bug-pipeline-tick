@@ -798,7 +798,7 @@ drive_ready_for_plan() { # row id thread_id original_text issue_number clear_opt
         --output-format stream-json \
         --verbose \
         --name "bug-pipeline-plan-${id}" \
-        > "$planlog" 2>&1
+        > "$planlog" 2>&1 # claude-perm-ok: unattended headless plan run for a Discord feature request with no human to answer a prompt; writes a plan file
     rc=$?
 
     if claude_env_error "$(cat "$planlog" 2>/dev/null)"; then

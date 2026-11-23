@@ -473,7 +473,7 @@ LAST line of the final message."
     HR_ARGV=(claude -p --model claude-sonnet-5-5 --max-turns "$HR_MAX_TURNS"
         --max-budget-usd "$HR_MAX_BUDGET_USD"
         --permission-prompts none --allowedTools "$ALLOWED" --tools "$ALLOWED"
-        --disallowedTools "$DENIED")
+        --disallowedTools "$DENIED") # claude-perm-ok: fix agent runs the PR's test commands in a disposable worktree, so it needs unrestricted Bash
     _pf_timeout_argv "$HR_TIMEOUT_SECS"
     if [ "$DRY_RUN" = 1 ]; then
         echo "postplan-fix: dry-run fingerprint=$HR_FP"
@@ -953,7 +953,7 @@ if [ "$HEADLESS" = 1 ]; then
     PROMPT+="End your final message with a line SUMMARY: <one line>, then a last line that is exactly RESOLVED or exactly FAILED."
     ARGV=(claude -p --model claude-sonnet-5-5 --max-turns 100 --max-budget-usd 5
         --permission-prompts none --allowedTools "$ALLOWED" --tools "$ALLOWED"
-        --disallowedTools "$DENIED")
+        --disallowedTools "$DENIED") # claude-perm-ok: fix agent runs the PR's test commands in a disposable worktree, so it needs unrestricted Bash
     # The prompt goes on stdin: the tool flags above are variadic, so a trailing positional
     # prompt could be read as one more tool name. FIX_TIMEOUT mirrors harness conflict_fix.
     FIX_TIMEOUT=1500

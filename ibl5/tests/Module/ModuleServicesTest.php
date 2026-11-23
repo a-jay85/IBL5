@@ -61,6 +61,27 @@ class ModuleServicesTest extends TestCase
         ModuleServices::current();
     }
 
+    public function testCurrentOrPublishReusesPublishedInstance(): void
+    {
+        $services = new ModuleServices(new Container());
+        ModuleServices::publish($services);
+
+        $result = ModuleServices::currentOrPublish(
+            static fn (): \Bootstrap\Contracts\ContainerInterface => throw new \LogicException('must not build'),
+        );
+
+        $this->assertSame($services, $result);
+    }
+
+    public function testCurrentOrPublishPublishesWhenNoneCurrent(): void
+    {
+        ModuleServices::clearCurrent();
+
+        $result = ModuleServices::currentOrPublish(fn (): Container => $this->buildContainer());
+
+        $this->assertSame($result, ModuleServices::current());
+    }
+
     /**
      * @return array<string, array{string}>
      */

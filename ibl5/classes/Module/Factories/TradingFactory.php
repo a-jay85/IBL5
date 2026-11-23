@@ -10,8 +10,7 @@ use Module\ModuleServices;
 /**
  * Composition root for modules/Trading/index.php.
  *
- * maketradeoffer.php, accepttradeoffer.php and rejecttradeoffer.php are separate
- * ?file= entry points and stay outside this factory.
+ * maketradeoffer.php, accepttradeoffer.php and rejecttradeoffer.php call controller() too.
  */
 final class TradingFactory implements ModuleFactoryInterface
 {

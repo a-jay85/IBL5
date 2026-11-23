@@ -28,7 +28,7 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-global $db, $mysqli_db, $prefix, $user_prefix, $user, $multilingual, $currentlang, $anonymous, $articlecomm, $cookieusrtime;
+global $db, $prefix, $user_prefix, $user, $multilingual, $currentlang, $anonymous, $articlecomm, $cookieusrtime;
 
 // English UI strings defined in this file.
 if (!defined('_DATESTRING')) {
@@ -38,8 +38,9 @@ if (!defined('_NOTE')) {
     define('_NOTE', 'Note:');
 }
 
-assert($mysqli_db instanceof \mysqli);
-$nukeCompat = new \Utilities\NukeCompat();
+$services = \Module\ModuleServices::current();
+$newsFactory = $services->factory(\Module\Factories\NewsFactory::class);
+$nukeCompat = $services->nukeCompat();
 
 $optionbox = "";
 $module_name = basename(dirname(__FILE__));
@@ -50,7 +51,7 @@ $module_name = basename(dirname(__FILE__));
 $sid    = is_numeric($_REQUEST['sid']    ?? null) ? (int) $_REQUEST['sid']    : 0;
 $teamid = is_numeric($_REQUEST['teamid'] ?? null) ? (int) $_REQUEST['teamid'] : null;
 
-$newsService = new \Topics\News\NewsService($mysqli_db);
+$newsService = $newsFactory->service();
 
 $REQUEST_URI = is_string($_SERVER['REQUEST_URI'] ?? null) ? $_SERVER['REQUEST_URI'] : '';
 
@@ -142,7 +143,7 @@ if ($catid !== 0) {
     }
 }
 
-(new \Topics\News\NewsView())->renderArticle([
+$newsFactory->view()->renderArticle([
     'aid' => $aaid, 'informant' => $informant, 'time' => $time, 'title' => $title,
     'bodytext' => $bodytext, 'topic' => $topic, 'topicname' => $topicname,
     'topicimage' => $topicimage, 'topictext' => $topictext,

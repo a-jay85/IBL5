@@ -1,6 +1,6 @@
 ---
-description: Automouse workflow detail. The plan autonomy contract (stop_condition and evidence frontmatter), the cost ledger columns, and the delegate effort trial. Companion to automouse-workflow.md; attaches on the same paths.
-last_verified: 2026-11-16
+description: Automouse workflow detail. The plan autonomy contract (stop_condition and evidence frontmatter), the cost ledger columns, environmental stops and attempt refunds, and the delegate effort trial. Companion to automouse-workflow.md; attaches on the same paths.
+last_verified: 2026-11-20
 paths: "bin/automouse/**"
 ---
 
@@ -31,6 +31,8 @@ evidence: bin/lib/plan-autonomy-contract, bin/test-check-plan
 Every parser is **line-1-anchored** (frontmatter only, to the closing `---`), so the example above never self-selects. Enforced by `bin/lib/plan-autonomy-contract`, `bin/check-plan` `[K]`, `/post-plan` Phase 5.0.
 
 ## Cost ledger columns
+
+**Writers and null-cost rows.** `bin/automouse/run` writes one JSON object per priced phase; `bin/automouse/backfill-costs` fills history. The weekly aggregate reads the sidecar. A phase the usage gate paused before it started writes no row in either file. A phase that ran without cost data keeps its `?` row. The weekly aggregate drops a null-cost `unknown` row when a priced row shares its date, plan and phase, so sidecars written before the skip still count right.
 
 **Recomputed vs. harness cost.** The harness `result` event undercounts: it sums only the top-level `usage` of the main transcript, missing `usage.iterations[]` entries and all subagent transcripts. `bin/lib/automouse-pricer` recomputes from transcripts after the phase exits, because subagent transcripts are still flushing when `result` fires.
 
@@ -66,6 +68,10 @@ The check is the packet's own `**Self-verify:**` command. The impl session runs 
 **Log.** Each attempt is one row in `<nightly>/logs/<plan>.delegate-attempts.jsonl`, written by `bin/measure-delegate-cost --record-attempt`. The fields are `plan`, `phase`, `arm`, `attempt`, `effort`, `check_exit`, `check_result` and `ts`. The nightly dir sits outside the repo. `archive_stale logs` moves old files to `logs.archive/` with the cost ledger, and the reader reads both.
 
 **Keep or revert.** Run `bin/measure-delegate-cost --trial`, adding `--json` for machine output. It prints `INSUFFICIENT` until each arm has at least 30 plans and 100 packets. A plan with any `inherited` attempt is left out of its arm. Past that floor it prints `KEEP` only when the `low-first` final packet pass rate is at least the `control` rate and the `low-first` median cost per completed plan is lower. Otherwise it prints `REVERT`. On `REVERT`, unset the variable. On `KEEP`, flipping the default is a separate plan.
+
+## Environmental stops and attempt refunds
+
+Each stop writes a `YYYY-MM-DD-env-stop-<slug>.md` report. Post-plan exit 76 (GitHub unreachable) counts at any duration. The watchdog stall threshold is **30 min, not 10**, because an asynchronous `Agent` delegate emits nothing on the parent's stream while it works. A deliberate impl disposition (to `done/` or `skipped/`) is an outcome; the loop continues. A `bin/wt-new` failure is a counted attempt; the agent drops `<plan>.wt-fail` and the loop defers the plan. A plan defect at impl Step 6.7 (matrix rows that cannot be realised) ends the plan after one attempt. The agent writes `<plan>.plan-defect` (line 1 a fixed marker, then the failing rows) only when no test or lint run is red and the stop is not the time budget. The loop then moves the plan to `skipped/` with a `skipped-<slug>` report naming the rows. A `DIVERGED-CONFLICT` or `DIVERGED-DIRTY` verdict from `bin/wt-sync-tick --only` sends the plan to `skipped/` after one claim, burns no attempt, and keeps the worktree. A held queue lock leaves the attempt counted, so `MAX_ATTEMPTS` bounds the re-claims. A garbled or absent marker keeps the normal retries. A `cannot resume into worktree` refusal retries once with the worktree path; a second counts and defers. `MAX_ATTEMPTS` bounds retries. A wall-clock cap-timeout is refunded like a transient failure, but only a bounded number of times per plan, and does not break the loop. Exact signatures, thresholds and refund limits: `should_impl_env_stop()`, `impl_cap_timeout()`, `should_refund_cap_timeout()`. Locked by `bin/test-automouse-env-breaker`, `bin/test-automouse-impl-cap-timeout` and `bin/test-automouse-repeat-failure`.
 
 ## Post-plan cap-kill hold
 

@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * Ratchet: a module entry point may not compose its own object graph.
  *
- * Module `index.php` files resolve a factory through `ModuleServices` instead of
+ * Module entry points (index.php and every ?file= sibling) resolve a factory through `ModuleServices` instead of
  * calling `new` or reading the `$mysqli_db` global. ALLOWLIST holds the entry
  * points that still do; it can only shrink. A converted module that stays listed
  * fails testAllowlistHasNoStaleEntries, and a new module that composes its own
@@ -20,7 +20,7 @@ use PHPUnit\Framework\TestCase;
 class ModuleCompositionRootRatchetTest extends TestCase
 {
     /**
-     * Module directories whose index.php still holds a T_NEW token or a
+     * "<Module>/<file>.php" entries that still hold a T_NEW token or a
      * `$mysqli_db` variable. Every module entry point now composes through a factory,
      * so this list must stay empty.
      *
@@ -64,13 +64,13 @@ class ModuleCompositionRootRatchetTest extends TestCase
     }
 
     /**
-     * Module directory name => detector violations, for every modules/<dir>/index.php.
+     * "<Module>/<file>.php" => detector violations, for every PHP file directly under modules/<dir>/.
      *
      * @return array<string, list<string>>
      */
     private static function scanModules(): array
     {
-        $files = glob(self::ibl5Root() . '/modules/*/index.php');
+        $files = glob(self::ibl5Root() . '/modules/*/*.php');
         self::assertNotFalse($files);
         self::assertNotSame([], $files, 'No module entry points found; the scan path is wrong');
 
@@ -78,7 +78,7 @@ class ModuleCompositionRootRatchetTest extends TestCase
         foreach ($files as $file) {
             $source = file_get_contents($file);
             self::assertNotFalse($source);
-            $result[basename(dirname($file))] = self::detectOwnComposition($source);
+            $result[basename(dirname($file)) . '/' . basename($file)] = self::detectOwnComposition($source);
         }
 
         return $result;
@@ -96,7 +96,7 @@ class ModuleCompositionRootRatchetTest extends TestCase
         $this->assertSame(
             [],
             $unlisted,
-            'These modules compose their own object graph in index.php. Resolve a factory through '
+            'These module entry points compose their own object graph. Resolve a factory through '
             . 'ModuleServices instead; see ibl5/classes/Module/README.md § Module composition.'
         );
     }
@@ -108,7 +108,7 @@ class ModuleCompositionRootRatchetTest extends TestCase
         $stale = [];
         foreach (self::allowlist() as $module) {
             if (!array_key_exists($module, $scan)) {
-                $stale[] = $module . ' (no modules/' . $module . '/index.php)';
+                $stale[] = $module . ' (no modules/' . $module . ')';
             } elseif ($scan[$module] === []) {
                 $stale[] = $module . ' (no longer composes its own graph)';
             }
@@ -119,6 +119,15 @@ class ModuleCompositionRootRatchetTest extends TestCase
             $stale,
             'Remove these entries from ModuleCompositionRootRatchetTest::ALLOWLIST; the list can only shrink.'
         );
+    }
+
+    public function testScanCoversSiblingEntryPoints(): void
+    {
+        $scanned = array_keys(self::scanModules());
+
+        foreach (['Trading/index.php', 'Trading/maketradeoffer.php', 'Player/articles.php', 'News/categories.php'] as $expected) {
+            $this->assertContains($expected, $scanned, 'The ratchet must scan every PHP file under modules/<dir>/');
+        }
     }
 
     public function testFrontControllerPublishesServicesAfterPageCacheExit(): void

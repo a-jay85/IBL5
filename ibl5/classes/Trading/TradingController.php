@@ -161,15 +161,46 @@ class TradingController implements TradingControllerInterface
      */
     public function submitTradeOffer(mixed $user, array $post): void
     {
+        $this->requireValidTradeOfferCsrf();
+
+        $sessionTeam = $this->resolveSubmittingTeam($user);
+        if ($sessionTeam === null) {
+            return;
+        }
+
+        $tradeData = $this->buildTradeData($post, $sessionTeam);
+
+        try {
+            $result = $this->tradeOffer->createTradeOffer($tradeData);
+        } catch (\Exception $e) {
+            $this->tradeLogger->error('Failed to create trade offer', ['error' => $e->getMessage()]);
+            $result = ['success' => false, 'error' => $e->getMessage()];
+        }
+
+        if ($result['success']) {
+            $this->finishSubmittedOffer($tradeData);
+        }
+
+        $this->redirectFailedOffer($tradeData, $result);
+    }
+
+    private function requireValidTradeOfferCsrf(): void
+    {
         if (!\Security\CsrfGuard::validateSubmittedToken('trade_offer')) {
             \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&error=' . rawurlencode('Invalid or expired form submission. Please try again.'));
         }
+    }
 
+    /**
+     * Returns null after showing the login box; redirects (never returns) on an unresolvable team.
+     */
+    private function resolveSubmittingTeam(mixed $user): ?string
+    {
         // Identity is derived from the authenticated session, never from form input —
         // the IDOR check below must trust who the user actually is, not who they claim.
-        if (!$this->nukeCompat->isUser($user)) {
+        if (!$this->nukeCompat->isUser($user)) { // submitTradeOffer session gate
             $this->nukeCompat->loginBox();
-            return;
+            return null;
         }
 
         $username = $this->authService->getUsername() ?? '';
@@ -179,6 +210,15 @@ class TradingController implements TradingControllerInterface
             \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&error=' . rawurlencode('Could not resolve your team.'));
         }
 
+        return $sessionTeam;
+    }
+
+    /**
+     * @param array<string, mixed> $post
+     * @return array{offeringTeam: string, listeningTeam: string, switchCounter: int, fieldsCounter: int, userSendsCash: array<int, int>, partnerSendsCash: array<int, int>, check: array<int, string|null>, contract: array<int, string>, index: array<int, string>, type: array<int, string>}
+     */
+    private function buildTradeData(array $post, string $sessionTeam): array
+    {
         $rawFieldsCounter = $post['fieldsCounter'] ?? 0;
         $fieldsCounter = (is_numeric($rawFieldsCounter) ? (int) $rawFieldsCounter : 0) + 1;
         // IDOR (D-03): the offering team is bound to the session, never the POST body.
@@ -228,7 +268,7 @@ class TradingController implements TradingControllerInterface
             $type[$j] = is_string($rawType) || is_int($rawType) ? (string) $rawType : '0';
         }
 
-        $tradeData = [
+        return [
             'offeringTeam' => $offeringTeam,
             'listeningTeam' => $listeningTeam,
             'switchCounter' => $switchCounter,
@@ -240,22 +280,33 @@ class TradingController implements TradingControllerInterface
             'index' => $index,
             'type' => $type,
         ];
+    }
 
-        try {
-            $result = $this->tradeOffer->createTradeOffer($tradeData);
-        } catch (\Exception $e) {
-            $this->tradeLogger->error('Failed to create trade offer', ['error' => $e->getMessage()]);
-            $result = ['success' => false, 'error' => $e->getMessage()];
-        }
+    /**
+     * @param array{offeringTeam: string, listeningTeam: string, switchCounter: int, fieldsCounter: int, userSendsCash: array<int, int>, partnerSendsCash: array<int, int>, check: array<int, string|null>, contract: array<int, string>, index: array<int, string>, type: array<int, string>} $tradeData
+     */
+    private function finishSubmittedOffer(array $tradeData): never
+    {
+        $this->auditLogger->info('trade_offer_created', [
+            'offering_team' => $tradeData['offeringTeam'],
+            'listening_team' => $tradeData['listeningTeam'],
+        ]);
+        EventLogger::setAction('trade_offer_submitted');
+        \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=offer_sent');
+    }
 
-        if ($result['success']) {
-            $this->auditLogger->info('trade_offer_created', [
-                'offering_team' => $tradeData['offeringTeam'],
-                'listening_team' => $tradeData['listeningTeam'],
-            ]);
-            EventLogger::setAction('trade_offer_submitted');
-            \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=offer_sent');
-        }
+    /**
+     * @param array{offeringTeam: string, listeningTeam: string, switchCounter: int, fieldsCounter: int, userSendsCash: array<int, int>, partnerSendsCash: array<int, int>, check: array<int, string|null>, contract: array<int, string>, index: array<int, string>, type: array<int, string>} $tradeData
+     * @param array{success: false, error?: string, errors?: array<string>, capData?: array{valid: bool, errors: array<string>, userPostTradeCapTotal: int, partnerPostTradeCapTotal: int}, tradeText?: string, tradeOfferId?: int} $result
+     */
+    private function redirectFailedOffer(array $tradeData, array $result): never
+    {
+        $fieldsCounter = $tradeData['fieldsCounter'];
+        $check = $tradeData['check'];
+        $type = $tradeData['type'];
+        $index = $tradeData['index'];
+        $userSendsCash = $tradeData['userSendsCash'];
+        $partnerSendsCash = $tradeData['partnerSendsCash'];
 
         $checkedItems = [];
         for ($j = 0; $j < $fieldsCounter; $j++) {

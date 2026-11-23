@@ -35,6 +35,14 @@ class Carveout:
 
 INACTIVE = Carveout(False, "not evaluated", frozenset())
 
+BUDGET_TRIM_HINT = (
+    "Fix hint (budget-forced trim): bin/check-rules-byte-budget fails on {path} "
+    "with this trim reverted. Shrink your own added text or move it to a -detail "
+    "companion. Keep the trim in place."
+)
+_UNPLANNED_TAG_RE = re.compile(r"\[unplanned-scope\]")
+_RULES_PATH_RE = re.compile(r"\.claude/rules/[\w./-]+\.md")
+
 _SCALAR_RE = re.compile(r"^paths:[ \t]*(\S.*)$")
 _BARE_RE = re.compile(r"^paths:[ \t]*$")
 _ITEM_RE = re.compile(r"^[ \t]*-[ \t]+(.*)$")
@@ -202,3 +210,96 @@ def carveout_prompt_text(in_diff) -> str:
         "commit. Bump `last_verified` on each touched rules file. Never raise a cap or "
         "edit `bin/check-rules-byte-budget`."
     )
+
+
+def _caps(worktree: str) -> dict[str, tuple[str, int, int, int]]:
+    """path -> (class, cap, bytes, headroom), read from BUDGET_SCRIPT --print-caps at HEAD."""
+    proc = subprocess.run([BUDGET_SCRIPT, "--print-caps"], cwd=worktree,
+                          capture_output=True, text=True, timeout=60)
+    if proc.returncode != 0:
+        raise subprocess.SubprocessError(f"{BUDGET_SCRIPT} --print-caps exit {proc.returncode}")
+    caps: dict[str, tuple[str, int, int, int]] = {}
+    for line in proc.stdout.splitlines():
+        cols = line.split("\t")
+        if len(cols) != 5:
+            continue
+        caps[cols[0]] = (cols[1], int(cols[2]), int(cols[3]), int(cols[4]))
+    return caps
+
+
+def _deleted_bytes(worktree: str, base_sha: str, path: str) -> int:
+    """Bytes the PR trimmed from path, counted per diff hunk as removed bytes minus added
+    bytes (floored at 0 per hunk). A line the PR rewrote still has new text in HEAD, so
+    restoring the old wording costs only the size difference. Summing per hunk, not over
+    the whole file, keeps a trim visible when the same PR also grew the file elsewhere.
+    A file absent at either end counts 0."""
+    try:
+        _git(worktree, "cat-file", "-e", f"{base_sha}:{path}")
+        _git(worktree, "cat-file", "-e", f"HEAD:{path}")
+        diff = _git(worktree, "diff", "-U0", "--no-color", base_sha, "HEAD", "--", path)
+    except subprocess.CalledProcessError:
+        return 0
+    total = 0
+    removed = added = 0
+    in_hunk = False
+    for line in diff.splitlines():
+        if line.startswith("@@"):
+            total += max(0, removed - added)
+            removed = added = 0
+            in_hunk = True
+        elif not in_hunk:
+            continue
+        elif line.startswith("-"):
+            removed += len(line[1:].encode()) + 1
+        elif line.startswith("+"):
+            added += len(line[1:].encode()) + 1
+    return total + max(0, removed - added)
+
+
+def budget_forced_paths(worktree: str, base_sha: str, paths) -> frozenset[str]:
+    """Rules files whose trim the byte budget forced: putting the PR's deleted bytes back
+    would push the file past its cap (headroom - deleted < 0). The cap and the HEAD size
+    come from BUDGET_SCRIPT --print-caps, and for a resident file the headroom already
+    includes the MAX_TOTAL aggregate. Any git or script failure returns frozenset()."""
+    try:
+        candidates = sorted({p for p in paths if _is_rules_md(p)})
+        if not candidates:
+            return frozenset()
+        caps = _caps(worktree)
+        forced = set()
+        for path in candidates:
+            row = caps.get(path)
+            if row is None:
+                continue
+            deleted = _deleted_bytes(worktree, base_sha, path)
+            if deleted > 0 and row[3] - deleted < 0:
+                forced.add(path)
+        return frozenset(forced)
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return frozenset()
+
+
+def annotate_work_list(work_list, worktree: str, base_sha: str, skip=()) -> list[dict]:
+    """Return a new list. An item gains the hint only when all hold: its text carries
+    [unplanned-scope], is not in skip, and cites a rules path in budget_forced_paths.
+    The hint is appended on a new line after the unchanged original text, one hint per
+    forced path. Every other item, and every key besides text, passes through unchanged.
+    The item count never changes; severity tags are never touched."""
+    cited: list[list[str]] = []
+    for item in work_list:
+        text = item.get("text", "")
+        if text in skip or not _UNPLANNED_TAG_RE.search(text):
+            cited.append([])
+        else:
+            cited.append(list(dict.fromkeys(_RULES_PATH_RE.findall(text))))
+    every = {p for paths in cited for p in paths}
+    forced = budget_forced_paths(worktree, base_sha, every) if every else frozenset()
+    out: list[dict] = []
+    for item, paths in zip(work_list, cited):
+        hits = [p for p in paths if p in forced]
+        if not hits:
+            out.append(item)
+            continue
+        hints = "\n".join(BUDGET_TRIM_HINT.format(path=p) for p in hits)
+        out.append({**item, "text": f"{item['text']}\n{hints}"})
+    return out

@@ -53,6 +53,11 @@ class ComparePlayersViewGoldenTest extends TestCase
     // Search form
     // ------------------------------------------------------------------
 
+    /**
+     * Pins the daisyUI form classes byte for byte.
+     *
+     * Mutation: change `w-40` to `w-48` on the Player2 input.
+     */
     public function testRenderSearchFormMatchesGoldenMarkup(): void
     {
         $html = $this->view->renderSearchForm(['Plain Name', "O\\'Brien", '<Z&"Q>']);

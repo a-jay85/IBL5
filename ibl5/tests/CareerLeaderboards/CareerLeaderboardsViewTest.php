@@ -370,6 +370,12 @@ final class CareerLeaderboardsViewTest extends TestCase
         $this->assertStringNotContainsString('Display Career Leaderboards', $html);
     }
 
+    /**
+     * The segmented control and the retired switch stay on their legacy
+     * classes in this batch.
+     *
+     * Mutation: rename `ibl-switch__input` to `d-toggle`.
+     */
     public function testFilterFormIsStackedAndLoadsEnhancementScript(): void
     {
         $html = $this->view->renderFilterForm([]);
@@ -381,6 +387,7 @@ final class CareerLeaderboardsViewTest extends TestCase
         $this->assertStringContainsString('name="display" class="d-input d-input-sm w-20"', $html);
         $this->assertStringContainsString('<fieldset class="ibl-segmented">', $html);
         $this->assertStringContainsString('class="ibl-switch__input"', $html);
+        $this->assertStringNotContainsString('d-toggle', $html);
         $this->assertDoesNotMatchRegularExpression('/ibl-filter-(form|fieldset)/', $html);
         $this->assertStringContainsString('<script src="jslib/career-leaderboards-form.js" defer></script>', $html);
     }

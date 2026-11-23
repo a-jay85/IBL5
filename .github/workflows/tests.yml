@@ -693,6 +693,15 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: ibl5
         run: bin/check-csrf-field-name
+      # gh-pr-files-rename-old-path: `gh pr view/list --json files` drops a rename's
+      # old path and caps at 100 files, so a hold predicate fed from it misses a
+      # rename away from a held path (backlog#1799). Whole-tree, no path filter.
+      - name: Check hold predicates read the REST pulls/N/files list
+        if: ${{ !cancelled() }}
+        run: bin/check-gh-pr-files-rename-old-path
+      - name: Test the hold file-list gate
+        if: ${{ !cancelled() }}
+        run: bin/test-check-gh-pr-files-rename-old-path
       # relative-path-used-after-cd: a path argument or dirname "$0" read after a
       # repo-root cd resolves against the wrong directory (PRs #3702 and #3857).
       # The harness runs first in the same step, so it never goes unwired.

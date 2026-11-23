@@ -88,7 +88,7 @@ CASE_IDS = [c[0] for c in CASES]
 def _shell(head_ref, files, md_state, verdict, diff_file=None):
     if shutil.which("jq") is None:
         raise RuntimeError("jq is required: pr_docs_refresh_hold is dead without it")
-    args = [head_ref, json.dumps([{"path": p} for p in files]), md_state, verdict]
+    args = [head_ref, json.dumps([{"filename": p, "status": "modified"} for p in files]), md_state, verdict]
     if diff_file is not None:
         args.append(str(diff_file))
     proc = subprocess.run(
@@ -426,6 +426,17 @@ def test_cond7_token_each_failed_clause_names_it(overrides, expected):
     assert c.blocked
     assert expected in c.reason
     assert c.reason.startswith(f"auto_merge: {DOCS_REFRESH_TOKEN} failed: ")
+
+
+def test_docs_refresh_evaluate_holds_rename_source():
+    """A rename out of a non-docs path lists its source in ui_paths; the docs-refresh paths clause holds."""
+    d = evaluate(_qualifying(
+        classification=Classification(files=["ibl5/docs/guide.md"]),
+        ui_paths=["ibl5/docs/guide.md", "bin/x"]))
+    c = _cond7(d)
+    assert c.blocked
+    assert "docs-refresh:paths:bin/x" in c.reason
+    assert not d.armed
 
 
 def test_cond7_token_uses_tree_gated_verdict_2():

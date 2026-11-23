@@ -1,0 +1,87 @@
+#!/bin/bash
+
+# Hold predicates in bin/lib/pr-armable.sh decide whether a PR may merge from
+# its changed-file list. `gh pr view/list --json files` gives `.path` objects
+# with no old path for a rename and stops at 100 files, so a PR that renames a
+# held path away (the engine golden snapshot, a UI file) skipped the hold
+# (backlog#1799, PR 3760 thread 4505747687). Only the REST list from
+# `gh api repos/{o}/{r}/pulls/N/files --paginate` carries `.previous_filename`.
+#
+# Rule A: the predicate bodies never read gh's `.path`.
+# Rule B: every predicate call passes a variable that a REST pulls/N/files call
+# assigns in the same file. Informational `--json files` users (overlap scans,
+# digests, notifications) call no predicate and are never flagged.
+#
+# Whole-tree, never diff-scoped: the live callers sat in files the fixing PR
+# did not touch. A call line may end `# files-json-ok: <reason>` (15+ chars).
+#
+# gate-backtest-argv:
+# gate-backtest-reads: bin/* .claude/review-shared/* .github/*
+#
+# Exit codes: 0 = pass, 1 = findings, 2 = usage error or missing anchor.
+
+set -euo pipefail
+
+MARKER_MIN_LEN=15
+LIB_REL="bin/lib/pr-armable.sh"
+# Hold predicate and the 1-based position of its file-list argument.
+HOLD_FNS="pr_golden_hold:1 pr_ui_hold:1 pr_docs_refresh_hold:2 pr_manual_testing_clearance:2"
+BODY_FNS="pr_golden_hold pr_ui_hold pr_docs_refresh_hold"
+
+usage() { echo "usage: bin/check-gh-pr-files-rename-old-path [--root DIR]" >&2; exit 2; }
+root="."
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --root) [ $# -ge 2 ] || usage; root="$2"; shift 2 ;;
+        *) usage ;;
+    esac
+done
+lib="$root/$LIB_REL"
+[ -f "$lib" ] || { echo "anchor missing: $LIB_REL under $root" >&2; exit 2; }
+
+hits=0
+marker_ok() { # <line>: 0 when it ends with a files-json-ok marker of MARKER_MIN_LEN+ chars
+    local reason
+    case "$1" in *'# files-json-ok:'*) ;; *) return 1 ;; esac
+    reason="$(printf '%s' "${1##*# files-json-ok:}" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')"
+    [ "${#reason}" -ge "$MARKER_MIN_LEN" ]
+}
+
+for fn in $BODY_FNS; do
+    if ! grep -qE "^${fn}\(\) \{" "$lib"; then
+        echo "anchor missing: ${fn}() in $LIB_REL" >&2; exit 2
+    fi
+    while IFS=: read -r ln text; do
+        marker_ok "$text" && continue
+        echo "$LIB_REL:$ln: $fn reads gh's .path; read the REST .filename and .previous_filename"
+        hits=$((hits + 1))
+    done < <(awk -v fn="$fn" '
+        $0 ~ ("^" fn "\\(\\) \\{") { inb = 1; next }
+        inb && /^\}/ { inb = 0 }
+        inb && $0 !~ /^[[:space:]]*#/ && $0 ~ /\.path([^A-Za-z0-9_]|$)/ { print NR ":" $0 }' "$lib")
+done
+
+while IFS= read -r f; do
+    rel="${f#"$root"/}"
+    for spec in $HOLD_FNS; do
+        fn="${spec%%:*}"; pos="${spec##*:}"; skip=""; i=1
+        while [ "$i" -lt "$pos" ]; do skip="${skip}[^[:space:]]+[[:space:]]+"; i=$((i + 1)); done
+        re='(^|[^A-Za-z0-9_])'"$fn"'[[:space:]]+'"$skip"'"?\$\{?([A-Za-z_][A-Za-z0-9_]*)'
+        while IFS=: read -r ln text; do
+            [[ "$text" =~ ^[[:space:]]*# ]] && continue
+            [[ "$text" =~ $re ]] || continue
+            var="${BASH_REMATCH[2]}"
+            marker_ok "$text" && continue
+            if grep -qE "(^|[^A-Za-z0-9_])${var}=.*pulls/[^[:space:]]*/files" "$f"; then continue; fi
+            echo "$rel:$ln: $fn reads \$$var, which no REST pulls/N/files call assigns (gh --json files drops a rename's old path and caps at 100)"
+            hits=$((hits + 1))
+        done < <(grep -nE "(^|[^A-Za-z0-9_])${fn}[[:space:]]" "$f" || true)
+    done
+done < <(find "$root/bin" "$root/.claude/review-shared" "$root/.github" -type f \
+    \( -name '*.sh' -o -name '*.yml' -o -name '*.yaml' -o ! -name '*.*' \) ! -name 'test-*' 2>/dev/null | sort)
+
+if [ "$hits" -gt 0 ]; then
+    echo "FAIL: $hits hold-predicate site(s) read a file list without a rename's old path" >&2
+    exit 1
+fi
+echo "ok: every hold predicate reads the REST pulls/N/files list"

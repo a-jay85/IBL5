@@ -1,0 +1,136 @@
+#!/bin/bash
+
+# Harness for bin/check-gh-pr-files-rename-old-path. Fixtures are inline: two of
+# them are the pre-fix `pr_ui_hold` call sites rebuilt from the parents of
+# 6e9d448faa (bin/pr-triage) and edf77d1de8 (holds.sh). No `git show` runs here,
+# because CI's checkout is shallow.
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+GATE="$REPO_ROOT/bin/check-gh-pr-files-rename-old-path"
+T="$(mktemp -d)"
+trap 'rm -rf "$T"' EXIT
+# shellcheck source=bin/lib/usage-test-isolation.sh
+. "$REPO_ROOT/bin/lib/usage-test-isolation.sh"; usage_test_isolate "$T/usage"
+
+fail=0
+
+# write_lib <root> [golden_body_line]: the predicate definitions with REST-shape bodies.
+write_lib() {
+    local root="$1" golden_line="${2:-    jq -e 'any(.[]; .filename == \"x\")' <<< \"\$1\"}"
+    mkdir -p "$root/bin/lib" "$root/.claude/review-shared" "$root/.github"
+    {
+        echo 'pr_golden_hold() {'
+        echo "$golden_line"
+        echo '}'
+        echo 'pr_ui_hold() {'
+        echo '    jq -e '"'"'any(.[]; .filename == "x")'"'"' <<< "$1"'
+        echo '}'
+        echo 'pr_docs_refresh_hold() {'
+        echo '    jq -e '"'"'any(.[]; .filename == "x")'"'"' <<< "$2"'
+        echo '}'
+        echo 'pr_manual_testing_clearance() {'
+        echo '    echo "$2"'
+        echo '}'
+    } > "$root/bin/lib/pr-armable.sh"
+}
+
+# run_case <name> <want_rc> <root> [grep-pattern the output must contain]
+run_case() {
+    local name="$1" want="$2" root="$3" pat="${4:-}" out rc=0
+    out="$("$GATE" --root "$root" 2>&1)" || rc=$?
+    if [ "$rc" -ne "$want" ]; then
+        echo "FAIL: $name — want rc $want, got $rc"
+        fail=1
+    elif [ -n "$pat" ] && ! grep -qF -- "$pat" <<< "$out"; then
+        echo "FAIL: $name — output lacks: $pat"
+        fail=1
+    else
+        echo "ok: $name"
+    fi
+}
+
+# C1 clean
+r="$T/c1"; write_lib "$r"
+cat > "$r/bin/caller" <<'EOF'
+    ui_files="$($GH_API_CMD "repos/$SLUG/pulls/$num/files?per_page=100" --paginate --slurp | jq -c 'add // []')"
+    feat="$(pr_ui_hold "$ui_files" "$labels")"
+EOF
+run_case "C1 clean" 0 "$r"
+
+# C2 history pr-triage (lines 706 and 709 of the parent of 6e9d448faa)
+r="$T/c2"; write_lib "$r"
+cat > "$r/bin/pr-triage" <<'EOF'
+    changed_paths="$(printf '%s' "$files" | jq -r '.[].path')"
+    feat="$(pr_ui_hold "$files" "$labels")"
+EOF
+run_case "C2 history pr-triage" 1 "$r" "pr_ui_hold"
+
+# C3 history holds.sh (lines 33 and 39 of the parent of edf77d1de8)
+r="$T/c3"; write_lib "$r"
+cat > "$r/.claude/review-shared/holds.sh" <<'EOF'
+FILES="$(gh pr view "$1" --json files --jq '.files')"     || { echo "STOP: gh pr view files failed for PR #$1"; exit 1; }
+run_predicate "ui-hold"                  pr_ui_hold "$FILES" "$LABELS"
+EOF
+run_case "C3 history holds.sh" 1 "$r" "pr_ui_hold"
+
+# C4 informational --json files caller that calls no predicate
+r="$T/c4"; write_lib "$r"
+cat > "$r/bin/pr-attack" <<'EOF'
+files="$(gh pr view "$num" --json files --jq '.files')"
+jq -r '.[].path' <<< "$files"
+EOF
+run_case "C4 informational" 0 "$r"
+# The informational caller is clear only because no predicate is in HOLD_FNS for it;
+# a `gh:3` entry would make every `gh pr view --json files` user a hold site.
+if grep -E '^HOLD_FNS=' "$GATE" | grep -qF 'gh:3'; then
+    echo "FAIL: C4 HOLD_FNS lists gh:3"; fail=1
+else
+    echo "ok: C4 HOLD_FNS has no gh:3 entry"
+fi
+
+# C5 Rule A: predicate body reads .path
+r="$T/c5"
+write_lib "$r" "    jq -e 'any(.[]; .path == \"engine/internal/sim/testdata/golden.json\")' <<< \"\$1\""
+run_case "C5 Rule A" 1 "$r" "pr_golden_hold reads gh's .path"
+
+# C6 marker with a 14-char reason is still flagged
+r="$T/c6"; write_lib "$r"
+cat > "$r/bin/pr-triage" <<'EOF'
+    feat="$(pr_ui_hold "$files" "$labels")"  # files-json-ok: abcdefghijklmn
+EOF
+run_case "C6 marker 14" 1 "$r"
+
+# C7 marker with a 15-char reason passes
+r="$T/c7"; write_lib "$r"
+cat > "$r/bin/pr-triage" <<'EOF'
+    feat="$(pr_ui_hold "$files" "$labels")"  # files-json-ok: abcdefghijklmno
+EOF
+run_case "C7 marker 15" 0 "$r"
+
+# C8 comment and prose near-misses
+r="$T/c8"; write_lib "$r"
+cat > "$r/bin/pr-triage" <<'EOF'
+# pr_golden_hold "$files"
+echo "see pr_golden_hold docs"
+EOF
+run_case "C8 comment near-miss" 0 "$r"
+
+# C9 anchor: a renamed predicate, then a root with no lib
+r="$T/c9a"; write_lib "$r"
+sed -E 's/^pr_golden_hold\(\)/pr_golden_hold_old()/' "$r/bin/lib/pr-armable.sh" > "$r/lib.tmp"
+mv "$r/lib.tmp" "$r/bin/lib/pr-armable.sh"
+run_case "C9 anchor renamed" 2 "$r"
+mkdir -p "$T/c9b/bin"
+run_case "C9 anchor no lib" 2 "$T/c9b"
+
+# C10 usage
+rc=0
+"$GATE" --bogus >/dev/null 2>&1 || rc=$?
+if [ "$rc" -eq 2 ]; then echo "ok: C10 usage"; else echo "FAIL: C10 usage — want rc 2, got $rc"; fail=1; fi
+
+# C11 real tree
+run_case "C11 real tree" 0 "$REPO_ROOT"
+
+exit "$fail"

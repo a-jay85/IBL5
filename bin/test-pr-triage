@@ -519,7 +519,7 @@ held_pr() {
 }
 
 FIX_A="$(mktemp -d -p "$TMP")"
-for n in 40 41 42 43 44 45 46 47 48 49; do
+for n in 40 41 42 43 44 45 46 47 48 49 50 51; do
     checks_json success success success > "$FIX_A/checks-$(printf '%040d' "$n").json"
 done
 checks_json failure success success > "$FIX_A/checks-$(printf '%040d' 46).json"
@@ -540,6 +540,8 @@ jq -n --arg b "$(printf '%s\n' '<!-- pr-ready-verdict -->' 'Fidelity: PASS · au
     held_pr 47 CLEAN fixture-me false false
     held_pr 48 CLEAN fixture-me false false "chore: fixture forty-eight" ibl5/classes/Moved.php
     held_pr 49 CLEAN fixture-me false false
+    held_pr 50 CLEAN fixture-me false false "chore: fixture fifty" ibl5/x.php
+    held_pr 51 CLEAN fixture-me false false "chore: fixture fifty-one" ibl5/x.php
 } | jq -s . > "$FIX_A/prs.json"
 # The UI floor reads REST pulls/N/files (--paginate --slurp pages), not gh pr list's files.
 echo '[[{"filename":"ibl5/design/input.css","status":"modified"}]]' > "$FIX_A/rest-files-45.json"
@@ -549,6 +551,10 @@ echo '[[{"filename":"ibl5/classes/Moved.php","previous_filename":"ibl5/design/in
     > "$FIX_A/rest-files-48.json"
 # H-E7: the REST file read fails, so the UI floor fails closed.
 echo 1 > "$FIX_A/rest-files-rc-49"
+# H-G1: the golden hold reads the REST list, so a plain REST file clears it.
+echo '[[{"filename":"ibl5/x.php","status":"modified"}]]' > "$FIX_A/rest-files-50.json"
+# H-G2: the REST file read fails, so the golden hold fails closed.
+echo 1 > "$FIX_A/rest-files-rc-51"
 
 run_triage "$FIX_A" --held
 assert_match  "H-E1 header"                        '^PR#  URL  TITLE  REASONS$' "$OUT"
@@ -566,7 +572,10 @@ assert_match  "H-E4 UI awaiting sign-off"        '^#45  .*  ui-awaiting-signoff$
 assert_match  "H-E4 red check"                     '^#46  .*  red checks: Tests and Analysis \(failure\)$' "$OUT"
 assert_match  "H-E4 pending check"                 '^#47  .*  pending checks: E2E Tests$'                  "$OUT"
 assert_match  "H-E6 rename out of a UI path holds" '^#48  .*  ui-awaiting-signoff$'                      "$OUT"
-assert_match  "H-E7 REST file read error fails closed" '^#49  .*  ui-classifier-error$'                  "$OUT"
+assert_match  "H-E7 REST file read error fails closed" '^#49  .*  golden-changed; ui-classifier-error$'  "$OUT"
+assert_match  "H-G1 REST list without golden path does not hold" '^#50  ' "$OUT"
+assert_absent "H-G1 no golden-changed on #50"      '^#50  .*golden-changed'                             "$OUT"
+assert_match  "H-G2 REST file read error holds golden" '^#51  .*golden-changed'                         "$OUT"
 assert_match  "H-E6 UI floor reads REST pulls/N/files" 'api repos/a-jay85/IBL5-test/pulls/48/files'     "$(cat "$FIX_A/calls.log")"
 
 # H-E9: default mode still lists the armed PR and prints the old header.

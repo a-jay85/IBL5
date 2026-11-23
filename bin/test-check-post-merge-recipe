@@ -268,6 +268,35 @@ FIXTURE_END
 run_case no-section-ok
 check no-section-ok 0 "" "no post-merge section"
 
+# A fenced example `## After merge` row is not a real row, so owner prose still fails.
+fx after-merge-prose-fenced-row-heading-in-fence <<'FIXTURE_END'
+## Summary
+
+The owner runs the installer once on the Mac after merge.
+
+```markdown
+## After merge
+
+- **Row 1** [manual] — example
+```
+FIXTURE_END
+run_case after-merge-prose-fenced-row-heading-in-fence
+check after-merge-prose-fenced-row-heading-in-fence 1 "FAIL after-merge-prose"
+
+fx after-merge-prose-fenced-row-under-heading <<'FIXTURE_END'
+## Summary
+
+The owner runs the installer once on the Mac after merge.
+
+## After merge
+
+```markdown
+- **Row 1** [manual] — example
+```
+FIXTURE_END
+run_case after-merge-prose-fenced-row-under-heading
+check after-merge-prose-fenced-row-under-heading 1 "FAIL after-merge-prose"
+
 fx fenced-comment-not-heading <<'FIXTURE_END'
 ## Summary
 

@@ -20,10 +20,25 @@ PMR_WAIVER_TAG='after-merge-prose-ok:'
 # that carries the executor file turns its rows automatic and one that lacks it does not.
 PMR_BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-# pmr_rows FILE -- print the raw row lines of the `## After merge` section.
+# pmr_strip_fences FILE -- print FILE with fenced code blocks (fence lines included) dropped.
+# Width-aware like planfile.py _strip_fenced: a closing fence uses the opener's character, is at
+# least as long, and has no text after it. A 3-backtick block inside a 4-backtick block stays fenced.
+pmr_strip_fences() {
+    awk '/^[[:space:]]*(```|~~~)/ {
+            s = $0; sub(/^[[:space:]]*/, "", s); c = substr(s, 1, 1); n = 0
+            while (substr(s, n + 1, 1) == c) n++
+            if (!f) { f = 1; fc = c; fl = n }
+            else if (c == fc && n >= fl && substr(s, n + 1) ~ /^[[:space:]]*$/) f = 0
+            next
+        }
+        !f' "$1"
+}
+
+# pmr_rows FILE -- print the raw row lines of the `## After merge` section. Fenced code blocks
+# are dropped first: a row (or a heading) inside a fence is an example, not a real row.
 pmr_rows() {
     local _s
-    _s="$(sed -n '/^## After merge/,/^## /p' "$1")"
+    _s="$(pmr_strip_fences "$1" | sed -n '/^## After merge/,/^## /p')"
     _s="$(awk -v a="$PMR_END_ANCHOR" 'index($0, a) { exit } { print }' <<< "$_s")"
     grep -E '^- (\[ \] )?\*\*Row' <<< "$_s" || true
 }

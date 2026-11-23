@@ -1,11 +1,12 @@
 ---
 description: ADR-0268. A whole-tree CI gate, bin/check-bashpid-under-set-u, rejects bare BASHPID reads in bin/ shell scripts because macOS bash 3.2 has no such variable
-last_verified: 2026-11-20
+last_verified: 2026-11-23
 ---
 
 # ADR-0268: Gate bare BASHPID reads in bin/ shell scripts
 
 **Status:** Accepted
+**Superseded by:** ADR-0281 (bash 4 floor; the gate is retired)
 **Date:** 2026-11-20
 
 ## Context
@@ -14,7 +15,7 @@ last_verified: 2026-11-20
 
 ## Decision
 
-`bin/` shell scripts read the variable only with a default operator, such as `"${BASHPID:-$$}"`. `bin/check-bashpid-under-set-u` scans every shell file under `bin/` and flags a dollar-prefixed or braced read with no `:-`, `-`, `:+` or `+` operator. Comment text is stripped first. CI runs the gate and its harness `bin/test-check-bashpid-under-set-u` in the `static-guards` job.
+`bin/` shell scripts read the variable only with a default operator, such as `"${BASHPID:-$$}"`. `bin/check-bashpid-under-set-u` (example) scans every shell file under `bin/` and flags a dollar-prefixed or braced read with no `:-`, `-`, `:+` or `+` operator. Comment text is stripped first. CI runs the gate and its harness `bin/test-check-bashpid-under-set-u` (example) in the `static-guards` job.
 
 ## Alternatives Considered
 
@@ -32,6 +33,6 @@ last_verified: 2026-11-20
 
 ## References
 
-- `bin/check-bashpid-under-set-u`
-- `bin/test-check-bashpid-under-set-u`
+- `bin/check-bashpid-under-set-u` (example)
+- `bin/test-check-bashpid-under-set-u` (example)
 - `tools/postplan-harness/harness/gate_backtest.py`

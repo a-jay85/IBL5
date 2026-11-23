@@ -78,7 +78,6 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
     public function getSimDates(int $limit = 20): array
     {
         return $this->fetchAll(
-            // @phpstan-ignore ibl.orderByMissingTiebreaker (sim is the ibl_sim_dates primary key)
             "SELECT sim, start_date, end_date FROM `ibl_sim_dates` ORDER BY sim DESC LIMIT ?",
             "i",
             $limit

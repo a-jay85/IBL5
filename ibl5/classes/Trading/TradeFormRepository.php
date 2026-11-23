@@ -57,7 +57,6 @@ class TradeFormRepository extends BaseMysqliRepository implements TradeFormRepos
     {
         /** @var list<TradingDraftPickRow> */
         return $this->fetchAll(
-            // @phpstan-ignore ibl.orderByMissingTiebreaker (dp.pickid is the ibl_draft_picks primary key; not on the rule allowlist)
             "SELECT dp.*, dp.teampick_teamid AS teampick_id
              FROM `ibl_draft_picks` dp
              WHERE dp.owner_teamid = ?

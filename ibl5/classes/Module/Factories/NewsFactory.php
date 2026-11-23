@@ -10,8 +10,7 @@ use Module\ModuleServices;
 /**
  * Composition root for modules/News/index.php.
  *
- * News/article.php and News/categories.php are separate ?file= entry points and
- * stay outside this factory.
+ * News/article.php and News/categories.php compose through service() and view().
  */
 final class NewsFactory implements ModuleFactoryInterface
 {
@@ -49,7 +48,7 @@ final class NewsFactory implements ModuleFactoryInterface
             $this->services->auth(),
             $this->services->teamIdentity(),
             new \LastSimRecap\LastSimRecapService(
-                new \LastSimRecap\LastSimRecapRepository($db),
+                new \LastSimRecap\LastSimRecapRepository($db, $this->services->leagueContext()),
                 $this->services->playerLookup(),
             ),
             new \LastSimRecap\LastSimRecapView(),
@@ -58,5 +57,15 @@ final class NewsFactory implements ModuleFactoryInterface
             onThisDayService: \OnThisDay\OnThisDayFactory::createService($db, $this->services->leagueContext()),
             onThisDayView: new \OnThisDay\OnThisDayView(),
         );
+    }
+
+    public function service(): \Topics\News\NewsService
+    {
+        return new \Topics\News\NewsService($this->services->db());
+    }
+
+    public function view(): \Topics\News\NewsView
+    {
+        return new \Topics\News\NewsView();
     }
 }

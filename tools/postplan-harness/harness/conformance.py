@@ -402,8 +402,8 @@ def phase_omission_items(plan: PlanInfo, changed_files: list[str],
 
     Exempt, in order: a phase whose heading carries an all-S `[phases: S]` marker
     (bookkeeping), a phase number named in `## Out of Scope` (declared deferred), a phase
-    carrying an honoured `**No diff:**` marker, a phase whose heading and body cite no
-    path at all (no evidence = cannot verify = skip), and a phase none of whose citations
+    carrying an honoured `**No diff:**` marker, a phase whose heading, body and Files line
+    cite no path at all (no evidence = cannot verify = skip), and a phase none of whose citations
     can name a repo path (uncheckable). A citation is a repo-path candidate when `_touched`
     matches it against the diff or against `git ls-files`; a mixed phase is checked on its
     candidates alone. A phase that would hold is cleared when a bare word in its HEADING
@@ -423,6 +423,11 @@ def phase_omission_items(plan: PlanInfo, changed_files: list[str],
     heading identifier (underscore-joined, 6+ chars, see `_heading_identifiers`) appears as
     a whole token on an added diff line. `None`, an empty diff, or an error while matching
     keeps the hold (fail closed, today's behaviour).
+
+    When the phase carries a `**Files:**` line with at least one repo-path candidate, only
+    those paths are checked and the item ends with a `[Files line only]` tag after the closing paren. A Files
+    line with no candidate falls back to every cited path and appends a
+    `FILES-LINE-FALLBACK:` note.
 
     `notes` is an out-param like `resolutions` on `check`. Each exemption appends one
     `NO-DIFF-PHASE:` / `UNCHECKABLE-PHASE:` / `NON-REPO-CITATION:` / `PLACEHOLDER-MATCHED-PHASE:`
@@ -444,7 +449,7 @@ def phase_omission_items(plan: PlanInfo, changed_files: list[str],
             _note(notes, f"NO-DIFF-PHASE: {ph.number} — {ph.heading[:80]} "
                          f"(exempt: {ph.no_diff_reason[:80]})")
             continue
-        if not ph.evidence_paths:
+        if not ph.evidence_paths and not ph.files_line_paths:
             continue
         hit = _placeholder_deliverable(ph.evidence_paths, changed_files)
         if hit:
@@ -453,7 +458,17 @@ def phase_omission_items(plan: PlanInfo, changed_files: list[str],
             continue
         tracked = tracked_files if tracked_files is not None else _tracked_files()
         dropped: list[str] = []
-        cands = _repo_path_candidates(ph.evidence_paths, changed_files, tracked, dropped)
+        cands: list[str] = []
+        files_only = False
+        if ph.files_line_paths:
+            cands = _repo_path_candidates(ph.files_line_paths, changed_files, tracked, dropped)
+            files_only = bool(cands)
+            if not files_only:
+                _note(notes, f"FILES-LINE-FALLBACK: {ph.number} — **Files:** line gave no "
+                             f"repo-path candidate; phase checked on every cited path")
+                dropped = []
+        if not files_only:
+            cands = _repo_path_candidates(ph.evidence_paths, changed_files, tracked, dropped)
         for tok in dropped:
             _note(notes, f"NON-REPO-CITATION: {ph.number} — {tok[:80]} "
                          f"(leading / or ~/ and no exact, suffix, or directory match)")
@@ -485,8 +500,9 @@ def phase_omission_items(plan: PlanInfo, changed_files: list[str],
             continue
         sample = ", ".join(cands[:3])
         more = f" (+{len(cands) - 3} more)" if len(cands) > 3 else ""
+        scope = " [Files line only]" if files_only else ""
         items.append(f"MISSING-PHASE: {ph.number} — {ph.heading[:80]} "
-                     f"(phase cites {sample}{more}; none appeared in the diff)")
+                     f"(phase cites {sample}{more}; none appeared in the diff){scope}")
     return items
 
 

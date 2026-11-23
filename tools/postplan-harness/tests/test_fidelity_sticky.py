@@ -9,6 +9,7 @@ import re
 import stat
 import subprocess
 import sys
+import types
 
 import pytest
 
@@ -1073,3 +1074,58 @@ def test_sticky_renders_fix_round_line():
 
 def test_sticky_default_has_no_fix_round_line():
     assert "Fix round:" not in _sticky()
+
+
+# --- fix-round fidelity re-judge wording and sticky ---------------------------
+
+TREE_B = "b" * 40
+
+
+def rejudged_fid(monkeypatch, verdict_2, tree_a=TREE, tree_b=TREE_B, verdict_1="READY WITH NOTES"):
+    """A fid dict that runner._rejudge_fidelity_after_fix_round produced, judge stubbed."""
+    import runner
+
+    class Git:
+        def head_tree(self):
+            return tree_b
+
+    class Gh:
+        def pr_body_fresh(self):
+            return "body"
+
+    monkeypatch.setattr(runner.fidelity, "re_review",
+                        lambda *a, **k: (verdict_2, tree_b, "/tmp/post-plan-fidelity-verdict-1-2.md"))
+    fid = {"verdict_1": verdict_1, "error_kind": None, "reviewed_tree": tree_a,
+           "remediation_sha": None, "verdict_2": None, "reviewed_tree_2": None,
+           "verdict_path": "/tmp/post-plan-fidelity-verdict-1.md"}
+    res = types.SimpleNamespace(fidelity=fid, slug="")
+    runner._rejudge_fidelity_after_fix_round(None, Git(), Gh(), "out", "wt", None, "m", "body", 1,
+                                             "abc1234", res, lambda *_: None)
+    return fid
+
+
+def test_terminal_line_pr_copy_notes_round_unchanged():
+    line = fidelity.terminal_line("READY WITH NOTES", None, None, "READY", TREE, 1)
+    assert line.startswith("READY (re-review) — the pr-copy notes were fixed in the PR body")
+
+
+def test_terminal_line_fix_round_ready_rejudge_wording():
+    line = fidelity.terminal_line("READY WITH NOTES", None, None, "READY", TREE_B, None,
+                                  fix_round_sha="abc1234")
+    assert line.startswith("READY (re-review) — fix-round commit abc1234")
+    assert "pr-copy" not in line
+
+
+def test_terminal_line_fix_round_not_ready_rejudge():
+    line = fidelity.terminal_line("READY", None, None, "NOT READY", TREE_B, None,
+                                  fix_round_sha="abc1234")
+    assert line.startswith("NOT READY — the fix-round re-review on tree")
+
+
+def test_sticky_prints_fix_round_rereviewed_tree(monkeypatch):
+    fid = rejudged_fid(monkeypatch, "READY")
+    terminal = fidelity.sticky_terminal(fid)
+    body = _sticky(fid=fid, terminal=terminal)
+    assert f"**Re-reviewed tree:** {TREE_B} (READY)" in body
+    assert terminal.startswith("READY (re-review) — fix-round commit abc1234")
+    assert terminal in body

@@ -18,7 +18,7 @@ import time
 
 from .state import HarnessError
 from . import llm_calls
-from . import fidelity_filefix
+from . import fidelity_filefix, rules_budget_carveout
 from . import schemas
 from . import hold_text
 from .classify import strip_runner_blocks
@@ -767,11 +767,19 @@ def body_only_findings(verdict_path: str) -> list[str] | None:
     return body_only_findings_text(text)
 
 
+def _conflict_paths_value(paths: list[str] | None) -> str:
+    """CONFLICT_RESOLVED_PATHS value. None means the caller did not read the run's list."""
+    if paths is None:
+        return "(not recorded for this packet)"
+    return ", ".join(paths) if paths else "(none — no rebase in this run auto-resolved a conflict)"
+
+
 def build_packet(out_dir: str, master_sha: str, reviewed_tree: str, plan, diff: str,
                  pr_body: str, pr_number: int | str, phase4b_ran: bool, *,
                  worktree: str = ".", packet_name: str = "fidelity-packet",
                  extra_context: str = "", review_findings: str = "",
-                 shadow_request: bool = False) -> str:
+                 shadow_request: bool = False,
+                 conflict_resolved_paths: list[str] | None = None) -> str:
     """Write the seven `_phase-5.5-fidelity.md` Step-2 inputs as files. Returns the dir.
 
     `shadow_request` asks the reviewer for the procedure 6f `## SHADOW-ARMING` block and adds
@@ -814,8 +822,7 @@ def build_packet(out_dir: str, master_sha: str, reviewed_tree: str, plan, diff: 
     )
     _write("context.md",
            "# Context\n\n"
-           "CONFLICT_RESOLVED_PATHS: (none — the harness path rebases cleanly or fails "
-           "closed before reaching Phase 5.5)\n"
+           f"CONFLICT_RESOLVED_PATHS: {_conflict_paths_value(conflict_resolved_paths)}\n"
            f"PHASE_4B_RAN: {'yes' if phase4b_ran else 'no'}\n"
            + findings_block
            + f"REVIEW_TIMESTAMP: {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}\n"
@@ -983,6 +990,11 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
            else f"inactive ({filefix.reason})"))
     filefix_note = (f"\n{fidelity_filefix.prompt_text(filefix.eligible)}\n"
                     if filefix.active else "")
+    # Budget-forced trims (ADR-0184 carve-out module): git and --print-caps decide, never
+    # the reviewer. Adds a fix hint to the fixer's copy of the finding; the verdict file,
+    # its severity tags and the keep-unplanned path are untouched.
+    work_list = rules_budget_carveout.annotate_work_list(
+        work_list, worktree, master_sha, skip=withheld)
 
     procedure = _find_procedure(worktree, master_sha, REMEDIATION_PATHS,
                                 "remediation-procedure-missing")
@@ -1116,8 +1128,9 @@ def re_review(llm, gitad, out_dir: str, worktree: str, plan, master_sha: str,
         "A last_verified date bump in a touched doc is the harness clearing the\n"
         "doc-staleness commit hook, not a new finding.\n"
     )
+    packet_tree = gitad.head_tree()
     try:
-        packet = build_packet(out_dir, master_sha, gitad.head_tree(), plan, diff,
+        packet = build_packet(out_dir, master_sha, packet_tree, plan, diff,
                               pr_body, pr_number, phase4b_ran, worktree=worktree,
                               packet_name=f"fidelity-packet-{round_num + 1}",
                               extra_context=extra, shadow_request=shadow_request)
@@ -1138,8 +1151,8 @@ def re_review(llm, gitad, out_dir: str, worktree: str, plan, master_sha: str,
             fh.write(text if text.endswith("\n") else text + "\n")
     except OSError:
         return None, None, None
-    # the tree is read after the push, so the recorded tree is the one the reviewer saw
-    record_reviewed_tree(path2, gitad.head_tree())
+    # the recorded tree is the one the packet was built from, read once after the push
+    record_reviewed_tree(path2, packet_tree)
     # read back from the file, never the in-memory value: a reviewer-written line with
     # prose after the hash must yield None here exactly as the skill's parser does
     return parse_verdict(path2), read_reviewed_tree(path2), path2
@@ -1160,9 +1173,15 @@ RECHECK_DECLINE_REASONS = (
 
 def body_recheck_eligibility(prior_verdict_text: str, prior_tree: str | None,
                              current_tree: str, plan_hash_at_review: str | None,
-                             plan_hash_now: str) -> tuple[list[str] | None, str | None]:
-    """Pure. (findings, None) when eligible; (None, reason) otherwise."""
-    if _effective_verdict_word((prior_verdict_text or "").split(DIGEST_CUT, 1)[0]) != "NOT READY":
+                             plan_hash_now: str, *, notes: list[str] | None = None
+                             ) -> tuple[list[str] | None, str | None]:
+    """Pure. (findings, None) when eligible; (None, reason) otherwise.
+
+    notes=None is the NOT READY body-only round: findings come from the verdict's
+    check-4 bullets. A list is the READY WITH NOTES notes round: the prior verdict
+    must read READY WITH NOTES and the findings are the given note texts."""
+    expected = "NOT READY" if notes is None else "READY WITH NOTES"
+    if _effective_verdict_word((prior_verdict_text or "").split(DIGEST_CUT, 1)[0]) != expected:
         return None, "prior-verdict-unparsed"
     if prior_tree is None:
         return None, "prior-tree-unrecorded"
@@ -1172,7 +1191,8 @@ def body_recheck_eligibility(prior_verdict_text: str, prior_tree: str | None,
         return None, "plan-hash-missing"
     if plan_hash_at_review != plan_hash_now:
         return None, "plan-changed"
-    findings = body_only_findings_text(prior_verdict_text)
+    findings = (body_only_findings_text(prior_verdict_text) if notes is None
+                else (list(notes) or None))
     if findings is None:
         return None, "not-pure-body"
     return findings, None
@@ -1193,7 +1213,7 @@ def body_recheck(llm, gitad, out_dir: str, worktree: str, plan, master_sha: str,
                  pr_body: str, prior_body: str, pr_number: int | str,
                  prior_verdict_path: str, name_status: str,
                  plan_hash_at_review: str | None, plan_hash_now: str, *,
-                 round_num: int = 1, log=None
+                 round_num: int = 1, log=None, notes: list[str] | None = None
                  ) -> tuple[str | None, str | None, str | None, str | None]:
     """(verdict, reviewed_tree, verdict_path, decline_reason).
 
@@ -1216,7 +1236,7 @@ def body_recheck(llm, gitad, out_dir: str, worktree: str, plan, master_sha: str,
         return _decline("prior-verdict-unparsed")
     findings, reason = body_recheck_eligibility(
         prior_text, read_reviewed_tree(prior_verdict_path), current_tree,
-        plan_hash_at_review, plan_hash_now)
+        plan_hash_at_review, plan_hash_now, notes=notes)
     if reason:
         return _decline(reason)
     fids = [f"F{i}" for i in range(1, len(findings) + 1)]
@@ -1369,10 +1389,12 @@ def _says_already_done(text: str, pr_number: int | None = None) -> bool:
 
 
 NOTE_HARMS = ("crash", "wrong-value", "lost-data", "security", "false-gate")
-_TOOLING_PATH_RE = re.compile(r"(?<![\w/.-])(?:bin|tools|\.claude|\.github|ibl5/docs)/")
+# `~/` (home) and `./` (cwd) count as path starts; ibl5/ may follow `/` in an absolute path (backlog#1771).
+_TOOLING_PATH_RE = re.compile(r"(?<![\w/.-])(?:~/|\./)?(?:bin|tools|\.claude|\.github|ibl5/docs)/")
 _WEBSITE_PATH_RE = re.compile(
-    r"(?<![\w/.-])(?:ibl5/(?!docs/)"
-    r"|(?:classes|modules|themes|migrations|includes|blocks|language|config|jslib|design)/)")
+    r"(?<![\w.-])ibl5/(?!docs/)"
+    r"|(?<![\w/.-])(?:~/|\./)?"
+    r"(?:classes|modules|themes|migrations|includes|blocks|language|config|jslib|design)/")
 
 
 def _is_harmless_tooling(note: dict) -> bool:
@@ -1403,6 +1425,72 @@ def _is_misstated_pr_copy(note: dict) -> bool:
     if note.get("harm") in NOTE_HARMS:
         return True
     return _BODY_MISSTATES_RE.search(f"{note['title']} {note['detail']}") is not None
+
+
+def pr_copy_round_findings(notes: list[dict]) -> list[str] | None:
+    """Finding texts for the READY WITH NOTES body round, or None when it must not run.
+
+    Takes the list extract_notes returned, after its filters. The round runs only
+    when every kept note is a pr-copy note. An empty list or any followup returns
+    None, and the notes file as they do today."""
+    if not notes or any(n.get("kind") != "pr-copy" for n in notes):
+        return None
+    return [f"{n['title']}: {n['detail']}" for n in notes]
+
+
+def _is_body_fix_shape(r) -> bool:
+    return isinstance(r, dict) and isinstance(r.get("body"), str) and bool(r["body"].strip())
+
+
+def _validate_body_fix(r) -> None:
+    """llm.call validators raise on a bad reply; the CLI adapter then re-asks once."""
+    if not _is_body_fix_shape(r):
+        raise HarnessError("llm-invalid-output", "expected {\"body\": \"<non-empty text>\"}")
+
+
+def _pr_copy_fix_prompt(pr_body: str, findings: list[str]) -> str:
+    listed = "\n".join(f"F{i}: {f}" for i, f in enumerate(findings, 1))
+    return (
+        "You edit a pull request body. A plan-fidelity reviewer left non-blocking notes "
+        "saying the body states something false or stale. Fix only that.\n\n"
+        f"Notes:\n{listed}\n\n"
+        "Rules:\n"
+        "- Change only the sentences a note names.\n"
+        "- Keep every heading line, every HTML comment line, and the whole "
+        "`## Manual Testing` section byte-identical.\n"
+        "- Make no claim the diff does not support.\n"
+        "- You have no tools. Do not describe code changes.\n\n"
+        "Reply with JSON only: {\"body\": \"<the full new body>\"}\n\n"
+        "Current body:\n<<<BODY\n"
+        f"{(pr_body or '')[:150_000]}\n"
+        "BODY>>>\n"
+    )
+
+
+def fix_pr_copy_notes(llm, pr_body: str, findings: list[str], out_dir: str, *,
+                      round_num: int, log=None) -> str | None:
+    """One Sonnet call with no tools that rewrites the PR body to answer pr-copy notes.
+
+    Returns the new body, or None on an LLM failure, a wrong shape, or an unchanged
+    body. The call has no tools, so it cannot touch the tree."""
+    log = log or _noop_log
+    audit = os.path.join(out_dir, f"notes-body-fix-{round_num + 1}.json")
+    try:
+        data = llm.call(f"plan-fidelity-notes-body-fix-{round_num + 1}", "sonnet",
+                        _pr_copy_fix_prompt(pr_body, findings),
+                        validate=_validate_body_fix)
+    except HarnessError as exc:
+        _write_audit(audit, {"error": exc.kind, "detail": str(exc.detail or "")[:2000]})
+        log(f"phase5.5 notes round: body fix unavailable ({exc.kind})")
+        return None
+    _write_audit(audit, data if isinstance(data, dict) else {"raw": str(data)[:2000]})
+    if not _is_body_fix_shape(data):
+        log("phase5.5 notes round: body fix returned an unexpected shape")
+        return None
+    if data["body"].strip() == (pr_body or "").strip():
+        log("phase5.5 notes round: body fix left the body unchanged")
+        return None
+    return data["body"]
 
 
 def extract_notes(llm, verdict_path: str, log=None,
@@ -1697,8 +1785,22 @@ def _landed_later(item, changed_files, diff_text: str) -> bool:
     return False
 
 
-def reviewer_arming_holds(shadow, changed_files, diff_text: str, log) -> list[str]:
+def _landed_for_arming(item, changed_files, diff_text, review_inputs):
+    """True only when the item landed in the master diff and, on a stacked run, also in
+    the review-base diff the Phase 5.5 reviewer judged. Either miss keeps the hold."""
+    if not _landed_later(item, changed_files, diff_text):
+        return False
+    if review_inputs is None:
+        return True
+    review_files, review_diff = review_inputs
+    return _landed_later(item, review_files, review_diff)
+
+
+def reviewer_arming_holds(shadow, changed_files, diff_text: str, log, *,
+                           review_inputs=None) -> list[str]:
     """Condition (21) parts from the SHADOW-ARMING record. Add-only: it never clears a hold.
+
+    `review_inputs` is `(files, diff)` against the stacked review base, or None on the master base.
 
     Anything but a well-formed present or carried record is neutral: [] plus one log line.
     """
@@ -1711,7 +1813,8 @@ def reviewer_arming_holds(shadow, changed_files, diff_text: str, log) -> list[st
         parts = []
         pl = fields["planned_landed"]
         if pl["hold"] is True and not shadow.get("plan_blind"):
-            items = [i for i in pl["missing"] if not _landed_later(i, changed_files, diff_text)]
+            items = [i for i in pl["missing"]
+                     if not _landed_for_arming(i, changed_files, diff_text, review_inputs)]
             if items:
                 parts.append("planned-landed: " + ", ".join(
                     f"{_one_line(i.get('kind'))}:{_one_line(i.get('token'))}" for i in items))
@@ -1786,7 +1889,13 @@ def verdict_file_usable(path: str) -> bool:
     return bool(findings_excerpt(path, True))
 
 
-def terminal_line(v1, error_kind, remediation_sha, v2, tree_2, rounds_completed) -> str:
+def _fix_round_sha(fid):
+    repin = (fid or {}).get("same_run_repin") or {}
+    return repin.get("sha") if repin.get("kind") == "fix-round" else None
+
+
+def terminal_line(v1, error_kind, remediation_sha, v2, tree_2, rounds_completed,
+                  fix_round_sha=None) -> str:
     """The last prose line of the sticky comment. First matching row wins.
 
     An indeterminate verdict 1 (None) never yields a READY prefix — a missing verdict is
@@ -1795,9 +1904,23 @@ def terminal_line(v1, error_kind, remediation_sha, v2, tree_2, rounds_completed)
     if v1 is None:
         return ("NOT READY — plan-fidelity review produced no verdict "
                 f"({error_kind}); re-run /post-plan")
+    if fix_round_sha and v2 is not None:
+        # verdict 2 came from the fix round's re-judge of a code-fix commit
+        if v2 == "READY":
+            return (f"READY (re-review) — fix-round commit {fix_round_sha} re-reviewed clean "
+                    f"on tree {tree_2 or 'unrecorded'}")
+        if v2 == "READY WITH NOTES":
+            return (f"READY WITH NOTES (re-review) — fix-round commit {fix_round_sha} "
+                    f"re-reviewed on tree {tree_2 or 'unrecorded'}")
+        return (f"NOT READY — the fix-round re-review on tree {tree_2 or 'unrecorded'} "
+                "found blocking findings; remediate and re-run /post-plan")
     if v1 == "READY":
         return "READY"
     if v1 == "READY WITH NOTES":
+        if v2 == "READY":
+            # Only the PR-body notes round sets verdict 2 on a READY WITH NOTES first review.
+            return ("READY (re-review) — the pr-copy notes were fixed in the PR body and "
+                    f"re-reviewed clean on tree {tree_2 or 'unrecorded'}")
         return "READY WITH NOTES"
     if not remediation_sha:
         return ("NOT READY — the blocking findings listed above remain; "
@@ -2108,7 +2231,8 @@ def sticky_terminal(fid: dict) -> str:
     fid = fid or {}
     return owner_scope_terminal(fid) or terminal_line(
         fid.get("verdict_1"), fid.get("error_kind"), fid.get("remediation_sha"),
-        fid.get("verdict_2"), fid.get("reviewed_tree_2"), fid.get("rounds_completed", 0))
+        fid.get("verdict_2"), fid.get("reviewed_tree_2"), fid.get("rounds_completed", 0),
+        fix_round_sha=_fix_round_sha(fid))
 
 
 def _kept_scope_line(item: dict) -> str:

@@ -1,6 +1,6 @@
 ---
 description: Prevent duplicate ADR and migration numbers at allocation time and detect them at PR time, rather than renumbering the legacy duplicates.
-last_verified: 2026-10-29
+last_verified: 2026-11-20
 ---
 
 # ADR-0110: ADR and migration numbering collision prevention
@@ -46,3 +46,7 @@ The gate compares against the **base tree only** and never calls the two scan he
 - `.gitattributes` — the `merge=union` driver scoped to the ADR index.
 - `bin/check-destructive-migrations` — the sibling gate whose skeleton, `--since=<sha>` semantics and exit-code contract this gate copies.
 - `ibl5/bin/run-migrations-ci` — deliberately unchanged: it globs `*.sql` because it decides what to *execute*, while the allocator decides what number is *free*.
+
+## Addendum (2026-11-20): index row order
+
+`bin/check-numbering` gains a fourth check. The rows of the index table in `ibl5/docs/decisions/README.md` must ascend by ADR number. The `merge=union` driver above appends concurrent rows at the end of a hunk, so a lower number can land after higher ones (PR #3389). The check runs in the same scope as the duplicate-row check: `--all`, or whenever the index is in the diff. A number already reported as duplicated is skipped so one row is reported once. There is no bypass marker. The fix moves the named rows verbatim and renumbers no file. The PR that added the check sorted the 18 rows that were out of order.

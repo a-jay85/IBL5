@@ -17,10 +17,16 @@ class PlayerArticlesEntryPointTest extends ModuleEntryPointTestCase
 {
     private const PREPARED_SQL = 'SELECT sid, title, time FROM nuke_stories WHERE hometext LIKE ? OR bodytext LIKE ? ORDER BY time DESC';
 
+    private function publishServices(): void
+    {
+        \Module\ModuleServices::publish(new \Module\ModuleServices($this->buildModuleContainer()));
+    }
+
     private function runArticles(string $player): string
     {
         $_REQUEST['player'] = $player;
         $GLOBALS['mysqli_db'] = $this->mockDb;
+        $this->publishServices();
         ob_start();
         require __DIR__ . '/../../../modules/Player/articles.php';
 
@@ -32,6 +38,7 @@ class PlayerArticlesEntryPointTest extends ModuleEntryPointTestCase
     {
         unset($_REQUEST['player']);
         $GLOBALS['mysqli_db'] = $this->mockDb;
+        $this->publishServices();
         ob_start();
         require __DIR__ . '/../../../modules/Player/articles.php';
 
@@ -42,6 +49,7 @@ class PlayerArticlesEntryPointTest extends ModuleEntryPointTestCase
     {
         $_REQUEST['player'] = $player;
         $GLOBALS['mysqli_db'] = $this->mockDb;
+        $this->publishServices();
         ob_start();
         require __DIR__ . '/../../../modules/Player/articles.php';
 
@@ -204,37 +212,29 @@ class PlayerArticlesEntryPointTest extends ModuleEntryPointTestCase
 
     public function testFalseResultRendersErrorNoticeWithoutRows(): void
     {
-        $stmt = new class {
-            public function bind_param(string $types, string ...$vars): bool
+        $stmt = new class extends \Tests\WideUnit\Mocks\MockPreparedStatement {
+            public function __construct()
             {
-                return true;
-            }
-
-            public function execute(): bool
-            {
-                return true;
+                parent::__construct(null);
             }
 
             public function get_result(): false
             {
                 return false;
             }
-
-            public function close(): bool
-            {
-                return true;
-            }
         };
-        $GLOBALS['mysqli_db'] = new class ($stmt) {
-            public function __construct(private object $stmt)
+        $GLOBALS['mysqli_db'] = new class ($stmt) extends \Tests\WideUnit\Mocks\MockDatabase {
+            public function __construct(private readonly \Tests\WideUnit\Mocks\MockPreparedStatement $stmt)
             {
+                parent::__construct();
             }
 
-            public function prepare(string $query): object
+            public function prepare(string $query): \Tests\WideUnit\Mocks\MockPreparedStatement
             {
                 return $this->stmt;
             }
         };
+        $this->publishServices();
         $_REQUEST['player'] = 'Kobe';
         ob_start();
         require __DIR__ . '/../../../modules/Player/articles.php';

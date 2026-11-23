@@ -601,3 +601,188 @@ def test_cover_pkgs_follow_declared_files(repo):
     assert pkgs == [[f"{MODULE}/internal/sim"]]
     assert tp._cover_pkgs(MODULE, ["engine/internal/sim/a.go", "engine/internal/sim/b.go",
                                    "engine/main.go"]) == [MODULE, f"{MODULE}/internal/sim"]
+
+
+# ---- jsb-native-hosted captures ----
+
+HOSTED_NAME = "pl-0001.jsonl"
+HOSTED = f"captures/{HOSTED_NAME}"
+
+
+def _make_jsbn(tmp_path, text=None):
+    jsbn = tmp_path / "jsb-native"
+    jsbn.mkdir()
+    _git(jsbn, "init", "-q", "-b", "main")
+    _write(jsbn, HOSTED, text or _capture_text())
+    return jsbn, _commit(jsbn, "capture")
+
+
+def _hosted_entry(root, jsbn, commit, **overrides):
+    data = _git_show(jsbn, commit, overrides.get("capture", HOSTED))
+    entry = _entry(root, capture=HOSTED, capture_host="jsb-native", capture_commit=commit,
+                   capture_sha256=tp._sha256(data) if data is not None else "")
+    entry.update(overrides)
+    return entry
+
+
+def _git_show(root, commit, path):
+    proc = subprocess.run(["git", "show", f"{commit}:{path}"], cwd=root, capture_output=True)
+    return proc.stdout if proc.returncode == 0 else None
+
+
+def _hosted_go(committed, normal="pass", perturbed="fail", calls=None):
+    """A fake run_go for hosted entries: both runs see a staged capture dir."""
+    def run_go(root, package, test, env=None, cover_profile=None, cover_pkgs=()):
+        staged = Path(env["JSB_TRACE_CAPTURE_DIR"]) / HOSTED_NAME
+        if calls is not None:
+            calls.append((bool(cover_profile), staged.read_bytes()))
+        if cover_profile:
+            assert staged.read_bytes() == committed
+            Path(cover_profile).write_text(_profile((ENGINE_FILE,)))
+            return normal
+        assert staged.read_bytes() != committed
+        return perturbed
+    return run_go
+
+
+def _hosted_verdict(root, base, jsbn, entry, run_go=None):
+    data = {"schema": tp.SCHEMA, "token": "trace-pinned", "branch": BRANCH, "tests": [entry]}
+    committed = (_capture_text()).encode()
+    return tp.evaluate_data(root, BRANCH, base, CHANGED, data,
+                            run_go=run_go or _hosted_go(committed), jsbn_dir=jsbn)
+
+
+@pytest.fixture
+def hosted(tmp_path):
+    root, base = _make_repo(tmp_path)
+    jsbn, commit = _make_jsbn(tmp_path)
+    return root, base, jsbn, commit
+
+
+def test_hosted_capture_ok(hosted):
+    root, base, jsbn, commit = hosted
+    calls = []
+    run_go = _hosted_go(_capture_text().encode(), calls=calls)
+    assert _hosted_verdict(root, base, jsbn, _hosted_entry(root, jsbn, commit), run_go) == "ok"
+    assert [c[0] for c in calls] == [True, False]
+
+
+def test_hosted_capture_hash_mismatch_held(hosted):
+    root, base, jsbn, commit = hosted
+    entry = _hosted_entry(root, jsbn, commit, capture_sha256="0" * 64)
+    assert _hosted_verdict(root, base, jsbn, entry) == "capture-hash-mismatch"
+
+
+def test_hosted_capture_missing_at_commit_held(hosted):
+    root, base, jsbn, commit = hosted
+    entry = _hosted_entry(root, jsbn, commit, capture="captures/pl-0002.jsonl")
+    assert _hosted_verdict(root, base, jsbn, entry) == "capture-not-at-commit"
+
+
+def test_hosted_capture_commit_off_main_held(hosted):
+    root, base, jsbn, _ = hosted
+    _git(jsbn, "checkout", "-q", "-b", "side")
+    _write(jsbn, HOSTED, _capture_text(records=[RECORDS[0], RECORDS[0]]))
+    side = _commit(jsbn, "side capture")
+    _git(jsbn, "checkout", "-q", "main")
+    entry = _hosted_entry(root, jsbn, side)
+    assert _hosted_verdict(root, base, jsbn, entry) == "capture-commit-off-main"
+
+
+@pytest.mark.parametrize("commit", ["abc123", "A" * 40, "a" * 41, "main", "HEAD", "0" * 40, None],
+                         ids=["short", "uppercase", "41-chars", "branch-name", "head",
+                              "absent-object", "missing"])
+def test_hosted_capture_commit_bad_format_held(hosted, commit):
+    root, base, jsbn, good = hosted
+    entry = _hosted_entry(root, jsbn, good, capture_commit=commit)
+    assert _hosted_verdict(root, base, jsbn, entry) == "capture-commit-bad"
+
+
+@pytest.mark.parametrize("path", ["captures/../x.jsonl", "capturesx/a.jsonl", "captures/a.json",
+                                  "captures/sub/a.jsonl", "engine/testdata/jsb-captures/a.jsonl"])
+def test_hosted_capture_bad_path_near_misses_held(hosted, path):
+    root, base, jsbn, commit = hosted
+    entry = _hosted_entry(root, jsbn, commit, capture=path)
+    assert _hosted_verdict(root, base, jsbn, entry) == "capture-bad-path"
+
+
+def test_hosted_capture_unknown_host_held(hosted):
+    root, base, jsbn, commit = hosted
+    entry = _hosted_entry(root, jsbn, commit, capture_host="github")
+    assert _hosted_verdict(root, base, jsbn, entry) == "capture-bad-host"
+
+
+def test_hosted_capture_host_unavailable_held(hosted, tmp_path):
+    root, base, jsbn, commit = hosted
+    entry = _hosted_entry(root, jsbn, commit)
+    assert _hosted_verdict(root, base, tmp_path / "absent", entry) == "capture-host-unavailable"
+
+
+def test_hosted_run_uses_committed_bytes(hosted):
+    root, base, jsbn, commit = hosted
+    committed = _capture_text().encode()
+    (jsbn / HOSTED).write_text(_capture_text(records=[RECORDS[1], RECORDS[1]]))
+    calls = []
+    entry = _hosted_entry(root, jsbn, commit)
+    assert _hosted_verdict(root, base, jsbn, entry, _hosted_go(committed, calls=calls)) == "ok"
+    assert calls[0] == (True, committed)
+
+
+def test_hosted_circular_still_held(hosted):
+    root, base, jsbn, commit = hosted
+    run_go = _hosted_go(_capture_text().encode(), perturbed="pass")
+    assert _hosted_verdict(root, base, jsbn, _hosted_entry(root, jsbn, commit), run_go) \
+        == f"circular: {TEST} passes with perturbed JSB outputs"
+
+
+def test_hosted_skip_is_held(hosted):
+    root, base, jsbn, commit = hosted
+    run_go = _hosted_go(_capture_text().encode(), normal="skip")
+    assert _hosted_verdict(root, base, jsbn, _hosted_entry(root, jsbn, commit), run_go) == "test-skip"
+
+
+def test_jsb_native_dir_is_common_dir_parent(tmp_path):
+    main = tmp_path / "main"
+    main.mkdir()
+    _git(main, "init", "-q", "-b", "master")
+    _write(main, "README", "x\n")
+    _commit(main, "init")
+    _git(main, "worktree", "add", "-q", str(tmp_path / "wt"), "-b", "wt")
+    want = (main / "jsb-native").resolve()
+    assert tp.jsb_native_dir(tmp_path / "wt").resolve() == want
+    assert tp.jsb_native_dir(main).resolve() == want
+
+
+def test_record_capture_host_jsb_native_pins_commit(hosted):
+    root, _, jsbn, commit = hosted
+    run_go = _hosted_go(_capture_text().encode())
+    assert tp.record(root, BRANCH, [f"{PACKAGE}:{TEST}"], [HOSTED_NAME], run_go=run_go,
+                     ported_specs=[ENGINE_FILE], capture_host="jsb-native", jsbn_dir=jsbn) == 0
+    entry = json.loads((root / EVIDENCE).read_text())["tests"][0]
+    assert entry["capture"] == HOSTED and entry["capture_host"] == "jsb-native"
+    assert entry["capture_commit"] == commit
+    assert entry["capture_sha256"] == tp._sha256(_capture_text().encode())
+
+
+def test_record_hosted_absent_capture_refused(hosted, capsys):
+    root, _, jsbn, _ = hosted
+    assert tp.record(root, BRANCH, [f"{PACKAGE}:{TEST}"], ["pl-0009.jsonl"],
+                     run_go=_hosted_go(b""), ported_specs=[ENGINE_FILE],
+                     capture_host="jsb-native", jsbn_dir=jsbn) == 1
+    assert "capture-commit-bad" in capsys.readouterr().err
+    assert not (root / EVIDENCE).exists()
+
+
+def test_record_rejects_unknown_capture_host(tmp_path, monkeypatch):
+    root, _ = _make_repo(tmp_path)
+    monkeypatch.chdir(root)
+    with pytest.raises(SystemExit) as exc:
+        tp.main(["record", "--branch", BRANCH, "--test", f"{PACKAGE}:{TEST}",
+                 "--capture", HOSTED_NAME, "--ported", ENGINE_FILE, "--capture-host", "github"])
+    assert exc.value.code == 2
+
+
+def test_repo_entry_without_host_unchanged(repo):
+    root, base = repo
+    _write_evidence(root, capture=f"{tp.CAPTURE_DIR}/absent.jsonl")
+    assert _verdict(root, base) == "capture-not-on-base"

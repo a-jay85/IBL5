@@ -330,7 +330,6 @@ class TeamCapCalculatorTest extends TestCase
 
         self::assertSame(900, $current);
         self::assertSame(1200, $next);
-        self::assertGreaterThan($current, $next);
     }
 
     public function testGetSalaryCapArrayInPlayoffsKeepsYear1AtRawContractYear(): void

@@ -34,14 +34,14 @@ class HeadToHeadRecordsController
     private HeadToHeadRecordsRepositoryInterface $repo;
     private HeadToHeadRecordsView $view;
     private \Season\Season $season;
-    private object $user;
+    private \stdClass $user;
     private TeamIdentityRepositoryInterface $teamRepo;
 
     public function __construct(
         HeadToHeadRecordsRepositoryInterface $repo,
         HeadToHeadRecordsView $view,
         \Season\Season $season,
-        object $user,
+        \stdClass $user,
         TeamIdentityRepositoryInterface $teamRepo
     ) {
         $this->repo   = $repo;

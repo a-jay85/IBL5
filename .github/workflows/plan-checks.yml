@@ -117,9 +117,10 @@ jobs:
         bun install
         echo IBL_CI_BUN_READY=1 >> "$GITHUB_ENV"
 
-    # Same Go and actionlint pins as the Lint workflows job in tests.yml.
-    - name: Setup Go for actionlint
-      if: steps.needs.outputs.actionlint == '1'
+    # Same Go and actionlint pins as the Lint workflows job in tests.yml. Go rows
+    # share the step: 1.26.3 is engine/go.mod's toolchain pin (seeded-PRNG golden snapshots).
+    - name: Setup Go for actionlint and go rows
+      if: steps.needs.outputs.actionlint == '1' || steps.needs.outputs.go == '1'
       uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
       with:
         go-version: '1.26.3'
@@ -128,6 +129,29 @@ jobs:
     - name: Install actionlint
       if: steps.needs.outputs.actionlint == '1'
       run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+
+    - name: Mark Go ready for go rows
+      if: steps.needs.outputs.go == '1'
+      run: |
+        go version
+        echo IBL_CI_GO_READY=1 >> "$GITHUB_ENV"
+
+    # Same Node pins as the iblbot job in tests.yml (ci-node-toolchain-pin.md).
+    - name: Set up Node for IBLbot vitest rows
+      if: steps.needs.outputs.node == '1'
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: '22'
+        cache: 'npm'
+        cache-dependency-path: ibl5/IBLbot/package-lock.json
+
+    - name: Install IBLbot dependencies
+      if: steps.needs.outputs.node == '1'
+      working-directory: ibl5/IBLbot
+      run: |
+        set -euo pipefail
+        npm ci
+        echo IBL_CI_NODE_READY=1 >> "$GITHUB_ENV"
 
     - name: Run plan checks
       env:

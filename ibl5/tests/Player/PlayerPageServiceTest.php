@@ -190,18 +190,18 @@ class PlayerPageServiceTest extends TestCase
         return $stub;
     }
 
-    private function createMockTeam(string $name, int $hasUsedExtension, int $teamid = 1): object
+    private function createMockTeam(string $name, int $hasUsedExtension, int $teamid = 1): \Team\Team
     {
-        $team = new \stdClass();
+        $team = self::createStub(\Team\Team::class);
         $team->name = $name;
         $team->teamid = $teamid;
         $team->hasUsedExtensionThisSeason = $hasUsedExtension;
         return $team;
     }
 
-    private function createMockSeason(string $phase): object
+    private function createMockSeason(string $phase): \Season\Season
     {
-        $season = new \stdClass();
+        $season = self::createStub(\Season\Season::class);
         $season->phase = $phase;
         return $season;
     }

@@ -1,6 +1,6 @@
 ---
 description: Ship the compiled post-plan harness in-repo under tools/postplan-harness/ with a dedicated Python CI workflow, a main-checkout path pin, and real-data dirs gitignored.
-last_verified: 2026-09-22
+last_verified: 2026-11-21
 ---
 # 92. Post-plan harness in-repo with dedicated Python CI
 

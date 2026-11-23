@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace RecordHolders;
 
 use Cache\Contracts\DatabaseCacheInterface;
+use RecordHolders\Contracts\RecordHoldersCacheInterface;
 use RecordHolders\Contracts\RecordHoldersServiceInterface;
 
 /**
@@ -19,7 +20,7 @@ use RecordHolders\Contracts\RecordHoldersServiceInterface;
  *
  * @phpstan-import-type AllRecordsData from RecordHoldersServiceInterface
  */
-class CachedRecordHoldersService implements RecordHoldersServiceInterface
+class CachedRecordHoldersService implements RecordHoldersServiceInterface, RecordHoldersCacheInterface
 {
     private const CACHE_KEY = 'record_holders';
     private const TTL_SECONDS = 86400; // 24 hours

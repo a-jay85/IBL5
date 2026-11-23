@@ -1,0 +1,64 @@
+#!/bin/bash
+#
+# bin/check-ambient-env-fallback — keep undocumented ambient env vars out of bin/ default chains.
+#
+# A default chain where REPO_DIR falls back to REPO lets whatever REPO the
+# caller's shell exports pick the target, though no usage text names REPO
+# (backlog a-jay85/IBL5-backlog#1610, PR #3350). Flags a code line that reads a
+# generic name in the fallback position of a ${VAR:-...} expansion when the same
+# file never assigns that name. HOME, XDG_*, TMPDIR, PWD and PATH are standard
+# and never flagged. TMP is left out because harnesses assign it from mktemp.
+# Comment text and single-quoted spans are stripped first (quote-blind: the first
+# # at line start or after whitespace starts a comment, as in
+# bin/check-bashpid-under-set-u). Waive one line with a trailing
+# "# ambient-env-ok: <reason of 15+ chars>". The waiver is read from the raw line.
+# Scope: every file under bin/ ending in .sh or .bash, or with a shell shebang.
+# --files exists for the harness. Whole-tree scan, so no base ref.
+#
+# Bash 3.2 safe (no mapfile). Exit codes: 0 = pass, 1 = violation, 2 = usage error.
+# gate-backtest-argv:
+
+set -euo pipefail
+
+die() { echo "check-ambient-env-fallback: $*" >&2; exit 2; }
+GENERIC='REPO|DIR|ROOT|REPO_DIR|REPO_ROOT|ROOT_DIR|BASE|FILE|NAME|CWD|WORKDIR|TARGET|SRC|DEST|OUT|CONFIG'
+# shellcheck disable=SC2016 # regex text, nothing to expand
+FALLBACK_RE=':-\$\{?('"$GENERIC"')([^A-Za-z0-9_]|$)'
+# shellcheck disable=SC2016 # regex text, nothing to expand
+BAD_RE='\$\{[A-Za-z_][A-Za-z0-9_]*'"$FALLBACK_RE"
+WAIVER_RE='#[[:space:]]*ambient-env-ok:[[:space:]]*[^[:space:]].{14,}'
+
+files=()
+case "${1:-}" in
+    -h | --help) echo "usage: bin/check-ambient-env-fallback [--files <path>...]"; exit 0 ;;
+    --files)
+        shift
+        [ "$#" -gt 0 ] || die "--files needs at least one path"
+        for f in "$@"; do [ -f "$f" ] || die "no such file: $f"; files+=("$f"); done
+        ;;
+    "") cd "$(dirname "$0")/.."
+        while IFS= read -r f; do [ -f "$f" ] && files+=("$f"); done < <(find bin -type f | sort) ;;
+    *) die "unknown option: $1" ;;
+esac
+
+hits=0
+for f in ${files[@]+"${files[@]}"}; do
+    first=""
+    IFS= read -r first <"$f" || true
+    case "$f" in *.sh | *.bash) ;; *) case "$first" in '#!'*bash* | '#!'*/sh*) ;; *) continue ;; esac ;; esac
+    out=$(sed -E "s/(^|[[:space:]])#.*//; s/'[^']*'//g" "$f" | grep -nE "$BAD_RE" || true)
+    [ -n "$out" ] || continue
+    while IFS= read -r hit; do
+        n=${hit%%:*}
+        raw=$(sed -n "${n}p" "$f")
+        [[ "$raw" =~ $WAIVER_RE ]] && continue
+        unassigned=""
+        for name in $(printf '%s\n' "${hit#*:}" | grep -oE "$FALLBACK_RE" | sed -E 's/^:-\$\{?//; s/[^A-Za-z0-9_]$//' | sort -u); do
+            grep -qE "^[[:space:]]*(local |export |readonly |declare( -[a-zA-Z]+)? )?$name=" "$f" || unassigned="$unassigned $name"
+        done
+        [ -z "$unassigned" ] || { hits=1; echo "$f:$hit  (unassigned:$unassigned)"; }
+    done <<<"$out"
+done
+# shellcheck disable=SC2016 # literal hint text
+[ "$hits" -eq 0 ] || { echo 'fix: name the target with a documented flag or a var this script assigns (waive: # ambient-env-ok: <reason>)'; exit 1; }
+echo "check-ambient-env-fallback: OK (${#files[@]} files scanned)"

@@ -81,7 +81,7 @@ class TeamView implements TeamViewInterface
      *
      * @param Team $team Team object
      */
-    private function renderBannerBlock(bool $isActualTeam, int $teamid, object $team, string $imagesPath, string $userTeamName, bool $isOwnTeam): string
+    private function renderBannerBlock(bool $isActualTeam, int $teamid, \Team\Team $team, string $imagesPath, string $userTeamName, bool $isOwnTeam): string
     {
         if ($isActualTeam) {
             return $this->renderTeamBanner($teamid, $team, $imagesPath, $userTeamName, $isOwnTeam);
@@ -122,7 +122,7 @@ class TeamView implements TeamViewInterface
      * @param string $draftPicksTable Pre-built HTML from TeamCardRenderer::renderDraftPicksTable()
      * @param string $awardsCard Pre-built HTML from TeamService::getTeamPageData() (TeamCardRenderer)
      */
-    private function renderCardsRow(bool $isActualTeam, object $team, string $currentSeasonCard, string $draftPicksTable, string $awardsCard): string
+    private function renderCardsRow(bool $isActualTeam, \Team\Team $team, string $currentSeasonCard, string $draftPicksTable, string $awardsCard): string
     {
         if (!$isActualTeam) {
             return '';
@@ -164,7 +164,7 @@ class TeamView implements TeamViewInterface
      *
      * @param Team $team Team object with color1, color2, name, discord_id properties
      */
-    private function renderTeamBanner(int $teamid, object $team, string $imagesPath, string $userTeamName, bool $isOwnTeam): string
+    private function renderTeamBanner(int $teamid, \Team\Team $team, string $imagesPath, string $userTeamName, bool $isOwnTeam): string
     {
         /** @var Team $team */
         $color1 = \UI\TableStyles::sanitizeColor($team->color1);
@@ -194,7 +194,7 @@ class TeamView implements TeamViewInterface
     /**
      * @param Team $team Team object with name property
      */
-    private function renderTradeButton(string $userTeamName, bool $isOwnTeam, object $team, string $imagesPath): string
+    private function renderTradeButton(string $userTeamName, bool $isOwnTeam, \Team\Team $team, string $imagesPath): string
     {
         if ($userTeamName === '') {
             return '';
@@ -212,7 +212,7 @@ class TeamView implements TeamViewInterface
     /**
      * @param Team $team Team object with discord_id property
      */
-    private function renderDiscordButton(string $userTeamName, bool $isOwnTeam, object $team, string $imagesPath): string
+    private function renderDiscordButton(string $userTeamName, bool $isOwnTeam, \Team\Team $team, string $imagesPath): string
     {
         if ($userTeamName === '') {
             return '';
@@ -236,7 +236,7 @@ class TeamView implements TeamViewInterface
      *
      * @param Team $team Team object with color1, color2 properties
      */
-    private function renderDraftPicksSection(object $team, string $draftPicksTable): string
+    private function renderDraftPicksSection(\Team\Team $team, string $draftPicksTable): string
     {
         /** @var Team $team */
         ob_start();

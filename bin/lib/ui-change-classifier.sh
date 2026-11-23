@@ -152,13 +152,15 @@ UI_LOCK_WS_RE='^        "([^"]+)": "([^"]+)",?$'
 UI_LOCK_PKG_RE='^    "([@A-Za-z0-9._/-]+)": (\[.*\]),?$'
 UI_LOCK_NAME_RE='^(@[A-Za-z0-9._-]+/)?[A-Za-z0-9._-]+@(0|[1-9][0-9]*)[.](0|[1-9][0-9]*)[.](0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$'
 # A specifier passes only when it is a semver range: comparators, versions, ||, and hyphen ranges.
+# A peerDependencies specifier may also be npm:<name>@<range>, with <name> in the UI_LOCK_NAME_RE charset and <range> passing UI_LOCK_SPEC_RE. dependencies and optionalDependencies get no alias.
 UI_LOCK_SPEC_RE='^ *([|][|]|-|[~^<>=]* *v?(0|[1-9][0-9]*|[*xX])([.](0|[1-9][0-9]*|[*xX]))*(-[0-9A-Za-z.-]+)?)( +([|][|]|-|[~^<>=]* *v?(0|[1-9][0-9]*|[*xX])([.](0|[1-9][0-9]*|[*xX]))*(-[0-9A-Za-z.-]+)?))* *$'
 UI_LOCK_ENTRY_JQ='
 if type == "array" and length == 4
   and (.[0] | type == "string" and test($re))
   and .[1] == ""
   and (.[2] | type == "object")
-  and ([.[2] | (.dependencies, .optionalDependencies, .peerDependencies) | select(. != null) | if type == "object" then .[] else error("dependency map is not an object") end | if type == "string" then . else error("specifier is not a string") end | select(test($spec) | not)] | length == 0)
+  and ([.[2] | (.dependencies, .optionalDependencies) | select(. != null) | if type == "object" then .[] else error("dependency map is not an object") end | if type == "string" then . else error("specifier is not a string") end | select(test($spec) | not)] | length == 0)
+  and ([.[2] | .peerDependencies | select(. != null) | if type == "object" then .[] else error("dependency map is not an object") end | if type == "string" then . else error("specifier is not a string") end | select((test($spec) or ((capture("^npm:(@[A-Za-z0-9._-]+/)?[A-Za-z0-9._-]+@(?<range>.+)$") | .range) // "" | test($spec))) | not)] | length == 0)
   and (.[3] | type == "string" and test("^sha512-[A-Za-z0-9+/]{86}==$"))
 then .[0] | sub("@[^@]*$"; "") else error("lock entry outside the registry shape") end'
 
@@ -241,8 +243,9 @@ _ui_pkg_lines_ok() {
 
 # _ui_lock_entry_name <line>: prints "<key> <name>" when <line> is one registry
 # entry of bun.lock: four fields, a plain name@version, the default registry
-# (empty second field), only semver-range specifiers in its dependency maps, and a
-# sha512 integrity. rc 1 for any other line.
+# (empty second field), only semver-range specifiers in its dependency maps (a
+# peerDependencies value may be an npm:<name>@<range> alias), and a sha512
+# integrity. rc 1 for any other line.
 _ui_lock_entry_name() {
     local key entry name
     [[ $1 =~ $UI_LOCK_PKG_RE ]] || return 1

@@ -15,7 +15,9 @@ At arming time the runner calls `arm_input_value`. It returns exactly "ok" only 
     file is a changed, existing, non-test engine `.go` file outside those two directories;
 (b) each named test starts with `TestTracePinned`, sits in a changed `_test.go` file, calls
     `jsbtrace.MustLoad(`, and its blob SHA matches the evidence;
-    each capture already exists on the base commit with the recorded sha256;
+    each capture already exists on the base commit with the recorded sha256, or, for an
+    entry with `capture_host: jsb-native`, exists at the recorded jsb-native commit
+    reachable from that repo's `main`, with the recorded sha256;
 (c) each test passes under `go test -json -coverprofile`, executes at least one line the PR
     adds in every file its entry declares, and fails when every captured output is
     perturbed, which proves its expected values come from the capture.
@@ -44,6 +46,10 @@ from .sql_equivalence import _blob_sha, _git
 TOKEN = "trace-pinned"
 EVIDENCE_DIR = "engine/trace-evidence"
 CAPTURE_DIR = "engine/testdata/jsb-captures"
+CAPTURE_HOSTS = ("repo", "jsb-native")
+HOSTED_DIR = "captures"  # capture dir inside the private jsb-native repo
+JSB_NATIVE_MAIN = "refs/heads/main"
+_COMMIT = re.compile(r"^[0-9a-f]{40}$")
 LOADER_DIR = "engine/internal/jsbtrace"  # the capture loader every pinned test trusts
 SCHEMA = 2
 TEST_PREFIX = "TestTracePinned"
@@ -299,7 +305,52 @@ def _check_test_entry(root, entry, changed) -> str:
     return "ok"
 
 
-def _check_capture(root, base, entry) -> str:
+def jsb_native_dir(root) -> Path:
+    """The jsb-native checkout beside the main IBL5 checkout. A worktree resolves to the main
+    checkout's copy; a CI checkout resolves to a path that does not exist. No env override."""
+    common = _git(["rev-parse", "--path-format=absolute", "--git-common-dir"], cwd=str(root))
+    return Path(common.strip()).parent / "jsb-native"
+
+
+def _hosted_ok(jsbn, args) -> bool:
+    return subprocess.run(["git", "-C", str(jsbn), *args], capture_output=True).returncode == 0
+
+
+def _hosted_bytes(entry, jsbn) -> bytes:
+    """The capture bytes from the recorded jsb-native commit (never its working tree)."""
+    return _git_bytes(["-C", str(jsbn), "show", f"{entry['capture_commit']}:{entry['capture']}"], jsbn)
+
+
+def _check_hosted_capture(entry, jsbn) -> str:
+    capture, commit = entry.get("capture"), entry.get("capture_commit")
+    if not isinstance(capture, str) or str(Path(capture).parent) != HOSTED_DIR \
+            or not capture.endswith(".jsonl") or ".." in capture:
+        return "capture-bad-path"
+    if not isinstance(commit, str) or not _COMMIT.match(commit):
+        return "capture-commit-bad"
+    jsbn = Path(jsbn)
+    if not (jsbn / ".git").exists():
+        return "capture-host-unavailable"
+    if not _hosted_ok(jsbn, ["cat-file", "-e", f"{commit}^{{commit}}"]):
+        return "capture-commit-bad"
+    if not _hosted_ok(jsbn, ["merge-base", "--is-ancestor", commit, JSB_NATIVE_MAIN]):
+        return "capture-commit-off-main"
+    if not _hosted_ok(jsbn, ["cat-file", "-e", f"{commit}:{capture}"]):
+        return "capture-not-at-commit"
+    data = _hosted_bytes(entry, jsbn)
+    if _sha256(data) != entry.get("capture_sha256"):
+        return "capture-hash-mismatch"
+    if _capture_lines(data) is None:
+        return "capture-unreadable"
+    return "ok"
+
+
+def _check_capture(root, base, entry, jsbn_dir=None) -> str:
+    host = entry.get("capture_host", "repo")
+    if host == "jsb-native":
+        return _check_hosted_capture(entry, jsbn_dir or jsb_native_dir(root))
+    if host != "repo":
+        return "capture-bad-host"
     capture = entry.get("capture")
     if not isinstance(capture, str) or str(Path(capture).parent) != CAPTURE_DIR \
             or not capture.endswith(".jsonl") or ".." in capture:
@@ -395,14 +446,28 @@ def coverage_verdict(root, base, ported, blocks) -> str:
     return "ok"
 
 
-def _run_entry(root, base, entry, run_go) -> str:
+def _run_entry(root, base, entry, run_go, jsbn_dir=None) -> str:
     """Steps (c) and the perturbation run for one evidence entry."""
-    test, package, capture = entry["test"], entry["package"], entry["capture"]
+    if entry.get("capture_host") == "jsb-native":
+        with tempfile.TemporaryDirectory(prefix="trace-pinned-hosted-") as stage_dir:
+            stage = Path(stage_dir)
+            name = Path(entry["capture"]).name
+            dest = stage / CAPTURE_DIR / name
+            dest.parent.mkdir(parents=True)
+            dest.write_bytes(_hosted_bytes(entry, jsbn_dir or jsb_native_dir(root)))
+            return _run_entry_at(root, base, entry, run_go, stage, f"{CAPTURE_DIR}/{name}",
+                                 {"JSB_TRACE_CAPTURE_DIR": str(stage / CAPTURE_DIR)})
+    return _run_entry_at(root, base, entry, run_go, root, entry["capture"], None)
+
+
+def _run_entry_at(root, base, entry, run_go, capture_root, capture, cover_env) -> str:
+    test, package = entry["test"], entry["package"]
     ported, module = entry["ported_files"], _module_path(root)
     with tempfile.TemporaryDirectory(prefix="trace-pinned-cover-") as cover_dir:
         profile = Path(cover_dir) / "cover.out"
+        extra = {"env": cover_env} if cover_env else {}
         verdict = run_go(root, package, test, cover_profile=str(profile),
-                         cover_pkgs=_cover_pkgs(module, ported))
+                         cover_pkgs=_cover_pkgs(module, ported), **extra)
         if verdict != "pass":
             return f"test-{verdict}"
         text = profile.read_text() if profile.is_file() else ""
@@ -413,7 +478,7 @@ def _run_entry(root, base, entry, run_go) -> str:
     if covered != "ok":
         return covered
     with tempfile.TemporaryDirectory(prefix="trace-pinned-") as tmp:
-        if write_perturbed_dir(root, capture, tmp) == 0:
+        if write_perturbed_dir(capture_root, capture, tmp) == 0:
             return "capture-out-unperturbable"
         verdict = run_go(root, package, test, env={"JSB_TRACE_CAPTURE_DIR": tmp})
     if verdict != "fail":
@@ -423,7 +488,7 @@ def _run_entry(root, base, entry, run_go) -> str:
     return "ok"
 
 
-def evaluate_data(root, branch, base, changed_files, data, run_go=None) -> str:
+def evaluate_data(root, branch, base, changed_files, data, run_go=None, jsbn_dir=None) -> str:
     """The verdict for an already-loaded evidence object."""
     run_go = run_go or run_go_test
     tests = data.get("tests") if isinstance(data, dict) else None
@@ -441,8 +506,8 @@ def evaluate_data(root, branch, base, changed_files, data, run_go=None) -> str:
     for entry in tests:
         for step in (lambda: _check_ported(root, entry, changed),
                      lambda: _check_test_entry(root, entry, changed),
-                     lambda: _check_capture(root, base, entry),
-                     lambda: _run_entry(root, base, entry, run_go)):
+                     lambda: _check_capture(root, base, entry, jsbn_dir),
+                     lambda: _run_entry(root, base, entry, run_go, jsbn_dir)):
             note = step()
             if note != "ok":
                 return note
@@ -494,7 +559,8 @@ def _find_test_file(root, package, test) -> str:
     return ""
 
 
-def record(root, branch, test_specs, capture_names, run_go=None, ported_specs=None) -> int:
+def record(root, branch, test_specs, capture_names, run_go=None, ported_specs=None,
+           capture_host="repo", jsbn_dir=None) -> int:
     """Write the evidence file after every check passes. 0 written, 1 refused, 2 usage."""
     test_specs, capture_names = list(test_specs or ()), list(capture_names or ())
     ported_specs = list(ported_specs or ())
@@ -510,20 +576,34 @@ def record(root, branch, test_specs, capture_names, run_go=None, ported_specs=No
         if not sep or not package or not test or "/" in name:
             print(f"trace_pinned: bad --test {spec!r} or --capture {name!r}", file=sys.stderr)
             return 2
-        capture = f"{CAPTURE_DIR}/{name}"
         file = _find_test_file(root, package, test)
-        capture_file = Path(root) / capture
-        tests.append({
-            "package": package, "test": test, "file": file,
-            "ported_files": ported.split(","),
-            "test_blob": _blob_sha(root, file) if file else "",
-            "capture": capture,
-            "capture_sha256": _sha256(capture_file.read_bytes()) if capture_file.is_file() else "",
-        })
+        entry = {"package": package, "test": test, "file": file,
+                 "ported_files": ported.split(","),
+                 "test_blob": _blob_sha(root, file) if file else ""}
+        if capture_host == "jsb-native":
+            capture = f"{HOSTED_DIR}/{name}"
+            jsbn = Path(jsbn_dir or jsb_native_dir(root))
+            commit = ""
+            if (jsbn / ".git").exists():
+                proc = subprocess.run(["git", "-C", str(jsbn), "log", "-1", "--format=%H",
+                                       JSB_NATIVE_MAIN, "--", capture],
+                                      capture_output=True, text=True)
+                commit = proc.stdout.strip() if proc.returncode == 0 else ""
+            entry.update({"capture": capture, "capture_host": "jsb-native",
+                          "capture_commit": commit, "capture_sha256": ""})
+            if commit and _hosted_ok(jsbn, ["cat-file", "-e", f"{commit}:{capture}"]):
+                entry["capture_sha256"] = _sha256(_hosted_bytes(entry, jsbn))
+        else:
+            capture = f"{CAPTURE_DIR}/{name}"
+            capture_file = Path(root) / capture
+            entry.update({"capture": capture,
+                          "capture_sha256": _sha256(capture_file.read_bytes())
+                          if capture_file.is_file() else ""})
+        tests.append(entry)
     data = {"schema": SCHEMA, "token": TOKEN, "branch": branch, "tests": tests}
     base = resolve_base(root, branch)
     changed = sorted(set(changed_files_since(root, base) if base else []) | {evidence_rel(branch)})
-    verdict = evaluate_data(root, branch, base, changed, data, run_go)
+    verdict = evaluate_data(root, branch, base, changed, data, run_go, jsbn_dir)
     if verdict != "ok":
         print(f"trace_pinned: refusing to write evidence: {verdict}", file=sys.stderr)
         return 1
@@ -541,6 +621,8 @@ def _parser() -> argparse.ArgumentParser:
     rec.add_argument("--branch", required=True)
     rec.add_argument("--test", action="append", default=[])
     rec.add_argument("--capture", action="append", default=[])
+    rec.add_argument("--capture-host", choices=CAPTURE_HOSTS, default="repo",
+                     help="where every --capture lives: this repo or jsb-native captures/")
     rec.add_argument("--ported", action="append", default=[],
                      help="comma-separated engine .go files the paired --test ports; one per --test")
     chk = sub.add_parser("check", help="print the arming verdict for this branch's evidence")
@@ -552,7 +634,8 @@ def main(argv) -> int:
     args = _parser().parse_args(argv)
     root = _git(["rev-parse", "--show-toplevel"]).strip()
     if args.command == "record":
-        return record(root, args.branch, args.test, args.capture, ported_specs=args.ported)
+        return record(root, args.branch, args.test, args.capture, ported_specs=args.ported,
+                      capture_host=args.capture_host)
     base = resolve_base(root, args.branch)
     verdict = (evaluate_evidence(root, args.branch, base, changed_files_since(root, base))
                if base else "base-unresolved")

@@ -1,6 +1,6 @@
 ---
 description: Locates current draft pick ownership across trades and deals.
-last_verified: 2026-09-22
+last_verified: 2026-11-21
 ---
 
 # DraftPickLocator

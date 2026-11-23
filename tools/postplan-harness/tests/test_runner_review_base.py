@@ -1,4 +1,4 @@
-"""runner routes reviewer-facing diffs through LiveGit.review_base(); arming reads stay on master."""
+"""runner routes reviewer-facing diffs through LiveGit.review_base(); arming reads stay on master except the planned-landed filter, which also checks the review base."""
 from __future__ import annotations
 
 import os
@@ -127,6 +127,124 @@ def test_run_passes_review_diff_to_fidelity(tmp_path, monkeypatch):
     monkeypatch.setattr(runner, "_run_fidelity", spy)
     h.run("stacked")
     assert seen == [stacked]
+
+
+def _arming_spy(monkeypatch):
+    """Wrap reviewer_arming_holds; returns the list of (args, kwargs) calls."""
+    calls = []
+    real = runner.fidelity.reviewer_arming_holds
+
+    def spy(*args, **kw):
+        calls.append((args, kw))
+        return real(*args, **kw)
+
+    monkeypatch.setattr(runner.fidelity, "reviewer_arming_holds", spy)
+    return calls
+
+
+def test_run_arming_master_base_reads_master_inputs(tmp_path, monkeypatch):
+    h = Harness(tmp_path, monkeypatch)
+    reads = []
+
+    class RecordingGit(gitad.ReplayGit):
+        def conformance_files(self, *a, **k):
+            out = super().conformance_files(*a, **k)
+            reads.append(("conformance_files", a, k, out))
+            return out
+
+        def diff_vs_base(self, *a, **k):
+            out = super().diff_vs_base(*a, **k)
+            reads.append(("diff_vs_base", a, k, out))
+            return out
+
+    calls = _arming_spy(monkeypatch)
+    monkeypatch.setattr(runner, "ReplayGit", RecordingGit)
+    h.run("stacked")
+    assert len(calls) == 1
+    args, _ = calls[0]
+    files = [r[3] for r in reads if r[0] == "conformance_files" and not r[1] and not r[2]]
+    diffs = [r[3] for r in reads if r[0] == "diff_vs_base" and not r[1] and not r[2]]
+    assert args[1] in files
+    assert args[2] in diffs
+
+
+def test_landed_later_review_inputs_master_base_is_none():
+    def boom(*a, **k):
+        raise AssertionError("must not read git on the master base")
+
+    git = types.SimpleNamespace(conformance_files=boom, diff_vs_base=boom)
+    logs = []
+    assert runner._landed_later_review_inputs(git, MASTER_REVIEW_BASE, logs.append) is None
+    assert logs == []
+
+
+def test_landed_later_review_inputs_stacked_reads_parent_ref():
+    bases = []
+
+    def files(base="origin/master"):
+        bases.append(base)
+        return ["child.py"]
+
+    def diff(base="origin/master"):
+        bases.append(base)
+        return "<diff>"
+
+    git = types.SimpleNamespace(conformance_files=files, diff_vs_base=diff)
+    out = runner._landed_later_review_inputs(git, ReviewBase(SHA, "parent"), [].append)
+    assert out == (["child.py"], "<diff>")
+    assert bases == [SHA, SHA]
+
+
+def test_landed_later_review_inputs_git_error_keeps_holds():
+    def files(base="origin/master"):
+        raise RuntimeError("boom")
+
+    git = types.SimpleNamespace(conformance_files=files, diff_vs_base=lambda base="x": "")
+    logs = []
+    assert runner._landed_later_review_inputs(git, ReviewBase(SHA, "parent"), logs.append) == ((), "")
+    assert len(logs) == 1 and "keeping planned-landed holds" in logs[0]
+
+
+def test_run_arming_stacked_passes_review_base_inputs(tmp_path, monkeypatch):
+    h = Harness(tmp_path, monkeypatch)
+    stacked = _section("B.txt", 1, "x")
+
+    master_files, master_diffs = [], []
+
+    class StackedGit(gitad.ReplayGit):
+        def review_base(self):
+            return ReviewBase(SHA, "parent")
+
+        def diff_vs_base(self, base="origin/master"):
+            if base == SHA:
+                return stacked
+            out = super().diff_vs_base(base)
+            master_diffs.append(out)
+            return out
+
+        def conformance_files(self, base="origin/master"):
+            if base == SHA:
+                return ["child.py"]
+            out = super().conformance_files(base)
+            master_files.append(out)
+            return out
+
+    calls = _arming_spy(monkeypatch)
+    monkeypatch.setattr(runner, "ReplayGit", StackedGit)
+    h.run("stacked")
+    assert len(calls) == 1
+    args, kwargs = calls[0]
+    assert kwargs["review_inputs"] == (["child.py"], stacked)
+    assert args[1] in master_files and args[1] != ["child.py"]
+    assert args[2] in master_diffs and args[2] != stacked
+
+
+def test_run_arming_master_base_passes_no_review_inputs(tmp_path, monkeypatch):
+    h = Harness(tmp_path, monkeypatch)
+    calls = _arming_spy(monkeypatch)
+    h.run("stacked")
+    assert len(calls) == 1
+    assert calls[0][1].get("review_inputs") is None
 
 
 def test_same_run_delta_review_reads_review_diff(monkeypatch):

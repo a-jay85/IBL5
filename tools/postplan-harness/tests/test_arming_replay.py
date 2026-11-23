@@ -829,6 +829,7 @@ def test_aliased_open_for_append_stays_held(tmp_path):
 
 
 def test_pathlib_open_for_append_stays_held(tmp_path):
+    """`pathlib.Path(path).open("a")` raises a write-mode `open` audit event through an alias."""
     v, text = _fid_replay(tmp_path, lambda s: _insert_first_line(
         s, "parse_verdict", 'import pathlib as _pl; _pl.Path(path).open("a").close()'))
     assert v.cleared is False, text

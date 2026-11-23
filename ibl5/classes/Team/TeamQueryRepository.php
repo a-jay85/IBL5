@@ -113,7 +113,6 @@ class TeamQueryRepository extends \Database\BaseMysqliRepository implements Team
     {
         /** @var list<DraftPickRow> */
         return $this->fetchAll(
-            // @phpstan-ignore ibl.orderByMissingTiebreaker (pickid is the PK of ibl_draft_picks, inherently unique)
             "SELECT *
             FROM `ibl_draft_picks`
             WHERE owner_teamid = ?

@@ -127,6 +127,9 @@
 #                              material) carries a `context-budget:` marker with
 #                              a one-line justification; validity of that
 #                              justification stays Opus judgment.
+#   NC a Critical Files change target within 1024 B of a byte cap needs a
+#                              'budget-cuts:' line naming the path (caps read
+#                              from each owning script's --print-caps).
 #   T  Tier binding         — an implementation phase whose `**Tier:**` line
 #                              names a tier BELOW the plan's whole-run model
 #                              (bin/lib/plan-impl-model, ranked opus>sonnet>haiku)
@@ -2318,12 +2321,13 @@ done < "$MATRIX_FILE"
 # whose ) closes on the same segment moved nothing, so later segments are still checked.
 # Version flags need no project, and bun or composer validate given an ibl5/ path find
 # their file from the root, so those pass.
+# A version flag may carry trailing redirects (>/dev/null, 2>&1, &>file) and still passes.
 # ---------------------------------------------------------------------------
 # php may carry flags before the path. -d, -c and -z take a separate value. -r takes
 # inline code, so a path after it is only an argument and is not what php opens.
 _cw_re='^(\./)?vendor/bin/|^(composer|bun|bunx|npm|npx)([[:space:]]|$)|^php[[:space:]]+(((-[dcz]|--define|--php-ini|--zend-extension)[[:space:]]+[^[:space:]]+|-[^r[:space:]][^[:space:]]*)[[:space:]]+)*(\./)?(vendor|scripts|tests)/'
 _cw_dir_re='^composer[[:space:]](.*[[:space:]])?(-d[^[:space:]]*|--working-dir(=[^[:space:]]*)?)([[:space:]]|$)|^npm[[:space:]](.*[[:space:]])?--prefix([=[:space:]]|$)|^bun[[:space:]]+(run[[:space:]]+)?--cwd([=[:space:]]|$)'
-_cw_root_ok_re='^(composer|bun|bunx|npm|npx)[[:space:]]+(--version|-[vV])([[:space:])}]*|[[:space:]]*\).*)$|^bun([[:space:]]+run)?[[:space:]]+(\./)?ibl5/|^composer[[:space:]]+validate[[:space:]](.*[[:space:]])?(\./)?ibl5/'
+_cw_root_ok_re='^(composer|bun|bunx|npm|npx)[[:space:]]+(--version|-[vV])([[:space:]]+[0-9]*(&>>?|>>?|<)[[:space:]]*[^[:space:])}]+)*([[:space:])}]*|[[:space:]]*\).*)$|^bun([[:space:]]+run)?[[:space:]]+(\./)?ibl5/|^composer[[:space:]]+validate[[:space:]](.*[[:space:]])?(\./)?ibl5/'
 _cw_wrap_re='^(env|time)([[:space:]]+-[^[:space:]]+)*[[:space:]]+(.*)$'
 _cw_timeout_re='^g?timeout([[:space:]]+-[^[:space:]]+)*[[:space:]]+[0-9.]+[smhd]?[[:space:]]+(.*)$'
 _cw_flagval_re='^((env|time|g?timeout)([[:space:]]+-[^[:space:]]+)*)[[:space:]]+(-u|--unset|-s|--signal|-k|--kill-after|-o|--output)[[:space:]]+[^[:space:]]+[[:space:]]+(.*)$'
@@ -2437,6 +2441,44 @@ CB_CF_COUNT=$(cf_parse_section "$PLAN_FILE" | grep -c '^MUST_APPEAR:' || true)
 if [ "$CB_LINES" -ge 500 ] || [ "$CB_PHASES" -ge 12 ]; then
     if ! grep -qF 'context-budget:' "$PLAN_FILE"; then
         viol "[C] marathon-sized plan (${CB_LINES} lines, ${CB_PHASES} numbered phases, ${CB_VM_ROWS} matrix rows, ${CB_CF_COUNT} critical-file targets; flags at >=500 lines or >=12 phases) — split into stacked PR-sized plans (/plan Step 2.5), or justify a deliberate exception with a 'context-budget:' marker"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# Gate NC: a plan that changes a near-cap byte-capped file must name its cuts.
+# ---------------------------------------------------------------------------
+# Change targets come from the Critical Files parser (MUST_APPEAR entries only;
+# reference-marked and (conditional) entries are not edits). Caps and sizes come
+# from each cap's owning script via --print-caps, measured at the base ref, so
+# no cap value is copied here. Additive: a plan with no near-cap target is untouched.
+NC_THRESHOLD=1024
+NC_TARGETS=$(cf_parse_section "$PLAN_FILE" | sed -n 's/^MUST_APPEAR:[[:space:]]*//p' | sed 's/[[:space:]]*$//') || NC_TARGETS=''
+if [ -n "$NC_TARGETS" ]; then
+    NC_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
+    NC_REF="${CHECK_PLAN_BUDGET_REF:-}"
+    if [ -z "$NC_REF" ]; then
+        NC_REF=origin/master
+        git -C "$NC_ROOT" rev-parse --verify -q 'origin/master^{commit}' >/dev/null || NC_REF=master
+    fi
+    if ! git -C "$NC_ROOT" rev-parse --verify -q "${NC_REF}^{commit}" >/dev/null; then
+        warn "[NC] skipped: base ref '${NC_REF}' does not resolve, so near-cap headroom is unmeasured"
+    else
+        NC_CAPS=$(cd "$NC_ROOT" && {
+            "$SCRIPT_DIR/check-rules-byte-budget" --print-caps --ref="$NC_REF" || true
+            "$SCRIPT_DIR/test-architect-contract-split" --print-caps --ref="$NC_REF" || true
+        } 2>/dev/null) || NC_CAPS=''
+        [ -n "$NC_CAPS" ] || warn "[NC] skipped: --print-caps printed no cap rows"
+        while IFS=$'\t' read -r nc_path nc_class nc_cap nc_bytes nc_room; do
+            [ -n "$nc_path" ] || continue
+            grep -qxF "$nc_path" <<< "$NC_TARGETS" || continue
+            [ "$nc_room" -lt "$NC_THRESHOLD" ] || continue
+            if awk -v p="budget-cuts: $nc_path" \
+                'i = index($0, p) { if (length(substr($0, i + length(p))) >= 15) f = 1 } END { exit !f }' \
+                "$PLAN_FILE"; then
+                continue
+            fi
+            viol "[NC] plan changes ${nc_path} (${nc_class}), which has ${nc_room} B of headroom under its ${nc_cap} B cap at ${NC_REF} (flags below ${NC_THRESHOLD} B); add a line 'budget-cuts: ${nc_path} <the text you cut, or the -detail.md companion the text moves to>'"
+        done <<< "$NC_CAPS"
     fi
 fi
 

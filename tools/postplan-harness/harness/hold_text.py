@@ -44,7 +44,9 @@ def _missing_item(item: str) -> str:
     m = re.match(r"MISSING-FILE:\s*(\S+)", item)
     if m:
         return f"file {m.group(1)}"
-    m = re.match(r"MISSING-PHASE:\s*\d+\s*—\s*(.*?)(?:\s*\(phase cites .*)?$", item)
+    # The reason is split on `;` first, so a Files-line item's first piece ends at
+    # `(Files line only`; strip that tail the same way as `(phase cites ...`.
+    m = re.match(r"MISSING-PHASE:\s*\d+\s*—\s*(.*?)(?:\s*\((?:Files line only\b|phase cites ).*)?$", item)
     if m:
         return m.group(1)
     m = re.match(r"UNREALISED-ASSERTION:\s*row\s*(\S+)", item)

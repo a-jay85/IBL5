@@ -59,7 +59,6 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
     {
         /** @var list<AwardRow> */
         return $this->fetchAll(
-            // @phpstan-ignore ibl.orderByMissingTiebreaker (table_id is the ibl_awards primary key)
             "SELECT year, award, name, table_id FROM `ibl_awards` WHERE year = ? ORDER BY award ASC, table_id ASC",
             "i",
             $year

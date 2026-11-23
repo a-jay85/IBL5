@@ -11,6 +11,8 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=bin/lib/bug-bot-dist.sh disable=SC1091
+source "$SCRIPT_DIR/lib/bug-bot-dist.sh"
 
 # Env seams — override via env vars in tests; defaults are production values
 TICK_HEARTBEAT="${BUG_PIPELINE_TICK_HEARTBEAT:-$HOME/.claude/logs/bug-pipeline-tick-heartbeat}"
@@ -250,12 +252,6 @@ check_bot_loaded() {
     fi
 }
 
-# _mtime <file> — file mtime as epoch seconds. GNU stat first: on GNU, `stat -f`
-# is the filesystem flag and would print noise to stdout.
-_mtime() {
-    stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null
-}
-
 # _etime_secs <ps-etime> — turn ps's [[dd-]hh:]mm:ss into seconds. Exit 1 for
 # anything else. bash 3.2 safe (one awk program, no arrays).
 _etime_secs() {
@@ -272,11 +268,12 @@ _etime_secs() {
 }
 
 # check_bot_build — the bot runs from its dist/bug-bot build folder under the
-# IBLbot package, which is gitignored and built by hand. A merged src change does nothing until someone
-# rebuilds the dist AND restarts the process. Two signals, one per step.
+# IBLbot package, which is gitignored. A merged src change does nothing until the
+# dist is rebuilt AND the process restarts. bin/bug-pipeline-tick does both on its
+# own (maybe_rebuild_bot); these two signals catch it when that step fails.
 check_bot_build() {
-    local src_ct dist newest m f pid secs start os pout
-    src_ct="$("$GIT_BIN" -C "$BOT_REPO_ROOT" log -1 --format=%ct -- ibl5/IBLbot/src/bug-bot 2>/dev/null)"
+    local src_ct dist newest pid secs start os pout
+    src_ct="$(bug_bot_src_ct "$BOT_REPO_ROOT" "$GIT_BIN")"
     case "$src_ct" in
         ''|*[!0-9]*)
             emit UNKNOWN botdist:unprobeable "no git history for ibl5/IBLbot/src/bug-bot"
@@ -285,14 +282,7 @@ check_bot_build() {
     esac
 
     dist="$BOT_REPO_ROOT/ibl5/IBLbot/dist/bug-bot"
-    newest=""
-    if [ -d "$dist" ]; then
-        while IFS= read -r f; do
-            m="$(_mtime "$f")"
-            case "$m" in ''|*[!0-9]*) continue ;; esac
-            if [ -z "$newest" ] || [ "$m" -gt "$newest" ]; then newest="$m"; fi
-        done < <(find "$dist" -type f 2>/dev/null)
-    fi
+    newest="$(bug_bot_dist_newest "$BOT_REPO_ROOT")"
     if [ -z "$newest" ]; then
         emit UNKNOWN botdist:unprobeable "$dist absent; the bug-bot is not built on this host"
         return 0

@@ -57,6 +57,12 @@ class TestCharacterizationTodayDeny:
         for name in ("fidelity.py", "thread_ingestion.py", "prosefix.py"):
             text = base.with_name(name).read_text()
             assert "denied_gate_edits(" in text, name
+            if name == "fidelity.py":
+                # The Phase 5.5 fixer imports the module for annotate_work_list only
+                # (budget-trim fix hint). It must not use the ci-fix carve-out hooks.
+                for hook in ("snapshot(", "permit(", "carveout_prompt_text", "file_verdicts("):
+                    assert f"rules_budget_carveout.{hook}" not in text, hook
+                continue
             assert "rules_budget_carveout" not in text, name
         paths = [".claude/rules/x.md", "bin/check-prose", ".github/workflows/t.yml",
                  "tools/postplan-harness/harness/armable.py", "ibl5/x.php"]
@@ -446,3 +452,101 @@ class TestRunnerWiring:
                  failed=["Static guards"])
         assert _has(r.lines, "rules-budget carve-out inactive (no worktree)")
         assert git.pushes == 0
+
+
+# --- budget-forced trim hint (annotate_work_list) ------------------------------------
+
+X_RULES = ".claude/rules/x.md"
+X_LINES = 10                                   # 10 lines x 100 B = 1000 B at base
+FINDING = (f"- [BLOCKING] [unplanned-scope] The PR deleted prose from `{X_RULES}` "
+           "that the plan never named. Put the phrases back.")
+
+
+def _caps_stub(root, cap, *, exit_code=0):
+    """Cap oracle: prints one --print-caps row for x.md from the HEAD size and `cap`."""
+    size = os.path.getsize(os.path.join(root, X_RULES))
+    row = f"{X_RULES}\tlazy\t{cap}\t{size}\t{cap - size}"
+    stub = pathlib.Path(root) / "bin" / "check-rules-byte-budget"
+    stub.parent.mkdir(exist_ok=True)
+    stub.write_text("#!/bin/sh\n"
+                    f'if [ "{exit_code}" != 0 ]; then exit {exit_code}; fi\n'
+                    f"printf '{row}\\n'\n")
+    stub.chmod(0o755)
+
+
+@pytest.fixture
+def trim_repo(tmp_path):
+    """Base holds 1000 B in x.md; the PR commit deletes 3 lines (300 B), leaving 700 B."""
+    root = tmp_path / "trim"
+    root.mkdir()
+    _g(root, "init", "-q")
+    _g(root, "config", "user.name", "t")
+    _g(root, "config", "user.email", "t@example.com")
+    _g(root, "config", "commit.gpgsign", "false")
+    lines = [f"{i}" * 99 + "\n" for i in range(X_LINES)]
+    base = _commit(root, "base", {X_RULES: "".join(lines)})
+    _commit(root, "pr", {X_RULES: "".join(lines[:7])})
+    return SimpleNamespace(root=str(root), base=base)
+
+
+def _items(*texts):
+    return [{"hold": "12", "text": t} for t in texts]
+
+
+def test_annotate_work_list_pins_hint_wording(trim_repo):
+    _caps_stub(trim_repo.root, 700)                      # headroom 0, 300 B cut: forced
+    out = rbc.annotate_work_list(_items(FINDING), trim_repo.root, trim_repo.base)
+    hint = rbc.BUDGET_TRIM_HINT.format(path=X_RULES)
+    assert out[0]["text"].endswith(hint)
+    assert out[0]["text"] == f"{FINDING}\n{hint}"
+    assert "Shrink your own added text or move it to a -detail companion." in out[0]["text"]
+    assert out[0]["hold"] == "12"
+
+
+def test_annotate_work_list_keeps_blocking_tag(trim_repo):
+    _caps_stub(trim_repo.root, 700)
+    other = "- [NOTE] a different finding"
+    out = rbc.annotate_work_list(_items(FINDING, other), trim_repo.root, trim_repo.base)
+    assert len(out) == 2
+    assert out[0]["text"].startswith("- [BLOCKING] [unplanned-scope]")
+    assert "[NOTE]" not in out[0]["text"]
+    assert out[1]["text"] == other
+
+
+def test_budget_forced_paths_skips_trim_that_fits(trim_repo):
+    _caps_stub(trim_repo.root, 2000)                     # 1300 B headroom >= 300 B cut
+    assert rbc.budget_forced_paths(trim_repo.root, trim_repo.base, [X_RULES]) == frozenset()
+    items = _items(FINDING)
+    out = rbc.annotate_work_list(items, trim_repo.root, trim_repo.base)
+    assert out == items
+    assert out[0]["text"] == FINDING
+
+
+def test_annotate_work_list_skips_withheld_and_non_rules(trim_repo):
+    _caps_stub(trim_repo.root, 700)
+    non_rules = "- [BLOCKING] [unplanned-scope] The PR touched `bin/foo` without a plan row."
+    no_tag = f"- [BLOCKING] The PR deleted prose from `{X_RULES}`."
+    items = _items(FINDING, non_rules, no_tag)
+    out = rbc.annotate_work_list(items, trim_repo.root, trim_repo.base, skip=(FINDING,))
+    assert [i["text"] for i in out] == [FINDING, non_rules, no_tag]
+
+
+def test_budget_forced_paths_script_failure_returns_empty(trim_repo):
+    _caps_stub(trim_repo.root, 700, exit_code=2)
+    assert rbc.budget_forced_paths(trim_repo.root, trim_repo.base, [X_RULES]) == frozenset()
+    items = _items(FINDING)
+    assert rbc.annotate_work_list(items, trim_repo.root, trim_repo.base) == items
+
+
+def test_carveout_does_not_import_fidelity():
+    import ast
+    tree = ast.parse(pathlib.Path(rbc.__file__).read_text())
+    names = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            names.update(a.name for a in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            names.add(node.module or "")
+            names.update(a.name for a in node.names)
+    flat = {part for n in names for part in n.replace(".", " ").split()}
+    assert "fidelity" not in flat and "unplanned_scope" not in flat

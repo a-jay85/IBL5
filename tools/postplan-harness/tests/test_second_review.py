@@ -214,6 +214,28 @@ def _pass(inp, spawn, head=lambda: TREE_A, plan=None, diff=lambda: "diff\n"):
     return second_review.review_pass(inp, PR, head, diff, plan, lambda _m: None, spawn)
 
 
+def test_over_cap_diff_names_the_cap_in_the_hold():
+    calls = []
+    big = "x" * (fidelity.REMEDIATION_DIFF_INLINE_CAP + 1)
+    inp = inputs(**PLAN_HOLD, current_tree=TREE_A)
+    out = _pass(inp, lambda **kw: calls.append(kw), diff=lambda: big)
+    assert calls == []
+    decision = evaluate(out)
+    assert not decision.armed
+    reason = decision.holds[0].reason
+    assert "second reviewer: absent, diff too big" in reason
+    assert f"{len(big)} bytes > {fidelity.REMEDIATION_DIFF_INLINE_CAP} cap" in reason
+
+
+def test_failed_spawn_on_small_diff_stays_plain_absent():
+    def spawn(**_):
+        raise RuntimeError("boom")
+    inp = inputs(**PLAN_HOLD, current_tree=TREE_A)
+    decision = evaluate(_pass(inp, spawn))
+    assert not decision.armed
+    assert decision.holds[0].reason.endswith("second reviewer: absent")
+
+
 def test_runner_seats_on_pre_spawn_tree():
     state = {"tree": TREE_A}
 

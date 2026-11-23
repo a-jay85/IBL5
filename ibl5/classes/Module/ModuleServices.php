@@ -161,6 +161,7 @@ final class ModuleServices
      * @param class-string<T> $type
      * @return T
      */
+    // @phpstan-ignore ibl.bareObjectType (template T of object: native object is the only fitting type)
     private function typed(string $id, string $type): object
     {
         $service = $this->container->get($id);

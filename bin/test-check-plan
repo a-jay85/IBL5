@@ -15,6 +15,7 @@
 #      bin/test-check-plan gateQ  (only the gate [Q] seed-state block, for plan mutation checks)
 #      bin/test-check-plan gateHC  (only the gate [HC] How-column block, for plan mutation checks)
 #      bin/test-check-plan gateCR  (only the gate [CR] bare-marker block, for plan mutation checks)
+#      bin/test-check-plan gateNC  (only the gate [NC] near-cap cases, for plan mutation checks)
 #      bin/test-check-plan gateH  (only the gate [H] hold cases, for plan mutation checks)
 #
 # shellcheck disable=SC2016  # backtick spans in the single-quoted plan fixtures
@@ -568,6 +569,151 @@ assert_msg "q_novr_class_unasserted_quiet" 0 "" "[Q-advisory]" "$FM_OPUS"'
 fi
 [ "$TCP_ONLY" != gateQ ] || h_done
 
+# ---------------------------------------------------------------------------
+# Gate [NC]: near-cap byte-capped Critical Files target needs a budget-cuts
+# marker. Every case measures headroom at HEAD (CHECK_PLAN_BUDGET_REF=HEAD) so
+# CI and local runs read the same tree. Sizes are computed per run, never pinned.
+# `bin/test-check-plan gateNC` runs these alone.
+# ---------------------------------------------------------------------------
+if [ -z "$TCP_ONLY" ] || [ "$TCP_ONLY" = gateNC ]; then
+NC_RULES_CAPS="$SCRIPT_DIR/check-rules-byte-budget"
+NC_CONTRACT_CAPS="$SCRIPT_DIR/test-architect-contract-split"
+NC_LAZY_ROW=$("$NC_RULES_CAPS" --print-caps --ref=HEAD | awk -F'\t' '$2 == "lazy" && !f { print; f = 1 }')
+NC_LAZY=$(printf '%s' "$NC_LAZY_ROW" | cut -f1)
+NC_LAZY_B=$(printf '%s' "$NC_LAZY_ROW" | cut -f4)
+NC_NEAR=$((NC_LAZY_B + 100))      # lazy cap leaving exactly 100 B of headroom
+NC_AMPLE=$((NC_LAZY_B + 100000))  # lazy cap leaving 100000 B
+NC_CONTRACT=.claude/skills/plan/_architect-contract.md
+
+# _nc_run <name> <plan-body> [ENV=VAL ...]: run check-plan on the fixture with the
+# given env; sets NC_OUT. Returns 1 when this shard does not own the case.
+_nc_run() {
+    _nc_name="$1"; _nc_body="$2"; shift 2
+    _nc_f="$TMP/$_nc_name.md"
+    printf '%s\n' "$_nc_body" > "$_nc_f"
+    h_shard_take || return 1
+    NC_OUT="$(env CHECK_PLAN_BUDGET_REF=HEAD "$@" "$GUARD" "$_nc_f" 2>&1)" || true
+    return 0
+}
+# _nc_expect <name> <has|none> <token>: assert NC_OUT contains / lacks <token>.
+_nc_expect() {
+    if [ "$2" = has ]; then
+        if grep -qF -- "$3" <<< "$NC_OUT"; then h_pass "$1"; else h_fail "$1" "'$3' not in output"; fi
+    else
+        if grep -qF -- "$3" <<< "$NC_OUT"; then h_fail "$1" "'$3' unexpectedly in output"; else h_pass "$1"; fi
+    fi
+}
+_nc_cf() { printf '%s\n## Critical Files\n%s\n' "$FM$CF_MATRIX" "$1"; }
+
+# 1. No marker on a near-cap target: [NC] fires and states the headroom (row 7).
+if _nc_run gateNC-fail-without-marker "$(_nc_cf "- \`$NC_LAZY\` (extend)")" RULES_LAZY_BUDGET="$NC_NEAR"; then
+    _nc_expect "gateNC-fail-without-marker names path" has "[NC] plan changes $NC_LAZY"
+    _nc_expect "gateNC-fail-without-marker names headroom" has "100 B of headroom"
+fi
+# 2. A budget-cuts line with a reason clears it (row 8).
+if _nc_run gateNC-pass-with-marker "$(_nc_cf "- \`$NC_LAZY\` (extend)")
+budget-cuts: $NC_LAZY move the example table to a -detail.md companion" RULES_LAZY_BUDGET="$NC_NEAR"; then
+    _nc_expect "gateNC-pass-with-marker" none "[NC]"
+fi
+# 3. Ample headroom needs no marker (row 9).
+if _nc_run gateNC-ample-headroom "$(_nc_cf "- \`$NC_LAZY\` (extend)")" RULES_LAZY_BUDGET="$NC_AMPLE"; then
+    _nc_expect "gateNC-ample-headroom" none "[NC]"
+fi
+# 4. A target with no byte cap needs no marker (row 10).
+if _nc_run gateNC-no-cap "$(_nc_cf '- `bin/check-plan` (extend)')" RULES_LAZY_BUDGET="$NC_NEAR"; then
+    _nc_expect "gateNC-no-cap" none "[NC]"
+fi
+# 5. Near-miss markers still fail (row 11): another file, a bare context-budget, no reason.
+if _nc_run gateNC-nearmiss-other-file "$(_nc_cf "- \`$NC_LAZY\` (extend)")
+budget-cuts: .claude/rules/other.md cut the long example" RULES_LAZY_BUDGET="$NC_NEAR"; then
+    _nc_expect "gateNC-nearmiss-other-file" has "[NC] plan changes $NC_LAZY"
+fi
+if _nc_run gateNC-nearmiss-context-budget "$(_nc_cf "- \`$NC_LAZY\` (extend)")
+context-budget: big plan" RULES_LAZY_BUDGET="$NC_NEAR"; then
+    _nc_expect "gateNC-nearmiss-context-budget" has "[NC] plan changes $NC_LAZY"
+fi
+if _nc_run gateNC-nearmiss-no-reason "$(_nc_cf "- \`$NC_LAZY\` (extend)")
+budget-cuts: $NC_LAZY" RULES_LAZY_BUDGET="$NC_NEAR"; then
+    _nc_expect "gateNC-nearmiss-no-reason" has "[NC] plan changes $NC_LAZY"
+fi
+# 6. A reference-marked entry is not an edit (row 12).
+if _nc_run gateNC-reference-entry "$(_nc_cf "- \`$NC_LAZY\` (reference)")" RULES_LAZY_BUDGET="$NC_NEAR"; then
+    _nc_expect "gateNC-reference-entry" none "[NC]"
+fi
+# 7. Base-ref env (row 13). Empty behaves like unset; an unresolvable ref skips.
+if _nc_run gateNC-empty-ref "$(_nc_cf "- \`$NC_LAZY\` (extend)")" CHECK_PLAN_BUDGET_REF= RULES_LAZY_BUDGET="$NC_NEAR"; then
+    if grep -qF '[NC] plan changes' <<< "$NC_OUT" || grep -qF '[NC] skipped' <<< "$NC_OUT"; then
+        h_pass "gateNC-empty-ref derives the base ref"
+    else
+        h_fail "gateNC-empty-ref" "neither a violation nor a skip warning in output"
+    fi
+fi
+if _nc_run gateNC-bad-ref "$(_nc_cf "- \`$NC_LAZY\` (extend)")" CHECK_PLAN_BUDGET_REF=no-such-ref-xyz RULES_LAZY_BUDGET="$NC_NEAR"; then
+    _nc_expect "gateNC-bad-ref warns skipped" has "[NC] skipped"
+    _nc_expect "gateNC-bad-ref no violation" none "[NC] plan changes"
+fi
+# 8. print-caps contract (rows 3, 4, 5).
+if h_shard_take; then
+    _nc_rows="$("$NC_RULES_CAPS" --print-caps --ref=HEAD)"
+    _nc_ok=1
+    for _nc_pick in "$(sed -n '1p' <<< "$_nc_rows")" "$(sed -n '$p' <<< "$_nc_rows")"; do
+        _nc_p=$(cut -f1 <<< "$_nc_pick"); _nc_b=$(cut -f4 <<< "$_nc_pick")
+        _nc_real=$(git -C "$SCRIPT_DIR/.." show "HEAD:$_nc_p" | wc -c | tr -d '[:space:]')
+        [ "$_nc_b" = "$_nc_real" ] || { _nc_ok=0; h_fail "gateNC-print-caps-bytes" "$_nc_p: row says $_nc_b, git says $_nc_real"; }
+    done
+    [ "$_nc_ok" -eq 1 ] && h_pass "gateNC-print-caps bytes equal git show sizes"
+fi
+if h_shard_take; then
+    _nc_res_row=$(awk -F'\t' '$2 == "resident" && $4 > m { m = $4; r = $0 } END { print r }' <<< "$("$NC_RULES_CAPS" --print-caps --ref=HEAD)")
+    _nc_res_p=$(cut -f1 <<< "$_nc_res_row"); _nc_res_b=$(cut -f4 <<< "$_nc_res_row")
+    _nc_low=$((_nc_res_b - 1))
+    if RULES_RESIDENT_BUDGET="$_nc_low" "$NC_RULES_CAPS" >/dev/null 2>&1; then
+        h_fail "gateNC-resident-class" "lowered resident cap did not fail the normal run"
+    else
+        _nc_room=$(RULES_RESIDENT_BUDGET="$_nc_low" "$NC_RULES_CAPS" --print-caps --ref=HEAD | awk -F'\t' -v p="$_nc_res_p" '$1 == p { print $5 }')
+        if [ -n "$_nc_room" ] && [ "$_nc_room" -lt 0 ]; then
+            h_pass "gateNC-resident-class: lowered cap fails the run and shows negative headroom"
+        else
+            h_fail "gateNC-resident-class" "headroom for $_nc_res_p was '$_nc_room', want < 0"
+        fi
+    fi
+fi
+if h_shard_take; then
+    "$NC_RULES_CAPS" --print-caps --ref >/dev/null 2>&1; _nc_rc1=$?
+    "$NC_RULES_CAPS" --print-caps --ref=no-such-ref-xyz >/dev/null 2>&1; _nc_rc2=$?
+    if [ "$_nc_rc1" -eq 2 ] && [ "$_nc_rc2" -eq 2 ]; then
+        h_pass "gateNC-print-caps rejects '--ref' without '=' and an unknown ref (exit 2)"
+    else
+        h_fail "gateNC-print-caps-reject" "exit codes were $_nc_rc1 and $_nc_rc2, want 2 and 2"
+    fi
+fi
+if h_shard_take; then
+    # A ref with no .claude/rules/*.md leaves the row array empty. bash 3.2
+    # under set -u used to die "unbound variable" there. Run it under /bin/bash.
+    _nc_empty_tree=$(git -C "$SCRIPT_DIR/.." hash-object -t tree -w /dev/null)
+    _nc_empty_ref=$(GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t \
+        git -C "$SCRIPT_DIR/.." commit-tree "$_nc_empty_tree" -m empty < /dev/null)
+    _nc_err=$(mktemp)
+    _nc_out=$(/bin/bash "$NC_RULES_CAPS" --print-caps --ref="$_nc_empty_ref" 2>"$_nc_err"); _nc_rc3=$?
+    _nc_errtxt=$(cat "$_nc_err"); rm -f "$_nc_err"
+    if [ "$_nc_rc3" -eq 0 ] && [ -z "$_nc_out" ] && [ -z "$_nc_errtxt" ]; then
+        h_pass "gateNC-print-caps on a ref with no rules: exit 0, no rows, no stderr (/bin/bash)"
+    else
+        h_fail "gateNC-print-caps-empty-ref" "exit $_nc_rc3, stdout '$_nc_out', stderr '$_nc_errtxt'"
+    fi
+fi
+# 9. Architect contract row comes from the contract-split script (row 14).
+_nc_contract_room=$("$NC_CONTRACT_CAPS" --print-caps --ref=HEAD | awk -F'\t' -v p="$NC_CONTRACT" '$1 == p { print $5 }')
+if _nc_run gateNC-architect-contract "$(_nc_cf "- \`$NC_CONTRACT\` (extend)")"; then
+    if [ -n "$_nc_contract_room" ] && [ "$_nc_contract_room" -lt 1024 ]; then
+        _nc_expect "gateNC-architect-contract trips below 1024 B" has "[NC] plan changes $NC_CONTRACT"
+    else
+        _nc_expect "gateNC-architect-contract quiet at or above 1024 B" none "[NC] plan changes $NC_CONTRACT"
+    fi
+fi
+fi
+[ "$TCP_ONLY" != gateNC ] || h_done
+
 # Gate [V] parse arm and bin/fixtures bare-path arm. TCP_ONLY=gateVsyntax runs
 # only these. The cells are single-quoted so the harness never expands them.
 if [ -z "$TCP_ONLY" ] || [ "$TCP_ONLY" = gateVsyntax ]; then
@@ -621,6 +767,8 @@ _vs_clean gate-V-fixtures-path-with-verb \
 fi
 [ "$TCP_ONLY" != gateVsyntax ] || h_done
 
+# `gateCW` skips everything from here to the gate [CW] cases, which sit last.
+if [ "$TCP_ONLY" != gateCW ]; then
 if [ "$TCP_ONLY" != matrix-split ]; then
 if [ "$TCP_ONLY" != gate13 ] && [ "$TCP_ONLY" != gateH ]; then
 # A minimal well-formed matrix passes (exit 0). Baseline / no false positives.
@@ -5167,15 +5315,16 @@ _corpus_guard_ok() {
     # Gate [AB] is downgradeable too: it postdates every frozen corpus plan, and
     # the plans it flags carry genuine plan-only negated greps (true positives).
     # Gate [CW] is the same: frozen plans shipped before prefire-verify ran their rows.
+    # Gate [NC] is the same: frozen plans edit near-cap rules with no budget-cuts: line.
     # The [H] missing-hold_trigger line is the same: frozen held plans predate the key.
     _cgo_other="$(printf '%s\n' "$_cgo_out" | awk '
         /^check-plan: violations in /{v=1; next}
         /^check-plan: /{v=0}
-        v && /^\[/ && !/^\[E\]/ && !/^\[AB\]/ && !/^\[CW\]/ && !/^\[V\].*unbalanced backtick after Phase 5\.0 strip/ && !/^\[V\].*does not parse as shell after Phase 5\.0 strip/ && !/^\[V\].*a bare bin\/fixtures\/ file path/ && !/^\[F\] ## Critical Files entry has an absolute path/ && !/^\[H\].*no non-empty hold_trigger:/ {print}')"
+        v && /^\[/ && !/^\[E\]/ && !/^\[AB\]/ && !/^\[CW\]/ && !/^\[NC\]/ && !/^\[V\].*unbalanced backtick after Phase 5\.0 strip/ && !/^\[V\].*does not parse as shell after Phase 5\.0 strip/ && !/^\[V\].*a bare bin\/fixtures\/ file path/ && !/^\[F\] ## Critical Files entry has an absolute path/ && !/^\[H\].*no non-empty hold_trigger:/ {print}')"
     _cgo_dvio="$(printf '%s\n' "$_cgo_out" | awk '
         /^check-plan: violations in /{v=1; next}
         /^check-plan: /{v=0}
-        v && (/^\[E\]/ || /^\[AB\]/ || /^\[CW\]/ || /^\[V\].*unbalanced backtick after Phase 5\.0 strip/ || /^\[V\].*does not parse as shell after Phase 5\.0 strip/ || /^\[V\].*a bare bin\/fixtures\/ file path/ || /^\[F\] ## Critical Files entry has an absolute path/ || /^\[H\].*no non-empty hold_trigger:/) {print}' | head -1)"
+        v && (/^\[E\]/ || /^\[AB\]/ || /^\[CW\]/ || /^\[NC\]/ || /^\[V\].*unbalanced backtick after Phase 5\.0 strip/ || /^\[V\].*does not parse as shell after Phase 5\.0 strip/ || /^\[V\].*a bare bin\/fixtures\/ file path/ || /^\[F\] ## Critical Files entry has an absolute path/ || /^\[H\].*no non-empty hold_trigger:/) {print}' | head -1)"
     # Downgrade ONLY when: non-zero exit, zero non-downgradeable lines, and at
     # least one downgradeable line actually explains the failure. A non-zero exit
     # with no visible violation line still fails loudly instead of passing silently.
@@ -6542,11 +6691,15 @@ else
 fi
 fi
 GUARD="$AB_GUARD_SAVED"
+fi
 
 # ---------------------------------------------------------------------------
 # Gate [CW]: prefire-verify runs matrix rows from the repo root, so a row that starts
 # with an ibl5/-only tool can never pass. The 2026-11-06 trade-suggestions skip.
+# `bin/test-check-plan gateCW` runs these cases alone; the guard opened after
+# the gateVsyntax group skips every case between there and here.
 # ---------------------------------------------------------------------------
+if [ -z "$TCP_ONLY" ] || [ "$TCP_ONLY" = gateCW ]; then
 assert_viol "gateCW-bare-phpunit-flags" 1 '[CW]' "$FM"'
 ## Verification Matrix
 | # | What to verify | Test type | Timing | Test file / location |
@@ -6810,6 +6963,47 @@ assert_viol "gateCW-version-flag-extra-arg-flags" 1 '[CW]' "$FM"'
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---------------|-----------|--------|---------------------|
 | 1 | x | CLI-executable | post-impl | `composer --version test` |
+'
+# A version flag may carry trailing redirects (a-jay85/IBL5-backlog#1788). The -flags
+# near-misses guard the redirect group: a flag group widened to
+# (--version|-[vV]|[a-z]+) would pass `composer test >/dev/null 2>&1`, and an optional
+# operator (&>>?|>>?|<)? would read ` test` as a redirect target, so the
+# extra-arg case above would pass.
+assert_viol "gateCW-version-flag-redirect-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `composer --version >/dev/null 2>&1` |
+'
+assert_viol "gateCW-version-flag-fd-dup-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `npm --version 2>&1` |
+'
+assert_viol "gateCW-version-flag-amp-redirect-ok" 0 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `bun --version &>/dev/null` |
+'
+assert_viol "gateCW-version-flag-redirect-extra-arg-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `composer --version >/dev/null test` |
+'
+assert_viol "gateCW-redirect-no-version-flag-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `composer test >/dev/null 2>&1` |
+'
+assert_viol "gateCW-version-flag-redirect-then-test-flags" 1 '[CW]' "$FM"'
+## Verification Matrix
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | x | CLI-executable | post-impl | `composer --version >/dev/null && composer test` |
 '
 assert_viol "gateCW-bun-run-ibl5-path-ok" 0 '[CW]' "$FM"'
 ## Verification Matrix
@@ -7127,5 +7321,7 @@ assert_viol "gateCW-timeout-s-value-root-tool-ok" 0 '[CW]' "$FM"'
 |---|---------------|-----------|--------|---------------------|
 | 1 | x | CLI-executable | post-impl | `timeout -s KILL 5m bin/check-prose --since=master` |
 '
+fi
+[ "$TCP_ONLY" != gateCW ] || h_done
 
 h_done

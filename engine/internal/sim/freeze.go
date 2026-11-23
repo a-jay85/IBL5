@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"github.com/a-jay85/IBL5/engine/internal/result"
+	"github.com/a-jay85/IBL5/engine/internal/rng"
 )
 
 // Freeze-override infrastructure for the empty-FGA source-isolation diagnostic
@@ -529,6 +530,10 @@ type Options struct {
 	Freeze       FreezeConfig
 	Accum        *FreezeAccum  // non-nil only during a baseline accumulation pass
 	BranchBAccum *BranchBAccum // non-nil only when harvesting the Branch-B engagement instrument
+	// RNG, when non-nil, replaces the seeded PCG stream for every game in this
+	// call. cmd/jsbreplay passes a replay source (rng.NewReplay). nil keeps the
+	// zero Options byte-identical to Simulate.
+	RNG *rng.RNG
 
 	// BaseTimeMid overrides the package const baseTimeMid (tempo.go) — the constant
 	// per-game base_time (J24 Phase 0: 5.60's composite ratio is dead code) — for

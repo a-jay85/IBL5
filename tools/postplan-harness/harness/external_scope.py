@@ -14,7 +14,6 @@ the same contract as `workflow_scope.workflow_send_change`.
 from __future__ import annotations
 
 import re
-import shutil
 
 from harness.workflow_scope import _HUNK_RE, _R_BAD_HUNK, _R_BAD_SECTION, _R_TRUNCATED, _SECTION_META
 
@@ -64,14 +63,27 @@ _DM_SAFE_COMMANDS = frozenset((
     "date", "ps", "dirname", "basename", "mkdir", "cat", "grep", "true", "false", ":",
     "local", "say",
 ))
-# Commands the script runs that a same-named function would silently replace. A PATH lookup
-# backs this up for names not listed.
+# Commands the script runs that a same-named function would silently replace.
 _DM_SHADOWABLE = frozenset((
     "sleep", "rm", "mv", "cp", "ln", "ls", "touch", "chmod", "kill", "wait", "read", "trap",
     "mktemp", "sort", "uniq", "stat", "id", "hostname", "uname", "timeout", "tee", "ssh", "curl",
     "unset", "export", "declare", "typeset", "readonly", "set", "unalias", "alias", "cd", "pwd",
 ))
-_DM_CONTROL = frozenset(("exit","return", "break", "continue", "shift"))
+# External commands a same-named new function would shadow. The list is fixed so one diff gets
+# one verdict on every host, and the match is case-sensitive. It must hold every external
+# command word `bin/discord-dm` runs; test_dm_every_invoked_command_word_is_listed checks that.
+_DM_EXTERNAL_COMMANDS = frozenset((
+    "jq", "log", "LOG", "gh", "caffeinate", "reset", "perl", "launchctl",
+    "claude", "expect", "go", "gtest", "route", "sha256",
+    "awk", "wget", "nc", "ncat", "socat", "scp", "sftp", "rsync", "osascript", "telnet",
+    "xargs", "env", "command", "builtin", "nohup", "sudo", "bash", "sh", "zsh", "python",
+    "python3", "ruby", "node", "php", "eval", "exec", "source", "git", "find", "diff",
+    "base64", "openssl", "shasum", "sha256sum", "md5", "md5sum", "gzip", "tar", "xxd", "od",
+    "open", "security", "pbcopy", "pbpaste", "logger", "which", "type", "hash", "printenv",
+    "sqlite3", "mysql", "docker", "make", "tput", "stty", "expr", "seq", "flock", "realpath",
+    "readlink", "du", "df", "whoami", "nslookup", "dig", "host", "ping",
+))
+_DM_CONTROL =frozenset(("exit","return", "break", "continue", "shift"))
 _DM_SAFE_TARGETS = ("/dev/null", "1", "2", "-")
 # Scanned over the whole joined command, quoted text included, before any parsing.
 _DM_DENY_RE = re.compile(
@@ -82,6 +94,7 @@ _DM_DENY_RE = re.compile(
 # Same-length mask characters for quoted text, `${...}`, and `$(...)` / `$((...))`.
 _DM_Q, _DM_V, _DM_S = "\x01", "\x02", "\x03"
 _DM_TESTS = frozenset(("[", "[[", "test"))
+_DM_NAMED_COMMANDS = _DM_SAFE_COMMANDS | _DM_CONTROL | _DM_TESTS | _DM_SHADOWABLE | _DM_EXTERNAL_COMMANDS
 _DM_RESERVED = frozenset((
     "if", "then", "elif", "else", "fi", "for", "in", "do", "done", "while", "until", "case",
     "esac", "{", "}", "(", ")", "!",
@@ -699,10 +712,7 @@ def _dm_reason(hunks: list[tuple[int, int, list[str]]]) -> str | None:
         for ln in body:
             m = _DM_FUNC_RE.match(ln[1:]) if ln[:1] == "+" else None
             if m is not None and m.group(1) not in _DM_EXISTING_FUNCS:
-                if (
-                    m.group(1) in _DM_SAFE_COMMANDS | _DM_CONTROL | _DM_TESTS | _DM_SHADOWABLE
-                    or shutil.which(m.group(1)) is not None
-                ):
+                if m.group(1) in _DM_NAMED_COMMANDS:
                     # A function named like a builtin or an external command (`sleep`, `rm`, `mv`)
                     # changes what every unchanged call site runs.
                     return _R_SEND

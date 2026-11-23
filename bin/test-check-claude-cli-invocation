@@ -434,6 +434,12 @@ cat > "$T/perm_marker_scoped_keeps_no_timeout.sh" <<'FIX'
 claude -p "$p" --dangerously-skip-permissions # claude-perm-ok: reason here
 FIX
 expect_class "perm_marker_scoped_keeps_no_timeout" "$T/perm_marker_scoped_keeps_no_timeout.sh" no-timeout
+# A perm-only marker must not be read as a claude-cli-ok marker with an empty reason.
+if grep -q "needs a non-empty reason" <<< "$OUT"; then
+    fail "perm_marker_scoped_not_a_cli_ok_marker (output: $OUT)"
+else
+    pass "perm_marker_scoped_not_a_cli_ok_marker"
+fi
 
 perm_fix mode_acceptedits "--permission-mode acceptEdits"
 expect_class perm_mode_acceptedits_fail "$T/perm_mode_acceptedits.sh" permission

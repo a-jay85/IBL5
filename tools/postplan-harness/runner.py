@@ -1235,6 +1235,9 @@ def _run_pass(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                         sha = git.head()
                         _repin_fidelity_after_same_run(llm, git, gh, out_dir, worktree, plan,
                                                        master_sha, body, pr, pushed or sha, res, log)
+                        _rejudge_fidelity_after_fix_round(llm, git, gh, out_dir, worktree, plan,
+                                                          master_sha, body, pr, pushed or sha,
+                                                          res, log)
                     fix_round.apply_plan_repair(plan, fr, out_dir, log)
                     _clear_meta_flag_after_fix_round(fr, git, res, log)
                     _arm = _evaluate_arm(log_suffix=" (post-fix-round)")
@@ -3970,6 +3973,44 @@ def _repin_fidelity_after_same_run(llm, git, gh, out_dir, worktree, plan, master
     res.fidelity["verdict_2"] = v
     res.fidelity["reviewed_tree_2"] = tree
     res.fidelity["same_run_repin"] = {"sha": fix_sha, "verdict": v, "verdict_path": path}
+
+
+FIX_ROUND_REJUDGE_VERDICTS = ("READY", "READY WITH NOTES")
+
+
+def _rejudge_fidelity_after_fix_round(llm, git, gh, out_dir, worktree, plan, master_sha, body, pr,
+                                      fix_sha, res, log) -> None:
+    """Re-judge fidelity on the post-fix head when verdict 1 passed and no verdict 2 exists.
+
+    Only the fix round's accepted branch calls this. It writes verdict_2 / reviewed_tree_2
+    from a real re-review and never sets remediation_sha. Any failure writes nothing, so
+    the sticky keeps no Re-reviewed tree line and REVIEW-OWED still fires.
+    """
+    fid = res.fidelity
+    if not fid or fid.get("verdict_2") is not None:
+        return
+    if fid.get("verdict_1") not in FIX_ROUND_REJUDGE_VERDICTS:
+        return
+    if not fix_sha:  # fix-round re-judge: no pushed commit
+        log("fix-round: fidelity re-judge skipped - the round pushed no commit")
+        return
+    rejudge_tree_now = git.head_tree()
+    if rejudge_tree_now == fid.get("reviewed_tree"):  # fix-round re-judge: head unchanged
+        log("fix-round: fidelity re-judge skipped - head tree unchanged")
+        return
+    rj_verdict, rj_tree, rj_path = fidelity.re_review(
+        llm, git, out_dir, worktree or ".", plan, master_sha, gh.pr_body_fresh() or body, pr,
+        fix_sha, fid.get("verdict_path") or fidelity.verdict_path(pr),
+        round_num=1, log=log,
+        owner_section=owner_intent.seat_section(getattr(res, "slug", "") or ""))
+    if rj_verdict is None or rj_tree is None:
+        log("fix-round: fidelity re-judge produced no verdict - no Re-reviewed tree line")
+        return
+    fid["verdict_2"] = rj_verdict
+    fid["reviewed_tree_2"] = rj_tree
+    fid["same_run_repin"] = {"sha": fix_sha, "verdict": rj_verdict,
+                             "verdict_path": rj_path, "kind": "fix-round"}
+    log(f"fix-round: fidelity re-judged {rj_verdict} on tree {rj_tree}")
 
 
 def _write_review_cache(res, cache_key, cache_files, cache_rec, cache_dir, slug, out_dir,

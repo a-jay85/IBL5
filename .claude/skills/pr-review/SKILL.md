@@ -6,7 +6,7 @@ name: pr-review
 description: Token-efficient code review for pull requests
 disable-model-invocation: true
 model: claude-sonnet-5-5
-last_verified: 2026-11-21
+last_verified: 2026-11-22
 ---
 
 Provide a code review for the given pull request. This command optimizes token usage by fetching the diff once and distributing only what each agent needs.
@@ -14,7 +14,7 @@ Provide a code review for the given pull request. This command optimizes token u
 ## Step 1: Eligibility check
 
 Use a **Haiku** agent to check if the pull request:
-(a) is closed, (b) is a draft, (c) does not need a code review (e.g. automated PR, or very simple and obviously ok), or (d) already has a code review from you earlier (check both PR issue comments and PR **reviews** — `gh pr view --json comments,reviews` — for a prior `Code review` heading from you **at any heading level** — regex `^#{1,6} +Code review`, since `bin/lib/post-review-findings.sh` emits `### Code review` in its source but every such comment currently on a PR carries `## Code review`, so a level-pinned match finds nothing and re-reviews an already-reviewed PR. Check reviews as well as issue comments, since findings are now posted as a review body with inline threads, not only as issue comments. A match must be **from the reviewing identity and be that comment's own heading** — a `/pr-ready` verdict quoting the heading is not a prior review, and treating it as one skips a review that was never done).
+(a) is closed, (b) is a draft, (c) does not need a code review (e.g. automated PR, or very simple and obviously ok), or (d) already has a code review from you that covers the PR's current head. Run `source bin/lib/prior-review.sh && prior_review_covers_head <PR> && echo COVERED || echo NOT-COVERED`. Only `COVERED` makes (d) true. The helper counts a comment or review by the reviewing identity whose first non-blank line is a `Code review` heading or the collapsed no-issues banner, and only when it is a review on the current `headRefOid` or carries `<!-- reviewed-head: <headRefOid> -->`. A review of an older head, an unmarked comment, a quoted heading, or any gh failure prints `NOT-COVERED`, so the review runs. `bin/pr-review-now` runs the same helper before it starts this session.
 
 If any of these are true, do not proceed. Tell the user why.
 
@@ -124,7 +124,7 @@ The helper routes on-diff findings to a batch resolvable review POST (inline thr
 **If no issues survived Step 5,** call:
 ```bash
 post_review_summary "$PR_NUMBER" "Code review" \
-    "No issues found. <1-2 sentence evidence summary>"
+    "No issues found. <1-2 sentence evidence summary>" "$HEAD_SHA"
 ```
 
 ### Dispositioning open threads:

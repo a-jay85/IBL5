@@ -383,10 +383,18 @@ printf '#!/usr/bin/env bash\nshift 3\nexec "$@"\n' > "$SCRATCH/.local/bin/caffei
 chmod +x "$SCRATCH/.local/bin/caffeinate"
 cat > "$SCRATCH/gh-review" <<GHR_EOF
 #!/usr/bin/env bash
-[[ "\$1 \$2" == "api user" ]] && { echo me; exit 0; }
+if [[ "\$1 \$2" == "api user" ]]; then
+    [[ -e "$SCRATCH/gh-fail-user" ]] && exit 1
+    if [[ -e "$SCRATCH/gh-login" ]]; then cat "$SCRATCH/gh-login"; else echo me; fi
+    exit 0
+fi
+[[ -e "$SCRATCH/gh-fail-view" ]] && exit 1
 cat "$SCRATCH/gh-view.json" | jq "\${@: -1}"
 GHR_EOF
 chmod +x "$SCRATCH/gh-review"
+H1=1111111111111111111111111111111111111111
+H0=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+_fx() { printf '%s' "$1" | sed "s/@H1@/$H1/g; s/@H0@/$H0/g"; }
 printf '#!/usr/bin/env bash\ncat >> "%s"\n' "$SCRATCH/dm-sent.txt" > "$SCRATCH/dm-stub"
 chmod +x "$SCRATCH/dm-stub"
 _SAVED_CLAUDE_STUB="$CLAUDE_STUB"
@@ -394,37 +402,96 @@ printf '#!/usr/bin/env bash\necho called >> "%s"\nexit 0\n' "$SCRATCH/claude-cal
     > "$SCRATCH/.local/bin/claude-recorder"
 chmod +x "$SCRATCH/.local/bin/claude-recorder"
 CLAUDE_STUB="$SCRATCH/.local/bin/claude-recorder"
-_run_runner() {  # $1 = gh pr view JSON fixture
-    printf '%s' "$1" > "$SCRATCH/gh-view.json"
+RUNNER_HAS_FN=0
+_run_runner() {  # $1 = gh pr view JSON fixture (@H1@/@H0@ expand to head hashes)
+    _fx "$1" > "$SCRATCH/gh-view.json"
     : > "$SCRATCH/dm-sent.txt"
     : > "$SCRATCH/claude-calls.txt"
     PR_REVIEW_NOW_DRY_RUN=1 PR_REVIEW_NOW_GH="$SCRATCH/gh-review" \
         PR_REVIEW_NOW_DISCORD_DM="$SCRATCH/dm-stub" run_driver 1903 >/dev/null 2>&1
+    grep -qF 'prior_review_covers_head ()' /tmp/pr-review-now-runner-1903.sh && RUNNER_HAS_FN=1
     env HOME="$SCRATCH" PATH="$SCRATCH/.local/bin:$PATH" \
         bash /tmp/pr-review-now-runner-1903.sh >/dev/null 2>&1
+    rm -f "$SCRATCH/gh-fail-user" "$SCRATCH/gh-fail-view" "$SCRATCH/gh-login"
     clean_slots
 }
-_run_runner '{"comments":[{"author":{"login":"me"},"body":"## Code review\nNo issues found."}],"reviews":[]}'
-[[ -s "$SCRATCH/dm-sent.txt" ]] \
-    && fail "prior-review-no-dm: DM sent for an already-reviewed PR: $(cat "$SCRATCH/dm-sent.txt")"
-[[ -s "$SCRATCH/claude-calls.txt" ]] \
-    && fail "prior-review-no-dm: claude started for an already-reviewed PR"
-grep -qF 'skipped without starting claude' /tmp/pr-review-now-1903.log \
-    || fail "prior-review-no-dm: skip not recorded in the log (got: $(cat /tmp/pr-review-now-1903.log 2>/dev/null))"
-_run_runner '{"comments":[],"reviews":[{"author":{"login":"me"},"body":"\n\n### Code review\nfindings"}]}'
-[[ -s "$SCRATCH/claude-calls.txt" ]] \
-    && fail "prior-review-no-dm: review-body heading after blank lines not counted"
-_run_runner '{"comments":[{"author":{"login":"me"},"body":"verdict quoting > ## Code review"},{"author":{"login":"other"},"body":"## Code review"}],"reviews":[]}'
-grep -qF '✅ pr-review-now: PR #1903' "$SCRATCH/dm-sent.txt" \
-    || fail "prior-review-no-dm: fresh PR got no ✅ DM (got: $(cat "$SCRATCH/dm-sent.txt"))"
-[[ -s "$SCRATCH/claude-calls.txt" ]] \
-    || fail "prior-review-no-dm: claude not started for a PR with no own review"
-_run_runner '{"comments":[{"author":{"login":"me"},"body":"**READY** verdict\n\n## Code review\nquoted"}],"reviews":[]}'
-[[ -s "$SCRATCH/claude-calls.txt" ]] \
-    || fail "prior-review-no-dm: heading below the first line counted as a prior review"
+_expect_skip() {  # $1 = label
+    [[ -s "$SCRATCH/dm-sent.txt" ]] \
+        && fail "prior-review-no-dm: $1: DM sent for a covered PR: $(cat "$SCRATCH/dm-sent.txt")"
+    [[ -s "$SCRATCH/claude-calls.txt" ]] \
+        && fail "prior-review-no-dm: $1: claude started for a covered PR"
+    grep -qF 'already had a code review — skipped without starting claude.' /tmp/pr-review-now-1903.log \
+        || fail "prior-review-no-dm: $1: skip not recorded in the log (got: $(cat /tmp/pr-review-now-1903.log 2>/dev/null))"
+    return 0
+}
+_expect_run() {  # $1 = label
+    grep -qF '✅ pr-review-now: PR #1903' "$SCRATCH/dm-sent.txt" \
+        || fail "prior-review-no-dm: $1: no ✅ DM (got: $(cat "$SCRATCH/dm-sent.txt"))"
+    [[ -s "$SCRATCH/claude-calls.txt" ]] \
+        || fail "prior-review-no-dm: $1: claude not started"
+    ! grep -qF 'skipped without starting claude' /tmp/pr-review-now-1903.log 2>/dev/null \
+        || fail "prior-review-no-dm: $1: log holds the skip line"
+    return 0
+}
+# F1: own comment, heading on line 1, current-head marker -> skips
+F1='{"headRefOid":"@H1@","comments":[{"author":{"login":"me"},"body":"## Code review\nNo issues found.\n\n<!-- reviewed-head: @H1@ -->"}],"reviews":[]}'
+_run_runner "$F1"
+_expect_skip "F1 own marked comment"
+[[ "$RUNNER_HAS_FN" = 1 ]] \
+    || fail "prior-review-no-dm: runner does not define prior_review_covers_head ()"
+# F2: own review on the current head -> skips
+_run_runner '{"headRefOid":"@H1@","comments":[],"reviews":[{"author":{"login":"me"},"commit":{"oid":"@H1@"},"body":"\n\n### Code review\nfindings"}]}'
+_expect_skip "F2 own review on current head"
+# F3: another author's current-head marker -> runs (pins the author filter)
+_run_runner '{"headRefOid":"@H1@","comments":[{"author":{"login":"me"},"body":"verdict quoting > ## Code review"},{"author":{"login":"other"},"body":"## Code review\n\n<!-- reviewed-head: @H1@ -->"}],"reviews":[]}'
+_expect_run "F3 other author marker"
+# F4: heading below the first line, current marker -> runs
+_run_runner '{"headRefOid":"@H1@","comments":[{"author":{"login":"me"},"body":"**READY** verdict\n\n## Code review\nquoted\n\n<!-- reviewed-head: @H1@ -->"}],"reviews":[]}'
+_expect_run "F4 heading below line 1"
+# older-head review -> runs
+_run_runner '{"headRefOid":"@H1@","comments":[],"reviews":[{"author":{"login":"me"},"commit":{"oid":"@H0@"},"body":"### Code review\nfindings"}]}'
+_expect_run "older-head review"
+# legacy unmarked comment (the PR 4088 shape) -> runs
+_run_runner '{"headRefOid":"@H1@","comments":[{"author":{"login":"me"},"body":"## Code review\n\nNo issues found."}],"reviews":[]}'
+_expect_run "legacy unmarked comment"
+# older-head marker -> runs
+_run_runner '{"headRefOid":"@H1@","comments":[{"author":{"login":"me"},"body":"## Code review\n\n<!-- reviewed-head: @H0@ -->"}],"reviews":[]}'
+_expect_run "older-head marker"
+# helper envelope with current-head marker -> skips
+_run_runner '{"headRefOid":"@H1@","comments":[{"author":{"login":"me"},"body":"<details><summary>✅ Code review — no issues found</summary>\n\n### Code review\n\nNo issues found.\n\n</details>\n<!-- reviewed-head: @H1@ -->"}],"reviews":[]}'
+_expect_skip "helper envelope with current marker"
+# short-prefix near-miss marker -> runs
+_run_runner '{"headRefOid":"@H1@","comments":[{"author":{"login":"me"},"body":"## Code review\n\n<!-- reviewed-head: 1111111 -->"}],"reviews":[]}'
+_expect_run "short-prefix marker"
+# missing headRefOid -> runs (fails toward running)
+_run_runner '{"comments":[{"author":{"login":"me"},"body":"## Code review\n\n<!-- reviewed-head: @H1@ -->"}],"reviews":[{"author":{"login":"me"},"commit":{"oid":"@H1@"},"body":"### Code review"}]}'
+_expect_run "missing headRefOid"
+# gh pr view failing -> runs (fail-open)
+touch "$SCRATCH/gh-fail-view"
+_run_runner "$F1"
+_expect_run "gh pr view fails"
+# gh api user failing -> runs (fail-open)
+touch "$SCRATCH/gh-fail-user"
+_run_runner "$F1"
+_expect_run "gh api user fails"
+# hostile login -> runs, no jq injection
+printf '%s' 'x" or "a"=="a' > "$SCRATCH/gh-login"
+_run_runner '{"headRefOid":"@H1@","comments":[{"author":{"login":"other"},"body":"## Code review\n\n<!-- reviewed-head: @H1@ -->"}],"reviews":[]}'
+_expect_run "hostile login"
 CLAUDE_STUB="$_SAVED_CLAUDE_STUB"
 rm -f /tmp/pr-review-now-runner-1903.sh /tmp/pr-review-now-prompt-1903.md /tmp/pr-review-now-1903.log
 end_case pr-review-now-prior-review-no-dm
+
+# --- case 11b: pr-review-now-skill-shares-rule -------------------------------------------
+# The /pr-review skill's Step 1 (d) must call the same function the runner embeds, and its
+# clean-path call must pass the head so the posted comment carries the marker.
+begin_case
+SKILL_MD="$SCRIPT_DIR/../.claude/skills/pr-review/SKILL.md"
+grep -qF 'source bin/lib/prior-review.sh && prior_review_covers_head' "$SKILL_MD" \
+    || fail "skill-shares-rule: SKILL.md Step 1 (d) does not source prior-review.sh and call prior_review_covers_head"
+grep -qF '"No issues found. <1-2 sentence evidence summary>" "$HEAD_SHA"' "$SKILL_MD" \
+    || fail "skill-shares-rule: SKILL.md clean-path post_review_summary does not pass \"\$HEAD_SHA\""
+end_case pr-review-now-skill-shares-rule
 
 # --- case 12: pr-review-now-submit-argv --------------------------------------------------
 begin_case

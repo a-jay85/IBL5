@@ -228,15 +228,32 @@ def _caps(worktree: str) -> dict[str, tuple[str, int, int, int]]:
 
 
 def _deleted_bytes(worktree: str, base_sha: str, path: str) -> int:
-    """Net bytes the PR removed from path: size at base_sha minus size at HEAD, floored at 0.
-    A line the PR rewrote still has new text in HEAD, so restoring the old wording costs
-    only the size difference, not the full old line. A file absent at either end counts 0."""
+    """Bytes the PR trimmed from path, counted per diff hunk as removed bytes minus added
+    bytes (floored at 0 per hunk). A line the PR rewrote still has new text in HEAD, so
+    restoring the old wording costs only the size difference. Summing per hunk, not over
+    the whole file, keeps a trim visible when the same PR also grew the file elsewhere.
+    A file absent at either end counts 0."""
     try:
-        before = int(_git(worktree, "cat-file", "-s", f"{base_sha}:{path}").strip())
-        after = int(_git(worktree, "cat-file", "-s", f"HEAD:{path}").strip())
+        _git(worktree, "cat-file", "-e", f"{base_sha}:{path}")
+        _git(worktree, "cat-file", "-e", f"HEAD:{path}")
+        diff = _git(worktree, "diff", "-U0", "--no-color", base_sha, "HEAD", "--", path)
     except subprocess.CalledProcessError:
         return 0
-    return max(0, before - after)
+    total = 0
+    removed = added = 0
+    in_hunk = False
+    for line in diff.splitlines():
+        if line.startswith("@@"):
+            total += max(0, removed - added)
+            removed = added = 0
+            in_hunk = True
+        elif not in_hunk:
+            continue
+        elif line.startswith("-"):
+            removed += len(line[1:].encode()) + 1
+        elif line.startswith("+"):
+            added += len(line[1:].encode()) + 1
+    return total + max(0, removed - added)
 
 
 def budget_forced_paths(worktree: str, base_sha: str, paths) -> frozenset[str]:

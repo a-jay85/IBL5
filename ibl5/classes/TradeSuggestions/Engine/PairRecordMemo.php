@@ -10,24 +10,24 @@ use TradeSuggestions\SlotMapper;
 
 /**
  * Request-scoped memo of `DominanceComparator::record` net results. One packed
- * int key per (offset, slot, lower pid, higher pid). The stored value is the
- * lower pid's net record against the higher pid.
+ * int key per (offset, slot, lower index, higher index). Each pid gets a dense
+ * index on first sight, so any pid fits the key's 20-bit fields. One league
+ * snapshot holds a few thousand distinct pids, far under 2^20. The stored
+ * value is the lower pid's net record against the higher pid.
  */
 final class PairRecordMemo
 {
-    private const int PID_LIMIT = 1 << 20;
-
     /** @var array<int, int> */
     private array $memo = [];
+
+    /** @var array<int, int> pid => dense index */
+    private array $indexByPid = [];
 
     /**
      * `record['wins'] - record['losses']` of `$a` against `$b` at `$slot`.
      */
     public function diff(int $offset, string $slot, int $pidA, RatingSet $a, int $pidB, RatingSet $b): int
     {
-        if ($pidA >= self::PID_LIMIT || $pidB >= self::PID_LIMIT) {
-            throw new \OverflowException("Pid above the memo key range at slot {$slot}");
-        }
         if ($pidA === $pidB) {
             return 0;
         }
@@ -36,8 +36,8 @@ final class PairRecordMemo
             throw new \InvalidArgumentException("Unknown slot {$slot}");
         }
         $swapped = $pidA > $pidB;
-        $lo = $swapped ? $pidB : $pidA;
-        $hi = $swapped ? $pidA : $pidB;
+        $lo = $this->index($swapped ? $pidB : $pidA);
+        $hi = $this->index($swapped ? $pidA : $pidB);
         $key = (($offset * 8 + $slotIndex) << 40) | ($lo << 20) | $hi;
 
         if (!isset($this->memo[$key])) {
@@ -46,6 +46,14 @@ final class PairRecordMemo
         }
 
         return $swapped ? -$this->memo[$key] : $this->memo[$key];
+    }
+
+    private function index(int $pid): int
+    {
+        if (isset($this->indexByPid[$pid])) {
+            return $this->indexByPid[$pid];
+        }
+        return $this->indexByPid[$pid] = count($this->indexByPid);
     }
 
     public function size(): int

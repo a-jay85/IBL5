@@ -15,29 +15,35 @@ use TradeSuggestions\Projection\RatingSet;
  */
 final class PairRecordMemoEdgeTest extends TestCase
 {
-    private const int PID_LIMIT = 1048576;
+    /** The CI seed's synthetic pids sit far above the key's 20-bit fields. */
+    private const int SEED_PID = 200000030;
 
-    public function testPidAtTheLimitOnTheSecondSideThrows(): void
+    public function testPidAboveTwentyBitsOnTheSecondSideIsAccepted(): void
     {
-        $this->expectException(\OverflowException::class);
-
-        (new PairRecordMemo())->diff(0, 'PG', 1, self::zero(), self::PID_LIMIT, self::zero());
+        self::assertSame(2, (new PairRecordMemo())->diff(0, 'PG', 1, self::strong(), self::SEED_PID, self::zero()));
     }
 
-    public function testPidAtTheLimitOnTheFirstSideThrows(): void
+    public function testPidAboveTwentyBitsOnTheFirstSideIsAccepted(): void
     {
-        $this->expectException(\OverflowException::class);
-
-        (new PairRecordMemo())->diff(0, 'PG', self::PID_LIMIT, self::zero(), 1, self::zero());
+        self::assertSame(-2, (new PairRecordMemo())->diff(0, 'PG', self::SEED_PID, self::zero(), 1, self::strong()));
     }
 
-    public function testPidJustBelowTheLimitIsAccepted(): void
+    public function testPidsAboveTwentyBitsShareOneEntryWhenSwapped(): void
     {
         $memo = new PairRecordMemo();
 
-        self::assertSame(2, $memo->diff(0, 'PG', 1, self::strong(), self::PID_LIMIT - 1, self::zero()));
-        self::assertSame(-2, $memo->diff(0, 'PG', self::PID_LIMIT - 1, self::zero(), 1, self::strong()));
+        self::assertSame(2, $memo->diff(0, 'PG', self::SEED_PID, self::strong(), self::SEED_PID + 1, self::zero()));
+        self::assertSame(-2, $memo->diff(0, 'PG', self::SEED_PID + 1, self::zero(), self::SEED_PID, self::strong()));
         self::assertSame(1, $memo->size());
+    }
+
+    public function testHighPidsThatShareLowBitsKeepSeparateEntries(): void
+    {
+        $memo = new PairRecordMemo();
+
+        self::assertSame(2, $memo->diff(0, 'PG', 1, self::strong(), 2, self::zero()));
+        self::assertSame(-1, $memo->diff(0, 'PG', 1 + (1 << 20), self::zero(), 2 + (1 << 20), self::tdOnly()));
+        self::assertSame(2, $memo->size());
     }
 
     public function testSlotAndPidBitsDoNotCollideAcrossSlots(): void

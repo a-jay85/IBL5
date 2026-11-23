@@ -2318,12 +2318,13 @@ done < "$MATRIX_FILE"
 # whose ) closes on the same segment moved nothing, so later segments are still checked.
 # Version flags need no project, and bun or composer validate given an ibl5/ path find
 # their file from the root, so those pass.
+# A version flag may carry trailing redirects (>/dev/null, 2>&1, &>file) and still passes.
 # ---------------------------------------------------------------------------
 # php may carry flags before the path. -d, -c and -z take a separate value. -r takes
 # inline code, so a path after it is only an argument and is not what php opens.
 _cw_re='^(\./)?vendor/bin/|^(composer|bun|bunx|npm|npx)([[:space:]]|$)|^php[[:space:]]+(((-[dcz]|--define|--php-ini|--zend-extension)[[:space:]]+[^[:space:]]+|-[^r[:space:]][^[:space:]]*)[[:space:]]+)*(\./)?(vendor|scripts|tests)/'
 _cw_dir_re='^composer[[:space:]](.*[[:space:]])?(-d[^[:space:]]*|--working-dir(=[^[:space:]]*)?)([[:space:]]|$)|^npm[[:space:]](.*[[:space:]])?--prefix([=[:space:]]|$)|^bun[[:space:]]+(run[[:space:]]+)?--cwd([=[:space:]]|$)'
-_cw_root_ok_re='^(composer|bun|bunx|npm|npx)[[:space:]]+(--version|-[vV])([[:space:])}]*|[[:space:]]*\).*)$|^bun([[:space:]]+run)?[[:space:]]+(\./)?ibl5/|^composer[[:space:]]+validate[[:space:]](.*[[:space:]])?(\./)?ibl5/'
+_cw_root_ok_re='^(composer|bun|bunx|npm|npx)[[:space:]]+(--version|-[vV])([[:space:]]+[0-9]*(&>>?|>>?|<)[[:space:]]*[^[:space:])}]+)*([[:space:])}]*|[[:space:]]*\).*)$|^bun([[:space:]]+run)?[[:space:]]+(\./)?ibl5/|^composer[[:space:]]+validate[[:space:]](.*[[:space:]])?(\./)?ibl5/'
 _cw_wrap_re='^(env|time)([[:space:]]+-[^[:space:]]+)*[[:space:]]+(.*)$'
 _cw_timeout_re='^g?timeout([[:space:]]+-[^[:space:]]+)*[[:space:]]+[0-9.]+[smhd]?[[:space:]]+(.*)$'
 _cw_flagval_re='^((env|time|g?timeout)([[:space:]]+-[^[:space:]]+)*)[[:space:]]+(-u|--unset|-s|--signal|-k|--kill-after|-o|--output)[[:space:]]+[^[:space:]]+[[:space:]]+(.*)$'

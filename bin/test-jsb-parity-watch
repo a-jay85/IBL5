@@ -216,6 +216,7 @@ case_merged_fires() {
     last=$(slurp "$S/home/.cache/jsb-parity-watch.last")
     h_contains "merged: fingerprint names the PR" "$last" "pl-0001=7:MERGED:sha1"
     h_contains "merged: fingerprint ends with the run time" "$last" " $BASE"
+    h_not_contains "merged: verdict is a fire, not WAIT:merged" "$(out)" "WAIT:merged"
 }
 
 case_open_failed_fires_once_per_sha() {
@@ -277,6 +278,7 @@ case_closed_fires() {
     run_watch
     h_eq "closed unmerged: webhook" 1 "$(cnt curl)"
     h_contains "closed: reason names it" "$(slurp "$S/log/curl.argv")" "pl-0001:closed"
+    h_not_contains "closed: verdict is a fire, not WAIT:closed" "$(out)" "WAIT:closed"
 }
 
 # --- Queue and plan-now cases (rows 14-22) ----------------------------------------
@@ -698,6 +700,10 @@ case_setup_main_wt_empty() {
     SETUP_MAIN_WT='' run_setup --print-schedule
     cp "$S/out" "$S/print.plist"
     h_contains "empty MAIN_WT falls back to the first worktree" "$(plist_get "$S/print.plist" 'd["ProgramArguments"][2]')" "$(main_checkout)/bin/jsb-parity-watch"
+    # An unset MAIN_WT falls back the same way. A guard written as ${MAIN_WT+set}
+    # would keep the empty value above, so the first assertion would fail.
+    env -u MAIN_WT HOME="$S/home" REPO_ROOT="$REPO" "$REPO/bin/jsb-parity-watch-setup" --print-schedule > "$S/print-unset.plist" 2> "$S/err"
+    h_contains "unset MAIN_WT falls back to the first worktree" "$(plist_get "$S/print-unset.plist" 'd["ProgramArguments"][2]')" "$(main_checkout)/bin/jsb-parity-watch"
 }
 
 # --- Dispatch ------------------------------------------------------------------------

@@ -375,11 +375,6 @@ class Unresolvable(Exception):
 
 
 UNRESOLVABLE_CALLS = frozenset({"globals", "locals", "vars", "eval", "exec", "__import__", "import_module"})
-SIDE_EFFECT_NAMES = frozenset({"open", "print", "input", "breakpoint"})
-SIDE_EFFECT_MODULES = frozenset({"os", "shutil", "subprocess", "tempfile", "sys"})
-FILE_WRITE_ATTRS = frozenset({"write_text", "write_bytes", "unlink", "mkdir", "rmdir", "touch", "chmod"})
-MUTATING_METHODS = frozenset({"append", "extend", "insert", "pop", "popitem", "clear", "update",
-                              "setdefault", "add", "discard", "remove"})
 MODULE_ROOT = "<module>"
 
 
@@ -691,107 +686,27 @@ def reachable_from_roots(func, roots, graph) -> bool:
     return func in _reach(sorted(roots), graph)
 
 
-def _root_name(expr):
-    while isinstance(expr, (ast.Attribute, ast.Subscript, ast.Call, ast.Starred)):
-        expr = expr.func if isinstance(expr, ast.Call) else expr.value
-    return expr.id if isinstance(expr, ast.Name) else None
+HAZARD_CALLS = frozenset({"exec", "eval", "compile", "__import__"})
 
 
-def _stmt_nodes(stmt):
-    """`stmt` and its non-statement descendants (a compound statement's header only)."""
-    stack = [stmt]
-    while stack:
-        node = stack.pop()
-        yield node
-        for child in ast.iter_child_nodes(node):
-            if not isinstance(child, (ast.stmt, ast.ExceptHandler)):
-                stack.append(child)
-
-
-def _fn_locals(fn) -> tuple[set[str], set[str]]:
-    """(names `fn` binds by assignment, names `fn` declares global or nonlocal). Parameters are not
-    local. A declared name is never local, even when `fn` assigns it."""
-    # Parameters are not local: a write into one reaches the caller's object (bypass class 17).
-    local = {n.id for n in ast.walk(fn) if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store)}
-    declared = {name for n in ast.walk(fn) if isinstance(n, (ast.Global, ast.Nonlocal))
-                for name in n.names}
-    a = fn.args
-    params = {x.arg for x in a.posonlyargs + a.args + a.kwonlyargs}
-    params |= {x.arg for x in (a.vararg, a.kwarg) if x is not None}
-    # A rebind such as `fid = fid or {}` can still alias the caller's object, so a parameter name
-    # stays non-local even when `fn` assigns it.
-    return local - declared - params, declared
-
-
-def _stmt_effect(stmt, local, declared, defs, seen) -> bool:
-    """True when `stmt`'s own targets or header calls write state outside the locals, or call a
-    top-level def in `defs` that does."""
-    if isinstance(stmt, (ast.Global, ast.Nonlocal)):
-        return True
-    targets = []
-    if isinstance(stmt, ast.Assign):
-        targets = list(stmt.targets)
-    elif isinstance(stmt, (ast.AugAssign, ast.AnnAssign)):
-        targets = [stmt.target]
-    elif isinstance(stmt, ast.Delete):
-        targets = list(stmt.targets)
-    for t in targets:
-        for sub in ast.walk(t):
-            if isinstance(sub, (ast.Subscript, ast.Attribute)) and _root_name(sub) not in local:
-                return True
-            if isinstance(sub, ast.Name) and sub.id in declared:
-                return True
-    for node in _stmt_nodes(stmt):
-        if not isinstance(node, ast.Call):
+def changed_line_hazard(tree, line):
+    """The first construct on `line` that reaches state the runtime watch cannot see, or None.
+    It covers side effects on inputs the corpus never has."""
+    for node in ast.walk(tree):
+        start, end = getattr(node, "lineno", None), getattr(node, "end_lineno", None)
+        if start is None or end is None or not start <= line <= end:
             continue
-        f = node.func
-        if isinstance(f, ast.Name):
-            if f.id in SIDE_EFFECT_NAMES:
-                return True
-            if f.id in defs and _def_effect(f.id, defs, seen):
-                return True
-        if isinstance(f, ast.Attribute):
-            if _root_name(f.value) in SIDE_EFFECT_MODULES:
-                return True
-            if f.attr in FILE_WRITE_ATTRS:
-                return True
-            if f.attr in MUTATING_METHODS and _root_name(f.value) not in local:
-                return True
-            if f.attr in defs and _def_effect(f.attr, defs, seen):
-                return True
-    return False
-
-
-def _def_effect(name, defs, seen) -> bool:
-    """True when any statement of top-level def `name`, or of a def it calls, has a side effect.
-    A def already on the walk counts as clean here; its own statements decide it."""
-    if name in seen:
-        return False
-    seen.add(name)
-    fn = defs[name]
-    local, declared = _fn_locals(fn)
-    return any(_stmt_effect(st, local, declared, defs, seen)
-               for st in ast.walk(fn) if isinstance(st, ast.stmt) and st is not fn)
-
-
-def side_effect(fn, line, tree) -> bool:
-    """True when the innermost statement covering `line` writes state outside `fn`'s locals.
-
-    A compound statement counts with every statement it guards, and a call to a top-level def
-    of `tree` counts with that def's own side effects, followed through its callees."""
-    best = None
-    for node in ast.walk(fn):
-        if isinstance(node, ast.stmt) and node is not fn and node.lineno <= line <= node.end_lineno:
-            if best is None or (node.end_lineno - node.lineno) <= (best.end_lineno - best.lineno):
-                best = node
-    if best is None:
-        return False
-    defs = {st.name: st for st in tree.body
-            if isinstance(st, (ast.FunctionDef, ast.AsyncFunctionDef))}
-    local, declared = _fn_locals(fn)
-    seen: set[str] = set()
-    return any(_stmt_effect(st, local, declared, defs, seen)
-               for st in ast.walk(best) if isinstance(st, ast.stmt))
+        if isinstance(node, (ast.Global, ast.Nonlocal)):
+            return type(node).__name__.lower()
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in HAZARD_CALLS:
+            return node.func.id
+        if isinstance(node, ast.Name) and node.id == "importlib":
+            return "importlib"
+        if isinstance(node, ast.Import) and any(a.name.split(".")[0] == "importlib" for a in node.names):
+            return "importlib"
+        if isinstance(node, ast.ImportFrom) and (node.module or "").split(".")[0] == "importlib":
+            return "importlib"
+    return None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -799,6 +714,7 @@ class FidSide:
     schema: str
     results: tuple
     executed: dict
+    side_effects: tuple = ()
 
 
 def _fid_side(payload) -> FidSide:
@@ -806,7 +722,8 @@ def _fid_side(payload) -> FidSide:
         raise ValueError("driver output is not an object")
     results = tuple((str(r["id"]), dict(r["out"])) for r in payload["results"])
     executed = {str(k): frozenset(int(n) for n in v) for k, v in payload["executed"].items()}
-    return FidSide(str(payload["schema"]), results, executed)
+    side_effects = tuple(str(h) for h in payload["side_effects"])  # required: missing key is an error
+    return FidSide(str(payload["schema"]), results, executed, side_effects)
 
 
 def judge_fidelity(old, new, srcs, lines, roots) -> tuple[bool, str, list[str]]:
@@ -817,6 +734,9 @@ def judge_fidelity(old, new, srcs, lines, roots) -> tuple[bool, str, list[str]]:
     if (old.schema != new.schema or old.schema != "fidelity-replay/1"
             or [r[0] for r in old.results] != [r[0] for r in new.results]):
         return False, "fidelity-result-mismatch", detail
+    for side, res in (("old", old), ("new", new)):
+        if res.side_effects:
+            return False, f"fidelity-side-effect-change: {side} {res.side_effects[0]}", detail
     if len(old.results) < MIN_FIDELITY_RECORDS:
         return False, "fidelity-corpus-too-small", detail
     words = [out.get("v1.parse_verdict", {}).get("ok") for _, out in old.results]
@@ -868,8 +788,9 @@ def judge_fidelity(old, new, srcs, lines, roots) -> tuple[bool, str, list[str]]:
             ran = line in executed if part == "body" else any(n in executed for n in body)
             if not ran:
                 return False, "fidelity-unexercised-change", detail
-            if side_effect(defs[side][func], line, trees[side]):
-                return False, f"fidelity-side-effect-change: {func}:{line}", detail
+            hazard = changed_line_hazard(trees[side], line)
+            if hazard is not None:
+                return False, f"fidelity-changed-line-hazard: {hazard} at {func}:{line}", detail
             must_equal |= shield
             detail.append(f"{side}:{line}: replayed {func}")
     loosened, shielded = compare_sides(old, new, must_equal)
@@ -922,7 +843,7 @@ def replay_sides(tmp: Path, root: Path, diff_text: str, section: str | None, env
         return False, "fidelity-timeout", []
     if applied.returncode != 0:
         return False, "fidelity-apply-failed", []
-    side_env = dict(env, PYTHONHASHSEED="0", TZ="UTC", LC_ALL="C")
+    side_env = dict(env, PYTHONHASHSEED="0", TZ="UTC", LC_ALL="C", PYTHONDONTWRITEBYTECODE="1")
     out: dict = {}
     for name, side in sides.items():
         pkg = side / pkg_rel

@@ -67,7 +67,6 @@ class AswRepository extends \Database\BaseMysqliRepository
     {
         /** @var list<array{season_year: int, event_type: string, roster_slot: int, pid: int|null}> $rows */
         $rows = $this->fetchAll(
-            // @phpstan-ignore ibl.orderByMissingTiebreaker (roster_slot is unique within season_year + event_type)
             'SELECT season_year, event_type, roster_slot, pid
                FROM `ibl_jsb_allstar_rosters`
               WHERE season_year <> ?

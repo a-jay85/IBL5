@@ -31,7 +31,7 @@ ORDER BY t.season_year, t.transaction_month, t.transaction_day, t.id';
 
     private const NAME_COUNT_SQL = 'SELECT COUNT(*) AS n FROM `ibl_plr` WHERE name = ?';
 
-    private const AWARDS_SQL = 'SELECT year, award FROM `ibl_awards` WHERE name = ? ORDER BY year ASC, award ASC'; // @phpstan-ignore ibl.orderByMissingTiebreaker (name is fixed and UNIQUE KEY uk_year_award_name makes year, award a total order)
+    private const AWARDS_SQL = 'SELECT year, award FROM `ibl_awards` WHERE name = ? ORDER BY year ASC, award ASC';
 
     public function __construct(\mysqli $db)
     {

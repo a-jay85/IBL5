@@ -30,25 +30,43 @@ use PHPStan\Rules\RuleErrorBuilder;
  *   (b) GROUP BY  — grouping key governs row uniqueness; proving totality through
  *                   GROUP BY is beyond the string proxy (favors false-negatives)
  *   (c) no ORDER BY at all
- *   (d) final bare column ∈ UNIQUE_COLUMNS
+ *   (d) final bare column is on the fallback allowlist, or the ORDER BY plus
+ *       WHERE-bound columns cover a PRIMARY KEY or NOT NULL UNIQUE key of the
+ *       single FROM table, per ibl5/docs/schema/current-schema.sql
+ *
+ * The key check in (d) is set containment. When every column of one usable key
+ * appears among the ORDER BY columns or the `col = ?` columns of an OR-free AND
+ * chain, two rows that tie on the whole ORDER BY share that key, so they are the
+ * same row. OrderBySqlShape reads the query and SchemaKeyMap reads the dump.
+ *
+ * A table missing from the dump (a view, or a table whose migration landed before
+ * CI refreshed the dump) gets no key-map acceptance. Run bin/regen-schema-dump in
+ * that PR, or keep an inline ignore. See ADR-0083 and ADR-0274.
  *
  * @implements Rule<String_>
  */
 final class OrderByRequiresUniqueTiebreakerRule implements Rule
 {
     /**
-     * Column names accepted as a unique/PK-ish final ORDER BY tiebreaker.
+     * Fallback allowlist for queries the table-aware check cannot prove: a JOIN,
+     * a view, a sprintf placeholder, or any other shape OrderBySqlShape returns
+     * null for. A final term on this list passes by bare column name.
      * Case-insensitive match after stripping table/alias qualifier + backticks.
-     * Extensible: add a genuinely-unique column name here (one line) when a new
-     * total-order site legitimately ends on a PK the rule doesn't yet recognize.
      *
-     * Known false-negative: 'sid' is the AUTO_INCREMENT PRIMARY KEY of nuke_stories,
-     * but nuke_comments.sid is a non-unique FK to it (KEY sid). Because matching is
-     * by bare column name, an ORDER BY over nuke_comments ending on sid would pass
-     * unflagged. No such query exists today; this is the accepted proxy trade-off
-     * (ADR-0083 favors false-negatives). Order comment lists by their own PK.
+     * 'sid' left the list because the key map proves it per table: it is the
+     * PRIMARY KEY of nuke_stories, but nuke_comments.sid is a non-unique FK, which
+     * a bare-name match could not tell apart.
      */
-    private const UNIQUE_COLUMNS = ['id', 'pid', 'uuid', 'box_id', 'schedid', 'teamid', 'sid'];
+    private const UNIQUE_COLUMNS = ['id', 'pid', 'uuid', 'box_id', 'schedid', 'teamid'];
+
+    private SchemaKeyMap $keyMap;
+
+    public function __construct(?string $schemaDumpPath = null)
+    {
+        $this->keyMap = SchemaKeyMap::fromSchemaDump(
+            $schemaDumpPath ?? dirname(__DIR__) . '/docs/schema/current-schema.sql'
+        );
+    }
 
     public function getNodeType(): string
     {
@@ -128,6 +146,10 @@ final class OrderByRequiresUniqueTiebreakerRule implements Rule
             return [];
         }
 
+        if ($this->tableAwareAccepts($normalized, $orderByClause)) {
+            return [];
+        }
+
         $error = RuleErrorBuilder::message(
             'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column '
             . '(e.g. append ", pid ASC"); final sort term "' . $bareColumn . '" is not a '
@@ -136,5 +158,24 @@ final class OrderByRequiresUniqueTiebreakerRule implements Rule
         )->identifier('ibl.orderByMissingTiebreaker')->build();
 
         return [$error];
+    }
+
+    private function tableAwareAccepts(string $normalized, string $orderByClause): bool
+    {
+        $shape = OrderBySqlShape::resolve($normalized, $orderByClause);
+        if ($shape === null) {
+            return false;
+        }
+        $keys = $this->keyMap->keysFor($shape->table());
+        if ($keys === null) {
+            return false;
+        }
+        $fixed = array_flip([...$shape->orderColumns(), ...$shape->boundColumns()]);
+        foreach ($keys as $key) {
+            if (array_diff_key(array_flip($key), $fixed) === []) {
+                return true;
+            }
+        }
+        return false;
     }
 }

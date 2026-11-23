@@ -179,7 +179,6 @@ ORDER BY game_date ASC, game_of_that_day ASC, visitor_teamid ASC';
     public function getFranchisePlayoffSeries(int $a, int $b): array
     {
         $rows = $this->fetchAll(
-            // @phpstan-ignore ibl.orderByMissingTiebreaker (year + round + both teams identify one series)
             'SELECT pr.year, pr.round, pr.winner_tid, pr.loser_tid, pr.winner_games, pr.loser_games,
        CAST(pr.winner_tid AS CHAR) AS winner_side
 FROM `ibl_playoff_series_results` pr

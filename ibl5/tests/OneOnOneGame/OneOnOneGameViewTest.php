@@ -99,12 +99,12 @@ final class OneOnOneGameViewTest extends TestCase
     {
         $html = $this->view->renderPlayerSelectionForm([], null, null);
 
-        $this->assertStringContainsString('ibl-filter-form', $html);
-        $this->assertStringContainsString('ibl-filter-form__row', $html);
-        $this->assertStringContainsString('ibl-filter-form__group', $html);
-        $this->assertStringContainsString('ibl-filter-form__label', $html);
-        $this->assertStringContainsString('ibl-filter-form__submit', $html);
-        $this->assertStringContainsString('ibl-select', $html);
+        $this->assertStringContainsString("<form name=\"OneOnOneGame\" method=\"post\" action=\"modules.php?name=OneOnOneGame\" class=\"d-card d-card-border bg-base-200 p-4 mb-6\">\n", $html);
+        $this->assertStringContainsString("<div class=\"flex flex-wrap items-center justify-center gap-4\">\n<div class=\"flex items-center gap-2\">\n<label class=\"d-label\" for=\"pid1\">Player One</label>\n<select name=\"pid1\" id=\"pid1\" class=\"d-select d-select-sm w-auto\">\n", $html);
+        $this->assertStringContainsString("<div class=\"flex items-center gap-2\">\n<label class=\"d-label\" for=\"pid2\">Player Two</label>\n<select name=\"pid2\" id=\"pid2\" class=\"d-select d-select-sm w-auto\">\n", $html);
+        $this->assertStringContainsString("<button type=\"submit\" class=\"d-btn d-btn-primary d-btn-sm\">Begin One-on-One Match</button>\n</div>\n</form>\n", $html);
+        $this->assertStringNotContainsString('ibl-filter-form', $html);
+        $this->assertStringNotContainsString('ibl-select', $html);
     }
 
     // ========== renderGameLookupForm Tests ==========
@@ -122,9 +122,18 @@ final class OneOnOneGameViewTest extends TestCase
     {
         $html = $this->view->renderGameLookupForm();
 
-        $this->assertStringContainsString('ibl-filter-form', $html);
-        $this->assertStringContainsString('ibl-input', $html);
-        $this->assertStringContainsString('ibl-filter-form__submit', $html);
+        $this->assertSame(
+            "<form name=\"LookUpOldGame\" method=\"post\" action=\"modules.php?name=OneOnOneGame\" class=\"d-card d-card-border bg-base-200 p-4 mb-6\">\n"
+            . "<div class=\"flex flex-wrap items-center justify-center gap-4\">\n"
+            . "<div class=\"flex items-center gap-2\">\n"
+            . "<label class=\"d-label\" for=\"gameid\">Review Old Game (Game ID)</label>\n"
+            . "<input type=\"text\" name=\"gameid\" id=\"gameid\" class=\"d-input d-input-sm w-40\">\n"
+            . "</div>\n"
+            . "<button type=\"submit\" class=\"d-btn d-btn-primary d-btn-sm\">Review Old Game</button>\n"
+            . "</div>\n"
+            . "</form>\n",
+            $html
+        );
     }
 
     // ========== renderErrors Tests ==========

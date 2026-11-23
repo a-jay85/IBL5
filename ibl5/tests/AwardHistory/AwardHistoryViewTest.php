@@ -44,6 +44,23 @@ final class AwardHistoryViewTest extends TestCase
         $this->assertStringContainsString('</form>', $result);
     }
 
+    public function testSearchFormUsesDaisyUiClasses(): void
+    {
+        $params = ['name' => null, 'award' => null, 'year' => null, 'sortby' => 3];
+
+        $html = $this->view->renderSearchForm($params);
+
+        $this->assertStringContainsString('<form method="post" action="modules.php?name=AwardHistory" class="d-card d-card-border bg-base-200 p-4 mb-6">', $html);
+        $this->assertStringContainsString('<div class="flex flex-wrap items-center justify-center gap-4"><div class="flex items-center gap-2"><label class="d-label" for="aw_name">Name</label>', $html);
+        $this->assertStringContainsString('placeholder="Player name..." class="d-input d-input-sm w-40"></div><div class="flex items-center gap-2"><label class="d-label" for="aw_Award">Award</label>', $html);
+        $this->assertStringContainsString('placeholder="Award name..." class="d-input d-input-sm w-40"></div><div class="flex items-center gap-2"><label class="d-label" for="aw_year">Year</label>', $html);
+        $this->assertStringContainsString('placeholder="Year" class="d-input d-input-sm w-20"></div></div>', $html);
+        $this->assertStringContainsString('<div class="flex flex-wrap items-center justify-center gap-4 mt-3"><div class="flex items-center gap-2"><span class="d-label">Sort by</span>', $html);
+        $this->assertStringContainsString('</div><button type="submit" class="d-btn d-btn-primary d-btn-sm">Search</button></div></form>', $html);
+        $this->assertStringContainsString('<label class="player-awards-sort__option" for="sort-', $html);
+        $this->assertStringNotContainsString('ibl-filter-form', $html);
+    }
+
     public function testRenderSearchFormIncludesFormFields(): void
     {
         $params = ['name' => null, 'award' => null, 'year' => null, 'sortby' => 3];

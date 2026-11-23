@@ -13,7 +13,7 @@ use Security\HtmlSanitizer;
 /**
  * ComparePlayersView - HTML rendering for player comparison
  *
- * Uses the IBL5 design system with ibl-filter-form for search
+ * Uses daisyUI d-* form classes for the search form
  * and ibl-data-table for comparison tables.
  *
  * @phpstan-type ComparePlayerRow array{pid: int, name: string, pos: string, age: ?int, teamid: int, teamname: ?string, color1: ?string, color2: ?string, team_city: ?string, r_fga: ?int, r_fgp: ?int, r_fta: ?int, r_ftp: ?int, r_3ga: ?int, r_3gp: ?int, r_orb: ?int, r_drb: ?int, r_ast: ?int, r_stl: ?int, r_tvr: ?int, r_blk: ?int, r_foul: ?int, oo: ?int, r_drive_off: ?int, po: ?int, r_trans_off: ?int, od: ?int, dd: ?int, pd: ?int, td: ?int, stats_gm: ?int, stats_gs: ?int, stats_min: ?int, stats_fgm: ?int, stats_fga: ?int, stats_ftm: ?int, stats_fta: ?int, stats_3gm: ?int, stats_3ga: ?int, stats_orb: ?int, stats_drb: ?int, stats_ast: ?int, stats_stl: ?int, stats_tvr: ?int, stats_blk: ?int, stats_pf: ?int, car_gm: ?int, car_min: ?int, car_fgm: ?int, car_fga: ?int, car_ftm: ?int, car_fta: ?int, car_3gm: ?int, car_3ga: ?int, car_orb: ?int, car_drb: ?int, car_reb: ?int, car_ast: ?int, car_stl: ?int, car_tvr: ?int, car_blk: ?int, car_pf: ?int, car_pts: ?int}
@@ -37,20 +37,20 @@ class ComparePlayersView implements ComparePlayersViewInterface
         }
         $datalistHtml .= '</datalist>';
 
-        $output .= '<form action="modules.php?name=ComparePlayers" method="POST" class="ibl-filter-form">';
-        $output .= '<div class="ibl-filter-form__row">';
+        $output .= '<form action="modules.php?name=ComparePlayers" method="POST" class="d-card d-card-border bg-base-200 p-4 mb-6">';
+        $output .= '<div class="flex flex-wrap items-center justify-center gap-4">';
 
-        $output .= '<div class="ibl-filter-form__group">';
-        $output .= '<label class="ibl-filter-form__label" for="Player1">Player 1</label>';
-        $output .= '<input type="text" name="Player1" id="Player1" list="player-names" placeholder="Search player..." autocomplete="off">';
+        $output .= '<div class="flex items-center gap-2">';
+        $output .= '<label class="d-label" for="Player1">Player 1</label>';
+        $output .= '<input type="text" name="Player1" id="Player1" class="d-input d-input-sm w-40" list="player-names" placeholder="Search player..." autocomplete="off">';
         $output .= '</div>';
 
-        $output .= '<div class="ibl-filter-form__group">';
-        $output .= '<label class="ibl-filter-form__label" for="Player2">Player 2</label>';
-        $output .= '<input type="text" name="Player2" id="Player2" list="player-names" placeholder="Search player..." autocomplete="off">';
+        $output .= '<div class="flex items-center gap-2">';
+        $output .= '<label class="d-label" for="Player2">Player 2</label>';
+        $output .= '<input type="text" name="Player2" id="Player2" class="d-input d-input-sm w-40" list="player-names" placeholder="Search player..." autocomplete="off">';
         $output .= '</div>';
 
-        $output .= '<button type="submit" class="ibl-filter-form__submit">Compare</button>';
+        $output .= '<button type="submit" class="d-btn d-btn-primary d-btn-sm">Compare</button>';
 
         $output .= '</div>';
         $output .= '</form>';

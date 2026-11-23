@@ -59,12 +59,12 @@ class ComparePlayersViewGoldenTest extends TestCase
 
         $this->assertSame(self::flat(<<<'HTML'
 <h1 class="ibl-title">Compare Players</h1>
-<form action="modules.php?name=ComparePlayers" method="POST" class="ibl-filter-form"><div class="ibl-filter-form__row"><div class="ibl-filter-form__group">
-<label class="ibl-filter-form__label" for="Player1">Player 1</label>
-<input type="text" name="Player1" id="Player1" list="player-names" placeholder="Search player..." autocomplete="off"></div><div class="ibl-filter-form__group">
-<label class="ibl-filter-form__label" for="Player2">Player 2</label>
-<input type="text" name="Player2" id="Player2" list="player-names" placeholder="Search player..." autocomplete="off"></div>
-<button type="submit" class="ibl-filter-form__submit">Compare</button></div>
+<form action="modules.php?name=ComparePlayers" method="POST" class="d-card d-card-border bg-base-200 p-4 mb-6"><div class="flex flex-wrap items-center justify-center gap-4"><div class="flex items-center gap-2">
+<label class="d-label" for="Player1">Player 1</label>
+<input type="text" name="Player1" id="Player1" class="d-input d-input-sm w-40" list="player-names" placeholder="Search player..." autocomplete="off"></div><div class="flex items-center gap-2">
+<label class="d-label" for="Player2">Player 2</label>
+<input type="text" name="Player2" id="Player2" class="d-input d-input-sm w-40" list="player-names" placeholder="Search player..." autocomplete="off"></div>
+<button type="submit" class="d-btn d-btn-primary d-btn-sm">Compare</button></div>
 </form>
 <datalist id="player-names">
 <option value="Plain Name">
@@ -80,12 +80,12 @@ HTML), $html);
 
         $this->assertSame(self::flat(<<<'HTML'
 <h1 class="ibl-title">Compare Players</h1>
-<form action="modules.php?name=ComparePlayers" method="POST" class="ibl-filter-form"><div class="ibl-filter-form__row"><div class="ibl-filter-form__group">
-<label class="ibl-filter-form__label" for="Player1">Player 1</label>
-<input type="text" name="Player1" id="Player1" list="player-names" placeholder="Search player..." autocomplete="off"></div><div class="ibl-filter-form__group">
-<label class="ibl-filter-form__label" for="Player2">Player 2</label>
-<input type="text" name="Player2" id="Player2" list="player-names" placeholder="Search player..." autocomplete="off"></div>
-<button type="submit" class="ibl-filter-form__submit">Compare</button></div>
+<form action="modules.php?name=ComparePlayers" method="POST" class="d-card d-card-border bg-base-200 p-4 mb-6"><div class="flex flex-wrap items-center justify-center gap-4"><div class="flex items-center gap-2">
+<label class="d-label" for="Player1">Player 1</label>
+<input type="text" name="Player1" id="Player1" class="d-input d-input-sm w-40" list="player-names" placeholder="Search player..." autocomplete="off"></div><div class="flex items-center gap-2">
+<label class="d-label" for="Player2">Player 2</label>
+<input type="text" name="Player2" id="Player2" class="d-input d-input-sm w-40" list="player-names" placeholder="Search player..." autocomplete="off"></div>
+<button type="submit" class="d-btn d-btn-primary d-btn-sm">Compare</button></div>
 </form>
 <datalist id="player-names">
 </datalist>

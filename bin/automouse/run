@@ -2137,6 +2137,58 @@ write_failure_report() {
     } > "$_wfr_file"
 }
 
+# The end-of-run note for a failed impl attempt (no handoff, plan still queued).
+# The impl agent often finished most of the build and stopped at a later check,
+# so "Building X failed" misstated it. When the agent wrote its own
+# reports/YYYY-MM-DD-error-<slug>.md during this attempt (mtime >= <since>), the
+# note quotes that report's title and points at it. Otherwise it points at the
+# .failure log tail, which is the only record left.
+# Args: <plan_name> <attempt_num> <since_epoch>
+impl_failure_note() {
+    _ifn_slug="${1%.md}"; _ifn_attempt="$2"; _ifn_since="$3"
+    _ifn_report=""; _ifn_best=0
+    # Pass 1: a report named for this plan's filename slug.
+    for _ifn_f in "$NIGHTLY_DIR"/reports/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-error-"$_ifn_slug".md; do
+        [ -f "$_ifn_f" ] || continue
+        _ifn_m=$(stat -c %Y "$_ifn_f" 2>/dev/null || stat -f %m "$_ifn_f" 2>/dev/null || echo 0)
+        if [ "$_ifn_m" -ge "$_ifn_since" ] && [ "$_ifn_m" -ge "$_ifn_best" ]; then
+            _ifn_best=$_ifn_m; _ifn_report=$_ifn_f
+        fi
+    done
+    # Pass 2: the agent may name the file from the plan title instead. Another
+    # runner can write its own error report during this attempt, so a report
+    # under another slug counts only when it was written during this attempt
+    # (since > 0) AND its body names this plan's filename or its title.
+    # The filename must not sit inside a longer name (x-plan-g.md is not plan-g.md).
+    _ifn_ptitle=""
+    [ ! -f "$QUEUE_DIR/$1" ] || _ifn_ptitle=$(sed -n '/^#[[:space:]]/{s/^#[[:space:]]*//p;q;}' "$QUEUE_DIR/$1" 2>/dev/null) || _ifn_ptitle=""
+    _ifn_fre=$(printf '%s' "$1" | sed 's/[.]/[.]/g')
+    if [ -z "$_ifn_report" ] && [ "$_ifn_since" -gt 0 ]; then
+        for _ifn_f in "$NIGHTLY_DIR"/reports/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-error-*.md; do
+            [ -f "$_ifn_f" ] || continue
+            if ! grep -qE -- "(^|[^A-Za-z0-9_.-])${_ifn_fre}" "$_ifn_f" 2>/dev/null; then
+                { [ -n "$_ifn_ptitle" ] && grep -qF -- "$_ifn_ptitle" "$_ifn_f" 2>/dev/null; } || continue
+            fi
+            _ifn_m=$(stat -c %Y "$_ifn_f" 2>/dev/null || stat -f %m "$_ifn_f" 2>/dev/null || echo 0)
+            if [ "$_ifn_m" -ge "$_ifn_since" ] && [ "$_ifn_m" -ge "$_ifn_best" ]; then
+                _ifn_best=$_ifn_m; _ifn_report=$_ifn_f
+            fi
+        done
+    fi
+    _ifn_title=""
+    [ -z "$_ifn_report" ] || _ifn_title=$(sed -n '1s/^#*[[:space:]]*//p' "$_ifn_report" 2>/dev/null) || _ifn_title=""
+    if [ -n "$_ifn_report" ] && [ -n "$_ifn_title" ]; then
+        printf 'The build agent for %s stopped before shipping (try %s of %s). Its report says: "%s". It stays queued for another try. Read %s' \
+            "$_ifn_slug" "$_ifn_attempt" "$MAX_ATTEMPTS" "$_ifn_title" "$_ifn_report"
+    elif [ -n "$_ifn_report" ]; then
+        printf 'The build agent for %s stopped before shipping (try %s of %s). It stays queued for another try. Read %s' \
+            "$_ifn_slug" "$_ifn_attempt" "$MAX_ATTEMPTS" "$_ifn_report"
+    else
+        printf 'The build agent for %s stopped before shipping and wrote no report (try %s of %s). It stays queued for another try. Read %s' \
+            "$_ifn_slug" "$_ifn_attempt" "$MAX_ATTEMPTS" "$QUEUE_DIR/$1.failure"
+    fi
+}
+
 # Print the failure-signature header line of a .failure sidecar, or nothing.
 # Reads only the header region (stops at the first ``` fence), so a log line in
 # the fenced tail that happens to start with "failure-signature:" is never read.
@@ -3167,7 +3219,7 @@ while true; do
             rm -f "$FAILSIG_FILE" 2>/dev/null || true
             write_failure_report "$PLAN_NAME" "$IMPL_LOG_BEFORE" "$IMPL_MODEL" "$(( ATTEMPTS + 1 ))" "$NEW_FAILSIG"
             echo "Genuine impl failure — wrote $FAILURE_FILE (attempt $(( ATTEMPTS + 1 ))/$MAX_ATTEMPTS)." >> "$LOG"
-            note_failure "Building ${PLAN_NAME%.md} failed (try $(( ATTEMPTS + 1 )) of $MAX_ATTEMPTS). It stays queued for another try. Read $FAILURE_FILE"
+            note_failure "$(impl_failure_note "$PLAN_NAME" "$(( ATTEMPTS + 1 ))" "${IMPL_START:-0}")"
             if [ -n "$NEW_FAILSIG" ]; then
                 echo "failsig: recorded (${#NEW_FAILSIG} chars)" >> "$LOG"
             else

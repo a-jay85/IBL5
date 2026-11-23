@@ -17,7 +17,7 @@ The arming replay (ADR-0246) runs the base and candidate `evaluate` over a store
 `harness/arming_replay.py` runs a second stage, `harness/fidelity_replay.py`, whenever a diff touches `harness/fidelity.py`. The main-checkout driver `harness/fidelity_replay_driver.py` runs each side's arming-facing fidelity readers over `harness/fidelity_replay_corpus.json` under a line tracer. The stage clears a changed line by one of two proofs:
 
 1. **Dead in production.** No production file reaches the changed function from any fidelity name it references.
-2. **Replayed only.** Every production path to the function starts at a replayed root, the changed line ran on the corpus, the line has no side effect, and no replayed output got looser. A function a replayed root shields must give equal outputs.
+2. **Replayed only.** Every production path to the function starts at a replayed root, the changed line ran on the corpus, no replayed call records a runtime side effect, and the changed line carries no `global`, `nonlocal`, `exec`, `eval`, `compile`, `__import__` or `importlib`, and no replayed output got looser. A function a replayed root shields must give equal outputs.
 
 Anything else keeps the flag with a named reason. Looseness follows this table:
 
@@ -36,7 +36,7 @@ The stage defends 21 bypass classes:
 3. Missing or empty corpus: `fidelity-corpus-missing`, the `MIN_FIDELITY_RECORDS` floor, and driver exit 4 on empty verdict text.
 4. Exception divergence counts as looser.
 5. Nondeterminism: the driver runs with `PYTHONHASHSEED=0`, `TZ=UTC` and `LC_ALL=C`, and any difference counts.
-6. A disabled tracer leaves lines unexecuted, and `sys.*` calls count as side effects.
+6. A disabled tracer leaves lines unexecuted, and a `sys.settrace`, `sys.setprofile` or `sys.addaudithook` call inside a replayed call records a side effect.
 7. In-process stdout forgery stays a residual shared with the first stage.
 8. Dynamic dispatch (`globals()`, `eval`, computed `getattr`, `sys.modules`) holds as `fidelity-unresolvable-dispatch`.
 9. A module alias read as a value holds as `fidelity-unresolvable-reference`. The check resolves each name in its own scope, so a parameter named `fidelity` does not trip it.
@@ -47,7 +47,7 @@ The stage defends 21 bypass classes:
 14. Reworded hold text counts as a lost item.
 15. The cross-run sticky channel must stay equal.
 16. A change reachable from an LLM-input root holds as `fidelity-unreplayed-channel`.
-17. Side effects and argument mutation: a static check plus the `holds.args_after` output.
+17. Side effects and argument mutation: runtime watches in the driver subprocess: an audit hook that records write-mode `open` events and the `os.`, `shutil.`, `subprocess.`, `socket.`, `tempfile.` and `ctypes.` event families; a deepcopy compare of every replayed root's arguments; a per-record snapshot of side-module globals and `os.environ`. Anything the watch cannot copy or compare holds. A changed-line static check covers inputs the corpus never has.
 18. A function reachable from replayed and unreplayed roots holds through the unreplayed root.
 19. Signature drift: each side gets only the keywords its own signature names, and a raise counts as looser.
 20. A new production caller on the candidate side: roots come from both sides.
@@ -60,6 +60,16 @@ The stage defends 21 bypass classes:
 - **Line-ran check only.** Rejected because an edit to `verdict_items` would clear while it feeds `body_recheck`.
 - **ArmInputs call graph.** Rejected because it misses the verdict file, the sticky and the LLM packet.
 - **Stubbed LLM replay.** Replaying `re_review` and `body_recheck` against recorded LLM output was rejected for now because a prompt edit would pass against a recorded answer.
+
+## Residual gap
+
+The watches see only the corpus inputs, so an effect behind an input the corpus lacks goes unseen. Two checks bound that gap: the line-ran check makes the changed line run on a corpus record, and the changed-line static check holds on `global`, `nonlocal`, `exec`, `eval`, `compile`, `__import__` and `importlib`. The watch detects and records. The replayed code still runs unsandboxed in a throwaway subprocess, as it did on #4205. The driver does not see these writes:
+
+- a C extension write that raises no audit event;
+- a write to a function's `__dict__` or an `lru_cache`, because callables compare by identity;
+- a call-only event (`object.__setattr__`, `sys.settrace`) that an unchanged module raises at its own top level when a replayed call imports it lazily. The driver counts any such event raised while importlib runs a module body as import work, because master's `read_shadow` lazily imports modules whose `@dataclass` classes set `__doc__` through `type.__setattr__`.
+
+The globals snapshot skips three things that never carry replay state: the driver's own module, module-valued names, and the `__future__` flag that `from __future__ import annotations` binds. That flag has no value equality, so a deepcopy of it never compares equal.
 
 ## Consequences
 

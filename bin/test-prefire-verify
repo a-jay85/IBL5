@@ -922,6 +922,16 @@ test_gate_environment_failure_exits_10() {
     ! fired || note "post-plan-now launched when the gate could not run"
 }
 
+# The stages Step 6.9 must run, in order: the fire point's `all` list, with
+# local-mutations swapped for exec-mutations, which runs every mutation row.
+# Read from bin/lib/prefire-verify, so a new fire-point stage fails these cases
+# until the impl prompt runs it too.
+step_6_9_stages() {
+    local line
+    line=$(sed -n 's/^ *all) *STAGES="\([^"]*\)".*/\1/p' "$REPO/bin/lib/prefire-verify")
+    printf '%s\n' "${line/local-mutations/exec-mutations}"
+}
+
 assert_step_6_9() { # <prompt-impl path>
     local f="$1" l69 l68 l7 body
     l69=$(grep -nF -- '## Step 6.9: Pre-Fire Verification Gate' "$f" | head -n 1 | cut -d: -f1)
@@ -937,9 +947,11 @@ assert_step_6_9() { # <prompt-impl path>
     [ -n "$l7" ] && [ "$l69" -lt "$l7" ] || note "Step 6.9 is not before Step 7"
     if [ -n "$l7" ] && [ "$l69" -lt "$l7" ]; then
         body=$(sed -n "${l69},$((l7 - 1))p" "$f")
-        local s
-        for s in "--stage matrix" "--stage phpunit" "--stage exec-mutations"; do
-            grep -qF -- "$s" <<< "$body" || note "Step 6.9 does not name '$s'"
+        local s stages
+        stages=$(step_6_9_stages)
+        [ -n "$stages" ] || note "no all) STAGES line in bin/lib/prefire-verify"
+        for s in $stages; do
+            grep -qF -- "--stage $s" <<< "$body" || note "Step 6.9 does not name '--stage $s'"
         done
         grep -qF -- "--stage infection" <<< "$body" && note "Step 6.9 still names '--stage infection'"
     fi
@@ -982,7 +994,10 @@ assert_step_6_9_blocks_set_plan_path() { # <prompt-impl path>
         b { print > out }
     ' "$f"
     i=0
-    for stage in matrix phpunit exec-mutations; do
+    local stages
+    stages=$(step_6_9_stages)
+    [ -n "$stages" ] || note "no all) STAGES line in bin/lib/prefire-verify"
+    for stage in $stages; do
         i=$((i + 1))
         if [ ! -f "$D/blocks/$i.sh" ]; then
             note "Step 6.9 has no bash block for $stage"
@@ -997,7 +1012,7 @@ assert_step_6_9_blocks_set_plan_path() { # <prompt-impl path>
         [ "$got" = "--plan $want --stage $stage" ] \
             || note "$stage block called the gate with '$got'"
     done
-    [ ! -f "$D/blocks/4.sh" ] || note "Step 6.9 has a fourth bash block"
+    [ ! -f "$D/blocks/$((i + 1)).sh" ] || note "Step 6.9 has an extra bash block"
 }
 
 test_prompt_impl_step_6_9_blocks_set_plan_path() {
@@ -1018,7 +1033,7 @@ test_prompt_impl_block_without_plan_path_fails() {
     ' "$REPO/bin/automouse/prompt-impl" > "$fixture"
     assert_step_6_9_blocks_set_plan_path "$fixture"
     case "$WHY" in
-        "phpunit block called the gate with '--plan  --stage phpunit'") WHY="" ;;
+        "matrix block called the gate with '--plan  --stage matrix'") WHY="" ;;
         *) WHY="a block with no PLAN_PATH must fail, got: '${WHY}'" ;;
     esac
 }
@@ -1850,13 +1865,14 @@ test_help_lists_exec_mutations() {
     refute_out "PREFIRE_EXCLUDES_CMD"
 }
 
-test_prompt_impl_runs_three_stages() {
+test_prompt_impl_runs_fire_point_stages() {
     OUT=$(cat "$REPO/bin/automouse/prompt-impl")
     want_out '--stage exec-mutations'
-    want_out 'When all three return 0, proceed to Step 7.'
+    want_out 'When all six return 0, proceed to Step 7.'
     want_out "Never edit a"
     want_out 'never delete a mutation block'
-    refute_out 'When all four return 0'
+    want_out 'never move a phase to `## Out of Scope`'
+    refute_out 'When all three return 0'
     want_out '"prefire_deferred": ["exec-mutations: <the UNDECIDED line>"]'
 }
 
@@ -2847,7 +2863,7 @@ test_xm_fire_point_limits_match_harness
 test_xm_fire_point_undecided_still_fails
 test_post_plan_now_passes_fire_point
 test_help_lists_exec_mutations
-test_prompt_impl_runs_three_stages
+test_prompt_impl_runs_fire_point_stages
 test_phpunit_full_run_passes_no_args
 test_matrix_repeated_command_runs_once
 test_matrix_repeated_failing_command_still_refuses

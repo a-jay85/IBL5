@@ -20,6 +20,7 @@
 #   bin/wt-sync-cron-setup --install-hook        # symlink hook + register in ~/.claude/settings.json
 #   bin/wt-sync-cron-setup --uninstall-hook      # remove symlink + deregister from settings.json
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"

@@ -11,6 +11,7 @@
 # --push --delete is rejected: deleting prod snapshots from a laptop is never the intent.
 # PROD_SSH_HOST must be USER@HOST format (env var or .env).
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"

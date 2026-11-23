@@ -1,8 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # jsb-verdict — collapse a JSB calibration JSON (up to ~400KB) to its verdict metrics
 # WITHOUT full-reading it. Array indices are collapsed to [] and numeric leaves
 # aggregated (n/min/max/mean), so per-row arrays become one summary line.
 # A ~100K-token Read becomes ~40 lines. Usage: bin/jsb-verdict <artifact.json> [key-regex]
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     cat <<'EOF'
 Usage: bin/jsb-verdict <artifact.json> [key-regex]

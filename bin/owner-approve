@@ -32,6 +32,7 @@
 # A NOT READY verdict on an approval that lists kept unplanned changes and a diff
 # fingerprint first gets one bin/post-plan-now --state-changed re-review; exit 4
 # can follow that re-review. --finish on such an approval gets the same re-review.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -uo pipefail
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then

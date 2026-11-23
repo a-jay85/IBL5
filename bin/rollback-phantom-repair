@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Restores the rows migration 168 deleted, from the *_phantom_backup tables.
 #
 # Usage: bin/rollback-phantom-repair [--help]
@@ -17,6 +17,7 @@
 # Exit codes: 0 = restored (or already restored), 1 = aborted with nothing written,
 #             2 = usage error, 3 = environment unavailable (php container not running).
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"

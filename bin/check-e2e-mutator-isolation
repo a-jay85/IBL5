@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Guards the "updater-firing specs live in the mutators project" invariant.
 #
 # The Playwright `mutators` project (ADR-0052) runs destructive full-season
@@ -22,6 +22,7 @@
 #
 # Overridable for the self-test via E2E_MUTATOR_CONFIG / E2E_MUTATOR_SPECS_DIR.
 # Exits 0 (clean) or 1 (an updater-firing spec is outside the mutators project).
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     cat <<'EOF'
 Usage: bin/check-e2e-mutator-isolation

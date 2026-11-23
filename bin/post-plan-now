@@ -94,6 +94,7 @@
 # $2 = 1 in --rebase-only mode: the skill has no rebase-only path and would run the
 # full review on a PR only a human can clear, so a rebase-only failure never falls back.
 # The fallback never arms; see .claude/skills/post-plan/SKILL.md Phase 2.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 should_fallback() { [ "${2:-0}" = 1 ] && return 1; case "$1" in 0|3|7|76) return 1 ;; *) return 0 ;; esac; }
 # rebase_only_harness_arg <0|1>: the harness flag for --rebase-only, or nothing.
 rebase_only_harness_arg() { [ "${1:-0}" = 1 ] && printf ' --rebase-only'; return 0; }

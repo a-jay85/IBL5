@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Remove a git worktree and its Docker environment.
 # Tears down Docker containers first (if running), then removes the worktree.
 # Uses --force for git because symlinked files (vendor, config.php, .env.test,
@@ -6,6 +6,7 @@
 #
 # Usage: bin/wt-remove <worktree-name> [--force] [--volumes] [--if-empty]
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 # lsof lives in /usr/sbin on macOS. Without it is_worktree_in_use reads "not in
 # use" (empty pipe), which is fail-open for a destructive call. Append the

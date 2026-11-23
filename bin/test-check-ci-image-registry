@@ -1,10 +1,11 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # bin/test-check-ci-image-registry — self-test for bin/check-ci-image-registry. Each case
 # builds a minimal tree under a temp dir (manifest + the files the case needs), runs the
 # gate with --root=DIR and asserts the exit code; every exit-1 case also asserts the rule
 # letter and the offending file:line on stderr.
 #
 # Run: bin/test-check-ci-image-registry  (exit 0 = all pass, 1 = a case failed)
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

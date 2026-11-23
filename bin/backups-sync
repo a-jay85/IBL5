@@ -20,6 +20,7 @@
 # --delete is OFF by default: on a backups archive an accidental mirror could
 # wipe local history. Opt in only when you truly want dest to match source.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"

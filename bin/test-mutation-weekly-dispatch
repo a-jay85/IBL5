@@ -3,6 +3,7 @@
 # its calls and serves canned run history; MWD_NOW fakes the clock.
 #
 # Usage: bin/test-mutation-weekly-dispatch [case_name]
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -u
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)

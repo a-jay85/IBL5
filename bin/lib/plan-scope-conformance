@@ -36,6 +36,7 @@
 # the body before either section is read, so the files-changed block can never
 # declare the paths it lists. The helper reads no environment variable.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 set -f
 # Force the C locale: deterministic byte-wise matching across locales.

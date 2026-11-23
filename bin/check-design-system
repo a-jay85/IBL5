@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # bin/check-design-system — keep component CSS on the design tokens and keep the
 # UI class catalog in step with the code.
@@ -31,6 +31,7 @@
 # gate-backtest-argv:
 # gate-backtest-reads: ibl5/design/components/*.css ibl5/classes/UI/*
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 usage() { echo "usage: bin/check-design-system [--root <dir>]"; }

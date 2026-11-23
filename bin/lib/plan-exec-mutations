@@ -45,6 +45,7 @@
 # The journal lives at $(git rev-parse --absolute-git-dir)/exec-mutations/:
 # per-worktree and outside the porcelain view.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -u
 export LC_ALL=C
 

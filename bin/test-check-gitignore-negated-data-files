@@ -5,6 +5,7 @@
 # (so cwd never decides the scanned repo), and asserts the exit code plus one
 # output substring. Prints PASS <case> or FAIL <case>: <detail>.
 # Run: bin/test-check-gitignore-negated-data-files  (exit 0 = all pass, 1 = a case failed)
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 case "$0" in

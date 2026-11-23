@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Run Playwright E2E tests against a worktree's Docker environment.
 # Usage: bin/e2e-wt <worktree-name> [playwright-args...]
 #
@@ -14,6 +14,7 @@
 # Front door: bin/test e2e run from inside the worktree derives <name> and calls
 # this script. Call bin/e2e-wt <name> directly for agent and background runs.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then

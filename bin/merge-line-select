@@ -18,6 +18,7 @@
 # Exit codes: 0 = ran; 1 = runtime error (fetch failed, bad snapshot, --pr not
 #             found); 2 = usage error.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 # The colon form treats an empty GH_CMD like an unset one. Plain ${GH_CMD-gh}

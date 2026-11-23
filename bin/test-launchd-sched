@@ -13,6 +13,7 @@
 #   bin/test-launchd-sched           # compare every case against its fixture
 #   bin/test-launchd-sched --regen   # rewrite every fixture from current scripts
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"

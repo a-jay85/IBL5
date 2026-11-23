@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # bin/check-gitignore-negated-data-files: fails when a JSB runtime data file at
 # the ibl5/ root is git-tracked (usually force-tracked by a .gitignore "!"
 # negation) and is not on the ALLOWLIST below.
@@ -14,6 +14,7 @@
 #
 # CI (tests.yml) runs it with no arguments; the script finds the repo from its own path.
 # gate-backtest-argv:
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 JSB_EXTS="lge sch plr sco car trn his asw rcb awa dra ret hof plb"

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # <!-- no-adr: additive lint gate that pins model ids to one list; no new architectural boundary or constraint beyond the existing tiering rules -->
 # bin/test-check-model-pins — behavioural harness for bin/check-model-pins.
 #
@@ -9,6 +9,7 @@
 #
 # Run: bin/test-check-model-pins  (exit 0 = all pass, 1 = an assertion failed)
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -u
 # shellcheck source=bin/lib/harness.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"

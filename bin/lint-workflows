@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # bin/lint-workflows — CI gate: run actionlint over .github/workflows/**.
 #
 # actionlint catches what YAML alone cannot: unknown `runs-on` labels, bad
@@ -29,6 +29,7 @@
 # actionlint honors — that keeps SC2170 live everywhere else.
 #
 # Usage: bin/lint-workflows [file ...]   (no args = every workflow in the repo)
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then

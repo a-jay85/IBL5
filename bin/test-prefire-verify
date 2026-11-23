@@ -5,6 +5,7 @@
 # Usage: bin/test-prefire-verify [case_name ...]
 # With no arguments every case runs; with arguments only the named cases run.
 # Prints `PASS <name>` / `FAIL <name>: <why>` per case. Exit 0 iff all pass.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -uo pipefail
 
 # shellcheck source=bin/lib/harness.sh

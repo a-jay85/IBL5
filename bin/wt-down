@@ -1,9 +1,10 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Stop a worktree Docker environment and remove its volumes.
 # With --stop: stop the containers only (volumes, images, containers and .wt-slug stay).
 # Usage: bin/wt-down <worktree-name> [--force] [--stop]
 #        bin/wt-down --all [--force] [--stop]
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then

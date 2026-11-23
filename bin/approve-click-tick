@@ -28,6 +28,7 @@
 # At-most-once: the ledger dir holds one directory per press, with O_EXCL marker files in the order
 # claimed, bot claim, checks, started, owner-approve. A crash anywhere leaves the press consumed and
 # not run, and reconcile_local reports it by DM. Nothing re-runs a press.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 die_usage() { echo "approve-click-tick: $*" >&2; exit 2; }

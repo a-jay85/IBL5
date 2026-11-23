@@ -40,6 +40,7 @@
 # --case takes a case_end name such as headless-result-committed. Cases 1-13 have no
 # name and always run.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -u
 
 # shellcheck source=bin/lib/harness.sh

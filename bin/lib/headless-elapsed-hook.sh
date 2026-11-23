@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # bin/lib/headless-elapsed-hook.sh — PostToolUse hook that appends an elapsed-
 # clock line after every tool call in automouse impl runs.
 #
@@ -12,6 +12,7 @@
 # Emits one JSON object consumed by the Claude Code harness as additionalContext.
 # Always exits 0 (fail-open: if jq is missing, exit 0 silently).
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -u
 
 # Discard stdin (the harness pipes tool result JSON here; we don't use it).

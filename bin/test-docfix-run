@@ -6,6 +6,7 @@
 # dedupe skip, empty-arg rejection, poll logic (reap, decline, fire), and the
 # health predicate (all three ALERT branches + every silent one).
 # Run: bin/test-docfix-run  (exit 0 = all pass).
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -u
 _USAGE_TMP="$(mktemp -d "${TMPDIR:-/tmp}/usage-iso.XXXXXX")"
 [ -n "$(trap -p EXIT)" ] || trap 'rm -rf "$_USAGE_TMP"' EXIT

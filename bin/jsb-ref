@@ -1,9 +1,10 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # jsb-ref — locate a JSB symbol / address / topic in the master reference and the
 # decompile, printing only excerpts (ref) and match line-numbers (the 10MB .c), so you
 # avoid full-reading 00_MASTER_REFERENCE.md (287K) or jsb560_decompiled.c (10.4M).
 # Workflow: jsb-ref FUN_004e1ba0  → then Read ±ctx at the decompile line it reports.
 # Usage: bin/jsb-ref <pattern> [context-lines]   (env: JSB_DECOMPILE_DIR)
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -uo pipefail
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then

@@ -22,6 +22,7 @@
 #        those dispatches in $PFIX/line-dispatched.jsonl and serves the line from $PFIX/line.json.
 #
 # Run: bin/test-ci-checks-green  (exit 0 = all pass, 1 = a case failed)
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -uo pipefail
 # shellcheck source=bin/lib/harness.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"

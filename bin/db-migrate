@@ -1,10 +1,11 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Run pending SQL migrations against a running Docker MariaDB container.
 # Usage: bin/db-migrate <db-container> <migrations-dir> [db-name]
 #
 # Migrations are tracked in schema_migrations(version VARCHAR(255) PRIMARY KEY).
 # Already-applied migrations are skipped (idempotent).
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     cat <<'EOF'
 Usage: bin/db-migrate <db-container> <migrations-dir> [db-name]

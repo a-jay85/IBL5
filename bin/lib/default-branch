@@ -25,6 +25,7 @@
 #
 # CLI: bin/lib/default-branch [--repo DIR] [--ref] [-h|--help]
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 _default_branch_err() {
     printf 'default-branch: %s\n' "$1" >&2
 }

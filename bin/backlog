@@ -39,6 +39,7 @@
 #                    print the cap decision (would-create, would-convert, ...) without filing
 #
 # Requires: gh authenticated against the repo.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -uo pipefail
 
 REPO="a-jay85/IBL5-backlog"

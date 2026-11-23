@@ -2,6 +2,7 @@
 # test-vr-apply-baselines: pins bin/vr-apply-baselines behavior with mktemp fixtures.
 # Usage: bin/test-vr-apply-baselines   (exit 0 all pass, 1 any failure)
 # VR_APPLY_SCRIPT overrides the script under test (used by the mutation case).
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"

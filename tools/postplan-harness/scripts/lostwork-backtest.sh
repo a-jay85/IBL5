@@ -5,6 +5,7 @@
 # the saved pre-rebase patch. Reports only; the exit code is 0 whenever the loop completes.
 #
 # Usage: lostwork-backtest.sh [--keep] [--script <path>] <key>...
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 usage() {

@@ -23,6 +23,7 @@
 
 # ── helpers ─────────────────────────────────────────────────────────────────
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 _shl_is_shell_script() {
     local f="$1"
     # .sh extension — no shebang check needed

@@ -15,6 +15,7 @@
 # is copied into a temp dir and its two hard-coded /tmp literals are rewritten.
 # bug-pipeline-test-env is never run; only its lsof guard region is extracted.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

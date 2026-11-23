@@ -5,6 +5,7 @@
 # Applies 000_baseline_schema.sql first (creates all tables), then numbered
 # migrations (001_*, 002_*, 033b_*, etc.) which alter them.
 # Skips .php data migrations (need production data), .md files and .down.sql partners.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 trap 'echo "ERROR: Failed applying migration: $(basename "${f:-unknown}")"; exit 1' ERR
 

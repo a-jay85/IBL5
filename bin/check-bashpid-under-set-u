@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # bin/check-bashpid-under-set-u — keep bash-4-only BASHPID reads out of bin/ shell scripts.
 #
@@ -15,6 +15,7 @@
 # Bash 3.2 safe (no mapfile). Exit codes: 0 = pass, 1 = violation, 2 = usage error.
 # gate-backtest-argv:
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 die() { echo "check-bashpid-under-set-u: $*" >&2; exit 2; }

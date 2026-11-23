@@ -18,6 +18,7 @@
 #
 # Usage: bin/lib/automouse-escalate-model <base_model> <current_attempt> <max_attempts>
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -u
 
 BASE="${1:?Usage: automouse-escalate-model <base_model> <current_attempt> <max_attempts>}"

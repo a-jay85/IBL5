@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Resolve a PR number or branch name to that branch's git worktree path.
 # Prints exactly one absolute path on stdout; errors go to stderr.
 # Used by the /pr-wt skill, which feeds the path to EnterWorktree.
@@ -6,6 +6,7 @@
 # switch out of one, so resolving a path would be pointless.
 # Usage: bin/pr-wt-resolve <pr-number|branch-name>
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then

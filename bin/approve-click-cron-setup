@@ -14,6 +14,7 @@
 # Run --install once on the Mac, from the main checkout, after the PR that adds this
 # script has merged. Exactly one flag is required. Anything else exits 2.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"

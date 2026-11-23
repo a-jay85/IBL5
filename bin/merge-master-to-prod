@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Merges master into production and pushes both branches to origin.
 # All git output is suppressed; only errors or the final summary are printed.
@@ -20,6 +20,7 @@
 #
 # Set SKIP_CI_CHECK=1 to bypass the CI-green gate (emergency use only).
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -e
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then

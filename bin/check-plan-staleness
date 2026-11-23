@@ -46,6 +46,7 @@
 # tokens. The `shell=bash` directive above keeps shellcheck's SC3xxx
 # (sh-dialect) warnings from firing on the intentional bashisms.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -u
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then

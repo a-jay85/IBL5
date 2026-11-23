@@ -18,6 +18,7 @@
 # Seams: GH_BIN (default gh), BUG_PIPELINE_ISSUE_REPO. Tests stub GH_BIN + point
 # BUG_PIPELINE_ISSUE_REPO at a throwaway repo.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 : "${GH_BIN:=gh}"
 : "${BUG_PIPELINE_ISSUE_REPO:=}"
 

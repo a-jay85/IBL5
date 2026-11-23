@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # bin/check-ci-image-registry — CI gate: CI pulls Docker Hub images only through the
 # GHCR mirror (ghcr.io/a-jay85/mirror/<name>:<tag>) listed in .github/ci-image-mirror.txt,
 # so a Docker Hub timeout cannot fail a job. Rules (each violation prints
@@ -15,6 +15,7 @@
 # See bin/test-check-ci-image-registry and ADR-0191.
 #
 # Usage: bin/check-ci-image-registry [--root=DIR]
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)

@@ -30,6 +30,7 @@
 #             2 = usage error / unreadable or empty input file
 #             3 = malformed input (no `diff --git` header found)
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -u
 
 usage() {

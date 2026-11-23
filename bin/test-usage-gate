@@ -6,6 +6,7 @@
 # state dir is never written, and shadows `security` / `curl` on PATH so the real
 # keychain and network are never touched.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -uo pipefail
 # An operator shell may tune these. Tests expect the built-in 93/98 unless a
 # case sets its own, so drop inherited values (see bin/lib/usage-test-isolation.sh).

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # bin/website-affecting — classify a list of changed files as website-affecting or not.
 #
 # Reads a newline-separated list of repo-relative changed file paths from stdin
@@ -94,6 +94,7 @@
 #
 # shellcheck shell=bash
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -u
 
 DENY_REGEX='(\.md$|^docs/|^ibl5/docs/|^\.claude/|^bin/|^engine/|^tools/|^ibl5/tests/)'

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Open a local drag-and-drop page to reorder the automouse plan queue.
 #
 # Spawns an ephemeral `php -S` server bound to 127.0.0.1 ONLY, opens the browser,
@@ -9,6 +9,7 @@
 #
 # Usage: bin/automouse/queue-reorder-ui
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then

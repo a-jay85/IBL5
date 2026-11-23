@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Cross-PR auto-merge triage. Classifies every OPEN PR into exactly one bucket
 # (first-match-wins) and prints a report. With --arm it arms
@@ -74,6 +74,7 @@
 # Exit codes: 0 = report generated; 1 = an attempted --arm merge or merge-line pass failed,
 #             or a --card fetch failed; 2 = usage error or gh not authenticated.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 GH_CMD="${GH_CMD:-gh}"

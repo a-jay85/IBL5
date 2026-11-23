@@ -23,6 +23,7 @@
 # Live mode needs BUG_PIPELINE_APPROVER_ID exported, the same value you gave
 # bin/bug-pipeline-cron-setup --install-schedule, because step 12 reinstalls the cron plist.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 usage() {

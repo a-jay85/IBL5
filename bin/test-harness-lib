@@ -10,6 +10,7 @@
 #      bin/test-harness-lib shard|leg|coverage  (only that group of the
 #      shard and leg cases, so a plan mutation check runs inside its limit)
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -uo pipefail
 
 THL_ONLY="${1:-}"

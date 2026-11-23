@@ -1,8 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Generate .claude/rules/codebase-map.md from ibl5/classes/ structure.
 # Run: bin/generate-codebase-map
 # Auto-run: SessionStart hook + git pre-commit hook + master-push CI job in .github/workflows/tests.yml
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     cat <<'EOF'
 Usage: bin/generate-codebase-map

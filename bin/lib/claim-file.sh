@@ -3,6 +3,7 @@
 # uutils mkdir (Ubuntu 26.04) reports success to both of two racing mkdir calls, so a
 # lock is owned by whoever creates its claim file under noclobber (bash opens it O_EXCL).
 # mkdir only makes room for that file.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 [ -n "${_CLAIM_FILE_SH_LOADED:-}" ] && return 0
 _CLAIM_FILE_SH_LOADED=1
 

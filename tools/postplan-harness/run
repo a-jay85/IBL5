@@ -5,6 +5,7 @@
 #   ./run isolated <worktree> [outdir] [--live]    — live git+verify; without --live gh mutations are
 #                                                    recorded intents; --live is the INSTALLED mode
 #                                                    (push origin, execute allowlisted gh, watch CI)
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 cd "$(dirname "$0")"
 case "${1:-}" in

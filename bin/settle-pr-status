@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Resolves a PR head SHA and base branch from the API, asks bin/check-pr-checks-green for
 # the verdict, and writes it as the `All checks settled` commit status. This is the only
@@ -11,6 +11,7 @@
 #
 # Exit codes: 0 = posted, or nothing to settle, or dry-run printed; 2 = usage or API error.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 usage() {

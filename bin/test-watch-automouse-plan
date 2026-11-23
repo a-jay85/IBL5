@@ -15,6 +15,7 @@
 #   fire() without the `date > "$SENTINEL"` line     -> case 1
 #
 # no-adr: stub-driven regression harness copying the bin/test-watch-run pattern; it adds no architectural constraint and no new governance gate
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -uo pipefail
 # shellcheck source=bin/lib/harness.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"

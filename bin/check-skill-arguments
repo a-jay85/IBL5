@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # bin/check-skill-arguments — CI gate: a SKILL.md may reference `$ARGUMENTS` only
 # ONCE, unless its extra uses are on this file's allowlist.
 #
@@ -25,6 +25,7 @@
 # Usage:
 #   bin/check-skill-arguments              gate mode — exit 1 on any violation
 #   bin/check-skill-arguments --self-test  verify the gate catches a violation
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     cat <<'EOF'
 Usage: bin/check-skill-arguments [--self-test]

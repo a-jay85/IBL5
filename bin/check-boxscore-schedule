@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Reconciles ibl_box_scores_teams against ibl_schedule for one season.
 #
 # Usage: bin/check-boxscore-schedule [--season=YYYY] [--replay=<path>] [--phase=<phase>] [--duplicates-only] [--json] [--help]
@@ -13,6 +13,7 @@
 # Exit codes: 0 = clean (warnings allowed), 1 = errors found, 2 = usage error,
 #             3 = environment unavailable (php container not running).
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"

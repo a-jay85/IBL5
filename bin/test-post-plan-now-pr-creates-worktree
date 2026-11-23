@@ -5,6 +5,7 @@
 # the --auto headless guard and its IBL5_BURNDOWN_LOOP=1 opt-in.
 #
 # Fifteen cases, exit 0 iff all pass.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 # shellcheck source=bin/lib/harness.sh

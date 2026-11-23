@@ -2,6 +2,7 @@
 # shellcheck shell=bash
 # bin/test-default-branch — regression harness for bin/lib/default-branch.
 # Scratch repos with a local bare origin; never touches the network or HOME.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=bin/lib/harness.sh

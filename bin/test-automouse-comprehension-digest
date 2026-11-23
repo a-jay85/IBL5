@@ -3,6 +3,7 @@
 # Drives only the CLI. gh, claude, the usage gate, and discord-dm are stubbed through the
 # script's env seams, so no case reaches GitHub, a real model, or Discord.
 # shellcheck disable=SC2329  # case_* and helpers are dispatched via "$c"
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -uo pipefail
 # shellcheck source=bin/lib/harness.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"

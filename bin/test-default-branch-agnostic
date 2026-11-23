@@ -16,6 +16,7 @@
 #      seams (see bin/test-wt-new-root); never a live Docker stack.
 #   3. tools/postplan-harness test suite is green under a main scratch remote.
 # Read each seam address (script path, CLI flag) from the serving code at that time.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -uo pipefail
 
 # --- SKIP block: unit 7 deletes these three lines. ---

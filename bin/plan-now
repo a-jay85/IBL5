@@ -7,6 +7,8 @@
 # Usage:
 #   bin/plan-now <prompt-file>              # run it, then queue for automouse if the
 #                                           #   run exits clean AND check-plan passes
+#                                           #   (a queued jsb-port-pl-<n> plan also starts
+#                                           #   bin/automouse/run plan <slug> right away)
 #   bin/plan-now --implement <prompt-file>  # ... but leave the plan on disk, unqueued
 #   bin/plan-now --queue <prompt-file>      # explicit form of the default
 #   bin/plan-now --model opus <prompt-file> # orchestrator model (default claude-sonnet-5-5)

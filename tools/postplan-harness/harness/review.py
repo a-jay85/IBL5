@@ -635,8 +635,10 @@ class ReviewPhase:
         pr = meta.get("number") or 0
         sha = meta.get("headRefOid") or meta.get("sha") or ""
 
-        def _post_code_review_summary(body: str) -> None:
-            self.gh.post_review_summary(pr, "Code review", body + _reviewed_head_marker(sha))
+        def _post_code_review_summary(body: str, *, covers_head: bool = True) -> None:
+            # A degraded run did no real review, so it must not claim to cover the head.
+            marker = _reviewed_head_marker(sha) if covers_head else ""
+            self.gh.post_review_summary(pr, "Code review", body + marker)
 
         code = labels.sort_by_severity([f for f in surviving if f.source == "code-review"])
         sec = labels.sort_by_severity([f for f in surviving if f.source == "security-audit"])
@@ -649,7 +651,8 @@ class ReviewPhase:
             self.gh.post_review_findings(pr, sha, "Code review", code)
         elif code_degraded:
             _post_code_review_summary("Review unavailable - unparseable output from: "
-                                      + ", ".join(code_degraded) + _reused_note(reused_code))
+                                      + ", ".join(code_degraded) + _reused_note(reused_code),
+                                      covers_head=False)
         elif reused_code:
             _post_code_review_summary(_reused_note(reused_code).strip())
         else:

@@ -439,6 +439,15 @@ case_bad_input_quiet() {
     h_contains "invalid ledger: no action taken" "$(out)" "no action taken"
     h_absent "invalid ledger: gh never called" "$S/log/gh.argv"
     no_actions "invalid ledger"
+    # A rows array of numbers passes the shape check, then breaks the row filter.
+    # That failure reaches the ERR trap, which must exit 0 with a log line.
+    printf '{"rows":[1]}\n' > "$S/parity/ledger.json"
+    run_watch
+    rc_is "broken row filter: exit 0" 0
+    h_contains "broken row filter: ERR trap logs it" "$(out)" "error at line"
+    h_contains "broken row filter: no action taken" "$(out)" "no action taken"
+    h_absent "broken row filter: gh never called" "$S/log/gh.argv"
+    no_actions "broken row filter"
 }
 
 case_curl_failure_no_fingerprint() {

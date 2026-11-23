@@ -155,10 +155,8 @@ row_verdict() {
     # Cleared here, a failure exits the subshell non-zero and main's own trap handles it.
     trap - ERR
     slug_re="${slug}([^A-Za-z0-9]|\$)"
-    if ! prs=$(gh pr list --repo a-jay85/IBL5 --head "$slug" --state all --json number,state,mergedAt,url,autoMergeRequest,statusCheckRollup,headRefOid 2>/dev/null); then
-        echo "ERROR:gh"; return 0
-    fi
-    if ! pr=$(printf '%s' "$prs" | jq -c "$PR_PICK" 2>/dev/null); then
+    if ! prs=$(gh pr list --repo a-jay85/IBL5 --head "$slug" --state all --json number,state,mergedAt,url,autoMergeRequest,statusCheckRollup,headRefOid 2>/dev/null) \
+        || ! pr=$(printf '%s' "$prs" | jq -c "$PR_PICK" 2>/dev/null); then
         echo "ERROR:gh"; return 0
     fi
 

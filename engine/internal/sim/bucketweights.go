@@ -357,10 +357,11 @@ func bucket3E88(in bucket3Inputs) (float64, bool) {
 
 // scaledDraw scales one uniform draw u by scale. JSB uses this one-draw scaled
 // uniform at many call sites; each caller takes the draw itself, so the
-// DrawSites table keeps naming the real call site. The trace-pinned test
-// checks the draw count and the raw value against the native capture.
+// DrawSites table keeps naming the real call site. The trace-pinned tests
+// check the draw count, the raw value and the exact scaled result against
+// the native capture.
 func scaledDraw(u, scale float64) float64 {
-	return u * scale
+	return u * scale // u in [0, 1), so the result lies in [0, scale) for scale > 0
 }
 
 // bucket3Weight: half-court adds the raw signed hca, then e90 = mq*0.25 + e88,

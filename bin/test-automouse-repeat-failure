@@ -293,7 +293,7 @@ fi
 # written during this attempt is still found
 rm -f "$NIGHTLY_DIR"/reports/*.md
 FREP4="$NIGHTLY_DIR/reports/2026-11-23-error-title-slug-for-plan-h.md"
-printf '# Title slug report\n' > "$FREP4"
+printf '# Title slug report\n\nPlan: plan-h.md\n' > "$FREP4"
 F4=$(impl_failure_note plan-h.md 1 "$(( $(date +%s) - 60 ))")
 if grep -qF 'Its report says: "Title slug report"' <<< "$F4" \
     && grep -qF "Read $FREP4" <<< "$F4"; then
@@ -312,6 +312,43 @@ if grep -qF 'stopped before shipping (try 1 of 3). It stays queued' <<< "$F5" \
     pass "f5-no-title-branch"
 else
     fail "f5-no-title-branch" "got '$F5'"
+fi
+
+# f6: another runner's fresh report for a different plan, written during this
+# attempt, is never quoted (real since-time, exact slug absent)
+rm -f "$NIGHTLY_DIR"/reports/*.md
+printf '# Other plan broke\n\nPlan: x-plan-j.md\n' > "$NIGHTLY_DIR/reports/2026-11-23-error-x-plan-j.md"
+printf '# Unrelated\n\nPlan: other.md\n' > "$NIGHTLY_DIR/reports/2026-11-23-error-other.md"
+F6=$(impl_failure_note plan-j.md 1 "$(( $(date +%s) - 60 ))")
+if grep -qF 'wrote no report' <<< "$F6" \
+    && ! grep -qF 'x-plan-j' <<< "$F6" \
+    && ! grep -qF 'Unrelated' <<< "$F6"; then
+    pass "f6-other-plan-fresh-report-not-quoted"
+else
+    fail "f6-other-plan-fresh-report-not-quoted" "got '$F6'"
+fi
+
+# f7: exact-slug report wins over a fresher other-slug report
+FREP7="$NIGHTLY_DIR/reports/2026-11-23-error-plan-j.md"
+printf '# Own report\n' > "$FREP7"
+F7=$(impl_failure_note plan-j.md 1 "$(( $(date +%s) - 60 ))")
+if grep -qF 'Its report says: "Own report"' <<< "$F7" \
+    && grep -qF "Read $FREP7" <<< "$F7"; then
+    pass "f7-exact-slug-report-preferred"
+else
+    fail "f7-exact-slug-report-preferred" "got '$F7'"
+fi
+
+# f8: a title-named report that names the plan's title (not its filename) is found
+rm -f "$NIGHTLY_DIR"/reports/*.md
+printf '# Fix the widget sorter\n\nbody\n' > "$QUEUE_DIR/plan-k.md"
+FREP8="$NIGHTLY_DIR/reports/2026-11-23-error-fix-the-widget-sorter.md"
+printf '# Prefire failed: Fix the widget sorter\n' > "$FREP8"
+F8=$(impl_failure_note plan-k.md 1 "$(( $(date +%s) - 60 ))")
+if grep -qF "Read $FREP8" <<< "$F8"; then
+    pass "f8-title-named-report-found-by-plan-title"
+else
+    fail "f8-title-named-report-found-by-plan-title" "got '$F8'"
 fi
 
 h_done

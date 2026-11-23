@@ -28,7 +28,7 @@
 #   (so a `last_verified:` bump passes).
 #
 # Allowed edits inside the frozen set (the rule doc's list, nothing wider):
-#   - whitespace-only changes and blank-line removal,
+#   - trailing-whitespace changes and blank-line removal,
 #   - an appended `[CORRECTED ...]` / `[SUPERSEDED ...]` stamp, or
 #     `**Superseded by:** ADR-NNNN`: the old line kept whole, followed only by
 #     whitespace and stamps (text inside the stamp's brackets is free),
@@ -66,7 +66,8 @@
 set -euo pipefail
 
 MIN_REASON_LEN=15
-MARKER_RE='<!--[[:space:]]*adr-edit-ok:[[:space:]]*[0-9]{4}[[:space:]][^>]*-->'
+# The reason runs to the first "-->", so it may hold ">" (as in "->" or "=>").
+MARKER_RE='<!--[[:space:]]*adr-edit-ok:[[:space:]]*[0-9]{4}[[:space:]]([^-]|-[^-]|--[^>])*-->'
 # The whole suffix after the kept old line: whitespace plus one or more stamps.
 STAMP_ONE='(\[(CORRECTED|SUPERSEDED)[^]]*\]|\*\*\[(CORRECTED|SUPERSEDED)[^]]*\]\*\*|\*\*Superseded by:\*\* ADR-[0-9]{4})'
 STAMP_SUFFIX_RE="^([[:space:]]*$STAMP_ONE)+[[:space:]]*\$"

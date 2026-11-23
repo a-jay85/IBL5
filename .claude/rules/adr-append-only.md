@@ -40,7 +40,7 @@ because the workflow had been upgraded. The upgrade is real; the decision it rec
 The first line of defence is the prompt: the constraint is written into the
 headless prompt in `bin/docfix-run`, which also requires every non-date content change to be disclosed verbatim
 (before/after sentence plus the evidence checked) under a `## Content rewritten` heading in the
-commit body and PR body, the same forced-disclosure shape already used for deleted `paths:`
+commit body and PR body — the same forced-disclosure shape already used for deleted `paths:`
 globs. `bin/docfix-check-veronly` remains binary and unchanged: a date-only diff arms auto-merge,
 any content change HOLDs for a human. That gate worked in the case above; what failed was the
 quality of the edits it held, which is why the fix is upstream in the prompt.

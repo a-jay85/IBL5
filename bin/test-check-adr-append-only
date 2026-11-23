@@ -387,6 +387,14 @@ case_bypass_valid() {
     run_case "$CASE_NAME" 0 'BYPASSED' --since=master
 }
 
+case_bypass_reason_with_arrow() {
+    new_case a
+    rewrite_decision
+    commit_pr
+    PRB='<!-- adr-edit-ok: 0104 repair path -> new helper => Decision -->'
+    run_case "$CASE_NAME" 0 'BYPASSED' --since=master
+}
+
 case_bypass_short_reason_flagged() {
     new_case a
     rewrite_decision
@@ -627,7 +635,7 @@ ALL_CASES=(
     case_context_removal_flagged case_whitespace_only_pass case_new_adr_file
     case_readme_ignored case_deleted_adr_flagged case_pure_rename_pass
     case_rename_with_edit_flagged case_bypass_valid case_bypass_short_reason_flagged
-    case_bypass_wrong_number_flagged case_pr_body_unset case_pr_body_empty
+    case_bypass_wrong_number_flagged case_bypass_reason_with_arrow case_pr_body_unset case_pr_body_empty
     case_unknown_flag case_since_space_form case_missing_since case_bad_rev
     case_help case_empty_range case_stacked_base case_uncommitted_edit
     case_dead_path_to_dead_path_flagged case_action_ref_bump_flagged

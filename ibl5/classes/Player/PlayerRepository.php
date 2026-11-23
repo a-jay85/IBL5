@@ -203,7 +203,6 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     {
         /** @var list<AwardRow> */
         return $this->fetchAll(
-            // @phpstan-ignore ibl.orderByMissingTiebreaker (UNIQUE uk_year_award_name covers year + award + name, and name is bound)
             "SELECT * FROM `ibl_awards` WHERE name = ? ORDER BY year ASC, award ASC",
             "s",
             $playerName

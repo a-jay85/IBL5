@@ -117,10 +117,11 @@ run_step() {       # <path> <pr> <log> -> ok | timeout | exit-<rc>
     local pid=$! rc wd
     # The step is its own process group leader (pgid = pid), so the timeout signals the whole group, children included.
     # Inside the watchdog subshell, pid holds the negated pgid; `kill -TERM -N` signals group N (bash 3.2 and 5).
-    ( pid="-$pid"; sleep "$STEP_TIMEOUT"; kill -TERM "$pid" 2>/dev/null ) </dev/null >/dev/null 2>&1 &
+    # A step that traps TERM would outlive the limit, so after a 5s grace the watchdog sends KILL to the group.
+    ( pid="-$pid"; sleep "$STEP_TIMEOUT"; kill -TERM "$pid" 2>/dev/null; sleep 5; kill -KILL "$pid" 2>/dev/null ) </dev/null >/dev/null 2>&1 &
     wd=$!; wait "$pid"; rc=$?
     pkill -P "$wd" 2>/dev/null; kill "$wd" 2>/dev/null; wait "$wd" 2>/dev/null
-    case "$rc" in 0) echo ok ;; 143) echo timeout ;; *) echo "exit-$rc" ;; esac
+    case "$rc" in 0) echo ok ;; 143|137) echo timeout ;; *) echo "exit-$rc" ;; esac
 }
 process_pr() {     # <pr> <merge-oid> <merged-epoch>; body already in $TMP/body.txt
     local pr="$1" oid="$2" merged="$3" line n step res fails=""

@@ -345,6 +345,23 @@ case_plan_done_stall() {
     h_contains "plan in done/: DM names the file" "$(slurp "$S/log/discord-dm.stdin")" "010-jsb-port-pl-0001.md"
 }
 
+case_report_slug_attributed_to_own_pr() {
+    sandbox report_slug
+    ledger "pl-0001:captured:jsb-port-pl-0001-r1"
+    : > "$(AM)/done/010-jsb-port-pl-0001.md"
+    gh_pr jsb-port-pl-0001 7 MERGED no sha1 "$GREEN"
+    run_watch
+    h_not_contains "re-port: base plan in done/ is not its stall" \
+        "$(slurp "$S/home/.cache/jsb-parity-stalls.txt")" "plan-done"
+    h_not_contains "re-port: base slug's PR is not its fingerprint" \
+        "$(slurp "$S/home/.cache/jsb-parity-watch.last")" "pl-0001=7:"
+    reset_logs
+    gh_pr jsb-port-pl-0001-r1 9 MERGED no sha2 "$GREEN"
+    run_watch
+    h_contains "re-port: own PR is its fingerprint" \
+        "$(slurp "$S/home/.cache/jsb-parity-watch.last")" "pl-0001=9:MERGED:sha2"
+}
+
 case_plan_skipped_stall() {
     sandbox plan_skipped
     : > "$(AM)/skipped/010-jsb-port-pl-0001.md"

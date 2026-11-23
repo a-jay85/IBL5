@@ -1,0 +1,115 @@
+#!/bin/bash
+# bin/check-gitignore-negated-data-files: fails when a JSB runtime data file at
+# the ibl5/ root is git-tracked (usually force-tracked by a .gitignore "!"
+# negation) and is not on the ALLOWLIST below.
+#
+# The deploy job in .github/workflows/main.yml runs
+# `git reset --hard origin/production`, which restores every tracked file. A
+# tracked data file that the runtime or a manual upload replaced on the server
+# goes back to the stale committed copy on the next deploy. Ignored files survive.
+#
+# Scope: the extensions in JSB_EXTS, ibl5/ root only, extension case-insensitive.
+# Fixtures under ibl5/tests/ are out of scope.
+# Exits 0 (clean), 1 (tracked data file not allowlisted), 2 (usage or setup error).
+#
+# CI (tests.yml) runs it with no arguments; the script finds the repo from its own path.
+# gate-backtest-argv:
+set -euo pipefail
+
+JSB_EXTS="lge sch plr sco car trn his asw rcb awa dra ret hof plb"
+
+# One entry per line: <repo-relative path>|<why it must stay tracked>.
+# Every entry needs a reason. Prefer moving a fixture under ibl5/tests/.
+ALLOWLIST='
+ibl5/IBL5.lge|fixture for LgeFileParserTest and LeagueConfigServiceTest
+ibl5/IBL5.sch|fixture for SchFileParserTest and e2e engine-shadow-spawn-on-update
+ibl5/Olympics.sch|JsbSourceResolver disk fallback when the archive has no .sch entry'
+
+usage() {
+  cat <<'EOF'
+Usage: bin/check-gitignore-negated-data-files [--repo-root=<dir>] [--help|-h]
+Fails when a JSB runtime data file at the ibl5/ root is git-tracked and not
+allowlisted in this script. --repo-root=<dir> scans another git work tree
+(the = form is required). Default: the repo holding this script.
+Exits 0 clean, 1 violation, 2 usage or setup error.
+EOF
+}
+
+die() { echo "check-gitignore-negated-data-files: $1" >&2; exit 2; }
+
+REPO_ROOT=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --repo-root=*)
+      REPO_ROOT="${1#--repo-root=}"
+      [ -n "$REPO_ROOT" ] || die "--repo-root= needs a directory"
+      shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) usage >&2; die "unknown argument: $1" ;;
+  esac
+done
+
+if [ -z "$REPO_ROOT" ]; then
+  case "$0" in
+    */*) SCRIPT_DIR="${0%/*}" ;;
+    *) SCRIPT_DIR="." ;;
+  esac
+  REPO_ROOT="$SCRIPT_DIR/.."
+fi
+ROOT=$(git -C "$REPO_ROOT" rev-parse --show-toplevel 2>/dev/null) \
+  || die "not a git work tree: $REPO_ROOT"
+
+while IFS= read -r entry; do
+  [ -n "$entry" ] || continue
+  case "$entry" in
+    *'|'?*) ;;
+    *) die "ALLOWLIST entry has no reason: $entry" ;;
+  esac
+done <<EOF
+$ALLOWLIST
+EOF
+
+# allow_reason <path>: print the allowlist reason; return 1 when not listed.
+allow_reason() {
+  local want="$1" line
+  while IFS= read -r line; do
+    if [ "${line%%|*}" = "$want" ]; then
+      printf '%s\n' "${line#*|}"
+      return 0
+    fi
+  done <<EOF
+$ALLOWLIST
+EOF
+  return 1
+}
+
+# :(glob) keeps * from crossing /, so only the ibl5/ root matches.
+specs=()
+for ext in $JSB_EXTS; do
+  specs+=(":(glob,icase)ibl5/*.$ext")
+done
+tracked=$(git -C "$ROOT" ls-files -- "${specs[@]}") \
+  || die "git ls-files failed in $ROOT"
+
+violations=0
+allowed=0
+while IFS= read -r path; do
+  [ -n "$path" ] || continue
+  if reason=$(allow_reason "$path"); then
+    allowed=$((allowed + 1))
+    echo "ok   $path (allowlisted: $reason)"
+  else
+    violations=$((violations + 1))
+    echo "FAIL $path is a git-tracked JSB runtime data file." >&2
+    echo "     The runtime may overwrite this path, and a deploy reset restores the stale committed content." >&2
+    echo "     Add it to ALLOWLIST in bin/check-gitignore-negated-data-files with a reason, or move the fixture under ibl5/tests/." >&2
+  fi
+done <<EOF
+$tracked
+EOF
+
+if [ "$violations" -gt 0 ]; then
+  echo "check-gitignore-negated-data-files: $violations violation(s)" >&2
+  exit 1
+fi
+echo "check-gitignore-negated-data-files: clean ($allowed allowlisted)"

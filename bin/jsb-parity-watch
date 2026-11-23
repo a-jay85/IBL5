@@ -150,6 +150,10 @@ lock_is_stale() {
 # (absent when the row has no PR).
 row_verdict() {
     local id="$1" slug="$2" prs pr state number sha check armed f b log label newest r slug_re
+    # Runs in a command-substitution subshell. The inherited ERR trap would print its
+    # log line into the captured output and exit 0, which hides a failed gh or jq call.
+    # Cleared here, a failure exits the subshell non-zero and main's own trap handles it.
+    trap - ERR
     slug_re="${slug}([^A-Za-z0-9]|\$)"
     if ! prs=$(gh pr list --repo a-jay85/IBL5 --head "$slug" --state all --json number,state,mergedAt,url,autoMergeRequest,statusCheckRollup,headRefOid 2>/dev/null); then
         echo "ERROR:gh"; return 0
@@ -225,7 +229,7 @@ row_verdict() {
 stall_message() {
     local key="$1" id rest stage ref slug
     id="${key%%:*}"; rest="${key#*:}"; stage="${rest%%:*}"; ref="${rest#*:}"
-    slug=$(jq -r --arg id "$id" '[.rows[] | select(.id == $id) | .plan_slug][0] // ""' "$PARITY_DIR/ledger.json")
+    slug=$(jq -r --arg id "$id" '[.rows[] | select(.id == $id) | .plan_slug][0] // ""' "$PARITY_DIR/ledger.json" || echo "")
     case "$stage" in
         held-for-owner)
             printf 'JSB parity watch: %s (%s) has PR https://github.com/a-jay85/IBL5/pull/%s. It is green and auto-merge is not armed.\n' "$id" "$slug" "$ref" ;;
@@ -261,6 +265,7 @@ fire_webhook() {
     esac
     body='{"source":"jsb-parity-watch","reasons":"'"$reasons"'"}'
     code=$(printf 'url = "%s"\n' "$url" | curl -sS -o /dev/null -w '%{http_code}' --max-time 20 -X POST -H 'Content-Type: application/json' --data "$body" -K - 2>/dev/null) || code=000
+    case "$code" in [0-9][0-9][0-9]) ;; *) code=000 ;; esac
     case "$code" in 2??) ;; *) log "webhook POST failed (HTTP $code)"; return 0 ;; esac
     mkdir -p "$CACHE_DIR"
     printf '%s %s\n' "$fp" "$NOW" > "$LAST.tmp"
@@ -291,10 +296,13 @@ main() {
     if [ ! -f "$ledger" ]; then
         quiet_exit "ledger missing at $ledger; no action taken"
     fi
+    if ! jq -e '.rows | type == "array"' "$ledger" >/dev/null 2>&1; then
+        quiet_exit "ledger unreadable at $ledger; no action taken"
+    fi
     inflight=$(jq -r "$INFLIGHT_FILTER" "$ledger")
     recording="none"
     if [ -f "$PARITY_DIR/recordings/index.json" ]; then
-        recording=$(jq -r '.current // "none"' "$PARITY_DIR/recordings/index.json")
+        recording=$(jq -r '.current // "none"' "$PARITY_DIR/recordings/index.json" 2>/dev/null || echo "none")
     fi
 
     while read -r id slug; do

@@ -161,3 +161,4 @@
 2 bin/test-automouse-repeat-failure
 2 bin/test-check-registry-trigger-rows
 2 ibl5/bin/test-flake-ledger
+1 bin/test-jsb-parity-watch

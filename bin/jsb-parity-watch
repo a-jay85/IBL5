@@ -356,7 +356,7 @@ main() {
         fi
         if dry_guard "send stall DM $key"; then
             msg=$(stall_message "$key")
-            if printf '%s' "$msg" | "$JSB_BIN/discord-dm" --quiet - >/dev/null 2>&1; then
+            if printf '%s' "$msg" | "$JSB_BIN/discord-dm" --quiet --error - >/dev/null 2>&1; then
                 mkdir -p "$CACHE_DIR"
                 printf '%s\n' "$key" >> "$STALLS"
             else

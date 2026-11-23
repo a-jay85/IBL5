@@ -214,3 +214,13 @@ def test_model_pins_match_source():
         purpose, model = pin.split(":")
         pattern = rf'"{re.escape(purpose)}",\s*"{re.escape(model)}"'
         assert re.search(pattern, sources), f"pin {pin} not found in review.py or runner.py"
+
+
+def test_vet_fidelity_skips_cache_after_fix_round_rejudge():
+    """A fix-round re-judge sets verdict_2 with no remediation_sha and no rounds.
+
+    The stale verdict-1 arm must not be cached then: the next run judges fidelity again."""
+    fid = {"verdict_1": "READY WITH NOTES", "error_kind": None, "diff_id": "d" * 40,
+           "plan_hash": "p" * 40, "verdict_2": "READY", "reviewed_tree_2": "b" * 40}
+    assert rc.vet_fidelity(fid, "run1") is None
+    assert rc.vet_fidelity(dict(fid, verdict_2=None, reviewed_tree_2=None), "run1") is not None

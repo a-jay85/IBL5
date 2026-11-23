@@ -142,3 +142,36 @@ def test_usage_error_and_timeout_degrade(tmp_path, monkeypatch):
         str(tmp_path), "master_sha", 123, HARNESS_STICKY, T1, str(tmp_path))
     assert result2["reason"] == "timeout"
     assert result2["fired"] is False
+
+
+def test_review_owed_fires_when_fix_round_rejudge_indeterminate(tmp_path, monkeypatch):
+    """An indeterminate fix-round re-judge writes nothing: the sticky names no new tree."""
+    import types
+    import runner
+    from tests.test_fidelity_sticky import _sticky
+
+    fired = _stub_pr_review_now(tmp_path, monkeypatch)
+
+    class Git:
+        def head_tree(self):
+            return T2
+
+    class Gh:
+        def pr_body_fresh(self):
+            return "body"
+
+    monkeypatch.setattr(runner.fidelity, "re_review", lambda *a, **k: (None, None, None))
+    fid = {"verdict_1": "READY WITH NOTES", "error_kind": None, "reviewed_tree": T1,
+           "remediation_sha": None, "verdict_2": None, "reviewed_tree_2": None,
+           "verdict_path": "/tmp/post-plan-fidelity-verdict-1.md"}
+    res = types.SimpleNamespace(fidelity=fid, slug="")
+    runner._rejudge_fidelity_after_fix_round(None, Git(), Gh(), "out", "wt", None, "m", "body", 1,
+                                             "abc1234", res, lambda *_: None)
+    body = _sticky(fid=fid, terminal=fidelity.sticky_terminal(fid),
+                   excerpt="REVIEW-COVERAGE: CURRENT\nfinding one")
+    assert "**Re-reviewed tree:**" not in body
+    result = fidelity.fire_review_owed(None, "master_sha", 123, body, T2, str(tmp_path), live=True)
+    assert result["verdict"] == "REVIEW-OWED"
+    assert result["reason"] == "no-tree-line"
+    assert result["fired"] is True
+    assert fired.read_text().strip() == "123"

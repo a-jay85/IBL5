@@ -899,6 +899,12 @@ jobs:
       - name: Ban silently-disabled tests (markTestSkipped)
         if: ${{ !cancelled() }}
         run: bin/check-phpunit-hygiene
+      # A git-tracked JSB data file at the ibl5/ root goes back to its committed
+      # copy on every deploy (main.yml runs git reset --hard). The gate fails on
+      # one that is not allowlisted with a reason. It runs in about a second.
+      - name: Tracked JSB data files need an allowlist reason
+        if: ${{ !cancelled() }}
+        run: bin/check-gitignore-negated-data-files
       - name: Grep for host mariadb invocations outside bin/db-query
         if: ${{ !cancelled() }}
         run: |

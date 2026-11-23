@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+# bin/test-check-gitignore-negated-data-files: fixture harness for
+# bin/check-gitignore-negated-data-files. Each case builds a throwaway git repo
+# under mktemp, tracks fixture files with `git add -f`, runs the gate from cwd /
+# (so cwd never decides the scanned repo), and asserts the exit code plus one
+# output substring. Prints PASS <case> or FAIL <case>: <detail>.
+# Run: bin/test-check-gitignore-negated-data-files  (exit 0 = all pass, 1 = a case failed)
+set -euo pipefail
+
+case "$0" in
+  */*) HERE="${0%/*}" ;;
+  *) HERE="." ;;
+esac
+GATE="$(cd "$HERE" && pwd)/check-gitignore-negated-data-files"
+[ -x "$GATE" ] || { echo "FAIL setup: $GATE missing or not executable"; exit 1; }
+
+TMP=$(mktemp -d)
+trap 'rm -rf "$TMP"' EXIT
+failures=0
+
+# mkrepo <name> [path ...]: init $TMP/<name> and commit each path (content "x").
+mkrepo() {
+  local repo="$TMP/$1" f
+  shift
+  mkdir -p "$repo/ibl5"
+  git -C "$repo" init -q
+  printf 'readme\n' > "$repo/ibl5/README"
+  for f in "$@"; do
+    mkdir -p "$repo/${f%/*}"
+    printf 'x\n' > "$repo/$f"
+  done
+  git -C "$repo" add -f -A
+  git -C "$repo" -c user.name=t -c user.email=t@example.invalid \
+    -c core.hooksPath=/dev/null -c commit.gpgsign=false commit -q -m fixture
+}
+
+# expect <case> <exit> <substring> <command> [args ...]: run from cwd /.
+expect() {
+  local name="$1" want="$2" needle="$3" out rc
+  shift 3
+  rc=0
+  out=$(cd / && "$@" 2>&1) || rc=$?
+  if [ "$rc" -ne "$want" ]; then
+    echo "FAIL $name: exit $rc, want $want. Output: $out"
+    failures=$((failures + 1))
+    return 0
+  fi
+  case "$out" in
+    *"$needle"*) echo "PASS $name" ;;
+    *) echo "FAIL $name: output lacks: $needle. Output: $out"
+       failures=$((failures + 1)) ;;
+  esac
+}
+
+mkrepo clean
+expect clean_tree_passes 0 "clean (0 allowlisted)" "$GATE" --repo-root="$TMP/clean"
+
+mkrepo untracked
+printf 'x\n' > "$TMP/untracked/ibl5/X.plr"
+expect untracked_file_ignored 0 "clean (0 allowlisted)" "$GATE" --repo-root="$TMP/untracked"
+
+mkrepo plr ibl5/X.plr
+expect tracked_plr_fails 1 "or move the fixture under ibl5/tests/" "$GATE" --repo-root="$TMP/plr"
+expect tracked_plr_names_deploy 1 "a deploy reset restores the stale committed content" \
+  "$GATE" --repo-root="$TMP/plr"
+
+mkrepo allow ibl5/IBL5.lge ibl5/IBL5.sch ibl5/Olympics.sch
+expect allowlisted_passes 0 "clean (3 allowlisted)" "$GATE" --repo-root="$TMP/allow"
+
+mkrepo mixed ibl5/IBL5.sch ibl5/Foo.sch
+expect mixed_fails_on_unlisted 1 "FAIL ibl5/Foo.sch" "$GATE" --repo-root="$TMP/mixed"
+
+mkrepo nested ibl5/tests/fixtures/X.plr ibl5/sub/Y.sch
+expect nested_paths_ignored 0 "clean (0 allowlisted)" "$GATE" --repo-root="$TMP/nested"
+
+mkrepo upper ibl5/X.PLR
+expect uppercase_ext_fails 1 "FAIL ibl5/X.PLR" "$GATE" --repo-root="$TMP/upper"
+
+mkrepo nearmiss ibl5/X.plr.bak ibl5/Xplr ibl5/X.lgee ibl5/X.sch.txt
+expect near_miss_names_pass 0 "clean (0 allowlisted)" "$GATE" --repo-root="$TMP/nearmiss"
+
+# No --repo-root: the gate must resolve the repo from its own location, not cwd.
+mkdir -p "$TMP/plr/bin"
+cp "$GATE" "$TMP/plr/bin/"
+expect default_root_arbitrary_cwd 1 "FAIL ibl5/X.plr" "$TMP/plr/bin/check-gitignore-negated-data-files"
+
+expect unknown_flag_rejected 2 "unknown argument: --bogus" "$GATE" --bogus
+expect space_form_rejected 2 "unknown argument: --repo-root" "$GATE" --repo-root "$TMP/clean"
+expect empty_repo_root_rejected 2 "needs a directory" "$GATE" --repo-root=
+mkdir -p "$TMP/plain"
+expect not_a_repo_rejected 2 "not a git work tree" "$GATE" --repo-root="$TMP/plain"
+
+# A copy of the gate whose IBL5.lge allowlist entry lost its reason must refuse to run.
+sed 's/^ibl5\/IBL5\.lge|.*/ibl5\/IBL5.lge|/' "$GATE" > "$TMP/noreason-gate"
+chmod +x "$TMP/noreason-gate"
+expect empty_reason_rejected 2 "has no reason" "$TMP/noreason-gate" --repo-root="$TMP/clean"
+
+if [ "$failures" -gt 0 ]; then
+  echo "test-check-gitignore-negated-data-files: $failures case(s) failed"
+  exit 1
+fi
+echo "test-check-gitignore-negated-data-files: all cases passed"

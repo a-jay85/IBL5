@@ -1,6 +1,6 @@
 ---
 description: Class registry for /post-plan Phase 9 retrospective routing — one row per defect class, written by /post-plan, never edited by hand.
-last_verified: 2026-10-20
+last_verified: 2026-11-21
 ---
 
 # Retrospective Class Registry
@@ -63,6 +63,7 @@ not add backticks or markdown links to a row.
 | 2026-09-15 | #2231 | class: a plan prescribes verbatim regression test implementations for a behavior gate; the prescribed token paths resolve on disk or carry pre-existing cue words that match the old guard alternation, making the new test cases vacuous against the pre-fix state and providing no coverage of the new behavior | routed to: Rung 3 - forced-trigger row in .claude/review-shared/_plan-verification.md (Forced verification trigger): when a plan phase prescribes verbatim regression test implementations claimed to fail against the pre-fix guard, require empirical proof — run the prescribed cases against origin/master's guard and confirm the new cases exit 1 before verifying exit 0 against the patched guard | prior: -- |
 | 2026-09-16 | #2232 | class: a write function accepts externally-supplied IDs and appends state records without first verifying the IDs reference real entries in the same store, silently persisting orphaned records until the next compaction | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): any plan adding or modifying a function that writes records keyed to externally-supplied IDs must assert that unknown IDs are ignored and produce no write to the backing store | prior: -- |
 | 2026-09-16 | #2244 | class: a PR body Scope bullet carries a specific count of files or rules modified that overcounts the realized diff, because the count was written at plan-time before implementation finalized and was never re-verified against git diff --numstat before the body was committed | routed to: Rung 4 - addendum added to .claude/skills/post-plan/_pr-body-claims.md and .claude/skills/pr-ready/_phase65-remediation.md step 4 requiring a Read of _pr-body-claims.md before finalizing the body, making the count-re-check explicit in the write path; caught by Phase 5.5 fidelity reviewer as a 6d.4 finding | prior: -- |
+| 2026-11-21 | --   | class: app-generated file read by an updater is force-tracked via .gitignore negation, so deploy git-reset clobbers live data with stale committed content | routed to: Rung 2 - CI gate bin/check-gitignore-negated-data-files in the static-guards job of .github/workflows/tests.yml: fails when a JSB data file at the ibl5/ root is git-tracked without an allowlist reason; the Rung 3 row in .claude/review-shared/_plan-verification.md stays in force | prior: #1834 |
 ```
 
 ---

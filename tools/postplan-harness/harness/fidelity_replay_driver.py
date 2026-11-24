@@ -14,12 +14,14 @@ import sys
 if __name__ == "__main__" and len(sys.argv) == 4:
     sys.path[0] = sys.argv[2]      # side package root; must precede every other import
     sys.dont_write_bytecode = True  # a side import must not write __pycache__ (a write-mode open)
+import atexit
 import copy
 import dataclasses
 import inspect
 import json
 import os
 import tempfile
+import threading
 import types
 
 OUTPUT_KEYS = (
@@ -74,15 +76,19 @@ def _denied(event, phase):
 
 def _audit(event, args):
     phase = _WATCH["phase"]
-    if phase is None:
-        return
     try:
+        if phase is None:
+            # Between calls only the main thread is the driver's own. A thread a replayed call
+            # left running is replayed code, so it is watched like a call.
+            if threading.current_thread() is threading.main_thread():
+                return
+            phase = "call"
         if event == "open":
             if _write_open(args):
                 _hit("audit:open-write")
         elif _denied(event, phase):
             _hit(f"audit:{event}")
-    except Exception:  # noqa: BLE001 — a raising hook would abort the replayed call
+    except BaseException:  # noqa: BLE001 — a raising hook would abort the replayed call
         _hit("audit:hook-error")
 
 
@@ -293,6 +299,14 @@ def main(argv):                    # argv: driver, corpus path, side package roo
                 results.append({"id": rec["id"], "out": out_rec})
     finally:
         sys.settrace(None)
+    # Run exit callbacks a replayed call registered while the watch is on, so a deferred write counts.
+    _WATCH["phase"], _WATCH["where"] = "call", "atexit"
+    try:
+        atexit._run_exitfuncs()
+    except BaseException:  # noqa: BLE001
+        _hit("atexit-raised")
+    finally:
+        _WATCH["phase"] = None
     json.dump({"schema": "fidelity-replay/1", "results": results,
                "executed": {k: sorted(v) for k, v in hits.items()},
                "side_effects": list(_WATCH["hits"])}, sys.stdout)

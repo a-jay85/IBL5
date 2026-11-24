@@ -20,7 +20,7 @@ var DrawSites = map[string]string{
 	"sim.foulBucketWeight":                     "FUN_004e3860",
 	"sim.possession":                           "",
 	"sim.possessionTime":                       "",
-	"sim.randInt":                              "",
+	"sim.randInt":                              "FUN_0047f5a0",
 	"sim.rollMake":                             "",
 	"sim.selectBallHandler":                    "",
 	"sim.selectDefender":                       "",
@@ -28,6 +28,5 @@ var DrawSites = map[string]string{
 	"sim.selectRebounder":                      "",
 	"sim.selectShotType":                       "",
 	"sim.simGameWith":                          "",
-	"sim.tipOffWinner":                         "",
 	"sim.transitionTriggers":                   "FUN_004e42e0",
 }

@@ -94,7 +94,7 @@ const (
 // handlers) rather than near-always as the 120 estimate produced.
 const doForcedMakeMax = 10
 
-// randInt returns JSB's integer rand_int(bound) from one raw draw: scale the
+// randInt ports JSB's integer rand_int(bound), FUN_0047f5a0, from one raw draw: scale the
 // draw by 1/32768, multiply by bound, truncate toward zero, add one. For
 // bound >= 1 the result is uniform in 1..bound. The product raw*bound fits
 // exactly in a float64 and 1/32768 is a power of two, so the result does not

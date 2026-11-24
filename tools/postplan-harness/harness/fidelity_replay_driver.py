@@ -72,25 +72,11 @@ def _denied(event, phase):
     return event.startswith(DENY_PREFIXES) and event not in READ_ONLY_EVENTS
 
 
-def _in_module_load():
-    """True while importlib runs a module body: a lazy import inside a replayed call is import
-    work (`@dataclass` sets class attributes there), so call-only events count as import."""
-    frame = sys._getframe(1)
-    while frame is not None:
-        code = frame.f_code
-        if code.co_filename.startswith("<frozen importlib") and code.co_name == "_load_unlocked":
-            return True
-        frame = frame.f_back
-    return False
-
-
 def _audit(event, args):
     phase = _WATCH["phase"]
     if phase is None:
         return
     try:
-        if phase == "call" and event in CALL_ONLY_EVENTS and _in_module_load():
-            phase = "import"
         if event == "open":
             if _write_open(args):
                 _hit("audit:open-write")
@@ -244,6 +230,12 @@ def main(argv):                    # argv: driver, corpus path, side package roo
         import harness.fidelity as fidelity
         import harness.second_review as second_review
         import harness.armable as armable
+        # Modules that fidelity functions import lazily inside a call. Their `@dataclass`
+        # bodies raise call-only events, so they load here, while the import phase is open.
+        import harness.schemas  # noqa: F401
+        import harness.merge_danger  # noqa: F401
+        import harness.reviewcache  # noqa: F401
+        import harness.adapters.llm  # noqa: F401
     finally:
         _WATCH["phase"] = None
 

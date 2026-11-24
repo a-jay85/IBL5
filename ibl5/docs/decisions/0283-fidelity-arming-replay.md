@@ -67,7 +67,7 @@ The watches see only the corpus inputs, so an effect behind an input the corpus 
 
 - a C extension write that raises no audit event;
 - a write to a function's `__dict__` or an `lru_cache`, because callables compare by identity;
-- a call-only event (`object.__setattr__`, `sys.settrace`) that an unchanged module raises at its own top level when a replayed call imports it lazily. The driver counts any such event raised while importlib runs a module body as import work, because master's `read_shadow` lazily imports modules whose `@dataclass` classes set `__doc__` through `type.__setattr__`.
+- a write to a stdlib module attribute such as `subprocess.run`, because the globals snapshot covers only modules under the side root and a module attribute write raises no audit event (not probed);
 
 The globals snapshot skips three things that never carry replay state: the driver's own module, module-valued names, and the `__future__` flag that `from __future__ import annotations` binds. That flag has no value equality, so a deepcopy of it never compares equal.
 

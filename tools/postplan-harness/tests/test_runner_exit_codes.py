@@ -653,12 +653,6 @@ def _sh(script):
     return subprocess.run(["bash", "-c", script], capture_output=True, text=True, timeout=30)
 
 
-def test_post_plan_now_skips_fallback_on_remote_unreachable():
-    line = next(l for l in _PPN.read_text().splitlines() if l.startswith("should_fallback() {"))
-    out = _sh(f'{line}\nfor c in 76 1 3; do should_fallback "$c"; printf "%s=%s " "$c" "$?"; done')
-    assert out.stdout.split() == ["76=1", "1=0", "3=1"]
-
-
 def test_post_plan_now_tail_forwards_remote_unreachable():
     text = _PPN.read_text()
     start = text.index('if [ \\"\\${rc:-0}\\" = 3 ]')

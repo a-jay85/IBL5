@@ -3403,7 +3403,7 @@ test_prestart_blind_pass_keeps_open() {
 
 PP_KILLED=$'RESULT: post-plan KILLED (signal 15) at phase2\n'
 PP_PAUSED_LINE='post-plan-now: RESULT paused (usage gate); auto-resumes after reset.'
-PP_KILLED_LINE='post-plan-now: RESULT killed (harness rc=143); no skill fallback and no usage-gate pause.'
+PP_KILLED_LINE='post-plan-now: RESULT killed (harness rc=143); no usage-gate pause.'
 
 pp_seed_marker() {
     in_env "usage_marker_write $SID_A post-plan-now $PPN_BIN usage-pause drain 94 five_hour ''"
@@ -3497,7 +3497,7 @@ test_postplan_killed_no_evidence() {
 }
 
 # ppn_seg_file <rc> <sigterm>: $T/seg.sh built from the REAL bin/post-plan-now
-# GATE_OPEN / GATE_CLOSE / PAUSE_SEG text, with `echo FALLBACK-RAN` as the fallback body.
+# OUTCOME_SEG / RC_SEG / PAUSE_SEG text (the harness-only outcome tail).
 ppn_seg_file() {
     local seg_rc="$1" seg_term="$2"
     (
@@ -3505,17 +3505,14 @@ ppn_seg_file() {
         # shellcheck disable=SC2034  # read by the eval'd segment assignments
         SESSION_ID=$SID_A ROOT=$REPO_ROOT LOG=$T/log REBASE_ONLY=0 \
             HARNESS_RUN_DIR=$T/run SLUG=t SAFE_SLUG=t FIX_ROOT=$T
-        eval "$(grep -E '^ *GATE_OPEN="if ' "$REPO_ROOT/bin/post-plan-now")"
         eval "$(grep -E '^ *LOG_Q="' "$REPO_ROOT/bin/post-plan-now")"
-        eval "$(grep -E '^ *GATE_CLOSE="; elif ' "$REPO_ROOT/bin/post-plan-now")"
+        eval "$(grep -E '^ *OUTCOME_SEG="' "$REPO_ROOT/bin/post-plan-now")"
+        eval "$(grep -E '^ *RC_SEG="' "$REPO_ROOT/bin/post-plan-now")"
         eval "$(grep -E '^PAUSE_SEG="' "$REPO_ROOT/bin/post-plan-now")"
         {
             printf '. %s\n' "$(shq "$REPO_ROOT/bin/lib/usage-gate.sh")"
-            grep -E '^should_fallback\(\) \{' "$REPO_ROOT/bin/post-plan-now"
-            printf 'rc=%s\n_sigterm_received=%s\npp_rc=0\n' "$seg_rc" "$seg_term"
-            printf '%s\n' "${GATE_OPEN}echo FALLBACK-RAN${GATE_CLOSE}"
-            printf 'pp_rc=$?\n'
-            printf '%s\n' "${PAUSE_SEG}"
+            printf 'rc=%s\n_sigterm_received=%s\n' "$seg_rc" "$seg_term"
+            printf '%s\n' "{ ${OUTCOME_SEG}}; ${RC_SEG}${PAUSE_SEG}"
             printf 'echo "final=$pp_rc"\n'
         } > "$T/seg.sh"
     )
@@ -3525,14 +3522,13 @@ ppn_seg_run() {
     ( export PATH="$STUB:$ORIG_PATH" HOME="$T/home"; mkdir -p "$HOME"; bash "$T/seg.sh" 2>&1 )
 }
 
-test_ppn_seg_harness_kill_blocks_fallback() {
+test_ppn_seg_harness_kill_exits_143() {
     new_env
     make_stub_bin "$STUB" "" "$BODY_B"
     printf '%s' "$PP_KILLED" > "$T/log"
     ppn_seg_file 143 0
     local out
     out=$(ppn_seg_run)
-    case "$out" in *FALLBACK-RAN*) fail ppn_seg_kill:no-fallback "$out" ;; *) pass ppn_seg_kill:no-fallback ;; esac
     assert_contains ppn_seg_kill:killed-line "$out" "$PP_KILLED_LINE"
     assert_contains ppn_seg_kill:final "$out" "final=143"
 }
@@ -3545,7 +3541,6 @@ test_ppn_seg_3352_marker_and_kill_not_paused() {
     ppn_seg_file 0 0
     local out
     out=$(ppn_seg_run)
-    case "$out" in *FALLBACK-RAN*) fail ppn_seg_3352:no-fallback "$out" ;; *) pass ppn_seg_3352:no-fallback ;; esac
     assert_contains ppn_seg_3352:final "$out" "final=143"
     case "$out" in *"RESULT paused"*) fail ppn_seg_3352:not-paused "$out" ;; *) pass ppn_seg_3352:not-paused ;; esac
 }
@@ -3570,20 +3565,19 @@ test_ppn_seg_real_pause_control() {
     ppn_seg_file 75 0
     local out
     out=$(ppn_seg_run)
-    case "$out" in *FALLBACK-RAN*) fail ppn_seg_pause:no-fallback "$out" ;; *) pass ppn_seg_pause:no-fallback ;; esac
     assert_contains ppn_seg_pause:final "$out" "final=75"
     assert_contains ppn_seg_pause:paused-line "$out" "$PP_PAUSED_LINE"
 }
 
-test_ppn_seg_plain_failure_still_falls_back() {
+test_ppn_seg_plain_failure_stops_with_harness_rc() {
     new_env
     make_stub_bin "$STUB" "" "$BODY_B"
     printf 'plain harness failure\n' > "$T/log"
     ppn_seg_file 1 0
     local out
     out=$(ppn_seg_run)
-    assert_contains ppn_seg_plain:fallback "$out" "FALLBACK-RAN"
-    assert_contains ppn_seg_plain:final "$out" "final=0"
+    assert_contains ppn_seg_plain:final "$out" "final=1"
+    case "$out" in *"RESULT paused"*) fail ppn_seg_plain:not-paused "$out" ;; *) pass ppn_seg_plain:not-paused ;; esac
 }
 
 # ---------------------------------------------------------------- runner

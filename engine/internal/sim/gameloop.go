@@ -42,8 +42,7 @@ func resolveBaseTimeMid(opts Options) float64 {
 // TestTracePinnedPl0028TipOff pins the draw and the returned index against the
 // native capture.
 func tipOffWinner(r *rng.RNG) int {
-	tipRaw := r.Raw()
-	return tipRaw*2/(rng.RawMax+1) + 1
+	return randInt(r, 2)
 }
 
 // simGameWith is simGame plus the freeze/accumulation Options (freeze.go). A zero

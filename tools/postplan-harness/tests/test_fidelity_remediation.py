@@ -249,6 +249,7 @@ def test_re_review_packet_tells_reviewer_last_verified_bump_is_not_a_finding(tmp
         ctx = " ".join(open(os.path.join(str(out), "fidelity-packet-2", "context.md")).read().split())
         assert "last_verified date bump" in ctx
         assert "not a new finding" in ctx
+        assert "FORCED_TRIM_PATHS: (none)" in ctx
     finally:
         if os.path.exists(path2):
             os.unlink(path2)

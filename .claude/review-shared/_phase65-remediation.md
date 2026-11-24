@@ -1,6 +1,6 @@
 ---
 description: Phase 6.5 remediation procedure for the post-plan harness. Fixes every Phase 6 finding in-PR; harness commits and pushes after exit.
-last_verified: 2026-11-23
+last_verified: 2026-11-24
 ---
 
 # Phase 6.5 in-PR remediation
@@ -23,6 +23,7 @@ Every Phase 6 finding gets fixed and its prevention filed, in this PR's existing
 "Never zero entries" binds the findings Phase 6 actually emitted, and each of them gets an entry.
 
    - **Unplanned-scope findings.** A finding tagged `[unplanned-scope]` is not yours to delete by judgment. Before editing for any such finding, run the `python3 -m harness.unplanned_scope` command from `.claude/skills/post-plan/_phase-5.5-fidelity.md` Step 4 and act on each line it prints. `KEEP`: leave the code as it is, add the block that `--render-block` prints to the PR body with `gh pr edit`, and record the entry as `kept — declared in PR body` with `class: n/a — kept unplanned scope`. File no backlog issue for it. `REMOVE`: a post-plan fix commit introduced the code, so remediate it like any other finding. `HOLD`: the change removes a guard the plan's `## Must preserve` lists. Leave it unfixed and record `not fixed — Must preserve conflict at <path>`. If the command exits non-zero, leave every tagged finding unfixed and record `not fixed — unplanned-scope classifier unavailable`. Never delete code for a tagged finding the command did not mark `REMOVE`. A finding whose owner quote comes from an `## Owner amendments` entry is kept. Never revert or remove it. The harness classifies it `keep`.
+   - **Size-forced trims.** A finding that carries the `Fix hint (budget-forced trim)` line cites a file whose byte cap forced the trim. Once the classifier marks it `REMOVE`, judge the trim on two questions only. (a) Was anything critical lost: a `## Must preserve` guard, a gate's decision steps, a command, a number or fact another file cites, or a rule sentence? (b) Was anything wildly out of scope added? A `[NOTE]` finding means the reviewer answered no to both, so leave that trim as it is. When either answer is yes, restore only the text the finding names as lost, or remove only the text it names as added, and keep the rest of the trim. Any trim you make to fit a cap must pass the same two questions.
    - **Worktree:** this PR's existing one. Do not run `bin/wt-new`, do not create a second worktree, do not tear down the existing one.
    - **Backlog:** file an issue only for a finding with work left after this pass: a `not fixed — filed` row or a prevention rung 1-5 (`_remediation.md` step 5, `Mode: in-PR`). A finding fixed here with no gate warranted gets its entry in the Phase 7 verdict and no issue. Do not run the full `/backlog` chain. Consolidate findings sharing a surface into one issue. Apply these filing rules in order:
      - **File after the last fix.** Write issues only once every step 3 fix for this pass is in the tree. Any issue filed earlier in this run gets re-checked against `git diff HEAD` now. Close each one the final diff resolved with `bin/backlog close <n> "resolved in-PR by <pr-url>"`.

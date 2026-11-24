@@ -550,3 +550,111 @@ def test_carveout_does_not_import_fidelity():
             names.update(a.name for a in node.names)
     flat = {part for n in names for part in n.replace(".", " ").split()}
     assert "fidelity" not in flat and "unplanned_scope" not in flat
+
+
+# --- second cap source: bin/test-architect-contract-split ----------------------------
+
+X_CONTRACT = ".claude/skills/plan/_architect-contract.md"
+CONTRACT_FINDING = (f"- [BLOCKING] [unplanned-scope] The PR deleted prose from "
+                    f"`{X_CONTRACT}` that the plan never named. Put the phrases back.")
+
+
+def _split_caps_stub(root, cap, exit_code=0):
+    """Cap oracle for the split script: one --print-caps row for X_CONTRACT."""
+    size = os.path.getsize(os.path.join(root, X_CONTRACT))
+    row = f"{X_CONTRACT}\tfile\t{cap}\t{size}\t{cap - size}"
+    stub = pathlib.Path(root) / "bin" / "test-architect-contract-split"
+    stub.parent.mkdir(exist_ok=True)
+    stub.write_text("#!/bin/sh\n"
+                    f'if [ "{exit_code}" != 0 ]; then exit {exit_code}; fi\n'
+                    f"printf '{row}\\n'\n")
+    stub.chmod(0o755)
+
+
+@pytest.fixture
+def contract_trim_repo(tmp_path):
+    """Like trim_repo, and the PR commit also cuts 300 B from X_CONTRACT (1000 -> 700 B)."""
+    root = tmp_path / "ctrim"
+    root.mkdir()
+    _g(root, "init", "-q")
+    _g(root, "config", "user.name", "t")
+    _g(root, "config", "user.email", "t@example.com")
+    _g(root, "config", "commit.gpgsign", "false")
+    lines = [f"{i}" * 99 + "\n" for i in range(X_LINES)]
+    base = _commit(root, "base", {X_RULES: "".join(lines), X_CONTRACT: "".join(lines)})
+    _commit(root, "pr", {X_RULES: "".join(lines[:7]), X_CONTRACT: "".join(lines[:7])})
+    return SimpleNamespace(root=str(root), base=base)
+
+
+def test_budget_forced_paths_split_caps_forces_contract(contract_trim_repo):
+    _split_caps_stub(contract_trim_repo.root, 700)            # headroom 0, 300 B cut
+    got = rbc.budget_forced_paths(contract_trim_repo.root, contract_trim_repo.base,
+                                  [X_CONTRACT])
+    assert got == frozenset({X_CONTRACT})
+
+
+def test_budget_forced_paths_split_failure_empties_all(contract_trim_repo):
+    _caps_stub(contract_trim_repo.root, 700)                  # rules file alone is forced
+    _split_caps_stub(contract_trim_repo.root, 700, exit_code=2)
+    got = rbc.budget_forced_paths(contract_trim_repo.root, contract_trim_repo.base,
+                                  [X_RULES, X_CONTRACT])
+    assert got == frozenset()
+
+
+def test_budget_forced_paths_rules_only_skips_split_script(trim_repo):
+    _caps_stub(trim_repo.root, 700)                           # no split stub exists
+    assert not os.path.exists(os.path.join(trim_repo.root, rbc.SPLIT_CAPS_SCRIPT))
+    got = rbc.budget_forced_paths(trim_repo.root, trim_repo.base, [X_RULES])
+    assert got == frozenset({X_RULES})
+
+
+def test_budget_forced_paths_contract_trim_that_fits(contract_trim_repo):
+    _split_caps_stub(contract_trim_repo.root, 2000)           # 1300 B headroom >= 300 B
+    got = rbc.budget_forced_paths(contract_trim_repo.root, contract_trim_repo.base,
+                                  [X_CONTRACT])
+    assert got == frozenset()
+
+
+def test_annotate_work_list_hints_contract_with_split_script(contract_trim_repo):
+    _split_caps_stub(contract_trim_repo.root, 700)
+    out = rbc.annotate_work_list(_items(CONTRACT_FINDING), contract_trim_repo.root,
+                                 contract_trim_repo.base)
+    assert out[0]["text"].startswith(CONTRACT_FINDING + "\n")
+    assert (f"bin/test-architect-contract-split fails on {X_CONTRACT}"
+            in out[0]["text"])
+    assert "bin/check-rules-byte-budget" not in out[0]["text"]
+    assert out[0]["text"].endswith("Keep the trim in place.")
+
+
+def test_annotate_work_list_ignores_mdx_near_miss(contract_trim_repo):
+    _split_caps_stub(contract_trim_repo.root, 700)
+    near_miss = ".claude/skills/plan/_architect-contract.mdx"
+    text = ("- [BLOCKING] [unplanned-scope] The PR deleted prose from "
+            f"`{near_miss}` that the plan never named.")
+    items = _items(text)
+    out = rbc.annotate_work_list(items, contract_trim_repo.root, contract_trim_repo.base)
+    assert out == items
+    assert out[0]["text"] == text
+
+
+def test_annotate_work_list_no_hint_for_uncapped_path(contract_trim_repo):
+    _split_caps_stub(contract_trim_repo.root, 700)
+    uncapped = ".claude/review-shared/_plan-fidelity-review.md"
+    text = ("- [BLOCKING] [unplanned-scope] The PR deleted prose from "
+            f"`{uncapped}` that the plan never named.")
+    items = _items(text)
+    out = rbc.annotate_work_list(items, contract_trim_repo.root, contract_trim_repo.base)
+    assert out == items
+
+
+def test_forced_paths_since_reads_changed_files(contract_trim_repo):
+    _caps_stub(contract_trim_repo.root, 700)
+    _split_caps_stub(contract_trim_repo.root, 700)
+    got = rbc.forced_paths_since(contract_trim_repo.root, contract_trim_repo.base)
+    assert got == frozenset({X_RULES, X_CONTRACT})
+
+
+def test_forced_paths_since_bad_base_returns_empty(contract_trim_repo):
+    _caps_stub(contract_trim_repo.root, 700)
+    _split_caps_stub(contract_trim_repo.root, 700)
+    assert rbc.forced_paths_since(contract_trim_repo.root, "deadbeef") == frozenset()

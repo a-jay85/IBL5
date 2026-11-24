@@ -17,6 +17,7 @@ from dataclasses import dataclass
 BUDGET_CHECK_NAME = "Static guards"            # tests.yml job name; its step
                                                # "Check path-unscoped rules byte budget"
 BUDGET_SCRIPT = "bin/check-rules-byte-budget"
+SPLIT_CAPS_SCRIPT = "bin/test-architect-contract-split"  # caps _architect-contract.md, _plan-verification.md
 POST_CHECKS = (
     ("bin/check-rules-byte-budget",),
     ("bin/check-prose", "--since=origin/master"),
@@ -35,13 +36,14 @@ class Carveout:
 
 INACTIVE = Carveout(False, "not evaluated", frozenset())
 
-BUDGET_TRIM_HINT = (
-    "Fix hint (budget-forced trim): bin/check-rules-byte-budget fails on {path} "
+_TRIM_HINT = (
+    "Fix hint (budget-forced trim): {script} fails on {path} "
     "with this trim reverted. Shrink your own added text or move it to a -detail "
     "companion. Keep the trim in place."
 )
+BUDGET_TRIM_HINT = _TRIM_HINT.replace("{script}", BUDGET_SCRIPT)
 _UNPLANNED_TAG_RE = re.compile(r"\[unplanned-scope\]")
-_RULES_PATH_RE = re.compile(r"\.claude/rules/[\w./-]+\.md")
+_CAPPED_PATH_RE = re.compile(r"\.claude/[\w./-]+\.md\b")
 
 _SCALAR_RE = re.compile(r"^paths:[ \t]*(\S.*)$")
 _BARE_RE = re.compile(r"^paths:[ \t]*$")
@@ -50,6 +52,16 @@ _ITEM_RE = re.compile(r"^[ \t]*-[ \t]+(.*)$")
 
 def _is_rules_md(path: str) -> bool:
     return path.startswith(RULES_PREFIX) and path.endswith(".md")
+
+
+def _is_cap_candidate(path: str) -> bool:
+    """A .claude markdown file that either caps script may list."""
+    return path.startswith(".claude/") and path.endswith(".md")
+
+
+def _hint_for(path: str) -> str:
+    script = BUDGET_SCRIPT if _is_rules_md(path) else SPLIT_CAPS_SCRIPT
+    return _TRIM_HINT.format(script=script, path=path)
 
 
 def _git(worktree, *args: str) -> str:
@@ -212,12 +224,12 @@ def carveout_prompt_text(in_diff) -> str:
     )
 
 
-def _caps(worktree: str) -> dict[str, tuple[str, int, int, int]]:
-    """path -> (class, cap, bytes, headroom), read from BUDGET_SCRIPT --print-caps at HEAD."""
-    proc = subprocess.run([BUDGET_SCRIPT, "--print-caps"], cwd=worktree,
+def _caps(worktree: str, script: str = BUDGET_SCRIPT) -> dict[str, tuple[str, int, int, int]]:
+    """path -> (class, cap, bytes, headroom), read from script --print-caps at HEAD."""
+    proc = subprocess.run([script, "--print-caps"], cwd=worktree,
                           capture_output=True, text=True, timeout=60)
     if proc.returncode != 0:
-        raise subprocess.SubprocessError(f"{BUDGET_SCRIPT} --print-caps exit {proc.returncode}")
+        raise subprocess.SubprocessError(f"{script} --print-caps exit {proc.returncode}")
     caps: dict[str, tuple[str, int, int, int]] = {}
     for line in proc.stdout.splitlines():
         cols = line.split("\t")
@@ -257,15 +269,20 @@ def _deleted_bytes(worktree: str, base_sha: str, path: str) -> int:
 
 
 def budget_forced_paths(worktree: str, base_sha: str, paths) -> frozenset[str]:
-    """Rules files whose trim the byte budget forced: putting the PR's deleted bytes back
-    would push the file past its cap (headroom - deleted < 0). The cap and the HEAD size
-    come from BUDGET_SCRIPT --print-caps, and for a resident file the headroom already
-    includes the MAX_TOTAL aggregate. Any git or script failure returns frozenset()."""
+    """Capped `.claude` markdown files whose trim the byte cap forced: putting the PR's
+    deleted bytes back would push the file past its cap (headroom - deleted < 0). Caps
+    come from BUDGET_SCRIPT for `.claude/rules/*.md` and SPLIT_CAPS_SCRIPT for the rest;
+    either script failing returns frozenset(). For a resident rules file the headroom
+    already includes the MAX_TOTAL aggregate. Any git failure also returns frozenset()."""
     try:
-        candidates = sorted({p for p in paths if _is_rules_md(p)})
+        candidates = sorted({p for p in paths if _is_cap_candidate(p)})
         if not candidates:
             return frozenset()
-        caps = _caps(worktree)
+        caps: dict[str, tuple[str, int, int, int]] = {}
+        if any(_is_rules_md(p) for p in candidates):
+            caps.update(_caps(worktree))
+        if any(not _is_rules_md(p) for p in candidates):
+            caps.update(_caps(worktree, SPLIT_CAPS_SCRIPT))
         forced = set()
         for path in candidates:
             row = caps.get(path)
@@ -279,9 +296,18 @@ def budget_forced_paths(worktree: str, base_sha: str, paths) -> frozenset[str]:
         return frozenset()
 
 
+def forced_paths_since(worktree: str, base_sha: str) -> frozenset[str]:
+    """budget_forced_paths over every file changed from base_sha to HEAD. Fail closed."""
+    try:
+        names = _git(worktree, "diff", "--name-only", base_sha, "HEAD").splitlines()
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return frozenset()
+    return budget_forced_paths(worktree, base_sha, names)
+
+
 def annotate_work_list(work_list, worktree: str, base_sha: str, skip=()) -> list[dict]:
     """Return a new list. An item gains the hint only when all hold: its text carries
-    [unplanned-scope], is not in skip, and cites a rules path in budget_forced_paths.
+    [unplanned-scope], is not in skip, and cites a capped `.claude` path in budget_forced_paths.
     The hint is appended on a new line after the unchanged original text, one hint per
     forced path. Every other item, and every key besides text, passes through unchanged.
     The item count never changes; severity tags are never touched."""
@@ -291,7 +317,7 @@ def annotate_work_list(work_list, worktree: str, base_sha: str, skip=()) -> list
         if text in skip or not _UNPLANNED_TAG_RE.search(text):
             cited.append([])
         else:
-            cited.append(list(dict.fromkeys(_RULES_PATH_RE.findall(text))))
+            cited.append(list(dict.fromkeys(_CAPPED_PATH_RE.findall(text))))
     every = {p for paths in cited for p in paths}
     forced = budget_forced_paths(worktree, base_sha, every) if every else frozenset()
     out: list[dict] = []
@@ -300,6 +326,6 @@ def annotate_work_list(work_list, worktree: str, base_sha: str, skip=()) -> list
         if not hits:
             out.append(item)
             continue
-        hints = "\n".join(BUDGET_TRIM_HINT.format(path=p) for p in hits)
+        hints = "\n".join(_hint_for(p) for p in hits)
         out.append({**item, "text": f"{item['text']}\n{hints}"})
     return out

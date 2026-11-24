@@ -616,6 +616,7 @@ def test_delta_packet_holds_only_delta_hunks_and_touched_sections(tmp_path):
     assert "DELTA_ANCHOR_RUN: live-prior" in ctx_md
     assert "DELTA_LINES: 1 of 2" in ctx_md
     assert "PLAN_SECTIONS: Phase 2 — X" in ctx_md
+    assert "FORCED_TRIM_PATHS: (none)" in ctx_md
     assert read("delta-paths.txt") == "a.py\n"
     assert read("pr-body.md") == "pr body"
 

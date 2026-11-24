@@ -268,9 +268,14 @@ matrix row and the mutation it must catch, each review finding to fix) and step 
    Comment on the PR listing the chores done.
 ```
 
-Run at most 4 jobs at once. Each one is a full Opus session, and more worktree stacks
-starve Docker. Queue the rest in `$D/jobs/queue.txt` and start the next when a `.result`
-lands.
+Each job is a full Opus session with its own worktree stack, and too many stacks starve
+Docker of memory. Read the Docker memory cap first:
+`docker info --format '{{.MemTotal}}' | awk '{print int($1/1e9)}'` prints it in GB.
+Under 9 GB, run at most 4 jobs at once. From 9 GB, run at most 6. From 13 GB, run at
+most 8. Docker reports a little less than its setting, so a 14 GB setting prints 14 and
+a 6 GB setting prints 6. A busy stack (PHPUnit or a browser check) uses about 1 to 2
+GB, and the main stack holds about 1 GB. Queue the rest in `$D/jobs/queue.txt` and start
+the next when a `.result` lands.
 
 Run a read-only chore yourself when it is one command, such as a replay script or a query
 the verdict's note asks for. Post its output as a PR comment. A job costs a full Opus

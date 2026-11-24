@@ -159,7 +159,7 @@ The verdict is a commit status with context `human-signoff` on the PR head. A ch
 
 The gate trusts a run only when its path is `.github/workflows/human-signoff-trigger.yml` and the head's blob of that file equals master's (`hs_trigger_trusted`). A PR that edits the stub therefore holds. The owner merges it with `gh pr merge --admin <N>` after reading the stub diff. This PR is one of them, since its own head gets no verdict from the new gate.
 
-A dispatch on a head with no stub reads the PR's file list. A PR branched before the stub existed is trusted. A PR whose file list names the stub path holds, as does one whose list cannot be read.
+A dispatch on a head with no stub holds until the PR is updated.
 
 To re-run the gate by hand, run `gh workflow run human-signoff.yml -f pr_number=<N>` from master. A dispatch from any other ref computes a verdict but writes nothing: each write job and the pending step carry `(github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/master')`.
 

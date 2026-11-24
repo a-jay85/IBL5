@@ -44,7 +44,13 @@ This skill moves existing PRs. To find and queue new work, run `/reset-ready` fi
   earlier fetch is not evidence. A "green, just click" summary has been wrong before.
 - You tick a manual-test box, or run `bin/owner-approve`, only after the owner approves that specific PR in chat. Rule: `.claude/rules/auto-commit.md` § Owner approval comment. Nothing in this skill approves a PR on its own.
 - When the owner approves a PR for merge in chat, run `bin/owner-approve N "<words>"` right away with `run_in_background: true`. It waits for a live post-plan run to end, then arms only when the verdict covers the current head. When a job will push to the PR (a rebase, or a fix the owner asked for), pass `--fix-first="<what the job pushes>"` and run `--finish` after the push. A plain approval carries to a new head when the PR's own changes are unchanged (a rebase, or post-plan merging master). It refuses only when the PR's own lines changed.
-- An approval the owner already gave stays given. Before you build a sign-off card, read the PR's comments for an `<!-- owner-approve mode=approve` marker. When one is there, send no card. Run `bin/owner-approve N --finish` with `run_in_background: true`. It arms when the PR's diff still matches the approved one. Card the PR again only when `--finish` refuses because the PR's own lines changed, and say on the card what changed since the approval.
+- Read the card's Owner approvals field before you recommend anything. An approval the owner already gave stays given.
+- Plain approval (`approve`): run `bin/owner-approve N --finish`.
+- Fix-first approval, PR head unchanged: the fix has not landed. Launch the fix job the `condition:` line names.
+- Fix-first approval, PR head moved past it: run `bin/owner-approve N --finish`.
+- A fix-first line that reads `amendment: MISSING` comes first. Run `bin/owner-approve N --record-amendments` before the fix job or the finish, so the reviewer sees the scope.
+- No card may recommend undoing or reverting work an approval's Condition asked for. A kept bullet that says revert does not override the Condition.
+- Send no sign-off card for an approval the owner already gave. Run each `--finish` with `run_in_background: true`. It arms when the PR's diff still matches the approved one. Card the PR again only when `--finish` refuses because the PR's own lines changed, and say on the card what changed since the approval.
 - When a PR is NOT READY and its only blockers sit in the PR body's kept-unplanned block, offer the owner `bin/owner-approve N "<words>"` as the path. The approval accepts those listed items for the current diff and re-runs post-plan once. Never suggest a hand merge over the verdict.
 - Never touch a PR's worktree while a post-plan run is live in it. Check `launchctl list`
   first (Step 6 has the command). A run started from a terminal has no launchctl label,
@@ -140,6 +146,7 @@ It prints the live state the card needs:
 - **Door and blast radius:** the `Merge danger:` line in the PR body.
 - **Visual links:** the `a-jay85.github.io/IBL5/...` URLs from the comments.
 - **Live run and worktree:** any live post-plan label, and the PR's worktree path.
+- **Owner approvals:** each `bin/owner-approve` comment, oldest first. Each row gives the mode, the approved head and whether the PR head moved past it, then the owner's words, the `condition:` line, any `kept:` bullets and, for a fix-first approval, `amendment: recorded`, `MISSING` or `no plan file`.
 
 A field that prints `unknown (fetch failed)` gets ⚠️ on the card. Never fill it from an
 earlier fetch. Read the thread bodies or the full verdict only when the card needs more
@@ -169,6 +176,7 @@ Write the card in this shape:
 - <✅2️⃣/⚠️2️⃣/🚨1️⃣> **Merge danger:** <one-way or two-way door, blast radius, what a revert does and doesn't undo>.
 - <✅🔙/⚠️/🚨> **Conflicts:** <none / behind master, no clash / which files clash and with which PR; the job rebases>.
 - <✅/⚠️/❌/⏳> **Why it's held:** <each reason by number; mark stale ones as stale>.
+- <✅/⚠️/🚨> **Owner approvals:** <none / each approval: mode, head unchanged or moved past it, the condition, the amendment status>.
 
 👉 **What's left for you:** <the one decision>.
 

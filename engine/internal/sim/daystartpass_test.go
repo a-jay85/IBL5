@@ -69,6 +69,9 @@ func TestDayStartScaledPassWritesBackUnchangedBlocks(t *testing.T) {
 	if back[1] != b {
 		t.Errorf("back[1] = %v, want %v", back[1], b)
 	}
+	if back[0] == (dayStartBlock{}) || back[1] == (dayStartBlock{}) {
+		t.Errorf("write-back stored a zeroed block")
+	}
 	if in[0] != keepA || in[1] != keepB {
 		t.Errorf("input blocks were modified")
 	}

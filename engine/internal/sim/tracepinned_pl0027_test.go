@@ -34,7 +34,7 @@ type pl0027Out struct {
 // TestTracePinnedPl0027DayStartPass replays every capture record through
 // dayStartScaledPass. It asserts the pass consumes exactly the captured raw
 // draws in order, and that every written-back block equals the capture's
-// block at every index. The capture's output carries no truncated draw, so
+// block (`out.assign`) at every index. The capture's output carries no truncated draw, so
 // that value is not pinned here; TestDayStartScaledPassTruncatesScaledDraw
 // pins the truncation rule.
 func TestTracePinnedPl0027DayStartPass(t *testing.T) {

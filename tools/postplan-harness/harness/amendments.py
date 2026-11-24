@@ -201,10 +201,10 @@ def card_lines(comments: Sequence[dict], head: str, plan_text: Optional[str], pr
         if w:
             opt = f" ({w.group('o')})" if w.group("o") else ""
             rows.append(f'     words: "{w.group("w")}"{opt}')
-        if m.group("mode") == "fix-first":
-            rows.append(f'     condition: "{us._condition_text(body)}"')
-        for bullet in _kept_bullets(body):
-            rows.append(f"     kept: {bullet}")
+        # A fix-first approval adds a condition line before the kept bullets and an
+        # amendment line after them; an approve-mode one adds neither.
+        before: list[str] = []
+        after: list[str] = []
         if m.group("mode") == "fix-first":
             fields = us.comment_fields(c)
             if recorded is None:
@@ -213,7 +213,11 @@ def card_lines(comments: Sequence[dict], head: str, plan_text: Optional[str], pr
                 status = "recorded"
             else:
                 status = f"MISSING (run bin/owner-approve {pr} --record-amendments)"
-            rows.append(f"     amendment: {status}")
+            before.append(f'     condition: "{us._condition_text(body)}"')
+            after.append(f"     amendment: {status}")
+        rows += before
+        rows += [f"     kept: {bullet}" for bullet in _kept_bullets(body)]
+        rows += after
     if not rows:
         return ["Owner approvals: none"]
     return ["Owner approvals:"] + rows

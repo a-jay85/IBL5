@@ -85,6 +85,12 @@ def test_comment_fields_accepts_authentic_fix_first():
 
 def test_comment_fields_rejects_approve_mode():
     assert us.comment_fields(comment(mode="approve")) is None
+    # An approve marker on a body that still carries a Condition line: only the mode check
+    # rejects it.
+    c = comment()
+    c["body"] = c["body"].replace("mode=fix-first", "mode=approve")
+    assert "Condition: " in c["body"]
+    assert us.comment_fields(c) is None
 
 
 def test_comment_fields_rejects_non_owner_association():

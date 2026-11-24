@@ -12,7 +12,9 @@
 # pass through other stages first (echo "$x" | tr a b | grep -q y). An aggregating
 # stage such as wc -l is flagged too, even though it drains the producer; rewriting
 # it costs one line. grep -c is never flagged: it reads to EOF, so its producer never
-# gets SIGPIPE. Only echo and printf count as producers. The matcher is quote-blind
+# gets SIGPIPE. Only echo, printf and `launchctl list` count as producers. The
+# last one prints ~600 lines, past the pipe buffer, so its quiet-grep interlock
+# reads a live job as gone (bin/docfix-poll, 2026-11-23). The matcher is quote-blind
 # (see the comment above BAD_RE), so some quoted forms are missed.
 #
 # Only lines this branch adds are read, so older sites never block a PR. One exception:
@@ -84,7 +86,8 @@ diff_to() {
 SHEBANG_RE='^#!.*[/[:space:]](bash|sh)([[:space:]]|$)'
 SET_RE='^[[:space:]]*set([[:space:]]+[-+][A-Za-z]+([[:space:]]+[a-z]+)?)*[[:space:]]+-[A-Za-z]*o[[:space:]]+pipefail'
 # Quiet-grep matcher, Bash 3.2 ERE only (no \s, \b, lookaround, non-greedy).
-# Producer: echo or printf, with any arguments up to the first single pipe.
+# Producer: echo, printf or `launchctl list`, with any arguments up to the first
+#   single pipe.
 # Stages: zero or more intermediate pipeline stages (tr, sed, wc, ...). A stage
 #   holds no pipe, # (a trailing comment) or ; & ( ), except the >& and &>
 #   redirects, and must end on a non-pipe character, so a || join never reads
@@ -96,7 +99,7 @@ SET_RE='^[[:space:]]*set([[:space:]]+[-+][A-Za-z]+([[:space:]]+[a-z]+)?)*[[:spac
 # The matcher does not parse quotes. A quoted ; & ( ) | or # inside a stage or a
 #   grep pattern ends the match early, so those lines are missed, never flagged.
 # Quiet: --quiet, --silent, or a short-flag cluster holding q (-q, -qF, -Eq).
-BAD_PRODUCER_RE='(^|[^[:alnum:]_.-])(echo|printf)[[:space:]]([^|]*[^|\\])?'
+BAD_PRODUCER_RE='(^|[^[:alnum:]_.-])(echo[[:space:]]|printf[[:space:]]|launchctl[[:space:]]+list)([^|]*[^|\\])?'
 BAD_STAGE_RE='[|]([^|;&()#]|>&|&>)*[^|;&()#\\]'
 BAD_ARG_RE='[[:space:]]+(-[^-[:space:]|;&()`][^[:space:]|;&()`]*|--[^[:space:]|;&()`]+|[^-#[:space:]|;&()`][^[:space:]|;&()`]*)'
 BAD_QUIET_RE='[[:space:]]+(--quiet|--silent|-[A-Za-z]*q)'

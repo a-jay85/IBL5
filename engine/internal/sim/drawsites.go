@@ -17,6 +17,7 @@ var DrawSites = map[string]string{
 	"sim.(*gameState).threePtShot":             "",
 	"sim.(*gameState).transitionStealSucceeds": "",
 	"sim.bucket3Weight":                        "",
+	"sim.dayStartScaledPass":                   "FUN_005c6100",
 	"sim.foulBucketWeight":                     "FUN_004e3860",
 	"sim.possession":                           "",
 	"sim.possessionTime":                       "",

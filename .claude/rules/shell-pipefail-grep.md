@@ -1,6 +1,6 @@
 ---
 description: Avoid printf-pipe-grep-q under set -o pipefail (herestring, no SIGPIPE), and keep pipeline-status traps out of errexit+pipefail bin/ scripts (two diff gates).
-last_verified: 2026-11-19
+last_verified: 2026-11-23
 paths: "bin/**"
 ---
 
@@ -32,7 +32,7 @@ PR #2174's `bin/test-architect-contract-split` used the printf-pipe form under `
 
 Any shell script with `set -o pipefail` (or `set -euo pipefail`) that pipes `echo` or `printf` into a `grep -q`-family call (`-qF`, `-qE`, `-qP`, `--quiet`). The quiet flag may come after the pattern (`grep -F "$pat" -q`), and the pipe may pass through other stages first (`echo "$x" | tr A-Z a-z | grep -q y`). Both forms exit 141 under pipefail. A `-q` after `--` is a file operand, so it does not count. `grep -c` reads to EOF and is safe (`bin/test-sigpipe-grep-q-guard` case 2). `bin/check-pipefail-grep-q` fails a PR that adds a new instance under `bin/`. The gate also flags an aggregating middle stage such as `wc -l`, which drains the producer and cannot exit 141. Rewrite those lines the same way, since the fix costs one line.
 
-The gate reads text and does not parse quotes. It only sees `echo` and `printf` producers. A quoted `;` `&` `(` `)` `|` or `#` inside a middle stage or a grep pattern ends the match early, so lines like `echo "$x" | sed -E 's/(a)/b/' | grep -q y` or `echo "$x" | grep -E "a|b" -q` pass the gate while still hitting SIGPIPE. A `2>&1` or `&>` redirect in a stage is fine. A gate pass is not proof the line is safe.
+The gate reads text and does not parse quotes. It only sees `echo`, `printf` and `launchctl list` producers. `launchctl list` prints about 600 lines, so `launchctl list | grep -q` reads a live job as gone; read the table once with `ljob_snapshot` and test it with `ljob_listed` (`bin/lib/launchd-job.sh`). A quoted `;` `&` `(` `)` `|` or `#` inside a middle stage or a grep pattern ends the match early, so lines like `echo "$x" | sed -E 's/(a)/b/' | grep -q y` or `echo "$x" | grep -E "a|b" -q` pass the gate while still hitting SIGPIPE. A `2>&1` or `&>` redirect in a stage is fine. A gate pass is not proof the line is safe.
 
 With a middle stage, capture the stage's output first and feed the quiet grep a herestring:
 

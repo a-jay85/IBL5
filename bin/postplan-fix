@@ -26,6 +26,7 @@
 # claude call.
 # Env seams: POSTPLAN_FIX_STATE_DIR, POSTPLAN_FIX_DISCORD_DM, POSTPLAN_FIX_USAGE_JSON,
 # POSTPLAN_FIX_POST_PLAN_NOW. Unset and empty each mean the default.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 usage() { echo "Usage: postplan-fix [--headless|--holdrepeat] [--dry-run] <PR-number|branch-slug>"; }

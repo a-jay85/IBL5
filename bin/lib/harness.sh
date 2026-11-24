@@ -254,6 +254,14 @@ h_shard_take() {
 # routed through h_shard_take run only here, so each still runs exactly once.
 h_shard_primary() { [ "${H_SHARD_I:-0}" -eq 0 ]; }
 
+# harness_bare_path <scratch-dir> — prints "<dir>/hb5-bash:/usr/bin:/bin", where the
+# first entry holds only a `bash` symlink to the running interpreter. Use it in place
+# of a pinned PATH=/usr/bin:/bin so `env bash` finds bash 4+ and nothing else is added.
+harness_bare_path() {
+    mkdir -p "$1/hb5-bash" && ln -sf "$BASH" "$1/hb5-bash/bash"
+    printf '%s' "$1/hb5-bash:/usr/bin:/bin"
+}
+
 h_done() {
     local total=$((H_PASS + H_FAIL)) sfx=""
     if [ "$H_SKIP" -gt 0 ]; then

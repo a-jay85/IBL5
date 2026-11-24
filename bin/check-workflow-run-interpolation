@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # bin/check-workflow-run-interpolation — CI gate: a `${{ env.* }}` or string-typed
 # `${{ inputs.* }}` expression must not sit inside a `run:` body. GitHub expands
 # `${{ }}` into the script text BEFORE the shell parses it, so a caller-controlled
@@ -19,6 +19,7 @@
 #
 # Usage: bin/check-workflow-run-interpolation [file ...]
 #   default: .github/workflows/*.yml and .github/actions/*/action.yml
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -eu
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then

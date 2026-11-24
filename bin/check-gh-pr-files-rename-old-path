@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Hold predicates in bin/lib/pr-armable.sh decide whether a PR may merge from
 # its changed-file list. `gh pr view/list --json files` gives `.path` objects
@@ -20,6 +20,7 @@
 #
 # Exit codes: 0 = pass, 1 = findings, 2 = usage error or missing anchor.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 MARKER_MIN_LEN=15

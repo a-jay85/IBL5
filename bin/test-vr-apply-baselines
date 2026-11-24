@@ -2,6 +2,7 @@
 # test-vr-apply-baselines: pins bin/vr-apply-baselines behavior with mktemp fixtures.
 # Usage: bin/test-vr-apply-baselines   (exit 0 all pass, 1 any failure)
 # VR_APPLY_SCRIPT overrides the script under test (used by the mutation case).
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -42,7 +43,8 @@ run_script() {
   local args=("--gallery=$FIX/g.json" "--actuals=$FIX/actuals" "--snapshot-dir=$FIX/snaps" "--list-out=$FIX/list.txt")
   RC=0
   if [ "$mode" = clean ]; then
-    env -i PATH=/usr/bin:/bin bash "$script" "${args[@]}" > "$FIX/out" 2> "$FIX/err" || RC=$?
+    mkdir -p "$FIX/hb5-bash" && ln -sf "$BASH" "$FIX/hb5-bash/bash"
+    env -i PATH="$FIX/hb5-bash:/usr/bin:/bin" bash "$script" "${args[@]}" > "$FIX/out" 2> "$FIX/err" || RC=$?
   else
     bash "$script" "${args[@]}" > "$FIX/out" 2> "$FIX/err" || RC=$?
   fi

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 #
 # bin/code-slice-review — weekly rotating review of EXISTING code.
@@ -43,7 +44,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
 log() { echo "code-slice-review: $*" >&2; }
 say() { echo "code-slice-review: $*"; }
 
-usage() { awk 'NR<=2{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "${BASH_SOURCE[0]}"; }
+usage() { awk 'NR<=3{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "${BASH_SOURCE[0]}"; }
 
 # ── Env seams (${VAR:-x}: unset and empty both mean the default) ──────────────
 # No HOME-derived default lives here; resolve_state_dir computes those, so

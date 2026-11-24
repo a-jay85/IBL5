@@ -5,6 +5,7 @@
 # Fixtures mirror MUTATION_PARITY_EXEMPT in ibl5/bin/check-xml-class-refs; a new
 # exemption needs its path added to the base fixture (tests/Support below).
 # Prints PASS <case-id> / FAIL <case-id> per assertion; exits 1 on any FAIL.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -uo pipefail
 
 command -v php >/dev/null || { echo "FAIL php-available (php not on PATH)"; exit 1; }

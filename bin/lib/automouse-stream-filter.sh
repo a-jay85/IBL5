@@ -1,5 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Usage: claude ... --output-format stream-json | automouse-stream-filter <heartbeat_file> [<cmdpid_file>] [<slug>] [<phase>] [<failsig_file>]
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 HEARTBEAT_FILE="${1:?Usage: automouse-stream-filter <heartbeat_file> [<cmdpid_file>] [<slug>] [<phase>] [<failsig_file>]}"

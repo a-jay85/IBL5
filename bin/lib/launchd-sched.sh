@@ -138,6 +138,16 @@ lsched_calendar_multi() {
 lsched_env_open() { printf '\t<key>EnvironmentVariables</key>\n\t<dict>\n'; }
 lsched_env_close() { printf '\t</dict>\n'; }
 
+# PATH for plist-scheduled jobs: brew first so `env bash` resolves bash 4+.
+LSCHED_JOB_PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+# lsched_env_path <path> — EnvironmentVariables dict holding one PATH key. The key and
+# its value share one line, so a grep for PATH.*/opt/homebrew/bin: finds them.
+lsched_env_path() {
+    lsched_env_open
+    printf '\t\t<key>PATH</key><string>%s</string>\n' "$1"
+    lsched_env_close
+}
+
 # lsched_plist <body_fn> — prolog, then the body function's output, then footer.
 lsched_plist() {
     printf '%s\n' '<?xml version="1.0" encoding="UTF-8"?>'

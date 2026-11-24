@@ -22,6 +22,7 @@
 # Run: bin/test-wt-gc-tick [--case NAME]...  (exit 0 = all pass, 1 = a case failed)
 # --case runs only the named cases (repeatable); an unknown name fails the run.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -u
 # shellcheck source=bin/lib/harness.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
@@ -930,7 +931,7 @@ fresh
 mkdir -p "$CD/state"
 # The reap steps run at their defaults here, so lsof/gh/docker resolve from
 # the stub dir (first on PATH and the only WT_GC_BIN_DIRS entry).
-G12_ENV=(PATH="$STUBBIN:/usr/bin:/bin" WT_GC_BIN_DIRS="$STUBBIN" STUB_CASE_DIR="$CD"
+G12_ENV=(PATH="$STUBBIN:$(harness_bare_path "$ROOT")" WT_GC_BIN_DIRS="$STUBBIN" STUB_CASE_DIR="$CD"
     IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR"
     WT_GC_LOCK_DIR="$CD/state" WT_GC_IOREG="$STUBBIN/ioreg"
     WT_GC_CLEANUP="$STUBBIN/cleanup-stub" WT_GC_WT_STATUS="$STUBBIN/wt-status-stub"
@@ -941,7 +942,7 @@ RC=$?
 chk_rc "env -i dry-run" 0
 grep -q 'unbound variable' "$CD/out" && note_err "env -i dry-run: unbound variable"
 final_line | grep -q 'done dry_run=1' || note_err "env -i dry-run: final log line missing (got: $(final_line))"
-env -i PATH=/usr/bin:/bin bash -euo pipefail "$TICK" --help > "$CD/help.out" 2>&1
+env -i PATH="$(harness_bare_path "$ROOT")" bash -euo pipefail "$TICK" --help > "$CD/help.out" 2>&1
 RC=$?
 chk_rc "env -i --help" 0
 grep -q 'unbound variable' "$CD/help.out" && note_err "env -i --help: unbound variable"
@@ -1019,7 +1020,7 @@ fi
 if should_run G15-emitter-empty-env; then
 begin_case G15-emitter-empty-env
 RC=0
-env -i PATH=/usr/bin:/bin bash -euo pipefail "$EMIT/bin/wt-gc-cron-setup" --print-schedule > "$CD/out" 2>&1 || RC=$?
+env -i PATH="$(harness_bare_path "$ROOT")" bash -euo pipefail "$EMIT/bin/wt-gc-cron-setup" --print-schedule > "$CD/out" 2>&1 || RC=$?
 chk_rc "env -i print-schedule" 0
 grep -q 'unbound variable' "$CD/out" && note_err "unbound variable"
 grep -qE '<string>/[^<$]+/\.claude/projects/-Users-ajaynicolas-GitHub-IBL5/wt-gc/launchd-stdout\.log</string>' "$CD/out" \
@@ -1203,7 +1204,7 @@ fi
 if should_run L1-library-env-i; then
 begin_case L1-library-env-i
 RC=0
-env -i PATH=/usr/bin:/bin bash -euo pipefail -c \
+env -i PATH="$(harness_bare_path "$ROOT")" bash -euo pipefail -c \
     'source "$1" && type _gc_do _gc_tips_record _gc_live_work >/dev/null && echo OK' \
     _ "$SCRIPT_DIR/lib/wt-gc-reap.sh" > "$CD/out" 2>&1 || RC=$?
 chk_rc "env -i source" 0
@@ -3391,7 +3392,7 @@ fi
 
 if should_run H2-help-lists-new-vars; then
 fx H2-help-lists-new-vars
-env -i PATH=/usr/bin:/bin bash -euo pipefail "$TICK" --help > "$CD/help.out" 2>&1
+env -i PATH="$(harness_bare_path "$ROOT")" bash -euo pipefail "$TICK" --help > "$CD/help.out" 2>&1
 chk_rc H2-help 0
 for ec_var in "${EC_SWITCHES[@]}" WT_GC_ARCHIVE_DAYS WT_GC_DIRTY_ARCHIVE_DAYS WT_GC_DETACHED_DAYS \
     WT_GC_CLOSED_DAYS WT_GC_STASH_DAYS WT_GC_BACKUP_FALLBACK_DAYS WT_GC_CONTAINER_DAYS WT_GC_ARCHIVE_STAMP \

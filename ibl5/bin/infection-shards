@@ -10,6 +10,7 @@
 # aggregate  Sum each shard's infection-summary.log, print a markdown table and
 #            a verdict line. Exit 1 below either bar, 3 on malformed results.
 # Flags take --name=value only. <root> defaults to the current directory.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -uo pipefail
 
 if ! command -v jq >/dev/null 2>&1; then

@@ -8,6 +8,7 @@
 #
 # Run: bin/test-sim-recap-ssh-gate  (exit 0 = all pass, 1 = failures)
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -u
 # shellcheck source=bin/lib/harness.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
@@ -140,7 +141,7 @@ gate_denied_report "denies other scripts"
 
 # ── 8. empty env denied without spawning php ──────────────────────────────────
 rm -f "$STUB/php.argv" "$STUB/err"
-env -i SIM_RECAP_GATE_PHP_BIN="$STUB/php" bash "$GATE" </dev/null >/dev/null 2>"$STUB/err"
+env -i SIM_RECAP_GATE_PHP_BIN="$STUB/php" "$BASH" "$GATE" </dev/null >/dev/null 2>"$STUB/err"
 rc=$?
 if [ "$rc" -eq 2 ] && grep -qF "denied: no command" "$STUB/err" && [ ! -e "$STUB/php.argv" ]; then
     srt_ok "empty env denied without spawning php"

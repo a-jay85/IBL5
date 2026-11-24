@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Old-code compatibility gate: runs production's PHP tests against the PR-head
 # schema, which is the state auto-rollback leaves behind. The verdict engine
@@ -7,6 +7,7 @@
 # Exit codes: 0 = pass, 1 = old code broke, 2 = usage error,
 #             3 = false-green guard tripped.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 BYPASS_MIN_LENGTH=20

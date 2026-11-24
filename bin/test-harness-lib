@@ -3,13 +3,14 @@
 #
 # It cannot judge the lib with the lib, so it keeps its own t_ok/t_bad
 # helpers and T_FAIL counter. Each case writes a scenario script that
-# sources the lib, runs it under /bin/bash (bash 3.2 on macOS, 5.x on
-# Ubuntu), and checks stdout, stderr, and the exit code.
+# sources the lib, runs it under the bash running this harness (bash 4+;
+# Homebrew bash on macOS), and checks stdout, stderr, and the exit code.
 #
 # Run: bin/test-harness-lib  (every case)
 #      bin/test-harness-lib shard|leg|coverage  (only that group of the
 #      shard and leg cases, so a plan mutation check runs inside its limit)
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -uo pipefail
 
 THL_ONLY="${1:-}"
@@ -20,7 +21,7 @@ esac
 
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIB="$SELF_DIR/lib/harness.sh"
-BASH_BIN=/bin/bash
+BASH_BIN="$BASH"
 
 T_FAIL=0
 t_ok() { printf 'ok: %s\n' "$1"; }
@@ -294,6 +295,23 @@ case_env_i() {
         t_ok "case_env_i"
     else
         t_bad "case_env_i"
+    fi
+}
+
+case_bare_path() {
+    local d="$WORK/bare-path" out link n
+    mkdir -p "$d"
+    out=$(
+        # shellcheck source=bin/lib/harness.sh
+        . "$LIB" >/dev/null 2>&1
+        harness_bare_path "$d"
+    )
+    link=$(readlink "$d/hb5-bash/bash" 2>/dev/null || true)
+    n=$(find "$d/hb5-bash" -mindepth 1 -maxdepth 1 | wc -l | tr -d ' ')
+    if [ "$out" = "$d/hb5-bash:/usr/bin:/bin" ] && [ "$link" = "$BASH" ] && [ "$n" = 1 ]; then
+        t_ok "case_bare_path"
+    else
+        t_bad "case_bare_path (out=[$out] link=[$link] entries=$n)"
     fi
 }
 
@@ -740,6 +758,7 @@ case_git_repo_bare_origin
 case_git_repo_ignores_inherited_git_dir
 case_git_repo_unknown_flag
 case_env_i
+case_bare_path
 case_double_source
 case_tmp_blank_tmpdir
 case_bpt_delegates

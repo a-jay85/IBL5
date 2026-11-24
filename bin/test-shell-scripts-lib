@@ -7,6 +7,7 @@
 # and verifies that the new helper discovers them correctly.
 #
 # Run: bin/test-shell-scripts-lib   (exit 0 = all pass, 1 = a case failed)
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -u
 # shellcheck source=bin/lib/harness.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
@@ -119,20 +120,6 @@ if [ -n "$stderr_out" ]; then
     pass "case 8b: --bogus prints to stderr"
 else
     fail "case 8b: --bogus prints to stderr" "nothing on stderr"
-fi
-
-# ── case 9: bash 3.2 compat ──────────────────────────────────────────────────
-system_bash="/bin/bash"
-if [ -x "$system_bash" ]; then
-    compat_count=$(BASH="$system_bash" "$system_bash" "$HELPER" --full | wc -l | tr -d ' ')
-    if [ "$compat_count" = "$count" ]; then
-        pass "case 9: bash 3.2 compat — count matches ($compat_count)"
-    else
-        fail "case 9: bash 3.2 compat" \
-             "got $compat_count under /bin/bash (expected $count)"
-    fi
-else
-    pass "case 9: /bin/bash not available — skipped"
 fi
 
 # ── case 10: filter mode with no shell inputs emits empty output, exits 0 ────

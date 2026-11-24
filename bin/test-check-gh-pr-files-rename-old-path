@@ -1,10 +1,11 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Harness for bin/check-gh-pr-files-rename-old-path. Fixtures are inline: two of
 # them are the pre-fix `pr_ui_hold` call sites rebuilt from the parents of
 # 6e9d448faa (bin/pr-triage) and edf77d1de8 (holds.sh). No `git show` runs here,
 # because CI's checkout is shallow.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

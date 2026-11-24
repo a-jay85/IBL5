@@ -21,6 +21,7 @@
 #   run per name (sort_by(.completed_at // .started_at) | last). Input/output:
 #   {check_runs:[...]} (total_count recomputed). Byte-identical to the former
 #   DEDUPE_JQ in bin/check-master-ci-green.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 ccg_dedupe() { jq --argjson skip "$1" '
   [ .check_runs[] | select(.name | IN($skip[]) | not) ]
   | group_by(.name) | map(sort_by(.completed_at // .started_at) | last)

@@ -33,6 +33,7 @@
 # Expect at least one FAIL across 10 runs on an unpatched tree.
 # The test is intentionally flaky pre-fix; after the mutex lands it must be green on every run.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -u
 # shellcheck source=bin/lib/harness.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"

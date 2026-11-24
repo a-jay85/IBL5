@@ -5,6 +5,7 @@
 # the --auto headless guard and its IBL5_BURNDOWN_LOOP=1 opt-in.
 #
 # Fifteen cases, exit 0 iff all pass.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 # shellcheck source=bin/lib/harness.sh
@@ -427,7 +428,7 @@ run_far_side() {
     P7_OUT="no script written"; P7_MARKERS=0
     [ -n "$script" ] || return 0
     set +e
-    HOME="$HOME7" FAKE_MODE="$mode" GH_CMD="$SHIMS/gh-none" /bin/bash "$script" > "$log" 2>&1
+    HOME="$HOME7" FAKE_MODE="$mode" GH_CMD="$SHIMS/gh-none" "$BASH" "$script" > "$log" 2>&1
     set -e
     P7_OUT=$(cat "$log")
     P7_MARKERS=$(find "$IBL5_USAGE_GATE_STATE_DIR/markers" -name '*.json' 2>/dev/null | wc -l | tr -d ' ')
@@ -499,7 +500,7 @@ if [ -z "$P7B_SCRIPT" ] || [ -z "$P7B_LOG" ]; then
 else
     set +e
     HOME="$HOME7" FAKE_CLAUDE="$FAKE_CLAUDE.triage" GH_CMD="$SHIMS/gh-none" \
-        /bin/bash "$P7B_SCRIPT" > "$P7B_LOG" 2>&1
+        "$BASH" "$P7B_SCRIPT" > "$P7B_LOG" 2>&1
     set -e
     P7B_OUT=$(cat "$P7B_LOG")
     rm -f "$P7B_LOG" "${P7B_LOG%.log}.session" "$P7B_SCRIPT"

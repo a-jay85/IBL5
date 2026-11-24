@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # send.sh — the shell logic of the notify-discord composite action.
 #
 # POSTs the message file to the channel webhook it is given (#errors, #dev,

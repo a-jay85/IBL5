@@ -33,6 +33,7 @@
 # structurally impossible. This diverges from bin/lib/plan-impl-model, which signals
 # via exit code because its caller wraps it in an `if`.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 plan_depends_on_status() {
     local plan_file="$1"
 

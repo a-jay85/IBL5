@@ -3,6 +3,7 @@
 # Usage: bin/e2e-for-file <php-file-path>
 # Output: One E2E test path per line (relative to ibl5/), or nothing if no mapping.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     cat <<'EOF'
 Usage: bin/e2e-for-file <php-file-path>

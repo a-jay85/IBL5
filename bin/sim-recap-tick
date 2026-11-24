@@ -33,6 +33,7 @@
 # parkByCause / reclaimStaleClaim. The only local time math is reading a usage-limit
 # reset time (claude_reset_epoch) and the Actions step budget for a retry pass.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -u
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then

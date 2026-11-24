@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Bootstrap a sibling ibl5_test database and optionally run database integration
 # tests against it. Resets ibl5_test on each run; never touches iblhoops_ibl5.
 #
@@ -8,6 +8,7 @@
 # With a worktree name: uses the worktree's Docker environment (ibl5-db-<slug> / ibl5-php-<slug>).
 # --no-run: bootstrap the database only, skip running phpunit.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then

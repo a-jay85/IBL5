@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # bin/playwright-image-tag — derive the pinned Playwright Docker image ref from
 # the INSTALLED @playwright/test version (node_modules), falling back to the
 # declared version in package.json. Single source of truth for the version-to-image-tag
@@ -12,6 +12,7 @@
 #
 # Usage: bin/playwright-image-tag <path-to-package.json>
 # Echoes e.g. the Microsoft Playwright image ref tagged with the installed version.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -eu
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then

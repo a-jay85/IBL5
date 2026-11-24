@@ -317,6 +317,7 @@
 # state. `shell=bash` keeps shellcheck's SC3xxx (sh-dialect) warnings quiet on
 # the intentional bashisms.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     cat <<'EOF'
 Usage: bin/check-plan [--print-critical-files] [--require-must-preserve] [--draft] <plan-file>
@@ -463,7 +464,7 @@ fi
 # the restored cell IS the runnable command, so no separate un-escape step exists.
 # Deliberately NOT `sed 's/\\|/\x01/g' | cut -d'|' -f6 | tr '\x01' '|'`: BSD sed
 # and BSD tr do not honour \x01, so that idiom emits the literal text "x01" on
-# macOS, which is where this script runs most. Pure bash 3.2, no external tools.
+# macOS, which is where this script runs most. Pure bash, no external tools.
 MC_NUM=""; MC_TYPE=""; MC_TIME=""; MC_LOC=""; MC_PIPES=0
 # Look-and-feel lexicon shared by gates [Q] and [PM]. A What-cell hit means the
 # row is screenshot-reviewable on the open PR (ADR-0126), so [Q] demands a vr:

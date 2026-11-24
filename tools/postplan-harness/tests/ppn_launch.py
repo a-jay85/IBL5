@@ -1,5 +1,6 @@
 """Shared reader for what bin/post-plan-now launches (ljob_submit + per-run script)."""
 import json
+import os
 import pathlib
 import re
 
@@ -26,7 +27,12 @@ def launched_cmd(stdout: str, home: pathlib.Path) -> str:
     assert len(paths) == 1, f"expected one '  script:' line, got {paths}: {stdout!r}"
     text = pathlib.Path(paths[0]).read_text()
     first, _, body = text.partition("\n")
-    assert first == "#!/bin/bash", f"unexpected shebang {first!r}"
+    # The shebang is post-plan-now's own $BASH (bash 4+), so the path varies by
+    # host: Homebrew on a Mac, /usr/bin/bash on the CI runner.
+    interp = first[2:]
+    assert first.startswith("#!/") and interp.rsplit("/", 1)[-1] == "bash", \
+        f"unexpected shebang {first!r}"
+    assert os.access(interp, os.X_OK), f"shebang interpreter not executable: {first!r}"
     assert body.startswith("export PATH="), body[:80]
     return body.rstrip("\n")
 

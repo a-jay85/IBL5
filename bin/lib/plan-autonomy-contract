@@ -21,6 +21,7 @@
 #   exit 1, one line on stdout  -> the violation message (caller prefixes/labels it)
 #   exit 2                      -> usage error (missing arg / unreadable file)
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -u
 
 # Force the C locale — same rationale as bin/check-plan: deterministic

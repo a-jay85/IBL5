@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Create a new worktree with symlinks and CSS — ready for development.
 # No Docker setup; use bin/wt-up if you need a browser preview.
 #
@@ -6,6 +6,7 @@
 #        bin/wt-new --existing <branch> [<name>] [--base <parent-branch>]
 #        bin/wt-new --pool-refill
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     cat <<'EOF'
 Usage: bin/wt-new <name> [--base <branch>]

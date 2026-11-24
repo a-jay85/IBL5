@@ -1,9 +1,10 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # bin/ci-image-mirror — copy the Docker Hub images CI pulls to ghcr.io/a-jay85/mirror/
 # so a Docker Hub timeout cannot fail a CI job. The manifest of record is
 # .github/ci-image-mirror.txt; bin/check-ci-image-registry gates new docker.io refs.
 #
 # Usage: bin/ci-image-mirror [--only-missing] [--dry-run] [--check] [--manifest=PATH]
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)

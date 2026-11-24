@@ -4,6 +4,7 @@
 #   Every case builds a throwaway repo and runs the guard under the empty
 #   launchd-like env (env -i PATH=/usr/bin:/bin) with a DM stub.
 #   Exit 0 when all cases pass, 1 on any failure.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
@@ -49,6 +50,9 @@ new_case() {
     CASE_NAME="$1"
     CASE_FAILS=""
     T="$(mktemp -d)"
+    # Shim dir holding only a `bash` symlink: `env bash` finds bash 4+ under the bare PATH.
+    mkdir -p "$T/hb5-bash" && ln -sf "$BASH" "$T/hb5-bash/bash"
+    BARE_PATH="$T/hb5-bash:/usr/bin:/bin"
     R="$T/repo"
     mkdir -p "$R" "$T/guard" "$T/home"
     git -C "$R" init -q -b master
@@ -105,7 +109,7 @@ run_raw() {
 
 # run_guard <guard args...>: the standard launchd-like invocation.
 run_guard() {
-    run_raw env -i PATH=/usr/bin:/bin HOME="$T/home" \
+    run_raw env -i PATH="$BARE_PATH" HOME="$T/home" \
         MAIN_CHECKOUT_GUARD_REPO="$R" MAIN_CHECKOUT_GUARD_STATE_DIR="$T/state" \
         DISCORD_DM_BIN="$T/dm-stub" "$T/guard/main-checkout-guard" "$@"
 }
@@ -289,13 +293,13 @@ end_case
 # 19
 new_case state_dir_unset_and_empty_default
 dirty_a
-run_raw env -i PATH=/usr/bin:/bin HOME="$T/home" \
+run_raw env -i PATH="$BARE_PATH" HOME="$T/home" \
     MAIN_CHECKOUT_GUARD_REPO="$R" DISCORD_DM_BIN="$T/dm-stub" \
     "$T/guard/main-checkout-guard"
 check "unset: exit 0" [ "$RC" -eq 0 ]
 check "unset: default state file" [ -f "$T/home/$STATE_REL" ]
 rm -rf "$T/home/.claude"
-run_raw env -i PATH=/usr/bin:/bin HOME="$T/home" \
+run_raw env -i PATH="$BARE_PATH" HOME="$T/home" \
     MAIN_CHECKOUT_GUARD_REPO="$R" MAIN_CHECKOUT_GUARD_STATE_DIR= \
     DISCORD_DM_BIN="$T/dm-stub" "$T/guard/main-checkout-guard"
 check "empty: exit 0" [ "$RC" -eq 0 ]
@@ -304,7 +308,7 @@ end_case
 
 # 20
 new_case no_home_no_state_dir_exit2
-run_raw env -i PATH=/usr/bin:/bin \
+run_raw env -i PATH="$BARE_PATH" \
     MAIN_CHECKOUT_GUARD_REPO="$R" MAIN_CHECKOUT_GUARD_STATE_DIR= \
     DISCORD_DM_BIN="$T/dm-stub" "$T/guard/main-checkout-guard"
 check "exit 2" [ "$RC" -eq 2 ]
@@ -321,14 +325,14 @@ git -C "$R" -c user.name=t -c user.email=t@t commit -q -m "add guard"
 dirty_a
 HERE="$PWD"
 cd /
-run_raw env -i PATH=/usr/bin:/bin HOME="$T/home" \
+run_raw env -i PATH="$BARE_PATH" HOME="$T/home" \
     MAIN_CHECKOUT_GUARD_STATE_DIR="$T/state" "$R/bin/main-checkout-guard"
 check "unset: exit 0" [ "$RC" -eq 0 ]
 check "unset: one DM via repo discord-dm" [ "$(ncalls)" -eq 1 ]
 check "unset: body lists a.txt" has "$(cat "$T/dm.body.1")" "a.txt"
 rm -rf "$T/state"
 rm -f "$T/dm.calls"
-run_raw env -i PATH=/usr/bin:/bin HOME="$T/home" \
+run_raw env -i PATH="$BARE_PATH" HOME="$T/home" \
     MAIN_CHECKOUT_GUARD_REPO= DISCORD_DM_BIN= \
     MAIN_CHECKOUT_GUARD_STATE_DIR="$T/state" "$R/bin/main-checkout-guard"
 check "empty: exit 0" [ "$RC" -eq 0 ]
@@ -340,7 +344,7 @@ end_case
 # 22
 new_case not_a_repo_exit2
 mkdir -p "$T/plain-dir"
-run_raw env -i PATH=/usr/bin:/bin HOME="$T/home" \
+run_raw env -i PATH="$BARE_PATH" HOME="$T/home" \
     MAIN_CHECKOUT_GUARD_REPO="$T/plain-dir" MAIN_CHECKOUT_GUARD_STATE_DIR="$T/state" \
     DISCORD_DM_BIN="$T/dm-stub" "$T/guard/main-checkout-guard"
 check "exit 2" [ "$RC" -eq 2 ]
@@ -489,7 +493,7 @@ for i in $(seq -w 1 10); do
     touch -t "2020010100$i" "$T/state/snapshot-fake$i.txt"
 done
 echo 0 >"$T/dm.rc"
-run_raw env -i PATH=/usr/bin:/bin HOME="$T/home" \
+run_raw env -i PATH="$BARE_PATH" HOME="$T/home" \
     MAIN_CHECKOUT_GUARD_REPO="$R" MAIN_CHECKOUT_GUARD_STATE_DIR="$T/state" \
     MAIN_CHECKOUT_GUARD_SNAPSHOT_KEEP=3 \
     DISCORD_DM_BIN="$T/dm-stub" "$T/guard/main-checkout-guard"

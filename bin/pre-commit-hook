@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # shellcheck shell=bash
 #
 # bin/pre-commit-hook — the git pre-commit gate body, version-controlled.
@@ -12,6 +12,7 @@
 # branch's commits UNION the index, so it runs whenever origin/master resolves.
 # codebase-map.md is regenerated on master by the regen-codebase-map job in tests.yml, never here.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     cat <<'EOF'
 Usage: bin/pre-commit-hook

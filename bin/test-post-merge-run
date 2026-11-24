@@ -9,6 +9,7 @@
 # state lands in $T/home/.ibl5-post-merge-run and never in the real home.
 # PMR_RUN_SRC overrides the executor source so a mutated scratch copy can be checked.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/lib/harness.sh

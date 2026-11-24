@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # bin/check-adr-append-only — fail a diff that rewrites or removes frozen ADR text.
 #
@@ -63,6 +63,7 @@
 #
 # Exit codes: 0 = pass, 1 = frozen-section change found, 2 = usage error.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 MIN_REASON_LEN=15

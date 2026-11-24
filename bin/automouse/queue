@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Queue a plan for automouse autonomous execution.
 #
 # Creates a symlink NNN-<slug>.md in the automouse queue pointing to the
@@ -26,6 +26,7 @@
 #   bin/automouse/queue requeue
 #   bin/automouse/queue remove velvet-brewing-starlight
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then

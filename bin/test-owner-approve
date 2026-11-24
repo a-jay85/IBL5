@@ -5,6 +5,7 @@
 # Usage: bin/test-owner-approve [case_name ...]
 # With no arguments every case runs; with arguments only the named cases run.
 # Prints `PASS <name>` / `FAIL <name>: <why>` per case. Exit 0 iff all pass.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -uo pipefail
 
 # shellcheck source=bin/lib/harness.sh
@@ -334,10 +335,10 @@ live_crash_fails_closed() {
     refute_gh "pr edit"
     refute_gh "pr merge"
 }
-# Runs the pgrep cases under /bin/bash, which is 3.2 on macOS and has no BASHPID.
+# Runs the pgrep cases under the running bash (bash 4+; /bin/bash 3.2 is refused by the version guard).
 live_ok_bin_bash() { # <signal text>
     seed_ready
-    run_oa_env /bin/bash "$OA" "$PR" "ok" --poll=0 --timeout=30
+    run_oa_env "$BASH" "$OA" "$PR" "ok" --poll=0 --timeout=30
     want_rc 0
     want_out "waiting 0s: $1"
     want_gh "pr merge $PR -R a-jay85/IBL5 --squash --auto --match-head-commit $H"

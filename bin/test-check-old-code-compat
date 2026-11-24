@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Harness for bin/check-old-code-compat.
 #
@@ -7,6 +7,7 @@
 #
 # Exit codes: 0 = all cases passed, 1 = a case failed, 2 = usage error.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -uo pipefail
 # shellcheck source=bin/lib/harness.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
@@ -145,7 +146,7 @@ run_case() {
     shift 4
     printf '%s' "$STDIN_TEXT" > "$WORK/stdin"
     if [ "$RUN_ENV_I" = "1" ]; then
-        out="$(env -i PATH=/usr/bin:/bin "$SUT" "$@" < "$WORK/stdin" 2>&1)"
+        out="$(env -i PATH="$(harness_bare_path "$WORK")" "$SUT" "$@" < "$WORK/stdin" 2>&1)"
         rc=$?
     else
         out="$("$SUT" "$@" < "$WORK/stdin" 2>&1)"

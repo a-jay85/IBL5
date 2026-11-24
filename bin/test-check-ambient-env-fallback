@@ -1,9 +1,10 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # shellcheck disable=SC2016 # fixture text holds literal expansions
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 # Test harness for bin/check-ambient-env-fallback (the undocumented-ambient-var gate).
-# Follows bin/test-check-bashpid-under-set-u style.
+# Follows bin/test-check-shell-portability style.
 #
 # Every fixture lives in a mktemp dir; nothing is written inside the IBL5 tree.
 # Fixture lines are single-quoted, and the gate strips single-quoted spans, so the

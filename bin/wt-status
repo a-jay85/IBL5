@@ -26,6 +26,7 @@
 # relies on git predicates returning nonzero as a signal (merge-base --is-ancestor,
 # rev-list | grep -q .) and on its own deliberate exit 1.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -u
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then

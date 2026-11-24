@@ -1,7 +1,8 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Advisory tool: reports CSS class selectors in ibl5/design/**/*.css that
 # appear in neither the source corpus nor (optionally) rendered HTML.
 # Exit 0 always (advisory); --strict exits 1 when candidates remain.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 SCRIPT_NAME=$(basename "$0")

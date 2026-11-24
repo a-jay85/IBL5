@@ -9,6 +9,7 @@
 #   exit 0 — no duplicate signal (or no slug derivable); caller should proceed
 #   exit 2 — usage error
 #   exit 3 — duplicate found; the decline message is on stdout
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     cat <<'EOF'
 Usage: bin/plan-dup-check <prompt-file>

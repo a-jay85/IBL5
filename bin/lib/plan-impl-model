@@ -19,6 +19,7 @@
 #
 # Usage: bin/lib/plan-impl-model <plan-file>   # echoes exactly one model id
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -u
 
 PLAN_FILE="${1:?Usage: plan-impl-model <plan-file>}"

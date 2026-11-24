@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # <!-- no-adr: lint gate that follows the existing bin/check-* pattern; no new architectural boundary -->
 #
 # bin/check-claude-cli-invocation — keep `claude -p` call sites in bin/ safe.
@@ -41,6 +41,7 @@
 #
 # Exit codes: 0 = clean, 1 = violation found, 2 = usage error.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"

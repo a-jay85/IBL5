@@ -15,6 +15,7 @@
 #   fire() without the `date > "$SENTINEL"` line     -> case 1
 #
 # no-adr: stub-driven regression harness copying the bin/test-watch-run pattern; it adds no architectural constraint and no new governance gate
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -uo pipefail
 # shellcheck source=bin/lib/harness.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
@@ -139,7 +140,7 @@ want "names the disposition dir" "$OUT" "is done/ (already shipped), not in queu
 echo "== 9. empty-env run"
 make_tree c9
 touch "$AM/done/s1.md"
-OUT=$(env -i PATH=/usr/bin:/bin AUTOMOUSE_DIR="$AM" "$T/bin/watch-automouse-plan" --slug s1 --force --poll 1 --wait 3 --timeout 3 2>&1); RC=$?
+OUT=$(env -i PATH="$(harness_bare_path "$TMP_ROOT")" AUTOMOUSE_DIR="$AM" "$T/bin/watch-automouse-plan" --slug s1 --force --poll 1 --wait 3 --timeout 3 2>&1); RC=$?
 expected=$(printf '%s\n\n%s' "$FIRE_MSG" "log: $AM/logs/")
 [ "$RC" = 0 ] && pass "exit 0 without HOME" || fail "exit 0 without HOME (got $RC: $OUT)"
 body_is "same exact body" "$expected"
@@ -284,7 +285,7 @@ echo "== 21. smoke under an empty env"
 if [ "$HAVE_JQ" = 1 ]; then
     make_tree c21
     make_gh_stub
-    OUT=$(env -i PATH=/usr/bin:/bin AUTOMOUSE_DIR="$AM" WATCH_AUTOMOUSE_GH_BIN="$T/gh-stub" "$T/bin/watch-automouse-plan" --slug s1 --smoke-test 2>&1); RC=$?
+    OUT=$(env -i PATH="$(harness_bare_path "$TMP_ROOT")" AUTOMOUSE_DIR="$AM" WATCH_AUTOMOUSE_GH_BIN="$T/gh-stub" "$T/bin/watch-automouse-plan" --slug s1 --smoke-test 2>&1); RC=$?
     [ "$RC" = 0 ] && pass "exit 0 without HOME" || fail "exit 0 without HOME (got $RC: $OUT)"
     want "pass line" "$OUT" "smoke-test: PASS"
 else

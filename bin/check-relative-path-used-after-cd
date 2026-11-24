@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # bin/check-relative-path-used-after-cd: catch a relative path read after a repo-root cd.
 #
@@ -30,6 +30,7 @@
 #
 # gate-backtest-argv:
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 usage() { echo "usage: bin/check-relative-path-used-after-cd [--files <path>...]"; }

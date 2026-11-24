@@ -25,6 +25,7 @@
 # purpose — the host-mariadb grep step in the `static-guards` job of tests.yml greps for a bare
 # `mariadb` client invocation in bin/ scripts; switching to that alias would
 # trip it. Do not "modernize" the binary name.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 if [ "${1:-}" = "--help" ]; then

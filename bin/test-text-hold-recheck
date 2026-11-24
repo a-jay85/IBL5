@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # bin/test-text-hold-recheck: cases for bin/lib/text-hold-recheck.sh, bin/text-hold-recheck
 # and .github/workflows/text-hold-recheck.yml. Prints PASS/FAIL per case; exit 1 on any FAIL.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

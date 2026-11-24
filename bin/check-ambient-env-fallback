@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # bin/check-ambient-env-fallback — keep undocumented ambient env vars out of bin/ default chains.
 #
@@ -10,7 +10,7 @@
 # and never flagged. TMP is left out because harnesses assign it from mktemp.
 # Comment text and single-quoted spans are stripped first (quote-blind: the first
 # # at line start or after whitespace starts a comment, as in
-# bin/check-bashpid-under-set-u). Waive one line with a trailing
+# bin/check-shell-portability). Waive one line with a trailing
 # "# ambient-env-ok: <reason of 15+ chars>". The waiver is read from the raw line.
 # Scope: every file under bin/ ending in .sh or .bash, or with a shell shebang.
 # --files exists for the harness. Whole-tree scan, so no base ref.
@@ -18,6 +18,7 @@
 # Bash 3.2 safe (no mapfile). Exit codes: 0 = pass, 1 = violation, 2 = usage error.
 # gate-backtest-argv:
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 die() { echo "check-ambient-env-fallback: $*" >&2; exit 2; }

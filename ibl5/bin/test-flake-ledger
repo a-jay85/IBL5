@@ -3,6 +3,7 @@
 # bin/test-flake-ledger — regression harness for bin/parse-playwright-flakes and bin/flake-ledger-report.
 # Run: bin/test-flake-ledger   (exit 0 = all passed, 1 = a case failed)
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

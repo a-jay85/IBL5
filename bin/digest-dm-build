@@ -39,6 +39,7 @@
 #                      ~1955
 #   The after-merge top block spends from the What-changed budget, floor 200.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 # shellcheck source=bin/lib/post-merge-rows.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/post-merge-rows.sh"

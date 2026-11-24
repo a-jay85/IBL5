@@ -5,7 +5,7 @@
 # Sourced by bin/lib/burndown.sh, bin/merge-line-select, bin/settle-pr-status and bin/check-pr-checks-green. Never executed.
 # Defines five functions and nothing else: no top-level `set`, no `exit`, no
 # top-level commands. It reports through return codes only, so it is safe under
-# a caller's `set -euo pipefail` with PATH=/usr/bin:/bin on bash 3.2 and 5.
+# a caller's `set -euo pipefail` with PATH=/usr/bin:/bin.
 #
 #   gh_retry <cmd> [args...]
 #

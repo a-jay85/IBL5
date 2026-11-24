@@ -23,6 +23,7 @@
 # via launchd, targeting the MAIN checkout. Install AFTER this lands on master,
 # because the launchd Program points at the main checkout's bin/backups-sync.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -69,6 +70,7 @@ if [ -n "$SCHEDULE_ACTION" ]; then
   plist_body() {
     lsched_key_string Label "$PLIST_LABEL"
     lsched_key_string Program "$PROGRAM"
+    lsched_env_path "$LSCHED_JOB_PATH"
     lsched_calendar Hour=3 Minute=0
     lsched_key_string WorkingDirectory "$MAIN_WT"
     lsched_key_string StandardOutPath "${LOG_DIR}/launchd-stdout.log"

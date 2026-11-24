@@ -65,3 +65,26 @@ def test_load_runs_parses_dirname_and_skips_corrupt(tmp_path):
     assert len(runs) == 1
     assert runs[0]["slug"] == "a-b" and runs[0]["ts"] == "20261001-120000"
     assert runs[0]["armed"] is False and runs[0]["conditions"][0]["number"] == 7
+
+
+OWNER_ONLY_FIXTURE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures",
+                                  "holdrepeat_owner_only_replay.json")
+
+
+def _owner_only_report():
+    with open(OWNER_ONLY_FIXTURE, encoding="utf-8") as fh:
+        return rp.replay_owner_only(json.load(fh))
+
+
+def test_owner_only_replay_declines_pinned():
+    report = _owner_only_report()
+    assert report["declines"] == 3
+    assert report["body_only_skips"] == 4
+
+
+def test_owner_only_replay_no_decline_of_armed_run():
+    assert _owner_only_report()["declined_then_armed"] == 0
+
+
+def test_owner_only_replay_no_skip_of_cleared_round():
+    assert _owner_only_report()["skipped_then_cleared"] == 0

@@ -1,6 +1,9 @@
 package sim
 
-import "github.com/a-jay85/IBL5/engine/internal/result"
+import (
+	"github.com/a-jay85/IBL5/engine/internal/result"
+	"github.com/a-jay85/IBL5/engine/internal/rng"
+)
 
 // maxOffensiveRebounds caps offensive-rebound continuations within a single
 // trip, guaranteeing the inner loop terminates even on a pathological roster.
@@ -91,6 +94,15 @@ const (
 // handlers) rather than near-always as the 120 estimate produced.
 const doForcedMakeMax = 10
 
+// randInt returns JSB's integer rand_int(bound) from one raw draw: scale the
+// draw by 1/32768, multiply by bound, truncate toward zero, add one. For
+// bound >= 1 the result is uniform in 1..bound. The product raw*bound fits
+// exactly in a float64 and 1/32768 is a power of two, so the result does not
+// depend on floating-point precision.
+func randInt(r *rng.RNG, bound int) int {
+	return int(float64(r.Raw())*(1.0/32768)*float64(bound)) + 1
+}
+
 // lateGameForcing returns (forcedMake, shotClock) flags for a half-court crunch-time
 // possession per 5.60's game-state foul-coupling mechanisms.
 //
@@ -120,7 +132,7 @@ func (gs *gameState) lateGameForcing(scoreDiff int, bh onCourt) (forcedMake, sho
 			shotClock = true
 		case forcedFoulFires(gs.period, gs.clock, scoreDiff):
 			// 5.60: local_15e=1 when bh.DriveOff < rand_int(max)
-			if bh.DriveOff < gs.rng.IntN(doForcedMakeMax)+1 {
+			if bh.DriveOff < randInt(gs.rng, doForcedMakeMax) {
 				forcedMake = true
 			}
 		}

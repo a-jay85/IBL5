@@ -160,8 +160,16 @@ want_rc "10 non-repo" 2 "$rc"
 want "10 says git grep failed" "$out" "git grep failed"
 
 # 11. Empty env still catches a stale id (gate 17). Reuses case 2's tree.
-out=$(env -i "$BASH" "$D2/bin/check-model-pins" 2>&1); rc=$?
+# The child records the bash it runs under, so a swap to /bin/bash (3.2 on the
+# Mac) fails here on Linux too, where /bin/bash is also bash 5.
+out=$(env -i "$BASH" -c 'printf "%s\n" "${BASH}" >"$0"; exec "${BASH}" "$1"' "$TMPROOT/child-bash" "$D2/bin/check-model-pins" 2>&1); rc=$?
 want_rc "11 empty env" 1 "$rc"
+child_bash=$(cat "$TMPROOT/child-bash" 2>/dev/null) || child_bash=''
+if [ "$child_bash" = "${BASH}" ]; then
+    ok "11 gate ran under the harness bash"
+else
+    fail "11 gate ran under '$child_bash', want '${BASH}'"
+fi
 want "11 empty env names the id" "$out" "$STALE_SONNET"
 
 # 12. Unknown flag fails loudly.

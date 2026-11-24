@@ -94,8 +94,15 @@ expect() {
 expect_env() {
     local label="$1" want="$2" sub="$3" out rc=0
     shift 3
-    out=$(cd "$REPO" && env -i PATH="$BARE/hb5-bash:/usr/bin:/bin" "$BASH" -o pipefail bin/check-pipefail-grep-q "$@" 2>&1) || rc=$?
+    # The child records the bash it runs under, so a swap to /bin/bash (3.2 on
+    # the Mac) fails here on Linux too, where /bin/bash is also bash 5.
+    out=$(cd "$REPO" && env -i PATH="$BARE/hb5-bash:/usr/bin:/bin" "$BASH" -o pipefail -c 'printf "%s\n" "${BASH}" >"$0"; exec "${BASH}" -o pipefail bin/check-pipefail-grep-q "$@"' "$BARE/child-bash" "$@" 2>&1) || rc=$?
     check_out "$label" "$rc" "$want" "$sub" "$out"
+    if [ "$(cat "$BARE/child-bash" 2>/dev/null)" = "${BASH}" ]; then
+        pass "$label: gate ran under the harness bash"
+    else
+        fail "$label: gate ran under '$(cat "$BARE/child-bash" 2>/dev/null)', want '${BASH}'"
+    fi
 }
 
 expect_since() { # <label> <want_rc> <want_substring>

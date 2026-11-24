@@ -116,3 +116,56 @@ func TestLateGameForcingForcedMakeOneDraw(t *testing.T) {
 		})
 	}
 }
+
+// --- matrix #3: randInt copies JSB's scaling on one raw draw ---------------
+
+// 3276*10/32768 = 0.99976 truncates to 0; 3277*10/32768 = 1.00006 truncates
+// to 1. A raw%bound+1 port gives 7 for raw 3276, 8 for raw 32767, and panics
+// at bound 0.
+func TestRandIntBoundaries(t *testing.T) {
+	cases := []struct {
+		bound, raw, want int
+	}{
+		{10, 0, 1},
+		{10, 3276, 1},
+		{10, 3277, 2},
+		{10, 32767, 10},
+		{1, 32767, 1},
+		{0, 32767, 1},
+	}
+	for _, tc := range cases {
+		r, err := rng.NewReplay([]int{tc.raw})
+		if err != nil {
+			t.Fatalf("NewReplay: %v", err)
+		}
+		if got := randInt(r, tc.bound); got != tc.want {
+			t.Errorf("randInt(raw %d, bound %d) = %d, want %d", tc.raw, tc.bound, got, tc.want)
+		}
+		draws := r.Draws()
+		if len(draws) != 1 {
+			t.Fatalf("randInt(raw %d, bound %d) consumed %d draws, want 1", tc.raw, tc.bound, len(draws))
+		}
+		if draws[0].API != "raw" || draws[0].Value != tc.raw {
+			t.Errorf("draw = {API %q, Value %d}, want {API \"raw\", Value %d}", draws[0].API, draws[0].Value, tc.raw)
+		}
+	}
+}
+
+// --- matrix #4: the forced-make roll goes through randInt ------------------
+
+// Raw 32767 rolls 10 under JSB's scaling, so DriveOff 8 fires. The old
+// IntN(10)+1 replay path rolls 32767%10+1 = 8, and 8 < 8 is false.
+func TestLateGameForcingForcedMakeUsesRandInt(t *testing.T) {
+	gs, r := lateGameState(t, 4, 20, []int{32767})
+	forcedMake, _ := gs.lateGameForcing(forcedFoulMinLead, handler(8))
+	if !forcedMake {
+		t.Errorf("forcedMake = false, want true for DriveOff 8 against roll 10")
+	}
+	draws := r.Draws()
+	if len(draws) != 1 {
+		t.Fatalf("consumed %d draws, want 1", len(draws))
+	}
+	if draws[0].API != "raw" {
+		t.Errorf("draw API = %q, want \"raw\"", draws[0].API)
+	}
+}

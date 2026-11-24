@@ -16,7 +16,7 @@ last_verified: 2026-11-23
 
 Ship `bin/pr-review-now <PR>` as a standalone detached launcher mirroring `bin/pr-ready-now` (example)'s launchd slot-token architecture, and have `/pr-ready` Phase 7 fire it through `scripts/review-owed.sh` as the single permitted post-verdict action. The launcher owns its own label namespace (`com.ibl5.pr-review-now-<PR>`) and its own test seams (`PR_REVIEW_NOW_*`); the plist file is the slot token, so an already-live slot makes `review-owed.sh` skip rather than double-fire. Enforced by `bin/test-pr-review-now` (9 cases) and by the terminator/auto-fire pins in `bin/test-pr-ready-now` (example), both wired into `.github/workflows/tests.yml`.
 
-## Addendum — test harness wiring (2026-11-23)
+## Addendum: test harness wiring (2026-11-23)
 
 The Decision above records `bin/test-pr-review-now` as 9 cases and names `bin/test-pr-ready-now` (example) pins, both wired into `.github/workflows/tests.yml`. Today `bin/test-pr-review-now` prints 20 passing `ok:` lines. `bin/test-pr-ready-now` (example) no longer exists, since the launcher became `bin/post-plan-fleet` with `bin/test-post-plan-fleet`. The harnesses now run from `.github/workflows/harness-legs.txt` rather than a step in `tests.yml`.
 

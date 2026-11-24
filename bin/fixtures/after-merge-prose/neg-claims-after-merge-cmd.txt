@@ -1,0 +1,1 @@
+After merge, `launchctl list | grep <label>` shows the job.

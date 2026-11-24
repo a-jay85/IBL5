@@ -116,3 +116,152 @@ def test_post_merge_row_outside_typed_table_yields_no_row():
     _, manual, post_merge = parse_matrix(HDR + PLAIN + other)
     assert [r.number for r in manual] == ["29"]
     assert post_merge == []
+
+
+# --- Writer side: plan `## After merge` section -> tagged PR-body rows (ADR-0198) -------
+
+import subprocess  # noqa: E402
+
+from harness.classify import render_after_merge_block  # noqa: E402
+from harness.manual_rows import ManualRow  # noqa: E402
+from harness.planfile import parse_after_merge_section  # noqa: E402
+
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+
+def _row(num, text, tag=""):
+    return ManualRow(number=num, text=text, raw="", post_merge_reason="plan After merge section", tag=tag)
+
+
+def _steps(tmp_path, *names, track=True):
+    d = tmp_path / "steps"
+    d.mkdir(exist_ok=True)
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    for n in names:
+        (d / n).write_text("#!/bin/bash\n")
+        if track:
+            subprocess.run(["git", "-C", str(tmp_path), "add", f"steps/{n}"], check=True)
+    return str(d)
+
+
+def test_untracked_step_fails_closed_to_manual(tmp_path):
+    block = render_after_merge_block([_row("1", "run it", "auto:mac fresh")],
+                                     steps_dir=_steps(tmp_path, "fresh", track=False))
+    assert "- **Row 1** [manual] — run it" in block
+
+
+def test_symlink_step_fails_closed_to_manual(tmp_path):
+    steps = _steps(tmp_path, "real")
+    os.symlink(os.path.join(steps, "real"), os.path.join(steps, "link"))
+    subprocess.run(["git", "-C", str(tmp_path), "add", "steps/link"], check=True)
+    block = render_after_merge_block([_row("1", "run it", "auto:mac link")], steps_dir=steps)
+    assert "- **Row 1** [manual] — run it" in block
+
+
+def test_render_after_merge_tagged_row(tmp_path):
+    block = render_after_merge_block([_row("1", "run the step", "auto:mac ok-step")],
+                                     steps_dir=_steps(tmp_path, "ok-step"))
+    assert "- **Row 1** [auto:mac ok-step] — run the step" in block
+    assert "bin/post-merge-run" in block
+
+
+def test_render_after_merge_untagged_unchanged():
+    rows = [_row("28", "set the secret")]
+    block = render_after_merge_block(rows)
+    assert "- **Row 28** — set the secret" in block
+    assert "[" not in block.split("## After merge", 1)[1].split("-->")[0].replace("<!--", "")
+    assert "bin/post-merge-run" not in block
+    assert render_after_merge(rows) == "- **Row 28** — set the secret"
+
+
+def test_missing_step_fails_closed_to_manual(tmp_path):
+    block = render_after_merge_block([_row("1", "run it", "auto:mac ghost")],
+                                     steps_dir=_steps(tmp_path, "other"))
+    assert "- **Row 1** [manual] — run it" in block
+    assert "auto:mac" not in block
+
+
+def test_auto_ci_rewritten_to_manual(tmp_path):
+    block = render_after_merge_block([_row("1", "run it", "auto:ci some-check")],
+                                     steps_dir=_steps(tmp_path, "some-check"))
+    assert "- **Row 1** [manual] — run it" in block
+    assert "auto:ci" not in block
+
+
+def test_rendered_rows_parse_in_bash(tmp_path):
+    block = render_after_merge_block(
+        [_row("1", "run it", "auto:mac ok-step"), _row("2", "do it by hand")],
+        steps_dir=_steps(tmp_path, "ok-step"))
+    f = tmp_path / "body.md"
+    f.write_text(block + "\n")
+    script = ('source bin/lib/post-merge-rows.sh; pmr_rows "$1" | while IFS= read -r l; do '
+              'pmr_parse_row "$l"; echo "$PMR_KIND $PMR_NAME $PMR_VALID $PMR_TEXT"; done')
+    out = subprocess.run(["bash", "-c", script, "_", str(f)], cwd=REPO_ROOT,
+                         capture_output=True, text=True, check=True).stdout.splitlines()
+    # PMR_TEXT keeps the em-dash separator, so a render that changes it no longer matches.
+    assert out == ["auto:mac ok-step 1 — run it", "manual  1 — do it by hand"]
+
+
+def test_after_merge_section_skips_fences():
+    content = ("## After merge\n\n- **Row 1** [manual] — real\n\n```\n"
+               "- **Row 2** [manual] — fenced\n```\n")
+    rows = parse_after_merge_section(content)
+    assert [r.number for r in rows] == ["1"]
+
+
+def test_after_merge_section_link_text_not_tag():
+    rows = parse_after_merge_section(
+        "## After merge\n\n- **Row 1** [see the runbook](https://example.com) — open it\n"
+        "- **Row 2** [auto:mac ok-step] — run it\n")
+    assert rows[0].tag == ""
+    assert rows[0].text.startswith("[see the runbook](https://example.com)")
+    assert rows[1].tag == "auto:mac ok-step"
+    assert rows[1].text == "run it"
+
+
+def test_after_merge_section_stops_at_next_heading():
+    rows = parse_after_merge_section(
+        "## After merge\n\n- **Row 1** [manual] — in\n\n## Other\n\n- **Row 2** [manual] — out\n")
+    assert [r.number for r in rows] == ["1"]
+
+
+# --- Parser parity: planfile.py and bin/lib/post-merge-rows.sh read the same rows ------
+# bin/post-merge-run calls pmr_rows, so the bash side below covers it too.
+
+_PARITY_BODIES = {
+    "tilde-fence": ("~~~\n## After merge\n- **Row 3** [auto:mac foo] — x\n~~~\n"
+                    "## After merge\n- **Row 4** [manual] — real\n"),
+    "info-string-inside-backticks": ("## After merge\n```\n- **Row 1** [manual] — fenced\n"
+                                     "```python\n- **Row 2** [manual] — still fenced\n```\n"
+                                     "- **Row 3** [manual] — real\n"),
+    "nested-4-backtick": ("## After merge\n````\n```\n- **Row 1** [manual] — fenced\n```\n"
+                          "- **Row 2** [manual] — fenced\n````\n- **Row 3** [manual] — real\n"),
+    "tilde-closes-only-tilde": ("## After merge\n~~~\n```\n- **Row 1** [manual] — fenced\n~~~\n"
+                                "- **Row 2** [manual] — real\n"),
+    "end-anchor": ("## After merge\n- **Row 1** [manual] — in\n<!-- after-merge:end -->\n"
+                   "- **Row 2** [manual] — after the anchor\n"
+                   "## After merge\n- **Row 3** [manual] — second section after anchor\n"),
+    "next-heading-closes": ("## After merge\n- **Row 1** [manual] — in\n## Other\n"
+                            "- **Row 2** [manual] — out\n## After merge\n- **Row 3** [manual] — in again\n"),
+    "back-to-back-headings": ("## After merge\n- **Row 1** [manual] — in\n## After merge\n"
+                              "- **Row 2** [manual] — sed closed the range here\n"),
+    "blockquote-fence": "## After merge\n> ```\n- **Row 1** [manual] — real\n> ```\n",
+    "checkbox-and-link": ("## After merge\n- [ ] **Row 1** [manual] — box\n"
+                          "- **Row 2** [see](https://example.com) — link\n"),
+    "non-canonical-row": ("## After merge\n- **Row 3:** run the installer on the Mac\n"
+                          "- [ ] **Row** no number\n- **Row 4** [manual] — canonical\n"),
+}
+
+
+@pytest.mark.parametrize("name", sorted(_PARITY_BODIES))
+def test_after_merge_parsers_agree(tmp_path, name):
+    body = _PARITY_BODIES[name]
+    f = tmp_path / "body.md"
+    f.write_text(body)
+    bash_rows = subprocess.run(
+        ["bash", "-c", '. bin/lib/post-merge-rows.sh; pmr_rows "$1"', "_", str(f)],
+        cwd=REPO_ROOT, capture_output=True, text=True, check=True).stdout.splitlines()
+    py_rows = [r.raw for r in parse_after_merge_section(body)]
+    assert py_rows == bash_rows
+    if name == "tilde-fence":
+        assert py_rows == ["- **Row 4** [manual] — real"]

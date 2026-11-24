@@ -1,0 +1,99 @@
+<!-- merge-digest:begin -->
+## Merge digest
+
+**What changed:** The bug bot now posts one Discord message to a GM when their bug issue closes, and a one-off script lets the owner move the 29 old bug issues into the public IBL5 repo.
+
+**Why:** GMs could not open links to the private bug repo, and nobody told them when a fix landed.
+
+**Watch:** The tick's default issue repo is now `a-jay85/IBL5`, but the 29 issues stay in `a-jay85/ibl5-bugs` until the owner runs `bin/bug-issues-migrate --live`.
+
+**Touches:** bin/bug-pipeline-tick, bin/bug-issues-migrate, bin/bug-pipeline-cron-setup, bin/lib/, ibl5/IBLbot/src/bug-bot/, ibl5/classes/BugPipeline/, ibl5/scripts/bug-pipeline/, ibl5/migrations/221_create_ibl_bug_issue_notices.sql, ibl5/docs/decisions/, .claude/skills/reset-ready/SKILL.md
+
+**Machine-authored fixes:** Phase 6.5 rewrote two PR body bullets and added the audit bullet, and it changed no code. (post-plan remediation: body-only)
+<!-- merge-digest:end -->
+
+## Summary
+- Adds close notices to `bin/bug-pipeline-tick`. Each tick checks tracked issues. When one is closed, the bot posts one Discord message that mentions the reporter. The text is fixed words plus the issue URL: fixed, not planned, duplicate, or plain closed. No issue title, body or comment is ever sent, because the repo is now public.
+- Checks at most 25 tracked issues per tick, so a tick makes at most 25 gh issue reads. The tick saves the last issue number it read in `~/.claude/logs/bug-pipeline-notice-cursor`. The next tick passes it as `--after` to `issue-notice-pending.php` and reads the next 25. A page shorter than 25 sends the cursor back to 0. With N pending issues, each one gets checked at least once every ceil(N/25)+1 ticks (the +1 is an empty tick that only resets the cursor when N is a multiple of 25), so issues that stay open cannot hide the ones after them. `close_notice_pages_one_window_per_tick` in `bin/test-bug-pipeline-tick` covers this.
+- Posts at most once per issue. A row goes pending to claimed before the post and to notified after it. A failed post is released and retried, and a row that fails repeatedly is marked failed. A crash between claim and mark leaves the row claimed, and the tick logs it as stuck every run.
+- Registers each newly filed issue with the notice table from `file_and_close_row`, saving the reporter, channel, thread and original message ids.
+- Adds a migration that creates the `ibl_bug_issue_notices` table, keyed by the public-repo issue number. It also has the legacy `ibl5-bugs` number and the notice state. The table is added to `bin/db-sync-preserve-tables.txt` so a prod sync keeps it.
+- Adds the one-off, owner-run `bin/bug-issues-migrate`. It moves the 29 issues from `a-jay85/ibl5-bugs` to `a-jay85/IBL5`, rewrites the old links in the bot's Discord messages, and records the old-to-new map in the DB. Dry-run is the default. `--live` needs a typed confirmation and refuses under `CLAUDE_HEADLESS`. It can resume from a state file.
+- Points the default issue repo at `a-jay85/IBL5` in `bin/bug-pipeline-tick`, `bin/bug-pipeline-cron-setup` and the cron plist golden file. `--bootstrap-issues` now only views the repo and exits with an error if it is missing. If `gh repo view` fails for another reason (a network error, say), it warns and keeps going. It never creates a repo.
+- Audit, no code change: `ship_via_cron` hands off to `bin/post-plan-now` and builds no issue reference. `$REPO` at `bin/lib/burndown.sh:96` is set nowhere in the burndown files.
+- Adds `bpgh_issue_close_state`, which reads only the issue state and close reason.
+- Adds tests: `bin/test-bug-issues-migrate` (registered in `.github/workflows/harness-legs.txt`), stubs for the notice scripts and the post-with-mention call, and a repository integration test.
+- Updates the `bugreports` row in the reset-ready skill to look for `gm-reported` issues in `a-jay85/IBL5`.
+- The migrate script is not run by this change. The owner runs it by hand.
+
+<!-- scope-notes:begin -->
+## Unplanned changes
+The plan did not name these changed paths. A path counts as named when a plan Critical File, a Verification Matrix test path or a `## Declared scope` bullet covers it. Auto-merge is not held on them. Riskiest first.
+- `.claude/skills/reset-ready/SKILL.md` +2/-2: the bug-report scout told agents to look in `ibl5-bugs`, which this move retires.
+- `bin/lib/bug-pipeline-test-stubs.sh` +98/-2: the tick tests need stubs for the new notice scripts, the post-with-mention call and issue state reads.
+- `ibl5/scripts/bug-pipeline/issue-notice-upsert.php` +71/-0: CLI wrapper that registers an issue with its reporter and Discord ids.
+- `ibl5/scripts/bug-pipeline/issue-notice-mark.php` +55/-0: CLI wrapper that records a notice as sent, with its reason.
+- `ibl5/scripts/bug-pipeline/issue-notice-release.php` +53/-0: CLI wrapper that returns a failed post to pending, or to failed after repeated tries.
+- `ibl5/scripts/bug-pipeline/issue-notice-pending.php` +59/-0: CLI wrapper that lists issues still waiting for a notice, also used by the migrate preflight.
+- `ibl5/scripts/bug-pipeline/issue-notice-stale.php` +51/-0: CLI wrapper that lists rows stuck in claimed so the tick can log them.
+- `ibl5/scripts/bug-pipeline/report-issue-renumber.php` +49/-0: CLI wrapper that updates the old issue number in the DB to the new public number.
+- `ibl5/scripts/bug-pipeline/issue-notice-claim.php` +48/-0: CLI wrapper the tick uses to claim a pending notice before posting.
+- `ibl5/scripts/bug-pipeline/issue-notice-seed.php` +48/-0: CLI wrapper that marks already-closed issues as seeded, so the first live tick does not announce them.
+- `ibl5/scripts/bug-pipeline/issue-notice-skip.php` +48/-0: CLI wrapper for closed issues with no reporter and no known Discord location.
+- `ibl5/tests/DatabaseIntegration/BugPipeline/BugReportRepositoryTest.php` +22/-0: covers the repository behavior behind the new notice scripts.
+- `ibl5/migrations/221_create_ibl_bug_issue_notices.sql` +21/-0: creates the table that holds the old-to-new issue map and notice state.
+
+The plan names these files, but the diff does not change them:
+- gap `ibl5/migrations/NNN_create_ibl_bug_issue_notices.sql` (must-appear plan Critical File absent from the diff, and no PR-body '## Plan gaps' bullet explains why)
+<!-- scope-notes:end -->
+
+<!-- removed-guards:begin -->
+## Removed guards
+The deleted-guard check flagged these removals. Each needs a one-line reason, or auto-merge holds.
+- `or-true@bin/bug-pipeline-cron-setup#40878d4b` — Reason: Intended: the plan removes gh repo create so --bootstrap-issues never creates or edits a repository (view-only now).
+  removed: `|| gh repo create "$BUG_PIPELINE_ISSUE_REPO" --private 2>/dev/null || true`
+<!-- removed-guards:end -->
+
+**Merge danger:** Door: two-way · Blast radius: site-wide · Why: mechanical: no one-way trigger in the realized diff
+**How to revert:** Open a PR with `git revert <merge-sha>`; then add a new migration that undoes the schema change, since git revert does not roll back an applied migration.
+
+<!-- manual-confirmation:begin -->
+## Manual confirmation needed
+
+> **Decision:** Merge if you accept the bug bot posting close notices driven by public IBL5 issue state, and you will run bin/bug-issues-migrate yourself afterward.
+<!-- manual-confirmation:end -->
+
+## Manual Testing
+
+No manual testing needed — all changes are covered by automated tests.
+
+<!-- plan-checks:begin -->
+<details><summary>Plan checks for CI (read by the Plan checks job)</summary>
+
+```text
+plan-checks v1 sha256=b207396a6ced35c839dddf4f38b5c5633f59e351fd18258a4b21f6be54599b11 rows=9 mutations=16
+eNq1VmtP4zgU/St3s+wUEG5pgQFasdphJrOqhADx2Ido13ITJ/WQOB3baamA/e1747SkKQXaFfMt
+ju/jHN/r43vvxKlhRiRSO82be8frc+/WaTo9IWuGa0P8HtFj6ZGBSnzCVDh0tpxARHxiU2xzzdWQ
+E8N6EddVc2fQMGbG66Ol6EW0l4ZUaJ1yKhMjPK5xX/FBxDz+kgVlPc1lFkglIzSqO49bCyCiHxmI
+AY+ExPwCN0sQF21PgXlRorkPTEMg7rhfLWHKN6tF+o8/MD9SBkws5WIUZYg5nP0fAEeArQDJK0Bi
+pm6BEPvvqOOsyY6DS8WZTmS2Nsktx39zgOeCKB6hA5+LU/A4eHceN4A5NPY1R7xHuPh8cnbpfsFF
+Fx4ewEukETLlJdhG5T9yTIfvjuknuLGwMGOiDFcZsn/hn5ttcti9r+9v1Q8f16DbLWEKWKQLUI3G
+u4PKKhSMad5j+eXT6xtwX0LxkhEoblIlYbtVQNxZAqKnEkk0+g5eAVoymsJtEka+sfHBXq19fLL3
+WEJZ7KGW7GUZ9WOBa3cJXJbZqpAkH3IFHl4JDAiJAu4Lo4FBVmctTKLGWOlfPzTKR7qsVwvCvv05
+Mc466Pj6d3rePndP2qcubV9eXrv0wj0/s1dzoMQQzQriey8TzytJYhGqLLKvxlSlknp9JkMUXyx7
+X8jw+YGU/WbOApNLE0Dly8Xf5OL6tAm/6E5HVjLMm3Migb9+m9GAxv7SMCMx5HSEpQgp3uNAqNg+
+X1TxINX2VVkWrtUCX3DYRYSzsfCnbwXZWrZgchIwQhEeKWHMM82zoUoK0jhYjVHARJQqTmPhU6OY
+1AFXyEljK2AthkKLnoiEGVMmfZp14gpER300BKs+IuuSyMAOdFvgJyUSuZnVnOmepbKzvRoVxbM2
+QthpjNADlcTUavEKiDtO35iBbtZqoTD9tFf1kri2dur+Wctdah1nc2OuoV73IPbKPfnlxOpLE8P5
+JohE2Dc0lfxuwD0zlUKKivA/mi/rux2siDUAjIFvpu05fsc8E42fvU1v2OaEGksTSuWtTEaSBhEL
+Ef43y2gF/IRktd6Ak/Yf7lEdWq0S4Hz3YXNuPwdZfiNC9AIikV6lhtpnyAjrR2Kc+/AmVrBdMznP
+9L6XmJpWnoVlv7N5U1XNzKkvYzolsChbicMCAxxlJIu5XynIoHB17WIyP8f+W9OzTONilrXm+RF4
+UPl84X66cuHq0/GJC+2vcHp2Be5f7curS1g4IFfyw8mrk83wtU2avxN0oX1Vf4+eEDRmELw6S0wA
+f3zTvvRATpLsvuk1fXYnDnuLHCKWSq/vE41d4xe2L0Kaa/afYX0kFE7RQgJKuYbzi40iyv5cFNuZ
+xE88jQ+qFtLjRzHTOLLhUiYEtSzikmsNHz5AYY8ltjPurMNTjp3ZY8hQZlq8jkoFubMIJeo8LL51
+8Bq1Bxh5qOgbma7z77BdpDywnTl0mvXH/wC0o6h7
+```
+
+</details>
+<!-- plan-checks:end -->
+

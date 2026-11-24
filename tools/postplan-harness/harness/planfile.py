@@ -538,6 +538,76 @@ def parse_matrix(
     return planned, manual, post_merge
 
 
+_AM_HEAD_RE = re.compile(r"^## After merge")
+_AM_ROW_RE = re.compile(
+    r"^- (?:\[ \] )?\*\*Row (?P<num>[0-9]+)\*\*\s*(?:\[(?P<tag>[^\]]*)\](?!\())?\s*(?:—\s*)?(?P<text>.*)$")
+
+
+# The bash row filter, `^- (\[ \] )?\*\*Row` in pmr_rows. Canonical rows match _AM_ROW_RE first.
+_AM_LOOSE_ROW_RE = re.compile(r"^- (?:\[ \] )?")
+_AM_LOOSE_ROW_HEAD = re.compile(r"^- (?:\[ \] )?\*\*Row")
+_AM_FENCE_RE =re.compile(r"^\s*(```|~~~)")
+_AM_END_ANCHOR = "<!-- after-merge:end -->"
+
+
+def _strip_fenced_after_merge(content: str) -> list[str]:
+    """Lines outside fenced blocks, by the same walk as pmr_strip_fences in
+    bin/lib/post-merge-rows.sh, so this parser and the bash one agree on what is a row.
+    A fence opens on a backtick or tilde run of 3+; it closes only on a run of the same
+    character, at least as long, with nothing after it. `>` lines get no special case.
+    The shared _strip_fenced stays as it is: it mirrors cf_section() for other parsers."""
+    out: list[str] = []
+    in_fence = False
+    fence_char = ""
+    fence_len = 0
+    for line in content.splitlines():
+        if _AM_FENCE_RE.match(line):
+            s = line.lstrip()
+            c = s[0]
+            n = len(s) - len(s.lstrip(c))
+            if not in_fence:
+                in_fence, fence_char, fence_len = True, c, n
+            elif c == fence_char and n >= fence_len and not s[n:].strip():
+                in_fence = False
+            continue
+        if not in_fence:
+            out.append(line)
+    return out
+
+
+def parse_after_merge_section(content: str) -> list[manual_rows.ManualRow]:
+    """Rows of the plan's own `## After merge` section (ADR-0198 grammar). Fenced blocks are
+    skipped by _strip_fenced_after_merge; the section ends at the next `## ` heading or at
+    `<!-- after-merge:end -->`, as pmr_rows does. A leading `[text](url)` link is text.
+
+    Section bounds copy pmr_rows' `sed -n '/^## After merge/,/^## /p'` then its awk cut:
+    the `## ` line that closes a section never opens a new one (sed checks the next start
+    from the line after), and the first end anchor inside a section ends the whole scan."""
+    rows: list[manual_rows.ManualRow] = []
+    inside = False
+    for line in _strip_fenced_after_merge(content):
+        if line.startswith("## "):
+            was_inside = inside
+            inside = not was_inside and bool(_AM_HEAD_RE.match(line))
+            if (was_inside or inside) and _AM_END_ANCHOR in line:
+                break
+            continue
+        if inside and _AM_END_ANCHOR in line:
+            break
+        m = _AM_ROW_RE.match(line.rstrip()) if inside else None
+        if m:
+            rows.append(manual_rows.ManualRow(
+                number=m["num"], text=m["text"].strip(), raw=line.rstrip(),
+                post_merge_reason="plan After merge section", tag=(m["tag"] or "").strip()))
+        elif inside and _AM_LOOSE_ROW_HEAD.match(line):
+            # pmr_rows takes any `- **Row...` line and pmr_parse_row reads a non-canonical
+            # one as a manual row with the whole line as text. Keep it so the PR body lists it.
+            rows.append(manual_rows.ManualRow(
+                number="?", text=_AM_LOOSE_ROW_RE.sub("", line.rstrip(), count=1).strip(),
+                raw=line.rstrip(), post_merge_reason="plan After merge section", tag=""))
+    return rows
+
+
 _EXECUTABLE_TYPE = re.compile(
     r"\b(PHPUnit|API.?test|E2E|Visual.?regression|CLI.?executable)\b", re.IGNORECASE)
 _TABLE_SEP = re.compile(r"^\s*\|[\s:|-]+\|?\s*$")
@@ -1297,6 +1367,7 @@ def locate_plan(slug: str, plans_dir: str | None = None, explicit_path: str | No
         info.no_change_test_paths = parse_no_change_test_paths(content)
         info.run_only_test_paths = parse_run_only_test_paths(content)
         info.reference_only_test_paths, info.reference_only_refusals = parse_reference_only_test_paths(content)
+    info.post_merge_rows = list(info.post_merge_rows) + parse_after_merge_section(content)
     info.critical_files = parse_critical_files(content)
     info.required_test_methods = parse_required_test_methods(content)
     info.backlog_issues = parse_backlog_issues(content)

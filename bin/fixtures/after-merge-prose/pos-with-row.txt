@@ -1,0 +1,5 @@
+The launchd agent is not installed by merging. The owner runs `bin/approve-click-cron-setup --install` once on the Mac after merge.
+
+## After merge
+- **Row 1** [manual] — run the installer
+<!-- after-merge:end -->

@@ -5,7 +5,10 @@ Pure functions: file list + unified diff text in, Classification out.
 """
 from __future__ import annotations
 
+import dataclasses
+import os
 import re
+import subprocess
 
 from .sql_comments import migration_sections
 from .state import Classification
@@ -812,15 +815,48 @@ AFTER_MERGE_END = "<!-- after-merge:end -->"
 _AFTER_MERGE_RE = re.compile(r"^## After merge[ \t]*$", re.M)
 
 
-def render_after_merge_block(rows: list) -> str:
+_AUTO_TAG_RE = re.compile(r"^(?P<kind>auto:(?:mac|ci)) (?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)$")
+_AUTO_MAC_SENTENCE = (
+    "Rows tagged auto:mac run once on the owner's Mac through bin/post-merge-run, "
+    "which sends a Discord message only when one fails.")
+
+
+def _is_tracked_step(steps_dir, name):
+    """Same test as bin/post-merge-run resolve_step: regular, non-symlink, git-tracked."""
+    p = os.path.join(steps_dir, name)
+    if os.path.islink(p) or not os.path.isfile(p):
+        return False
+    try:
+        r = subprocess.run(["git", "-C", steps_dir, "ls-files", "--error-unmatch", "--", name],
+                           capture_output=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return r.returncode == 0
+
+
+def _fail_closed_tag(row, steps_dir):
+    """Keep a tag only when it is `manual` or an auto:mac step the Mac executor will accept."""
+    tag = getattr(row, "tag", "")
+    if not tag or tag == "manual":
+        return row
+    m = _AUTO_TAG_RE.match(tag)
+    if m and m["kind"] == "auto:mac" and steps_dir and _is_tracked_step(steps_dir, m["name"]):
+        return row
+    return dataclasses.replace(row, tag="manual")
+
+
+def render_after_merge_block(rows: list, steps_dir: str | None = None) -> str:
     """The `## After merge` block for post-merge rows, or "" when there are none."""
     if not rows:
         return ""
     from .manual_rows import render_after_merge  # local import keeps module-level cycle-free
+    rows = [_fail_closed_tag(r, steps_dir) for r in rows]
+    mac_note = f" {_AUTO_MAC_SENTENCE}" if any(
+        getattr(r, "tag", "").startswith("auto:mac ") for r in rows) else ""
     return (
         f"{AFTER_MERGE_HEADING}\n\n"
         "These rows run only after the PR merges. The merge workflow posts them as a "
-        "checklist comment on this PR and sends one Discord message.\n\n"
+        f"checklist comment on this PR.{mac_note}\n\n"
         f"{render_after_merge(rows)}\n{AFTER_MERGE_END}"
     )
 

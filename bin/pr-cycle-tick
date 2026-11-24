@@ -18,7 +18,8 @@
 # bin/pr-triage --arm. Never polls or sleeps. NOT set -e: one PR's failed fetch must not
 # abort the tick.
 #
-# Guards, cheapest first: stop file, usage zone, a live pr-cycle worker, then per PR:
+# Guards, cheapest first: stop file, then the post-merge-run sweep (bin/post-merge-run runs
+# the auto:mac rows of merged PRs and spends no Claude), usage zone, a live pr-cycle worker, then per PR:
 # a needs-a-human label (the PR waits on a human's review, so no rescue touches its
 # branch), post-plan in flight, post-plan finished under 30 minutes ago, checks pending or green,
 # stacked on another open PR's branch, and a one-rescue-per-patch-id retry cap. At most
@@ -214,6 +215,17 @@ stale_label_sweep() {
     return 0
 }
 stale_label_sweep
+
+# auto:mac rows of merged PRs (ADR-0198 update 2026-11-20). Spends no Claude, so it runs
+# ahead of the usage gate; like stale_label_sweep it uses `return`, never `exit`.
+post_merge_run_sweep() {
+    local _pm_args=(--tick)
+    if [[ "$DRY_RUN" -eq 1 ]]; then _pm_args+=(--dry-run); fi
+    [ -f "$SCRIPT_DIR/post-merge-run" ] || return 0
+    bash "$SCRIPT_DIR/post-merge-run" "${_pm_args[@]}" || log "post-merge-run: exited $?; tick continues"
+    return 0
+}
+post_merge_run_sweep
 
 # ── (b) Usage gate ───────────────────────────────────────────────────────────
 # Read-only mirror of the first half of usage_prestart_gate. The gate itself writes a

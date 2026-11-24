@@ -2425,6 +2425,13 @@ kick_reset
 kick_run jsb-port-pl-7
 [ "$(kick_args)" = "jsb-port-pl-7" ] && ok "K1 single-digit port slug kicks once" \
     || fail "K1 single-digit port slug kicks once (got: $(kick_args))"
+kick_reset
+kick_run jsb-port-pl-0027-r1
+[ "$(kick_args)" = "jsb-port-pl-0027-r1" ] && ok "K1 retry port slug (-r<n>) kicks once" \
+    || fail "K1 retry port slug (-r<n>) kicks once (got: $(kick_args))"
+kick_reset
+kick_run jsb-port-pl-0027-rx
+kick_ran && fail "K1 malformed retry suffix: kicked" || ok "K1 malformed retry suffix: never kicked"
 
 # K2 a non-port plan queues and never kicks.
 kick_reset

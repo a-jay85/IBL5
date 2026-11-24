@@ -129,6 +129,7 @@ REPLAY_SPECS: dict[str, ReplaySpec | str] = {
     "bin/check-pipefail-grep-q": _SINCE,
     "bin/check-pipefail-assignment-guard": _SINCE,
     "bin/check-exit-code-handling": _SINCE,
+    "bin/check-adr-append-only": _SINCE,
     "bin/check-destructive-migrations": _BYPASS_SINCE,
     # Whole-tree scans with no required argument.
     "bin/check-ambient-env-fallback": _TREE,

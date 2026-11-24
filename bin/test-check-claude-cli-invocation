@@ -404,6 +404,26 @@ cat > "$T/perm_subshell_redirect_marker_pass.sh" <<'FIX'
     > "$W/out.json" 2>&1 # claude-perm-ok: scratch fixture runs in a temp dir
 FIX
 expect "perm_subshell_redirect_marker_pass" "$T/perm_subshell_redirect_marker_pass.sh" 0
+# The redirect-line rule is for claude-perm-ok only. A claude-cli-ok on that line does not
+# reach the statement, so the old checks still fire.
+cat > "$T/cli_ok_subshell_redirect_marker_fail.sh" <<'FIX'
+#!/bin/bash
+( cd "$W" && \
+    claude -p "$p" \
+        --permission-mode acceptEdits ) \
+    > "$W/out.json" 2>&1 # claude-cli-ok: redirect-line marker must not count
+FIX
+expect_class "cli_ok_subshell_redirect_marker_no_timeout" "$T/cli_ok_subshell_redirect_marker_fail.sh" no-timeout
+expect_class "cli_ok_subshell_redirect_marker_permission" "$T/cli_ok_subshell_redirect_marker_fail.sh" permission
+cat > "$T/perm_ok_subshell_redirect_no_timeout_fail.sh" <<'FIX'
+#!/bin/bash
+( cd "$W" && \
+    claude -p "$p" \
+        --permission-mode acceptEdits ) \
+    > "$W/out.json" 2>&1 # claude-perm-ok: scratch fixture runs in a temp dir
+FIX
+expect_class "perm_ok_subshell_redirect_keeps_no_timeout" "$T/perm_ok_subshell_redirect_no_timeout_fail.sh" no-timeout
+expect_no_class "perm_ok_subshell_redirect_silences_permission" "$T/perm_ok_subshell_redirect_no_timeout_fail.sh" permission
 
 perm_pass perm_cli_ok_marker_pass "--dangerously-skip-permissions # claude-cli-ok: all-class escape still covers permission"
 

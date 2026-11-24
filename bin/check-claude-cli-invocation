@@ -70,7 +70,7 @@ ALLOWED_FLAGS="--add-dir --agent --agents --all --allow-dangerously-skip-permiss
 VARIADIC_FLAGS="--add-dir --allowed-tools --allowedTools --betas --disallowed-tools --disallowedTools --file --mcp-config --tools"
 # permission class: a marker that silences only this class; the other four keep running
 PERM_MARKER='# claude-perm-ok:'
-# Bash(...) rules may name these binaries with no marker. Repo scripts match by path: bin/NAME or bin/lib/NAME.
+# Bash(...) rules may name these binaries with no marker. A repo script under bin or bin/lib matches by its path.
 PERM_SAFE_BINS="gh"
 # --permission-mode values that grant nothing extra
 PERM_OK_MODES="default plan dontAsk"
@@ -383,9 +383,11 @@ function merge_scan(s, e,    j, d, t, outr) {
     if (tt[e + 1] == "S" && tx[e + 1] == "|&") return 1
     return 0
 }
-function mk_range(lo, hi,    l, r) {
-    for (l = lo; l <= hi; l++) {
-        if ((l in cmt) && index(cmt[l], MARKER) == 1) {
+# mk_range: claude-cli-ok counts on lines lo..hi; claude-perm-ok counts on lo..phi (phi >= hi).
+function mk_range(lo, hi, phi,    l, r) {
+    if (phi < hi) phi = hi
+    for (l = lo; l <= phi; l++) {
+        if (l <= hi && (l in cmt) && index(cmt[l], MARKER) == 1) {
             site_marker = 1
             r = trim(substr(cmt[l], length(MARKER) + 1))
             if (length(r) > reason_len) reason_len = length(r)
@@ -397,9 +399,11 @@ function mk_range(lo, hi,    l, r) {
         }
     }
 }
-# range_hi: last line a marker may sit on. Redirects after a closing ")" belong to the
-# statement, so ( cd d && claude -p ... ) > out 2>&1 may carry its marker on the redirect line.
-function range_hi(e,    k) {
+function range_hi(e) { return (e + 1 <= ntk) ? tl[e + 1] : tl[e] }
+# perm_range_hi: last line a claude-perm-ok marker may sit on. Redirects after a closing ")"
+# belong to the statement, so ( cd d && claude -p ... ) > out 2>&1 may carry that marker on
+# the redirect line. claude-cli-ok keeps the range_hi range.
+function perm_range_hi(e,    k) {
     k = e + 1
     if (k <= ntk && tt[k] == ")") {
         while (k + 1 <= ntk && tt[k + 1] == "R") {
@@ -536,7 +540,7 @@ function analyze(f, inner,    i, j, s, e, k, prefix_ok, hast, aopen, ac, name, n
             aopen = j; name = tx[j]
             for (ac = i; ac <= ntk && tt[ac] != "AC"; ac++) ;
             gather(i + 1)
-            if (!inner) mk_range(tl[aopen], tl[ac <= ntk ? ac : ntk])
+            if (!inner) mk_range(tl[aopen], tl[ac <= ntk ? ac : ntk], 0)
             hasexec = 0; mrg = 0
             for (k = 1; k <= ntk; k++) {
                 if (tt[k] != "X" || index(tx[k], "{" name "[@]") == 0) continue
@@ -546,14 +550,14 @@ function analyze(f, inner,    i, j, s, e, k, prefix_ok, hast, aopen, ac, name, n
                 for (w = ks; w <= ke; w++) if (is_timeout_tok(w)) hast = 1
                 if (tc[k] && merge_scan(ks, ke)) mrg = 1
                 gather(k + 1)
-                if (!inner) mk_range(tl[ks], range_hi(ke))
+                if (!inner) mk_range(tl[ks], range_hi(ke), perm_range_hi(ke))
             }
             if (!hasexec) hast = hast
             site_finish(f, tl[i], hast, mrg)
         } else {
             s = stmt_start(i); e = stmt_end(i)
             gather(i + 1)
-            if (!inner) mk_range(tl[s], range_hi(e))
+            if (!inner) mk_range(tl[s], range_hi(e), perm_range_hi(e))
             mrg = (tc[i] && merge_scan(s, e)) ? 1 : 0
             site_finish(f, tl[i], hast, mrg)
         }
@@ -575,7 +579,7 @@ function analyze(f, inner,    i, j, s, e, k, prefix_ok, hast, aopen, ac, name, n
         npf++
         pf_text[npf] = substr(t, 2, length(t) - 2); pf_line[npf] = tl[k]
         site_marker = 0; reason_len = 0; perm_marker = 0; perm_rl = 0
-        mk_range(tl[s], range_hi(stmt_end(i)))
+        mk_range(tl[s], range_hi(stmt_end(i)), perm_range_hi(stmt_end(i)))
         pf_mark[npf] = site_marker; pf_rl[npf] = reason_len; pf_pmark[npf] = perm_marker; pf_prl[npf] = perm_rl
     }
 }

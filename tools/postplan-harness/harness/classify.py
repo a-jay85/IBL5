@@ -856,7 +856,7 @@ def render_after_merge_block(rows: list, steps_dir: str | None = None) -> str:
     return (
         f"{AFTER_MERGE_HEADING}\n\n"
         "These rows run only after the PR merges. The merge workflow posts them as a "
-        f"checklist comment on this PR and sends one Discord message.{mac_note}\n\n"
+        f"checklist comment on this PR.{mac_note}\n\n"
         f"{render_after_merge(rows)}\n{AFTER_MERGE_END}"
     )
 

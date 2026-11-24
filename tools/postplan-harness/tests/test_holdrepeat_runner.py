@@ -374,3 +374,17 @@ def test_record_hold_repeat_keeps_marker_on_repeat(tmp_path, dm):
     out = _record_call(state, plan, armed=False, reason=MISSING_A)
     assert out["action"].startswith("repeat")
     assert marker.exists()
+
+
+def test_record_hold_repeat_passes_fidelity(tmp_path, monkeypatch):
+    monkeypatch.setattr(holdrepeat, "fingerprint", lambda *a, **k: "fp")
+    scope = "[unplanned-scope] Adds bin/foo helper. Next action: keep."
+    fid = {"review_items": [{"verdict": "NOT READY", "blocking": [scope]}],
+           "kept_unplanned": ["Adds bin/foo helper"], "kept_owner_scope": []}
+    res = types.SimpleNamespace(plan=None, pr_number=4242, fidelity=fid)
+    decision = types.SimpleNamespace(
+        armed=False,
+        conditions=_hold_conds((12, "plan-fidelity-verdict", "fidelity verdict='NOT READY'")))
+    state = str(tmp_path / "state")
+    runner._record_hold_repeat(res, decision, SLUG, str(tmp_path), state, lambda s: None)
+    assert holdrepeat.load_record(state, SLUG)["hold_kinds"] == ["12:kept-unplanned-scope"]

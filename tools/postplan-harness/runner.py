@@ -5354,6 +5354,7 @@ def _record_hold_repeat(res, decision, slug, worktree, state_dir, log) -> dict |
         fp = holdrepeat.fingerprint(plan_path, worktree or os.getcwd())
         obs = holdrepeat.observe(state_dir, slug, armed=decision.armed,
                                  conditions=decision.conditions, fingerprint=fp,
+                                 fidelity=getattr(res, "fidelity", None),
                                  pr=res.pr_number,
                                  now=datetime.datetime.now(datetime.timezone.utc).isoformat())
         out = {"action": obs.action, "key": obs.key,

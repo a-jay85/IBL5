@@ -130,7 +130,7 @@ run_step() {       # <path> <pr> <log> -> ok | timeout | exit-<rc>
     local _kids; _kids="$(pgrep -P "$wd" 2>/dev/null || true)"
     kill "$wd" 2>/dev/null; wait "$wd" 2>/dev/null
     for _kid in $_kids; do kill "$_kid" 2>/dev/null; done
-    if [ -e "$mark" ] && [ "$rc" -ne 0 ]; then rm -f "$mark"; echo timeout
+    if [ -e "$mark" ]; then rm -f "$mark"; echo timeout
     elif [ "$rc" -eq 0 ]; then echo ok
     else echo "exit-$rc"; fi
 }

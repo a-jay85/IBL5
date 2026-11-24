@@ -1189,6 +1189,7 @@ oa_branch() {
 }
 
 # OA1 card_owner_approvals_both_modes
+card_owner_approvals_both_modes() {
 k_fixture 320
 oa_comments 320 OWNER User > "$FIX/comments-320.json"
 run_triage "$FIX" --card 320
@@ -1204,7 +1205,11 @@ assert_match  "OA1 approve words"           '^     words: "ship it"$' "$OA_FIELD
 assert_match  "OA1 kept bullet"             '^     kept: Keep the tooltip rewrite$' "$OA_FIELD"
 assert_match  "OA1 order fix-first then approve" '1\. .*fix-first.*2\. .*approve' "$(tr '\n' ' ' <<< "$OA_FIELD")"
 
+}
+card_owner_approvals_both_modes
+
 # OA2 card_owner_approvals_unauthentic_ignored
+card_owner_approvals_unauthentic_ignored() {
 k_fixture 321
 jq -s 'add' <(oa_comments 321 CONTRIBUTOR User) <(oa_comments 321 OWNER Bot) > "$FIX/comments-321.json"
 run_triage "$FIX" --card 321
@@ -1212,7 +1217,11 @@ assert_status "OA2 card_owner_approvals_unauthentic_ignored exit 0" 0 "$ST"
 assert_match  "OA2 none listed"             '^Owner approvals: none$' "$OUT"
 assert_absent "OA2 no marker rows"          'fix-first head|approve head' "$OUT"
 
+}
+card_owner_approvals_unauthentic_ignored
+
 # OA3 card_owner_approvals_fetch_failure_unknown
+card_owner_approvals_fetch_failure_unknown() {
 k_fixture 322
 echo 1 > "$FIX/comments-rc-322"
 run_triage "$FIX" --card 322
@@ -1220,7 +1229,11 @@ assert_status "OA3 card_owner_approvals_fetch_failure_unknown exits 1" 1 "$ST"
 assert_match  "OA3 field unknown"           '^Owner approvals: unknown \(fetch failed\)$' "$OUT"
 assert_absent "OA3 never says none"         '^Owner approvals: none$' "$OUT"
 
+}
+card_owner_approvals_fetch_failure_unknown
+
 # OA4 card_owner_approvals_flags_missing_amendment
+card_owner_approvals_flags_missing_amendment() {
 k_fixture 323
 oa_comments 323 OWNER User > "$FIX/comments-323.json"
 oa_branch 323 oa-card-323
@@ -1236,5 +1249,7 @@ run_triage "$FIX" --card 323
 assert_match  "OA4 recorded after append"   '^     amendment: recorded$' "$OUT"
 assert_absent "OA4 no MISSING after append" 'amendment: MISSING' "$OUT"
 rm -f "$HOME/claude-plans/oa-card-323.md"
+}
+card_owner_approvals_flags_missing_amendment
 
 h_done

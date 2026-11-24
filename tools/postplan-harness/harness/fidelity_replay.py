@@ -647,7 +647,8 @@ def production_roots(files: dict) -> dict:
             except (SyntaxError, ValueError):
                 tree = None
         if tree is None:
-            if "harness.fidelity" in text or "import fidelity" in text:
+            if ("harness.fidelity" in text or "import fidelity" in text
+                    or (re.search(r"\bharness\b", text) and re.search(r"\bfidelity\b", text))):
                 raise Unresolvable(f"fidelity-unresolvable-reference: {rel}")
             continue
         _file_roots(rel, tree, out)

@@ -631,6 +631,12 @@ def _loads_fidelity(tree, load, fid_imports) -> bool:
     return _binds(tree, load.id, fid_imports)[0]
 
 
+# A non-Python file names the module only through one of these spellings.
+_NON_PY_FIDELITY_REF = re.compile(
+    r"harness\.fidelity\b|harness/fidelity\.py|\bfidelity\.py\b|\bimport\s+fidelity\b"
+    r"|\bfrom\s+fidelity\s+import\b")
+
+
 def production_roots(files: dict) -> dict:
     """Each fidelity name -> the production relpaths that reference it. Test and bench files are
     excluded; a bench import from production, a module alias used as a value, `import *`, or a
@@ -647,8 +653,10 @@ def production_roots(files: dict) -> dict:
             except (SyntaxError, ValueError):
                 tree = None
         if tree is None:
-            if ("harness.fidelity" in text or "import fidelity" in text
-                    or (re.search(r"\bharness\b", text) and re.search(r"\bfidelity\b", text))):
+            # Comment lines are prose, and a loose "harness ... fidelity" word pair matched
+            # unrelated text (`plan-fidelity`, a Phase 5.5 note), so every real tree held.
+            code = "\n".join(ln for ln in text.splitlines() if not ln.lstrip().startswith("#"))
+            if _NON_PY_FIDELITY_REF.search(code):
                 raise Unresolvable(f"fidelity-unresolvable-reference: {rel}")
             continue
         _file_roots(rel, tree, out)

@@ -621,6 +621,17 @@ def test_static_analyzer_near_misses():
         "f": {"tools/x.py"}}
     assert production_roots({"tools/x.py": "import harness\nharness.fidelity.f()\n"}) == {
         "f": {"tools/x.py"}}
+    # A non-Python file holds only on a real module reference outside a comment line.
+    for prose in ("#!/bin/sh\n# fidelity.record_reviewed_tree writes it; see harness/x.py\n",
+                  "#!/bin/sh\necho 'harness ran the Phase 5.5 fidelity reviewer'\n",
+                  "#!/bin/sh\nls post-plan-fidelity-verdict-1.md harness/fidelity_replay.py\n"):
+        assert production_roots({"bin/x": prose}) == {}
+    for ref in ("#!/bin/sh\npython3 -m harness.fidelity check\n",
+                "#!/bin/sh\npython3 tools/postplan-harness/harness/fidelity.py\n",
+                "#!/bin/sh\npython3 - <<'EOF'\nimport fidelity\nEOF\n",
+                "#!/bin/sh\npython3 - <<'EOF'\nfrom fidelity import f\nEOF\n"):
+        with pytest.raises(Unresolvable):
+            production_roots({"bin/x": ref})
     master = ast.parse((REPO / FIDELITY).read_text(encoding="utf-8"))
     check_resolvable(master)
     top_defs(master)

@@ -79,3 +79,67 @@ func TestDayStartScaledPassWritesBackUnchangedBlocks(t *testing.T) {
 		t.Errorf("took %d draws, want 2", n)
 	}
 }
+
+func TestGameStartPassTakesSixtyRawDraws(t *testing.T) {
+	values := make([]int, 61)
+	for i := range values {
+		values[i] = i * 541 % 32768
+	}
+	r, err := rng.NewReplay(values)
+	if err != nil {
+		t.Fatalf("NewReplay: %v", err)
+	}
+	if err := GameStartPass(r); err != nil {
+		t.Fatalf("GameStartPass: %v", err)
+	}
+	draws := r.Draws()
+	if len(draws) != 60 {
+		t.Fatalf("len(draws) = %d, want 60", len(draws))
+	}
+	for i, d := range draws {
+		if d.API != "raw" {
+			t.Errorf("draw %d api = %q, want raw", i, d.API)
+		}
+		if d.Caller != "sim.dayStartScaledPass" {
+			t.Errorf("draw %d caller = %q, want sim.dayStartScaledPass", i, d.Caller)
+		}
+		if d.Value != values[i] {
+			t.Errorf("draw %d value = %d, want %d", i, d.Value, values[i])
+		}
+	}
+}
+
+func TestGameStartPassExhaustsOnShortList(t *testing.T) {
+	values := make([]int, 59)
+	for i := range values {
+		values[i] = i * 541 % 32768
+	}
+	r, err := rng.NewReplay(values)
+	if err != nil {
+		t.Fatalf("NewReplay: %v", err)
+	}
+	defer func() {
+		got := recover()
+		if _, ok := got.(*rng.ExhaustedError); !ok {
+			t.Fatalf("recovered %v (%T), want *rng.ExhaustedError", got, got)
+		}
+	}()
+	_ = GameStartPass(r)
+	t.Fatal("GameStartPass returned without exhausting a 59-value list")
+}
+
+// TestTracePinnedDayStartPassDrawCount pins that the pass takes one draw per
+// record without needing the private capture, which CI does not have.
+func TestTracePinnedDayStartPassDrawCount(t *testing.T) {
+	r, err := rng.NewReplay([]int{1, 2, 3})
+	if err != nil {
+		t.Fatalf("NewReplay: %v", err)
+	}
+	_, draws, err := dayStartScaledPass(make([]dayStartBlock, 3), []int{1, 1, 1}, r)
+	if err != nil {
+		t.Fatalf("dayStartScaledPass: %v", err)
+	}
+	if len(draws) != 3 || len(r.Draws()) != 3 {
+		t.Errorf("%d truncated draws and %d logged draws, want 3 of each", len(draws), len(r.Draws()))
+	}
+}

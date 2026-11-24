@@ -1,0 +1,747 @@
+#!/bin/bash
+set -euo pipefail
+
+# Fixture harness for bin/check-adr-append-only.
+#
+# Two template repos are built once in a mktemp dir (variant "a" ends in
+# References, variant "b" ends in Alternatives Considered). Each case copies a
+# template, edits it on branch `pr`, and asserts the gate's exit code and an output
+# substring. Nothing is written inside the IBL5 tree.
+#
+# Usage: bin/test-check-adr-append-only [case_name ...]
+#   No arguments runs every case. An unknown case name exits 2.
+#
+# The ITEM2 / DESC / DEC18 texts below are the real rewrites that motivated the
+# gate (PR 3367 on ADR-0104, PR 3373 and PR 3637 on ADR-0169).
+
+SCRIPT="$(cd "$(dirname "$0")" && pwd)/check-adr-append-only"
+WORK="$(mktemp -d)"
+# No detached auto-gc/maintenance: it can still be writing .git when the EXIT trap runs.
+trap 'rm -rf "$WORK"' EXIT
+
+export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
+export GIT_AUTHOR_NAME=fixture GIT_AUTHOR_EMAIL=fixture@example.invalid
+export GIT_COMMITTER_NAME=fixture GIT_COMMITTER_EMAIL=fixture@example.invalid
+# The DEC18 fixture text names bin/automouse/comprehension-digest, a usage-gated
+# entry point. Nothing here runs it, but isolate the usage gate anyway so
+# bin/test-harness-lib case_usage_gate_isolated holds.
+export IBL5_USAGE_GATE_STATE_DIR="$WORK/usage-gate"
+
+PASS=0
+FAIL=0
+CASE_NAME=""
+CASE_DIR=""
+RESULT_MSG=""
+RESULT_OUT=""
+
+ADR104="ibl5/docs/decisions/0104-fixture.md"
+ADR168="ibl5/docs/decisions/0168-fixture.md"
+README="ibl5/docs/decisions/README.md"
+
+IFS= read -r ITEM2_OLD <<'EOF_ITEM2_OLD'
+2. **Release happens at the plan seed, not in the merge gate.** <!-- slop-ok --> On PASS, `bin/docfix-check-veronly` rewrites the seeded plan's frontmatter `auto_merge: false` → `true` and deletes its `## Automouse Hold Justification` section. `tools/postplan-harness/harness/armable.py` is **not** modified. The merge gate stays one generic mechanism with no docfix-shaped special case, and the grant stays auditable in a plan file a human can read.
+EOF_ITEM2_OLD
+IFS= read -r ITEM2_NEW <<'EOF_ITEM2_NEW'
+2. **Release happens at the plan seed, not in the merge gate.** On PASS, `bin/docfix-check-veronly` rewrites the seeded plan's frontmatter `auto_merge: false` → `true` and deletes its `## Automouse Hold Justification` section. `.claude/skills/post-plan/@RETIRED_ARM_DOC@` is **not** modified. The merge gate stays one generic mechanism with no docfix-shaped special case, and the grant stays auditable in a plan file a human can read.
+EOF_ITEM2_NEW
+# The real rewrite named a retired post-plan phase file. Built from two pieces so
+# bin/test-postplan-arm-conditions' repo-wide retired-phase sweep does not flag it.
+RETIRED_ARM_DOC='_phase-6'".5-arm-auto-merge.md"
+ITEM2_NEW="${ITEM2_NEW/@RETIRED_ARM_DOC@/$RETIRED_ARM_DOC}"
+IFS= read -r DESC_OLD <<'EOF_DESC_OLD'
+description: Weekly launchd digest that turns the week's merged PRs into a short architecture-delta brief and flags what landed without a recorded human gate.
+EOF_DESC_OLD
+IFS= read -r DEC18_OLD <<'EOF_DEC18_OLD'
+Add `bin/automouse/comprehension-digest`, run weekly by the LaunchAgent `com.ibl5.automouse-comprehension-digest` (Sunday 10:00 local) and installed by `bin/automouse/comprehension-digest-cron-setup`. The script fetches the seven days of merged PRs that end at 00:00 UTC on the digest date. It classifies each PR as `human-signoff` (a `feat:` title), `auto-armed` (`autoMergeRequest` set), or `direct-merge` (neither). It counts the last two as landed without a recorded human gate and lists which of them touched ADRs, agent rules and skills, CI workflows, migrations, or `bin/` tooling. One headless Sonnet call with no tools turns those facts and the fenced, untrusted PR text into a brief of at most 250 words under three headings. The brief goes to `~/claude-plans/_reports/<date>-comprehension-digest.md` and to a Discord DM. A usage-gate denial or a failed model call sends a `DEGRADED:` brief that still carries the deterministic facts, and the run exits 2. A failed GitHub fetch sends a `DEGRADED:` line and exits 1. The send runs host-side under launchd for the reason ADR-0124 gives: GitHub-hosted runners cannot reach the Discord bot tunnel.
+EOF_DEC18_OLD
+IFS= read -r DEC18_NEW <<'EOF_DEC18_NEW'
+Add `bin/automouse/comprehension-digest`, run weekly by the LaunchAgent `com.ibl5.automouse-comprehension-digest` (Sunday 16:03 UTC, the weekly usage reset; the plist holds 08:03 and 09:03 local entries and passes `--at-reset`, so exactly one fire runs across the PDT/PST switch) and installed by `bin/automouse/comprehension-digest-cron-setup`. The script fetches the seven days of merged PRs that end at 00:00 UTC on the digest date. It classifies each PR as `human-signoff` (a `feat:` title), `auto-armed` (`autoMergeRequest` set), or `direct-merge` (neither). It counts the last two as landed without a recorded human gate and lists which of them touched ADRs, agent rules and skills, CI workflows, migrations, or `bin/` tooling. One headless Sonnet call with no tools turns those facts and the fenced, untrusted PR text into a brief of at most 250 words under three headings. The brief goes to `~/claude-plans/_reports/<date>-comprehension-digest.md` and to the #reviews channel through the `~/.iblbot-reviews-webhook-url` webhook. The facts-only `DEGRADED:` brief posts to #reviews with the report. Only the bare `DEGRADED:` line for a failed GitHub fetch stays on the default #dev webhook. A usage-gate denial or a failed model call sends a `DEGRADED:` brief that still carries the deterministic facts, and the run exits 2. A failed GitHub fetch sends a `DEGRADED:` line and exits 1. The send runs host-side under launchd for the reason ADR-0124 gives: GitHub-hosted runners cannot reach the Discord bot tunnel.
+EOF_DEC18_NEW
+
+DESC_NEW="${DESC_OLD/launchd/scheduled}"
+
+# write_adr104 <path> <with-references: 1|0>
+write_adr104() {
+    {
+        printf '%s\n' '---' \
+            'description: Fixture ADR for the append-only gate.' \
+            'last_verified: 2026-09-30' \
+            '---' '' \
+            '# ADR-0104: Fixture' '' \
+            '**Status:** Accepted' '' \
+            '## Context' '' \
+            'Context line alpha.' \
+            'Context line beta.' '' \
+            '## Decision' '' \
+            '1. First decision item stays put.'
+        printf '%s\n' "$ITEM2_OLD" ''
+        printf '%s\n' \
+            '3. Third decision item cites `bin/gone-tool` for the old helper.' \
+            '4. Fourth decision item cites `bin/live-tool` for the current helper.' '' \
+            '## Consequences' '' \
+            'Consequence line alpha.' '' \
+            '## Contextual notes' '' \
+            'Contextual note alpha.' '' \
+            '## Decision: addendum 2026-11-01' '' \
+            'Addendum decision note alpha.' '' \
+            '## Alternatives Considered' '' \
+            'Alternative alpha.'
+        if [ "$2" = 1 ]; then
+            printf '%s\n' '' '## References' '' '- Reference alpha.'
+        fi
+    } >"$1"
+}
+
+write_adr168() {
+    {
+        printf '%s\n' '---' "$DESC_OLD" 'last_verified: 2026-10-03' '---' '' \
+            '# ADR-0168: Fixture' '' '**Status:** Accepted' '' \
+            '## Context' '' 'Context line gamma.' '' \
+            '## Decision' ''
+        printf '%s\n' "$DEC18_OLD" ''
+        printf '%s\n' '## Consequences' '' 'Consequence line gamma.'
+    } >"$1"
+}
+
+# build_template <dir> <with-references: 1|0>
+build_template() {
+    local d="$1"
+    mkdir -p "$d/bin" "$d/ibl5/docs/decisions"
+    git -C "$d" init -q -b master
+    printf '%s\n' '#!/bin/bash' 'exit 0' >"$d/bin/live-tool"
+    chmod +x "$d/bin/live-tool"
+    write_adr104 "$d/$ADR104" "$2"
+    write_adr168 "$d/$ADR168"
+    printf '%s\n' '# Decisions' '' 'Index of ADRs.' >"$d/$README"
+    git -C "$d" add -A
+    git -C "$d" commit -q -m base
+}
+
+build_template "$WORK/tmpl-a" 1
+build_template "$WORK/tmpl-b" 0
+
+g() { git -C "$CASE_DIR" "$@"; }
+
+# new_case <variant: a|b>: copy a template to a fresh dir on branch `pr`.
+new_case() {
+    CASE_NAME="${FUNCNAME[1]}"
+    CASE_DIR="$WORK/cases/$CASE_NAME"
+    mkdir -p "$WORK/cases"
+    cp -R "$WORK/tmpl-${1:-a}" "$CASE_DIR"
+    g checkout -q -b pr
+}
+
+commit_pr() {
+    g add -A
+    g commit -q -m "pr edit"
+}
+
+# edit_file <file> <old-substring> <new-text>: replace the first occurrence on every
+# line that contains <old-substring>. A file with no match aborts the harness.
+edit_file() {
+    local f="$1"
+    if ! OLD="$2" NEW="$3" LC_ALL=C awk '
+        BEGIN { o = ENVIRON["OLD"]; n = ENVIRON["NEW"] }
+        { i = index($0, o); if (i) { $0 = substr($0, 1, i - 1) n substr($0, i + length(o)); c++ } print }
+        END { exit c ? 0 : 3 }' "$f" >"$f.new"; then
+        echo "harness bug: edit_file found no match in $f for: ${2:0:60}" >&2
+        exit 3
+    fi
+    mv "$f.new" "$f"
+}
+
+# delete_lines <file> <substring>: drop every line containing <substring>.
+delete_lines() {
+    local f="$1"
+    SUB="$2" LC_ALL=C awk 'index($0, ENVIRON["SUB"]) == 0' "$f" >"$f.new"
+    if cmp -s "$f" "$f.new"; then
+        echo "harness bug: delete_lines found no match in $f for: ${2:0:60}" >&2
+        exit 3
+    fi
+    mv "$f.new" "$f"
+}
+
+# A plain Decision rewrite on item 1 (no dead path, no stamp).
+rewrite_decision() {
+    edit_file "$CASE_DIR/$ADR104" 'First decision item stays put.' 'First decision item was reworded.'
+}
+
+# _run <expected-exit> <expected-substring> <gate args...>. Sets RESULT_MSG (empty = ok).
+_run() {
+    local want_rc="$1" want_sub="$2" out rc
+    shift 2
+    if [ "${PRB+set}" = set ]; then
+        if out=$(cd "$CASE_DIR" && env PR_BODY="$PRB" "$SCRIPT" "$@" 2>&1); then rc=0; else rc=$?; fi
+    else
+        if out=$(cd "$CASE_DIR" && env -u PR_BODY "$SCRIPT" "$@" 2>&1); then rc=0; else rc=$?; fi
+    fi
+    RESULT_MSG=""
+    RESULT_OUT="$out"
+    if [ "$rc" -ne "$want_rc" ]; then
+        RESULT_MSG="exit $rc, want $want_rc"
+    fi
+    if [ -n "$want_sub" ] && ! grep -qF -e "$want_sub" <<<"$out"; then
+        RESULT_MSG="${RESULT_MSG:+$RESULT_MSG; }output lacks '$want_sub'"
+    fi
+    [ -z "$RESULT_MSG" ]
+}
+
+report() {
+    if [ -z "$RESULT_MSG" ]; then
+        echo "PASS $1"
+        PASS=$((PASS + 1))
+    else
+        echo "FAIL $1: $RESULT_MSG"
+        printf '%s\n' "$RESULT_OUT" | sed 's/^/    /'
+        FAIL=$((FAIL + 1))
+    fi
+}
+
+# run_case <name> <expected-exit> <expected-substring> <gate args...>
+run_case() {
+    local name="$1"
+    shift
+    _run "$@" || true
+    report "$name"
+}
+
+# ---- cases -----------------------------------------------------------------
+
+case_adr0104_decision_rewrite() {
+    new_case a
+    edit_file "$CASE_DIR/$ADR104" "$ITEM2_OLD" "$ITEM2_NEW"
+    commit_pr
+    run_case "$CASE_NAME" 1 '[decision] rewrite' --since=master
+}
+
+case_adr0168_description() {
+    new_case a
+    edit_file "$CASE_DIR/$ADR168" "$DESC_OLD" "$DESC_NEW"
+    commit_pr
+    run_case "$CASE_NAME" 1 '[fm:description] rewrite' --since=master
+}
+
+case_adr0168_decision_line() {
+    new_case a
+    edit_file "$CASE_DIR/$ADR168" "$DEC18_OLD" "$DEC18_NEW"
+    commit_pr
+    run_case "$CASE_NAME" 1 '[decision] rewrite' --since=master
+}
+
+case_last_verified_bump() {
+    new_case a
+    edit_file "$CASE_DIR/$ADR104" 'last_verified: 2026-09-30' 'last_verified: 2026-11-20'
+    commit_pr
+    run_case "$CASE_NAME" 0 'OK' --since=master
+}
+
+case_addendum_append() {
+    new_case b
+    # The first appended line is the heading, not a blank: a blank first line would let a
+    # zero-count hunk mistaken for a one-line change pass as a whitespace-only edit.
+    printf '%s\n' '## Addendum — fixture (2026-11-20)' '' 'The decision is unchanged; this paragraph only records a later fact.' \
+        >>"$CASE_DIR/$ADR104"
+    commit_pr
+    run_case "$CASE_NAME" 0 'OK' --since=master
+}
+
+case_dead_path_repair() {
+    new_case a
+    edit_file "$CASE_DIR/$ADR104" '`bin/gone-tool`' '`bin/live-tool`'
+    commit_pr
+    run_case "$CASE_NAME" 0 'OK' --since=master
+}
+
+case_dead_path_example_suffix() {
+    new_case a
+    edit_file "$CASE_DIR/$ADR104" '`bin/gone-tool`' '`bin/gone-tool` (example)'
+    commit_pr
+    run_case "$CASE_NAME" 0 'OK' --since=master
+}
+
+case_live_path_swap_flagged() {
+    new_case a
+    # bin/other-tool exists too, so only the old span's live check can flag the swap.
+    printf '%s\n' '#!/bin/bash' 'exit 0' >"$CASE_DIR/bin/other-tool"
+    edit_file "$CASE_DIR/$ADR104" '`bin/live-tool`' '`bin/other-tool`'
+    commit_pr
+    run_case "$CASE_NAME" 1 '[decision] rewrite' --since=master
+}
+
+case_corrected_stamp() {
+    new_case a
+    edit_file "$CASE_DIR/$ADR104" 'First decision item stays put.' \
+        'First decision item stays put. [CORRECTED 2026-11-20: see Addendum]'
+    commit_pr
+    run_case "$CASE_NAME" 0 'OK' --since=master
+}
+
+case_stamp_with_rewrite_flagged() {
+    new_case a
+    edit_file "$CASE_DIR/$ADR104" 'First decision item stays put.' \
+        'First decision item was reworded. [CORRECTED 2026-11-20: see Addendum]'
+    # A valid stamp on another frozen line must still pass, so the stamp check keys
+    # on the kept old line and does not reject every stamp.
+    edit_file "$CASE_DIR/$ADR104" 'Context line alpha.' 'Context line alpha. [CORRECTED 2026-11-20: see Addendum]'
+    commit_pr
+    _run 1 '[decision] rewrite' --since=master || true
+    if grep -qF '[context] rewrite' <<<"$RESULT_OUT"; then
+        RESULT_MSG="${RESULT_MSG:+$RESULT_MSG; }valid Context stamp was flagged"
+    fi
+    report "$CASE_NAME"
+}
+
+case_contextual_heading_not_frozen() {
+    new_case a
+    edit_file "$CASE_DIR/$ADR104" 'Contextual note alpha.' 'Contextual note beta.'
+    commit_pr
+    run_case "$CASE_NAME" 0 'OK' --since=master
+}
+
+case_decision_colon_addendum_not_frozen() {
+    new_case a
+    edit_file "$CASE_DIR/$ADR104" 'Addendum decision note alpha.' 'Addendum decision note beta.'
+    commit_pr
+    run_case "$CASE_NAME" 0 'OK' --since=master
+}
+
+case_unfrozen_sections_pass() {
+    new_case a
+    edit_file "$CASE_DIR/$ADR104" 'Consequence line alpha.' 'Consequence line beta.'
+    edit_file "$CASE_DIR/$ADR104" '- Reference alpha.' '- Reference beta.'
+    edit_file "$CASE_DIR/$ADR104" '**Status:** Accepted' '**Status:** Superseded'
+    commit_pr
+    run_case "$CASE_NAME" 0 'OK' --since=master
+}
+
+case_context_removal_flagged() {
+    new_case a
+    delete_lines "$CASE_DIR/$ADR104" 'Context line beta.'
+    commit_pr
+    run_case "$CASE_NAME" 1 '[context] removal' --since=master
+}
+
+case_whitespace_only_pass() {
+    new_case a
+    edit_file "$CASE_DIR/$ADR104" 'First decision item stays put.' 'First decision item stays put.   '
+    # Drop the blank line between Decision items 2 and 3 (the line right before item 3).
+    awk '
+        { lines[NR] = $0 }
+        END {
+            for (i = 1; i <= NR; i++) {
+                if (lines[i] == "" && index(lines[i + 1], "3. Third decision item") == 1) continue
+                print lines[i]
+            }
+        }' "$CASE_DIR/$ADR104" >"$CASE_DIR/$ADR104.new"
+    if cmp -s "$CASE_DIR/$ADR104" "$CASE_DIR/$ADR104.new"; then
+        echo "harness bug: no blank Decision line removed" >&2
+        exit 3
+    fi
+    mv "$CASE_DIR/$ADR104.new" "$CASE_DIR/$ADR104"
+    commit_pr
+    run_case "$CASE_NAME" 0 'OK' --since=master
+}
+
+case_new_adr_file() {
+    new_case a
+    printf '%s\n' '---' 'description: A new ADR.' '---' '' '# ADR-0300: New' '' '## Decision' '' 'Brand new.' \
+        >"$CASE_DIR/ibl5/docs/decisions/0300-new.md"
+    commit_pr
+    run_case "$CASE_NAME" 0 'OK' --since=master
+}
+
+# Review finding on PR 4155: a removed blank line plus a stamp on the next line make
+# one mixed hunk (2 old lines, 1 new). Both edits are allowed, so the gate must pass.
+case_blank_removal_with_stamp_pass() {
+    new_case a
+    awk '
+        { lines[NR] = $0 }
+        END {
+            for (i = 1; i <= NR; i++) {
+                if (lines[i] == "" && index(lines[i + 1], "3. Third decision item") == 1) continue
+                print lines[i]
+            }
+        }' "$CASE_DIR/$ADR104" >"$CASE_DIR/$ADR104.new"
+    mv "$CASE_DIR/$ADR104.new" "$CASE_DIR/$ADR104"
+    edit_file "$CASE_DIR/$ADR104" 'for the old helper.' 'for the old helper. [CORRECTED 2026-11-20: see Addendum]'
+    commit_pr
+    run_case "$CASE_NAME" 0 'OK' --since=master
+}
+
+# Same mixed hunk, but the next line is reworded. Dropping the blank line must not
+# hide the rewrite, so a gate that skips every line of a mixed hunk fails this case.
+case_blank_removal_with_rewrite_flagged() {
+    new_case a
+    awk '
+        { lines[NR] = $0 }
+        END {
+            for (i = 1; i <= NR; i++) {
+                if (lines[i] == "" && index(lines[i + 1], "3. Third decision item") == 1) continue
+                print lines[i]
+            }
+        }' "$CASE_DIR/$ADR104" >"$CASE_DIR/$ADR104.new"
+    mv "$CASE_DIR/$ADR104.new" "$CASE_DIR/$ADR104"
+    edit_file "$CASE_DIR/$ADR104" 'for the old helper.' 'for the retired helper.'
+    commit_pr
+    _run 1 '[decision] rewrite' --since=master || true
+    if ! grep -qF 'for the old helper.' <<<"$RESULT_OUT"; then
+        RESULT_MSG="${RESULT_MSG:+$RESULT_MSG; }finding does not quote the reworded line"
+    fi
+    if grep -qF 'removal' <<<"$RESULT_OUT"; then
+        RESULT_MSG="${RESULT_MSG:+$RESULT_MSG; }blank-line removal was reported"
+    fi
+    report "$CASE_NAME"
+}
+
+case_readme_ignored() {
+    new_case a
+    printf '%s\n' '' 'One more index line.' >>"$CASE_DIR/$README"
+    commit_pr
+    run_case "$CASE_NAME" 0 'no ADR modifications' --since=master
+}
+
+case_deleted_adr_flagged() {
+    new_case a
+    g rm -q "$ADR104"
+    commit_pr
+    run_case "$CASE_NAME" 1 'deleted-file' --since=master
+}
+
+case_pure_rename_pass() {
+    new_case a
+    g mv "$ADR104" ibl5/docs/decisions/0105-fixture.md
+    commit_pr
+    run_case "$CASE_NAME" 0 'OK' --since=master
+}
+
+case_rename_with_edit_flagged() {
+    new_case a
+    g mv "$ADR104" ibl5/docs/decisions/0105-fixture.md
+    edit_file "$CASE_DIR/ibl5/docs/decisions/0105-fixture.md" 'First decision item stays put.' 'First decision item was reworded.'
+    commit_pr
+    run_case "$CASE_NAME" 1 '[decision] rewrite' --since=master
+}
+
+case_bypass_valid() {
+    new_case a
+    rewrite_decision
+    commit_pr
+    PRB='<!-- adr-edit-ok: 0104 fixture factual slip found in review -->'
+    run_case "$CASE_NAME" 0 'BYPASSED' --since=master
+}
+
+case_bypass_reason_with_arrow() {
+    new_case a
+    rewrite_decision
+    commit_pr
+    PRB='<!-- adr-edit-ok: 0104 repair path -> new helper => Decision -->'
+    run_case "$CASE_NAME" 0 'BYPASSED' --since=master
+}
+
+case_bypass_short_reason_flagged() {
+    new_case a
+    rewrite_decision
+    commit_pr
+    PRB='<!-- adr-edit-ok: 0104 typo fix -->'
+    run_case "$CASE_NAME" 1 'WARN' --since=master
+}
+
+case_bypass_wrong_number_flagged() {
+    new_case a
+    rewrite_decision
+    commit_pr
+    PRB='<!-- adr-edit-ok: 0105 fixture factual slip found in review -->'
+    run_case "$CASE_NAME" 1 '[decision] rewrite' --since=master
+}
+
+case_pr_body_unset() {
+    new_case a
+    rewrite_decision
+    commit_pr
+    run_case "$CASE_NAME" 1 '[decision] rewrite' --since=master
+}
+
+case_pr_body_empty() {
+    new_case a
+    rewrite_decision
+    commit_pr
+    PRB=''
+    run_case "$CASE_NAME" 1 '[decision] rewrite' --since=master
+}
+
+case_unknown_flag() {
+    new_case a
+    run_case "$CASE_NAME" 2 'unknown argument' --since=master --bogus
+}
+
+case_since_space_form() {
+    new_case a
+    run_case "$CASE_NAME" 2 "unknown argument '--since'" --since master
+}
+
+case_missing_since() {
+    new_case a
+    run_case "$CASE_NAME" 2 'is required'
+}
+
+case_bad_rev() {
+    new_case a
+    run_case "$CASE_NAME" 2 'cannot resolve' --since=no-such-ref
+}
+
+case_help() {
+    new_case a
+    run_case "$CASE_NAME" 0 'Usage:' --help
+}
+
+case_empty_range() {
+    new_case a
+    run_case "$CASE_NAME" 0 'no ADR modifications' --since=HEAD --head=HEAD
+}
+
+case_stacked_base() {
+    new_case a
+    g checkout -q -b parent
+    edit_file "$CASE_DIR/$ADR104" "$ITEM2_OLD" "$ITEM2_NEW"
+    g add -A
+    g commit -q -m "parent rewrite"
+    g checkout -q -b child
+    printf '%s\n' '' '## Addendum — fixture (2026-11-20)' '' 'Appended on the child branch only.' >>"$CASE_DIR/$ADR104"
+    g add -A
+    g commit -q -m "child addendum"
+    local msg=""
+    _run 0 'OK' --since=parent || msg="--since=parent: $RESULT_MSG"
+    local out1="$RESULT_OUT"
+    if ! _run 1 '[decision] rewrite' --since=master; then
+        msg="${msg:+$msg; }--since=master: $RESULT_MSG"
+        out1="$out1"$'\n'"$RESULT_OUT"
+    fi
+    RESULT_MSG="$msg"
+    RESULT_OUT="$out1"
+    report "$CASE_NAME"
+}
+
+case_uncommitted_edit() {
+    new_case a
+    rewrite_decision
+    run_case "$CASE_NAME" 1 '[decision] rewrite' --since=master
+}
+
+# ---- review-thread regressions ----------------------------------------------
+# Cases that need base content the templates lack commit it on `pr` first and run
+# with --since=$BASE, so the templates (and every other case's line numbers) stay put.
+
+BASE=""
+
+# commit_base: commit the current tree as the case's base and set BASE to its sha.
+commit_base() {
+    g add -A
+    g commit -q -m "case base"
+    BASE=$(g rev-parse HEAD)
+}
+
+# add_decision_line <text>: insert <text> as a new Decision line after item 4.
+add_decision_line() {
+    edit_file "$CASE_DIR/$ADR104" '4. Fourth decision item cites `bin/live-tool` for the current helper.' \
+        '4. Fourth decision item cites `bin/live-tool` for the current helper.'$'\n'"$1"
+}
+
+# A dead old span swapped for another dead span is a rewrite, not a repair.
+case_dead_path_to_dead_path_flagged() {
+    new_case a
+    edit_file "$CASE_DIR/$ADR104" '`bin/gone-tool`' '`bin/also-gone-tool`'
+    commit_pr
+    run_case "$CASE_NAME" 1 '[decision] rewrite' --since=master
+}
+
+# A slash token that is not a path (an action ref) is not a dead path.
+case_action_ref_bump_flagged() {
+    new_case a
+    add_decision_line '5. Scan with `gitleaks/gitleaks-action@v2` on every push.'
+    commit_base
+    edit_file "$CASE_DIR/$ADR104" '`gitleaks/gitleaks-action@v2`' '`gitleaks/gitleaks-action@v3`'
+    commit_pr
+    run_case "$CASE_NAME" 1 '[decision] rewrite' --since="$BASE"
+}
+
+case_slash_figure_rewrite_flagged() {
+    new_case a
+    add_decision_line '5. The token grants `read/write` access.'
+    commit_base
+    edit_file "$CASE_DIR/$ADR104" '`read/write`' '`read-only`'
+    commit_pr
+    run_case "$CASE_NAME" 1 '[decision] rewrite' --since="$BASE"
+}
+
+# A path written relative to ibl5/ that resolves there is live, so swapping it is a rewrite.
+case_ibl5_relative_live_path_flagged() {
+    new_case a
+    mkdir -p "$CASE_DIR/ibl5/classes/Foo"
+    printf '%s\n' '<?php' >"$CASE_DIR/ibl5/classes/Foo/Bar.php"
+    printf '%s\n' '<?php' >"$CASE_DIR/ibl5/classes/Foo/Baz.php"
+    add_decision_line '5. The helper lives in `classes/Foo/Bar.php`.'
+    commit_base
+    edit_file "$CASE_DIR/$ADR104" '`classes/Foo/Bar.php`' '`classes/Foo/Baz.php`'
+    commit_pr
+    run_case "$CASE_NAME" 1 '[decision] rewrite' --since="$BASE"
+}
+
+# A dead path repaired to a live ibl5/-relative path is still a repair.
+case_dead_path_repair_ibl5_relative() {
+    new_case a
+    mkdir -p "$CASE_DIR/ibl5/classes/Foo"
+    printf '%s\n' '<?php' >"$CASE_DIR/ibl5/classes/Foo/Baz.php"
+    commit_base
+    edit_file "$CASE_DIR/$ADR104" '`bin/gone-tool`' '`classes/Foo/Baz.php`'
+    commit_pr
+    run_case "$CASE_NAME" 0 'OK' --since="$BASE"
+}
+
+# New prose ahead of a stamp is a rewrite even though the old words are kept.
+case_stamp_with_added_prose_flagged() {
+    new_case a
+    edit_file "$CASE_DIR/$ADR104" 'First decision item stays put.' \
+        'First decision item stays put. We now decide the opposite. [CORRECTED 2026-11-20]'
+    commit_pr
+    run_case "$CASE_NAME" 1 '[decision] rewrite' --since=master
+}
+
+case_stamp_with_trailing_prose_flagged() {
+    new_case a
+    edit_file "$CASE_DIR/$ADR104" 'First decision item stays put.' \
+        'First decision item stays put. [CORRECTED 2026-11-20] We now decide the opposite.'
+    commit_pr
+    run_case "$CASE_NAME" 1 '[decision] rewrite' --since=master
+}
+
+# A rename into a subfolder leaves the ADR set, so it fails like a deletion.
+case_rename_out_of_set_with_edit_flagged() {
+    new_case a
+    mkdir -p "$CASE_DIR/ibl5/docs/decisions/archive"
+    g mv "$ADR104" ibl5/docs/decisions/archive/0104-fixture.md
+    edit_file "$CASE_DIR/ibl5/docs/decisions/archive/0104-fixture.md" 'First decision item stays put.' 'First decision item was reworded.'
+    commit_pr
+    run_case "$CASE_NAME" 1 'renamed-out-of-set' --since=master
+}
+
+case_pure_rename_out_of_set_flagged() {
+    new_case a
+    g mv "$ADR104" ibl5/docs/decisions/fixture-0104.md
+    commit_pr
+    run_case "$CASE_NAME" 1 'renamed-out-of-set' --since=master
+}
+
+# A `## ` line inside a code fence is not a heading.
+case_fenced_heading_flagged() {
+    new_case a
+    add_decision_line '```markdown'$'\n''## Template heading'$'\n''```'$'\n''5. Decision line after the fence.'
+    commit_base
+    edit_file "$CASE_DIR/$ADR104" '5. Decision line after the fence.' '5. Decision line after the fence, reworded.'
+    commit_pr
+    run_case "$CASE_NAME" 1 '[decision] rewrite' --since="$BASE"
+}
+
+# heading_variant <heading> <expected tag>: a line under a real heading variant is frozen.
+heading_variant() {
+    CASE_NAME="${FUNCNAME[1]}"
+    CASE_DIR="$WORK/cases/$CASE_NAME"
+    mkdir -p "$WORK/cases"
+    cp -R "$WORK/tmpl-a" "$CASE_DIR"
+    g checkout -q -b pr
+    printf '%s\n' '' "$1" '' 'Variant line alpha.' >>"$CASE_DIR/$ADR104"
+    commit_base
+    edit_file "$CASE_DIR/$ADR104" 'Variant line alpha.' 'Variant line beta.'
+    commit_pr
+    run_case "$CASE_NAME" 1 "[$2] rewrite" --since="$BASE"
+}
+
+case_heading_decision_numbered() { heading_variant '## Decision 1 — first choice' 'decision 1'; }
+case_heading_decisions() { heading_variant '## Decisions' 'decisions'; }
+case_heading_alternatives_rejected() { heading_variant '## Alternatives rejected' 'alternatives rejected'; }
+
+# Removing the space between two words changes the text, so it is still a rewrite.
+case_joined_words_flagged() {
+    new_case a
+    edit_file "$CASE_DIR/$ADR104" 'Context line alpha.' 'Contextline alpha.'
+    commit_pr
+    run_case "$CASE_NAME" 1 '[context] rewrite' --since=master
+}
+
+# insert_above <file> <prefix> <new line>: put a new line above the line starting with <prefix>.
+insert_above() {
+    P="$2" L="$3" awk 'index($0, ENVIRON["P"]) == 1 { print ENVIRON["L"] } { print }' "$1" >"$1.new"
+    mv "$1.new" "$1"
+}
+
+# Review finding on PR 4155: prose inserted above a stamped line makes one mixed hunk
+# (1 old line, 2 new). Each edit passes alone, so the pair must pass too. Pairing by
+# position matched the old line to the inserted prose and failed this case.
+case_insert_above_stamp_pass() {
+    new_case a
+    insert_above "$CASE_DIR/$ADR104" '4. Fourth decision item' 'Inserted decision note.'
+    edit_file "$CASE_DIR/$ADR104" 'for the current helper.' 'for the current helper. [CORRECTED 2026-11-20: see Addendum]'
+    commit_pr
+    run_case "$CASE_NAME" 0 'OK' --since=master
+}
+
+# Same mixed hunk, but the old line is reworded. The inserted line must not hide it.
+case_insert_above_rewrite_flagged() {
+    new_case a
+    insert_above "$CASE_DIR/$ADR104" '4. Fourth decision item' 'Inserted decision note.'
+    edit_file "$CASE_DIR/$ADR104" 'for the current helper.' 'for the newer helper.'
+    commit_pr
+    _run 1 '[decision] rewrite' --since=master || true
+    if ! grep -qF 'for the current helper.' <<<"$RESULT_OUT"; then
+        RESULT_MSG="${RESULT_MSG:+$RESULT_MSG; }finding does not quote the reworded line"
+    fi
+    report "$CASE_NAME"
+}
+
+# ---- dispatch --------------------------------------------------------------
+
+ALL_CASES=(
+    case_adr0104_decision_rewrite case_adr0168_description case_adr0168_decision_line
+    case_last_verified_bump case_addendum_append case_dead_path_repair
+    case_dead_path_example_suffix case_live_path_swap_flagged case_corrected_stamp
+    case_stamp_with_rewrite_flagged case_contextual_heading_not_frozen
+    case_decision_colon_addendum_not_frozen case_unfrozen_sections_pass
+    case_context_removal_flagged case_whitespace_only_pass case_new_adr_file
+    case_readme_ignored case_deleted_adr_flagged case_pure_rename_pass
+    case_rename_with_edit_flagged case_bypass_valid case_bypass_short_reason_flagged
+    case_bypass_wrong_number_flagged case_bypass_reason_with_arrow case_pr_body_unset case_pr_body_empty
+    case_unknown_flag case_since_space_form case_missing_since case_bad_rev
+    case_help case_empty_range case_stacked_base case_uncommitted_edit
+    case_dead_path_to_dead_path_flagged case_action_ref_bump_flagged
+    case_slash_figure_rewrite_flagged case_ibl5_relative_live_path_flagged
+    case_dead_path_repair_ibl5_relative case_stamp_with_added_prose_flagged
+    case_stamp_with_trailing_prose_flagged case_rename_out_of_set_with_edit_flagged
+    case_pure_rename_out_of_set_flagged case_fenced_heading_flagged
+    case_heading_decision_numbered case_heading_decisions case_heading_alternatives_rejected
+    case_joined_words_flagged case_blank_removal_with_stamp_pass
+    case_blank_removal_with_rewrite_flagged
+    case_insert_above_stamp_pass case_insert_above_rewrite_flagged
+)
+
+SELECTED=("$@")
+if [ "${#SELECTED[@]}" -eq 0 ]; then
+    SELECTED=("${ALL_CASES[@]}")
+else
+    for want in "${SELECTED[@]}"; do
+        known=0
+        for c in "${ALL_CASES[@]}"; do
+            [ "$c" = "$want" ] && known=1
+        done
+        if [ "$known" -eq 0 ]; then
+            echo "test-check-adr-append-only: unknown case '$want'" >&2
+            exit 2
+        fi
+    done
+fi
+
+for c in "${SELECTED[@]}"; do
+    unset PRB
+    "$c"
+done
+
+echo "$PASS passed, $FAIL failed"
+[ "$FAIL" -eq 0 ]

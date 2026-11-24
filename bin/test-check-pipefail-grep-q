@@ -236,7 +236,15 @@ commit_all
 expect_since full-scan-shape2 1 'bin/arm23.sh:3:'
 expect_since full-scan-shape3 1 'bin/arm23.sh:4:'
 
+# launchctl list is a producer too: its ~600-line table outgrows the pipe buffer.
+LCL='launch''ctl list'
+expect_added_bad launchctl-list-producer "if $LCL 2>/dev/null $PIPE $GQ -q \"com\\.x-\$b-\"; then :; fi"
+expect_added_bad launchctl-list-no-space "$LCL$PIPE$GQ -qF x && continue"
+
 # Must stay unflagged.
+expect_added_ok launchctl-list-grep-c-passes "[ \"\$($LCL 2>/dev/null $PIPE $GQ -c x)\" -gt 0 ]"
+LCP='launch''ctl print'
+expect_added_ok launchctl-print-passes "$LCP gui/1/x $PIPE $GQ -q y"
 expect_added_ok dashdash-file-operand-passes "echo \"\$x\" $PIPE $GQ -F -- y -q"
 expect_added_ok eq-after-subst-passes "[ \"\$(printf '%s\\n' \"\$x\" $PIPE $GQ -c y)\" -eq 1 ]"
 expect_added_ok semicolon-ends-grep-passes "echo \"\$x\" $PIPE $GQ -c y; [ \"\$n\" -eq 1 ]"

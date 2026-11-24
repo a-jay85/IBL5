@@ -125,9 +125,19 @@ exit 0
 H
 
     # launchctl shim: SHIM_LAUNCHCTL_OUT controls what `launchctl list` returns.
+    # The 6000-line filler AFTER the wanted rows is load-bearing: the real table is
+    # ~600 lines, and a `launchctl list | grep -q` interlock under pipefail reads a
+    # live job as gone only when output is still queued past the pipe buffer when
+    # grep exits. Without the filler, test 17 passes on that broken form.
     cat > "$SB/shim/launchctl" <<'LCTL'
 #!/usr/bin/env bash
-[ "${1:-}" = "list" ] && printf '%s\n' "${SHIM_LAUNCHCTL_OUT:-}" || true
+[ "${1:-}" = "list" ] || exit 0
+printf '%s\n' "${SHIM_LAUNCHCTL_OUT:-}"
+i=0
+while [ "$i" -lt 6000 ]; do
+    printf '%s\t0\tcom.example.filler-%s\n' - "$i"
+    i=$((i + 1))
+done
 exit 0
 LCTL
 
@@ -830,5 +840,19 @@ printf '%s\n' "$OUT25C" | grep -qF 'It has survived 1 nightly salvage attempt(s)
     && ! printf '%s\n' "$OUT25A" "$OUT25B" | grep -q 'salvage it automatically'; } \
   && ok "(25d) wedged outputs stay 3 lines and drop the automatic-salvage promise" \
   || bad "(25d) wedged outputs: 3-line contract / no automatic-salvage promise"
+
+# (25e) Same 5h local-only branch as 25c, but its docfix-run job is loaded: the
+# run is alive, so the health arm must not call it wedged. This is the 2026-11-23
+# false alert: a warm-pool slot carried a 4h25m reflog age into a run that had
+# just started, and the interlock read the live job as gone.
+OUT25E="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" \
+    SHIM_LS_REMOTE="" SHIM_PR_FOR_BRANCH=0 \
+    SHIM_BRANCH_OUT="$B_OLD" SHIM_REFLOG_OUT="$REFLOG_5H" \
+    SHIM_LAUNCHCTL_OUT="$(printf '4242\t0\tcom.ibl5.docfix-run-%s-20261123-210514-1' "$B_OLD")" \
+    SHIM_WORKTREE_LIST="$WL25" \
+    run_health "$SB" 77)"
+{ grep -q '^alert=' <<< "$OUT25E" && ! grep -qxF 'kind=wedged' <<< "$OUT25E"; } \
+  && ok "(25e) live job: 5h-old branch with a loaded docfix-run job is not wedged" \
+  || bad "(25e) live job: health arm called a running branch wedged (or printed no report)"
 
 h_done

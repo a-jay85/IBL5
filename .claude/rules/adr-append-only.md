@@ -1,6 +1,6 @@
 ---
 description: Decision records in ibl5/docs/decisions/ are append-only — frozen sections (Context, Decision, Rationale, Alternatives) must never be rewritten in place; corrections go in a dated Addendum section.
-last_verified: 2026-11-15
+last_verified: 2026-11-21
 paths: "ibl5/docs/decisions/**"
 ---
 
@@ -37,7 +37,7 @@ PR #2059) and all three of its content edits:
 ADR-0034 showed the plain form: `gitleaks-action@v2` in `## Decision` was overwritten with `@v3`
 because the workflow had been upgraded. The upgrade is real; the decision it records is still v2.
 
-Enforcement is by construction rather than by a runtime gate: the constraint is written into the
+The first line of defence is the prompt: the constraint is written into the
 headless prompt in `bin/docfix-run`, which also requires every non-date content change to be disclosed verbatim
 (before/after sentence plus the evidence checked) under a `## Content rewritten` heading in the
 commit body and PR body — the same forced-disclosure shape already used for deleted `paths:`
@@ -48,3 +48,5 @@ quality of the edits it held, which is why the fix is upstream in the prompt.
 Because a prose clause in a prompt is discipline and not enforcement, `bin/test-docfix-run`
 case 48 statically asserts both clauses are still present in `$PROMPT`, so deleting one fails
 CI instead of silently reverting the behaviour.
+
+CI enforces the rule since 2026-11-20. `bin/check-adr-append-only --since=<base>` runs on every pull request in the `Meta checks` job and fails a PR that rewrites or removes text under a frozen heading (Context, Decision, Decisions, Decision N, Rationale, Alternatives Considered, Alternatives Rejected, Alternatives) or the frontmatter `description`. A pure insertion, such as an Addendum, always passes. The gate also fails the same-line numeric ADR edits that `bin/docfix-check-veronly` would arm, so a docfix PR that rewrites frozen ADR text now stops at CI. To keep a deliberate in-place edit, put `<!-- adr-edit-ok: NNNN <reason of 15+ chars> -->` in the PR body, one marker per ADR number. Decision record: ADR-0272.

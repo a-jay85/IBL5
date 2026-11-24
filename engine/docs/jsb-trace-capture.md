@@ -49,6 +49,10 @@ A hosted entry adds these hold reasons: `capture-bad-host`, `capture-commit-bad`
 
 List every non-test engine `.go` file the PR changes for that routine. The check holds the PR when a changed non-test engine `.go` file is in no list, or when the pinned test executes no added line of a listed file. A comment-only edit, a pure deletion, a rename, and any file under `engine/cmd/` therefore hold for the owner. The reason strings live in `tools/postplan-harness/harness/trace_pinned.py`.
 
+### Replay progress for port branches
+
+A `jsb-port-<row>-rN` branch needs one more check before its trace-pinned evidence lifts the hold. At arming, `tools/postplan-harness/harness/replay_progress.py` replays the recorded week on the PR head and on its base. The base replay runs days 1 to 7 and stops at its first mismatching day. The head replay runs days 1 to that day. The hold lifts only when the head matches through that day, or when its first mismatch comes strictly later than the base's. Positions are ordered by day, then game, then draw, then matched draws, and a box-score-only mismatch ranks after every draw mismatch on its day. An equal or earlier position keeps the hold with `replay-no-progress:<row>:<position>`. The check keeps the hold with `replay-unavailable:<why>` when jsb-native or its current recording is missing, the recording changes during the check, `go run ./cmd/jsbreplay` fails, or the 40-minute budget runs out. Each replay writes only to its own temp copy of `parity/state`, so it never touches the loop's replay directory. Results are cached under `~/.cache/ibl5-postplan/replay-progress/`, keyed by the engine tree hash, the recording id and the baseline hash. Reason strings carry the row id and positions only.
+
 ## Whole-day replay
 
 The whole-day recorder in jsb-native captures every `rand()` draw of a sim day together with the calling function, game enter and exit markers, and a league snapshot before each day. The recordings stay in jsb-native, pinned by commit and sha256 (ADR-0279). IBL5 holds none of them.

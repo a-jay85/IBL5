@@ -628,8 +628,9 @@ def test_annotate_work_list_hints_contract_with_split_script(contract_trim_repo)
 
 def test_annotate_work_list_ignores_mdx_near_miss(contract_trim_repo):
     _split_caps_stub(contract_trim_repo.root, 700)
+    near_miss = ".claude/skills/plan/_architect-contract.mdx"
     text = ("- [BLOCKING] [unplanned-scope] The PR deleted prose from "
-            f"`{X_CONTRACT}x` that the plan never named.")
+            f"`{near_miss}` that the plan never named.")
     items = _items(text)
     out = rbc.annotate_work_list(items, contract_trim_repo.root, contract_trim_repo.base)
     assert out == items

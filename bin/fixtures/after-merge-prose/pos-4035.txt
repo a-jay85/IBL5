@@ -1,0 +1,69 @@
+<!-- merge-digest:begin -->
+## Merge digest
+
+**What changed:** The owner can now approve a held PR, or ask for a fix first, by pressing a button in the Discord DM, and a Mac job turns that press into a `bin/owner-approve` run.
+
+**Why:** The owner wants to approve a held PR from the phone in one tap, without going back to a terminal.
+
+**Watch:** `bin/lib/launchd-expected-jobs.sh` now expects `com.ibl5.approve-click-tick`, so the launchd health check reports it missing until the owner runs `bin/approve-click-cron-setup --install`. When a button DM fails to send, `mintToken` has already retired that PR's older button, so the owner falls back to the CLI.
+
+**Touches:** bin/approve-click-tick, bin/approve-click-cron-setup, bin/post-plan-fleet, bin/test-plan-review-seam, bin/lib/, bin/fixtures/, ibl5/IBLbot/src/, ibl5/IBLbot/README.approve-buttons.md, ibl5/docs/decisions/0262-discord-approve-buttons.md, .gitleaks.toml
+
+**Machine-authored fixes:** Earlier review-thread commits built the button path from `$ROOT` and widened `CONTROL_RE` to C1 control characters. This run's Phase 6.5 has not run.
+<!-- merge-digest:end -->
+
+## Summary
+- Adds Approve and Fix first button handling to IBLbot in `ibl5/IBLbot/src/interactions/approve-buttons.ts`. Only the configured owner id can press. Fix first opens a modal for a condition of up to 300 characters with no control characters. Each press is recorded once per token, and a press on an expired, used or replaced token gets an ephemeral refusal.
+- Wires the button and modal handlers into `ibl5/IBLbot/src/index.ts` under the `approve_` and `approve_cond_` custom id prefixes.
+- Adds `bin/approve-click-tick`, a Mac-side poller. It lists pending presses over the existing ssh route and claims each one at most once, using marker files in a local ledger. It re-checks the actor, the press age, the PR state and the live head SHA, and fails closed when `gh` fails. It then starts a detached `bin/owner-approve` run, passing the condition as one argv element so shell metacharacters stay literal. It DMs the outcome, and DMs about a press that was claimed but never ran. It exits 3 under `CLAUDE_HEADLESS`, except `--send-button`.
+- Adds `bin/approve-click-cron-setup`, which prints, installs or removes a launchd agent that runs the poller every 180 seconds. The agent points at the main checkout.
+- `bin/post-plan-fleet` now sends the button DM after the held text DM. A failed button send never suppresses the text DM.
+- `bin/test-plan-review-seam` gains drift checks for the three approve routes in `express.ts` and for the owner id pinned in both `bin/approve-click-tick` and `bin/discord-dm`. It also gains stubbed ssh, gh, owner-approve and discord-dm cases for the poller. They cover a valid press, a moved head, duplicate ticks, metacharacters in the condition, the headless guard, a crash mid-run, the condition cap, control characters, a wrong or numeric actor, a 409 claim, closed PRs, the plist and the post-plan-fleet ordering.
+- Adds vitest tests for the button and modal handlers and for the click store, plus `ibl5/IBLbot/README.approve-buttons.md`, a prod and Mac runbook.
+- The diff shown was truncated, so this summary covers only the visible part. Nothing here changes what a league GM sees. It is owner and dev tooling.
+- The launchd agent is not installed by merging. The owner runs `bin/approve-click-cron-setup --install` once on the Mac after merge.
+
+**Merge danger:** Door: two-way · Blast radius: site-wide · Why: Adds new bot routes and Mac scripts; nothing runs until the owner deploys the bot and installs the agent, and a revert removes the code.
+**How to revert:** `git revert <merge-sha>`, then run `bin/approve-click-cron-setup --uninstall` on the Mac if the agent was installed, and `pm2 restart iblbot` on prod.
+
+<!-- manual-confirmation:begin -->
+## Manual confirmation needed
+
+> **Decision:** Merge if you're OK with an Approve press in Discord from your account running bin/owner-approve on the Mac, which still arms only on a READY verdict.
+<!-- manual-confirmation:end -->
+
+## Manual Testing
+
+No manual testing needed — all changes are covered by automated tests.
+
+<!-- plan-checks:begin -->
+<details><summary>Plan checks for CI (read by the Plan checks job)</summary>
+
+```text
+plan-checks v1 sha256=ffb0d044048d127bad9fce5909124bcb75c3c496f5d42141625ed05c22be1635 rows=19 mutations=15
+eNq1V2FT4zYQ/Suqj+HgwCRAjjuSyc3QhGmZocBAO+0MMB5FVhIVW/JJcoDh+O9dyUpsQ6GxoB8g
+iax9z293tbt6CNJcY80EV0H38iEgU0pugm4wYrylqdJhlmAeSjpj9DZUFKfoAyJYUYSzTIoZDWc4
+YXEPzVG6KJYiQ3pKURiKzCwhmtCUch1sBmOWUAc+tycJIzehhn/wPMWaTGEDlpNZf+0qWMnkVYDg
+81bIWNmvc9T+CnxeBetgJSm8JKGv2Nld4hZ27HwOHjc9ZCqNE1qVaRc4VQoZe6QFYmM0xomiDXSC
+yaV5zYTNaKSmGF76p75ZmFIcu4XrnvEmr+mcU5WPCnF7fuLiPKtKIwlmKY3fLCykRgqJmWw5yIZy
+vvjJSanGZIplVVPOv+dCU5eYY3YHfxLkYSnxvUeGziM3yrUWHHSZsAFsqRCZZNww2Vjh668QwcEN
+6z00Zk99sCTgM7gFWOG1r35eMymXQD5XvbZxt0iCbmi/Ns4BbkQ9DI4P/hgeRr8eHgyPDy8uNu4e
+X06Fl4y64ROjQu6+n1yZ81DfMvL0UEsNmT/JsYyNai6g3Lwh7x1gJYj0jmnUfhb+7kLQ7rafICKx
+mlbFALiwatQNy95DzBywogbSTzOe09f07HrqwfWihLP3qLQPH8yJMYkUTrRZGJyeDI9+Pzo9iX47
++KtZfdrteCrjWiY1bWah2OMRJmtnYmQrC2Icfbq87FrM7vX1p3VIhHGuaGSNzUYuOKG2PxoTZnv0
+FCsbTCngRaB2YqKphM7ZW4QY9XqIKkxeCrNnYwUiUavUduE9Qm2BFh319M+Tw/NoeHQxOD0fRkfD
+hqH27Ky274Wd9v6z/hpNtS4zWsu8iUSrr4Rx3WKn3Taq0I8f6KEmyqAvVgs9y7fWWLKxRokQWb24
+cJwW7dS+B5Iih/bKTIHLJLSRLa1KQWyUfG4d/Xw8ErqlJGkpKmdUtmpbF7Nflm1lQum1j3MfDIwL
+VDFDfNyEVOXQqAbml32yBrVpfb1XHwRfBaHx6zDWRZ2256QIFnFeHxYPRkAm+JkUBPT+Ar6yBfk/
+M5tIwYFE51nFQYlliG7ofTQScFz/FbzIp9IhyxjNX8fp9+xD44RSHd4yyfik1lspj8NiukEJ47bU
+deviTcQKfAtS0QzpHmXZOHIkpnyHFcA+PD87h9VvrZjOWjxPErTzbXXbJP0zV5Q1q+PZmiwzSYSi
+tZvPSPMIGr6ZMt9evRZg8wp2enZ40qxodaA/Xdsf7m6Xxv/bzY7naeV21Yyo2d3KMe35MC1/0XEs
+X3xY3nL/cLxffXiXnuAdyb4PCU0zfT9P2gJot+0D1GwAd0zbPkwLb5c4Oz44y0/YjmXXi2Wpudcx
+dLwYlps/HYXXkV5+qnMsXse54XTlqJY9028afAqujtfJ8JggHJ3f8WjYsB2XV3L7dE7HV031Cdyh
+bdcO2YQLCSX1O6rOmDHWuN5m1dbfSvCkhHua1gVcLIgyowWDG1I/xQouQfATTkTZklZXUbkfGBR9
+YlBy7Nn+Owu624//ADskMrA=
+```
+
+</details>
+<!-- plan-checks:end -->
+

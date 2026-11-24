@@ -1,0 +1,184 @@
+#!/bin/bash
+# shellcheck shell=bash
+#
+# post-merge-run — runs the `auto:mac` rows of merged PRs on the owner's Mac (ADR-0198).
+#
+# A merged PR body can carry `## After merge` rows tagged `[auto:mac <name>]`. For each such
+# row this script runs the tracked step file bin/post-merge-steps/<name> once, as
+# `bash <step> --pr <N>` from this checkout, with CLAUDE_HEADLESS=1. It sends a Discord
+# message only when a step fails, times out, is unknown, or its merge commit never reached
+# this checkout within 24 hours.
+#
+# Trust rules: the PR body supplies a step NAME only (already filtered by PMR_NAME_RE). The
+# name must resolve to a regular, git-tracked, non-symlink file under bin/post-merge-steps/.
+# A step receives exactly `--pr <N>`, never row text. Manual and unparseable rows are skipped
+# here because the merge digest already lists them as manual.
+#
+# Usage: bin/post-merge-run --tick [--dry-run] [--prs-json <file>] [--step-timeout <seconds>]
+#
+#   --tick                  Required. Run one sweep over merged PRs.
+#   --dry-run               Log what would run; run nothing and write no state.
+#   --prs-json <file>       Test seam: read the merged-PR list from a file instead of gh.
+#   --step-timeout <secs>   Kill a step after this many seconds (default 900). Space form only.
+#   -h, --help              Show this message.
+#
+# State (outside the repo): $HOME/.ibl5-post-merge-run/
+#   since                 epoch of the first run; earlier merges are never back-filled
+#   lock/                 one sweep at a time (mkdir plus a claim file holding the pid)
+#   done/<pr>.row<N>      marker per row, so a rerun never repeats a row
+#   logs/<pr>.row<N>.log  step output
+#   pending-dm/*.txt      failure DMs that did not send; each tick retries them
+#
+# Exit codes: 0 done or nothing to do, 1 gh or state failure, 2 usage error.
+#
+# Portable to bash 3.2.
+
+set -uo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=bin/lib/post-merge-rows.sh
+. "$ROOT/bin/lib/post-merge-rows.sh"
+# shellcheck source=bin/lib/claim-file.sh
+. "$ROOT/bin/lib/claim-file.sh"
+
+usage() { sed -n '/^# Usage:/,/^# Exit codes:/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+log() { printf 'post-merge-run: %s\n' "$*"; }
+
+TICK=0
+DRY_RUN=0
+PRS_JSON=""
+STEP_TIMEOUT=900
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --tick) TICK=1; shift ;;
+        --dry-run) DRY_RUN=1; shift ;;
+        --prs-json)
+            [ $# -ge 2 ] || { echo "post-merge-run: --prs-json needs a file" >&2; exit 2; }
+            PRS_JSON="$2"; shift 2 ;;
+        --step-timeout)
+            [ $# -ge 2 ] || { echo "post-merge-run: --step-timeout needs seconds" >&2; exit 2; }
+            STEP_TIMEOUT="$2"; shift 2 ;;
+        -h|--help) usage; exit 0 ;;
+        *) echo "post-merge-run: unknown option: $1 (try --help)" >&2; exit 2 ;;
+    esac
+done
+[ "$TICK" -eq 1 ] || { echo "post-merge-run: --tick is required (try --help)" >&2; exit 2; }
+pmr_is_count "$STEP_TIMEOUT" && [ "$STEP_TIMEOUT" -gt 0 ] || { echo "post-merge-run: --step-timeout must be a positive integer" >&2; exit 2; }
+
+PENDING_MAX=86400
+NOW="$(date +%s)"; STATE="${HOME:?HOME is unset}/.ibl5-post-merge-run"
+if [ ! -f "$STATE/since" ]; then   # first run: earlier merges are never back-filled
+    if [ "$DRY_RUN" -eq 0 ]; then
+        mkdir -p "$STATE" && printf '%s\n' "$NOW" > "$STATE/since" || { log "cannot record $STATE/since"; exit 1; }
+    fi
+    log "first run: since=$NOW recorded; earlier merges are not back-filled"; exit 0
+fi
+SINCE="$(cat "$STATE/since")"; pmr_is_count "$SINCE" || { log "corrupt $STATE/since"; exit 1; }
+
+# take_lock: mkdir makes room, claim_file owns it. A lock whose pid is dead is reaped.
+take_lock() {
+    mkdir -p "$STATE" "$STATE/done" "$STATE/logs" "$STATE/pending-dm" || { log "cannot create state dirs under $STATE"; exit 1; }
+    if mkdir "$STATE/lock" 2>/dev/null && claim_file "$STATE/lock/pid" printf '%s\n' "$$"; then
+        return 0
+    fi
+    local _p
+    _p="$(cat "$STATE/lock/pid" 2>/dev/null || true)"
+    if pmr_is_count "$_p" && kill -0 "$_p" 2>/dev/null; then
+        log "another run holds the lock (pid $_p); exiting"; return 1
+    fi
+    _lock_stale() { local _q; _q="$(cat "$1/pid" 2>/dev/null || true)"; ! { pmr_is_count "$_q" && kill -0 "$_q" 2>/dev/null; }; }
+    claim_reclaim "$STATE/lock" pid _lock_stale printf '%s\n' "$$" || { log "could not take the lock; exiting"; return 1; }
+}
+if [ "$DRY_RUN" -eq 0 ]; then take_lock || exit 0; fi   # mkdir + claim_file, reaps a dead pid
+TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"; [ "$DRY_RUN" -eq 1 ] || rm -rf "$STATE/lock"' EXIT
+
+if [ -n "$PRS_JSON" ]; then
+    [ -r "$PRS_JSON" ] || { log "--prs-json not readable: $PRS_JSON"; exit 1; }
+    cp "$PRS_JSON" "$TMP/prs.json"
+else
+    # Lower bound is the later of `since` and 14 days ago, minus a day for timezone slack. The window slides, so the
+    # list stays under the 500 cap; done markers already stop repeats, and a Mac off for over 14 days skips older merges.
+    _since_day="$(jq -rn --argjson s "$SINCE" --argjson n "$NOW" '([$s, $n - 1209600] | max) - 86400 | strftime("%Y-%m-%d")')" || { log "jq failed"; exit 1; }
+    gh pr list --state merged --author @me --limit 500 --search "merged:>=$_since_day" \
+        --json number,mergedAt,mergeCommit,body > "$TMP/prs.json" || { log "gh pr list failed"; exit 1; }
+    if [ "$(jq 'length' "$TMP/prs.json")" -ge 500 ]; then log "WARNING: PR list hit the 500 limit; older merges may be skipped"; fi
+fi
+jq -c --argjson since "$SINCE" '.[] | select((.number | type) == "number")
+    | select(.mergedAt != null and ((.mergeCommit.oid // "") | test("^[0-9a-f]{40}$")))
+    | select((.mergedAt | fromdateiso8601) >= $since)' "$TMP/prs.json" > "$TMP/prs.ndjson" || { log "could not parse the PR list"; exit 1; }
+
+resolve_step() {   # <name> -> path of an allowlisted, tracked, regular step file
+    local p="$ROOT/bin/post-merge-steps/$1"
+    [ -f "$p" ] && [ ! -L "$p" ] || return 1
+    git -C "$ROOT" ls-files --error-unmatch "bin/post-merge-steps/$1" >/dev/null 2>&1 || return 1
+    printf '%s\n' "$p"
+}
+run_step() {       # <path> <pr> <log> -> ok | timeout | exit-<rc>
+    ( cd "$ROOT" && CLAUDE_HEADLESS=1 exec perl -e 'setpgrp(0, 0); exec @ARGV or exit 127' bash "$1" --pr "$2" ) </dev/null >"$3" 2>&1 &
+    local pid=$! rc wd
+    # The step is its own process group leader (pgid = pid), so the timeout signals the whole group, children included.
+    # Inside the watchdog subshell, pid holds the negated pgid; `kill -TERM -N` signals group N (bash 3.2 and 5).
+    # A step that traps TERM would outlive the limit, so after a 5s grace the watchdog sends KILL to the group.
+    # The watchdog writes a marker before TERM, so only a real timeout reports "timeout"; a step that dies from its own signal reports exit-<rc>.
+    local mark="$TMP/timedout.$2"; rm -f "$mark"
+    ( pid="-$pid"; sleep "$STEP_TIMEOUT"; : > "$mark"; kill -TERM "$pid" 2>/dev/null; sleep 5; kill -KILL "$pid" 2>/dev/null ) </dev/null >/dev/null 2>&1 &
+    wd=$!; wait "$pid"; rc=$?
+    # Stop the watchdog before its sleep: killing the sleep first lets the watchdog run on to write the marker and send TERM.
+    # Read the sleep's pid first, since it is orphaned (ppid 1) once the watchdog dies.
+    local _kid
+    local _kids; _kids="$(pgrep -P "$wd" 2>/dev/null || true)"
+    kill "$wd" 2>/dev/null; wait "$wd" 2>/dev/null
+    for _kid in $_kids; do kill "$_kid" 2>/dev/null; done
+    if [ -e "$mark" ]; then rm -f "$mark"; echo timeout
+    elif [ "$rc" -eq 0 ]; then echo ok
+    else echo "exit-$rc"; fi
+}
+process_pr() {     # <pr> <merge-oid> <merged-epoch>; body already in $TMP/body.txt
+    local pr="$1" oid="$2" merged="$3" line n step res fails=""
+    # pmr_rows drops fenced code blocks itself: a row inside a fence is documentation, not a step to run.
+    pmr_rows "$TMP/body.txt" > "$TMP/rows.txt"
+    while IFS= read -r line; do
+        pmr_parse_row "$line"
+        [ "$PMR_KIND" = auto:mac ] && [ "$PMR_VALID" -eq 1 ] || continue
+        n="${PMR_LABEL//[!0-9]/}"
+        [ -f "$STATE/done/$pr.row$n" ] && continue
+        if ! git -C "$ROOT" merge-base --is-ancestor "$oid" HEAD 2>/dev/null; then
+            if [ $((NOW - merged)) -lt "$PENDING_MAX" ]; then log "PR $pr row $n: merge commit not in checkout yet; pending"; continue; fi
+            res=checkout-behind
+        elif ! step="$(resolve_step "$PMR_NAME")"; then res=unknown-step
+        elif [ "$DRY_RUN" -eq 1 ]; then log "PR $pr row $n: would run $PMR_NAME"; continue
+        else res="$(run_step "$step" "$pr" "$STATE/logs/$pr.row$n.log")"
+        fi
+        log "PR $pr row $n ($PMR_NAME): $res"
+        [ "$DRY_RUN" -eq 1 ] || { printf '%s\t%s\n' "$PMR_NAME" "$res" > "$STATE/done/$pr.row$n.tmp" && mv "$STATE/done/$pr.row$n.tmp" "$STATE/done/$pr.row$n"; }
+        [ "$res" = ok ] || fails="$fails"$'\n'"Row $n [auto:mac $PMR_NAME]: $res (log: $STATE/logs/$pr.row$n.log)"
+    done < "$TMP/rows.txt"
+    [ -n "$fails" ] && [ "$DRY_RUN" -eq 0 ] || return 0
+    printf 'post-merge-run: PR #%s has auto:mac rows that did not succeed. Run them by hand.%s\n' "$pr" "$fails" > "$TMP/dm.txt"
+    # The done markers are already written, so a failed DM is saved and retried on the next tick.
+    if ! bash "$ROOT/bin/discord-dm" - < "$TMP/dm.txt"; then
+        log "PR $pr: discord-dm failed; saved for retry"
+        cp "$TMP/dm.txt" "$STATE/pending-dm/$pr.$NOW.txt" || log "PR $pr: could not save the pending DM"
+    fi
+}
+retry_pending_dms() {
+    local f
+    [ "$DRY_RUN" -eq 0 ] || return 0
+    for f in "$STATE"/pending-dm/*.txt; do
+        [ -f "$f" ] || continue
+        if bash "$ROOT/bin/discord-dm" - < "$f"; then rm -f "$f"; log "resent pending DM $(basename "$f")"
+        else log "pending DM $(basename "$f") still failing"; fi
+    done
+}
+
+retry_pending_dms
+while IFS= read -r _pr_json; do
+    [ -n "$_pr_json" ] || continue
+    _pr="$(jq -r '.number' <<< "$_pr_json")"
+    _oid="$(jq -r '.mergeCommit.oid' <<< "$_pr_json")"
+    _merged="$(jq -r '.mergedAt | fromdateiso8601' <<< "$_pr_json")"
+    jq -r '.body // ""' <<< "$_pr_json" | tr -d '\r' > "$TMP/body.txt"
+    process_pr "$_pr" "$_oid" "$_merged"
+done < "$TMP/prs.ndjson"
+exit 0

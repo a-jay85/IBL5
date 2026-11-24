@@ -1,0 +1,20 @@
+{
+  "branch": "jsb-port-pl-0028",
+  "schema": 2,
+  "tests": [
+    {
+      "capture": "captures/pl-0028.jsonl",
+      "capture_commit": "2ba5afc27184b07cd13f351a6eea685c4c6e7543",
+      "capture_host": "jsb-native",
+      "capture_sha256": "9102065f8b47f1cbbf1232e4b2ce9aebc0d985f5ac5def7275272d64dc16f03c",
+      "file": "engine/internal/sim/tracepinned_pl0028_test.go",
+      "package": "./internal/sim",
+      "ported_files": [
+        "engine/internal/sim/gameloop.go"
+      ],
+      "test": "TestTracePinnedPl0028TipOff",
+      "test_blob": "40181ec7cacfd050ebce9eebdf755b61a7fc0a85"
+    }
+  ],
+  "token": "trace-pinned"
+}

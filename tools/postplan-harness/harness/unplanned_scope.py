@@ -299,11 +299,14 @@ def title_key(text: str) -> str:
     The reviewer rewords the explanation after the first `: ` on every run, and it may
     add or drop a bracketed tag such as `[MERGE-RULE]`. The key drops leading tags and
     keeps the words before the first `: `, so the same finding matches its declared line
-    and the owner's approved line. A title with no `: ` keeps its whole text.
+    and the owner's approved line. A title with no `: ` stops at its first sentence end
+    (`. ` or a final `.`), because the reviewer also rewords the sentences after it
+    (PRs 4202 and 4213).
     """
     title = title_of(text) if is_unplanned_scope(text) else _BULLET_RE.sub("", text.splitlines()[0] if text else "")
     title = _LEAD_TAGS_RE.sub("", title.strip())
-    return title.split(": ", 1)[0].split(". Next action", 1)[0].strip()
+    title = title.split(": ", 1)[0].split(". Next action", 1)[0]
+    return title.split(". ", 1)[0].strip().rstrip(".").strip()
 
 
 def _listed_keys(span: str) -> set:

@@ -157,3 +157,26 @@ def test_only_owner_approve_emits_marker():
                 hits.add(path)
     assert hits - allowed == set(), sorted(str(p) for p in hits - allowed)
     assert REPO / "bin" / "owner-approve" in hits
+
+
+def test_reworded_finding_without_colon_matches_by_first_sentence():
+    """A title with no `: ` keys on its first sentence. The re-review rewords the
+    sentences after it, and the owner's approval still covers it (PRs 4202, 4213)."""
+    old = ("- [BLOCKING] [unplanned-scope] Scope range_hi widening to the claude-perm-ok "
+           "marker only. In `bin/check-x`, `mk_range` gained a third parameter. "
+           "Three tests pin the edges.")
+    new = ("- [BLOCKING] [unplanned-scope] Scope range_hi widening to the claude-perm-ok "
+           "marker only. In `bin/check-x`, `mk_range` gained a parameter and a new "
+           "function. No plan phase asked for this.")
+    key = "Scope range_hi widening to the claude-perm-ok marker only"
+    assert us.title_key(old) == us.title_key(new) == key
+    got = us.approval_from_comments([_comment(_body(span=(f"- {us.title_of(old)}",)))], FP)
+    assert us.approval_covers(new, got)
+    # A dotted name inside the first sentence does not end it early.
+    dotted = ("- [BLOCKING] [unplanned-scope] [MERGE-RULE] Revert the opt-out change in "
+              "gate_backtest.py (no path cited). `gate_backtest.py` still rewrites it.")
+    assert us.title_key(dotted) == "Revert the opt-out change in gate_backtest.py (no path cited)"
+    # A different first sentence is still not covered.
+    other = ("- [BLOCKING] [unplanned-scope] Scope range_hi widening to every marker. "
+             "In `bin/check-x`, `mk_range` gained a third parameter.")
+    assert not us.approval_covers(other, got)

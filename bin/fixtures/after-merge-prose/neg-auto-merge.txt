@@ -1,0 +1,1 @@
+Auto-merge is armed. The merge digest runs after merge and posts the checklist.

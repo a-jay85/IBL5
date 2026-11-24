@@ -792,7 +792,9 @@ def _run_pass(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         # Every pass (idempotent), so a fixer rewrite or an older body is repaired;
         # outside the clearance == "UNKNOWN" branch on purpose.
         body = upsert_after_merge(
-            body, render_after_merge_block(plan.post_merge_rows) if plan.found else "")
+            body, render_after_merge_block(
+                plan.post_merge_rows,
+                steps_dir=os.path.join(worktree or ".", "bin", "post-merge-steps")) if plan.found else "")
         # Remove files-changed/tests-changed blocks left by older harness runs.
         body = strip_change_blocks(body)
         _gb = gate_backtest_result(worktree or ".", diff, pr=pr, live=live,

@@ -292,6 +292,8 @@ func TestSimulate_MinutesConservation(t *testing.T) {
 // GameMIN as the iron-man max, so it does not exercise the invariant. We
 // therefore require a foul-out that DEMONSTRABLY reduced minutes (GameMIN
 // strictly below the max); the first such seed is 573.
+// The pl-0028 tip-off port (jsb-port-pl-0028) flipped the start side and pushed
+// the first qualifying seed to 1216, so the bound was raised 1000 → 1500.
 //
 // Guard against a broken removal: if a fouled-out C kept playing it would log
 // GameMIN == max in every foul-out game, so no seed would ever qualify and the
@@ -299,7 +301,7 @@ func TestSimulate_MinutesConservation(t *testing.T) {
 // proof that removal fired. (Stub-validated: disabling foul-out removal in
 // substitution.go makes this test fail, confirming the guard is live.)
 func TestSimulate_FoulOutStopsMinutes(t *testing.T) {
-	for seed := uint64(1); seed <= 1000; seed++ {
+	for seed := uint64(1); seed <= 1500; seed++ {
 		g := Simulate(rotationBundle(), seed).Games[0]
 
 		maxMin := 0
@@ -317,7 +319,7 @@ func TestSimulate_FoulOutStopsMinutes(t *testing.T) {
 			}
 		}
 	}
-	t.Fatal("no seed in [1,1000] produced a lone-C foul-out that reduced minutes below " +
+	t.Fatal("no seed in [1,1500] produced a lone-C foul-out that reduced minutes below " +
 		"the whole-game max (foul-out removal broken, or the fixture no longer forces a " +
 		"mid-game center foul-out — re-scan and re-tune the bound as prior RNG shifts did)")
 }

@@ -18,3 +18,5 @@ When you change code that can be run, built, or type-checked, run a real check t
 ## What you report
 
 End with what you could not confirm. For each gap, say where you looked (for example, "no caller found under `ibl5/classes/`; did not search `tests/`"). Never claim a check you did not run.
+
+When a principle in `.claude/review-shared/_engineering-principles.md` changed a decision you made, add one line `<principle name>: <the decision it changed>` to your report. Read that file only when your task leaves a design choice to you. When you departed from a `## Principles applied` bullet in the plan you were given, name the bullet and say why.

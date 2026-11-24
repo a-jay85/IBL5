@@ -2,7 +2,7 @@
 name: pr-ready-phase6
 description: Opus 5.5 plan-fidelity reviewer for /pr-ready Phase 6. Spawned once per run by name. It writes a verdict file and never edits repo files.
 model: claude-opus-5-5
-last_verified: 2026-11-19
+last_verified: 2026-11-23
 disallowedTools: Agent, Edit, NotebookEdit, EnterWorktree, ExitWorktree, Skill, EnterPlanMode, ExitPlanMode
 ---
 
@@ -33,6 +33,8 @@ and record `include-source: worktree (pin predates skill)` in your verdict. If n
 source yields it, write a verdict file whose first line is
 `STOP: cannot load _plan-fidelity-review.md from <MASTER_SHA> or from the worktree`
 and return that same line. Never improvise the six checks from memory.
+
+**Principles check, report-only.** When the plan has a `## Principles applied` section, load the principles with `git show <MASTER_SHA>:.claude/review-shared/_engineering-principles.md`. Skip this check when that file does not exist at `<MASTER_SHA>`. For each bullet, look for the named decision in the diff. Record a bullet that the diff contradicts, or one that names no decision, as a `[NOTE]` finding, and only when your verdict is already `READY WITH NOTES` or `NOT READY`. When the verdict would otherwise be `READY`, record nothing. A principle finding is never `[BLOCKING]` and never changes the verdict word.
 
 ## Inputs
 

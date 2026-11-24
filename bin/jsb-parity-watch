@@ -151,6 +151,18 @@ lock_is_stale() {
     return 1
 }
 
+# log_names_slug <log> <slug>: 0 when the plan-now log belongs to <slug>. A log whose
+# identity line (bin/plan-now writes it first) carries a slug matches on that field
+# exactly. Older logs and slug=- logs fall back to the content match.
+log_names_slug() {
+    local log="$1" slug="$2" id_slug
+    id_slug=$(sed -n 's/^plan-now: identity slug=\([^ ]*\) .*/\1/p' "$log" 2>/dev/null | head -n 1)
+    if [ -n "$id_slug" ] && [ "$id_slug" != "-" ]; then
+        [ "$id_slug" = "$slug" ]; return
+    fi
+    grep -qE "${slug}([^A-Za-z0-9]|\$)" "$log" 2>/dev/null
+}
+
 # row_verdict <id> <slug>: line 1 is the verdict; line 2 is the fingerprint fact
 # (absent when the row has no PR).
 row_verdict() {
@@ -197,9 +209,11 @@ row_verdict() {
 
     for label in $(launchctl list 2>/dev/null | grep -oE 'com\.ibl5\.plan-now-[0-9-]+' || true); do
         log="$PLANNOW_DIR/plan-now-${label#com.ibl5.plan-now-}.log"
-        if grep -qE "$slug_re" "$log" 2>/dev/null; then
+        if log_names_slug "$log" "$slug"; then
             echo "WAIT:plan-now-running"; return 0
         fi
+        # The identity line names another run's slug, so this live run is attributed.
+        if grep -qE '^plan-now: identity slug=[^- ]' "$log" 2>/dev/null; then continue; fi
         if [ ! -f "$log" ] || ! grep -qE 'jsb-port-' "$log"; then echo "WAIT:plan-now-unattributed"; return 0; fi
     done
 
@@ -219,10 +233,15 @@ row_verdict() {
     newest=""
     for f in "$PLANNOW_DIR"/plan-now-*.log; do
         [ -e "$f" ] || continue
-        if grep -qE "$slug_re" "$f" 2>/dev/null; then newest="$f"; fi
+        if log_names_slug "$f" "$slug"; then newest="$f"; fi
     done
     if [ -n "$newest" ]; then
-        echo "STALL:no-trace:$(basename "$newest")"
+        # No-plan / failed stage: the newest linked log's last RESULT line decides.
+        case "$(grep '^plan-now: RESULT ' "$newest" 2>/dev/null | tail -n 1)" in
+            "plan-now: RESULT no-plan"|"plan-now: RESULT no-plan "*) echo "STALL:no-plan:$(basename "$newest")" ;;
+            "plan-now: RESULT failed"|"plan-now: RESULT failed "*) echo "STALL:plan-now-failed:$(basename "$newest")" ;;
+            *) echo "STALL:no-trace:$(basename "$newest")" ;;
+        esac
     else
         echo "STALL:no-trace:none"
     fi
@@ -231,7 +250,7 @@ row_verdict() {
 
 # stall_message <key>: the DM text for one stall key (<id>:<stage>:<ref>).
 stall_message() {
-    local key="$1" id rest stage ref slug
+    local key="$1" id rest stage ref slug q
     id="${key%%:*}"; rest="${key#*:}"; stage="${rest%%:*}"; ref="${rest#*:}"
     slug=$(jq -r --arg id "$id" '[.rows[] | select(.id == $id) | .plan_slug][0] // ""' "$PARITY_DIR/ledger.json" || echo "")
     case "$stage" in
@@ -243,6 +262,15 @@ stall_message() {
             printf 'JSB parity watch: %s (%s) has no PR, but its plan is in skipped/: %s.\n' "$id" "$slug" "$ref" ;;
         plan-failed)
             printf 'JSB parity watch: %s (%s) has no PR and a failure report names it: %s.\n' "$id" "$slug" "$ref" ;;
+        no-plan)
+            q=$(grep -E '^[[:space:]]*NO_PLAN: ' "$PLANNOW_DIR/$ref" 2>/dev/null | tail -n 1 || true)
+            [ -n "$q" ] || q=$(grep '^plan-now: RESULT ' "$PLANNOW_DIR/$ref" 2>/dev/null | tail -n 1 || true)
+            printf 'JSB parity watch: %s (%s) has no PR. Its plan-now run halted with no plan. Log: %s\n%s\nCheck whether the work is already done (an earlier PR may have landed it), then re-fire the port or flip the ledger row. Until someone acts, row %s stays stranded at status captured.\n' \
+                "$id" "$slug" "$PLANNOW_DIR/$ref" "$q" "$id" ;;
+        plan-now-failed)
+            q=$(grep '^plan-now: RESULT ' "$PLANNOW_DIR/$ref" 2>/dev/null | tail -n 1 || true)
+            printf 'JSB parity watch: %s (%s) has no PR. Its plan-now run failed. Log: %s\n%s\nRead the log and fix the cause, then re-fire the port or flip the ledger row. Until someone acts, row %s stays stranded at status captured.\n' \
+                "$id" "$slug" "$PLANNOW_DIR/$ref" "$q" "$id" ;;
         no-trace)
             if [ "$ref" = "none" ]; then
                 printf 'JSB parity watch: %s (%s) has no PR, no queued plan and no plan-now log naming it.\n' "$id" "$slug"

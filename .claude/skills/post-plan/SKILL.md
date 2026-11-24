@@ -1,11 +1,11 @@
 ---
 name: post-plan
-description: Fallback for bin/post-plan-now when the compiled harness crashes. Runs only what the harness lacks: crash triage (report and hold, never arm), backlog housekeeping, the E2E verify track, Phase 10 preview, and background cleanup.
+description: Fallback for bin/post-plan-now when the compiled harness crashes. Runs only what the harness lacks: crash triage (report and hold, never arm), backlog housekeeping, Phase 10 preview, and background cleanup. E2E defers to CI.
 disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-11-12
+last_verified: 2026-11-24
 ---
 
 # Post-Plan Fallback
@@ -33,7 +33,7 @@ if ! git diff --cached --quiet; then
 fi
 ```
 
-Phase 5 is the only phase here that may modify files. Its E2E fix is committed and pushed per the block above only when Phase 2 reported `state=OPEN` and `armed=no`. Any other value holds the fix uncommitted.
+No phase here modifies repo files today. The block stays for any phase that later does.
 
 ---
 
@@ -151,27 +151,11 @@ The harness runs the same sweep in `runner.py` (`outofscope.file_deferral_issues
 
 ---
 
-## Phase 5: E2E verify track
+## Phase 5: E2E defers to CI
 
-The harness runs PHPUnit, PHPStan and the Go track (`tools/postplan-harness/harness/adapters/verify.py`) and has no E2E track; this is the only verify work the fallback does. Skip when no PR exists (nothing to fix against), when the PR's `state=` is not `OPEN` (a merged PR has no `autoMergeRequest`, so it reads `armed=no`, and a push would resurrect the deleted branch), or when `bin/e2e-for-pr` maps no tests. A red E2E run is fixed in the worktree. Commit and push the fix per `## Incremental Checkpoints` only when the Phase 2 `CRASH-TRIAGE:` line exists and reports `state=OPEN` and `armed=no`. On `armed=yes`, `armed=unknown`, or the `CRASH-TRIAGE: skipped` line, leave the fix uncommitted and unpushed, because a push to an armed PR can merge with no review. Report the E2E result, and any held fix, in one `gh pr comment` of this phase's own. It is never used to arm. When E2E is red and the line reports `armed=yes`, open the comment with `E2E RED ON AN ARMED PR: a human should disarm auto-merge on the PR page until the held fix lands`. The skill itself never disarms; the comment is the warning.
+The fallback runs no local E2E. CI runs the E2E suite on the PR, and that result is the one that counts. The harness has no local E2E track either (`tools/postplan-harness/harness/adapters/verify.py`), so a crash run and a normal run give the same E2E coverage.
 
-**E2E agent (Haiku):**
-
-Steps:
-1. Run `bin/wt-stack start <worktree-name> --seed`. It prints `STACK: started` when it brought up a fresh seeded stack. It prints `STACK: already-up user-owned (left as is)` when the user is previewing this worktree; run E2E anyway on the data that is there and say so in the report.
-2. Run `bin/e2e-for-pr <worktree-name>` and capture both stdout and exit code
-3. Branch on the result:
-   - **Exit 0, empty stdout** → print "No E2E tests map to changed files — skipping E2E", run `bin/wt-stack stop <worktree-name>`, and stop
-   - **Exit 2** → run full suite: `bin/e2e-wt <worktree-name>`
-   - **Exit 0, test file list on stdout** → run targeted: `bin/e2e-wt <worktree-name> <test-files-from-stdout>`
-
-Run whichever `bin/e2e-wt` command applies with the stop in the same call: `bin/e2e-wt <worktree-name> [<test-files-from-stdout>]; rc=$?; bin/wt-stack stop <worktree-name>; exit $rc`. Make it ONE foreground Bash call with `timeout: 600000`, so the stop runs after `bin/e2e-wt` exits, on pass or fail. The stop acts only on a stack that step 1 started, so a user's preview keeps running. Report the `STACK:` line it prints.
-
-Prompt MUST include: "Run these commands and report the summary output. Do NOT investigate, re-run, or diagnose individual test failures — just report the pass/fail counts and any error output." <!-- slop-ok -->
-
-Prompt MUST ALSO include this long-run handling rule: "`bin/e2e-wt` can exceed the Bash tool's 600s cap. If it does, invoke Bash with `run_in_background: true` and poll via the **BashOutput** tool — do NOT pipe to a file and shell-loop on `grep`. If you absolutely must shell-poll, the terminator must accept every Playwright outcome (`grep -qE 'passed|failed|did not run|timed out|error'` scanning `tail -10`, not a single last-line match): Playwright's trailing line is often `N did not run` after an early setup failure, which will hang a `passed|failed`-only check forever." <!-- slop-ok -->
-
-If it fails, fix in the worktree and re-run the failing track. Commit and push only under the `armed` rule above.
+Do not run `bin/wt-stack start`, `bin/e2e-for-pr`, or `bin/e2e-wt` in this skill. In the final report, write one line: `E2E: deferred to CI on the PR.` Post no PR comment for it.
 
 ---
 
@@ -197,7 +181,7 @@ echo "PR_STATE=$PR_STATE ENGINE_ONLY=$ENGINE_ONLY"
 
 **You MUST execute this phase before ending your turn.** This is not optional even if all earlier phases succeeded cleanly.
 
-`bin/e2e-wt` from Phase 5 may still be running. If it holds the pipeline open after you emit your final response, the automouse runner's stall-kill fires after 30 minutes and burns an attempt.
+This skill no longer starts `bin/e2e-wt`, but an older run or a hand-started one may still be running. If it holds the pipeline open after you emit your final response, the automouse runner's stall-kill fires after 30 minutes and burns an attempt.
 
 Kill the lingering patterns so their tool results deliver immediately:
 

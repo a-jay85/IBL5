@@ -5,7 +5,7 @@ paths:
   - "**/design/**/*.css"
   - "**/themes/**/*.php"
   - "**/themes/**/*.html"
-last_verified: 2026-09-24
+last_verified: 2026-11-23
 ---
 
 # Visual Verification Required

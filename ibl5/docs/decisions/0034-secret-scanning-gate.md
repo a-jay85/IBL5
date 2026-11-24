@@ -1,6 +1,6 @@
 ---
 description: Rationale for adding a gitleaks secret-scanning CI gate, scrubbing a rotated DB password, and hardening the demo-login token to fail closed.
-last_verified: 2026-09-23
+last_verified: 2026-11-23
 ---
 
 # ADR-0034: Secret-Scanning Gate

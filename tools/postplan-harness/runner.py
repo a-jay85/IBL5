@@ -1548,6 +1548,19 @@ _GATE_DENIAL_TAIL_CHARS = 2000
 # finding it has already answered in the body just re-answers it.
 BODY_ONLY_SHA = "body-only"
 BODY_FETCH_FAILED_REASON = "body-fetch-failed"
+KEPT_SCOPE_ONLY_OUTCOME = "kept-scope-owner-only"
+
+
+def _kept_scope_only_round(prior_verdict_path, kept_all) -> bool:
+    """True when every blocking finding of the prior verdict is a kept [unplanned-scope]
+    item. A body edit cannot clear those, so the re-review is skipped. Fails open (False)."""
+    try:
+        blocking = fidelity.verdict_items(prior_verdict_path or "").get("blocking") or []
+        kept = [unplanned_scope.title_of(i.get("text") or "")
+                for i in kept_all or [] if isinstance(i, dict)]
+        return holdrepeat.kept_scope_only(blocking, kept)
+    except Exception:  # noqa: BLE001 - any doubt runs the review
+        return False
 
 
 def _last_remediation_commit(fid: dict) -> str | None:
@@ -4558,6 +4571,18 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         # fidelity.re_review() needs no signature change.
         v_n = tree_n = path_n = None
         review_kind, recheck_reason = "full", None
+        if sha == BODY_ONLY_SHA and _kept_scope_only_round(current_verdict_path, kept_all):
+            rec["outcome"] = KEPT_SCOPE_ONLY_OUTCOME
+            rec["review_kind"] = "skipped"
+            rec["remediation_sha"] = str(sha)
+            # The verdict stands unchanged, so review_items reads the prior verdict file for
+            # this round and holdrepeat sees the kept-scope-only blockers.
+            rec["verdict_path"] = current_verdict_path
+            res.fidelity["rounds_completed"] = sum(1 for r in rounds if r["remediation_sha"])
+            log(f"phase5.5 round {round_num}: body-only round left only kept unplanned-scope "
+                f"blockers; re-review skipped. "
+                f"{holdrepeat.owner_only_message(bool(getattr(plan, 'found', False)))}")
+            break  # kept-scope-only: skip re-review
         if sha == BODY_ONLY_SHA:
             prior_body = _prior_packet_body(out_dir, round_num)
             if prior_body is None:
@@ -5354,6 +5379,7 @@ def _record_hold_repeat(res, decision, slug, worktree, state_dir, log) -> dict |
         fp = holdrepeat.fingerprint(plan_path, worktree or os.getcwd())
         obs = holdrepeat.observe(state_dir, slug, armed=decision.armed,
                                  conditions=decision.conditions, fingerprint=fp,
+                                 fidelity=getattr(res, "fidelity", None),
                                  pr=res.pr_number,
                                  now=datetime.datetime.now(datetime.timezone.utc).isoformat())
         out = {"action": obs.action, "key": obs.key,

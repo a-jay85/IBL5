@@ -2979,6 +2979,31 @@ grep -qF '**Skipped (1)**' <<< "$_dm" || fail "human-only-skip-1-7-8: DM lacks S
 grep -qF 'manual-testing-clearance' <<< "$_dm" || fail "human-only-skip-1-7-8: DM lacks the condition name: $_dm"
 hr_cleanup
 
+# held_unchanged_owner_only_skip: a {12,18} hold whose record carries both owner-only kinds is
+# skipped and the skip line names the owner, in plain words.
+hu_prep "12,18"
+jq '. + {hold_kinds: ["12:kept-unplanned-scope", "18:self-governing"]}' \
+    "$SCRATCH/hrstate/first-slug.holdrepeat.json" > "$SCRATCH/hrstate/kinds.tmp" \
+    && mv "$SCRATCH/hrstate/kinds.tmp" "$SCRATCH/hrstate/first-slug.holdrepeat.json"
+triage_report > "$SCRATCH/triage-out"
+HRHARNESS="$HRH" run --worker
+[[ "$(calls ready)" == "0" ]] || fail "held_unchanged_owner_only_skip: fleet ran $(calls ready) time(s), want 0"
+grep -qF 'held it for (12,18)' "$(rundir)/stage1-skipped.txt" \
+    || fail "held_unchanged_owner_only_skip: skip line lacks 'held it for (12,18)'"
+grep -qE 'waiting on: owner approval$' "$(rundir)/stage1-skipped.txt" \
+    || fail "held_unchanged_owner_only_skip: skip line does not end 'waiting on: owner approval'"
+hr_cleanup
+
+# held_unchanged_kind_with_foreign_runs: a foreign condition (14) beside a 12 kind is not skipped.
+hu_prep "12,14"
+jq '. + {hold_kinds: ["12:kept-unplanned-scope"]}' \
+    "$SCRATCH/hrstate/first-slug.holdrepeat.json" > "$SCRATCH/hrstate/kinds.tmp" \
+    && mv "$SCRATCH/hrstate/kinds.tmp" "$SCRATCH/hrstate/first-slug.holdrepeat.json"
+HRHARNESS="$HRH" run --worker
+grep -qF 'held it for' "$(rundir)/stage1-skipped.txt" 2>/dev/null \
+    && fail "held_unchanged_kind_with_foreign_runs: skip line written for {12,14}"
+hr_cleanup
+
 # A hold on condition 1 alone, written by the production `observe`, is skipped.
 hu_prep "1"
 env -u PLANS_DIR HOME="$SCRATCH" PYTHONPATH="$HRH" python3 - "$SCRATCH/hrstate" first-slug "$SCRATCH/wt-first-slug" <<'PY'

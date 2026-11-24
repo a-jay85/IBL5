@@ -236,6 +236,8 @@ BLOCKED-CHECK PR is exempt, so `bin/pr-cycle-tick` needs no filter: its retry ca
 a second rescue on an unchanged patch-id. A skipped PR stays in the your-turn DM under
 `**Skipped (K)**` with the condition names after `waiting on:`. The skip never arms a PR.
 
+The skip also covers the two holds that `bin/post-plan-now` declines as owner-only: merge-danger (18) in state `SELF-GOVERNING`, and a fidelity hold (12) whose blocking findings are all kept `[unplanned-scope]` items. `bin/pr-cycle` lets 12 and 18 through its condition filter, and `human-only-eligible` decides from the record's `hold_kinds`. These PRs show `waiting on: owner approval`. Inside a run, a body-only fix round that leaves only kept `[unplanned-scope]` blockers skips the step 4b re-review and records round outcome `kept-scope-owner-only`.
+
 The repeat DM changes wording for the same set. When a hold repeats and every reason the DM
 names is (3), (7) or (8), `_send_hold_repeat_dm` in `runner.py` says the PR is waiting on the
 owner's approval, links the PR, and gives no `--force` advice. A repeat that names (13) keeps

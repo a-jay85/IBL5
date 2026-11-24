@@ -1,6 +1,6 @@
 ---
 description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made.
-last_verified: 2026-11-20
+last_verified: 2026-11-24
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
@@ -77,6 +77,7 @@ skill fallback is suppressed. `cd` into the target worktree and re-run.
 It exits **8** when it declines a repeat hold: the last run for this slug held on the same
 structural reasons, the repeat DM was already sent, and plan, diff and harness are unchanged
 (`harness/holdrepeat.py`). Nothing fired. `--force` overrides.
+It also exits **8** on the first same-diff re-run after a hold that only the owner can clear. Two holds count: merge-danger (18) in state `SELF-GOVERNING`, and a fidelity hold (12) whose every blocking finding is a kept `[unplanned-scope]` item that no owner quote accepted. Conditions (1), (3), (7) and (8) may sit beside them, and any other condition keeps today's behavior. A PR body edit leaves the fingerprint unchanged, so a body note never lifts the decline. The decline prints `Waiting on owner approval. Body notes won't clear this.` and then the fix. `--force` and `--state-changed` always run, and `bin/owner-approve` passes `--state-changed`. `owner_only_decline` in `harness/holdrepeat.py` makes the call.
 The harness also declines inside a run, after the conflict probe and before its first LLM
 call, when the diff changed but condition (3)'s `MISSING:` and `MISSING-FILE:` items equal
 the ones the last hold recorded. A diff that never adds the missing files cannot clear that

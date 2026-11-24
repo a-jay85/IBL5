@@ -24,7 +24,7 @@
 #                   P11: workflow_run.workflows equals the name of every workflow
 #                   whose push trigger fires on master, so no master SHA waits on a
 #                   workflow the promoter never hears finish.
-#   required PR workflows (R1): tests.yml, e2e-tests.yml, human-signoff.yml,
+#   required PR workflows (R1): tests.yml, e2e-tests.yml, human-signoff-trigger.yml,
 #                   pr-meta-checks.yml and mutation.yml must keep a block-style
 #                   `on: pull_request:` trigger with no `paths:` or
 #                   `paths-ignore:` under it. push.paths stays legal.
@@ -476,7 +476,7 @@ fi  # end pp_file present
 # tests.yml and e2e-tests.yml scope master pushes that way. A file with no
 # block-style pull_request key also fails, so a flow-style rewrite cannot turn
 # this check into a vacuous pass.
-for wf_name in tests.yml e2e-tests.yml human-signoff.yml pr-meta-checks.yml mutation.yml; do
+for wf_name in tests.yml e2e-tests.yml human-signoff-trigger.yml pr-meta-checks.yml mutation.yml; do
   wf_file="$WORKFLOWS/$wf_name"
   if [ ! -f "$wf_file" ]; then
     echo "composite-contracts: $wf_name absent — R1 skipped"

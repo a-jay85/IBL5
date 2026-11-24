@@ -24,7 +24,7 @@ on:
       - Weekly Flake Report
       - gitleaks
       - Hotfix dispatch
-      - Human Sign-off
+      - Human Sign-off trigger
       - Merge digest notify
       - Migration Safety
       - Mutation Testing (per-PR diff)

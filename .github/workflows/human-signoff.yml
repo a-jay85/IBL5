@@ -36,15 +36,22 @@ name: Human Sign-off
 # The classifiers live in bin/lib/human-signoff-classifier.sh and
 # bin/lib/ui-change-classifier.sh, sourced by BOTH this workflow and
 # bin/test-human-signoff-classifier so the gate's logic cannot drift from its
-# regression test. Both jobs load them from the BASE ref, never the PR head.
-# That stops a PR from changing the classifier libs; such a change applies
-# after merge. It does NOT stop a PR that edits this workflow file itself.
-# GitHub runs the PR's own copy of this file on pull_request, so that PR can
-# skip the hold. Moving the check to a trusted trigger is on the backlog.
+# regression test. Every job loads them from master, never the PR head.
+#
+# Trusted trigger (ADR-0062 Update). GitHub runs master's copy of this file on
+# each run of the PR-side stub .github/workflows/human-signoff-trigger.yml, so a
+# PR cannot rewrite the gate that judges it; an edit to this file or the libs
+# applies after merge. The verdict is a commit status named `human-signoff` on
+# the PR head, posted by the post-status job, because a run started this way
+# belongs to master's tip. The stub's run title carries the event action and
+# label. The gate trusts it only when the run came from the stub's path and the
+# head's stub blob equals master's. A PR that edits the stub holds for a human
+# and merges with `gh pr merge --admin`.
 #
 # Nothing re-runs this check when the wait times out and the gallery lands
-# later. A human re-runs the failed human-signoff job by hand; an automatic
-# re-run is tracked in backlog#1798.
+# later. The hand re-run is `gh workflow run human-signoff.yml -f pr_number=N`
+# from master; automatic re-runs are tracked in backlog#1962. A PR workflow
+# that posts its own `human-signoff` context is tracked in backlog#1958.
 #
 # The `needs-a-human-label` job mirrors the gate's verdict onto the PR as the
 # `needs-a-human` label: added while the gate is red, removed once it passes.
@@ -62,13 +69,15 @@ name: Human Sign-off
 # complete first), and the write job removes the label and comments why.
 #
 # No job-level skip. The title-keyed skip of ADR 0210 is gone: the verdict now
-# depends on the diff and the VR gallery, which no event payload carries, so a
-# skipped run (which GitHub reports as success) could post a passing check on a
-# held PR. Each event cancels and replaces the per-PR run. The needs-a-human
-# label is written with github.token, so it starts no new run.
+# depends on the diff and the VR gallery, which no event payload carries. A
+# skipped run now posts nothing, so the required context stays missing (or
+# pending) and the PR cannot merge. Each event cancels and replaces the per-PR
+# run. The needs-a-human label is written with github.token, so it starts no
+# new run.
 #
 # Approval race (ADR-0062 Update 2026-11-02): a `labeled` event for
-# human-approved runs in its own per-run group (`-approve-<run_id>`), so a push
+# human-approved runs in its own per-run group (`-approve-<run_id>`), keyed on
+# the stub run's display title `hs:labeled:human-approved`, so a push
 # seconds later (an update-branch merge) can no longer cancel it before it
 # records the fingerprint. A run that would drop `missing`, or `mismatch`
 # against a stale older record (ADR-0062 Update 2026-11-08), while that label
@@ -78,11 +87,16 @@ name: Human Sign-off
 # newer revoke supersedes.
 
 on:
-  pull_request:
-    branches: [ master ]
-    # labeled/unlabeled re-run the gate so applying `human-approved` flips red→green.
-    # Every event runs the job; none may skip.
-    types: [opened, reopened, synchronize, edited, ready_for_review, labeled, unlabeled]
+  workflow_run:
+    # Master's copy of this file runs. The PR-side stub only signals that a PR event happened.
+    workflows: ["Human Sign-off trigger"]
+    types: [requested]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: PR number to judge. Dispatch from master only; a branch dispatch evaluates and writes nothing.
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -91,15 +105,60 @@ permissions:
   actions: read
 
 concurrency:
-  group: ${{ (github.event.action == 'labeled' && github.event.label.name == 'human-approved') && format('human-signoff-{0}-approve-{1}', github.event.pull_request.number, github.run_id) || format('human-signoff-{0}', github.event.pull_request.number) }}
+  group: ${{ format('human-signoff-{0}-{1}{2}', github.event.workflow_run.pull_requests[0].number || github.event.inputs.pr_number || github.event.workflow_run.head_sha, github.event.workflow_run.path || 'dispatch', github.event.workflow_run.display_title == 'hs:labeled:human-approved' && format('-approve-{0}', github.run_id) || '') }}
   cancel-in-progress: true
 
 jobs:
+  mark-pending:
+    name: human-signoff pending
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.path == '.github/workflows/human-signoff-trigger.yml')
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      statuses: write
+      pull-requests: read
+    outputs:
+      head_sha: ${{ steps.head.outputs.head_sha }}
+      pr_input: ${{ steps.head.outputs.pr_input }}
+    steps:
+      - name: Resolve the head SHA
+        id: head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          EVENT_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          PR_INPUT: ${{ github.event.inputs.pr_number }}
+        run: |
+          set -euo pipefail
+          SHA="$EVENT_HEAD_SHA"
+          if [ -z "$SHA" ]; then
+            case "$PR_INPUT" in ''|*[!0-9]*) echo "::error::pr_number must be digits"; exit 1 ;; esac
+            SHA=$(gh api "repos/$GH_REPO/pulls/$PR_INPUT" --jq '.head.sha')
+          fi
+          case "$SHA" in ''|*[!0-9a-f]*) echo "::error::no usable head SHA"; exit 1 ;; esac
+          { echo "head_sha=$SHA"; echo "pr_input=$PR_INPUT"; } >> "$GITHUB_OUTPUT"
+      - name: Post pending so an older verdict on this head stops counting
+        if: github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/master'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ steps.head.outputs.head_sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh api --method POST "repos/$GH_REPO/statuses/$HEAD_SHA" -f state=pending \
+            -f context=human-signoff -f description='Evaluating' -f target_url="$RUN_URL" >/dev/null
+
   human-signoff:
-    name: human-signoff
+    name: human-signoff evaluate
+    needs: mark-pending
+    if: ${{ !cancelled() && needs.mark-pending.outputs.head_sha != '' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 60
     outputs:
+      state: ${{ steps.state.outputs.state }}
+      pr: ${{ steps.eval.outputs.pr }}
+      labels: ${{ steps.eval.outputs.labels }}
       verdict: ${{ steps.eval.outputs.verdict }}
       reason: ${{ steps.eval.outputs.reason }}
       fingerprint: ${{ steps.eval.outputs.fingerprint }}
@@ -113,38 +172,31 @@ jobs:
       - name: Checkout the PR head (diff fingerprint only)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ needs.mark-pending.outputs.head_sha }}
           fetch-depth: 1
-      # The gate logic comes from the BASE ref, never the PR head. That stops
-      # a PR from changing the classifier, bin/website-affecting, or a helper
-      # they call; such an edit takes effect after merge. A PR that edits this
-      # workflow file itself can still skip the hold, because GitHub runs the
-      # PR's copy of this file on pull_request.
+      # The gate logic comes from master, never the PR head. That stops a PR
+      # from changing the classifier, bin/website-affecting, or a helper they
+      # call; such an edit takes effect after merge. The default ref is
+      # master's tip, the commit this workflow_run run belongs to.
       # This checkout runs second because a root checkout cleans the workspace.
-      - name: Checkout the base ref (trusted classifier lib)
+      - name: Checkout master (trusted classifier lib)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
           path: .hs-base
           fetch-depth: 1
           persist-credentials: false
       - name: Evaluate human sign-off and the approved-diff fingerprint
         id: eval
         env:
-          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
-          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
-          ACTION: ${{ github.event.action }}
-          EVENT_LABEL: ${{ github.event.label.name }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
-          PR: ${{ github.event.pull_request.number }}
+          RUN_PATH: ${{ github.event.workflow_run.path }}
+          RUN_TITLE: ${{ github.event.workflow_run.display_title }}
+          HEAD_SHA: ${{ needs.mark-pending.outputs.head_sha }}
+          PR_INPUT: ${{ needs.mark-pending.outputs.pr_input }}
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           # Bounded wait for an in-flight approving run's record (ADR-0062 Update 2026-11-02).
           HS_AWAIT_ATTEMPTS: '20'
           HS_AWAIT_SLEEP: '15'
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
-          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
           # Bounded wait for this PR's own head-SHA VR gallery artifact (e2e-tests.yml).
           UI_VR_ATTEMPTS: '90'
           UI_VR_SLEEP: '30'
@@ -161,6 +213,28 @@ jobs:
           source "$HS_LIB/human-signoff-classifier.sh"
           # shellcheck source=bin/lib/ui-change-classifier.sh
           source "$HS_LIB/ui-change-classifier.sh"
+          # Every PR fact below comes from the API, never the event payload.
+          MODE=run; [ -n "$PR_INPUT" ] && MODE=dispatch
+          TRUST_RC=0
+          hs_trigger_trusted "$RUN_PATH" "$GITHUB_WORKSPACE/.hs-base" "$GITHUB_WORKSPACE" "$MODE" || TRUST_RC=$?
+          hs_fetch_commit_pulls() { gh api "repos/$GH_REPO/commits/$1/pulls"; }
+          if [ "$MODE" = dispatch ]; then PR="$PR_INPUT"; hs_pr_number_ok "$PR" || PR=""
+          else PR=$(hs_resolve_pr "$HEAD_SHA" hs_fetch_commit_pulls) || PR=""; fi
+          echo "pr=$PR" >> "$GITHUB_OUTPUT"
+          if [ -z "$PR" ] || [ "$TRUST_RC" != 0 ] || ! gh api "repos/$GH_REPO/pulls/$PR" > "$RUNNER_TEMP/hs-pr.json"; then
+            echo "::error title=Human sign-off required::No open PR into master for $HEAD_SHA, or the PR changed the trigger stub (rc $TRUST_RC). Merge needs gh pr merge --admin."
+            echo "verdict=hold" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          PR_AUTHOR=$(jq -r '.user.login' "$RUNNER_TEMP/hs-pr.json")
+          LABELS=$(jq -r '[.labels[].name] | join(",")' "$RUNNER_TEMP/hs-pr.json")
+          BASE_REF=$(jq -r '.base.ref' "$RUNNER_TEMP/hs-pr.json")
+          HEAD_REF=$(jq -r '.head.ref' "$RUNNER_TEMP/hs-pr.json")
+          HEAD_REPO=$(jq -r '.head.repo.full_name' "$RUNNER_TEMP/hs-pr.json")
+          echo "labels=$LABELS" >> "$GITHUB_OUTPUT"
+          ACTION=dispatch; EVENT_LABEL=""
+          if [ "$MODE" = run ]; then IFS=$'\t' read -r ACTION EVENT_LABEL < <(hs_trigger_event "$RUN_TITLE") || true; fi
+          export PR PR_AUTHOR LABELS BASE_REF HEAD_REF HEAD_REPO ACTION EVENT_LABEL
           PATHS="$RUNNER_TEMP/ui-paths.txt"
           if ! gh api --paginate "repos/$GH_REPO/pulls/$PR/files" \
                --jq '.[] | .filename, (.previous_filename // empty)' > "$PATHS"; then
@@ -282,34 +356,58 @@ jobs:
             printf '%s\n' "$BODY"
             echo "$delim"
           } >> "$GITHUB_OUTPUT"
-      # A separate step maps the verdict to the check result, so the outputs
-      # above are always published for the write job. An unset or unknown
-      # verdict (the eval step crashed) is red.
-      - name: Require human sign-off for UI PRs
+      # A separate step maps the verdict to the status state, so the outputs
+      # above are always published for the write jobs. An unset or unknown
+      # verdict (the eval step crashed) is failure. A drop on a non-UI PR stays
+      # success: the write job still removes the label and posts the revoke.
+      # A hold does not fail this job: a failed job would mark master's commit
+      # and say nothing on the PR.
+      - name: Map the verdict to a status state
+        id: state
+        if: always()
         env:
           VERDICT: ${{ steps.eval.outputs.verdict }}
           GATE_RED: ${{ steps.eval.outputs.gate_red }}
         run: |
-          set -euo pipefail
-          # A drop on a non-UI PR stays green: the write job still removes the
-          # label and posts the revoke, so post-plan condition (7) holds again.
-          case "$VERDICT" in
-            pass|keep|record) echo "Human sign-off gate: $VERDICT" ;;
-            drop)
-              if [ "${GATE_RED:-}" = 0 ]; then
-                echo "Human sign-off gate: drop on a non-UI PR (green; approval removed)"
-                exit 0
-              fi
-              echo "Human sign-off gate: drop (red)"; exit 1 ;;
-            *) echo "Human sign-off gate: ${VERDICT:-unset} (red)"; exit 1 ;;
-          esac
+          if ! source "$GITHUB_WORKSPACE/.hs-base/bin/lib/human-signoff-classifier.sh"; then
+            echo "state=failure" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          echo "state=$(hs_status_state "$VERDICT" "$GATE_RED")" >> "$GITHUB_OUTPUT"
+          echo "Human sign-off gate: ${VERDICT:-unset}"
+
+  # The only job that posts the verdict. It checks out nothing.
+  post-status:
+    name: human-signoff status
+    needs: [mark-pending, human-signoff]
+    if: ${{ !cancelled() && needs.mark-pending.outputs.head_sha != '' && (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/master') }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      statuses: write
+    steps:
+      - name: Post the verdict on the PR head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ needs.mark-pending.outputs.head_sha }}
+          STATE: ${{ needs.human-signoff.outputs.state }}
+          VERDICT: ${{ needs.human-signoff.outputs.verdict }}
+          PR: ${{ needs.human-signoff.outputs.pr }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ "$VERDICT" = superseded ]; then echo "A newer head replaced this one; posting nothing."; exit 0; fi
+          case "$STATE" in success|failure) ;; *) STATE=error ;; esac
+          if ! gh api --method POST "repos/$GH_REPO/statuses/$HEAD_SHA" -f state="$STATE" \
+            -f context=human-signoff -f description="verdict: ${VERDICT:-none}" -f target_url="$RUN_URL" >/dev/null; then
+            echo "::warning::Could not post human-signoff on $HEAD_SHA (a Dependabot-triggered run has a read-only token). Run: gh workflow run human-signoff.yml -f pr_number=${PR:-N}"
+          fi
 
   needs-a-human-label:
     name: needs-a-human label
     needs: human-signoff
-    # always() so a red gate still runs this job. A cancelled gate was
-    # superseded by a newer run, which owns the label instead.
-    if: always() && (needs.human-signoff.result == 'failure' || needs.human-signoff.result == 'success')
+    # Runs once the gate mapped a state. A cancelled gate was superseded by a
+    # newer run, which owns the label instead.
+    if: ${{ !cancelled() && needs.human-signoff.outputs.pr != '' && needs.human-signoff.outputs.state != '' && (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/master') }}
     runs-on: ubuntu-26.04
     permissions:
       issues: write
@@ -322,10 +420,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          PR: ${{ github.event.pull_request.number }}
-          RESULT: ${{ needs.human-signoff.result }}
+          PR: ${{ needs.human-signoff.outputs.pr }}
+          RESULT: ${{ needs.human-signoff.outputs.state }}
           VERDICT: ${{ needs.human-signoff.outputs.verdict }}
-          HAS_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'needs-a-human') }}
+          LABELS: ${{ needs.human-signoff.outputs.labels }}
         run: |
           set -euo pipefail
           # The head moved during the gate's wait. The newer head's run owns the label.
@@ -339,7 +437,7 @@ jobs:
               --description "Blocked on the human-signoff check; a maintainer must inspect it and apply human-approved" \
               2>/dev/null || true
             gh api --method POST "repos/$GH_REPO/issues/$PR/labels" -f 'labels[]=needs-a-human' >/dev/null
-          elif [ "$HAS_LABEL" = "true" ]; then
+          elif case ",$LABELS," in *,needs-a-human,*) true ;; *) false ;; esac; then
             gh api --method DELETE "repos/$GH_REPO/issues/$PR/labels/needs-a-human" >/dev/null
           fi
 
@@ -349,7 +447,7 @@ jobs:
     # Runs only when the gate asked for a write: record on approval, or drop.
     # A cancelled gate was superseded by a newer run, which owns the write.
     # !cancelled() so a cancelled run skips this job even if its gate finished.
-    if: ${{ !cancelled() && (needs.human-signoff.result == 'failure' || needs.human-signoff.result == 'success') && (needs.human-signoff.outputs.verdict == 'record' || needs.human-signoff.outputs.verdict == 'drop') }}
+    if: ${{ !cancelled() && (needs.human-signoff.result == 'failure' || needs.human-signoff.result == 'success') && (needs.human-signoff.outputs.verdict == 'record' || needs.human-signoff.outputs.verdict == 'drop') && (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/master') }}
     runs-on: ubuntu-26.04
     timeout-minutes: 5
     permissions:
@@ -359,12 +457,11 @@ jobs:
     steps:
       # Only the record branch reads the lib. A failed checkout makes the
       # record guard skip; the drop branch never depends on it. The lib comes
-      # from the BASE ref: this job holds a write token.
+      # from master's tip (the default ref): this job holds a write token.
       - name: Checkout the base ref (trusted classifier lib)
         continue-on-error: true
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
           fetch-depth: 1
           persist-credentials: false
       - name: Record or revoke the approved diff fingerprint
@@ -376,7 +473,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          PR: ${{ github.event.pull_request.number }}
+          PR: ${{ needs.human-signoff.outputs.pr }}
           VERDICT: ${{ needs.human-signoff.outputs.verdict }}
           BODY: ${{ needs.human-signoff.outputs.comment_body }}
           APPROVED_AT: ${{ needs.human-signoff.outputs.approved_at }}

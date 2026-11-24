@@ -1005,7 +1005,8 @@ if ($method === 'POST' && $action === 'trade-suggestions-fixture') {
 // page E2E: tid 8 (the fixture team, a constant), an `e2e-` key no generated
 // deal can have, and a script-tag note that must render as text. Old `e2e-`
 // rows for tid 8 go first, so reruns stay at one row. The feedback reset above
-// skips `e2e-` keys, so the panel spec cannot wipe it. No body or params are read.
+// skips `e2e-` keys, so the panel spec cannot wipe it. The row's created_at is
+// pinned to 2026-01-01 00:00:00. No body or params are read.
 if ($method === 'POST' && $action === 'trade-suggestions-feedback-seed') {
     $seedTid = 8;
     $clear = $db->prepare("DELETE FROM `ibl_trade_suggestion_feedback` WHERE tid = ? AND deal_key LIKE 'e2e-%'");
@@ -1020,6 +1021,9 @@ if ($method === 'POST' && $action === 'trade-suggestions-feedback-seed') {
         \TradeSuggestions\Feedback\HideReason::Other->value,
         '<script>alert("tuning")</script> & co',
     );
+    // Pin the "Hidden at" time. record() stamps CURRENT_TIMESTAMP, so unpinned
+    // the tuning page shows the wall-clock time of the run.
+    $db->query("UPDATE `ibl_trade_suggestion_feedback` SET created_at = '2026-01-01 00:00:00' WHERE tid = 8 AND deal_key LIKE 'e2e-%'");
     echo json_encode(['ok' => true]);
     $db->close();
     exit;

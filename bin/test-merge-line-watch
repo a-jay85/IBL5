@@ -144,6 +144,14 @@ MERGE_LINE_WATCH_RETRY_WAIT=0 GH_PUT_FAIL=1 SEL_OUT=$'action=update\nhead=3' \
 assert_match "Y: failure surfaced" 'update-branch FAILED for #3: boom' "$OUT"
 assert_eq "Y: exit 1" 1 "$RC"
 
+# Y2: the re-check gives an answer outside update, wait and none. Only those
+# three can clear a failed update, so any other answer is still a failure.
+MERGE_LINE_WATCH_RETRY_WAIT=0 GH_PUT_FAIL=1 SEL_OUT=$'action=update\nhead=3' \
+    SEL_OUT2=$'action=bogus\nhead=3' run "$WATCH" --once
+assert_match "Y2: failure surfaced" 'update-branch FAILED for #3: boom' "$OUT"
+assert_absent "Y2: not called updated" 'already updated' "$OUT"
+assert_eq "Y2: exit 1" 1 "$RC"
+
 # I: skipped PRs print with readable reasons; unknown reasons pass through.
 SEL_OUT=$'action=update\nhead=8\nskipped=12:dirty 13:red 14:weird' run "$WATCH" --once
 assert_match "I: skipped line" 'skipped: #12 \(conflict\), #13 \(failing check\), #14 \(weird\)$' "$OUT"

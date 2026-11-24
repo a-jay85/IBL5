@@ -185,15 +185,17 @@ def card_lines(comments: Sequence[dict], head: str, plan_text: Optional[str], pr
     """The Owner approvals field, oldest approval first."""
     recorded = {e.comment_id for e in us.parse_amendments(plan_text)} if plan_text is not None else None
     rows: list[str] = []
+    n = 0
     for c in _oldest_first(comments):
         if not us._authentic(c):
             continue
         m = _marker(c)
         if m is None:
             continue
+        n += 1
         body = (c.get("body") or "").replace("\r", "")
         moved = "PR head moved past it" if m.group("head") != head else "PR head unchanged"
-        rows.append(f"  {len(rows) + 1}. {c.get('created_at') or 'unknown time'} {m.group('mode')} "
+        rows.append(f"  {n}. {c.get('created_at') or 'unknown time'} {m.group('mode')} "
                     f"head {m.group('head')[:7]} ({moved})")
         w = us.APPROVAL_WORDS_RE.match(body.split("\n", 1)[0])
         if w:

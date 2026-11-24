@@ -133,12 +133,29 @@ def _row(num, text, tag=""):
     return ManualRow(number=num, text=text, raw="", post_merge_reason="plan After merge section", tag=tag)
 
 
-def _steps(tmp_path, *names):
+def _steps(tmp_path, *names, track=True):
     d = tmp_path / "steps"
     d.mkdir(exist_ok=True)
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     for n in names:
         (d / n).write_text("#!/bin/bash\n")
+        if track:
+            subprocess.run(["git", "-C", str(tmp_path), "add", f"steps/{n}"], check=True)
     return str(d)
+
+
+def test_untracked_step_fails_closed_to_manual(tmp_path):
+    block = render_after_merge_block([_row("1", "run it", "auto:mac fresh")],
+                                     steps_dir=_steps(tmp_path, "fresh", track=False))
+    assert "- **Row 1** [manual] — run it" in block
+
+
+def test_symlink_step_fails_closed_to_manual(tmp_path):
+    steps = _steps(tmp_path, "real")
+    os.symlink(os.path.join(steps, "real"), os.path.join(steps, "link"))
+    subprocess.run(["git", "-C", str(tmp_path), "add", "steps/link"], check=True)
+    block = render_after_merge_block([_row("1", "run it", "auto:mac link")], steps_dir=steps)
+    assert "- **Row 1** [manual] — run it" in block
 
 
 def test_render_after_merge_tagged_row(tmp_path):

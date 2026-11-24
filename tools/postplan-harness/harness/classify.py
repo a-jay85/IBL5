@@ -8,6 +8,7 @@ from __future__ import annotations
 import dataclasses
 import os
 import re
+import subprocess
 
 from .sql_comments import migration_sections
 from .state import Classification
@@ -820,13 +821,26 @@ _AUTO_MAC_SENTENCE = (
     "which sends a Discord message only when one fails.")
 
 
+def _is_tracked_step(steps_dir, name):
+    """Same test as bin/post-merge-run resolve_step: regular, non-symlink, git-tracked."""
+    p = os.path.join(steps_dir, name)
+    if os.path.islink(p) or not os.path.isfile(p):
+        return False
+    try:
+        r = subprocess.run(["git", "-C", steps_dir, "ls-files", "--error-unmatch", "--", name],
+                           capture_output=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return r.returncode == 0
+
+
 def _fail_closed_tag(row, steps_dir):
-    """Keep a tag only when it is `manual` or an auto:mac step present in steps_dir."""
+    """Keep a tag only when it is `manual` or an auto:mac step the Mac executor will accept."""
     tag = getattr(row, "tag", "")
     if not tag or tag == "manual":
         return row
     m = _AUTO_TAG_RE.match(tag)
-    if m and m["kind"] == "auto:mac" and steps_dir and os.path.isfile(os.path.join(steps_dir, m["name"])):
+    if m and m["kind"] == "auto:mac" and steps_dir and _is_tracked_step(steps_dir, m["name"]):
         return row
     return dataclasses.replace(row, tag="manual")
 

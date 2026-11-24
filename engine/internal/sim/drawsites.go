@@ -8,7 +8,6 @@ package sim
 // TestDrawSitesAddressesMatchDocComments pins each value to the doc comment.
 var DrawSites = map[string]string{
 	"sim.(*gameState).creditBlock":             "",
-	"sim.(*gameState).lateGameForcing":         "",
 	"sim.(*gameState).maybeInjure":             "",
 	"sim.(*gameState).rebound":                 "",
 	"sim.(*gameState).resolveFoulAt":           "",
@@ -21,6 +20,7 @@ var DrawSites = map[string]string{
 	"sim.foulBucketWeight":                     "FUN_004e3860",
 	"sim.possession":                           "",
 	"sim.possessionTime":                       "",
+	"sim.randInt":                              "",
 	"sim.rollMake":                             "",
 	"sim.selectBallHandler":                    "",
 	"sim.selectDefender":                       "",
@@ -28,5 +28,6 @@ var DrawSites = map[string]string{
 	"sim.selectRebounder":                      "",
 	"sim.selectShotType":                       "",
 	"sim.simGameWith":                          "",
+	"sim.tipOffWinner":                         "",
 	"sim.transitionTriggers":                   "FUN_004e42e0",
 }

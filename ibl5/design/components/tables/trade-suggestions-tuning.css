@@ -1,0 +1,83 @@
+@layer components {
+
+/* ==========================================================================
+   Trade Suggestions Tuning (admin page)
+
+   - Engine settings: pretty-printed JSON wraps inside its cell
+   - Counts: small label/value table, one line per veto id
+   - Wide result tables sit in .table-scroll-wrapper for mobile scroll
+   ========================================================================== */
+
+.tuning-sim {
+    text-align: center;
+    overflow-wrap: anywhere;
+}
+
+.tuning-filter {
+    margin: 0 auto var(--space-4);
+}
+
+.tuning-config {
+    max-width: 960px;
+    margin: 0 auto var(--space-4);
+}
+
+.tuning-config > summary {
+    cursor: pointer;
+    text-align: center;
+    font-weight: var(--font-weight-semibold);
+    margin-bottom: var(--space-2);
+}
+
+.tuning-config-table th,
+.tuning-counts th {
+    text-align: left;
+    white-space: nowrap;
+    vertical-align: top;
+}
+
+.tuning-config-table td,
+.tuning-counts td {
+    text-align: left;
+}
+
+.tuning-json {
+    margin: 0;
+    font-family: monospace;
+    font-size: var(--text-xs);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.tuning-counts {
+    min-width: 240px;
+}
+
+.tuning-count-line {
+    font-family: monospace;
+    font-size: var(--text-xs);
+    overflow-wrap: anywhere;
+}
+
+.tuning-rows td {
+    white-space: nowrap;
+}
+
+/* Long headers and the outcome text wrap so the table fits a 1280 screen
+   without scrolling. Number cells stay on one line. */
+.ibl-data-table.tuning-rows th,
+.tuning-rows td.tuning-outcome {
+    white-space: normal;
+}
+
+.tuning-rows td.tuning-outcome {
+    min-width: 7rem;
+}
+
+.tuning-subtitle {
+    text-align: center;
+    font-weight: var(--font-weight-semibold);
+    margin: var(--space-4) 0 var(--space-2);
+}
+
+}

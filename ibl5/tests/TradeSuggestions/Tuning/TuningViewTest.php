@@ -34,7 +34,7 @@ final class TuningViewTest extends TestCase
     {
         $html = self::render(unmatched: [self::feedback('<script>alert("tuning")</script> & co')]);
 
-        preg_match('/<table class="ibl-table tuning-unmatched" id="tuning-unmatched-1">(.*?)<\/table>/s', $html, $m);
+        preg_match('/<table class="ibl-data-table tuning-unmatched" id="tuning-unmatched-1">(.*?)<\/table>/s', $html, $m);
         $table = $m[1] ?? '';
         self::assertStringContainsString('&lt;script&gt;alert(&quot;tuning&quot;)&lt;/script&gt; &amp; co', $table);
         self::assertStringContainsString('Too old', $table);
@@ -65,7 +65,7 @@ final class TuningViewTest extends TestCase
         $html = self::render(rows: []);
 
         self::assertStringContainsString('No suggestions for this team in this sim.', $html);
-        self::assertStringNotContainsString('<table class="ibl-table tuning-rows"', $html);
+        self::assertStringNotContainsString('<table class="ibl-data-table tuning-rows"', $html);
     }
 
     public function testIgnoredFilterNoteNamesTheParameter(): void
@@ -145,8 +145,8 @@ final class TuningViewTest extends TestCase
         ]);
 
         preg_match_all('/<tr data-outcome="[a-z_]+">(.*?)<\/tr>/s', $html, $m);
-        preg_match_all('/<td>(.*?)<\/td>/s', $m[1][0] ?? '', $first);
-        preg_match_all('/<td>(.*?)<\/td>/s', $m[1][1] ?? '', $second);
+        preg_match_all('/<td[^>]*>(.*?)<\/td>/s', $m[1][0] ?? '', $first);
+        preg_match_all('/<td[^>]*>(.*?)<\/td>/s', $m[1][1] ?? '', $second);
         self::assertSame(['4', 'Eligible (later refresh)', 'Team 2', 'ONE_FOR_ONE', '1.23'], array_slice($first[1], 0, 5));
         self::assertSame('yes', $first[1][9] ?? null);
         self::assertSame(['-', 'Eligible (later refresh)', '99'], array_slice($second[1], 0, 3));
@@ -160,8 +160,8 @@ final class TuningViewTest extends TestCase
         $html = self::render(rows: [self::row(gain: $twoSeasons), self::row(gain: $none)]);
 
         preg_match_all('/<tr data-outcome="[a-z_]+">(.*?)<\/tr>/s', $html, $m);
-        preg_match_all('/<td>(.*?)<\/td>/s', $m[1][0] ?? '', $first);
-        preg_match_all('/<td>(.*?)<\/td>/s', $m[1][1] ?? '', $second);
+        preg_match_all('/<td[^>]*>(.*?)<\/td>/s', $m[1][0] ?? '', $first);
+        preg_match_all('/<td[^>]*>(.*?)<\/td>/s', $m[1][1] ?? '', $second);
         self::assertSame(['1.23 / 0.50', '1.23 / 0.50'], array_slice($first[1], 5, 2));
         self::assertSame(['-', '-'], array_slice($second[1], 5, 2));
     }
@@ -190,7 +190,7 @@ final class TuningViewTest extends TestCase
     #[DataProvider('modeProvider')]
     public function testModeLabel(TeamMode $mode, string $label): void
     {
-        self::assertStringContainsString('<li>Mode: ' . $label . '</li>', self::render(mode: $mode));
+        self::assertStringContainsString('<tr><th scope="row">Mode</th><td>' . $label . '</td></tr>', self::render(mode: $mode));
     }
 
     public function testCountsListShowsCappedAndDiagnostics(): void
@@ -199,11 +199,26 @@ final class TuningViewTest extends TestCase
         $capped = self::render(capped: true, diagnostics: $diagnostics);
         $open = self::render(capped: false);
 
-        self::assertStringContainsString('<li>Capped: yes</li>', $capped);
-        self::assertStringContainsString('<li>Capped: no</li>', $open);
-        self::assertStringContainsString('<li>generated: 7</li>', $capped);
-        self::assertStringContainsString('<li>vetoed_by_id: {&quot;V1&quot;:2}</li>', $capped);
-        self::assertStringContainsString('<li>validator_rejections: []</li>', $capped);
+        self::assertStringContainsString('<tr><th scope="row">Capped</th><td>yes</td></tr>', $capped);
+        self::assertStringContainsString('<tr><th scope="row">Capped</th><td>no</td></tr>', $open);
+        self::assertStringContainsString('<tr><th scope="row">generated</th><td>7</td></tr>', $capped);
+        self::assertStringContainsString('<tr><th scope="row">validator_rejections</th><td>-</td></tr>', $capped);
+    }
+
+    public function testVetoCountsShowOneLinePerId(): void
+    {
+        $html = self::render(diagnostics: new RankDiagnostics(0, 0, 0, 0, 0, ['V1' => 2, '<V2>' => 0], 0, [], 0, 0));
+
+        self::assertStringContainsString('<div class="tuning-count-line">V1: 2</div>', $html);
+        self::assertStringContainsString('<div class="tuning-count-line">&lt;V2&gt;: 0</div>', $html);
+    }
+
+    public function testConfigValuesArePrettyPrintedOneEntryPerLine(): void
+    {
+        $html = self::render(config: ['veto_ids' => ['A_B', 'C/D'], 'ranker' => ['keep_top' => 12]]);
+
+        self::assertStringContainsString("<pre class=\"tuning-json\">[\n    &quot;A_B&quot;,\n    &quot;C/D&quot;\n]</pre>", $html);
+        self::assertStringContainsString("<pre class=\"tuning-json\">{\n    &quot;keep_top&quot;: 12\n}</pre>", $html);
     }
 
     /**
@@ -230,13 +245,14 @@ final class TuningViewTest extends TestCase
     {
         $html = self::render(rows: [self::row(outcome: $outcome)]);
 
-        self::assertMatchesRegularExpression('/<tr data-outcome="' . $outcome->value . '">\s*<td>[^<]*<\/td>\s*<td>' . preg_quote($label, '/') . '<\/td>/', $html);
+        self::assertMatchesRegularExpression('/<tr data-outcome="' . $outcome->value . '">\s*<td>[^<]*<\/td>\s*<td class="tuning-outcome">' . preg_quote($label, '/') . '<\/td>/', $html);
     }
 
     /**
      * @param list<TuningRow>|null $rows
      * @param list<int> $teamsNotRun
      * @param list<TuningFeedback> $unmatched
+     * @param array<string, mixed> $config
      */
     private static function render(
         ?array $rows = null,
@@ -249,6 +265,7 @@ final class TuningViewTest extends TestCase
         TeamMode $mode = TeamMode::Middle,
         bool $capped = false,
         ?RankDiagnostics $diagnostics = null,
+        array $config = ['exposure_k' => 8],
     ): string {
         $names = [];
         for ($tid = 1; $tid <= 28; $tid++) {
@@ -270,7 +287,7 @@ final class TuningViewTest extends TestCase
             simKey: 'sim-1',
             filter: $filter ?? new TuningFilter(1, TuningStatus::All, []),
             teamNames: $names,
-            config: ['exposure_k' => 8],
+            config: $config,
             sections: [$section],
             truncated: $truncated,
             teamsNotRun: $teamsNotRun,

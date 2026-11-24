@@ -28,36 +28,48 @@ final class TuningView implements TuningViewInterface
         ob_start();
         ?>
 <h1 class="ibl-title">Trade suggestions tuning</h1>
-<p id="tuning-sim">Sim <?= HtmlSanitizer::e($report->simKey) ?></p>
+<p id="tuning-sim" class="tuning-sim">Sim <?= HtmlSanitizer::e($report->simKey) ?></p>
 
-<form method="get" action="modules.php">
+<form method="get" action="modules.php" class="ibl-filter-form tuning-filter">
     <input type="hidden" name="name" value="TradeSuggestionsTuning">
-    <label for="tuning-team">Team</label>
-    <select name="team" id="tuning-team">
-        <option value="all"<?= HtmlSanitizer::e($filter->tid === null ? ' selected' : '') ?>>All teams</option>
+    <div class="ibl-filter-form__row">
+        <div class="ibl-filter-form__group">
+            <label class="ibl-filter-form__label" for="tuning-team">Team</label>
+            <select name="team" id="tuning-team">
+                <option value="all"<?= HtmlSanitizer::e($filter->tid === null ? ' selected' : '') ?>>All teams</option>
 <?php foreach ($report->teamNames as $tid => $name): ?>
-        <option value="<?= HtmlSanitizer::e($tid) ?>"<?= HtmlSanitizer::e($filter->tid === $tid ? ' selected' : '') ?>><?= HtmlSanitizer::e($name) ?></option>
+                <option value="<?= HtmlSanitizer::e($tid) ?>"<?= HtmlSanitizer::e($filter->tid === $tid ? ' selected' : '') ?>><?= HtmlSanitizer::e($name) ?></option>
 <?php endforeach; ?>
-    </select>
-    <label for="tuning-status">Show</label>
-    <select name="status" id="tuning-status">
+            </select>
+        </div>
+        <div class="ibl-filter-form__group">
+            <label class="ibl-filter-form__label" for="tuning-status">Show</label>
+            <select name="status" id="tuning-status">
 <?php foreach (TuningStatus::cases() as $status): ?>
-        <option value="<?= HtmlSanitizer::e($status->value) ?>"<?= HtmlSanitizer::e($filter->status === $status ? ' selected' : '') ?>><?= HtmlSanitizer::e($status->label()) ?></option>
+                <option value="<?= HtmlSanitizer::e($status->value) ?>"<?= HtmlSanitizer::e($filter->status === $status ? ' selected' : '') ?>><?= HtmlSanitizer::e($status->label()) ?></option>
 <?php endforeach; ?>
-    </select>
-    <button type="submit">Run</button>
+            </select>
+        </div>
+        <button type="submit" class="ibl-filter-form__submit">Run</button>
+    </div>
 </form>
 <?php if ($filter->ignored !== []): ?>
 <div class="ibl-alert ibl-alert--info" id="tuning-ignored">Ignored unknown values for: <?= HtmlSanitizer::e(implode(', ', $filter->ignored)) ?></div>
 <?php endif; ?>
 
-<details id="tuning-config">
+<details id="tuning-config" class="tuning-config">
     <summary>Engine settings</summary>
-    <table class="ibl-table">
+    <div class="table-scroll-wrapper">
+        <div class="table-scroll-container">
+            <table class="ibl-data-table tuning-config-table">
+                <tbody>
 <?php foreach ($report->config as $key => $value): ?>
-        <tr><th><?= HtmlSanitizer::e($key) ?></th><td><?= HtmlSanitizer::e(json_encode($value)) ?></td></tr>
+                    <tr><th scope="row"><?= HtmlSanitizer::e($key) ?></th><td><pre class="tuning-json"><?= HtmlSanitizer::e(self::prettyJson($value)) ?></pre></td></tr>
 <?php endforeach; ?>
-    </table>
+                </tbody>
+            </table>
+        </div>
+    </div>
 </details>
 <?php if ($report->truncated): ?>
 <div class="ibl-alert ibl-alert--info" id="tuning-truncated">Stopped after <?= HtmlSanitizer::e(StatsFormatter::formatWithDecimals($report->elapsedSeconds, 1)) ?> s (budget <?= HtmlSanitizer::e(TuningBudget::TIME_BUDGET_SECONDS) ?> s). Teams not run: <?= HtmlSanitizer::e(implode(', ', $report->teamsNotRun)) ?></div>
@@ -65,21 +77,35 @@ final class TuningView implements TuningViewInterface
 <?php foreach ($report->sections as $section): ?>
 
 <section class="tuning-team" id="tuning-team-<?= HtmlSanitizer::e($section->tid) ?>">
-    <h2><?= HtmlSanitizer::e($section->teamName) ?></h2>
-    <ul class="tuning-counts">
-        <li>Mode: <?= HtmlSanitizer::e(self::modeLabel($section->mode)) ?></li>
-        <li>Eligible partners: <?= HtmlSanitizer::e(count($section->eligiblePartners)) ?></li>
-        <li>Raw candidates: <?= HtmlSanitizer::e($section->generation->rawCount) ?></li>
-        <li>Prefilter rejected: <?= HtmlSanitizer::e($section->generation->prefilterRejected) ?></li>
-        <li>Capped: <?= HtmlSanitizer::e($section->generation->capped ? 'yes' : 'no') ?></li>
+    <h2 class="ibl-title"><?= HtmlSanitizer::e($section->teamName) ?></h2>
+    <table class="ibl-data-table tuning-counts">
+        <tbody>
+            <tr><th scope="row">Mode</th><td><?= HtmlSanitizer::e(self::modeLabel($section->mode)) ?></td></tr>
+            <tr><th scope="row">Eligible partners</th><td><?= HtmlSanitizer::e(count($section->eligiblePartners)) ?></td></tr>
+            <tr><th scope="row">Raw candidates</th><td><?= HtmlSanitizer::e($section->generation->rawCount) ?></td></tr>
+            <tr><th scope="row">Prefilter rejected</th><td><?= HtmlSanitizer::e($section->generation->prefilterRejected) ?></td></tr>
+            <tr><th scope="row">Capped</th><td><?= HtmlSanitizer::e($section->generation->capped ? 'yes' : 'no') ?></td></tr>
 <?php foreach ($section->diagnostics->toArray() as $label => $count): ?>
-        <li><?= HtmlSanitizer::e($label) ?>: <?= HtmlSanitizer::e($count) ?></li>
+<?php if (!is_array($count)): ?>
+            <tr><th scope="row"><?= HtmlSanitizer::e($label) ?></th><td><?= HtmlSanitizer::e($count) ?></td></tr>
+<?php elseif ($count === []): ?>
+            <tr><th scope="row"><?= HtmlSanitizer::e($label) ?></th><td>-</td></tr>
+<?php else: ?>
+            <tr><th scope="row"><?= HtmlSanitizer::e($label) ?></th><td>
+<?php foreach ($count as $id => $n): ?>
+                <div class="tuning-count-line"><?= HtmlSanitizer::e($id) ?>: <?= HtmlSanitizer::e($n) ?></div>
 <?php endforeach; ?>
-    </ul>
+            </td></tr>
+<?php endif; ?>
+<?php endforeach; ?>
+        </tbody>
+    </table>
 <?php if ($section->rows === []): ?>
     <div class="ibl-empty-state"><p class="ibl-empty-state__text">No suggestions for this team in this sim.</p></div>
 <?php else: ?>
-    <table class="ibl-table tuning-rows">
+    <div class="table-scroll-wrapper">
+    <div class="table-scroll-container">
+    <table class="ibl-data-table tuning-rows">
         <thead>
             <tr>
                 <th>Rank</th><th>Outcome</th><th>Partner</th><th>Shape</th><th>Weaker side</th>
@@ -91,7 +117,7 @@ final class TuningView implements TuningViewInterface
 <?php foreach ($section->rows as $row): ?>
             <tr data-outcome="<?= HtmlSanitizer::e($row->outcome->value) ?>">
                 <td><?= HtmlSanitizer::e($row->rank ?? '-') ?></td>
-                <td><?= HtmlSanitizer::e($row->outcome->label()) ?></td>
+                <td class="tuning-outcome"><?= HtmlSanitizer::e($row->outcome->label()) ?></td>
                 <td><?= HtmlSanitizer::e($report->teamNames[$row->partnerTid] ?? $row->partnerTid) ?></td>
                 <td><?= HtmlSanitizer::e($row->shapeId) ?></td>
                 <td><?= HtmlSanitizer::e(StatsFormatter::formatWithDecimals($row->weakerSideTotal, 2)) ?></td>
@@ -109,10 +135,14 @@ final class TuningView implements TuningViewInterface
 <?php endforeach; ?>
         </tbody>
     </table>
+    </div>
+    </div>
 <?php endif; ?>
 <?php if ($section->unmatchedFeedback !== []): ?>
-    <h3>Hidden ideas not in this run</h3>
-    <table class="ibl-table tuning-unmatched" id="tuning-unmatched-<?= HtmlSanitizer::e($section->tid) ?>">
+    <h3 class="tuning-subtitle">Hidden ideas not in this run</h3>
+    <div class="table-scroll-wrapper">
+    <div class="table-scroll-container">
+    <table class="ibl-data-table tuning-unmatched" id="tuning-unmatched-<?= HtmlSanitizer::e($section->tid) ?>">
         <thead>
             <tr><th>Partner</th><th>Reasons</th><th>Note</th><th>Hidden at</th></tr>
         </thead>
@@ -127,6 +157,8 @@ final class TuningView implements TuningViewInterface
 <?php endforeach; ?>
         </tbody>
     </table>
+    </div>
+    </div>
 <?php endif; ?>
 <?php if ($section->omittedRows > 0): ?>
     <div class="ibl-alert ibl-alert--info"><?= HtmlSanitizer::e($section->omittedRows) ?> more rows not shown (cap <?= HtmlSanitizer::e(TuningBudget::MAX_ROWS_PER_TEAM) ?>).</div>
@@ -135,6 +167,14 @@ final class TuningView implements TuningViewInterface
 <?php endforeach; ?>
         <?php
         return (string) ob_get_clean();
+    }
+
+    /**
+     * One config value as indented JSON, so lists and maps show one entry per line.
+     */
+    private static function prettyJson(mixed $value): string
+    {
+        return (string) json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     }
 
     private static function modeLabel(TeamMode $mode): string

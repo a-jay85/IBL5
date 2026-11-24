@@ -219,6 +219,7 @@
 @import './components/tables/season-highs.css';
 @import './components/tables/voting.css';
 @import './components/tables/trading.css';
+@import './components/tables/trade-suggestions-tuning.css';
 @import './components/tables/draft-history.css';
 @import './components/tables/league-stats.css';
 @import './components/tables/contact-list.css';

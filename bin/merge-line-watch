@@ -138,7 +138,10 @@ run_pass() {
         # updater's push, so wait one retry interval before asking.
         pr=$head
         sleep "$RETRY_WAIT"
-        if select_head; then
+        # A refused PUT can also be a real conflict: GitHub then marks the PR
+        # dirty and the selector lists it under skipped=. A PR the selector
+        # skips (dirty or red) is a failure, never a lost race.
+        if select_head && ! grep -qE "(^|[[:space:]])${pr}:" <<<"$(sed -n 's/^skipped=//p' <<<"$out")"; then
             if [ "$action" = "update" ] && [ "$head" != "$pr" ]; then
                 say "PR #$pr is no longer the head (now #$head); leaving it for the next pass"
                 return 0

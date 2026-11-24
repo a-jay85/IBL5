@@ -48,6 +48,18 @@ CONDITION_NAMES = {
     7: "plan-auto-merge-hold",
     8: "ui-review-floor",
 }
+# Owner-only hold kinds. Kind tokens stay out of `structural_key`, so they never
+# add a repeat DM. They join the human-only set and the owner-only decline.
+KIND_SELF_GOVERNING = "18:self-governing"
+KIND_KEPT_SCOPE = "12:kept-unplanned-scope"
+_KIND_NUMBERS = {KIND_SELF_GOVERNING: 18, KIND_KEPT_SCOPE: 12}
+SELF_GOVERNING_REASON = "state=SELF-GOVERNING"
+OWNER_APPROVAL_NAME = "owner approval"
+OWNER_ONLY_MESSAGE = ("Waiting on owner approval. Body notes won't clear this. "
+                      "Revert the change, or add a plan phase for it.")
+OWNER_ONLY_MESSAGE_PLAN_BLIND = ("Waiting on owner approval. Body notes won't clear this. "
+                                 "Revert the change, or run bin/owner-approve.")
+_ITEM_PREFIX = "- [BLOCKING] "
 ELIGIBLE_EXIT = 10
 FIX_ELIGIBLE_EXIT = 10
 FIX_GIVEUP_EXIT = 11
@@ -120,6 +132,66 @@ def hold_set(conditions) -> list:
     return [_triple(c) for c in _blocked(conditions)]
 
 
+def owner_only_message(plan_found: bool) -> str:
+    return OWNER_ONLY_MESSAGE if plan_found else OWNER_ONLY_MESSAGE_PLAN_BLIND
+
+
+def kept_scope_only(blocking, kept_titles, owner_titles=()) -> bool:
+    """True when every blocking finding is a kept `[unplanned-scope]` item no owner quote accepted."""
+    from harness import unplanned_scope
+    items = [b for b in (blocking or []) if isinstance(b, str) and b.strip()]
+    if not items:
+        return False
+    kept = set(kept_titles or [])
+    owner = set(owner_titles or [])
+    for item in items:
+        line = _ITEM_PREFIX + item
+        if not unplanned_scope.is_unplanned_scope(line):
+            return False
+        title = unplanned_scope.title_of(line)
+        if title not in kept or title in owner:
+            return False
+    return True
+
+
+def _fidelity_kept_scope_only(fid) -> bool:
+    try:
+        if not isinstance(fid, dict):
+            return False
+        items = fid.get("review_items")
+        if not isinstance(items, list) or not items:
+            return False
+        last = items[-1]
+        if not isinstance(last, dict) or last.get("verdict") != "NOT READY":
+            return False
+        owner = {d["title"] for d in fid.get("kept_owner_scope") or []
+                 if isinstance(d, dict) and isinstance(d.get("title"), str)}
+        return kept_scope_only(last.get("blocking"), fid.get("kept_unplanned"), owner)
+    except Exception:  # noqa: BLE001 - fail open: no kind
+        return False
+
+
+def owner_only_kinds(conditions, fidelity=None) -> list:
+    """Kind tokens for the blocked conditions: 18 with state SELF-GOVERNING, 12 with kept scope only."""
+    kinds = []
+    for n, _name, reason in hold_set(conditions):
+        if n == 18 and reason == normalize_reason(SELF_GOVERNING_REASON):
+            kinds.append(KIND_SELF_GOVERNING)
+        if n == 12 and _fidelity_kept_scope_only(fidelity):
+            kinds.append(KIND_KEPT_SCOPE)
+    return sorted(kinds)
+
+
+def _valid_kinds(raw) -> list:
+    if not isinstance(raw, list) or not all(isinstance(k, str) and k in _KIND_NUMBERS for k in raw):
+        return []
+    return sorted(set(raw))
+
+
+def _allowed_numbers(kinds) -> frozenset:
+    return HUMAN_ONLY_CONDITIONS | {_KIND_NUMBERS[k] for k in kinds}
+
+
 def _structural(conditions) -> list:
     return [t for t in hold_set(conditions) if t[0] in STRUCTURAL_CONDITIONS]
 
@@ -176,13 +248,14 @@ class Observation:
 
 
 def observe(state_dir, slug, *, armed: bool, conditions, fingerprint: str,
-            pr, now: str) -> Observation:
+            pr, now: str, fidelity=None) -> Observation:
     """Advance the repeat state machine. Never sends anything."""
+    kinds = owner_only_kinds(conditions, fidelity)
     key = structural_key(conditions)
     structural = _structural(conditions)
     if armed or key == "":
         nums = {t[0] for t in hold_set(conditions)}
-        if not armed and nums and nums <= HUMAN_ONLY_CONDITIONS:
+        if not armed and nums and nums <= _allowed_numbers(kinds):
             # A hold with no structural condition (1 alone) still needs a record so
             # `human_only_names` can skip it. Empty dm_sent_key/structural_key keep
             # `should_decline` and the repeat DM off.
@@ -191,6 +264,7 @@ def observe(state_dir, slug, *, armed: bool, conditions, fingerprint: str,
                 "slug": slug,
                 "structural_key": "",
                 "hold_set": hold_set(conditions),
+                "hold_kinds": kinds,
                 "structural": [],
                 "repeat_count": 1,
                 "dm_sent_key": None,
@@ -210,6 +284,7 @@ def observe(state_dir, slug, *, armed: bool, conditions, fingerprint: str,
             "slug": slug,
             "structural_key": key,
             "hold_set": full_set,
+            "hold_kinds": kinds,
             "structural": structural,
             "repeat_count": 1,
             "dm_sent_key": None,
@@ -225,6 +300,7 @@ def observe(state_dir, slug, *, armed: bool, conditions, fingerprint: str,
     record["repeat_count"] = int(record.get("repeat_count") or 1) + 1
     record["fingerprint"] = fingerprint
     record["hold_set"] = full_set
+    record["hold_kinds"] = kinds
     record["structural"] = structural
     record["pr"] = pr
     record["updated_at"] = now
@@ -548,6 +624,16 @@ def should_decline(state_dir, slug, current_fp: str):
     return True, f"unchanged plan+diff+harness; held again on {key} (DM already sent)"
 
 
+def owner_only_decline(state_dir, slug, current_fp: str):
+    """Names text when the last hold was owner-only and plan, diff and harness are unchanged, else None."""
+    rec = load_record(state_dir, slug)
+    if rec is None or not current_fp or current_fp != rec.get("fingerprint"):
+        return None
+    if not _valid_kinds(rec.get("hold_kinds")):
+        return None
+    return human_only_names(state_dir, slug, current_fp)
+
+
 def _hold_numbers(rec):
     """Return the set of condition numbers in the record's `hold_set`, or None.
 
@@ -586,7 +672,9 @@ def rebase_only_eligible(state_dir, slug) -> bool:
 
 def human_only_names(state_dir, slug, current_fp=None):
     """Return "1 manual-testing-clearance, 7 plan-auto-merge-hold" style text when the
-    stored hold set is a non-empty subset of {1,3,7,8}, else None. When current_fp is
+    stored hold set is a non-empty subset of {1,3,7,8}, plus 12 or 18 when the record
+    carries the matching owner-only kind (then "owner approval" is appended), else
+    None. When current_fp is
     given it must equal the record's fingerprint (plan, diff and harness unchanged).
     Any absent, unreadable, malformed or stale record returns None (fail toward running).
     """
@@ -594,11 +682,15 @@ def human_only_names(state_dir, slug, current_fp=None):
     if not rec:
         return None
     nums = _hold_numbers(rec)
-    if not nums or not nums <= HUMAN_ONLY_CONDITIONS:
+    kinds = _valid_kinds(rec.get("hold_kinds"))
+    if not nums or not nums <= _allowed_numbers(kinds):
         return None
     if current_fp is not None and (not current_fp or current_fp != rec.get("fingerprint")):
         return None
-    return ", ".join(f"{n} {CONDITION_NAMES[n]}" for n in sorted(nums))
+    names = [f"{n} {CONDITION_NAMES[n]}" for n in sorted(nums) if n in CONDITION_NAMES]
+    if kinds:
+        names.append(OWNER_APPROVAL_NAME)
+    return ", ".join(names)
 
 
 def hold_fingerprint(reason: str) -> str:
@@ -847,11 +939,17 @@ def main(argv=None) -> int:
         plan_info = locate_plan(args.slug, explicit_path=args.plan or None)
         fp = fingerprint(plan_info.path or "", args.worktree)
         decline, reason = should_decline(args.state_dir, args.slug, fp)
+        owner = None if decline else owner_only_decline(args.state_dir, args.slug, fp)
+        plan_found = bool(plan_info.path)
     except Exception as e:  # noqa: BLE001 - fail open by design
         print(f"holdrepeat: check failed ({e}); proceeding", file=sys.stderr)
         return 0
     if decline:
         print(f"holdrepeat: DECLINE {reason}")
+        return DECLINE_EXIT
+    if owner:
+        print(f"holdrepeat: DECLINE unchanged plan+diff+harness; owner-only hold ({owner}). "
+              f"{owner_only_message(plan_found)}")
         return DECLINE_EXIT
     return 0
 

@@ -94,6 +94,98 @@ def replay(runs: list[dict], since: str = "", until: str = "") -> dict:
             "caught_in_slugs_with_3plus": caught_3plus}
 
 
+def _fid_str(value) -> str:
+    return value if isinstance(value, str) else ""
+
+
+def load_owner_only_runs(out_dir: str, since: str = "20261110") -> list[dict]:
+    """Runs for the owner-only replay: one dict per live-*/result.json in the window.
+
+    Only slugs with 2 or more runs are kept. `fp` pairs plan_hash and diff_id, the replay's
+    stand-in for plan+diff, since result.json stores no fingerprint. `owner_refire` marks a
+    run that carries an owner-approval entry, the stand-in for a `--state-changed` re-fire.
+    """
+    runs = []
+    for path in sorted(glob.glob(os.path.join(out_dir, "live-*", "result.json"))):
+        m = RUN_DIR_RE.match(os.path.basename(os.path.dirname(path)))
+        if not m or not _in_window(m.group(2), since, ""):
+            continue
+        try:
+            with open(path, encoding="utf-8") as fh:
+                data = json.load(fh)
+            arm = data.get("arm")
+            fid = data.get("fidelity") or {}
+            if not isinstance(arm, dict) or not isinstance(fid, dict):
+                continue
+            plan_hash, diff_id = _fid_str(fid.get("plan_hash")), _fid_str(fid.get("diff_id"))
+            owner_scope = [{"title": e.get("title"), "source": e.get("source")}
+                           for e in fid.get("kept_owner_scope") or [] if isinstance(e, dict)]
+            runs.append({
+                "slug": m.group(1), "ts": m.group(2), "armed": bool(arm.get("armed")),
+                "terminal": data.get("terminal"),
+                "conditions": [{"number": c.get("number"), "name": c.get("name"),
+                                "reason": c.get("reason") or "", "blocked": bool(c.get("blocked"))}
+                               for c in arm.get("conditions") or [] if isinstance(c, dict)],
+                "fp": f"{plan_hash}:{diff_id}" if plan_hash and diff_id else "",
+                "owner_refire": any(e["source"] == "owner-approval" for e in owner_scope),
+                "fidelity": {
+                    "review_items": [{"verdict": i.get("verdict"), "blocking": i.get("blocking") or []}
+                                     for i in fid.get("review_items") or [] if isinstance(i, dict)],
+                    "kept_unplanned": [t for t in fid.get("kept_unplanned") or []
+                                       if isinstance(t, str)],
+                    "kept_owner_scope": owner_scope,
+                    "rounds": [{"outcome": r.get("outcome")}
+                               for r in fid.get("rounds") or [] if isinstance(r, dict)],
+                },
+            })
+        except (OSError, ValueError, AttributeError, TypeError):
+            continue
+    counts: dict[str, int] = {}
+    for run in runs:
+        counts[run["slug"]] = counts.get(run["slug"], 0) + 1
+    return [r for r in runs if counts[r["slug"]] >= 2]
+
+
+def replay_owner_only(runs: list[dict]) -> dict:
+    """Count what the owner-only decline and the body-only skip would have done to past runs.
+
+    `declined_then_armed` and `skipped_then_cleared` must stay 0: each one is a run the new
+    rules would have stopped although the old path went on to arm or clear it.
+    """
+    import tempfile
+
+    by_slug: dict[str, list[dict]] = {}
+    for run in runs:
+        by_slug.setdefault(run["slug"], []).append(run)
+    out = {"runs": len(runs), "declines": 0, "declined_then_armed": 0,
+           "body_only_skips": 0, "skipped_then_cleared": 0}
+    with tempfile.TemporaryDirectory() as sd:
+        for slug, slug_runs in by_slug.items():
+            slug_runs.sort(key=lambda r: r["ts"])
+            for run in slug_runs:
+                fid = run.get("fidelity") or {}
+                fp = run.get("fp") or ""
+                if (not run.get("owner_refire")
+                        and holdrepeat.owner_only_decline(sd, slug, fp)):
+                    out["declines"] += 1
+                    out["declined_then_armed"] += bool(run["armed"])
+                obs = holdrepeat.observe(sd, slug, armed=bool(run["armed"]),
+                                         conditions=run["conditions"], fingerprint=fp, pr=None,
+                                         now=run["ts"], fidelity=fid)
+                if getattr(obs, "action", "") == "repeat-dm":
+                    holdrepeat.mark_dm_sent(sd, slug, obs.key)
+                items = fid.get("review_items") or []
+                for i, rnd in enumerate(fid.get("rounds") or []):
+                    if rnd.get("outcome") != "body-only" or i >= len(items):
+                        continue
+                    if holdrepeat.kept_scope_only(items[i].get("blocking"),
+                                                  fid.get("kept_unplanned")):
+                        out["body_only_skips"] += 1
+                        nxt = items[i + 1].get("verdict") if i + 1 < len(items) else None
+                        out["skipped_then_cleared"] += (nxt is not None and nxt != "NOT READY")
+    return out
+
+
 def main(argv=None) -> int:
     default_out = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "out")
     ap = argparse.ArgumentParser(prog="harness.holdrepeat_replay")

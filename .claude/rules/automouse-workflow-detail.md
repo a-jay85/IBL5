@@ -1,6 +1,6 @@
 ---
 description: Automouse workflow detail. The plan autonomy contract (stop_condition and evidence frontmatter), the cost ledger columns, environmental stops and attempt refunds, and the delegate effort trial. Companion to automouse-workflow.md; attaches on the same paths.
-last_verified: 2026-11-20
+last_verified: 2026-11-24
 paths: "bin/automouse/**"
 ---
 
@@ -42,7 +42,7 @@ Every parser is **line-1-anchored** (frontmatter only, to the closing `---`), so
 
 ## Post-plan exit 76: GitHub unreachable
 
-When the post-plan harness cannot reach GitHub, it stops with kind `remote-unreachable` and exit 76. A failed `git fetch`, `push`, `ls-remote` or `pull` raises it once netretry gives up on an outage shape (publickey, DNS, timeout, HTTP 5xx). `bin/lib/branch-base.sh` raises it by returning 2 when a base lookup could not ask GitHub. `bin/post-plan-now` passes 76 through and skips the skill fallback. `bin/automouse/run` treats 76 as environmental at any duration. It refunds the attempt, writes the env-stop report and stops the loop with the plan still queued, so the next run claims it first. A base that origin reports absent, a rebase conflict and a local gate denial still exit 3 and move the plan to skipped/.
+When the post-plan harness cannot reach GitHub, it stops with kind `remote-unreachable` and exit 76. A failed `git fetch`, `push`, `ls-remote` or `pull` raises it once netretry gives up on an outage shape (publickey, DNS, timeout, HTTP 5xx). `bin/lib/branch-base.sh` raises it by returning 2 when a base lookup could not ask GitHub. `bin/post-plan-now` passes 76 through. `bin/automouse/run` treats 76 as environmental at any duration. It refunds the attempt, writes the env-stop report and stops the loop with the plan still queued, so the next run claims it first. A base that origin reports absent, a rebase conflict and a local gate denial still exit 3 and move the plan to skipped/.
 
 ## Orphan watcher reaping
 

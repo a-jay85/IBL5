@@ -1,5 +1,5 @@
 ---
-description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made.
+description: Post-plan engine internals — compiled harness only (a crash posts the failure comment and DM, then stops), what `--auto`'s skip gate does, and where the auto-merge arming decision is made.
 last_verified: 2026-11-24
 paths:
   - ".claude/skills/post-plan/SKILL.md"
@@ -17,16 +17,17 @@ Internals behind `.claude/rules/workflow-continuity.md` § Post-Plan. Read befor
 `bin/post-plan-now --auto` spawns a detached, launchd-supervised post-plan run on the current
 branch; it survives you closing Claude Code. Engine selection:
 
-- **Compiled post-plan harness** (`tools/postplan-harness`) when present. It is a
+- **Compiled post-plan harness** (`tools/postplan-harness`). It is a
   deterministic sequencer with bounded LLM calls. `bin/post-plan-now` pins the MAIN-CHECKOUT
   copy and ignores the worktree's (ADR-0092).
-- **Fallback:** a fresh **Sonnet 5.5** `/post-plan` skill session if the harness is
-  absent or exits outside 0, 3 and 7. It triages and holds the PR; it never arms.
-  `POST_PLAN_SKILL=1` forces it.
+- **No fallback session** (ADR-0284). A harness exit outside 0, 3, 7 and 76 posts the failure
+  PR comment, sends the crash DM and exits with the harness rc. No `claude -p` session starts.
+  A missing `$HARNESS/run` refuses with exit **1** before any lock or launchd job.
+  `POST_PLAN_SKILL` is gone.
 - **No partial resume.** The harness runs Phase 5.5's plan-intent review itself
   (`harness/fidelity.py`), posts the sticky `<!-- pr-ready-verdict -->` comment, and feeds the
   verdict to arming condition (12). It exits **0**, **1** or **3** only. It has no exit 4 and no Phase-5.5 re-entry.
-  Exit **3** is the fail-closed sentinel and suppresses the skill fallback.
+  Exit **3** is the fail-closed sentinel.
   These reach it: a rebase conflict, a **diverged remote head** (the PR branch was rewritten
   on GitHub), a **local gate denial** (a `bin/pre-commit-hook` or `bin/pre-push-adr-hook`
   refusal), a **usage limit** (`llm-usage-limit`),
@@ -72,8 +73,8 @@ On the commit path that detection is structural: any non-zero `git commit` is tr
 gate denial, so a hook message nobody enumerated in `_LOCAL_GATE_MARKERS` is still caught.
 `bin/post-plan-now` also exits **6** from its in-flight duplicate-run guard.
 It refuses a second supervised run while the slug's launchd job is loaded. `--force` bypasses it.
-It also exits **7** when run from the main checkout (ADR-0062). Nothing was fired and the
-skill fallback is suppressed. `cd` into the target worktree and re-run.
+It also exits **7** when run from the main checkout (ADR-0062). Nothing was fired.
+`cd` into the target worktree and re-run.
 It exits **8** when it declines a repeat hold: the last run for this slug held on the same
 structural reasons, the repeat DM was already sent, and plan, diff and harness are unchanged
 (`harness/holdrepeat.py`). Nothing fired. `--force` overrides.
@@ -82,7 +83,7 @@ The harness also declines inside a run, after the conflict probe and before its 
 call, when the diff changed but condition (3)'s `MISSING:` and `MISSING-FILE:` items equal
 the ones the last hold recorded. A diff that never adds the missing files cannot clear that
 hold, so a fresh review would only spend tokens. The run ends with terminal
-`hold-repeat-declined`, exits **0** so no skill fallback starts, and opens no PR.
+`hold-repeat-declined`, exits **0**, and opens no PR.
 It prints `RESULT: post-plan DECLINED` with this phrase:
 `declined: same hold as last run (<reason>), no tokens spent`.
 It DMs once per recorded hold. A strict subset (some files added) or a new

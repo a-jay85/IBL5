@@ -123,6 +123,18 @@ def test_remediate_prompt_carries_budget_trim_hint(forced_trim):
     assert f"bin/check-rules-byte-budget fails on {X_RULES}" in llm.prompts[0]
 
 
+def test_budget_trim_hint_constant_is_pinned(forced_trim):
+    """BUDGET_TRIM_HINT keeps its pre-split wording and fills the rules script name in."""
+    from harness import rules_budget_carveout as rbc
+    assert rbc.BUDGET_TRIM_HINT == (
+        "Fix hint (budget-forced trim): bin/check-rules-byte-budget fails on {path} "
+        "with this trim reverted. Shrink your own added text or move it to a -detail "
+        "companion. Keep the trim in place."
+    )
+    llm = _remediate(forced_trim)
+    assert rbc.BUDGET_TRIM_HINT.format(path=X_RULES) in llm.prompts[0]
+
+
 def test_remediate_leaves_verdict_blocking(forced_trim):
     _, _, verdict, _ = forced_trim
     before = verdict.read_bytes()

@@ -774,6 +774,18 @@ def _conflict_paths_value(paths: list[str] | None) -> str:
     return ", ".join(paths) if paths else "(none — no rebase in this run auto-resolved a conflict)"
 
 
+FORCED_TRIM_NONE = "(none)"
+
+
+def _forced_trim_value(worktree: str, master_sha: str) -> str:
+    """FORCED_TRIM_PATHS value. Any failure reads as (none), so every trim stays blocking."""
+    try:
+        paths = rules_budget_carveout.forced_paths_since(worktree, master_sha)
+    except Exception:  # fail closed: a packet must never crash on this line
+        paths = frozenset()
+    return ", ".join(sorted(paths)) or FORCED_TRIM_NONE
+
+
 def build_packet(out_dir: str, master_sha: str, reviewed_tree: str, plan, diff: str,
                  pr_body: str, pr_number: int | str, phase4b_ran: bool, *,
                  worktree: str = ".", packet_name: str = "fidelity-packet",
@@ -787,7 +799,7 @@ def build_packet(out_dir: str, master_sha: str, reviewed_tree: str, plan, diff: 
     runner passes the plan with unbacked `## Owner amendments` entries stripped.
 
     `shadow_request` asks the reviewer for the procedure 6f `## SHADOW-ARMING` block and adds
-    the `DIFF_FILES:` summary it needs. Off, `context.md` is byte-identical to before.
+    the `DIFF_FILES:` summary it needs. Off, `context.md` carries no shadow lines.
     """
     packet = os.path.join(out_dir, packet_name)
     os.makedirs(packet, exist_ok=True)
@@ -830,6 +842,7 @@ def build_packet(out_dir: str, master_sha: str, reviewed_tree: str, plan, diff: 
     _write("context.md",
            "# Context\n\n"
            f"CONFLICT_RESOLVED_PATHS: {_conflict_paths_value(conflict_resolved_paths)}\n"
+           f"FORCED_TRIM_PATHS: {_forced_trim_value(worktree, master_sha)}\n"
            f"PHASE_4B_RAN: {'yes' if phase4b_ran else 'no'}\n"
            + findings_block
            + f"REVIEW_TIMESTAMP: {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}\n"

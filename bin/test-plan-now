@@ -643,6 +643,23 @@ out=$(run_case "$PLANS/peer-plan.md" "NO_PLAN: already done")
 want_no "NO_PLAN never names a best-effort guess"   "$out" "best-effort guess"
 want_no "NO_PLAN never names a peer's fresh plan"   "$out" "peer-plan.md"
 
+echo "── identity line: line 1 of every log ──"
+
+# bin/jsb-parity-watch links a ledger row to its log by this line. The slugless
+# prompt gives slug=-, and the brief path is baked from the prompt file.
+out=$(run_case "$PLANS/peer-plan.md" "NO_PLAN: already done")
+want "identity line is line 1 (no slug)" "$(printf '%s\n' "$out" | head -n 1)" "plan-now: identity slug=- resume_of=- brief="
+want "identity line names the brief path" "$(printf '%s\n' "$out" | head -n 1)" "brief=$PROMPT"
+
+IDL_PROMPT="$TMP/idl-prompt.md"
+{
+    printf '/plan a throwaway task for bin/test-plan-now\n'
+    printf -- '- Branch slug: `idl-demo-slug`. Base: `master`.\n'
+} > "$IDL_PROMPT"
+out=$(PROMPT="$IDL_PROMPT" run_case "$PLANS/peer-plan.md" "NO_PLAN: already done")
+want    "identity line is line 1 (slug)" "$(printf '%s\n' "$out" | head -n 1)" "plan-now: identity slug=idl-demo-slug resume_of=- brief="
+want_no "identity line carries a brief path, not a dash" "$(printf '%s\n' "$out" | head -n 1)" "brief=-"
+
 out=$(STUB_NO_PLAN=1 run_case "$P" "**NO_PLAN:** \`already done\`")
 want "bold-wrapped NO_PLAN is still recognised" "$out" "RESULT no-plan"
 want "decoration is stripped from the reason"   "$out" "no-plan — already done"
@@ -702,7 +719,8 @@ want "no draft → verbatim line 1" "$out" \
 want "no draft → verbatim line 2" "$out" \
      "plan-now: so its plan cannot be identified, check-plan was NOT run, and nothing was queued."
 want "no draft → verbatim closer" "$out" "plan-now: read the transcript above."
-want_no "no draft → no recovery chatter" "$out" "recovery"
+# The identity line names the brief, and this fixture's brief is recovery-prompt.md.
+want_no "no draft → no recovery chatter" "$(printf '%s\n' "$out" | grep -v '^plan-now: identity ')" "recovery"
 
 # 4. Partial draft that cannot pass check-plan.
 out=$(run_case_recovery "$PARTIAL_DRAFT" demo-slug)
@@ -1800,6 +1818,19 @@ resume_fixture oklog
 run_resume --resume "$RES_TS"
 [ "$RES_RC" = 2 ] && ok "R-6 oklog rc 2" || fail "R-6 oklog rc 2 (got $RES_RC)"
 want    "R-6 oklog: only failed is resumable" "$RES_OUT" "only a failed, paused, or parked run is resumable"
+
+# R-6 with an identity line on line 1: the verdict reader still finds the RESULT line.
+resume_fixture oklog
+printf 'plan-now: identity slug=x resume_of=- brief=-\nplan-now: RESULT ok — plan written and check-plan PASSED.\n' > "$RL/plan-now-$RES_TS.log"
+run_resume --resume "$RES_TS"
+[ "$RES_RC" = 2 ] && ok "R-6 identity-first oklog rc 2" || fail "R-6 identity-first oklog rc 2 (got $RES_RC)"
+want    "R-6 identity-first oklog: verdict read past line 1" "$RES_OUT" "only a failed, paused, or parked run is resumable"
+resume_fixture parkedlog
+printf 'plan-now: identity slug=x resume_of=- brief=-\nplan-now: RESULT parked — Claude login expired; no model call was made.\n' > "$RL/plan-now-$RES_TS.log"
+run_resume --resume "$RES_TS"
+[ "$RES_RC" = 0 ] && ok "R-6 identity-first parkedlog resumes (rc 0)" || fail "R-6 identity-first parkedlog resumes (got $RES_RC: $RES_OUT)"
+want    "runner bakes PROMPT_SRC" "$(cat "$RES_RUNNER" 2>/dev/null)" "PROMPT_SRC="
+preflight_cleanup "$RES_OUT"
 
 # R-park a parked run never started its session, so it resumes fresh.
 resume_fixture parkedlog

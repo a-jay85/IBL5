@@ -525,6 +525,7 @@ REVIEW_ROUTE_DEFAULT=$(grep -oE "'/discordPlanReviewDM'" \
     printf 'ROOT=%q\n'       "$ROOT"
     printf 'PLANS_DIR=%q\n'  "$PLANS_DIR"
     printf 'PROMPT=%q\n'     "$PROMPT"
+    printf 'PROMPT_SRC=%q\n' "${PROMPT_SRC:-}"
     printf 'OUT=%q\n'        "$OUT"
     printf 'RUN_TIMEOUT=%q\n' "$RUN_TIMEOUT"
     printf 'MODEL=%q\n'      "$MODEL"
@@ -696,6 +697,13 @@ run_slug() {
     grep -ioE 'branch slug[^`]{0,24}`[^`]+`' "$PROMPT" 2>/dev/null | head -1 \
         | grep -oE '`[^`]+`' | head -1 | tr -d '`'
 }
+# Identity line: the first line of every plan-now log. bin/jsb-parity-watch links a
+# ledger row to its log by the slug= field. Keep the prefix and field order stable;
+# brief= is last because a path may hold spaces.
+_id_slug=$(run_slug || true)
+[ -n "$_id_slug" ] || _id_slug=-
+printf 'plan-now: identity slug=%s resume_of=%s brief=%s\n' \
+    "$_id_slug" "${RESUME_FROM:--}" "${PROMPT_SRC:--}"
 
 # Echo the path of a draft that provably belongs to THIS run, or nothing.
 # Two locations are tried, .drafts/<slug>.draft.md then <plans-dir>/<slug>.draft.md;

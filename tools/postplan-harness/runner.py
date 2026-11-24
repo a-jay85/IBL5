@@ -4575,6 +4575,9 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
             rec["outcome"] = KEPT_SCOPE_ONLY_OUTCOME
             rec["review_kind"] = "skipped"
             rec["remediation_sha"] = str(sha)
+            # The verdict stands unchanged, so review_items reads the prior verdict file for
+            # this round and holdrepeat sees the kept-scope-only blockers.
+            rec["verdict_path"] = current_verdict_path
             res.fidelity["rounds_completed"] = sum(1 for r in rounds if r["remediation_sha"])
             log(f"phase5.5 round {round_num}: body-only round left only kept unplanned-scope "
                 f"blockers; re-review skipped. "

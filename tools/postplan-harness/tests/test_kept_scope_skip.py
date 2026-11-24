@@ -11,7 +11,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import runner
-from harness import fidelity
+from harness import fidelity, holdrepeat
 from harness.adapters.ghad import RecordingGh
 from harness.state import UsageLedger
 
@@ -83,6 +83,12 @@ def test_body_only_kept_scope_only_skips_rereview(tmp_path, loop_env):
     assert any("re-review skipped" in m and "Waiting on owner approval" in m for m in logs)
     assert res.fidelity.get("verdict_2") is None
     assert len(res.fidelity["rounds"]) == 1
+    # The skipped round still reads as NOT READY with kept-scope-only blockers, so the
+    # holdrepeat record gets the owner-only kind for this very run.
+    assert res.fidelity["review_items"][-1]["verdict"] == "NOT READY"
+    assert holdrepeat.owner_only_kinds(
+        [types.SimpleNamespace(number=12, name="plan-fidelity", blocked=True, reason="NOT READY")],
+        res.fidelity) == [holdrepeat.KIND_KEPT_SCOPE]
 
 
 def test_body_only_with_body_claim_still_rereviews(tmp_path, loop_env):

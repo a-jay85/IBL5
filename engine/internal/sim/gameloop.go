@@ -36,6 +36,16 @@ func resolveBaseTimeMid(opts Options) float64 {
 	return baseTimeMid
 }
 
+// tipOffWinner returns the index of the team that wins the opening tip, in
+// the native routine's own index convention (1 or 2). It takes exactly one raw
+// draw and applies the native arithmetic: scale the draw to 0..1 and add 1.
+// TestTracePinnedPl0028TipOff pins the draw and the returned index against the
+// native capture.
+func tipOffWinner(r *rng.RNG) int {
+	tipRaw := r.Raw()
+	return tipRaw*2/(rng.RawMax+1) + 1
+}
+
 // simGameWith is simGame plus the freeze/accumulation Options (freeze.go). A zero
 // Options leaves every possession decision byte-identical to simGame; a non-zero
 // Options either harvests league-mean derived values (opts.Accum) or substitutes a
@@ -86,7 +96,7 @@ func simGameWith(b bundle.Bundle, g bundle.Game, r *rng.RNG, opts Options) (resu
 
 	// Tip-off winner starts on offense; possessions strictly alternate.
 	offense, defense := visitor, home
-	if r.IntN(2) == 1 {
+	if tipOffWinner(r) == 1 {
 		offense, defense = home, visitor
 	}
 

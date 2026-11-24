@@ -429,7 +429,7 @@ cat > "$T/cli_ok_subshell_redirect_marker_fail.sh" <<'FIX'
     > "$W/out.json" 2>&1 # claude-cli-ok: redirect-line marker must not count
 FIX
 expect_class "cli_ok_subshell_redirect_marker_no_timeout" "$T/cli_ok_subshell_redirect_marker_fail.sh" no-timeout
-expect_class "cli_ok_subshell_redirect_marker_permission" "$T/cli_ok_subshell_redirect_marker_fail.sh" permission
+expect_class perm_cli_ok_subshell_redirect_permission_fail "$T/cli_ok_subshell_redirect_marker_fail.sh" permission
 cat > "$T/perm_ok_subshell_redirect_no_timeout_fail.sh" <<'FIX'
 #!/bin/bash
 ( cd "$W" && \

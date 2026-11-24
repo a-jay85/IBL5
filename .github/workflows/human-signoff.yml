@@ -382,8 +382,15 @@ jobs:
     if: ${{ !cancelled() && needs.mark-pending.outputs.head_sha != '' && (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/master') }}
     runs-on: ubuntu-26.04
     timeout-minutes: 5
+    # A job-level block zeroes every scope it omits. The settle steps below read
+    # checks, runs and the PR, and --line-dispatch needs actions: write, the same
+    # grants all-checks-settled.yml holds.
     permissions:
+      contents: read
       statuses: write
+      pull-requests: read
+      actions: write
+      checks: read
     steps:
       - name: Post the verdict on the PR head
         env:
@@ -401,6 +408,33 @@ jobs:
             -f context=human-signoff -f description="verdict: ${VERDICT:-none}" -f target_url="$RUN_URL" >/dev/null; then
             echo "::warning::Could not post human-signoff on $HEAD_SHA (a Dependabot-triggered run has a read-only token). Run: gh workflow run human-signoff.yml -f pr_number=${PR:-N}"
           fi
+      # All checks settled no longer hears this gate finish: this run belongs to
+      # master's tip, so the aggregator's workflow_run trigger never sees it.
+      # Re-settle the PR head here. The script comes from master's tip (the
+      # default ref), never the PR head, because this job holds write grants.
+      - name: Checkout master (for bin/settle-pr-status and bin/check-pr-checks-green)
+        if: ${{ needs.human-signoff.outputs.verdict != 'superseded' }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Re-settle All checks settled on the PR head
+        # Keep --self, --anchor and --ignore equal to all-checks-settled.yml
+        # (bin/test-human-signoff-classifier pins them), so both writers of the
+        # context reach the same verdict.
+        if: ${{ needs.human-signoff.outputs.verdict != 'superseded' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ needs.mark-pending.outputs.head_sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          bin/settle-pr-status --repo="$GITHUB_REPOSITORY" --head-sha="$HEAD_SHA" \
+            --context='All checks settled' --target-url="$RUN_URL" \
+            --line-dispatch=update-behind-prs.yml \
+            --self='Aggregate check status,All checks settled' \
+            --anchor='Tests and Analysis,E2E Tests,Meta checks,Infection PHP (per-PR diff)' \
+            --ignore='human-signoff,needs-a-human label,human-approved fingerprint,auto-mergeable label,Enable auto-merge,notify-merge-digest,notify-fixed,Dispatch hotfix pass,Infection PHP,Plan mutation shards,Mutation coverage,Aggregate MSI,Infection PHP s01,Infection PHP s02,Infection PHP s03,Infection PHP s04,Infection PHP s05,Infection PHP s06,Infection PHP s07,Infection PHP s08,Infection PHP s09,Infection PHP s10,Notify Mutation Failure'
 
   needs-a-human-label:
     name: needs-a-human label

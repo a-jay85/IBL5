@@ -833,6 +833,28 @@ POST_BLOCK=$(hs_job_block post-status)
 want "wf: post-status re-runs settle-pr-status for the head" "$POST_BLOCK" 'bin/settle-pr-status --repo="$GITHUB_REPOSITORY" --head-sha="$HEAD_SHA"'
 want "wf: post-status settles the All checks settled context" "$POST_BLOCK" "--context='All checks settled'"
 want "wf: post-status settle step is skipped for a superseded run" "$POST_BLOCK" "needs.human-signoff.outputs.verdict != 'superseded'"
+# Both writers of `All checks settled` must pass the same verdict flags, or the
+# re-settle here and the aggregator's settle could disagree on one head.
+AGG_WF="$REPO_ROOT/.github/workflows/all-checks-settled.yml"
+for flag in self anchor ignore line-dispatch; do
+    # One flag per line in both files; drop the trailing line continuation.
+    agg_v=$(command grep -m 1 -oE -- "--$flag=.*" "$AGG_WF" | sed -E 's/[[:space:]]*\\$//') || agg_v=''
+    post_v=$(command grep -m 1 -oE -- "--$flag=.*" <<< "$POST_BLOCK" | sed -E 's/[[:space:]]*\\$//') || post_v=''
+    if [ -n "$agg_v" ] && [ "$agg_v" = "$post_v" ]; then
+        h_pass "wf: post-status --$flag matches all-checks-settled.yml"
+    else
+        h_fail "wf: post-status --$flag matches all-checks-settled.yml" "agg=[$agg_v] post=[$post_v]"
+    fi
+done
+# The re-settle runs master's copy of the script: a checkout with no ref: (the
+# default branch tip on workflow_run) and no persisted token.
+POST_CHECKOUT=$(awk '/^      - / { if (b ~ /actions\/checkout@/) print b; b="" } { b = b $0 "\n" } END { if (b ~ /actions\/checkout@/) print b }' <<< "$POST_BLOCK")
+want "wf: post-status checks out with no persisted token" "$POST_CHECKOUT" "persist-credentials: false"
+if [ -n "$POST_CHECKOUT" ] && ! command grep -qE '^[[:space:]]+ref:' <<< "$POST_CHECKOUT"; then
+    h_pass "wf: post-status checkout takes the default ref (master), never the PR head"
+else
+    h_fail "wf: post-status checkout takes the default ref (master), never the PR head" "checkout=[$POST_CHECKOUT]"
+fi
 gate_to=$(sed -nE 's/^    timeout-minutes: ([0-9]+)$/\1/p' <<< "$GATE_BLOCK")
 write_to=$(sed -nE 's/^    timeout-minutes: ([0-9]+)$/\1/p' <<< "$WRITE_BLOCK")
 aw_n=$(sed -nE "s/^          HS_AWAIT_ATTEMPTS: '([0-9]+)'$/\1/p" <<< "$GATE_BLOCK")

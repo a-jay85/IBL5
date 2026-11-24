@@ -3,7 +3,7 @@ description: The human-signoff gate splits into a PR-side trigger stub and a mas
 last_verified: 2026-11-24
 ---
 
-# ADR-0280: Human-signoff trigger stub plus workflow_run gate
+# ADR-0282: Human-signoff trigger stub plus workflow_run gate
 
 **Status:** Accepted
 **Date:** 2026-11-24
@@ -26,6 +26,7 @@ We split the gate into two workflows. `.github/workflows/human-signoff-trigger.y
 
 - Positive: a PR can no longer edit the gate and pass its own sign-off.
 - Positive: the new workflow carries no permissions and runs no PR code.
+- Negative: `All checks settled` never hears the gate finish, because the gate's run belongs to master's tip. The gate's `post-status` job re-runs master's `bin/settle-pr-status` on the PR head after it posts, with the same flags as `all-checks-settled.yml`.
 - Negative: a PR that edits the stub always holds and needs an admin merge.
 - Negative: a Dependabot-triggered `workflow_run` gets a read-only token, so the owner re-runs the gate with `gh workflow run human-signoff.yml -f pr_number=<N>`.
 

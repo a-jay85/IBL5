@@ -79,6 +79,11 @@ PROGRAM="$MAIN/bin/docfix-poll"
 LOG_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/docfix-poll/logs"
 # shellcheck source=bin/lib/docfix-health.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib/docfix-health.sh"
+# ljob_snapshot + ljob_listed: the in-flight interlocks below read the job table
+# through these, never `launchctl list | grep -q`. Under pipefail that pipe reports
+# NOT-FOUND for a live job once the table outgrows the pipe buffer (SIGPIPE, 141).
+# shellcheck source=bin/lib/launchd-job.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/launchd-job.sh"
 
 # Single source of truth for the plist — shared by --print-schedule and
 # --install-schedule, so the MAIN-checkout derivation is exercised by tests.
@@ -334,11 +339,12 @@ salvage_wedged_branch() {   # $1 = branch name
 # has no auto-delete). A local branch WITH an origin ref → orphaned_refresh_branch()
 # domain. Only local-only (no origin ref) → this function's domain.
 wedged_local_refresh_branch() {   # echoes branch name or empty; always exits 0
-    local b age_s on_origin pr_count
+    local b age_s on_origin pr_count jobs
+    jobs="$(ljob_snapshot)"
     while IFS= read -r b; do
         [ -n "$b" ] || continue
         # A loaded docfix-run job means the run is alive, not wedged — never alert.
-        launchctl list 2>/dev/null | grep -q "com\.ibl5\.docfix-run-$b-" && continue
+        ljob_listed "com\.ibl5\.docfix-run-$b-" "$jobs" && continue
         # ASYMMETRY, deliberate (Design decision 8): an UNKNOWN age (expired reflog)
         # counts as wedged HERE, because this arm only sends a DM. The reaper treats the
         # same unknown as "leave alone". Alerting fails open; destroying fails closed.
@@ -545,11 +551,12 @@ SIG="$(jq -r '.[].path' "$REPORT" | sort -u | paste -sd, -)"
 
 # Reap leftovers whose PR is finished (merged or declined). An OPEN PR's branch
 # stays: it is waiting on the user's review, which is the designed steady state.
+REAP_JOBS="$(ljob_snapshot)"
 while IFS= read -r branch; do
     [ -n "$branch" ] || continue
     # Defect 6: launchctl interlock — if a docfix-run launchd job is still loaded,
     # cleanup would kill a live run. Skip until the job self-removes on completion.
-    if launchctl list 2>/dev/null | grep -q "com\.ibl5\.docfix-run-$branch-"; then
+    if ljob_listed "com\.ibl5\.docfix-run-$branch-" "$REAP_JOBS"; then
         echo "docfix-poll: leaving '$branch' — docfix-run job still loaded (in flight)."
         continue
     fi

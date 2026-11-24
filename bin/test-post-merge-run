@@ -34,7 +34,8 @@ mk_case() {
     printf '#!/bin/bash\ncat >> "$HOME/dm.txt"\n' > "$T/bin/discord-dm"
     printf '#!/bin/bash\necho "$*|${CLAUDE_HEADLESS:-}" >> "$HOME/calls"\n' > "$T/bin/post-merge-steps/ok-step"
     printf '#!/bin/bash\nexit 3\n' > "$T/bin/post-merge-steps/fail-step"
-    printf '#!/bin/bash\nsleep 5\n' > "$T/bin/post-merge-steps/slow-step"
+    # The sleep is a grandchild of the runner; it records its pid so the watchdog case can check the whole group died.
+    printf '#!/bin/bash\nsleep 5 &\necho $! > "$HOME/slow.pid"\nwait\n' > "$T/bin/post-merge-steps/slow-step"
     ln -s ok-step "$T/bin/post-merge-steps/link-step"
     (
         cd "$T" || exit 1
@@ -203,6 +204,15 @@ T0=$SECONDS
 run_exec --step-timeout 1
 h_contains "watchdog: hung step reported as timeout" "$(dms)" "timeout"
 h_eq "watchdog: run ended well before the step would have" 1 "$([ $((SECONDS - T0)) -lt 5 ] && echo 1 || echo 0)"
+# A leader-only kill leaves the step's child sleeping; a process-group kill takes it too.
+CHILD="$(cat "$T/home/slow.pid" 2>/dev/null || true)"
+ALIVE=1
+for _i in 1 2 3 4 5 6 7 8 9 10; do
+    if [ -z "$CHILD" ] || ! kill -0 "$CHILD" 2>/dev/null; then ALIVE=0; break; fi
+    sleep 0.1
+done
+h_eq "watchdog: step's child process is gone too (group kill)" 0 "$ALIVE"
+h_exists "watchdog: step recorded its child pid" "$T/home/slow.pid"
 
 mk_case lock_live; set_since 0
 mk_prs 7 "$HEAD_OID" "$NOW" "$(body_rows '- **Row 1** [auto:mac ok-step] — x')"

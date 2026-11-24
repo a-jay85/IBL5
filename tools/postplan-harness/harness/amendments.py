@@ -107,12 +107,12 @@ def _write_atomic(real: str, text: str) -> None:
             fh.write(text)
         os.chmod(tmp, mode)
         os.replace(tmp, real)
-    except BaseException:
-        try:
-            os.remove(tmp)
-        except OSError:
-            pass
-        raise
+    finally:
+        if os.path.exists(tmp):
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
 
 
 def cmd_append(args: argparse.Namespace) -> int:

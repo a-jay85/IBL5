@@ -142,6 +142,7 @@ def test_reworded_finding_still_matches_by_title_key():
 
 def test_only_owner_approve_emits_marker():
     allowed = {REPO / "bin" / "owner-approve", REPO / "bin" / "test-owner-approve",
+               REPO / "bin" / "test-pr-triage",
                REPO / "tools" / "postplan-harness" / "harness" / "unplanned_scope.py"}
     hits = set()
     for root in (REPO / "bin", REPO / "tools" / "postplan-harness" / "harness"):

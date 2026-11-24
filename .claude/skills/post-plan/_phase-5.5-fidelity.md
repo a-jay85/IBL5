@@ -3,13 +3,13 @@ description: /post-plan Phase 5.5 — plan-intent fidelity review (a carry-forwa
 last_verified: 2026-11-23
 ---
 
-# /post-plan Phase 5.5 — Plan-intent fidelity review & merge digest
+# /post-plan Phase 5.5: plan-intent fidelity review & merge digest
 
 Purpose: ask whether the implementation does what the plan *intended*. The semantic question Phase 5.0 structurally cannot answer. The fidelity criteria stay in `.claude/review-shared/_plan-fidelity-review.md`; the remediation procedure stays in `.claude/review-shared/_phase65-remediation.md`. This file sequences them and adds the post-plan-specific glue.
 
-`<MASTER_SHA>` and `<N>` below are **literals to substitute** with the values pinned in step 1 — a value captured in one Bash call does not survive into the next, and every `/post-plan` block runs in a fresh shell.
+`<MASTER_SHA>` and `<N>` below are **literals to substitute** with the values pinned in step 1. A value captured in one Bash call does not survive into the next, and every `/post-plan` block runs in a fresh shell.
 
-## Step 1 — Pin the run's identifiers
+## Step 1 - Pin the run's identifiers
 
 Each block runs in its own shell; nothing is exported between them. Re-derive everything in-block. `REVIEWED_TREE` is captured **before** the spawn so it names the tree the reviewer actually sees. Substitute the printed values as literals into every step below. `PLAN_SHA256` is the sha256 of the plan file Phase 1 resolved, or the literal `none` on a plan-blind run. Step 6 records it in the sticky audit trail so a later run can tell an unchanged tree with an unchanged plan from an unchanged tree with a rewritten plan.
 
@@ -119,7 +119,7 @@ echo "CARRIED=$VF"
 
 The word lands before `## DIGEST`, so Step 3's canonical parse reads it unchanged. `REVIEWED_TREE=` lands after `## DIGEST`, exactly where Step 3b would put it. The `**Machine-authored fixes:**` line is copied as-is, including any `(post-plan remediation: <sha>)` suffix from the prior run.
 
-## Step 2 — Gather the seven inputs, then spawn exactly one reviewer
+## Step 2 - Gather the seven inputs, then spawn exactly one reviewer
 
 Skip this step when Step 1b printed `FIDELITY_GATE=skip`. The spawn budget below applies only to the spawn path.
 
@@ -136,27 +136,27 @@ rm -f "$FIDELITY_VERDICT_FILE"
 
 **The first verdict is never replaced.** The re-review writes a **separate file** (`/tmp/post-plan-fidelity-verdict-<N>-2.md`); verdict 1's word, findings and digest stay exactly as the reviewer wrote them. The record grows, it never gets rewritten. Never hand-edit or regenerate verdict 1 to flip its word.
 
-If anything was left unfixed, do **not** re-spawn — a reviewer looking at a tree that still carries a known finding buys nothing and costs an Opus turn.
+If anything was left unfixed, do **not** re-spawn. A reviewer looking at a tree that still carries a known finding buys nothing and costs an Opus turn.
 
 Spawn with `subagent_type: "pr-ready-phase6"` and **omit `model`** so the def's `model: claude-opus-5-5` pin wins. This must be an `Agent` spawn and not a `/pr-ready` invocation: this skill's frontmatter carries `disallowed-tools: [EnterPlanMode, ExitPlanMode, Skill]`, so `Skill` is not callable at all.
 
-The prompt hands the def its five 6b inputs and the output path. Output path: `/tmp/post-plan-fidelity-verdict-<N>.md` (substitute `<N>` with the `$PR_NUM` value from step 1). Keyed to the PR number, never to a per-shell PID — every block is a fresh shell, so a PID-keyed path would be written by one block and unreadable by the next.
+The prompt hands the def its five 6b inputs and the output path. Output path: `/tmp/post-plan-fidelity-verdict-<N>.md` (substitute `<N>` with the `$PR_NUM` value from step 1). Key it to the PR number. Every block is a fresh shell, so a PID-keyed path would be written by one block and unreadable by the next.
 
-Provide these seven inputs in the spawn prompt (items 1, 2, 6, 7 are post-plan-specific; items 3–5 are the `_plan-fidelity-review.md` contract inputs):
+Provide these seven inputs in the spawn prompt (items 1, 2, 6 and 7 are post-plan-specific; items 3 to 5 are the `_plan-fidelity-review.md` contract inputs):
 
-1. **Output path** — `/tmp/post-plan-fidelity-verdict-<N>.md`. The def's output contract item 1 writes the verdict to the absolute path the prompt names.
+1. **Output path.** `/tmp/post-plan-fidelity-verdict-<N>.md`. The def's output contract item 1 writes the verdict to the absolute path the prompt names.
 2. **`<MASTER_SHA>`**: the pinned value from step 1, so the def can `git show <MASTER_SHA>:.claude/review-shared/_plan-fidelity-review.md`. If the `Read`-by-worktree-path fallback fires instead, the def records `include-source: worktree (pin predates skill)` and step 6 surfaces that line in the sticky comment.
-3. **Plan file** — the plan resolved in Phase 1 (`~/claude-plans/<branch>.md`). On a plan-blind run (`PLAN_FOUND=none`), declare input 1 absent and instruct the reviewer to state that plainly, mark 6d checks 1, 2 and 5 `not assessable — plan-blind run`, still perform checks 3, 4 and 6, and still emit one 6e verdict word plus the 6e(b) digest (taking `**Why:**` from the PR body, which 6e(b) permits). Do **not** skip the review and do **not** synthesise a `NOT READY` — either would block auto-merge on every ad-hoc PR, a behaviour regression.
+3. **Plan file.** The plan resolved in Phase 1 (`~/claude-plans/<branch>.md`). On a plan-blind run (`PLAN_FOUND=none`), declare input 1 absent and instruct the reviewer to state that plainly, mark 6d checks 1, 2 and 5 `not assessable — plan-blind run`, still perform checks 3, 4 and 6, and still emit one 6e verdict word plus the 6e(b) digest (taking `**Why:**` from the PR body, which 6e(b) permits). Do **not** skip the review and do **not** synthesise a `NOT READY`. Either would block auto-merge on every ad-hoc PR, which would be a behaviour regression.
 4. **Full post-rebase diff.** `gh pr diff <N>`. Phase 1's rebase already ran, so this diff is post-rebase by construction; say so in the prompt. For a stacked PR, `gh pr diff` already shows only the PR's own changes against its parent branch. The harness matches it: `LiveGit.review_base()` resolves the parent's side of HEAD while the parent PR is open, and the run logs `review base: parent <branch>@<sha>` or `review base: master`. When the parent cannot be resolved, is gone, or has landed on master, the review uses the master diff.
-5. **PR body** — `gh pr view <N> --json body`.
-6. **Conflict-resolved path list** — provably empty on any run that reaches Phase 5.5, because Phase 1's rebase fail-closes on conflict rather than resolving. State that in the prompt in those words so 6d check 6 passes on the stated grounds. `/tmp/pr-ready-diff-pre-<N>.patch` is neither produced nor referenced.
+5. **PR body.** `gh pr view <N> --json body`.
+6. **Conflict-resolved path list.** It is provably empty on any run that reaches Phase 5.5, because Phase 1's rebase fail-closes on conflict rather than resolving. State that in the prompt in those words so 6d check 6 passes on the stated grounds. `/tmp/pr-ready-diff-pre-<N>.patch` is neither produced nor referenced.
 7. **`PHASE_4B_RAN`** and the review timestamp from Phase 4B's result earlier in this run.
 
 The def returns a thin pointer only (its output contract item 4). Treat the returned text as a pointer and read the file; never treat captured stdout as the verdict.
 
 The skill does not write `SHADOW_ARMING: requested` into the reviewer's context, so the reviewer emits no `## SHADOW-ARMING` block here. Only the compiled harness requests it (procedure 6f). Step 3's parse is unchanged either way, because the block sits above the terminal verdict word.
 
-## Step 3 — Read the verdict word
+## Step 3 - Read the verdict word
 
 This block produces the verdict word. `bin/test-postplan-arm-conditions`'s drift guard asserts it keeps the verdict-path stem `post-plan-fidelity-verdict-` and the three parse tokens below: the `sed` delete from `## DIGEST`, the anchored `READY WITH NOTES|NOT READY|READY` match, and `tail -1`. Condition (12) is evaluated in `tools/postplan-harness/harness/armable.py` (`select_fidelity_verdict`).
 
@@ -177,11 +177,11 @@ else
 fi
 ```
 
-If `$FIDELITY_VERDICT_FILE` does not exist or is empty → `FIDELITY=missing` — STOP. Post nothing. The reviewer either produced no output or wrote to a different path; fail-closed means nothing proceeds.
+If `$FIDELITY_VERDICT_FILE` does not exist or is empty → `FIDELITY=missing`. STOP. Post nothing. The reviewer either produced no output or wrote to a different path; fail-closed means nothing proceeds.
 
-If `FIDELITY=missing` for any other reason (no parseable verdict word before `## DIGEST`) — STOP. The verdict is indeterminate, not clean.
+If `FIDELITY=missing` for any other reason (no parseable verdict word before `## DIGEST`), STOP. The verdict is indeterminate.
 
-## Step 3b — Record the reviewed tree on the verdict file
+## Step 3b - Record the reviewed tree on the verdict file
 
 ```bash
 # phase 5.5 record reviewed tree
@@ -193,25 +193,25 @@ fi
 grep -m1 '^REVIEWED_TREE=' "$FIDELITY_VERDICT_FILE" || echo "REVIEWED_TREE=unrecorded"
 ```
 
-The value is the **tree** SHA (`HEAD^{tree}`), the same value step 1 pins as `REVIEWED_TREE` and step 6 prints as `**Reviewed tree:**`. One concept, one name, one value — an operator can grep the sticky comment's SHA straight out of the verdict file.
+The value is the **tree** SHA (`HEAD^{tree}`), the same value step 1 pins as `REVIEWED_TREE` and step 6 prints as `**Reviewed tree:**`. The concept has one name and one value, so an operator can grep the sticky comment's SHA straight out of the verdict file.
 
-The append is **guarded and idempotent** — a second pass never writes a second line, and `grep -m1` means only the first would ever be read anyway.
+The append is guarded and idempotent. A second pass never writes a second line, and `grep -m1` means only the first would ever be read anyway.
 
 The line lands at **end of file, after the `## DIGEST` section**, so the canonical parse (`sed '/^## DIGEST/,$d'` first) deletes it before the verdict grep ever sees it. The verdict word is unaffected by construction; condition (12) reads the raw file for this field.
 
 Appending a metadata line is **not** editing the verdict: the word, the findings and the digest are untouched. The prohibition that stands is on changing the **verdict word**.
 
-**Negative-path note:** if the verdict file is missing or empty, write nothing and do not create it — an absent verdict is condition (12)'s blocking state and this step must not manufacture a file that makes it look present.
+**Negative-path note:** if the verdict file is missing or empty, write nothing and do not create it. An absent verdict is condition (12)'s blocking state, and this step must not manufacture a file that makes it look present.
 
-## Step 4 — Remediation on `READY WITH NOTES` (and `NOT READY`)
+## Step 4 - Remediation on `READY WITH NOTES` (and `NOT READY`)
 
 Load the procedure in place: `git show <MASTER_SHA>:.claude/review-shared/_phase65-remediation.md`. Run it as written, including its step 2 clean-tree precondition (`STOP: worktree dirty before remediation`) and its fifth-file gate handoff to one `subagent_type: "sonnet-5-5"` delegate. On the harness path, the harness commits and pushes after the phase exits. On the skill-fallback path, the `/post-plan` skill's own commit and push phases follow. The harness engine adds one bounded exception to the gate-owning deny: a `.claude/rules/*.md` file that a `[BLOCKING]` finding names and the PR already changes may be edited and committed, within the size and frontmatter limits in `tools/postplan-harness/harness/fidelity_filefix.py`; every other gate-owning path stays denied and a mixed commit is discarded whole. The skill engine keeps the full deny. For findings tagged `[unplanned-scope]`, both engines use one classifier. The harness calls `harness/unplanned_scope.py` directly. The skill engine runs it as `(cd "$WT/tools/postplan-harness" && python3 -m harness.unplanned_scope --verdict <verdict> --plan <plan> --base <MASTER_SHA> --worktree "$WT")` and follows `_phase65-remediation.md` step 3 for each line. A finding whose owner quote comes from an `## Owner amendments` entry is kept. Never revert or remove it. The harness classifies it `keep`. On the skill engine the step-3 `FIDELITY=<word>` stays frozen, so a kept finding leaves a `NOT READY` run stopped for the human, as any `NOT READY` does today. Only the harness may treat a verdict whose blockers are all kept and declared as armable. The skill-engine fallback has no owner-evidence check, so it never posts `READY` for kept scope. Kept-scope blockers stay `NOT READY` there.
 
-Three post-plan-specific rules on top — these are where a re-spawn would otherwise creep in:
+Three post-plan-specific rules sit on top. They are where a re-spawn would otherwise creep in:
 
-1. **Two channels; the gate word is frozen, the comment's last line is not.** The `FIDELITY=<word>` that condition (12) reads is the step-3 word and never changes — remediation never upgrades it and never re-runs the reviewer. The sticky comment's **terminal verdict line** is a separate channel governed by `_phase7-verdict.md`: it states what this run left the PR in, so it must name its own reason whenever that state is anything but a plain `READY`. Compose it from the terminal-line recipe below; never emit the bare step-3 word as the last line for any outcome other than a plain `READY`.
-2. **`**Reviewed tree:**` keeps the step 1 value** — the tree the reviewer actually saw, not the post-remediation tree. That line tells a reader exactly how much of the shipped head the verdict covers.
-3. **The remediation commit is named in the existing `**Machine-authored fixes:**` digest label** — no new field, no sixth line. Append ` (post-plan remediation: <sha>)` to that one line's value. This is the only permitted deviation from `_phase7-verdict.md`'s paste-verbatim rule; it changes a value, not the label set.
+1. Two channels carry the verdict. The gate word is frozen and the comment's last line can change. The `FIDELITY=<word>` that condition (12) reads is the step-3 word and never changes. Remediation never upgrades it and never re-runs the reviewer. The sticky comment's **terminal verdict line** is a separate channel governed by `_phase7-verdict.md`: it states what this run left the PR in, so it must name its own reason whenever that state is anything but a plain `READY`. Compose it from the terminal-line recipe below; never emit the bare step-3 word as the last line for any outcome other than a plain `READY`.
+2. `**Reviewed tree:**` keeps the step 1 value. That is the tree the reviewer actually saw, before remediation. That line tells a reader exactly how much of the shipped head the verdict covers.
+3. **The remediation commit is named in the existing `**Machine-authored fixes:**` digest label**. Add no new field and no sixth line. Append ` (post-plan remediation: <sha>)` to that one line's value. This is the only permitted deviation from `_phase7-verdict.md`'s paste-verbatim rule. It changes a value and leaves the label set alone.
 
 On `NOT READY`, run the same remediation for every `Mode: in-PR` finding, then stop. `FIDELITY` stays `NOT READY` and condition (12) will block; do not attempt to reach `READY` and do not re-spawn the reviewer.
 
@@ -233,31 +233,31 @@ The last line of the sticky comment, immediately above the `<!-- pr-ready-verdic
 A `(re-review)` terminal line never carries forward. Step 1's exact match on `READY` and `READY WITH NOTES` already rejects both re-review rows, and the harness guard `_RE_REVIEW_TERMINAL_RE` in `tools/postplan-harness/harness/fidelity.py` does the same on the harness path.
 
 **A `NOT READY` line carries action items only.** Its suffix names what the reader must still
-do to reach `READY` — nothing else. Remediation the run already completed is **not** an action
+do to reach `READY`, and nothing else. Remediation the run already completed is **not** an action
 item and never appears there: work that is done is evidence *for* readiness, so narrating it
 under a blocking word reads as a contradiction and buries the one thing the reader has to act
-on. The remediation `<sha>` is not lost — step 4 point 3 above already appends it to the
+on. The remediation `<sha>` is still recorded. Step 4 point 3 above already appends it to the
 `**Machine-authored fixes:**` digest label, which is where a reader looks for what the run
 changed. Likewise, `auto_merge: false` needs no explanation of the mechanism: the action item
-is simply `held for your final review`. `READY`-prefixed rows are unaffected — on a passing
+is simply `held for your final review`. `READY`-prefixed rows are unaffected. On a passing
 verdict the extra context is doing real work.
 
-This does not relax PR #2192's lesson ("don't mis-report the reason for the hold") — terse is
-not mis-reported; each `NOT READY` row still states its own true reason, just only that. The
-hold itself is unchanged for both `NOT READY` remediated rows — condition (12) still reads the
-frozen `FIDELITY` word from the verdict file, never this line. The `READY (re-review)` line
-signals the fidelity hold is cleared, but **does not mean the PR is armed** — Phase 6.5 has not
+This does not relax PR #2192's lesson ("don't mis-report the reason for the hold"). A terse line still
+reports the reason correctly; each `NOT READY` row still states its own true reason, just only that. The
+hold itself is unchanged for both `NOT READY` remediated rows. Condition (12) still reads the
+frozen `FIDELITY` word from the verdict file and never reads this line. The `READY (re-review)` line
+signals the fidelity hold is cleared, but **does not mean the PR is armed**. Phase 6.5 has not
 run yet, and conditions (1)-(11) and (13) may still hold it.
 
 Skip this step entirely when `FIDELITY=READY`.
 
-## Step 4b — Bounded re-review on a fully remediated tree
+## Step 4b - Bounded re-review on a fully remediated tree
 
 Run this step only when step 4 addressed **every** `Mode: in-PR` finding. Skip it when `FIDELITY=READY` (step 4 never ran) or when any finding was left unfixed.
 
 **Harness body-only recheck.** The compiled harness (`tools/postplan-harness/runner.py`) takes a shorter path when the round changed only the PR body, the head tree equals the tree the prior review recorded, the plan hash is unchanged, and every prior finding was a check-4 (PR body) finding. It runs one single-turn Sonnet call over the prior findings, the numbered added body hunks, and the diff sections they cite, and it writes a `READY` verdict file at the re-review path only when every finding is resolved and every hunk is supported. Any other result runs the full re-review below. This skill fallback has no recheck path; when it runs, it always spawns the full re-review. Details: `tools/postplan-harness/README.md`.
 
-**Skip gate first.** Reuse the existing condition-(7) resolver rather than re-implementing plan lookup — `bin/lib/plan-resolve.sh` sets `$PLAN_FILE`, and the `awk` below is the same line-1-frontmatter parse condition (7) uses. The `</dev/null` is load-bearing: macOS `awk` with a program and no file argument reads STDIN and hangs.
+**Skip gate first.** Reuse the existing condition-(7) resolver rather than re-implementing plan lookup. `bin/lib/plan-resolve.sh` sets `$PLAN_FILE`, and the `awk` below is the same line-1-frontmatter parse condition (7) uses. The `</dev/null` is load-bearing: macOS `awk` with a program and no file argument reads STDIN and hangs.
 
 ```bash
 # phase 5.5 re-review skip gate
@@ -288,9 +288,9 @@ rm -f "$FIDELITY_VERDICT_FILE_2"
 
 On `RE_REVIEW=spawn`, spawn **one** reviewer: `subagent_type: "pr-ready-phase6"`, **omit `model`** so the def's `model: claude-opus-5-5` pin wins. An `Agent` spawn. This skill's frontmatter carries `disallowed-tools: [EnterPlanMode, ExitPlanMode, Skill]`.
 
-**Output path:** `/tmp/post-plan-fidelity-verdict-<N>-2.md` (substitute `<N>` = step 1's `$PR_NUM`). PR-number-keyed, never `$$`/`$PPID`-keyed — condition (12) reads it from a different shell. The `-2` suffix ensures verdict 2 can never overwrite verdict 1.
+**Output path:** `/tmp/post-plan-fidelity-verdict-<N>-2.md` (substitute `<N>` = step 1's `$PR_NUM`). Key it by PR number and never by `$$` or `$PPID`, because condition (12) reads it from a different shell. The `-2` suffix ensures verdict 2 can never overwrite verdict 1.
 
-**The same seven inputs as step 2**, with two changes: input 4 is the **post-remediation** diff (`gh pr diff <N>` re-run after step 4's push, so it includes the remediation commit), and one added pointer — "reviewer 1's findings are at `/tmp/post-plan-fidelity-verdict-<N>.md`; confirm each was addressed by the remediation commit, and report a new finding only if the remediation itself introduced one."
+**The same seven inputs as step 2**, with two changes: input 4 is the **post-remediation** diff (`gh pr diff <N>` re-run after step 4's push, so it includes the remediation commit), and it adds one pointer: "reviewer 1's findings are at `/tmp/post-plan-fidelity-verdict-<N>.md`; confirm each was addressed by the remediation commit, and report a new finding only if the remediation itself introduced one."
 
 After the reviewer returns, re-run step 3's parse against the `-2` path to get the second verdict word, then run step 3b's record block against the `-2` path so verdict 2 also carries `REVIEWED_TREE=`. Both must run **after** step 4's push, so the recorded tree is the tree the reviewer saw.
 
@@ -313,13 +313,13 @@ printf 'V2_FINDINGS_PRESENT=%s\n' "$([ -n "$V2_FINDINGS" ] && echo yes || echo n
 [ -n "$V2_FINDINGS" ] && printf '%s\n%s\n' '--- V2_FINDINGS ---' "$V2_FINDINGS"
 ```
 
-**Failure paths:** if the re-review writes no file, or writes one with no parseable verdict word, treat it as "no re-review happened" — verdict 1 stands, condition (12) blocks on verdict 1's word, and the terminal line is the fully-remediated `NOT READY` row. Never re-spawn a third time to retry.
+**Failure paths:** if the re-review writes no file, or writes one with no parseable verdict word, treat it as "no re-review happened". Verdict 1 stands, condition (12) blocks on verdict 1's word, and the terminal line is the fully-remediated `NOT READY` row. Never re-spawn a third time to retry.
 
-## Step 5 — Materialise the digest lines
+## Step 5 - Materialise the digest lines
 
 On the skip path do not run this chain. Step 1c already copied the five prior lines to `/tmp/post-plan-digest-lines-<N>.txt`, and running `digest.sh` here would clobber them.
 
-Mirror `_phase7-verdict.md`'s chain exactly, pointed at post-plan's verdict path. `digest.sh` takes the verdict file as `$1`, so it works unchanged. The **trailing `cat` is load-bearing** — without it the five lines sit on disk and never enter context, so there is nothing to paste into the `Write` call in step 6. `digest.sh` exits 0 on every degrade path and prints five `unavailable — <reason>` lines rather than failing, so this chain never aborts the run.
+Mirror `_phase7-verdict.md`'s chain exactly, pointed at post-plan's verdict path. `digest.sh` takes the verdict file as `$1`, so it works unchanged. The trailing `cat` is load-bearing. Without it the five lines sit on disk and never enter context, so there is nothing to paste into the `Write` call in step 6. `digest.sh` exits 0 on every degrade path and prints five `unavailable — <reason>` lines instead of failing, so this chain never aborts the run.
 
 ```bash
 git show <MASTER_SHA>:.claude/review-shared/scripts/digest.sh > /tmp/post-plan-digest-<N>.sh \
@@ -328,9 +328,9 @@ git show <MASTER_SHA>:.claude/review-shared/scripts/digest.sh > /tmp/post-plan-d
   && cat /tmp/post-plan-digest-lines-<N>.txt
 ```
 
-## Step 6 — Compose and post the sticky comment
+## Step 6 - Compose and post the sticky comment
 
-**Write the composed body to `/tmp/post-plan-fidelity-comment-<N>.md` with the `Write` tool first**, then post — a `tmpfile=$(mktemp)` assigned in one Bash call is gone by the next, so an inline compose would send an empty `--body-file`.
+**Write the composed body to `/tmp/post-plan-fidelity-comment-<N>.md` with the `Write` tool first**, then post. A `tmpfile=$(mktemp)` assigned in one Bash call is gone by the next, so an inline compose would send an empty `--body-file`.
 
 The body template (write to `/tmp/post-plan-fidelity-comment-<N>.md` with the `Write` tool):
 
@@ -416,4 +416,4 @@ Both the HTML marker and the digest heading are byte-identical to `/pr-ready`'s 
 
 Post with the find-and-update-else-create shape of `pr_sticky_upsert` in `bin/lib/pr-sticky.sh`. Grep the function name rather than trusting a line number. Do **not** write into the `/tmp/pr-ready-verdict-<N>.md` namespace. Step 3 of `.claude/review-shared/_phase7-verdict.md` ("Post the sticky verdict") writes there, and a post-plan write would collide with a concurrent run of that step on the same PR.
 
-After posting, when `FIDELITY=missing` or `FIDELITY=NOT READY`: STOP with instructions to remediate the reviewer's findings and re-run `/post-plan`. Never hand-edit the verdict file to clear it — an absent file is itself a blocking state for condition (12).
+After posting, when `FIDELITY=missing` or `FIDELITY=NOT READY`: STOP with instructions to remediate the reviewer's findings and re-run `/post-plan`. Never hand-edit the verdict file to clear it. An absent file is itself a blocking state for condition (12).

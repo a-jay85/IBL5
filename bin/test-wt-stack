@@ -258,8 +258,10 @@ case_post_plan_wiring() {
   grep -qF 'bin/wt-up <slug> --prod' "$p10" || fail post-plan-wiring "phase 10 lacks printed wt-up --prod"
   grep -qF 'http://<slug>.localhost/ibl5/' "$p10" || fail post-plan-wiring "phase 10 lacks preview URL"
   ! grep -qF 'bin/wt-down <slug>' "$p10" || fail post-plan-wiring "phase 10 runs bin/wt-down <slug> again"
-  grep -qF 'bin/wt-stack start <worktree-name> --seed' "$sk" || fail post-plan-wiring "SKILL.md lacks wt-stack start"
-  grep -qF 'rc=$?; bin/wt-stack stop <worktree-name>; exit $rc' "$sk" || fail post-plan-wiring "SKILL.md lacks same-call stop"
+  # The fallback skill defers E2E to CI: it must not start a stack or run bin/e2e-wt.
+  ! grep -qF 'bin/wt-stack start <worktree-name>' "$sk" || fail post-plan-wiring "SKILL.md starts a wt-stack again"
+  ! grep -qE 'bin/e2e-wt <worktree-name>' "$sk" || fail post-plan-wiring "SKILL.md runs bin/e2e-wt again"
+  grep -qF 'E2E: deferred to CI on the PR.' "$sk" || fail post-plan-wiring "SKILL.md lacks the E2E-deferred report line"
 }
 
 case_started_then_stopped

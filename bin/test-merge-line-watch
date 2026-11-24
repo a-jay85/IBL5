@@ -52,6 +52,7 @@ if [ -n "\${SEL_UNKNOWN_UNTIL:-}" ] && [ \$n -lt "\$SEL_UNKNOWN_UNTIL" ]; then
     printf 'action=unknown\nhead=\n'; exit 0
 fi
 [ -n "\${SEL_FAIL:-}" ] && { echo "graphql error"; exit 1; }
+if [ -n "\${SEL_FAIL2:-}" ] && [ \$n -ge 2 ]; then echo "graphql error"; exit 1; fi
 if [ -n "\${SEL_OUT2:-}" ] && [ \$n -ge 2 ]; then printf '%s\n' "\$SEL_OUT2"; exit 0; fi
 printf '%s\n' "\$SEL_OUT"
 EOF
@@ -109,6 +110,25 @@ MERGE_LINE_WATCH_RETRY_WAIT=0 GH_PUT_FAIL=1 SEL_OUT=$'action=update\nhead=3' SEL
 assert_match "W: already-updated reported" 'PR #3 already updated by another updater \(now action=none head=3\)' "$OUT"
 assert_absent "W: no FAILED line" 'FAILED' "$OUT"
 assert_eq "W: exit 0" 0 "$RC"
+
+# W2: the re-check says wait (CI running after the other push). Still fine.
+MERGE_LINE_WATCH_RETRY_WAIT=0 GH_PUT_FAIL=1 SEL_OUT=$'action=update\nhead=3' SEL_OUT2=$'action=wait\nhead=3' \
+    run "$WATCH" --once
+assert_match "W2: already-updated reported" 'PR #3 already updated by another updater \(now action=wait head=3\)' "$OUT"
+assert_eq "W2: exit 0" 0 "$RC"
+
+# W3: the re-check says none for a different head. PR #3 is not called updated.
+MERGE_LINE_WATCH_RETRY_WAIT=0 GH_PUT_FAIL=1 SEL_OUT=$'action=update\nhead=3' SEL_OUT2=$'action=none\nhead=' \
+    run "$WATCH" --once
+assert_match "W3: moved-head reported" 'PR #3 is no longer the head' "$OUT"
+assert_absent "W3: not called updated" 'already updated' "$OUT"
+assert_eq "W3: exit 0" 0 "$RC"
+
+# Z: the re-check itself fails. The pass reports the update failure.
+MERGE_LINE_WATCH_RETRY_WAIT=0 GH_PUT_FAIL=1 SEL_OUT=$'action=update\nhead=3' SEL_FAIL2=1 \
+    run "$WATCH" --once
+assert_match "Z: failure surfaced" 'update-branch FAILED for #3: boom' "$OUT"
+assert_eq "Z: exit 1" 1 "$RC"
 
 # X: the re-check names a different head that needs an update. The pass
 # leaves it for the next pass and makes no second PUT.

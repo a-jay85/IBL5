@@ -138,13 +138,19 @@ run_pass() {
         # updater's push, so wait one retry interval before asking.
         pr=$head
         sleep "$RETRY_WAIT"
-        if select_head && [ "$action" != "update" ] && [ "$action" != "unknown" ]; then
-            say "PR #$pr already updated by another updater (now action=$action head=$head)"
-            return 0
-        fi
-        if [ "$action" = "update" ] && [ "$head" != "$pr" ]; then
-            say "PR #$pr is no longer the head (now #$head); leaving it for the next pass"
-            return 0
+        if select_head; then
+            if [ "$action" = "update" ] && [ "$head" != "$pr" ]; then
+                say "PR #$pr is no longer the head (now #$head); leaving it for the next pass"
+                return 0
+            fi
+            if [ "$action" = "wait" ] || [ "$action" = "none" ]; then
+                if [ "$head" = "$pr" ]; then
+                    say "PR #$pr already updated by another updater (now action=$action head=$head)"
+                else
+                    say "PR #$pr is no longer the head (now action=$action head=${head:-none}); leaving it for the next pass"
+                fi
+                return 0
+            fi
         fi
         say "update-branch FAILED for #$pr: ${err:0:150}"
         return 1

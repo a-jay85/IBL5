@@ -69,6 +69,9 @@ event families. A deepcopy compare checks every replayed root's arguments after 
 per-record snapshot checks side-module globals and `os.environ`. Any recorded hit on either side
 makes the stage hold with `fidelity-side-effect-change`. The driver sets `sys.dont_write_bytecode`
 and the stage sets `PYTHONDONTWRITEBYTECODE=1`, so a side import writes no `__pycache__`.
+The watch stays on between replayed calls and after the last one, so a gc finalizer, a thread
+a call left running, and an `atexit` callback are all recorded. Only the driver's own temp-file
+step turns it off, with gc paused. The driver ends with `os._exit`, so nothing runs after its output.
 
 **Second-reviewer clear (ADR-0231).** A blind Opus seat may clear conditions 7, 10, 12 and 17. It runs only when every blocked condition is one of those four, and a floor keeps one-way and merge-rule changes with the owner. The UI path floor covers all four conditions: a PR that changes a UI file gets no seat. Condition 21 is never clearable, so a reviewer-added hold keeps the seat from running. Condition 7 also needs every `hold_trigger` token to be reviewer-clearable (`security-surface`, `gate-weakening`, `golden-snapshot`). The owner-held tokens include `bootstrap-hazard`, `security-irreducible` and `golden-new`, the must-ask shapes of gate 14. The verdict binds to the tree captured before the spawn, so any later push makes it stale. Each clear prints in the merge digest with the condition and the reviewer's reason.
 

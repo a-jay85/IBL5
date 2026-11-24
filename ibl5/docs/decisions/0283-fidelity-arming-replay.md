@@ -1,6 +1,6 @@
 ---
 description: The arming replay's second stage replays fidelity.py's deterministic readers over a committed corpus and clears a fidelity.py edit only when it is dead in production or reachable only through replayed roots.
-last_verified: 2026-11-23
+last_verified: 2026-11-24
 ---
 
 # ADR-0283: Fidelity arming replay
@@ -68,6 +68,9 @@ The watches see only the corpus inputs, so an effect behind an input the corpus 
 - a C extension write that raises no audit event;
 - a write to a function's `__dict__` or an `lru_cache`, because callables compare by identity;
 - a write to a stdlib module attribute such as `subprocess.run`, because the globals snapshot covers only modules under the side root and a module attribute write raises no audit event (not probed);
+- a write from a plain refcount finalizer that happens to run inside the driver's own temp-file step, the one place the watch is off. The driver runs pending finalizers under the watch before that step and pauses gc during it.
+
+The watch stays on between replayed calls and after the last one. A gc finalizer, a thread a call left running, and an `atexit` callback are all recorded. A thread still alive at the end is recorded too, and the driver then exits with `os._exit`, so nothing runs after its output.
 
 The globals snapshot skips three things that never carry replay state: the driver's own module, module-valued names, and the `__future__` flag that `from __future__ import annotations` binds. That flag has no value equality, so a deepcopy of it never compares equal.
 

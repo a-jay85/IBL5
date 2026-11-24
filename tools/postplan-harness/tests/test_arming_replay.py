@@ -948,6 +948,36 @@ def test_import_time_side_effect_is_recorded(tmp_path):
     assert any("import audit:open-write" in e for e in json.loads(proc.stdout)["side_effects"])
 
 
+_DEFERRED_WRITES = {
+    # a gc finalizer: it runs whenever the collector next runs, often between replayed calls
+    "finalizer": ("class _Probe:\n"
+                  "    def __del__(self):\n"
+                  "        open(__file__ + '.probe', 'a').close()\n",
+                  "    _p = _Probe(); _p.me = _p\n"),
+    # a thread left running after the call returns
+    "thread": ("import threading as _thr\n",
+               "    _thr.Thread(target=lambda: (_thr.Event().wait(0.2),"
+               " open(__file__ + '.probe', 'a').close())).start()\n"),
+    # an exit callback: it runs after the last replayed call
+    "atexit": ("import atexit as _ax\n",
+               "    _ax.register(lambda: open(__file__ + '.probe', 'a').close())\n"),
+}
+
+
+@pytest.mark.parametrize("kind", sorted(_DEFERRED_WRITES))
+def test_deferred_write_after_a_replayed_call_is_recorded(tmp_path, kind):
+    tree = _fid_tree(tmp_path)
+    fid = tree / FIDELITY
+    module_code, call_code = _DEFERRED_WRITES[kind]
+    fid.write_text(fid.read_text(encoding="utf-8") + "\n" + module_code
+                   + "_orig_parse_verdict = parse_verdict\n\n\ndef parse_verdict(path):\n"
+                   + call_code + "    return _orig_parse_verdict(path)\n", encoding="utf-8")
+    _, proc = _run_driver_in(tree)
+    assert proc.returncode == 0, proc.stderr
+    effects = json.loads(proc.stdout)["side_effects"]
+    assert any(" import " not in e for e in effects), effects
+
+
 def test_driver_output_without_side_effects_is_an_error():
     with pytest.raises(KeyError):
         fidelity_replay._fid_side({"schema": "fidelity-replay/1", "results": [], "executed": {}})

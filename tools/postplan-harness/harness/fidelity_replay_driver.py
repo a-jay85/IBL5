@@ -15,11 +15,14 @@ if __name__ == "__main__" and len(sys.argv) == 4:
     sys.path[0] = sys.argv[2]      # side package root; must precede every other import
     sys.dont_write_bytecode = True  # a side import must not write __pycache__ (a write-mode open)
 import atexit
+import contextlib
 import copy
 import dataclasses
+import gc
 import inspect
 import json
 import os
+import shutil
 import tempfile
 import threading
 import types
@@ -48,6 +51,9 @@ _WRITE_FLAGS = os.O_WRONLY | os.O_RDWR | os.O_APPEND | os.O_CREAT | os.O_TRUNC
 _WATCH = {"phase": None, "record": "-", "where": "import", "hits": []}
 MAX_HITS = 50
 _UNCOPYABLE = object()
+# Every built-in raise, named one by one: the harness bans a bare BaseException handler
+# (tests/test_usage_pause_swallow_sites.py), and this tuple still lets its UsagePause through.
+_ANY_RAISE = (Exception, KeyboardInterrupt, SystemExit, GeneratorExit)
 
 
 def _hit(kind):
@@ -78,8 +84,9 @@ def _audit(event, args):
     phase = _WATCH["phase"]
     try:
         if phase is None:
-            # Between calls only the main thread is the driver's own. A thread a replayed call
-            # left running is replayed code, so it is watched like a call.
+            # The watch is off only inside `_driver_io`, the driver's own temp-file work, where
+            # gc is paused. A thread a replayed call left running is replayed code, so it is
+            # watched like a call even there.
             if threading.current_thread() is threading.main_thread():
                 return
             phase = "call"
@@ -88,8 +95,25 @@ def _audit(event, args):
                 _hit("audit:open-write")
         elif _denied(event, phase):
             _hit(f"audit:{event}")
-    except BaseException:  # noqa: BLE001 — a raising hook would abort the replayed call
+    except _ANY_RAISE:  # a raising hook would abort the replayed call
         _hit("audit:hook-error")
+
+
+@contextlib.contextmanager
+def _driver_io():
+    """Turn the watch off for the driver's own temp-file writes. Everywhere else after import
+    the phase is "between" or "call", so a finalizer, a side `__deepcopy__` or `__eq__`, or any
+    other deferred side code that runs between replayed calls is still recorded. Pending
+    finalizers run first, watched, and gc stays paused while the watch is off."""
+    _untraced(gc.collect)
+    prior = _WATCH["phase"]
+    gc.disable()
+    _WATCH["phase"] = None
+    try:
+        yield
+    finally:
+        _WATCH["phase"] = prior
+        gc.enable()
 
 
 def _untraced(fn, *args):
@@ -203,7 +227,7 @@ def _call(fn_lookup, *args, **optional):
     else:
         raised = None
     finally:
-        _WATCH["phase"] = None
+        _WATCH["phase"] = "between"
     _untraced(_arg_check, args, kw, before)
     if raised is not None:
         return raised, None
@@ -243,7 +267,7 @@ def main(argv):                    # argv: driver, corpus path, side package roo
         import harness.reviewcache  # noqa: F401
         import harness.adapters.llm  # noqa: F401
     finally:
-        _WATCH["phase"] = None
+        _WATCH["phase"] = "between"
 
     current = {"v1": None}
 
@@ -275,7 +299,8 @@ def main(argv):                    # argv: driver, corpus path, side package roo
     sys.settrace(tracer)
     try:
         for rec in records:
-            with tempfile.TemporaryDirectory(prefix="fid-replay-") as tmp:
+            with _driver_io():
+                tmp = tempfile.mkdtemp(prefix="fid-replay-")
                 v1 = os.path.join(tmp, "v1.md")
                 with open(v1, "w", encoding="utf-8") as fh:
                     fh.write(rec["verdict_1"])
@@ -284,6 +309,7 @@ def main(argv):                    # argv: driver, corpus path, side package roo
                     v2 = os.path.join(tmp, "v2.md")
                     with open(v2, "w", encoding="utf-8") as fh:
                         fh.write(rec["verdict_2"])
+            try:
                 current["v1"] = v1
                 mods = _side_modules(root)
                 snap, env_before = _untraced(_freeze_globals, mods), dict(os.environ)
@@ -297,16 +323,24 @@ def main(argv):                    # argv: driver, corpus path, side package roo
                                if env_before.get(k) != env_after.get(k))
                     _hit(f"environ:{key}")
                 results.append({"id": rec["id"], "out": out_rec})
+            finally:
+                with _driver_io():
+                    shutil.rmtree(tmp, ignore_errors=True)
     finally:
         sys.settrace(None)
     # Run exit callbacks a replayed call registered while the watch is on, so a deferred write counts.
     _WATCH["phase"], _WATCH["where"] = "call", "atexit"
     try:
         atexit._run_exitfuncs()
-    except BaseException:  # noqa: BLE001
+    except _ANY_RAISE:
         _hit("atexit-raised")
     finally:
-        _WATCH["phase"] = None
+        _WATCH["phase"] = "between"
+    _WATCH["where"] = "exit"
+    gc.collect()
+    for t in threading.enumerate():
+        if t is not threading.main_thread() and t.is_alive():
+            _hit(f"thread-alive:{t.name}")  # it could write after the output; __main__ kills it
     json.dump({"schema": "fidelity-replay/1", "results": results,
                "executed": {k: sorted(v) for k, v in hits.items()},
                "side_effects": list(_WATCH["hits"])}, sys.stdout)
@@ -366,4 +400,6 @@ def _record(rec, v1, v2, marker):
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv))
+    _rc = main(sys.argv)
+    sys.stdout.flush()
+    os._exit(_rc)  # no atexit, finalizer or leftover thread runs after the output

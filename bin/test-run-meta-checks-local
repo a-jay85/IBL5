@@ -131,7 +131,7 @@ make_repo() {
                  check-hot-files check-orphan-css adr-check refactor-flag \
                  check-pr-collisions check-model-pins test-check-model-pins test-text-hold-recheck \
                  check-engine-freeze test-check-engine-freeze \
-                 check-pipefail-grep-q test-check-pipefail-grep-q check-exit-code-handling \
+                 check-pipefail-grep-q test-check-pipefail-grep-q check-exit-code-handling check-adr-append-only \
                  check-pipefail-assignment-guard test-check-pipefail-assignment-guard \
                  check-shell-portability test-check-shell-portability \
                  check-design-system test-check-design-system \
@@ -355,6 +355,19 @@ pbg_run "$FIXTURE_WORKFLOW" -- --stage post-pr --pr 99996
 want   "pbg-5 SKIP ref" "$OUT" "SKIP  refactor-flag (filter refactor=false)"
 absent "pbg-5 no DEFER" "$OUT" "DEFER "
 rm -f /tmp/ibl5-meta-checks-99997.status /tmp/ibl5-meta-checks-99996.status
+
+# ─── Case aao: check-adr-append-only is hard only when a PR body is available ──
+# Its only bypass is a marker in the PR body. With no body the step must warn,
+# not block; with --body-file it blocks as in CI.
+pbg_run "$FIXTURE_WORKFLOW_ALL" STUB_RC_check_adr_append_only=1 --
+want   "aao-1 no body: advisory WARN" "$OUT" "WARN  check-adr-append-only (advisory, not blocking)"
+absent "aao-1 no body: not failed" "$OUT" "META-CHECK-FAILED: check-adr-append-only"
+AAO_BODY=$(mktemp)
+printf 'body\n' > "$AAO_BODY"
+pbg_run "$FIXTURE_WORKFLOW_ALL" STUB_RC_check_adr_append_only=1 -- --body-file "$AAO_BODY"
+want   "aao-2 body file: hard FAIL" "$OUT" "META-CHECK-FAILED: check-adr-append-only"
+[ "$RC" -eq 1 ] && pass "aao-2 exit 1" || fail "aao-2 exit 1 (got $RC)"
+rm -f "$AAO_BODY"
 
 # ─── Case l: bidirectional CI-parity assertion ────────────────────────────────
 # Extract bin/<name> from the real workflow's run: blocks only (not comments).
@@ -638,6 +651,7 @@ PASS  check-pipefail-grep-q
 PASS  test-check-pipefail-assignment-guard
 PASS  check-pipefail-assignment-guard
 PASS  check-exit-code-handling
+PASS  check-adr-append-only
 PASS  test-check-shell-portability
 PASS  check-shell-portability
 PASS  test-check-design-system

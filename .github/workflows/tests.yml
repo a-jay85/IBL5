@@ -724,6 +724,12 @@ jobs:
       - name: Run bin/test-check-exit-code-handling
         if: ${{ !cancelled() }}
         run: bin/test-check-exit-code-handling
+      # check-adr-append-only harness: builds its own fixture repo, so it needs
+      # no base sha and no history. The PR-diff run of the gate lives in
+      # pr-meta-checks.yml (ADR-0272).
+      - name: Run bin/test-check-adr-append-only
+        if: ${{ !cancelled() }}
+        run: bin/test-check-adr-append-only
       # config-example: CI copies config.php.example verbatim to config.php, so an
       # empty/zero placeholder becomes the CI test environment (PR #1008).
       # Also pins the config.local.php contract (template shape, fail-closed require).

@@ -573,11 +573,11 @@ REVIEW_ROUTE_DEFAULT=$(grep -oE "'/discordPlanReviewDM'" \
     declare -f ljob_dm_ready ljob_dm_send
     cat <<'RUNNER_EOF'
 # --- automouse kick for JSB parity port plans --------------------------------
-# A queued jsb-port-pl-<digits>[-<n>] plan starts `bin/automouse/run plan <slug>`
+# A queued jsb-port-pl-<digits>[-<n>|-r<n>] plan starts `bin/automouse/run plan <slug>`
 # right away, detached under its own launchd label, instead of waiting for the
 # nightly run. Every skip leaves the plan queued, so the nightly run still takes it.
 # Returns 0 on launch or skip; nonzero only when the launch itself failed.
-KICK_PORT_RE='^jsb-port-pl-[0-9]+(-[0-9]+)?$'
+KICK_PORT_RE='^jsb-port-pl-[0-9]+(-r?[0-9]+)?$'  # -r<n>: the parity loop's retry ports
 KICK_RUNNER_RE='bin/automouse/run( |$)'
 KICK_LAUNCHED=""
 plan_now_kick_port() {

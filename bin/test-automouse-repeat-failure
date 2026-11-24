@@ -125,7 +125,7 @@ fi
 
 # --- run-loop helpers, extracted from bin/automouse/run so the test cannot drift
 RUN="$REPO/bin/automouse/run"
-for fn in write_failure_report read_failure_signature failure_signature_repeats write_repeat_failure_report plan_defect_marker_present write_plan_defect_report; do
+for fn in write_failure_report read_failure_signature failure_signature_repeats write_repeat_failure_report plan_defect_marker_present write_plan_defect_report impl_failure_note; do
     FN_SRC=$(awk -v f="$fn" '$0 ~ "^"f"\\(\\) \\{" {capture=1} capture {print} capture && /^\}/ {exit}' "$RUN")
     if [ -z "$FN_SRC" ]; then
         fail "extract-$fn" "function not found in bin/automouse/run"
@@ -255,6 +255,100 @@ if grep -qF '(the sentinel listed no rows' "$NIGHTLY_DIR/reports/$(date +%Y-%m-%
     pass "p6-plan-defect-report-empty-body"
 else
     fail "p6-plan-defect-report-empty-body" "placeholder missing for marker-only sentinel"
+fi
+
+# f1: an error report the agent wrote during this attempt is quoted and named
+mkdir -p "$NIGHTLY_DIR/reports"
+FREP="$NIGHTLY_DIR/reports/2026-11-23-error-plan-f.md"
+printf '# Prefire gate failed: plan-f (row 52 cannot pass as written)\n\nbody\n' > "$FREP"
+F1=$(impl_failure_note plan-f.md 1 0)
+if grep -qF 'The build agent for plan-f stopped before shipping (try 1 of 3)' <<< "$F1" \
+    && grep -qF '"Prefire gate failed: plan-f (row 52 cannot pass as written)"' <<< "$F1" \
+    && grep -qF "Read $FREP" <<< "$F1" \
+    && ! grep -qF 'Building' <<< "$F1"; then
+    pass "f1-note-quotes-agent-error-report"
+else
+    fail "f1-note-quotes-agent-error-report" "got '$F1'"
+fi
+
+# f2: a report older than this attempt is ignored; the note falls back to .failure
+F2=$(impl_failure_note plan-f.md 2 "$(( $(date +%s) + 3600 ))")
+if grep -qF 'wrote no report (try 2 of 3)' <<< "$F2" \
+    && grep -qF "Read $QUEUE_DIR/plan-f.md.failure" <<< "$F2"; then
+    pass "f2-stale-report-ignored"
+else
+    fail "f2-stale-report-ignored" "got '$F2'"
+fi
+
+# f3: another slug's report whose name ends in this slug is not picked up
+printf '# Other plan\n' > "$NIGHTLY_DIR/reports/2026-11-23-error-x-plan-g.md"
+F3=$(impl_failure_note plan-g.md 1 0)
+if grep -qF 'wrote no report' <<< "$F3"; then
+    pass "f3-other-slug-report-not-matched"
+else
+    fail "f3-other-slug-report-not-matched" "got '$F3'"
+fi
+
+# f4: a report named from the plan title (slug differs from the plan filename)
+# written during this attempt is still found
+rm -f "$NIGHTLY_DIR"/reports/*.md
+FREP4="$NIGHTLY_DIR/reports/2026-11-23-error-title-slug-for-plan-h.md"
+printf '# Title slug report\n\nPlan: plan-h.md\n' > "$FREP4"
+F4=$(impl_failure_note plan-h.md 1 "$(( $(date +%s) - 60 ))")
+if grep -qF 'Its report says: "Title slug report"' <<< "$F4" \
+    && grep -qF "Read $FREP4" <<< "$F4"; then
+    pass "f4-title-slug-report-found"
+else
+    fail "f4-title-slug-report-found" "got '$F4'"
+fi
+
+# f5: a report with an empty first line gets the no-title note that names the path
+FREP5="$NIGHTLY_DIR/reports/2026-11-23-error-plan-i.md"
+printf '\nbody only\n' > "$FREP5"
+F5=$(impl_failure_note plan-i.md 1 0)
+if grep -qF 'stopped before shipping (try 1 of 3). It stays queued' <<< "$F5" \
+    && ! grep -qF 'report says' <<< "$F5" \
+    && grep -qF "Read $FREP5" <<< "$F5"; then
+    pass "f5-no-title-branch"
+else
+    fail "f5-no-title-branch" "got '$F5'"
+fi
+
+# f6: another runner's fresh report for a different plan, written during this
+# attempt, is never quoted (real since-time, exact slug absent)
+rm -f "$NIGHTLY_DIR"/reports/*.md
+printf '# Other plan broke\n\nPlan: x-plan-j.md\n' > "$NIGHTLY_DIR/reports/2026-11-23-error-x-plan-j.md"
+printf '# Unrelated\n\nPlan: other.md\n' > "$NIGHTLY_DIR/reports/2026-11-23-error-other.md"
+F6=$(impl_failure_note plan-j.md 1 "$(( $(date +%s) - 60 ))")
+if grep -qF 'wrote no report' <<< "$F6" \
+    && ! grep -qF 'x-plan-j' <<< "$F6" \
+    && ! grep -qF 'Unrelated' <<< "$F6"; then
+    pass "f6-other-plan-fresh-report-not-quoted"
+else
+    fail "f6-other-plan-fresh-report-not-quoted" "got '$F6'"
+fi
+
+# f7: exact-slug report wins over a fresher other-slug report
+FREP7="$NIGHTLY_DIR/reports/2026-11-23-error-plan-j.md"
+printf '# Own report\n' > "$FREP7"
+F7=$(impl_failure_note plan-j.md 1 "$(( $(date +%s) - 60 ))")
+if grep -qF 'Its report says: "Own report"' <<< "$F7" \
+    && grep -qF "Read $FREP7" <<< "$F7"; then
+    pass "f7-exact-slug-report-preferred"
+else
+    fail "f7-exact-slug-report-preferred" "got '$F7'"
+fi
+
+# f8: a title-named report that names the plan's title (not its filename) is found
+rm -f "$NIGHTLY_DIR"/reports/*.md
+printf '# Fix the widget sorter\n\nbody\n' > "$QUEUE_DIR/plan-k.md"
+FREP8="$NIGHTLY_DIR/reports/2026-11-23-error-fix-the-widget-sorter.md"
+printf '# Prefire failed: Fix the widget sorter\n' > "$FREP8"
+F8=$(impl_failure_note plan-k.md 1 "$(( $(date +%s) - 60 ))")
+if grep -qF "Read $FREP8" <<< "$F8"; then
+    pass "f8-title-named-report-found-by-plan-title"
+else
+    fail "f8-title-named-report-found-by-plan-title" "got '$F8'"
 fi
 
 h_done

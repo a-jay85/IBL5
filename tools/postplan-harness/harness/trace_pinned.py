@@ -12,7 +12,13 @@ At arming time the runner calls `arm_input_value`. It returns exactly "ok" only 
 (a) every changed path is an engine `_test.go` file, a non-test engine `.go` file that some
     entry declares in `ported_files`, a golden snapshot file, or this branch's evidence
     file, and no raw capture or capture-loader file is added or modified; each declared
-    file is a changed, existing, non-test engine `.go` file outside those two directories;
+    file is a changed, existing, non-test engine `.go` file outside those two directories.
+    Two inert paths also pass without a declaration: `engine/docs/jsb-trace-capture.md`
+    when every change sits inside its "Rows blocked on a richer capture" section (a port
+    that lifts a capture limit rewrites its bullet there), and
+    `engine/internal/sim/drawsites.go` when every line it adds or removes is one
+    `DrawSites` map entry (that table only labels draws in `cmd/jsbreplay` output, and Go
+    coverage gives a map literal no block, so it can never meet (c));
 (b) each named test starts with `TestTracePinned`, sits in a changed `_test.go` file, calls
     `jsbtrace.MustLoad(`, and its blob SHA matches the evidence;
     each capture already exists on the base commit with the recorded sha256, or, for an
@@ -62,6 +68,11 @@ _ADDRESS = re.compile(r"^0x[0-9a-f]+$")
 _PACKAGE = re.compile(r"^\./[A-Za-z0-9_./-]+$")
 GO_MOD = "engine/go.mod"
 _HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
+DRAW_SITES = "engine/internal/sim/drawsites.go"
+# doc path -> the one heading whose section a trace-pinned port may edit
+INERT_DOC_SECTIONS = {"engine/docs/jsb-trace-capture.md": "## Rows blocked on a richer capture"}
+_OLD_NEW_HUNK = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
+_DRAW_SITE_ENTRY = re.compile(r'^\s*"sim\.[A-Za-z0-9_.()*]+":\s*"(FUN_[0-9a-f]{8})?",\s*$')
 _COVER_LINE = re.compile(r"^(.+\.go):(\d+)\.\d+,(\d+)\.\d+ \d+ (\d+)$")
 
 
@@ -109,6 +120,8 @@ def allowlist_verdict(changed_files, branch, ported=frozenset()) -> str:
             return f"loader-in-diff: {path}"
         if path in GOLDEN_FILES or path == own_evidence:
             continue
+        if path in INERT_DOC_SECTIONS or (path == DRAW_SITES and path not in ported):
+            continue  # the content check runs in evaluate_data once the base resolves
         if path.startswith("engine/") and path.endswith(".go"):
             if path.endswith("_test.go") or path in ported:
                 continue
@@ -427,6 +440,89 @@ def added_lines(root, base, path):
     return lines
 
 
+_SAFE_DIFF_HEADERS = ("diff --git ", "index ", "--- ", "+++ ")
+
+
+def _text_hunks(root, base, path):
+    """[(old_start, old_count, new_start, new_count, [+/- lines])] of `path` vs `base`, or
+    a reason string. Fails closed on a file missing on either side, a mode change, a binary
+    diff, or any header line other than the plain text-diff ones."""
+    if not (Path(root) / path).is_file():
+        return f"inert-path-missing: {path}"
+    try:
+        _git(["cat-file", "-e", f"{base}:{path}"], cwd=str(root))
+        diff = _git(["diff", "-U0", "--no-color", "--no-renames", "--no-ext-diff",
+                     base, "--", path], cwd=str(root))
+    except (subprocess.CalledProcessError, OSError):
+        return f"inert-path-unreadable: {path}"
+    hunks = []
+    for line in diff.splitlines():
+        found = _OLD_NEW_HUNK.match(line)
+        if found:
+            old_s, old_c, new_s, new_c = (int(g) if g is not None else 1 for g in found.groups())
+            hunks.append((old_s, old_c, new_s, new_c, []))
+        elif not hunks:
+            if not line.startswith(_SAFE_DIFF_HEADERS):
+                return f"inert-path-unsafe-diff: {path}"
+        elif line.startswith(("+", "-")):
+            hunks[-1][4].append(line)
+    if diff.strip() and not hunks:
+        return f"inert-path-unsafe-diff: {path}"
+    return hunks
+
+
+def draw_sites_verdict(root, base) -> str:
+    """ok when every line drawsites.go adds or removes vs `base` is one DrawSites entry."""
+    hunks = _text_hunks(root, base, DRAW_SITES)
+    if isinstance(hunks, str):
+        return hunks
+    for *_, lines in hunks:
+        if not all(_DRAW_SITE_ENTRY.match(line[1:]) for line in lines):
+            return f"draw-sites-non-entry-change: {DRAW_SITES}"
+    return "ok"
+
+
+def _section_span(lines, heading):
+    """(first, last) 1-based body lines of the one `heading` section, or None."""
+    starts = [n for n, line in enumerate(lines, 1) if line.rstrip() == heading]
+    if len(starts) != 1:
+        return None
+    start = starts[0]
+    end = next((n - 1 for n, line in enumerate(lines, 1)
+                if n > start and line.startswith("#")), len(lines))
+    return start, end
+
+
+def _inside(start, count, span) -> bool:
+    """A hunk side (start, count) sits in the section body; count 0 inserts after `start`."""
+    head, end = span
+    if count == 0:
+        return head <= start <= end
+    return head < start and start + count - 1 <= end
+
+
+def doc_section_verdict(root, base, path) -> str:
+    """ok when every change to an inert doc sits inside its one allowed section."""
+    heading = INERT_DOC_SECTIONS[path]
+    hunks = _text_hunks(root, base, path)
+    if isinstance(hunks, str):
+        return hunks
+    try:
+        old = _git(["show", f"{base}:{path}"], cwd=str(root)).splitlines()
+        new = (Path(root) / path).read_text().splitlines()
+    except (subprocess.CalledProcessError, OSError, UnicodeDecodeError):
+        return f"inert-path-unreadable: {path}"
+    old_span, new_span = _section_span(old, heading), _section_span(new, heading)
+    if old_span is None or new_span is None:
+        return f"doc-section-missing: {path}"
+    for old_s, old_c, new_s, new_c, lines in hunks:
+        if not (_inside(old_s, old_c, old_span) and _inside(new_s, new_c, new_span)):
+            return f"doc-change-outside-section: {path}"
+        if any(line[1:].startswith("#") for line in lines):
+            return f"doc-change-outside-section: {path}"
+    return "ok"
+
+
 def coverage_verdict(root, base, ported, blocks) -> str:
     """ok when the run executed at least one added line of every declared file."""
     for path in sorted(ported):
@@ -503,6 +599,14 @@ def evaluate_data(root, branch, base, changed_files, data, run_go=None, jsbn_dir
         return allowed
     if not base:
         return "base-unresolved"
+    if DRAW_SITES in changed and DRAW_SITES not in ported:
+        note = draw_sites_verdict(root, base)
+        if note != "ok":
+            return note
+    for doc in sorted(set(changed) & set(INERT_DOC_SECTIONS)):
+        note = doc_section_verdict(root, base, doc)
+        if note != "ok":
+            return note
     for entry in tests:
         for step in (lambda: _check_ported(root, entry, changed),
                      lambda: _check_test_entry(root, entry, changed),
@@ -528,13 +632,28 @@ def evaluate_evidence(root, branch, base, changed_files, run_go=None) -> str:
     return evaluate_data(root, branch, base, changed_files, data, run_go)
 
 
-def arm_input_value(plan_hold_triggers, root, branch, changed_files) -> str:
-    """The `ArmInputs.trace_pinned_evidence` value. Reads nothing without the token."""
+PORT_PREFIX = "jsb-port-"
+
+
+def _default_progress(root, branch, base, jsbn_dir):
+    from . import replay_progress
+    return replay_progress.verdict(root, branch, base, jsbn_dir)
+
+
+def arm_input_value(plan_hold_triggers, root, branch, changed_files, progress=None) -> str:
+    """The `ArmInputs.trace_pinned_evidence` value. Reads nothing without the token.
+
+    A jsb-port-* branch also needs replay progress over base (replay_progress.verdict).
+    """
     if TOKEN not in set(plan_hold_triggers or ()):
         return "not-applicable"
     try:
         base = resolve_base(root, branch)
-        return evaluate_evidence(root, branch, base, changed_files)
+        note = evaluate_evidence(root, branch, base, changed_files)
+        if note != "ok" or not str(branch or "").startswith(PORT_PREFIX):
+            return note
+        progress = progress or _default_progress
+        return progress(root, branch, base, jsb_native_dir(root))
     except Exception as exc:  # noqa: BLE001 — fail closed, never raise into arming
         return f"error: {type(exc).__name__}"
 

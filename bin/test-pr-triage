@@ -1170,4 +1170,71 @@ assert_match  "AM3 live hold fetches the baseRefName ref" \
     '\+refs/heads/fixture-base:refs/remotes/origin/fixture-base' "$(cat "$FIX/git.log" 2>/dev/null)"
 assert_match  "AM4 auto_merge:false with no space body-holds" '^#83 .*body-hold' "$OUT"
 
+# --- OA1..OA4: the card's Owner approvals field (harness/amendments.py card) ---
+OA_OLD_HEAD="$(printf 'c%.0s' $(seq 1 40))"
+# oa_comments <n> <assoc> <user-type>: one fix-first approval at an older head, then one
+# approve at the PR head carrying a kept block, both from the given author.
+oa_comments() {
+    local n="$1" assoc="$2" utype="$3" sha ff ap
+    sha="$(printf '%040d' "$n")"
+    ff="$(printf 'Owner approved 2026-11-23: "fix the label first" (Ship with a fix). Head %s.\n\nCondition: rename the Save button to Submit\nThe label and the arm wait until the fix is pushed.\n\n<!-- owner-approve mode=fix-first head=%s diff=unread -->' "$OA_OLD_HEAD" "$OA_OLD_HEAD")"
+    ap="$(printf 'Owner approved 2026-11-23: "ship it". Head %s.\n\n<!-- owner-approve:kept:begin -->\n- Keep the tooltip rewrite\n<!-- owner-approve:kept:end -->\n\n<!-- owner-approve mode=approve head=%s diff=unread -->' "$sha" "$sha")"
+    jq -n --arg ff "$ff" --arg ap "$ap" --arg a "$assoc" --arg t "$utype" \
+        '[{id: 5001, created_at: "2026-11-23T10:00:00Z", author_association: $a, user: {login: "o", type: $t}, body: $ff},
+          {id: 5002, created_at: "2026-11-23T11:00:00Z", author_association: $a, user: {login: "o", type: $t}, body: $ap}]'
+}
+# oa_branch <n> <branch>: point the view fixture at a flat branch name the plan resolver can match.
+oa_branch() {
+    jq --arg b "$2" '.headRefName = $b' "$FIX/view-$1.json" > "$FIX/v.tmp" && mv "$FIX/v.tmp" "$FIX/view-$1.json"
+}
+
+# OA1 card_owner_approvals_both_modes
+k_fixture 320
+oa_comments 320 OWNER User > "$FIX/comments-320.json"
+run_triage "$FIX" --card 320
+OA_FIELD="$(sed -n '/^Owner approvals:/,$p' <<< "$OUT")"
+assert_status "OA1 card_owner_approvals_both_modes exit 0" 0 "$ST"
+assert_match  "OA1 field header"            '^Owner approvals:$' "$OA_FIELD"
+assert_match  "OA1 fix-first first, head moved" "^  1\. 2026-11-23T10:00:00Z fix-first head ccccccc \(PR head moved past it\)$" "$OA_FIELD"
+assert_match  "OA1 fix-first words"         '^     words: "fix the label first" \(Ship with a fix\)$' "$OA_FIELD"
+assert_match  "OA1 condition line"          '^     condition: "rename the Save button to Submit"$' "$OA_FIELD"
+assert_match  "OA1 no plan file"            '^     amendment: no plan file$' "$OA_FIELD"
+assert_match  "OA1 approve second, head unchanged" '^  2\. 2026-11-23T11:00:00Z approve head 0000000 \(PR head unchanged\)$' "$OA_FIELD"
+assert_match  "OA1 approve words"           '^     words: "ship it"$' "$OA_FIELD"
+assert_match  "OA1 kept bullet"             '^     kept: Keep the tooltip rewrite$' "$OA_FIELD"
+assert_match  "OA1 order fix-first then approve" '1\. .*fix-first.*2\. .*approve' "$(tr '\n' ' ' <<< "$OA_FIELD")"
+
+# OA2 card_owner_approvals_unauthentic_ignored
+k_fixture 321
+jq -s 'add' <(oa_comments 321 CONTRIBUTOR User) <(oa_comments 321 OWNER Bot) > "$FIX/comments-321.json"
+run_triage "$FIX" --card 321
+assert_status "OA2 card_owner_approvals_unauthentic_ignored exit 0" 0 "$ST"
+assert_match  "OA2 none listed"             '^Owner approvals: none$' "$OUT"
+assert_absent "OA2 no marker rows"          'fix-first head|approve head' "$OUT"
+
+# OA3 card_owner_approvals_fetch_failure_unknown
+k_fixture 322
+echo 1 > "$FIX/comments-rc-322"
+run_triage "$FIX" --card 322
+assert_status "OA3 card_owner_approvals_fetch_failure_unknown exits 1" 1 "$ST"
+assert_match  "OA3 field unknown"           '^Owner approvals: unknown \(fetch failed\)$' "$OUT"
+assert_absent "OA3 never says none"         '^Owner approvals: none$' "$OUT"
+
+# OA4 card_owner_approvals_flags_missing_amendment
+k_fixture 323
+oa_comments 323 OWNER User > "$FIX/comments-323.json"
+oa_branch 323 oa-card-323
+mkdir -p "$HOME/claude-plans"
+printf '# Plan\n\n## Phase 1: x\n\nDo x.\n' > "$HOME/claude-plans/oa-card-323.md"
+run_triage "$FIX" --card 323
+assert_status "OA4 card_owner_approvals_flags_missing_amendment exit 0" 0 "$ST"
+assert_match  "OA4 names the backfill command" '^     amendment: MISSING \(run bin/owner-approve 323 --record-amendments\)$' "$OUT"
+python3 -I -c 'import sys; sys.path.insert(0, sys.argv[1]); from harness import amendments; sys.exit(amendments.main(sys.argv[2:]))' \
+    "$SCRIPT_DIR/../tools/postplan-harness" append --plan "$HOME/claude-plans/oa-card-323.md" \
+    --comments "$FIX/comments-323.json" >/dev/null
+run_triage "$FIX" --card 323
+assert_match  "OA4 recorded after append"   '^     amendment: recorded$' "$OUT"
+assert_absent "OA4 no MISSING after append" 'amendment: MISSING' "$OUT"
+rm -f "$HOME/claude-plans/oa-card-323.md"
+
 h_done

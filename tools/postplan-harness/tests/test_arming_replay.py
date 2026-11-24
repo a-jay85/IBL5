@@ -614,6 +614,13 @@ def test_static_analyzer_near_misses():
     with pytest.raises(Unresolvable):
         production_roots({"tools/x.py": lazy + "def h():\n    from harness import fidelity\n"
                                                "    return [fidelity]\n"})
+    for src in ("from ..fidelity import f\nf()\n", "from .. import fidelity\nfidelity.f()\n"):
+        with pytest.raises(Unresolvable):
+            production_roots({"harness/adapters/x.py": src})
+    assert production_roots({"tools/x.py": "import harness as h\nh.fidelity.f()\n"}) == {
+        "f": {"tools/x.py"}}
+    assert production_roots({"tools/x.py": "import harness\nharness.fidelity.f()\n"}) == {
+        "f": {"tools/x.py"}}
     master = ast.parse((REPO / FIDELITY).read_text(encoding="utf-8"))
     check_resolvable(master)
     top_defs(master)

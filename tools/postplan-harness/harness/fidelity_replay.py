@@ -512,6 +512,8 @@ def _file_roots(rel: str, tree, out: dict) -> None:
                     raise Unresolvable(f"fidelity-unresolvable-reference: {rel}")
                 if a.name == "fidelity" or a.name.endswith(".fidelity") and a.name != "harness.fidelity":
                     raise Unresolvable(f"fidelity-unresolvable-reference: {rel}")
+                if a.name == "harness":
+                    pkgs.add(a.asname or "harness")
                 if a.name == "harness.fidelity":
                     if a.asname:
                         aliases.add(a.asname)
@@ -523,6 +525,9 @@ def _file_roots(rel: str, tree, out: dict) -> None:
             if mod == "bench" or mod.startswith("bench.") or mod.endswith(".bench"):
                 raise Unresolvable(f"fidelity-unresolvable-reference: {rel}")
             if node.level == 0 and mod == "fidelity":
+                raise Unresolvable(f"fidelity-unresolvable-reference: {rel}")
+            if node.level >= 2 and (mod == "fidelity" or mod.endswith(".fidelity")
+                                    or (not mod and any(a.name in ("fidelity", "*") for a in node.names))):
                 raise Unresolvable(f"fidelity-unresolvable-reference: {rel}")
             if mod == "harness.fidelity" or (node.level == 1 and mod == "fidelity"):
                 for a in node.names:

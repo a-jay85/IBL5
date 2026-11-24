@@ -394,6 +394,110 @@ case_no_trace_stall_quotes_log_tail() {
     h_not_contains "no-trace: DM does not quote the older log" "$(slurp "$S/log/discord-dm.stdin")" "FIRST-LOG-END"
 }
 
+# idline <slug>: the identity line bin/plan-now writes first in every log.
+idline() { printf 'plan-now: identity slug=%s resume_of=- brief=/tmp/port.md\n' "$1"; }
+STALLS_REL="home/.cache/jsb-parity-stalls.txt"
+
+case_no_plan_stall_quotes_reason() {
+    local log=plan-now-20261124-111400-23978.log
+    sandbox no_plan_reason
+    ledger "pl-0028:captured:jsb-port-pl-0028-r1"
+    {
+        idline jsb-port-pl-0028-r1
+        printf 'NO_PLAN: already merged as PR #4229\n'
+        printf 'plan-now: RESULT no-plan — already merged as PR #4229\n'
+        printf 'plan-now: the run halted by design and wrote no plan\n'
+        printf 'discord-dm: delivered\n'
+    } > "$S/plannow/$log"
+    run_watch
+    h_eq "no-plan: key" "pl-0028:no-plan:$log" "$(slurp "$S/$STALLS_REL")"
+    h_not_contains "no-plan: key is not no-trace" "$(slurp "$S/$STALLS_REL")" "no-trace"
+    h_contains "no-plan: DM quotes the NO_PLAN line" "$(slurp "$S/log/discord-dm.stdin")" "NO_PLAN: already merged as PR #4229"
+    h_contains "no-plan: DM says check whether done" "$(slurp "$S/log/discord-dm.stdin")" "already done"
+    h_contains "no-plan: DM names the log" "$(slurp "$S/log/discord-dm.stdin")" "$log"
+    h_contains "no-plan: DM names the row" "$(slurp "$S/log/discord-dm.stdin")" "pl-0028"
+    h_contains "no-plan: DM says the row stays stranded" "$(slurp "$S/log/discord-dm.stdin")" "status captured"
+    h_eq "no-plan: one DM on the first run" 1 "$(cnt discord-dm)"
+    run_watch
+    h_eq "no-plan: the same log DMs once" 1 "$(cnt discord-dm)"
+}
+
+case_no_plan_dm_falls_back_to_result_line() {
+    local log=plan-now-20261124-111400-23978.log
+    sandbox no_plan_fallback
+    ledger "pl-0028:captured:jsb-port-pl-0028-r1"
+    {
+        idline jsb-port-pl-0028-r1
+        printf 'plan-now: RESULT no-plan — already merged as PR #4229\n'
+        printf 'discord-dm: delivered\n'
+    } > "$S/plannow/$log"
+    run_watch
+    h_eq "no-plan fallback: key" "pl-0028:no-plan:$log" "$(slurp "$S/$STALLS_REL")"
+    h_contains "no-plan fallback: DM quotes the RESULT line" "$(slurp "$S/log/discord-dm.stdin")" \
+        "plan-now: RESULT no-plan — already merged as PR #4229"
+}
+
+case_failed_result_links_by_identity() {
+    local log=plan-now-20261124-120000-5.log
+    sandbox failed_result
+    {
+        idline jsb-port-pl-0001
+        printf 'plan-now: RESULT failed — claude exited 1\n'
+    } > "$S/plannow/$log"
+    run_watch
+    h_eq "failed: key" "pl-0001:plan-now-failed:$log" "$(slurp "$S/$STALLS_REL")"
+    h_contains "failed: DM quotes the RESULT line" "$(slurp "$S/log/discord-dm.stdin")" "RESULT failed — claude exited 1"
+}
+
+case_ok_result_keeps_no_trace() {
+    local log=plan-now-20261123-010000-1.log
+    sandbox ok_result
+    printf 'Branch slug: jsb-port-pl-0001\nplan-now: RESULT ok\n' > "$S/plannow/$log"
+    run_watch
+    h_eq "ok result: key stays no-trace" "pl-0001:no-trace:$log" "$(slurp "$S/$STALLS_REL")"
+}
+
+# near_miss_body <slug>: an identity-first no-plan log body.
+near_miss_body() { idline "$1"; printf 'NO_PLAN: x\nplan-now: RESULT no-plan — x\n'; }
+
+case_identity_near_miss_never_links() {
+    local log=plan-now-20261124-111400-23978.log
+    sandbox near_miss_short
+    ledger "pl-0028:captured:jsb-port-pl-0028"
+    near_miss_body jsb-port-pl-0028-r1 > "$S/plannow/$log"
+    run_watch
+    h_eq "near miss: a -r1 log never links to the base row" "pl-0028:no-trace:none" "$(slurp "$S/$STALLS_REL")"
+    sandbox near_miss_long
+    ledger "pl-0029:captured:jsb-port-pl-0028-r1"
+    near_miss_body jsb-port-pl-0028 > "$S/plannow/$log"
+    run_watch
+    h_eq "near miss: a base log never links to the -r1 row" "pl-0029:no-trace:none" "$(slurp "$S/$STALLS_REL")"
+}
+
+case_no_plan_newest_log_wins() {
+    sandbox newest_wins
+    { idline jsb-port-pl-0001; printf 'plan-now: RESULT no-plan — old\n'; } > "$S/plannow/plan-now-20261123-010000-1.log"
+    { idline jsb-port-pl-0001; printf 'plan-now: RESULT ok\n'; } > "$S/plannow/plan-now-20261123-020000-2.log"
+    run_watch
+    h_eq "newest log wins: an older no-plan under a newer ok is no-trace" \
+        "pl-0001:no-trace:plan-now-20261123-020000-2.log" "$(slurp "$S/$STALLS_REL")"
+}
+
+case_identity_live_label_waits() {
+    sandbox identity_live_own
+    printf -- '-\t0\tcom.ibl5.plan-now-20261123-012805-44230\n' > "$S/fix/launchctl-list"
+    idline jsb-port-pl-0001 > "$S/plannow/plan-now-20261123-012805-44230.log"
+    run_watch
+    no_actions "identity live label"
+    h_contains "identity live label: verdict is a wait" "$(out)" "WAIT:plan-now-running"
+    sandbox identity_live_other
+    printf -- '-\t0\tcom.ibl5.plan-now-20261123-012805-44230\n' > "$S/fix/launchctl-list"
+    idline some-other-slug > "$S/plannow/plan-now-20261123-012805-44230.log"
+    run_watch
+    h_not_contains "other slug's live log: row is not held unattributed" "$(out)" "WAIT:plan-now-unattributed"
+    h_eq "other slug's live log: row reaches no-trace" "pl-0001:no-trace:none" "$(slurp "$S/$STALLS_REL")"
+}
+
 # --- Aggregation, dedupe and failure cases (rows 23-29) ----------------------------
 
 case_no_row_in_flight_fires() {

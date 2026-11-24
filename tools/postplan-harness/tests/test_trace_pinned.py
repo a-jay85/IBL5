@@ -70,12 +70,14 @@ def _commit(root, message) -> str:
     return _git(root, "rev-parse", "HEAD")
 
 
-def _make_repo(tmp_path, capture_text=None):
+def _make_repo(tmp_path, capture_text=None, base_files=None):
     root = tmp_path / "repo"
     root.mkdir()
     _git(root, "init", "-q")
     _write(root, "engine/go.mod", "module github.com/a-jay85/IBL5/engine\n\ngo 1.22\n")
     _write(root, CAPTURE, capture_text or _capture_text())
+    for rel, body in (base_files or {}).items():
+        _write(root, rel, body)
     _write(root, ENGINE_FILE, "package sim\n\nfunc foulRoll() int { return 0 }\n")
     base = _commit(root, "base")
     _git(root, "update-ref", "refs/remotes/origin/master", base)
@@ -196,10 +198,156 @@ def test_allowlist_rejects_non_engine_file(repo):
 
 
 @pytest.mark.parametrize("path", ["engine/go.mod", "engine/go.sum", "engine/Makefile",
-                                  "engine/docs/j27-foul-volume-port.md"])
+                                  "engine/docs/j27-foul-volume-port.md",
+                                  "engine/docs/j27-live-outcome-map-port.md", "engine/README.md"])
 def test_allowlist_rejects_engine_non_go_files(repo, path):
     root, base = repo
     assert _verdict(root, base, changed=[*CHANGED, path]) == f"non-engine-path: {path}"
+
+
+CAPTURE_DOC = "engine/docs/jsb-trace-capture.md"
+CAPTURE_DOC_BASE = """# JSB per-call trace capture
+
+## Using a capture
+
+Check the header before you land it.
+
+## Rows blocked on a richer capture
+
+A capture can be too thin to pin a port.
+
+- **pl-0027.** The capture carries no record values.
+
+## Later section
+
+Tail text.
+"""
+
+
+def _doc_repo(tmp_path, head_body):
+    root, base = _make_repo(tmp_path, base_files={CAPTURE_DOC: CAPTURE_DOC_BASE})
+    _write(root, CAPTURE_DOC, head_body)
+    _write_evidence(root)
+    return root, base
+
+
+@pytest.mark.parametrize("head", [
+    CAPTURE_DOC_BASE.replace("- **pl-0027.** The capture carries no record values.\n",
+                             "No row is blocked on a thin capture today.\n"),
+    CAPTURE_DOC_BASE.replace("- **pl-0027.** The capture carries no record values.\n", ""),
+    CAPTURE_DOC_BASE.replace("thin to pin a port.\n", "thin to pin a port.\n\n- **pl-0031.** x\n"),
+], ids=["replace-bullet", "drop-bullet", "add-bullet"])
+def test_capture_doc_edit_inside_blocked_rows_section_is_ok(tmp_path, head):
+    root, base = _doc_repo(tmp_path, head)
+    assert _verdict(root, base, changed=[*CHANGED, CAPTURE_DOC]) == "ok"
+
+
+@pytest.mark.parametrize("head", [
+    CAPTURE_DOC_BASE.replace("Check the header before you land it.", "Land it."),
+    CAPTURE_DOC_BASE.replace("Tail text.", "Other text."),
+    CAPTURE_DOC_BASE.replace("## Rows blocked on a richer capture", "## Rows blocked"),
+    CAPTURE_DOC_BASE.replace("A capture can be", "## Using a capture\n\nA capture can be"),
+    CAPTURE_DOC_BASE + "\n## Rows blocked on a richer capture\n",
+], ids=["edit-above", "edit-below", "rename-heading", "new-heading", "second-heading"])
+def test_capture_doc_edit_outside_section_holds(tmp_path, head):
+    root, base = _doc_repo(tmp_path, head)
+    verdict = _verdict(root, base, changed=[*CHANGED, CAPTURE_DOC])
+    assert verdict in (f"doc-change-outside-section: {CAPTURE_DOC}",
+                       f"doc-section-missing: {CAPTURE_DOC}")
+
+
+def test_capture_doc_mode_change_holds(tmp_path):
+    root, base = _doc_repo(tmp_path, CAPTURE_DOC_BASE)
+    os.chmod(root / CAPTURE_DOC, 0o755)
+    _git(root, "config", "core.fileMode", "true")
+    assert _verdict(root, base, changed=[*CHANGED, CAPTURE_DOC]) \
+        == f"inert-path-unsafe-diff: {CAPTURE_DOC}"
+
+
+_FUN = "FUN" + "_"  # keeps the address-shaped tokens out of this file's text
+DRAW_SITES_BASE = """package sim
+
+var DrawSites = map[string]string{
+\t"sim.rollMake":   "",
+\t"sim.possession": "@@A@@",
+}
+""".replace("@@A@@", _FUN + "004e3860")
+
+
+def _draw_sites_repo(tmp_path, head_body):
+    root, base = _make_repo(tmp_path, base_files={tp.DRAW_SITES: DRAW_SITES_BASE})
+    _write(root, tp.DRAW_SITES, head_body)
+    _write_evidence(root)
+    return root, base
+
+
+def test_draw_sites_entry_only_change_is_ok(tmp_path):
+    """gofmt realigns neighbours when a long key lands; those rewritten entries pass too."""
+    head = DRAW_SITES_BASE.replace('\t"sim.rollMake":   "",\n',
+                                   '\t"sim.dayStartScaledPass": "",\n'
+                                   '\t"sim.rollMake":            "",\n'
+                                   '\t"sim.(*gameState).foo":    "' + _FUN + '004e4e90",\n')
+    root, base = _draw_sites_repo(tmp_path, head)
+    assert _verdict(root, base, changed=[*CHANGED, tp.DRAW_SITES]) == "ok"
+
+
+@pytest.mark.parametrize("bad_line", [
+    '\tfoo := 1\n',
+    '\t"sim.x": "' + _FUN + '4e4e90",\n',
+    '\t"sim.x": "not-an-address",\n',
+    '\t"other.x": "",\n',
+    '// a comment\n',
+    'func init() { DrawSites["sim.x"] = "" }\n',
+])
+def test_draw_sites_non_entry_change_holds(tmp_path, bad_line):
+    root, base = _draw_sites_repo(tmp_path, DRAW_SITES_BASE + bad_line)
+    assert _verdict(root, base, changed=[*CHANGED, tp.DRAW_SITES]) \
+        == f"draw-sites-non-entry-change: {tp.DRAW_SITES}"
+
+
+def test_draw_sites_removed_non_entry_line_holds(tmp_path):
+    root, base = _draw_sites_repo(tmp_path, DRAW_SITES_BASE.replace("package sim\n", ""))
+    assert _verdict(root, base, changed=[*CHANGED, tp.DRAW_SITES]) \
+        == f"draw-sites-non-entry-change: {tp.DRAW_SITES}"
+
+
+def test_draw_sites_new_file_holds(repo):
+    root, base = repo
+    _write(root, tp.DRAW_SITES, DRAW_SITES_BASE)
+    assert _verdict(root, base, changed=[*CHANGED, tp.DRAW_SITES]) \
+        == f"inert-path-unreadable: {tp.DRAW_SITES}"
+
+
+def test_draw_sites_deleted_holds(tmp_path):
+    root, base = _make_repo(tmp_path, base_files={tp.DRAW_SITES: DRAW_SITES_BASE})
+    (root / tp.DRAW_SITES).unlink()
+    _write_evidence(root)
+    assert _verdict(root, base, changed=[*CHANGED, tp.DRAW_SITES]) \
+        == f"inert-path-missing: {tp.DRAW_SITES}"
+
+
+def test_draw_sites_binary_content_holds(tmp_path):
+    root, base = _draw_sites_repo(tmp_path, DRAW_SITES_BASE + "\x00func evil() {}\n")
+    assert _verdict(root, base, changed=[*CHANGED, tp.DRAW_SITES]) \
+        == f"inert-path-unsafe-diff: {tp.DRAW_SITES}"
+
+
+def test_capture_doc_binary_content_holds(tmp_path):
+    head = CAPTURE_DOC_BASE.replace("Tail text.", "Tail text.\n") \
+        .replace("A capture can be too thin", "A capture can be too\x00 thin")
+    root, base = _doc_repo(tmp_path, head)
+    assert _verdict(root, base, changed=[*CHANGED, CAPTURE_DOC]) \
+        == f"inert-path-unsafe-diff: {CAPTURE_DOC}"
+
+
+def test_declared_draw_sites_takes_the_coverage_rule(tmp_path):
+    """Declaring drawsites.go skips the entry check, and a map literal never meets (c)."""
+    head = DRAW_SITES_BASE.replace('\t"sim.rollMake":   "",\n',
+                                   '\t"sim.rollMake":   "",\n\t"sim.zzz":        "",\n')
+    root, base = _draw_sites_repo(tmp_path, head)
+    _write_evidence(root, ported_files=[ENGINE_FILE, tp.DRAW_SITES])
+    assert _verdict(root, base, changed=[*CHANGED, tp.DRAW_SITES]) \
+        == f"unexercised-change: {tp.DRAW_SITES}"
 
 
 def test_allowlist_rejects_capture_in_diff(repo):

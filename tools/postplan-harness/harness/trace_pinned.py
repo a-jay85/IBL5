@@ -451,7 +451,7 @@ def _text_hunks(root, base, path):
         return f"inert-path-missing: {path}"
     try:
         _git(["cat-file", "-e", f"{base}:{path}"], cwd=str(root))
-        diff = _git(["diff", "-U0", "--text", "--no-color", "--no-renames", "--no-ext-diff",
+        diff = _git(["diff", "-U0", "--no-color", "--no-renames", "--no-ext-diff",
                      base, "--", path], cwd=str(root))
     except (subprocess.CalledProcessError, OSError):
         return f"inert-path-unreadable: {path}"

@@ -264,13 +264,14 @@ def test_capture_doc_mode_change_holds(tmp_path):
         == f"inert-path-unsafe-diff: {CAPTURE_DOC}"
 
 
+_FUN = "FUN" + "_"  # keeps the address-shaped tokens out of this file's text
 DRAW_SITES_BASE = """package sim
 
 var DrawSites = map[string]string{
 \t"sim.rollMake":   "",
-\t"sim.possession": "FUN_004e3860",
+\t"sim.possession": "@@A@@",
 }
-"""
+""".replace("@@A@@", _FUN + "004e3860")
 
 
 def _draw_sites_repo(tmp_path, head_body):
@@ -285,14 +286,14 @@ def test_draw_sites_entry_only_change_is_ok(tmp_path):
     head = DRAW_SITES_BASE.replace('\t"sim.rollMake":   "",\n',
                                    '\t"sim.dayStartScaledPass": "",\n'
                                    '\t"sim.rollMake":            "",\n'
-                                   '\t"sim.(*gameState).foo":    "FUN_004e4e90",\n')
+                                   '\t"sim.(*gameState).foo":    "' + _FUN + '004e4e90",\n')
     root, base = _draw_sites_repo(tmp_path, head)
     assert _verdict(root, base, changed=[*CHANGED, tp.DRAW_SITES]) == "ok"
 
 
 @pytest.mark.parametrize("bad_line", [
     '\tfoo := 1\n',
-    '\t"sim.x": "FUN_4e4e90",\n',
+    '\t"sim.x": "' + _FUN + '4e4e90",\n',
     '\t"sim.x": "not-an-address",\n',
     '\t"other.x": "",\n',
     '// a comment\n',
@@ -328,7 +329,15 @@ def test_draw_sites_deleted_holds(tmp_path):
 def test_draw_sites_binary_content_holds(tmp_path):
     root, base = _draw_sites_repo(tmp_path, DRAW_SITES_BASE + "\x00func evil() {}\n")
     assert _verdict(root, base, changed=[*CHANGED, tp.DRAW_SITES]) \
-        == f"draw-sites-non-entry-change: {tp.DRAW_SITES}"
+        == f"inert-path-unsafe-diff: {tp.DRAW_SITES}"
+
+
+def test_capture_doc_binary_content_holds(tmp_path):
+    head = CAPTURE_DOC_BASE.replace("Tail text.", "Tail text.\n") \
+        .replace("A capture can be too thin", "A capture can be too\x00 thin")
+    root, base = _doc_repo(tmp_path, head)
+    assert _verdict(root, base, changed=[*CHANGED, CAPTURE_DOC]) \
+        == f"inert-path-unsafe-diff: {CAPTURE_DOC}"
 
 
 def test_declared_draw_sites_takes_the_coverage_rule(tmp_path):

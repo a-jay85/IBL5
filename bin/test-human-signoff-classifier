@@ -2709,25 +2709,7 @@ tt hs_trigger_trusted "$STUB" "$TT/base" "$TT/diff"; expect "trigger-trusted: he
 tt hs_trigger_trusted .github/workflows/ci.yml "$TT/base" "$TT/same"; expect "trigger-trusted: run from another workflow file rc 1" 1 $?
 tt hs_trigger_trusted '' "$TT/base" "$TT/same"; expect "trigger-trusted: empty run path rc 1" 1 $?
 tt hs_trigger_trusted "$STUB" "$TT/base" "$TT/none" run; expect "trigger-trusted: head with no stub rc 0 in run mode" 0 $?
-# Dispatch on a head with no stub: the PR's file list decides. A PR branched
-# before the stub existed is trusted; one whose diff names the stub holds.
-printf '#!/bin/sh\nprintf "README\\nibl5/a.php\\n"\n' > "$TT/files-clean"
-printf '#!/bin/sh\nprintf "README\\n.github/workflows/human-signoff-trigger.yml\\n"\n' > "$TT/files-stub"
-printf '#!/bin/sh\nprintf "x.github/workflows/human-signoff-trigger.yml.bak\\n"\n' > "$TT/files-near"
-printf '#!/bin/sh\nexit 1\n' > "$TT/files-fail"
-chmod +x "$TT/files-clean" "$TT/files-stub" "$TT/files-near" "$TT/files-fail"
-PR_INPUT=42 HS_PR_FILES_FN="$TT/files-clean" tt hs_trigger_trusted '' "$TT/base" "$TT/none" dispatch
-expect "trigger-trusted: dispatch, no stub, diff omits the stub rc 0" 0 $?
-PR_INPUT=42 HS_PR_FILES_FN="$TT/files-near" tt hs_trigger_trusted '' "$TT/base" "$TT/none" dispatch
-expect "trigger-trusted: dispatch, no stub, near-miss path in diff rc 0" 0 $?
-PR_INPUT=42 HS_PR_FILES_FN="$TT/files-stub" tt hs_trigger_trusted '' "$TT/base" "$TT/none" dispatch
-expect "trigger-trusted: dispatch, no stub, diff deletes the stub rc 2" 2 $?
-PR_INPUT=42 HS_PR_FILES_FN="$TT/files-fail" tt hs_trigger_trusted '' "$TT/base" "$TT/none" dispatch
-expect "trigger-trusted: dispatch, no stub, file list fetch fails rc 2" 2 $?
-PR_INPUT='' HS_PR_FILES_FN="$TT/files-clean" tt hs_trigger_trusted '' "$TT/base" "$TT/none" dispatch
-expect "trigger-trusted: dispatch, no stub, no PR number rc 2" 2 $?
-PR_INPUT='4x' HS_PR_FILES_FN="$TT/files-clean" tt hs_trigger_trusted '' "$TT/base" "$TT/none" dispatch
-expect "trigger-trusted: dispatch, no stub, non-digit PR number rc 2" 2 $?
+tt hs_trigger_trusted '' "$TT/base" "$TT/none" dispatch; expect "trigger-trusted: head with no stub rc 2 in dispatch mode" 2 $?
 tt hs_trigger_trusted '' "$TT/base" "$TT/diff" dispatch; expect "trigger-trusted: dispatch with a changed stub rc 2" 2 $?
 tt hs_trigger_trusted '' "$TT/base" "$TT/same" dispatch; expect "trigger-trusted: dispatch with identical stub rc 0" 0 $?
 tt hs_trigger_trusted "$STUB" "$TT/nobase" "$TT/same"; expect "trigger-trusted: base with no stub rc 2" 2 $?

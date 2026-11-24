@@ -401,35 +401,17 @@ hs_trigger_event() {
 }
 
 # hs_trigger_trusted <run_path> <base_dir> <head_dir> [run|dispatch]
-# rc 0 trusted; rc 1 the run came from another workflow file; rc 2 the head changed the stub.
+# rc 0 trusted; rc 1 the run came from another workflow file; rc 2 the head changed the stub,
+# or (dispatch mode) has none, so that PR holds until it is updated.
 hs_trigger_trusted() {
   local run_path="${1:-}" base_dir="$2" head_dir="$3" mode="${4:-run}" base_blob head_blob
   if [ "$mode" = run ] && [ "$run_path" != "$HS_TRIGGER_PATH" ]; then return 1; fi
   base_blob=$(git -C "$base_dir" rev-parse -q --verify "HEAD:$HS_TRIGGER_PATH" 2>/dev/null) || return 2
   if ! head_blob=$(git -C "$head_dir" rev-parse -q --verify "HEAD:$HS_TRIGGER_PATH" 2>/dev/null); then
     if [ "$mode" = run ]; then return 0; fi
-    # Dispatch on a head with no stub. A PR branched before the stub existed is
-    # trusted; a PR whose diff deletes or renames the stub still holds.
-    _hs_pr_touches_stub "${PR_INPUT:-}" && return 2
-    return 0
+    return 2
   fi
   [ "$head_blob" = "$base_blob" ] || return 2
-}
-
-# _hs_pr_files <pr>: prints each changed path (and old path of a rename) of the PR.
-_hs_pr_files() {
-  gh api --paginate "repos/$GH_REPO/pulls/$1/files" --jq '.[] | .filename, (.previous_filename // empty)'
-}
-
-# _hs_pr_touches_stub <pr>: rc 0 when the PR's file list names the stub, or the
-# list cannot be read (fail closed); rc 1 only for a list that omits the stub.
-# HS_PR_FILES_FN overrides the fetcher (tests).
-_hs_pr_touches_stub() {
-  local pr="${1:-}" files
-  hs_pr_number_ok "$pr" || return 0
-  files=$("${HS_PR_FILES_FN:-_hs_pr_files}" "$pr") || return 0
-  printf '%s\n' "$files" | grep -qxF "$HS_TRIGGER_PATH" && return 0
-  return 1
 }
 
 # hs_resolve_pr <head_sha> <fetch_fn>: fetch_fn <sha> prints GET repos/<repo>/commits/<sha>/pulls.

@@ -82,7 +82,7 @@ def _audit(event, args):
                 _hit("audit:open-write")
         elif _denied(event, phase):
             _hit(f"audit:{event}")
-    except BaseException:  # noqa: BLE001 — a raising hook would abort the replayed call
+    except Exception:  # noqa: BLE001 — a raising hook would abort the replayed call
         _hit("audit:hook-error")
 
 

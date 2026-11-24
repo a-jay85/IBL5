@@ -2327,6 +2327,12 @@ fi
 # Every flow runs real ticks: tick N launches, the stub hands tick N+1 the canned result, and
 # tick N+1 settles it and then qualifies.
 TODAY_STR="$(date +%F)"
+# retries_is <pr> <n>: retries/<pr> reads "<day> <n>", where <day> is TODAY_STR or the day now.
+# The suite can cross midnight between setting TODAY_STR and a tick writing the ledger.
+retries_is() {
+    local v; v="$(retries "$1")"
+    [[ "$v" == "$TODAY_STR $2" || "$v" == "$(date +%F) $2" ]]
+}
 DIRTY101='101|branch-one|aaa1111|DIRTY|false'
 WAIT_NOTE='skip PR 101: retry cap (head aaa1111; rebase conflict, waiting for a new master tip)'
 CAP_NOTE='skip PR 101: retry cap (head aaa1111; rebase conflict, daily cap of 2 launches reached)'
@@ -2353,7 +2359,7 @@ run_tick
 set_tip e0002
 run_tick
 [[ "$(launch_count)" == "2" ]] || fail "conflict-new-tip-launched: launches $(launch_count), want 2"
-[[ "$(retries 101)" == "$TODAY_STR 2" ]] || fail "conflict-new-tip-launched: retries/101 is '$(retries 101)'"
+retries_is 101 2 || fail "conflict-new-tip-launched: retries/101 is '$(retries 101)'"
 end_case conflict-new-tip-launched
 fi
 
@@ -2374,7 +2380,7 @@ printf '2000-01-01 2\n' > "$STATE_DIR/retries/101"
 set_tip e0004
 run_tick
 [[ "$(launch_count)" == "3" ]] || fail "conflict-day-rollover: launches $(launch_count), want 3"
-[[ "$(retries 101)" == "$TODAY_STR 1" ]] || fail "conflict-day-rollover: retries/101 is '$(retries 101)'"
+retries_is 101 1 || fail "conflict-day-rollover: retries/101 is '$(retries 101)'"
 end_case conflict-third-launch-skipped
 fi
 
@@ -2450,7 +2456,7 @@ run_tick
 set_tip e0002
 run_tick --dry-run
 out_has 'would run:' || fail "conflict-dry-run-no-ledger: dry run did not qualify the PR: $OUT"
-[[ "$(retries 101)" == "$TODAY_STR 1" ]] || fail "conflict-dry-run-no-ledger: retries/101 is '$(retries 101)'"
+retries_is 101 1 || fail "conflict-dry-run-no-ledger: retries/101 is '$(retries 101)'"
 [[ "$(pending_count)" == "0" ]] || fail "conflict-dry-run-no-ledger: dry run wrote pending/"
 [[ "$(launch_count)" == "1" ]] || fail "conflict-dry-run-no-ledger: dry run launched"
 end_case conflict-dry-run-no-ledger
@@ -2668,7 +2674,7 @@ conflict_prefix
 set_tip_raw "$P_M2"; run_tick
 [[ "$(launch_count)" == "1" ]] || fail "conflict-unchanged-skipped: relaunched, count $(launch_count)"
 out_has "$UNCH_NOTE" || fail "conflict-unchanged-skipped: no unchanged note: $OUT"
-[[ "$(retries 101)" == "$TODAY_STR 1" ]] || fail "conflict-unchanged-skipped: retries/101 is '$(retries 101)'"
+retries_is 101 1 || fail "conflict-unchanged-skipped: retries/101 is '$(retries 101)'"
 [[ "$(sed -n '1p' "$STATE_DIR/conflict-hold/101")" == "$P_M2" ]] \
     || fail "conflict-unchanged-skipped: hold tip not advanced"
 run_tick

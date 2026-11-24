@@ -383,8 +383,8 @@ final class CareerLeaderboardsViewTest extends TestCase
         $this->assertStringContainsString('class="d-card d-card-border bg-base-200 p-4 mb-6 mx-4">', $html);
         $this->assertStringContainsString('<div class="flex flex-col items-stretch gap-3 md:flex-row md:flex-wrap md:items-center md:justify-center md:gap-4">', $html);
         $this->assertStringContainsString('<div class="flex justify-center mt-4">', $html);
-        $this->assertStringContainsString('<select id="cl-phase" name="phase" class="d-select d-select-sm w-auto">', $html);
-        $this->assertStringContainsString('name="display" class="d-input d-input-sm w-20"', $html);
+        $this->assertStringContainsString('<select id="cl-phase" name="phase" class="d-select w-auto">', $html);
+        $this->assertStringContainsString('name="display" class="d-input w-20"', $html);
         $this->assertStringContainsString('<fieldset class="ibl-segmented">', $html);
         $this->assertStringContainsString('class="ibl-switch__input"', $html);
         $this->assertStringNotContainsString('d-toggle', $html);

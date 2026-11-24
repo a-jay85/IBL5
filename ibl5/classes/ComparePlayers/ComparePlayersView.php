@@ -42,15 +42,15 @@ class ComparePlayersView implements ComparePlayersViewInterface
 
         $output .= '<div class="flex items-center gap-2">';
         $output .= '<label class="d-label" for="Player1">Player 1</label>';
-        $output .= '<input type="text" name="Player1" id="Player1" class="d-input d-input-sm w-40" list="player-names" placeholder="Search player..." autocomplete="off">';
+        $output .= '<input type="text" name="Player1" id="Player1" class="d-input w-40" list="player-names" placeholder="Search player..." autocomplete="off">';
         $output .= '</div>';
 
         $output .= '<div class="flex items-center gap-2">';
         $output .= '<label class="d-label" for="Player2">Player 2</label>';
-        $output .= '<input type="text" name="Player2" id="Player2" class="d-input d-input-sm w-40" list="player-names" placeholder="Search player..." autocomplete="off">';
+        $output .= '<input type="text" name="Player2" id="Player2" class="d-input w-40" list="player-names" placeholder="Search player..." autocomplete="off">';
         $output .= '</div>';
 
-        $output .= '<button type="submit" class="d-btn d-btn-primary d-btn-sm">Compare</button>';
+        $output .= '<button type="submit" class="d-btn d-btn-primary">Compare</button>';
 
         $output .= '</div>';
         $output .= '</form>';

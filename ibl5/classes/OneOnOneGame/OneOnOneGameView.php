@@ -38,7 +38,7 @@ class OneOnOneGameView implements OneOnOneGameViewInterface
 
         $html .= '<div class="flex items-center gap-2">' . "\n";
         $html .= '<label class="d-label" for="pid1">Player One</label>' . "\n";
-        $html .= '<select name="pid1" id="pid1" class="d-select d-select-sm w-auto">' . "\n";
+        $html .= '<select name="pid1" id="pid1" class="d-select w-auto">' . "\n";
 
         foreach ($players as $player) {
             $pid = $player['pid'];
@@ -52,7 +52,7 @@ class OneOnOneGameView implements OneOnOneGameViewInterface
 
         $html .= '<div class="flex items-center gap-2">' . "\n";
         $html .= '<label class="d-label" for="pid2">Player Two</label>' . "\n";
-        $html .= '<select name="pid2" id="pid2" class="d-select d-select-sm w-auto">' . "\n";
+        $html .= '<select name="pid2" id="pid2" class="d-select w-auto">' . "\n";
 
         foreach ($players as $player) {
             $pid = $player['pid'];
@@ -64,7 +64,7 @@ class OneOnOneGameView implements OneOnOneGameViewInterface
         $html .= '</select>' . "\n";
         $html .= '</div>' . "\n";
 
-        $html .= '<button type="submit" class="d-btn d-btn-primary d-btn-sm">Begin One-on-One Match</button>' . "\n";
+        $html .= '<button type="submit" class="d-btn d-btn-primary">Begin One-on-One Match</button>' . "\n";
 
         $html .= '</div>' . "\n";
         $html .= '</form>' . "\n";
@@ -81,9 +81,9 @@ class OneOnOneGameView implements OneOnOneGameViewInterface
             . '<div class="flex flex-wrap items-center justify-center gap-4">' . "\n"
             . '<div class="flex items-center gap-2">' . "\n"
             . '<label class="d-label" for="gameid">Review Old Game (Game ID)</label>' . "\n"
-            . '<input type="text" name="gameid" id="gameid" class="d-input d-input-sm w-40">' . "\n"
+            . '<input type="text" name="gameid" id="gameid" class="d-input w-40">' . "\n"
             . '</div>' . "\n"
-            . '<button type="submit" class="d-btn d-btn-primary d-btn-sm">Review Old Game</button>' . "\n"
+            . '<button type="submit" class="d-btn d-btn-primary">Review Old Game</button>' . "\n"
             . '</div>' . "\n"
             . '</form>' . "\n";
     }

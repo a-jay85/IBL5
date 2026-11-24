@@ -51,17 +51,17 @@ class AwardHistoryView implements AwardHistoryViewInterface
         $output .= '<div class="flex flex-wrap items-center justify-center gap-4">';
         $output .= '<div class="flex items-center gap-2">';
         $output .= '<label class="d-label" for="aw_name">Name</label>';
-        $output .= '<input type="text" name="aw_name" id="aw_name" value="' . $name . '" placeholder="Player name..." class="d-input d-input-sm w-40">';
+        $output .= '<input type="text" name="aw_name" id="aw_name" value="' . $name . '" placeholder="Player name..." class="d-input w-40">';
         $output .= '</div>';
 
         $output .= '<div class="flex items-center gap-2">';
         $output .= '<label class="d-label" for="aw_Award">Award</label>';
-        $output .= '<input type="text" name="aw_Award" id="aw_Award" value="' . $award . '" placeholder="Award name..." class="d-input d-input-sm w-40">';
+        $output .= '<input type="text" name="aw_Award" id="aw_Award" value="' . $award . '" placeholder="Award name..." class="d-input w-40">';
         $output .= '</div>';
 
         $output .= '<div class="flex items-center gap-2">';
         $output .= '<label class="d-label" for="aw_year">Year</label>';
-        $output .= '<input type="text" name="aw_year" id="aw_year" value="' . $year . '" placeholder="Year" class="d-input d-input-sm w-20">';
+        $output .= '<input type="text" name="aw_year" id="aw_year" value="' . $year . '" placeholder="Year" class="d-input w-20">';
         $output .= '</div>';
         $output .= '</div>';
 
@@ -80,7 +80,7 @@ class AwardHistoryView implements AwardHistoryViewInterface
         }
         $output .= '</div>';
 
-        $output .= '<button type="submit" class="d-btn d-btn-primary d-btn-sm">Search</button>';
+        $output .= '<button type="submit" class="d-btn d-btn-primary">Search</button>';
         $output .= '</div>';
 
         $output .= '</form>';

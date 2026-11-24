@@ -75,7 +75,7 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
     <div class="flex flex-col items-stretch gap-3 md:flex-row md:flex-wrap md:items-center md:justify-center md:gap-4">
         <div class="flex w-full items-center justify-between gap-2 md:w-auto md:justify-start">
             <label for="cl-phase" class="d-label">Phase:</label>
-            <select id="cl-phase" name="phase" class="d-select d-select-sm w-auto">
+            <select id="cl-phase" name="phase" class="d-select w-auto">
                 <?php foreach ($phases as $key => $label): ?>
                     <option value="<?= HtmlSanitizer::e($key) ?>" data-has-averages="<?= $this->service->phaseHasAverages($key) ? '1' : '0' ?>" data-shows-games="<?= $this->service->phaseShowsGames($key) ? '1' : '0' ?>"<?= ($phase === $key) ? ' selected' : '' ?>><?= HtmlSanitizer::e($label) ?></option>
                 <?php endforeach; ?>
@@ -97,7 +97,7 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
         </div>
         <div class="flex w-full items-center justify-between gap-2 md:w-auto md:justify-start">
             <label for="cl-sortby" class="d-label">Sort By:</label>
-            <select id="cl-sortby" name="sortby" class="d-select d-select-sm w-auto">
+            <select id="cl-sortby" name="sortby" class="d-select w-auto">
                 <?php foreach ($sortOptions as $key => $label): ?>
                     <option value="<?= HtmlSanitizer::e($key) ?>"<?= ($sortKey === $key) ? ' selected' : '' ?><?= ($key === 'GAMES' && !$showsGames) ? ' disabled' : '' ?>><?= HtmlSanitizer::e($label) ?></option>
                 <?php endforeach; ?>
@@ -112,12 +112,12 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
         </div>
         <div class="flex w-full items-center justify-between gap-2 md:w-auto md:justify-start">
             <label for="cl-limit" class="d-label">Results Limit:</label>
-            <input id="cl-limit" type="number" name="display" class="d-input d-input-sm w-20" value="<?= HtmlSanitizer::e($display) ?>" min="1" placeholder="50">
+            <input id="cl-limit" type="number" name="display" class="d-input w-20" value="<?= HtmlSanitizer::e($display) ?>" min="1" placeholder="50">
         </div>
     </div>
     <input type="hidden" name="submitted" value="1">
     <div class="flex justify-center mt-4">
-        <button type="submit" class="d-btn d-btn-primary d-btn-sm">Search</button>
+        <button type="submit" class="d-btn d-btn-primary">Search</button>
     </div>
 </form>
 <script src="jslib/career-leaderboards-form.js" defer></script>

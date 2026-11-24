@@ -67,7 +67,7 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
     <div class="flex flex-col items-stretch gap-3 md:flex-row md:flex-wrap md:items-center md:justify-center md:gap-4">
         <div class="flex w-full items-center justify-between gap-2 md:w-auto md:justify-start">
             <label for="sl-team" class="d-label">Team:</label>
-            <select id="sl-team" name="team" class="d-select d-select-sm w-auto">
+            <select id="sl-team" name="team" class="d-select w-auto">
                 <option value="0">All</option>
                 <?php foreach ($teams as $team): ?>
                 <option value="<?= (int)$team['teamid'] ?>"<?= ($selectedTeam === (int)$team['teamid']) ? ' selected' : '' ?>><?= HtmlSanitizer::e($team['Team']) ?></option>
@@ -76,7 +76,7 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
         </div>
         <div class="flex w-full items-center justify-between gap-2 md:w-auto md:justify-start">
             <label for="sl-year" class="d-label">Year:</label>
-            <select id="sl-year" name="year" class="d-select d-select-sm w-auto">
+            <select id="sl-year" name="year" class="d-select w-auto">
                 <option value="">All</option>
                 <?php foreach ($years as $year): ?>
                 <option value="<?= (int)$year ?>"<?= ($selectedYear === (string)$year) ? ' selected' : '' ?>><?= (int)$year ?></option>
@@ -85,7 +85,7 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
         </div>
         <div class="flex w-full items-center justify-between gap-2 md:w-auto md:justify-start">
             <label for="sl-sortby" class="d-label">Sort By:</label>
-            <select id="sl-sortby" name="sortby" class="d-select d-select-sm w-auto">
+            <select id="sl-sortby" name="sortby" class="d-select w-auto">
                 <?php foreach ($sortOptions as $key => $label): ?>
                 <option value="<?= HtmlSanitizer::e($key) ?>"<?= ($key === $selectedSort) ? ' selected' : '' ?>><?= HtmlSanitizer::e($label) ?></option>
                 <?php endforeach; ?>
@@ -93,12 +93,12 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
         </div>
         <div class="flex w-full items-center justify-between gap-2 md:w-auto md:justify-start">
             <label for="sl-limit" class="d-label">Results Limit:</label>
-            <input id="sl-limit" type="number" name="limit" class="d-input d-input-sm w-20" value="<?= HtmlSanitizer::e($limitValue) ?>" min="1" placeholder="50">
+            <input id="sl-limit" type="number" name="limit" class="d-input w-20" value="<?= HtmlSanitizer::e($limitValue) ?>" min="1" placeholder="50">
         </div>
     </div>
     <input type="hidden" name="submitted" value="1">
     <div class="flex justify-center mt-4">
-        <button type="submit" class="d-btn d-btn-primary d-btn-sm">Search</button>
+        <button type="submit" class="d-btn d-btn-primary">Search</button>
     </div>
 </form>
         <?php

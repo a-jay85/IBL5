@@ -66,10 +66,10 @@ class ComparePlayersViewGoldenTest extends TestCase
 <h1 class="ibl-title">Compare Players</h1>
 <form action="modules.php?name=ComparePlayers" method="POST" class="d-card d-card-border bg-base-200 p-4 mb-6"><div class="flex flex-wrap items-center justify-center gap-4"><div class="flex items-center gap-2">
 <label class="d-label" for="Player1">Player 1</label>
-<input type="text" name="Player1" id="Player1" class="d-input d-input-sm w-40" list="player-names" placeholder="Search player..." autocomplete="off"></div><div class="flex items-center gap-2">
+<input type="text" name="Player1" id="Player1" class="d-input w-40" list="player-names" placeholder="Search player..." autocomplete="off"></div><div class="flex items-center gap-2">
 <label class="d-label" for="Player2">Player 2</label>
-<input type="text" name="Player2" id="Player2" class="d-input d-input-sm w-40" list="player-names" placeholder="Search player..." autocomplete="off"></div>
-<button type="submit" class="d-btn d-btn-primary d-btn-sm">Compare</button></div>
+<input type="text" name="Player2" id="Player2" class="d-input w-40" list="player-names" placeholder="Search player..." autocomplete="off"></div>
+<button type="submit" class="d-btn d-btn-primary">Compare</button></div>
 </form>
 <datalist id="player-names">
 <option value="Plain Name">
@@ -87,10 +87,10 @@ HTML), $html);
 <h1 class="ibl-title">Compare Players</h1>
 <form action="modules.php?name=ComparePlayers" method="POST" class="d-card d-card-border bg-base-200 p-4 mb-6"><div class="flex flex-wrap items-center justify-center gap-4"><div class="flex items-center gap-2">
 <label class="d-label" for="Player1">Player 1</label>
-<input type="text" name="Player1" id="Player1" class="d-input d-input-sm w-40" list="player-names" placeholder="Search player..." autocomplete="off"></div><div class="flex items-center gap-2">
+<input type="text" name="Player1" id="Player1" class="d-input w-40" list="player-names" placeholder="Search player..." autocomplete="off"></div><div class="flex items-center gap-2">
 <label class="d-label" for="Player2">Player 2</label>
-<input type="text" name="Player2" id="Player2" class="d-input d-input-sm w-40" list="player-names" placeholder="Search player..." autocomplete="off"></div>
-<button type="submit" class="d-btn d-btn-primary d-btn-sm">Compare</button></div>
+<input type="text" name="Player2" id="Player2" class="d-input w-40" list="player-names" placeholder="Search player..." autocomplete="off"></div>
+<button type="submit" class="d-btn d-btn-primary">Compare</button></div>
 </form>
 <datalist id="player-names">
 </datalist>

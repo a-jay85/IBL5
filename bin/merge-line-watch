@@ -78,10 +78,13 @@ say() { echo "[$(ts)] $*"; }
 
 master_sha() { "$GH_CMD" api "repos/$REPO/commits/master" --jq .sha 2>/dev/null; }
 
-# One head-of-line pass. The selector returns action=unknown while GitHub is
-# still computing mergeability, so retry a few times before giving up.
-run_pass() {
-    local out action="" head="" i err skipped list entry why
+# Ask the selector for the head of the line. Sets out, action and head in the
+# caller's scope. The selector returns action=unknown while GitHub is still
+# computing mergeability, so retry a few times before giving up. Returns 1
+# when the selector itself fails.
+select_head() {
+    local i
+    action="" head=""
     for ((i = 1; i <= RETRIES; i++)); do
         if ! out=$("$SELECT_CMD" --live --repo "$REPO" --summary /dev/null 2>&1); then
             say "select failed: $out"
@@ -92,6 +95,13 @@ run_pass() {
         [ "$action" = "unknown" ] || break
         [ "$i" -lt "$RETRIES" ] && sleep "$RETRY_WAIT"
     done
+    return 0
+}
+
+# One head-of-line pass.
+run_pass() {
+    local out action head err skipped list entry why pr
+    select_head || return 1
 
     # Terminal-only. The workflow owns the skip-notice comments on GitHub.
     skipped=$(sed -n 's/^skipped=//p' <<<"$out")
@@ -119,7 +129,24 @@ run_pass() {
     if err=$("$GH_CMD" api -X PUT "repos/$REPO/pulls/$head/update-branch" 2>&1); then
         say "updated PR #$head onto master"
     else
-        say "update-branch FAILED for #$head: ${err:0:150}"
+        # The update-behind-prs workflow runs the same pass and can update the
+        # head a second earlier. GitHub then refuses this call. Ask the selector
+        # again: when the PR no longer needs an update, or is no longer the
+        # head, another updater got there first and this pass has nothing left
+        # to do. Any other answer, including a still-unknown one, is a failure.
+        # GitHub can report the old BEHIND state for a moment after the other
+        # updater's push, so wait one retry interval before asking.
+        pr=$head
+        sleep "$RETRY_WAIT"
+        if select_head && [ "$action" != "update" ] && [ "$action" != "unknown" ]; then
+            say "PR #$pr already updated by another updater (now action=$action head=$head)"
+            return 0
+        fi
+        if [ "$action" = "update" ] && [ "$head" != "$pr" ]; then
+            say "PR #$pr is no longer the head (now #$head); leaving it for the next pass"
+            return 0
+        fi
+        say "update-branch FAILED for #$pr: ${err:0:150}"
         return 1
     fi
 }

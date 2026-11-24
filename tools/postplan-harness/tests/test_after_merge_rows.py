@@ -231,6 +231,8 @@ _PARITY_BODIES = {
     "blockquote-fence": "## After merge\n> ```\n- **Row 1** [manual] — real\n> ```\n",
     "checkbox-and-link": ("## After merge\n- [ ] **Row 1** [manual] — box\n"
                           "- **Row 2** [see](https://example.com) — link\n"),
+    "non-canonical-row": ("## After merge\n- **Row 3:** run the installer on the Mac\n"
+                          "- [ ] **Row** no number\n- **Row 4** [manual] — canonical\n"),
 }
 
 

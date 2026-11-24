@@ -543,7 +543,10 @@ _AM_ROW_RE = re.compile(
     r"^- (?:\[ \] )?\*\*Row (?P<num>[0-9]+)\*\*\s*(?:\[(?P<tag>[^\]]*)\](?!\())?\s*(?:—\s*)?(?P<text>.*)$")
 
 
-_AM_FENCE_RE = re.compile(r"^\s*(```|~~~)")
+# The bash row filter, `^- (\[ \] )?\*\*Row` in pmr_rows. Canonical rows match _AM_ROW_RE first.
+_AM_LOOSE_ROW_RE = re.compile(r"^- (?:\[ \] )?")
+_AM_LOOSE_ROW_HEAD = re.compile(r"^- (?:\[ \] )?\*\*Row")
+_AM_FENCE_RE =re.compile(r"^\s*(```|~~~)")
 _AM_END_ANCHOR = "<!-- after-merge:end -->"
 
 
@@ -596,6 +599,12 @@ def parse_after_merge_section(content: str) -> list[manual_rows.ManualRow]:
             rows.append(manual_rows.ManualRow(
                 number=m["num"], text=m["text"].strip(), raw=line.rstrip(),
                 post_merge_reason="plan After merge section", tag=(m["tag"] or "").strip()))
+        elif inside and _AM_LOOSE_ROW_HEAD.match(line):
+            # pmr_rows takes any `- **Row...` line and pmr_parse_row reads a non-canonical
+            # one as a manual row with the whole line as text. Keep it so the PR body lists it.
+            rows.append(manual_rows.ManualRow(
+                number="?", text=_AM_LOOSE_ROW_RE.sub("", line.rstrip(), count=1).strip(),
+                raw=line.rstrip(), post_merge_reason="plan After merge section", tag=""))
     return rows
 
 

@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Tests for postplan_holdrepeat_decline in bin/post-plan-now (repeat-hold pre-flight decline)."""
 from __future__ import annotations
 
@@ -220,3 +221,9 @@ def test_owner_only_record_state_changed_proceeds(tmp_path):
     r = _run_ppn(tmp_path, args=("--state-changed",), extra_env={"HARNESS": str(h)})
     assert r.returncode != 8, f"stdout={r.stdout!r} stderr={r.stderr!r}"
     assert "post-plan DECLINED" not in r.stdout
+
+
+if __name__ == "__main__":
+    # The plan matrix cell is this file path alone, so the file runs itself.
+    import pytest
+    sys.exit(pytest.main(["-q", __file__]))

@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Phase 6.5 hold-repeat wiring in runner.py: record, one-shot DM, RESULT note.
 
 The record is advisory. These tests drive runner.run() in replay mode to a HELD
@@ -388,3 +389,9 @@ def test_record_hold_repeat_passes_fidelity(tmp_path, monkeypatch):
     state = str(tmp_path / "state")
     runner._record_hold_repeat(res, decision, SLUG, str(tmp_path), state, lambda s: None)
     assert holdrepeat.load_record(state, SLUG)["hold_kinds"] == ["12:kept-unplanned-scope"]
+
+
+if __name__ == "__main__":
+    # The plan matrix cell is this file path alone, so the file runs itself.
+    import pytest
+    sys.exit(pytest.main(["-q", __file__]))

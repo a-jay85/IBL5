@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Owner-only hold kinds in holdrepeat: 18 with SELF-GOVERNING, and 12 with kept scope only.
 
 Records are seeded through `holdrepeat.observe`, the production writer.
@@ -211,3 +212,9 @@ def test_check_message_plan_vs_blind(tmp_path, monkeypatch, capsys):
 
 def test_kinds_never_enter_structural_key():
     assert hr.structural_key([_cond(12), _cond(18, SG)]) == ""
+
+
+if __name__ == "__main__":
+    # The plan matrix cell is this file path alone, so the file runs itself.
+    import pytest
+    sys.exit(pytest.main(["-q", __file__]))

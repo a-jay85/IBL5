@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Phase 5.5: a round that cannot clear a kept [unplanned-scope] blocker skips the re-review."""
 from __future__ import annotations
 
@@ -118,3 +119,9 @@ def test_helper_true_for_kept_only_verdict(tmp_path):
     assert runner._kept_scope_only_round(str(path), [{"text": KEEP_ITEM}]) is True
     path.write_text(_review(KEEP_ITEM, BODY_CLAIM_ITEM), encoding="utf-8")
     assert runner._kept_scope_only_round(str(path), [{"text": KEEP_ITEM}]) is False
+
+
+if __name__ == "__main__":
+    # The plan matrix cell is this file path alone, so the file runs itself.
+    import pytest
+    sys.exit(pytest.main(["-q", __file__]))

@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Tests for harness/holdrepeat_replay.py: corpus replay of the repeat-hold detector."""
 from __future__ import annotations
 
@@ -88,3 +89,9 @@ def test_owner_only_replay_no_decline_of_armed_run():
 
 def test_owner_only_replay_no_skip_of_cleared_round():
     assert _owner_only_report()["skipped_then_cleared"] == 0
+
+
+if __name__ == "__main__":
+    # The plan matrix cell is this file path alone, so the file runs itself.
+    import pytest
+    sys.exit(pytest.main(["-q", __file__]))

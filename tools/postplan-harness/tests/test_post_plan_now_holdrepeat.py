@@ -177,3 +177,46 @@ def test_explicit_plan_path_is_the_one_fingerprinted(tmp_path):
     assert "rc=0" in r.stdout
     # Control: without the explicit path the fallback reads the decoy, so the check proceeds.
     assert "rc=1" in _decline(root, plans_dir, state, slug).stdout
+
+
+# --- owner-only decline wording (hold kinds 12 kept scope and 18 self-governing) -----------------
+
+OWNER_ONLY_RESULT = ("RESULT: post-plan DECLINED — waiting on owner approval and nothing changed "
+                     "since; no tokens spent, no PR change. Override: bin/post-plan-now --force")
+
+
+def _owner_only_harness(tmp_path):
+    """A stub HARNESS whose `holdrepeat check` prints the owner-only DECLINE line and exits 10."""
+    from test_post_plan_now_fallback import _holdrepeat_harness
+    h = _holdrepeat_harness(tmp_path)
+    (h / "harness" / "holdrepeat.py").write_text(
+        "import sys\n"
+        "if sys.argv[1:2] == ['check']:\n"
+        "    print('holdrepeat: DECLINE unchanged plan+diff+harness; owner-only hold "
+        "(owner approval). Waiting on owner approval.')\n"
+        "    sys.exit(10)\n")
+    return h
+
+
+def test_owner_only_decline_result_line(tmp_path):
+    from test_post_plan_now_fallback import _run_ppn
+    h = _owner_only_harness(tmp_path)
+    r = _run_ppn(tmp_path, extra_env={"HARNESS": str(h)})
+    assert r.returncode == 8, f"stdout={r.stdout!r} stderr={r.stderr!r}"
+    assert OWNER_ONLY_RESULT in r.stdout
+
+
+def test_owner_only_record_force_proceeds(tmp_path):
+    from test_post_plan_now_fallback import _run_ppn
+    h = _owner_only_harness(tmp_path)
+    r = _run_ppn(tmp_path, args=("--force",), extra_env={"HARNESS": str(h)})
+    assert r.returncode != 8, f"stdout={r.stdout!r} stderr={r.stderr!r}"
+    assert "post-plan DECLINED" not in r.stdout
+
+
+def test_owner_only_record_state_changed_proceeds(tmp_path):
+    from test_post_plan_now_fallback import _run_ppn
+    h = _owner_only_harness(tmp_path)
+    r = _run_ppn(tmp_path, args=("--state-changed",), extra_env={"HARNESS": str(h)})
+    assert r.returncode != 8, f"stdout={r.stdout!r} stderr={r.stderr!r}"
+    assert "post-plan DECLINED" not in r.stdout

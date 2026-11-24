@@ -1,6 +1,7 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Re-measures the owner-after-merge prose detector in bin/lib/post-merge-rows.sh.
 # Usage (repo root): bash bin/fixtures/after-merge-prose/measure.sh prs|plans
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -uo pipefail
 root="$(cd "$(dirname "$0")/../../.." && pwd)"
 source "$root/bin/lib/post-merge-rows.sh"

@@ -42,7 +42,7 @@ DENY_PREFIXES = ("os.", "shutil.", "subprocess.", "socket.", "tempfile.", "ctype
                  "http.", "urllib.", "smtplib.", "ftplib.", "poplib.", "imaplib.", "nntplib.",
                  "telnetlib.", "fcntl.", "mmap.", "resource.", "signal.", "syslog.",
                  "webbrowser.", "winreg.", "_winapi.", "msvcrt.", "builtins.input",
-                 "builtins.breakpoint")
+                 "builtins.breakpoint", "_thread.")  # `_thread.` raises on 3.13+ only; see _call
 READ_ONLY_EVENTS = frozenset({"os.listdir", "os.scandir", "os.walk", "os.fwalk", "os.getxattr",
                               "os.listxattr", "os.listdrives", "os.listmounts", "os.listvolumes"})
 CALL_ONLY_EVENTS = frozenset({"object.__setattr__", "object.__delattr__", "sys.settrace",
@@ -219,6 +219,9 @@ def _call(fn_lookup, *args, **optional):
     kw = {k: v for k, v in optional.items() if var_kw or k in params}
     _WATCH["where"] = getattr(fn, "__qualname__", "?")
     before = _untraced(_arg_copy, args, kw)
+    # A thread start raises no audit event before 3.13 and `atexit.register` never does, so a
+    # call that leaves either behind is recorded here, whatever the deferred code does later.
+    threads_before, exits_before = set(threading.enumerate()), atexit._ncallbacks()
     _WATCH["phase"] = "call"
     try:
         value = fn(*args, **kw)
@@ -228,6 +231,10 @@ def _call(fn_lookup, *args, **optional):
         raised = None
     finally:
         _WATCH["phase"] = "between"
+    if any(t.is_alive() for t in set(threading.enumerate()) - threads_before):
+        _hit("thread-started")
+    if atexit._ncallbacks() != exits_before:
+        _hit("atexit-registered")
     _untraced(_arg_check, args, kw, before)
     if raised is not None:
         return raised, None

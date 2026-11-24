@@ -47,7 +47,7 @@ The stage defends 21 bypass classes:
 14. Reworded hold text counts as a lost item.
 15. The cross-run sticky channel must stay equal.
 16. A change reachable from an LLM-input root holds as `fidelity-unreplayed-channel`.
-17. Side effects and argument mutation: runtime watches in the driver subprocess: an audit hook that records write-mode `open` events and the `os.`, `shutil.`, `subprocess.`, `socket.`, `tempfile.` and `ctypes.` event families; a deepcopy compare of every replayed root's arguments; a per-record snapshot of side-module globals and `os.environ`. Anything the watch cannot copy or compare holds. A changed-line static check covers inputs the corpus never has.
+17. Side effects and argument mutation: runtime watches in the driver subprocess: an audit hook that records write-mode `open` events and the `os.`, `shutil.`, `subprocess.`, `socket.`, `tempfile.` and `ctypes.` event families; a deepcopy compare of every replayed root's arguments; a per-record snapshot of side-module globals and `os.environ`; a check after each replayed call that records a live thread or a new `atexit` callback the call left behind. Anything the watch cannot copy or compare holds. A changed-line static check covers inputs the corpus never has.
 18. A function reachable from replayed and unreplayed roots holds through the unreplayed root.
 19. Signature drift: each side gets only the keywords its own signature names, and a raise counts as looser.
 20. A new production caller on the candidate side: roots come from both sides.

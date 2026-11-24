@@ -978,6 +978,28 @@ def test_deferred_write_after_a_replayed_call_is_recorded(tmp_path, kind):
     assert any(" import " not in e for e in effects), effects
 
 
+_DEFERRED_SETUPS = {
+    # no write at all: leaving a thread running or an exit callback behind is itself the hit
+    "thread-started": ("import threading as _thr\n",
+                       "    _thr.Thread(target=_thr.Event().wait, args=(0.5,), daemon=True).start()\n"),
+    "atexit-registered": ("import atexit as _ax\n", "    _ax.register(int)\n"),
+}
+
+
+@pytest.mark.parametrize("kind", sorted(_DEFERRED_SETUPS))
+def test_call_leaving_a_thread_or_exit_callback_is_recorded(tmp_path, kind):
+    tree = _fid_tree(tmp_path)
+    fid = tree / FIDELITY
+    module_code, call_code = _DEFERRED_SETUPS[kind]
+    fid.write_text(fid.read_text(encoding="utf-8") + "\n" + module_code
+                   + "_orig_parse_verdict = parse_verdict\n\n\ndef parse_verdict(path):\n"
+                   + call_code + "    return _orig_parse_verdict(path)\n", encoding="utf-8")
+    _, proc = _run_driver_in(tree)
+    assert proc.returncode == 0, proc.stderr
+    effects = json.loads(proc.stdout)["side_effects"]
+    assert any(e.endswith(" " + kind) for e in effects), effects
+
+
 def test_driver_output_without_side_effects_is_an_error():
     with pytest.raises(KeyError):
         fidelity_replay._fid_side({"schema": "fidelity-replay/1", "results": [], "executed": {}})

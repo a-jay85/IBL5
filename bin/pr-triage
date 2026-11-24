@@ -66,7 +66,8 @@
 # "unknown" when nothing explains the hold. Read-only; cannot combine with --arm.
 #
 # --card N prints one PR's decision-card data (head, ci, open threads, sticky verdict
-# CURRENT/STALE, merge danger, visual links, live post-plan run, worktree) in compact
+# CURRENT/STALE, merge danger, visual links, live post-plan run, worktree, owner
+# approvals with each fix-first one's amendment status) in compact
 # plain text, live. Read-only; cannot combine with --arm or --held (exit 2). Fails
 # closed: a failed fetch prints `<field>: unknown (fetch failed)` and exits 1.
 #
@@ -112,7 +113,9 @@ Options:
                gates), unresolved non-outdated review threads, the last
                pr-ready-verdict sticky (CURRENT or STALE against the head tree),
                the Merge danger line, visual-review URLs, a live post-plan run
-               label and the worktree. N must be a positive integer. Read-only;
+               label, the worktree and the owner approvals (approve and
+               fix-first markers, oldest first, with each fix-first one's
+               Owner amendments status). N must be a positive integer. Read-only;
                cannot be combined with --arm or --held (exit 2). A failed fetch
                prints `<field>: unknown (fetch failed)` and exits 1.
   --help, -h   Show this message.
@@ -452,6 +455,31 @@ card_main() {
         card_unknown live-run
         card_unknown worktree
     fi
+
+    # --- owner approvals: approve and fix-first markers, and whether each fix-first one
+    # has an Owner amendments entry in the branch's plan. Parsing lives in harness/amendments.py.
+    local oa_ok="$c_ok" oa_file="" oa_plan="" oa_out=""
+    if [ "$view_ok" != 1 ]; then oa_ok=0; fi
+    if [ "$oa_ok" = 1 ]; then
+        oa_file="$(mktemp)" || oa_ok=0
+    fi
+    if [ "$oa_ok" = 1 ]; then
+        printf '%s\n' "$comments" > "$oa_file"
+        oa_plan=$(
+            unset PLAN_FILE PLAN_SLUG_DRIFT
+            PLAN_SLUG="$branch"
+            # shellcheck source=bin/lib/plan-resolve.sh
+            . "$SCRIPT_DIR/lib/plan-resolve.sh"
+            resolve_plan_file 2>/dev/null
+            printf '%s' "${PLAN_FILE:-}"
+        )
+        if [ -n "$oa_plan" ] && [ ! -f "$oa_plan" ]; then oa_plan=""; fi
+        oa_out="$(python3 -I -c 'import sys; sys.path.insert(0, sys.argv[1]); from harness import amendments; sys.exit(amendments.main(sys.argv[2:]))' \
+            "$SCRIPT_DIR/../tools/postplan-harness" card --comments "$oa_file" --head "$sha" \
+            ${oa_plan:+--plan "$oa_plan"} --pr "$n" 2>/dev/null)" || oa_ok=0
+        rm -f "$oa_file"
+    fi
+    if [ "$oa_ok" = 1 ]; then printf '%s\n' "$oa_out"; else card_unknown "Owner approvals"; fi
     return "$CARD_FAIL"
 }
 

@@ -6,6 +6,7 @@
 #   bin/owner-approve N "<owner's words>" [--option=<picked>] [--fix-first=<condition>]
 #       [--timeout=<seconds>] [--poll=<seconds>]
 #   bin/owner-approve N --finish [--timeout=<seconds>] [--poll=<seconds>]
+#   bin/owner-approve N --record-amendments
 #
 # Order: post the approval comment; wait up to --timeout seconds (default 3600,
 # polled every --poll, default 20) for any live post-plan run on N (a launchd label,
@@ -16,12 +17,14 @@
 # condition and stops. --finish later requires a new pushed head, the PR's worktree
 # clean at that head, and a bin/lib/prefire-verify pass there, then waits, checks
 # the verdict, and arms. --finish after a plain approval resumes at the wait.
+# --fix-first also adds an entry to the plan's "## Owner amendments" section, and
+# --record-amendments adds any missing entries without posting a comment (exit 0, or 1).
 # A plain approval carries to a new head (a rebase, or post-plan merging master)
 # when the PR's merge-base diff fingerprint equals the one in the approval marker,
 # so the owner never re-approves unchanged work. A changed diff still refuses.
 #
 # Run it from a Claude session through the Bash tool with run_in_background: true.
-# The last stdout line is RESULT: armed|refused|timeout|fix-first-recorded|headless|usage.
+# The last stdout line is RESULT: armed|refused|timeout|fix-first-recorded|amendments-recorded|headless|usage.
 # Exit: 0 armed; 2 usage error, nothing posted; 3 CLAUDE_HEADLESS set, nothing
 # posted; 4 not armed, a reason comment posted whenever gh can post one; 5 a
 # post-plan run was still live at --timeout, reason comment posted; 6 fix-first
@@ -49,7 +52,7 @@ OA_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=bin/lib/human-signoff-classifier.sh
 . "$OA_ROOT/bin/lib/human-signoff-classifier.sh"
 
-OA_PR="" OA_WORDS="" OA_OPTION="" OA_FIX="" OA_FINISH=0 OA_TIMEOUT=3600 OA_POLL=20 OA_WT="" OA_KEPT_ACCEPTED=0
+OA_PR="" OA_WORDS="" OA_OPTION="" OA_FIX="" OA_FINISH=0 OA_TIMEOUT=3600 OA_POLL=20 OA_WT="" OA_KEPT_ACCEPTED=0 OA_RECORD=0
 head_tree_armed="" head="" branch="" state="" labels=",," rec_mode=approve rec_head="" rec_diff="" rec_kept=false me="" comments="" verdict_word=""
 _oa_usage() { printf 'owner-approve: %s\n' "$1" >&2; printf 'RESULT: usage\n'; exit 2; }
 pos=0
@@ -61,6 +64,8 @@ while [ $# -gt 0 ]; do
         --timeout=*) OA_TIMEOUT="${1#--timeout=}" ;;
         --poll=*) OA_POLL="${1#--poll=}" ;;
         --finish) OA_FINISH=1 ;;
+        --record-amendments) OA_RECORD=1 ;;
+        --record-amendments=*) _oa_usage "--record-amendments takes no value" ;;
         --option|--fix-first|--timeout|--poll) _oa_usage "$1 needs =<value>" ;;
         --*) _oa_usage "unknown flag: $1" ;;
         *)
@@ -75,7 +80,10 @@ while [ $# -gt 0 ]; do
 done
 case "$OA_PR" in ''|0*|*[!0-9]*) _oa_usage "the first argument must be a PR number" ;; esac
 case "$OA_TIMEOUT$OA_POLL" in *[!0-9]*) _oa_usage "--timeout and --poll take whole seconds" ;; esac
-if [ "$OA_FINISH" -eq 1 ]; then
+if [ "$OA_RECORD" -eq 1 ]; then
+    if [ "$OA_FINISH" -eq 1 ] || [ -n "$OA_FIX" ]; then _oa_usage "--record-amendments cannot be combined with --fix-first or --finish"; fi
+    if [ -n "$OA_WORDS$OA_OPTION" ]; then _oa_usage "--record-amendments takes only the PR number"; fi
+elif [ "$OA_FINISH" -eq 1 ]; then
     if [ -n "$OA_WORDS$OA_OPTION$OA_FIX" ]; then _oa_usage "--finish takes only the PR number"; fi
 elif [ -z "$OA_WORDS" ]; then
     _oa_usage "pass the owner's words as the second argument"
@@ -144,6 +152,36 @@ _oa_approval_body() { # [diff fingerprint] [kept bullet lines]
         printf '\nKept unplanned changes this approval accepts:\n<!-- owner-approve:kept:begin -->\n%s\n<!-- owner-approve:kept:end -->\n' "$kept"
     fi
     printf '\n<!-- owner-approve mode=%s head=%s diff=%s -->' "$mode" "${head:-unread}" "${diff_fp:-unread}"
+}
+# Runs the owner-amendments CLI (tools/postplan-harness/harness/amendments.py).
+_oa_amendments() {
+    python3 -I -c 'import sys; sys.path.insert(0, sys.argv[1]); from harness import amendments; sys.exit(amendments.main(sys.argv[2:]))' \
+        "$OA_ROOT/tools/postplan-harness" "$@"
+}
+# <pr> <branch>: adds an Owner amendments entry to the branch's plan for each fix-first
+# approval comment not yet recorded. Returns the CLI's exit code; 3 when no plan resolves.
+_oa_record_amendments() {
+    local pr="$1" br="$2" plan rc
+    plan=$(
+        unset PLAN_FILE PLAN_SLUG_DRIFT
+        PLAN_SLUG="$br"
+        # shellcheck source=bin/lib/plan-resolve.sh
+        . "$OA_ROOT/bin/lib/plan-resolve.sh"
+        resolve_plan_file 2>/dev/null
+        printf '%s' "${PLAN_FILE:-}"
+    )
+    if [ -z "$plan" ] || [ ! -f "$plan" ]; then
+        printf 'owner-approve: no plan file for branch %s under %s, so no owner amendment was written\n' \
+            "$br" "${PLAN_DIR:-$HOME/claude-plans}" >&2
+        return 3
+    fi
+    gh api --paginate "repos/$OA_REPO/issues/$pr/comments" > "$tmpd/amend-comments.json" 2>/dev/null || {
+        printf 'owner-approve: could not read the comments on PR %s\n' "$pr" >&2
+        return 5
+    }
+    rc=0
+    _oa_amendments append --plan "$plan" --comments "$tmpd/amend-comments.json" >&2 || rc=$?
+    return "$rc"
 }
 _oa_safe() { printf '%s' "$1" | tr -cs 'A-Za-z0-9._-' '-'; }
 _oa_find_wt() { # prints the worktree checked out on $branch, or nothing
@@ -376,6 +414,18 @@ _oa_head_carry() { # <context: "the head moved" or "the re-review moved the head
     _oa_refuse 4 "$1 from $rec_head (the one the owner approved) to $head, and the PR's own changes are not the approved ones. Approve the new head again: bin/owner-approve $OA_PR \"<words>\"."
 }
 
+if [ "$OA_RECORD" -eq 1 ]; then
+    _oa_read_pr || { printf 'owner-approve: could not read PR %s with gh pr view, so its branch is unknown. Nothing written.\n' "$OA_PR" >&2; printf 'RESULT: refused\n'; exit 1; }
+    amend_rc=0
+    _oa_record_amendments "$OA_PR" "$branch" || amend_rc=$?
+    if [ "$amend_rc" -ne 0 ]; then
+        printf 'owner-approve: owner amendment not recorded (exit %s); no comment was posted\n' "$amend_rc" >&2
+        printf 'RESULT: refused\n'
+        exit 1
+    fi
+    printf 'RESULT: amendments-recorded\n'
+    exit 0
+fi
 pr_ok=1
 _oa_read_pr || pr_ok=0
 if [ "$OA_FINISH" -eq 0 ]; then rec_head=$head; fi
@@ -396,6 +446,11 @@ fi
 [ "$pr_ok" -eq 1 ] || _oa_refuse 4 "could not read PR $OA_PR with gh pr view, so its head and state are unknown."
 [ "$state" = "OPEN" ] || _oa_refuse 4 "PR $OA_PR is $state, so there is nothing to arm."
 if [ "$OA_FINISH" -eq 0 ] && [ -n "$OA_FIX" ]; then
+    amend_rc=0
+    _oa_record_amendments "$OA_PR" "$branch" || amend_rc=$?
+    if [ "$amend_rc" -ne 0 ]; then
+        printf 'owner-approve: owner amendment not recorded (exit %s); the approval comment is posted\n' "$amend_rc" >&2
+    fi
     printf 'owner-approve: fix-first condition recorded. Run bin/owner-approve %s --finish after the fix is pushed.\n' "$OA_PR" >&2
     printf 'RESULT: fix-first-recorded\n'
     exit 6

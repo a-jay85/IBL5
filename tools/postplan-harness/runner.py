@@ -1151,7 +1151,8 @@ def _run_pass(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                     packet = fidelity.build_packet(
                         out_dir, master_sha, git.head_tree(), plan, git.diff_vs_base(review.ref), body, pr,
                         phase4b_ran=getattr(res, "phase4b_code_ran", False),
-                        worktree=worktree or ".", packet_name="fidelity-packet-fix-round")
+                        worktree=worktree or ".", packet_name="fidelity-packet-fix-round",
+                        plan_text=_backed_amendments(gh, plan, pr, log)[1])
                 except HarnessError as e:
                     log(f"phase6.5-fix: fidelity packet failed ({e.kind})")
                     return {"ran": False, "reason": "packet-failed"}
@@ -3353,6 +3354,8 @@ def _partition_unplanned(work, kept_all, worktree, git, gh, plan, master_sha, bo
             _declare_kept([], None, gh, body, pr, log)   # drop a stale block
         return work, []
     ctx = _unplanned_ctx(worktree, git, plan, master_sha, None, log)
+    if ctx is not None:
+        ctx["amendments"] = _backed_amendments(gh, plan, pr, log)[0]
     work, kept, held = unplanned_scope.partition(work, ctx)
     unplanned_scope.merge_kept(kept_all, kept, (ctx or {}).get("changed_paths", ()))
     res.fidelity["held_unplanned"] = [unplanned_scope.title_of(i["text"]) for i in held]
@@ -3375,6 +3378,36 @@ def _declare_kept(kept_all, ctx, gh, body, pr, log) -> None:
             gh.pr_edit_body(pr, new)
     except (HarnessError, OSError, subprocess.SubprocessError) as e:
         log(f"phase5.5: kept-unplanned body write failed ({e.__class__.__name__}: {e})")
+
+
+def _backed_amendments(gh, plan, pr, log) -> tuple[list, str | None]:
+    """(backed owner amendments, plan text with unbacked entries stripped).
+
+    ([], None) when plan-blind or unreadable, so the packet reads the plan as before. A plan
+    with no `## Owner amendments` heading makes no gh call. Unreadable comments back no
+    entry, so the reviewer never sees an amendment the owner's comment cannot confirm.
+    """
+    if not (plan and getattr(plan, "found", False) and getattr(plan, "path", "")):
+        return [], None
+    try:
+        with open(plan.path, encoding="utf-8") as fh:
+            text = fh.read()
+    except (OSError, ValueError) as e:
+        log(f"owner-amendments: plan unreadable ({e}); packet reads the plan file")
+        return [], None
+    if not any(unplanned_scope._AMENDMENTS_HEADING_RE.match(ln) for ln in text.splitlines()):
+        return [], text
+    entries = unplanned_scope.parse_amendments(text)
+    try:
+        comments = gh.pr_comments_json(pr)
+    except Exception as exc:  # fail closed: no entry is backed
+        log(f"owner-amendments: comments unreadable; {len(entries)} entries withheld "
+            f"from the reviewer: {exc}")
+        return [], unplanned_scope.strip_unbacked(text, [])
+    backed, unbacked = unplanned_scope.backed_amendments(entries, comments)
+    for entry, reason in unbacked:
+        log(f"owner-amendments: withheld entry {entry.comment_id} ({reason})")
+    return backed, unplanned_scope.strip_unbacked(text, backed)
 
 
 def _owner_approval_evidence(gh, git, worktree, pr, log):
@@ -3409,6 +3442,8 @@ def _apply_kept_downgrade(inputs, res, git, gh, worktree, plan, master_sha, pr, 
                            for t in fidelity.blocking_finding_texts(path)):
         return
     ctx = _unplanned_ctx(worktree, git, plan, master_sha, None, log)
+    if ctx is not None:
+        ctx["amendments"] = _backed_amendments(gh, plan, pr, log)[0]
     payload = owner_intent.load(res.slug)
     approval = None
     if not unplanned_scope.downgrade_applies(path, ctx, inputs.pr_body, payload):
@@ -3429,9 +3464,15 @@ def _apply_kept_downgrade(inputs, res, git, gh, worktree, plan, master_sha, pr, 
     fid["posted_verdict"], fid["posted_source"] = word, source
     texts = fidelity.blocking_finding_texts(path)
     if approval is None:
+        amendments = (ctx or {}).get("amendments", ())
         fid["kept_owner_scope"] = [
-            {"title": unplanned_scope.title_of(t), "quote": unplanned_scope.owner_quote(t)}
+            {"title": unplanned_scope.title_of(t), "quote": unplanned_scope.owner_quote(t),
+             "source": "amendment" if unplanned_scope.amendment_covers(t, amendments) else "capture"}
             for t in texts]
+        covering = next((a for t in texts for a in amendments
+                         if unplanned_scope.amendment_covers(t, [a])), None)
+        if covering is not None:
+            log(f"phase5.5: kept scope accepted by owner amendment {covering.comment_id}")
     else:
         captured = [unplanned_scope.owner_evidence_ok(t, payload) for t in texts]
         fid["kept_owner_scope"] = [
@@ -4270,6 +4311,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
             phase4b_ran=phase4b_ran, worktree=worktree or ".",
             review_findings=review_findings, shadow_request=True,
             conflict_resolved_paths=_packet_conflict_paths(slug),
+            plan_text=_backed_amendments(gh, plan, pr, log)[1],
         )
     except HarnessError as e:
         log(f"phase5.5 fidelity: packet failed ({e.kind}) - verdict indeterminate")

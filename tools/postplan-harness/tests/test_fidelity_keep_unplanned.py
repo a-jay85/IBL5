@@ -307,7 +307,7 @@ def test_apply_kept_downgrade_posts_single_word(tmp_path, monkeypatch):
     assert runner.select_fidelity_verdict(inputs.fidelity_verdict, inputs.fidelity_verdict_2,
                                           inputs.fidelity_tree_2, inputs.current_tree)[0] == "READY"
     assert res.fidelity["kept_owner_scope"] == [
-        {"title": us.title_of(KEEP_ITEM), "quote": OWNER_WORDS}]
+        {"title": us.title_of(KEEP_ITEM), "quote": OWNER_WORDS, "source": "capture"}]
     assert res.fidelity["verdict_1"] == "NOT READY"
     assert "phase5.5: blocking findings are all kept unplanned scope; declared in PR body" in logs
 

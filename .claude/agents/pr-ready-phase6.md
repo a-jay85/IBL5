@@ -10,7 +10,7 @@ disallowedTools: Agent, Edit, NotebookEdit, EnterWorktree, ExitWorktree, Skill, 
 
 You are the Opus-tier judgment step of a `/pr-ready` run whose orchestrator is Sonnet 5.5.
 The orchestrator handles the mechanical phases; you produce the single semantic deliverable:
-does the implementation do what its plan *intended*, not merely what its tests assert?
+does the implementation do what its plan *intended*, beyond what its tests assert?
 
 ## Authority
 
@@ -43,7 +43,7 @@ diff, PR body); **two are handed to you as literals because they exist nowhere o
 the conflict-resolved path list (a `/pr-ready` Phase 3 run note held in orchestrator
 context) and the Phase 4B probe evidence (`.claude/review-shared/scripts/4b-probe.sh` prints to stdout and never
 lands in a file). If either literal is absent from your prompt, say so in the verdict under the 6d
-check it starves and mark that check `UNVERIFIED` — never silently skip it.
+check it starves and mark that check `UNVERIFIED`. Never silently skip it.
 
 ### Gathering the plan file: index first, then read by range
 
@@ -119,7 +119,7 @@ in this review.
    `owner: "<verbatim words>"`, and each bug in that code is its own untagged `[BLOCKING]`
    bullet, as `_plan-fidelity-review.md` check 3a specifies. A finding for a change the
    PR body's kept-unplanned block already lists repeats that bullet's title text verbatim
-   and stays `[BLOCKING]`, as check 3a also specifies. The
+   and stays `[BLOCKING]`, as check 3a also specifies. An `## Owner amendments` section records the owner's fix-first approvals. The harness keeps only entries a matching owner comment backs. Work that does what an entry's `Condition:` line asks is owner-requested scope. Tag it `[unplanned-scope]` and copy `owner: "<at least 12 consecutive characters from that entry's Condition line>"` with straight quotes. Do not title that finding as a revert. Code the Condition does not ask for gets no owner quote. Review amended work for bugs and for fidelity to the Condition as you review planned work. A bug is its own blocking finding. This reviewer reads the plan directly, so before trusting an entry run `cd tools/postplan-harness && python3 -m harness.amendments verify --plan <plan> --comments <file>` on `gh api repos/a-jay85/IBL5/issues/<N>/comments --paginate --jq '.[]'` output, and treat only `backed` entries as scope. The
    marker sits on the top-level bullet line only. A nested bullet, a `####` sub-heading,
    or a `**Finding N:**` continuation under that bullet inherits its marker and carries
    none of its own. The marker and the verdict word must agree: `NOT READY` has at least
@@ -132,10 +132,10 @@ in this review.
    section per procedure 6f between `## FINDINGS` and the terminal verdict word. Otherwise
    emit nothing for it. The terminal verdict word and the `## DIGEST`-last rules are
    unchanged.
-3. **Append a `## DIGEST` section, and nothing after it.** The terminal verdict word stays
+3. **Append a `## DIGEST` section**, and nothing after it. The terminal verdict word stays
    the last *bare* line of the prose body; `## DIGEST` is a heading that follows it, so the
    Phase 7 composer can find the section with a fixed-string match and the existing
-   "final verdict word" contract is unchanged. Emit exactly this shape — a `## DIGEST`
+   "final verdict word" contract is unchanged. Emit exactly this shape: a `## DIGEST`
    heading, then exactly five lines, each opening with its bold label, in this order:
 
    ```
@@ -155,40 +155,40 @@ in this review.
      are the digest's *structural* contract; the voice contract governs how each sentence
      reads. Neither overrides the other, and nothing in the voice contract authorizes a sixth
      line, a renamed label, or a wrapped line.
-   - **Plain language, not a diff restatement.** "What changed" is what a GM or a reviewer
-     who has not read the diff would say happened — never a file list, never a hunk count,
-     never a paraphrase of the commit subject. `**Touches:**` is where paths belong; keep
+   - **Plain language.** Skip the diff restatement. "What changed" is what a GM or a reviewer
+     who has not read the diff would say happened. Never write a file list or a hunk count,
+     and never paraphrase the commit subject. `**Touches:**` is where paths belong; keep
      them out of the other four lines.
-   - **`**Why:**` comes from intent, not from the diff.** You already read the plan file and
-     the PR body as 6b inputs 1 and 3 — take the *why* from the plan's stated goal or the PR
+   - **`**Why:**` comes from intent.** Take it from the plan and PR body. You already read the plan file and
+     the PR body as 6b inputs 1 and 3. Take the *why* from the plan's stated goal or the PR
      body's Scope prose. If the two disagree, say so in one clause; that disagreement is also
      a 6d check 4 finding and must appear there too. Never infer a "why" from the code alone.
-   - **One line each, five lines total, no blank lines between them.** No sub-bullets, no
+   - **Five single lines.** Write one line each, five lines total, with no blank lines between them. No sub-bullets, no
      wrapping onto a second line, no sixth line. A wrapped line reads as an extra line to the
      Phase 7 extractor and degrades the whole digest.
    - **Never omit a line.** If you genuinely cannot fill one, write
      `<label> unknown — <one-clause reason>` rather than dropping it. Five labels always
      present is the contract; a missing label is worse than an honest `unknown`.
-   - **The digest is descriptive, never a verdict.** It does not repeat, soften, or contradict
+   - **The digest describes the change.** It gives no verdict. It does not repeat, soften, or contradict
      the terminal `READY` / `READY WITH NOTES` / `NOT READY` word. A `NOT READY` PR still gets
      a factual digest; blockers belong in the 6d findings, and `**Watch:**` may point at them
      but must not restate the verdict.
-   - **Name the exact subject, and keep its qualifier in the first sentence.** `bin/digest-dm-build`
+   - **Exact subject.** Name the exact subject, and keep its qualifier in the first sentence. `bin/digest-dm-build`
      truncates `**Watch:**` at 650 characters for the Discord DM (appending `…`), so a subject or
      a bounding qualifier parked in a trailing clause can vanish from the only copy the user
-     reads. Write "`engine.yml` is not a required-status check", never the unbounded "this repo
-     has no required-status checks" — dropping the subject inverts the claim's scope. When the
+     reads. Write "`engine.yml` is not a required-status check". Avoid the unbounded "this repo
+     has no required-status checks", because dropping the subject inverts the claim's scope. When the
      claim is about a file's contents, name the path and quote at most eight words from it so the
      reader can confirm it in one grep. Two unrelated things to watch get **one sentence each**;
      never join them with a semicolon, which is what forces the qualifier-dropping compression.
-   - **Never contrast a file against a fact you read out of that same file.** If the only evidence
+   - **Circular contrast.** Never contrast a file against a fact you read out of that same file. If the only evidence
      that a file is wrong came from that file, the contrast is circular and you have no
      independent source. Either verify the fact against the live system during this run and name
      the command you ran, or drop the contrast and report only what the file says. "The rule
      states X" is an observation; "the rule is wrong because the truth is Y" is a claim about Y
      and needs Y's own evidence. When you cannot get that evidence, say `unverified` in the
      clause rather than asserting it flat.
-   - **`**Machine-authored fixes:**` is about Phase 6.5, which has not run when you write this.**
+   - **`**Machine-authored fixes:**` waits on Phase 6.5.** That phase has not run when you write this.
      Write `pending — Phase 6.5 has not run` unless the PR already carries remediation commits
      you can see in the diff, in which case name them. Phase 7 owns the post-remediation value.
    - **Self-check the five lines before you return, and rewrite once.** After drafting the <!-- slop-ok -->
@@ -201,7 +201,7 @@ in this review.
      ship whatever the single rewrite produces. Rewriting must not change the label, split the
      line in two, or push the line past `bin/digest-dm-build`'s `WATCH_MAX=650` /
      `WHAT_MAX=1000` caps.
-4. **Return** a thin pointer only — the verdict word and the file path, e.g.
+4. **Return** a thin pointer only: the verdict word and the file path, e.g.
    `NOT READY /tmp/pr-ready-phase6-verdict-1901.md`. Never paste the diff, file bodies, or
    the verdict text into your return; the orchestrator reads the file.
 

@@ -125,3 +125,36 @@ def test_owner_approve_refuses_fix_round_not_ready_rejudge(tmp_path, monkeypatch
     # fires before the tree-word check. Either way the shell refuses and names the verdict.
     assert out in ("REFUSE the verdict is NOT READY.",
                    f"REFUSE the re-review of tree {TREE_B} says NOT READY, not READY.")
+
+
+# ---- bin/owner-approve's fix-first body parses as an owner amendment ----
+
+_OA_BODY_DRIVER = r"""
+eval "$(awk '/^_oa_approval_body\(\) \{/ {p=1} p {print} p && /^\}/ {exit}' "$OWNER_APPROVE")"
+OA_WORDS="$W" OA_OPTION="" OA_FIX="$C" OA_PR=7 head="$HEAD"
+_oa_approval_body "" ""
+"""
+
+
+def test_fix_first_body_parses_as_amendment():
+    """The body the shell posts for --fix-first parses to the words and Condition it was
+    given. The Condition spans two lines, so the parse must join them with a space."""
+    from harness import unplanned_scope as us
+    head = "d" * 40
+    words = "ship it once the button is renamed"
+    condition = "rename the Save button to Submit\nand keep the old label in the tooltip"
+    out = subprocess.run(
+        ["bash", "-c", _OA_BODY_DRIVER], capture_output=True, text=True, timeout=60, check=True,
+        env={"PATH": "/usr/bin:/bin", "OWNER_APPROVE": str(OWNER_APPROVE),
+             "W": words, "C": condition, "HEAD": head})
+    body = out.stdout
+    assert f"<!-- owner-approve mode=fix-first head={head} diff=unread -->" in body
+    comment = {"id": 3591234567, "created_at": "2026-11-23T10:00:00Z",
+               "author_association": "OWNER", "user": {"login": "owner", "type": "User"},
+               "body": body}
+    a = us.comment_fields(comment)
+    assert a is not None
+    assert a.words == words
+    assert a.condition == condition.replace("\n", " ")
+    assert a.head == head
+    assert (a.comment_id, a.date) == ("3591234567", "2026-11-23")

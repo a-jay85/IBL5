@@ -119,7 +119,7 @@ in this review.
    `owner: "<verbatim words>"`, and each bug in that code is its own untagged `[BLOCKING]`
    bullet, as `_plan-fidelity-review.md` check 3a specifies. A finding for a change the
    PR body's kept-unplanned block already lists repeats that bullet's title text verbatim
-   and stays `[BLOCKING]`, as check 3a also specifies. The
+   and stays `[BLOCKING]`, as check 3a also specifies. An `## Owner amendments` section records the owner's fix-first approvals. The harness keeps only entries a matching owner comment backs. Work that does what an entry's `Condition:` line asks is owner-requested scope. Tag it `[unplanned-scope]` and copy `owner: "<at least 12 consecutive characters from that entry's Condition line>"` with straight quotes. Do not title that finding as a revert. Code the Condition does not ask for gets no owner quote. Review amended work for bugs and for fidelity to the Condition as you review planned work. A bug is its own blocking finding. This reviewer reads the plan directly, so before trusting an entry run `cd tools/postplan-harness && python3 -m harness.amendments verify --plan <plan> --comments <file>` on `gh api repos/a-jay85/IBL5/issues/<N>/comments --paginate --jq '.[]'` output, and treat only `backed` entries as scope. The
    marker sits on the top-level bullet line only. A nested bullet, a `####` sub-heading,
    or a `**Finding N:**` continuation under that bullet inherits its marker and carries
    none of its own. The marker and the verdict word must agree: `NOT READY` has at least

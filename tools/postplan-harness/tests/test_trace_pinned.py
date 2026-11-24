@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from harness import replay_progress
 from harness import trace_pinned as tp
 
 REPO = Path(__file__).resolve().parents[3]
@@ -934,3 +935,101 @@ def test_repo_entry_without_host_unchanged(repo):
     root, base = repo
     _write_evidence(root, capture=f"{tp.CAPTURE_DIR}/absent.jsonl")
     assert _verdict(root, base) == "capture-not-on-base"
+
+
+# ---- jsb-port-* branches also need replay progress over base ----
+
+PORT_BRANCH = "jsb-port-pl-0027-r1"
+PORT_EVIDENCE = f"engine/trace-evidence/{PORT_BRANCH}.json"
+PORT_CHANGED = [ENGINE_FILE, TEST_FILE, GOLDEN, PORT_EVIDENCE]
+TRIGGERS = ("trace-pinned",)
+
+
+def _port_repo(tmp_path):
+    root, base = _make_repo(tmp_path)
+    data = {"schema": tp.SCHEMA, "token": "trace-pinned", "branch": PORT_BRANCH,
+            "tests": [_entry(root)]}
+    _write(root, PORT_EVIDENCE, json.dumps(data))
+    return root, base
+
+
+def _first(day=1, game=0, gi=0, matched=0):
+    return {"day": day, "game": game, "global_index": gi, "matched_draws": matched,
+            "total_draws": 900, "kind": "draw", "target": "0xFEEDF00D"}
+
+
+def _fake_replay_child(base_first, head_first):
+    def fake(args, timeout):
+        if "probe" in args:
+            return {"status": "ok", "recording": "rec-a", "baseline_sha256": "b1"}
+        label = args[args.index("--label") + 1]
+        return {"status": "ok", "first": base_first if label == "base" else head_first}
+    return fake
+
+
+def _progress_seam(tmp_path, base_first, head_first):
+    loop_dir = tmp_path / "fake-jsbn" / "tools" / "parity_loop"
+    loop_dir.mkdir(parents=True)
+    (loop_dir / "diverge.py").write_text("")
+
+    def seam(root, branch, base, jsbn_dir):
+        return replay_progress.verdict(root, branch, base, tmp_path / "fake-jsbn",
+                                       run_child=_fake_replay_child(base_first, head_first),
+                                       cache_dir=tmp_path / "cache")
+    return seam
+
+
+def _raising_seam(*args):
+    raise AssertionError("progress check must not run")
+
+
+def test_arm_port_branch_holds_when_replay_unchanged(tmp_path, monkeypatch):
+    from harness.armable import trace_pinned_lifts
+    from harness.classify import classify
+    from tests.test_armable import inputs
+    root, _ = _port_repo(tmp_path)
+    monkeypatch.setattr(tp, "run_go_test", _fake_go())
+    seam = _progress_seam(tmp_path, _first(), _first())
+    value = tp.arm_input_value(TRIGGERS, root, PORT_BRANCH, PORT_CHANGED, progress=seam)
+    assert value == "replay-no-progress:pl-0027:day1:game0:draw0:matched0"
+    inp = inputs(classification=classify([ENGINE_FILE, GOLDEN], ""), plan_hold_triggers=TRIGGERS,
+                 trace_pinned_evidence=value)
+    assert trace_pinned_lifts(inp) is False
+
+
+def test_arm_port_branch_clears_when_replay_advances(tmp_path, monkeypatch):
+    root, _ = _port_repo(tmp_path)
+    monkeypatch.setattr(tp, "run_go_test", _fake_go())
+    seam = _progress_seam(tmp_path, _first(), _first(gi=12))
+    assert tp.arm_input_value(TRIGGERS, root, PORT_BRANCH, PORT_CHANGED, progress=seam) == "ok"
+
+
+def test_arm_port_branch_holds_when_replay_cannot_run(tmp_path, monkeypatch):
+    root, _ = _port_repo(tmp_path)
+    monkeypatch.setattr(tp, "run_go_test", _fake_go())
+    assert tp.arm_input_value(TRIGGERS, root, PORT_BRANCH, PORT_CHANGED) \
+        == "replay-unavailable:no-jsb-native"
+
+
+def test_arm_port_branch_skips_replay_when_pin_fails(tmp_path, monkeypatch):
+    root, _ = _make_repo(tmp_path)
+    monkeypatch.setattr(tp, "run_go_test", _fake_go())
+    value = tp.arm_input_value(TRIGGERS, root, PORT_BRANCH, PORT_CHANGED, progress=_raising_seam)
+    assert value == "evidence-missing"
+
+
+def test_arm_non_port_branch_never_runs_replay(repo, monkeypatch):
+    root, _ = repo
+    assert not BRANCH.startswith(tp.PORT_PREFIX)
+    monkeypatch.setattr(tp, "run_go_test", _fake_go())
+    assert tp.arm_input_value(TRIGGERS, root, BRANCH, CHANGED, progress=_raising_seam) == "ok"
+
+
+def test_arm_progress_exception_fails_closed(tmp_path, monkeypatch):
+    root, _ = _port_repo(tmp_path)
+    monkeypatch.setattr(tp, "run_go_test", _fake_go())
+
+    def boom(*args):
+        raise RuntimeError("x")
+    assert tp.arm_input_value(TRIGGERS, root, PORT_BRANCH, PORT_CHANGED, progress=boom) \
+        == "error: RuntimeError"

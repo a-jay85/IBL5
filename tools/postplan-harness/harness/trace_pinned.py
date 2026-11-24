@@ -632,13 +632,28 @@ def evaluate_evidence(root, branch, base, changed_files, run_go=None) -> str:
     return evaluate_data(root, branch, base, changed_files, data, run_go)
 
 
-def arm_input_value(plan_hold_triggers, root, branch, changed_files) -> str:
-    """The `ArmInputs.trace_pinned_evidence` value. Reads nothing without the token."""
+PORT_PREFIX = "jsb-port-"
+
+
+def _default_progress(root, branch, base, jsbn_dir):
+    from . import replay_progress
+    return replay_progress.verdict(root, branch, base, jsbn_dir)
+
+
+def arm_input_value(plan_hold_triggers, root, branch, changed_files, progress=None) -> str:
+    """The `ArmInputs.trace_pinned_evidence` value. Reads nothing without the token.
+
+    A jsb-port-* branch also needs replay progress over base (replay_progress.verdict).
+    """
     if TOKEN not in set(plan_hold_triggers or ()):
         return "not-applicable"
     try:
         base = resolve_base(root, branch)
-        return evaluate_evidence(root, branch, base, changed_files)
+        note = evaluate_evidence(root, branch, base, changed_files)
+        if note != "ok" or not str(branch or "").startswith(PORT_PREFIX):
+            return note
+        progress = progress or _default_progress
+        return progress(root, branch, base, jsb_native_dir(root))
     except Exception as exc:  # noqa: BLE001 — fail closed, never raise into arming
         return f"error: {type(exc).__name__}"
 

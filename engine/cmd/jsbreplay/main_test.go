@@ -29,6 +29,21 @@ func loadBundle(t *testing.T) bundle.Bundle {
 	return b
 }
 
+// startPassValues are the 60 leading values every recorded game opens with: the
+// draws of JSB's start-of-game record pass.
+func startPassValues() []int {
+	vals := make([]int, sim.GameStartPassDraws)
+	for i := range vals {
+		vals[i] = i * 541 % 32768
+	}
+	return vals
+}
+
+// withStartPass puts the start-of-game pass values in front of a game's own values.
+func withStartPass(vals []int) []int {
+	return append(startPassValues(), vals...)
+}
+
 func rawValues(seed uint64, n int) []int {
 	src := rng.New(seed)
 	vals := make([]int, n)
@@ -69,7 +84,7 @@ func TestDayGamesReturnsAppendedRecords(t *testing.T) {
 
 func TestReplayGameWritesDrawLog(t *testing.T) {
 	b := loadBundle(t)
-	values := rawValues(11, 200000)
+	values := withStartPass(rawValues(11, 200000))
 	out, err := replayGame(b, b.Schedule[0], values)
 	if err != nil {
 		t.Fatalf("replayGame: %v", err)
@@ -97,7 +112,7 @@ func TestReplayGameWritesDrawLog(t *testing.T) {
 		if d.Fn != sim.DrawSites[d.Caller] {
 			t.Fatalf("line %d: fn %q, want DrawSites[%q] = %q", i, d.Fn, d.Caller, sim.DrawSites[d.Caller])
 		}
-		if d.Fn != "" {
+		if i >= len(startPassValues()) && d.Fn != "" {
 			mapped++
 		}
 		if d.V != values[i] {
@@ -105,13 +120,13 @@ func TestReplayGameWritesDrawLog(t *testing.T) {
 		}
 	}
 	if mapped == 0 {
-		t.Error("no draw line carried a non-empty fn; the fn lookup is not wired")
+		t.Error("no game draw line carried a non-empty fn; the fn lookup is not wired")
 	}
 }
 
 func TestReplayGameExhaustionIsExtraDraw(t *testing.T) {
 	b := loadBundle(t)
-	values := rawValues(11, 10)
+	values := withStartPass(rawValues(11, 10))
 	out, err := replayGame(b, b.Schedule[0], values)
 	if err != nil {
 		t.Fatalf("replayGame: %v", err)
@@ -124,21 +139,78 @@ func TestReplayGameExhaustionIsExtraDraw(t *testing.T) {
 		t.Fatalf("writeDrawLines: %v", err)
 	}
 	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
-	if len(lines) != 11 {
-		t.Fatalf("%d lines, want 10 draws + 1 exhausted marker", len(lines))
+	if len(lines) != 71 {
+		t.Fatalf("%d lines, want 70 draws + 1 exhausted marker", len(lines))
 	}
 	var last exhaustedLine
 	if err := json.Unmarshal([]byte(lines[len(lines)-1]), &last); err != nil {
 		t.Fatal(err)
 	}
-	if last.I != 10 || !last.Exhausted || last.Game != 4 {
-		t.Errorf("last line = %+v, want game 4, i 10, exhausted", last)
+	if last.I != 70 || !last.Exhausted || last.Game != 4 {
+		t.Errorf("last line = %+v, want game 4, i 70, exhausted", last)
+	}
+	if last.Caller == "sim.dayStartScaledPass" {
+		t.Errorf("exhaustion landed inside the start pass, not in the game: %+v", last)
 	}
 	if _, ok := sim.DrawSites[last.Caller]; !ok {
 		t.Errorf("caller %q is not a DrawSites key", last.Caller)
 	}
 	if last.Fn != sim.DrawSites[last.Caller] {
 		t.Errorf("fn %q, want %q", last.Fn, sim.DrawSites[last.Caller])
+	}
+}
+
+func TestReplayGameStartsWithGameStartPass(t *testing.T) {
+	b := loadBundle(t)
+	lead := startPassValues()
+	values := withStartPass(rawValues(11, 200000))
+	out, err := replayGame(b, b.Schedule[0], values)
+	if err != nil {
+		t.Fatalf("replayGame: %v", err)
+	}
+	var buf bytes.Buffer
+	if err := writeDrawLines(&buf, 0, values, out); err != nil {
+		t.Fatalf("writeDrawLines: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+	if len(lines) <= len(lead) {
+		t.Fatalf("%d lines, want more than the %d start-pass draws", len(lines), len(lead))
+	}
+	for i, l := range lines[:len(lead)+1] {
+		var d drawLine
+		if err := json.Unmarshal([]byte(l), &d); err != nil {
+			t.Fatalf("line %d: %v", i, err)
+		}
+		if d.I != i {
+			t.Fatalf("line %d: i = %d", i, d.I)
+		}
+		if i < len(lead) {
+			if d.Caller != "sim.dayStartScaledPass" || d.Fn != "FUN_005c6100" || d.API != "raw" || d.V != lead[i] {
+				t.Fatalf("line %d = %+v, want a raw start-pass draw FUN_005c6100 with value %d", i, d, lead[i])
+			}
+			continue
+		}
+		if d.Caller == "sim.dayStartScaledPass" {
+			t.Fatalf("line %d: the game's own draws still carry the start-pass caller", i)
+		}
+	}
+}
+
+func TestReplayGameExhaustsInsideGameStartPass(t *testing.T) {
+	b := loadBundle(t)
+	values := startPassValues()[:sim.GameStartPassDraws-1]
+	out, err := replayGame(b, b.Schedule[0], values)
+	if err != nil {
+		t.Fatalf("replayGame: %v", err)
+	}
+	if out.Exhausted == nil {
+		t.Fatalf("want an exhausted game, got %+v", out)
+	}
+	if out.Exhausted.Caller != "sim.dayStartScaledPass" {
+		t.Errorf("exhaustion caller = %q, want sim.dayStartScaledPass", out.Exhausted.Caller)
+	}
+	if len(out.Draws) != 59 {
+		t.Errorf("%d draws, want 59", len(out.Draws))
 	}
 }
 
@@ -248,7 +320,7 @@ func TestWriteDayWritesAllOutputs(t *testing.T) {
 			Boxes: []backup.ScoBox{{TeamID: g0.VisitorTeamID, PlayerID: 7, Min: 30}}},
 		{VisitorTeamID: g0.VisitorTeamID, HomeTeamID: g0.HomeTeamID},
 	}
-	games := [][]int{rawValues(11, 200000), rawValues(11, 10)}
+	games := [][]int{withStartPass(rawValues(11, 200000)), withStartPass(rawValues(11, 10))}
 	// The second game reuses the same pairing, so it needs a second schedule
 	// entry; matchSchedule must not hand game 0's entry out twice.
 	b.Schedule = append(b.Schedule[:1:1], g0)
@@ -261,8 +333,12 @@ func TestWriteDayWritesAllOutputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(draws), `"game":1,"i":10,"exhausted":true`) {
+	if !strings.Contains(string(draws), `"game":1,"i":70,"exhausted":true`) {
 		t.Errorf("draw log has no exhausted marker for game 1")
+	}
+	if !strings.Contains(string(draws), `"game":0,"i":59,"api":"raw"`) ||
+		!strings.Contains(string(draws), `"fn":"FUN_005c6100"`) {
+		t.Errorf("draw log does not open game 0 with the 60 start-pass draws")
 	}
 
 	var jsb []gameBox

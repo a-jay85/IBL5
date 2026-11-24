@@ -301,7 +301,7 @@ func matchSchedule(b bundle.Bundle, day []backup.ScoGame) ([]int, error) {
 
 // replayGame plays one game from the recorded values on a one-game copy of the
 // bundle. Running out of values marks the game exhausted; any other panic
-// propagates.
+// propagates. It runs sim.GameStartPass first, matching the 60 draws at the head of every recorded game.
 func replayGame(b bundle.Bundle, g bundle.Game, values []int) (out gameOut, err error) {
 	rep, err := rng.NewReplay(values)
 	if err != nil {
@@ -319,6 +319,11 @@ func replayGame(b bundle.Bundle, g bundle.Game, values []int) (out gameOut, err 
 			err = nil
 		}
 	}()
+	// Every recorded game opens with JSB's start-of-game record pass (60 draws),
+	// so the replay runs it on the same RNG before the game's own draws.
+	if err = sim.GameStartPass(rep); err != nil {
+		return gameOut{}, err
+	}
 	res, err := sim.SimulateWith(b1, 0, sim.Options{RNG: rep})
 	if err != nil {
 		return gameOut{}, err

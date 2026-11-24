@@ -23,9 +23,12 @@
 #                         cannot read statically, an argv expansion such as "$@",
 #                         --dangerously-skip-permissions, --allow-dangerously-skip-permissions,
 #                         --permission-mode other than default/plan/dontAsk, --settings,
-#                         --mcp-config or --add-dir. Only Bash rules are read: other tool
-#                         names (Read, Write, Edit, WebFetch, mcp__*) pass. Deny-list values
-#                         are never read, but a bare "$@" or "$*" after a deny flag is a finding.
+#                         --mcp-config or --add-dir. An argv expansion is "$@", "$*", NAME[@]
+#                         or any unquoted $NAME, ${NAME} or $(...). The tool value default
+#                         turns on Bash, so it is a finding. Only Bash rules are read: other
+#                         tool names (Read, Write, Edit, WebFetch, mcp__*) pass. Deny-list
+#                         values are never read, but "$@", "$*" or an unquoted expansion
+#                         after a deny flag is a finding.
 #
 # A call site is `claude -p` (or --print) at a real command position: the start of a
 # simple command, after timeout/caffeinate/env/exec/nohup/command/nice/perl wrappers,
@@ -421,6 +424,12 @@ function report(f, ln, cls, detail) {
     hits++
 }
 
+# perm_splits: 1 when an argv word can expand to several words or to a flag: "$@", "$*",
+# an array NAME[@], or any unquoted expansion such as $FLAGS, ${FLAGS} or $(cmd).
+function perm_splits(v) {
+    if (v ~ /^"?\$[@*]"?$/ || index(v, "[@]") > 0) return 1
+    return (v ~ /^\$[A-Za-z_{(]/)
+}
 function perm_static(v) { return (index(v, "$") == 0 && index(v, "`") == 0) }
 function perm_bin_ok(b) {
     if (b in safebin) return 1
@@ -429,6 +438,7 @@ function perm_bin_ok(b) {
 function perm_rule(f, ln, rule, sfx,    inner, b) {
     if (rule == "") return
     if (rule == "Bash" || rule == "Bash()" || rule == "Bash(*)") { report(f, ln, "permission", "bare Bash rule grants every shell command" sfx); return }
+    if (rule == "default") { report(f, ln, "permission", "tool value default turns on every built-in tool, Bash included" sfx); return }
     if (substr(rule, 1, 5) != "Bash(") return
     if (substr(rule, length(rule), 1) != ")") { report(f, ln, "permission", "malformed Bash rule: " rule sfx); return }
     inner = trim(substr(rule, 6, length(rule) - 6))
@@ -459,7 +469,7 @@ function perm_check(f, ln, sfx,    a, fl, v, val, hasv, mode) {
     for (a = 1; a <= nav; a++) {
         v = avx[a]
         if (!(v ~ /^-/ && (avt[a] == "W" || v ~ /^--[A-Za-z-]+=/))) {
-            if (v ~ /^"?\$[@*]"?$/ || index(v, "[@]") > 0) report(f, ln, "permission", "argv expansion " v " can carry permission flags" sfx)
+            if (perm_splits(v)) report(f, ln, "permission", "argv expansion " v " can carry permission flags" sfx)
             continue
         }
         fl = v; hasv = (index(fl, "=") > 0); val = ""
@@ -484,7 +494,7 @@ function perm_check(f, ln, sfx,    a, fl, v, val, hasv, mode) {
             # but a bare "$@" or "$*" here can still carry any permission flag.
             while (a + 1 <= nav && !(avt[a + 1] == "W" && avx[a + 1] ~ /^-/)) {
                 a++
-                if (avx[a] ~ /^"?\$[@*]"?$/) report(f, ln, "permission", "argv expansion " avx[a] " can carry permission flags" sfx)
+                if (perm_splits(avx[a]) && index(avx[a], "[@]") == 0) report(f, ln, "permission", "argv expansion " avx[a] " can carry permission flags" sfx)
             }
             continue
         }

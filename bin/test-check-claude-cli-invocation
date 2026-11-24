@@ -540,6 +540,19 @@ perm_fix array_value '--allowedTools "${TOOLS[@]}"'
 expect_class perm_array_value_fail "$T/perm_array_value.sh" permission
 perm_fix argv_dollar_at '"$@"'
 expect_class perm_argv_dollar_at_fail "$T/perm_argv_dollar_at.sh" permission
+perm_fix argv_unquoted_var '$FLAGS'
+expect_class perm_argv_unquoted_var_fail "$T/perm_argv_unquoted_var.sh" permission
+perm_fix argv_braced_var '${FLAGS}'
+expect_class perm_argv_braced_var_fail "$T/perm_argv_braced_var.sh" permission
+perm_fix argv_unquoted_cmdsub '$(cat flags.txt)'
+expect_class perm_argv_unquoted_cmdsub_fail "$T/perm_argv_unquoted_cmdsub.sh" permission
+perm_fix deny_unquoted_var "--disallowedTools \$FLAGS"
+expect_class perm_deny_unquoted_var_fail "$T/perm_deny_unquoted_var.sh" permission
+perm_pass perm_quoted_prompt_var_pass '--model "$MODEL"'
+perm_fix tools_default "--tools default"
+expect_class perm_tools_default_fail "$T/perm_tools_default.sh" permission
+perm_fix tools_eq_default "--tools=default"
+expect_class perm_tools_eq_default_fail "$T/perm_tools_eq_default.sh" permission
 perm_fix marker_no_colon "--dangerously-skip-permissions # claude-perm-ok reason without colon"
 expect_class perm_marker_no_colon_fail "$T/perm_marker_no_colon.sh" permission
 perm_fix marker_empty_reason "--dangerously-skip-permissions # claude-perm-ok:"

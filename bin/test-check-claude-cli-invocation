@@ -392,6 +392,11 @@ cat > "$T/perm_deny_then_star_fail.sh" <<'FIX'
 timeout 600 claude -p "$p" --disallowed-tools 'Bash(rm:*)' "$*"
 FIX
 expect_class perm_deny_then_star_fail "$T/perm_deny_then_star_fail.sh" permission
+cat > "$T/perm_deny_bash_then_argv_fail.sh" <<'FIX'
+#!/bin/bash
+timeout 600 claude -p "$p" --disallowedTools Bash "$@"
+FIX
+expect_class perm_deny_bash_then_argv_fail "$T/perm_deny_bash_then_argv_fail.sh" permission
 
 # Non-Bash tool names pass by design (plan Design decision 4); a Bash grant still fires.
 perm_pass perm_write_edit_pass "--allowedTools Write,Edit,NotebookEdit"

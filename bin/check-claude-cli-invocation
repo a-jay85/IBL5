@@ -17,13 +17,15 @@
 #                         as one more tool name. Put the prompt first or on stdin.
 #   unknown-flag          a flag outside the committed allowlist; an unknown option
 #                         makes claude exit before it runs anything.
-#   permission            the call grants more than read-only tools: a Bash(...) rule whose
+#   permission            the call can widen shell or permission access: a Bash(...) rule whose
 #                         first word is off the safe list (gh, or a script directly under
 #                         bin/ or bin/lib/), a bare Bash rule, a tool value the checker
 #                         cannot read statically, an argv expansion such as "$@",
 #                         --dangerously-skip-permissions, --allow-dangerously-skip-permissions,
 #                         --permission-mode other than default/plan/dontAsk, --settings,
-#                         --mcp-config or --add-dir. Deny-list flags are never read.
+#                         --mcp-config or --add-dir. Only Bash rules are read: other tool
+#                         names (Read, Write, Edit, WebFetch, mcp__*) pass. Deny-list values
+#                         are never read, but a bare "$@" or "$*" after a deny flag is a finding.
 #
 # A call site is `claude -p` (or --print) at a real command position: the start of a
 # simple command, after timeout/caffeinate/env/exec/nohup/command/nice/perl wrappers,
@@ -478,7 +480,12 @@ function perm_check(f, ln, sfx,    a, fl, v, val, hasv, mode) {
             continue
         }
         if (fl == "--disallowedTools" || fl == "--disallowed-tools") {
-            while (a + 1 <= nav && !(avt[a + 1] == "W" && avx[a + 1] ~ /^-/)) a++
+            # Deny values are never read, and a deny array such as "${DENY[@]}" is skipped,
+            # but a bare "$@" or "$*" here can still carry any permission flag.
+            while (a + 1 <= nav && !(avt[a + 1] == "W" && avx[a + 1] ~ /^-/)) {
+                a++
+                if (avx[a] ~ /^"?\$[@*]"?$/) report(f, ln, "permission", "argv expansion " avx[a] " can carry permission flags" sfx)
+            }
             continue
         }
         if (fl == "--allowedTools" || fl == "--allowed-tools" || fl == "--tools") {

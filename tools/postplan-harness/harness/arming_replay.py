@@ -349,12 +349,10 @@ def _replay_uncached(root: Path, diff_text: str, sections: dict,
             return judge(old, new, kept_sections, sources)
         fid_section = kept_sections.pop(fid_path)
         sources.pop(fid_path, None)
-        note = "fidelity only"
-        if kept_sections:
-            base = judge(old, new, kept_sections, sources)
-            if not base.cleared:
-                return base
-            note = base.note
+        base = judge(old, new, kept_sections, sources)
+        if not base.cleared:
+            return base
+        note = base.note
         fv = fidelity_replay.replay_sides(Path(tmp), Path(root), diff_text, fid_section, _env(tmp))
         if not fv[0]:
             return _kept(fv[1])

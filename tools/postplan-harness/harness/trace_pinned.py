@@ -319,8 +319,10 @@ def _check_test_entry(root, entry, changed) -> str:
 
 
 def jsb_native_dir(root) -> Path:
-    """The jsb-native checkout beside the main IBL5 checkout. A worktree resolves to the main
-    checkout's copy; a CI checkout resolves to a path that does not exist. No env override."""
+    """The jsb-native checkout nested inside the main IBL5 checkout, at <main checkout>/jsb-native.
+    The git common dir's parent is the main checkout itself, so this is not a sibling path. A
+    worktree resolves to the main checkout's copy; a CI checkout resolves to a path that does
+    not exist. No env override."""
     common = _git(["rev-parse", "--path-format=absolute", "--git-common-dir"], cwd=str(root))
     return Path(common.strip()).parent / "jsb-native"
 

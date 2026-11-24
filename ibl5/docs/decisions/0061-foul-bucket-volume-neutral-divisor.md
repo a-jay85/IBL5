@@ -1,6 +1,6 @@
 ---
 description: The foul-bucket offQ divisor (offQualityWithHCA) is replaced by a volume-NEUTRAL constant base (offQualityConstant), faithful to 5.60's dead-zero +0xDE0; this measurably relaxes (≈30% on the shots-per-poss axis, not a sign flip) the Fork-B foul-share volume-inversion the old per-player ΣOO·scale divisor injected, re-homes the GATE-1 home-margin calibration knob from offQualityRatingScale to offQualityConstant (corpus stand-in, x32dbg pin is a follow-up), and partially supersedes ADR-0044's off-side compression.
-last_verified: 2026-11-10
+last_verified: 2026-11-24
 ---
 
 # ADR-0061: Foul-bucket volume-neutral divisor (Fork-B carrier fix)
@@ -196,8 +196,9 @@ possession, and read the actual values. That would:
 - let the two synthetic degeneracy guards (`TestBucketWeights_FoulPathMix` ceiling,
   `TestSimulate_FoulOutRate`) be re-derived from the faithful foul rate or dropped.
 
-(A model — even a higher tier — cannot shortcut this: it cannot execute the binary, and the
-value is runtime/data-dependent, not statically recoverable.)
+(Static RE cannot recover the value, because it depends on runtime data. The parity loop
+gets it by running `jumpshot.exe` on the RE VM over SSH, with the scripts in
+`jsb-native/tools/vm/`.)
 
 ## Objective verification (the coupling, measured)
 

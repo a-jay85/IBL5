@@ -11,12 +11,20 @@ likely close the residual GATE-1 home-margin undershoot (faithful, not calibrate
 let the two synthetic degeneracy guards (`TestBucketWeights_FoulPathMix`,
 `TestSimulate_FoulOutRate`) be re-derived from the faithful foul rate or dropped.
 
-A model cannot shortcut this — the value is runtime/data-dependent, not statically
-recoverable.
+Static RE cannot recover the value, because it depends on runtime data. Only a live run
+of `jumpshot.exe` gives it.
+
+## Who runs it
+
+The parity loop runs this trace, and so do the plans fed to it. They drive the VM over
+SSH with the scripts in `jsb-native/tools/vm/` (see its `README.md`). The owner does not
+run it by hand. The Mac side never starts or controls UTM. Desktop steps below (x32dbg
+menus, the JSB window) run on the VM's session-1 desktop through `tools/vm/vmgui`.
 
 ## Environment
 
-- **VM:** Windows 11 ARM under UTM (Apple Virtualization) on the M3 Max.
+- **VM:** Windows 11 ARM64 under UTM (QEMU) on the M3 Max, reached as `A-Jay@192.168.64.2`
+  (`jsb-native/parity/vm.json`).
 - **Target:** `jumpshot.exe` (JSB 5.60, 32-bit PE, image base `0x400000`).
 - **Data:** load **IBL5** (`IBL5.plr/.sco/.sch/.bxs`) — this is the calibration target, so
   pin against IBL5 (same as the `+0x6638`/`+0x6698` baselines were).
@@ -62,8 +70,10 @@ The storm has a cause: `FUN_004e3f80` installs an SEH frame (`ExceptionList = &l
 and the xtajit x86→ARM64 JIT first-chances every SEH setup and every internal `0xC0000005`.
 Default x32dbg breaks on each → the storm.
 
-1. **VM snapshot NOW** (UTM), with IBL5 already loaded in jumpshot.exe. You *will* hit a
-   freeze — revert to snapshot instead of a ~20-min reload. Single biggest time-saver.
+1. **Plan the reset before the first attach.** A freeze will happen. The loop recovers
+   with `tools/vm/restore.ps1`, which stops jumpshot and mirrors the baseline
+   (`C:\JSB_pre_q2_20261116`, `baseline_dir` in `parity/vm.json`) onto `C:\JSB`. Then
+   `jsb-start` and `loadibl5.py` bring IBL5 back up. It never uses a UTM snapshot.
 2. **x32dbg → Options → Preferences → Exceptions:** add range `0x00000000–0xFFFFFFFF`,
    set **"Ignore (pass to debuggee)" on first chance**. Passes first-chance exceptions to
    the program (JIT/SEH handle them); only breaks on a genuine unhandled second-chance

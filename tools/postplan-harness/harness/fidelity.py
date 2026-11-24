@@ -779,8 +779,12 @@ def build_packet(out_dir: str, master_sha: str, reviewed_tree: str, plan, diff: 
                  worktree: str = ".", packet_name: str = "fidelity-packet",
                  extra_context: str = "", review_findings: str = "",
                  shadow_request: bool = False,
-                 conflict_resolved_paths: list[str] | None = None) -> str:
+                 conflict_resolved_paths: list[str] | None = None,
+                 plan_text: str | None = None) -> str:
     """Write the seven `_phase-5.5-fidelity.md` Step-2 inputs as files. Returns the dir.
+
+    `plan_text`, when given, is written as `plan.md` in place of the plan file's bytes. The
+    runner passes the plan with unbacked `## Owner amendments` entries stripped.
 
     `shadow_request` asks the reviewer for the procedure 6f `## SHADOW-ARMING` block and adds
     the `DIFF_FILES:` summary it needs. Off, `context.md` is byte-identical to before.
@@ -799,8 +803,11 @@ def build_packet(out_dir: str, master_sha: str, reviewed_tree: str, plan, diff: 
 
     if getattr(plan, "found", False) and getattr(plan, "path", ""):
         try:
-            with open(plan.path) as fh:
-                _write("plan.md", fh.read())
+            if plan_text is not None:
+                _write("plan.md", plan_text)
+            else:
+                with open(plan.path) as fh:
+                    _write("plan.md", fh.read())
         except OSError:
             _write("plan.md", PLAN_BLIND_MARKER)
             _write("plan-index.txt", PLAN_INDEX_BLIND)

@@ -105,14 +105,22 @@ def classify(
     subjects_by_path: Mapping[str, Sequence[str]],
     must_preserve: Iterable[str],
     removed_guard_paths: Iterable[str],
+    amendments: Sequence = (),
 ) -> Optional[str]:
-    """`keep`, `remove` or `hold` for a tagged finding, None for an untagged one."""
+    """`keep`, `remove` or `hold` for a tagged finding, None for an untagged one.
+
+    A finding that quotes a backed owner amendment is kept, so the fixer never reverts
+    work the owner asked for. The check sits below `hold`: an amendment never licenses
+    removing a `## Must preserve` guard.
+    """
     if not is_unplanned_scope(item_text):
         return None
     paths = cited_paths(item_text, changed_paths)
     preserved, removed = set(must_preserve), set(removed_guard_paths)
     if any(path in removed and path in preserved for path in paths):
         return "hold"
+    if amendment_covers(item_text, amendments):
+        return "keep"
     if paths and all(_only_machine_commits(subjects_by_path.get(path, ())) for path in paths):
         return "remove"
     return "keep"
@@ -332,14 +340,19 @@ def upsert_kept_block(body: str, block: str) -> str:
 
 def downgrade_applies(verdict_path: str, ctx: Optional[dict], body_text: str, payload: Optional[dict] = None,
                       approval: Optional[OwnerApproval] = None) -> bool:
-    """True when a NOT READY verdict's blockers are all kept, declared, and quoted from the owner."""
+    """True when a NOT READY verdict's blockers are all kept and owner-backed.
+
+    Each blocker is either covered by a backed owner amendment in ctx["amendments"], or
+    declared in the PR body's kept block and quoted from the owner.
+    """
     from . import fidelity
 
     body = body_text or ""
     begin, end = body.find(KEPT_BEGIN), body.find(KEPT_END)
-    if ctx is None or begin == -1 or end < begin:
+    amendments = (ctx or {}).get("amendments", ())
+    declared = body[begin:end] if begin != -1 and end >= begin else ""
+    if ctx is None or (not declared and not amendments):
         return False
-    declared = body[begin:end]
     if fidelity.parse_verdict(verdict_path) != "NOT READY":
         return False
     texts = fidelity.blocking_finding_texts(verdict_path)
@@ -348,8 +361,10 @@ def downgrade_applies(verdict_path: str, ctx: Optional[dict], body_text: str, pa
     kept = [t for t in texts if is_unplanned_scope(t)]
     if len(kept) != len(texts):
         return False   # a bug in kept code is its own blocking finding and blocks
-    return all(classify(t, **ctx) == "keep" and _listed(t, declared)
-               and (owner_evidence_ok(t, payload) or approval_covers(t, approval))
+    return all(classify(t, **ctx) == "keep"
+               and (amendment_covers(t, amendments)
+                    or (bool(declared) and _listed(t, declared)
+                        and (owner_evidence_ok(t, payload) or approval_covers(t, approval))))
                for t in kept)
 
 
@@ -432,6 +447,198 @@ def approval_covers(text: str, approval: Optional[OwnerApproval]) -> bool:
     if approval is None:
         return False
     return _listed(text, approval.kept_span)
+
+
+# A fix-first approval's scope, carried into the plan by `bin/owner-approve`. The plan
+# entry alone is not trusted: `backed_amendments` matches it to its own approval comment.
+AMENDMENTS_HEADING = "## Owner amendments"
+_AMENDMENTS_HEADING_RE = re.compile(r"^## Owner amendments\s*$")
+_AMENDMENT_MARKER_RE = re.compile(r"^<!-- owner-amendment comment=(\d+) head=([0-9a-f]{40}) -->$")
+_FENCE_OPEN = "```text"
+_FENCE_CLOSE = "```"
+_WORDS_PREFIX = "Owner words: "
+_CONDITION_PREFIX = "Condition: "
+
+
+@dataclass(frozen=True)
+class Amendment:
+    comment_id: str
+    head: str
+    words: str
+    condition: str
+    date: str
+
+
+def _one_line(s: str) -> str:
+    return " ".join(s.replace("\r", "").split("\n")).strip()
+
+
+# bin/owner-approve prints this sentence on the line after the Condition. A Condition
+# that holds a newline runs on until it, a blank line or an HTML comment.
+_CONDITION_END_PREFIX = "The label and the arm wait until the fix is pushed"
+
+
+def _condition_text(body: str) -> str:
+    """The first `Condition: ` line's text, with its continuation lines joined by spaces."""
+    lines = body.split("\n")
+    start = next((i for i, ln in enumerate(lines) if ln.startswith(_CONDITION_PREFIX)), None)
+    if start is None:
+        return ""
+    parts = [lines[start][len(_CONDITION_PREFIX):]]
+    for ln in lines[start + 1:]:
+        if not ln.strip() or ln.startswith(_CONDITION_END_PREFIX) or ln.lstrip().startswith("<!--"):
+            break
+        parts.append(ln)
+    return " ".join(parts).strip()
+
+
+def comment_fields(comment: dict) -> Optional[Amendment]:
+    """The amendment an authentic fix-first approval comment carries, else None."""
+    if not isinstance(comment, dict):
+        return None
+    if not _authentic(comment):
+        return None
+    body = (comment.get("body") or "").replace("\r", "")
+    lines = [ln.strip() for ln in body.split("\n") if ln.strip()]
+    m = APPROVAL_MARKER_RE.fullmatch(lines[-1]) if lines else None
+    if m is None:
+        return None
+    if m.group("mode") != "fix-first":
+        return None
+    w = APPROVAL_WORDS_RE.match(body.split("\n", 1)[0])
+    if w is None:
+        return None
+    condition = _condition_text(body)
+    if not condition:
+        return None
+    cid = comment.get("id")
+    if not isinstance(cid, int) or isinstance(cid, bool):
+        return None
+    date = (comment.get("created_at") or "")[:10]
+    return Amendment(comment_id=str(cid), head=m.group("head"), words=_one_line(w.group("w")),
+                     condition=condition, date=date)
+
+
+def render_amendment(a: Amendment) -> str:
+    """One plan entry: heading, marker line and a text fence with the words and Condition."""
+    return "\n".join([
+        f"### {a.date} comment {a.comment_id}",
+        f"<!-- owner-amendment comment={a.comment_id} head={a.head} -->",
+        _FENCE_OPEN,
+        f"{_WORDS_PREFIX}{_one_line(a.words)}",
+        f"{_CONDITION_PREFIX}{_one_line(a.condition)}",
+        _FENCE_CLOSE,
+    ])
+
+
+def _section_bounds(lines: Sequence[str]) -> Optional[tuple[int, int]]:
+    """(heading index, end index) of the `## Owner amendments` section, else None."""
+    start = next((i for i, ln in enumerate(lines) if _AMENDMENTS_HEADING_RE.match(ln)), None)
+    if start is None:
+        return None
+    end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
+    return start, end
+
+
+def _entries_in(lines: Sequence[str]) -> list[Amendment]:
+    """Entries in a section body. Anything not in the exact entry shape is skipped."""
+    found: list[Amendment] = []
+    date = ""
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        heading = re.match(r"^### (\d{4}-\d{2}-\d{2}) comment \d+\s*$", line)
+        if heading:
+            date = heading.group(1)
+        m = _AMENDMENT_MARKER_RE.match(line)
+        if (m and i + 4 < len(lines) and lines[i + 1] == _FENCE_OPEN
+                and lines[i + 2].startswith(_WORDS_PREFIX)
+                and lines[i + 3].startswith(_CONDITION_PREFIX)
+                and lines[i + 4] == _FENCE_CLOSE
+                and lines[i + 3][len(_CONDITION_PREFIX):].strip()):
+            found.append(Amendment(comment_id=m.group(1), head=m.group(2),
+                                   words=lines[i + 2][len(_WORDS_PREFIX):].strip(),
+                                   condition=lines[i + 3][len(_CONDITION_PREFIX):].strip(),
+                                   date=date))
+            date = ""
+            i += 5
+            continue
+        i += 1
+    return found
+
+
+def parse_amendments(plan_text: str) -> list[Amendment]:
+    """Every entry under the exact `## Owner amendments` heading."""
+    lines = (plan_text or "").replace("\r", "").split("\n")
+    bounds = _section_bounds(lines)
+    if bounds is None:
+        return []
+    start, end = bounds
+    return _entries_in(lines[start + 1:end])
+
+
+def _mismatch(e: Amendment, f: Optional[Amendment]) -> Optional[str]:
+    """None when comment `f` backs entry `e`, else the reason it does not."""
+    if f is None:
+        return "no-comment"
+    if f.head != e.head:
+        return "head"
+    if _norm_words(f.condition) != _norm_words(e.condition):
+        return "condition"
+    if _norm_words(f.words) != _norm_words(e.words):
+        return "words"
+    return None
+
+
+def backed_amendments(entries: Iterable[Amendment],
+                      comments: Iterable[dict]) -> tuple[list[Amendment], list[tuple[Amendment, str]]]:
+    """(backed, [(unbacked, reason)]). Backed means an authentic fix-first comment with the
+    same id, a byte-equal head and equal normalized Condition and words."""
+    by_id: dict[str, Amendment] = {}
+    for c in comments or []:
+        f = comment_fields(c)
+        if f is not None:
+            by_id[f.comment_id] = f
+    backed: list[Amendment] = []
+    unbacked: list[tuple[Amendment, str]] = []
+    for e in entries:
+        f = by_id.get(e.comment_id)
+        reason = _mismatch(e, f)
+        if reason is None:
+            backed.append(e)
+        else:
+            unbacked.append((e, reason))
+    return backed, unbacked
+
+
+def amendment_covers(text: str, amendments: Iterable[Amendment]) -> bool:
+    """True when the finding's owner quote occurs in a backed amendment's Condition or words."""
+    quote = owner_quote(text)
+    if quote is None:
+        return False
+    needle = _norm_words(quote)
+    return any(needle in _norm_words(a.condition) or needle in _norm_words(a.words)
+               for a in amendments or ())
+
+
+def strip_unbacked(plan_text: str, backed: Iterable[Amendment]) -> str:
+    """The plan with its amendments section rebuilt from `backed` only, or removed when
+    none is backed. Text outside the section is byte-identical."""
+    text = plan_text or ""
+    lines = text.split("\n")
+    bounds = _section_bounds([ln.rstrip("\r") for ln in lines])
+    if bounds is None:
+        return text
+    start, end = bounds
+    keep = list(backed)
+    if keep:
+        body = [lines[start], ""]
+        for a in keep:
+            body += [render_amendment(a), ""]
+        section = body
+    else:
+        section = []
+    return "\n".join(lines[:start] + section + lines[end:])
 
 
 def owner_evidence_ok(text: str, payload: Optional[dict]) -> bool:

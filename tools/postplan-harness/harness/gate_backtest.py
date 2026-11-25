@@ -183,6 +183,9 @@ REPLAY_SPECS: dict[str, ReplaySpec | str] = {
     "bin/check-e2e-fixture-drift": "needs a snapshot outfile and a live database",
     "bin/check-old-code-compat": "needs --old-tree and a live database",
     "bin/check-orphan-css": "crawls a running app",
+    # CI runs it only on jsb-fix-* head refs. Replayed over an ordinary PR's range it
+    # would refuse every legitimate edit to a protected parity file.
+    "bin/check-parity-rule-guard": "scoped to jsb-fix-* fixer branches; ordinary PRs may edit protected parity files",
     # Exit 0 means "ran"; flags come from stdout lines. Exit 2 lands in the error bucket.
     "bin/lib/plan-matrix-assertions": ReplaySpec(
         argv=("{plan_file}", "{diff_file}"),

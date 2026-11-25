@@ -25,6 +25,11 @@ export PATH="$TMP/shims:$PATH"
 export IBL5_USAGE_GATE_STATE_DIR="$TMP/gate"
 mkdir -p "$IBL5_USAGE_GATE_STATE_DIR"
 export POSTPLAN_LOG_DIR="$TMP/runlog" PLAN_NOW_LOG_DIR="$TMP/runlog"
+# Stub harness: post-plan-now refuses up front without an executable $HARNESS/run, and
+# the real main-checkout path does not exist in CI. launchctl is stubbed, so it never runs.
+mkdir -p "$TMP/harness"
+printf '#!/bin/sh\nexit 0\n' > "$TMP/harness/run"; chmod +x "$TMP/harness/run"
+export HARNESS="$TMP/harness"
 unset CLAUDE_HEADLESS SHELLCHECK_OPTS
 # The phases stage runs conformance against the plan; true ignores its arguments and
 # exits 0, so every case not about that stage passes it. Phases cases override this.

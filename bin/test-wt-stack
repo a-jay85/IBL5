@@ -253,15 +253,10 @@ FIX
 case_post_plan_wiring() {
   reset_case
   local p10="$REPO/.claude/skills/post-plan/_phase-10-preview-environment.md"
-  local sk="$REPO/.claude/skills/post-plan/SKILL.md"
   grep -qF 'bin/wt-stack stop <slug>' "$p10" || fail post-plan-wiring "phase 10 lacks wt-stack stop"
   grep -qF 'bin/wt-up <slug> --prod' "$p10" || fail post-plan-wiring "phase 10 lacks printed wt-up --prod"
   grep -qF 'http://<slug>.localhost/ibl5/' "$p10" || fail post-plan-wiring "phase 10 lacks preview URL"
   ! grep -qF 'bin/wt-down <slug>' "$p10" || fail post-plan-wiring "phase 10 runs bin/wt-down <slug> again"
-  # The fallback skill defers E2E to CI: it must not start a stack or run bin/e2e-wt.
-  ! grep -qF 'bin/wt-stack start <worktree-name>' "$sk" || fail post-plan-wiring "SKILL.md starts a wt-stack again"
-  ! grep -qE 'bin/e2e-wt <worktree-name>' "$sk" || fail post-plan-wiring "SKILL.md runs bin/e2e-wt again"
-  grep -qF 'E2E: deferred to CI on the PR.' "$sk" || fail post-plan-wiring "SKILL.md lacks the E2E-deferred report line"
 }
 
 case_started_then_stopped

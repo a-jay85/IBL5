@@ -1,5 +1,5 @@
 #!/bin/sh
-# Single entry point for the prose /post-plan skill to render manual-testing checkboxes.
+# Command-line entry point to render manual-testing checkboxes.
 # The Python harness calls harness.manual_rows.render_rows in-process; both execute the
 # same module, so there is no second implementation to drift.
 set -eu
@@ -8,7 +8,7 @@ if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     cat <<'EOF'
 Usage: bin/normalize-manual-testing [args...]
 
-Render manual-testing checkboxes for the /post-plan skill. Delegates to
+Render manual-testing checkboxes. Delegates to
 the Python module harness.manual_rows in tools/postplan-harness. All
 arguments are passed through to the module.
 EOF

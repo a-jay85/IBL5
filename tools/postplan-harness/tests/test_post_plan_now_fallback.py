@@ -16,22 +16,6 @@ _LAUNCHCTL_OTHER_SLUG = (
 )
 
 
-def _fb(code):
-    r = subprocess.run(
-        ["bash", "-c", f'source "{PPN}" >/dev/null 2>&1; should_fallback {code}; echo $?'],
-        capture_output=True, text=True)
-    return r.stdout.strip().splitlines()[-1]
-
-def test_success_and_sentinel_do_not_fall_back():
-    assert _fb(0) == "1"   # success → should_fallback returns 1 (false) → no skill fallback
-    assert _fb(3) == "1"   # rebase-conflict sentinel → NO fallback (the fix)
-    assert _fb(7) == "1"   # main-checkout refusal → NO fallback (nothing ran)
-
-def test_generic_failures_fall_back():            # negative path: real failures still degrade
-    assert _fb(1) == "0"
-    assert _fb(2) == "0"
-    assert _fb(130) == "0"
-
 def _bash(script):
     return subprocess.run(["bash", "-c", script], capture_output=True, text=True)
 
@@ -59,52 +43,21 @@ def test_shq_survives_a_second_shell_parse():
         assert r.stdout == s, f"{s!r}: round-tripped to {r.stdout!r}"
 
 
-def test_plan_blind_prompt_reaches_the_model_intact():
-    """The real plan-blind prompt literal, round-tripped through the far-side shell.
-
-    Regression: it carried literal backticks around <slug>-N.md, was embedded as
-    `claude -p \\"$PROMPT\\"`, and `/bin/bash -lc` ran the backticks as command
-    substitution — logging `slug: No such file or directory` and silently deleting the
-    plan-disambiguation clause from the prompt the model received.
-    """
-    import re
-    src = open(PPN).read()
-    prompts = re.findall(r'^\s*(PROMPT="(?:[^"\\]|\\.)*")$', src, re.M)
-    assert len(prompts) == 2, f"expected the --plan and plan-blind prompts, got {len(prompts)}"
-    plan_blind = prompts[1]
-    assert "<slug>-N.md" in plan_blind, "plan-blind prompt no longer names the variant rule"
-
-    script = (f'source "{PPN}" >/dev/null 2>&1\n'
-              f'{plan_blind}\n'
-              'q=$(shq "$PROMPT")\n'
-              'bash -c "printf %s $q"\n')
-    r = _bash(script)
-    assert r.stderr == "", f"far-side shell wrote to stderr: {r.stderr!r}"
-    assert "`<slug>-N.md`" in r.stdout, f"backticked span did not survive: {r.stdout!r}"
-    assert "never ask questions" in r.stdout
-
-
 def test_embed_sites_are_shell_quoted():
     src = open(PPN).read()
-    # The prompt is shq()'d into SKILL_PROMPT_ARG, which the claude call splices in
-    # (usage gate resume swaps it); it must never be interpolated inside \"...\".
-    assert 'SKILL_PROMPT_ARG="$(shq "$PROMPT")"' in src   # see shq() header
-    assert 'claude -p ${SKILL_PROMPT_ARG}' in src
-    assert r'claude -p \"$PROMPT\"' not in src
+    # The --plan path is free-form text re-parsed by the far-side shell: shq() it.
     assert '--plan $(shq "$PLAN_OVERRIDE")' in src
 
 
 def test_plist_wiring_regression():
     src = open(PPN).read()
     assert "--live || " not in src               # old unconditional fallback chain removed
-    assert "should_fallback" in src              # fallback now gated by the tested function
     assert r"rc=\$?" in src                       # harness exit code captured for the gate
     assert r'\"\$rc\" = 3' in src                 # fail-closed notice is rc=3-only (elif)
     # New wiring assertions
     assert "PLAN_ARG" in src
     assert "--live${PLAN_ARG}" in src
     assert "${PLAN_OVERRIDE:-$(plans_dir)/$SLUG.md}" in src
-    assert "do NOT derive the plan from the branch slug" in src
 
 
 def test_plan_override_missing_file_aborts(tmp_path):
@@ -152,72 +105,6 @@ def test_plan_override_valid_path_passes_validation(tmp_path):
     assert "does not exist — aborting" not in r.stderr
     assert "not inside a git repo" in r.stderr
 
-
-
-def test_skill_block_matches_resolver(tmp_path):
-    """SKILL.md Phase 1 shell block and locate_plan agree on same corpus."""
-    import sys as _sys
-    _sys.path.insert(0, os.path.join(REPO, "tools", "postplan-harness"))
-    from harness.planfile import locate_plan
-
-    plans = tmp_path
-    for name in ("s.md", "s-shared-context.md", "s-2.md"):
-        (plans / name).write_text("---\nauto_merge: false\n---\n# " + name + "\n")
-
-    skill_md = os.path.join(REPO, ".claude", "skills", "post-plan", "SKILL.md")
-    skill_src = open(skill_md).read()
-    # Extract the resolution shell block between the two bash fences in Phase 1
-    import re
-    m = re.search(r"```bash\n(# Authoritative.*?PLAN_VARIANT_SELECTED.*?\n)```", skill_src, re.S)
-    assert m, "SKILL.md Phase 1 shell block not found"
-    shell_block = m.group(1)
-
-    # Use plan-resolve.sh test seams: PLAN_DIR and PLAN_SLUG override slug derivation.
-    env = os.environ.copy()
-    env["PLAN_DIR"] = str(plans)
-    env["PLAN_SLUG"] = "s"
-    script = (
-        f"cd {REPO!r}\n"
-        f'mkdir -p "{tmp_path!s}"\n'
-        + shell_block
-        + '\necho "PLAN_FILE=$PLAN_FILE"\n'
-        + '\necho "BEST=$BEST"\n'
-    )
-    r = subprocess.run(["bash", "-c", script], capture_output=True, text=True, env=env)
-    assert r.returncode == 0, r.stderr
-    # Skill should pick s-2.md (highest)
-    assert "s-2.md" in r.stdout, f"skill output: {r.stdout!r}"
-
-    # Resolver should also pick s-2.md
-    info = locate_plan("s", plans_dir=str(tmp_path))
-    assert info.path.endswith("s-2.md"), f"resolver picked: {info.path}"
-
-
-def test_skill_block_plan_blind(tmp_path):
-    """SKILL.md shell block on empty plans dir prints nothing, leaves PLAN_FILE empty."""
-    skill_md = os.path.join(REPO, ".claude", "skills", "post-plan", "SKILL.md")
-    skill_src = open(skill_md).read()
-    import re
-    m = re.search(r"```bash\n(# Authoritative.*?PLAN_VARIANT_SELECTED.*?\n)```", skill_src, re.S)
-    assert m, "SKILL.md Phase 1 shell block not found"
-    shell_block = m.group(1)
-
-    plans_dir = str(tmp_path / "empty-plans")
-    os.makedirs(plans_dir, exist_ok=True)
-    # Use plan-resolve.sh test seams: PLAN_DIR and PLAN_SLUG override slug derivation.
-    env = os.environ.copy()
-    env["PLAN_DIR"] = plans_dir
-    env["PLAN_SLUG"] = "no-such-slug"
-    script = (
-        f"cd {REPO!r}\n"
-        + shell_block
-        + '\necho "PLAN_FILE=${PLAN_FILE:-}"\n'
-        + 'if [ -z "${PLAN_FILE:-}" ]; then echo "PLAN_FOUND=none"; fi\n'
-    )
-    r = subprocess.run(["bash", "-c", script], capture_output=True, text=True, env=env)
-    assert r.returncode == 0, r.stderr
-    assert "PLAN_VARIANT_SELECTED" not in r.stdout
-    assert "PLAN_FOUND=none" in r.stdout
 
 
 def _fixture_repo(tmp_path, dirty_default=True, dirty=None):
@@ -298,18 +185,6 @@ def _gh_stub(bin_dir, branch, rc=0):
     stub.chmod(0o755)
 
 
-def _guard_block():
-    """Extract the Phase 0 guard block verbatim from SKILL.md."""
-    skill_path = os.path.join(REPO, ".claude", "skills", "post-plan", "SKILL.md")
-    src = open(skill_path).read()
-    START = "# --- post-plan worktree guard (Phase 0) ---"
-    END   = "# --- end post-plan worktree guard ---"
-    parts = src.split(START)
-    assert len(parts) == 2, f"expected exactly one guard block start, got {len(parts) - 1}"
-    inner = parts[1].split(END)
-    assert len(inner) == 2, f"expected exactly one guard block end, got {len(inner) - 1}"
-    return (START + inner[0] + END).strip()
-
 def _run_ppn(tmp_path, args=(), extra_env=None, dirty=None, launchctl_stub=None):
     """Run bin/post-plan-now with launchctl + gh stubbed and HOME redirected.
 
@@ -334,7 +209,6 @@ def _run_ppn(tmp_path, args=(), extra_env=None, dirty=None, launchctl_stub=None)
     env = dict(os.environ, HOME=str(home), HARNESS=str(harness),
                LCTL_ARGV_LOG=str(tmp_path / "launchctl.argv"),
                PATH=f"{shim}:{os.environ['PATH']}")
-    env.pop("POST_PLAN_SKILL", None)
     env.pop("FAKE_PR_NUMBER", None)
     env.pop("POSTPLAN_FIRED_BY", None)
     env.update(extra_env or {})
@@ -350,34 +224,28 @@ def _generate_cmd(tmp_path, extra_env=None, args=()):
 
     return ppn_launch.launched_cmd(r.stdout, home)
 
-def test_generated_cmd_has_no_rc4_arm(tmp_path):
-    cmd = _generate_cmd(tmp_path)
-    assert '[ "$rc" = 4 ]' not in cmd, "rc=4 arm must be gone after the full-port"
-    assert cmd.index('should_fallback "$rc" 0 && ! usage_postrun_pause') < cmd.index('elif [ "$rc" = 3 ]; then')
+_OUTCOME_START = "if postplan_killed"
 
-def test_generated_cmd_carries_one_claude_invocation(tmp_path):
-    cmd = _generate_cmd(tmp_path)
-    assert cmd.count("caffeinate -s claude -p ") == 1
-    assert "RESUMING at Phase 5.5" not in cmd
-    assert "then execute every remaining phase of the shrunk skill" in cmd
-    # The crash-triage seam: the skill's Phase 2 reads the harness exit code from here.
-    assert 'POSTPLAN_HARNESS_RC="${rc:-}" ' in cmd
+
+def _outcome_seg(cmd):
+    """OUTCOME_SEG sliced out of the generated CMD: from its first token to the brace
+    that closes the harness group (the text before ``}; pp_rc=``)."""
+    assert cmd.count(_OUTCOME_START) == 1, "expected exactly one OUTCOME_SEG in the CMD"
+    return _OUTCOME_START + cmd.split(_OUTCOME_START, 1)[1].split("}; pp_rc=", 1)[0]
 
 
 def _rc3_gate(tmp_path, log_text="", block=None):
-    """The generated gate chain with the claude call stubbed, $LOG repointed at a
-    fixture this test controls, and the harness run dir repointed at a tmp dir.
+    """The generated OUTCOME_SEG with $LOG repointed at a fixture this test controls and
+    the harness run dir repointed at a tmp dir.
     `block` sets what the harness left there: None = no run dir at all, "" = an empty
     blocked-ship.txt, any other string = that file's text.
     Returns (gate_source, fixture_path)."""
     cmd = _generate_cmd(tmp_path)
-    gate = cmd.split("rc=$?; ", 1)[1].split("; }; pp_rc=", 1)[0]
-    gate = re.sub(r'CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0.*?--name "[^"]*"',
-                  'echo "RAN-SKILL"', gate)
-    real_log = re.search(r"grep -m1 '\^RESULT:' \"([^\"]+)\"", gate).group(1)
+    gate = _outcome_seg(cmd)
+    real_log = re.search(r'blocked_ship_block "[^"]+" "[^"]+" "[^"]+" "([^"]+)"', gate).group(1)
     fixture = tmp_path / "ship-run.log"
     fixture.write_text(log_text)
-    gate = gate.replace(real_log, str(fixture))   # rewrites the grep AND the "Log: ..." arg
+    gate = gate.replace(real_log, str(fixture))   # rewrites every "Log: ..." / kill-check arg
     real_dir = re.search(r'blocked_ship_block "([^"]+)"', gate).group(1)
     run_dir = tmp_path / "ship-run-dir"
     if block is not None:
@@ -409,39 +277,26 @@ def _marker_section(stdout):
 
 def _run_gate(gate, rc=3):
     return subprocess.run(
-        ["bash", "-c", f'source "{PPN}" >/dev/null 2>&1; rc={rc}; {gate}'],
+        ["bash", "-c",
+         f'source "{PPN}" >/dev/null 2>&1; . "{REPO}/bin/lib/usage-gate.sh"; rc={rc}; {gate}'],
         capture_output=True, text=True)
 
 
 def test_gate_selects_the_right_arm_per_rc(tmp_path):
-    """Branch selection, exercised on the GENERATED chain with the claude call stubbed.
+    """Branch selection, exercised on the GENERATED OUTCOME_SEG with a literal rc.
 
-    The single `caffeinate -s claude … --name "…"` span is replaced (with an echo
-    marker) and the harness segment with a literal rc; every condition under test —
-    `should_fallback "$rc"`, `[ "$rc" = 3 ]` — is the generated text.
+    rc 0, 1, 2 and 4 print nothing and exit 0 (no session, no notice); rc 3 prints the
+    blocked-ship block. Every condition under test is the generated text.
     """
-    cmd = _generate_cmd(tmp_path)
-    gate = cmd.split("rc=$?; ", 1)[1].split("; }; pp_rc=", 1)[0]
-    seen = []
-    def _stub(_m):
-        seen.append(1)
-        return f'echo "RAN-{len(seen)}"'
-    gate = re.sub(r'CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0.*?--name "[^"]*"', _stub, gate)
-    assert len(seen) == 1
-
-    for rc, expect in ((4, "RAN-1"), (1, "RAN-1"), (2, "RAN-1"),
-                       (0, None), (3, None)):
-        r = subprocess.run(
-            ["bash", "-c", f'source "{PPN}" >/dev/null 2>&1; rc={rc}; {gate}'],
-            capture_output=True, text=True)
+    gate, _fixture = _rc3_gate(tmp_path)
+    for rc in (0, 1, 2, 4):
+        r = _run_gate(gate, rc=rc)
         assert r.returncode == 0, f"rc={rc}: {r.stderr!r}"
-        if expect:
-            assert expect in r.stdout, f"rc={rc}: expected {expect}, got {r.stdout!r}"
-        else:
-            assert "RAN-" not in r.stdout, f"rc={rc} must launch no session: {r.stdout!r}"
-        if rc == 3:
-            assert "=== post-plan blocked ship ===" in r.stdout, "rc=3 lost its notice"
-            assert "did not ship. No PR opened." in r.stdout
+        assert r.stdout == "", f"rc={rc} must print nothing: {r.stdout!r}"
+    r = _run_gate(gate, rc=3)
+    assert r.returncode == 0, f"rc=3: {r.stderr!r}"
+    assert "=== post-plan blocked ship ===" in r.stdout, "rc=3 lost its notice"
+    assert "did not ship. No PR opened." in r.stdout
 
 
 def test_every_other_failure_dms_with_the_rerun_command(tmp_path):
@@ -483,15 +338,8 @@ def test_generated_cmd_captures_the_harness_result_line(tmp_path):
     cmd = _generate_cmd(tmp_path)
     assert "HARNESS_RESULT=$(grep -m1 '^RESULT:'" in cmd
     assert "HARNESS_RESULT=${HARNESS_RESULT:0:1200}" in cmd
-    assert (cmd.index("rc=$?; ") < cmd.index("HARNESS_RESULT=$(grep")
-            < cmd.index('should_fallback "$rc" 0 && ! usage_postrun_pause'))
-
-
-def test_skill_only_cmd_has_no_harness_result_capture(tmp_path):
-    cmd = _generate_cmd(tmp_path, extra_env={"POST_PLAN_SKILL": "1"})
-    # HARNESS_RESULT appears in the serialised badge function body in all paths;
-    # the negative path is that the *capture command* (POST_HARNESS_SEG) is absent.
-    assert "HARNESS_RESULT=$(grep" not in cmd
+    assert (cmd.index(" isolated ") < cmd.index("HARNESS_RESULT=$(grep")
+            < cmd.index(_OUTCOME_START))
 
 
 _ADR_HOOK_RESULT_LINE = (
@@ -528,7 +376,6 @@ def test_exit3_prints_the_block_file_verbatim(tmp_path):
     assert r.returncode == 0, r.stderr
     assert _marker_section(r.stdout) == block
     assert "bin/next-adr" in r.stdout
-    assert "RAN-" not in r.stdout
 
 
 def test_exit3_block_file_is_inert_data_not_shell(tmp_path):
@@ -567,7 +414,6 @@ def test_exit3_prints_plain_block_when_no_block_file(tmp_path, block, log_text):
     assert "Or open Claude in that folder" not in section
     for word in ("harness", "sentinel", "fallback", "terminal", "rc="):
         assert word not in section.lower(), word
-    assert "RAN-" not in r.stdout
 
 
 def _deferred_dm_prefix():
@@ -658,22 +504,6 @@ def test_failure_body_rc3_percent_is_safe_and_falls_back():
     assert "gate denial" in r2.stdout
 
 
-def test_prompt_assignment_count_is_still_two():
-    """The two real PROMPT sites must keep their order (index 1 is the plan-blind one)."""
-    src = open(PPN).read()
-    prompts = re.findall(r'^\s*(PROMPT="(?:[^"\\]|\\.)*")$', src, re.M)
-    assert len(prompts) == 2, f"expected exactly two PROMPT= sites, got {len(prompts)}"
-    assert "<slug>-N.md" in prompts[1]
-    assert not re.search(r'^\s*RESUME_(PROMPT|PLAN_CLAUSE)=', src, re.M)
-
-def test_should_fallback_body_unchanged():
-    src = open(PPN).read()
-    assert 'should_fallback() { [ "${2:-0}" = 1 ] && return 1; case "$1" in 0|3|7|76) return 1 ;; *) return 0 ;; esac; }' in src
-    assert _fb(4) == "0"     # 4 escalates to the full skill like any other non-0/3 code
-    assert _fb(6) == "0"     # neighbours of 7 still escalate: the arm is exact, not a range
-    assert _fb(8) == "0"
-    assert _fb(76) == "1"    # remote-unreachable: GitHub is down, a skill run would hit the same wall
-
 def test_bare_invocation_cmd_has_no_plan_slug_export(tmp_path):
     """Bare invocation (no --pr) must not inject PLAN_SLUG into $CMD."""
     cmd = _generate_cmd(tmp_path)
@@ -712,7 +542,6 @@ def test_foreground_exit3_message_quotes_the_harness_result(tmp_path, _private_l
     plan = tmp_path / "plan.md"; plan.write_text("# plan\n")
     env = dict(os.environ, HOME=str(home), HARNESS=str(harness),
                GH_CMD=str(shim / "gh"), PATH=f"{shim}:{os.environ['PATH']}")
-    env.pop("POST_PLAN_SKILL", None)
     repo = _fixture_repo(tmp_path)
     # $ROOT is `git rev-parse --show-toplevel` of the cwd, i.e. the linked worktree `repo`.
     # On rc=3 post-plan-now runs "$ROOT/bin/post-plan-fail-dm" "$ROOT" "$SAFE_SLUG" "$LOG" "$msg";
@@ -762,8 +591,10 @@ def test_plan_override_reaches_the_python_harness_in_live_mode():
     and the audit trail this field exists for would not cover the live run class.
     """
     src = open(PPN).read()
-    seg = next(l for l in src.splitlines() if l.startswith("    HARNESS_SEG="))
-    assert "--live${PLAN_ARG}" in seg
+    segs = [l for l in src.splitlines() if 'HARNESS_SEG="CLAUDE_HEADLESS=1' in l]
+    assert len(segs) == 2, "expected the background and foreground HARNESS_SEG lines"
+    for seg in segs:
+        assert "--live${PLAN_ARG}" in seg
 
 
 def _runner_module():
@@ -812,8 +643,10 @@ def _run_foreground(tmp_path, harness_rc, with_claude_stub=False, extra_args=(),
     bun_bin.mkdir(parents=True)
 
     # caffeinate stub: swallow leading flags (-s etc.), exec the rest.
+    caffeinate_log = tmp_path / "caffeinate-log.txt"
     (bun_bin / "caffeinate").write_text(
-        '#!/bin/sh\nwhile [ $# -gt 0 ] && [ "${1#-}" != "$1" ]; do shift; done\nexec "$@"\n')
+        '#!/bin/sh\nwhile [ $# -gt 0 ] && [ "${1#-}" != "$1" ]; do shift; done\n'
+        'printf "%s\\n" "$*" >> "$CAFFEINATE_LOG"\nexec "$@"\n')
     (bun_bin / "caffeinate").chmod(0o755)
 
     # fake harness: ignore all args, exit with the requested code.
@@ -823,8 +656,8 @@ def _run_foreground(tmp_path, harness_rc, with_claude_stub=False, extra_args=(),
         harness_body if harness_body is not None else f"#!/bin/sh\nexit {harness_rc}\n")
     (harness / "run").chmod(0o755)
 
-    env = dict(os.environ, HOME=str(home), HARNESS=str(harness))
-    env.pop("POST_PLAN_SKILL", None)
+    env = dict(os.environ, HOME=str(home), HARNESS=str(harness),
+               CAFFEINATE_LOG=str(caffeinate_log))
 
     if with_claude_stub:
         # claude stub: record each argv item on its own line via CLAUDE_LOG, exit 0.
@@ -873,10 +706,10 @@ def test_detached_default_submits_script(tmp_path):
 
 def test_script_sets_path_and_cwd_first(tmp_path):
     """The script runs under a bare launchd env: PATH is exported and the cd happens
-    before the first claude call."""
+    before the harness launch."""
     cmd = _generate_cmd(tmp_path)
     assert cmd.startswith("export PATH="), cmd[:60]
-    assert cmd.index('cd "') < cmd.index("claude -p")
+    assert cmd.index('cd "') < cmd.index(" isolated ")
 
 
 def test_submit_failure_removes_script(tmp_path):
@@ -944,20 +777,6 @@ def test_foreground_exit3_fails_closed(tmp_path):
     ), f"postplan-rc=3 harness-rc=3 marker not found in stdout:\n{r.stdout!r}"
 
 
-def test_foreground_exit1_falls_back(tmp_path):
-    """Row 6: harness exit 1 → claude fallback runs; marker carries harness-rc=1."""
-    r = _run_foreground(tmp_path, 1, with_claude_stub=True)
-    assert re.search(
-        r'^post-plan-now: postplan-rc=\d+ harness-rc=1 harness-run-dir=\S+$',
-        r.stdout, re.MULTILINE
-    ), f"harness-rc=1 marker not found in stdout:\n{r.stdout!r}"
-    claude_log = tmp_path / "claude-log.txt"
-    assert claude_log.exists(), "claude stub must have been invoked for harness-rc=1"
-    log_text = claude_log.read_text()
-    assert "then execute every remaining phase of the shrunk skill" in log_text, \
-        f"fallback prompt not found in claude args:\n{log_text!r}"
-
-
 def test_foreground_exit0_launches_no_claude(tmp_path):
     """Row 8: harness exit 0 → success; claude must NOT be invoked."""
     r = _run_foreground(tmp_path, 0, with_claude_stub=True)
@@ -966,20 +785,68 @@ def test_foreground_exit0_launches_no_claude(tmp_path):
         "claude must not be invoked on harness-rc=0"
 
 
-def test_foreground_exit4_takes_full_fallback_not_resume(tmp_path):
-    """Row 7: harness exit 4 → full skill fallback (same as rc=1); marker carries harness-rc=4."""
-    r = _run_foreground(tmp_path, 4, with_claude_stub=True)
-    assert re.search(
-        r'^post-plan-now: postplan-rc=\d+ harness-rc=4 harness-run-dir=\S+$',
-        r.stdout, re.MULTILINE
-    ), f"harness-rc=4 marker not found in stdout:\n{r.stdout!r}"
+# Harness exit code -> (process exit code, marker). Baseline recorded from the engine
+# before the skill fallback was retired: a harness crash now exits with the harness rc.
+@pytest.mark.parametrize("harness_rc, expected_rc, marker", [
+    (1, 1, "post-plan-now: postplan-rc=1 harness-rc=1"),
+    (2, 2, "post-plan-now: postplan-rc=2 harness-rc=2"),
+    (4, 4, "post-plan-now: postplan-rc=4 harness-rc=4"),
+])
+def test_foreground_harness_crash_exits_with_harness_rc(tmp_path, harness_rc, expected_rc, marker):
+    r = _run_foreground(tmp_path, harness_rc, with_claude_stub=True)
+    assert r.returncode == expected_rc, f"stdout={r.stdout!r} stderr={r.stderr!r}"
+    assert re.search(rf"^{re.escape(marker)} harness-run-dir=\S+$", r.stdout, re.MULTILINE), \
+        f"marker {marker!r} not found in stdout:\n{r.stdout!r}"
+
+
+def test_foreground_harness_crash_launches_no_claude(tmp_path):
+    r = _run_foreground(tmp_path, 1, with_claude_stub=True)
+    assert r.returncode == 1, f"stdout={r.stdout!r} stderr={r.stderr!r}"
     claude_log = tmp_path / "claude-log.txt"
-    assert claude_log.exists(), "claude stub must have been invoked for rc=4"
-    log_text = claude_log.read_text()
-    assert "then execute every remaining phase of the shrunk skill" in log_text, \
-        f"full fallback prompt not found in claude args:\n{log_text!r}"
-    assert "RESUMING at Phase 5.5" not in log_text, \
-        "rc=4 must take the full fallback, not the old RESUME_PROMPT"
+    assert not claude_log.exists() or claude_log.read_text() == "", \
+        "claude must not be invoked when the harness crashes"
+    harness_run = str(tmp_path / "fake-harness" / "run")
+    calls = (tmp_path / "caffeinate-log.txt").read_text().splitlines()
+    assert len(calls) == 1 and calls[0].startswith(f"{harness_run} isolated "), calls
+
+
+def test_generated_cmd_launches_no_claude(tmp_path):
+    cmd = _generate_cmd(tmp_path)
+    assert "claude -p" not in cmd
+    assert "--dangerously-skip-permissions" not in cmd
+    assert "POSTPLAN_HARNESS_RC" not in cmd
+
+
+def test_generated_cmd_concludes_badge_with_pp_rc(tmp_path):
+    """The foreground CMD tail concludes the badge with pp_rc, then prints the marker.
+
+    The foreground form is exec'd, so its CMD is not observable from outside; this
+    evaluates the real CMD_TAIL assignment out of bin/post-plan-now.
+    """
+    src = open(PPN).read().splitlines()
+    i = next(n for n, l in enumerate(src) if l.strip().startswith('CMD_TAIL="conclude_status_badge')
+             and "postplan-rc=" in l)
+    r = subprocess.run(["bash", "-c", f'HARNESS_RUN_DIR=/x; {src[i].strip()}; printf %s "$CMD_TAIL"'],
+                       capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    assert 'conclude_status_badge "$pp_rc"; echo "post-plan-now: postplan-rc=' in r.stdout, r.stdout
+    assert r.stdout.endswith("exit $pp_rc"), r.stdout
+
+
+def test_missing_harness_refuses_before_launch(tmp_path):
+    empty = tmp_path / "empty-harness"
+    empty.mkdir()
+    state = tmp_path / "home" / "ugstate"
+    r = _run_ppn(tmp_path, extra_env={"HARNESS": str(empty), "IBL5_USAGE_GATE_STATE_DIR": str(state)})
+    assert r.returncode == 1, f"stdout={r.stdout!r} stderr={r.stderr!r}"
+    assert "no executable harness" in r.stderr
+    # The in-flight guard runs `launchctl list` before the refusal, so the log is not empty;
+    # what must be absent is any submit (no job was launched).
+    assert ppn_launch.submit_calls(tmp_path / "launchctl.argv") == [], "no launchctl submit may run"
+    written = [q for q in (tmp_path / "home").rglob("*.json") if q.is_file()]
+    assert written == [], f"no usage marker may be written under HOME: {written}"
+    assert not any(state.rglob("*")) if state.exists() else True, "the usage state dir must stay empty"
+
 
 # --pr flag tests
 # ---------------------------------------------------------------------------
@@ -1107,7 +974,6 @@ def test_pr_flag_targets_the_matching_worktree_and_exports_plan_slug(tmp_path):
                HARNESS=str(harness),
                PATH=f"{shim}:{stub_dir}:{os.environ['PATH']}",
                POST_PLAN_MAIN_ROOT=str(main_root))
-    env.pop("POST_PLAN_SKILL", None)
     r = subprocess.run(["bash", PPN, "--pr", "42"],
                        capture_output=True, text=True,
                        cwd=str(wt_root), env=env)
@@ -1139,7 +1005,6 @@ def test_pr_flag_plan_blind_when_no_plan_file_exists(tmp_path):
                HARNESS=str(harness),
                PATH=f"{shim}:{stub_dir}:{os.environ['PATH']}",
                POST_PLAN_MAIN_ROOT=str(main_root))
-    env.pop("POST_PLAN_SKILL", None)
     r = subprocess.run(["bash", PPN, "--pr", "42"],
                        capture_output=True, text=True,
                        cwd=str(wt_root), env=env)
@@ -1161,7 +1026,6 @@ def test_refuses_to_run_in_the_main_checkout(tmp_path):
     (shim / "launchctl").chmod(0o755)
     env = dict(os.environ, HOME=str(home),
                PATH=f"{shim}:{os.environ['PATH']}")
-    env.pop("POST_PLAN_SKILL", None)
     # Run from the main checkout itself (which is on some-feature, not master/main/HEAD)
     r = subprocess.run(["bash", PPN],
                        capture_output=True, text=True,
@@ -1176,120 +1040,7 @@ def test_refuses_to_run_in_the_main_checkout(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# SKILL.md Phase 0 guard block tests
-# ---------------------------------------------------------------------------
-
-def test_phase0_guard_extracts_cleanly():
-    """_guard_block() must return a non-empty string containing both markers."""
-    block = _guard_block()
-    assert "# --- post-plan worktree guard (Phase 0) ---" in block
-    assert "# --- end post-plan worktree guard ---" in block
-    assert len(block) > 100
-
-
-def test_phase0_guard_already_in_target_arm_is_a_noop(tmp_path):
-    """ALREADY-IN-TARGET arm: linked worktree on the right branch → exit 0."""
-    _, wt_root = _fixture_worktree(tmp_path, "target-branch")
-    block = _guard_block()
-    env = dict(os.environ, PLAN_SLUG="target-branch")
-    r = subprocess.run(["bash", "-c", block],
-                       capture_output=True, text=True,
-                       cwd=str(wt_root), env=env)
-    assert r.returncode == 0, f"stdout={r.stdout!r} stderr={r.stderr!r}"
-    assert "ALREADY-IN-TARGET" in r.stdout
-
-
-def test_phase0_guard_main_checkout_arm_exits_nonzero(tmp_path):
-    """MAIN-CHECKOUT arm: running from the main checkout → exit 1, STOP in output."""
-    main_root, _ = _fixture_worktree(tmp_path, "some-branch")
-    block = _guard_block()
-    r = subprocess.run(["bash", "-c", block],
-                       capture_output=True, text=True,
-                       cwd=str(main_root))
-    assert r.returncode == 1
-    assert "STOP" in r.stdout
-    assert "MAIN-CHECKOUT" in r.stdout
-
-
-def test_phase0_guard_wrong_worktree_arm_exits_nonzero(tmp_path):
-    """WRONG-WORKTREE arm: linked worktree on wrong branch → exit 1."""
-    _, wt_root = _fixture_worktree(tmp_path, "wrong-branch")
-    block = _guard_block()
-    env = dict(os.environ, PLAN_SLUG="different-branch")
-    r = subprocess.run(["bash", "-c", block],
-                       capture_output=True, text=True,
-                       cwd=str(wt_root), env=env)
-    assert r.returncode == 1
-    assert "STOP" in r.stdout
-    assert "WRONG-WORKTREE" in r.stdout
-    assert "wrong-branch" in r.stdout
-    assert "different-branch" in r.stdout
-
-
-def test_phase0_guard_main_checkout_arm_wins_over_a_branch_match(tmp_path):
-    """MAIN-CHECKOUT must win even when PLAN_SLUG matches the main checkout's branch.
-
-    If the guard checked branch equality first, a main-checkout run on the correct
-    branch would slip through to ALREADY-IN-TARGET and exit 0. The is_in_worktree
-    check must be the outer gate.
-    """
-    main_root, _ = _fixture_worktree(tmp_path, "some-branch")
-    # The main checkout is on 'some-feature' (set by _fixture_repo).
-    main_branch_r = subprocess.run(
-        ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-        capture_output=True, text=True, cwd=str(main_root), check=True)
-    main_branch = main_branch_r.stdout.strip()
-    block = _guard_block()
-    # Set PLAN_SLUG to the main checkout's own branch — branch matches, but it's still main.
-    env = dict(os.environ, PLAN_SLUG=main_branch)
-    r = subprocess.run(["bash", "-c", block],
-                       capture_output=True, text=True,
-                       cwd=str(main_root), env=env)
-    assert r.returncode == 1, "main checkout must be refused even when branch matches PLAN_SLUG"
-    assert "MAIN-CHECKOUT" in r.stdout
-
-
-def test_phase0_guard_prearm_blocks_reserved_branch_name(tmp_path):
-    """Pre-arm: a worktree whose branch is named 'master' exits 1 before is_in_worktree.
-
-    The master|main|HEAD case fires on the branch-name check, not the worktree
-    check, so it catches a linked worktree on a reserved name as well as the main
-    checkout itself.
-
-    Uses the fixture repo's existing 'master' branch rather than -b master, which
-    git rejects when 'master' already exists as the initial default branch.
-    """
-    main_root, _ = _fixture_worktree(tmp_path, "some-branch")
-    wt_master = tmp_path / "wt-on-master"
-    subprocess.run(
-        ["git", "worktree", "add", str(wt_master), "master"],
-        cwd=str(main_root), check=True, capture_output=True)
-    wt_root = wt_master
-    block = _guard_block()
-    r = subprocess.run(["bash", "-c", block],
-                       capture_output=True, text=True,
-                       cwd=str(wt_root))
-    assert r.returncode == 1, f"stdout={r.stdout!r} stderr={r.stderr!r}"
-    assert "STOP" in r.stdout
-    assert "MAIN-CHECKOUT or detached HEAD" in r.stdout
-
-
-def test_phase0_guard_prearm_blocks_detached_head(tmp_path):
-    """Pre-arm: a detached HEAD state exits 1 before the is_in_worktree check."""
-    _, wt_root = _fixture_worktree(tmp_path, "some-detach-branch")
-    subprocess.run(["git", "checkout", "--detach", "HEAD"],
-                   cwd=str(wt_root), check=True, capture_output=True)
-    block = _guard_block()
-    r = subprocess.run(["bash", "-c", block],
-                       capture_output=True, text=True,
-                       cwd=str(wt_root))
-    assert r.returncode == 1, f"stdout={r.stdout!r} stderr={r.stderr!r}"
-    assert "STOP" in r.stdout
-    assert "MAIN-CHECKOUT or detached HEAD" in r.stdout
-
-# Exit-5 guard: a PR already exists and the working set touches no production files.
-# The failure mode is a SILENTLY DEAD guard, so each test below names the mutation it
-# catches; a guard that never fires still leaves the whole rest of this file green.
+# bin/post-plan-now pre-launch guards
 # ---------------------------------------------------------------------------
 
 _TEST_ONLY_DIRTY = {"ibl5/tests/Foo/BarTest.php": "<?php\n// test-only change\n"}
@@ -1403,145 +1154,20 @@ def test_force_flag_rejected_forms_fail_loudly(tmp_path):
         assert "unknown argument" in r.stderr, f"{args}: got {r.stderr!r}"
 
 
-# ---------------------------------------------------------------------------
-# Phase 4 CI-outcome resume clause. Phase 8 removed its only call site with the
-# exit-4 resume; the function and these tests stay for the skill-fallback arm.
-# ---------------------------------------------------------------------------
-
-def _clause(run_dir, sha):
-    """Run the REAL shell function out of bin/post-plan-now, not a text match."""
-    script = ('eval "$(sed -n "/^postplan_ci_resume_clause()/,/^}/p" "$1")"; '
-              'postplan_ci_resume_clause "$2" "$3"')
-    return subprocess.run(["bash", "-c", script, "_", PPN, str(run_dir), sha],
-                          capture_output=True, text=True)
-
-def _ci_file(tmp_path, sha, status):
-    p = tmp_path / f"ci-{sha}.json"
-    # indent=2/sort_keys shape matters: the clause greps the status on its own line
-    p.write_text('{\n'
-                 '  "failed_checks": [\n    "build"\n  ],\n'
-                 '  "sha": "' + sha + '",\n'
-                 '  "status": "' + status + '"\n'
-                 '}\n')
-    return p
-
-def test_ci_clause_reports_success(tmp_path):
-    _ci_file(tmp_path, "aaa111", "success")
-    r = _clause(tmp_path, "aaa111")
-    assert r.returncode == 0, r.stderr
-    assert "SUCCESS" in r.stdout
-    assert "Do NOT run" in r.stdout
-
-def test_ci_clause_reports_failure_and_orders_fix_before_5_5(tmp_path):
-    _ci_file(tmp_path, "bbb222", "failure")
-    r = _clause(tmp_path, "bbb222")
-    assert r.returncode == 0, r.stderr
-    assert "FAILURE" in r.stdout
-    assert "BEFORE spawning the Phase 5.5 fidelity reviewer" in r.stdout
-
-def test_ci_clause_unknown_when_file_missing(tmp_path):
-    """Fail-open lands on "watch it yourself", never on a fabricated green."""
-    r = _clause(tmp_path, "ccc333")
-    assert r.returncode == 0, r.stderr
-    assert "unknown" in r.stdout
-    assert "SUCCESS" not in r.stdout
-
-def test_ci_clause_indeterminate_on_timeout_status(tmp_path):
-    """A watch that never settled is not a reusable verdict."""
-    _ci_file(tmp_path, "ddd444", "timeout")
-    r = _clause(tmp_path, "ddd444")
-    assert r.returncode == 0, r.stderr
-    assert "indeterminate" in r.stdout
-    assert "SUCCESS" not in r.stdout
-
-def test_ci_clause_exits_zero_on_garbage_file(tmp_path):
-    """A truncated or corrupt outcome file must not abort the resume command."""
-    (tmp_path / "ci-eee555.json").write_text("not json")
-    r = _clause(tmp_path, "eee555")
-    assert r.returncode == 0, f"stdout={r.stdout!r} stderr={r.stderr!r}"
-    assert "SUCCESS" not in r.stdout
-    assert r.stdout.startswith("CI OUTCOME:")
-
-# --- Phase 2: session-id sidecar tests ---------------------------------------------------
-
-def _run_log_path(tmp_path):
-    """Return the one run log the detached launch wrote into POSTPLAN_LOG_DIR."""
-    logs = list(pathlib.Path(os.environ["POSTPLAN_LOG_DIR"]).glob("post-plan-now-wt-feature-*.log"))
-    assert len(logs) == 1, f"expected one log, got {logs}"
-    return str(logs[0])
-
-
-def test_generated_cmd_pins_exactly_one_session_id(tmp_path):
-    """The harness arm's claude -p leg carries exactly one --session-id.
-
-    Phase 8 removed the rc=4 resume leg, so $CMD now holds a single invocation.
-    Exactly-one is the assertion that matters: a second uuid appearing here would
-    mean a leg came back untracked, leaving the sidecar pointing at the wrong
-    transcript.
-    """
-    cmd = _generate_cmd(tmp_path)
-    matches = re.findall(r"--session-id '([0-9a-f-]{36})'", cmd)
-    assert len(matches) == 1, f"expected 1 --session-id occurrence, got {matches}"
-
-
-def test_session_id_matches_the_sidecar(tmp_path):
-    """The uuid in $CMD must match the sidecar written next to the log."""
-    cmd = _generate_cmd(tmp_path)
-    matches = re.findall(r"--session-id '([0-9a-f-]{36})'", cmd)
-    assert matches, "no --session-id found in cmd"
-    uuid = matches[0]
-
-    log_path = _run_log_path(tmp_path)
-    sidecar = pathlib.Path(log_path[:-4] + ".session")
-    try:
-        assert sidecar.exists(), f"sidecar not found at {sidecar}"
-        assert sidecar.read_text() == f"{uuid}\n", \
-            f"sidecar content {sidecar.read_text()!r} != {uuid!r}"
-    finally:
-        sidecar.unlink(missing_ok=True)
-
-
-def test_session_id_is_lowercase_canonical(tmp_path):
-    """The uuid must be lowercase — macOS uuidgen emits uppercase, which is_session_id rejects.
-
-    Explicitly assert uuid == uuid.lower(): an uppercase uuid passing the shq wrapper
-    would reach the plist fine but be rejected by the consumer's is_session_id gate,
-    silently producing a live run that shows permanently blank progress.
-    """
-    cmd = _generate_cmd(tmp_path)
-    matches = re.findall(r"--session-id '([0-9a-f-]{36})'", cmd)
-    assert matches, "no --session-id found in cmd"
-    uuid = matches[0]
-    assert re.match(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', uuid), \
-        f"uuid {uuid!r} is not lowercase canonical"
-    assert uuid == uuid.lower(), f"uuid {uuid!r} is not lowercase"
-
-
-def test_skill_only_leg_also_carries_a_session_id(tmp_path):
-    """POST_PLAN_SKILL=1: GATE_OPEN/GATE_CLOSE are empty, exactly one caffeinate invocation,
-    and it still carries --session-id.
-
-    This is the arm with no harness — an edit that only touches the harness gate would
-    leave the skill-only path bare, and it is the arm that runs on every machine where
-    tools/postplan-harness/run is not executable.
-    """
-    cmd = _generate_cmd(tmp_path, extra_env={"POST_PLAN_SKILL": "1"})
-    assert cmd.count("caffeinate -s claude -p ") == 1, \
-        "POST_PLAN_SKILL=1 should produce exactly one caffeinate invocation"
-    matches = re.findall(r"--session-id '([0-9a-f-]{36})'", cmd)
-    assert len(matches) == 1, f"expected one --session-id in skill-only cmd, got {matches}"
+def _outcome_seg_source_line():
+    src = open(PPN).read()
+    line = [l for l in src.splitlines() if l.startswith('OUTCOME_SEG="')]
+    assert len(line) == 1, f"expected one OUTCOME_SEG assignment, got {len(line)}"
+    return line[0]
 
 
 def test_exit3_message_is_shell_safe_and_reads_the_block():
-    """GATE_CLOSE is re-parsed by /bin/bash -lc on the far side of the launchd plist:
-    a backtick there silently mangles the message (see the file's own comments). Its one
+    """OUTCOME_SEG is re-parsed by /bin/bash -lc on the far side of the launch: a backtick
+    there silently mangles the message (see the file's own comments). Its one
     command substitution must be the escaped call to blocked_ship_block, and it must
     no longer carry the old fixed wording."""
-    src = open(PPN).read()
-    line = [l for l in src.splitlines() if l.strip().startswith("GATE_CLOSE=\"; elif")]
-    assert len(line) == 1, f"expected one populated GATE_CLOSE, got {len(line)}"
-    body = line[0]
-    assert "`" not in body, "backtick in GATE_CLOSE survives to a second shell parse"
+    body = _outcome_seg_source_line()
+    assert "`" not in body, "backtick in OUTCOME_SEG survives to a second shell parse"
     assert body.count("$(") == 1 and "\\$(blocked_ship_block " in body, \
         "the only command substitution must be the far-side blocked_ship_block call"
     assert "fail-closed sentinel" not in body and "SKIPPING" not in body
@@ -1565,12 +1191,9 @@ def test_exit3_dm_and_echo_send_the_same_single_string():
     """Pins the single-string invariant: echo and post-plan-fail-dm (which owns the DM)
     both receive the same $msg, assigned exactly once. Tests 3-6 rely on stdout as a
     valid proxy for the DM text."""
-    src = open(PPN).read()
-    line = [l for l in src.splitlines() if l.strip().startswith("GATE_CLOSE=\"; elif")]
-    assert len(line) == 1, f"expected one populated GATE_CLOSE, got {len(line)}"
-    body = line[0]
+    body = _outcome_seg_source_line()
     assert "'=== post-plan blocked ship ===' \\\"\\$msg\\\" '=== end blocked ship ==='" in body
-    assert 'bin/post-plan-fail-dm\\" ' in body and body.rstrip('"').endswith('\\"\\$msg\\" || true; fi')
+    assert 'bin/post-plan-fail-dm\\" ' in body and body.rstrip('"').endswith('\\"\\$msg\\" || true; fi; ')
     assert body.count("msg=") == 1
 
 
@@ -1603,7 +1226,6 @@ def test_mint_failure_aborts_before_bootstrap(tmp_path):
 
     env = dict(os.environ, HOME=str(home), HARNESS=str(harness),
                PATH=f"{shim}:{os.environ['PATH']}")
-    env.pop("POST_PLAN_SKILL", None)
     repo = _fixture_repo(tmp_path)
     r = subprocess.run(["bash", PPN], cwd=repo, env=env, capture_output=True, text=True)
 
@@ -1687,19 +1309,17 @@ def test_gate_denial_fails_closed_then_allows_a_refire(tmp_path):
 
 # ── Bug 2: SIGTERM reported as success ────────────────────────────────────────
 
-def test_generated_cmd_guards_gate_open_with_sigterm_flag(tmp_path):
-    """GATE_OPEN must check _sigterm_received so a SIGTERM'd run cannot launch claude.
+def test_generated_cmd_passes_sigterm_flag_to_kill_check(tmp_path):
+    """OUTCOME_SEG must hand _sigterm_received to the kill check, first in the chain.
 
-    Without the guard, a harness that exits non-zero (e.g. rc=1) after SIGTERM would
-    satisfy should_fallback(), spawning a full /post-plan skill session on a killed run.
+    Without it, a SIGTERM'd run whose harness exited non-zero would be reported as an
+    ordinary failure (or a blocked ship) instead of a kill.
     """
     cmd = _generate_cmd(tmp_path)
-    # The guard appears before should_fallback in the gate expression
-    gate_pos = cmd.index('should_fallback "$rc" 0 && ! usage_postrun_pause')
-    sigterm_guard = '_sigterm_received'
-    assert sigterm_guard in cmd[:gate_pos], (
-        "GATE_OPEN must check _sigterm_received BEFORE calling should_fallback"
-    )
+    seg = _outcome_seg(cmd)
+    assert 'postplan_killed "$rc" "${_sigterm_received:-0}"' in seg
+    assert seg.startswith(_OUTCOME_START), "the kill check must lead the outcome chain"
+    assert seg.index("postplan_killed") < seg.index('[ "$rc" = 3 ]')
 
 
 def test_generated_cmd_overrides_pp_rc_to_143_on_sigterm(tmp_path):

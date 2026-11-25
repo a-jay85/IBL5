@@ -11,7 +11,7 @@ returns one failure line (`FAILURE_LINE`) and nothing else.
 
 Entry points:
 - `write_record(...)`   called by gitad at resolve time; writes `<marker>.report.json`
-- `section_for(...)`    called by the runner (and the skill fallback through `main`)
+- `section_for(...)`    called by the runner (and by hand through `main`)
 - `python3 -m harness.conflict_report --branch B --repo R`   prints the section
 """
 from __future__ import annotations

@@ -544,26 +544,16 @@ done
 end_case rebase-only-prs-rejected
 fi
 
-# bin/post-plan-now: a rebase-only failure never falls back to the skill, and the harness
-# flag appears only in rebase-only mode.
+# bin/post-plan-now: the harness flag appears only in rebase-only mode.
 _ppn_bin="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/post-plan-now"
 if should_run "post-plan-now-rebase-only-helpers"; then
 begin_case
 _ppn_probe="$(
     # shellcheck source=/dev/null
     . "$_ppn_bin"
-    should_fallback 1 1; printf 'a%s ' "$?"
-    should_fallback 1 0; printf 'b%s ' "$?"
-    should_fallback 1; printf 'c%s ' "$?"
-    should_fallback 3 0; printf 'd%s ' "$?"
-    # Matrix row 18: rebase-only (second arg 1) never falls back, whatever the rc.
-    should_fallback 0 1; printf 'h%s ' "$?"
-    should_fallback 2 1; printf 'i%s ' "$?"
-    should_fallback 3 1; printf 'j%s ' "$?"
-    should_fallback 124 1; printf 'k%s ' "$?"
     printf 'e[%s] f[%s] g[%s]' "$(rebase_only_harness_arg 1)" "$(rebase_only_harness_arg 0)" "$(rebase_only_harness_arg "")"
 )"
-[[ "$_ppn_probe" == "a1 b0 c0 d1 h1 i1 j1 k1 e[ --rebase-only] f[] g[]" ]] \
+[[ "$_ppn_probe" == "e[ --rebase-only] f[] g[]" ]] \
     || fail "post-plan-now-rebase-only-helpers: probe gave '$_ppn_probe'"
 end_case post-plan-now-rebase-only-helpers
 fi

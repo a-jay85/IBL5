@@ -1,0 +1,20 @@
+{
+  "branch": "jsb-port-pl-0010-r1",
+  "schema": 2,
+  "tests": [
+    {
+      "capture": "captures/pl-0010.jsonl",
+      "capture_commit": "6a564fae625918930f10a6c7b2a85fbe0b3005ae",
+      "capture_host": "jsb-native",
+      "capture_sha256": "3cd453e973dba1e60a4b0aac561e1052c724519c94cfbc2a14ab545e5daf923b",
+      "file": "engine/internal/sim/tracepinned_pl0010_test.go",
+      "package": "./internal/sim",
+      "ported_files": [
+        "engine/internal/sim/ballhandler.go"
+      ],
+      "test": "TestTracePinnedPl0010BallHandler",
+      "test_blob": "816e680bffd8685cf21ef86abb4359ff79da813d"
+    }
+  ],
+  "token": "trace-pinned"
+}

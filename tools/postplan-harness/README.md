@@ -11,7 +11,7 @@ Status: INSTALLED (2026-07-16, explicit approval). `./run isolated
 <worktree> --live` is the live mode: it pushes to origin, executes the seven
 allowlisted `gh` mutations (each still audited to `out/actions.jsonl` with
 `executed: true`), and watches CI. `bin/post-plan-now` in IBL5 invokes it,
-falling back to the Sonnet `/post-plan` skill session if the harness fails.
+and a harness crash posts the failure comment, sends the crash DM and stops (ADR-0284).
 Without `--live`, every would-be side effect remains a typed intent record.
 
 ## What is code vs. what is still a model

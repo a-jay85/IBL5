@@ -106,10 +106,10 @@ repointing it before master carries the new path would brick the next nightly ru
 (and unloading the launchd job would SIGTERM the very run doing the work). Do these
 steps **by hand on the Mac host, after this PR is merged to master and pulled**:
 
-1. **Repoint the launchd Program path** in
-   `~/Library/LaunchAgents/com.ibl5.automouse.plist`:
-   `…/bin/automouse-run` → `…/bin/automouse/run` (both `<Program>` and the
-   `ProgramArguments` string).
+1. **Repoint the launchd ProgramArguments** in
+   `~/Library/LaunchAgents/com.ibl5.automouse.plist` (ADR-0285). Set the array
+   to `/bin/bash`, `-c`, `exec "$0" "$@"`, `<abs path>/bin/automouse/run`, and
+   delete any `Program` key. The old path was `…/bin/automouse-run`.
 2. **Reload the daemon** so it reads the new path:
    ```bash
    launchctl unload ~/Library/LaunchAgents/com.ibl5.automouse.plist

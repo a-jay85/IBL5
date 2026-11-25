@@ -526,6 +526,7 @@ ROWS
 if [ -n "\${STUB_SCHEDULED:-}" ]; then
     printf -- '-\t0\tcom.ibl5.fire-demo-oneshot\n'
     printf -- '-\t0\tcom.ibl5.demo-recurring\n'
+    printf -- '-\t0\tcom.ibl5.wrapped-oneshot\n'
 fi
 for e in \${STUB_ONESHOT_EPOCHS:-}; do
     printf -- '-\t0\tcom.ibl5.automouse-oneshot-%s\n' "\$e"
@@ -1536,6 +1537,20 @@ cat > "$LA/com.ibl5.fire-demo-oneshot.plist" <<'PLIST_EOF'
 </plist>
 PLIST_EOF
 cp "$PLIST" "$LA/com.ibl5.demo-recurring.plist"
+# A wrapped job (ADR-0285). The argv block comes from the real lsched helper, so a
+# drift between fleet-status's wrap literal and LSCHED_EXEC_WRAP turns this red.
+{
+    printf '%s\n' '<?xml version="1.0" encoding="UTF-8"?>' '<plist version="1.0">' '<dict>' \
+        '    <key>Label</key>' '    <string>com.ibl5.wrapped-oneshot</string>'
+    (. "$SCRIPT_DIR/lib/launchd-sched.sh"
+     lsched_wrapped_program_arguments "$HOME/bin/wrapped-tick" --once)
+    printf '%s\n' '    <key>StartCalendarInterval</key>' '    <dict>' \
+        '        <key>Month</key>' '        <integer>12</integer>' \
+        '        <key>Day</key>' '        <integer>25</integer>' \
+        '        <key>Hour</key>' '        <integer>9</integer>' \
+        '        <key>Minute</key>' '        <integer>15</integer>' \
+        '    </dict>' '</dict>' '</plist>'
+} > "$LA/com.ibl5.wrapped-oneshot.plist"
 SCHED="$(run_fleet STUB_SCHEDULED=1 STUB_ONESHOT_EPOCHS="$ONESHOT_SOON" \
     FLEET_STATUS_LAUNCH_AGENTS_DIR="$LA" \
     | sed -n '/SCHEDULED JOBS/,/PAUSED JOBS/p')"
@@ -1547,6 +1562,11 @@ assert_has "scheduled: fire time is the pinned date" \
     "$SCHED" 'fires [A-Z][a-z]{2} [0-9]{4}-12-25 09:15  ·  in '
 assert_has "scheduled: program is the script path" \
     "$SCHED" '/opt/demo/fire-demo.sh'
+# shellcheck disable=SC2088  # the page prints a literal ~, not an expanded path
+assert_has "scheduled: wrapped job shows its script" \
+    "$SCHED" '~/bin/wrapped-tick'
+assert_lacks "scheduled: wrapped job hides its trailing arg" \
+    "$SCHED" '--once'
 assert_has "scheduled: automouse one-shot label is listed" \
     "$SCHED" "◷ automouse one-shot"
 assert_has "scheduled: automouse one-shot fire time" \

@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-11-23
+last_verified: 2026-11-24
 ---
 
 # IBL5 Architecture Decision Records
@@ -126,6 +126,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0278](0278-jsb-native-hosted-trace-captures.md) | Trace-pinned evidence may cite a jsb-native capture | Accepted | An entry with `capture_host: jsb-native` pins `capture_commit` and `capture_sha256`; `harness.trace_pinned` reads the bytes from that commit, which must be reachable from jsb-native `main`, and CI holds with `capture-host-unavailable`. |
 | [0279](0279-jsb-draw-replay-parity.md) | Whole-day JSB draw replay finds the first divergent function | Accepted | `rng.NewReplay` feeds recorded raw draws through `sim.Options.RNG`; `sim.DrawSites` maps each runtime caller to the JSB function it ports, and `engine/cmd/jsbreplay` writes a draw log and box scores in one shape for both engines. Recordings stay in jsb-native. |
 | [0281](0281-homebrew-bash-floor.md) | Repo shell scripts need bash 4 or newer | Accepted | Every bash script uses `#!/usr/bin/env bash`, and executable ones carry a one-line version guard that exits 2 under bash 3.2. `bin/check-shell-portability` enforces both. The Mac runs Homebrew bash. Supersedes ADR-0268. |
+| [0285](0285-launchd-fixed-agents-exec-via-bin-bash.md) | Start every fixed launchd agent through /bin/bash | Accepted | Fixed `com.ibl5` agents run `/bin/bash -c 'exec "$0" "$@"' <script>`, so macOS sees a system binary and stops raising the Background Items Added pop-up. `bin/test-launchd-sched` enforces it, and `bin/post-merge-steps/launchd-rewrap-installed` rewraps installed plists. |
 
 ## When an ADR is Required
 

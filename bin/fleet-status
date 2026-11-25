@@ -1514,7 +1514,7 @@ wallclock_epoch() {
 
 # One plist's pinned fire epoch and program, tab-separated, or nothing.
 plist_oneshot() {
-    local f=$1 flat sci mo d h m y epoch now prog
+    local f=$1 flat sci mo d h m y epoch now prog wrap_head
     [ -f "$f" ] || return 0
     flat="$(tr -d '\r\n' < "$f" 2>/dev/null | sed 's/>[[:space:]]*</></g')"
     sci="${flat#*<key>StartCalendarInterval</key><dict>}"
@@ -1541,14 +1541,18 @@ plist_oneshot() {
         case "$epoch" in ''|*[!0-9]*) return 0 ;; esac
     fi
 
-    # The program is the last word of the last ProgramArguments string, which
-    # covers both `/bin/bash script.sh` and `bash -lc "exec ... script.sh"`.
+    # A wrapped job (ADR-0285) runs its 4th string; keep in sync with
+    # LSCHED_EXEC_WRAP. Otherwise the program is the last word of the last
+    # string, which covers `/bin/bash script.sh` and `bash -lc "exec ... script.sh"`.
     prog="${flat#*<key>ProgramArguments</key><array>}"
     if [ "$prog" != "$flat" ]; then
         prog="${prog%%</array>*}"
-        prog="${prog%</string>}"
-        prog="${prog##*<string>}"
-        prog="${prog##* }"
+        wrap_head='<string>/bin/bash</string><string>-c</string><string>exec "$0" "$@"</string><string>'
+        if [ "${prog#"$wrap_head"}" != "$prog" ]; then
+            prog="${prog#"$wrap_head"}"; prog="${prog%%</string>*}"
+        else
+            prog="${prog%</string>}"; prog="${prog##*<string>}"; prog="${prog##* }"
+        fi
         case "$prog" in "$HOME"/*) prog="~${prog#"$HOME"}" ;; esac
     else
         prog=''

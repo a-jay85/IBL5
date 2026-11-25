@@ -34,7 +34,7 @@ The defense from ADR-0266 stays. The harness reads the capture bytes from the co
 
 ## Consequences
 
-- Positive: the Go pinned tests run on every PR. A missing capture fails `go test`, because `jsbtrace.SkipIfAbsent` is gone.
+- Positive: CI can now run the Go pinned tests, because it has the captures. A missing capture fails `go test`, because `jsbtrace.SkipIfAbsent` is gone.
 - Positive: CI and the local harness check a capture the same way.
 - Negative: the capture files are public. The content scan above is the only review they get before the owner's capture PR.
 - Negative: jsb-native `captures/` keeps its history and receives no new files.

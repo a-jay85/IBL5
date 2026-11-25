@@ -20,7 +20,7 @@ The defense from ADR-0266 stays. The harness reads the capture bytes from the co
 
 `_check_capture` enforces a per-file cap of 8 MiB (8388608 bytes) as hold reason `capture-too-large`. `test_every_committed_capture_under_size_cap` pins the cap against every committed capture. The largest capture today is 4468937 bytes.
 
-**Base-branch rule.** A trace-pinned check reads the capture from base. A PR that adds a capture together with its evidence holds as `capture-not-on-base` and can never clear `trace-pinned`. A capture file always routes to `golden-new` (ADR-0266), so that PR goes to the owner. The normal path is ADR-0266's two PRs. The owner-held capture PR lands first, then the port PR records against master.
+**Base-branch rule.** A trace-pinned check reads the capture from base. A PR that adds a capture together with its evidence holds as `capture-in-diff` and can never clear `trace-pinned`. `allowlist_verdict` rejects the capture path before `_check_capture` runs. A capture file always routes to `golden-new` (ADR-0266), so that PR goes to the owner. The normal path is ADR-0266's two PRs. The owner-held capture PR lands first, then the port PR records against master.
 
 **Fresh-capture handoff.** The parity loop's `trace` and `record` write the capture into an IBL5 worktree named `jsb-capture-<row>`. That worktree ships as the owner-held capture PR. `port` refuses until the file is on IBL5 `origin/master` with the same sha256.
 

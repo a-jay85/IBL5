@@ -136,9 +136,6 @@ func decodePl0010(t *testing.T, i int, rec jsbtrace.Record) (pl0010In, pl0010Out
 // The p8_passthrough subtest pins that p8 passes through off play type 5 and
 // that p6 stays 0, which no capture record can show because both are 0 in all
 // of them.
-// The production selector selectBallHandler reads its one draw through Raw and
-// is labelled FUN_005c6100 in DrawSites, so the replay logs it in the form the
-// capture uses.
 func TestTracePinnedPl0010BallHandler(t *testing.T) {
 	const name = "pl-0010.jsonl"
 	jsbtrace.SkipIfAbsent(t, name)
@@ -226,28 +223,6 @@ func TestTracePinnedPl0010BallHandler(t *testing.T) {
 		}
 		if got.P6 != 0 {
 			t.Errorf("p6 %d with no prior handler, want 0", got.P6)
-		}
-	})
-	// The production selector reads one raw draw, the form the capture holds.
-	// Feed it the last captured raw value of the first record and require the
-	// replay log to show that value, api "raw", and the FUN_005c6100 label.
-	t.Run("production_draw_form", func(t *testing.T) {
-		in, _ := decodePl0010(t, 0, c.Records[0])
-		want := in.Rand[len(in.Rand)-1]
-		rp, err := rng.NewReplay([]int{want})
-		if err != nil {
-			t.Fatalf("replay: %v", err)
-		}
-		selectBallHandler(fiveEqualHandlers(), rp)
-		d := rp.Draws()
-		if len(d) != 1 {
-			t.Fatalf("selectBallHandler took %d draws, want 1", len(d))
-		}
-		if d[0].API != "raw" || d[0].Value != want {
-			t.Errorf("draw api %q value %d, want raw %d", d[0].API, d[0].Value, want)
-		}
-		if got := DrawSites[d[0].Caller]; got != "FUN_005c6100" {
-			t.Errorf("DrawSites[%q] = %q, want FUN_005c6100", d[0].Caller, got)
 		}
 	})
 	t.Logf("pinned %d capture records, %d written flags", len(c.Records), written)

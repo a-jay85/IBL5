@@ -426,15 +426,22 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ needs.mark-pending.outputs.head_sha }}
+          PR: ${{ needs.human-signoff.outputs.pr }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
-          bin/settle-pr-status --repo="$GITHUB_REPOSITORY" --head-sha="$HEAD_SHA" \
+          # A Dependabot-triggered run has a read-only token, so this write can
+          # fail. A failed job here would put a red check on master's tip, so
+          # warn and go on, like the verdict post above.
+          if ! bin/settle-pr-status --repo="$GITHUB_REPOSITORY" --head-sha="$HEAD_SHA" \
             --context='All checks settled' --target-url="$RUN_URL" \
             --line-dispatch=update-behind-prs.yml \
             --self='Aggregate check status,All checks settled' \
             --anchor='Tests and Analysis,E2E Tests,Meta checks,Infection PHP (per-PR diff)' \
             --ignore='human-signoff,needs-a-human label,human-approved fingerprint,auto-mergeable label,Enable auto-merge,notify-merge-digest,notify-fixed,Dispatch hotfix pass,Infection PHP,Plan mutation shards,Mutation coverage,Aggregate MSI,Infection PHP s01,Infection PHP s02,Infection PHP s03,Infection PHP s04,Infection PHP s05,Infection PHP s06,Infection PHP s07,Infection PHP s08,Infection PHP s09,Infection PHP s10,Notify Mutation Failure'
+          then
+            echo "::warning::Could not re-settle All checks settled on $HEAD_SHA (a Dependabot-triggered run has a read-only token). Run: gh workflow run all-checks-settled.yml -f pr_number=${PR:-N}"
+          fi
 
   needs-a-human-label:
     name: needs-a-human label
@@ -470,9 +477,11 @@ jobs:
             gh label create needs-a-human --color D93F0B \
               --description "Blocked on the human-signoff check; a maintainer must inspect it and apply human-approved" \
               2>/dev/null || true
-            gh api --method POST "repos/$GH_REPO/issues/$PR/labels" -f 'labels[]=needs-a-human' >/dev/null
+            gh api --method POST "repos/$GH_REPO/issues/$PR/labels" -f 'labels[]=needs-a-human' >/dev/null \
+              || echo "::warning::Could not add needs-a-human to PR #$PR (a Dependabot-triggered run has a read-only token)"
           elif case ",$LABELS," in *,needs-a-human,*) true ;; *) false ;; esac; then
-            gh api --method DELETE "repos/$GH_REPO/issues/$PR/labels/needs-a-human" >/dev/null
+            gh api --method DELETE "repos/$GH_REPO/issues/$PR/labels/needs-a-human" >/dev/null \
+              || echo "::warning::Could not remove needs-a-human from PR #$PR (a Dependabot-triggered run has a read-only token)"
           fi
 
   human-approved-fingerprint:

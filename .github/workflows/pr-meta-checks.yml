@@ -190,6 +190,18 @@ jobs:
         if: ${{ !cancelled() }}
         run: bin/check-registry-trigger-rows
 
+      # Fixer PRs (head ref jsb-fix-*) must not loosen a parity rule (ADR 0288).
+      # Runs the BASE ref's copy, so the PR cannot weaken the guard that judges it.
+      - name: Run bin/check-parity-rule-guard
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && startsWith(github.head_ref, 'jsb-fix-') }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if ! git show "$BASE_SHA:bin/check-parity-rule-guard" > "$RUNNER_TEMP/prg"; then
+            echo "check-parity-rule-guard missing at base: refusing (fail closed)"; exit 1
+          fi
+          bash "$RUNNER_TEMP/prg" --ibl5 "$BASE_SHA" HEAD
+
       - name: Run bin/check-model-pins
         if: ${{ !cancelled() }}
         run: bin/check-model-pins

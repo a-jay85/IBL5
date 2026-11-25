@@ -498,6 +498,25 @@ adr_append_only_step() {
     fi
 }
 
+# parity_rule_guard_step <queue|run>: local mirror of the pr-meta-checks.yml
+# step. It runs only on a jsb-fix-* branch (ADR 0288). The guard reads the range
+# from the current directory, so it starts at $ROOT.
+parity_rule_guard_step() {
+    local how="$1" branch=""
+    branch="$(git -C "$ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null)" || branch=""
+    case "$branch" in
+        jsb-fix-*) ;;
+        *) return 0 ;;
+    esac
+    # shellcheck disable=SC2016  # the inner shell expands its own arguments
+    local -a cmd=(bash -c 'cd "$1" && exec "$2" --ibl5 "$3" HEAD' _ "$ROOT" "$BIN/check-parity-rule-guard" "$BASE")
+    if [ "$how" = queue ]; then
+        queue_step "check-parity-rule-guard" hard "${cmd[@]}"
+    else
+        run_step "check-parity-rule-guard" hard "${cmd[@]}"
+    fi
+}
+
 # queue_step starts one step in the background; run_group_end waits for all of
 # them and reports in queue order, so output stays grouped and the step order
 # matches the table. bash 3.2: indexed arrays and plain wait only.
@@ -540,6 +559,7 @@ run_group_end() {
 META_INPUTS_test_check_model_pins="bin/test-check-model-pins bin/check-model-pins bin/lib/current-models bin/lib/model-pins-allowlist bin/lib/harness.sh bin/lib/usage-test-isolation.sh"
 META_INPUTS_test_check_engine_freeze="bin/test-check-engine-freeze bin/check-engine-freeze"
 META_INPUTS_test_check_pipefail_grep_q="bin/test-check-pipefail-grep-q bin/check-pipefail-grep-q"
+META_INPUTS_test_check_parity_rule_guard="bin/test-check-parity-rule-guard bin/check-parity-rule-guard"
 META_INPUTS_test_check_pipefail_assignment_guard="bin/test-check-pipefail-assignment-guard bin/check-pipefail-assignment-guard"
 META_INPUTS_test_check_reviewer_eval="bin/test-check-reviewer-eval bin/check-reviewer-eval bin/reviewer-eval bin/lib/harness.sh bin/lib/usage-test-isolation.sh bin/lib/branch-base.sh tools/postplan-harness/harness tools/postplan-harness/fixtures/reviewer-eval .claude/review-shared"
 META_INPUTS_reviewer_eval_validate="bin/reviewer-eval bin/lib/branch-base.sh tools/postplan-harness/harness tools/postplan-harness/fixtures/reviewer-eval .claude/review-shared"
@@ -563,6 +583,7 @@ if [ "$STAGE" = "pre-push" ]; then
     queue_step "check-pipefail-assignment-guard" hard "$BIN/check-pipefail-assignment-guard" "--since=$BASE"
     queue_step "check-exit-code-handling"      hard "$BIN/check-exit-code-handling" "--since=$BASE"
     adr_append_only_step queue  # hard only when a PR body is available
+    parity_rule_guard_step queue
     queue_step "test-check-shell-portability"  hard "$BIN/test-check-shell-portability"
     queue_step "check-shell-portability"       hard "$BIN/check-shell-portability"
     queue_step "test-check-design-system"      hard "$BIN/test-check-design-system"
@@ -631,6 +652,7 @@ if [ "$STAGE" = "post-pr" ]; then
 
     # check-adr-append-only with the live PR body, so an adr-edit-ok marker counts.
     adr_append_only_step run
+    parity_rule_guard_step run
 
     # Write state file for the Phase 6.5 arming condition to read.
     printf '%s\n' "${FAILED:+FAILED:${FAILED# }}" > "/tmp/ibl5-meta-checks-${PR}.status"

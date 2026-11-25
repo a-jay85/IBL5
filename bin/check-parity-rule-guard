@@ -1,0 +1,274 @@
+#!/usr/bin/env bash
+# bin/check-parity-rule-guard — refuses a parity-loop fix that loosens a rule.
+#
+# A jsb-fix-* run unblocks the parity loop. This guard stops it from unblocking
+# the loop by weakening the checks that stopped it. The rules are structural
+# (protected files, protected fixed-string tokens, add-only tests), so nothing
+# here judges intent from prose. The brief mode is the one text check.
+#
+# Usage:
+#   bin/check-parity-rule-guard --ibl5 <base> <head>          # IBL5 range, from the repo root
+#   bin/check-parity-rule-guard --jsbn <repo> <base> <head>   # jsb-native commit range
+#   bin/check-parity-rule-guard --brief <file>                # a fixer-authored plan-now brief
+#   bin/check-parity-rule-guard --print-rule-block            # the canonical rule block
+#
+# Exit codes (every caller treats any non-zero exit as a refusal):
+#   0  PASS: <mode>
+#   1  one "REFUSE: <rule> <path>: <line text>" line per hit
+#   2  CANNOT-TELL: <why> (or a usage error)
+#
+# CI runs a copy of this file taken from the base ref, with nothing beside it,
+# so it sources no other file.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
+set -Eeuo pipefail
+
+cannot_tell() {
+    printf 'CANNOT-TELL: %s\n' "$1"
+    exit 2
+}
+trap 'cannot_tell "internal error at line $LINENO"' ERR
+
+usage() {
+    printf 'usage: %s --ibl5 <base> <head> | --jsbn <repo> <base> <head> | --brief <file> | --print-rule-block\n' \
+        "check-parity-rule-guard" >&2
+}
+
+print_rule_block() {
+    cat <<'RULES'
+<<<PARITY-RULES
+1. The trace-pinned test stays: same test name, exact equality on every traced field.
+2. Every refuse check in tools/parity_loop and tools/postplan-harness stays as written.
+3. Caps stay as written: PORT_CAP, attempts, TRY_CAP, DAILY_FIX_CAP.
+4. bin/check-plan and bin/check-parity-rule-guard run unchanged and must pass.
+5. Existing tests are add-only. Add no skip markers.
+6. Never edit jsb-native/cleanroom/ or the ibl-engine repo. Never control UTM from the Mac.
+7. Never arm, approve, or run bin/owner-approve on this PR.
+8. Push jsb-native changes to its main from a fresh clone. Never pull, edit or commit in the live jsb-native checkout.
+9. Add ibl5/docs/parity-fixes/<branch slug>.md (description and last_verified frontmatter) listing each jsb-native commit SHA, or none.
+PARITY-RULES>>>
+RULES
+}
+
+# --- Protected files (R1) ------------------------------------------------------
+# An entry ending in "/" protects every path under it. Others match exactly.
+
+IBL5_FILES=(
+    'bin/check-parity-rule-guard'
+    'bin/test-check-parity-rule-guard'
+    '.github/workflows/pr-meta-checks.yml'
+    '.github/workflows/harness-legs.txt'
+    'bin/run-meta-checks-local'
+    'bin/check-plan'
+    'bin/jsb-parity-watch'
+    'bin/jsb-parity-watch-setup'
+    'bin/owner-approve'
+    'bin/lib/pr-armable.sh'
+    'tools/postplan-harness/harness/trace_pinned.py'
+    'tools/postplan-harness/harness/replay_progress.py'
+    'tools/postplan-harness/harness/armable.py'
+    'tools/postplan-harness/harness/gate_backtest.py'
+    'engine/docs/jsb-trace-capture.md'
+    '.claude/'
+    'jsb-native/'
+)
+
+JSBN_FILES=(
+    'tools/parity_loop/fixer.py'
+    'tools/parity_loop/guard.py'
+    'tools/parity_loop/lock.py'
+    'tools/parity_loop/diverge.py'
+    'tools/parity_loop/tests/fixtures/port_brief_round1.txt'
+    'tools/vm/tracehost.py'
+    'parity/vm.json'
+    'cleanroom/'
+)
+
+# --- Protected tokens (R2) -----------------------------------------------------
+# Fixed strings matched as substrings, so a longer identifier refuses too.
+
+IBL5_TOKENS=('TestTracePinned' 'trace-pinned' 'KICK_PORT_RE')
+
+JSBN_TOKENS=(
+    'PORT_CAP' 'TRY_CAP' 'DAILY_FIX_CAP' 'attempts' 'RECORD_DAYS' 'HANDOFF_STALE_S'
+    'PIN_GRACE_S' 'FORBIDDEN_APIS' '_check_hook' 'is_thin_capture' 'RAND_MAX' '"PASS"'
+    'PREFLIGHT_IDS' 'trace-pinned' 'plan-architect' 'exact' 'check-parity-rule-guard'
+    'fixer' 'pull_gate' 'clear_merged' 'jsbn_base'
+)
+
+# --- Add-only tests (R3) -------------------------------------------------------
+
+# Checked in order; a refusal names the first pattern that matched.
+TEST_PATHS=('ibl5/tests/' 'bin/test-' '/tests/' '_test.go')
+SKIP_RE='t\.Skip|markTestSkipped|@unittest\.skip|unittest\.skip|expectedFailure|pytest\.mark\.(skip|xfail)|\.skip\('
+
+# --- Brief wording -------------------------------------------------------------
+
+BRIEF_VERBS='drop(s|ping)?|remov(e|es|ing)|delet(e|es|ing)|skip(s|ping)?|disabl(e|es|ing)|relax(es|ing)?|loosen(s|ing)?|widen(s|ing)?|rais(e|es|ing)|increas(e|es|ing)|lower(s|ing)?|bypass(es|ing)?|weaken(s|ing)?|xfail|tolerance|approximate|--no-verify|--tier-ok'
+BRIEF_PHRASES='trace test|TestTracePinned|exact|equality|check-plan|caps?|refuse|refusals?|attempts|[A-Z_]+_CAP|guard|trace-pinned'
+
+HITS=0
+refuse() {
+    printf 'REFUSE: %s %s: %s\n' "$1" "$2" "$3"
+    HITS=$((HITS + 1))
+}
+
+TMP=""
+cleanup() {
+    if [ -n "$TMP" ]; then
+        rm -rf "$TMP"
+    fi
+}
+trap cleanup EXIT
+
+finish() {
+    if [ "$HITS" -gt 0 ]; then
+        exit 1
+    fi
+    printf 'PASS: %s\n' "$1"
+    exit 0
+}
+
+# test_path_of <path>: print the first test pattern the path matches.
+test_path_of() {
+    local p
+    for p in "${TEST_PATHS[@]}"; do
+        if [[ "/$1" == *"$p"* ]]; then
+            printf '%s' "$p"
+            return 0
+        fi
+    done
+    return 0
+}
+
+# check_range <mode> <repo> <base> <head>
+check_range() {
+    local mode="$1" repo="$2" base="$3" head="$4"
+    local ref status path f t line sign text test_pat
+    local -a files tokens
+
+    case "$mode" in
+        ibl5) files=("${IBL5_FILES[@]}"); tokens=("${IBL5_TOKENS[@]}") ;;
+        *) files=("${JSBN_FILES[@]}"); tokens=("${JSBN_TOKENS[@]}") ;;
+    esac
+
+    [ -d "$repo" ] || cannot_tell "missing repo: $repo"
+    for ref in "$base" "$head"; do
+        case "$ref" in
+            ''|-*) cannot_tell "bad ref: $ref" ;;
+        esac
+        git -C "$repo" rev-parse --verify --quiet "$ref^{commit}" >/dev/null 2>&1 \
+            || cannot_tell "git cannot resolve $ref in $repo"
+    done
+
+    TMP=$(mktemp -d)
+    local -a diff_cmd=(git -C "$repo" --literal-pathspecs diff --no-renames --no-ext-diff --no-textconv --no-color)
+
+    "${diff_cmd[@]}" --name-status -z "$base..$head" -- > "$TMP/names" 2>/dev/null \
+        || cannot_tell "git diff --name-status failed for $base..$head"
+    if [ ! -s "$TMP/names" ]; then
+        printf 'PASS: empty range\n'
+        exit 0
+    fi
+    "${diff_cmd[@]}" --numstat "$base..$head" -- > "$TMP/numstat" 2>/dev/null \
+        || cannot_tell "git diff --numstat failed for $base..$head"
+    while IFS= read -r line; do
+        if [[ "$line" == $'-\t-\t'* ]]; then
+            cannot_tell "binary change: ${line##*$'\t'}"
+        fi
+    done < "$TMP/numstat"
+
+    while IFS= read -r -d '' status && IFS= read -r -d '' path; do
+        for f in "${files[@]}"; do
+            if [[ "$path" == "$f" || ( "$f" == */ && "$path" == "$f"* ) ]]; then
+                refuse protected-file "$path" "status $status"
+                break
+            fi
+        done
+
+        test_pat=$(test_path_of "$path")
+        if [ -n "$test_pat" ] && [ "$status" = D ]; then
+            refuse "test-file-removed($test_pat)" "$path" "status $status"
+        fi
+
+        "${diff_cmd[@]}" --unified=0 "$base..$head" -- "$path" > "$TMP/patch" 2>/dev/null \
+            || cannot_tell "git diff failed for $path"
+        # Content lines only: everything after a hunk header, never the file headers.
+        awk '/^diff --git /{hunk=0; next} /^@@/{hunk=1; next} hunk && /^[+-]/' "$TMP/patch" > "$TMP/lines"
+
+        while IFS= read -r line || [ -n "$line" ]; do
+            sign="${line:0:1}"
+            text="${line:1}"
+            for t in "${tokens[@]}"; do
+                if [[ "$text" == *"$t"* ]]; then
+                    refuse protected-token "$path" "$line"
+                    break
+                fi
+            done
+            if [ "$sign" = '-' ] && [ -n "$test_pat" ]; then
+                refuse "test-line-removed($test_pat)" "$path" "$line"
+            fi
+            if [ "$sign" = '+' ] && [[ "$text" =~ $SKIP_RE ]]; then
+                refuse test-skip-added "$path" "$line"
+            fi
+        done < "$TMP/lines"
+    done < "$TMP/names"
+
+    finish "$mode"
+}
+
+check_brief() {
+    local file="$1" starts ends start end line rc
+    [ -f "$file" ] && [ -r "$file" ] || cannot_tell "unreadable brief: $file"
+    TMP=$(mktemp -d)
+
+    starts=$(awk '$0 == "<<<PARITY-RULES" {print NR}' "$file")
+    ends=$(awk '$0 == "PARITY-RULES>>>" {print NR}' "$file")
+    if ! [[ "$starts" =~ ^[0-9]+$ && "$ends" =~ ^[0-9]+$ ]] || [ "$starts" -ge "$ends" ]; then
+        refuse brief-block "$file" "need exactly one <<<PARITY-RULES ... PARITY-RULES>>> block"
+        finish brief
+    fi
+    start="$starts"
+    end="$ends"
+
+    awk -v s="$start" -v e="$end" 'NR >= s && NR <= e' "$file" > "$TMP/block"
+    print_rule_block > "$TMP/canonical"
+    if ! cmp -s "$TMP/block" "$TMP/canonical"; then
+        refuse brief-block "$file" "rule block differs from --print-rule-block"
+    fi
+
+    awk -v s="$start" -v e="$end" 'NR < s || NR > e' "$file" > "$TMP/outside"
+    rc=0
+    grep -a -iwE -- "($BRIEF_VERBS)" "$TMP/outside" > "$TMP/verbs" || rc=$?
+    [ "$rc" -le 1 ] || cannot_tell "grep failed on $file"
+    rc=0
+    grep -a -iwE -- "($BRIEF_PHRASES)" "$TMP/verbs" > "$TMP/hits" || rc=$?
+    [ "$rc" -le 1 ] || cannot_tell "grep failed on $file"
+    while IFS= read -r line || [ -n "$line" ]; do
+        refuse brief-weakens "$file" "$line"
+    done < "$TMP/hits"
+
+    finish brief
+}
+
+case "${1:-}" in
+    --ibl5)
+        [ $# -eq 3 ] || { usage; exit 2; }
+        check_range ibl5 . "$2" "$3"
+        ;;
+    --jsbn)
+        [ $# -eq 4 ] || { usage; exit 2; }
+        check_range jsbn "$2" "$3" "$4"
+        ;;
+    --brief)
+        [ $# -eq 2 ] || { usage; exit 2; }
+        check_brief "$2"
+        ;;
+    --print-rule-block)
+        [ $# -eq 1 ] || { usage; exit 2; }
+        print_rule_block
+        ;;
+    *)
+        usage
+        exit 2
+        ;;
+esac

@@ -163,3 +163,4 @@
 2 bin/test-check-registry-trigger-rows
 2 ibl5/bin/test-flake-ledger
 1 bin/test-jsb-parity-watch
+2 bin/test-check-parity-rule-guard

@@ -1,0 +1,378 @@
+#!/usr/bin/env bash
+# bin/test-check-parity-rule-guard — fixture harness for
+# bin/check-parity-rule-guard and for the Meta checks step that runs it. Each
+# case builds throwaway git repos, so no jsb-native checkout is needed.
+#
+# Usage: bin/test-check-parity-rule-guard [case_name ...]   (no arguments runs every case)
+# shellcheck disable=SC2329  # case_* and helpers are dispatched by name
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
+set -uo pipefail
+# shellcheck source=bin/lib/harness.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+GUARD="$REPO/bin/check-parity-rule-guard"
+WORKFLOW="$REPO/.github/workflows/pr-meta-checks.yml"
+h_tmp T
+
+R=""
+OUT=""
+RC=0
+
+# --- Fixtures ---------------------------------------------------------------------
+
+# new_repo <name>: set R to a fresh repo.
+new_repo() {
+    R="$T/$1"
+    h_git_repo "$R"
+}
+
+# put <path> <line>...: write a file under $R, one argument per line.
+put() {
+    local f="$R/$1"
+    shift
+    mkdir -p "$(dirname "$f")"
+    printf '%s\n' "$@" > "$f"
+}
+
+# commit: commit everything in $R and print the new SHA.
+commit() {
+    git -C "$R" add -A >/dev/null
+    git -C "$R" commit -q --allow-empty -m step
+    git -C "$R" rev-parse HEAD
+}
+
+# guard <args...>: run the guard from $R, set OUT (stdout and stderr) and RC.
+guard() {
+    OUT=$(cd "${R:-$T}" && "$GUARD" "$@" 2>&1)
+    RC=$?
+}
+
+rc_is() { h_eq "$1" "$2" "$RC"; }
+
+# brief <name> <outside line>...: write a brief holding the canonical block.
+brief() {
+    local f="$T/$1.brief"
+    shift
+    {
+        printf '/plan Fix the parity loop tooling bug.\n\n'
+        "$GUARD" --print-rule-block
+        printf '%s\n' "$@"
+    } > "$f"
+    printf '%s' "$f"
+}
+
+# --- Brief cases ------------------------------------------------------------------
+
+case_brief_drops_trace_test() {
+    guard --brief "$(brief drops 'Drop the exact trace test.')"
+    rc_is "drop trace test: exit 1" 1
+    h_contains "drop trace test: refused as weakening" "$OUT" "REFUSE: brief-weakens"
+    h_contains "drop trace test: names the line" "$OUT" "Drop the exact trace test."
+}
+
+case_brief_block_altered() {
+    local f
+    f="$(brief altered 'Fix the reader.')"
+    sed 's/on every traced field\./on every traced field!/' "$f" > "$f.2"
+    guard --brief "$f.2"
+    rc_is "one byte off: exit 1" 1
+    h_contains "one byte off: brief-block" "$OUT" "REFUSE: brief-block"
+
+    printf '/plan Fix it.\n' > "$T/noblock.brief"
+    guard --brief "$T/noblock.brief"
+    rc_is "no block: exit 1" 1
+    h_contains "no block: brief-block" "$OUT" "REFUSE: brief-block"
+
+    { cat "$f"; "$GUARD" --print-rule-block; } > "$f.3"
+    guard --brief "$f.3"
+    rc_is "two blocks: exit 1" 1
+    h_contains "two blocks: brief-block" "$OUT" "REFUSE: brief-block"
+}
+
+case_brief_negated_near_miss() {
+    guard --brief "$(brief negated 'In this fix, do not drop the trace test.')"
+    rc_is "negated line: exit 1" 1
+    h_contains "negated line: refused" "$OUT" "REFUSE: brief-weakens"
+}
+
+case_brief_clean_passes() {
+    guard --brief "$(brief clean 'Fix the capture reader so it handles an empty file.')"
+    rc_is "clean brief: exit 0" 0
+    h_eq "clean brief: PASS" "PASS: brief" "$OUT"
+}
+
+case_brief_capture_diagnosis_passes() {
+    guard --brief "$(brief diagnosis 'Remove the stale capture file; the hook wrote exactly 0 records.')"
+    rc_is "capture diagnosis: exit 0" 0
+    h_eq "capture diagnosis: PASS" "PASS: brief" "$OUT"
+}
+
+# --- jsb-native range cases -------------------------------------------------------
+
+case_jsbn_refuse_check_loosened() {
+    local base head
+    new_repo refuse_check
+    put tools/parity_loop/loop.py 'def validate(records):' '    if is_thin_capture(records):' '        return "blocked"' '    return "ok"'
+    base=$(commit)
+    put tools/parity_loop/loop.py 'def validate(records):' '    return "ok"'
+    head=$(commit)
+    guard --jsbn "$R" "$base" "$head"
+    rc_is "removed refuse check: exit 1" 1
+    h_contains "removed refuse check: names the line" "$OUT" "REFUSE: protected-token tools/parity_loop/loop.py: -    if is_thin_capture(records):"
+}
+
+case_jsbn_cap_raise() {
+    local base head
+    new_repo cap_raise
+    put tools/parity_loop/limits.py 'DAILY_FIX_CAP = 2' 'PORT_CAP = 3'
+    base=$(commit)
+    put tools/parity_loop/limits.py 'DAILY_FIX_CAP = 3' 'PORT_CAP = 4'
+    head=$(commit)
+    guard --jsbn "$R" "$base" "$head"
+    rc_is "cap raise: exit 1" 1
+    h_contains "cap raise: the daily cap line is refused" "$OUT" "+DAILY_FIX_CAP = 3"
+    h_contains "cap raise: the port cap line is refused" "$OUT" "+PORT_CAP = 4"
+}
+
+case_jsbn_protected_file() {
+    local base head
+    new_repo jsbn_protected
+    put tools/parity_loop/diverge.py 'x = 1'
+    put cleanroom/a.go 'package a'
+    base=$(commit)
+    put tools/parity_loop/diverge.py 'x = 2'
+    put cleanroom/b.go 'package a'
+    head=$(commit)
+    guard --jsbn "$R" "$base" "$head"
+    rc_is "jsbn protected file: exit 1" 1
+    h_contains "jsbn protected file: diverge.py" "$OUT" "REFUSE: protected-file tools/parity_loop/diverge.py"
+    h_contains "jsbn protected dir: cleanroom" "$OUT" "REFUSE: protected-file cleanroom/b.go"
+}
+
+case_attempts_substring_refuses() {
+    local base head
+    new_repo substring
+    put tools/parity_loop/recording.py 'x = 1'
+    base=$(commit)
+    put tools/parity_loop/recording.py 'x = 1' 'attemptsLeft = 1'
+    head=$(commit)
+    guard --jsbn "$R" "$base" "$head"
+    rc_is "substring token: exit 1" 1
+    h_contains "substring token: names the line" "$OUT" "+attemptsLeft = 1"
+}
+
+case_jsbn_gate_call_removed_refuses() {
+    local base head
+    new_repo gate_removed
+    put tools/parity_loop/loop.py 'def begin(root):' '    blocked = fixer.pull_gate(root)' '    return None'
+    base=$(commit)
+    put tools/parity_loop/loop.py 'def begin(root):' '    return None'
+    head=$(commit)
+    guard --jsbn "$R" "$base" "$head"
+    rc_is "gate call removed: exit 1" 1
+    h_contains "gate call removed: names the line" "$OUT" "-    blocked = fixer.pull_gate(root)"
+}
+
+# --- IBL5 range cases -------------------------------------------------------------
+
+case_ibl5_protected_file() {
+    local base head
+    new_repo ibl5_protected
+    put tools/postplan-harness/harness/trace_pinned.py 'X = 1'
+    base=$(commit)
+    put tools/postplan-harness/harness/trace_pinned.py 'X = 2'
+    put .claude/rules/new.md 'text'
+    head=$(commit)
+    guard --ibl5 "$base" "$head"
+    rc_is "ibl5 protected file: exit 1" 1
+    h_contains "ibl5 protected file: trace_pinned" "$OUT" "REFUSE: protected-file tools/postplan-harness/harness/trace_pinned.py"
+    h_contains "ibl5 protected dir: .claude" "$OUT" "REFUSE: protected-file .claude/rules/new.md"
+}
+
+case_ibl5_test_line_removed() {
+    local base head
+    new_repo test_removed
+    put ibl5/tests/FooTest.php '<?php' '$this->assertSame(1, 1);' '$this->assertSame(2, 2);'
+    base=$(commit)
+    put ibl5/tests/FooTest.php '<?php' '$this->assertSame(1, 1);'
+    head=$(commit)
+    guard --ibl5 "$base" "$head"
+    rc_is "test line removed: exit 1" 1
+    h_contains "test line removed: names the path rule" "$OUT" "REFUSE: test-line-removed(ibl5/tests/) ibl5/tests/FooTest.php"
+
+    rm "$R/ibl5/tests/FooTest.php"
+    head=$(commit)
+    guard --ibl5 "$base" "$head"
+    rc_is "test file deleted: exit 1" 1
+    h_contains "test file deleted: refused" "$OUT" "REFUSE: test-file-removed(ibl5/tests/)"
+}
+
+case_ibl5_skip_added() {
+    local base head
+    new_repo skip_added
+    put ibl5/tests/FooTest.php '<?php'
+    base=$(commit)
+    put ibl5/tests/FooTest.php '<?php' '$this->markTestSkipped("later");'
+    head=$(commit)
+    guard --ibl5 "$base" "$head"
+    rc_is "skip added: exit 1" 1
+    h_contains "skip added: refused" "$OUT" "REFUSE: test-skip-added ibl5/tests/FooTest.php"
+}
+
+case_rename_of_protected_refuses() {
+    local base head
+    new_repo rename
+    put bin/check-plan 'one' 'two' 'three'
+    base=$(commit)
+    git -C "$R" mv bin/check-plan bin/check-plan-old
+    head=$(commit)
+    guard --ibl5 "$base" "$head"
+    rc_is "rename of protected: exit 1" 1
+    h_contains "rename of protected: old path refused" "$OUT" "REFUSE: protected-file bin/check-plan: status D"
+}
+
+case_normal_fix_passes() {
+    local base head
+    new_repo normal_ibl5
+    put bin/plan-dup-check 'echo one'
+    base=$(commit)
+    put bin/plan-dup-check 'echo two'
+    head=$(commit)
+    guard --ibl5 "$base" "$head"
+    rc_is "normal ibl5 fix: exit 0" 0
+    h_eq "normal ibl5 fix: PASS" "PASS: ibl5" "$OUT"
+
+    new_repo normal_jsbn
+    put tools/parity_loop/recording.py 'DAYS = []'
+    base=$(commit)
+    put tools/parity_loop/recording.py 'DAYS = [1]'
+    head=$(commit)
+    guard --jsbn "$R" "$base" "$head"
+    rc_is "normal jsbn fix: exit 0" 0
+    h_eq "normal jsbn fix: PASS" "PASS: jsbn" "$OUT"
+}
+
+case_empty_range_passes() {
+    new_repo empty
+    guard --ibl5 HEAD HEAD
+    rc_is "empty range: exit 0" 0
+    h_eq "empty range: PASS" "PASS: empty range" "$OUT"
+}
+
+# --- Cannot-tell and usage cases --------------------------------------------------
+
+case_binary_cannot_tell() {
+    local base head
+    new_repo binary
+    base=$(commit)
+    printf 'a\000b\n' > "$R/blob.bin"
+    head=$(commit)
+    guard --ibl5 "$base" "$head"
+    rc_is "binary: exit 2" 2
+    h_contains "binary: CANNOT-TELL" "$OUT" "CANNOT-TELL: binary change: blob.bin"
+}
+
+case_bad_range_cannot_tell() {
+    new_repo bad_range
+    guard --ibl5 no-such-ref HEAD
+    rc_is "bad ref: exit 2" 2
+    h_contains "bad ref: CANNOT-TELL" "$OUT" "CANNOT-TELL:"
+    guard --jsbn "$T/no-such-repo" HEAD HEAD
+    rc_is "missing repo: exit 2" 2
+    h_contains "missing repo: CANNOT-TELL" "$OUT" "CANNOT-TELL: missing repo"
+    guard --brief "$T/no-such-brief"
+    rc_is "unreadable brief: exit 2" 2
+    h_contains "unreadable brief: CANNOT-TELL" "$OUT" "CANNOT-TELL: unreadable brief"
+}
+
+case_unknown_flag_exits_2() {
+    new_repo usage
+    guard --bogus
+    rc_is "unknown flag: exit 2" 2
+    h_contains "unknown flag: usage" "$OUT" "usage:"
+    guard
+    rc_is "no arguments: exit 2" 2
+    guard --ibl5 HEAD
+    rc_is "short --ibl5: exit 2" 2
+    guard --print-rule-block extra
+    rc_is "extra argument: exit 2" 2
+}
+
+# --- The Meta checks step ---------------------------------------------------------
+
+# step_body: print the run block of the guard step in the real workflow.
+step_body() {
+    awk '
+        /^      - name: / { inside = ($0 == "      - name: Run bin/check-parity-rule-guard"); body = 0; next }
+        inside && /^        run: \|$/ { body = 1; next }
+        body && /^          / { print substr($0, 11); next }
+        body { body = 0 }
+    ' "$WORKFLOW"
+}
+
+# run_step <base sha>: run the step body in $R, set OUT and RC.
+run_step() {
+    mkdir -p "$T/runner"
+    step_body > "$T/step.sh"
+    OUT=$(cd "$R" && BASE_SHA="$1" RUNNER_TEMP="$T/runner" bash -e "$T/step.sh" 2>&1)
+    RC=$?
+}
+
+case_ci_step_runs_base_copy() {
+    local base
+    h_contains "step body found in the workflow" "$(step_body)" "check-parity-rule-guard"
+
+    new_repo ci_base_copy
+    mkdir -p "$R/bin"
+    cp "$GUARD" "$R/bin/check-parity-rule-guard"
+    base=$(commit)
+    put bin/check-parity-rule-guard '#!/usr/bin/env bash' 'echo "PASS: weakened copy"'
+    commit >/dev/null
+    run_step "$base"
+    rc_is "head weakens the guard: exit 1" 1
+    h_contains "head weakens the guard: base copy refuses" "$OUT" "REFUSE: protected-file bin/check-parity-rule-guard"
+
+    new_repo ci_missing_base
+    base=$(commit)
+    mkdir -p "$R/bin"
+    cp "$GUARD" "$R/bin/check-parity-rule-guard"
+    commit >/dev/null
+    run_step "$base"
+    rc_is "no guard at base: exit 1" 1
+    h_contains "no guard at base: fail closed" "$OUT" "missing at base"
+
+    new_repo ci_clean
+    mkdir -p "$R/bin"
+    cp "$GUARD" "$R/bin/check-parity-rule-guard"
+    base=$(commit)
+    put bin/plan-dup-check 'echo one'
+    commit >/dev/null
+    run_step "$base"
+    rc_is "clean fix: exit 0" 0
+    h_contains "clean fix: PASS" "$OUT" "PASS: ibl5"
+}
+
+# --- Dispatch ------------------------------------------------------------------------
+
+ALL_CASES=""
+while read -r _ _ fn; do
+    case "$fn" in
+        case_*) ALL_CASES="$ALL_CASES $fn" ;;
+    esac
+done < <(declare -F)
+
+if [ $# -gt 0 ]; then
+    CASES="$*"
+else
+    CASES="$ALL_CASES"
+fi
+
+for c in $CASES; do
+    case "$ALL_CASES " in
+        *" $c "*) "$c" ;;
+        *) h_fail "unknown case: $c" ;;
+    esac
+done
+
+h_done

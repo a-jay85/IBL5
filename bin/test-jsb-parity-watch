@@ -17,6 +17,9 @@ h_tmp T
 BASE=1795430000
 SECRET="https://hooks.example.invalid/T3-SECRET-7f3a9c"
 AMDIR=".claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse"
+FIXER_SECRET="https://hooks.example.invalid/FIXER-SECRET-91bd02"
+FIX_KEY="capture-invalid:pl-0009"
+FIX_SLUG="jsb-fix-capture-invalid-pl-0009-t1"
 
 GREEN='[{"__typename":"CheckRun","status":"COMPLETED","conclusion":"SUCCESS","name":"a"}]'
 ROLL_FAILED='[{"__typename":"CheckRun","status":"COMPLETED","conclusion":"FAILURE","name":"a"}]'
@@ -67,13 +70,21 @@ while [ $# -gt 0 ]; do
     [ "$1" = "--head" ] && slug="$2"
     shift
 done
+[ -e "$JSB_STUB_DIR/fix/gh-fail-$slug" ] && exit 1
 f="$JSB_STUB_DIR/fix/gh-$slug.json"
 if [ -f "$f" ]; then cat "$f"; else echo '[]'; fi
 STUB
     write_stub curl <<'STUB'
 #!/bin/sh
 echo "$*" >> "$JSB_STUB_DIR/log/curl.argv"
-cat >> "$JSB_STUB_DIR/log/curl.stdin"
+config=$(cat)
+printf '%s\n' "$config" >> "$JSB_STUB_DIR/log/curl.stdin"
+# Which URL file's value arrived on stdin.
+case "$config" in
+    *FIXER-SECRET*) echo fixer ;;
+    *T3-SECRET*) echo parity ;;
+    *) echo unknown ;;
+esac >> "$JSB_STUB_DIR/log/curl.target"
 code=204
 [ -f "$JSB_STUB_DIR/fix/curl-code" ] && code=$(cat "$JSB_STUB_DIR/fix/curl-code")
 printf '%s' "$code"
@@ -159,6 +170,41 @@ no_actions() {
 }
 
 AM() { printf '%s' "$S/home/$AMDIR"; }
+
+# --- Fixer helpers ---------------------------------------------------------------
+
+# write_blockers <json>: the sandbox parity dir's state/blockers.json.
+write_blockers() { printf '%s\n' "$1" > "$S/parity/state/blockers.json"; }
+
+arm_fixer() {
+    printf '%s\n' "$FIXER_SECRET" > "$S/home/.config/jsb-parity/fixer-webhook-url"
+    chmod 600 "$S/home/.config/jsb-parity/fixer-webhook-url"
+}
+
+# one_blocker <id> [dm_sent]: one fixer-class active blocker, nothing claimed.
+one_blocker() {
+    write_blockers "$(jq -nc --arg id "$1" --argjson sent "${2:-false}" \
+        '{active: {($id): {first: 1, fix: "line one\nline two", bucket: "fixer", dm_sent: $sent}}, fixer: {}}')"
+}
+
+# one_fix <claim epoch>: FIX_KEY claimed, with its fix PR slug.
+one_fix() {
+    write_blockers "$(jq -nc --arg k "$FIX_KEY" --arg s "$FIX_SLUG" --argjson at "$1" \
+        '{active: {($k): {first: 1, fix: "f", bucket: "fixer", dm_sent: false}},
+          fixer: {open: {($k): {slug: $s, "try": 1, at: $at, row: "pl-0009", jsbn_base: "abc1234"}}}}')"
+}
+
+# quiet_row: the in-flight port row waits, so only the fixer paths can act.
+quiet_row() { gh_pr jsb-port-pl-0001 7 OPEN yes sha1 "$PENDING"; }
+
+# posts <parity|fixer>: webhook POSTs sent to that URL.
+posts() {
+    local n=0
+    if [ -f "$S/log/curl.target" ]; then n=$(grep -cx "$1" "$S/log/curl.target" || true); fi
+    echo "$n"
+}
+
+QUEUE() { slurp "$S/home/.cache/jsb-parity-fixer-queue.txt"; }
 
 # --- Lock cases (rows 3-6) -------------------------------------------------------
 
@@ -602,14 +648,264 @@ case_curl_failure_no_fingerprint() {
 
 # --- Safety cases (rows 30-32) -----------------------------------------------------
 
+sha256_file() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum < "$1"
+    else
+        shasum -a 256 < "$1"
+    fi
+}
+
 # no_secret_in <label>: the webhook URL appears in no output, argv, DM or cache file.
 no_secret_in() {
     local f leak=0
     for f in "$S/out" "$S/err" "$S"/log/*.argv "$S/log/discord-dm.stdin"; do
-        if [ -f "$f" ] && grep -qF -- "T3-SECRET" "$f"; then leak=1; h_fail "$1: secret leaked into $f"; fi
+        if [ -f "$f" ] && grep -qE -- "T3-SECRET|FIXER-SECRET" "$f"; then leak=1; h_fail "$1: secret leaked into $f"; fi
     done
-    if [ -d "$S/home/.cache" ] && grep -rqF -- "T3-SECRET" "$S/home/.cache"; then leak=1; h_fail "$1: secret leaked into the cache"; fi
+    if [ -d "$S/home/.cache" ] && grep -rqE -- "T3-SECRET|FIXER-SECRET" "$S/home/.cache"; then leak=1; h_fail "$1: secret leaked into the cache"; fi
     if [ "$leak" = 0 ]; then h_pass "$1: secret stays out of every output"; fi
+}
+
+# --- Fixer cases ------------------------------------------------------------------
+
+case_fixer_blocker_wakes_fixer() {
+    sandbox fixer_wake
+    quiet_row
+    arm_fixer
+    write_blockers '{"active":{"days-empty":{"first":1,"fix":"line one\nline two","bucket":"fixer","dm_sent":false},"frida-missing":{"first":1,"fix":"x","bucket":"owner","dm_sent":true}},"fixer":{}}'
+    run_watch
+    rc_is "fixer blocker: exit 0" 0
+    h_eq "fixer blocker: one fixer POST" 1 "$(posts fixer)"
+    h_eq "fixer blocker: no parity POST" 0 "$(posts parity)"
+    h_eq "fixer blocker: no DM" 0 "$(cnt discord-dm)"
+    h_eq "queue holds the key and a one-line context" "$(printf 'days-empty\tline one line two')" "$(QUEUE)"
+    h_absent "the fixer POST records no parity fingerprint" "$S/home/.cache/jsb-parity-watch.last"
+    reset_logs
+    NOW=$((BASE + 3600)) run_watch
+    h_eq "one hour later: no second wake" 0 "$(posts fixer)"
+}
+
+case_fixer_unarmed_no_wake() {
+    sandbox fixer_unarmed
+    quiet_row
+    one_blocker days-empty
+    run_watch
+    rc_is "unarmed: exit 0" 0
+    no_actions "unarmed blocker"
+    h_absent "unarmed: no queue file" "$S/home/.cache/jsb-parity-fixer-queue.txt"
+}
+
+case_fixer_open_no_rewake() {
+    sandbox fixer_open
+    quiet_row
+    arm_fixer
+    one_fix "$BASE"
+    run_watch
+    no_actions "claimed blocker"
+    h_absent "claimed: no queue file" "$S/home/.cache/jsb-parity-fixer-queue.txt"
+    write_blockers '{"active":{"days-empty":{"first":1,"fix":"f","bucket":"fixer","dm_sent":false}},"fixer":{"owner":{"days-empty":"gave up"}}}'
+    run_watch
+    no_actions "owner-held blocker"
+    # Wake, claim, then the same blocker returns much later: it wakes again, with no DM.
+    sandbox fixer_recur
+    quiet_row
+    arm_fixer
+    one_blocker "$FIX_KEY"
+    run_watch
+    h_eq "recurrence: first wake" 1 "$(posts fixer)"
+    one_fix "$BASE"
+    NOW=$((BASE + 3600)) run_watch
+    one_blocker "$FIX_KEY"
+    reset_logs
+    NOW=$((BASE + 90000)) run_watch
+    h_eq "recurrence after a claim wakes again" 1 "$(posts fixer)"
+    h_eq "recurrence after a claim sends no DM" 0 "$(cnt discord-dm)"
+}
+
+case_fixer_stall_wakes_fixer_not_dm() {
+    sandbox fixer_stall
+    arm_fixer
+    run_watch
+    rc_is "armed stall: exit 0" 0
+    h_contains "armed stall: it is a no-trace stall" "$(out)" "STALL:no-trace"
+    h_eq "armed stall: one fixer POST" 1 "$(posts fixer)"
+    h_eq "armed stall: no DM" 0 "$(cnt discord-dm)"
+    h_contains "armed stall: queue key drops the ref" "$(QUEUE)" "$(printf 'stall:no-trace:pl-0001\tpl-0001:no-trace:none')"
+    reset_logs
+    NOW=$((BASE + 3600)) run_watch
+    h_eq "armed stall, one hour later: no DM" 0 "$(cnt discord-dm)"
+    h_eq "armed stall, one hour later: no second wake" 0 "$(posts fixer)"
+}
+
+case_fixer_unarmed_stall_dms_as_today() {
+    sandbox fixer_stall_unarmed
+    run_watch
+    h_eq "unarmed stall: one DM" 1 "$(cnt discord-dm)"
+    h_eq "unarmed stall: nothing POSTs to the fixer" 0 "$(cnt curl)"
+    h_contains "unarmed stall: stall key recorded" "$(slurp "$S/home/.cache/jsb-parity-stalls.txt")" "pl-0001:no-trace:none"
+}
+
+case_owner_stall_dms_once() {
+    sandbox fixer_owner_stall
+    arm_fixer
+    gh_pr jsb-port-pl-0001 42 OPEN no aaa "$GREEN"
+    run_watch
+    NOW=$((BASE + 3600)) run_watch
+    h_eq "owner stall: one DM across two runs" 1 "$(cnt discord-dm)"
+    h_eq "owner stall: nothing POSTs to the fixer" 0 "$(posts fixer)"
+}
+
+case_fixer_no_ack_dms_once() {
+    sandbox fixer_no_ack
+    quiet_row
+    arm_fixer
+    one_blocker days-empty
+    run_watch
+    h_eq "first wake: no DM" 0 "$(cnt discord-dm)"
+    NOW=$((BASE + 10800)) run_watch
+    h_eq "at exactly 3h: no DM yet" 0 "$(cnt discord-dm)"
+    NOW=$((BASE + 10801)) run_watch
+    h_eq "past 3h: one DM" 1 "$(cnt discord-dm)"
+    h_contains "past 3h: DM names the blocker" "$(slurp "$S/log/discord-dm.stdin")" "no ack for days-empty"
+    NOW=$((BASE + 14400)) run_watch
+    h_eq "next run: still one DM" 1 "$(cnt discord-dm)"
+    sandbox fixer_no_ack_sent
+    quiet_row
+    arm_fixer
+    one_blocker days-empty true
+    run_watch
+    NOW=$((BASE + 10801)) run_watch
+    h_eq "a blocker the loop already DM'd gets no second DM" 0 "$(cnt discord-dm)"
+    sandbox fixer_no_ack_stall
+    arm_fixer
+    run_watch
+    NOW=$((BASE + 10801)) run_watch
+    NOW=$((BASE + 14400)) run_watch
+    h_eq "an unclaimed stall DMs once after 3h" 1 "$(cnt discord-dm)"
+}
+
+case_fix_merged_wakes_parity() {
+    sandbox fix_merged
+    quiet_row
+    one_fix "$BASE"
+    gh_pr "$FIX_SLUG" 99 MERGED no f1 "$GREEN"
+    printf '500' > "$S/fix/curl-code"
+    run_watch
+    h_eq "merged fix, HTTP 500: one try" 1 "$(posts parity)"
+    rm -f "$S/fix/curl-code"
+    reset_logs
+    NOW=$((BASE + 3600)) run_watch
+    h_eq "merged fix: parity POST retried" 1 "$(posts parity)"
+    h_contains "merged fix: reason in the POST" "$(slurp "$S/log/curl.argv")" "\"reasons\":\"fix-merged:$FIX_SLUG\""
+    reset_logs
+    NOW=$((BASE + 7200)) run_watch
+    h_eq "merged fix, one hour later: no POST" 0 "$(cnt curl)"
+    reset_logs
+    NOW=$((BASE + 25200)) run_watch
+    h_eq "still uncleared after 6h: POSTs again" 1 "$(posts parity)"
+    h_eq "merged fix: never a DM" 0 "$(cnt discord-dm)"
+}
+
+case_fix_merged_single_parity_post() {
+    sandbox fix_merged_single
+    ledger "pl-0009:untraced:"
+    one_fix "$BASE"
+    run_watch
+    h_eq "no row in flight: first fire" 1 "$(posts parity)"
+    gh_pr "$FIX_SLUG" 99 MERGED no f1 "$GREEN"
+    reset_logs
+    NOW=$((BASE + 3600)) run_watch
+    h_eq "a merge inside 6h still fires, once" 1 "$(posts parity)"
+    h_contains "one POST carries both reasons" "$(slurp "$S/log/curl.argv")" "no-row-in-flight fix-merged:$FIX_SLUG"
+    reset_logs
+    NOW=$((BASE + 7200)) run_watch
+    h_eq "no double wake on the next run" 0 "$(cnt curl)"
+}
+
+# fix_pr_dm_case <label> <dm key kind>: two runs, one DM, no parity wake.
+fix_pr_dm_case() {
+    run_watch
+    NOW=$((BASE + 3600)) run_watch
+    h_eq "$1: one DM across two runs" 1 "$(cnt discord-dm)"
+    h_eq "$1: no parity POST" 0 "$(posts parity)"
+    h_contains "$1: DM key recorded" "$(slurp "$S/home/.cache/jsb-parity-stalls.txt")" "$2:$FIX_KEY:$FIX_SLUG"
+    h_contains "$1: DM gives the release command" "$(slurp "$S/log/discord-dm.stdin")" "parity_loop.py fix release --key $FIX_KEY --ibl5 "
+    h_contains "$1: DM gives the commit range" "$(slurp "$S/log/discord-dm.stdin")" "log --oneline abc1234..origin/main"
+}
+
+case_fix_pr_closed_dms_once() {
+    sandbox fix_closed
+    quiet_row
+    one_fix "$BASE"
+    gh_pr "$FIX_SLUG" 99 CLOSED no f1 "$GREEN"
+    fix_pr_dm_case "closed fix PR" fixer-pr-closed
+}
+
+case_fix_pr_red_dms_once() {
+    sandbox fix_red
+    quiet_row
+    one_fix "$BASE"
+    gh_pr "$FIX_SLUG" 99 OPEN no f1 "$ROLL_FAILED"
+    fix_pr_dm_case "red fix PR" fixer-pr-red
+}
+
+case_fix_pr_stale_dms_once() {
+    sandbox fix_young
+    quiet_row
+    one_fix $((BASE - 172800))
+    run_watch
+    h_eq "no PR at exactly 48h: no DM" 0 "$(cnt discord-dm)"
+    sandbox fix_stale
+    quiet_row
+    one_fix $((BASE - 172801))
+    fix_pr_dm_case "no fix PR after 48h" fixer-no-pr
+}
+
+case_fix_gh_error_no_action() {
+    sandbox fix_gh_error
+    arm_fixer
+    one_fix "$BASE"
+    : > "$S/fix/gh-fail-$FIX_SLUG"
+    run_watch
+    rc_is "fix gh failure: exit 0" 0
+    no_actions "fix gh failure"
+    h_contains "fix gh failure: line names the slug" "$(out)" "gh pr list failed for $FIX_SLUG"
+    h_absent "fix gh failure: nothing queued" "$S/home/.cache/jsb-parity-fixer-queue.txt"
+}
+
+case_fixer_dry_run_prints_decisions() {
+    sandbox fixer_dry
+    quiet_row
+    arm_fixer
+    write_blockers "$(jq -nc '{active: {"days-empty": {fix: "f", bucket: "fixer", dm_sent: false}},
+        fixer: {open: {"capture-thin:pl-0002": {slug: "jsb-fix-capture-thin-pl-0002-t1", at: 1, jsbn_base: "a"},
+                       "capture-thin:pl-0003": {slug: "jsb-fix-capture-thin-pl-0003-t1", at: 1, jsbn_base: "b"}}}}')"
+    gh_pr jsb-fix-capture-thin-pl-0002-t1 98 MERGED no f1 "$GREEN"
+    gh_pr jsb-fix-capture-thin-pl-0003-t1 99 CLOSED no f2 "$GREEN"
+    run_watch --dry-run
+    rc_is "dry run: exit 0" 0
+    h_contains "dry run: wake line" "$(out)" "fixer: wake days-empty"
+    h_contains "dry run: merged line" "$(out)" "fixer: fix-merged jsb-fix-capture-thin-pl-0002-t1"
+    h_contains "dry run: dm line" "$(out)" "fixer: dm fixer-pr-closed:capture-thin:pl-0003:jsb-fix-capture-thin-pl-0003-t1"
+    h_not_contains "dry run: no ERR trap line" "$(out)" "error at line"
+    no_actions "fixer dry run"
+    h_absent "dry run: nothing under the cache" "$S/home/.cache"
+}
+
+case_missing_blockers_json_as_today() {
+    local body
+    for body in missing '{not json' '[1]' '{"active":"x","fixer":7}'; do
+        sandbox "no_blockers_${#body}"
+        arm_fixer
+        [ "$body" = missing ] || write_blockers "$body"
+        gh_pr jsb-port-pl-0001 7 MERGED no sha1 "$GREEN"
+        run_watch
+        rc_is "blockers $body: exit 0" 0
+        h_eq "blockers $body: the parity fire happens" 1 "$(posts parity)"
+        h_eq "blockers $body: no fixer POST" 0 "$(posts fixer)"
+        h_eq "blockers $body: one gh call" 1 "$(cnt gh)"
+        h_not_contains "blockers $body: no ERR trap line" "$(out)" "error at line"
+    done
 }
 
 case_secret_never_leaks() {
@@ -627,6 +923,20 @@ case_secret_never_leaks() {
     printf '500' > "$S/fix/curl-code"
     run_watch
     no_secret_in "curl 500"
+    local before after code
+    for code in 204 500; do
+        sandbox "secret_fixer_$code"
+        quiet_row
+        arm_fixer
+        one_blocker days-empty
+        printf '%s' "$code" > "$S/fix/curl-code"
+        before=$(cksum < "$S/parity/state/blockers.json")
+        run_watch
+        after=$(cksum < "$S/parity/state/blockers.json")
+        no_secret_in "fixer wake HTTP $code"
+        h_contains "positive control: curl stdin holds the fixer secret ($code)" "$(slurp "$S/log/curl.stdin")" "FIXER-SECRET"
+        h_eq "blockers.json byte-identical ($code)" "$before" "$after"
+    done
 }
 
 case_read_only_surfaces() {
@@ -638,6 +948,16 @@ case_read_only_surfaces() {
     after=$(find "$S/parity" -type f -exec cksum {} + | sort)
     h_eq "a fire leaves the parity dir byte-identical" "$before" "$after"
     h_eq "the check-failed fire happened" 1 "$(cnt curl)"
+    sandbox read_only_fixer
+    quiet_row
+    arm_fixer
+    one_fix $((BASE - 172801))
+    gh_pr "$FIX_SLUG" 99 MERGED no f1 "$GREEN"
+    before=$(sha256_file "$S/parity/state/blockers.json")
+    run_watch
+    after=$(sha256_file "$S/parity/state/blockers.json")
+    h_eq "fixer paths leave blockers.json byte-identical" "$before" "$after"
+    h_eq "the merged-fix fire happened" 1 "$(posts parity)"
 }
 
 case_gh_read_only() {
@@ -648,6 +968,13 @@ case_gh_read_only() {
     h_exists "gh was called" "$S/log/gh.argv"
     bad=$(grep -vc '^pr list' "$S/log/gh.argv" || true)
     h_eq "every gh call is pr list" 0 "$bad"
+    sandbox gh_ro_fixer
+    arm_fixer
+    one_fix "$BASE"
+    run_watch
+    h_contains "the fix PR is read" "$(slurp "$S/log/gh.argv")" "--head $FIX_SLUG"
+    bad=$(grep -vc '^pr list' "$S/log/gh.argv" || true)
+    h_eq "every fixer gh call is pr list" 0 "$bad"
 }
 
 # --- CLI cases (rows 33-39) ---------------------------------------------------------

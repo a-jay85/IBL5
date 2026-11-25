@@ -25,6 +25,18 @@
 # A gh failure on any row aborts the run before any action. Any unexpected error
 # logs one line and exits 0, so launchd never throttles the job.
 #
+# Blocker fixer. Armed means the fixer webhook URL file is non-empty. State comes
+# from state/blockers.json under the parity dir.
+#
+#   fixer state                                       action
+#   ------------------------------------------------  ------------------------------
+#   armed, unfixed fixer-class blocker or stall       WAKE fixer webhook
+#   armed, stall the fixer cannot take                DM, as in the table above
+#   armed, no ack 3h after the first wake             DM once
+#   fix PR merged                                     FIRE webhook (fix-merged:<slug>)
+#   fix PR closed or red                              DM once
+#   fix PR never opened in 48h                        DM once
+#
 # Usage:
 #   bin/jsb-parity-watch             # act
 #   bin/jsb-parity-watch --dry-run   # print config, row and decision lines; act on nothing
@@ -69,6 +81,12 @@ MAIN_WT="$(lsched_main_wt "$REPO_ROOT")"
 STALE_AGE_S=14400
 MUTEX_STALE_S=60
 REFIRE_S=21600
+FIXER_URL_FILE="$HOME/.config/jsb-parity/fixer-webhook-url"
+FIXER_QUEUE="$HOME/.cache/jsb-parity-fixer-queue.txt"   # key<TAB>context, read by the fixer task
+FIXER_WAKES="$HOME/.cache/jsb-parity-fixer-wakes.txt"   # key<TAB>first_epoch<TAB>last_epoch
+FIXER_ACK_S=10800
+FIXER_PR_STALE_S=172800
+FIXER_STAGES=" plan-skipped plan-failed no-trace no-plan plan-now-failed "
 SCHEDULE_DELAY_S=120
 FAILED_CONCLUSIONS='["FAILURE","CANCELLED","TIMED_OUT","ACTION_REQUIRED","STARTUP_FAILURE","ERROR"]'
 INFLIGHT_FILTER='.rows[] | select(.status == "captured" and (.plan_slug // "") != "") | "\(.id) \(.plan_slug)"'
@@ -94,6 +112,9 @@ KICK=0
 GH_ERROR=""
 FACTS=""
 ROW_LINES=""
+FIXER_STATE=""
+FIXER_WAKE=0
+FIX_VERDICTS=""
 fp=""
 
 quiet_exit() { log "$1"; exit 0; }
@@ -283,11 +304,171 @@ stall_message() {
     esac
 }
 
-# fire_webhook <reasons>: POST once. The URL goes to curl only through its stdin config.
+fixer_armed() {
+    [ -s "$FIXER_URL_FILE" ]
+}
+
+# fixer_json: the active blockers and the fixer record, empty when unreadable.
+fixer_json() {
+    local f="$PARITY_DIR/state/blockers.json" out=""
+    trap - ERR
+    if [ -f "$f" ]; then
+        out=$(jq -c '{active: (.active // {}), fixer: (.fixer // {})}' "$f" 2>/dev/null) || out=""
+    fi
+    [ -n "$out" ] || out='{"active":{},"fixer":{}}'
+    printf '%s\n' "$out"
+}
+
+# fixer_known <key>: the fixer holds this key, as an open fix or as the owner's.
+fixer_known() {
+    jq -e --arg k "$1" '[.fixer.open?, .fixer.owner?] | any(.[]; type == "object" and has($k))' \
+        <<< "$FIXER_STATE" >/dev/null 2>&1
+}
+
+# put_line <file> <key> [value]: replace the key's tab-separated line, or drop it.
+put_line() {
+    local file="$1" key="$2" value="${3-}"
+    mkdir -p "$CACHE_DIR"
+    : >> "$file"
+    awk -F'\t' -v k="$key" '$1 != k' "$file" > "$file.tmp"
+    if [ -n "$value" ]; then printf '%s\t%s\n' "$key" "$value" >> "$file.tmp"; fi
+    mv "$file.tmp" "$file"
+}
+
+# wake_field <key> <column>: one number from the key's wakes line, or nothing.
+wake_field() {
+    local value=""
+    [ -f "$FIXER_WAKES" ] || return 0
+    value=$(awk -F'\t' -v k="$1" -v c="$2" '$1 == k && !f {print $c; f=1}' "$FIXER_WAKES")
+    case "$value" in ''|*[!0-9]*) return 0 ;; esac
+    echo "$value"
+}
+
+# fixer_wake_age <key>: seconds since the key's first wake, or nothing.
+fixer_wake_age() {
+    local first
+    first=$(wake_field "$1" 2)
+    [ -n "$first" ] || return 0
+    echo $((NOW - first))
+}
+
+# fixer_enqueue <key> <context>: queue the key, and ask for a wake when it is due.
+fixer_enqueue() {
+    local key="$1" context="$2" first last
+    context="${context//[$'\t\r\n']/ }"
+    first=$(wake_field "$key" 2)
+    last=$(wake_field "$key" 3)
+    [ -n "$first" ] || { first="$NOW"; last=""; }
+    if [ -z "$last" ] || [ $((NOW - last)) -gt "$REFIRE_S" ]; then
+        echo "fixer: wake $key"
+        FIXER_WAKE=1
+        last="$NOW"
+    fi
+    dry_guard "queue fixer key $key" || return 0
+    put_line "$FIXER_QUEUE" "$key" "$context"
+    put_line "$FIXER_WAKES" "$key" "$first"$'\t'"$last"
+}
+
+# A claim acks the wake. Dropping the wake line lets a later recurrence wake afresh.
+fixer_forget_claimed() {
+    local key keys
+    if [ "$DRY_RUN" != 0 ] || [ ! -s "$FIXER_WAKES" ]; then return 0; fi
+    keys=$(jq -r '[.fixer.open?, .fixer.owner?] | map(objects | keys[]) | .[]' <<< "$FIXER_STATE")
+    while read -r key; do
+        [ -n "$key" ] || continue
+        put_line "$FIXER_WAKES" "$key"
+    done <<< "$keys"
+}
+
+# fixer_dm <key> <text>: one error DM per key, deduped through the stalls file.
+fixer_dm() {
+    local key="$1" text="$2"
+    if grep -qxF -- "$key" "$STALLS" 2>/dev/null; then return 0; fi
+    echo "fixer: dm $key"
+    dry_guard "send fixer DM $key" || return 0
+    if printf '%s' "$text" | "$JSB_BIN/discord-dm" --quiet --error - >/dev/null 2>&1; then
+        mkdir -p "$CACHE_DIR"
+        printf '%s\n' "$key" >> "$STALLS"
+    else
+        log "discord-dm failed for $key; will retry next run"
+    fi
+}
+
+# fix_pr_dm <dm-kind> <stage text> <key> <slug>: the DM for a fix PR that cannot land.
+fix_pr_dm() {
+    local kind="$1" stage="$2" key="$3" slug="$4" base jsbn="$PARITY_DIR/.."
+    base=$(jq -r --arg k "$key" '.fixer.open[$k].jsbn_base // "<jsbn_base>"' <<< "$FIXER_STATE")
+    fixer_dm "$kind:$key:$slug" "JSB parity fixer: $stage for $key ($slug). The loop stays blocked. Check git -C $jsbn log --oneline $base..origin/main and revert bad commits, then run: python3 $jsbn/tools/parity_loop/parity_loop.py fix release --key $key --ibl5 $MAIN_WT"
+}
+
+# fix_pr_verdict <slug>: merged, closed, red, open or none. "error" on a gh failure.
+fix_pr_verdict() {
+    local slug="$1" prs pr state check
+    # Same subshell reason as row_verdict.
+    trap - ERR
+    if ! prs=$(gh pr list --repo a-jay85/IBL5 --head "$slug" --state all --json number,state,mergedAt,url,autoMergeRequest,statusCheckRollup,headRefOid 2>/dev/null) \
+        || ! pr=$(printf '%s' "$prs" | jq -c "$PR_PICK" 2>/dev/null); then
+        echo "error"; return 0
+    fi
+    if [ -z "$pr" ]; then echo "none"; return 0; fi
+    state=$(printf '%s' "$pr" | jq -r '.state')
+    case "$state" in
+        MERGED) echo "merged" ;;
+        CLOSED) echo "closed" ;;
+        OPEN)
+            check=$(printf '%s' "$pr" | jq -r --argjson failed "$FAILED_CONCLUSIONS" "$CHECK_FILTER")
+            if [ "$check" = "failed" ]; then echo "red"; else echo "open"; fi ;;
+        *) echo "open" ;;
+    esac
+}
+
+# fixer_actions: wake the fixer for open blockers and act on each fix PR verdict.
+fixer_actions() {
+    local key dm_sent fix age slug verdict at rows last
+    if fixer_armed; then
+        rows=$(jq -r '.active | objects | to_entries[] | select((.value | type) == "object" and .value.bucket == "fixer") | [.key, (if .value.dm_sent == false then "false" else "true" end), (.value.fix // "" | tostring | gsub("[\\t\\r\\n]+"; " "))] | @tsv' <<< "$FIXER_STATE")
+        while IFS=$'\t' read -r key dm_sent fix; do
+            [ -n "$key" ] || continue
+            if fixer_known "$key"; then continue; fi
+            age=$(fixer_wake_age "$key")
+            fixer_enqueue "$key" "$fix"
+            if [ "$dm_sent" = "false" ] && [ -n "$age" ] && [ "$age" -gt "$FIXER_ACK_S" ]; then
+                fixer_dm "fixer-no-ack:$key" "JSB parity fixer: no ack for $key after $((age / 3600))h. The loop stays blocked. Check that the T3 fixer task is on. Blocker: $fix"
+            fi
+        done <<< "$rows"
+    fi
+    while read -r key slug verdict; do
+        [ -n "$key" ] || continue
+        case "$verdict" in
+            merged)
+                # In the fingerprint on every run, so the first merge fires and a repeat does not.
+                FACTS="${FACTS:+$FACTS,}fix:$slug=merged"
+                last=$(wake_field "merged:$slug" 3)
+                if [ -z "$last" ] || [ $((NOW - last)) -ge "$REFIRE_S" ]; then
+                    echo "fixer: fix-merged $slug"
+                    FIRE_REASONS="$FIRE_REASONS fix-merged:$slug"
+                    FIRE_REASONS="${FIRE_REASONS# }"
+                fi ;;
+            closed) fix_pr_dm fixer-pr-closed "fix PR closed without merge" "$key" "$slug" ;;
+            red) fix_pr_dm fixer-pr-red "fix PR has a failed check" "$key" "$slug" ;;
+            none)
+                at=$(jq -r --arg k "$key" '.fixer.open[$k].at // 0 | floor' <<< "$FIXER_STATE")
+                if [ $((NOW - at)) -gt "$FIXER_PR_STALE_S" ]; then
+                    fix_pr_dm fixer-no-pr "no fix PR after 48h" "$key" "$slug"
+                fi ;;
+        esac
+    done <<< "$FIX_VERDICTS"
+    if [ "$FIXER_WAKE" = 1 ]; then
+        fire_webhook "fixer-queue" "$FIXER_URL_FILE"
+    fi
+}
+
+# fire_webhook <reasons> [url_file]: POST once. The URL goes to curl only through its
+# stdin config. url_file defaults to the parity webhook, the only one that records state.
 fire_webhook() {
-    local reasons="$1" url body code r
+    local reasons="$1" url_file="${2:-$WEBHOOK_FILE}" url body code r
     dry_guard "fire webhook ($reasons)" || return 0
-    url=$(head -n 1 "$WEBHOOK_FILE" 2>/dev/null || true)
+    url=$(head -n 1 "$url_file" 2>/dev/null || true)
     case "$url" in
         https://*) ;;
         *) log "webhook file unusable; no action taken"; return 0 ;;
@@ -299,12 +480,17 @@ fire_webhook() {
     code=$(printf 'url = "%s"\n' "$url" | curl -sS -o /dev/null -w '%{http_code}' --max-time 20 -X POST -H 'Content-Type: application/json' --data "$body" -K - 2>/dev/null) || code=000
     case "$code" in [0-9][0-9][0-9]) ;; *) code=000 ;; esac
     case "$code" in 2??) ;; *) log "webhook POST failed (HTTP $code)"; return 0 ;; esac
+    if [ "$url_file" != "$WEBHOOK_FILE" ]; then
+        log "fixer webhook POST ok (HTTP $code)"
+        return 0
+    fi
     mkdir -p "$CACHE_DIR"
     printf '%s %s\n' "$fp" "$NOW" > "$LAST.tmp"
     mv "$LAST.tmp" "$LAST"
     for r in $reasons; do
         case "$r" in
             *:check-failed:*) printf '%s:%s\n' "${r%%:*}" "${r##*:}" >> "$FIRED_SHAS" ;;
+            fix-merged:*) put_line "$FIXER_WAKES" "merged:${r#fix-merged:}" "$NOW"$'\t'"$NOW" ;;
         esac
     done
     log "webhook POST ok (HTTP $code) reasons=$reasons"
@@ -312,6 +498,7 @@ fire_webhook() {
 
 main() {
     local lockdir ledger inflight recording id slug out verdict fact key msg when last_fp="" last_at=0
+    local open_fixes s_row s_stage age
 
     if [ "$DRY_RUN" = 1 ]; then
         echo "config: parity_dir=$PARITY_DIR bin=$JSB_BIN plannow_dir=$PLANNOW_DIR now=$NOW"
@@ -364,6 +551,17 @@ main() {
         esac
     done <<< "$inflight"
 
+    FIXER_STATE=$(fixer_json)
+    open_fixes=$(jq -r '.fixer.open? | objects | to_entries[] | select((.value | type) == "object" and (.value.slug // "") != "") | "\(.key) \(.value.slug)"' <<< "$FIXER_STATE")
+    while read -r key slug; do
+        [ -n "$slug" ] || continue
+        verdict=$(fix_pr_verdict "$slug" </dev/null)
+        case "$verdict" in
+            merged|closed|red|open|none) FIX_VERDICTS="${FIX_VERDICTS}$key $slug $verdict"$'\n' ;;
+            *) GH_ERROR="$slug" ;;
+        esac
+    done <<< "$open_fixes"
+
     if [ -n "$GH_ERROR" ]; then
         quiet_exit "gh pr list failed for $GH_ERROR; no action taken"
     fi
@@ -379,7 +577,17 @@ main() {
         fi
     fi
 
+    fixer_forget_claimed
+
     for key in $STALL_KEYS; do
+        IFS=: read -r s_row s_stage _ <<< "$key"
+        if fixer_armed && [[ "$FIXER_STAGES" == *" $s_stage "* ]] && ! fixer_known "stall:$s_stage:$s_row"; then
+            age=$(fixer_wake_age "stall:$s_stage:$s_row")
+            if [ -z "$age" ] || [ "$age" -lt "$FIXER_ACK_S" ]; then
+                fixer_enqueue "stall:$s_stage:$s_row" "$key"
+                continue
+            fi
+        fi
         if grep -qxF -- "$key" "$STALLS" 2>/dev/null; then
             continue
         fi
@@ -393,6 +601,8 @@ main() {
             fi
         fi
     done
+
+    fixer_actions
 
     if [ -z "$FIRE_REASONS" ]; then
         echo "decision: no fire"

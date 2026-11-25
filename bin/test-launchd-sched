@@ -71,6 +71,9 @@ mkdir -p "$TMP/hb5-bash" && ln -sf "$BASH" "$TMP/hb5-bash/bash"
 BARE_PATH="$TMP/hb5-bash:/usr/bin:/bin"
 # shellcheck source=bin/lib/usage-test-isolation.sh
 . "$REPO_ROOT/bin/lib/usage-test-isolation.sh"; usage_test_isolate "$TMP/usage"
+# LSCHED_EXEC_WRAP and the wrap helpers come from the lib, the one owner of the literal.
+# shellcheck source=bin/lib/launchd-sched.sh
+. "$REPO_ROOT/bin/lib/launchd-sched.sh"
 
 MAIN_WT="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree / && !f {print $2; f=1}')"
 [ -n "$MAIN_WT" ] || MAIN_WT="$REPO_ROOT"
@@ -208,6 +211,170 @@ else
   fail "harness-coverage"
 fi
 
+# ── No plist leads with a repo-path executable (ADR-0285) ────────────────────
+# lead_verdict <plist file> — prints ok or bad:<reason>. A plist must start a system
+# binary (the allowlist below), never a path inside the repo or the user's home.
+# The golden node path is a stub the harness feeds through NODE_BIN.
+LEAD_ALLOWED=' /bin/bash /bin/sh /usr/bin/python3 /opt/homebrew/bin/node /opt/lsched-golden/bin/node /usr/bin/caffeinate '
+lead_verdict() {
+  local flat rest arr rest2 str
+  local -a s=()
+  flat="$(tr -d '\n\t' < "$1")"
+  case "$flat" in *'<key>Program</key>'*) echo 'bad:program-key'; return ;; esac
+  case "$flat" in
+    *'<key>ProgramArguments</key><array>'*) ;;
+    *) echo 'bad:no-program-arguments'; return ;;
+  esac
+  rest="${flat#*<key>ProgramArguments</key><array>}"
+  arr="${rest%%</array>*}"
+  while [[ "$arr" == *'<string>'* ]]; do
+    rest2="${arr#*<string>}"
+    str="${rest2%%</string>*}"
+    s+=("$str")
+    arr="${rest2#*</string>}"
+  done
+  case "$LEAD_ALLOWED" in *" ${s[0]:-} "*) ;; *) echo "bad:lead ${s[0]:-<none>}"; return ;; esac
+  if [ "${s[0]}" = /bin/bash ] && [ "${s[1]:-}" = -c ] && [ "${s[2]:-}" = "$LSCHED_EXEC_WRAP" ]; then
+    case "${s[3]:-}" in /*|@MAIN_WT@/*|@REPO_ROOT@/*|@HOME@/*) ;; *) echo 'bad:wrap-without-script'; return ;; esac
+  fi
+  echo ok
+}
+
+# (b) Every golden output plus the print-mode output of the two heredoc writers.
+PRINT_CHECKED="bin/docfix-poll bin/db-backups-pull"
+LEAD_FILES=""
+while IFS='|' read -r name _; do
+  [ -n "$name" ] || continue
+  LEAD_FILES="$LEAD_FILES $TMP/actual.$name"
+done <<< "$CASES"
+for pc in $PRINT_CHECKED; do
+  env -i HOME="$GOLDEN_HOME" PATH="$BARE_PATH" bash "$REPO_ROOT/$pc" --print-schedule \
+    > "$TMP/actual.print.${pc##*/}" 2>/dev/null || true
+  LEAD_FILES="$LEAD_FILES $TMP/actual.print.${pc##*/}"
+done
+lead_bad=""
+for lf in $LEAD_FILES; do
+  v="$(lead_verdict "$lf")"
+  [ "$v" = ok ] || lead_bad="$lead_bad ${lf#"$TMP"/actual.}($v)"
+done
+if [ -z "$lead_bad" ]; then
+  pass "lead-no-repo-executable"
+else
+  echo "  plists that do not lead with an allowed binary:$lead_bad" >&2
+  fail "lead-no-repo-executable"
+fi
+
+# (c) The cleanroom plist is wrapped. jsb-native is a private repo checked out beside
+# IBL5 (gitignored here), so it exists in the main checkout only. CI and a bare
+# worktree have no copy: the case then passes with a SKIP line instead of failing.
+CLEANROOM_PLIST=""
+for cr in "$REPO_ROOT" "$MAIN_WT"; do
+  if [ -f "$cr/jsb-native/cleanroom/bin/com.ibl5.cleanroom-nightly-validate.plist" ]; then
+    CLEANROOM_PLIST="$cr/jsb-native/cleanroom/bin/com.ibl5.cleanroom-nightly-validate.plist"
+    break
+  fi
+done
+if [ -z "$CLEANROOM_PLIST" ]; then
+  echo "SKIP cleanroom-plist-wrapped: jsb-native is not checked out here"
+  pass "cleanroom-plist-wrapped"
+elif [ "$(lead_verdict "$CLEANROOM_PLIST")" = ok ] \
+     && grep -qF "<string>$LSCHED_EXEC_WRAP</string>" "$CLEANROOM_PLIST"; then
+  pass "cleanroom-plist-wrapped"
+else
+  fail "cleanroom-plist-wrapped"
+fi
+
+# (d) Every output holding the wrap literal also puts brew first on PATH.
+brew_bad=""
+for lf in $LEAD_FILES; do
+  flat="$(tr -d '\n\t' < "$lf")"
+  case "$flat" in
+    *"<string>$LSCHED_EXEC_WRAP</string>"*)
+      case "$flat" in
+        *'<key>PATH</key><string>/opt/homebrew/bin:'*) ;;
+        *) brew_bad="$brew_bad ${lf#"$TMP"/actual.}" ;;
+      esac ;;
+  esac
+done
+if [ -z "$brew_bad" ]; then
+  pass "wrapped-path-has-brew"
+else
+  echo "  wrapped plists without a brew-first PATH:$brew_bad" >&2
+  fail "wrapped-path-has-brew"
+fi
+
+# (e) Synthetic negatives and a near miss.
+mkdir -p "$TMP/lead"
+# lead_plist <file> <string>... — a minimal plist whose argv is the strings.
+lead_plist() {
+  local f="$1" a; shift
+  { printf '<dict>\n\t<key>ProgramArguments</key>\n\t<array>\n'
+    for a in "$@"; do printf '\t\t<string>%s</string>\n' "$a"; done
+    printf '\t</array>\n</dict>\n'; } > "$f"
+}
+lead_plist "$TMP/lead/repo.plist" /Users/x/GitHub/IBL5/bin/wt-gc
+case "$(lead_verdict "$TMP/lead/repo.plist")" in
+  bad:lead*) pass "lead-rejects-repo-path" ;;
+  *) fail "lead-rejects-repo-path" ;;
+esac
+printf '<dict>\n\t<key>Program</key>\n\t<string>/x/y</string>\n</dict>\n' > "$TMP/lead/prog.plist"
+if [ "$(lead_verdict "$TMP/lead/prog.plist")" = "bad:program-key" ]; then
+  pass "lead-rejects-program-key"
+else
+  fail "lead-rejects-program-key"
+fi
+lead_plist "$TMP/lead/inline.plist" /bin/bash -c 'echo hi'
+if [ "$(lead_verdict "$TMP/lead/inline.plist")" = ok ]; then
+  pass "lead-accepts-inline-bash-c"
+else
+  fail "lead-accepts-inline-bash-c"
+fi
+lead_plist "$TMP/lead/noscript.plist" /bin/bash -c "$LSCHED_EXEC_WRAP"
+if [ "$(lead_verdict "$TMP/lead/noscript.plist")" = "bad:wrap-without-script" ]; then
+  pass "lead-wrap-needs-script"
+else
+  fail "lead-wrap-needs-script"
+fi
+
+# (f) Writer coverage: every file that writes a plist argv is converted, golden-checked,
+# print-checked or exempt with a reason.
+LEAD_EXEMPT="bin/automouse/run|one-shot /bin/bash -lc templates
+bin/burndown-loop|/bin/bash -lc
+bin/code-slice-review|/usr/bin/caffeinate lead
+bin/events-review|/usr/bin/caffeinate lead
+bin/jsb-parity-watch-setup|/bin/sh -c lead
+bin/fleet-status|reader"
+# writer_coverage <root> — prints the unclassified writer paths, space separated.
+writer_coverage() {
+  local root="$1" f rel unclassified=""
+  for f in "$root"/bin/* "$root"/bin/automouse/*; do
+    [ -f "$f" ] || continue
+    case "${f##*/}" in test-*) continue ;; esac
+    grep -qE '<key>ProgramArguments</key>|<key>Program</key>|lsched_program_arguments|lsched_wrapped_program_arguments|lsched_key_string Program' "$f" || continue
+    rel="${f#"$root"/}"
+    case "$CASES" in *"|$rel|"*) continue ;; esac
+    case " $PRINT_CHECKED " in *" $rel "*) continue ;; esac
+    case "$LEAD_EXEMPT" in
+      *"$rel|"*) ;;
+      *) unclassified="$unclassified $rel" ;;
+    esac
+  done
+  printf '%s\n' "$unclassified"
+}
+if [ -z "$(writer_coverage "$REPO_ROOT" | tr -d ' ')" ]; then
+  pass "writer-coverage"
+else
+  echo "  unclassified plist writers:$(writer_coverage "$REPO_ROOT")" >&2
+  fail "writer-coverage"
+fi
+mkdir -p "$TMP/fakeroot/bin"
+printf '#!/usr/bin/env bash\nlsched_key_string Program "$X"\n' > "$TMP/fakeroot/bin/fake-setup"
+if [ "$(writer_coverage "$TMP/fakeroot" | tr -d ' ')" = "bin/fake-setup" ]; then
+  pass "writer-coverage-rejects-unclassified"
+else
+  fail "writer-coverage-rejects-unclassified"
+fi
+
 # docfix-poll: the generated unit puts brew first on PATH, with nothing left for
 # launchd to expand and no empty value.
 dfp="$(env -i HOME="$GOLDEN_HOME" PATH="$BARE_PATH" bash "$REPO_ROOT/bin/docfix-poll" --print-schedule 2>/dev/null)" || dfp=""
@@ -339,6 +506,103 @@ err="$( ( set -uo pipefail; . "$LIB"; lsched_calendar_multi "Weekday=0,Hour=8" "
 ( set -uo pipefail; . "$LIB"; lsched_calendar_multi "Weekday=0,Hour=8" "" ) >/dev/null 2>&1
 rrc=$?
 if [ "$rrc" = "2" ] && [ -n "$err" ]; then pass "lib-reject: lsched_calendar_multi empty entry"; else fail "lib-reject: lsched_calendar_multi empty entry (rc=$rrc)"; fi
+
+# ── Wrap helper and installed-plist rewrap (ADR-0285) ────────────────────────
+expect_eq "helper-wrap-shape" "${TAB}<key>ProgramArguments</key>
+${TAB}<array>
+${TAB}${TAB}<string>/bin/bash</string>
+${TAB}${TAB}<string>-c</string>
+${TAB}${TAB}<string>exec \"\$0\" \"\$@\"</string>
+${TAB}${TAB}<string>/abs/x</string>
+${TAB}${TAB}<string>--once</string>
+${TAB}</array>" "$(emit lsched_wrapped_program_arguments /abs/x --once)"
+for hrej in "relative:rel/x" "system-binary:/bin/sh"; do
+  hname="${hrej%%:*}"; harg="${hrej#*:}"
+  herr="$( ( set -uo pipefail; . "$LIB"; lsched_wrapped_program_arguments "$harg" ) 2>&1 >/dev/null )"
+  ( set -uo pipefail; . "$LIB"; lsched_wrapped_program_arguments "$harg" ) >/dev/null 2>&1
+  hrc=$?
+  if [ "$hrc" = "2" ] && [ -n "$herr" ]; then pass "helper-rejects-$hname"; else fail "helper-rejects-$hname (rc=$hrc)"; fi
+done
+
+# rw_plist <file> <program|-> <argv string>... — an installed-plist fixture. A "-" program
+# writes no Program key. Extra keys let the tests prove the rewrap keeps them.
+mkdir -p "$TMP/rw"
+rw_plist() {
+  local f="$1" prog="$2" a; shift 2
+  {
+    printf '<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0">\n<dict>\n'
+    printf '\t<key>Label</key>\n\t<string>com.ibl5.rw</string>\n'
+    [ "$prog" = "-" ] || printf '\t<key>Program</key>\n\t<string>%s</string>\n' "$prog"
+    printf '\t<key>ProgramArguments</key>\n\t<array>\n'
+    for a in "$@"; do printf '\t\t<string>%s</string>\n' "$a"; done
+    printf '\t</array>\n'
+    printf '\t<key>WorkingDirectory</key>\n\t<string>/abs</string>\n'
+    printf '\t<key>EnvironmentVariables</key>\n\t<dict>\n\t\t<key>PATH</key>\n\t\t<string>/opt/homebrew/bin:/usr/bin</string>\n\t</dict>\n'
+    printf '\t<key>StartCalendarInterval</key>\n\t<dict>\n\t\t<key>Hour</key>\n\t\t<integer>3</integer>\n\t</dict>\n'
+    printf '\t<key>StandardOutPath</key>\n\t<string>/tmp/rw.out</string>\n'
+    printf '\t<key>StandardErrorPath</key>\n\t<string>/tmp/rw.err</string>\n'
+    printf '</dict>\n</plist>\n'
+  } > "$f"
+}
+# rw_argv <file> — prints the ProgramArguments list, one string per line, then
+# "program=<value|none>".
+rw_argv() {
+  python3 -I -c '
+import plistlib, sys
+d = plistlib.load(open(sys.argv[1], "rb"))
+print("\n".join(d.get("ProgramArguments", [])))
+print("program=" + str(d.get("Program", "none")))' "$1"
+}
+# rw_other_keys <file> — every key except the two argv keys, as sorted JSON.
+rw_other_keys() {
+  python3 -I -c '
+import json, plistlib, sys
+d = plistlib.load(open(sys.argv[1], "rb"))
+d.pop("Program", None); d.pop("ProgramArguments", None)
+print(json.dumps(d, sort_keys=True))' "$1"
+}
+rewrap() { ( set -uo pipefail; . "$LIB"; lsched_rewrap_plist "$@" ); }
+
+rw_plist "$TMP/rw/prog.plist" /abs/tick /abs/tick
+rw_before="$(rw_other_keys "$TMP/rw/prog.plist")"
+rw_out="$(rewrap "$TMP/rw/prog.plist")"
+expect_eq "rewrap-program-key" "wrapped|/bin/bash|-c|exec \"\$0\" \"\$@\"|/abs/tick|program=none" \
+  "$rw_out|$(rw_argv "$TMP/rw/prog.plist" | paste -sd'|' -)"
+expect_eq "rewrap-keeps-other-keys" "$rw_before" "$(rw_other_keys "$TMP/rw/prog.plist")"
+
+rw_plist "$TMP/rw/merge.plist" /abs/tick /ignored --tick
+rewrap "$TMP/rw/merge.plist" >/dev/null
+expect_eq "rewrap-merges-program-and-args" "/bin/bash|-c|exec \"\$0\" \"\$@\"|/abs/tick|--tick|program=none" \
+  "$(rw_argv "$TMP/rw/merge.plist" | paste -sd'|' -)"
+
+cp "$TMP/rw/prog.plist" "$TMP/rw/prog.once"
+rw_out="$(rewrap "$TMP/rw/prog.plist")"
+if [ "$rw_out" = "already-wrapped" ] && cmp -s "$TMP/rw/prog.plist" "$TMP/rw/prog.once"; then
+  pass "rewrap-idempotent"
+else
+  fail "rewrap-idempotent (got: $rw_out)"
+fi
+
+rw_plist "$TMP/rw/sh.plist" - /bin/sh -c 'echo hi'
+rw_plist "$TMP/rw/caff.plist" - /usr/bin/caffeinate -i /abs/x
+cp "$TMP/rw/sh.plist" "$TMP/rw/sh.orig"; cp "$TMP/rw/caff.plist" "$TMP/rw/caff.orig"
+rw_out="$(rewrap "$TMP/rw/sh.plist"),$(rewrap "$TMP/rw/caff.plist")"
+if [ "$rw_out" = "system-led,system-led" ] && cmp -s "$TMP/rw/sh.plist" "$TMP/rw/sh.orig" \
+   && cmp -s "$TMP/rw/caff.plist" "$TMP/rw/caff.orig"; then
+  pass "rewrap-system-led-untouched"
+else
+  fail "rewrap-system-led-untouched (got: $rw_out)"
+fi
+
+rw_plist "$TMP/rw/rel.plist" - relative/script
+cp "$TMP/rw/rel.plist" "$TMP/rw/rel.orig"
+rewrap "$TMP/rw/rel.plist" >/dev/null 2>&1
+rw_rc=$?
+if [ "$rw_rc" = "2" ] && cmp -s "$TMP/rw/rel.plist" "$TMP/rw/rel.orig"; then
+  pass "rewrap-rejects-relative"
+else
+  fail "rewrap-rejects-relative (rc=$rw_rc)"
+fi
 
 # lsched_plist wraps the body function.
 sample_body() { printf '\t<key>Label</key>\n\t<string>com.x</string>\n'; }

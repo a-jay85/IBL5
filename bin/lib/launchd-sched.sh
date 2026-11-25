@@ -10,7 +10,9 @@
 #   bin/wt-gc-cron-setup, bin/wt-sync-cron-setup, bin/db-sync-cron-setup,
 #   bin/sim-recap-cron-setup, bin/pr-cycle-tick-cron-setup,
 #   bin/automouse/*-digest-cron-setup, bin/backups-sync-setup,
-#   bin/bug-pipeline-cron-setup
+#   bin/bug-pipeline-cron-setup, bin/docfix-poll, bin/db-backups-pull,
+#   bin/launchd-health-cron-setup, bin/usage-gate-cron-setup,
+#   bin/approve-click-cron-setup, bin/post-merge-steps/launchd-rewrap-installed
 #
 # Every emitter writes with printf, tab indentation and one trailing newline
 # per line. Values are interpolated raw (never XML-escaped) so the output stays
@@ -18,6 +20,11 @@
 
 [[ -n "${_LSCHED_SOURCED:-}" ]] && return 0
 _LSCHED_SOURCED=1
+
+# Owner of the exec wrap literal (ADR-0285). launchd starts /bin/bash, so macOS
+# Background Task Management records a system binary whose code requirement never
+# changes; exec hands the process to the script, whose env shebang picks bash 4+.
+LSCHED_EXEC_WRAP='exec "$0" "$@"'
 
 # shellcheck source=bin/lib/launchd-job.sh
 . "${BASH_SOURCE[0]%/*}/launchd-job.sh"
@@ -76,6 +83,57 @@ lsched_program_arguments() {
     printf '\t<key>ProgramArguments</key>\n\t<array>\n'
     for a in "$@"; do printf '\t\t<string>%s</string>\n' "$a"; done
     printf '\t</array>\n'
+}
+
+# lsched_wrapped_program_arguments <abs-script> [arg]... (ADR-0285)
+lsched_wrapped_program_arguments() {
+    if [ "$#" -eq 0 ]; then
+        printf 'lsched_wrapped_program_arguments: script path required\n' >&2; return 2
+    fi
+    case "$1" in
+        /bin/*|/usr/bin/*|/usr/sbin/*|/sbin/*|/opt/homebrew/bin/*)
+            printf 'lsched_wrapped_program_arguments: %s is a system binary; use lsched_program_arguments\n' "$1" >&2
+            return 2 ;;
+        /*) ;;
+        *) printf 'lsched_wrapped_program_arguments: script path must be absolute, got: %s\n' "$1" >&2
+           return 2 ;;
+    esac
+    lsched_program_arguments /bin/bash -c "$LSCHED_EXEC_WRAP" "$@"
+}
+
+# lsched_rewrap_plist <plist> - rewrite an INSTALLED plist in place to the wrapped
+# form. Prints wrapped | already-wrapped | system-led. Exit 2, file untouched, on a
+# missing plist, no program, or a relative argv[0]. plistlib because CI has no plutil.
+lsched_rewrap_plist() {
+    [ -f "${1:-}" ] || { printf 'lsched_rewrap_plist: no such plist: %s\n' "${1:-}" >&2; return 2; }
+    python3 -I - "$LSCHED_EXEC_WRAP" "$1" <<'PY'
+import os, plistlib, sys
+wrap, path = sys.argv[1], sys.argv[2]
+SYSTEM = ('/bin/', '/usr/bin/', '/usr/sbin/', '/sbin/', '/opt/homebrew/bin/')
+def die(msg):
+    print('lsched_rewrap_plist: ' + msg, file=sys.stderr); sys.exit(2)
+with open(path, 'rb') as f:
+    d = plistlib.load(f)
+prog, pa = d.get('Program'), list(d.get('ProgramArguments') or [])
+if prog:
+    argv = [prog] + list(pa[1:])
+else:
+    argv = pa
+if not argv:
+    die('no Program or ProgramArguments in ' + path)
+if argv[:3] == ['/bin/bash', '-c', wrap]:
+    print('already-wrapped'); sys.exit(0)
+if argv[0].startswith(SYSTEM):
+    print('system-led'); sys.exit(0)
+if not argv[0].startswith('/'):
+    die('argv[0] must be absolute: ' + argv[0])
+d.pop('Program', None)
+d['ProgramArguments'] = ['/bin/bash', '-c', wrap] + argv
+with open(path + '.rewrap-tmp', 'wb') as f:
+    plistlib.dump(d, f, sort_keys=False)
+os.replace(path + '.rewrap-tmp', path)
+print('wrapped')
+PY
 }
 
 # lsched_calendar <Key=int>... — StartCalendarInterval dict, args in order.

@@ -93,13 +93,17 @@ func TestSelectBallHandlerDrawsThroughRaw(t *testing.T) {
 	if d.Caller != "sim.selectBallHandler" {
 		t.Errorf("caller = %q, want sim.selectBallHandler", d.Caller)
 	}
-	if got := DrawSites[d.Caller]; got != "FUN_005c6100" {
-		t.Errorf("DrawSites[%q] = %q, want FUN_005c6100", d.Caller, got)
+	if got := DrawSites["sim.selectBallHandler"]; got != "FUN_005c6100" {
+		t.Errorf("DrawSites[sim.selectBallHandler] = %q, want FUN_005c6100", got)
 	}
 }
 
 // TestSelectBallHandlerRawDrawBoundaries pins how a raw value maps to a pick.
 func TestSelectBallHandlerRawDrawBoundaries(t *testing.T) {
+	// Raw 0 picks t.players[0] (PID 1). Raw RawMax/2 picks t.players[2] (PID 3):
+	// the roll sits just under half of sum, inside the third fifth. Raw RawMax
+	// picks t.players[4] (PID 5): the roll stays below sum because the divisor
+	// is RawMax+1.
 	cases := []struct {
 		name    string
 		raw     int

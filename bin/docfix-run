@@ -11,6 +11,7 @@
 #
 # Usage: bin/docfix-run <issue-num> <sig>
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
@@ -171,7 +172,7 @@ esac
     # perl's alarm survives exec, so SIGALRM ends claude (the same fallback as
     # _pf_timeout_argv in bin/postplan-fix).
     printf 'cd %s && CLAUDE_HEADLESS=1 caffeinate -s perl -e "alarm shift; exec @ARGV or exit 127" 7200 claude -p %s --dangerously-skip-permissions --model claude-sonnet-5-5 --session-id %s --effort low --name %s\n' \
-        "$(shq "$WT_ROOT")" "$(shq "$PROMPT")" "$SESSION_ID" "$(shq "$LABEL")"
+        "$(shq "$WT_ROOT")" "$(shq "$PROMPT")" "$SESSION_ID" "$(shq "$LABEL")" # claude-perm-ok: unattended headless docfix run with no human to answer a prompt; edits docs in its worktree
 } > "$RUNNER"
 chmod 700 "$RUNNER"
 

@@ -13,6 +13,7 @@
 #
 # A "flaky" test is one Playwright retried and then passed: test-level status == "flaky".
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 JSON=""; RUN_ID=""; RUN_URL=""; MERGE=""; RETAIN_DAYS=90

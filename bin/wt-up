@@ -1,7 +1,8 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Start a Docker environment for a worktree with its own PHP-Apache + MariaDB.
 # Usage: bin/wt-up <worktree-name> [--pr] [--seed] [--prod] [--no-data] [--snapshot <file.sql.gz>]
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     cat <<'EOF'
 Usage: bin/wt-up <worktree-name> [--pr] [--seed] [--prod] [--no-data] [--snapshot <file.sql.gz>] [--force]

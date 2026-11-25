@@ -9,6 +9,7 @@
 # ibl_box_scores_teams, ibl_plr_snapshots, and ibl_plb_snapshots.
 # A phase snapshot is accurate for the current and previous season; older-season
 # comparisons may miss data in those four tables.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then

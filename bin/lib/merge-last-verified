@@ -26,6 +26,7 @@
 # put `*.md merge=text` in "$(git rev-parse --git-common-dir)/info/attributes"
 # for the command and remove it afterwards. Every worktree sees that file while
 # it exists.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 usage() {

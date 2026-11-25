@@ -8,6 +8,7 @@
 # caffeinate, claude), so no test reaches the real keychain, the live usage endpoint,
 # launchd or Discord. Named tests run as arguments: bin/test-burndown-loop test_cli_no_args
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -uo pipefail
 # shellcheck source=bin/lib/harness.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
@@ -85,7 +86,7 @@ new_env() {
     export IBL5_BURNDOWN_ENDGAME_HOURS=0
     REPORTS="$HOME/claude-plans/_reports"
     LAUNCH_DIR="$HOME/Library/LaunchAgents"
-    PATH="$STUB:$TMPROOT/bin:/usr/bin:/bin"
+    PATH="$STUB:$TMPROOT/bin:$(harness_bare_path "$TMPROOT")"
     export PATH
     make_stubs
 }
@@ -906,7 +907,7 @@ test_runner_exports_under_empty_env() {
     IBL5_BURNDOWN_DISCORD_DM="$T/a b'c/dm" run_loop start
     assert_eq runner_roundtrip:rc 0 "$RC"
     local got
-    got=$(env -i PATH=/usr/bin:/bin /bin/bash -c 'eval "$(grep "^export IBL5_BURNDOWN_" "$1")"; printf %s "$IBL5_BURNDOWN_DISCORD_DM"' _ "$STATE/runner.sh")
+    got=$(env -i PATH="$(harness_bare_path "$TMPROOT")" "$BASH" -c 'eval "$(grep "^export IBL5_BURNDOWN_" "$1")"; printf %s "$IBL5_BURNDOWN_DISCORD_DM"' _ "$STATE/runner.sh")
     assert_eq runner_roundtrip:value "$T/a b'c/dm" "$got"
 }
 

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # bin/check-exit-code-handling — keep new lines that hide a git or teardown exit status out of bin/ and skill bash fences.
 #
@@ -40,6 +40,7 @@
 # Exit codes: 0 = pass, 1 = violation found, 2 = usage or git error.
 # Decision record: ibl5/docs/decisions/0258-exit-code-handling-gate.md (ADR-0258).
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 usage() {

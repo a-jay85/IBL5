@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Wrapper script for the IBL5 automouse autonomous workflow.
 # Called by launchd on the recurring com.ibl5.automouse schedule. Loops through
 # queued plans, firing two claude -p invocations per plan (implementation +
@@ -10,6 +10,7 @@
 # To pause tonight's run:      bin/automouse/run disarm-tonight
 # To pause until a given time: bin/automouse/run disarm-until "2026-08-20 09:00 PDT"
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 # launchd runs with minimal env — ensure our tools are findable.
@@ -1084,9 +1085,9 @@ append_cost_row() {
     peak_raw=$(tail -n +"$((log_before + 1))" "$LOG" | grep -oE 'peak_ctx=[0-9]+' | tail -1 | sed 's/peak_ctx=//') || true
     peak_k=$(( ${peak_raw:-0} / 1000 ))
     # Harness-ledger source. bin/post-plan-now --foreground prints one marker line; a
-    # harness-rc of 0 or 3 means NO /post-plan skill session ran, which is the only case
-    # where result.json's ledger is the complete spend. Any other value (1, 4, none) means
-    # a Sonnet session also ran and the ledger would under-count it — stay on the pricer.
+    # harness-rc of 0 or 3 reads result.json's ledger as the full spend. Since ADR-0284
+    # no skill session runs on any rc, and the pricer branch for other rcs stays: any
+    # other value (1, 4, none) stays on the pricer.
     hrc=$(tail -n +"$((log_before + 1))" "$LOG" | grep -oE 'harness-rc=[^ ]+' | tail -1 | sed 's/harness-rc=//') || true
     hdir=$(tail -n +"$((log_before + 1))" "$LOG" | grep -oE 'harness-run-dir=[^ ]+' | tail -1 | sed 's/harness-run-dir=//') || true
     hcost=""

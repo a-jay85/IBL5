@@ -6,6 +6,7 @@
 #      MAIN_CHECKOUT_GUARD_STATE_DIR  state + snapshot dir (unset/empty: default)
 #      MAIN_CHECKOUT_GUARD_SNAPSHOT_KEEP  newest snapshot-*.txt files kept (unset/empty/non-numeric: 20)
 #      DISCORD_DM_BIN                 DM sender (unset/empty: $SCRIPT_DIR/discord-dm)
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 export GIT_OPTIONAL_LOCKS=0
 

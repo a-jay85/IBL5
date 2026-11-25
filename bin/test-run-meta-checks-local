@@ -7,6 +7,7 @@
 # Each behavioural case runs against a minimal fixture repo; the parity case
 # (case l) runs against the real workflow and runner on disk.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 # Group selector: all (default), base, contract, cache, parallel or stacked.
 GROUP="${1:-all}"

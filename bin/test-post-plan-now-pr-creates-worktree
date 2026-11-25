@@ -5,6 +5,7 @@
 # the --auto headless guard and its IBL5_BURNDOWN_LOOP=1 opt-in.
 #
 # Fifteen cases, exit 0 iff all pass.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 # shellcheck source=bin/lib/harness.sh
@@ -35,6 +36,12 @@ export IBL5_USAGE_GATE_STATE_DIR="$TMP/gate"
 mkdir -p "$IBL5_USAGE_GATE_STATE_DIR"
 printf '#!/bin/sh\nexit 1\n' > "$SHIMS/security"
 chmod +x "$SHIMS/security"
+
+# post-plan-now refuses to start without an executable harness. Every run here points
+# HARNESS at a stub, so the real harness in the main checkout never runs.
+HDEF="$TMP/harness-default"; mkdir -p "$HDEF"
+printf '#!/bin/sh\nexit 0\n' > "$HDEF/run"; chmod +x "$HDEF/run"
+export HARNESS="$HDEF"
 
 # ---- pass/fail counters -------------------------------------------------
 pass() { h_pass "$1"; }
@@ -306,7 +313,7 @@ chmod +x "$SHIMS/launchctl"
 RC6=0
 set +e
 # Run from within the feat-x worktree without the test-only overrides
-ERR6="$(cd "$WT6" && POSTPLAN_LOG_DIR="$PPLOGS" POST_PLAN_SKILL=1 HOME="$TMP" "$REPO/bin/post-plan-now" 2>&1)"
+ERR6="$(cd "$WT6" && POSTPLAN_LOG_DIR="$PPLOGS" HARNESS="$HDEF" HOME="$TMP" "$REPO/bin/post-plan-now" 2>&1)"
 RC6=$?
 set -e
 
@@ -338,7 +345,7 @@ chmod +x "$SHIMS/launchctl"
 
 RC6B=0
 set +e
-ERR6B="$(cd "$WT6" && POSTPLAN_LOG_DIR="$PPLOGS" POST_PLAN_SKILL=1 HOME="$TMP" "$REPO/bin/post-plan-now" 2>&1)"
+ERR6B="$(cd "$WT6" && POSTPLAN_LOG_DIR="$PPLOGS" HARNESS="$HDEF" HOME="$TMP" "$REPO/bin/post-plan-now" 2>&1)"
 RC6B=$?
 set -e
 
@@ -358,11 +365,11 @@ SHIM_EOF
 chmod +x "$SHIMS/launchctl"
 
 # ==========================================================================
-# Case 7 — a paused or limit-hit skill run is RESULT paused, never a FAIL-DM
+# Case 7 — a paused or limit-hit harness run is RESULT paused, never a FAIL-DM
 # ==========================================================================
-# Runs the far-side script that post-plan-now writes (the `  script:` stdout line), with a fake claude
-# behind a caffeinate shim. POST_PLAN_SKILL=1 selects the skill-only engine, so the
-# harness (which lives in the main checkout) never runs.
+# Runs the far-side script that post-plan-now writes (the `  script:` stdout line), with a stub
+# harness behind a caffeinate shim. HARNESS points at the stub, so the real harness (which
+# lives in the main checkout) never runs.
 unset GH_PR_JSON
 HOME7="$TMP/home7"
 mkdir -p "$HOME7/Library/LaunchAgents" "$HOME7/.local/bin" "$WT6/bin/lib"
@@ -387,24 +394,25 @@ export GATE_LIB
 RESUME_BIN7="$REPO/bin/post-plan-now"
 export RESUME_BIN7
 
+CAFF_LOG="$TMP/caffeinate.log"
+export CAFF_LOG
 cat > "$HOME7/.local/bin/caffeinate" << 'SHIM_EOF'
 #!/usr/bin/env bash
-while [ $# -gt 0 ]; do case "$1" in -*) shift ;; *) break ;; esac; done
-shift
-exec "$FAKE_CLAUDE" "$@"
+[ "${1:-}" = -s ] && shift
+printf '%s\n' "$*" >> "$CAFF_LOG"
+exec "$@"
 SHIM_EOF
 chmod +x "$HOME7/.local/bin/caffeinate"
 
-FAKE_CLAUDE="$TMP/fake-claude"
-export FAKE_CLAUDE
-cat > "$FAKE_CLAUDE" << 'SHIM_EOF'
+# Stub harness. The far side runs `caffeinate -s "$HARNESS/run" isolated ...` and hands the
+# usage-gate session id to the harness in IBL5_USAGE_GATE_SESSION_ID.
+H7="$TMP/fake-harness-7"; mkdir -p "$H7"
+cat > "$H7/run" << 'SHIM_EOF'
 #!/usr/bin/env bash
 case "${FAKE_MODE:-}" in
     marker)
-        sid=""; prev=""
-        for a in "$@"; do [ "$prev" = "--session-id" ] && sid="$a"; prev="$a"; done
         . "$GATE_LIB"
-        usage_marker_write "$sid" post-plan-now "$RESUME_BIN7" usage-pause drain 94 five_hour ""
+        usage_marker_write "$IBL5_USAGE_GATE_SESSION_ID" post-plan-now "$RESUME_BIN7" usage-pause drain 94 five_hour ""
         exit 0 ;;
     limit) echo "You've hit your limit"; exit 1 ;;
     auth)  echo "API Error: 401"; exit 1 ;;
@@ -412,7 +420,7 @@ case "${FAKE_MODE:-}" in
 esac
 exit 0
 SHIM_EOF
-chmod +x "$FAKE_CLAUDE"
+chmod +x "$H7/run"
 
 # run_far_side <mode> → P7_OUT (the log the run wrote), P7_MARKERS (marker count)
 run_far_side() {
@@ -420,14 +428,14 @@ run_far_side() {
     rm -f "$FAILDM_LOG"
     rm -rf "$IBL5_USAGE_GATE_STATE_DIR"; mkdir -p "$IBL5_USAGE_GATE_STATE_DIR/markers"
     set +e
-    ppn_out=$(cd "$WT6" && POST_PLAN_SKILL=1 HOME="$HOME7" "$REPO/bin/post-plan-now" 2>/dev/null)
+    ppn_out=$(cd "$WT6" && HARNESS="$H7" HOME="$HOME7" "$REPO/bin/post-plan-now" 2>/dev/null)
     set -e
     script=$(sed -n 's/^  script: \([^ ]*\).*/\1/p' <<< "$ppn_out")
     log=$(sed -n 's/^  log:    \([^ ]*\).*/\1/p' <<< "$ppn_out")
     P7_OUT="no script written"; P7_MARKERS=0
     [ -n "$script" ] || return 0
     set +e
-    HOME="$HOME7" FAKE_MODE="$mode" GH_CMD="$SHIMS/gh-none" /bin/bash "$script" > "$log" 2>&1
+    HOME="$HOME7" FAKE_MODE="$mode" GH_CMD="$SHIMS/gh-none" "$BASH" "$script" > "$log" 2>&1
     set -e
     P7_OUT=$(cat "$log")
     P7_MARKERS=$(find "$IBL5_USAGE_GATE_STATE_DIR/markers" -name '*.json' 2>/dev/null | wc -l | tr -d ' ')
@@ -455,41 +463,17 @@ if grep -qF -- "RESULT paused" <<< "$P7_OUT"; then fail "auth error: wrongly rep
 [ "$P7_MARKERS" = 0 ] || fail "auth error: a marker was written"
 [ "$H_FAIL" -eq "$FAIL_BEFORE" ] && pass "API Error 401: not paused, one FAIL-DM"
 
-# Case 7b — a harness crash that reaches the skill fallback sends exactly one DM.
-# The caffeinate shim routes both the harness and the skill claude through FAKE_CLAUDE.
-# In triage mode the harness call (argv starts with `isolated`) exits 1, and the skill
-# call runs the real crash-triage block from SKILL.md. The triage block only reports and
-# sends no DM. FAILDM_SEG is the only crash DM, and it resolves to the
-# $WT6/bin/post-plan-fail-dm shim.
+# Case 7b — a harness crash sends exactly one DM and starts no skill session.
+# The harness exits 1. FAILDM_SEG is the only crash DM, and it resolves to the
+# $WT6/bin/post-plan-fail-dm shim. The caffeinate log holds one line, the harness call.
 H7B="$TMP/fake-harness"; mkdir -p "$H7B"
 printf '#!/bin/sh\nexit 1\n' > "$H7B/run"; chmod +x "$H7B/run"
-SKILL_MD="$REPO/.claude/skills/post-plan/SKILL.md"
-# The plist CMD puts /usr/local/bin ahead of the shims, so the triage block gets its own
-# gh stub first on PATH. It reports an open, unarmed PR and logs every call it gets.
-GH7B_DIR="$TMP/gh7b"; GH7B_LOG="$TMP/gh7b.log"; mkdir -p "$GH7B_DIR"
-cat > "$GH7B_DIR/gh" << 'GH_EOF'
-#!/usr/bin/env bash
-printf '%s\n' "$*" >> "$GH7B_LOG"
-case "$*" in "pr view"*) printf '%s\n' '{"number":42,"state":"OPEN","autoMergeRequest":null}' ;; esac
-exit 0
-GH_EOF
-chmod +x "$GH7B_DIR/gh"
-export SKILL_MD GH7B_DIR GH7B_LOG
-cat > "$FAKE_CLAUDE.triage" << 'SHIM_EOF'
-#!/usr/bin/env bash
-[ "${1:-}" = isolated ] && { echo "RESULT: post-plan FAILED (fake harness crash)"; exit 1; }
-block=$(sed -n '/^# --- harness-crash triage ---$/,/^# --- end harness-crash triage ---$/p' "$SKILL_MD")
-[ -n "$block" ] || { echo "triage block not found in $SKILL_MD"; exit 1; }
-PATH="$GH7B_DIR:$PATH" bash -c "$block"
-exit 0
-SHIM_EOF
-chmod +x "$FAKE_CLAUDE.triage"
 FAIL_BEFORE=$H_FAIL
-rm -f "$FAILDM_LOG"
+rm -f "$FAILDM_LOG" "$CAFF_LOG"
 rm -rf "$IBL5_USAGE_GATE_STATE_DIR"; mkdir -p "$IBL5_USAGE_GATE_STATE_DIR/markers"
 # Read the runner script and log from post-plan-now's own output, as run_far_side does.
 set +e
-P7B_PPN=$(cd "$WT6" && env -u POST_PLAN_SKILL HARNESS="$H7B" HOME="$HOME7" \
+P7B_PPN=$(cd "$WT6" && HARNESS="$H7B" HOME="$HOME7" \
     "$REPO/bin/post-plan-now" 2>/dev/null)
 set -e
 P7B_SCRIPT=$(sed -n 's/^  script: \([^ ]*\).*/\1/p' <<< "$P7B_PPN")
@@ -498,20 +482,18 @@ if [ -z "$P7B_SCRIPT" ] || [ -z "$P7B_LOG" ]; then
     fail "harness crash: no runner script written (got: $P7B_PPN)"
 else
     set +e
-    HOME="$HOME7" FAKE_CLAUDE="$FAKE_CLAUDE.triage" GH_CMD="$SHIMS/gh-none" \
-        /bin/bash "$P7B_SCRIPT" > "$P7B_LOG" 2>&1
+    HOME="$HOME7" GH_CMD="$SHIMS/gh-none" \
+        "$BASH" "$P7B_SCRIPT" > "$P7B_LOG" 2>&1
     set -e
-    P7B_OUT=$(cat "$P7B_LOG")
     rm -f "$P7B_LOG" "${P7B_LOG%.log}.session" "$P7B_SCRIPT"
-    grep -qF -- "CRASH-TRIAGE: harness-rc=1 pr=42 state=OPEN armed=no" <<< "$P7B_OUT" \
-        || fail "harness crash: skill triage block did not report the PR (got: $P7B_OUT)"
-    if grep -qvE '^pr view( |$)' "$GH7B_LOG" 2>/dev/null; then
-        fail "harness crash: skill triage wrote to GitHub ($(cat "$GH7B_LOG"))"
-    fi
     P7B_DMS=$(wc -l < "$FAILDM_LOG" 2>/dev/null | tr -d ' ')
     [ "${P7B_DMS:-0}" = 1 ] || fail "harness crash: FAIL-DM count is ${P7B_DMS:-0}, expected 1"
+    P7B_CAFF=$(wc -l < "$CAFF_LOG" 2>/dev/null | tr -d ' ') || P7B_CAFF=''
+    [ "${P7B_CAFF:-0}" = 1 ] || fail "harness crash: caffeinate ran ${P7B_CAFF:-0} times, expected 1 (no skill session)"
+    grep -qF -- "$H7B/run" "$CAFF_LOG" 2>/dev/null \
+        || fail "harness crash: the one caffeinate line does not name $H7B/run (got: $(cat "$CAFF_LOG" 2>/dev/null))"
 fi
-[ "$H_FAIL" -eq "$FAIL_BEFORE" ] && pass "harness crash with skill triage: exactly one FAIL-DM"
+[ "$H_FAIL" -eq "$FAIL_BEFORE" ] && pass "harness crash stops: no skill session, one crash DM"
 
 # ==========================================================================
 # Case 8 — wt-new failure (e.g. slug collision) is reported and exits 1
@@ -582,13 +564,13 @@ run_auto_headless() {
     set +e
     if [ "$state" = "unset" ]; then
         G_OUT=$(cd "$WT6" && env -u IBL5_BURNDOWN_LOOP CLAUDE_HEADLESS=1 \
-            POST_PLAN_SKILL=1 HOME="$HOME7" "$REPO/bin/post-plan-now" --auto 2>&1)
+            HARNESS="$H7" HOME="$HOME7" "$REPO/bin/post-plan-now" --auto 2>&1)
     elif [ "$state" = "empty" ]; then
         G_OUT=$(cd "$WT6" && IBL5_BURNDOWN_LOOP='' CLAUDE_HEADLESS=1 \
-            POST_PLAN_SKILL=1 HOME="$HOME7" "$REPO/bin/post-plan-now" --auto 2>&1)
+            HARNESS="$H7" HOME="$HOME7" "$REPO/bin/post-plan-now" --auto 2>&1)
     else
         G_OUT=$(cd "$WT6" && IBL5_BURNDOWN_LOOP="$state" CLAUDE_HEADLESS=1 \
-            POST_PLAN_SKILL=1 HOME="$HOME7" "$REPO/bin/post-plan-now" --auto 2>&1)
+            HARNESS="$H7" HOME="$HOME7" "$REPO/bin/post-plan-now" --auto 2>&1)
     fi
     G_RC=$?
     set -e
@@ -627,22 +609,22 @@ grep -qF -- "IBL5_BURNDOWN_LOOP=1" <<< "$G_OUT" || fail "opt-in=1: no opt-in mes
 [ "$H_FAIL" -eq "$FAIL_BEFORE" ] && pass "headless --auto with IBL5_BURNDOWN_LOOP=1 fires"
 
 # Case 14 — the launchd path never inherits the caller's env, so only --foreground
-# can prove the scrub: the far-side claude must see IBL5_BURNDOWN_LOOP as unset.
+# can prove the scrub: the far-side harness must see IBL5_BURNDOWN_LOOP as unset.
 FAIL_BEFORE=$H_FAIL
 PROBE_FILE="$TMP/optin.probe"; export PROBE_FILE; rm -f "$PROBE_FILE"
 set +e
-(cd "$WT6" && IBL5_BURNDOWN_LOOP=1 CLAUDE_HEADLESS=1 POST_PLAN_SKILL=1 \
+(cd "$WT6" && IBL5_BURNDOWN_LOOP=1 CLAUDE_HEADLESS=1 HARNESS="$H7" \
     HOME="$HOME7" FAKE_MODE=envprobe GH_CMD="$SHIMS/gh-none" \
     "$REPO/bin/post-plan-now" --auto --foreground >/dev/null 2>&1)
 set -e
 if [ ! -f "$PROBE_FILE" ]; then
-    fail "scrub: probe file missing (far-side claude never ran)"
+    fail "scrub: probe file missing (far-side harness never ran)"
 elif [ "$(cat "$PROBE_FILE")" != "unset" ]; then
     fail "scrub: far side saw IBL5_BURNDOWN_LOOP=$(cat "$PROBE_FILE"), expected unset"
 fi
 rm -f "$PROBE_FILE"
 rm -f "$HOME7"/Library/LaunchAgents/*.plist
-[ "$H_FAIL" -eq "$FAIL_BEFORE" ] && pass "opt-in is scrubbed before the far-side claude runs"
+[ "$H_FAIL" -eq "$FAIL_BEFORE" ] && pass "opt-in is scrubbed before the far-side harness runs"
 
 # ==========================================================================
 # Case 15 — a live fleet slot refuses a detaching run (post-plan-fleet race)
@@ -650,7 +632,7 @@ rm -f "$HOME7"/Library/LaunchAgents/*.plist
 # bin/post-plan-fleet runs `post-plan-now --pr N --foreground` under the label
 # com.ibl5.post-plan-fleet-<N>, which postplan_inflight_label cannot see. A detaching run
 # for the same PR would race it, so it must exit 6. Placed after Case 14 because the
-# --foreground sub-case needs the fake claude and caffeinate shim set up for Case 7.
+# --foreground sub-case needs the stub harness and caffeinate shim set up for Case 7.
 cat > "$SHIMS/gh-fleet" << 'SHIM_EOF'
 #!/usr/bin/env bash
 if [ "${1:-}" = "pr" ] && [ "${2:-}" = "list" ]; then
@@ -677,7 +659,7 @@ chmod +x "$SHIMS/launchctl"
 run_fleet_case() {
     rm -f "$HOME7"/Library/LaunchAgents/*.plist
     set +e
-    F_OUT=$(cd "$WT6" && POST_PLAN_SKILL=1 HOME="$HOME7" FAKE_MODE='' \
+    F_OUT=$(cd "$WT6" && HARNESS="$H7" HOME="$HOME7" FAKE_MODE='' \
         GH_CMD="$SHIMS/gh-fleet" GH_PR_JSON='{"headRefName":"feat-x","isCrossRepository":false}' \
         "$REPO/bin/post-plan-now" "$@" 2>&1)
     F_RC=$?

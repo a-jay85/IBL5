@@ -34,6 +34,7 @@
 #
 # The watcher writes only under $HOME/.cache. It never writes under the parity
 # dir, never runs parity_loop.py, and calls gh only as `pr list`.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -Eeuo pipefail
 export PATH="$PATH:/usr/local/bin:/opt/homebrew/bin:/opt/homebrew/opt/mariadb/bin:$HOME/.bun/bin:$HOME/.local/bin:/usr/bin:/bin"
 

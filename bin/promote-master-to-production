@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Fast-forwards origin/production to an already-verified master SHA.
 #
@@ -20,6 +20,7 @@
 #
 # Exit codes: 0 = handled (promoted or a legitimate no-op), 1 = hard failure.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 REMOTE=origin

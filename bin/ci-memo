@@ -41,6 +41,7 @@
 #   4  not a git repo, unreadable manifest, or a git plumbing failure
 # --fail-open turns 3 and 4 into: empty stdout, "ci-memo: DEGRADED: ..." on
 # stderr, exit 0. The caller reads an empty hash as a forced miss.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 export LC_ALL=C
 

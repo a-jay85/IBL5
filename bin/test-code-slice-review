@@ -13,6 +13,7 @@
 #
 # Exit 0 = all pass, 1 = failures.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -u
 # shellcheck source=bin/lib/harness.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
@@ -183,12 +184,12 @@ case_plist_supervisor_env() {
 case_home_unset_refuses() {
     new_fixture
     local out rc=0
-    out="$(env -i /bin/bash "$CSR" 2>&1 >/dev/null)" || rc=$?
+    out="$(env -i "$BASH" "$CSR" 2>&1 >/dev/null)" || rc=$?
     expect_eq "HOME unset exits 1" 1 "$rc"
     expect_has "HOME unset message" "$out" "cannot resolve state dir"
-    env -i /bin/bash "$CSR" 2>&1 >/dev/null | grep -qF 'cannot resolve state dir' \
+    env -i "$BASH" "$CSR" 2>&1 >/dev/null | grep -qF 'cannot resolve state dir' \
         && ok "row 8: empty-env guard" || fail "row 8: empty-env guard"
-    env -i /bin/bash "$CSR" --help >/dev/null && ok "row 9: --help under empty env" || fail "row 9: --help under empty env"
+    env -i "$BASH" "$CSR" --help >/dev/null && ok "row 9: --help under empty env" || fail "row 9: --help under empty env"
     expect_absent "no claude call" "$STUB_DIR/claude.calls"
 }
 

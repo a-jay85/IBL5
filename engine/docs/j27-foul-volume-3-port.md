@@ -1,6 +1,6 @@
 ---
 description: J27 third foul-volume pass. Covers the decompile sweep for PF and team-foul writes outside FUN_004d8570 (zero PORT sites), the per-site foul tags and walk tallies, and the backlog#1841 blocked-miss verdict (undetermined statically, guard kept). Engine PF per team-game stays 10.473 against sco 17.116, a measured residual of 6.643, so backlog#265 stays open.
-last_verified: 2026-11-16
+last_verified: 2026-11-24
 ---
 
 # J27: third foul-volume pass
@@ -73,7 +73,7 @@ The site sum equals engine PF/g (10.473) in both walks, and the unknown tally is
 
 ## Blocking questions
 
-- Q1, block credit on a fouled blocked 3pt miss (backlog#1841). The decompile shows no block-stat write, so the verdict is undetermined statically. Human follow-up: `engine/docs/x32dbg-foul-divisor-pin-runbook.md`, with a breakpoint at 94131 after a blocked miss.
+- Q1, block credit on a fouled blocked 3pt miss (backlog#1841). The decompile shows no block-stat write, so the verdict is undetermined statically. Parity-loop follow-up over SSH to the VM: `engine/docs/x32dbg-foul-divisor-pin-runbook.md`, with a breakpoint at 94131 after a blocked miss.
 - Q2, the source of the missing 6.643 PF per team-game. Every PF-slot and team-foul write in the decompile sits in FUN_004d8570, and the first two passes audited them all. No RESIDUAL (constant unread) site came out of this sweep. The next lever is a debugger trace of PF-slot writes during one game, also through `engine/docs/x32dbg-foul-divisor-pin-runbook.md`.
 
 ## Residual unknowns

@@ -120,7 +120,6 @@ def _generate_cmd(tmp_path, extra_env=None):
 
     env = dict(os.environ, HOME=str(home), HARNESS=str(harness),
                PATH=f"{shim}:{os.environ['PATH']}")
-    env.pop("POST_PLAN_SKILL", None)
     env.update(extra_env or {})
     repo = _fixture_repo(tmp_path)
     log_dir = env.get("POSTPLAN_LOG_DIR")

@@ -32,6 +32,7 @@
 # A NOT READY verdict on an approval that lists kept unplanned changes and a diff
 # fingerprint first gets one bin/post-plan-now --state-changed re-review; exit 4
 # can follow that re-review. --finish on such an approval gets the same re-review.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -uo pipefail
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
@@ -280,6 +281,33 @@ _oa_comments() { # sets me and comments; refuses on a read error
     me=$(gh api user --jq .login 2>/dev/null) && [ -n "$me" ] || _oa_refuse 4 "could not read the gh login."
     comments=$(gh api --paginate "repos/$OA_REPO/issues/$OA_PR/comments" 2>/dev/null) || _oa_refuse 4 "could not read the comments on PR $OA_PR."
 }
+# post-plan's kept-scope downgrade (_apply_kept_downgrade, tools/postplan-harness/runner.py)
+# is the only writer of this shape. tools/postplan-harness/tests/test_owner_approve_kept_scope_coupling.py
+# pins both strings to harness/fidelity.py.
+OA_KEPT_SCOPE_HEADING='### Kept new scope (you asked for this)'
+OA_KEPT_SCOPE_PHRASE='the only blocking findings are new scope you asked for; each one is listed under Kept new scope'
+_oa_kept_scope_fingerprint() { # <sticky body> <banner word>; 0 only on post-plan's kept-scope shape
+    awk -v word="$2" -v phrase="$OA_KEPT_SCOPE_PHRASE" -v heading="$OA_KEPT_SCOPE_HEADING" \
+        -v marker="$HP_STICKY_MARKER" '
+        { sub(/\r$/, ""); line[NR] = $0 }
+        END {
+            last = 0; t = 0; fence = 0; seen = 0; ok_term = 0; ok_head = 0
+            for (i = NR; i >= 1; i--) if (line[i] != "") { last = i; break }
+            if (last == 0 || line[last] != marker) exit 1
+            for (i = last - 1; i >= 1; i--) if (line[i] != "") { t = i; break }
+            if (t == 0) exit 1
+            for (i = 1; i < t; i++) {
+                if (line[i] ~ /^[[:space:]]*(```|~~~)/) { fence = !fence; continue }
+                if (fence) continue
+                if (line[i] == heading && line[i + 1] ~ /^- `/) seen = 1
+            }
+            if (fence) exit 1
+            ok_term = (line[t] == word " — " phrase)
+            if (seen) ok_head = 1
+            if (ok_term && ok_head) exit 0
+            exit 1
+        }' <<< "$1"
+}
 _oa_verdict() {
     local sticky banner word tree_line tree_word bound head_tree
     _oa_comments
@@ -304,6 +332,9 @@ _oa_verdict() {
     tree_word=$(printf '%s' "$tree_line" | sed -nE 's/^.*tree:\*\*[[:space:]]*[0-9a-f]{40}[[:space:]]+\(([A-Za-z ]+)\)[[:space:]]*$/\1/p')
     case "$tree_word" in
         "" | "READY" | "READY WITH NOTES") ;;
+        "NOT READY")
+            _oa_kept_scope_fingerprint "$sticky" "$verdict_word" \
+                || _oa_refuse 4 "the re-review of tree $bound says $tree_word, not READY." ;;
         *) _oa_refuse 4 "the re-review of tree $bound says $tree_word, not READY." ;;
     esac
     [ -n "$bound" ] || _oa_refuse 4 "the verdict names no reviewed tree (${tree_line:-no tree line}), so it cannot be bound to the head."

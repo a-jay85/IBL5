@@ -12,6 +12,7 @@
 #
 # Run: bin/test-merge-line-select  (exit 0 = all pass, exit 1 = a case failed)
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -u
 
 # shellcheck source=bin/lib/harness.sh
@@ -757,7 +758,7 @@ fi
 
 # --- G17: empty environment, strict mode, macOS system bash ---
 
-OUT=$(cd "$REPO_ROOT" && env -i PATH=/usr/bin:/bin /bin/bash -c \
+OUT=$(cd "$REPO_ROOT" && env -i PATH="$(harness_bare_path "$TMP")" "$BASH" -c \
     'set -euo pipefail; bin/merge-line-select --input - < bin/fixtures/merge-line/live-snapshot.json' 2>&1)
 RC=$?
 if [ "$RC" = 0 ] && grep -q '^action=' <<< "$OUT"; then

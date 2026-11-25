@@ -96,7 +96,7 @@ def _run_foreground_with(tmp_path, harness_body, extra_env=None, with_claude_stu
                PATH=f"{shim}:{os.environ['PATH']}",
                IBL5_USAGE_GATE_STATE_DIR=str(state),
                IBL5_USAGE_CLAUDE_PROJECTS=str(projects))
-    for name in ("POST_PLAN_SKILL", "IBL5_USAGE_GATE", "IBL5_USAGE_GATE_RUNNER",
+    for name in ("IBL5_USAGE_GATE", "IBL5_USAGE_GATE_RUNNER",
                  "IBL5_USAGE_GATE_RESUME_BIN", "IBL5_USAGE_GATE_SESSION_ID"):
         env.pop(name, None)
     if with_claude_stub:
@@ -127,8 +127,8 @@ def _claude_ran(run):
 def test_harness_limit_hit_rc1_pauses_without_fallback(tmp_path):
     """Backlog #1229: a harness that prints the limit-hit line and exits 1 pauses the run.
 
-    GATE_OPEN's usage_postrun_pause writes a limit-hit marker, so the skill fallback is
-    skipped and PAUSE_SEG reports the pause.
+    PAUSE_SEG's usage_postrun_pause writes a limit-hit marker and reports the pause; no
+    claude session is launched.
     """
     run = _run_foreground_with(tmp_path, f"echo {LIMIT_HIT_LINE!r}\nexit 1")
     markers = _markers(run.state)
@@ -153,20 +153,14 @@ def test_harness_rc3_limit_hit_stays_blocked(tmp_path):
 # ---------------------------------------------------------------- Phase 3: launch context
 
 
-def _pinned_session_id(cmd):
-    matches = re.findall(r"--session-id '([0-9a-f-]{36})'", cmd)
-    assert matches, "no --session-id found in cmd"
-    return matches[0]
-
-
 def test_harness_launch_carries_gate_context(tmp_path):
     """The harness launch carries the three context vars and never the gate flag.
 
     Flipped from the Phase 1 characterization test_harness_launch_has_no_gate_env_today.
     """
     cmd = _generate_cmd(tmp_path)
-    sid = _pinned_session_id(cmd)
-    harness_seg = cmd.split("rc=$?; ", 1)[0]    # everything before the harness's rc capture
+    harness_seg = cmd.split(" isolated ", 1)[0]    # everything before the harness's args
+    sid = re.search(r"IBL5_USAGE_GATE_SESSION_ID='?([0-9a-f-]{36})'?(\s|$)", harness_seg)[1]
     assert "IBL5_USAGE_GATE_RUNNER=post-plan-now" in harness_seg
     assert re.search(rf"IBL5_USAGE_GATE_SESSION_ID='?{sid}'?(\s|$)", harness_seg), harness_seg
     m = re.search(r"IBL5_USAGE_GATE_RESUME_BIN=(\S+)", harness_seg)
@@ -189,18 +183,6 @@ def test_foreground_harness_env_has_context_without_gate_flag(tmp_path):
     assert seen.get("IBL5_USAGE_GATE_RESUME_BIN", "").endswith("/bin/post-plan-now")
     assert UUID_RE.match(seen.get("IBL5_USAGE_GATE_SESSION_ID", "")), seen.get("IBL5_USAGE_GATE_SESSION_ID")
     assert not any(line.startswith("IBL5_USAGE_GATE=") for line in lines)
-
-
-def test_skill_leg_gate_env_unchanged(tmp_path):
-    """The skill leg's GATE_ENV stays byte-identical, and carries no session-id var."""
-    cmd = _generate_cmd(tmp_path)
-    literal = ("IBL5_USAGE_GATE=1 IBL5_USAGE_GATE_RUNNER=post-plan-now "
-               "IBL5_USAGE_GATE_MODEL=claude-sonnet-5-5 IBL5_USAGE_GATE_RESUME_BIN=")
-    assert cmd.count(literal) == 1
-    skill_leg = cmd.split("should_fallback", 1)
-    assert len(skill_leg) >= 2
-    after = cmd[cmd.rindex("should_fallback"):]
-    assert "IBL5_USAGE_GATE_SESSION_ID" not in after
 
 
 # ---------------------------------------------------------------- Phase 9: pause, resume, fallback
@@ -230,12 +212,12 @@ def test_harness_pause_with_marker_pauses_without_faildm(tmp_path):
     assert not run.dm_calls.exists(), "the fail-DM must not fire on a pause"
 
 
-def test_stray_75_without_marker_falls_back(tmp_path):
-    """A reserved exit 75 with no marker never reads as a clean exit 0: the skill fallback runs."""
+def test_stray_75_without_marker_is_not_a_clean_exit(tmp_path):
+    """A reserved exit 75 with no marker never reads as a clean exit 0, and launches no claude."""
     run = _run_foreground_with(tmp_path, "exit 75")
     assert _markers(run.state) == []
-    assert _claude_ran(run), f"stdout={run.r.stdout!r} stderr={run.r.stderr!r}"
-    assert run.claude_log.read_text().count("then execute every remaining phase of the shrunk skill") == 1
+    assert run.r.returncode == 75, f"stdout={run.r.stdout!r} stderr={run.r.stderr!r}"
+    assert not _claude_ran(run), "no claude session may launch on any harness exit"
     assert PAUSED_LINE not in run.r.stdout
 
 
@@ -293,7 +275,10 @@ def test_resume_replays_marker_argv_and_clears_marker(tmp_path):
     assert not marker_file.exists(), "the resume must clear the pause marker"
 
     cmd = ppn_launch.launched_cmd(resume.stdout, tmp_path / "home")
-    launched = subprocess.run(["/bin/bash", "-lc", cmd], cwd=marker["resume_cwd"], env=run.env,
+    # Run it under the bash the launch script names (bash 4+); macOS /bin/bash is 3.2.
+    shebang = pathlib.Path(re.search(r"^  script: (\S+)", resume.stdout, re.M)[1]).read_text()
+    interp = shebang.partition("\n")[0][2:]
+    launched = subprocess.run([interp, "-lc", cmd], cwd=marker["resume_cwd"], env=run.env,
                               capture_output=True, text=True)
     assert launched.returncode == 0, f"stdout={launched.stdout!r} stderr={launched.stderr!r}"
 
@@ -353,3 +338,36 @@ def test_resume_discards_recorded_edit_before_prefire_gate(tmp_path):
     assert "resume discard: discarded" in resume.stdout
     assert saw.read_text().splitlines()[-1] == "clean"
     assert record.exists(), "the harness clears the record on its own discard"
+
+
+def test_resume_paused_started_session_runs_the_harness(tmp_path):
+    """A paused session that already has a claude transcript still resumes through the harness.
+
+    The saved argv is for session S and <projects>/p/S.jsonl exists, so a claude-based resume
+    would have had something to `--resume`. The launched command must run the harness and
+    carry no claude invocation at all.
+    """
+    extra = {"RUN_LOG": str(tmp_path / "run-log.txt"),
+             "ENV_DUMP": str(tmp_path / "env-dump.txt"),
+             "RESUME_FLAG": str(tmp_path / "resume-flag")}
+    run = _run_foreground_with(tmp_path, RESUME_BODY, extra_env=extra)
+    markers = _markers(run.state)
+    assert len(markers) == 1, f"stdout={run.r.stdout!r} stderr={run.r.stderr!r}"
+    marker = markers[0]
+    sid = marker["session_id"]
+    assert (pathlib.Path(run.state) / "runs" / f"{sid}.argv").exists(), "argv was not saved"
+
+    transcript = pathlib.Path(run.env["IBL5_USAGE_CLAUDE_PROJECTS"]) / "p" / f"{sid}.jsonl"
+    transcript.parent.mkdir(parents=True, exist_ok=True)
+    transcript.write_text("{}\n")
+    cache = dict(NORMAL_USAGE, fetched_at=int(__import__("time").time()))
+    (pathlib.Path(run.state) / "cache.json").write_text(json.dumps(cache))
+
+    resume = subprocess.run(["bash", PPN, "--resume-paused", sid], cwd=marker["resume_cwd"],
+                            env=run.env, capture_output=True, text=True)
+    assert resume.returncode == 0, f"stdout={resume.stdout!r} stderr={resume.stderr!r}"
+    cmd = ppn_launch.launched_cmd(resume.stdout, tmp_path / "home")
+    harness_run = f'"{run.env["HARNESS"]}/run" isolated'
+    assert harness_run in cmd, cmd
+    assert "claude -p" not in cmd
+    assert "--resume " not in cmd

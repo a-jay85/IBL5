@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Reconcile all active worktree branches with origin/<branch>, then merge each
 # branch's recorded base (branch.<name>.iblBase, falling back to origin/master)
 # into it. Fetches once up front (including in --dry-run, since classification is
@@ -19,6 +19,7 @@
 #
 # Usage: bin/wt-rebase [--dry-run]
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then

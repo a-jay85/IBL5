@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # rehearsal-prod-dump — emit a FILTERED logical dump of the production database to
 # stdout, for the Deploy Rehearsal CI job to restore and dry-run pending migrations
 # against real prod schema + data (ADR-0059).
@@ -27,6 +27,7 @@
 # `bin/migrate` and `bin/validate-schema` exercise no stored routines, and prod's
 # mysql.proc is under a server-side lock that hangs `--routines` (reference_prod_mysql_proc_lock).
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     cat <<'EOF'
 Usage: REMOTE_DATABASE=<db> bin/rehearsal-prod-dump

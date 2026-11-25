@@ -68,6 +68,7 @@
 #
 # Bash 3.2 / macOS compatible: no declare -A, no mapfile, no date -d/-v, no GNU timeout.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -557,7 +558,7 @@ bl_run_batch() {
         perl -e 'alarm shift; exec @ARGV or die "exec: $!"' "$timeout_secs" \
         $caff claude -p "$BL_PROMPT" --dangerously-skip-permissions \
         --model claude-sonnet-5-5 --effort high --name "burndown-loop-$ts" \
-        >"$BLOG" 2>&1 || BATCH_RC=$?
+        >"$BLOG" 2>&1 || BATCH_RC=$? # claude-perm-ok: unattended headless burndown batch run with no human to answer a prompt; edits worktrees and ships PRs
     bl_ledgers > "$STATE/ledgers.after"
     NEW_LEDGERS=$(comm -13 "$STATE/ledgers.before" "$STATE/ledgers.after")
     EMPTY_SEEN=0
@@ -585,7 +586,7 @@ bl_run_session() {
         perl -e 'alarm shift; exec @ARGV or die "exec: $!"' "$timeout_secs" \
         $caff claude -p "$prompt" --dangerously-skip-permissions "$@" \
         --model "$model" --effort high --name "burndown-$kind-$ts" \
-        >"$SESSION_LOG" 2>&1 || SESSION_RC=$?
+        >"$SESSION_LOG" 2>&1 || SESSION_RC=$? # claude-perm-ok: unattended headless burndown session run with no human to answer a prompt; edits worktrees and ships PRs
 }
 
 # bl_session_marker <log> <prefix>: the last "<prefix>: ..." line, tolerating bold,

@@ -25,6 +25,7 @@
 # Env (set by bin/sim-recap-tick, never by the agent — Claude Code denies an
 # env-prefixed command): SIM_RECAP_MYSQL_BIN, SIM_RECAP_DB_HOST, SIM_RECAP_DB_PORT,
 # SIM_RECAP_DB_USER, SIM_RECAP_DB_NAME. The password arrives as MYSQL_PWD.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 die() { printf 'sim-recap-mysql: %s\n' "$1" >&2; exit 2; }

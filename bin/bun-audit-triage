@@ -41,6 +41,7 @@
 #   A clean tree emits {} and exits 0. No lockfile: empty stdout, exits 1.
 #   --audit-level=high does NOT filter --json; severity selection is the consumer's job.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -u
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then

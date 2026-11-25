@@ -1,12 +1,23 @@
 ---
-description: Shell portability gotchas for bin/ scripts and skill inline bash — BSD vs GNU date and stat, SSH single-line commands, heredoc JSON, isolated bash blocks in skills, shellcheck only the scripts you changed.
-last_verified: 2026-11-20
+description: Shell portability gotchas for bin/ scripts and skill inline bash. Covers the bash 4 floor (Homebrew bash on macOS, env-bash shebang, version guard), BSD vs GNU date and stat, SSH single-line commands, heredoc JSON, isolated bash blocks in skills, and shellcheck on only the scripts you changed.
+last_verified: 2026-11-23
 paths:
   - "bin/**"
   - ".claude/skills/**/*.md"
 ---
 
 # Shell Portability
+
+## Bash 4+ only: Homebrew bash on macOS
+
+Every repo shell script runs on bash 4 or newer. macOS ships bash 3.2 at `/bin/bash`, so the Mac uses Homebrew bash (`brew install bash`, at `/opt/homebrew/bin/bash`). CI and production run Linux bash 5.
+
+- Start every bash script with `#!/usr/bin/env bash`. An absolute-path bash shebang such as `#!/bin/bash` pins 3.2 on the Mac.
+- Every executable bash script under `bin/`, `ibl5/bin/` and `tools/` carries the one-line version guard before its first command. It exits 2 and names `brew install bash` when bash is older than 4. Sourced-only libs (no exec bit), `bin/hooks/`, and `fixtures/` dirs carry none.
+- A plist or launcher that runs a repo script needs `/opt/homebrew/bin` ahead of `/usr/bin` in PATH. `bin/lib/launchd-sched.sh` supplies `LSCHED_JOB_PATH` for that.
+- `bin/check-shell-portability` rejects an absolute bash shebang and a missing or moved guard. CI runs it on every pull request.
+
+This allows bash 4 features but does not ask for them: existing 3.2-safe code stays as written.
 
 ## BSD vs GNU `date`: use `_date_ago()`
 
@@ -79,7 +90,7 @@ In `.claude/skills/**/*.md` skill files, every fenced `bash` block runs in a sep
 
 ## Shellcheck only the scripts you changed
 
-Never run the full-repo shellcheck on the Mac (`bin/lib/shell-scripts.sh --full` piped into `xargs -P`). It starts one shellcheck per core and uses about 2.5 GB in total. Several sessions doing it at once stall the machine. CI's `ShellCheck (bash 3.2 compat)` job already runs it on every push. That job never failed in the 1000 test runs from 2026-10-30 to 2026-11-11.
+Never run the full-repo shellcheck on the Mac (`bin/lib/shell-scripts.sh --full` piped into `xargs -P`). It starts one shellcheck per core and uses about 2.5 GB in total. Several sessions doing it at once stall the machine. CI's `ShellCheck` job already runs it on every push. That job never failed in the 1000 test runs from 2026-10-30 to 2026-11-11.
 
 Lint only the scripts you touched:
 

@@ -10,6 +10,7 @@
 # State is always a fresh mktemp dir; the real lock dirs and logs are never
 # touched.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -uo pipefail
 # shellcheck source=bin/lib/harness.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
@@ -171,7 +172,7 @@ if grep -Fq 'command not found' <<< "$OUT"; then fail "GC release no command-not
 LIB="$SCRIPT_DIR/lib/tick-guards.sh"
 
 strict() {  # <snippet> <args...>
-    env -i PATH=/usr/bin:/bin bash -euo pipefail -c "$1" _ "${@:2}"
+    env -i PATH="$(harness_bare_path "$T")" bash -euo pipefail -c "$1" _ "${@:2}"
 }
 
 mk_reader() {  # <name> <body> -> path of an executable stub reader

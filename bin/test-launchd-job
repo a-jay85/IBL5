@@ -6,6 +6,7 @@
 # Self-contained: creates a temp dir, builds stub binaries, never touches
 # ~/Library/LaunchAgents.  Runs on macOS and Linux CI.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -uo pipefail
 # shellcheck source=bin/lib/harness.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
@@ -503,6 +504,20 @@ NOTIFY=1
 DISCORD_DM='$FAILING_DM'
 ljob_dm_ready mytool && ljob_dm_send mytool 'hello'
 " 2>&1)"
+
+# Sub-case 1b: trailing flags reach discord-dm before the stdin dash.
+ARGV_DM="$T/ctl/argv_dm"
+printf '#!/usr/bin/env bash\nprintf "ARGV: %%s\\n" "$*"; cat >/dev/null\n' > "$ARGV_DM"
+chmod +x "$ARGV_DM"
+DM_OUT1B="$(env -i HOME="$T/home" PATH="$PATH" /bin/bash -c "
+$(. "$LIB" && declare -f ljob_dm_send)
+DISCORD_DM='$ARGV_DM'
+ljob_dm_send mytool 'hello' --error
+ljob_dm_send mytool 'hello'
+" 2>&1)"
+[ "$DM_OUT1B" = "ARGV: --error -
+ARGV: -" ] && pass "ljob_dm_send passes trailing flags before -" \
+    || fail "ljob_dm_send passes trailing flags before -" "got: $DM_OUT1B"
 
 # Sub-case 2: NOTIFY=0 → ljob_dm_ready returns 1 silently (no output)
 DM_OUT2="$(env -i IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" IBL5_USAGE_CLAUDE_PROJECTS="$IBL5_USAGE_CLAUDE_PROJECTS" IBL5_USAGE_GATE_TEST_MODE="$IBL5_USAGE_GATE_TEST_MODE" HOME="$T/home" /bin/bash -c "

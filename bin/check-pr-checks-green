@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Decides whether every non-ignored check-run on a PR head SHA has settled green,
 # optionally polling until it has. Read by bin/settle-pr-status, which
@@ -13,6 +13,7 @@
 #
 # Exit codes: 0 = settled green, 1 = failed / stacked base / deadline hit, 2 = usage or API error, 3 = still pending (one-shot only).
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 usage() {

@@ -17,6 +17,7 @@
 #   STACK: refused <reason>
 # Exit: 0 ok; 2 usage error or refused slug; otherwise the wt-up or wt-down exit code.
 # Test: bin/test-wt-stack.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -uo pipefail
 
 BIN_DIR="$(cd "$(dirname "$0")" && pwd)"

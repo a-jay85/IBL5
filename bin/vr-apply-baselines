@@ -12,6 +12,7 @@
 # The second form fails when the git index (cwd repo) stages any path that
 # the list file does not name.
 # Exit codes: 0 ok, 1 data error, 2 usage error.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 usage() {

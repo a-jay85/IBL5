@@ -2,6 +2,7 @@
 # shellcheck shell=bash
 # bin/test-default-branch — regression harness for bin/lib/default-branch.
 # Scratch repos with a local bare origin; never touches the network or HOME.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=bin/lib/harness.sh
@@ -148,7 +149,7 @@ run bash -c 'set -u; . "$1"; . "$1"; default_branch_name "$2"' _ "$BIN" "$T/r1"
 h_eq "sourced twice: still resolves" "master" "$OUT"
 
 # --- launchd-like environment and offline proof ---
-run env -i PATH=/usr/bin:/bin bash -c 'set -euo pipefail; "$1" --repo "$2"' _ "$BIN" "$T/r1"
+run env -i PATH="$(harness_bare_path "$T")" bash -c 'set -euo pipefail; "$1" --repo "$2"' _ "$BIN" "$T/r1"
 h_eq "env -i launchd-like: resolves under set -euo pipefail" "master" "$OUT"
 git -C "$T/r1" remote set-url origin /nonexistent/origin.git
 run "$BIN" --repo "$T/r1"

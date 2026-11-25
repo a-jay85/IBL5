@@ -1,10 +1,11 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Scans PHPUnit tests for markTestSkipped(), banned by .claude/rules/phpunit-tests.md.
 # Silently-disabled tests are a hygiene anti-pattern: delete the test instead, or —
 # for a legitimate integration-availability skip — carry an inline allow marker.
 # Also flags const-restatement: a test asserting a class constant equals its own value.
 # Also flags source-text-read: a test reading production source as text via file_get_contents.
 # Exits 0 (clean) or 1 (blocking violations found).
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 case "$0" in

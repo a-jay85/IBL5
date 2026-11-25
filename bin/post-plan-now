@@ -3,29 +3,22 @@
 # bin/post-plan-now — fire a detached post-plan run on the current worktree's
 # branch, replacing the manual "open a new session and hand off" step.
 #
-# Engine selection: when the compiled post-plan harness is present in the main
-# checkout (tools/postplan-harness, see its README) it runs `./run isolated <root>
-# --live` — the deterministic phase sequencer with bounded LLM calls (~65-100x
-# fewer gross tokens than a skill session). If the harness exits nonzero, or is
-# absent on this machine, the same launchd job falls back to the shrunk
-# Sonnet 5.5 /post-plan skill session. POST_PLAN_SKILL=1 forces the skill path,
-# which ships nothing on its own (see the WARNING below the engine selection).
-# The harness owns every ship phase including backlog housekeeping (runner.py
-# out-of-scope sweep). The skill fallback is a thin remainder: harness-crash
-# triage (report and hold, never arm), a dedup-safe backlog repeat, the E2E verify
-# track, and Phase 10 preview; it does not tear the worktree down. Any harness exit other than
-# 0, 3 or 7 launches that remainder with POSTPLAN_HARNESS_RC set to the exit code.
-# Measured 2026-10-19 over the records on disk (about 8 days): 1 fallback in
-# roughly 300 runs.
+# Engine: the compiled post-plan harness in the main checkout (tools/postplan-harness,
+# see its README). It runs `./run isolated <root> --live`, the deterministic phase
+# sequencer with bounded LLM calls. It is the only engine. A harness crash (any exit
+# other than 0, 3, 7 or 76) posts the failure PR comment, sends the crash DM and stops;
+# no `claude -p` session starts. A missing harness refuses up front with exit 1 and
+# nothing ships. See ibl5/docs/decisions/0092-postplan-harness-in-repo-with-python-ci.md for the engine
+# split and 0284-postplan-retire-skill-fallback.md for the retirement of the skill fallback.
 #
-# Either way the run is supervised by launchd (RunAtLoad one-shot), so it
+# The run is supervised by launchd (RunAtLoad one-shot), so it
 # survives closing Claude Code or the terminal — a plain `nohup … &` launched
 # from Claude Code's Bash tool shares the tool-shell's process group and dies
 # with it, so launchd is the load-bearing detach mechanism (same reason
 # bin/automouse/run uses launchd).
 #
 # The plan is resolved from the branch slug — by harness Phase 1 (plan-blind if
-# absent) or /post-plan skill Phase 1. No handoff file is needed.
+# absent). No handoff file is needed.
 #
 # Usage:
 #   bin/post-plan-now           # you decided to ship: fire unconditionally
@@ -74,27 +67,13 @@
 # POST_PLAN_SELF_BIN is a test-only override of the bin/ dir used to find wt-new.
 # Production never sets either.
 
-# should_fallback <rc> — decide whether to escalate to the /post-plan skill session after the
-# compiled harness exits with <rc>. Returns 0 (DO fall back) for a generic harness failure;
-# returns 1 (do NOT fall back) for success (0) and the fail-closed sentinel (3) emitted by
-# runner.py exit_code_for(). Exit 3 means the error kind is in runner.py _FAIL_CLOSED_KINDS,
-# among them: (1) a rebase conflict the auto-resolver declined or could not certify
-# (unresolvable conflict class, per-file round cap, or failed TREE-EQUIVALENT proof; see
-# ibl5/docs/decisions/0134-harness-conflict-autoresolve.md); (2) a local pre-commit/pre-push
-# gate denial (missing ADR, stale doc, rules byte budget); (3) a Claude usage limit; and
-# (4) an expired Claude CLI login (llm-auth-expired), which the skill session would reuse.
-# Each is a deterministic wall a skill re-run cannot climb, so the fallback is suppressed entirely.
-# 9 = pre-fire verification refused (bin/lib/prefire-verify failed, or it is missing).
-# 7 is this launcher's own main-checkout refusal (the is_in_worktree block further down):
-# nothing ran, and the fix is to cd into the right worktree. The harness never emits 7
-# (runner.py exit_code_for returns only 0, 1 or 3). Listing 7 keeps one no-fallback
-# vocabulary, so a skill re-run can never be spent against the main checkout.
-# This function is embedded verbatim into the $SCRIPT file below via `declare -f`, so the
-# tested logic here is exactly what runs there.
-# $2 = 1 in --rebase-only mode: the skill has no rebase-only path and would run the
-# full review on a PR only a human can clear, so a rebase-only failure never falls back.
-# The fallback never arms; see .claude/skills/post-plan/SKILL.md Phase 2.
-should_fallback() { [ "${2:-0}" = 1 ] && return 1; case "$1" in 0|3|7|76) return 1 ;; *) return 0 ;; esac; }
+# Exit codes this script returns: 0 shipped, 3 fail-closed stop (rebase conflict or local
+# gate denial, DM sent), 6 another post-plan run holds the worktree lock, 7 main-checkout
+# refusal (cd into the right worktree), 8 declined repeat hold, 9 pre-fire verification
+# refused (bin/lib/prefire-verify failed or is missing), 75 usage-gate pause, 76
+# GitHub unreachable (git or gh failed), 143 SIGTERM. Any other value is the harness's crash
+# rc: the run posts the failure comment, sends the crash DM and stops.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 # rebase_only_harness_arg <0|1>: the harness flag for --rebase-only, or nothing.
 rebase_only_harness_arg() { [ "${1:-0}" = 1 ] && printf ' --rebase-only'; return 0; }
 
@@ -102,8 +81,8 @@ rebase_only_harness_arg() { [ "${1:-0}" = 1 ] && printf ' --rebase-only'; return
 # exit-3 stop. The harness writes <run-dir>/blocked-ship.txt (runner.py write_blocked_ship);
 # print it as is. `-s` treats an empty file (a failed write) like a missing one and prints
 # a generic block of the same shape instead. The file is emitted with cat, never eval'd,
-# so its text stays inert. Shipped into the detached job via `declare -f`, like
-# should_fallback. bin/automouse/run carries a copy of the generic block; keep the two in
+# so its text stays inert. Shipped into the detached job via `declare -f`.
+# bin/automouse/run carries a copy of the generic block; keep the two in
 # step (both pinned by tests).
 blocked_ship_block() {
     local f="$1/blocked-ship.txt"
@@ -339,7 +318,7 @@ postplan_heldmarker_decline() {
     return 0
 }
 
-# Sourced-guard: the unit test does `source bin/post-plan-now` to load should_fallback, then this
+# Sourced-guard: the unit test does `source bin/post-plan-now` to load blocked_ship_block, then this
 # returns before the body executes. Must sit before `set -euo pipefail` (sourcing must not alter
 # the caller's shell options).
 [ "${BASH_SOURCE[0]}" != "${0}" ] && return 0
@@ -392,7 +371,6 @@ FOREGROUND=0
 PR_NUM=""
 SKIP_VERIFY_REASON=""
 RESUME_SID=""
-RESUME_STARTED=0
 # --resume-paused <sid>: the coordinator's entry point. Replays the argv saved when the
 # session was first started, under the same session id, so `claude --resume` continues it.
 if [ "${1:-}" = "--resume-paused" ]; then
@@ -515,8 +493,7 @@ case "$SLUG" in
 esac
 
 # ADR-0062: post-plan commits and pushes. It must never do that in the main checkout.
-# This is NOT --pr-only: the compiled harness (tools/postplan-harness) never executes
-# SKILL.md, so this assertion is the ONLY enforcement on the primary engine path.
+# This is NOT --pr-only: this assertion is the only enforcement on the engine path.
 # shellcheck source=bin/lib/git-helpers.sh
 . "$ROOT/bin/lib/git-helpers.sh"
 # Beside THIS script, not under $ROOT. $ROOT is the CALLER's toplevel, so the
@@ -571,7 +548,7 @@ if [ "$AUTO" -eq 1 ]; then
 fi
 
 # The opt-in is consumed by the guard above. Drop it so no child of this run
-# (harness, skill-fallback claude, a nested post-plan-now) inherits it through
+# (the harness, a nested post-plan-now) inherits it through
 # the --foreground exec and re-fires past its own headless guard.
 unset IBL5_BURNDOWN_LOOP
 
@@ -610,6 +587,18 @@ if [ "${FORCE:-0}" -eq 0 ]; then
       exit 6
     fi
   fi
+fi
+
+# Overridable ONLY so tools/postplan-harness/tests/test_post_plan_now_fallback.py,
+# bin/test-post-plan-now-pr-creates-worktree and bin/test-post-plan-now-worktree-lock can
+# point the engine at a stub and assert the generated $CMD in CI, where this absolute
+# path does not exist. Production never sets it. The default must stay the
+# MAIN-CHECKOUT absolute path — never $ROOT/tools/... — per ADR-0092: a worktree's own
+# harness copy is the one this run is changing, and must not judge its own change.
+HARNESS="${HARNESS:-/Users/ajaynicolas/GitHub/IBL5/tools/postplan-harness}"
+if [ ! -x "$HARNESS/run" ]; then
+    echo "post-plan-now: no executable harness at $HARNESS/run; refusing. Nothing ran and nothing shipped." >&2
+    exit 1
 fi
 
 # Per-worktree lock (backlog#1827). A --foreground run creates no launchd label, so the
@@ -759,9 +748,8 @@ FIRER_PIDS=${FIRER_PIDS# }
 # The launchd form runs $CMD from this file (ljob_submit). It deletes itself as the
 # run's last command; the --foreground form never writes it.
 SCRIPT="${LOG%.log}.sh"
-# ONE session uuid for this run. $CMD below carries a single `claude -p` invocation
-# since the harness absorbed Phase 5.5 and the rc=4 resume leg was removed, so one
-# uuid is all there is to pin. Minted here, before anything is
+# ONE session uuid for this run. It keys the usage gate and the harness gate context.
+# Minted here, before anything is
 # launched, so the sidecar is on disk before `ljob_submit` can make the label
 # visible to bin/fleet-status. Path comes from session_sidecar_path, not string
 # surgery: the label says `postplan-now-`, the log says `post-plan-now-`.
@@ -797,68 +785,17 @@ if [ "$_gate_rc" -eq 10 ]; then
     exit 75
 fi
 [ -z "$RESUME_SID" ] || usage_marker_clear "$RESUME_SID"
-if [ -n "$RESUME_SID" ] && usage_session_started "$SESSION_ID"; then
-    RESUME_STARTED=1
-fi
 
-if [ -n "$PLAN_OVERRIDE" ]; then
-    PROMPT="Invoke the /post-plan skill now on the current git branch. Use this exact plan file for Phase 1: $PLAN_OVERRIDE — do NOT derive the plan from the branch slug. Then execute every remaining phase of the shrunk skill (crash triage, backlog, E2E, preview, cleanup). You must not run gh pr merge or change auto-merge state; the harness owns arming. No human is present: never ask questions or wait for input — make the safe choice and continue."
-else
-    PROMPT="Invoke the /post-plan skill now on the current git branch. Resolve the plan from the branch slug per the skill Phase 1 (highest-numbered \`<slug>-N.md\` variant when several exist), then execute every remaining phase of the shrunk skill (crash triage, backlog, E2E, preview, cleanup). You must not run gh pr merge or change auto-merge state; the harness owns arming. No human is present: never ask questions or wait for input — make the safe choice and continue."
-fi
-
-# Compiled-harness engine (see header). The launchd job runs the harness, captures its exit code,
-# and escalates to the skill session ONLY when should_fallback permits it. Exit 3 (the fail-closed
-# sentinel from runner.py exit_code_for -- a rebase conflict OR a local gate denial) is NOT a
-# fallback trigger: it stops for a human instead of escalating to a
-# --dangerously-skip-permissions skill session on an unreviewed tree. Exit 6 is a DIFFERENT
-# namespace: it is this script's own in-flight duplicate-run refusal, raised before any harness
-# runs, and it never comes from runner.py.
-# Overridable ONLY so tools/postplan-harness/tests/test_post_plan_now_fallback.py can
-# point the engine-selection branch at a stub and assert the generated $CMD in CI, where
-# this absolute path does not exist. Production never sets it. The default must stay the
-# MAIN-CHECKOUT absolute path — never $ROOT/tools/... — per ADR-0092: a worktree's own
-# harness copy is the one this run is changing, and must not judge its own change.
-HARNESS="${HARNESS:-/Users/ajaynicolas/GitHub/IBL5/tools/postplan-harness}"
-# Renders the harness's background CI result (harness/ciwatch.py) as one sentence a
-# far-side skill session can act on at Phase 7. Phase 8 removed its only call site along
-# with the partial-run resume, so nothing embeds it today; the function and its tests stay
-# because the skill-fallback arm is the natural next caller.
-# Fail-open by design: a missing/garbled file yields the "unknown" clause, and the
-# skill then runs its own `gh pr checks --watch` exactly as it does today.
-postplan_ci_resume_clause() {
-    local run_dir="$1" sha="$2" f
-    [ -n "$run_dir" ] && [ -n "$sha" ] || { printf '%s' "CI OUTCOME: unknown (no harness run dir)."; return 0; }
-    f="$run_dir/ci-$sha.json"
-    if [ ! -f "$f" ]; then
-        printf 'CI OUTCOME: unknown — no background result at %s; watch CI yourself at Phase 7.' "$f"
-        return 0
-    fi
-    if grep -q '"status": "success"' "$f"; then
-        printf 'CI OUTCOME: SUCCESS for head %s, already measured by the harness (%s). Do NOT run `gh pr checks --watch` again for this SHA.' "$sha" "$f"
-        return 0
-    fi
-    if grep -q '"status": "failure"' "$f"; then
-        printf 'CI OUTCOME: FAILURE for head %s (%s). Failing checks: %s. Run the Phase 7 fix loop FIRST, BEFORE spawning the Phase 5.5 fidelity reviewer.' \
-            "$sha" "$f" "$(grep -oE '"[^"]+"' "$f" | sed -n '/^"/p' | tr '\n' ' ' | cut -c1-300)"
-        return 0
-    fi
-    printf 'CI OUTCOME: indeterminate for head %s (%s) — the background watch did not settle; watch CI yourself at Phase 7.' "$sha" "$f"
-}
-
+# Compiled-harness engine (see header). The launchd job runs the harness and captures its
+# exit code. Exit 3 (the fail-closed sentinel from runner.py exit_code_for -- a rebase
+# conflict OR a local gate denial) stops for a human with the blocked-ship message and a
+# DM. Exit 6 is a DIFFERENT namespace: it is this script's own in-flight duplicate-run
+# refusal, raised before any harness runs, and it never comes from runner.py.
 BADGE_FN="$(declare -f pr_sticky_find pr_sticky_delete \
     postplan_failure_body postplan_badge_pr_number \
     postplan_label_add postplan_label_remove postplan_label_present \
     postplan_failure_comment post_status_badge conclude_status_badge \
-    postplan_sweep_stale_badge \
-    postplan_ci_resume_clause || true); "
-FALLBACK_FN=""
-HARNESS_SEG=""
-HARNESS_RUN_DIR=""
-GATE_OPEN=""
-POST_HARNESS_SEG=""
-GATE_CLOSE=""
-ENGINE="Sonnet 5.5 /post-plan skill session"
+    postplan_sweep_stale_badge || true); "
 # Usage-gate context for the harness (ADR-0143 addendum). No IBL5_USAGE_GATE=1 here:
 # the harness adapter turns the gate on for its own claude children after checking
 # this context, so an older harness never gates.
@@ -884,51 +821,36 @@ fi
 # Fire source for the rerun report (runner.py _fired_by). An outer caller
 # (post-plan-fleet, automouse/run) exports its label; a direct run is post-plan-now.
 HARNESS_FIRED_BY_ENV="POSTPLAN_FIRED_BY=$(shq "${POSTPLAN_FIRED_BY:-post-plan-now}") "
-if [ "${POST_PLAN_SKILL:-0}" != "1" ] && [ -x "$HARNESS/run" ] && [ "${RESUME_STARTED:-0}" != 1 ]; then
-    FALLBACK_FN="$(declare -f should_fallback blocked_ship_block); "
-    PLAN_ARG="${PLAN_OVERRIDE:+ --plan $(shq "$PLAN_OVERRIDE")}"
-    REBASE_ONLY_ARG="$(rebase_only_harness_arg "$REBASE_ONLY")"
-    HARNESS_RUN_DIR="$HARNESS/out/live-$SAFE_SLUG-$TS"
-    HARNESS_SEG="CLAUDE_HEADLESS=1 ${HARNESS_GATE_CTX}${HARNESS_STATE_CHANGED_ENV}${HARNESS_FORCE_ENV}${HARNESS_FIRED_BY_ENV}${HARNESS_CONFIX_ENV}${HARNESS_FIXROUND_ENV}POSTPLAN_LOG_PATH=\"$LOG\" caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS_RUN_DIR\" --live${PLAN_ARG}${REBASE_ONLY_ARG}; rc=\$?; "
-    # Foreground has no launchd job, so nothing points stdout at $LOG. Without the tee, $LOG
-    # never exists: the RESULT capture below comes back empty and the Log line in the
-    # rc=3 message points at a missing file. Foreground only:
-    # under launchd, stdout already IS $LOG, and a tee there would write every line twice.
-    [ "$FOREGROUND" -eq 1 ] \
-        && HARNESS_SEG="CLAUDE_HEADLESS=1 ${HARNESS_GATE_CTX}${HARNESS_STATE_CHANGED_ENV}${HARNESS_FORCE_ENV}${HARNESS_FIRED_BY_ENV}${HARNESS_CONFIX_ENV}${HARNESS_FIXROUND_ENV}POSTPLAN_LOG_PATH=\"$LOG\" caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS_RUN_DIR\" --live${PLAN_ARG}${REBASE_ONLY_ARG} 2>&1 | tee -a \"$LOG\"; rc=\${PIPESTATUS[0]}; "
-    GATE_OPEN="if [ \"\${_sigterm_received:-0}\" -eq 0 ] && ! postplan_killed \"\$rc\" 0 $(shq "$LOG") && should_fallback \"\$rc\" $REBASE_ONLY && ! usage_postrun_pause post-plan-now $(shq "$SESSION_ID") $(shq "$ROOT/bin/post-plan-now") \"\$rc\" $(shq "$LOG"); then "
-    # The harness has already exited and flushed by the time HARNESS_SEG's `rc=` runs,
-    # so $LOG holds its final RESULT: line. The capture now feeds only
-    # postplan_failure_body; the exit-3 message comes from blocked_ship_block.
-    POST_HARNESS_SEG="HARNESS_RESULT=\$(grep -m1 '^RESULT:' \"$LOG\" 2>/dev/null || true); HARNESS_RESULT=\${HARNESS_RESULT:0:1200}; "
-    FIX_ROOT="$(resolve_canonical_root "$ROOT")"
-    # Quoted here so GATE_CLOSE keeps a single command substitution (the far-side one).
-    LOG_Q="$(shq "$LOG")"
-    GATE_CLOSE="; elif postplan_killed \"\$rc\" \"\${_sigterm_received:-0}\" $LOG_Q; then echo \"post-plan-now: RESULT killed (harness rc=\$rc); no skill fallback and no usage-gate pause.\"; (exit 143); elif [ \"\$rc\" = 3 ]; then msg=\"\$(blocked_ship_block \"$HARNESS_RUN_DIR\" \"$SLUG\" \"$ROOT\" \"$LOG\" \"$FIX_ROOT\")\"; printf '%s\n' '=== post-plan blocked ship ===' \"\$msg\" '=== end blocked ship ==='; \"$ROOT/bin/post-plan-fail-dm\" \"$ROOT\" \"$SAFE_SLUG\" \"$LOG\" \"\$msg\" || true; fi"
-    ENGINE="compiled post-plan harness (fails CLOSED on a rebase conflict or a local gate denial; falls back to the skill on other failures)"
-fi
-# The shrunk skill never commits, pushes, opens a PR or arms. Without the harness a run
-# ships nothing, so say so up front instead of letting a silent exit 0 look like a ship.
-if [ -z "$HARNESS_SEG" ]; then
-    ENGINE="$ENGINE only (no harness: nothing is committed, pushed or opened as a PR)"
-    echo "post-plan-now: WARNING: harness not used (POST_PLAN_SKILL=1, a resume, or no $HARNESS/run). This run will not ship." >&2
-fi
+OUTCOME_FN="$(declare -f blocked_ship_block); "
+PLAN_ARG="${PLAN_OVERRIDE:+ --plan $(shq "$PLAN_OVERRIDE")}"
+REBASE_ONLY_ARG="$(rebase_only_harness_arg "$REBASE_ONLY")"
+HARNESS_RUN_DIR="$HARNESS/out/live-$SAFE_SLUG-$TS"
+HARNESS_SEG="CLAUDE_HEADLESS=1 ${HARNESS_GATE_CTX}${HARNESS_STATE_CHANGED_ENV}${HARNESS_FORCE_ENV}${HARNESS_FIRED_BY_ENV}${HARNESS_CONFIX_ENV}${HARNESS_FIXROUND_ENV}POSTPLAN_LOG_PATH=\"$LOG\" caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS_RUN_DIR\" --live${PLAN_ARG}${REBASE_ONLY_ARG}; rc=\$?; "
+# Foreground has no launchd job, so nothing points stdout at $LOG. Without the tee, $LOG
+# never exists: the RESULT capture below comes back empty and the Log line in the
+# rc=3 message points at a missing file. Foreground only:
+# under launchd, stdout already IS $LOG, and a tee there would write every line twice.
+[ "$FOREGROUND" -eq 1 ] \
+    && HARNESS_SEG="CLAUDE_HEADLESS=1 ${HARNESS_GATE_CTX}${HARNESS_STATE_CHANGED_ENV}${HARNESS_FORCE_ENV}${HARNESS_FIRED_BY_ENV}${HARNESS_CONFIX_ENV}${HARNESS_FIXROUND_ENV}POSTPLAN_LOG_PATH=\"$LOG\" caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS_RUN_DIR\" --live${PLAN_ARG}${REBASE_ONLY_ARG} 2>&1 | tee -a \"$LOG\"; rc=\${PIPESTATUS[0]}; "
+# The harness has already exited and flushed by the time HARNESS_SEG's `rc=` runs,
+# so $LOG holds its final RESULT: line. The capture now feeds only
+# postplan_failure_body; the exit-3 message comes from blocked_ship_block.
+POST_HARNESS_SEG="HARNESS_RESULT=\$(grep -m1 '^RESULT:' \"$LOG\" 2>/dev/null || true); HARNESS_RESULT=\${HARNESS_RESULT:0:1200}; "
+FIX_ROOT="$(resolve_canonical_root "$ROOT")"
+# Quoted here so OUTCOME_SEG keeps a single command substitution (the far-side one).
+LOG_Q="$(shq "$LOG")"
+# A kill stops with 143 and exit 3 prints the blocked-ship block and DMs. Every other rc
+# falls through to RC_SEG, PAUSE_SEG and FAILDM_SEG below.
+OUTCOME_SEG="if postplan_killed \"\$rc\" \"\${_sigterm_received:-0}\" $LOG_Q; then echo \"post-plan-now: RESULT killed (harness rc=\$rc); no usage-gate pause.\"; (exit 143); elif [ \"\$rc\" = 3 ]; then msg=\"\$(blocked_ship_block \"$HARNESS_RUN_DIR\" \"$SLUG\" \"$ROOT\" \"$LOG\" \"$FIX_ROOT\")\"; printf '%s\n' '=== post-plan blocked ship ===' \"\$msg\" '=== end blocked ship ==='; \"$ROOT/bin/post-plan-fail-dm\" \"$ROOT\" \"$SAFE_SLUG\" \"$LOG\" \"\$msg\" || true; fi; "
+ENGINE="compiled post-plan harness (fails CLOSED on a rebase conflict or a local gate denial; any other failure posts a failure comment, sends the crash DM and stops)"
 
 # launchd runs with a minimal env, so prepend the same PATH bin/automouse/run uses
 # (proven to find claude/gh/docker/node for full post-plan runs). CLAUDE_HEADLESS=1
-# marks the detached run unattended: /post-plan skips the Phase 10 preview rebuild
-# and BLOCKS auto-merge on a golden-snapshot change instead of merely warning.
+# marks the detached run unattended.
 # caffeinate -s keeps the Mac awake on AC for the run's duration.
 # No CLAUDE_CODE_AUTO_COMPACT_WINDOW is set: with no override the run inherits
 # the same autoCompactWindow setting an interactive session uses — rationale and
 # the tripwire for re-adding an explicit window in bin/automouse/run.
-# CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 stops the harness terminating a
-# long-running backgrounded sub-AGENT mid-run (see bin/plan-now for the full
-# rationale). Applies to the /post-plan skill fallback only. It does NOT extend to a
-# backgrounded Bash shell: the sweep's other trigger ignores the ceiling and kills
-# `local_bash` tasks once nothing awaitable is left, which is why /post-plan Phase 5
-# mandates an in-turn BashOutput drain barrier and bash-guard.sh check 17 denies
-# `run_in_background: true` under CLAUDE_HEADLESS.
 #
 # The command line is assembled as PLAIN shell text — literal `&&`, and
 # whatever `<`/`>`/`&` the prompt happens to carry. The launchd form writes it
@@ -937,7 +859,7 @@ fi
 # broke `launchctl bootstrap` with "Bootstrap failed: 5: Input/output error".)
 #
 # $CMD is re-parsed as SHELL by `/bin/bash -lc` at the far end, so every variable
-# carrying FREE-FORM TEXT — the prompt and the --plan path — is quoted with shq()
+# carrying FREE-FORM TEXT — the --plan path — is quoted with shq()
 # (see its header) rather than interpolated inside \"…\". (The rest — $ROOT,
 # $LABEL, $LOG — are values this script controls, so \"…\" is fine for them.)
 # Interpolation let the `<slug>-N.md` string break as command substitution that
@@ -945,14 +867,14 @@ fi
 # $CMD's tail is launch-mechanism-specific. The launchd form runs from $SCRIPT under ljob_submit
 # — do not "unify" the two. The foreground form is the
 # only place the exit status and the cost marker can escape: the launchd wrapper swallows
-# both. HARNESS_RUN_DIR is empty on the skill-only path, hence the :-none default.
+# both.
 if [ "$FOREGROUND" -eq 1 ]; then
     CMD_TAIL="conclude_status_badge \"\$pp_rc\"; echo \"post-plan-now: postplan-rc=\$pp_rc harness-rc=\${rc:-none} harness-run-dir=${HARNESS_RUN_DIR:-none}\"; exit \$pp_rc"
 else
     CMD_TAIL="conclude_status_badge \"\$pp_rc\"; rm -f $(shq "$SCRIPT")"
 fi
 
-# One splice covers both far-side arms (harness and skill fallback).
+# Splices the plan slug into the far side.
 # Only set when --pr was given (PR_NUM is non-empty), so the bare path stays byte-identical.
 PLAN_SLUG_SEG=""
 [ -n "${PR_NUM:-}" ] && PLAN_SLUG_SEG="export PLAN_SLUG=$(shq "$PLAN_SLUG"); "
@@ -972,13 +894,14 @@ esac
 # Every other failed run DMs too. Exit 3 already sent its own DM above; 143 is a
 # deliberate SIGTERM. The last log lines carry the cause, e.g. a usage-limit notice.
 # $fail_tail is read into a variable, so log text is data and never re-parsed as shell.
-# This is the only crash DM. The skill's crash triage only reports and sends no DM,
-# so a harness crash DMs once even when the skill session dies before its triage block.
+# This is the only crash DM.
 FAILDM_SEG="if [ \"\$pp_rc\" != 0 ] && [ \"\$pp_rc\" != 3 ] && [ \"\$pp_rc\" != 143 ] && [ \"\$pp_rc\" != 75 ]; then fail_tail=\$(tail -n 3 \"$LOG\" 2>/dev/null | tr '\n' ' ' | cut -c1-600); msg=\"post-plan-now: run FAILED on branch $SLUG (exit \$pp_rc). Last log lines: \${fail_tail:-none}. Re-run: cd $ROOT && bin/post-plan-now. See $LOG.\"; echo \"\$msg\"; \"$ROOT/bin/post-plan-fail-dm\" \"$ROOT\" \"$SAFE_SLUG\" \"$LOG\" \"\$msg\" || true; fi; "
 
 # A paused run (marker on disk, or a limit-hit log) exits 75 and skips the FAIL-DM; the
 # coordinator sends one DM per wave. Placed before FAILDM_SEG so it wins over every other exit.
 # postplan_postrun_pause checks kill evidence first, so a killed run is never a pause.
+# rc normalisation; bin/test-usage-gate splices this line, so keep it on one physical line.
+RC_SEG="pp_rc=\$?; if [ \"\${_sigterm_received:-0}\" -eq 1 ]; then pp_rc=143; fi; if [ \"\${rc:-0}\" = 3 ]; then pp_rc=3; elif [ \"\${rc:-0}\" = 76 ]; then pp_rc=76; elif [ \"\$pp_rc\" = 0 ] && [ -n \"\${rc:-}\" ] && [ \"\$rc\" != 0 ] && [ \"\$rc\" != 7 ]; then pp_rc=\$rc; fi; "
 PAUSE_SEG="if postplan_postrun_pause $(shq "$SESSION_ID") $(shq "$ROOT/bin/post-plan-now") \"\$pp_rc\" \"\${_sigterm_received:-0}\" $(shq "$LOG"); then pp_rc=75; fi; "
 RELEASE_SEG="usage_token_release $(shq "$SESSION_ID") 2>/dev/null || true; "
 # The far side of $CMD takes over the worktree lock with its own long-lived pid (\$\$),
@@ -991,29 +914,21 @@ PP_UNLOCK_TRAP="; wtlock_release \"\$PP_WTLOCK\" \$\$"
 # so usage_token_reclaim_dead keeps it alive while the run is in flight. No-op when the
 # session does not hold the token (normal-zone runs never acquire it).
 ACQUIRE_SEG="if [ \"\$(usage_token_holder)\" = $(shq "$SESSION_ID") ]; then usage_token_acquire $(shq "$SESSION_ID") \$\$ 2>/dev/null || true; fi; "
-GATE_ENV="IBL5_USAGE_GATE=1 IBL5_USAGE_GATE_RUNNER=post-plan-now IBL5_USAGE_GATE_MODEL=claude-sonnet-5-5 IBL5_USAGE_GATE_RESUME_BIN=$(shq "$ROOT/bin/post-plan-now") "
-if [ "${RESUME_STARTED:-0}" = 1 ]; then
-    SKILL_PROMPT_ARG="$(shq "Continue the /post-plan run from where it stopped. The previous turn was paused by the usage gate.")"
-    SKILL_SESSION_ARG="--resume $(shq "$SESSION_ID")"
-else
-    SKILL_PROMPT_ARG="$(shq "$PROMPT")"
-    SKILL_SESSION_ARG="--session-id $(shq "$SESSION_ID")"
-fi
-
-CMD="export PATH=\"/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH\"; ${PLAN_SLUG_SEG}${LOCK_SEG}export POSTPLAN_LABEL=$(shq "$LABEL") POSTPLAN_STARTED=$(shq "$STARTED") POSTPLAN_BADGE_MARKER=$(shq "$POSTPLAN_BADGE_MARKER") POSTPLAN_RUNNING_LABEL=$(shq "$POSTPLAN_RUNNING_LABEL") POSTPLAN_FAILURE_MARKER=$(shq "$POSTPLAN_FAILURE_MARKER") POSTPLAN_LOG_FILE=$(shq "$LOG") FAILDM_FIRER_PIDS=$(shq "$FIRER_PIDS") POSTPLAN_STATUS_LABEL=$(shq "$POSTPLAN_RUNNING_LABEL"); ${BADGE_FN}_sigterm_received=0; trap 'conclude_status_badge \"\${pp_rc:-1}\"${PP_UNLOCK_TRAP}' EXIT INT HUP; trap '_sigterm_received=1; conclude_status_badge \"\${pp_rc:-1}\"' TERM; cd \"$ROOT\" && { . \"$ROOT/bin/lib/usage-gate.sh\"; postplan_sweep_stale_badge \"\$(postplan_badge_pr_number)\"; ${ACQUIRE_SEG}${FALLBACK_FN}${HARNESS_SEG}${POST_HARNESS_SEG}${GATE_OPEN}${GATE_ENV}POSTPLAN_HARNESS_RC=\"\${rc:-}\" CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 caffeinate -s claude -p ${SKILL_PROMPT_ARG} --dangerously-skip-permissions --model claude-sonnet-5-5 ${SKILL_SESSION_ARG} --effort high --name \"$LABEL\"${GATE_CLOSE}; }; pp_rc=\$?; if [ \"\${_sigterm_received:-0}\" -eq 1 ]; then pp_rc=143; fi; if [ \"\${rc:-0}\" = 3 ]; then pp_rc=3; elif [ \"\${rc:-0}\" = 76 ]; then pp_rc=76; elif [ \"\$pp_rc\" = 0 ] && [ -n \"\${rc:-}\" ] && [ \"\$rc\" != 0 ] && [ \"\$rc\" != 7 ]; then pp_rc=\$rc; fi; ${PAUSE_SEG}${FAILDM_SEG}${RELEASE_SEG}${CMD_TAIL}"
+CMD="export PATH=\"/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH\"; ${PLAN_SLUG_SEG}${LOCK_SEG}export POSTPLAN_LABEL=$(shq "$LABEL") POSTPLAN_STARTED=$(shq "$STARTED") POSTPLAN_BADGE_MARKER=$(shq "$POSTPLAN_BADGE_MARKER") POSTPLAN_RUNNING_LABEL=$(shq "$POSTPLAN_RUNNING_LABEL") POSTPLAN_FAILURE_MARKER=$(shq "$POSTPLAN_FAILURE_MARKER") POSTPLAN_LOG_FILE=$(shq "$LOG") FAILDM_FIRER_PIDS=$(shq "$FIRER_PIDS") POSTPLAN_STATUS_LABEL=$(shq "$POSTPLAN_RUNNING_LABEL"); ${BADGE_FN}_sigterm_received=0; trap 'conclude_status_badge \"\${pp_rc:-1}\"${PP_UNLOCK_TRAP}' EXIT INT HUP; trap '_sigterm_received=1; conclude_status_badge \"\${pp_rc:-1}\"' TERM; cd \"$ROOT\" && { . \"$ROOT/bin/lib/usage-gate.sh\"; postplan_sweep_stale_badge \"\$(postplan_badge_pr_number)\"; ${ACQUIRE_SEG}${OUTCOME_FN}${HARNESS_SEG}${POST_HARNESS_SEG}${OUTCOME_SEG}}; ${RC_SEG}${PAUSE_SEG}${FAILDM_SEG}${RELEASE_SEG}${CMD_TAIL}"
 
 if [ "$FOREGROUND" -eq 1 ]; then
     echo "post-plan-now: foreground mode on branch '$SLUG' — engine: $ENGINE"
     echo "post-plan-now: plan: $PLAN_FILE"
     # exec, not a call: `timeout` signals the whole process group, and a surviving
     # wrapper shell would outlive the SIGTERM its child just took. The launchd form
-    # runs $CMD from the $SCRIPT file (#!/bin/bash); both parse it as one bash script.
-    exec /bin/bash -lc "$CMD"
+    # runs $CMD from the $SCRIPT file. Both use this script's own bash ($BASH, 4+), because
+    # $CMD sources guarded libs that exit 2 under macOS /bin/bash 3.2.
+    exec "$BASH" -lc "$CMD"
 fi
 
 # $CMD goes to a private per-run file, never onto the submit argv (size). The file
-# is mode 700: it carries the prompt.
-( umask 077; printf '#!/bin/bash\n%s\n' "$CMD" > "$SCRIPT" ) \
+# is mode 700.
+( umask 077; printf '#!%s\n%s\n' "$BASH" "$CMD" > "$SCRIPT" ) \
     || { echo "post-plan-now: could not write $SCRIPT." >&2; exit 1; }
 chmod 700 "$SCRIPT"
 if ! ljob_submit "$LABEL" "$LOG" "$SCRIPT"; then
@@ -1035,4 +950,4 @@ echo "  log:    $LOG   (its RESULT: line is the verdict once the run ends)"
 echo "  script: $SCRIPT   (deleted by the run when it finishes)"
 echo "  label:  $LABEL   (self-removes when post-plan finishes)"
 echo "  PR / code review / CI / auto-merge progress appears on the PR."
-echo "  Leave this worktree alone — /post-plan rebuilds its Docker stack for E2E."
+echo "  Leave this worktree alone until the run ends."

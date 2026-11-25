@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 # Test harness for bin/check-pipefail-assignment-guard (the pipefail abort-before-fallback gate).
@@ -55,7 +56,10 @@ N_CONT2="    $PIPE$PIPE X=''"
 
 REPO=$(mktemp -d)
 NOREPO=$(mktemp -d)
-trap 'rm -rf "$REPO" "$NOREPO"' EXIT
+BARE=$(mktemp -d)
+trap 'rm -rf "$REPO" "$NOREPO" "$BARE"' EXIT
+# Shim dir holding only a `bash` symlink, so `env bash` finds bash 4+ under a bare PATH.
+mkdir -p "$BARE/hb5-bash" && ln -sf "${BASH}" "$BARE/hb5-bash/bash"
 
 git -C "$REPO" init -q
 git -C "$REPO" config user.email "test@example.com"
@@ -118,7 +122,7 @@ expect() {
 expect_env() {
     local label="$1" want="$2" sub="$3" out rc=0
     shift 3
-    out=$(cd "$REPO" && env -i PATH=/usr/bin:/bin /bin/bash -o pipefail bin/check-pipefail-assignment-guard "$@" 2>&1) || rc=$?
+    out=$(cd "$REPO" && env -i PATH="$BARE/hb5-bash:/usr/bin:/bin" "$BASH" -o pipefail bin/check-pipefail-assignment-guard "$@" 2>&1) || rc=$?
     check_out "$label" "$rc" "$want" "$sub" "$out"
 }
 

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Guards the single-owner invariant for the global ibl_fa_offers E2E table.
 #
 # Under Playwright's fullyParallel sharding, two separate spec files that both
@@ -10,6 +10,7 @@
 #
 # Owner: tests/e2e/flows/free-agency-submission.spec.ts
 # Exits 0 (clean) or 1 (a non-owner spec mutates ibl_fa_offers).
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 #
 # bin/events-review — weekly product-analytics review of ibl_events.
@@ -55,7 +56,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
 
 log() { echo "events-review: $*" >&2; }
 
-usage() { awk 'NR<=2{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"; }
+usage() { awk 'NR<=3{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"; }
 
 # ── Flags ─────────────────────────────────────────────────────────────────────
 DAYS=7

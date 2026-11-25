@@ -32,6 +32,7 @@
 # in 4-backtick ones, and per CommonMark a closing fence must be at least as long as its
 # opener), matching the same rule in tools/postplan-harness/harness/planfile.py.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then

@@ -9,6 +9,7 @@
 # cannot vouch for is deep. Exit 0 with a verdict; exit 2 on a usage error with no stdout.
 # Phase 4 runs master's copy (git show <MASTER_SHA>:bin/lib/review-depth.sh), so a PR cannot
 # lower its own review depth by editing this file.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -uo pipefail
 export LC_ALL=C
 

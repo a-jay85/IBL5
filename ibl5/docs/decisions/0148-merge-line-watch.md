@@ -1,6 +1,6 @@
 ---
 description: bin/merge-line-watch polls master from a developer shell and runs the same head-of-line update-branch pass as the update-behind-prs workflow, reusing bin/merge-line-select for the decision.
-last_verified: 2026-09-30
+last_verified: 2026-11-24
 ---
 
 > This ADR was drafted by the post-plan harness for this PR. A human must review and approve it before merging.
@@ -34,7 +34,7 @@ The watcher holds no selection logic of its own. The workflow and the watcher sh
 
 - Positive: while the watcher runs, every master move gets a head-of-line pass within about `interval + settle` seconds, whatever files the merge touched.
 - Positive: the watcher and the workflow pick the same head PR for a given master SHA, so a pass from each cannot push two different PRs forward.
-- Negative: when both run on one master move, the second update-branch call can fail on a branch the first already updated. The watcher prints that failure as one log line and keeps polling.
+- Negative: when both run on one master move, the second update-branch call can fail on a branch the first already updated. After a failed call the watcher asks the selector again. When the PR still is the head and the selector says `none` or `wait`, it prints `already updated by another updater`. When a different PR is the head, it prints `is no longer the head`. Both cases exit 0, so `bin/pr-triage` does not report a false failure. Any other answer still prints `update-branch FAILED` and exits 1.
 - Negative: the watcher covers the gap only while a developer keeps it open. The workflow stays the unattended path.
 - Negative: the update-branch push is made with the developer's personal token, so it appears under their account in the PR timeline.
 - Negative: one more `bin/` script and one more `test-*` harness to maintain under the meta-tooling bar.

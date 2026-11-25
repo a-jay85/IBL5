@@ -6,6 +6,7 @@
 # (ADR-0154). Admits exactly the command shapes bin/sim-recap-tick issues via
 # q(), qctx() and the store call, and nothing else. The argv is rebuilt from
 # matched pieces: no eval, no `sh -c`, and the raw request is never executed.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -u
 
 ROOT="${SIM_RECAP_GATE_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"

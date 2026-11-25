@@ -6,6 +6,7 @@
 #
 # Run: bin/test-vr-gallery-store  (exit 0 = all pass, 1 = a case failed)
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 # shellcheck source=bin/lib/harness.sh
@@ -333,12 +334,12 @@ build_shared_root "$ROOT_N"
 build_shared_root "$ROOT_S"
 run "$DEDUPE" --migrate --root "$ROOT_N"
 NORMAL_OUT="$OUT"
-run env -i PATH=/usr/bin:/bin bash "$DEDUPE" --migrate --root "$ROOT_S"
+run env -i PATH="$(harness_bare_path "$TMP")" bash "$DEDUPE" --migrate --root "$ROOT_S"
 h_eq "runs-under-scrubbed-env: migrate exit 0" "0" "$RC"
 h_eq "runs-under-scrubbed-env: migrate stdout matches normal env" "$NORMAL_OUT" "$OUT"
 run "$REFS" --root "$ROOT_N"
 NORMAL_OUT="$OUT"
-run env -i PATH=/usr/bin:/bin bash "$REFS" --root "$ROOT_S"
+run env -i PATH="$(harness_bare_path "$TMP")" bash "$REFS" --root "$ROOT_S"
 h_eq "runs-under-scrubbed-env: refs check exit 0" "0" "$RC"
 h_eq "runs-under-scrubbed-env: refs stdout matches normal env" "$NORMAL_OUT" "$OUT"
 

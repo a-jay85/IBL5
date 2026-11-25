@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Run database integration tests in a worktree using the sibling ibl5_test database.
 # Delegates to bin/db-test-up for bootstrap + test execution.
 #
@@ -6,6 +6,7 @@
 #
 # The worktree's Docker environment must already be running (bin/wt-up).
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then

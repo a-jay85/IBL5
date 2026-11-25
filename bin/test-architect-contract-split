@@ -25,6 +25,7 @@
 #      bin/test-architect-contract-split --self-test  (also proves checker catches a deletion)
 #      bin/test-architect-contract-split --help       (usage)
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 CONTRACT_CAP_BYTES=34816
 VERIFICATION_CAP_BYTES=21504
 # --print-caps [--ref=<rev>]: read-only. One TAB row per capped file:

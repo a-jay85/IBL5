@@ -85,6 +85,7 @@
 # location cell runs only outside the repo (~/, $HOME, /tmp) or against a post-PR CI
 # run (gh run|pr|api); such a row has no footprint a diff can carry.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 set -f
 # Force the C locale — deterministic byte-wise matching across locales.

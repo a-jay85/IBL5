@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Scans ibl5/scripts/, ibl5/bin/, and ibl5/api.php for bare SQL column
 # references that were renamed by a migration but are absent from the live
@@ -31,6 +31,7 @@
 #
 # Exit codes: 0 = pass, 1 = stale references found, 2 = usage error.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 BYPASS_MIN_LENGTH=20

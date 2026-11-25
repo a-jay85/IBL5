@@ -31,6 +31,7 @@
 # launchctl and discord-dm are stubbed; nothing leaves the machine.
 # Run: bin/test-post-plan-fail-dm  (exit 0 = all pass, 1 = a case failed)
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -u
 
 # shellcheck source=bin/lib/harness.sh

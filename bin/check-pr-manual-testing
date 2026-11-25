@@ -17,6 +17,7 @@
 #   1  Section is present but contains only freeform prose (drifted — blocks CI).
 #   2  Usage error.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 GH_CMD="${GH_CMD:-gh}"

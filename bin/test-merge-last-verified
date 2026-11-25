@@ -15,6 +15,7 @@
 #              The default run never executes it: CI's shallow checkout lacks
 #              the SHAs, and synthetic-contract-replay carries the same fixture.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -uo pipefail
 
 # shellcheck source=bin/lib/harness.sh
@@ -351,7 +352,7 @@ mk_doc "$TMP/e.o" 2026-10-14 base base
 mk_doc "$TMP/e.a" 2026-10-15 base base
 mk_doc "$TMP/e.b" 2026-10-18 base base
 rc=0
-env -i PATH=/usr/bin:/bin bash -c 'set -euo pipefail; "$1" "$2" "$3" "$4" 7 x' _ \
+env -i PATH="$(harness_bare_path "$TMP")" bash -c 'set -euo pipefail; "$1" "$2" "$3" "$4" 7 x' _ \
     "$DRIVER" "$TMP/e.o" "$TMP/e.a" "$TMP/e.b" > /dev/null 2>&1 || rc=$?
 h_eq "empty-env-driver: rc" "0" "$rc"
 ok_if "empty-env-driver: date" has_line "$TMP/e.a" "last_verified: 2026-10-18"

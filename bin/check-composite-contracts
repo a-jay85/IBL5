@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # gate-backtest-argv:
 # gate-backtest-reads: .github/actions/* .github/workflows/* ibl5/docs/decisions/* bin/merge-master-to-prod bin/promote-master-to-production bin/lib/pr-armable.sh tools/postplan-harness/harness/armable.py bin/check-pr-checks-green
 # bin/check-composite-contracts — pins behavior contracts of the shared CI
@@ -97,6 +97,7 @@
 #   `Infection PHP (per-PR diff)` context (or the --context=<name> one, e.g.
 #   `All checks settled` for ADR-0149) and changed nothing else. Exit 0 = OK,
 #   1 = an R check failed, 2 = bad usage or unreadable input.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -eu
 
 # Required status-check context emitted by mutation-pr.yml (ADR-0145). The ONE

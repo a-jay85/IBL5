@@ -377,12 +377,14 @@ ljob_dm_ready() {
 }
 
 # ---------------------------------------------------------------------------
-# ljob_dm_send <tool> <msg>
-# printf '%s' "$msg" | "$DISCORD_DM" -; on failure prints the UNDELIVERED line.
+# ljob_dm_send <tool> <msg> [flag ...]
+# printf '%s' "$msg" | "$DISCORD_DM" [flag ...] -; on failure prints the
+# UNDELIVERED line. Pass --error to post to the #errors channel.
 # ---------------------------------------------------------------------------
 ljob_dm_send() {
     local tool="$1" msg="$2"
-    if ! printf '%s' "$msg" | "$DISCORD_DM" -; then
+    shift 2
+    if ! printf '%s' "$msg" | "$DISCORD_DM" "$@" -; then
         printf '%s\n' "${tool}: DM UNDELIVERED (spooled by discord-dm) — the verdict above stands."
     fi
 }

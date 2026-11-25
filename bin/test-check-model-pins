@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # <!-- no-adr: additive lint gate that pins model ids to one list; no new architectural boundary or constraint beyond the existing tiering rules -->
 # bin/test-check-model-pins — behavioural harness for bin/check-model-pins.
 #
@@ -9,6 +9,7 @@
 #
 # Run: bin/test-check-model-pins  (exit 0 = all pass, 1 = an assertion failed)
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -u
 # shellcheck source=bin/lib/harness.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/harness.sh"
@@ -159,8 +160,16 @@ want_rc "10 non-repo" 2 "$rc"
 want "10 says git grep failed" "$out" "git grep failed"
 
 # 11. Empty env still catches a stale id (gate 17). Reuses case 2's tree.
-out=$(env -i /bin/bash "$D2/bin/check-model-pins" 2>&1); rc=$?
+# The child records the bash it runs under, so a swap to /bin/bash (3.2 on the
+# Mac) fails here on Linux too, where /bin/bash is also bash 5.
+out=$(env -i "$BASH" -c 'printf "%s\n" "${BASH}" >"$0"; exec "${BASH}" "$1"' "$TMPROOT/child-bash" "$D2/bin/check-model-pins" 2>&1); rc=$?
 want_rc "11 empty env" 1 "$rc"
+child_bash=$(cat "$TMPROOT/child-bash" 2>/dev/null) || child_bash=''
+if [ "$child_bash" = "${BASH}" ]; then
+    ok "11 gate ran under the harness bash"
+else
+    fail "11 gate ran under '$child_bash', want '${BASH}'"
+fi
 want "11 empty env names the id" "$out" "$STALE_SONNET"
 
 # 12. Unknown flag fails loudly.

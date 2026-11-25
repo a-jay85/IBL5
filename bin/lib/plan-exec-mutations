@@ -2,9 +2,9 @@
 # shellcheck shell=bash
 #
 # bin/lib/plan-exec-mutations — the ONE owner of the `## Executable Mutations`
-# plan grammar (ADR-0199). bin/check-plan gate [XM], the /post-plan skill-path
-# Phase 5.0 block and the compiled harness (harness/mutations.py) all shell out
-# to this script; nothing else parses the form.
+# plan grammar (ADR-0199). bin/check-plan gate [XM] and the compiled harness
+# (harness/mutations.py) both shell out to this script; nothing else parses
+# the form.
 #
 # Usage: bin/lib/plan-exec-mutations parse [--root DIR] <plan>
 #        bin/lib/plan-exec-mutations run [--root DIR] [--timeout SEC] [--max-timeout SEC] [--scale K] [--budget SEC] <plan>
@@ -45,6 +45,7 @@
 # The journal lives at $(git rev-parse --absolute-git-dir)/exec-mutations/:
 # per-worktree and outside the porcelain view.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -u
 export LC_ALL=C
 

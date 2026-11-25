@@ -26,6 +26,7 @@
 # a noun phrase has a codebase name. Wiring a guessing heuristic would produce noise the
 # author learns to ignore. It remains author-side guidance only.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -uo pipefail
 trap 'exit 0' EXIT
 

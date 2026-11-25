@@ -509,7 +509,7 @@ jobs:
       run: php bin/check-baseline-drift --base="$DRIFT_BASE"
 
   shellcheck:
-    name: ShellCheck (bash 3.2 compat)
+    name: ShellCheck
     needs: [ci-memo-check]
     if: needs.ci-memo-check.outputs.hit != 'true'
     runs-on: ubuntu-26.04
@@ -537,9 +537,8 @@ jobs:
           printf '  %s\n' "${scripts[@]}"
           echo ""
 
-          # --severity=warning catches SC3044 (declare -A unsupported in bash 3.2)
-          # and other portability issues. -s bash targets bash specifically; scripts
-          # must work in bash 3.2 (macOS default shell).
+          # --severity=warning catches portability issues. -s bash targets bash
+          # specifically; scripts need bash 4+ (Homebrew bash on macOS, ADR-0281).
           #
           # Excludes for pre-existing warnings, tracked as burn-down debt:
           #   SC2034 — unused variables (bin/lib/wt-guards.sh)
@@ -793,13 +792,6 @@ jobs:
       - name: Composite behavior contracts
         if: ${{ !cancelled() }}
         run: bin/check-composite-contracts
-      # bashpid-under-set-u: macOS /bin/bash is 3.2 and has no BASHPID, so a bare
-      # read under set -u aborts the script there (backlog#1859, PR #3937).
-      - name: Check bin/ scripts never read BASHPID bare
-        if: ${{ !cancelled() }}
-        run: |
-          bin/test-check-bashpid-under-set-u
-          bin/check-bashpid-under-set-u
       # ambient-env-fallback: a default chain that reads REPO after REPO_DIR lets an
       # undocumented exported var pick the target (backlog#1610, PR #3350).
       - name: Check bin/ scripts never fall back to an undocumented ambient var

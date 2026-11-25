@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 # Test harness for bin/check-shell-portability (the BSD-first stat gate).
@@ -21,7 +22,7 @@ BIN="$(cd "$(dirname "$0")" && pwd)"
 SCRIPT="$BIN/check-shell-portability"
 HARNESS="$BIN/$(basename "$0")"
 ST='st''at'
-SB='#!/bin/bash'
+SB='#!/usr/bin/env bash'
 FX="$DIR/fixture.sh"
 
 mk() { local out="$1"; shift; printf '%s\n' "$@" > "$out"; }
@@ -69,6 +70,48 @@ case_fx comment-only 0 "$OKMSG" "    # old form: $ST -f %m \"\$f\""
 case_fx trailing-comment 0 "$OKMSG" "x=1  # was $ST -f %m \"\$f\""
 case_fx quoted-message 0 "$OKMSG" "echo \"SKIP: needs $ST -f and BSD date\""
 case_fx lstat-near-miss 0 "$OKMSG" "x=\$(lstat -f %m \"\$f\")"
+
+# Bash-floor checks. GL is the exact guard line, read from this harness's own line 2,
+# so the file holds one literal copy of it.
+GL=$(sed -n '2p' "$HARNESS")
+T="$DIR/sb"
+# case_sb name want_rc substring relpath exec(0|1) line...  (line 1 included verbatim)
+case_sb() {
+    local name="$1" rc="$2" sub="$3" rel="$4" ex="$5"
+    shift 5
+    mkdir -p "$(dirname "$T/$rel")"
+    mk "$T/$rel" "$@"
+    if [ "$ex" = 1 ]; then chmod +x "$T/$rel"; else chmod -x "$T/$rel"; fi
+    run_gate --files "$T/$rel"
+    expect "$name" "$rc" "$sub"
+}
+ENVSB='#!/usr/bin/env bash'
+BB='#!/bin''/bash'
+GUARDMSG="missing bash-version guard"
+
+# Shebang cases (row 6): any absolute-path bash on line 1 is flagged.
+case_sb bin-bash 1 "fixture.sh:1:" fixture.sh 0 "$BB" "echo hi"
+case_sb usr-bin-bash 1 "fixture.sh:1:" fixture.sh 0 '#!/usr/bin/bash' "echo hi"
+case_sb bin-bash-flag 1 "fixture.sh:1:" fixture.sh 0 "$BB -e" "echo hi"
+case_sb brew-abs 1 "fixture.sh:1:" fixture.sh 0 '#!/opt/homebrew/bin/bash' "echo hi"
+
+# Near-miss cases (row 7): none of these is flagged.
+case_sb env-bash 0 "$OKMSG" env.sh 1 "$ENVSB" "$GL" "echo hi"
+case_sb sh 0 "$OKMSG" sh.sh 1 '#!/bin/sh' "echo hi"
+case_sb embedded-line3 0 "$OKMSG" emb.sh 1 "$ENVSB" "$GL" "cat <<'EOF'" "$BB" "EOF"
+case_sb prose-bash 0 "$OKMSG" prose.sh 0 "$ENVSB" "# runs under /bin/bash 3.2 on macOS" "echo hi"
+
+# Guard cases (row 8): an executable env-bash script needs the exact guard first.
+case_sb guard-missing 1 "$GUARDMSG" g1.sh 1 "$ENVSB" "set -euo pipefail" "echo hi"
+case_sb guard-after-code 1 "$GUARDMSG" g2.sh 1 "$ENVSB" "set -euo pipefail" "$GL"
+case_sb guard-altered 1 "$GUARDMSG" g3.sh 1 "$ENVSB" "${GL/-ge 4/-ge 3}" "echo hi"
+case_sb guard-commented 1 "$GUARDMSG" g4.sh 1 "$ENVSB" "# $GL" "echo hi"
+
+# Exclusion cases (row 9): no guard needed, or a guard after leading comments.
+case_sb guard-nonexec 0 "$OKMSG" lib.sh 0 "$ENVSB" "echo hi"
+case_sb guard-hooks 0 "$OKMSG" bin/hooks/x.sh 1 "$ENVSB" "echo hi"
+case_sb guard-fixtures 0 "$OKMSG" bin/fixtures/x 1 "$ENVSB" "echo hi"
+case_sb guard-after-comments 0 "$OKMSG" c.sh 1 "$ENVSB" "# shellcheck shell=bash" "" "$GL" "echo hi"
 
 mk "$DIR/tool.py" '#!/usr/bin/env python3' "os.system('$ST -f %m x')"
 run_gate --files "$DIR/tool.py"

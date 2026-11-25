@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # watch-automouse-plan — wait for an automouse plan to finish a phase, then DM.
 #
 # Generalised from a one-off watcher that fired correctly and then lost its
@@ -52,6 +52,7 @@
 # stale done/<slug> from a previous attempt is already sitting there (the queue/
 # precondition, overridable with --force).
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -uo pipefail
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 

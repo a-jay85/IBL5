@@ -18,6 +18,7 @@
 #
 # Run: bin/test-plan-now  (exit 0 = all pass, 1 = a case failed)
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -u
 
 # shellcheck source=bin/lib/harness.sh
@@ -634,6 +635,7 @@ want    "NO_PLAN DMs the halt icon"                   "$(dm)" "⏹️ plan-now:"
 want    "NO_PLAN DMs its verdict"                     "$(dm)" "RESULT no-plan — "
 want    "NO_PLAN DM carries the reason"               "$(dm)" "already merged as #1957 and #1958"
 want_no "NO_PLAN DM offers no review buttons"         "$(dm)" "--route"
+want    "NO_PLAN DM posts to #errors"                 "$(head -1 "$DM_LOG")" "ARGV: --error -"
 
 # The real bug's guess named a PEER's plan that appeared mid-run. The slugless
 # prompt keeps both recovery legs out, so only the guess branch could name it.
@@ -877,6 +879,7 @@ want "queued run DMs the next action"    "$(dm)" "queued for automouse"
 want "queued run DMs the plan path"      "$(dm)" "$P"
 want "queued run DMs the log path"       "$(dm)" "log: $RL/plan-now-"
 want "queued run DMs the elapsed time"   "$(dm)" "s · "
+want_no "ok run posts to #dev, not #errors" "$(head -1 "$DM_LOG")" "--error"
 
 # 2. ok + --implement: the case the user called out by name. It succeeded, and it
 #    is sitting there waiting for a human who has no way to know that.

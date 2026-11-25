@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # shellcheck shell=bash
 #
 # bin/post-merge-hook — post-merge automation body, exec'd by the post-merge
@@ -12,6 +12,7 @@
 # IBL5_POST_MERGE_DRY_RUN=1 prints the change-detection result and exits
 # before any side effect (used by bin/test-post-merge-hook).
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     cat <<'EOF'
 Usage: bin/post-merge-hook [squash-flag]

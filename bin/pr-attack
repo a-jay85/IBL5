@@ -13,6 +13,7 @@
 #   2. bin/pr-attack --work <dir> [--gate-edge '#A>#B'...] -> ordered document
 # Exit codes: 0 = ok; 1 = usage / refused argument; 2 = unjudged gate
 # candidates and no --gate-edge/--gate-edges; 3 = stale $WORK (tip moved).
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 export LC_ALL=C
 

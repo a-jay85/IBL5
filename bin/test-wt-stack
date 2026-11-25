@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # bin/test-wt-stack: behavior cases for bin/wt-stack with docker, wt-up and wt-down stubbed.
 # Runs on any host; touches no real container and no real $HOME.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 REPO=$(cd "$(dirname "$0")/.." && pwd)
@@ -252,13 +253,10 @@ FIX
 case_post_plan_wiring() {
   reset_case
   local p10="$REPO/.claude/skills/post-plan/_phase-10-preview-environment.md"
-  local sk="$REPO/.claude/skills/post-plan/SKILL.md"
   grep -qF 'bin/wt-stack stop <slug>' "$p10" || fail post-plan-wiring "phase 10 lacks wt-stack stop"
   grep -qF 'bin/wt-up <slug> --prod' "$p10" || fail post-plan-wiring "phase 10 lacks printed wt-up --prod"
   grep -qF 'http://<slug>.localhost/ibl5/' "$p10" || fail post-plan-wiring "phase 10 lacks preview URL"
   ! grep -qF 'bin/wt-down <slug>' "$p10" || fail post-plan-wiring "phase 10 runs bin/wt-down <slug> again"
-  grep -qF 'bin/wt-stack start <worktree-name> --seed' "$sk" || fail post-plan-wiring "SKILL.md lacks wt-stack start"
-  grep -qF 'rc=$?; bin/wt-stack stop <worktree-name>; exit $rc' "$sk" || fail post-plan-wiring "SKILL.md lacks same-call stop"
 }
 
 case_started_then_stopped

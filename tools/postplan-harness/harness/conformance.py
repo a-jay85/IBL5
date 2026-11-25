@@ -288,7 +288,7 @@ def _touched(tok: str, changed_files: list[str]) -> bool:
 def _rooted_match(tok: str, files: list[str]) -> bool:
     """Exact, path-suffix, or directory-prefix match only. Used for a citation that was
     written with a leading `/`: `/ibl5/modules.php` and `/modules.php` match tracked
-    `ibl5/modules.php`; `/post-plan` does NOT match `.claude/skills/post-plan/SKILL.md`
+    `ibl5/modules.php`; `/post-plan` does NOT match the retired stub `.claude/skills/post-plan/SKILL.md`
     (a parent-dir-name hit is what _touched accepts and what made a slash command look
     like a repo path)."""
     tok = tok.strip().lstrip("/").rstrip("/")

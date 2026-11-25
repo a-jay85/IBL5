@@ -8,6 +8,7 @@
 #
 # Run: bin/test-merge-line-watch  (exit 0 = all pass, exit 1 = a case failed)
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -u
 
 # shellcheck source=bin/lib/harness.sh
@@ -42,7 +43,9 @@ EOF
 chmod +x "$TMP/gh"
 
 # Stub selector: prints whatever $SEL_OUT holds. A counter file lets the
-# unknown-retry case flip to a real answer on the Nth call.
+# unknown-retry case flip to a real answer on the Nth call. $SEL_OUT2, when
+# set, replaces the answer from the second call on (the re-check after a
+# failed update-branch).
 cat > "$TMP/select" <<EOF
 #!/bin/sh
 n=\$(cat "$TMP/calls" 2>/dev/null || echo 0); n=\$((n + 1)); echo \$n > "$TMP/calls"
@@ -50,6 +53,8 @@ if [ -n "\${SEL_UNKNOWN_UNTIL:-}" ] && [ \$n -lt "\$SEL_UNKNOWN_UNTIL" ]; then
     printf 'action=unknown\nhead=\n'; exit 0
 fi
 [ -n "\${SEL_FAIL:-}" ] && { echo "graphql error"; exit 1; }
+if [ -n "\${SEL_FAIL2:-}" ] && [ \$n -ge 2 ]; then echo "graphql error"; exit 1; fi
+if [ -n "\${SEL_OUT2:-}" ] && [ \$n -ge 2 ]; then printf '%s\n' "\$SEL_OUT2"; exit 0; fi
 printf '%s\n' "\$SEL_OUT"
 EOF
 chmod +x "$TMP/select"
@@ -94,9 +99,68 @@ assert_absent "F: no PUT" 'update-branch' "$GH"
 assert_eq "F: exit 1" 1 "$RC"
 
 # G: update-branch failure is surfaced with the error text.
-GH_PUT_FAIL=1 SEL_OUT=$'action=update\nhead=3' run "$WATCH" --once
+MERGE_LINE_WATCH_RETRY_WAIT=0 GH_PUT_FAIL=1 SEL_OUT=$'action=update\nhead=3' run "$WATCH" --once
 assert_match "G: failure surfaced" 'update-branch FAILED for #3: boom' "$OUT"
 assert_eq "G: exit 1" 1 "$RC"
+assert_eq "G: re-checked once" 2 "$(cat "$TMP/calls")"
+
+# W: update-branch fails because another updater just updated the PR. The
+# re-check says the head is current, so the pass is fine.
+MERGE_LINE_WATCH_RETRY_WAIT=0 GH_PUT_FAIL=1 SEL_OUT=$'action=update\nhead=3' SEL_OUT2=$'action=none\nhead=3' \
+    run "$WATCH" --once
+assert_match "W: already-updated reported" 'PR #3 already updated by another updater \(now action=none head=3\)' "$OUT"
+assert_absent "W: no FAILED line" 'FAILED' "$OUT"
+assert_eq "W: exit 0" 0 "$RC"
+
+# W2: the re-check says wait (CI running after the other push). Still fine.
+MERGE_LINE_WATCH_RETRY_WAIT=0 GH_PUT_FAIL=1 SEL_OUT=$'action=update\nhead=3' SEL_OUT2=$'action=wait\nhead=3' \
+    run "$WATCH" --once
+assert_match "W2: already-updated reported" 'PR #3 already updated by another updater \(now action=wait head=3\)' "$OUT"
+assert_eq "W2: exit 0" 0 "$RC"
+
+# W3: the re-check says none for a different head. PR #3 is not called updated.
+MERGE_LINE_WATCH_RETRY_WAIT=0 GH_PUT_FAIL=1 SEL_OUT=$'action=update\nhead=3' SEL_OUT2=$'action=none\nhead=' \
+    run "$WATCH" --once
+assert_match "W3: moved-head reported" 'PR #3 is no longer the head' "$OUT"
+assert_absent "W3: not called updated" 'already updated' "$OUT"
+assert_eq "W3: exit 0" 0 "$RC"
+
+# Z: the re-check itself fails. The pass reports the update failure.
+MERGE_LINE_WATCH_RETRY_WAIT=0 GH_PUT_FAIL=1 SEL_OUT=$'action=update\nhead=3' SEL_FAIL2=1 \
+    run "$WATCH" --once
+assert_match "Z: failure surfaced" 'update-branch FAILED for #3: boom' "$OUT"
+assert_eq "Z: exit 1" 1 "$RC"
+
+# X: the re-check names a different head that needs an update. The pass
+# leaves it for the next pass and makes no second PUT.
+MERGE_LINE_WATCH_RETRY_WAIT=0 GH_PUT_FAIL=1 SEL_OUT=$'action=update\nhead=3' SEL_OUT2=$'action=update\nhead=4' \
+    run "$WATCH" --once
+assert_match "X: moved-head reported" 'PR #3 is no longer the head \(now #4\)' "$OUT"
+assert_eq "X: one PUT" 1 "$(grep -c 'update-branch' <<< "$GH")"
+assert_eq "X: exit 0" 0 "$RC"
+
+# Y: the re-check stays unknown. The pass cannot confirm, so it fails.
+MERGE_LINE_WATCH_RETRY_WAIT=0 GH_PUT_FAIL=1 SEL_OUT=$'action=update\nhead=3' \
+    SEL_OUT2=$'action=unknown\nhead=' run "$WATCH" --once
+assert_match "Y: failure surfaced" 'update-branch FAILED for #3: boom' "$OUT"
+assert_eq "Y: exit 1" 1 "$RC"
+
+# Y2: the re-check gives an answer outside update, wait and none. Only those
+# three can clear a failed update, so any other answer is still a failure.
+MERGE_LINE_WATCH_RETRY_WAIT=0 GH_PUT_FAIL=1 SEL_OUT=$'action=update\nhead=3' \
+    SEL_OUT2=$'action=bogus\nhead=3' run "$WATCH" --once
+assert_match "Y2: failure surfaced" 'update-branch FAILED for #3: boom' "$OUT"
+assert_absent "Y2: not called updated" 'already updated' "$OUT"
+assert_eq "Y2: exit 1" 1 "$RC"
+
+# Y3: a refused PUT plus a re-check that lists the PR under skipped= is a real
+# conflict, not a lost race. Even with a different head named, it must fail.
+MERGE_LINE_WATCH_RETRY_WAIT=0 GH_PUT_FAIL=1 SEL_OUT=$'action=update\nhead=3' \
+    SEL_OUT2=$'action=update\nhead=4\nskipped=3:dirty' run "$WATCH" --once
+assert_match "Y3: failure surfaced" 'update-branch FAILED for #3: boom' "$OUT"
+assert_absent "Y3: not called moved head" 'no longer the head' "$OUT"
+assert_absent "Y3: not called updated" 'already updated' "$OUT"
+assert_eq "Y3: exit 1" 1 "$RC"
 
 # I: skipped PRs print with readable reasons; unknown reasons pass through.
 SEL_OUT=$'action=update\nhead=8\nskipped=12:dirty 13:red 14:weird' run "$WATCH" --once

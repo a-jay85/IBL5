@@ -73,6 +73,30 @@ guarantee cannot be refactored away.
 Locked by `bin/test-automouse-postplan-disposition`; the agent-facing statement of the
 same three outcomes lives in `bin/automouse/prompt-postplan` Step 4.
 
+## launchd PATH: Homebrew bash first
+
+Every repo script starts with `#!/usr/bin/env bash` and a guard that exits 2 under bash older than 4. launchd's default PATH (`/usr/bin:/bin:/usr/sbin:/sbin`) finds macOS `/bin/bash` 3.2, so `~/Library/LaunchAgents/com.ibl5.automouse.plist` must carry this dict. No repo script writes that plist, so this README is its source:
+
+```xml
+<key>EnvironmentVariables</key>
+<dict>
+    <key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+</dict>
+```
+
+The value matches `LSCHED_JOB_PATH` in `bin/lib/launchd-sched.sh`. Launchers that start a `/bin/bash -lc` login shell get their PATH from `~/.bash_profile`, so that file must run `brew shellenv`. `ljob_job_path` puts `/usr/local/bin` early, so keep `/usr/local/bin/bash` absent or at version 4 or newer. To add it to an installed plist:
+
+```bash
+P=~/Library/LaunchAgents/com.ibl5.automouse.plist
+plutil -extract EnvironmentVariables raw "$P" >/dev/null 2>&1 \
+  || plutil -insert EnvironmentVariables -dictionary "$P"
+plutil -replace EnvironmentVariables.PATH \
+  -string '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin' "$P"
+plutil -lint "$P"
+```
+
+Reload the job with `launchctl bootout` and `launchctl bootstrap` only when no automouse run is live.
+
 ## Host-state runbook — REQUIRED after this rename merges
 
 The rename from `bin/automouse-run` to `bin/automouse/run` touches **live host

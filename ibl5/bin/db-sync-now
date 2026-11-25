@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Sync the local main-stack database with prod.
 #
 # Main stack only — worktree DBs (ibl5-db-<slug>) are NEVER touched by this script.
@@ -27,6 +27,7 @@
 # Prereqs: .env with REMOTE_* creds (live mode) or PROD_SSH_HOST (--from-backup).
 #          ibl5-mariadb container running.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"

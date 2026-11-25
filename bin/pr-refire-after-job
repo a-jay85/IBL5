@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # pr-refire-after-job: wait for a headless prep job on a PR, then re-fire post-plan.
 # It uses no tokens and wakes no Claude session.
 #
@@ -28,6 +28,7 @@
 # Exit codes (foreground call): 0 detached, 2 bad input.
 # Test knobs: PRRA_POLL (default 60) and PRRA_SETTLE (default 30) seconds,
 # PRRA_FOREGROUND=1 runs without detaching.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -u
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then

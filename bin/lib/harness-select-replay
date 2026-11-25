@@ -6,6 +6,7 @@
 # has since changed replays against today's coverage.
 # Prints one line per PR, then a summary line. Exits 1 on any MISS, 2 on a gh failure
 # or a bad argument.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 REPO="a-jay85/IBL5"

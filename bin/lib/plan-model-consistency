@@ -58,6 +58,7 @@
 #   --judge-rows prints MANUAL_COUNT=<n>, MANUAL_JUDGE=<opus or empty> and one
 #   `ROW: <raw row>` line per Opus-judgeable row, then exits 0 without the rules.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -u
 
 # Force the C locale — same rationale as bin/check-plan: deterministic

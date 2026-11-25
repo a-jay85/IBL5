@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 # Test harness for bin/check-claude-cli-invocation (the claude -p call-site gate).
@@ -21,7 +22,11 @@ trap 'rm -rf "$T"' EXIT
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # The fixtures name usage-gated entry points (bin/test-harness-lib scans for them).
-. "$HERE/lib/usage-test-isolation.sh"; usage_test_isolate "$T/usage"
+# A scratch copy of this harness (a counterfactual run) has no lib/ beside it; fall back to the repo's.
+ISOLATION_BIN="$HERE"
+[ -f "$ISOLATION_BIN/lib/usage-test-isolation.sh" ] || ISOLATION_BIN="$(git rev-parse --show-toplevel)/bin"
+. "$ISOLATION_BIN/lib/usage-test-isolation.sh"
+usage_test_isolate "$T/usage"
 SCRIPT="$HERE/check-claude-cli-invocation"
 
 OUT=""
@@ -65,6 +70,12 @@ expect_class() {
     fi
 }
 
+# expect_no_class NAME FILE CLASS: the gate prints no line of CLASS for FILE
+expect_no_class() {
+    run_gate "$2"
+    if grep -q ": $3: " <<< "$OUT"; then fail "$1 (unexpected $3)"; else pass "$1"; fi
+}
+
 # lineof FILE FIXED  -- first line number holding the fixed string
 lineof() { grep -nF -m1 -- "$2" "$1" | cut -d: -f1; }
 
@@ -98,7 +109,7 @@ _pf_timeout_argv() {  # <secs>
     HR_ARGV=(claude -p --model claude-sonnet-5-5 --max-turns "$HR_MAX_TURNS"
         --max-budget-usd "$HR_MAX_BUDGET_USD"
         --permission-prompts none --allowedTools "$ALLOWED" --tools "$ALLOWED"
-        --disallowedTools "$DENIED")
+        --disallowedTools "$DENIED") # claude-perm-ok: shape fixture; the grant is a variable
     _pf_timeout_argv "$HR_TIMEOUT_SECS"
     REPLY="$(printf '%s\n' "$HR_PROMPT" | CLAUDE_HEADLESS=1 PYTHONDONTWRITEBYTECODE=1 ${TMO[@]+"${TMO[@]}"} "${HR_ARGV[@]}" 2>"$HR_TMP/stderr")" || true
 FIX
@@ -115,7 +126,7 @@ _pf_timeout_argv() {  # <secs>
 }
     ARGV=(claude -p --model claude-sonnet-5-5 --max-turns 100 --max-budget-usd 5
         --permission-prompts none --allowedTools "$ALLOWED" --tools "$ALLOWED"
-        --disallowedTools "$DENIED")
+        --disallowedTools "$DENIED") # claude-perm-ok: shape fixture; the grant is a variable
     FIX_TIMEOUT=1500
     _pf_timeout_argv "$FIX_TIMEOUT"
     REPLY="$(printf '%s\n' "$PROMPT" | ${TMO[@]+"${TMO[@]}"} "${ARGV[@]}" 2>"$ERRLOG")" || true
@@ -148,7 +159,7 @@ expect "[good_prompt_before_variadic]" "$T/good_prompt_before_variadic.sh" 0
 
 cat > "$T/good_splat.sh" <<'FIX'
 #!/bin/bash
-timeout "$secs" claude -p "$p" --tools Read "$@"
+timeout "$secs" claude -p "$p" --tools Read "$@" # claude-perm-ok: shape fixture; caller flags pass through
 FIX
 expect "[good_splat]" "$T/good_splat.sh" 0
 
@@ -157,7 +168,7 @@ cat > "$T/good_perl_alarm.sh" <<'FIX'
 #!/bin/bash
 {
     printf 'cd %s && CLAUDE_HEADLESS=1 caffeinate -s perl -e "alarm shift; exec @ARGV or exit 127" 7200 claude -p %s --dangerously-skip-permissions --model claude-sonnet-5-5 --session-id %s --effort low --name %s\n' \
-        "$(shq "$WT_ROOT")" "$(shq "$PROMPT")" "$SESSION_ID" "$(shq "$LABEL")"
+        "$(shq "$WT_ROOT")" "$(shq "$PROMPT")" "$SESSION_ID" "$(shq "$LABEL")" # claude-perm-ok: shape fixture; unattended runner
 } > "$RUNNER"
 FIX
 expect "[good_perl_alarm]" "$T/good_perl_alarm.sh" 0
@@ -276,6 +287,7 @@ esac
 # ------------------------------------------- mutated copies of the real good file
 
 PFSRC="$HERE/postplan-fix"
+[ -f "$PFSRC" ] || PFSRC="$(git rev-parse --show-toplevel)/bin/postplan-fix"
 cp "$PFSRC" "$T/pf0"
 expect "[pf_baseline_clean]" "$T/pf0" 0
 
@@ -332,6 +344,265 @@ if command -v claude >/dev/null 2>&1; then
 else
     echo "SKIP: claude not on PATH; allowlist drift not checked"
 fi
+
+# ------------------------------------------------- permission class cases
+
+# perm_fix NAME TAIL  -- write $T/perm_NAME.sh: a clean call (timeout wrapper, prompt first,
+# no stderr merge) followed by TAIL, so only the permission class can fire.
+perm_fix() {
+    printf '#!/bin/bash\ntimeout 600 claude -p "$p" %s\n' "$2" > "$T/perm_$1.sh"
+}
+
+# perm_pass CASE_NAME TAIL  -- a clean call that must pass the whole gate
+perm_pass() { printf '#!/bin/bash\ntimeout 600 claude -p "$p" %s\n' "$2" > "$T/$1.sh"; expect "$1" "$T/$1.sh" 0; }
+
+perm_pass perm_mode_plan_pass "--permission-mode plan"
+perm_pass perm_mode_eq_dontask_pass "--permission-mode=dontAsk"
+perm_pass perm_bash_gh_pass "--allowedTools 'Bash(gh pr view:*),Bash(gh pr diff:*)'"
+perm_pass perm_bash_bin_pass '--allowedTools "Bash(bin/plan-tier-hint:*) Bash(bin/lib/claim-file.sh:*)"'
+perm_pass perm_bash_gh_bare_args_pass "--allowed-tools 'Bash(gh)'"
+perm_pass perm_tools_empty_pass '--tools ""'
+perm_pass perm_allowed_empty_pass "--allowedTools ''"
+perm_pass perm_tools_readonly_pass "--tools Read,Grep,Glob"
+perm_pass perm_allow_ends_at_next_flag_pass "--allowedTools Read --disallowedTools 'Bash(python3:*)'"
+perm_pass perm_strict_mcp_pass "--strict-mcp-config"
+
+cat > "$T/perm_deny_assignment_pass.sh" <<'FIX'
+#!/bin/bash
+DENY='Bash(gh pr merge:*),Bash(python3:*),Bash(bash:*)'
+timeout 600 claude -p "$p" --disallowedTools "$DENY"
+FIX
+expect "perm_deny_assignment_pass" "$T/perm_deny_assignment_pass.sh" 0
+
+cat > "$T/perm_deny_array_pass.sh" <<'FIX'
+#!/bin/bash
+DENY=('Bash(gh pr merge:*)' 'Bash(python3:*)')
+timeout 600 claude -p "$p" --disallowed-tools "${DENY[@]}"
+FIX
+expect "perm_deny_array_pass" "$T/perm_deny_array_pass.sh" 0
+
+# Deny values are never read, but a "$@" after the deny flag can still carry any flag.
+cat > "$T/perm_deny_then_argv_fail.sh" <<'FIX'
+#!/bin/bash
+timeout 600 claude -p "$p" --disallowedTools "$D" "$@"
+FIX
+expect_class perm_deny_then_argv_fail "$T/perm_deny_then_argv_fail.sh" permission
+cat > "$T/perm_deny_then_star_fail.sh" <<'FIX'
+#!/bin/bash
+timeout 600 claude -p "$p" --disallowed-tools 'Bash(rm:*)' "$*"
+FIX
+expect_class perm_deny_then_star_fail "$T/perm_deny_then_star_fail.sh" permission
+cat > "$T/perm_deny_bash_then_argv_fail.sh" <<'FIX'
+#!/bin/bash
+timeout 600 claude -p "$p" --disallowedTools Bash "$@"
+FIX
+expect_class perm_deny_bash_then_argv_fail "$T/perm_deny_bash_then_argv_fail.sh" permission
+
+# Non-Bash tool names pass by design (plan Design decision 4); a Bash grant still fires.
+perm_pass perm_write_edit_pass "--allowedTools Write,Edit,NotebookEdit"
+
+cat > "$T/perm_flag_in_prompt_pass.sh" <<'FIX'
+#!/bin/bash
+timeout 600 claude -p "never pass --dangerously-skip-permissions"
+FIX
+expect "perm_flag_in_prompt_pass" "$T/perm_flag_in_prompt_pass.sh" 0
+
+cat > "$T/perm_comment_mention_pass.sh" <<'FIX'
+#!/bin/bash
+# --dangerously-skip-permissions --permission-mode bypassPermissions
+timeout 600 claude -p "$p"
+FIX
+expect "perm_comment_mention_pass" "$T/perm_comment_mention_pass.sh" 0
+
+perm_pass perm_marker_reason_pass "--dangerously-skip-permissions # claude-perm-ok: unattended run in a throwaway worktree"
+# A marker on the redirect line after a subshell's closing paren belongs to the statement.
+cat > "$T/perm_subshell_redirect_marker_pass.sh" <<'FIX'
+#!/bin/bash
+( cd "$W" && \
+    timeout 9 claude -p "$p" \
+        --permission-mode acceptEdits ) \
+    > "$W/out.json" 2>&1 # claude-perm-ok: scratch fixture runs in a temp dir
+FIX
+expect "perm_subshell_redirect_marker_pass" "$T/perm_subshell_redirect_marker_pass.sh" 0
+# The redirect-line rule is for claude-perm-ok only. A claude-cli-ok on that line does not
+# reach the statement, so the old checks still fire.
+cat > "$T/cli_ok_subshell_redirect_marker_fail.sh" <<'FIX'
+#!/bin/bash
+( cd "$W" && \
+    claude -p "$p" \
+        --permission-mode acceptEdits ) \
+    > "$W/out.json" 2>&1 # claude-cli-ok: redirect-line marker must not count
+FIX
+expect_class "cli_ok_subshell_redirect_marker_no_timeout" "$T/cli_ok_subshell_redirect_marker_fail.sh" no-timeout
+expect_class perm_cli_ok_subshell_redirect_permission_fail "$T/cli_ok_subshell_redirect_marker_fail.sh" permission
+cat > "$T/perm_ok_subshell_redirect_no_timeout_fail.sh" <<'FIX'
+#!/bin/bash
+( cd "$W" && \
+    claude -p "$p" \
+        --permission-mode acceptEdits ) \
+    > "$W/out.json" 2>&1 # claude-perm-ok: scratch fixture runs in a temp dir
+FIX
+expect_class "perm_ok_subshell_redirect_keeps_no_timeout" "$T/perm_ok_subshell_redirect_no_timeout_fail.sh" no-timeout
+expect_no_class "perm_ok_subshell_redirect_silences_permission" "$T/perm_ok_subshell_redirect_no_timeout_fail.sh" permission
+
+perm_pass perm_cli_ok_marker_pass "--dangerously-skip-permissions # claude-cli-ok: all-class escape still covers permission"
+
+cat > "$T/perm_marker_multiline_pass.sh" <<'FIX'
+#!/bin/bash
+timeout 600 claude -p "$p" \
+    --dangerously-skip-permissions \
+    --model m # claude-perm-ok: unattended run in a throwaway worktree
+FIX
+expect "perm_marker_multiline_pass" "$T/perm_marker_multiline_pass.sh" 0
+
+cat > "$T/perm_printf_runner_marker_pass.sh" <<'FIX'
+#!/bin/bash
+{
+    printf 'cd %s && timeout 600 claude -p %s --dangerously-skip-permissions --model m\n' \
+        "$(shq "$WT_ROOT")" "$(shq "$PROMPT")" # claude-perm-ok: runner runs in a throwaway worktree
+} > "$RUNNER"
+FIX
+expect "perm_printf_runner_marker_pass" "$T/perm_printf_runner_marker_pass.sh" 0
+
+# Variadic words: the existing prompt-after-variadic class owns this shape; only the
+# permission verdict is asserted.
+perm_fix variadic_words "--allowedTools Read Grep Glob"
+expect_no_class "perm_variadic_words_no_permission" "$T/perm_variadic_words.sh" permission
+
+# The permission marker is scoped: the other four checks stay on.
+cat > "$T/perm_marker_scoped_keeps_no_timeout.sh" <<'FIX'
+#!/bin/bash
+claude -p "$p" --dangerously-skip-permissions # claude-perm-ok: reason here
+FIX
+expect_class "perm_marker_scoped_keeps_no_timeout" "$T/perm_marker_scoped_keeps_no_timeout.sh" no-timeout
+# A perm-only marker must not be read as a claude-cli-ok marker with an empty reason.
+if grep -q "needs a non-empty reason" <<< "$OUT"; then
+    fail "perm_marker_scoped_not_a_cli_ok_marker (output: $OUT)"
+else
+    pass "perm_marker_scoped_not_a_cli_ok_marker"
+fi
+
+perm_fix mode_acceptedits "--permission-mode acceptEdits"
+expect_class perm_mode_acceptedits_fail "$T/perm_mode_acceptedits.sh" permission
+perm_fix mode_bypass "--permission-mode bypassPermissions"
+expect_class perm_mode_bypass_fail "$T/perm_mode_bypass.sh" permission
+perm_fix mode_near_miss "--permission-mode acceptEditsX"
+expect_class perm_mode_near_miss_fail "$T/perm_mode_near_miss.sh" permission
+perm_fix mode_var '--permission-mode "$MODE"'
+expect_class perm_mode_var_fail "$T/perm_mode_var.sh" permission
+perm_fix mode_missing_value "--permission-mode"
+expect_class perm_mode_missing_value_fail "$T/perm_mode_missing_value.sh" permission
+perm_fix skip "--dangerously-skip-permissions"
+expect_class perm_skip_fail "$T/perm_skip.sh" permission
+perm_fix allow_skip "--allow-dangerously-skip-permissions"
+expect_class perm_allow_skip_fail "$T/perm_allow_skip.sh" permission
+perm_fix settings "--settings ./s.json"
+expect_class perm_settings_fail "$T/perm_settings.sh" permission
+perm_fix mcp_config "--mcp-config ./m.json"
+expect_class perm_mcp_config_fail "$T/perm_mcp_config.sh" permission
+perm_fix add_dir "--add-dir /tmp/x"
+expect_class perm_add_dir_fail "$T/perm_add_dir.sh" permission
+perm_fix bare_bash "--allowedTools 'Read,Bash'"
+expect_class perm_bare_bash_fail "$T/perm_bare_bash.sh" permission
+perm_fix bash_star "--allowedTools 'Bash(*)'"
+expect_class perm_bash_star_fail "$T/perm_bash_star.sh" permission
+perm_fix offlist_python "--allowedTools 'Bash(python3:*)'"
+expect_class perm_offlist_python_fail "$T/perm_offlist_python.sh" permission
+perm_fix xargs "--allowedTools 'Bash(xargs:*)'"
+expect_class perm_xargs_fail "$T/perm_xargs.sh" permission
+perm_fix find "--allowedTools 'Bash(find . -exec:*)'"
+expect_class perm_find_fail "$T/perm_find.sh" permission
+perm_fix env "--allowedTools 'Bash(env:*)'"
+expect_class perm_env_fail "$T/perm_env.sh" permission
+perm_fix sh_c "--allowedTools 'Bash(sh -c:*)'"
+expect_class perm_sh_c_fail "$T/perm_sh_c.sh" permission
+perm_fix near_gh "--allowedTools 'Bash(ghx:*)'"
+expect_class perm_near_gh_fail "$T/perm_near_gh.sh" permission
+perm_fix near_bin "--allowedTools 'Bash(bin/../etc/x:*)'"
+expect_class perm_near_bin_fail "$T/perm_near_bin.sh" permission
+perm_fix subdir_bin "--allowedTools 'Bash(bin/automouse/run:*)'"
+expect_class perm_subdir_bin_fail "$T/perm_subdir_bin.sh" permission
+perm_fix mixed_list "--allowedTools 'Bash(gh pr view:*),Bash(mysql:*)'"
+expect_class perm_mixed_list_fail "$T/perm_mixed_list.sh" permission
+perm_fix space_list '--allowedTools "Bash(gh pr view:*) Bash(curl:*)"'
+expect_class perm_space_list_fail "$T/perm_space_list.sh" permission
+perm_fix kebab_flag "--allowed-tools 'Bash(perl:*)'"
+expect_class perm_kebab_flag_fail "$T/perm_kebab_flag.sh" permission
+perm_fix tools_flag "--tools 'Read,Bash'"
+expect_class perm_tools_flag_fail "$T/perm_tools_flag.sh" permission
+perm_fix eq_form "--allowedTools='Bash(node:*)'"
+expect_class perm_eq_form_fail "$T/perm_eq_form.sh" permission
+perm_fix var_rule '--allowedTools "Bash(${WRAP}:*)"'
+expect_class perm_var_rule_fail "$T/perm_var_rule.sh" permission
+perm_fix cmdsub '--allowedTools "$(cat tools.txt)"'
+expect_class perm_cmdsub_fail "$T/perm_cmdsub.sh" permission
+perm_fix array_value '--allowedTools "${TOOLS[@]}"'
+expect_class perm_array_value_fail "$T/perm_array_value.sh" permission
+perm_fix argv_dollar_at '"$@"'
+expect_class perm_argv_dollar_at_fail "$T/perm_argv_dollar_at.sh" permission
+perm_fix argv_unquoted_var '$FLAGS'
+expect_class perm_argv_unquoted_var_fail "$T/perm_argv_unquoted_var.sh" permission
+perm_fix argv_unquoted_positional '$1'
+expect_class perm_argv_positional_fail "$T/perm_argv_unquoted_positional.sh" permission
+perm_fix argv_braced_at '"${@}"'
+expect_class perm_argv_braced_at_fail "$T/perm_argv_braced_at.sh" permission
+perm_fix argv_braced_at_slice '"${@:2}"'
+expect_class perm_argv_braced_at_slice_fail "$T/perm_argv_braced_at_slice.sh" permission
+perm_fix deny_braced_at '--disallowedTools "${@}"'
+expect_class perm_deny_braced_at_fail "$T/perm_deny_braced_at.sh" permission
+perm_fix argv_braced_var '${FLAGS}'
+expect_class perm_argv_braced_var_fail "$T/perm_argv_braced_var.sh" permission
+perm_fix argv_unquoted_cmdsub '$(cat flags.txt)'
+expect_class perm_argv_unquoted_cmdsub_fail "$T/perm_argv_unquoted_cmdsub.sh" permission
+perm_fix deny_unquoted_var "--disallowedTools \$FLAGS"
+expect_class perm_deny_unquoted_var_fail "$T/perm_deny_unquoted_var.sh" permission
+perm_pass perm_quoted_prompt_var_pass '--model "$MODEL"'
+perm_fix tools_default "--tools default"
+expect_class perm_tools_default_fail "$T/perm_tools_default.sh" permission
+perm_fix tools_eq_default "--tools=default"
+expect_class perm_tools_eq_default_fail "$T/perm_tools_eq_default.sh" permission
+perm_fix marker_no_colon "--dangerously-skip-permissions # claude-perm-ok reason without colon"
+expect_class perm_marker_no_colon_fail "$T/perm_marker_no_colon.sh" permission
+perm_fix marker_empty_reason "--dangerously-skip-permissions # claude-perm-ok:"
+expect_class perm_marker_empty_reason_fail "$T/perm_marker_empty_reason.sh" permission
+# Only judged once the gate has reported (rc 1); the expect_class line above owns an rc mismatch.
+if grep -q "claude-perm-ok marker needs a non-empty reason" <<< "$OUT"; then
+    pass "perm_marker_empty_reason_names_reason"
+elif [ "$RC" -eq 1 ]; then
+    fail "perm_marker_empty_reason_names_reason_missing (output: $OUT)"
+fi
+
+cat > "$T/perm_var_list_fail.sh" <<'FIX'
+#!/bin/bash
+ALLOWED="Read,Bash"
+timeout 600 claude -p "$p" --allowedTools "$ALLOWED"
+FIX
+expect_class perm_var_list_fail "$T/perm_var_list_fail.sh" permission
+
+cat > "$T/perm_multiline_rule_fail.sh" <<'FIX'
+#!/bin/bash
+timeout 600 claude -p "$p" --allowedTools 'Read,
+Grep,
+Bash(python3:*)'
+FIX
+expect_class perm_multiline_rule_fail "$T/perm_multiline_rule_fail.sh" permission
+
+cat > "$T/perm_printf_runner_fail.sh" <<'FIX'
+#!/bin/bash
+{
+    printf 'cd %s && timeout 600 claude -p %s --dangerously-skip-permissions --model m\n' \
+        "$(shq "$WT_ROOT")" "$(shq "$PROMPT")"
+} > "$RUNNER"
+FIX
+expect_class perm_printf_runner_fail "$T/perm_printf_runner_fail.sh" permission
+
+# Strings from the PR #3379 history, wrapped as the call's tool grant.
+perm_fix hist_1 "--permission-mode acceptEdits --allowedTools Read"
+expect_class perm_hist_1_fail "$T/perm_hist_1.sh" permission
+perm_fix hist_2 '--allowedTools "Bash(mysql:*)" "Bash(${SIM_RECAP_MYSQL_BIN}:*)" "Write"'
+expect_class perm_hist_2_fail "$T/perm_hist_2.sh" permission
+perm_fix hist_3 '--allowedTools "Bash(mysql:*)" "Write"'
+expect_class perm_hist_3_fail "$T/perm_hist_3.sh" permission
 
 echo "$PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

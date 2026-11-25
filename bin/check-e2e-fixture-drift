@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Runtime sibling of the static mutator-isolation gate (bin/check-e2e-mutator-isolation).
 #
 # The static grep gate catches only updater-firing specs (a narrow endpoint signal)
@@ -20,6 +20,7 @@
 #
 # Overridable for the self-test via FIXTURE_DRIFT_MANIFEST / FIXTURE_DRIFT_MYSQL.
 # Subcommands: `snapshot <outfile>` (dump curated rows) and `diff <before> <after>`.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then

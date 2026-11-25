@@ -21,12 +21,12 @@
 # whenever --label is given.
 #
 # A `RESULT:` line is NOT a terminator when --label is present, only a signal to
-# surface. bin/post-plan-now's launchd job runs the compiled harness and then, on
-# a generic harness failure, escalates to a /post-plan skill session in the SAME
-# job writing the SAME log — so the harness's own `RESULT: … FAILED` lands while
-# a second engine is still working. Exiting on it would report a failure the job
-# is in the middle of recovering from. Without --label there is no other signal,
-# so `RESULT:` becomes the terminator there.
+# surface. bin/post-plan-now's launchd job runs the compiled harness, and a
+# harness crash posts a failure comment on the PR and sends the crash DM after
+# the harness's own `RESULT: … FAILED` line, in the SAME job writing the SAME
+# log. Exiting on the RESULT line would cut the watch before those steps land.
+# Without --label there is no other signal, so `RESULT:` becomes the terminator
+# there.
 #
 # Arm it from a Monitor (both flags are printed for you by the producer):
 #   bin/watch-run --log /tmp/post-plan-now-<slug>-<ts>.log \
@@ -47,6 +47,7 @@
 # Exit 4 — --startup-grace elapsed and the launchd label was never seen alive:
 #          the job never registered. Nothing was killed.
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     awk 'NR>=3 && /^#/ { sub(/^# ?/, ""); print; next } NR>=3 { exit }' "$0"
     exit 0

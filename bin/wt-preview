@@ -23,6 +23,7 @@
 # Exit: 0 ok or --help; 2 usage error; otherwise the docker start or wt-up exit code.
 # A failed stop of another stack is reported and does not block the switch.
 # Test: bin/test-wt-preview.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -uo pipefail
 
 BIN_DIR="$(cd "$(dirname "$0")" && pwd)"

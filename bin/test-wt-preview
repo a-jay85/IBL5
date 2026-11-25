@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # bin/test-wt-preview: behavior cases for bin/wt-preview with docker, launchctl,
 # wt-up and wt-down stubbed. Runs on any host; touches no real container and no real $HOME.
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 
 REPO=$(cd "$(dirname "$0")/.." && pwd)

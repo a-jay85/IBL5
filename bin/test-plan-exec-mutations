@@ -7,6 +7,7 @@
 #
 # Usage: bin/test-plan-exec-mutations
 
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -u
 export LC_ALL=C
 # The lib exports these to every check it runs. When this suite is itself a check (the
@@ -568,7 +569,7 @@ for t in git awk sed grep tr cat rm mkdir mktemp python3 sort head tail wc cut d
     p=$(command -v "$t" 2>/dev/null) || continue
     case "$p" in /*) ln -sf "$p" "$NT/$t" ;; esac
 done
-OUT=$(PATH="$NT" /bin/bash "$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
+OUT=$(PATH="$NT" "$BASH" "$LIB" run --root "$R" "$R.plan.md" 2>&1); RC=$?
 chk "NO-TIMEOUT exits 1" eq "$RC" 1
 chk "NO-TIMEOUT reported" has "$OUT" "NO-TIMEOUT"
 chk "NO-TIMEOUT leaves target" eq "$(sha "$R/target.txt")" "$BEFORE"

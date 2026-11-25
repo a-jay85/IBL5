@@ -437,6 +437,131 @@ verdict_no_tree_line() {
     want_rc 4
     want_posted "names no reviewed tree"
 }
+KEPT_HEAD='### Kept new scope (you asked for this)'
+KEPT_PHRASE='the only blocking findings are new scope you asked for; each one is listed under Kept new scope'
+KEPT_ITEM='- `Add the roster export` (you said: `add the export too`)'
+seed_raw() { # <author> <body>: posts the body verbatim
+    jq -nc --arg u "$1" --arg b "$2" '{user:{login:$u},body:$b}' >> "$FX/comments.ndjson"
+}
+kept_sticky() { # <banner word> <tree word> <last line before the marker> [middle lines...]
+    local banner=$1 tw=$2 last=$3 body
+    shift 3
+    body="**$banner** (re-review, round 1) — 2026-11-24 12:00 UTC · auto-merge held"$'\n'
+    while [ $# -gt 0 ]; do body="$body$1"$'\n'; shift; done
+    body="$body**Reviewed tree:** $B40"$'\n'"**Re-reviewed tree:** $(cat "$FX/tree") ($tw)"$'\n'
+    body="$body$last"$'\n''<!-- pr-ready-verdict -->'
+    seed_raw owner "$body"
+}
+kept_refused() { # <case> <posted token> <kept_sticky args...>
+    local c=$1 tok=$2
+    shift 2
+    fresh "$c"
+    kept_sticky "$@"
+    run_oa "$PR" "ok"
+    want_rc 4
+    want_posted "$tok"
+}
+kept_scope_accepts() { # (i)
+    fresh kept_scope_accepts
+    kept_sticky "READY WITH NOTES" "NOT READY" "READY WITH NOTES — $KEPT_PHRASE" \
+        "" "$KEPT_HEAD" "$KEPT_ITEM" ""
+    run_oa "$PR" "ok"
+    want_rc 0
+    want_out "RESULT: armed"
+}
+kept_scope_no_heading() { # (ii) terminal line, no heading
+    kept_refused kept_scope_no_heading "not READY" "READY WITH NOTES" "NOT READY" \
+        "READY WITH NOTES — $KEPT_PHRASE" "" "$KEPT_ITEM" ""
+}
+kept_scope_empty_section() { # (iii) heading with no item line under it
+    kept_refused kept_scope_empty_section "not READY" "READY WITH NOTES" "NOT READY" \
+        "READY WITH NOTES — $KEPT_PHRASE" "" "$KEPT_HEAD" "" "Some other line"
+}
+kept_scope_no_phrase() { # (iv) bare READY WITH NOTES banner, heading and items, no terminal line
+    kept_refused kept_scope_no_phrase "not READY" "READY WITH NOTES" "NOT READY" \
+        "Reviewer: opus" "" "$KEPT_HEAD" "$KEPT_ITEM" ""
+}
+kept_scope_spoof_fence() { # (v-a) heading only inside a fence and inside an item quote
+    kept_refused kept_scope_spoof_fence "not READY" "READY WITH NOTES" "NOT READY" \
+        "READY WITH NOTES — $KEPT_PHRASE" "" '```' "$KEPT_HEAD" "$KEPT_ITEM" '```' \
+        '- `Note` (you said: `### Kept new scope (you asked for this)`)' ""
+}
+kept_scope_spoof_not_last() { # (v-b) phrase in an item quote and on a mid-body line, not last
+    kept_refused kept_scope_spoof_not_last "not READY" "READY WITH NOTES" "NOT READY" \
+        "Reviewer: opus" "" "$KEPT_HEAD" \
+        '- `Note` (you said: `READY WITH NOTES — '"$KEPT_PHRASE"'`)' "" \
+        "READY WITH NOTES — $KEPT_PHRASE" ""
+}
+kept_scope_unclosed_fence() { # (v-c) a fence opened before the terminal never closes
+    kept_refused kept_scope_unclosed_fence "not READY" "READY WITH NOTES" "NOT READY" \
+        "READY WITH NOTES — $KEPT_PHRASE" "" "$KEPT_HEAD" "$KEPT_ITEM" "" '```' "quoted text"
+}
+kept_scope_word_mismatch() { # (vi-a) banner READY WITH NOTES, terminal READY
+    kept_refused kept_scope_word_mismatch "not READY" "READY WITH NOTES" "NOT READY" \
+        "READY — $KEPT_PHRASE" "" "$KEPT_HEAD" "$KEPT_ITEM" ""
+}
+kept_scope_tree_word_near_miss() { # (vi-b) full fingerprint, tree word is not exactly NOT READY
+    kept_refused kept_scope_tree_word_near_miss "NOT READY YET" "READY WITH NOTES" "NOT READY YET" \
+        "READY WITH NOTES — $KEPT_PHRASE" "" "$KEPT_HEAD" "$KEPT_ITEM" ""
+}
+kept_scope_terminal_near_miss() { # (vi-c) terminal line carries trailing text
+    kept_refused kept_scope_terminal_near_miss "not READY" "READY WITH NOTES" "NOT READY" \
+        "READY WITH NOTES — $KEPT_PHRASE." "" "$KEPT_HEAD" "$KEPT_ITEM" ""
+}
+kept_scope_replay_4214() { # the live PR 4214 sticky's structural line order, generic text
+    local body
+    fresh kept_scope_replay_4214
+    body=$(printf '%s\n' \
+        "**READY WITH NOTES** (re-review, round 1) — 2026-11-24 14:07:17 PST · auto-merge held" \
+        "" \
+        "Auto-merge held:" \
+        "- (7) The plan says a person must review and merge this PR." \
+        "Any auto-merge already set on this PR is now turned off." \
+        "" \
+        "### Fixed in this PR" \
+        "- [x] [unplanned-scope] A fixed finding." \
+        "" \
+        "### Still open (non-blocking)" \
+        "- [ ] A note that does not block." \
+        "" \
+        "<details><summary>Reviewer verdict</summary>" \
+        "" \
+        "PR #4214 is still **NOT READY**. One blocker is left." \
+        "" \
+        "## FINDINGS" \
+        "- [BLOCKING] [unplanned-scope] Add the roster export." \
+        "- [NOTE] A note that does not block." \
+        "" \
+        "</details>" \
+        "" \
+        "$KEPT_HEAD" \
+        "$KEPT_ITEM" \
+        '- `Rename the export button` (you said: `call it Download`)' \
+        "" \
+        "### Merge digest" \
+        "**What changed:** Generic summary text." \
+        "" \
+        "---" \
+        "" \
+        "<details><summary>Audit trail</summary>" \
+        "" \
+        "REVIEW-COVERAGE: NONE" \
+        "**Reviewed tree:** $B40" \
+        "**Reviewed diff:** $B40" \
+        "**Hold code:** (7) plan-auto-merge-hold — plan declares auto_merge: false" \
+        "**Re-reviewed tree:** $(cat "$FX/tree") (NOT READY)" \
+        "**Remediation rounds:** 1. body-only → NOT READY" \
+        "**Review 1:** NOT READY, 2 blocking, 1 notes" \
+        "" \
+        "</details>" \
+        "" \
+        "READY WITH NOTES — $KEPT_PHRASE" \
+        "<!-- pr-ready-verdict -->")
+    seed_raw owner "$body"
+    run_oa "$PR" "ok"
+    want_rc 0
+    want_out "RESULT: armed"
+}
 verdict_rereview_wins() {
     fresh verdict_rereview_wins
     seed_sticky owner READY "**Reviewed tree:** $B40" "**Re-reviewed tree:** $A40"
@@ -1048,6 +1173,7 @@ live_launchd_now live_launchd_fleet live_label live_pgrep_args live_pgrep_cwd li
 live_crash_fails_closed live_pgrep_args_bin_bash live_pgrep_cwd_bin_bash
 verdict_ready_arms verdict_notes_arms verdict_stale_tree verdict_none verdict_not_ready
 verdict_unrecorded verdict_no_tree_line verdict_rereview_wins verdict_rereview_suffix verdict_banner_near_miss
+kept_scope_accepts kept_scope_no_heading kept_scope_empty_section kept_scope_no_phrase kept_scope_spoof_fence kept_scope_spoof_not_last kept_scope_unclosed_fence kept_scope_word_mismatch kept_scope_tree_word_near_miss kept_scope_terminal_near_miss kept_scope_replay_4214
 verdict_foreign_author verdict_ignores_approval_text verdict_gh_error
 arm_label_fail arm_merge_fail_rollback pr_closed
 fixfirst_records finish_no_record finish_head_unmoved finish_wt_mismatch finish_wt_dirty
@@ -1064,7 +1190,7 @@ record_amendments_backfills_once record_amendments_rejects_value_form record_ame
 
 if [ $# -gt 0 ]; then CASES="$*"; else CASES="$ALL_CASES"; fi
 
-for name in $CASES; do
+for name in ${OA_TEST_CASES:-$CASES}; do
     if ! declare -F "$name" >/dev/null; then
         echo "FAIL $name: no such case"
         H_FAIL=$((H_FAIL + 1))

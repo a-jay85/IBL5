@@ -63,8 +63,8 @@
 # know about escapes). Runner slugs with no queue file stay unlinked.
 #
 # THEY OPEN IN VS CODE. Every path URI is vscode://file<abs path>, so a plan or a
-# log lands in an editor, not the OS's .md/.log app. The one other link, `reorder`
-# on the queue header, is a URL that starts the reorder UI. Allow it once.
+# log lands in an editor, not the OS's .md/.log app. Two more links end the queue
+# header: `reorder` opens the reorder UI and `run` starts a run. Allow each once.
 #
 # UNDER TMUX, TWO THINGS HAVE TO BE TRUE or the click dies silently and the page
 # looks like plain text. tmux forwards OSC 8 only when the OUTER terminal is
@@ -127,6 +127,7 @@ PLISTBUDDY_BIN="${FLEET_STATUS_PLISTBUDDY:-/usr/libexec/PlistBuddy}"
 CODESIGN_BIN="${FLEET_STATUS_CODESIGN:-codesign}"
 LSREGISTER_BIN="${FLEET_STATUS_LSREGISTER:-/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister}"
 REORDER_URL_SCHEME="${FLEET_STATUS_REORDER_SCHEME:-ibl5-queue-reorder}"
+RUN_URL_SCHEME="${FLEET_STATUS_RUN_SCHEME:-ibl5-automouse-run}"
 # Same default and override as usage_state_dir in bin/lib/usage-fetch.sh.
 USAGE_STATE_DIR="${IBL5_USAGE_GATE_STATE_DIR:-$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/usage-gate}"
 # shellcheck source=bin/lib/session-id.sh
@@ -238,45 +239,87 @@ log_word() {
 }
 
 # reorder_link — print a `reorder` OSC 8 link that starts
-# bin/automouse/queue-reorder-ui, or nothing at all.
+# bin/automouse/queue-reorder-ui, or nothing at all. The launcher picks a port,
+# starts its server and opens the browser itself. No Terminal window.
+#
+# The launcher needs php, and do shell script runs with a bare /usr/bin:/bin
+# PATH, so the Homebrew prefixes go first. Its output goes to a fixed /tmp log.
+reorder_link() {
+    local target="$MAIN_CHECKOUT/bin/automouse/queue-reorder-ui"
+    applet_link ibl5-queue-reorder "$REORDER_URL_SCHEME" reorder "$target" \
+        "PATH=/opt/homebrew/bin:/usr/local/bin:\$PATH nohup '$target' >/tmp/ibl5-queue-reorder-ui.log 2>&1 &"
+}
+
+# run_link — print a `run` OSC 8 link that starts bin/automouse/run detached, or
+# nothing at all. The runner writes its own dated log, so the /tmp log only
+# catches a crash before that log opens. Its `#!/usr/bin/env bash` needs bash
+# 4+, and a bare PATH finds /bin/bash 3.2, so the Homebrew prefixes go first.
+#
+# A click with no runner alive starts one at once. A click while one is already
+# going asks first, because two runners work two plans at the same time and
+# spend twice as fast. The owner may still say yes: more than one run at a time
+# is allowed. The check is pgrep for a bash process whose script is the
+# runner, by absolute or relative path (a live runner shows as `bash
+# bin/automouse/run`). The leading ^...bash skips `claude -p` sessions whose
+# prompt text names bin/automouse/run (three such planners matched a looser
+# pattern). The [r] keeps the applet's own `sh -c` line, which carries the
+# pattern text, from matching itself. The check is yes or no, never a count,
+# because one runner shows as several bash processes while it forks.
+#
+# The runner is started directly, without `launchctl start com.ibl5.automouse`,
+# because launchd will not start a second copy of a job that is still running.
+run_link() {
+    local target="$MAIN_CHECKOUT/bin/automouse/run"
+    # shellcheck disable=SC2016  # $ is a regex anchor for pgrep, not a bash expansion.
+    applet_link ibl5-automouse-run "$RUN_URL_SCHEME" run "$target" \
+        "PATH=/opt/homebrew/bin:/usr/local/bin:\$PATH nohup '$target' >/tmp/ibl5-automouse-run-click.log 2>&1 &" \
+        'set live to do shell script "pgrep -f '"'"'^[^ ]*bash ([^ ]*/)?bin/automouse/[r]un( |$)'"'"' >/dev/null && echo yes || echo no"' \
+        'if live is "yes" then display dialog "An automouse run is already going. Start another one?" with title "automouse" buttons {"Cancel", "Start another"} default button "Cancel" cancel button "Cancel" with icon caution'
+}
+
+# applet_link <name> <scheme> <label> <target> <cmd> [<applescript line>...] —
+# print an OSC 8 link labelled <label> that runs the shell command <cmd>, or
+# nothing at all. Any extra AppleScript lines run first, so one can ask before
+# the command runs. A cancelled dialog stops the applet there.
 #
 # A LINK CANNOT RUN A COMMAND. OSC 8 carries a URI and the terminal hands it to
 # the OS, which only opens things. So the link is <scheme>://open, a URL scheme
-# owned by a tiny AppleScript applet. Opening the URL launches the applet, whose
-# only statement is a `do shell script` that starts the launcher detached. The
-# launcher then picks a port, starts its server and opens the browser itself. No
-# Terminal window.
+# owned by a tiny AppleScript applet. Opening the URL launches the applet, which
+# runs its lines and then a `do shell script` that starts <cmd> detached.
 #
 # WHY A SCHEME AND NOT file://<applet>. Ghostty 1.4 hard-blocks any local link
 # target that could execute code, and an app bundle is one. No setting allows
 # it. Ghostty treats a custom scheme like vscode://: it asks once, then opens.
 # The applet ignores the URL's contents, so the worst any link can do, a web
-# page's included, is open the reorder page.
+# page's included, is run that applet's one command. For `run` that command
+# starts a paid automouse run.
 #
 # The applet is built here with osacompile on first need and cached outside the
 # repo. PlistBuddy adds the scheme to its Info.plist. codesign re-signs it,
 # because an edited plist breaks the ad-hoc signature and LaunchServices then
 # ignores the scheme. lsregister registers it on every render (see below).
-# The stamp file holds the scheme and the command, and the applet is rebuilt
-# only when that changes. The target is the MAIN checkout's launcher, because a
-# worktree path dies with the worktree while the cached applet lives on.
-#
-# do shell script runs with a bare /usr/bin:/bin PATH, and the launcher needs
-# php, so the Homebrew prefixes go first. Its output goes to a fixed /tmp log.
+# The stamp file holds the scheme, the command and the extra lines, and the
+# applet is rebuilt only when those change. The target is the MAIN checkout's
+# script, because a worktree path dies with the worktree while the cached
+# applet lives on.
 #
 # FAIL-SOFT: no link when links are off (a pipe or a capture has nothing to
 # click), when a build tool is missing (Linux CI), when a path would break the
 # AppleScript string, or when any build step fails.
-reorder_link() {
+applet_link() {
     [ "$LINKS" -eq 1 ] || return 0
-    local target="$MAIN_CHECKOUT/bin/automouse/queue-reorder-ui"
-    local app="$REORDER_APP_DIR/ibl5-queue-reorder.app"
-    local stamp="$REORDER_APP_DIR/ibl5-queue-reorder.cmd"
-    local scheme="$REORDER_URL_SCHEME"
-    local cmd tmp tool plist
+    local name="$1" scheme="$2" label="$3" target="$4" cmd="$5"
+    shift 5
+    local app="$REORDER_APP_DIR/$name.app"
+    local stamp="$REORDER_APP_DIR/$name.cmd"
+    local id="com.ibl5.${name#ibl5-}"
+    local want tmp tool plist line
+    local -a src=()
     case "$target$REORDER_APP_DIR" in *\'*|*\"*|*\\*) return 0 ;; esac
-    cmd="PATH=/opt/homebrew/bin:/usr/local/bin:\$PATH nohup '$target' >/tmp/ibl5-queue-reorder-ui.log 2>&1 &"
-    if [ ! -d "$app" ] || [ "$(cat "$stamp" 2>/dev/null)" != "$scheme $cmd" ]; then
+    want="$scheme $cmd"
+    for line in "$@"; do want="$want
+$line"; done
+    if [ ! -d "$app" ] || [ "$(cat "$stamp" 2>/dev/null)" != "$want" ]; then
         for tool in "$OSACOMPILE_BIN" "$PLISTBUDDY_BIN" "$CODESIGN_BIN" "$LSREGISTER_BIN"; do
             command -v "$tool" >/dev/null 2>&1 || return 0
         done
@@ -284,25 +327,29 @@ reorder_link() {
         tmp="$REORDER_APP_DIR/.build-$$.app"
         plist="$tmp/Contents/Info.plist"
         rm -rf "$tmp"
-        "$OSACOMPILE_BIN" -o "$tmp" \
-            -e 'on run' -e "do shell script \"$cmd\"" -e 'end run' \
-            -e 'on open location u' -e "do shell script \"$cmd\"" \
-            -e 'end open location' >/dev/null 2>&1 \
+        # The same lines go in both handlers: `on run` for a double-click on
+        # the app, `on open location` for the link.
+        src+=(-e 'on run')
+        for line in "$@"; do src+=(-e "$line"); done
+        src+=(-e "do shell script \"$cmd\"" -e 'end run' -e 'on open location u')
+        for line in "$@"; do src+=(-e "$line"); done
+        src+=(-e "do shell script \"$cmd\"" -e 'end open location')
+        "$OSACOMPILE_BIN" -o "$tmp" "${src[@]}" >/dev/null 2>&1 \
             || { rm -rf "$tmp"; return 0; }
         # osacompile may or may not write a bundle id, so drop any and add ours.
         "$PLISTBUDDY_BIN" -c 'Delete :CFBundleIdentifier' "$plist" >/dev/null 2>&1
         if ! { "$PLISTBUDDY_BIN" \
-            -c 'Add :CFBundleIdentifier string com.ibl5.queue-reorder' \
+            -c "Add :CFBundleIdentifier string $id" \
             -c 'Add :CFBundleURLTypes array' \
             -c 'Add :CFBundleURLTypes:0 dict' \
-            -c 'Add :CFBundleURLTypes:0:CFBundleURLName string com.ibl5.queue-reorder' \
+            -c "Add :CFBundleURLTypes:0:CFBundleURLName string $id" \
             -c 'Add :CFBundleURLTypes:0:CFBundleURLSchemes array' \
             -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string $scheme" \
             "$plist" && "$CODESIGN_BIN" -f -s - "$tmp"; } >/dev/null 2>&1; then
             rm -rf "$tmp"; return 0
         fi
         { rm -rf "$app" && mv "$tmp" "$app"; } || { rm -rf "$tmp"; return 0; }
-        printf '%s' "$scheme $cmd" > "$stamp"
+        printf '%s' "$want" > "$stamp"
     fi
     # Register on every render, not only after a build. A macOS update rebuilds
     # the LaunchServices database and drops the scheme, while the cached applet
@@ -311,7 +358,7 @@ reorder_link() {
     command -v "$LSREGISTER_BIN" >/dev/null 2>&1 || return 0
     "$LSREGISTER_BIN" -f "$app" >/dev/null 2>&1 || return 0
     # shellcheck disable=SC1003  # '\033\\' is the OSC ST, as in link_file.
-    printf '\033]8;;%s://open\033\\%s\033]8;;\033\\' "$scheme" 'reorder'
+    printf '\033]8;;%s://open\033\\%s\033]8;;\033\\' "$scheme" "$label"
 }
 
 # Human-readable age from a seconds count: 45s / 12m / 3h04m / 2d01h.
@@ -1208,7 +1255,7 @@ EOF_LS
 
 render_queue() {
     local count=0 shown=0 stale=0 f base next ends pad hb rest pid slug slug_ld slug_lb
-    local claimed=' ' queue_list meta model merge title reorder mark state sid
+    local claimed=' ' queue_list meta model merge title reorder runl mark state sid
 
     next="$(automouse_next_run)"
     ends="$(automouse_run_end)"
@@ -1222,6 +1269,8 @@ render_queue() {
     if ls "$AUTOMOUSE_DIR"/queue/*.md >/dev/null 2>&1; then
         reorder="$(reorder_link)"
         [ -n "$reorder" ] && reorder="$R$DIM  ·  $reorder$R"
+        runl="$(run_link)"
+        [ -n "$runl" ] && reorder="$reorder$R$DIM  ·  $runl$R"
     fi
     if [ -n "$next" ]; then
         # $R$DIM inside the argument: section() bolds whatever it is handed, and

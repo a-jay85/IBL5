@@ -1012,8 +1012,19 @@ def test_call_leaving_a_thread_or_exit_callback_is_recorded(tmp_path, kind):
 
 
 def test_driver_output_without_side_effects_is_an_error():
-    with pytest.raises(KeyError):
-        fidelity_replay._fid_side({"schema": "fidelity-replay/1", "results": [], "executed": {}})
+    # Every other key is present, so only the missing side_effects key can raise.
+    with pytest.raises(KeyError, match="side_effects"):
+        fidelity_replay._fid_side({"schema": "fidelity-replay/1", "results": [], "executed": {},
+                                   "branches": None, "members": []})
+
+
+@pytest.mark.parametrize("key", ["branches", "members"])
+def test_driver_output_without_branch_keys_is_an_error(key):
+    payload = {"schema": "fidelity-replay/1", "results": [], "executed": {}, "side_effects": [],
+               "branches": None, "members": []}
+    del payload[key]
+    with pytest.raises(KeyError, match=key):
+        fidelity_replay._fid_side(payload)
 
 
 @pytest.mark.parametrize("src,line,token", [

@@ -32,16 +32,17 @@ menus, the JSB window) run on the VM's session-1 desktop through `tools/vm/vmgui
 
 ## What we are reading (decompile-confirmed, JSB 5.60)
 
-Foul function `FUN_004e1ba0 @ 0x4E1BA0`. Foul weight (decompile `:97165`):
+Foul function `FUN_004e1ba0 @ 0x4E1BA0` sets the foul weight at decompile line 97165:
 
-```c
-fVar11 = FUN_004e3d90(param_4);          // :97127  defQ
-fVar12 = FUN_004e3f80(param_4,param_5);   // :97128  offQ  (param_5==1 ⇒ home, applies HCA)
-dVar2  = *(double *)(param_1 + 0x68a8) * _DAT_00669ea0;  // :97116  teamDef (param_1 = CEngine)
-...
-local_e80 = (local_e80 / fVar12) * (fVar11 - dVar2 * _DAT_0066d3a0) + local_e80;  // :97165
-//          = (foul_base / offQ)   * (defQ   - teamDef · 5/6)        + foul_base
-```
+`foul_weight = (foul_base / offQ) * (defQ - teamDef · 5/6) + foul_base`
+
+`defQ` is the return of `FUN_004e3d90` (line 97127). `offQ` is the return of
+`FUN_004e3f80` (line 97128), which adds HCA for the home side. `teamDef` is the double
+at `[CEngine + 0x68A8]` times `_DAT_00669ea0` (line 97116). The 5/6 coefficient is
+`_DAT_0066d3a0`.
+
+The decompiled statements live in the private jsb-native repo at
+`jsb-native/re-artifacts/jsb-foul-weight-decompile-excerpt-20261125.md`.
 
 `.rdata` constants (statically pinned from the PE):
 

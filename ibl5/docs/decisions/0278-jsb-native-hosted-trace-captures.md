@@ -1,6 +1,6 @@
 ---
 description: ADR-0278. Trace-pinned evidence may cite a capture hosted in the private jsb-native repo, pinned by commit and sha256.
-last_verified: 2026-11-22
+last_verified: 2026-11-24
 ---
 
 # ADR-0278: Trace-pinned evidence may cite a jsb-native capture
@@ -38,3 +38,7 @@ An evidence entry may set `capture_host: jsb-native`. It then names `captures/<n
 - `engine/internal/jsbtrace/external_test.go`
 - `engine/docs/jsb-trace-capture.md`
 - `engine/testdata/jsb-captures/README.md`
+
+## Addendum (2026-11-24): a public IBL5 no longer rules out captures by itself
+
+The first rejected alternative above keeps captures out of IBL5 because IBL5 is public. On 2026-11-24 the owner chose to build the JSB port in public ([ADR-0236](0236-two-engine-model-jsb-port.md), 2026-11-24 addendum), so that reason no longer settles the question alone. Captures still live in jsb-native, and this ADR's decision stands. Moving them into IBL5 would let CI verify a trace-pinned entry and would end the `capture-host-unavailable` result there. That move needs its own decision.

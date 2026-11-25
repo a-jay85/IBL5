@@ -72,4 +72,6 @@ Three homes follow from that choice:
 - **`a-jay85/jsb-native`** (private) holds the raw reverse-engineering material: the `jumpshot.exe` binary, the decompiled C, the master reference, the VM trace captures and the calibration corpus. Pasted decompiled C stays out of IBL5, and captures stay in jsb-native under [ADR-0278](0278-jsb-native-hosted-trace-captures.md).
 - **`a-jay85/ibl-engine`** (private) holds the clean-room engine. It will differ widely from how JSB works and may become commercial. It never receives a decompile token or port code, as the Clean-room hygiene section says.
 
+In the Clean-room hygiene section, "decompile material" that stays in this repo means decompile tokens, which are the symbol citations in the port. Pasted decompiled C, the binary and raw captures stay in jsb-native.
+
 The Allowlist entries section calls `jsb-native/` untracked. It is a separate private repo, cloned at `jsb-native/` inside the main checkout and listed in `.gitignore`. The `jsb-native/` allowlist entry still matches no tracked IBL5 file.

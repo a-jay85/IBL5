@@ -1,38 +1,54 @@
 ---
-description: Template for new ADRs. Copy with `bin/next-adr "kebab-title"`; do not fill in place.
-last_verified: 2026-10-10
+description: ADR-0286. JSB trace captures live in IBL5 under engine/testdata/jsb-captures/. Retires the jsb-native capture host of ADR-0278 and adds a per-file size cap.
+last_verified: 2026-11-24
 ---
 
-# ADR-NNNN: <Title>
+# ADR-0286: JSB trace captures live in IBL5
 
 **Status:** Accepted
-**Date:** YYYY-MM-DD
-**Deciders:** (optional — names or roles)
+**Date:** 2026-11-24
 
 ## Context
 
-Two to four sentences. What forces were in play, what hurt, what the team had tried. Be concrete about the problem — an ADR is only useful if a future reader can reconstruct why the decision mattered at the time.
+ADR-0278 hosted captures in the private jsb-native repo. CI has no jsb-native checkout, so `harness.trace_pinned` held every hosted entry as `capture-host-unavailable`, and the pinned Go tests skipped. The owner decided on 2026-11-24 to move the captures into IBL5. The 2026-11-24 addendum to ADR-0236 already makes the port public.
 
 ## Decision
 
-What we chose, stated as a directive. One paragraph max. If the decision is mechanically enforced, cite the enforcement mechanism (PHPStan rule identifier, CI job, hook, `bin/` script).
+Captures live at `engine/testdata/jsb-captures/`. `capture_host: jsb-native` is retired. An entry that carries it holds as `capture-bad-host`.
+
+The defense from ADR-0266 stays. The harness reads the capture bytes from the committed object on the base branch, checks `capture_sha256`, and requires the working tree to match. It offers no env override and no pointer to another repo.
+
+`_check_capture` enforces a per-file cap of 8 MiB (8388608 bytes) as hold reason `capture-too-large`. `test_every_committed_capture_under_size_cap` pins the cap against every committed capture. The largest capture today is 4468937 bytes.
+
+**Base-branch rule.** A trace-pinned check reads the capture from base. A PR that adds a capture together with its evidence holds as `capture-not-on-base` and can never clear `trace-pinned`. A capture file always routes to `golden-new` (ADR-0266), so that PR goes to the owner. The normal path is ADR-0266's two PRs. The owner-held capture PR lands first, then the port PR records against master.
+
+**Fresh-capture handoff.** The parity loop's `trace` and `record` write the capture into an IBL5 worktree named `jsb-capture-<row>`. That worktree ships as the owner-held capture PR. `port` refuses until the file is on IBL5 `origin/master` with the same sha256.
+
+**Capture content.** A scan of all six files for IPv4 addresses, `192.168.`, `/Users/`, `C:\`, `password`, `utm`, `ssh` and `localhost` found nothing. The header carries `format`, `source`, `jsb_build`, `function` (a Ghidra `FUN_` name) and `address`. Records carry `caller` addresses. These fields belong to the capture format, and `engine/testdata/jsb-captures/README.md` requires `address`. They are accepted. The binary, decompiled C, the master reference, VM details and the whole-day replay recordings (ADR-0279) stay in jsb-native.
 
 ## Alternatives Considered
 
-- **<Alternative 1>** — one-line description. Rejected because: <one-line reason>.
-- **<Alternative 2>** — one-line description. Rejected because: <one-line reason>.
-- **<Alternative 3>** — one-line description. Rejected because: <one-line reason>.
+- **Keep `jsb-native` as a fallback host.** Rejected because no entry would use it after the move and CI can never reach it.
+- **Git LFS.** Rejected because the files sit far below GitHub's 50 MB warning and LFS adds a second fetch path to CI.
+- **An env override that points at another path.** Rejected again, as in ADR-0278, because it could aim the arming check at any repo.
 
 ## Consequences
 
-- Positive: <tradeoff we accepted>.
-- Positive: <tradeoff we accepted>.
-- Negative: <tradeoff we accepted>.
+- Positive: the Go pinned tests run on every PR. A missing capture fails `go test`, because `jsbtrace.SkipIfAbsent` is gone.
+- Positive: CI and the local harness check a capture the same way.
+- Negative: the capture files are public. The content scan above is the only review they get before the owner's capture PR.
+- Negative: jsb-native `captures/` keeps its history and receives no new files.
 
-## Supersedes
+## Lineage
 
-(Only present when this ADR replaces an earlier one. Remove this section otherwise.) Reference the superseded ADR by number and summarize what changed.
+This ADR replaces the hosting decision of ADR-0278. Its evidence schema and its rejections stand.
 
 ## References
 
-Bulleted list of source files, rules, commits, or prior docs that enforce or illustrate the decision. Use inline backticks for repo paths so `bin/check-docs` validates them.
+- `ibl5/docs/decisions/0266-trace-pinned-golden-clearance.md`
+- `ibl5/docs/decisions/0278-jsb-native-hosted-trace-captures.md`
+- `tools/postplan-harness/harness/trace_pinned.py`
+- `tools/postplan-harness/tests/test_trace_pinned.py`
+- `engine/internal/jsbtrace/jsbtrace.go`
+- `engine/docs/jsb-trace-capture.md`
+- `engine/testdata/jsb-captures/README.md`

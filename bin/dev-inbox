@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# dev-inbox — show dev alerts in a terminal tab, so Discord can stay closed.
+#
+# bin/discord-dm appends every message it sends to ~/.claude/dev-inbox.log. This
+# script prints the last few entries, then follows the file and prints each new
+# one as it lands. Leave it running in a Ghostty tab.
+#
+# Usage: bin/dev-inbox [--last <n>] [--no-bell]
+#   --last <n>   entries to show before following (default 10)
+#   --no-bell    never ring the terminal bell
+#   --once       print the whole file and exit (no follow; bells still ring)
+# ---
+# A new entry rings the bell when it is an error: the #errors target, an
+# undelivered message, a Discord-only button message, or a first line that
+# starts with an alert mark (❌ ❓ ⚠️ 🚨 🔴). Other entries print with no bell.
+# Ghostty's default bell adds 🔔 to the tab title and bounces the Dock icon
+# once, with no sound. The backlog shown at start never rings.
+# Env: DISCORD_DM_INBOX overrides the file path (the same variable discord-dm reads).
+#
+# Exit: 0 normal · 2 usage error.
+
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
+set -uo pipefail
+
+INBOX="${DISCORD_DM_INBOX:-$HOME/.claude/dev-inbox.log}"
+LAST=10
+BELL=1
+ONCE=0
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --last) [ $# -ge 2 ] || { echo "dev-inbox: --last needs a number" >&2; exit 2; }
+                case "$2" in ''|*[!0-9]*) echo "dev-inbox: --last needs a number" >&2; exit 2 ;; esac
+                LAST="$2"; shift 2 ;;
+        --no-bell) BELL=0; shift ;;
+        --once) ONCE=1; shift ;;
+        -h|--help) sed -n '/^# Usage:/,/^#$/p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        *) echo "dev-inbox: unknown argument: $1" >&2; exit 2 ;;
+    esac
+done
+
+# Render entries from stdin. bell=1 rings on an alert entry.
+render() { # bell
+    awk -v bell="$1" '
+        BEGIN { red = "\033[31m"; green = "\033[32m"; dim = "\033[2m"; bold = "\033[1m"; off = "\033[0m" }
+        /^@@ / {
+            ts = $2; kind = $3; caller = $4
+            t = substr(ts, 12, 5); d = substr(ts, 1, 10)
+            alert = (kind == "errors" || kind == "undelivered" || kind ~ /^route:/)
+            first = 1
+            print ""
+            printf "%s%s %s  %s  %s%s\n", dim, d, t, kind, caller, off
+            fflush(); next
+        }
+        {
+            line = substr($0, 3)
+            if (first) {
+                first = 0
+                if (line ~ /^(❌|❓|⚠|🚨|🔴)/) alert = 1
+                if (alert) {
+                    printf "%s%s%s%s\n", bold, red, line, off
+                    if (bell == 1) printf "\007"
+                } else if (line ~ /^✅/) {
+                    printf "%s%s%s\n", green, line, off
+                } else {
+                    print line
+                }
+            } else {
+                print line
+            }
+            fflush()
+        }
+    '
+}
+
+if [ "$ONCE" = 1 ]; then
+    [ -f "$INBOX" ] || exit 0
+    render "$BELL" < "$INBOX"
+    exit 0
+fi
+
+mkdir -p "$(dirname "$INBOX")" && touch "$INBOX"
+
+# Backlog: the last N entries, never ringing.
+starts=$(grep -c '^@@ ' "$INBOX") || starts=0
+skip=$(( starts > LAST ? starts - LAST : 0 ))
+awk -v skip="$skip" '/^@@ / { n++ } n > skip' "$INBOX" | render 0
+printf '\n\033[2m── watching %s ──\033[0m\n' "$INBOX"
+
+# New entries. -F keeps following across the 5 MB rotation.
+tail -n 0 -F "$INBOX" 2>/dev/null | render "$BELL"

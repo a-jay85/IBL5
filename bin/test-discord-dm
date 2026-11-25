@@ -1130,5 +1130,54 @@ out=$(DM_CAPTURE="$CAP" DISCORD_DM_SSH_BIN="$SSH_OK" DISCORD_DM_SPOOL="$SPOOL" D
 [ -z "$out" ] && ok "S1n --quiet stays quiet when logging fails" || fail "S1n out=[$out]"
 "$DM" --help | tail -1 | grep -q '^Exit:' && ok "S1o --help ends at the Exit line" || fail "S1o help tail: $("$DM" --help | tail -1)"
 
+# ── S2: dev inbox (full message for bin/dev-inbox) ────────────────────────────
+printf '\n── S2: dev inbox ──\n'
+INB="$TMP/inbox.log"
+DEV_INBOX="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/dev-inbox"
+rm -f "$INB"; : > "$CAP"
+printf '@@ fake header\nline two' > "$TMP/s2msg.txt"
+DM_CAPTURE="$CAP" DISCORD_DM_SSH_BIN="$SSH_OK" DISCORD_DM_SPOOL="$SPOOL" DISCORD_DM_SENT_LOG="$SENT" \
+    DISCORD_DM_INBOX="$INB" DISCORD_DM_CALLER="my script" "$DM" --to "$FAKE_TO" --attempts 1 --quiet - < "$TMP/s2msg.txt"
+s2_hdr=$(head -n 1 "$INB")
+case "$s2_hdr" in "@@ "[0-9][0-9][0-9][0-9]-*" dm my_script") ok "S2a header: time, target, caller with no spaces" ;; *) fail "S2a header=[$s2_hdr]" ;; esac
+[ "$(sed -n 2,3p "$INB")" = "$(printf '  @@ fake header\n  line two')" ] && ok "S2b body indented, so a body line never reads as a header" || fail "S2b body=[$(sed -n 2,3p "$INB")]"
+[ "$(grep -c '^@@ ' "$INB")" = 1 ] && ok "S2c one header per message" || fail "S2c headers=$(grep -c '^@@ ' "$INB")"
+
+rm -f "$INB"; : > "$CAP"
+DM_CAPTURE="$CAP" DISCORD_DM_SSH_BIN="$SSH_OK" DISCORD_DM_SPOOL="$SPOOL" DISCORD_DM_SENT_LOG="$SENT" \
+    DISCORD_DM_INBOX="$INB" "$DM" --attempts 1 --quiet --raw --route /discordApproveDM '{"a":1}'
+{ grep -qF 'route:/discordApproveDM' "$INB" && grep -qF 'Open Discord to act on it.' "$INB" && ! grep -qF '{"a":1}' "$INB"; } \
+    && ok "S2d raw: a note to open Discord, not the JSON" || fail "S2d inbox=[$(cat "$INB")]"
+
+rm -f "$INB" "$SPOOL"
+DISCORD_DM_SSH_BIN="$TMP/ssh-400" DISCORD_DM_SPOOL="$SPOOL" DISCORD_DM_SENT_LOG="$SENT" DISCORD_DM_INBOX="$INB" \
+    "$DM" --to "$FAKE_TO" --attempts 1 --quiet "lost one" 2>/dev/null
+{ grep -q '^@@ .* undelivered ' "$INB" && grep -qF '  lost one' "$INB"; } \
+    && ok "S2e failure: inbox entry with target undelivered" || fail "S2e inbox=[$(cat "$INB" 2>/dev/null)]"
+
+: > "$CAP"
+out=$(DM_CAPTURE="$CAP" DISCORD_DM_SSH_BIN="$SSH_OK" DISCORD_DM_SPOOL="$SPOOL" DISCORD_DM_SENT_LOG="$SENT" \
+    DISCORD_DM_INBOX="$TMP/notadir/sub/inbox" "$DM" --to "$FAKE_TO" --attempts 1 --quiet "q" 2>&1)
+s2_rc=$?
+{ [ "$s2_rc" = 0 ] && [ -z "$out" ]; } && ok "S2f unwritable inbox: exit 0, quiet" || fail "S2f rc=$s2_rc out=[$out]"
+
+# bin/dev-inbox --once: the bell rings only on alert entries.
+BEL=$(printf '\007')
+printf '%s\n' '@@ 2026-11-25T11:00:00-0800 dev a' '  ✅ fine' \
+    '@@ 2026-11-25T11:01:00-0800 dev b' '  ❓ need you' \
+    '@@ 2026-11-25T11:02:00-0800 errors c' '  boom' \
+    '@@ 2026-11-25T11:03:00-0800 dev d' '  plain' '  ❌ not first line' > "$TMP/r.log"
+r_out=$(DISCORD_DM_INBOX="$TMP/r.log" "$DEV_INBOX" --once)
+r_bells=$(tr -cd "$BEL" <<< "$r_out" | wc -c | tr -d ' ')
+[ "$r_bells" = 2 ] && ok "S2g bell rings for ❓ and #errors only" || fail "S2g bells=$r_bells"
+grep -qF "2026-11-25 11:01" <<< "$r_out" && ok "S2h date and time shown" || fail "S2h out=[$r_out]"
+grep -qxF "plain" <<< "$r_out" && ok "S2i body shown without its indent" || fail "S2i out=[$r_out]"
+r_out=$(DISCORD_DM_INBOX="$TMP/r.log" "$DEV_INBOX" --once --no-bell)
+r_bells=$(tr -cd "$BEL" <<< "$r_out" | wc -c | tr -d ' ')
+[ "$r_bells" = 0 ] && ok "S2j --no-bell rings nothing" || fail "S2j bells=$r_bells"
+DISCORD_DM_INBOX="$TMP/r.log" "$DEV_INBOX" --last x >/dev/null 2>&1
+s2_rc=$?
+[ "$s2_rc" = 2 ] && ok "S2k bad --last exits 2" || fail "S2k rc=$s2_rc"
+
 # ── Summary ───────────────────────────────────────────────────────────────────
 h_done

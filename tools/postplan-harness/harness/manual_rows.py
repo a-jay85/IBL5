@@ -2,7 +2,7 @@
 
 Single algorithm called two ways:
   - harness calls render_rows() in-process
-  - prose /post-plan skill calls bin/normalize-manual-testing (exec wrapper)
+  - a shell caller runs bin/normalize-manual-testing (exec wrapper)
 """
 from __future__ import annotations
 

@@ -1,6 +1,6 @@
 ---
 description: All work happens in a worktree; where plans live (outside the repo); worktree setup; post-plan handoff triggers.
-last_verified: 2026-11-20
+last_verified: 2026-11-24
 ---
 
 # Workflow Continuity Rule
@@ -51,4 +51,4 @@ Never run `/post-plan` **inline**. That costs several times a fresh run. Run it 
 - **Only fire when verification passed.** On failing tests, an unresolved blocker, or a question for the user, do **not** fire. Leave the worktree dirty and hand off in prose. Turn-end is not done; that judgment is yours. `bin/post-plan-now` refuses the tree with exit 9 until `bin/lib/prefire-verify` passes, and exits 10 when the gate cannot run. Read `.claude/rules/workflow-continuity-prefire.md` § Prefire verification before you fire.
 - **No watcher after the fire.** End the turn (`wait-guard.py` denies a watcher on the run).
 
-Engine (harness vs. Sonnet skill fallback), what `--auto`'s skip gate does, plan-blind ad-hoc runs, and where auto-merge is armed: `.claude/rules/workflow-continuity-detail.md`.
+Engine (the compiled harness; a crash stops after the failure comment and DM), what `--auto`'s skip gate does, plan-blind ad-hoc runs, and where auto-merge is armed: `.claude/rules/workflow-continuity-detail.md`.

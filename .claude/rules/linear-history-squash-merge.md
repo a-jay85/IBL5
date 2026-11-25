@@ -1,6 +1,6 @@
 ---
 description: Linear history — squash/rebase-merge only — path-scoped, loads only for post-plan/rebase surfaces. Read before diagnosing a "SHA not in master" result or rebasing a stacked branch after its parent merged.
-last_verified: 2026-11-21
+last_verified: 2026-11-24
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - "tools/postplan-harness/**"
@@ -52,13 +52,10 @@ parent tip when a stacked parent is not in the target, so a squash-merged parent
 replay, and `merge-base` otherwise. A conflict squashes the branch's own commits into one stop.
 The push uses an explicit `refs/heads/<b>:<sha>` lease. A hand-run `git rebase origin/master`
 without `--onto` still trips the trap above.
-When a Phase 2 conflict does occur, it is a real overlap with master, and what happens next
-**differs by engine**. Establish which engine ran before you act.
-
-**Harness** (the default, `tools/postplan-harness/`). `gitad.py` `rebase_onto` aborts the
+When a Phase 2 conflict does occur, it is a real overlap with master. The compiled harness
+(`tools/postplan-harness/`) is the only engine (ADR-0284). `gitad.py` `rebase_onto` aborts the
 rebase when neither `harness/conflict.py` nor its escalation ladder can resolve it, raises `rebase-conflict`, and `runner.py` `exit_code_for` returns **3**.
-`should_fallback` in `bin/post-plan-now` treats 3 as fail-closed and **does NOT escalate to a
-`/post-plan` skill session**. The run stops there and a **human** resolves the branch by hand.
+`bin/post-plan-now` treats 3 as fail-closed and starts no other session. The run stops there and a **human** resolves the branch by hand.
 If that's you: run `git fetch origin master`, then
 `git rebase --onto origin/master "$(git merge-base HEAD origin/master)"`, resolve three-way at each
 stop, then push with
@@ -66,10 +63,8 @@ stop, then push with
 then re-run `bin/post-plan-now --auto`.
 When the stacked `--onto` fallback (`gitad.py` `_autoresolve_stacked_rebase`) finds a merge commit in the `iblBase..HEAD` range, it first collapses the range into one commit with the identical tree, parented on `merge-base(iblBase, HEAD)`, and it moves the branch back to the original tip on every decline.
 
-**Skill** (`POST_PLAN_SKILL=1`): the shrunk skill has no Phase 2 rebase; conflict resolution is harness-only (`tools/postplan-harness/harness/conflict.py`, `conflict_ladder.py`).
-
-No path spawns a skill session *because of* a conflict. Engine split and exit codes:
-`.claude/rules/workflow-continuity-detail.md`, ADR-0092.
+Conflict resolution lives in `tools/postplan-harness/harness/conflict.py` and `conflict_ladder.py`.
+Exit codes: `.claude/rules/workflow-continuity-detail.md`, ADR-0092, ADR-0284.
 
 ## Harness
 

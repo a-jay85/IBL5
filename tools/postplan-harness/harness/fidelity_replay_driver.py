@@ -46,7 +46,8 @@ DENY_PREFIXES = ("os.", "shutil.", "subprocess.", "socket.", "tempfile.", "ctype
 READ_ONLY_EVENTS = frozenset({"os.listdir", "os.scandir", "os.walk", "os.fwalk", "os.getxattr",
                               "os.listxattr", "os.listdrives", "os.listmounts", "os.listvolumes"})
 CALL_ONLY_EVENTS = frozenset({"object.__setattr__", "object.__delattr__", "sys.settrace",
-                              "sys.setprofile", "sys.addaudithook"})
+                              "sys.setprofile", "sys.addaudithook",
+                              "sys.monitoring.register_callback"})
 _WRITE_FLAGS = os.O_WRONLY | os.O_RDWR | os.O_APPEND | os.O_CREAT | os.O_TRUNC
 _WATCH = {"phase": None, "record": "-", "where": "import", "hits": []}
 MAX_HITS = 50
@@ -119,10 +120,132 @@ def _driver_io():
 def _untraced(fn, *args):
     prior = sys.gettrace()
     sys.settrace(None)  # a side __eq__/__deepcopy__ run by the watch must not count as executed
+    branch_events = _branches_off()
     try:
         return fn(*args)
     finally:
+        _branches_on(branch_events)
         sys.settrace(prior)
+
+
+# --- branch outcomes (ADR-0283 residual gap: a weakened branch the corpus never takes) -------
+FIDELITY_REL = os.path.join("tools", "postplan-harness", "harness", "fidelity.py")
+_BRANCH = {"tool": None, "events": 0}
+_PRIMITIVE_TYPES = frozenset({str, int, float, bool, type(None), bytes})
+_MEMBER_PARENTS = ("If", "While", "Return", "Assign", "AnnAssign", "Expr")
+
+
+def _branches_off():
+    tool = _BRANCH["tool"]
+    if tool is None:
+        return 0
+    events = sys.monitoring.get_events(tool)
+    sys.monitoring.set_events(tool, 0)
+    return events
+
+
+def _branches_on(events):
+    if _BRANCH["tool"] is not None and events:
+        sys.monitoring.set_events(_BRANCH["tool"], events)
+
+
+def _start_branches(fid_path, seen):
+    """Record (qualname, firstlineno, src, dst) for every branch event in the side's fidelity.py.
+    Returns False when this interpreter has no sys.monitoring branch events (the judge then
+    holds every changed line that holds a branch)."""
+    mon = getattr(sys, "monitoring", None)
+    if mon is None:
+        return False
+    names = [n for n in ("BRANCH_LEFT", "BRANCH_RIGHT") if hasattr(mon.events, n)] or ["BRANCH"]
+    if not all(hasattr(mon.events, n) for n in names):
+        return False
+    tool = next((t for t in range(6) if mon.get_tool(t) is None), None)
+    if tool is None:
+        return False
+    real = {}
+
+    def _on_branch(code, src, dst):
+        name = code.co_filename
+        path = real.get(name)
+        if path is None:
+            path = real[name] = "" if name.startswith("<") else os.path.realpath(name)
+        if path != fid_path:
+            return mon.DISABLE  # foreign code: stop paying for this location
+        seen.add((code.co_qualname, code.co_firstlineno, src, dst))
+        return None
+
+    mon.use_tool_id(tool, "fidelity-replay-branches")
+    events = 0
+    for n in names:
+        mon.register_callback(tool, getattr(mon.events, n), _on_branch)
+        events |= getattr(mon.events, n)
+    _BRANCH["tool"], _BRANCH["events"] = tool, events
+    mon.set_events(tool, events)
+    return True
+
+
+def _stop_branches():
+    tool = _BRANCH["tool"]
+    if tool is not None:
+        sys.monitoring.set_events(tool, 0)
+        _BRANCH["tool"] = None
+
+
+def _member_sites(source):
+    """{line: [(key, name, members)]} for each membership guard the line probe can read.
+
+    The probe reads `name` when its statement's first line starts. That value is the one the
+    test sees only when the test is the whole condition or value of the statement, its left
+    side is a bare name and its right side is a literal of constants, and nothing in the
+    statement rebinds a name. Any other membership shape is left out, so the judge holds it."""
+    import ast
+    sites = {}
+    try:
+        tree = ast.parse(source)
+    except (SyntaxError, ValueError):
+        return sites
+    for stmt in ast.walk(tree):
+        if type(stmt).__name__ not in _MEMBER_PARENTS:
+            continue
+        node = getattr(stmt, "test", None) if hasattr(stmt, "test") else getattr(stmt, "value", None)
+        if not (isinstance(node, ast.Compare) and len(node.ops) == 1
+                and isinstance(node.ops[0], (ast.In, ast.NotIn))
+                and isinstance(node.left, ast.Name) and node.lineno == stmt.lineno
+                and isinstance(node.comparators[0], (ast.Tuple, ast.List, ast.Set))
+                and all(isinstance(e, ast.Constant) for e in node.comparators[0].elts)):
+            continue
+        head = [stmt.test] if hasattr(stmt, "test") else [stmt]
+        if any(isinstance(n, ast.NamedExpr) for h in head for n in ast.walk(h)):
+            continue
+        key = (node.lineno, node.col_offset, node.end_lineno, node.end_col_offset)
+        members = tuple(e.value for e in node.comparators[0].elts)
+        sites.setdefault(stmt.lineno, []).append((key, node.left.id, members))
+    return sites
+
+
+def _probe_members(frame, sites, seen):
+    """At a line event: record which listed member each site's operand equals (or none)."""
+    for key, name, members in sites:
+        entry = seen.setdefault(key, {"matched": set(), "nomatch": False, "unsafe": False})
+        code = frame.f_code
+        try:
+            if name in code.co_varnames or name in code.co_cellvars or name in code.co_freevars:
+                scope = frame.f_locals
+            elif name in frame.f_globals:
+                scope = frame.f_globals
+            else:
+                scope = frame.f_builtins
+            value = scope[name]
+        except (KeyError, NameError):
+            entry["unsafe"] = True  # unbound: the test raises, no outcome to record
+            continue
+        if type(value) not in _PRIMITIVE_TYPES:
+            entry["unsafe"] = True  # a custom __eq__ could decide the test; the probe cannot
+            continue
+        hit = [i for i, m in enumerate(members) if value is m or value == m]
+        entry["matched"].update(hit)
+        if not hit:
+            entry["nomatch"] = True
 
 
 def _same(a, b):
@@ -290,6 +413,16 @@ def main(argv):                    # argv: driver, corpus path, side package roo
         marker = ""
 
     hits, real = {}, {}
+    fid_path = os.path.join(root, FIDELITY_REL)
+    with _driver_io():
+        try:
+            with open(fid_path, encoding="utf-8") as fh:
+                member_sites = _member_sites(fh.read())
+        except (OSError, UnicodeDecodeError):
+            member_sites = {}
+    members = {key: {"matched": set(), "nomatch": False, "unsafe": False}
+               for sites in member_sites.values() for key, _n, _m in sites}
+    branches = set()
 
     def tracer(frame, event, arg):
         name = frame.f_code.co_filename
@@ -300,9 +433,12 @@ def main(argv):                    # argv: driver, corpus path, side package roo
             return None
         if event == "line":
             hits.setdefault(os.path.relpath(path, root), set()).add(frame.f_lineno)
+            if path == fid_path and frame.f_lineno in member_sites:
+                _probe_members(frame, member_sites[frame.f_lineno], members)
         return tracer
 
     results = []
+    have_branches = _start_branches(fid_path, branches)
     sys.settrace(tracer)
     try:
         for rec in records:
@@ -335,6 +471,7 @@ def main(argv):                    # argv: driver, corpus path, side package roo
                     shutil.rmtree(tmp, ignore_errors=True)
     finally:
         sys.settrace(None)
+        _stop_branches()
     # Run exit callbacks a replayed call registered while the watch is on, so a deferred write counts.
     _WATCH["phase"], _WATCH["where"] = "call", "atexit"
     try:
@@ -350,6 +487,9 @@ def main(argv):                    # argv: driver, corpus path, side package roo
             _hit(f"thread-alive:{t.name}")  # it could write after the output; __main__ kills it
     json.dump({"schema": "fidelity-replay/1", "results": results,
                "executed": {k: sorted(v) for k, v in hits.items()},
+               "branches": sorted(list(b) for b in branches) if have_branches else None,
+               "members": sorted([*k, sorted(e["matched"]), e["nomatch"], e["unsafe"]]
+                                 for k, e in members.items()),
                "side_effects": list(_WATCH["hits"])}, sys.stdout)
     return 0
 

@@ -59,7 +59,10 @@ diff floor, so a stripped segment or a hand-lowered Door still holds.
 When the diff touches `harness/fidelity.py`, a second stage (`harness/fidelity_replay.py`,
 ADR-0283) replays both sides' fidelity readers over `harness/fidelity_replay_corpus.json`. It
 clears a changed line only when no production code reaches it, or when only replayed roots reach
-it, the line ran, and no output got looser. `python3 -m harness.fidelity_replay harvest <out>
+it, the line ran, and no output got looser. Each branch on a replayed changed line must also go
+both ways over the corpus, and each member of a literal membership list must be matched. A
+branch the corpus takes one way only, or one the check cannot read, holds with
+`fidelity-unexercised-branch`. `python3 -m harness.fidelity_replay harvest <out>
 <dest>` rebuilds the corpus from `out/live-*` run dirs. `python3 -m harness.fidelity_replay prs
 <N>...` replays merged PRs and prints `cleared` or `kept` with the reason.
 

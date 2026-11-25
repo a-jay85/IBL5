@@ -20,6 +20,7 @@ from __future__ import annotations
 import ast
 import copy
 import dataclasses
+import dis
 import json
 import os
 import re
@@ -27,6 +28,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import types
 from pathlib import Path
 
 FIDELITY_PATH = "tools/postplan-harness/harness/fidelity.py"
@@ -729,6 +731,8 @@ class FidSide:
     results: tuple
     executed: dict
     side_effects: tuple = ()
+    branches: frozenset | None = None  # (qualname, firstlineno, src, dst); None = not recorded
+    members: dict | None = None  # Compare span -> (matched member indexes, nomatch, unsafe)
 
 
 def _fid_side(payload) -> FidSide:
@@ -737,7 +741,120 @@ def _fid_side(payload) -> FidSide:
     results = tuple((str(r["id"]), dict(r["out"])) for r in payload["results"])
     executed = {str(k): frozenset(int(n) for n in v) for k, v in payload["executed"].items()}
     side_effects = tuple(str(h) for h in payload["side_effects"])  # required: missing key is an error
-    return FidSide(str(payload["schema"]), results, executed, side_effects)
+    raw = payload["branches"]  # required: missing key is an error; null = not recorded
+    branches = None if raw is None else frozenset(
+        (str(q), int(f), int(s), int(d)) for q, f, s, d in raw)
+    members = {(int(a), int(b), int(c), int(d)): (frozenset(int(i) for i in m), bool(n), bool(u))
+               for a, b, c, d, m, n, u in payload["members"]}
+    return FidSide(str(payload["schema"]), results, executed, side_effects, branches, members)
+
+
+# --- branch outcomes -------------------------------------------------------------------------
+# A changed line that ran can still hide a weakened branch: the corpus may take only one way
+# through it. Each conditional jump on the line must be seen going both ways, and each member of
+# a literal membership guard must be matched by some record. Anything the check cannot read holds.
+
+# Conditional jump -> (fall-through outcome, jump outcome), as the condition reads.
+BRANCH_OUTCOMES = {
+    "POP_JUMP_IF_FALSE": ("True", "False"),
+    "POP_JUMP_IF_TRUE": ("False", "True"),
+    "POP_JUMP_IF_NONE": ("not None", "None"),
+    "POP_JUMP_IF_NOT_NONE": ("None", "not None"),
+    "FOR_ITER": ("a next item", "exhausted"),
+}
+PLAIN_JUMPS = frozenset({"JUMP_FORWARD", "JUMP_BACKWARD", "JUMP_BACKWARD_NO_INTERRUPT", "JUMP",
+                         "JUMP_NO_INTERRUPT"})
+_JUMP_OPS = frozenset(dis.opname[o] for o in getattr(dis, "hasjump", dis.hasjrel + dis.hasjabs))
+SEGMENT_CAP = 60
+SYNTHETIC_CODE = frozenset({"__annotate__"})
+
+
+def _segment(src_lines, pos) -> str:
+    """The source text at an instruction's or node's position, on one line and capped."""
+    lineno, end_lineno, col, end_col = pos
+    if None in pos or not 1 <= lineno <= end_lineno <= len(src_lines):
+        return "?"
+    if lineno == end_lineno:
+        text = src_lines[lineno - 1][col:end_col]
+    else:
+        text = " ".join([src_lines[lineno - 1][col:]] + [s.strip() for s in
+                         src_lines[lineno:end_lineno - 1]] + [src_lines[end_lineno - 1][:end_col].strip()])
+    text = " ".join(text.split())
+    return text if len(text) <= SEGMENT_CAP else text[:SEGMENT_CAP - 3] + "..."
+
+
+def _code_objects(code):
+    out, stack = [], [code]
+    while stack:
+        co = stack.pop()
+        out.append(co)
+        stack.extend(c for c in co.co_consts if isinstance(c, types.CodeType))
+    return out
+
+
+def branch_gap(tree, module_code, src, line, result) -> str | None:
+    """What the corpus never did at a branch on `line` of this side, or None when every outcome
+    was taken at least once. Reads the side's own driver output (`result`)."""
+    src_lines = src.splitlines()
+    codes = _code_objects(module_code)
+    keys = [(co.co_qualname, co.co_firstlineno) for co in codes]
+    sites: dict = {}
+    for co in codes:
+        if co.co_name in SYNTHETIC_CODE:
+            continue  # 3.14+ compiler-made annotation reader: its guard spans the whole def
+        key = (co.co_qualname, co.co_firstlineno)
+        instrs = list(dis.get_instructions(co))
+        lefts = ({s: left for s, left, _r in co.co_branches()} if hasattr(co, "co_branches")
+                 else None)
+        for i, ins in enumerate(instrs):
+            pos = ins.positions
+            if (ins.opname not in _JUMP_OPS or ins.opname in PLAIN_JUMPS or pos is None
+                    or pos.lineno is None or not pos.lineno <= line <= (pos.end_lineno or pos.lineno)):
+                continue
+            span = (pos.lineno, pos.end_lineno, pos.col_offset, pos.end_col_offset)
+            text = _segment(src_lines, span)
+            if None in span or ins.opname not in BRANCH_OUTCOMES:
+                return f"`{text}` has a branch the replay cannot classify ({ins.opname})"
+            if keys.count(key) != 1:
+                return f"`{text}` sits in a code object the replay cannot tell apart ({key[0]})"
+            if result.branches is None:
+                return f"`{text}` has a branch this interpreter cannot record"
+            nxt = instrs[i + 1] if i + 1 < len(instrs) else None
+            srcs = {ins.offset}
+            if nxt is not None and nxt.opname == "NOT_TAKEN":
+                srcs.add(nxt.offset)  # 3.14+: the fall-through event can come from NOT_TAKEN
+            left = lefts.get(ins.offset) if lefts is not None else (
+                nxt.offset if nxt is not None else None)
+            names = BRANCH_OUTCOMES[ins.opname]
+            seen = sites.setdefault((span, names), set())
+            for q, f, s, d in result.branches:
+                if (q, f) == key and s in srcs:
+                    seen.add(names[0] if d == left else names[1])
+    for (span, names), seen in sorted(sites.items()):
+        missing = [n for n in names if n not in seen]
+        if missing:
+            return f"`{_segment(src_lines, span)}` never {' or '.join(missing)}"
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Compare)
+                and any(isinstance(op, (ast.In, ast.NotIn)) for op in node.ops)
+                and node.lineno <= line <= node.end_lineno):
+            continue
+        span = (node.lineno, node.col_offset, node.end_lineno, node.end_col_offset)
+        text = _segment(src_lines, (node.lineno, node.end_lineno, node.col_offset,
+                                    node.end_col_offset))
+        probe = (result.members or {}).get(span)
+        if probe is None:
+            return f"`{text}` is a membership test the replay cannot read"
+        matched, nomatch, unsafe = probe
+        if unsafe:
+            return f"`{text}` has an operand the replay cannot read"
+        elts = node.comparators[0].elts
+        absent = [repr(e.value) for i, e in enumerate(elts) if i not in matched]
+        if absent:
+            return f"`{text}` never matched {', '.join(absent)}"
+        if not nomatch:
+            return f"`{text}` never saw a value outside the list"
+    return None
 
 
 def judge_fidelity(old, new, srcs, lines, roots) -> tuple[bool, str, list[str]]:
@@ -756,12 +873,13 @@ def judge_fidelity(old, new, srcs, lines, roots) -> tuple[bool, str, list[str]]:
     words = [out.get("v1.parse_verdict", {}).get("ok") for _, out in old.results]
     if "READY" not in words or "NOT READY" not in words:
         return False, "fidelity-corpus-degenerate", detail
-    trees, defs, owners, inert = {}, {}, {}, {}
+    trees, defs, owners, inert, codes = {}, {}, {}, {}, {}
     try:
         for side, src in zip(("old", "new"), srcs):
             if src is None:
                 return False, "fidelity-unreadable-source", detail
             trees[side] = ast.parse(src)
+            codes[side] = compile(src, FIDELITY_PATH, "exec", dont_inherit=True)
             check_resolvable(trees[side])
             defs[side] = top_defs(trees[side])
             owners[side] = line_owner(defs[side])
@@ -781,7 +899,9 @@ def judge_fidelity(old, new, srcs, lines, roots) -> tuple[bool, str, list[str]]:
     roots.setdefault(MODULE_ROOT, set()).add(MODULE_ROOT)
     must_equal: set[str] = set()
     changed = 0
-    for side, side_lines, result in (("old", lines[0], old), ("new", lines[1], new)):
+    gaps: list[str] = []
+    for side, side_lines, result, src in (("old", lines[0], old, srcs[0]),
+                                          ("new", lines[1], new, srcs[1])):
         owner = owners[side]
         executed = result.executed.get(FIDELITY_PATH, frozenset())
         for line in sorted(side_lines):
@@ -807,12 +927,21 @@ def judge_fidelity(old, new, srcs, lines, roots) -> tuple[bool, str, list[str]]:
                 return False, f"fidelity-changed-line-hazard: {hazard} at {func}:{line}", detail
             must_equal |= shield
             detail.append(f"{side}:{line}: replayed {func}")
+            try:
+                gap = branch_gap(trees[side], codes[side], src, line, result)
+            except Exception:  # noqa: BLE001 — a branch the check cannot read keeps the flag
+                gap = "a branch the replay cannot read"
+            if gap is not None:
+                gaps.append(f"{func}:{line} {gap}")
     loosened, shielded = compare_sides(old, new, must_equal)
     # A loosened output is reported first: it names the ordering that failed. Both keep the flag.
     if loosened:
         return False, f"fidelity-loosened: {len(loosened)} outputs ({loosened[0]})", detail
     if shielded:
         return False, f"fidelity-shielded-change: {shielded[0]} ({len(shielded)} outputs)", detail
+    # Checked last, so every earlier, named hold still reports first. It only adds holds.
+    if gaps:
+        return False, f"fidelity-unexercised-branch: {gaps[0]}", detail
     return (True, f"fidelity replay cleared {changed} changed lines over {len(old.results)} records",
             detail)
 

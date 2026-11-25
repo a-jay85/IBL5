@@ -1,6 +1,6 @@
 ---
 description: The arming replay's second stage replays fidelity.py's deterministic readers over a committed corpus and clears a fidelity.py edit only when it is dead in production or reachable only through replayed roots.
-last_verified: 2026-11-24
+last_verified: 2026-11-25
 ---
 
 # ADR-0283: Fidelity arming replay
@@ -63,7 +63,7 @@ The stage defends 21 bypass classes:
 
 ## Residual gap
 
-The watches see only the corpus inputs, so an effect behind an input the corpus lacks goes unseen. Two checks bound that gap: the line-ran check makes the changed line run on a corpus record, and the changed-line static check holds on `global`, `nonlocal`, `exec`, `eval`, `compile`, `__import__` and `importlib`. The watch detects and records. The replayed code still runs unsandboxed in a throwaway subprocess, as it did on #4205. The driver does not see these writes:
+The watches see only the corpus inputs, so an effect behind an input the corpus lacks goes unseen. Three checks bound that gap. The line-ran check makes the changed line run on a corpus record. The changed-line static check holds on `global`, `nonlocal`, `exec`, `eval`, `compile`, `__import__` and `importlib`. The branch check below makes the corpus take each way through a changed line's branches. The watch detects and records. The replayed code still runs unsandboxed in a throwaway subprocess, as it did on #4205. The driver does not see these writes:
 
 - a C extension write that raises no audit event;
 - a write to a function's `__dict__` or an `lru_cache`, because callables compare by identity;
@@ -71,6 +71,16 @@ The watches see only the corpus inputs, so an effect behind an input the corpus 
 - a write from a plain refcount finalizer that happens to run inside the driver's own temp-file step, the one place the watch is off. The driver runs pending finalizers under the watch before that step and pauses gc during it.
 
 The watch stays on between replayed calls and after the last one. A gc finalizer, a thread a call left running, and an `atexit` callback are all recorded. A thread still alive at the end is recorded too, and the driver then exits with `os._exit`, so nothing runs after its output.
+
+The line-ran check alone left one more hole. A changed line can run on every record while the corpus takes only one way through its branch. Then a weakened condition gives the same outputs and clears. Two live cases showed it. Adding `and md.get("door") == "never"` to `if md["hold"] is True:` cleared, because no record sets the merge-danger hold. Dropping `"carried"` from `status not in ("present", "carried")` cleared too, because no record has the `carried` status.
+
+The branch check closes that hole. The driver records every branch event in the side's fidelity.py through `sys.monitoring`. It also reads the operand of each simple membership guard when its line starts. The judge then holds a changed, replayed line with `fidelity-unexercised-branch` in three cases:
+
+- A conditional jump on the line was not taken both ways, on the side being judged. That covers `if`, `elif`, `while`, conditional expressions, `and`/`or`, comparisons that feed a branch, and `for` loops. The reason names the line, the condition text, and the outcome that never happened.
+- A member of a literal membership list was never matched, or no record held a value outside the list.
+- The check cannot read the line's branches. That covers a jump kind it does not know, a membership guard whose left side is not a bare name, a guard that is not the whole condition of its statement, two code objects it cannot tell apart, or an interpreter without branch events.
+
+This check runs last, so every earlier hold keeps its own reason. It only adds holds. It still sees only the corpus. Two values that both take the same branch look the same to it. A changed line inside a `finally` block or an `except` clause usually holds, because the corpus rarely takes the exception path.
 
 The globals snapshot skips three things that never carry replay state: the driver's own module, module-valued names, and the `__future__` flag that `from __future__ import annotations` binds. That flag has no value equality, so a deepcopy of it never compares equal.
 

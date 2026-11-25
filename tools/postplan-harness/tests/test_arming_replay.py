@@ -1079,3 +1079,86 @@ def test_non_fidelity_diff_skips_stage(tmp_path, monkeypatch):
     assert FIDELITY not in _sections(diff)
     _replay(tree, diff)
     assert calls == []
+
+
+# --- branch outcomes (ADR-0283 residual gap) ------------------------------------------------------
+
+def _fid_swap(old, new, func=None):
+    """Replace `old` once: in the whole file, or only inside top-level def `func`."""
+    def edit(source):
+        lo, hi = 0, len(source)
+        if func is not None:
+            node = top_defs(ast.parse(source))[func]
+            starts = [0]
+            for ln in source.splitlines(keepends=True):
+                starts.append(starts[-1] + len(ln))
+            lo, hi = starts[node.lineno - 1], starts[node.end_lineno]
+        body = source[lo:hi]
+        assert body.count(old) == 1, old
+        return source[:lo] + body.replace(old, new) + source[hi:]
+    return edit
+
+
+def test_weakened_branch_no_record_takes_stays_held(tmp_path):
+    """Review thread 4691330476: the line runs on every record, but no record has the hold set,
+    so the weakened condition is never true and the outputs match."""
+    v, text = _fid_replay(tmp_path, _fid_swap(
+        'if md["hold"] is True:', 'if md["hold"] is True and md.get("door") == "never":'))
+    assert v.cleared is False, text
+    assert "fidelity-unexercised-branch: reviewer_arming_holds:" in text
+    assert 'md["hold"] is True' in text and "never True" in text
+
+
+def test_dropped_membership_member_stays_held(tmp_path):
+    v, text = _fid_replay(tmp_path, _fid_swap(
+        'if status not in ("present", "carried"):', 'if status not in ("present",):'))
+    assert v.cleared is False, text
+    assert "fidelity-unexercised-branch: reviewer_arming_holds:" in text
+    assert "never matched 'carried'" in text
+
+
+def test_rewrite_of_a_branch_the_corpus_takes_both_ways_clears(tmp_path):
+    v, text = _fid_replay(tmp_path, _fid_swap(
+        "if line.strip() == DIGEST_CUT:", "if DIGEST_CUT == line.strip():", "parse_verdict"))
+    assert v.cleared is True, text
+    assert "fidelity replay cleared 2 changed lines" in text
+
+
+_GAP_SRC = ("def f(x, s):\n"
+            "    if x in ('a', 'b'):\n"
+            "        return 1\n"
+            "    return 2 if s else 3\n")
+
+
+def _gap(line, branches=frozenset(), members=None):
+    side = fidelity_replay.FidSide("fidelity-replay/1", (), {}, (), branches, members)
+    code = compile(_GAP_SRC, FIDELITY, "exec", dont_inherit=True)
+    return fidelity_replay.branch_gap(ast.parse(_GAP_SRC), code, _GAP_SRC, line, side)
+
+
+def _both_ways(line):
+    """Fake branch events that take the jump on `line` of `f` both ways."""
+    import dis
+    f_code = next(c for c in compile(_GAP_SRC, FIDELITY, "exec").co_consts
+                  if isinstance(c, types.CodeType))
+    instrs = list(dis.get_instructions(f_code))
+    lefts = dict((s, left) for s, left, _r in f_code.co_branches()) if hasattr(
+        f_code, "co_branches") else {}
+    for i, ins in enumerate(instrs):
+        if ins.opname.startswith("POP_JUMP") and ins.positions.lineno == line:
+            left = lefts.get(ins.offset, instrs[i + 1].offset)
+            return frozenset({("f", 1, ins.offset, left), ("f", 1, ins.offset, -1)})
+    raise AssertionError(f"no jump on line {line}")
+
+
+def test_branch_gap_fails_closed():
+    assert "never True or False" in _gap(4)  # no record took the jump either way
+    assert "cannot record" in _gap(4, branches=None)  # this interpreter recorded no branches
+    assert _gap(4, branches=_both_ways(4)) is None
+    full = _both_ways(2)
+    key = (2, 7, 2, 22)
+    assert "membership test the replay cannot read" in _gap(2, full, {})
+    assert "operand the replay cannot read" in _gap(2, full, {key: (frozenset({0, 1}), True, True)})
+    assert "never matched 'b'" in _gap(2, full, {key: (frozenset({0}), True, False)})
+    assert "outside the list" in _gap(2, full, {key: (frozenset({0, 1}), False, False)})
+    assert _gap(2, full, {key: (frozenset({0, 1}), True, False)}) is None

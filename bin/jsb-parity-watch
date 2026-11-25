@@ -32,6 +32,7 @@
 #   ------------------------------------------------  ------------------------------
 #   armed, unfixed fixer-class blocker or stall       WAKE fixer webhook
 #   armed, stall the fixer cannot take                DM, as in the table above
+#   armed, stall with an open fix                     no stall DM
 #   armed, no ack 3h after the first wake             DM once
 #   fix PR merged                                     FIRE webhook (fix-merged:<slug>)
 #   fix PR closed or red                              DM once
@@ -86,6 +87,7 @@ FIXER_QUEUE="$HOME/.cache/jsb-parity-fixer-queue.txt"   # key<TAB>context, read 
 FIXER_WAKES="$HOME/.cache/jsb-parity-fixer-wakes.txt"   # key<TAB>first_epoch<TAB>last_epoch
 FIXER_ACK_S=10800
 FIXER_PR_STALE_S=172800
+# Copy of FIXER_STAGES in jsb-native/tools/parity_loop/fixer.py. Change both together.
 FIXER_STAGES=" plan-skipped plan-failed no-trace no-plan plan-now-failed "
 SCHEDULE_DELAY_S=120
 FAILED_CONCLUSIONS='["FAILURE","CANCELLED","TIMED_OUT","ACTION_REQUIRED","STARTUP_FAILURE","ERROR"]'
@@ -113,7 +115,7 @@ GH_ERROR=""
 FACTS=""
 ROW_LINES=""
 FIXER_STATE=""
-FIXER_WAKE=0
+FIXER_DUE_KEYS=""   # newline-separated keys the next fixer POST wakes for
 FIX_VERDICTS=""
 fp=""
 
@@ -325,6 +327,12 @@ fixer_known() {
         <<< "$FIXER_STATE" >/dev/null 2>&1
 }
 
+# fixer_open <key>: a fix is open for this key.
+fixer_open() {
+    jq -e --arg k "$1" '.fixer.open? | type == "object" and has($k)' \
+        <<< "$FIXER_STATE" >/dev/null 2>&1
+}
+
 # put_line <file> <key> [value]: replace the key's tab-separated line, or drop it.
 put_line() {
     local file="$1" key="$2" value="${3-}"
@@ -361,19 +369,29 @@ fixer_enqueue() {
     [ -n "$first" ] || { first="$NOW"; last=""; }
     if [ -z "$last" ] || [ $((NOW - last)) -gt "$REFIRE_S" ]; then
         echo "fixer: wake $key"
-        FIXER_WAKE=1
-        last="$NOW"
+        # fixer_mark_woken stamps the last wake once the POST succeeds.
+        FIXER_DUE_KEYS="$FIXER_DUE_KEYS$key"$'\n'
     fi
     dry_guard "queue fixer key $key" || return 0
     put_line "$FIXER_QUEUE" "$key" "$context"
     put_line "$FIXER_WAKES" "$key" "$first"$'\t'"$last"
 }
 
+# fixer_mark_woken: stamp the last wake on each due key after a successful POST.
+fixer_mark_woken() {
+    local key first
+    while read -r key; do
+        [ -n "$key" ] || continue
+        first=$(wake_field "$key" 2)
+        put_line "$FIXER_WAKES" "$key" "${first:-$NOW}"$'\t'"$NOW"
+    done <<< "$FIXER_DUE_KEYS"
+}
+
 # A claim acks the wake. Dropping the wake line lets a later recurrence wake afresh.
 fixer_forget_claimed() {
     local key keys
     if [ "$DRY_RUN" != 0 ] || [ ! -s "$FIXER_WAKES" ]; then return 0; fi
-    keys=$(jq -r '[.fixer.open?, .fixer.owner?] | map(objects | keys[]) | .[]' <<< "$FIXER_STATE")
+    keys=$(jq -r '[.fixer.open?, .fixer.owner?] | map(objects | keys[]) | .[]' <<< "$FIXER_STATE") # pipefail-ok: jq filter pipe, not a shell pipe; a jq failure trips the ERR trap and the run takes no action
     while read -r key; do
         [ -n "$key" ] || continue
         put_line "$FIXER_WAKES" "$key"
@@ -381,17 +399,21 @@ fixer_forget_claimed() {
 }
 
 # fixer_prune: drop the queue and wake lines of blockers that are gone, so the
-# fixer never claims a resolved key and a recurrence starts a fresh wake.
+# fixer never claims a resolved key and a recurrence starts a fresh wake. The
+# merged:<slug> line stays while that fix is open, so its 6h refire limit holds.
 fixer_prune() {
-    local file="$PARITY_DIR/state/blockers.json" live key keys path s_row s_stage
+    local file="$PARITY_DIR/state/blockers.json" live key keys path s_row s_stage slug verdict
     if [ "$DRY_RUN" != 0 ]; then return 0; fi
     # An unreadable state file does not prove that a blocker is gone.
     if [ -f "$file" ] && ! jq -e . "$file" >/dev/null 2>&1; then return 0; fi
-    live=$(jq -r '.active | objects | keys[]' <<< "$FIXER_STATE")
+    live=$(jq -r '.active | objects | keys[]' <<< "$FIXER_STATE") # pipefail-ok: jq filter pipe, not a shell pipe; a jq failure trips the ERR trap and the run takes no action
     for key in $STALL_KEYS; do
         IFS=: read -r s_row s_stage _ <<< "$key"
         live="$live"$'\n'"stall:$s_stage:$s_row"
     done
+    while read -r _ slug verdict; do
+        if [ "$verdict" = "merged" ]; then live="$live"$'\n'"merged:$slug"; fi
+    done <<< "$FIX_VERDICTS"
     for path in "$FIXER_QUEUE" "$FIXER_WAKES"; do
         [ -s "$path" ] || continue
         keys=$(awk -F'\t' '{print $1}' "$path")
@@ -449,7 +471,7 @@ fix_pr_verdict() {
 fixer_actions() {
     local key dm_sent fix age slug verdict at rows last
     if fixer_armed; then
-        rows=$(jq -r '.active | objects | to_entries[] | select((.value | type) == "object" and .value.bucket == "fixer") | [.key, (if .value.dm_sent == false then "false" else "true" end), (.value.fix // "" | tostring | gsub("[\\t\\r\\n]+"; " "))] | @tsv' <<< "$FIXER_STATE")
+        rows=$(jq -r '.active | objects | to_entries[] | select((.value | type) == "object" and .value.bucket == "fixer") | [.key, (if .value.dm_sent == false then "false" else "true" end), (.value.fix // "" | tostring | gsub("[\\t\\r\\n]+"; " "))] | @tsv' <<< "$FIXER_STATE") # pipefail-ok: jq filter pipe, not a shell pipe; a jq failure trips the ERR trap and the run takes no action
         while IFS=$'\t' read -r key dm_sent fix; do
             [ -n "$key" ] || continue
             if fixer_known "$key"; then continue; fi
@@ -475,13 +497,13 @@ fixer_actions() {
             closed) fix_pr_dm fixer-pr-closed "fix PR closed without merge" "$key" "$slug" ;;
             red) fix_pr_dm fixer-pr-red "fix PR has a failed check" "$key" "$slug" ;;
             none)
-                at=$(jq -r --arg k "$key" '.fixer.open[$k].at // 0 | floor' <<< "$FIXER_STATE")
+                at=$(jq -r --arg k "$key" '.fixer.open[$k].at // 0 | floor' <<< "$FIXER_STATE") # pipefail-ok: jq filter pipe, not a shell pipe; a jq failure trips the ERR trap and the run takes no action
                 if [ $((NOW - at)) -gt "$FIXER_PR_STALE_S" ]; then
                     fix_pr_dm fixer-no-pr "no fix PR after 48h" "$key" "$slug"
                 fi ;;
         esac
     done <<< "$FIX_VERDICTS"
-    if [ "$FIXER_WAKE" = 1 ]; then
+    if [ -n "$FIXER_DUE_KEYS" ]; then
         fire_webhook "fixer-queue" "$FIXER_URL_FILE"
     fi
 }
@@ -504,6 +526,7 @@ fire_webhook() {
     case "$code" in [0-9][0-9][0-9]) ;; *) code=000 ;; esac
     case "$code" in 2??) ;; *) log "webhook POST failed (HTTP $code)"; return 0 ;; esac
     if [ "$url_file" != "$WEBHOOK_FILE" ]; then
+        fixer_mark_woken
         log "fixer webhook POST ok (HTTP $code)"
         return 0
     fi
@@ -575,7 +598,7 @@ main() {
     done <<< "$inflight"
 
     FIXER_STATE=$(fixer_json)
-    open_fixes=$(jq -r '.fixer.open? | objects | to_entries[] | select((.value | type) == "object" and (.value.slug // "") != "") | "\(.key) \(.value.slug)"' <<< "$FIXER_STATE")
+    open_fixes=$(jq -r '.fixer.open? | objects | to_entries[] | select((.value | type) == "object" and (.value.slug // "") != "") | "\(.key) \(.value.slug)"' <<< "$FIXER_STATE") # pipefail-ok: jq filter pipe, not a shell pipe; a jq failure trips the ERR trap and the run takes no action
     while read -r key slug; do
         [ -n "$slug" ] || continue
         verdict=$(fix_pr_verdict "$slug" </dev/null)
@@ -605,6 +628,10 @@ main() {
 
     for key in $STALL_KEYS; do
         IFS=: read -r s_row s_stage _ <<< "$key"
+        # An open fix owns its stall. fixer_actions DMs when that fix cannot land.
+        if fixer_armed && fixer_open "stall:$s_stage:$s_row"; then
+            continue
+        fi
         if fixer_armed && [[ "$FIXER_STAGES" == *" $s_stage "* ]] && ! fixer_known "stall:$s_stage:$s_row"; then
             age=$(fixer_wake_age "stall:$s_stage:$s_row")
             if [ -z "$age" ] || [ "$age" -lt "$FIXER_ACK_S" ]; then

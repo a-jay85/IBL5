@@ -908,6 +908,29 @@ case_missing_blockers_json_as_today() {
     done
 }
 
+case_fixer_prunes_resolved_keys() {
+    sandbox fixer_prune
+    quiet_row
+    arm_fixer
+    one_blocker days-empty
+    run_watch
+    h_contains "queued while active" "$(QUEUE)" "days-empty"
+    one_blocker replay-missing
+    reset_logs
+    NOW=$((BASE + 3600)) run_watch
+    h_not_contains "a resolved key leaves the queue" "$(QUEUE)" "days-empty"
+    h_contains "the live key is queued" "$(QUEUE)" "replay-missing"
+    h_not_contains "a resolved key loses its wake line" \
+        "$(slurp "$S/home/.cache/jsb-parity-fixer-wakes.txt")" "days-empty"
+    one_blocker days-empty
+    reset_logs
+    NOW=$((BASE + 7200)) run_watch
+    h_eq "a recurrence wakes the fixer again" 1 "$(posts fixer)"
+    write_blockers 'not json'
+    NOW=$((BASE + 10800)) run_watch
+    h_contains "an unreadable state file prunes nothing" "$(QUEUE)" "days-empty"
+}
+
 case_setup_save_fixer_webhook_mode_600() {
     local file mode
     sandbox setup_save_hook

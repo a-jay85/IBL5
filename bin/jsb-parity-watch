@@ -380,6 +380,29 @@ fixer_forget_claimed() {
     done <<< "$keys"
 }
 
+# fixer_prune: drop the queue and wake lines of blockers that are gone, so the
+# fixer never claims a resolved key and a recurrence starts a fresh wake.
+fixer_prune() {
+    local file="$PARITY_DIR/state/blockers.json" live key keys path s_row s_stage
+    if [ "$DRY_RUN" != 0 ]; then return 0; fi
+    # An unreadable state file does not prove that a blocker is gone.
+    if [ -f "$file" ] && ! jq -e . "$file" >/dev/null 2>&1; then return 0; fi
+    live=$(jq -r '.active | objects | keys[]' <<< "$FIXER_STATE")
+    for key in $STALL_KEYS; do
+        IFS=: read -r s_row s_stage _ <<< "$key"
+        live="$live"$'\n'"stall:$s_stage:$s_row"
+    done
+    for path in "$FIXER_QUEUE" "$FIXER_WAKES"; do
+        [ -s "$path" ] || continue
+        keys=$(awk -F'\t' '{print $1}' "$path")
+        while read -r key; do
+            if [ -n "$key" ] && ! grep -qxF -- "$key" <<< "$live"; then
+                put_line "$path" "$key"
+            fi
+        done <<< "$keys"
+    done
+}
+
 # fixer_dm <key> <text>: one error DM per key, deduped through the stalls file.
 fixer_dm() {
     local key="$1" text="$2"
@@ -578,6 +601,7 @@ main() {
     fi
 
     fixer_forget_claimed
+    fixer_prune
 
     for key in $STALL_KEYS; do
         IFS=: read -r s_row s_stage _ <<< "$key"

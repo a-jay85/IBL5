@@ -23,10 +23,12 @@ var DrawSites = map[string]string{
 	"sim.randInt":                              "FUN_0047f5a0",
 	"sim.rollMake":                             "",
 	"sim.selectBallHandler":                    "",
+	"sim.selectBallHandlerJSB":                 "",
 	"sim.selectDefender":                       "",
 	"sim.selectOutcome":                        "",
 	"sim.selectRebounder":                      "",
 	"sim.selectShotType":                       "",
 	"sim.simGameWith":                          "",
 	"sim.transitionTriggers":                   "FUN_004e42e0",
+	"sim.usageDominanceFlagsFor":               "",
 }

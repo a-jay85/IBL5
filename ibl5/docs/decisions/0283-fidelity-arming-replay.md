@@ -78,7 +78,7 @@ The branch check closes that hole. The driver records every branch event in the 
 
 - A conditional jump on the line was not taken both ways, on the side being judged. That covers `if`, `elif`, `while`, conditional expressions, `and`/`or`, comparisons that feed a branch, and `for` loops. The reason names the line, the condition text, and the outcome that never happened.
 - A member of a literal membership list was never matched, or no record held a value outside the list.
-- The check cannot read the line's branches. That covers a jump kind it does not know, a membership guard whose left side is not a bare name, a guard that is not the whole condition of its statement, two code objects it cannot tell apart, or an interpreter without branch events.
+- The check cannot read the line's branches. That covers a jump kind it does not know, a membership guard whose left side is not a bare name, a guard that is not the whole condition of its statement, a guard whose line also holds another statement or an `except` clause, two code objects it cannot tell apart, or an interpreter without branch events.
 
 This check runs last, so every earlier hold keeps its own reason. It only adds holds. It still sees only the corpus. Two values that both take the same branch look the same to it. A changed line inside a `finally` block or an `except` clause usually holds, because the corpus rarely takes the exception path.
 

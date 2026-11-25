@@ -15,6 +15,7 @@ if __name__ == "__main__" and len(sys.argv) == 4:
     sys.path[0] = sys.argv[2]      # side package root; must precede every other import
     sys.dont_write_bytecode = True  # a side import must not write __pycache__ (a write-mode open)
 import atexit
+import collections
 import contextlib
 import copy
 import dataclasses
@@ -196,16 +197,26 @@ def _member_sites(source):
 
     The probe reads `name` when its statement's first line starts. That value is the one the
     test sees only when the test is the whole condition or value of the statement, its left
-    side is a bare name and its right side is a literal of constants, and nothing in the
-    statement rebinds a name. Any other membership shape is left out, so the judge holds it."""
+    side is a bare name and its right side is a literal of constants, nothing in the
+    statement rebinds a name, and no other statement or `except` clause starts on its line or
+    ends there before it. Any other membership shape is left out, so the judge holds it."""
     import ast
     sites = {}
     try:
         tree = ast.parse(source)
     except (SyntaxError, ValueError):
         return sites
+    blocks = [n for n in ast.walk(tree) if isinstance(n, (ast.stmt, ast.excepthandler))]
+    starts = collections.Counter(n.lineno for n in blocks)
+    ends = {}  # line -> earliest (line, column) at which a block ends on it
+    for n in blocks:
+        end = (n.end_lineno, n.end_col_offset)
+        ends[n.end_lineno] = min(end, ends.get(n.end_lineno, end))
     for stmt in ast.walk(tree):
         if type(stmt).__name__ not in _MEMBER_PARENTS:
+            continue
+        if (starts[stmt.lineno] > 1  # code sharing the line can rebind the operand first
+                or ends.get(stmt.lineno, (stmt.lineno + 1, 0)) <= (stmt.lineno, stmt.col_offset)):
             continue
         node = getattr(stmt, "test", None) if hasattr(stmt, "test") else getattr(stmt, "value", None)
         if not (isinstance(node, ast.Compare) and len(node.ops) == 1

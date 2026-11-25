@@ -1135,6 +1135,25 @@ def test_rewrite_of_a_branch_the_corpus_takes_both_ways_clears(tmp_path):
     assert "fidelity replay cleared 2 changed lines" in text
 
 
+@pytest.mark.parametrize("src", [
+    # the probe fires at the line's first event, before `status` is rebound
+    'status = "carried"; ok = status not in ("present",)\n',
+    'ok = status not in ("present",); status = "carried"\n',
+    # an earlier statement that only ends on the site's line
+    'status = str(\n    1); ok = status not in ("present",)\n',
+    'try:\n    pass\nexcept ValueError as status: ok = status not in ("present",)\n',
+])
+def test_membership_site_sharing_its_line_is_dropped(src):
+    assert drv._member_sites(src) == {}
+
+
+def test_membership_site_alone_on_its_line_is_kept():
+    src = ('def f(status):\n'
+           '    status = "carried"\n'
+           '    return status not in ("present",)\n')
+    assert list(drv._member_sites(src)) == [3]
+
+
 _GAP_SRC = ("def f(x, s):\n"
             "    if x in ('a', 'b'):\n"
             "        return 1\n"

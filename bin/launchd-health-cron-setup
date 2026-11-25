@@ -13,6 +13,8 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=bin/lib/launchd-sched.sh
+. "$REPO_ROOT/bin/lib/launchd-sched.sh"
 ACTION=""
 VARIANT=""
 
@@ -61,6 +63,9 @@ build_plist() {
 	<string>${LABEL_PREFIX}-${v}</string>
 	<key>ProgramArguments</key>
 	<array>
+		<string>/bin/bash</string>
+		<string>-c</string>
+		<string>${LSCHED_EXEC_WRAP}</string>
 		<string>${PROGRAM}</string>
 PLIST_HEAD
 

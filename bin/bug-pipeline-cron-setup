@@ -83,7 +83,7 @@ BUG_PIPELINE_APPROVER_ID="${BUG_PIPELINE_APPROVER_ID:-}"
 # --install-schedule, so the MAIN-checkout derivation is exercised by tests.
 plist_body() {
   lsched_key_string Label "$PLIST_LABEL"
-  lsched_key_string Program "$PROGRAM"
+  lsched_wrapped_program_arguments "$PROGRAM"
   cat <<PLIST
 	<!-- StartInterval (net-new to the repo): the correct launchd primitive for a
 	     3-min poll. Do NOT "fix" this to a calendar-interval key — that is calendar-only. -->
@@ -111,7 +111,7 @@ PLIST
 		     this, bin/db-query exits 127 for every hunter and no data bug is ever
 		     reproduced — a silent throughput cliff, not a visible failure. -->
 PLIST
-  lsched_key_string PATH "/opt/homebrew/opt/mariadb/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${HOME}/.local/bin" 2
+  lsched_key_string PATH "/opt/homebrew/bin:/opt/homebrew/opt/mariadb/bin:/usr/local/bin:/usr/bin:/bin:${HOME}/.local/bin" 2
   lsched_key_string BUG_PIPELINE_ISSUE_REPO "${BUG_PIPELINE_ISSUE_REPO}" 2
   lsched_key_string BUG_PIPELINE_APPROVER_ID "${BUG_PIPELINE_APPROVER_ID}" 2
   cat <<PLIST

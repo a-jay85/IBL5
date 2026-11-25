@@ -54,7 +54,7 @@ PROGRAM="$MAIN_WT/bin/wt-gc-tick"
 # --install-schedule, so the MAIN-checkout derivation is exercised by tests.
 plist_body() {
   lsched_key_string Label "$PLIST_LABEL"
-  lsched_program_arguments "$PROGRAM"
+  lsched_wrapped_program_arguments "$PROGRAM"
   cat <<PLIST
 	<!-- Hourly poll; bin/wt-gc-tick's HID-idle gate (1800s) and 6h min-interval
 	     stamp decide whether a tick sweeps. Hourly fires survive sleep/wake

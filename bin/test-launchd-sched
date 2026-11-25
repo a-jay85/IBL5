@@ -268,12 +268,9 @@ fi
 # IBL5 (gitignored here), so it exists in the main checkout only. CI and a bare
 # worktree have no copy: the case then passes with a SKIP line instead of failing.
 CLEANROOM_PLIST=""
-for cr in "$REPO_ROOT" "$MAIN_WT"; do
-  if [ -f "$cr/jsb-native/cleanroom/bin/com.ibl5.cleanroom-nightly-validate.plist" ]; then
-    CLEANROOM_PLIST="$cr/jsb-native/cleanroom/bin/com.ibl5.cleanroom-nightly-validate.plist"
-    break
-  fi
-done
+if [ -f "$REPO_ROOT/jsb-native/cleanroom/bin/com.ibl5.cleanroom-nightly-validate.plist" ]; then
+  CLEANROOM_PLIST="$REPO_ROOT/jsb-native/cleanroom/bin/com.ibl5.cleanroom-nightly-validate.plist"
+fi
 if [ -z "$CLEANROOM_PLIST" ]; then
   echo "SKIP cleanroom-plist-wrapped: jsb-native is not checked out here"
   pass "cleanroom-plist-wrapped"

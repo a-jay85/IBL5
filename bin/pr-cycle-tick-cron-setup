@@ -53,7 +53,7 @@ PROGRAM="$MAIN_WT/bin/pr-cycle-tick"
 # --install-schedule, so the MAIN-checkout derivation is exercised by tests.
 plist_body() {
   lsched_key_string Label "$PLIST_LABEL"
-  lsched_key_string Program "$PROGRAM"
+  lsched_wrapped_program_arguments "$PROGRAM"
   cat <<PLIST
 	<!-- StartInterval: the correct launchd primitive for a 30-min poll.
 	     Do NOT "fix" this to a calendar-interval key, which is calendar-only.
@@ -73,7 +73,7 @@ PLIST
 		     variables in EnvironmentVariables, so a literal home variable would
 		     bake in a dead path. -->
 PLIST
-  lsched_key_string PATH "${HOME}/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" 2
+  lsched_key_string PATH "/opt/homebrew/bin:${HOME}/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" 2
   lsched_env_close
   lsched_key_string StandardOutPath "${LOG_DIR}/tick.log"
   lsched_key_string StandardErrorPath "${LOG_DIR}/tick.log"

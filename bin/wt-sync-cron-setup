@@ -62,7 +62,7 @@ SETTINGS="$HOME/.claude/settings.json"
 # --install-schedule, so the MAIN-checkout derivation is exercised by tests.
 plist_body() {
   lsched_key_string Label "$PLIST_LABEL"
-  lsched_key_string Program "$PROGRAM"
+  lsched_wrapped_program_arguments "$PROGRAM"
   cat <<PLIST
 	<!-- StartInterval: the correct launchd primitive for a 15-min poll.
 	     Do NOT "fix" this to a calendar-interval key — that is calendar-only. -->

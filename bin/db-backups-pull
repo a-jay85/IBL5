@@ -37,6 +37,8 @@ SCRIPT_DIR="$REPO_ROOT/bin"
 source "$SCRIPT_DIR/lib/git-helpers.sh"
 # shellcheck source=bin/lib/dm.sh
 . "$SCRIPT_DIR/lib/dm.sh"
+# shellcheck source=bin/lib/launchd-sched.sh
+. "$SCRIPT_DIR/lib/launchd-sched.sh"
 DISCORD_DM="$(dm_bin "$SCRIPT_DIR" DISCORD_DM_BIN)"
 RSYNC_BIN="${DB_BACKUPS_PULL_RSYNC_BIN:-rsync}"
 LOCAL_DIR="${IBL5_DB_BACKUP_DIR:-$HOME/Backups/ibl5-db}"
@@ -95,6 +97,9 @@ if [ "$ACTION" != "pull" ]; then
 	</dict>
 	<key>ProgramArguments</key>
 	<array>
+		<string>/bin/bash</string>
+		<string>-c</string>
+		<string>${LSCHED_EXEC_WRAP}</string>
 		<string>${PROGRAM}</string>
 	</array>
 	<key>WorkingDirectory</key>

@@ -74,7 +74,7 @@ plist_body() {
   fi
 
   lsched_key_string Label "$PLIST_LABEL"
-  lsched_program_arguments "$PROGRAM"
+  lsched_wrapped_program_arguments "$PROGRAM"
   lsched_key_string WorkingDirectory "$MAIN_WT"
   lsched_calendar "Hour=7" "Minute=0"
   lsched_key_bool RunAtLoad false
@@ -87,7 +87,7 @@ plist_body() {
 		     generation time; launchd does NOT expand environment variable references, so any
 		     unexpanded reference would bake in a dead path for every invocation. -->
 PLIST
-  lsched_key_string PATH "${MAIN_WT}/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${HOME}/.local/bin" 2
+  lsched_key_string PATH "/opt/homebrew/bin:${MAIN_WT}/bin:/usr/local/bin:/usr/bin:/bin:${HOME}/.local/bin" 2
   cat <<PLIST
 ${discord_block}
 PLIST

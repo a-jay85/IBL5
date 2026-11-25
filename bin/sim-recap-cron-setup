@@ -66,7 +66,7 @@ PROGRAM="$MAIN_WT/bin/sim-recap-tick"
 #      --print-schedule, the real value for --install-schedule).
 plist_body() {
   lsched_key_string Label "$PLIST_LABEL"
-  lsched_key_string Program "$PROGRAM"
+  lsched_wrapped_program_arguments "$PROGRAM"
   cat <<PLIST
 	<!-- StartInterval: the correct launchd primitive for a repeating poll.
 	     300s is frozen by the decisions digest (D6) — do NOT change it here.

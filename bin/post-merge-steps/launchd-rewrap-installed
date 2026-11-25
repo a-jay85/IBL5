@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
+# After-merge step (ADR-0285): rewrap every installed com.ibl5 plist whose
+# executable is a repo path. Reloads only loaded, idle jobs. Idempotent.
+set -uo pipefail
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+. "$REPO_ROOT/bin/lib/launchd-sched.sh"
+DRY_RUN=0
+for a in "$@"; do
+  case "$a" in
+    --dry-run) DRY_RUN=1 ;;
+    *) printf 'launchd-rewrap-installed: unknown argument: %s\n' "$a" >&2; exit 2 ;;
+  esac
+done
+AGENTS_DIR="${LSCHED_REWRAP_AGENTS_DIR:-$HOME/Library/LaunchAgents}"
+uid="$(id -u)"
+if ! table="$(launchctl list)"; then
+  echo "launchd-rewrap-installed: launchctl list failed; nothing touched" >&2; exit 1
+fi
+rc=0
+for plist in "$AGENTS_DIR"/com.ibl5.*.plist; do
+  [ -f "$plist" ] || continue
+  label="$(basename "$plist" .plist)"
+  pid="$(awk -v l="$label" '$3 == l {print $1}' <<<"$table")"
+  if [ -n "$pid" ] && [ "$pid" != "-" ]; then echo "deferred (running, pid $pid): $label"; rc=1; continue; fi
+  if [ "$DRY_RUN" = 1 ]; then
+    cp "$plist" "$plist.dry-rewrap"; echo "$(lsched_rewrap_plist "$plist.dry-rewrap"): $label"; rm -f "$plist.dry-rewrap"; continue
+  fi
+  cp -p "$plist" "$plist.pre-rewrap"
+  if ! verdict="$(lsched_rewrap_plist "$plist")"; then mv -f "$plist.pre-rewrap" "$plist"; echo "FAILED to read: $label" >&2; rc=1; continue; fi
+  if [ "$verdict" != wrapped ]; then rm -f "$plist.pre-rewrap"; echo "$verdict: $label"; continue; fi
+  if [ -z "$pid" ]; then rm -f "$plist.pre-rewrap"; echo "wrapped (not loaded, file only): $label"; continue; fi
+  launchctl bootout "gui/$uid/$label" 2>/dev/null || true
+  if launchctl bootstrap "gui/$uid" "$plist"; then rm -f "$plist.pre-rewrap"; echo "wrapped and reloaded: $label"
+  else mv -f "$plist.pre-rewrap" "$plist"; launchctl bootstrap "gui/$uid" "$plist" || true; echo "FAILED to reload, original restored: $label" >&2; rc=1; fi
+done
+exit "$rc"

@@ -601,6 +601,124 @@ else
   fail "rewrap-rejects-relative (rc=$rw_rc)"
 fi
 
+# ── After-merge rewrap step (bin/post-merge-steps/launchd-rewrap-installed) ───
+STEP="$REPO_ROOT/bin/post-merge-steps/launchd-rewrap-installed"
+mkdir -p "$TMP/stubbin"
+cat > "$TMP/stubbin/launchctl" <<'STUBEOF'
+#!/bin/sh
+echo "$*" >> "$STUB_LOG"
+case "$1" in
+  list)
+    [ "${STUB_LIST_FAIL:-0}" = 1 ] && exit 5
+    cat "$STUB_TABLE"; exit 0 ;;
+  bootstrap)
+    if [ "${STUB_BOOTSTRAP_FAIL:-0}" = 1 ] && [ ! -f "$STUB_LOG.failed" ]; then
+      : > "$STUB_LOG.failed"; exit 1
+    fi
+    exit 0 ;;
+esac
+exit 0
+STUBEOF
+chmod +x "$TMP/stubbin/launchctl"
+# step_agents — fresh fixture dir: idle, busy and unloaded repo-path agents, one system-led.
+step_agents() {
+  rm -rf "$TMP/agents"; mkdir -p "$TMP/agents"
+  rw_plist "$TMP/agents/com.ibl5.idle.plist" /abs/idle
+  rw_plist "$TMP/agents/com.ibl5.busy.plist" /abs/busy
+  rw_plist "$TMP/agents/com.ibl5.unloaded.plist" /abs/unloaded
+  rw_plist "$TMP/agents/com.ibl5.sys.plist" - /bin/sh -c 'echo hi'
+  printf '%s\n' "-	0	com.ibl5.idle" "4242	0	com.ibl5.busy" "-	0	com.ibl5.sys" > "$TMP/agents.table"
+  rm -f "$TMP/agents.log" "$TMP/agents.log.failed"; : > "$TMP/agents.log"
+}
+# run_step <env assignment>... -- <args> — prints nothing; sets STEP_RC and STEP_OUT.
+run_step() {
+  local envs=()
+  while [ "$#" -gt 0 ] && [ "$1" != -- ]; do envs+=("$1"); shift; done
+  shift
+  STEP_OUT="$(env HOME="$TMP/h" PATH="$TMP/stubbin:$PATH" STUB_LOG="$TMP/agents.log" STUB_TABLE="$TMP/agents.table" \
+    LSCHED_REWRAP_AGENTS_DIR="$TMP/agents" ${envs[@]+"${envs[@]}"} bash "$STEP" "$@" 2>&1)"
+  STEP_RC=$?
+}
+agents_snapshot() { for f in "$TMP"/agents/*.plist; do printf '%s ' "$(cksum < "$f")"; done; }
+
+step_agents
+cp "$TMP/agents/com.ibl5.busy.plist" "$TMP/busy.orig"
+run_step --
+if [ "$STEP_RC" = 1 ] && cmp -s "$TMP/agents/com.ibl5.busy.plist" "$TMP/busy.orig" \
+   && ! grep -q 'bootout.*com.ibl5.busy' "$TMP/agents.log" \
+   && [ "$(lead_verdict "$TMP/agents/com.ibl5.unloaded.plist")" = ok ] \
+   && ! grep -q 'bootstrap.*com.ibl5.unloaded' "$TMP/agents.log" \
+   && grep -q 'bootout .*com.ibl5.idle' "$TMP/agents.log" \
+   && grep -q 'bootstrap .*com.ibl5.idle' "$TMP/agents.log" \
+   && [ "$(lead_verdict "$TMP/agents/com.ibl5.idle.plist")" = ok ]; then
+  pass "rewrap-step-guards-running-and-unloaded"
+else
+  printf '  rc=%s out=%s\n' "$STEP_RC" "$STEP_OUT" >&2
+  fail "rewrap-step-guards-running-and-unloaded"
+fi
+
+# Rerun over a converted dir with the busy agent removed: nothing reloaded, exit 0.
+rm -f "$TMP/agents/com.ibl5.busy.plist"; : > "$TMP/agents.log"
+run_step --
+if [ "$STEP_RC" = 0 ] && ! grep -qE 'bootout|bootstrap' "$TMP/agents.log"; then
+  pass "rewrap-step-rerun-noop"
+else
+  printf '  rc=%s out=%s\n' "$STEP_RC" "$STEP_OUT" >&2
+  fail "rewrap-step-rerun-noop"
+fi
+
+step_agents
+cp "$TMP/agents/com.ibl5.idle.plist" "$TMP/idle.orig"
+run_step STUB_BOOTSTRAP_FAIL=1 --
+if [ "$STEP_RC" = 1 ] && cmp -s "$TMP/agents/com.ibl5.idle.plist" "$TMP/idle.orig" \
+   && [ "$(grep -c 'bootstrap .*com.ibl5.idle' "$TMP/agents.log")" = 2 ]; then
+  pass "rewrap-step-restores-on-bootstrap-fail"
+else
+  printf '  rc=%s out=%s\n' "$STEP_RC" "$STEP_OUT" >&2
+  fail "rewrap-step-restores-on-bootstrap-fail"
+fi
+
+step_agents
+before="$(agents_snapshot)"
+run_step STUB_LIST_FAIL=1 --
+if [ "$STEP_RC" = 1 ] && [ "$before" = "$(agents_snapshot)" ]; then
+  pass "rewrap-step-list-failure-aborts"
+else
+  fail "rewrap-step-list-failure-aborts (rc=$STEP_RC)"
+fi
+
+step_agents
+before="$(agents_snapshot)"
+run_step -- --bogus
+if [ "$STEP_RC" = 2 ] && [ "$before" = "$(agents_snapshot)" ]; then
+  pass "rewrap-step-rejects-unknown-flag"
+else
+  fail "rewrap-step-rejects-unknown-flag (rc=$STEP_RC)"
+fi
+
+# An empty LSCHED_REWRAP_AGENTS_DIR means unset, so the default dir under HOME is read.
+mkdir -p "$TMP/h/Library/LaunchAgents"
+rw_plist "$TMP/h/Library/LaunchAgents/com.ibl5.homed.plist" /abs/homed
+printf '%s\n' "-	0	com.ibl5.homed" > "$TMP/agents.table"; : > "$TMP/agents.log"
+run_step LSCHED_REWRAP_AGENTS_DIR= -- --dry-run
+if grep -qF 'wrapped: com.ibl5.homed' <<<"$STEP_OUT"; then
+  pass "rewrap-step-empty-agents-dir-uses-home"
+else
+  printf '  rc=%s out=%s\n' "$STEP_RC" "$STEP_OUT" >&2
+  fail "rewrap-step-empty-agents-dir-uses-home"
+fi
+
+step_agents
+before="$(agents_snapshot)"
+run_step -- --dry-run
+if [ "$before" = "$(agents_snapshot)" ] && grep -qF 'wrapped: com.ibl5.idle' <<<"$STEP_OUT" \
+   && ! grep -q bootout "$TMP/agents.log"; then
+  pass "rewrap-step-dry-run-writes-nothing"
+else
+  printf '  rc=%s out=%s\n' "$STEP_RC" "$STEP_OUT" >&2
+  fail "rewrap-step-dry-run-writes-nothing"
+fi
+
 # lsched_plist wraps the body function.
 sample_body() { printf '\t<key>Label</key>\n\t<string>com.x</string>\n'; }
 plist_out="$(set -euo pipefail; . "$LIB"; lsched_plist sample_body)"

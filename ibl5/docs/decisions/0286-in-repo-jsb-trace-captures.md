@@ -41,7 +41,7 @@ The defense from ADR-0266 stays. The harness reads the capture bytes from the co
 
 ## Lineage
 
-This ADR replaces the hosting decision of ADR-0278. Its evidence schema and its rejections stand.
+This ADR replaces the hosting decision of ADR-0278. It also reverses ADR-0278's rejection of committing captures to IBL5. ADR-0278 gave two reasons: the capture is derived from the binary, and IBL5 is public. Both are still true, and the owner accepted that exposure on 2026-11-24. ADR-0278's evidence schema stands, apart from the retired `capture_host: jsb-native` value. Its other two rejections also stand: reading the jsb-native working tree, and pointing the check elsewhere through an env var.
 
 ## References
 

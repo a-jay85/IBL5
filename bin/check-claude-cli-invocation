@@ -6,7 +6,8 @@
 # gate-backtest-argv: --stats
 # gate-backtest-reads: bin/* bin/lib/*
 #
-# Four flaw classes, each seen in review of PR #3363 (backlog#1613):
+# Five flaw classes. The first four were seen in review of PR #3363 (backlog#1613);
+# permission comes from backlog#1609 and backlog#1961.
 #   no-timeout            the call has no timeout, gtimeout or perl-alarm wrapper, so
 #                         one hung session holds its caller forever.
 #   stderr-merged-capture 2>&1 inside a $(...) capture mixes stderr text into the
@@ -16,6 +17,18 @@
 #                         as one more tool name. Put the prompt first or on stdin.
 #   unknown-flag          a flag outside the committed allowlist; an unknown option
 #                         makes claude exit before it runs anything.
+#   permission            the call can widen shell or permission access: a Bash(...) rule whose
+#                         first word is off the safe list (gh, or a script directly under
+#                         bin/ or bin/lib/), a bare Bash rule, a tool value the checker
+#                         cannot read statically, an argv expansion such as "$@",
+#                         --dangerously-skip-permissions, --allow-dangerously-skip-permissions,
+#                         --permission-mode other than default/plan/dontAsk, --settings,
+#                         --mcp-config or --add-dir. An argv expansion is "$@", "$*", NAME[@]
+#                         or any unquoted $NAME, ${NAME} or $(...). The tool value default
+#                         turns on Bash, so it is a finding. Only Bash rules are read: other
+#                         tool names (Read, Write, Edit, WebFetch, mcp__*) pass. Deny-list
+#                         values are never read, but "$@", "$*" or an unquoted expansion
+#                         after a deny flag is a finding.
 #
 # A call site is `claude -p` (or --print) at a real command position: the start of a
 # simple command, after timeout/caffeinate/env/exec/nohup/command/nice/perl wrappers,
@@ -29,6 +42,8 @@
 #
 # A site passes when its statement ends with `# claude-cli-ok: <reason>` (a non-empty
 # reason is required).
+# A '# claude-perm-ok: <reason>' marker on any line of the statement silences only the
+# permission class; the other four checks still run on that site.
 #
 # Scope: bash files directly under bin/ and bin/lib/ (no subdirectories, no test-*
 # scripts, no Python). Not traced: commands built as strings and run later
@@ -36,6 +51,7 @@
 # through "$@", backtick substitutions, and the body of a function that execs an array.
 # Flags are checked against a committed list because CI runners have no claude binary.
 # The awk program is POSIX only, so BSD awk (macOS) and mawk (Ubuntu) agree.
+# Subdirectories such as bin/automouse/ stay unscanned, so their call sites are unchecked.
 #
 # Usage: bin/check-claude-cli-invocation [--stats] [file ...]
 #
@@ -57,18 +73,26 @@ MARKER='# claude-cli-ok:'
 ALLOWED_FLAGS="--add-dir --agent --agents --all --allow-dangerously-skip-permissions --allowed-tools --allowedTools --append-system-prompt --autocompact --ax-screen-reader --background --bare --betas --bg --brief --chrome --cloud --continue --dangerously-skip-permissions --debug --debug-file --desktop --disable-slash-commands --disallowed-tools --disallowedTools --effort --environment --exclude-dynamic-system-prompt-sections --fallback-model --file --fork-session --forward-subagent-text --from-pr --help --ide --include-hook-events --include-partial-messages --input-format --json-schema --max-budget-usd --mcp-config --model --name --no-chrome --no-session-persistence --output-format --permission-mode --permission-prompt-tool --permission-prompts --plugin-dir --plugin-url --print --prompt-suggestions --remote-control --remote-control-session-name-prefix --replay-user-messages --restricted --resume --safe-mode --session-id --setting-sources --settings --strict-mcp-config --system-prompt --system-prompt-snapshot --teleport --tmux --tools --verbose --version --worktree -c -d -h -n -p -r -v -w --max-turns"
 # captured from claude --help (claude --version: 2.1.327 (Claude Code)) on 2026-11-20
 VARIADIC_FLAGS="--add-dir --allowed-tools --allowedTools --betas --disallowed-tools --disallowedTools --file --mcp-config --tools"
+# permission class: a marker that silences only this class; the other four keep running
+PERM_MARKER='# claude-perm-ok:'
+# Bash(...) rules may name these binaries with no marker. A repo script under bin or bin/lib matches by its path.
+PERM_SAFE_BINS="gh"
+# --permission-mode values that grant nothing extra
+PERM_OK_MODES="default plan dontAsk"
 
 usage() {
     cat <<'EOF'
 Usage: bin/check-claude-cli-invocation [--stats] [file ...]
 
-Checks every `claude -p` call site under bin/ and bin/lib/ for four flaws:
+Checks every `claude -p` call site under bin/ and bin/lib/ for five flaws:
   no-timeout             wrap the call in timeout, gtimeout or perl alarm
   stderr-merged-capture  send stderr to its own file inside $(...)
   prompt-after-variadic  put the prompt before the tool flags or on stdin
   unknown-flag           the flag is not in the committed claude flag list
+  permission             a grant beyond read-only tools; see the header for the list
 
 Fix: correct the call, or end its statement with # claude-cli-ok: <reason>
+For a permission finding only, use # claude-perm-ok: <reason>; the other checks stay on.
 
 Arguments:
   [file ...]   files to scan (default: shell scripts directly under bin/ and bin/lib/)
@@ -364,23 +388,128 @@ function merge_scan(s, e,    j, d, t, outr) {
     if (tt[e + 1] == "S" && tx[e + 1] == "|&") return 1
     return 0
 }
-function mk_range(lo, hi,    l, r) {
-    for (l = lo; l <= hi; l++) {
-        if ((l in cmt) && index(cmt[l], MARKER) == 1) {
+# mk_range: claude-cli-ok counts on lines lo..hi; claude-perm-ok counts on lo..phi (phi >= hi).
+function mk_range(lo, hi, phi,    l, r) {
+    if (phi < hi) phi = hi
+    for (l = lo; l <= phi; l++) {
+        if (l <= hi && (l in cmt) && index(cmt[l], MARKER) == 1) {
             site_marker = 1
             r = trim(substr(cmt[l], length(MARKER) + 1))
             if (length(r) > reason_len) reason_len = length(r)
         }
+        if ((l in cmt) && index(cmt[l], PERM_MARKER) == 1) {
+            perm_marker = 1
+            r = trim(substr(cmt[l], length(PERM_MARKER) + 1))
+            if (length(r) > perm_rl) perm_rl = length(r)
+        }
     }
 }
 function range_hi(e) { return (e + 1 <= ntk) ? tl[e + 1] : tl[e] }
+# perm_range_hi: last line a claude-perm-ok marker may sit on. Redirects after a closing ")"
+# belong to the statement, so ( cd d && claude -p ... ) > out 2>&1 may carry that marker on
+# the redirect line. claude-cli-ok keeps the range_hi range.
+function perm_range_hi(e,    k) {
+    k = e + 1
+    if (k <= ntk && tt[k] == ")") {
+        while (k + 1 <= ntk && tt[k + 1] == "R") {
+            k++
+            if (tx[k] ~ /[<>|]$/ && k + 1 <= ntk && (tt[k + 1] == "W" || tt[k + 1] == "X")) k++
+        }
+    }
+    return (k <= ntk) ? tl[k] : tl[e]
+}
 
 function report(f, ln, cls, detail) {
     printf "%s:%d: %s: %s\n", f, ln, cls, detail
     hits++
 }
 
-# site_finish: run the four checks for one call site. av holds the argv tokens.
+# perm_splits: 1 when an argv word can expand to several words or to a flag: "$@", "$*",
+# "${@}", "${@:2}", an array NAME[@], or any unquoted expansion such as $FLAGS, $1,
+# ${FLAGS} or $(cmd).
+function perm_splits(v) {
+    if (v ~ /^"?\$[@*]"?$/ || index(v, "[@]") > 0) return 1
+    return (v ~ /^\$[A-Za-z0-9_{(]/ || v ~ /^"?\$\{[@*]/)
+}
+function perm_static(v) { return (index(v, "$") == 0 && index(v, "`") == 0) }
+function perm_bin_ok(b) {
+    if (b in safebin) return 1
+    return (b ~ /^bin\/(lib\/)?[A-Za-z0-9][A-Za-z0-9._-]*$/)
+}
+function perm_rule(f, ln, rule, sfx,    inner, b) {
+    if (rule == "") return
+    if (rule == "Bash" || rule == "Bash()" || rule == "Bash(*)") { report(f, ln, "permission", "bare Bash rule grants every shell command" sfx); return }
+    if (rule == "default") { report(f, ln, "permission", "tool value default turns on every built-in tool, Bash included" sfx); return }
+    if (substr(rule, 1, 5) != "Bash(") return
+    if (substr(rule, length(rule), 1) != ")") { report(f, ln, "permission", "malformed Bash rule: " rule sfx); return }
+    inner = trim(substr(rule, 6, length(rule) - 6))
+    b = inner; sub(/[ :].*$/, "", b)
+    if (b == "" || b == "*") { report(f, ln, "permission", "bare Bash rule grants every shell command" sfx); return }
+    if (!perm_bin_ok(b)) report(f, ln, "permission", "Bash rule binary is off the safe list: " b sfx)
+}
+function perm_rules(f, ln, v, sfx,    i, c, d, cur) {
+    d = 0; cur = ""
+    for (i = 1; i <= length(v); i++) {
+        c = substr(v, i, 1)
+        if (c == "(") d++
+        else if (c == ")" && d > 0) d--
+        if (d == 0 && (c == "," || c == " " || c == "\t" || c == "\n")) { perm_rule(f, ln, cur, sfx); cur = ""; continue }
+        cur = cur c
+    }
+    perm_rule(f, ln, cur, sfx)
+}
+function perm_value(f, ln, fl, v, sfx) {
+    if (!perm_static(v)) { report(f, ln, "permission", fl " value is not a static literal: " v sfx); return }
+    perm_rules(f, ln, unq(v), sfx)
+}
+function perm_check(f, ln, sfx,    a, fl, v, val, hasv, mode) {
+    if (perm_marker) {
+        if (perm_rl > 0) return
+        sfx = sfx " (claude-perm-ok marker needs a non-empty reason)"
+    }
+    for (a = 1; a <= nav; a++) {
+        v = avx[a]
+        if (!(v ~ /^-/ && (avt[a] == "W" || v ~ /^--[A-Za-z-]+=/))) {
+            if (perm_splits(v)) report(f, ln, "permission", "argv expansion " v " can carry permission flags" sfx)
+            continue
+        }
+        fl = v; hasv = (index(fl, "=") > 0); val = ""
+        if (hasv) { val = substr(fl, index(fl, "=") + 1); sub(/=.*/, "", fl) }
+        if (fl == "--dangerously-skip-permissions") { report(f, ln, "permission", "--dangerously-skip-permissions skips every permission check" sfx); continue }
+        if (fl == "--allow-dangerously-skip-permissions") { report(f, ln, "permission", "--allow-dangerously-skip-permissions lets the session turn permission checks off" sfx); continue }
+        if (fl == "--settings") { report(f, ln, "permission", "--settings loads a file that can grant permissions" sfx); continue }
+        if (fl == "--mcp-config") { report(f, ln, "permission", "--mcp-config adds tools from a config file" sfx); continue }
+        if (fl == "--add-dir") { report(f, ln, "permission", "--add-dir widens file access past the working directory" sfx); continue }
+        if (fl == "--permission-mode") {
+            if (!hasv) {
+                if (a + 1 > nav) { report(f, ln, "permission", "--permission-mode has no value" sfx); continue }
+                a++; val = avx[a]
+            }
+            if (!perm_static(val)) { report(f, ln, "permission", "--permission-mode value is not a static literal: " val sfx); continue }
+            mode = unq(val)
+            if (!(mode in okmode)) report(f, ln, "permission", "--permission-mode " mode " is off the safe mode list (default plan dontAsk)" sfx)
+            continue
+        }
+        if (fl == "--disallowedTools" || fl == "--disallowed-tools") {
+            # Deny values are never read, and a deny array such as "${DENY[@]}" is skipped,
+            # but a bare "$@" or "$*" here can still carry any permission flag.
+            while (a + 1 <= nav && !(avt[a + 1] == "W" && avx[a + 1] ~ /^-/)) {
+                a++
+                if (perm_splits(avx[a]) && index(avx[a], "[@]") == 0) report(f, ln, "permission", "argv expansion " avx[a] " can carry permission flags" sfx)
+            }
+            continue
+        }
+        if (fl == "--allowedTools" || fl == "--allowed-tools" || fl == "--tools") {
+            if (hasv) perm_value(f, ln, fl, val, sfx)
+            while (a + 1 <= nav && !(avt[a + 1] == "W" && avx[a + 1] ~ /^-/)) {
+                if (avx[a + 1] ~ /^[0-9]*[<>]/) break
+                a++; perm_value(f, ln, fl, avx[a], sfx)
+            }
+            continue
+        }
+    }
+}
+# site_finish: run the five checks for one call site. av holds the argv tokens.
 function site_finish(f, ln, has_timeout, merged_capture,    a, fl, hq, sfx, vstate, cnt, prompt_after_variadic, flag) {
     calls++
     sfx = ""
@@ -409,6 +538,7 @@ function site_finish(f, ln, has_timeout, merged_capture,    a, fl, hq, sfx, vsta
         if (flag == "-" || flag == "--") continue
         if (!(flag in allowed)) report(f, ln, "unknown-flag", flag sfx)
     }
+    perm_check(f, ln, sfx)
 }
 
 function analyze(f, inner,    i, j, s, e, k, prefix_ok, hast, aopen, ac, name, nexec, hasexec, mrg, ks, ke, w, t, nm) {
@@ -423,12 +553,12 @@ function analyze(f, inner,    i, j, s, e, k, prefix_ok, hast, aopen, ac, name, n
         }
         if (!prefix_ok) continue
         nav = 0
-        if (!inner) { site_marker = 0; reason_len = 0 }
+        if (!inner) { site_marker = 0; reason_len = 0; perm_marker = 0; perm_rl = 0 }
         if (j >= 1 && tt[j] == "AO") {
             aopen = j; name = tx[j]
             for (ac = i; ac <= ntk && tt[ac] != "AC"; ac++) ;
             gather(i + 1)
-            if (!inner) mk_range(tl[aopen], tl[ac <= ntk ? ac : ntk])
+            if (!inner) mk_range(tl[aopen], tl[ac <= ntk ? ac : ntk], 0)
             hasexec = 0; mrg = 0
             for (k = 1; k <= ntk; k++) {
                 if (tt[k] != "X" || index(tx[k], "{" name "[@]") == 0) continue
@@ -438,14 +568,14 @@ function analyze(f, inner,    i, j, s, e, k, prefix_ok, hast, aopen, ac, name, n
                 for (w = ks; w <= ke; w++) if (is_timeout_tok(w)) hast = 1
                 if (tc[k] && merge_scan(ks, ke)) mrg = 1
                 gather(k + 1)
-                if (!inner) mk_range(tl[ks], range_hi(ke))
+                if (!inner) mk_range(tl[ks], range_hi(ke), perm_range_hi(ke))
             }
             if (!hasexec) hast = hast
             site_finish(f, tl[i], hast, mrg)
         } else {
             s = stmt_start(i); e = stmt_end(i)
             gather(i + 1)
-            if (!inner) mk_range(tl[s], range_hi(e))
+            if (!inner) mk_range(tl[s], range_hi(e), perm_range_hi(e))
             mrg = (tc[i] && merge_scan(s, e)) ? 1 : 0
             site_finish(f, tl[i], hast, mrg)
         }
@@ -466,9 +596,9 @@ function analyze(f, inner,    i, j, s, e, k, prefix_ok, hast, aopen, ac, name, n
         if (substr(t, length(t), 1) != substr(t, 1, 1)) continue
         npf++
         pf_text[npf] = substr(t, 2, length(t) - 2); pf_line[npf] = tl[k]
-        site_marker = 0; reason_len = 0
-        mk_range(tl[s], range_hi(stmt_end(i)))
-        pf_mark[npf] = site_marker; pf_rl[npf] = reason_len
+        site_marker = 0; reason_len = 0; perm_marker = 0; perm_rl = 0
+        mk_range(tl[s], range_hi(stmt_end(i)), perm_range_hi(stmt_end(i)))
+        pf_mark[npf] = site_marker; pf_rl[npf] = reason_len; pf_pmark[npf] = perm_marker; pf_prl[npf] = perm_rl
     }
 }
 
@@ -482,7 +612,7 @@ function finish_file(    p, m, lines, q) {
         m = split(pf_text[p], lines, "\n")
         for (q = 1; q <= m; q++) lex_line(lines[q], pf_line[p])
         finish_lex()
-        site_marker = pf_mark[p]; reason_len = pf_rl[p]
+        site_marker = pf_mark[p]; reason_len = pf_rl[p]; perm_marker = pf_pmark[p]; perm_rl = pf_prl[p]
         analyze(cur, 1)
         force_ln = 0
     }
@@ -498,6 +628,8 @@ BEGIN {
     RE_Q = "[" sq "\"\\\\]"
     n = split(ALLOWED, la, " "); for (i = 1; i <= n; i++) allowed[la[i]] = 1
     n = split(VARIADIC, la, " "); for (i = 1; i <= n; i++) variadic[la[i]] = 1
+    _n = split(PERM_SAFE_BINS, _pb, " "); for (_i = 1; _i <= _n; _i++) safebin[_pb[_i]] = 1
+    _n = split(PERM_OK_MODES, _pm, " "); for (_i = 1; _i <= _n; _i++) okmode[_pm[_i]] = 1
     n = split("timeout gtimeout caffeinate env exec nohup command nice perl", la, " "); for (i = 1; i <= n; i++) WRAP[la[i]] = 1
     n = split("! if then do else elif while until {", la, " "); for (i = 1; i <= n; i++) STOPW[la[i]] = 1
     force_ln = 0
@@ -573,12 +705,14 @@ main() {
     awk -v stats="$stats" -v ALLOWED="$ALLOWED_FLAGS" -v VARIADIC="$VARIADIC_FLAGS" \
         -v TIMEOUT_WORDS="$TIMEOUT_WORDS" -v TIMEOUT_VAR_RE="$TIMEOUT_VAR_RE" \
         -v MERGE_TOKEN="$MERGE_TOKEN" -v MARKER="$MARKER" \
+        -v PERM_MARKER="$PERM_MARKER" -v PERM_SAFE_BINS="$PERM_SAFE_BINS" -v PERM_OK_MODES="$PERM_OK_MODES" \
         "$AWK_PROG" "${files[@]}" || rc=$?
     case "$rc" in
         0) exit 0 ;;
         1)
             echo "check-claude-cli-invocation: a claude -p call site has a flaw (see the lines above)." >&2
             echo "fix: correct the call, or end its statement with # claude-cli-ok: <reason>" >&2
+            echo "fix (permission only): end the statement with # claude-perm-ok: <reason>" >&2
             exit 1
             ;;
         *) die "awk failed (exit $rc)" ;;

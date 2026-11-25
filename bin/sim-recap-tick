@@ -644,7 +644,7 @@ run_agent() { # sim prompt
             --model "$SIM_RECAP_MODEL" --output-format json \
             --permission-mode acceptEdits \
             --allowedTools "Bash(${SIM_RECAP_MYSQL_WRAPPER}:*)" ) \
-        > "$WORKDIR/agent.json" 2>&1
+        > "$WORKDIR/agent.json" 2>&1 # claude-perm-ok: Bash is limited to the SIM_RECAP_MYSQL_WRAPPER script; see the allowedTools comment above
     return $?
 }
 

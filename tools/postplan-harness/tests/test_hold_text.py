@@ -151,6 +151,19 @@ def test_variant_reasons(cond, want):
     assert hold_text.plain_hold(cond) == want
 
 
+@pytest.mark.parametrize("reason,needle,absent", [
+    ("golden snapshot changed in headless mode", "golden.json", "JSB capture"),
+    ("JSB capture changed in headless mode", "engine/testdata/jsb-captures/", "golden.json"),
+    ("golden snapshot and JSB capture changed in headless mode", "both need your OK", None),
+    ("golden snapshot or JSB capture changed in headless mode", "golden.json) or a raw", None),
+])
+def test_condition_5_names_what_changed(reason, needle, absent):
+    text = hold_text.plain_hold(ConditionResult(5, "golden-snapshot-headless", True, reason))
+    assert needle in text
+    if absent:
+        assert absent not in text
+
+
 def test_files_line_missing_phase_piece_strips_marker():
     item = "MISSING-PHASE: 1 — Phase 1: Add the thing (Files line only"
     assert hold_text._missing_item(item) == "Phase 1: Add the thing"

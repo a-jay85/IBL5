@@ -24,7 +24,6 @@ type pl0025Out struct {
 // and-one floor scale also replay through bucket3Weight's floor branch, so the
 // production call site is held to the same one-draw contract.
 func TestTracePinnedPl0025ScaledDraw(t *testing.T) {
-	jsbtrace.SkipIfAbsent(t, "pl-0025.jsonl")
 	c := jsbtrace.MustLoad(t, "pl-0025.jsonl")
 	if len(c.Records) == 0 {
 		t.Fatal("capture holds no records")

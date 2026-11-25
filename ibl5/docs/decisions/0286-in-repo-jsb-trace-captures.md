@@ -1,6 +1,6 @@
 ---
 description: ADR-0286. JSB trace captures live in IBL5 under engine/testdata/jsb-captures/. Retires the jsb-native capture host of ADR-0278 and adds a per-file size cap.
-last_verified: 2026-11-24
+last_verified: 2026-11-25
 ---
 
 # ADR-0286: JSB trace captures live in IBL5
@@ -24,7 +24,7 @@ The defense from ADR-0266 stays. The harness reads the capture bytes from the co
 
 **Fresh-capture handoff.** The parity loop's `trace` and `record` write the capture into an IBL5 worktree named `jsb-capture-<row>`. That worktree ships as the owner-held capture PR. `port` refuses until the file is on IBL5 `origin/master` with the same sha256.
 
-**Capture content.** A scan of all six files for IPv4 addresses, `192.168.`, `/Users/`, `C:\`, `password`, `utm`, `ssh` and `localhost` found nothing. The header carries `format`, `source`, `jsb_build`, `function` (a Ghidra `FUN_` name) and `address`. Records carry `caller` addresses. These fields belong to the capture format, and `engine/testdata/jsb-captures/README.md` requires `address`. They are accepted. The binary, decompiled C, the master reference, VM details and the whole-day replay recordings (ADR-0279) stay in jsb-native.
+**Capture content.** A scan of all ten files for IPv4 addresses, `192.168.`, `/Users/`, `C:\`, `password`, `utm`, `ssh` and `localhost` found nothing. The header carries `format`, `source`, `jsb_build`, `function` (a Ghidra `FUN_` name) and `address`. Records carry `caller` addresses. These fields belong to the capture format, and `engine/testdata/jsb-captures/README.md` requires `address`. They are accepted. The binary, decompiled C, the master reference, VM details and the whole-day replay recordings (ADR-0279) stay in jsb-native.
 
 ## Alternatives Considered
 

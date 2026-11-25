@@ -11,7 +11,7 @@ use Security\HtmlSanitizer;
 /**
  * OneOnOneGameView - Renders HTML for the One-on-One game module
  *
- * Uses the IBL5 design system with ibl-filter-form for player selection
+ * Uses daisyUI d-* form classes for player selection
  * and ibl-data-table for stats display.
  *
  * @see OneOnOneGameViewInterface For method contracts
@@ -32,13 +32,13 @@ class OneOnOneGameView implements OneOnOneGameViewInterface
      */
     public function renderPlayerSelectionForm(array $players, ?int $selectedPlayer1, ?int $selectedPlayer2): string
     {
-        $html = '<form name="OneOnOneGame" method="post" action="modules.php?name=OneOnOneGame" class="ibl-filter-form">' . "\n";
+        $html = '<form name="OneOnOneGame" method="post" action="modules.php?name=OneOnOneGame" class="d-card d-card-border bg-base-200 p-4 mb-6">' . "\n";
         $html .= \Security\CsrfGuard::generateToken('one_on_one') . "\n";
-        $html .= '<div class="ibl-filter-form__row">' . "\n";
+        $html .= '<div class="flex flex-wrap items-center justify-center gap-4">' . "\n";
 
-        $html .= '<div class="ibl-filter-form__group">' . "\n";
-        $html .= '<label class="ibl-filter-form__label" for="pid1">Player One</label>' . "\n";
-        $html .= '<select name="pid1" id="pid1" class="ibl-select">' . "\n";
+        $html .= '<div class="flex items-center gap-2">' . "\n";
+        $html .= '<label class="d-label" for="pid1">Player One</label>' . "\n";
+        $html .= '<select name="pid1" id="pid1" class="d-select w-auto">' . "\n";
 
         foreach ($players as $player) {
             $pid = $player['pid'];
@@ -50,9 +50,9 @@ class OneOnOneGameView implements OneOnOneGameViewInterface
         $html .= '</select>' . "\n";
         $html .= '</div>' . "\n";
 
-        $html .= '<div class="ibl-filter-form__group">' . "\n";
-        $html .= '<label class="ibl-filter-form__label" for="pid2">Player Two</label>' . "\n";
-        $html .= '<select name="pid2" id="pid2" class="ibl-select">' . "\n";
+        $html .= '<div class="flex items-center gap-2">' . "\n";
+        $html .= '<label class="d-label" for="pid2">Player Two</label>' . "\n";
+        $html .= '<select name="pid2" id="pid2" class="d-select w-auto">' . "\n";
 
         foreach ($players as $player) {
             $pid = $player['pid'];
@@ -64,7 +64,7 @@ class OneOnOneGameView implements OneOnOneGameViewInterface
         $html .= '</select>' . "\n";
         $html .= '</div>' . "\n";
 
-        $html .= '<button type="submit" class="ibl-filter-form__submit">Begin One-on-One Match</button>' . "\n";
+        $html .= '<button type="submit" class="d-btn d-btn-primary">Begin One-on-One Match</button>' . "\n";
 
         $html .= '</div>' . "\n";
         $html .= '</form>' . "\n";
@@ -77,13 +77,13 @@ class OneOnOneGameView implements OneOnOneGameViewInterface
      */
     public function renderGameLookupForm(): string
     {
-        return '<form name="LookUpOldGame" method="post" action="modules.php?name=OneOnOneGame" class="ibl-filter-form">' . "\n"
-            . '<div class="ibl-filter-form__row">' . "\n"
-            . '<div class="ibl-filter-form__group">' . "\n"
-            . '<label class="ibl-filter-form__label" for="gameid">Review Old Game (Game ID)</label>' . "\n"
-            . '<input type="text" name="gameid" id="gameid" class="ibl-input ibl-input--sm">' . "\n"
+        return '<form name="LookUpOldGame" method="post" action="modules.php?name=OneOnOneGame" class="d-card d-card-border bg-base-200 p-4 mb-6">' . "\n"
+            . '<div class="flex flex-wrap items-center justify-center gap-4">' . "\n"
+            . '<div class="flex items-center gap-2">' . "\n"
+            . '<label class="d-label" for="gameid">Review Old Game (Game ID)</label>' . "\n"
+            . '<input type="text" name="gameid" id="gameid" class="d-input w-40">' . "\n"
             . '</div>' . "\n"
-            . '<button type="submit" class="ibl-filter-form__submit">Review Old Game</button>' . "\n"
+            . '<button type="submit" class="d-btn d-btn-primary">Review Old Game</button>' . "\n"
             . '</div>' . "\n"
             . '</form>' . "\n";
     }

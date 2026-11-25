@@ -72,7 +72,7 @@ test.describe('Leaderboards flow', () => {
     await page.locator('select[name="sortby"]').selectOption('REB');
     await Promise.all([
       page.waitForResponse((r) => r.url().includes('tab=season') && r.request().method() === 'GET'),
-      page.locator('.ibl-filter-form__submit').click(),
+      page.locator('form[name="Leaderboards"]').getByRole('button', { name: 'Search', exact: true }).click(),
     ]);
 
     await expect(page).toHaveURL(/tab=season/);
@@ -85,7 +85,7 @@ test.describe('Leaderboards flow', () => {
 
     await Promise.all([
       page.waitForResponse((r) => r.url().includes('tab=career') && r.request().method() === 'GET'),
-      page.locator('.ibl-filter-form__submit').click(),
+      page.locator('form[name="CareerLeaderboards"]').getByRole('button', { name: 'Search', exact: true }).click(),
     ]);
 
     await expect(page).toHaveURL(/tab=career/);
@@ -113,7 +113,7 @@ test.describe('Leaderboards flow', () => {
     await page.locator('select[name="sortby"]').selectOption('REB');
     await Promise.all([
       page.waitForResponse((r) => r.url().includes('tab=season') && r.request().method() === 'GET'),
-      page.locator('.ibl-filter-form__submit').click(),
+      page.locator('form[name="Leaderboards"]').getByRole('button', { name: 'Search', exact: true }).click(),
     ]);
     await expect(page).toHaveURL(/sortby=REB/);
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
@@ -121,7 +121,7 @@ test.describe('Leaderboards flow', () => {
     await page.locator('select[name="sortby"]').selectOption('AST');
     await Promise.all([
       page.waitForResponse((r) => r.url().includes('tab=season') && r.request().method() === 'GET'),
-      page.locator('.ibl-filter-form__submit').click(),
+      page.locator('form[name="Leaderboards"]').getByRole('button', { name: 'Search', exact: true }).click(),
     ]);
     await expect(page).toHaveURL(/sortby=AST/);
 

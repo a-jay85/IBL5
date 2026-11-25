@@ -11,7 +11,7 @@ test.describe('Award History flow', () => {
   });
 
   test('page loads with filter form and inputs', async ({ page }) => {
-    const form = page.locator('.ibl-filter-form');
+    const form = page.locator('form[action*="AwardHistory"]');
     await expect(form).toBeVisible();
 
     await expect(page.locator('#aw_name')).toBeVisible();
@@ -33,7 +33,7 @@ test.describe('Award History flow', () => {
 
   test('submitting empty form returns results table', async ({ page }) => {
     // Submit the form
-    await page.locator('.ibl-filter-form').locator('button[type="submit"]').first().click();
+    await page.locator('form[action*="AwardHistory"]').getByRole('button', { name: 'Search', exact: true }).click();
 
     const table = page.locator('.ibl-data-table.sortable');
     await expect(table.first()).toBeVisible();
@@ -43,7 +43,7 @@ test.describe('Award History flow', () => {
 
   test('searching by partial name returns results', async ({ page }) => {
     await page.locator('#aw_name').fill('a');
-    await page.locator('.ibl-filter-form').locator('button[type="submit"]').first().click();
+    await page.locator('form[action*="AwardHistory"]').getByRole('button', { name: 'Search', exact: true }).click();
 
     const table = page.locator('.ibl-data-table');
     await expect(table.first()).toBeVisible();
@@ -53,7 +53,7 @@ test.describe('Award History flow', () => {
 
   test('searching by award name returns matching rows', async ({ page }) => {
     await page.locator('#aw_Award').fill('MVP');
-    await page.locator('.ibl-filter-form').locator('button[type="submit"]').first().click();
+    await page.locator('form[action*="AwardHistory"]').getByRole('button', { name: 'Search', exact: true }).click();
 
     const table = page.locator('.ibl-data-table');
     await expect(table.first()).toBeVisible();
@@ -69,13 +69,13 @@ test.describe('Award History flow', () => {
     page,
   }) => {
     await page.locator('#aw_name').fill('zzzznonexistent999');
-    await page.locator('.ibl-filter-form').locator('button[type="submit"]').first().click();
+    await page.locator('form[action*="AwardHistory"]').getByRole('button', { name: 'Search', exact: true }).click();
 
     await assertNoPhpErrors(page);
   });
 
   test('result rows contain player links', async ({ page }) => {
-    await page.locator('.ibl-filter-form').locator('button[type="submit"]').first().click();
+    await page.locator('form[action*="AwardHistory"]').getByRole('button', { name: 'Search', exact: true }).click();
 
     const table = page.locator('.ibl-data-table');
     await expect(table.first()).toBeVisible();
@@ -85,7 +85,7 @@ test.describe('Award History flow', () => {
   });
 
   test('table has expected headers', async ({ page }) => {
-    await page.locator('.ibl-filter-form').locator('button[type="submit"]').first().click();
+    await page.locator('form[action*="AwardHistory"]').getByRole('button', { name: 'Search', exact: true }).click();
 
     const table = page.locator('.ibl-data-table');
     await expect(table.first()).toBeVisible();
@@ -100,7 +100,7 @@ test.describe('Award History flow', () => {
   });
 
   test('name sort orders awards differently than year sort', async ({ page }) => {
-    const submitBtn = page.locator('.ibl-filter-form__submit');
+    const submitBtn = page.locator('form[action*="AwardHistory"]').getByRole('button', { name: 'Search', exact: true });
 
     // --- Sort by name (value "1") ---
     await page.locator('#aw_Award').fill('E2E Sort Award');
@@ -140,7 +140,7 @@ test.describe('Award History flow', () => {
     await assertNoPhpErrors(page, 'on Award History form page');
 
     // Check results page
-    await page.locator('.ibl-filter-form').locator('button[type="submit"]').first().click();
+    await page.locator('form[action*="AwardHistory"]').getByRole('button', { name: 'Search', exact: true }).click();
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
     await assertNoPhpErrors(page, 'on Award History results page');
   });

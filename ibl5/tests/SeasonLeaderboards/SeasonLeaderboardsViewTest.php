@@ -144,7 +144,11 @@ final class SeasonLeaderboardsViewTest extends TestCase
         $this->assertStringContainsString('>Results Limit:</label>', $html);
         $this->assertStringNotContainsString('Records', $html);
         $this->assertStringNotContainsString('Search Season Data', $html);
-        $this->assertStringContainsString('ibl-filter-form--stacked', $html);
-        $this->assertStringContainsString('ibl-filter-form__actions', $html);
+        $this->assertStringContainsString('class="d-card d-card-border bg-base-200 p-4 mb-6 mx-4">', $html);
+        $this->assertStringContainsString('<div class="flex w-full items-center justify-between gap-2 md:w-auto md:justify-start">', $html);
+        $this->assertStringContainsString('<div class="flex justify-center mt-4">', $html);
+        $this->assertStringContainsString('<select id="sl-team" name="team" class="d-select w-auto">', $html);
+        $this->assertStringContainsString('<button type="submit" class="d-btn d-btn-primary">Search</button>', $html);
+        $this->assertDoesNotMatchRegularExpression('/ibl-filter-(form|fieldset)/', $html);
     }
 }

@@ -45,30 +45,30 @@ class AwardHistoryView implements AwardHistoryViewInterface
         /** @var array<int, string> $sortOptions */
         $sortOptions = $this->service->getSortOptions();
 
-        $output = '<form method="post" action="modules.php?name=AwardHistory" class="ibl-filter-form">';
+        $output = '<form method="post" action="modules.php?name=AwardHistory" class="d-card d-card-border bg-base-200 p-4 mb-6">';
 
         // Input row
-        $output .= '<div class="ibl-filter-form__row">';
-        $output .= '<div class="ibl-filter-form__group">';
-        $output .= '<label class="ibl-filter-form__label" for="aw_name">Name</label>';
-        $output .= '<input type="text" name="aw_name" id="aw_name" value="' . $name . '" placeholder="Player name...">';
+        $output .= '<div class="flex flex-wrap items-center justify-center gap-4">';
+        $output .= '<div class="flex items-center gap-2">';
+        $output .= '<label class="d-label" for="aw_name">Name</label>';
+        $output .= '<input type="text" name="aw_name" id="aw_name" value="' . $name . '" placeholder="Player name..." class="d-input w-40">';
         $output .= '</div>';
 
-        $output .= '<div class="ibl-filter-form__group">';
-        $output .= '<label class="ibl-filter-form__label" for="aw_Award">Award</label>';
-        $output .= '<input type="text" name="aw_Award" id="aw_Award" value="' . $award . '" placeholder="Award name...">';
+        $output .= '<div class="flex items-center gap-2">';
+        $output .= '<label class="d-label" for="aw_Award">Award</label>';
+        $output .= '<input type="text" name="aw_Award" id="aw_Award" value="' . $award . '" placeholder="Award name..." class="d-input w-40">';
         $output .= '</div>';
 
-        $output .= '<div class="ibl-filter-form__group">';
-        $output .= '<label class="ibl-filter-form__label" for="aw_year">Year</label>';
-        $output .= '<input type="text" name="aw_year" id="aw_year" value="' . $year . '" placeholder="Year" class="w-20">';
+        $output .= '<div class="flex items-center gap-2">';
+        $output .= '<label class="d-label" for="aw_year">Year</label>';
+        $output .= '<input type="text" name="aw_year" id="aw_year" value="' . $year . '" placeholder="Year" class="d-input w-20">';
         $output .= '</div>';
         $output .= '</div>';
 
         // Sort row
-        $output .= '<div class="ibl-filter-form__row mt-3">';
-        $output .= '<div class="ibl-filter-form__group">';
-        $output .= '<span class="ibl-filter-form__label">Sort by</span>';
+        $output .= '<div class="flex flex-wrap items-center justify-center gap-4 mt-3">';
+        $output .= '<div class="flex items-center gap-2">';
+        $output .= '<span class="d-label">Sort by</span>';
         foreach ($sortOptions as $value => $label) {
             $checked = ($sortby === $value) ? ' checked' : '';
             $id = 'sort-' . $value;
@@ -80,7 +80,7 @@ class AwardHistoryView implements AwardHistoryViewInterface
         }
         $output .= '</div>';
 
-        $output .= '<button type="submit" class="ibl-filter-form__submit">Search</button>';
+        $output .= '<button type="submit" class="d-btn d-btn-primary">Search</button>';
         $output .= '</div>';
 
         $output .= '</form>';

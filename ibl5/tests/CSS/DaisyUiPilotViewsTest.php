@@ -14,7 +14,7 @@ use PHPUnit\Framework\TestCase;
 class DaisyUiPilotViewsTest extends TestCase
 {
     /**
-     * Mutation: revert one `d-btn d-btn-primary` to `ibl-filter-form__submit`.
+     * Mutation: revert one `d-btn d-btn-primary` to `ibl-btn ibl-btn--primary`.
      */
     #[DataProvider('pilotViewProvider')]
     public function testPilotViewUsesNoLegacyIblComponentClass(string $filePath): void
@@ -58,6 +58,49 @@ class DaisyUiPilotViewsTest extends TestCase
             'RegistrationView' => [$classes . '/YourAccount/RegistrationView.php'],
             'PasswordResetView' => [$classes . '/YourAccount/PasswordResetView.php'],
             'ActivationView' => [$classes . '/YourAccount/ActivationView.php'],
+            'AwardHistoryView' => [$classes . '/AwardHistory/AwardHistoryView.php'],
+            'CareerLeaderboardsView' => [$classes . '/CareerLeaderboards/CareerLeaderboardsView.php'],
+            'SeasonLeaderboardsView' => [$classes . '/SeasonLeaderboards/SeasonLeaderboardsView.php'],
+            'ComparePlayersView' => [$classes . '/ComparePlayers/ComparePlayersView.php'],
+        ];
+    }
+
+    /**
+     * Views whose form controls are converted but whose ibl-card / ibl-alert
+     * result markup belongs to a later batch. Move an entry into
+     * pilotViewProvider() when that batch converts the cards.
+     *
+     * Mutation: revert the gameid input to `ibl-input ibl-input--sm`.
+     */
+    #[DataProvider('filterFormOnlyViewProvider')]
+    public function testFilterFormOnlyViewUsesNoLegacyFormClass(string $filePath): void
+    {
+        $content = self::read($filePath);
+
+        preg_match_all('/\bibl-(btn|label|input|select|filter-form|filter-fieldset)\b/', $content, $matches);
+
+        $this->assertSame([], $matches[0], basename($filePath) . ' still uses legacy ibl-* form-control classes');
+    }
+
+    /**
+     * Mutation: strip `d-btn` from both OneOnOneGame submit buttons.
+     */
+    #[DataProvider('filterFormOnlyViewProvider')]
+    public function testFilterFormOnlyViewUsesDaisyUiFormClasses(string $filePath): void
+    {
+        $content = self::read($filePath);
+
+        $this->assertMatchesRegularExpression('/\bd-btn\b/', $content);
+        $this->assertMatchesRegularExpression('/\bd-(select|input)\b/', $content);
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function filterFormOnlyViewProvider(): array
+    {
+        return [
+            'OneOnOneGameView' => [dirname(__DIR__, 2) . '/classes/OneOnOneGame/OneOnOneGameView.php'],
         ];
     }
 

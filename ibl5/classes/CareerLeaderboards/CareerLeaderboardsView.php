@@ -69,20 +69,20 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
 
         ob_start();
         ?>
-<form name="CareerLeaderboards" method="get" action="modules.php" class="ibl-filter-form ibl-filter-form--stacked">
+<form name="CareerLeaderboards" method="get" action="modules.php" class="d-card d-card-border bg-base-200 p-4 mb-6 mx-4">
     <input type="hidden" name="name" value="Leaderboards">
     <input type="hidden" name="tab" value="career">
-    <div class="ibl-filter-form__row">
-        <div class="ibl-filter-form__group">
-            <label for="cl-phase" class="ibl-filter-form__label">Phase:</label>
-            <select id="cl-phase" name="phase">
+    <div class="flex flex-col items-stretch gap-3 md:flex-row md:flex-wrap md:items-center md:justify-center md:gap-4">
+        <div class="flex w-full items-center justify-between gap-2 md:w-auto md:justify-start">
+            <label for="cl-phase" class="d-label">Phase:</label>
+            <select id="cl-phase" name="phase" class="d-select w-auto">
                 <?php foreach ($phases as $key => $label): ?>
                     <option value="<?= HtmlSanitizer::e($key) ?>" data-has-averages="<?= $this->service->phaseHasAverages($key) ? '1' : '0' ?>" data-shows-games="<?= $this->service->phaseShowsGames($key) ? '1' : '0' ?>"<?= ($phase === $key) ? ' selected' : '' ?>><?= HtmlSanitizer::e($label) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
-        <div class="ibl-filter-form__group">
-            <span class="ibl-filter-form__label" aria-hidden="true">Stats:</span>
+        <div class="flex w-full items-center justify-between gap-2 md:w-auto md:justify-start">
+            <span class="d-label" aria-hidden="true">Stats:</span>
             <fieldset class="ibl-segmented">
                 <legend class="ibl-segmented__legend">Stats</legend>
                 <label class="ibl-segmented__option">
@@ -95,29 +95,29 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
                 </label>
             </fieldset>
         </div>
-        <div class="ibl-filter-form__group">
-            <label for="cl-sortby" class="ibl-filter-form__label">Sort By:</label>
-            <select id="cl-sortby" name="sortby">
+        <div class="flex w-full items-center justify-between gap-2 md:w-auto md:justify-start">
+            <label for="cl-sortby" class="d-label">Sort By:</label>
+            <select id="cl-sortby" name="sortby" class="d-select w-auto">
                 <?php foreach ($sortOptions as $key => $label): ?>
                     <option value="<?= HtmlSanitizer::e($key) ?>"<?= ($sortKey === $key) ? ' selected' : '' ?><?= ($key === 'GAMES' && !$showsGames) ? ' disabled' : '' ?>><?= HtmlSanitizer::e($label) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
-        <div class="ibl-filter-form__group">
-            <label for="cl-retirees" class="ibl-filter-form__label">Retired?</label>
+        <div class="flex w-full items-center justify-between gap-2 md:w-auto md:justify-start">
+            <label for="cl-retirees" class="d-label">Retired?</label>
             <span class="ibl-switch">
                 <input type="checkbox" role="switch" name="retirees" value="1" id="cl-retirees" class="ibl-switch__input"<?= $retirees ? ' checked' : '' ?>>
                 <span class="ibl-switch__track" aria-hidden="true"></span>
             </span>
         </div>
-        <div class="ibl-filter-form__group">
-            <label for="cl-limit" class="ibl-filter-form__label">Results Limit:</label>
-            <input id="cl-limit" type="number" name="display" value="<?= HtmlSanitizer::e($display) ?>" min="1" placeholder="50">
+        <div class="flex w-full items-center justify-between gap-2 md:w-auto md:justify-start">
+            <label for="cl-limit" class="d-label">Results Limit:</label>
+            <input id="cl-limit" type="number" name="display" class="d-input w-20" value="<?= HtmlSanitizer::e($display) ?>" min="1" placeholder="50">
         </div>
     </div>
     <input type="hidden" name="submitted" value="1">
-    <div class="ibl-filter-form__actions">
-        <button type="submit" class="ibl-filter-form__submit">Search</button>
+    <div class="flex justify-center mt-4">
+        <button type="submit" class="d-btn d-btn-primary">Search</button>
     </div>
 </form>
 <script src="jslib/career-leaderboards-form.js" defer></script>

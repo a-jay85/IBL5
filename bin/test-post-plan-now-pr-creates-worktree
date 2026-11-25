@@ -488,7 +488,7 @@ else
     rm -f "$P7B_LOG" "${P7B_LOG%.log}.session" "$P7B_SCRIPT"
     P7B_DMS=$(wc -l < "$FAILDM_LOG" 2>/dev/null | tr -d ' ')
     [ "${P7B_DMS:-0}" = 1 ] || fail "harness crash: FAIL-DM count is ${P7B_DMS:-0}, expected 1"
-    P7B_CAFF=$(wc -l < "$CAFF_LOG" 2>/dev/null | tr -d ' ')
+    P7B_CAFF=$(wc -l < "$CAFF_LOG" 2>/dev/null | tr -d ' ') || P7B_CAFF=''
     [ "${P7B_CAFF:-0}" = 1 ] || fail "harness crash: caffeinate ran ${P7B_CAFF:-0} times, expected 1 (no skill session)"
     grep -qF -- "$H7B/run" "$CAFF_LOG" 2>/dev/null \
         || fail "harness crash: the one caffeinate line does not name $H7B/run (got: $(cat "$CAFF_LOG" 2>/dev/null))"

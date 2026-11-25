@@ -16,6 +16,11 @@ mkdir -p "$TMP/runlog"
 printf '#!/usr/bin/env bash\nexit 0\n' > "$TMP/prefire-pass"; chmod +x "$TMP/prefire-pass"
 export PREFIRE_VERIFY_SCRIPT="$TMP/prefire-pass"
 export POSTPLAN_LOG_DIR="$TMP/runlog" PLAN_NOW_LOG_DIR="$TMP/runlog"
+# Stub harness: post-plan-now refuses up front without an executable $HARNESS/run, and
+# the real main-checkout path does not exist in CI. launchctl is stubbed, so it never runs.
+mkdir -p "$TMP/harness"
+printf '#!/bin/sh\nexit 0\n' > "$TMP/harness/run"; chmod +x "$TMP/harness/run"
+export HARNESS="$TMP/harness"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 ORIGIN="$TMP/origin.git"
 MAIN="$TMP/IBL5"

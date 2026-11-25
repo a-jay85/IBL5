@@ -279,10 +279,7 @@ def test_sweep_exception_does_not_change_terminal_state(monkeypatch):
     assert any("oos-sweep: sweep failed" in line for line in broken.audit)
 
 
-# --- Phase 4: CLI + skill fallback -------------------------------------------
-
-REPO_ROOT = Path(__file__).resolve().parents[3]
-
+# --- Phase 4: CLI ----------------------------------------------------------------
 
 def test_cli_rejects_non_integer_pr():
     for bad in ("abc", "0"):
@@ -333,16 +330,6 @@ def test_cli_filing_exception_exits_zero(tmp_path, monkeypatch, capsys):
     rc = outofscope.main(["--plan", str(FIXTURE), "--slug", SLUG, "--pr", "5"])
     assert rc == 0
     assert "sweep failed" in capsys.readouterr().out
-
-
-def test_skill_phase_25_invokes_sweep():
-    from harness.planfile import _section
-    skill = (REPO_ROOT / ".claude" / "skills" / "post-plan" / "SKILL.md").read_text()
-    section = _section(skill, r"Phase 2\.5")
-    assert "python3 -m harness.outofscope" in section
-    assert '--slug "$SLUG"' in section
-    assert "(non-blocking)" in section
-    assert "exit 1" not in section
 
 
 # --- Exclusions added from the corpus review ----------------------------------

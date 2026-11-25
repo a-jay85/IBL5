@@ -8,9 +8,11 @@
 # a `test -x ... || exit 0` guard, so each run exits 0 and launchd logs no failure.
 #
 # Usage:
-#   bin/jsb-parity-watch-setup                    install (or replace) and load the LaunchAgent
-#   bin/jsb-parity-watch-setup --print-schedule   print the plist to stdout; no side effect
-#   bin/jsb-parity-watch-setup --uninstall        unload and remove the LaunchAgent
+#   bin/jsb-parity-watch-setup                       install (or replace) and load the LaunchAgent
+#   bin/jsb-parity-watch-setup --print-schedule      print the plist to stdout; no side effect
+#   bin/jsb-parity-watch-setup --uninstall           unload and remove the LaunchAgent
+#   bin/jsb-parity-watch-setup --print-fixer-prompt  print the blocker fixer task prompt; no side effect
+#   bin/jsb-parity-watch-setup --save-fixer-webhook  read the fixer webhook URL on stdin; save it, mode 600
 #
 # Environment: HOME (required). MAIN_WT overrides the main checkout (tests only).
 [ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
@@ -31,6 +33,8 @@ while [ $# -gt 0 ]; do
     case "$SEEN:$1" in
         0:--print-schedule) ACTION="print" ;;
         0:--uninstall) ACTION="uninstall" ;;
+        0:--print-fixer-prompt) ACTION="fixer-prompt" ;;
+        0:--save-fixer-webhook) ACTION="save-webhook" ;;
         0:-h|0:--help) usage; exit 0 ;;
         *) echo "jsb-parity-watch-setup: unknown argument: $1" >&2; usage >&2; exit 2 ;;
     esac
@@ -63,9 +67,74 @@ plist_body() {
     lsched_key_string StandardErrorPath "${LOG_DIR}/jsb-parity-watch.log"
 }
 
+# The task prompt for the scheduled fixer session. The watcher wakes that session
+# through its webhook. The loosening rules live in bin/check-parity-rule-guard.
+fixer_prompt() {
+    cat <<'FIXER_PROMPT_EOF'
+You are the JSB parity blocker fixer. A blocker has stopped part of the parity
+loop. You fire one fix plan for one blocker, then end.
+
+Setup:
+- Work from a fresh worktree of origin/master. Run `git fetch origin master` first.
+- Set JSBN to the jsb-native folder in the main checkout:
+  JSBN="$(git worktree list --porcelain | sed -n '1s/^worktree //p')/jsb-native"
+- Run every `fix` command as
+  python3 "$JSBN/tools/parity_loop/parity_loop.py" fix <action> --ibl5 "$(git rev-parse --show-toplevel)"
+
+Steps:
+1. Read ~/.cache/jsb-parity-fixer-queue.txt. Each line holds a blocker key, a tab
+   and its context. Run `parity_loop.py fix status`. Pick the oldest queued key
+   that is in neither `open` nor `owner`. The second column of
+   ~/.cache/jsb-parity-fixer-wakes.txt is the time each key was first queued.
+   When no key qualifies, end.
+2. Run `parity_loop.py fix claim --key <key>`. Unless it prints
+   "status": "claimed", end. The loop already DMed the owner for caps.
+   The printed slug is <slug> below.
+3. Diagnose from the blocker's `fix` text, the tail of the related plan-now log
+   (/tmp/plan-now-<TS>.log) and any planner report. When a planner report names a
+   recommended option, take it.
+4. Write the brief to /tmp/<slug>.prompt with these parts, in this order:
+   - a first line that starts with `/plan` and names the fix
+   - Branch slug: `<slug>`
+   - the output of `bin/check-parity-rule-guard --print-rule-block`, unchanged
+   - your diagnosis
+   - a line asking for plan-architect (Opus)
+5. Run `bin/check-parity-rule-guard --brief /tmp/<slug>.prompt`. On a non-zero
+   exit, run `parity_loop.py fix fail --key <key> --reason brief-refused` and end.
+6. Run `bin/plan-now --queue /tmp/<slug>.prompt`. When it exits non-zero, run
+   `parity_loop.py fix fail --key <key> --reason plan-now-exit-<code>` and end.
+7. Fire one fix per wake, then end.
+
+Never arm, approve or run `bin/owner-approve`.
+Never edit jsb-native/cleanroom/ or the ibl-engine repo.
+Never control UTM.
+FIXER_PROMPT_EOF
+}
+
+# Reads one URL on stdin. The URL is a secret, so it is never printed.
+save_fixer_webhook() {
+    local url="" dir="$HOME/.config/jsb-parity"
+    IFS= read -r url || true
+    if ! [[ "$url" =~ ^https://[^[:space:]]+$ ]]; then
+        echo "jsb-parity-watch-setup: --save-fixer-webhook needs one https:// URL on stdin" >&2
+        exit 2
+    fi
+    umask 077
+    mkdir -p "$dir"
+    printf '%s\n' "$url" > "$dir/fixer-webhook-url"
+    chmod 600 "$dir/fixer-webhook-url"
+    echo "saved fixer webhook (mode 600)"
+}
+
 case "$ACTION" in
     print)
         lsched_plist plist_body
+        ;;
+    fixer-prompt)
+        fixer_prompt
+        ;;
+    save-webhook)
+        save_fixer_webhook
         ;;
     install)
         if [ -z "${HOME:-}" ]; then

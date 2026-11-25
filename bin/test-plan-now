@@ -2486,6 +2486,26 @@ kick_reset
 kick_run jsb-port-pl-0027-rx
 kick_ran && fail "K1 malformed retry suffix: kicked" || ok "K1 malformed retry suffix: never kicked"
 
+# F1 a parity fixer plan named like its branch slug queues and kicks once.
+KICK_FIX_PROMPT="$KT/fix-prompt.md"
+{
+    printf '/plan Fix a parity blocker for the kick test\n'
+    printf -- '- Branch slug: `jsb-fix-capture-invalid-pl-0009-t1`. Base: `master`.\n'
+} > "$KICK_FIX_PROMPT"
+kick_reset
+PROMPT="$KICK_FIX_PROMPT" kick_run jsb-fix-capture-invalid-pl-0009-t1
+want    "F1 fix plan: the queue stub saw the plan" "$KOUT" "automouse-queue (stub): queued $PLANS/jsb-fix-capture-invalid-pl-0009-t1.md"
+want    "F1 fix plan: DM names the kicked run"     "$(dm)" "queued for automouse; kicked run plan jsb-fix-capture-invalid-pl-0009-t1"
+[ "$(kick_args)" = "jsb-fix-capture-invalid-pl-0009-t1" ] && ok "F1 fix plan: exactly one kick for the slug" \
+    || fail "F1 fix plan: exactly one kick for the slug (got: $(kick_args))"
+# F2 a fixer plan renamed away from its branch slug would skip the CI rule guard.
+kick_reset
+PROMPT="$KICK_FIX_PROMPT" kick_run renamed-fix-plan
+want    "F2 renamed fix plan: log says why"  "$KOUT" "plan-now: fixer plan name differs from its branch slug; NOT queued."
+want_no "F2 renamed fix plan: never queued"  "$KOUT" "automouse-queue (stub): queued"
+want    "F2 renamed fix plan: DM asks you"   "$(dm)" "NOT queued, needs you"
+kick_ran && fail "F2 renamed fix plan: the kick stub ran" || ok "F2 renamed fix plan: the kick stub never ran"
+
 # K2 a non-port plan queues and never kicks.
 kick_reset
 kick_run demo-slug

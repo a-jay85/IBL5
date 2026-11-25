@@ -578,11 +578,11 @@ REVIEW_ROUTE_DEFAULT=$(grep -oE "'/discordPlanReviewDM'" \
     declare -f ljob_dm_ready ljob_dm_send
     cat <<'RUNNER_EOF'
 # --- automouse kick for JSB parity port plans --------------------------------
-# A queued jsb-port-pl-<digits>[-<n>|-r<n>] plan starts `bin/automouse/run plan <slug>`
+# A queued jsb-port-pl-<digits>[-<n>|-r<n>] or jsb-fix-<slug> plan starts `bin/automouse/run plan <slug>`
 # right away, detached under its own launchd label, instead of waiting for the
 # nightly run. Every skip leaves the plan queued, so the nightly run still takes it.
 # Returns 0 on launch or skip; nonzero only when the launch itself failed.
-KICK_PORT_RE='^jsb-port-pl-[0-9]+(-r?[0-9]+)?$'  # -r<n>: the parity loop's retry ports
+KICK_PORT_RE='^(jsb-port-pl-[0-9]+(-r?[0-9]+)?|jsb-fix-[a-z0-9-]+)$'  # -r<n>: retry ports; jsb-fix-*: parity fixer
 KICK_RUNNER_RE='bin/automouse/run( |$)'
 KICK_LAUNCHED=""
 plan_now_kick_port() {
@@ -972,6 +972,12 @@ elif [ -n "$plan" ]; then
             if ! "$CHECK_PLAN_STALENESS" "$plan"; then
                 echo "plan-now: WARNING — check-plan passed but check-plan-staleness FAILED; the plan cites a path that does not exist on master. On disk, NOT queued."
                 DM_ICON="⚠️"; DM_VERDICT="ok — check-plan PASSED, but check-plan-staleness FAILED"
+                DM_NEXT="NOT queued, needs you"
+            # bin/check-parity-rule-guard runs only on jsb-fix-* branches, and the
+            # branch takes the plan's name. A renamed fix plan would skip it.
+            elif [[ "$(run_slug)" == jsb-fix-* && "$(basename "${plan%.md}")" != "$(run_slug)" ]]; then
+                echo "plan-now: fixer plan name differs from its branch slug; NOT queued."
+                DM_ICON="⚠️"; DM_VERDICT="ok — check-plan PASSED, but the fixer plan was renamed"
                 DM_NEXT="NOT queued, needs you"
             elif "$AUTOMOUSE_QUEUE" "$plan"; then
                 echo "plan-now: queued for automouse — it will implement this plan and open its PR."

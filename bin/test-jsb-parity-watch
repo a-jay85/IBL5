@@ -908,6 +908,67 @@ case_missing_blockers_json_as_today() {
     done
 }
 
+case_setup_save_fixer_webhook_mode_600() {
+    local file mode
+    sandbox setup_save_hook
+    file="$S/home/.config/jsb-parity/fixer-webhook-url"
+    printf 'https://t3.example/hook/FIXER-SECRET\n' > "$S/url.in"
+    run_setup --save-fixer-webhook < "$S/url.in"
+    rc_is "save: exit 0" 0
+    h_eq "save: file holds the URL" "https://t3.example/hook/FIXER-SECRET" "$(slurp "$file")"
+    mode=$(stat -c %a "$file" 2>/dev/null || stat -f %Lp "$file" 2>/dev/null || echo unknown)
+    h_eq "save: mode 600" 600 "$mode"
+    h_contains "save: says it saved" "$(out)" "saved fixer webhook (mode 600)"
+    h_not_contains "save: stdout hides the URL" "$(out)" "FIXER-SECRET"
+    h_not_contains "save: stderr hides the URL" "$(slurp "$S/err")" "FIXER-SECRET"
+    h_eq "save: parity webhook-url untouched" "$SECRET" "$(slurp "$S/home/.config/jsb-parity/webhook-url")"
+}
+
+case_setup_save_fixer_webhook_rejects_non_https() {
+    local bad
+    sandbox setup_save_bad
+    for bad in 'http://t3.example/hook/FIXER-SECRET' 'https://t3.example/a b' ''; do
+        printf '%s\n' "$bad" > "$S/url.in"
+        run_setup --save-fixer-webhook < "$S/url.in"
+        rc_is "reject '$bad': exit 2" 2
+        h_absent "reject '$bad': no file" "$S/home/.config/jsb-parity/fixer-webhook-url"
+        h_not_contains "reject '$bad': stderr hides the input" "$(slurp "$S/err")" "FIXER-SECRET"
+    done
+}
+
+case_setup_rejects_unknown_flag() {
+    local a
+    sandbox setup_fixer_flag
+    for a in --save-fixer-webhooks --print-fixer-prompt=1; do
+        run_setup "$a"
+        rc_is "$a: exit 2" 2
+        h_contains "$a: usage names the fixer flag" "$(slurp "$S/err")" "--save-fixer-webhook "
+    done
+    h_absent "unknown flag: no webhook file" "$S/home/.config/jsb-parity/fixer-webhook-url"
+}
+
+case_setup_fixer_prompt_brief_passes_guard() {
+    local prompt rc=0
+    sandbox setup_fixer_prompt
+    run_setup --print-fixer-prompt
+    rc_is "prompt: exit 0" 0
+    prompt=$(out)
+    h_contains "prompt: claims before work" "$prompt" "fix claim"
+    h_contains "prompt: checks the brief" "$prompt" "--brief"
+    h_contains "prompt: records a failure" "$prompt" "fix fail"
+    h_absent "prompt: no plist written" "$S/home/Library/LaunchAgents/$PLIST_NAME"
+    # The brief prompt step 4 describes.
+    {
+        printf '/plan Fix the parity blocker %s\n' "$FIX_KEY"
+        printf -- '- Branch slug: `%s`\n' "$FIX_SLUG"
+        "$REPO/bin/check-parity-rule-guard" --print-rule-block
+        printf 'Diagnosis: the capture hook sits on the wrong address.\n'
+        printf 'Use plan-architect (Opus) for this plan.\n'
+    } > "$S/brief.prompt"
+    "$REPO/bin/check-parity-rule-guard" --brief "$S/brief.prompt" > "$S/guard.out" 2>&1 || rc=$?
+    h_eq "prompt: the described brief passes the guard" 0 "$rc"
+}
+
 case_secret_never_leaks() {
     sandbox secret_merged
     gh_pr jsb-port-pl-0001 7 MERGED no sha1 "$GREEN"

@@ -727,8 +727,12 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     golden = inp.classification.golden_changed or inp.classification.jsb_capture_changed
     lifted = golden and trace_pinned_lifts(inp)
     blocked = golden and inp.headless and not lifted
+    # Name what actually changed, so the plain-words hold line (hold_text) can say it.
+    what = " and ".join(name for name, hit in (
+        ("golden snapshot", inp.classification.golden_changed),
+        ("JSB capture", inp.classification.jsb_capture_changed)) if hit)
     c5 = ConditionResult(5, "golden-snapshot-headless", blocked,
-                         "golden snapshot or JSB capture changed in headless mode" if blocked else "")
+                         f"{what} changed in headless mode" if blocked else "")
     if lifted:
         c5.warning = "golden change cleared by trace-pinned evidence (harness.trace_pinned)"
     elif golden and not inp.headless:

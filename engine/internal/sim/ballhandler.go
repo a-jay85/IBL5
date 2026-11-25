@@ -40,6 +40,8 @@ func ballHandlerShare(rating, teamTotal int) float64 {
 // random over each starter's ball-handling share. The team total is summed per
 // rating type (OO/DO/PO) exactly as the decompile does, so each starter's share
 // uses the correct denominator for its slot.
+// Its one draw comes from FUN_005c6100 and reads r.Raw(), so a replay logs
+// api "raw", the form the JSB draw log matches.
 func selectBallHandler(t *teamState, r *rng.RNG) onCourt {
 	var totOO, totDO, totPO int
 	for _, p := range t.players {
@@ -80,7 +82,7 @@ func selectBallHandler(t *teamState, r *rng.RNG) onCourt {
 	if sum <= 0 || len(t.players) == 0 {
 		return t.players[0]
 	}
-	roll := r.Float64() * sum
+	roll := float64(r.Raw()) / float64(rng.RawMax+1) * sum
 	var acc float64
 	for i, s := range shares {
 		acc += s

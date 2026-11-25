@@ -63,3 +63,61 @@ func TestSelectBallHandler_FavorsHigherShare(t *testing.T) {
 		t.Errorf("dominant handler not favored: %v", counts)
 	}
 }
+
+// fiveEqualHandlers builds five identical SG-slot players so each share is
+// one fifth of the sum. PIDs 1..5 mark the pick order.
+func fiveEqualHandlers() *teamState {
+	tm := &teamState{}
+	for pid := 1; pid <= 5; pid++ {
+		tm.players = append(tm.players, oc(slotSG, bundle.Player{PID: pid, OO: 5, DriveOff: 5, PO: 5}))
+	}
+	return tm
+}
+
+// TestSelectBallHandlerDrawsThroughRaw pins the draw API and the draw-site
+// label the replay reports for the selector's one draw.
+func TestSelectBallHandlerDrawsThroughRaw(t *testing.T) {
+	r, err := rng.NewReplay([]int{rng.RawMax / 2})
+	if err != nil {
+		t.Fatalf("replay: %v", err)
+	}
+	selectBallHandler(fiveEqualHandlers(), r)
+	draws := r.Draws()
+	if len(draws) != 1 {
+		t.Fatalf("draws = %d, want 1", len(draws))
+	}
+	d := draws[0]
+	if d.API != "raw" {
+		t.Errorf("api = %q, want raw", d.API)
+	}
+	if d.Caller != "sim.selectBallHandler" {
+		t.Errorf("caller = %q, want sim.selectBallHandler", d.Caller)
+	}
+	if got := DrawSites[d.Caller]; got != "FUN_005c6100" {
+		t.Errorf("DrawSites[%q] = %q, want FUN_005c6100", d.Caller, got)
+	}
+}
+
+// TestSelectBallHandlerRawDrawBoundaries pins how a raw value maps to a pick.
+func TestSelectBallHandlerRawDrawBoundaries(t *testing.T) {
+	cases := []struct {
+		name    string
+		raw     int
+		wantPID int
+	}{
+		{"lower", 0, 1},
+		{"middle", rng.RawMax / 2, 3},
+		{"upper", rng.RawMax, 5},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			r, err := rng.NewReplay([]int{c.raw})
+			if err != nil {
+				t.Fatalf("replay: %v", err)
+			}
+			if got := selectBallHandler(fiveEqualHandlers(), r).PID; got != c.wantPID {
+				t.Errorf("raw %d picked PID %d, want %d", c.raw, got, c.wantPID)
+			}
+		})
+	}
+}

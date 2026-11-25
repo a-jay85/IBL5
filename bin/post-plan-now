@@ -803,9 +803,9 @@ if [ -n "$RESUME_SID" ] && usage_session_started "$SESSION_ID"; then
 fi
 
 if [ -n "$PLAN_OVERRIDE" ]; then
-    PROMPT="Invoke the /post-plan skill now on the current git branch. Use this exact plan file for Phase 1: $PLAN_OVERRIDE — do NOT derive the plan from the branch slug. Then execute every remaining phase of the shrunk skill (crash triage, backlog, E2E, preview, cleanup). You must not run gh pr merge or change auto-merge state; the harness owns arming. No human is present: never ask questions or wait for input — make the safe choice and continue."
+    PROMPT="Invoke the /post-plan skill now on the current git branch. Use this exact plan file for Phase 1: $PLAN_OVERRIDE — do NOT derive the plan from the branch slug. Then execute every remaining phase of the shrunk skill (crash triage, backlog, preview, cleanup; E2E defers to CI). You must not run gh pr merge or change auto-merge state; the harness owns arming. No human is present: never ask questions or wait for input — make the safe choice and continue."
 else
-    PROMPT="Invoke the /post-plan skill now on the current git branch. Resolve the plan from the branch slug per the skill Phase 1 (highest-numbered \`<slug>-N.md\` variant when several exist), then execute every remaining phase of the shrunk skill (crash triage, backlog, E2E, preview, cleanup). You must not run gh pr merge or change auto-merge state; the harness owns arming. No human is present: never ask questions or wait for input — make the safe choice and continue."
+    PROMPT="Invoke the /post-plan skill now on the current git branch. Resolve the plan from the branch slug per the skill Phase 1 (highest-numbered \`<slug>-N.md\` variant when several exist), then execute every remaining phase of the shrunk skill (crash triage, backlog, preview, cleanup; E2E defers to CI). You must not run gh pr merge or change auto-merge state; the harness owns arming. No human is present: never ask questions or wait for input — make the safe choice and continue."
 fi
 
 # Compiled-harness engine (see header). The launchd job runs the harness, captures its exit code,
@@ -1037,4 +1037,4 @@ echo "  log:    $LOG   (its RESULT: line is the verdict once the run ends)"
 echo "  script: $SCRIPT   (deleted by the run when it finishes)"
 echo "  label:  $LABEL   (self-removes when post-plan finishes)"
 echo "  PR / code review / CI / auto-merge progress appears on the PR."
-echo "  Leave this worktree alone — /post-plan rebuilds its Docker stack for E2E."
+echo "  Leave this worktree alone until the run ends."

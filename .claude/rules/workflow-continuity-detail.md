@@ -23,7 +23,7 @@ branch; it survives you closing Claude Code. Engine selection:
 - **No fallback session** (ADR-0284). A harness exit outside 0, 3, 7 and 76 posts the failure
   PR comment, sends the crash DM and exits with the harness rc. No `claude -p` session starts.
   A missing `$HARNESS/run` refuses with exit **1** before any lock or launchd job.
-  `POST_PLAN_SKILL` is gone.
+  The env switch that forced the skill path is gone.
 - **No partial resume.** The harness runs Phase 5.5's plan-intent review itself
   (`harness/fidelity.py`), posts the sticky `<!-- pr-ready-verdict -->` comment, and feeds the
   verdict to arming condition (12). It exits **0**, **1** or **3** only. It has no exit 4 and no Phase-5.5 re-entry.

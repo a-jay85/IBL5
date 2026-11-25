@@ -4,8 +4,13 @@
 <dict>
 	<key>Label</key>
 	<string>com.ibl5.bug-pipeline-cron</string>
-	<key>Program</key>
-	<string>@MAIN_WT@/bin/bug-pipeline-tick</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>-c</string>
+		<string>exec "$0" "$@"</string>
+		<string>@MAIN_WT@/bin/bug-pipeline-tick</string>
+	</array>
 	<!-- StartInterval (net-new to the repo): the correct launchd primitive for a
 	     3-min poll. Do NOT "fix" this to a calendar-interval key — that is calendar-only. -->
 	<key>StartInterval</key>
@@ -32,7 +37,7 @@
 		     this, bin/db-query exits 127 for every hunter and no data bug is ever
 		     reproduced — a silent throughput cliff, not a visible failure. -->
 		<key>PATH</key>
-		<string>/opt/homebrew/opt/mariadb/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:@HOME@/.local/bin</string>
+		<string>/opt/homebrew/bin:/opt/homebrew/opt/mariadb/bin:/usr/local/bin:/usr/bin:/bin:@HOME@/.local/bin</string>
 		<key>BUG_PIPELINE_ISSUE_REPO</key>
 		<string>a-jay85/IBL5</string>
 		<key>BUG_PIPELINE_APPROVER_ID</key>

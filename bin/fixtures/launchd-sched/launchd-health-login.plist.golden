@@ -6,6 +6,9 @@
 	<string>com.ibl5.launchd-health-login</string>
 	<key>ProgramArguments</key>
 	<array>
+		<string>/bin/bash</string>
+		<string>-c</string>
+		<string>exec "$0" "$@"</string>
 		<string>@MAIN_WT@/bin/launchd-health-check</string>
 		<string>--startup-delay</string>
 		<string>180</string>

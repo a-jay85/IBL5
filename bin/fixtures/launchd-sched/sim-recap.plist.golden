@@ -4,8 +4,13 @@
 <dict>
 	<key>Label</key>
 	<string>com.ibl5.sim-recap-poll</string>
-	<key>Program</key>
-	<string>@MAIN_WT@/bin/sim-recap-tick</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>-c</string>
+		<string>exec "$0" "$@"</string>
+		<string>@MAIN_WT@/bin/sim-recap-tick</string>
+	</array>
 	<!-- StartInterval: the correct launchd primitive for a repeating poll.
 	     300s is frozen by the decisions digest (D6) — do NOT change it here.
 	     Do NOT "fix" this to a calendar-interval key — that is calendar-only. -->

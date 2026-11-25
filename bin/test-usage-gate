@@ -1677,11 +1677,13 @@ test_setup_print_plist_shape() {
     assert_contains setup_shape:abandon "$(printf '%s\n' "$out" | grep -A1 'AbandonProcessGroup')" "<true/>"
     assert_contains setup_shape:path-usr-bin "$(printf '%s\n' "$out" | grep -A1 '<key>PATH</key>')" "/usr/bin:/bin"
     assert_contains setup_shape:path-local-bin "$(printf '%s\n' "$out" | grep -A1 '<key>PATH</key>')" "/.local/bin"
-    first=$(printf '%s\n' "$out" | grep -A2 'ProgramArguments' | tail -1 | sed -e 's/.*<string>//' -e 's/<\/string>.*//')
+    # Wrapped argv: /bin/bash, -c, the exec wrap literal, then the script (4th string).
+    first=$(printf '%s\n' "$out" | grep -A7 'ProgramArguments' | sed -n '6p' | sed -e 's/.*<string>//' -e 's/<\/string>.*//')
     case "$first" in
         /*/bin/usage-gate-coordinator) pass setup_shape:program-absolute ;;
         *) fail setup_shape:program-absolute "got [$first]" ;;
     esac
+    assert_contains setup_shape:wrapped-lead "$(printf '%s\n' "$out" | grep -A4 'ProgramArguments' | tr -d '\n\t')" '<array><string>/bin/bash</string><string>-c</string>'
 }
 
 test_setup_print_no_unexpanded() {

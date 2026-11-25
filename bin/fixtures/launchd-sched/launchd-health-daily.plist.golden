@@ -6,6 +6,9 @@
 	<string>com.ibl5.launchd-health-daily</string>
 	<key>ProgramArguments</key>
 	<array>
+		<string>/bin/bash</string>
+		<string>-c</string>
+		<string>exec "$0" "$@"</string>
 		<string>@MAIN_WT@/bin/launchd-health-check</string>
 	</array>
 	<key>WorkingDirectory</key>

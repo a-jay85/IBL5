@@ -6,6 +6,9 @@
 	<string>com.ibl5.automouse-comprehension-digest</string>
 	<key>ProgramArguments</key>
 	<array>
+		<string>/bin/bash</string>
+		<string>-c</string>
+		<string>exec "$0" "$@"</string>
 		<string>@MAIN_WT@/bin/automouse/comprehension-digest</string>
 		<string>--at-reset</string>
 	</array>
@@ -41,7 +44,7 @@
 		     generation time; launchd does NOT expand environment variable references, so any
 		     unexpanded reference would bake in a dead path for every invocation. -->
 		<key>PATH</key>
-		<string>@MAIN_WT@/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:@HOME@/.local/bin</string>
+		<string>/opt/homebrew/bin:@MAIN_WT@/bin:/usr/local/bin:/usr/bin:/bin:@HOME@/.local/bin</string>
 		<key>DISCORD_DM_TO</key>
 		<string>100000000000000001</string>
 	</dict>

@@ -166,20 +166,29 @@ else
     lht_ok "3: daily does not contain --startup-delay"
 fi
 
-# ── Case 4: first ProgramArguments string — no worktrees in either variant ────
-_login_prog="$(printf '%s\n' "$LOGIN_OUT" | _first_prog_str)"
-_daily_prog="$(printf '%s\n' "$DAILY_OUT" | _first_prog_str)"
-for _vl_prog in "login:$_login_prog" "daily:$_daily_prog"; do
-    _vl="${_vl_prog%%:*}"
-    _prog="${_vl_prog#*:}"
+# ── Case 4: wrapped ProgramArguments — no worktrees in either variant ────────
+# argv is /bin/bash, -c, the exec wrap literal, the script, then the variant's args.
+_wrap_lit='exec "$0" "$@"'
+for _vl_out in "login:$LOGIN_OUT" "daily:$DAILY_OUT"; do
+    _vl="${_vl_out%%:*}"
+    _argv="$(printf '%s\n' "${_vl_out#*:}" | python3 -I -c '
+import plistlib, sys
+print("\n".join(plistlib.loads(sys.stdin.buffer.read())["ProgramArguments"]))')"
+    _a0="$(sed -n 1p <<<"$_argv")"; _a1="$(sed -n 2p <<<"$_argv")"
+    _a2="$(sed -n 3p <<<"$_argv")"; _prog="$(sed -n 4p <<<"$_argv")"
+    _a4="$(sed -n 5p <<<"$_argv")"
+    lht_expect_eq "4: $_vl argv starts /bin/bash -c <wrap>" "/bin/bash|-c|$_wrap_lit" "$_a0|$_a1|$_a2"
     case "$_prog" in
-        */bin/launchd-health-check) lht_ok "4: $_vl first ProgramArguments ends with /bin/launchd-health-check" ;;
-        *) lht_fail "4: $_vl first ProgramArguments should end with /bin/launchd-health-check — got [$_prog]" ;;
+        */bin/launchd-health-check) lht_ok "4: $_vl wrapped script ends with /bin/launchd-health-check" ;;
+        *) lht_fail "4: $_vl wrapped script should end with /bin/launchd-health-check — got [$_prog]" ;;
     esac
     case "$_prog" in
-        *worktrees*) lht_fail "4: $_vl first ProgramArguments must not contain worktrees — got [$_prog]" ;;
-        *) lht_ok "4: $_vl first ProgramArguments does not contain worktrees" ;;
+        *worktrees*) lht_fail "4: $_vl wrapped script must not contain worktrees — got [$_prog]" ;;
+        *) lht_ok "4: $_vl wrapped script does not contain worktrees" ;;
     esac
+    if [ "$_vl" = login ]; then
+        lht_expect_eq "4: login wrapped script is followed by --startup-delay" "--startup-delay" "$_a4"
+    fi
 done
 
 # ── Case 5: PATH value — required dirs present, no literal \$HOME ─────────────

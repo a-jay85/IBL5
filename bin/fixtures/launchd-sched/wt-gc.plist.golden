@@ -6,6 +6,9 @@
 	<string>com.ibl5.wt-gc</string>
 	<key>ProgramArguments</key>
 	<array>
+		<string>/bin/bash</string>
+		<string>-c</string>
+		<string>exec "$0" "$@"</string>
 		<string>@MAIN_WT@/bin/wt-gc-tick</string>
 	</array>
 	<!-- Hourly poll; bin/wt-gc-tick's HID-idle gate (1800s) and 6h min-interval

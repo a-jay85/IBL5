@@ -4,8 +4,13 @@
 <dict>
 	<key>Label</key>
 	<string>com.ibl5.watch-pr-cycle</string>
-	<key>Program</key>
-	<string>@MAIN_WT@/bin/pr-cycle-tick</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>-c</string>
+		<string>exec "$0" "$@"</string>
+		<string>@MAIN_WT@/bin/pr-cycle-tick</string>
+	</array>
 	<!-- StartInterval: the correct launchd primitive for a 30-min poll.
 	     Do NOT "fix" this to a calendar-interval key, which is calendar-only.
 	     RunAtLoad stays false so installing never fires a tick. -->
@@ -26,7 +31,7 @@
 		     variables in EnvironmentVariables, so a literal home variable would
 		     bake in a dead path. -->
 		<key>PATH</key>
-		<string>@HOME@/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+		<string>/opt/homebrew/bin:@HOME@/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
 	</dict>
 	<key>StandardOutPath</key>
 	<string>@HOME@/.ibl5-pr-cycle-watch/tick.log</string>

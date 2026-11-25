@@ -4,8 +4,13 @@
 <dict>
 	<key>Label</key>
 	<string>com.ibl5.backups-sync</string>
-	<key>Program</key>
-	<string>@MAIN_WT@/bin/backups-sync</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>-c</string>
+		<string>exec "$0" "$@"</string>
+		<string>@MAIN_WT@/bin/backups-sync</string>
+	</array>
 	<key>EnvironmentVariables</key>
 	<dict>
 		<key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>

@@ -4,8 +4,13 @@
 <dict>
 	<key>Label</key>
 	<string>com.ibl5.wt-sync</string>
-	<key>Program</key>
-	<string>@MAIN_WT@/bin/wt-sync-tick</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>-c</string>
+		<string>exec "$0" "$@"</string>
+		<string>@MAIN_WT@/bin/wt-sync-tick</string>
+	</array>
 	<!-- StartInterval: the correct launchd primitive for a 15-min poll.
 	     Do NOT "fix" this to a calendar-interval key — that is calendar-only. -->
 	<key>StartInterval</key>

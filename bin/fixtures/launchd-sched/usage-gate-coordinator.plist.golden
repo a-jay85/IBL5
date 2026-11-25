@@ -6,6 +6,9 @@
 	<string>com.ibl5.usage-gate-coordinator</string>
 	<key>ProgramArguments</key>
 	<array>
+		<string>/bin/bash</string>
+		<string>-c</string>
+		<string>exec "$0" "$@"</string>
 		<string>@MAIN_WT@/bin/usage-gate-coordinator</string>
 		<string>--once</string>
 	</array>

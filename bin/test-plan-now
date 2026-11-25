@@ -2506,6 +2506,14 @@ want_no "F2 renamed fix plan: never queued"  "$KOUT" "automouse-queue (stub): qu
 want    "F2 renamed fix plan: DM asks you"   "$(dm)" "NOT queued, needs you"
 kick_ran && fail "F2 renamed fix plan: the kick stub ran" || ok "F2 renamed fix plan: the kick stub never ran"
 
+# F3 near-miss slugs queue and never kick: the fix prefix needs its dash and a tail.
+for f3_slug in jsb-fixer jsb-fix-; do
+    kick_reset
+    kick_run "$f3_slug"
+    want "F3 near-miss slug $f3_slug still queues" "$KOUT" "automouse-queue (stub): queued $PLANS/$f3_slug.md"
+    kick_ran && fail "F3 near-miss slug $f3_slug: kicked" || ok "F3 near-miss slug $f3_slug: never kicked"
+done
+
 # K2 a non-port plan queues and never kicks.
 kick_reset
 kick_run demo-slug

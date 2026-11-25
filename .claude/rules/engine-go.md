@@ -1,7 +1,7 @@
 ---
 description: Go engine workflow. Run the CI-pinned golangci-lint locally before pushing (a red Engine check holds auto-merge through All checks settled, and master pushes are ungated), the two lint rules it enforces, and the real measured runtime of an archive A/B walk. Also the two-engine model and the decompile-token allowlist gate.
 paths: "engine/**"
-last_verified: 2026-11-09
+last_verified: 2026-11-24
 ---
 
 # Engine (Go) Workflow
@@ -21,6 +21,8 @@ carries only what that one does not.
 `bin/test-check-engine-freeze` is the harness. The script keeps its historical name because ADR-0194 and the decision index cite it.
 
 Decompile material and port work stay in this repo. Never copy a decompile token or port code into `a-jay85/ibl-engine`.
+
+The port is public on purpose and non-commercial (ADR-0236, 2026-11-24 addendum). Keep citing JSB symbols next to the code that ports them. The binary, pasted decompiled C and raw trace captures stay in the private `a-jay85/jsb-native` repo. The clean-room engine in `a-jay85/ibl-engine` will differ widely from JSB.
 
 ## Lint locally before pushing
 

@@ -1,6 +1,6 @@
 ---
 description: ADR-0236. Two engines coexist, the faithful JSB port in engine/ and a clean-room engine in a private repo; bin/check-engine-freeze allows decompile tokens only under engine/ and jsb-native/
-last_verified: 2026-11-09
+last_verified: 2026-11-24
 ---
 
 # ADR-0236: Two engines, the faithful JSB port in engine/ and a clean-room engine elsewhere
@@ -61,3 +61,15 @@ ADR-0194. Its freeze gate is removed. Its decompile-token gate stays under the s
 - `.github/workflows/pr-meta-checks.yml`
 - `.github/dependabot.yml`
 - [ADR-0194](0194-engine-freeze-gates.md)
+
+## Addendum (2026-11-24): the port is public on purpose
+
+On 2026-11-24 the owner chose to keep building the JSB 5.60 port in public IBL5. The port under `engine/` keeps citing JSB symbols, such as generated function names, data names and struct offsets, next to the code that ports them. The owner weighed replacing those citations with plain names kept in jsb-native and turned it down. The port is not the league's own code, so the owner will never charge for it.
+
+Three homes follow from that choice:
+
+- **IBL5 `engine/`** (public) holds the faithful port and its JSB symbol citations. It stays non-commercial.
+- **`a-jay85/jsb-native`** (private) holds the raw reverse-engineering material: the `jumpshot.exe` binary, the decompiled C, the master reference, the VM trace captures and the calibration corpus. Pasted decompiled C stays out of IBL5, and captures stay in jsb-native under [ADR-0278](0278-jsb-native-hosted-trace-captures.md).
+- **`a-jay85/ibl-engine`** (private) holds the clean-room engine. It will differ widely from how JSB works and may become commercial. It never receives a decompile token or port code, as the Clean-room hygiene section says.
+
+The Allowlist entries section calls `jsb-native/` untracked. It is a separate private repo, cloned at `jsb-native/` inside the main checkout and listed in `.gitignore`. The `jsb-native/` allowlist entry still matches no tracked IBL5 file.

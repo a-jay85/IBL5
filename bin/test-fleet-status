@@ -1566,7 +1566,7 @@ assert_has "scheduled: program is the script path" \
 assert_has "scheduled: wrapped job shows its script" \
     "$SCHED" '~/bin/wrapped-tick'
 assert_lacks "scheduled: wrapped job hides its trailing arg" \
-    "$SCHED" '--once'
+    "$SCHED" '[-]-once'
 assert_has "scheduled: automouse one-shot label is listed" \
     "$SCHED" "◷ automouse one-shot"
 assert_has "scheduled: automouse one-shot fire time" \

@@ -20,6 +20,8 @@ on:
       - 'bin/check-*'
       - 'bin/gate-backtest'
       - '.claude/review-shared/scripts/lostwork.sh'
+      - 'engine/testdata/jsb-captures/**'
+      - 'engine/trace-evidence/**'
   push:
     branches: [master]
     paths:
@@ -36,6 +38,8 @@ on:
       - 'bin/check-*'
       - 'bin/gate-backtest'
       - '.claude/review-shared/scripts/lostwork.sh'
+      - 'engine/testdata/jsb-captures/**'
+      - 'engine/trace-evidence/**'
 
 permissions:
   contents: read

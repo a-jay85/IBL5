@@ -580,6 +580,14 @@ prefire_pytest_select() { # <list-file>
                 PYTEST_TRIGGERED=1; pytest_defer "harness file with no test mapping: $path"; continue ;;
             .github/workflows/python-tests.yml)
                 PYTEST_TRIGGERED=1; pytest_defer "harness CI workflow changed: $path"; continue ;;
+            engine/testdata/jsb-captures/*|engine/trace-evidence/*)
+                # Capture and evidence files are data read by the trace-pinned
+                # size-cap and evidence tests; python-tests.yml lists both dirs.
+                PYTEST_TRIGGERED=1
+                if [ -f "$PYTEST_HOME/tests/test_trace_pinned.py" ]; then
+                    printf '%s\n' "tests/test_trace_pinned.py" >> "$out"
+                else pytest_defer "no trace-pinned test for the changed capture or evidence file: $path"; fi
+                continue ;;
             bin/lib/pr-armable.sh|bin/lib/post-review-findings.sh|bin/post-plan-now|bin/lib/branch-base.sh|bin/lib/usage-gate.sh|bin/normalize-manual-testing|bin/lib/pr-sticky.sh|bin/lib/current-models|bin/check-*|bin/gate-backtest|.claude/review-shared/scripts/lostwork.sh)
                 PYTEST_TRIGGERED=1
                 before=$(wc -l < "$out" | tr -d ' ')

@@ -143,13 +143,16 @@ func TestTracePinnedPl0010BallHandler(t *testing.T) {
 	if len(c.Records) == 0 {
 		t.Fatal("capture holds no records")
 	}
-	written := 0
+	written, play6 := 0, 0
 	var passthrough *pl0010In
 	for i, rec := range c.Records {
 		in, out := decodePl0010(t, i, rec)
 		if passthrough == nil && in.PlayType != 5 {
 			cp := in
 			passthrough = &cp
+		}
+		if in.PlayType == 6 {
+			play6++
 		}
 		t.Run(fmt.Sprintf("rec%04d_play%d", i, in.PlayType), func(t *testing.T) {
 			rp, err := rng.NewReplay(in.Rand)
@@ -159,16 +162,16 @@ func TestTracePinnedPl0010BallHandler(t *testing.T) {
 			got := selectBallHandlerJSB(pl0010Inputs(in), rp)
 
 			if got.Ret != out.Ret {
-				t.Errorf("record %d play %d: ret %d, capture %d", i, in.PlayType, got.Ret, out.Ret)
+				t.Errorf("record %d play %d: ret %d, out.ret %d", i, in.PlayType, got.Ret, out.Ret)
 			}
 			if got.Slot != out.Slot {
-				t.Errorf("record %d play %d: slot %d, capture %d", i, in.PlayType, got.Slot, out.Slot)
+				t.Errorf("record %d play %d: slot %d, out.slot %d", i, in.PlayType, got.Slot, out.Slot)
 			}
 			if got.P6 != out.P6 {
-				t.Errorf("record %d play %d: p6 %d, capture %d", i, in.PlayType, got.P6, out.P6)
+				t.Errorf("record %d play %d: p6 %d, out.p6 %d", i, in.PlayType, got.P6, out.P6)
 			}
 			if got.P8 != out.P8 {
-				t.Errorf("record %d play %d: p8 %d, capture %d", i, in.PlayType, got.P8, out.P8)
+				t.Errorf("record %d play %d: p8 %d, out.p8 %d", i, in.PlayType, got.P8, out.P8)
 			}
 			for k, v := range got.Flags {
 				if v == flagUnwritten {
@@ -176,7 +179,7 @@ func TestTracePinnedPl0010BallHandler(t *testing.T) {
 				}
 				written++
 				if v != out.Flags6334[k] {
-					t.Errorf("record %d play %d: flag %d written %d, capture %d", i, in.PlayType, k, v, out.Flags6334[k])
+					t.Errorf("record %d play %d: flag %d written %d, out.flags6334 %d", i, in.PlayType, k, v, out.Flags6334[k])
 				}
 			}
 
@@ -193,6 +196,11 @@ func TestTracePinnedPl0010BallHandler(t *testing.T) {
 	}
 	if written == 0 {
 		t.Error("no record wrote a usage-dominance flag")
+	}
+	// Play type 6 is the rarest captured play type, so its records are the
+	// boundary case. The _play6 subtests must exist for the run to cover it.
+	if play6 == 0 {
+		t.Error("capture holds no play type 6 record, so no _play6 subtest ran")
 	}
 
 	t.Run("p8_passthrough", func(t *testing.T) {

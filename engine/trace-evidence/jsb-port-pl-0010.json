@@ -13,7 +13,7 @@
         "engine/internal/sim/ballhandler.go"
       ],
       "test": "TestTracePinnedPl0010BallHandler",
-      "test_blob": "6863d3fe0586d7086c8d8f455615983df409a5cc"
+      "test_blob": "56676bbcdd89eebce5aad7203688f67136e17d90"
     }
   ],
   "token": "trace-pinned"

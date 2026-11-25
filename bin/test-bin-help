@@ -63,8 +63,11 @@ in_scope() {
     # invocation; it has no --help handler by design. check-gh-pr-files-rename-old-path
     # is a CI-only hold-input gate whose header comment is its help; any
     # argument but --root prints its usage line and exits 2.
+    # check-parity-rule-guard is a CI and parity-loop gate whose header
+    # comment is its help; an unknown argument prints its usage line and
+    # exits 2, which the CANNOT-TELL verdict also uses.
     case "$base" in
-        test-*|*.md|*.txt|check-composite-contracts|check-gh-pr-files-rename-old-path) return 1 ;;
+        test-*|*.md|*.txt|check-composite-contracts|check-gh-pr-files-rename-old-path|check-parity-rule-guard) return 1 ;;
     esac
     [ "$(head -c 2 "$f")" = "#!" ] || return 1
     return 0

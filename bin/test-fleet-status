@@ -1262,6 +1262,39 @@ assert_lacks "links: failed codesign leaves no applet or stamp behind" \
     "$LEFTOVER_NOSIGN" '.'
 assert_lacks "links: failed mv leaves no .build-* temp applet behind" \
     "$LEFTOVER_BUILD" '.build-'
+# `run` follows `reorder` on its own applet and scheme. It starts the runner
+# straight away, and asks first only when a runner is already alive.
+RUN_SCRIPT="$(cat "$TMP/apps/ibl5-automouse-run.app/script.txt" 2>/dev/null)"
+assert_has "links: queue header ends in a run link after reorder" \
+    "$OUTPUT_LINKS" 'AUTOMOUSE QUEUE.*reorder.*8;;ibl5-automouse-run://open[^ ]*run'
+assert_has "links: the run applet starts bin/automouse/run detached" \
+    "$RUN_SCRIPT" "^do shell script \"PATH=/opt/homebrew/bin:[^ ]* nohup '[^']*/bin/automouse/run' .*&\"$"
+assert_has "links: the run applet asks only when a runner is live" \
+    "$RUN_SCRIPT" '^if live is "yes" then display dialog .*Start another'
+assert_has "links: the run applet's plist claims its scheme" \
+    "$(cat "$TMP/apps/ibl5-automouse-run.app/Contents/Info.plist" 2>/dev/null)" \
+    'CFBundleURLSchemes:0 string ibl5-automouse-run$'
+assert_lacks "links: no run link in a non-tty capture" \
+    "$OUTPUT" 'AUTOMOUSE QUEUE.*  run'
+assert_lacks "links: no run link when osacompile is missing" \
+    "$OUTPUT_NOOSA" 'automouse-run'
+# The live-runner check must see a runner and nothing else. The pattern is
+# lifted from the applet and tried on sample `ps -o command=` lines: a runner
+# by absolute or relative path matches; a `claude -p` whose prompt names the runner
+# and the applet's own `sh -c` line do not.
+RUN_PGREP="$(printf '%s\n' "$RUN_SCRIPT" | sed -n "s/^set live to do shell script \"pgrep -f '\\([^']*\\)'.*/\\1/p" | head -n 1)"
+assert_has "links: the run applet's pgrep pattern was found" "$RUN_PGREP" 'automouse'
+RUN_HITS="$(printf '%s\n' \
+    '/opt/homebrew/bin/bash /Users/x/GitHub/IBL5/bin/automouse/run' \
+    'bash /Users/x/GitHub/IBL5/bin/automouse/run --resume-paused abc' \
+    'bash bin/automouse/run' \
+    'claude -p /plan see bin/automouse/run for the runner' \
+    'caffeinate -s timeout 10800 claude -p bash /x/bin/automouse/run' \
+    "sh -c pgrep -f '$RUN_PGREP' >/dev/null && echo yes || echo no" \
+    '/bin/bash /Users/x/GitHub/IBL5/bin/automouse/run-other' \
+    | grep -cE "$RUN_PGREP")"
+assert_has "links: the run applet matches the three runners and nothing else" \
+    "$RUN_HITS" '^3$'
 # The word is the link text; the path lives only in the URI.
 assert_has "links: post-plan audit word links its audit.log" \
     "$OUTPUT_LINKS" 'last-exit-col 0  [^ ]*8;;vscode://file/[^ ]*live-demo-slug-20260910-120000-4242/audit\.log[^ ]*audit'

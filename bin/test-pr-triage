@@ -680,6 +680,27 @@ assert_match  "S4 error bucket=BLOCKED-CHECK"   '^BLOCKED-CHECK$' "$(row_bucket 
 assert_absent "S4 never arms"                   'pr merge'        "$(cat "$FIX/calls.log")"
 assert_status "S4 exit 0"                       0                 "$ST"
 
+# --- S4b: human-signoff as a failed commit status (#86, the workflow_run gate's shape)
+# gets the same SIGNOFF cell and bucket as a failed human-signoff check run (#85) ---
+FIX="$(mktemp -d -p "$TMP")"
+protection_json "${PROT_REQ[@]}" > "$FIX/protection.json"
+checks_json success success failure > "$FIX/checks-$(printf '%040d' 85).json"
+{
+    printf '{"check_runs":['
+    printf '{"name":"Tests and Analysis","status":"completed","conclusion":"success","completed_at":"2026-09-25T00:00:00Z","details_url":"https://github.com/a-jay85/IBL5-test/actions/runs/1"},'
+    printf '{"name":"E2E Tests","status":"completed","conclusion":"success","completed_at":"2026-09-25T00:00:00Z","details_url":"https://github.com/a-jay85/IBL5-test/actions/runs/1"}'
+    printf ']}'
+} > "$FIX/checks-$(printf '%040d' 86).json"
+status_json failure human-signoff > "$FIX/status-$(printf '%040d' 86).json"
+{ pr_json 85 BLOCKED "$BODY_CLEAR"; pr_json 86 BLOCKED "$BODY_CLEAR"; } | jq -s . > "$FIX/prs.json"
+run_triage "$FIX" --arm
+S4B_CR_CELL="$(row_col "$OUT" 85 SIGNOFF)"
+S4B_ST_CELL="$(row_col "$OUT" 86 SIGNOFF)"
+assert_match  "S4b check-run SIGNOFF cell is failing" '^failing$' "$S4B_CR_CELL"
+assert_match  "S4b status SIGNOFF cell matches the check run" "^${S4B_CR_CELL}\$" "$S4B_ST_CELL"
+assert_match  "S4b status bucket matches the check run" "^$(row_bucket "$OUT" 85)\$" "$(row_bucket "$OUT" 86)"
+assert_absent "S4b never arms"                    'pr merge'  "$(cat "$FIX/calls.log")"
+
 # --- S5: no status at all (GitHub's real EMPTY shape: top-level state "pending",
 # zero statuses) -> absent, BLOCKED-CHECK. Reading the top-level .state would print
 # `pending` here; the test pins `absent`. ---

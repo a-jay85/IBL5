@@ -741,7 +741,7 @@ else
 fi
 
 # r1-pr-ignore-fails: paths-ignore under pull_request → exit 1
-d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_required_wf "$d_wf" human-signoff.yml pr-ignore
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_required_wf "$d_wf" human-signoff-trigger.yml pr-ignore
 "$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" >/dev/null 2>&1
 expect "r1-pr-ignore-fails" 1 $?
 
@@ -763,7 +763,7 @@ fi
 # r1-real-files-pass: the five real required workflows pass R1 → exit 0
 REAL_WF="$SCRIPT_DIR/../.github/workflows"
 d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"
-for n in tests.yml e2e-tests.yml human-signoff.yml pr-meta-checks.yml mutation.yml; do
+for n in tests.yml e2e-tests.yml human-signoff-trigger.yml pr-meta-checks.yml mutation.yml; do
   cp "$REAL_WF/$n" "$d_wf/$n"
 done
 "$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" >/dev/null 2>&1
@@ -1058,6 +1058,12 @@ run_agg_mut "A6 rejects an unlisted PR workflow with a flow-map trigger" "(A6)" 
 d_wf="$(agg_copy)"
 agg_edit "$d_wf/all-checks-settled.yml" 's/^      - VR Refresh$/      - VR Refresh\n      - Phantom Workflow/m'
 run_agg_mut "A6 rejects a listed name without a PR trigger" "(A6)" "$d_wf"
+
+# a6-stub-listed: the list still names the gate workflow while the PR-side stub
+# "Human Sign-off trigger" exists, so the stub's completion would never settle.
+d_wf="$(agg_copy)"
+agg_edit "$d_wf/all-checks-settled.yml" 's/^      - Human Sign-off trigger$/      - Human Sign-off/m'
+run_agg_mut "a6-stub-listed: A6 rejects the gate name in place of the stub name" "(A6)" "$d_wf"
 
 # A5 other direction: the legacy waiter is retired, so a leftover ignore token must fail.
 d_wf="$(agg_copy)"

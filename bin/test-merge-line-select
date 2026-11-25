@@ -133,7 +133,8 @@ assert_match "C3-skip-dirty variant UNKNOWN+CONFLICTING skipped" '^skipped=1:dir
 for red_ctx in \
     "$(cr 'Tests and Analysis' COMPLETED FAILURE)" \
     "$(cr 'E2E Tests' COMPLETED TIMED_OUT)" \
-    "$(sc human-signoff ERROR)"; do
+    "$(sc human-signoff ERROR)" \
+    "$(sc human-signoff FAILURE)"; do
     run_sel "$(snapshot \
         "$(pr_node 1 false master "$T6" BEHIND MERGEABLE "$(ctxs "$red_ctx")")" \
         "$(pr_node 2 false master "$T7" BEHIND MERGEABLE "$NOCTX")")"

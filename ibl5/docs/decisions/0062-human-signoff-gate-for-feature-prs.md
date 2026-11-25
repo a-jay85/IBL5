@@ -1,6 +1,6 @@
 ---
 description: Feature PRs (conventional-commit `feat:`) cannot merge until a human applies the `human-approved` label — a required CI check, not a convention, blocks auto-merge.
-last_verified: 2026-11-16
+last_verified: 2026-11-24
 ---
 
 # ADR-0062: Human sign-off gate for feature PRs
@@ -143,3 +143,29 @@ The classifier judges a grouped PR per member, so one major member holds the who
 [#3858](https://github.com/a-jay85/IBL5/pull/3858) made the workflow record and drop fingerprints for non-UI PRs too. A non-UI PR that already carried `human-approved` when that change landed had no recorded fingerprint. On its next event, `hs_eval_approval` in `bin/lib/human-signoff-classifier.sh` finds no record and removes the label once. The check stays green, because a non-UI PR needs no sign-off to merge. If post-plan condition (7) still holds that PR, the owner applies the label again and the workflow records a fresh fingerprint.
 
 The classifier keeps this one-time drop. Skipping it for a PR with no record would add an rc-0 path that never passes `hs_pr_cleared`, and the header of `hs_eval_approval` allows only tightening on its rc-0 paths. No open PR carried the label on 2026-11-10, so the drop had no live case.
+
+## Update 2026-11-21: the gate runs from workflow_run and reports a commit status
+
+Until this update `human-signoff.yml` ran on `pull_request`. GitHub runs the PR's own copy of a `pull_request` workflow, so a PR could edit the gate file and turn its own `human-signoff` check green ([backlog#1798](https://github.com/a-jay85/IBL5-backlog/issues/1798)). Loading the classifier lib from the base ref did not close that hole, because the workflow file itself came from the head.
+
+`pull_request_target` would run master's copy, but the repo cannot use it. The ADR-0223 addendum of 2026-11-09 records that GitHub blocks that trigger by default in public repos, and `bin/check-workflow-run-interpolation` denies it in every workflow.
+
+The gate now has two files:
+
+- `.github/workflows/human-signoff-trigger.yml` runs on the PR's `pull_request` events with `permissions: {}`. Its one job runs `true`, and it decides nothing. Its run title `hs:<action>:<label>` reaches the gate as `display_title`.
+- `.github/workflows/human-signoff.yml` runs on `workflow_run` of that stub and on `workflow_dispatch`. GitHub always runs master's copy of a `workflow_run` workflow. It resolves the PR from the run's head SHA, posts `pending` first, computes the verdict from API data and a checkout of master's lib, and then posts the verdict.
+
+The verdict is a commit status with context `human-signoff` on the PR head. A check run made by a `workflow_run` job lands on master's SHA, so the PR would never see it. Branch protection pins the `human-signoff` context to app 15368, and that pin already accepts the `All checks settled` commit status this way. `bin/lib/human-signoff-classifier.sh` `hs_status_state` maps the verdict to the state: `pass`, `keep`, and `record` give `success`, `drop` gives `success` only when the gate is not red, and every other verdict gives `failure`.
+
+The gate trusts a run only when its path is `.github/workflows/human-signoff-trigger.yml` and the head's blob of that file equals master's (`hs_trigger_trusted`). A PR that edits the stub therefore holds. The owner merges it with `gh pr merge --admin <N>` after reading the stub diff. This PR is one of them, since its own head gets no verdict from the new gate.
+
+A dispatch on a head with no stub holds until the PR is updated.
+
+To re-run the gate by hand, run `gh workflow run human-signoff.yml -f pr_number=<N>` from master. A dispatch from any other ref computes a verdict but writes nothing: each write job and the pending step carry `(github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/master')`.
+
+A Dependabot-triggered `workflow_run` gets a read-only token, so its status POST fails with 403. The step warns with the dispatch command, and the owner runs it.
+
+`bin/test-human-signoff-classifier` pins the trust boundary as text in `hs_trust_boundary_ok` (rules T1 to T10). Two items stay open:
+
+- [backlog#1962](https://github.com/a-jay85/IBL5-backlog/issues/1962): nothing re-runs the gate when its verdict goes stale, as after a late VR gallery or a Dependabot run.
+- [backlog#1958](https://github.com/a-jay85/IBL5-backlog/issues/1958): any PR-triggered workflow job can still post its own `human-signoff` status, because the protection pin names the shared Actions app and not one workflow.

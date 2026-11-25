@@ -1,0 +1,22 @@
+name: Human Sign-off trigger
+
+# PR-side signal for the human-signoff gate (ADR-0062 Update). GitHub runs the PR's copy of
+# this file, so it decides nothing. Master's copy of human-signoff.yml starts on each run of
+# this workflow and judges the PR from API data. A PR that edits this file holds for a human.
+run-name: "hs:${{ github.event.action }}:${{ github.event.label.name }}"
+
+on:
+  pull_request:
+    branches: [ master ]
+    types: [opened, reopened, synchronize, edited, ready_for_review, labeled, unlabeled]
+
+permissions: {}
+
+jobs:
+  trigger:
+    name: human-signoff trigger
+    runs-on: ubuntu-26.04
+    timeout-minutes: 2
+    steps:
+      - name: Mark the event
+        run: 'true'

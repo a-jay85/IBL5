@@ -621,7 +621,6 @@ want "eval: not-ui near-miss label -> pass" "$LAST_OUT" "VERDICT=pass"
 WF_TEXT=$(cat "$REPO_ROOT/.github/workflows/human-signoff.yml")
 # shellcheck disable=SC2016  # literal workflow text
 want "wf: labeled non-UI PR computes fingerprint" "$WF_TEXT" 'if hs_pr_cleared "$UI_VERDICT" "$LABELS" && { [ "$UI_VERDICT" != not-ui ] || hs_has_approval_label "$LABELS"; }; then'
-want "wf: non-UI drop exits green" "$WF_TEXT" 'echo "Human sign-off gate: drop on a non-UI PR (green; approval removed)"'
 # shellcheck disable=SC2016  # literal workflow text
 want "wf: gate_red reaches the gate step" "$WF_TEXT" 'GATE_RED: ${{ steps.eval.outputs.gate_red }}'
 
@@ -827,6 +826,44 @@ HS_WF="$REPO_ROOT/.github/workflows/human-signoff.yml"
 hs_job_block() { awk -v j="  $1:" '$0 == j {f=1; print; next} f && /^  [A-Za-z0-9_-]+:$/ {f=0} f' "$HS_WF"; }
 GATE_BLOCK=$(hs_job_block human-signoff)
 WRITE_BLOCK=$(hs_job_block human-approved-fingerprint)
+# The status-posting job re-settles `All checks settled` after posting, because
+# that aggregator no longer hears this gate finish (Owner amendments, plan 2026-11-23).
+POST_BLOCK=$(hs_job_block post-status)
+# shellcheck disable=SC2016  # literal workflow text
+want "wf: post-status re-runs settle-pr-status for the head" "$POST_BLOCK" 'bin/settle-pr-status --repo="$GITHUB_REPOSITORY" --head-sha="$HEAD_SHA"'
+want "wf: post-status settles the All checks settled context" "$POST_BLOCK" "--context='All checks settled'"
+want "wf: post-status settle step is skipped for a superseded run" "$POST_BLOCK" "needs.human-signoff.outputs.verdict != 'superseded'"
+# A Dependabot-triggered run has a read-only token. The re-settle must warn and
+# go on, or the failed job puts a red check on master's tip (PR #4165 review).
+# shellcheck disable=SC2016  # literal workflow text
+want "wf: post-status re-settle warns instead of failing" "$POST_BLOCK" 'if ! bin/settle-pr-status --repo="$GITHUB_REPOSITORY" --head-sha="$HEAD_SHA"'
+want "wf: post-status re-settle failure prints a warning" "$POST_BLOCK" '::warning::Could not re-settle All checks settled'
+# The label sync writes with the same token, so each write warns on failure too.
+LABEL_SYNC_BLOCK=$(hs_job_block needs-a-human-label)
+want "wf: label add warns instead of failing" "$LABEL_SYNC_BLOCK" '::warning::Could not add needs-a-human'
+want "wf: label remove warns instead of failing" "$LABEL_SYNC_BLOCK" '::warning::Could not remove needs-a-human'
+# Both writers of `All checks settled` must pass the same verdict flags, or the
+# re-settle here and the aggregator's settle could disagree on one head.
+AGG_WF="$REPO_ROOT/.github/workflows/all-checks-settled.yml"
+for flag in self anchor ignore line-dispatch; do
+    # One flag per line in both files; drop the trailing line continuation.
+    agg_v=$(command grep -m 1 -oE -- "--$flag=.*" "$AGG_WF" | sed -E 's/[[:space:]]*\\$//') || agg_v=''
+    post_v=$(command grep -m 1 -oE -- "--$flag=.*" <<< "$POST_BLOCK" | sed -E 's/[[:space:]]*\\$//') || post_v=''
+    if [ -n "$agg_v" ] && [ "$agg_v" = "$post_v" ]; then
+        h_pass "wf: post-status --$flag matches all-checks-settled.yml"
+    else
+        h_fail "wf: post-status --$flag matches all-checks-settled.yml" "agg=[$agg_v] post=[$post_v]"
+    fi
+done
+# The re-settle runs master's copy of the script: a checkout with no ref: (the
+# default branch tip on workflow_run) and no persisted token.
+POST_CHECKOUT=$(awk '/^      - / { if (b ~ /actions\/checkout@/) print b; b="" } { b = b $0 "\n" } END { if (b ~ /actions\/checkout@/) print b }' <<< "$POST_BLOCK")
+want "wf: post-status checks out with no persisted token" "$POST_CHECKOUT" "persist-credentials: false"
+if [ -n "$POST_CHECKOUT" ] && ! command grep -qE '^[[:space:]]+ref:' <<< "$POST_CHECKOUT"; then
+    h_pass "wf: post-status checkout takes the default ref (master), never the PR head"
+else
+    h_fail "wf: post-status checkout takes the default ref (master), never the PR head" "checkout=[$POST_CHECKOUT]"
+fi
 gate_to=$(sed -nE 's/^    timeout-minutes: ([0-9]+)$/\1/p' <<< "$GATE_BLOCK")
 write_to=$(sed -nE 's/^    timeout-minutes: ([0-9]+)$/\1/p' <<< "$WRITE_BLOCK")
 aw_n=$(sed -nE "s/^          HS_AWAIT_ATTEMPTS: '([0-9]+)'$/\1/p" <<< "$GATE_BLOCK")
@@ -881,12 +918,13 @@ else
     h_fail "wf: drop path never sources the lib" "source line [$src_ln] record-if line [$rec_ln]"
 fi
 
-# ---- trusted lib: both jobs load the classifier from the BASE ref ----
+# ---- trusted lib: both jobs load the classifier from master ----
 # trusted_lib_ok <workflow-file> — rc 0 when the gate sources both libs from
-# the .hs-base checkout of base.sha, runs no head-relative bin/ script, and the
-# write job checks out base.sha (never head.sha).
+# the .hs-base checkout, that checkout step has no ref: line (so it is master's
+# tip, the commit a workflow_run run belongs to), the gate runs no
+# head-relative bin/ script, and the write job's checkout has no ref: line.
 trusted_lib_ok() {
-    local wf="$1" gate write
+    local wf="$1" gate write base_step
     gate=$(awk -v j="  human-signoff:" '$0 == j {f=1; print; next} f && /^  [A-Za-z0-9_-]+:$/ {f=0} f' "$wf")
     write=$(awk -v j="  human-approved-fingerprint:" '$0 == j {f=1; print; next} f && /^  [A-Za-z0-9_-]+:$/ {f=0} f' "$wf")
     # shellcheck disable=SC2016  # literal workflow text
@@ -898,12 +936,14 @@ trusted_lib_ok() {
     command grep -qE '(source|\.) +"?(\./)?bin/' <<< "$gate" && return 1
     command grep -qE '^[[:space:]]*"?(\./)?bin/' <<< "$gate" && return 1
     command grep -qF 'path: .hs-base' <<< "$gate" || return 1
-    # shellcheck disable=SC2016  # literal workflow text
-    [ "$(command grep -cF 'ref: ${{ github.event.pull_request.base.sha }}' <<< "$gate")" = 1 ] || return 1
-    # shellcheck disable=SC2016  # literal workflow text
-    command grep -qF 'ref: ${{ github.event.pull_request.head.sha }}' <<< "$write" && return 1
-    # shellcheck disable=SC2016  # literal workflow text
-    command grep -qF 'ref: ${{ github.event.pull_request.base.sha }}' <<< "$write" || return 1
+    base_step=$(awk '/^      - / { if (hit) printf "%s", s; s = ""; hit = 0 }
+        { s = s $0 "\n" }
+        $0 == "          path: .hs-base" { hit = 1 }
+        END { if (hit) printf "%s", s }' <<< "$gate")
+    [ -n "$base_step" ] || return 1
+    command grep -qE '^ +ref:' <<< "$base_step" && return 1
+    command grep -qF 'actions/checkout@' <<< "$write" || return 1
+    command grep -qE '^ +ref:' <<< "$write" && return 1
     return 0
 }
 if trusted_lib_ok "$HS_WF"; then
@@ -918,8 +958,12 @@ sed 's|source "$HS_LIB/ui-change-classifier.sh"|source bin/lib/ui-change-classif
 # shellcheck disable=SC2016  # literal workflow text
 sed 's|source "$HS_LIB/human-signoff-classifier.sh"|source "$HS_LIB/human-signoff-classifier.sh"; source bin/lib/human-signoff-classifier.sh|' "$HS_WF" > "$TL_DIR/head-hs.yml"
 # shellcheck disable=SC2016  # literal workflow text
-sed 's|ref: ${{ github.event.pull_request.base.sha }}|ref: ${{ github.event.pull_request.head.sha }}|' "$HS_WF" > "$TL_DIR/head-ref.yml"
-for neg in head-ui head-hs head-ref; do
+awk '{ print } $0 == "          path: .hs-base" { print "          ref: ${{ needs.mark-pending.outputs.head_sha }}" }' "$HS_WF" > "$TL_DIR/head-ref.yml"
+# shellcheck disable=SC2016  # literal workflow text
+awk '{ print } $0 == "  human-approved-fingerprint:" { w = 1 }
+    w && $0 == "          persist-credentials: false" { print "          ref: ${{ needs.mark-pending.outputs.head_sha }}"; w = 0 }' "$HS_WF" > "$TL_DIR/write-ref.yml"
+for neg in head-ui head-hs head-ref write-ref; do
+    if cmp -s "$HS_WF" "$TL_DIR/$neg.yml"; then h_fail "mutant identical: trusted-lib $neg"; fi
     if trusted_lib_ok "$TL_DIR/$neg.yml"; then
         h_fail "wf: trusted-lib guard rejects $neg" "accepted"
     else
@@ -1240,12 +1284,12 @@ check_fixture() {
     tag="$action $title $label"
 
     # Run invariant: the UI verdict depends on the diff and the VR gallery,
-    # which no event payload carries, so the human-signoff job runs on every
-    # event. The title plays no part.
+    # which no event payload carries, so the PR-side trigger stub runs on every
+    # event and master's gate starts on each stub run. The title plays no part.
     case "$action" in
-        auto_merge_*) ;; # human-signoff.yml lists no auto_merge_* types
+        auto_merge_*) ;; # the trigger stub lists no auto_merge_* types
         *)
-            job_would_run "$WF_DIR/human-signoff.yml" human-signoff "$ev"
+            job_would_run "$WF_DIR/human-signoff-trigger.yml" trigger "$ev"
             if [ "$JOB_RESULT" = "run" ]; then
                 h_pass "hs always runs $tag"
             else
@@ -1319,14 +1363,30 @@ expect "unknown function exits 2" 2 "$EV_RC"
 ev_expr "$EV_OPENED" "github.event.pull_request.title =="
 expect "dangling expression exits 2" 2 "$EV_RC"
 
+# hs_if_expect <job-id> — the exact job-level if: of each human-signoff.yml job
+# (wrapper stripped). rc 1 for a job id with no pinned string. These are
+# literals: gha-if-eval has no cancelled(), so the run/skip logic of the
+# workflow_run jobs is pinned as text and the stub carries the per-event table.
+hs_if_expect() {
+    case "$1" in
+        mark-pending) printf '%s\n' "github.event_name == 'workflow_dispatch' || (github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.path == '.github/workflows/human-signoff-trigger.yml')" ;;
+        human-signoff) printf '%s\n' "!cancelled() && needs.mark-pending.outputs.head_sha != ''" ;;
+        post-status) printf '%s\n' "!cancelled() && needs.mark-pending.outputs.head_sha != '' && (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/master')" ;;
+        needs-a-human-label) printf '%s\n' "!cancelled() && needs.human-signoff.outputs.pr != '' && needs.human-signoff.outputs.state != '' && (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/master')" ;;
+        human-approved-fingerprint) printf '%s\n' "!cancelled() && (needs.human-signoff.result == 'failure' || needs.human-signoff.result == 'success') && (needs.human-signoff.outputs.verdict == 'record' || needs.human-signoff.outputs.verdict == 'drop') && (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/master')" ;;
+        *) return 1 ;;
+    esac
+}
+HS_GROUP_EXPECT="format('human-signoff-{0}-{1}{2}', github.event.workflow_run.pull_requests[0].number || github.event.inputs.pr_number || github.event.workflow_run.head_sha, github.event.workflow_run.path || 'dispatch', github.event.workflow_run.display_title == 'hs:labeled:human-approved' && format('-approve-{0}', github.run_id) || '')"
+
 # ---- awk helper smoke: negative, positive, not-found, multi-line ----
-HS_JOB_IF_RC_EXPECTED=1 # human-signoff has no job-level if: (the UI verdict needs every event)
+HS_JOB_IF_RC_EXPECTED=0 # human-signoff carries one pinned if: (it waits on mark-pending)
 out=$(wf_job_if "$WF_DIR/human-signoff.yml" needs-a-human-label)
 rc=$?
-if [ "$rc" -eq 0 ] && [ "${out#always()}" != "$out" ]; then
-    h_pass "wf_job_if needs-a-human-label prints always()..."
+if [ "$rc" -eq 0 ] && [ "$out" = "$(hs_if_expect needs-a-human-label)" ]; then
+    h_pass "wf_job_if needs-a-human-label prints the pinned if:"
 else
-    h_fail "wf_job_if needs-a-human-label prints always()..." "rc=$rc out=[$out]"
+    h_fail "wf_job_if needs-a-human-label prints the pinned if:" "rc=$rc out=[$out]"
 fi
 wf_job_if "$WF_DIR/human-signoff.yml" human-signoff > /dev/null 2>&1
 expect "wf_job_if human-signoff exit code (expected-rc variable)" "$HS_JOB_IF_RC_EXPECTED" "$?"
@@ -1351,7 +1411,7 @@ wf_job_if "$EV_DIR/multi.yml" b > /dev/null 2>&1
 expect "wf_job_if multi-line (unbalanced paren) exits 3" 3 "$?"
 out=$(wf_concurrency_group "$WF_DIR/human-signoff.yml")
 rc=$?
-if [ "$rc" -eq 0 ] && [[ "$out" == *"|| format('human-signoff-{0}', github.event.pull_request.number)" ]]; then
+if [ "$rc" -eq 0 ] && [ "$out" = "$HS_GROUP_EXPECT" ]; then
     h_pass "wf_concurrency_group human-signoff"
 else
     h_fail "wf_concurrency_group human-signoff" "rc=$rc out=[$out]"
@@ -1377,25 +1437,24 @@ group_pred() {
     return 1
 }
 
-# hs_group_ok <workflow-file> — 0 when human-signoff's group is exactly the
-# two-arm shape `(approving label) && format('human-signoff-{0}-approve-{1}', ...)
-# || format('human-signoff-{0}', ...)`. No skip arm. Silent.
+# hs_group_ok <workflow-file> — 0 when human-signoff's group is exactly
+# HS_GROUP_EXPECT: one group per PR and trigger file, plus a per-run suffix
+# only for the approving-label title. No skip arm. Silent.
 hs_group_ok() {
-    local grp re
+    local grp
     grp=$(wf_concurrency_group "$1") || return 1
-    re="^\\(github\\.event\\.action == 'labeled' && github\\.event\\.label\\.name == 'human-approved'\\) && format\\('human-signoff-\\{0\\}-approve-\\{1\\}', github\\.event\\.pull_request\\.number, github\\.run_id\\) \\|\\| format\\('human-signoff-\\{0\\}', github\\.event\\.pull_request\\.number\\)\$"
-    [[ "$grp" =~ $re ]]
+    [ "$grp" = "$HS_GROUP_EXPECT" ]
 }
 
-# hs_no_skip_ok <workflow-file> — 0 when the human-signoff job has no `if:` and
-# the group has no skip arm (4a). am_ident_ok <workflow-file> — 0 when the
+# hs_no_skip_ok <workflow-file> — 0 when the human-signoff job carries exactly
+# its pinned `if:` and the group has no skip arm (4a). am_ident_ok <workflow-file> — 0 when the
 # sync-label `if:` equals the merged guard plus the negated group predicate.
 # Silent, so mutants can reuse them.
 hs_no_skip_ok() {
-    local rc=0
+    local ifx
     hs_group_ok "$1" || return 1
-    wf_job_if "$1" human-signoff > /dev/null 2>&1 || rc=$?
-    [ "$rc" -eq 1 ]
+    ifx=$(wf_job_if "$1" human-signoff 2> /dev/null) || return 1
+    [ "$ifx" = "$(hs_if_expect human-signoff)" ]
 }
 am_ident_ok() {
     local ifx
@@ -1461,26 +1520,25 @@ wf_job_block() {
         s { print }
     ' "$1"
 }
-# EXEMPT_HS: dependent jobs that already exclude `skipped`.
+# EXEMPT_HS: dependent jobs that need the gate job's outputs.
 EXEMPT_HS=(needs-a-human-label human-approved-fingerprint)
-# hs_job_ok <workflow-file> <job-id> — 0 when the job is guarded or exempt. Silent.
+# hs_job_ok <workflow-file> <job-id> — 0 when the job carries exactly one `if:`,
+# equal to its pinned string, and each EXEMPT_HS job needs the gate job. Silent.
 hs_job_ok() {
-    local ex id ifx blk
+    local ex id ifx blk want
     id=$2
+    want=$(hs_if_expect "$id") || return 1
+    hs_group_ok "$1" || return 1
+    blk=$(wf_job_block "$1" "$id")
+    [ "$(command grep -c '^    if: ' <<< "$blk")" = 1 ] || return 1
+    ifx=$(wf_job_if "$1" "$id" 2> /dev/null) || return 1
+    [ "$ifx" = "$want" ] || return 1
     for ex in "${EXEMPT_HS[@]}"; do
         if [ "$ex" = "$id" ]; then
-            blk=$(wf_job_block "$1" "$id")
             grep -qxF "    needs: human-signoff" <<< "$blk" || return 1
-            ifx=$(wf_job_if "$1" "$id") || return 1
-            case "$ifx" in *"needs.human-signoff.result == 'failure'"*) return 0 ;; esac
-            return 1
         fi
     done
-    # Every other job carries no `if:` at all, so it runs on every event.
-    local rc=0
-    hs_group_ok "$1" || return 1
-    wf_job_if "$1" "$id" > /dev/null 2>&1 || rc=$?
-    [ "$rc" -eq 1 ]
+    return 0
 }
 # am_job_ok <workflow-file> <job-id> — EXEMPT_AM is empty: every job must equal the 4a string.
 am_job_ok() {
@@ -1498,7 +1556,7 @@ while IFS= read -r job_id; do
     if hs_job_ok "$WF_DIR/human-signoff.yml" "$job_id"; then
         h_pass "hs job $job_id guarded-or-exempt"
     else
-        h_fail "hs job $job_id guarded-or-exempt" "neither unguarded (no if:) nor a needs: human-signoff dependent excluding skipped"
+        h_fail "hs job $job_id guarded-or-exempt" "if: differs from its pinned string, or the job has a second if:"
     fi
 done <<< "$HS_IDS"
 AM_IDS=$(wf_job_ids "$WF_DIR/auto-mergeable-label.yml")
@@ -1524,7 +1582,7 @@ h_eq "pr-meta-checks has no skip group" "$PMC_GROUP_EXPECT" "$PMC_GROUP_ACTUAL"
 # Row: workflow|job|action|title|label|changes|pr-labels|expected
 EXPECT=()
 tbl() { EXPECT+=("$1|$2|$3|$4|$5|$6|$7"); }
-HS_WF="human-signoff.yml|human-signoff"
+HS_WF="human-signoff-trigger.yml|trigger"
 AM_WF="auto-mergeable-label.yml|sync-label"
 
 for t_act in opened reopened synchronize ready_for_review; do
@@ -1581,8 +1639,8 @@ t_run=0
 t_skip=0
 for t_row in "${EXPECT[@]}"; do
     case "$t_row" in
-        "human-signoff.yml|human-signoff|"*"|run") t_run=$((t_run + 1)) ;;
-        "human-signoff.yml|human-signoff|"*"|skip") t_skip=$((t_skip + 1)) ;;
+        "human-signoff-trigger.yml|trigger|"*"|run") t_run=$((t_run + 1)) ;;
+        "human-signoff-trigger.yml|trigger|"*"|skip") t_skip=$((t_skip + 1)) ;;
     esac
 done
 if [ "$t_run" -ge 30 ] && [ "$t_skip" -eq 0 ]; then
@@ -1620,7 +1678,7 @@ for t_row in "${EXPECT[@]}"; do
     fi
     # Feed this table's fixtures the Phase 1 run-invariant check where Phase 1
     # had none (base-only edits and the superset chore title).
-    if [ "$t_wf" = "human-signoff.yml" ]; then
+    if [ "$t_wf" = "human-signoff-trigger.yml" ]; then
         case "$t_ch:$t_title" in
             r:* | *:"chore: refactor feature flags") check_fixture "$t_action" "$t_title" "$t_label" "$t_ch" "$t_prl" ;;
         esac
@@ -1628,25 +1686,52 @@ for t_row in "${EXPECT[@]}"; do
 done
 
 # ---- 4f. concurrency group values (race fix, ADR-0062 Update 2026-11-02) ----
-HS_GROUP=$(wf_concurrency_group "$WF_DIR/human-signoff.yml")
-# grp_check <name> <action> <title> <label> <changes> <pr-labels> <expected-group>
+# gha-if-eval has no [n] index, so the group's pull_requests[0].number is
+# read from a flat workflow_run.pr0_number key in these fixtures.
+hs_group_evalable() { sed 's/pull_requests\[0\]\.number/pr0_number/g' <<< "$1"; }
+HS_GROUP=$(hs_group_evalable "$(wf_concurrency_group "$WF_DIR/human-signoff.yml")")
+HS_TRIG=.github/workflows/human-signoff-trigger.yml
+# mk_wr_event <display_title> <pr-number|-> — a workflow_run payload from the stub.
+# mk_wr_event dispatch <pr-number> — a workflow_dispatch payload.
+mk_wr_event() {
+    local path
+    path=$(mktemp "$EV_DIR/wr.XXXXXX") || return 1
+    python3 -I -c '
+import json, sys
+title, pr, trig, path = sys.argv[1:5]
+if title == "dispatch":
+    ev = {"event_name": "workflow_dispatch", "inputs": {"pr_number": pr}}
+else:
+    wr = {"event": "pull_request", "path": trig, "display_title": title, "head_sha": "abc123"}
+    if pr != "-":
+        wr["pr0_number"] = int(pr)
+    ev = {"event_name": "workflow_run", "workflow_run": wr}
+with open(path, "w") as fh:
+    json.dump(ev, fh)
+' "$1" "$2" "$HS_TRIG" "$path" || return 1
+    printf '%s\n' "$path"
+}
+# grp_check <name> <display_title|dispatch> <pr-number|-> <expected-group>
 grp_check() {
     local ev
-    ev=$(mk_event "$2" "$3" "$4" "$5" "$6") || { h_fail "$1" "mk_event failed"; return 0; }
+    ev=$(mk_wr_event "$2" "$3") || { h_fail "$1" "mk_wr_event failed"; return 0; }
     # gha-if-eval prints only true or false, so compare inside the expression.
-    # The parentheses matter: the group expression has a top-level ||.
-    ev_check "$1" "$ev" "($HS_GROUP) == '$7'" true
+    ev_check "$1" "$ev" "($HS_GROUP) == '$4'" true
 }
-grp_check "group: labeled human-approved feat -> per-run approve" labeled "feat: x" human-approved n human-approved "human-signoff-1-approve-1"
-grp_check "group: labeled human-approved fix -> per-run approve" labeled "fix: x" human-approved n human-approved "human-signoff-1-approve-1"
-grp_check "group: synchronize feat -> shared" synchronize "feat: x" - n human-approved "human-signoff-1"
-grp_check "group: synchronize fix -> shared" synchronize "fix: x" - n - "human-signoff-1"
-grp_check "group: unlabeled human-approved feat -> shared" unlabeled "feat: x" human-approved n - "human-signoff-1"
-grp_check "group: labeled lookalike human-approved-x feat -> shared" labeled "feat: x" human-approved-x n human-approved-x "human-signoff-1"
-grp_check "group: labeled needs-a-human feat -> shared" labeled "feat: x" needs-a-human n needs-a-human "human-signoff-1"
-grp_check "group: labeled needs-a-human fix -> shared (no skip group)" labeled "fix: x" needs-a-human n needs-a-human "human-signoff-1"
-grp_check "group: edited body fix -> shared (no skip group)" edited "fix: x" - b - "human-signoff-1"
-grp_check "group: edited title feat -> shared" edited "feat: x" - y - "human-signoff-1"
+grp_check "group: labeled human-approved -> per-run approve" "hs:labeled:human-approved" 1 "human-signoff-1-$HS_TRIG-approve-1"
+grp_check "group: synchronize -> shared" "hs:synchronize:" 1 "human-signoff-1-$HS_TRIG"
+grp_check "group: unlabeled human-approved -> shared" "hs:unlabeled:human-approved" 1 "human-signoff-1-$HS_TRIG"
+grp_check "group: labeled lookalike human-approved-x -> shared" "hs:labeled:human-approved-x" 1 "human-signoff-1-$HS_TRIG"
+grp_check "group: labeled needs-a-human -> shared (no skip group)" "hs:labeled:needs-a-human" 1 "human-signoff-1-$HS_TRIG"
+grp_check "group: edited -> shared (no skip group)" "hs:edited:" 1 "human-signoff-1-$HS_TRIG"
+grp_check "group: fork run with no PR list -> head sha" "hs:synchronize:" - "human-signoff-abc123-$HS_TRIG"
+grp_check "group: dispatch -> its own per-PR group" dispatch 7 "human-signoff-7-dispatch"
+# mark-pending's if: has no cancelled(), so the evaluator can run it.
+MP_IF=$(wf_job_if "$WF_DIR/human-signoff.yml" mark-pending)
+ev_check "mark-pending runs on a stub run" "$(mk_wr_event 'hs:synchronize:' 1)" "$MP_IF" true
+ev_check "mark-pending runs on a dispatch" "$(mk_wr_event dispatch 1)" "$MP_IF" true
+ev_check "mark-pending skips a run from another file" \
+    "$(HS_TRIG=.github/workflows/ci.yml mk_wr_event 'hs:synchronize:' 1)" "$MP_IF" false
 
 # ---- 4e. permanent mutation checks (forced-trigger rows) ----
 # mutate <name> <orig> <out> <sed-arg>... — build the mutant; fail loudly if identical.
@@ -1661,9 +1746,9 @@ mutate() {
     return 0
 }
 
-# 1. hs-if-added: a title-keyed job `if:` re-added under `name: human-signoff`.
+# 1. hs-if-added: a title-keyed job `if:` added under `name: human-signoff evaluate`.
 M1="$EV_DIR/m-hs-if-added.yml"
-awk '{ print } $0 == "    name: human-signoff" { print "    if: ${{ !contains(github.event.pull_request.title, '"'"'feat'"'"') }}" }' \
+awk '{ print } $0 == "    name: human-signoff evaluate" { print "    if: ${{ !contains(github.event.pull_request.title, '"'"'feat'"'"') }}" }' \
     "$WF_DIR/human-signoff.yml" > "$M1"
 if cmp -s "$WF_DIR/human-signoff.yml" "$M1"; then
     h_fail "mutant identical: hs-if-added"
@@ -1699,15 +1784,37 @@ fi
 
 # 2b. hs-group-drops-approve-arm: the approving-label arm removed from the group.
 M2B="$EV_DIR/m-hs-group-drops-approve-arm.yml"
-if mutate hs-group-drops-approve-arm "$WF_DIR/human-signoff.yml" "$M2B" -e "/^  group: /s/(github.event.action == 'labeled' && github.event.label.name == 'human-approved') && format('human-signoff-{0}-approve-{1}', github.event.pull_request.number, github.run_id) || //"; then
+if mutate hs-group-drops-approve-arm "$WF_DIR/human-signoff.yml" "$M2B" -e "/^  group: /s/github.event.workflow_run.display_title == 'hs:labeled:human-approved' && format('-approve-{0}', github.run_id) || ''/''/"; then
     if hs_group_ok "$M2B"; then
         h_fail "mutant hs-group-drops-approve-arm shape guard catches it" "shape still matched"
     else
         h_pass "mutant hs-group-drops-approve-arm shape guard catches it"
     fi
     ev_check "mutant hs-group-drops-approve-arm evaluator exposes the shared group" \
-        "$(mk_event labeled 'feat: x' human-approved n human-approved)" \
-        "($(wf_concurrency_group "$M2B")) == 'human-signoff-1'" true
+        "$(mk_wr_event 'hs:labeled:human-approved' 1)" \
+        "($(hs_group_evalable "$(wf_concurrency_group "$M2B")")) == 'human-signoff-1-$HS_TRIG'" true
+fi
+
+# 2c. hs-if-loosened: post-status runs even after a cancel.
+M2C="$EV_DIR/m-hs-if-loosened.yml"
+if mutate hs-if-loosened "$WF_DIR/human-signoff.yml" "$M2C" -e "/^    if: .*github.ref == 'refs\/heads\/master')/s/!cancelled() && needs.mark-pending/always() || needs.mark-pending/"; then
+    if hs_job_ok "$M2C" post-status; then
+        h_fail "mutant hs-if-loosened per-job guard catches it" "accepted"
+    else
+        h_pass "mutant hs-if-loosened per-job guard catches it"
+    fi
+fi
+
+# 2d. hs-if-second: a second `if:` line after mark-pending's real one.
+M2D="$EV_DIR/m-hs-if-second.yml"
+awk '{ print } $0 == "    name: human-signoff pending" { n = 1 } n && /^    if: / { print "    if: ${{ always() }}"; n = 0 }' \
+    "$WF_DIR/human-signoff.yml" > "$M2D"
+if cmp -s "$WF_DIR/human-signoff.yml" "$M2D"; then
+    h_fail "mutant identical: hs-if-second"
+elif hs_job_ok "$M2D" mark-pending; then
+    h_fail "mutant hs-if-second per-job guard catches it" "accepted"
+else
+    h_pass "mutant hs-if-second per-job guard catches it"
 fi
 
 # 4. am-if-drops-auto-mergeable: label clause removed from the sync-label `if:` only.
@@ -2569,5 +2676,243 @@ else
     h_pass "mutant label-job-writes: guard catches a label write on superseded"
 fi
 rm -rf "$LV_TMP"
+
+
+# ---- trusted-trigger helpers (ADR-0062 Update: the gate runs from workflow_run) ----
+# tt <lib function> <args...>: run one helper under production strict mode.
+tt() { LAST_OUT=$(bash -c 'set -euo pipefail; source "$1"; f="$2"; shift 2; "$f" "$@"' _ "$LIB" "$@" 2>&1); }
+TAB=$'\t'
+tt hs_trigger_event 'hs:labeled:human-approved'; rc=$?
+expect "trigger-event: labeled title rc 0" 0 "$rc"
+same "trigger-event: labeled title prints action and label" "$LAST_OUT" "labeled${TAB}human-approved"
+tt hs_trigger_event 'hs:synchronize:'; rc=$?
+expect "trigger-event: synchronize title rc 0" 0 "$rc"
+same "trigger-event: synchronize title has an empty label" "$LAST_OUT" "synchronize${TAB}"
+for t in 'xhs:labeled:human-approved' 'fix: hs:labeled:human-approved' 'hs:labeled' 'hs::human-approved' 'hs:Labeled:human-approved' ''; do
+    tt hs_trigger_event "$t"; rc=$?
+    expect "trigger-event: near-miss [$t] rc 1" 1 "$rc"
+    same "trigger-event: near-miss [$t] prints unknown" "$LAST_OUT" "unknown${TAB}"
+done
+tt hs_trigger_event 'hs:labeled:human-approved:x'; rc=$?
+expect "trigger-event: trailing colon title rc 0" 0 "$rc"
+same "trigger-event: trailing colon keeps the whole label" "$LAST_OUT" "labeled${TAB}human-approved:x"
+
+TT=$(mktemp -d)
+# tt_repo <dir> [stub text|-]: a throwaway git repo; "-" leaves the stub out.
+tt_repo() {
+    mkdir -p "$1/.github/workflows"
+    git -C "$1" init -q
+    printf 'x\n' > "$1/README"
+    if [ "${2:--}" != - ]; then printf '%s\n' "$2" > "$1/.github/workflows/human-signoff-trigger.yml"; fi
+    git -C "$1" add -A
+    git -C "$1" -c user.email=t@t -c user.name=t commit -q -m init
+}
+tt_repo "$TT/base" 'stub-v1'
+tt_repo "$TT/same" 'stub-v1'
+tt_repo "$TT/diff" 'stub-v2'
+tt_repo "$TT/none" -
+tt_repo "$TT/nobase" -
+STUB=.github/workflows/human-signoff-trigger.yml
+tt hs_trigger_trusted "$STUB" "$TT/base" "$TT/same"; expect "trigger-trusted: identical stub blobs rc 0" 0 $?
+tt hs_trigger_trusted "$STUB" "$TT/base" "$TT/diff"; expect "trigger-trusted: head changed the stub rc 2" 2 $?
+tt hs_trigger_trusted .github/workflows/ci.yml "$TT/base" "$TT/same"; expect "trigger-trusted: run from another workflow file rc 1" 1 $?
+tt hs_trigger_trusted '' "$TT/base" "$TT/same"; expect "trigger-trusted: empty run path rc 1" 1 $?
+tt hs_trigger_trusted "$STUB" "$TT/base" "$TT/none" run; expect "trigger-trusted: head with no stub rc 0 in run mode" 0 $?
+tt hs_trigger_trusted '' "$TT/base" "$TT/none" dispatch; expect "trigger-trusted: head with no stub rc 2 in dispatch mode" 2 $?
+tt hs_trigger_trusted '' "$TT/base" "$TT/diff" dispatch; expect "trigger-trusted: dispatch with a changed stub rc 2" 2 $?
+tt hs_trigger_trusted '' "$TT/base" "$TT/same" dispatch; expect "trigger-trusted: dispatch with identical stub rc 0" 0 $?
+tt hs_trigger_trusted "$STUB" "$TT/nobase" "$TT/same"; expect "trigger-trusted: base with no stub rc 2" 2 $?
+rm -rf "$TT"
+
+# hs_resolve_pr: the fetcher prints a canned commits/<sha>/pulls body, or fails on FAIL.
+RP_SHA=abc123
+rp_pr() { jq -n --argjson n "$1" --arg st "$2" --arg h "$3" --arg b "$4" '{number:$n,state:$st,head:{sha:$h},base:{ref:$b}}'; }
+rp_run() { # name expected_rc expected_out json-or-FAIL
+    local out rc
+    out=$(RP_J="$4" bash -c 'set -euo pipefail; source "$1"; rp_fetch() { if [ "$RP_J" = FAIL ]; then return 1; fi; printf "%s" "$RP_J"; }; hs_resolve_pr "$2" rp_fetch' _ "$LIB" "$RP_SHA" 2>&1); rc=$?
+    LAST_OUT="$out"
+    expect "resolve-pr: $1 rc" "$2" "$rc"
+    if [ "$out" = "$3" ]; then h_pass "resolve-pr: $1 output"; else h_fail "resolve-pr: $1 output" "[$out] != [$3]"; fi
+}
+rp_run "one open PR into master" 0 41 "$(rp_pr 41 open "$RP_SHA" master | jq -s .)"
+rp_run "two open PRs into master" 1 "" "$( { rp_pr 41 open "$RP_SHA" master; rp_pr 42 open "$RP_SHA" master; } | jq -s .)"
+rp_run "a closed PR" 1 "" "$(rp_pr 41 closed "$RP_SHA" master | jq -s .)"
+rp_run "a PR into another base" 1 "" "$(rp_pr 41 open "$RP_SHA" develop | jq -s .)"
+rp_run "a head SHA mismatch" 1 "" "$(rp_pr 41 open def456 master | jq -s .)"
+rp_run "an empty list" 1 "" "[]"
+rp_run "a failing fetcher" 1 "" FAIL
+rp_run "one open PR among others" 0 43 "$( { rp_pr 41 closed "$RP_SHA" master; rp_pr 43 open "$RP_SHA" master; rp_pr 44 open "$RP_SHA" develop; } | jq -s .)"
+
+for v in pass keep record; do
+    tt hs_status_state "$v" ""; same "status-state: $v is success" "$LAST_OUT" success
+done
+tt hs_status_state drop 0; same "status-state: drop with gate_red 0 is success" "$LAST_OUT" success
+tt hs_status_state drop 1; same "status-state: drop with gate_red 1 is failure" "$LAST_OUT" failure
+tt hs_status_state drop ""; same "status-state: drop with empty gate_red is failure" "$LAST_OUT" failure
+for v in hold superseded '' bogus; do
+    tt hs_status_state "$v" 0; same "status-state: [$v] is failure" "$LAST_OUT" failure
+done
+
+tt hs_pr_number_ok 123; expect "pr-number-ok: 123 rc 0" 0 $?
+for v in '' 12a '12 3' -1; do
+    tt hs_pr_number_ok "$v"; expect "pr-number-ok: [$v] rc 1" 1 $?
+done
+
+# ---- trust boundary of the workflow_run gate (ADR-0062 Update) ----
+# hs_trust_boundary_ok <gate-file> <stub-file> <workflows-dir> — prints the first
+# failed rule (T1..T10) and returns 1; rc 0 and no output when every rule holds.
+# Text checks only: they pin what GitHub runs from master and what the PR copy
+# of the stub can do. Reuses hs_job_block (via HS_WF) and wf_job_ids.
+hs_steps_with() { # <needle> — print each step (from `      - `) that holds the needle
+    awk -v n="$1" '/^      - / { if (hit) printf "%s", s; s = ""; hit = 0 }
+        { s = s $0 "\n" }
+        index($0, n) { hit = 1 }
+        END { if (hit) printf "%s", s }'
+}
+hs_run_bodies() { # print every run: line and its block-scalar body
+    awk '{
+        if (inrun) {
+            match($0, /^ */)
+            if (RLENGTH > ind || $0 ~ /^ *$/) { print; next }
+            inrun = 0
+        }
+        if ($0 ~ /^ +(- )?run: /) {
+            match($0, /^ */); ind = RLENGTH; print
+            if ($0 ~ /run: [|>][-+]?$/) inrun = 1
+        }
+    }'
+}
+hs_trust_boundary_ok() {
+    local gate=$1 stub=$2 wfd=$3 onblk perms ids id blk heads=0 head_blk f clause inner
+    inner="github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/master'"
+    clause="($inner)"
+    onblk=$(awk '/^on:/ { f = 1; next } /^[a-z]/ { f = 0 } f' "$gate")
+    if ! command grep -qx '  workflow_run:' <<< "$onblk" || ! command grep -qx '  workflow_dispatch:' <<< "$onblk" \
+        || command grep -qF pull_request <<< "$onblk"; then
+        echo T1; return 1
+    fi
+    if [ "$(command grep -c '^ *workflows:' <<< "$onblk")" != 1 ] \
+        || ! command grep -qxF '    workflows: ["Human Sign-off trigger"]' <<< "$onblk"; then
+        echo T2; return 1
+    fi
+    perms=$(awk '/^permissions:/ { f = 1; print; next } /^[a-z]/ { f = 0 } f' "$gate")
+    if [ -z "$perms" ] || command grep -qF write <<< "$perms"; then echo T3; return 1; fi
+    ids=$(wf_job_ids "$gate")
+    [ -n "$ids" ] || { echo T4; return 1; }
+    while IFS= read -r id; do
+        blk=$(HS_WF="$gate" hs_job_block "$id")
+        if command grep -qF ': write' <<< "$blk" && command grep -qE '^ +ref:' <<< "$blk"; then
+            echo T4; return 1
+        fi
+        # shellcheck disable=SC2016  # literal workflow text
+        if command grep -qF 'ref: ${{ needs.mark-pending.outputs.head_sha }}' <<< "$blk"; then
+            heads=$((heads + 1))
+            head_blk=$blk
+        fi
+    done <<< "$ids"
+    [ "$heads" = 1 ] || { echo T5; return 1; }
+    command grep -q '^    permissions:' <<< "$head_blk" && { echo T5; return 1; }
+    while IFS= read -r f; do
+        [ -n "$f" ] || continue
+        # shellcheck disable=SC2016  # literal workflow text
+        case "$f" in *'"$HS_LIB/'* | *'.hs-base/'*) ;; *) echo T5; return 1 ;; esac
+    done <<< "$(command grep -vE '^ *#' <<< "$head_blk" | command grep -E '(^|[[:space:];!])(source|\.) +[^ ]' || true)"
+    # shellcheck disable=SC2016  # literal workflow text
+    if hs_run_bodies < "$gate" | command grep -qE '\$\{\{ *(github\.event\.|inputs\.|needs\.)'; then
+        echo T6; return 1
+    fi
+    while IFS= read -r id; do
+        blk=$(HS_WF="$gate" hs_job_block "$id")
+        if command grep -qF 'context=human-signoff' <<< "$blk" && ! command grep -qE '^      statuses: write$' <<< "$blk"; then
+            echo T7; return 1
+        fi
+    done <<< "$ids"
+    for f in "$wfd"/*.yml "$wfd"/*.yaml; do
+        [ -f "$f" ] || continue
+        if command grep -qE '^ +name: human-signoff$' "$f"; then echo T7; return 1; fi
+        if [ "$(basename "$f")" != "$(basename "$gate")" ] && command grep -qF 'context=human-signoff' "$f"; then
+            echo T7; return 1
+        fi
+    done
+    if ! command grep -qx 'permissions: {}' "$stub" \
+        || ! command grep -qxF '    types: [opened, reopened, synchronize, edited, ready_for_review, labeled, unlabeled]' "$stub" \
+        || ! command grep -qxF 'run-name: "hs:${{ github.event.action }}:${{ github.event.label.name }}"' "$stub" \
+        || ! command grep -qxF '    branches: [ master ]' "$stub" \
+        || command grep -qE '^ *(- )?uses:' "$stub"; then
+        echo T8; return 1
+    fi
+    for id in post-status needs-a-human-label human-approved-fingerprint; do
+        blk=$(HS_WF="$gate" hs_job_block "$id")
+        command grep -E '^    if: ' <<< "$blk" | command grep -qF "$clause" || { echo T9; return 1; }
+    done
+    blk=$(HS_WF="$gate" hs_job_block mark-pending | hs_steps_with 'context=human-signoff') || blk=''
+    command grep -E '^        if: ' <<< "$blk" | command grep -qF "$inner" || { echo T9; return 1; }
+    command grep -qx '    needs: mark-pending' <<< "$(HS_WF="$gate" hs_job_block human-signoff)" || { echo T10; return 1; }
+    command grep -qx '    needs: \[mark-pending, human-signoff\]' <<< "$(HS_WF="$gate" hs_job_block post-status)" || { echo T10; return 1; }
+    return 0
+}
+
+TB_OUT=$(hs_trust_boundary_ok "$WF_DIR/human-signoff.yml" "$WF_DIR/human-signoff-trigger.yml" "$WF_DIR"); rc=$?
+expect "trust boundary: the real gate and stub pass (rc)" 0 "$rc"
+if [ -z "$TB_OUT" ]; then h_pass "trust boundary: the real gate and stub print nothing"; else h_fail "trust boundary: the real gate and stub print nothing" "[$TB_OUT]"; fi
+
+TB=$(mktemp -d)
+# tb_mut <name> <expected-rule> <file in the copy: gate|stub|settle> <old> <new> —
+# copy the workflows dir, replace <old> with <new> exactly once (an empty <old>
+# appends <new> as a line), and require the named rule to fail.
+tb_mut() {
+    local d="$TB/$1" f out rc
+    cp -R "$WF_DIR" "$d"
+    case "$3" in
+        gate) f="$d/human-signoff.yml" ;;
+        stub) f="$d/human-signoff-trigger.yml" ;;
+        settle) f="$d/all-checks-settled.yml" ;;
+    esac
+    if ! python3 -I -c '
+import sys
+p, old, new = sys.argv[1:4]
+s = open(p).read()
+if old == "":
+    s += new + "\n"
+elif s.count(old) != 1:
+    sys.exit("match count %d" % s.count(old))
+else:
+    s = s.replace(old, new)
+open(p, "w").write(s)
+' "$f" "$4" "$5"; then
+        h_fail "trust boundary mutant $1 builds" "match is not unique"
+        return 0
+    fi
+    out=$(hs_trust_boundary_ok "$d/human-signoff.yml" "$d/human-signoff-trigger.yml" "$d"); rc=$?
+    if [ "$rc" -ne 0 ] && [ "$out" = "$2" ]; then
+        h_pass "trust boundary mutant $1 fails $2"
+    else
+        h_fail "trust boundary mutant $1 fails $2" "rc=$rc out=[$out]"
+    fi
+}
+NL=$'\n'
+# shellcheck disable=SC2016  # literal workflow text throughout
+{
+tb_mut on-pull-request T1 gate '  workflow_run:' '  pull_request:'
+tb_mut on-no-dispatch T1 gate "  workflow_dispatch:${NL}" ''
+tb_mut workflows-widened T2 gate 'workflows: ["Human Sign-off trigger"]' 'workflows: ["Human Sign-off trigger", "CI"]'
+tb_mut top-actions-write T3 gate '  actions: read' '  actions: write'
+tb_mut write-job-ref T4 gate "          persist-credentials: false${NL}      - name: Record or revoke" "          persist-credentials: false${NL}          ref: \${{ needs.mark-pending.outputs.head_sha }}${NL}      - name: Record or revoke"
+tb_mut head-job-perms T5 gate "    name: human-signoff evaluate${NL}" "    name: human-signoff evaluate${NL}    permissions:${NL}      contents: read${NL}"
+tb_mut head-sourced-lib T5 gate 'source "$HS_LIB/ui-change-classifier.sh"' 'source bin/lib/ui-change-classifier.sh'
+tb_mut run-event-expr T6 gate 'HS_LIB="$GITHUB_WORKSPACE/.hs-base/bin/lib"' 'HS_LIB="$GITHUB_WORKSPACE/.hs-base/bin/lib"; echo "${{ github.event.workflow_run.head_branch }}"'
+tb_mut run-needs-expr T6 gate '-f context=human-signoff -f description='"'"'Evaluating'"'" '-f context=human-signoff -f description="${{ needs.x.outputs.y }}"'
+tb_mut stub-job-named-context T7 stub 'name: human-signoff trigger' 'name: human-signoff'
+tb_mut status-without-scope T7 gate "    permissions:${NL}      statuses: write${NL}      pull-requests: read${NL}    outputs:" "    permissions:${NL}      pull-requests: read${NL}    outputs:"
+tb_mut other-file-posts-context T7 settle '' '# gh api statuses -f context=human-signoff'
+tb_mut stub-drops-unlabeled T8 stub 'types: [opened, reopened, synchronize, edited, ready_for_review, labeled, unlabeled]' 'types: [opened, reopened, synchronize, edited, ready_for_review, labeled]'
+tb_mut stub-uses-action T8 stub "run: 'true'" 'uses: actions/checkout@v7'
+tb_mut stub-gets-scope T8 stub 'permissions: {}' 'permissions: write-all'
+tb_mut post-status-any-ref T9 gate "needs.mark-pending.outputs.head_sha != '' && (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/master') }}" "needs.mark-pending.outputs.head_sha != '' }}"
+tb_mut pending-any-ref T9 gate "        if: github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/master'${NL}" ''
+tb_mut gate-skips-pending T10 gate 'needs: mark-pending' 'needs: []'
+tb_mut status-skips-pending T10 gate 'needs: [mark-pending, human-signoff]' 'needs: human-signoff'
+}
+rm -rf "$TB"
 
 h_done

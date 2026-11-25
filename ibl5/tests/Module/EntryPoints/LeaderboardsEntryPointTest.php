@@ -72,7 +72,7 @@ class LeaderboardsEntryPointTest extends ModuleEntryPointTestCase
         $output = $this->runModule('Leaderboards', ['tab' => 'season'], [], $this->dbGlobals());
 
         $this->assertStringContainsString('<form name="Leaderboards"', $output);
-        $this->assertStringContainsString('class="ibl-filter-form ibl-filter-form--stacked"', $output);
+        $this->assertStringContainsString('class="d-card d-card-border bg-base-200 p-4 mb-6 mx-4"', $output);
         $this->assertStringContainsString('name="sortby"', $output);
     }
 

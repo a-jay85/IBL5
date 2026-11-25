@@ -49,10 +49,10 @@ MERGE_TARGET_TIMEOUT = 30   # seconds; covers ls-remote (10 s) + gh (5 s) + bash
 _MERGE_TARGET_RE = re.compile(r"origin/[A-Za-z0-9][A-Za-z0-9._/-]*")
 
 # Local gate denials (bin/pre-commit-hook, bin/pre-push-adr-hook) are deterministic:
-# re-running the FULL /post-plan skill hits the identical hook and cannot clear it
+# re-running the harness hits the identical hook and cannot clear it
 # without a human writing an ADR, refreshing a doc, or trimming a rule file. A distinct
-# kind lets exit_code_for() emit the fail-closed 3 sentinel, so bin/post-plan-now skips
-# the ~1M-token skill fallback instead of burning it on a guaranteed re-denial.
+# kind lets exit_code_for() emit the fail-closed 3 sentinel, so the run stops for a
+# human instead of burning tokens on a guaranteed re-denial.
 # Markers are the hooks' own output: bin/pre-push-adr-hook's prefix and its base-check
 # line, the two guidance lines bin/pre-commit-hook echoes, and
 # bin/check-rules-byte-budget's summary line.
@@ -564,13 +564,13 @@ class LiveGit:
         # _LOCAL_GATE_MARKERS sniff catches the gates whose wording it enumerates, but
         # bin/pre-commit-hook's gofmt leg ("gofmt: unformatted Go files") and its
         # check-docs leg ("Fix the above doc issues before committing.") match none of
-        # them -- those rejections still type "git", exit 1, and launch the ~1M-token
-        # skill fallback on a tree only a human can fix. On the COMMIT path the return
-        # code alone is sufficient signal: no blind /post-plan re-run satisfies a hook
+        # them -- those rejections still type "git" and exit 1 on a tree only a human
+        # can fix. On the COMMIT path the return
+        # code alone is sufficient signal: no blind re-run satisfies a hook
         # that just said no, so there is no message left to enumerate. Kind stays
         # "local-gate" so it lands in runner._FAIL_CLOSED_KINDS and exits 3 -- no new
-        # exit code to thread through should_fallback, GATE_CLOSE or the automouse
-        # ledger arm, all of which already admit 3. Same direct-subprocess shape as
+        # exit code to thread through GATE_CLOSE or the automouse
+        # ledger arm, both of which already admit 3. Same direct-subprocess shape as
         # rebase_onto() below; no abort step, because a rejected commit leaves no
         # partial state. BOTH streams are captured: the hook writes its reason to
         # whichever it likes, so rebase_onto's `stderr or stdout` would discard the one
@@ -1372,7 +1372,7 @@ class LiveGit:
         surfaces at one stop. Conflict → attempt auto-resolution; if that fails or is
         not applicable, abort the rebase, restore the tree, and raise
         HarnessError. Fail closed: exit_code_for() maps this to exit 3, which
-        bin/post-plan-now refuses to escalate to the skill fallback."""
+        bin/post-plan-now stops there for a human."""
         from ..conflict import (
             DECLINE_RETRY_MODEL, MAX_DECLINE_RETRIES, SYNC_BRANCH_STAGE,
             abort_and_restore, assert_text_only, inventory_conflicts,

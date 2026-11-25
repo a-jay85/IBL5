@@ -8,7 +8,7 @@ import type { Page } from '@playwright/test';
 async function submitFilters(page: Page): Promise<void> {
   await Promise.all([
     page.waitForResponse((r) => r.url().includes('tab=season') && r.request().method() === 'GET'),
-    page.locator('.ibl-filter-form__submit').click(),
+    page.locator('form[name="Leaderboards"]').getByRole('button', { name: 'Search', exact: true }).click(),
   ]);
 }
 
@@ -22,21 +22,21 @@ test.describe('Season Leaderboards flow', () => {
   });
 
   test('page loads with filter form', async ({ page }) => {
-    const form = page.locator('.ibl-filter-form');
+    const form = page.locator('form[name="Leaderboards"]');
     await expect(form).toBeVisible();
 
     await expect(page.locator('select[name="team"]')).toBeVisible();
     await expect(page.locator('select[name="year"]')).toBeVisible();
     await expect(page.locator('select[name="sortby"]')).toBeVisible();
     await expect(page.locator('input[name="limit"]')).toBeVisible();
-    await expect(page.locator('.ibl-filter-form__submit')).toHaveText('Search');
-    await expect(page.locator('.ibl-filter-form')).not.toContainText('Records');
+    await expect(page.locator('form[name="Leaderboards"]').getByRole('button', { name: 'Search', exact: true })).toHaveText('Search');
+    await expect(page.locator('form[name="Leaderboards"]')).not.toContainText('Records');
     await expect(page.locator('label[for="sl-limit"]')).toHaveText('Results Limit:');
   });
 
   test('first visit shows the form without running a search', async ({ page }) => {
     await page.goto('modules.php?name=Leaderboards&tab=season');
-    await expect(page.locator('.ibl-filter-form')).toBeVisible();
+    await expect(page.locator('form[name="Leaderboards"]')).toBeVisible();
     await expect(page.locator('.ibl-data-table')).toHaveCount(0);
   });
 

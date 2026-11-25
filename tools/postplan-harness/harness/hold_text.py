@@ -294,13 +294,36 @@ def _ui_review_floor(r: str) -> str:
     return f"This PR changes files that build pages league GMs see ({ui_shown}), so it needs your OK. " + ask
 
 
+_GOLDEN_TEXT = ("The game simulation output changed (golden.json), and no person was "
+                "watching to confirm it was on purpose.")
+_CAPTURE_TEXT = ("This PR adds or changes a raw JSB capture under engine/testdata/jsb-captures/, "
+                 "and every capture needs your OK. Check its header line: source tool, JSB "
+                 "build, and function address.")
+
+
+def _golden_or_capture(r: str) -> str:
+    """Condition (5): name the golden snapshot, the JSB capture, or both (armable.py)."""
+    golden = "golden snapshot" in r
+    capture = "JSB capture" in r
+    if capture and not golden:
+        return _CAPTURE_TEXT
+    if golden and not capture:
+        return _GOLDEN_TEXT
+    if " and " in r:
+        return ("The game simulation output changed (golden.json) and this PR adds or changes "
+                "a raw JSB capture, so both need your OK. Check the capture's header line: "
+                "source tool, JSB build, and function address.")
+    # An older reason that did not say which one changed.
+    return ("The game simulation output (golden.json) or a raw JSB capture changed, and no "
+            "person was watching to confirm it was on purpose.")
+
+
 _BY_NUMBER = {
     1: _manual_testing,
     2: _review_findings,
     3: _missing_items,
     4: _phase5,
-    5: lambda r: ("The game simulation output changed (golden.json), and no person was "
-                  "watching to confirm it was on purpose."),
+    5: _golden_or_capture,
     6: _depends_on,
     7: _plan_auto_merge,
     8: _ui_review_floor,

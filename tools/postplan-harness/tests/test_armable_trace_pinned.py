@@ -52,7 +52,7 @@ def test_c5_c7_held_when_evidence_not_ok():
         decision = evaluate(inp)
         assert not decision.armed
         assert {5, 7} <= _holds(decision), evidence
-        assert _cond(decision, 5).reason == "golden snapshot or JSB capture changed in headless mode"
+        assert _cond(decision, 5).reason == "golden snapshot changed in headless mode"
         assert second_review_candidates(inp, decision.conditions) == {}
 
 
@@ -68,7 +68,7 @@ def test_golden_seeds_only_triggers_c5():
     assert cls.golden_changed
     decision = evaluate(inputs(classification=cls))
     assert _holds(decision) == {5}
-    assert _cond(decision, 5).reason == "golden snapshot or JSB capture changed in headless mode"
+    assert _cond(decision, 5).reason == "golden snapshot changed in headless mode"
 
 
 def test_golden_seeds_only_interactive_warns():
@@ -83,8 +83,10 @@ def test_capture_dir_change_triggers_c5_and_is_not_liftable():
     assert cls.jsb_capture_changed and not cls.golden_changed
     held = evaluate(inputs(classification=cls))
     assert _holds(held) == {5}
+    assert _cond(held, 5).reason == "JSB capture changed in headless mode"
     inp = _golden_inputs(files=(GO_FILE, GOLDEN, CAPTURE))
     decision = evaluate(inp)
+    assert _cond(decision, 5).reason == "golden snapshot and JSB capture changed in headless mode"
     assert not decision.armed
     assert {5, 7} <= _holds(decision)
     assert second_review_candidates(inp, decision.conditions) == {}

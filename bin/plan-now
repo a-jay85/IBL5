@@ -1274,7 +1274,13 @@ log: $LOG"
 
     # discord-dm spools an undeliverable DM and raises a macOS notification. The
     # verdict is in $LOG regardless, so ljob_dm_send only reports the failure.
-    ljob_dm_send plan-now "$msg"
+    # Only a clean ok and a usage pause stay in #dev. Every other verdict
+    # (no-plan, failed, degraded, unconfirmed, parked) needs the owner, so it
+    # goes to #errors.
+    case "${DM_ICON:-}" in
+        "✅"|"⏸️") ljob_dm_send plan-now "$msg" ;;
+        *)         ljob_dm_send plan-now "$msg" --error ;;
+    esac
 }
 notify
 # Teardown (launchctl remove + once-marker cleanup) belongs to the ljob_submit

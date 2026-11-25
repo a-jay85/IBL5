@@ -61,44 +61,44 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
 
         ob_start();
         ?>
-<form name="Leaderboards" method="get" action="modules.php" class="ibl-filter-form ibl-filter-form--stacked">
+<form name="Leaderboards" method="get" action="modules.php" class="d-card d-card-border bg-base-200 p-4 mb-6 mx-4">
     <input type="hidden" name="name" value="Leaderboards">
     <input type="hidden" name="tab" value="season">
-    <div class="ibl-filter-form__row">
-        <div class="ibl-filter-form__group">
-            <label for="sl-team" class="ibl-filter-form__label">Team:</label>
-            <select id="sl-team" name="team">
+    <div class="flex flex-col items-stretch gap-3 md:flex-row md:flex-wrap md:items-center md:justify-center md:gap-4">
+        <div class="flex w-full items-center justify-between gap-2 md:w-auto md:justify-start">
+            <label for="sl-team" class="d-label">Team:</label>
+            <select id="sl-team" name="team" class="d-select w-auto">
                 <option value="0">All</option>
                 <?php foreach ($teams as $team): ?>
                 <option value="<?= (int)$team['teamid'] ?>"<?= ($selectedTeam === (int)$team['teamid']) ? ' selected' : '' ?>><?= HtmlSanitizer::e($team['Team']) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
-        <div class="ibl-filter-form__group">
-            <label for="sl-year" class="ibl-filter-form__label">Year:</label>
-            <select id="sl-year" name="year">
+        <div class="flex w-full items-center justify-between gap-2 md:w-auto md:justify-start">
+            <label for="sl-year" class="d-label">Year:</label>
+            <select id="sl-year" name="year" class="d-select w-auto">
                 <option value="">All</option>
                 <?php foreach ($years as $year): ?>
                 <option value="<?= (int)$year ?>"<?= ($selectedYear === (string)$year) ? ' selected' : '' ?>><?= (int)$year ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
-        <div class="ibl-filter-form__group">
-            <label for="sl-sortby" class="ibl-filter-form__label">Sort By:</label>
-            <select id="sl-sortby" name="sortby">
+        <div class="flex w-full items-center justify-between gap-2 md:w-auto md:justify-start">
+            <label for="sl-sortby" class="d-label">Sort By:</label>
+            <select id="sl-sortby" name="sortby" class="d-select w-auto">
                 <?php foreach ($sortOptions as $key => $label): ?>
                 <option value="<?= HtmlSanitizer::e($key) ?>"<?= ($key === $selectedSort) ? ' selected' : '' ?>><?= HtmlSanitizer::e($label) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
-        <div class="ibl-filter-form__group">
-            <label for="sl-limit" class="ibl-filter-form__label">Results Limit:</label>
-            <input id="sl-limit" type="number" name="limit" value="<?= HtmlSanitizer::e($limitValue) ?>" min="1" placeholder="50">
+        <div class="flex w-full items-center justify-between gap-2 md:w-auto md:justify-start">
+            <label for="sl-limit" class="d-label">Results Limit:</label>
+            <input id="sl-limit" type="number" name="limit" class="d-input w-20" value="<?= HtmlSanitizer::e($limitValue) ?>" min="1" placeholder="50">
         </div>
     </div>
     <input type="hidden" name="submitted" value="1">
-    <div class="ibl-filter-form__actions">
-        <button type="submit" class="ibl-filter-form__submit">Search</button>
+    <div class="flex justify-center mt-4">
+        <button type="submit" class="d-btn d-btn-primary">Search</button>
     </div>
 </form>
         <?php

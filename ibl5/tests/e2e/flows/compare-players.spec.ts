@@ -14,7 +14,7 @@ async function submitComparison(page: Page): Promise<void> {
 
   await page.locator('#Player1').fill(player1Name);
   await page.locator('#Player2').fill(player2Name);
-  await page.locator('.ibl-filter-form__submit').click();
+  await page.locator('form[action*="ComparePlayers"]').getByRole('button', { name: 'Compare', exact: true }).click();
   await expect(page.locator('.ibl-data-table').first()).toBeVisible();
 }
 
@@ -24,7 +24,7 @@ test.describe('Compare Players flow', () => {
   });
 
   test('page loads with comparison form', async ({ page }) => {
-    const form = page.locator('.ibl-filter-form');
+    const form = page.locator('form[action*="ComparePlayers"]');
     await expect(form).toBeVisible();
 
     await expect(page.locator('#Player1')).toBeVisible();
@@ -37,7 +37,7 @@ test.describe('Compare Players flow', () => {
   });
 
   test('form has submit button with Compare text', async ({ page }) => {
-    const submitBtn = page.locator('.ibl-filter-form__submit');
+    const submitBtn = page.locator('form[action*="ComparePlayers"]').getByRole('button', { name: 'Compare', exact: true });
     await expect(submitBtn).toBeVisible();
     await expect(submitBtn).toContainText('Compare');
   });
@@ -68,7 +68,7 @@ test.describe('Compare Players flow', () => {
   test('invalid player name shows error', async ({ page }) => {
     await page.locator('#Player1').fill('Nonexistent Player XYZ123');
     await page.locator('#Player2').fill('Another Fake Player ABC456');
-    await page.locator('.ibl-filter-form__submit').click();
+    await page.locator('form[action*="ComparePlayers"]').getByRole('button', { name: 'Compare', exact: true }).click();
 
     const emptyState = page.locator('.ibl-empty-state');
     await expect(emptyState).toBeVisible();

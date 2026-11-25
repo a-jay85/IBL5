@@ -10,7 +10,7 @@ last_verified: 2026-11-25
 
 ## Context
 
-ADR-0278 hosted captures in the private jsb-native repo. CI has no jsb-native checkout, so `harness.trace_pinned` held every hosted entry as `capture-host-unavailable`, and the pinned Go tests skipped. The owner decided on 2026-11-24 to move the captures into IBL5. The 2026-11-24 addendum to ADR-0236 already makes the port public.
+ADR-0278 hosted captures in the private jsb-native repo. CI has no jsb-native checkout, so `harness.trace_pinned` held every hosted entry as `capture-host-unavailable`, and the pinned Go tests skipped. The owner decided on 2026-11-24 to move the captures into IBL5. That decision accepts that the capture files become public.
 
 ## Decision
 

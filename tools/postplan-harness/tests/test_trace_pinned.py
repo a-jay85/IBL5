@@ -955,9 +955,9 @@ def test_committed_evidence_entries_pin_in_repo_captures():
             assert entry.get("capture_host", "repo") == "repo", where
             assert "capture_commit" not in entry, where
             assert str(Path(entry["capture"]).parent) == tp.CAPTURE_DIR, where
-            capture = REPO / entry["capture"]
-            assert capture.is_file(), where
-            assert tp._sha256(capture.read_bytes()) == entry["capture_sha256"], where
+            # No sha256 check: a later re-trace may overwrite a capture. `_check_capture`
+            # enforces the sha at arming time on the port branch.
+            assert (REPO / entry["capture"]).is_file(), where
 
 
 def test_jsb_native_dir_is_common_dir_parent(tmp_path):

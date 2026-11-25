@@ -544,6 +544,12 @@ perm_fix argv_unquoted_var '$FLAGS'
 expect_class perm_argv_unquoted_var_fail "$T/perm_argv_unquoted_var.sh" permission
 perm_fix argv_unquoted_positional '$1'
 expect_class perm_argv_positional_fail "$T/perm_argv_unquoted_positional.sh" permission
+perm_fix argv_braced_at '"${@}"'
+expect_class perm_argv_braced_at_fail "$T/perm_argv_braced_at.sh" permission
+perm_fix argv_braced_at_slice '"${@:2}"'
+expect_class perm_argv_braced_at_slice_fail "$T/perm_argv_braced_at_slice.sh" permission
+perm_fix deny_braced_at '--disallowedTools "${@}"'
+expect_class perm_deny_braced_at_fail "$T/perm_deny_braced_at.sh" permission
 perm_fix argv_braced_var '${FLAGS}'
 expect_class perm_argv_braced_var_fail "$T/perm_argv_braced_var.sh" permission
 perm_fix argv_unquoted_cmdsub '$(cat flags.txt)'

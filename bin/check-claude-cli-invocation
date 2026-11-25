@@ -425,10 +425,11 @@ function report(f, ln, cls, detail) {
 }
 
 # perm_splits: 1 when an argv word can expand to several words or to a flag: "$@", "$*",
-# an array NAME[@], or any unquoted expansion such as $FLAGS, ${FLAGS} or $(cmd).
+# "${@}", "${@:2}", an array NAME[@], or any unquoted expansion such as $FLAGS, $1,
+# ${FLAGS} or $(cmd).
 function perm_splits(v) {
     if (v ~ /^"?\$[@*]"?$/ || index(v, "[@]") > 0) return 1
-    return (v ~ /^\$[A-Za-z_{(]/)
+    return (v ~ /^\$[A-Za-z0-9_{(]/ || v ~ /^"?\$\{[@*]/)
 }
 function perm_static(v) { return (index(v, "$") == 0 && index(v, "`") == 0) }
 function perm_bin_ok(b) {

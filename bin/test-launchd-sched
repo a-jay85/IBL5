@@ -513,13 +513,16 @@ ${TAB}${TAB}<string>exec \"\$0\" \"\$@\"</string>
 ${TAB}${TAB}<string>/abs/x</string>
 ${TAB}${TAB}<string>--once</string>
 ${TAB}</array>" "$(emit lsched_wrapped_program_arguments /abs/x --once)"
-for hrej in "relative:rel/x" "system-binary:/bin/sh"; do
-  hname="${hrej%%:*}"; harg="${hrej#*:}"
+# helper_rejects <case name> <script path> — the helper must exit 2 and say why.
+helper_rejects() {
+  local hcase="$1" harg="$2" herr hrc
   herr="$( ( set -uo pipefail; . "$LIB"; lsched_wrapped_program_arguments "$harg" ) 2>&1 >/dev/null )"
   ( set -uo pipefail; . "$LIB"; lsched_wrapped_program_arguments "$harg" ) >/dev/null 2>&1
   hrc=$?
-  if [ "$hrc" = "2" ] && [ -n "$herr" ]; then pass "helper-rejects-$hname"; else fail "helper-rejects-$hname (rc=$hrc)"; fi
-done
+  if [ "$hrc" = "2" ] && [ -n "$herr" ]; then pass "$hcase"; else fail "$hcase (rc=$hrc)"; fi
+}
+helper_rejects "helper-rejects-relative" "rel/x"
+helper_rejects "helper-rejects-system-binary" "/bin/sh"
 
 # rw_plist <file> <program|-> <argv string>... — an installed-plist fixture. A "-" program
 # writes no Program key. Extra keys let the tests prove the rewrap keeps them.

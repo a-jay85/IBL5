@@ -1,6 +1,6 @@
 ---
 description: Runbook for capturing per-call (input, output) pairs from the original JSB binary into a jsb-trace/1 JSONL file.
-last_verified: 2026-11-24
+last_verified: 2026-11-25
 ---
 
 # JSB per-call trace capture
@@ -25,7 +25,7 @@ The existing traces count events per team-game. See `engine/docs/j27-foul-volume
 
 A capture lands in its own PR, before the port PR that uses it. The owner reviews that PR.
 
-The jsb-native parity loop writes its capture into an IBL5 worktree named `jsb-capture-<row>`, under `engine/testdata/jsb-captures/`. That worktree ships as an owner-held capture PR (ADR-0266). `port` refuses until the file is on IBL5 `origin/master` with the same sha256. A PR that adds a capture and its evidence together holds as `capture-not-on-base`. ADR-0286 (`ibl5/docs/decisions/0286-in-repo-jsb-trace-captures.md`) records this path.
+The jsb-native parity loop writes its capture into an IBL5 worktree named `jsb-capture-<row>`, under `engine/testdata/jsb-captures/`. That worktree ships as an owner-held capture PR (ADR-0266). `port` refuses until the file is on IBL5 `origin/master` with the same sha256. A PR that adds a capture and its evidence together holds as `capture-in-diff`. ADR-0286 (`ibl5/docs/decisions/0286-in-repo-jsb-trace-captures.md`) records this path.
 
 ## Using a capture
 

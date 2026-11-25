@@ -3,9 +3,7 @@
   "schema": 2,
   "tests": [
     {
-      "capture": "captures/pl-0027.jsonl",
-      "capture_commit": "3c707144dde33d91aae959ba1aa638d2c259eab4",
-      "capture_host": "jsb-native",
+      "capture": "engine/testdata/jsb-captures/pl-0027-3c70714.jsonl",
       "capture_sha256": "c8a7e13d58b9f46dbf24236512b0a3c56266228f27c9edb92dee75922630c93a",
       "file": "engine/internal/sim/tracepinned_pl0027_test.go",
       "package": "./internal/sim",

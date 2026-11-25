@@ -380,7 +380,7 @@ resolve_target() {
 
 # Inbox: the full message for bin/dev-inbox. Best-effort, like the sent log.
 log_inbox() { # target
-    local inbox size body
+    local inbox size body entry
     inbox="${DISCORD_DM_INBOX:-$HOME/.claude/dev-inbox.log}"
     mkdir -p "$(dirname "$inbox")"
     size=$(stat -c %s "$inbox" 2>/dev/null || stat -f %z "$inbox" 2>/dev/null || echo 0)
@@ -390,10 +390,12 @@ log_inbox() { # target
     else
         body="$FULL_MSG"
     fi
-    {
-        printf '@@ %s %s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$1" "${CALLER// /_}"
-        printf '%s\n' "$body" | tr -d '\r' | sed 's/^/  /'
-    } >> "$inbox"
+    # One write per entry, so parallel sends cannot interleave. Bash's printf writes
+    # line by line, so build the entry first and let cat append it. <<< adds the last \n.
+    printf -v entry '@@ %s %s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$1" "${CALLER// /_}"
+    body=${body//$'\r'/}
+    entry+="  ${body//$'\n'/$'\n  '}"
+    cat <<< "$entry" >> "$inbox"
 }
 
 # Sent log: one line per delivered message. Best-effort by design: every failure is

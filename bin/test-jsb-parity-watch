@@ -1038,6 +1038,39 @@ case_fixer_prunes_resolved_keys() {
     h_contains "an unreadable state file prunes nothing" "$(QUEUE)" "days-empty"
 }
 
+case_fixer_keeps_hidden_stall() {
+    local key="stall:no-trace:pl-0001" wakes
+    sandbox fixer_hidden_stall
+    wakes="$S/home/.cache/jsb-parity-fixer-wakes.txt"
+    arm_fixer
+    run_watch
+    h_eq "before hiding: one fixer POST" 1 "$(posts fixer)"
+    # An unrelated plan-now job with no log hides the stall for one run.
+    printf -- '-\t0\tcom.ibl5.plan-now-20261123-012805-44230\n' > "$S/fix/launchctl-list"
+    reset_logs
+    NOW=$((BASE + 3600)) run_watch
+    h_contains "hidden run: verdict is a wait" "$(out)" "WAIT:plan-now-unattributed"
+    h_contains "hidden stall stays queued" "$(QUEUE)" "$key"
+    h_contains "hidden stall keeps its wake line" "$(slurp "$wakes")" \
+        "$(printf '%s\t%s\t%s' "$key" "$BASE" "$BASE")"
+    rm -f "$S/fix/launchctl-list"
+    reset_logs
+    NOW=$((BASE + 7200)) run_watch
+    h_eq "stall back inside 6h: no second wake" 0 "$(posts fixer)"
+    NOW=$((BASE + 10801)) run_watch
+    h_eq "stall past 3h from the first wake: one DM" 1 "$(cnt discord-dm)"
+    printf -- '-\t0\tcom.ibl5.plan-now-20261123-012805-44230\n' > "$S/fix/launchctl-list"
+    NOW=$((BASE + 14400)) run_watch
+    rm -f "$S/fix/launchctl-list"
+    NOW=$((BASE + 18000)) run_watch
+    h_eq "hidden again after the DM: still one DM" 1 "$(cnt discord-dm)"
+    # A row with a PR has really left the stall, so its lines go.
+    quiet_row
+    NOW=$((BASE + 19000)) run_watch
+    h_not_contains "a recovered row leaves the queue" "$(QUEUE)" "$key"
+    h_not_contains "a recovered row loses its wake line" "$(slurp "$wakes")" "$key"
+}
+
 case_setup_save_fixer_webhook_mode_600() {
     local file mode
     sandbox setup_save_hook

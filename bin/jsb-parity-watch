@@ -110,6 +110,7 @@ AUTOMOUSE_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse"
 
 FIRE_REASONS=""
 STALL_KEYS=""
+HIDDEN_ROWS=" "     # space-delimited row ids whose stall state is unknown this run
 KICK=0
 GH_ERROR=""
 FACTS=""
@@ -403,6 +404,7 @@ fixer_forget_claimed() {
 # fixer_prune: drop the queue and wake lines of blockers that are gone, so the
 # fixer never claims a resolved key and a recurrence starts a fresh wake. The
 # merged:<slug> line stays while that fix is open, so its 6h refire limit holds.
+# An unattributed plan-now job hides a row's stall, so that row's stall lines stay.
 fixer_prune() {
     local file="$PARITY_DIR/state/blockers.json" live key keys path s_row s_stage slug verdict
     if [ "$DRY_RUN" != 0 ]; then return 0; fi
@@ -420,6 +422,7 @@ fixer_prune() {
         [ -s "$path" ] || continue
         keys=$(awk -F'\t' '{print $1}' "$path")
         while read -r key; do
+            if [[ "$key" == stall:* && "$HIDDEN_ROWS" == *" ${key##*:} "* ]]; then continue; fi
             if [ -n "$key" ] && ! grep -qxF -- "$key" <<< "$live"; then
                 put_line "$path" "$key"
             fi
@@ -596,6 +599,7 @@ main() {
             FIRE:*) FIRE_REASONS="${FIRE_REASONS:+$FIRE_REASONS }$id:${verdict#FIRE:}" ;;
             KICK:*) KICK=1 ;;
             STALL:*) STALL_KEYS="${STALL_KEYS:+$STALL_KEYS }$id:${verdict#STALL:}" ;;
+            WAIT:plan-now-unattributed) HIDDEN_ROWS="$HIDDEN_ROWS$id " ;;
             WAIT:*) ;;
         esac
     done <<< "$inflight"

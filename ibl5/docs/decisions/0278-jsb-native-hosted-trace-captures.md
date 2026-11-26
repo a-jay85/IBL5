@@ -1,6 +1,6 @@
 ---
 description: ADR-0278. Trace-pinned evidence may cite a capture hosted in the private jsb-native repo, pinned by commit and sha256.
-last_verified: 2026-11-24
+last_verified: 2026-11-25
 ---
 
 # ADR-0278: Trace-pinned evidence may cite a jsb-native capture
@@ -45,4 +45,4 @@ The first rejected alternative above keeps captures out of IBL5 because IBL5 is 
 
 ## Addendum (2026-11-24, hosting superseded)
 
-ADR-0286 moves every capture into `engine/testdata/jsb-captures/` and retires `capture_host: jsb-native`. The evidence schema and this ADR's rejections still apply.
+ADR-0286 is the separate decision the addendum above calls for. It moves every capture into `engine/testdata/jsb-captures/` and retires `capture_host: jsb-native`. It also reverses the first rejected alternative. The evidence schema and the other two rejections still apply.

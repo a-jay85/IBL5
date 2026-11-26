@@ -18,6 +18,7 @@
 #   no PR, a loaded plan-now job may own the slug     wait
 #   no PR, plan in done/ or skipped/                  STALL (DM)
 #   no PR, failure report names the slug              STALL (DM)
+#   no PR, newest linked plan-now log ends paused     wait
 #   no PR, nothing found                              STALL (DM: no trace)
 #   no row in flight                                  FIRE webhook
 #
@@ -238,8 +239,9 @@ row_verdict() {
         if log_names_slug "$f" "$slug"; then newest="$f"; fi
     done
     if [ -n "$newest" ]; then
-        # No-plan / failed stage: the newest linked log's last RESULT line decides.
+        # The newest linked log's last RESULT line decides. A paused run auto-resumes.
         case "$(grep '^plan-now: RESULT ' "$newest" 2>/dev/null | tail -n 1)" in
+            "plan-now: RESULT paused"|"plan-now: RESULT paused "*) echo "WAIT:plan-now-paused" ;;
             "plan-now: RESULT no-plan"|"plan-now: RESULT no-plan "*) echo "STALL:no-plan:$(basename "$newest")" ;;
             "plan-now: RESULT failed"|"plan-now: RESULT failed "*) echo "STALL:plan-now-failed:$(basename "$newest")" ;;
             *) echo "STALL:no-trace:$(basename "$newest")" ;;

@@ -449,6 +449,18 @@ case_failed_result_links_by_identity() {
     h_contains "failed: DM quotes the RESULT line" "$(slurp "$S/log/discord-dm.stdin")" "RESULT failed — claude exited 1"
 }
 
+case_paused_result_waits() {
+    local log=plan-now-20261124-120000-5.log
+    sandbox paused_result
+    {
+        idline jsb-port-pl-0001
+        printf 'plan-now: RESULT paused — usage gate; auto-resumes after reset.\n'
+    } > "$S/plannow/$log"
+    run_watch
+    h_contains "paused: row waits" "$(out)" "WAIT:plan-now-paused"
+    h_eq "paused: no stall DM" 0 "$(cnt discord-dm)"
+}
+
 case_ok_result_keeps_no_trace() {
     local log=plan-now-20261123-010000-1.log
     sandbox ok_result

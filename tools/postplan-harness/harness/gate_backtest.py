@@ -200,6 +200,9 @@ _ARMING_PATHS = (
     "tools/postplan-harness/harness/owner_intent.py",
     ".claude/agents/pr-second-reviewer.md",
     "tools/postplan-harness/harness/fidelity.py",
+    # The owner reads this module's evidence line before approving a fidelity.py edit. A looser
+    # copy merged alone would mislead that approval, so its edits wait for the owner too.
+    "tools/postplan-harness/harness/fidelity_evidence.py",
     "tools/postplan-harness/harness/planfile.py",
     "bin/lib/ui-change-classifier.sh",
     "bin/lib/human-signoff-classifier.sh",

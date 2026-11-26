@@ -307,7 +307,7 @@ def _worker(root, files_path, out_path) -> int:
     sys.path.insert(0, root)
     try:
         module = importlib.import_module("harness.fidelity")
-    except BaseException as exc:  # a SystemExit at import time is an import failure too
+    except (Exception, SystemExit) as exc:  # a SystemExit at import time is an import failure too
         Path(out_path).write_text(
             json.dumps({"import_error": f"{type(exc).__name__}: {exc}"[:200]}), encoding="utf-8")
         return 0

@@ -1237,5 +1237,18 @@ r_bells=$(tr -cd "$BEL" <<< "$r_out" | wc -c | tr -d ' ')
 { [[ "$r_out" == *"watching"*"late boom"* ]] && [ "$r_bells" = 1 ]; } \
     && ok "S2q empty inbox: watching line first, new entry rings" || fail "S2q bells=$r_bells out=[$r_out]"
 
+# A cut-off multibyte character (bytes e2 80) must not stop the viewer. The UTF-8
+# locale is set here because macOS awk only fails on the byte under one.
+printf '%s\n' '@@ 2026-11-25T13:00:00-0800 dev a' $'  cut \342\200' \
+    '@@ 2026-11-25T13:01:00-0800 errors b' '  after bad byte' > "$TMP/u.log"
+r_out=$(LC_ALL=en_US.UTF-8 DISCORD_DM_INBOX="$TMP/u.log" "$DEV_INBOX" --once 2>&1)
+r_bells=$(LC_ALL=C tr -cd "$BEL" <<< "$r_out" | wc -c | tr -d ' ')
+{ [[ "$r_out" == *"after bad byte"* ]] && [ "$r_bells" = 1 ]; } \
+    && ok "S2v --once reads past a bad UTF-8 byte and still rings" || fail "S2v bells=$r_bells out=[$r_out]"
+r_out=$(LC_ALL=en_US.UTF-8 PATH="$TMP/s2bin:$PATH" REAL_TAIL="$S2_TAIL" DISCORD_DM_INBOX="$TMP/u.log" "$DEV_INBOX" 2>&1)
+r_bells=$(LC_ALL=C tr -cd "$BEL" <<< "$r_out" | wc -c | tr -d ' ')
+{ [[ "$r_out" == *"after bad byte"*"watching"*"late boom"* ]] && [ "$r_bells" = 1 ]; } \
+    && ok "S2w follow mode reads past a bad UTF-8 byte" || fail "S2w bells=$r_bells out=[$r_out]"
+
 # ── Summary ───────────────────────────────────────────────────────────────────
 h_done

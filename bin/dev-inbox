@@ -42,8 +42,9 @@ done
 # Render entries from stdin. Entries up to number <skip> are dropped, and entries
 # up to number <quiet> never ring. bell=1 rings on a later alert entry. The
 # "watching" line prints after input line <mark_at> (-1: never).
+# Both awk calls use LC_ALL=C: under a UTF-8 locale, macOS awk exits on one bad byte.
 render() { # bell [skip quiet mark_at]
-    awk -v bell="$1" -v skip="${2:--1}" -v quiet="${3:-0}" -v mark_at="${4:--1}" -v inbox="$INBOX" '
+    LC_ALL=C awk -v bell="$1" -v skip="${2:--1}" -v quiet="${3:-0}" -v mark_at="${4:--1}" -v inbox="$INBOX" '
         function mark() { printf "\n\033[2m── watching %s ──\033[0m\n", inbox; fflush() }
         BEGIN {
             red = "\033[31m"; green = "\033[32m"; dim = "\033[2m"; bold = "\033[1m"; off = "\033[0m"
@@ -92,6 +93,6 @@ mkdir -p "$(dirname "$INBOX")" && touch "$INBOX"
 # The backlog and new entries come through one tail, so an entry that lands during
 # startup is not lost. The count only marks where the backlog ends: the last N
 # entries show without a bell. -F keeps following across the 5 MB rotation.
-read -r starts lines < <(awk '/^@@ / { n++ } END { print n + 0, NR }' "$INBOX")
+read -r starts lines < <(LC_ALL=C awk '/^@@ / { n++ } END { print n + 0, NR }' "$INBOX")
 skip=$(( starts > LAST ? starts - LAST : 0 ))
 tail -n +1 -F "$INBOX" 2>/dev/null | render "$BELL" "$skip" "$starts" "$lines"

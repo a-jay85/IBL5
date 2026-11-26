@@ -1981,6 +1981,25 @@ want    "R-12 chain: second log mentions TS2"        "$R12_LOG2"  "bin/plan-now 
 want_no "R-12 chain: second log omits TS1"           "$R12_LOG2"  "--resume $TS1"
 rm -f "$RL"/plan-now-"$TS1".* "$RL"/plan-now-"$TS2".*
 
+# R-16 a resume of a resume still knows its slug: each resume owns a .prompt copy.
+resume_fixture
+run_resume --resume "$RES_TS"
+RUNNER_B="$RES_RUNNER"
+TSB=$(basename "${RUNNER_B%.sh}"); TSB="${TSB#plan-now-}"
+STUB_RC=1 STUB_NO_PLAN=1 STUB_TAIL="" bash "$RUNNER_B" > "$RL/plan-now-$TSB.log" 2>&1
+cmp -s "$RL/plan-now-$RES_TS.prompt" "$RL/plan-now-$TSB.prompt" \
+    && ok "R-16 resume writes its own prompt copy" || fail "R-16 resume writes its own prompt copy"
+# Only B's own artifacts may feed C.
+rm -f "$RL"/plan-now-"$RES_TS".*
+run_resume --resume "$TSB"
+[ "$RES_RC" = 0 ] && ok "R-16 second resume rc 0" || fail "R-16 second resume rc 0 (got $RES_RC: $RES_OUT)"
+RUNNER_C="$RES_RUNNER"
+TSC=$(basename "${RUNNER_C%.sh}"); TSC="${TSC#plan-now-}"
+R16_OUT=$(STUB_RC=1 STUB_NO_PLAN=1 STUB_TAIL="" bash "$RUNNER_C" 2>&1)
+want "R-16 second resume identity line keeps the slug" "$(printf '%s\n' "$R16_OUT" | head -n 1)" \
+    "plan-now: identity slug=demo-slug resume_of=$TSB brief=-"
+rm -f "$RL"/plan-now-"$TSB".* "$RL"/plan-now-"$TSC".*
+
 # R-13 unknown flag still loud.
 run_resume --resum "$RES_TS"
 [ "$RES_RC" = 2 ] && ok "R-13 typo flag: rc 2" || fail "R-13 typo flag: rc 2 (got $RES_RC)"

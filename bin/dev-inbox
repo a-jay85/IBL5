@@ -12,7 +12,7 @@
 # ---
 # A new entry rings the bell when it is an error: the #errors target, an
 # undelivered message, a Discord-only button message, or a first line that
-# starts with an alert mark (❌ ❓ ⚠️ 🚨 🔴). Other entries print with no bell.
+# starts with an alert mark (❌ ❓ ⚠️ 🚨 🔴 🛑 ⏱ 💥). Other entries print with no bell.
 # Ghostty's default bell adds 🔔 to the tab title and bounces the Dock icon
 # once, with no sound. The backlog shown at start never rings.
 # Env: DISCORD_DM_INBOX overrides the file path (the same variable discord-dm reads).
@@ -56,7 +56,7 @@ render() { # bell
             line = substr($0, 3)
             if (first) {
                 first = 0
-                if (line ~ /^(❌|❓|⚠|🚨|🔴)/) alert = 1
+                if (line ~ /^(❌|❓|⚠|🚨|🔴|🛑|⏱|💥)/) alert = 1
                 if (alert) {
                     printf "%s%s%s%s\n", bold, red, line, off
                     if (bell == 1) printf "\007"

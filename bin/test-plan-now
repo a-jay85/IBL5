@@ -643,6 +643,23 @@ out=$(run_case "$PLANS/peer-plan.md" "NO_PLAN: already done")
 want_no "NO_PLAN never names a best-effort guess"   "$out" "best-effort guess"
 want_no "NO_PLAN never names a peer's fresh plan"   "$out" "peer-plan.md"
 
+echo "── identity line: line 1 of every log ──"
+
+# bin/jsb-parity-watch links a ledger row to its log by this line. The slugless
+# prompt gives slug=-, and the brief path is baked from the prompt file.
+out=$(run_case "$PLANS/peer-plan.md" "NO_PLAN: already done")
+want "identity line is line 1 (no slug)" "$(printf '%s\n' "$out" | head -n 1)" "plan-now: identity slug=- resume_of=- brief="
+want "identity line names the brief path" "$(printf '%s\n' "$out" | head -n 1)" "brief=$PROMPT"
+
+IDL_PROMPT="$TMP/idl-prompt.md"
+{
+    printf '/plan a throwaway task for bin/test-plan-now\n'
+    printf -- '- Branch slug: `idl-demo-slug`. Base: `master`.\n'
+} > "$IDL_PROMPT"
+out=$(PROMPT="$IDL_PROMPT" run_case "$PLANS/peer-plan.md" "NO_PLAN: already done")
+want    "identity line is line 1 (slug)" "$(printf '%s\n' "$out" | head -n 1)" "plan-now: identity slug=idl-demo-slug resume_of=- brief="
+want_no "identity line carries a brief path, not a dash" "$(printf '%s\n' "$out" | head -n 1)" "brief=-"
+
 out=$(STUB_NO_PLAN=1 run_case "$P" "**NO_PLAN:** \`already done\`")
 want "bold-wrapped NO_PLAN is still recognised" "$out" "RESULT no-plan"
 want "decoration is stripped from the reason"   "$out" "no-plan — already done"
@@ -702,7 +719,8 @@ want "no draft → verbatim line 1" "$out" \
 want "no draft → verbatim line 2" "$out" \
      "plan-now: so its plan cannot be identified, check-plan was NOT run, and nothing was queued."
 want "no draft → verbatim closer" "$out" "plan-now: read the transcript above."
-want_no "no draft → no recovery chatter" "$out" "recovery"
+# The identity line names the brief, and this fixture's brief is recovery-prompt.md.
+want_no "no draft → no recovery chatter" "$(printf '%s\n' "$out" | grep -v '^plan-now: identity ')" "recovery"
 
 # 4. Partial draft that cannot pass check-plan.
 out=$(run_case_recovery "$PARTIAL_DRAFT" demo-slug)
@@ -1801,6 +1819,19 @@ run_resume --resume "$RES_TS"
 [ "$RES_RC" = 2 ] && ok "R-6 oklog rc 2" || fail "R-6 oklog rc 2 (got $RES_RC)"
 want    "R-6 oklog: only failed is resumable" "$RES_OUT" "only a failed, paused, or parked run is resumable"
 
+# R-6 with an identity line on line 1: the verdict reader still finds the RESULT line.
+resume_fixture oklog
+printf 'plan-now: identity slug=x resume_of=- brief=-\nplan-now: RESULT ok — plan written and check-plan PASSED.\n' > "$RL/plan-now-$RES_TS.log"
+run_resume --resume "$RES_TS"
+[ "$RES_RC" = 2 ] && ok "R-6 identity-first oklog rc 2" || fail "R-6 identity-first oklog rc 2 (got $RES_RC)"
+want    "R-6 identity-first oklog: verdict read past line 1" "$RES_OUT" "only a failed, paused, or parked run is resumable"
+resume_fixture parkedlog
+printf 'plan-now: identity slug=x resume_of=- brief=-\nplan-now: RESULT parked — Claude login expired; no model call was made.\n' > "$RL/plan-now-$RES_TS.log"
+run_resume --resume "$RES_TS"
+[ "$RES_RC" = 0 ] && ok "R-6 identity-first parkedlog resumes (rc 0)" || fail "R-6 identity-first parkedlog resumes (got $RES_RC: $RES_OUT)"
+want    "runner bakes PROMPT_SRC" "$(cat "$RES_RUNNER" 2>/dev/null)" "PROMPT_SRC="
+preflight_cleanup "$RES_OUT"
+
 # R-park a parked run never started its session, so it resumes fresh.
 resume_fixture parkedlog
 run_resume --resume "$RES_TS"
@@ -1949,6 +1980,25 @@ R12_LOG2=$(cat "$RL/plan-now-$TS2.log" 2>/dev/null)
 want    "R-12 chain: second log mentions TS2"        "$R12_LOG2"  "bin/plan-now --resume $TS2"
 want_no "R-12 chain: second log omits TS1"           "$R12_LOG2"  "--resume $TS1"
 rm -f "$RL"/plan-now-"$TS1".* "$RL"/plan-now-"$TS2".*
+
+# R-16 a resume of a resume still knows its slug: each resume owns a .prompt copy.
+resume_fixture
+run_resume --resume "$RES_TS"
+RUNNER_B="$RES_RUNNER"
+TSB=$(basename "${RUNNER_B%.sh}"); TSB="${TSB#plan-now-}"
+STUB_RC=1 STUB_NO_PLAN=1 STUB_TAIL="" bash "$RUNNER_B" > "$RL/plan-now-$TSB.log" 2>&1
+cmp -s "$RL/plan-now-$RES_TS.prompt" "$RL/plan-now-$TSB.prompt" \
+    && ok "R-16 resume writes its own prompt copy" || fail "R-16 resume writes its own prompt copy"
+# Only B's own artifacts may feed C.
+rm -f "$RL"/plan-now-"$RES_TS".*
+run_resume --resume "$TSB"
+[ "$RES_RC" = 0 ] && ok "R-16 second resume rc 0" || fail "R-16 second resume rc 0 (got $RES_RC: $RES_OUT)"
+RUNNER_C="$RES_RUNNER"
+TSC=$(basename "${RUNNER_C%.sh}"); TSC="${TSC#plan-now-}"
+R16_OUT=$(STUB_RC=1 STUB_NO_PLAN=1 STUB_TAIL="" bash "$RUNNER_C" 2>&1)
+want "R-16 second resume identity line keeps the slug" "$(printf '%s\n' "$R16_OUT" | head -n 1)" \
+    "plan-now: identity slug=demo-slug resume_of=$TSB brief=-"
+rm -f "$RL"/plan-now-"$TSB".* "$RL"/plan-now-"$TSC".*
 
 # R-13 unknown flag still loud.
 run_resume --resum "$RES_TS"

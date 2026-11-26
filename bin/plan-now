@@ -414,20 +414,23 @@ write_session_sidecar "$LOG" "$SESSION_ID" \
 # Usage gate (ADR-0143): the coordinator replays this argv through --resume-paused.
 usage_argv_save "$SESSION_ID" --resume "$(basename "$LOG" .log | sed 's/^plan-now-//')" || true
 
-if [ -n "$RESUME_ID" ]; then
-    # The resumed session already holds the original prompt and coda; nothing is
-    # re-sent. $PROMPT stays defined because the runner's run_slug() reads it for
-    # draft recovery; point it at the old run's copy. If macOS has cleared that
-    # file, run_slug() finds nothing and both recovery legs no-op, which is the
-    # existing slugless-prompt behaviour.
-    PROMPT="$RUNLOG_DIR/plan-now-$RESUME_ID.prompt"
-else
-# Own a private copy: the caller's mktemp block may be cleaned up long before
-# launchd gets around to running the job.
 if [ -e "$PROMPT" ]; then
     echo "plan-now: artifact path already exists — label collision would occur ($PROMPT). Aborting." >&2
     exit 1
 fi
+if [ -n "$RESUME_ID" ]; then
+    # A resumed session already holds the original prompt and coda, so no coda is
+    # appended here. The copy gives this run its own $PROMPT: run_slug() reads it,
+    # and a later resume of THIS run copies it again. If macOS has cleared the old
+    # file, nothing is copied, run_slug() finds nothing and both recovery legs
+    # no-op, which is the existing slugless-prompt behaviour.
+    OLD_PROMPT="$RUNLOG_DIR/plan-now-$RESUME_ID.prompt"
+    if [ -f "$OLD_PROMPT" ]; then
+        cp "$OLD_PROMPT" "$PROMPT"
+    fi
+else
+# Own a private copy: the caller's mktemp block may be cleaned up long before
+# launchd gets around to running the job.
 cp "$PROMPT_SRC" "$PROMPT"
 
 # The headless coda. It lives HERE, not in the skill's drafted block, so every
@@ -525,6 +528,7 @@ REVIEW_ROUTE_DEFAULT=$(grep -oE "'/discordPlanReviewDM'" \
     printf 'ROOT=%q\n'       "$ROOT"
     printf 'PLANS_DIR=%q\n'  "$PLANS_DIR"
     printf 'PROMPT=%q\n'     "$PROMPT"
+    printf 'PROMPT_SRC=%q\n' "${PROMPT_SRC:-}"
     printf 'OUT=%q\n'        "$OUT"
     printf 'RUN_TIMEOUT=%q\n' "$RUN_TIMEOUT"
     printf 'MODEL=%q\n'      "$MODEL"
@@ -696,6 +700,13 @@ run_slug() {
     grep -ioE 'branch slug[^`]{0,24}`[^`]+`' "$PROMPT" 2>/dev/null | head -1 \
         | grep -oE '`[^`]+`' | head -1 | tr -d '`'
 }
+# Identity line: the first line of every plan-now log. bin/jsb-parity-watch links a
+# ledger row to its log by the slug= field. Keep the prefix and field order stable;
+# brief= is last because a path may hold spaces.
+_id_slug=$(run_slug || true)
+[ -n "$_id_slug" ] || _id_slug=-
+printf 'plan-now: identity slug=%s resume_of=%s brief=%s\n' \
+    "$_id_slug" "${RESUME_FROM:--}" "${PROMPT_SRC:--}"
 
 # Echo the path of a draft that provably belongs to THIS run, or nothing.
 # Two locations are tried, .drafts/<slug>.draft.md then <plans-dir>/<slug>.draft.md;

@@ -1074,3 +1074,42 @@ def test_arm_progress_exception_fails_closed(tmp_path, monkeypatch):
         raise RuntimeError("x")
     assert tp.arm_input_value(TRIGGERS, root, PORT_BRANCH, PORT_CHANGED, progress=boom) \
         == "error: RuntimeError"
+
+
+# ---- pinned copies of older captures (ADR-0286) ----
+
+PINNED_NAME = "foul-roll-abcdef0.jsonl"
+PINNED = f"engine/testdata/jsb-captures/{PINNED_NAME}"
+PINNED_RECORDS = [{"in": {"roll": 5, "fouls": 0}, "out": {"foul": False, "site": "none"}}]
+
+
+@pytest.mark.parametrize("capture,want", [
+    (PINNED, CAPTURE_NAME),
+    (CAPTURE, CAPTURE_NAME),
+    ("engine/testdata/jsb-captures/pl-0010-d322a86.jsonl", "pl-0010.jsonl"),
+    ("engine/testdata/jsb-captures/pl-0005.jsonl", "pl-0005.jsonl"),
+])
+def test_load_name_strips_pinned_commit_suffix(capture, want):
+    assert tp.load_name(capture) == want
+
+
+def test_pinned_copy_is_staged_under_the_name_the_test_loads(tmp_path):
+    pinned_text = _capture_text(records=PINNED_RECORDS)
+    root, base = _make_repo(tmp_path, base_files={PINNED: pinned_text})
+    _write_evidence(root, capture=PINNED,
+                    capture_sha256=tp._sha256((Path(root) / PINNED).read_bytes()))
+    seen = []
+
+    def run_go(root_, package, test, env=None, cover_profile=None, cover_pkgs=()):
+        loaded = (Path(env["JSB_TRACE_CAPTURE_DIR"]) / CAPTURE_NAME).read_text()
+        if cover_profile:
+            seen.append("normal")
+            assert loaded == pinned_text
+            Path(cover_profile).write_text(_profile((ENGINE_FILE,)))
+            return "pass"
+        seen.append("perturbed")
+        assert loaded not in (pinned_text, (Path(root) / CAPTURE).read_text())
+        return "fail"
+
+    assert _verdict(root, base, run_go=run_go) == "ok"
+    assert seen == ["normal", "perturbed"]

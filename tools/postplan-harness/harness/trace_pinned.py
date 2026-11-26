@@ -53,6 +53,8 @@ TOKEN = "trace-pinned"
 EVIDENCE_DIR = "engine/trace-evidence"
 CAPTURE_DIR = "engine/testdata/jsb-captures"
 MAX_CAPTURE_BYTES = 8 * 1024 * 1024  # per-file cap on a committed capture (ADR-0286)
+# a pinned copy of an older capture: `<load name>-<7-hex commit>.jsonl`
+_PINNED_COPY = re.compile(r"^(.+)-[0-9a-f]{7}\.jsonl$")
 LOADER_DIR = "engine/internal/jsbtrace"  # the capture loader every pinned test trusts
 SCHEMA = 2
 TEST_PREFIX = "TestTracePinned"
@@ -540,9 +542,30 @@ def coverage_verdict(root, base, ported, blocks) -> str:
     return "ok"
 
 
+def load_name(capture) -> str:
+    """The file name a pinned test loads for `capture`: `pl-0010-d322a86.jsonl` -> `pl-0010.jsonl`."""
+    name = Path(capture).name
+    match = _PINNED_COPY.match(name)
+    return f"{match.group(1)}.jsonl" if match else name
+
+
 def _run_entry(root, base, entry, run_go) -> str:
-    """Steps (c) and the perturbation run for one evidence entry."""
-    return _run_entry_at(root, base, entry, run_go, root, entry["capture"], None)
+    """Steps (c) and the perturbation run for one evidence entry.
+
+    A pinned copy such as `pl-0010-d322a86.jsonl` holds an older capture's exact bytes while
+    the test loads `pl-0010.jsonl`. The run stages the copy's base-branch bytes under the
+    name the test loads, so both runs read and perturb the capture the entry pins.
+    """
+    capture = entry["capture"]
+    bare = load_name(capture)
+    if bare == Path(capture).name:
+        return _run_entry_at(root, base, entry, run_go, root, capture, None)
+    with tempfile.TemporaryDirectory(prefix="trace-pinned-staged-") as stage_dir:
+        stage = Path(stage_dir)
+        shutil.copytree(Path(root) / CAPTURE_DIR, stage / CAPTURE_DIR)
+        (stage / CAPTURE_DIR / bare).write_bytes(_git_bytes(["show", f"{base}:{capture}"], root))
+        return _run_entry_at(root, base, entry, run_go, stage, f"{CAPTURE_DIR}/{bare}",
+                             {"JSB_TRACE_CAPTURE_DIR": str(stage / CAPTURE_DIR)})
 
 
 def _run_entry_at(root, base, entry, run_go, capture_root, capture, cover_env) -> str:

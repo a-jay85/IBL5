@@ -36,4 +36,6 @@ A capture committed to this directory lands in its own PR. Phase 6.5 always hold
 
 The parity loop writes each capture into an IBL5 worktree named `jsb-capture-<row>`, under this directory. Each capture PR holds for the owner (ADR-0266). The port PR records its evidence only after the capture is on `origin/master`.
 
+A file named `pl-NNNN-<7-hex commit>.jsonl` keeps the exact bytes an older evidence entry pinned, while its test loads `pl-NNNN.jsonl`. `trace_pinned` copies that file's base-branch bytes into a temp dir under the name the test loads. It then runs the test and the perturbed run against that copy.
+
 Each file is at most 8 MiB (8388608 bytes). `tools/postplan-harness/harness/trace_pinned.py` holds a larger one as `capture-too-large`. `.gitattributes` marks `*.jsonl` here as `binary`, so git stores the bytes as written and keeps them out of review diffs. ADR-0286 records the decision.

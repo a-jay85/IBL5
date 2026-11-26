@@ -1150,6 +1150,78 @@ run_triage "$FIX" --card 316
 assert_status "K10 missing head tree exits 1" 1 "$ST"
 assert_match  "K10 verdict unknown"          '^verdict: unknown \(fetch failed\)$' "$OUT"
 
+# --- K-EV: fidelity evidence row on the card -------------------------------------
+EV_PATH="tools/postplan-harness/harness/fidelity.py"
+EV_STATUS="same output on 3 past PRs (5 stored verdict files) for parse_verdict."
+EV_MISSING='^fidelity-evidence: missing \(this PR edits fidelity\.py and has no evidence comment\)$'
+# k_touch <n>: add fidelity.py to the view fixture's files.
+k_touch() {
+    jq --arg p "$EV_PATH" '.files += [{path: $p}]' "$FIX/view-$1.json" > "$FIX/v.tmp" && mv "$FIX/v.tmp" "$FIX/view-$1.json"
+}
+# k_evidence <N> <head40> <status> [author_association]: append an evidence comment.
+k_evidence() {
+    local n="$1" head="$2" status="$3" assoc="${4:-OWNER}" text
+    text="$(printf '<!-- fidelity-evidence head=%s base=%s -->\nfidelity-evidence: %s\n' "$head" "$KTREE_OLD" "$status")"
+    jq --arg a "$assoc" --arg b "$text" '. + [{author_association: $a, body: $b}]' "$FIX/comments-$n.json" \
+        > "$FIX/c.tmp" && mv "$FIX/c.tmp" "$FIX/comments-$n.json"
+}
+
+# K-EV1: evidence computed for the PR head -> CURRENT
+k_fixture 330
+k_touch 330
+k_evidence 330 "$(printf '%040d' 330)" "$EV_STATUS"
+run_triage "$FIX" --card 330
+assert_status "K-EV1 exit 0"                 0  "$ST"
+assert_match  "K-EV1 current"                '^fidelity-evidence: same output on 3 past PRs \(5 stored verdict files\) for parse_verdict\. \| CURRENT$' "$OUT"
+
+# K-EV2: evidence computed for another head -> STALE naming both
+k_fixture 331
+k_touch 331
+k_evidence 331 "$KTREE_OLD" "$EV_STATUS"
+run_triage "$FIX" --card 331
+assert_match  "K-EV2 stale"                  '\| STALE \(computed for head bbbbbbb, PR head [0-9a-f]{7}\)$' "$OUT"
+
+# K-EV3: touches fidelity.py with no evidence comment -> missing
+k_fixture 332
+k_touch 332
+run_triage "$FIX" --card 332
+assert_match  "K-EV3 missing"                "$EV_MISSING" "$OUT"
+
+# K-EV4: an untrusted marker comment is ignored -> missing
+k_fixture 333
+k_touch 333
+k_evidence 333 "$(printf '%040d' 333)" "$EV_STATUS" NONE
+run_triage "$FIX" --card 333
+assert_match  "K-EV4 untrusted ignored"      "$EV_MISSING" "$OUT"
+
+# K-EV5: no touch and no comment -> no row at all
+k_fixture 334
+run_triage "$FIX" --card 334
+assert_status "K-EV5 exit 0"                 0  "$ST"
+assert_absent "K-EV5 no row"                 '^fidelity-evidence:' "$OUT"
+
+# K-EV6: near-miss marker (7-hex head) -> malformed
+k_fixture 335
+k_touch 335
+k_evidence 335 abc1234 "$EV_STATUS"
+run_triage "$FIX" --card 335
+assert_match  "K-EV6 malformed"              '^fidelity-evidence: malformed evidence comment$' "$OUT"
+
+# K-EV7: comments fetch failure on a touching PR -> unknown
+k_fixture 336
+k_touch 336
+echo 1 > "$FIX/comments-rc-336"
+run_triage "$FIX" --card 336
+assert_status "K-EV7 comments failure exits 1" 1 "$ST"
+assert_match  "K-EV7 evidence unknown"       '^fidelity-evidence: unknown \(fetch failed\)$' "$OUT"
+
+# K-EV8: view failure -> file list unknown, so the evidence row is unknown
+k_fixture 337
+echo 1 > "$FIX/view-rc-337"
+run_triage "$FIX" --card 337
+assert_status "K-EV8 view failure exits 1"   1  "$ST"
+assert_match  "K-EV8 evidence unknown"       '^fidelity-evidence: unknown \(fetch failed\)$' "$OUT"
+
 # --- AM1..AM4: condition (7) body hold (HELD_AM_FALSE_RE) and the live-hold base ref ---
 # AM3 runs pr_owner_approval_live_hold for real: GIT_ALLOW_PROTOCOL=file makes its
 # https fetch fail at once (fail closed, no network), and a logging git wrapper

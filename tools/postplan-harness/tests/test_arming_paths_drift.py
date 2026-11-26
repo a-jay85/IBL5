@@ -79,6 +79,17 @@ def test_drift_walk_flags_unlisted_fixture_module(tmp_path):
     assert _unlisted(tmp_path) == ["deep", "mid", "rogue_abs", "rogue_rel"]
 
 
+def test_fidelity_evidence_unreachable_from_arming():
+    assert "fidelity_evidence" not in _reachable(HARNESS)
+
+
+def test_drift_walk_reaches_planted_evidence_import(tmp_path):
+    (tmp_path / "armable.py").write_text("from .fidelity_evidence import x\n")
+    (tmp_path / "merge_danger.py").write_text("")
+    (tmp_path / "fidelity_evidence.py").write_text("")
+    assert "fidelity_evidence" in _reachable(tmp_path)
+
+
 def test_drift_walk_reads_type_checking_imports(tmp_path):
     (tmp_path / "armable.py").write_text(
         "from typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    from .typed_only import T\n"

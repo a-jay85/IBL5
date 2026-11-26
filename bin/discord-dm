@@ -410,8 +410,9 @@ log_inbox() { # target
     else
         body="$FULL_MSG"
     fi
-    # One write per entry, so parallel sends cannot interleave. Bash's printf writes
-    # line by line, so build the entry first and let cat append it. <<< adds the last \n.
+    # Bash's printf writes line by line, so build the entry first and let cat append it.
+    # cat copies in buffer-sized chunks: a small entry goes in one write, but parallel
+    # sends of very large messages can mix their lines. <<< adds the last \n.
     printf -v entry '@@ %s %s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$target" "${CALLER// /_}"
     body=${body//$'\r'/}
     entry+="  ${body//$'\n'/$'\n  '}"

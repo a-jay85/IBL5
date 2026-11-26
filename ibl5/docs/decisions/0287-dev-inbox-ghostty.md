@@ -1,6 +1,6 @@
 ---
 description: ADR-0287. bin/discord-dm appends the full text of every message to a local inbox file, and the new bin/dev-inbox shows that file in a terminal tab and rings the bell on alert entries.
-last_verified: 2026-11-25
+last_verified: 2026-11-26
 ---
 
 > This ADR was drafted by the post-plan harness for this PR. A human must review and approve it before merging.
@@ -21,11 +21,11 @@ Repo scripts send dev alerts through `bin/discord-dm`. The owner had to keep Dis
 
 - The inbox lives at `~/.claude/dev-inbox.log`. `DISCORD_DM_INBOX` overrides the path for both scripts.
 - Each entry is a `@@ <time> <target> <caller>` header line. The message follows with every line indented two spaces, so a body line can never read as a header. Spaces in the caller become underscores, and carriage returns are removed from the body.
-- A delivered message uses the sent-log target, except that a `--raw` message uses `raw:<path>`. A message that failed on every attempt uses the target `undelivered`.
-- A `--raw` body is JSON for a Discord-only button message. The inbox stores a note telling the owner to open Discord, and it leaves the JSON out.
+- A delivered message uses the sent-log target, with two exceptions. A `--raw` message uses `raw:<path>`. Any `--error` message uses `errors`, even when it went out over the DM or #dev, so the viewer rings for it. The sent log keeps its own target. A message that failed on every attempt uses the target `undelivered`.
+- A `--raw` body is JSON for a Discord-only button message. For a delivered one, the inbox stores a note telling the owner to open Discord, adds the JSON's `.digest` text when it has one, and leaves the rest of the JSON out. For a failed one, the inbox says it was not delivered and keeps the full JSON.
 - The inbox write is best-effort, like the sent log. A write failure never changes the exit code or output of `bin/discord-dm`. Past 5 MB the file rotates to `.1`.
 - `bin/dev-inbox` prints the last 10 entries, then follows the file. One `tail -F` reads both, so an entry that arrives during startup is not lost, and the viewer survives the rotation. It rings the terminal bell on a new entry for the `errors` target, an `undelivered` entry, a `raw:` entry, or a first line that starts with an alert mark. The backlog it prints at start never rings. `--no-bell` and `--once` cover quiet use and tests.
-- `bin/test-discord-dm` section S2 checks the header shape, the indent, the raw note, the undelivered entry, the unwritable-inbox case, which entries ring the bell, and an entry added during viewer startup.
+- `bin/test-discord-dm` section S2 checks the header shape, the indent, the raw note and digest, the `--error` target, undelivered entries (including a failed raw send), the unwritable-inbox case, rotation, which entries ring the bell, a bad `--last` value, the `--help` text, an entry added during viewer startup, and a bad UTF-8 byte.
 
 ## Alternatives Considered
 
@@ -39,6 +39,7 @@ Repo scripts send dev alerts through `bin/discord-dm`. The owner had to keep Dis
 - Positive: only alert entries ring the bell, so routine success messages stay quiet.
 - Negative: the inbox is a second local copy of every message, kept up to about 10 MB across the live file and `.1`.
 - Negative: a button message still needs Discord to act on it. The inbox only says one arrived.
+- Negative: the inbox write takes no lock. Two parallel sends of very large messages can mix their lines.
 - Negative: the alert test reads the first body line for a fixed set of marks. A sender that puts its alert mark on a later line gets no bell.
 
 ## References

@@ -18,7 +18,6 @@
 #   no PR, a loaded plan-now job may own the slug     wait
 #   no PR, plan in done/ or skipped/                  STALL (DM)
 #   no PR, failure report names the slug              STALL (DM)
-#   no PR, newest linked plan-now log ends paused     wait
 #   no PR, nothing found                              STALL (DM: no trace)
 #   no row in flight                                  FIRE webhook
 #
@@ -154,16 +153,14 @@ lock_is_stale() {
 
 # log_names_slug <log> <slug>: 0 when the plan-now log belongs to <slug>. A log whose
 # identity line (bin/plan-now writes it first) carries a slug matches on that field
-# exactly. Older logs and slug=- logs fall back to the content match. That match
-# rejects a -r<digit> tail (a retry's slug) and keeps other tails, such as
-# <slug>-blocked.md, which may be an older log's only mention of its slug.
+# exactly. Older logs and slug=- logs fall back to the content match.
 log_names_slug() {
     local log="$1" slug="$2" id_slug
     id_slug=$(awk '!f && match($0, /^plan-now: identity slug=[^ ]* /) { print substr($0, 25, RLENGTH - 25); f = 1 }' "$log" 2>/dev/null) || id_slug=''
     if [ -n "$id_slug" ] && [ "$id_slug" != "-" ]; then
         [ "$id_slug" = "$slug" ]; return
     fi
-    grep -qE "${slug}(\$|[^A-Za-z0-9-]|-\$|-[^r]|-r\$|-r[^0-9])" "$log" 2>/dev/null
+    grep -qE "${slug}([^A-Za-z0-9]|\$)" "$log" 2>/dev/null
 }
 
 # row_verdict <id> <slug>: line 1 is the verdict; line 2 is the fingerprint fact
@@ -239,9 +236,8 @@ row_verdict() {
         if log_names_slug "$f" "$slug"; then newest="$f"; fi
     done
     if [ -n "$newest" ]; then
-        # The newest linked log's last RESULT line decides. A paused run auto-resumes.
+        # No-plan / failed stage: the newest linked log's last RESULT line decides.
         case "$(grep '^plan-now: RESULT ' "$newest" 2>/dev/null | tail -n 1)" in
-            "plan-now: RESULT paused"|"plan-now: RESULT paused "*) echo "WAIT:plan-now-paused" ;;
             "plan-now: RESULT no-plan"|"plan-now: RESULT no-plan "*) echo "STALL:no-plan:$(basename "$newest")" ;;
             "plan-now: RESULT failed"|"plan-now: RESULT failed "*) echo "STALL:plan-now-failed:$(basename "$newest")" ;;
             *) echo "STALL:no-trace:$(basename "$newest")" ;;

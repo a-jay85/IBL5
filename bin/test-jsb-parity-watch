@@ -1079,6 +1079,9 @@ case_setup_fixer_prompt_brief_passes_guard() {
     h_contains "prompt: claims before work" "$prompt" "fix claim"
     h_contains "prompt: checks the brief" "$prompt" "--brief"
     h_contains "prompt: records a failure" "$prompt" "fix fail"
+    h_contains "prompt: names the try cap" "$prompt" '"status": "over-cap" with "cap": "try"'
+    h_contains "prompt: skips a blocked key" "$prompt" "Skip it for this wake"
+    h_contains "prompt: ends on the daily cap" "$prompt" 'including "cap": "daily", end.'
     h_absent "prompt: no plist written" "$S/home/Library/LaunchAgents/$PLIST_NAME"
     # The brief prompt step 4 describes.
     {

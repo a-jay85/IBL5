@@ -87,9 +87,14 @@ Steps:
    that is in neither `open` nor `owner`. The second column of
    ~/.cache/jsb-parity-fixer-wakes.txt is the time each key was first queued.
    When no key qualifies, end.
-2. Run `parity_loop.py fix claim --key <key>`. Unless it prints
-   "status": "claimed", end. The loop already DMed the owner for caps.
-   The printed slug is <slug> below.
+2. Run `parity_loop.py fix claim --key <key>`. When it prints
+   "status": "claimed", go on. The printed slug is <slug> below.
+   When it prints "status": "over-cap" with "cap": "try", or
+   "status": "owner-class", that key is blocked. Skip it for this wake, then
+   claim the next oldest key that step 1 allows. Claim each key at most once
+   per wake. When no key is left, end.
+   On any other result, including "cap": "daily", end.
+   The loop already DMed the owner for caps.
 3. Diagnose from the blocker's `fix` text, the tail of the related plan-now log
    (/tmp/plan-now-<TS>.log) and any planner report. When a planner report names a
    recommended option, take it.

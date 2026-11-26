@@ -28,7 +28,7 @@ final class SnapshotTimingCommand
      * @param array{teamid: int, repeat: int, host: string, db: string, user: string, pass: string} $parsed
      * @param resource $out
      */
-    public function run(array $parsed, $out): int
+    public function run(array $parsed, mixed $out): int
     {
         $key = $this->provider->currentKey();
         $this->cache->delete($key);

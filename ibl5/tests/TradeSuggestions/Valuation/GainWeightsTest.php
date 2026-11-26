@@ -25,10 +25,10 @@ final class GainWeightsTest extends TestCase
         $winNow = GainWeights::seasonWeights(TeamMode::WinNow);
         $rebuild = GainWeights::seasonWeights(TeamMode::Rebuild);
 
-        self::assertSame([0.55, 0.25, 0.12, 0.08], $winNow);
-        self::assertSame([0.10, 0.20, 0.30, 0.40], $rebuild);
         self::assertGreaterThan($rebuild[0], $winNow[0]);
         self::assertGreaterThan($winNow[3], $rebuild[3]);
+        self::assertSame([0.55, 0.25, 0.12, 0.08], $winNow);
+        self::assertSame([0.10, 0.20, 0.30, 0.40], $rebuild);
         foreach ([1, 2, 3] as $offset) {
             self::assertLessThanOrEqual($winNow[$offset - 1], $winNow[$offset]);
             self::assertGreaterThanOrEqual($rebuild[$offset - 1], $rebuild[$offset]);

@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand only (no auto-attach trigger). Auto-generated cross-module dependency list for ibl5/classes/, the companion to codebase-map.md.
-last_verified: 2026-11-22
+last_verified: 2026-11-26
 paths: "~/.claude/hooks/plan-gate-edit.sh"
 ---
 

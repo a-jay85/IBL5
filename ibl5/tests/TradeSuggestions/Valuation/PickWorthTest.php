@@ -83,11 +83,12 @@ final class PickWorthTest extends TestCase
 
         $rebuild = PickWorth::worth(1, 0, 4, $index, TeamMode::Rebuild, 5, 1);
         $winNow = PickWorth::worth(1, 0, 4, $index, TeamMode::WinNow, 5, 1);
+        $middle = PickWorth::worth(1, 0, 4, $index, TeamMode::Middle, 5, 1);
 
         self::assertEqualsWithDelta(4.0, $rebuild, 1e-12);
         self::assertEqualsWithDelta(2.0, $winNow, 1e-12);
-        self::assertGreaterThan(PickWorth::YEARS_AWAY_WEIGHTS['win_now'][0], PickWorth::YEARS_AWAY_WEIGHTS['middle'][0]);
-        self::assertGreaterThan(PickWorth::YEARS_AWAY_WEIGHTS['middle'][0], PickWorth::YEARS_AWAY_WEIGHTS['rebuild'][0]);
+        self::assertGreaterThan($winNow, $middle);
+        self::assertGreaterThan($middle, $rebuild);
     }
 
     public function testYearsAwayBeyondTableUsesLastEntry(): void

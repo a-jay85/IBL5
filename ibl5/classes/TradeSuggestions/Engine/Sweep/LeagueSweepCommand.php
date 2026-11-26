@@ -43,7 +43,7 @@ final class LeagueSweepCommand
      *
      * @param resource $out
      */
-    public function run(int $maxTeams, $out): int
+    public function run(int $maxTeams, mixed $out): int
     {
         $tidByName = [];
         foreach ($this->formRepo->getAllTeamsWithCity() as $team) {

@@ -34,12 +34,13 @@ final class NewsFactory implements ModuleFactoryInterface
     ): \Topics\News\NewsController {
         $db = $this->services->db();
         $season = $this->services->season();
+        $leagueContext = $this->services->leagueContext();
         $tradeFormRepo = new \Trading\TradeFormRepository($db);
         $tradeValidator = new \Trading\TradeValidator($db, $season);
-        $teamModeRepo = new \TradeSuggestions\TeamModeRepository($db);
+        $teamModeRepo = new \TradeSuggestions\TeamModeRepository($db, $leagueContext);
 
-        $assetRepo = new \TradeSuggestions\SuggestionAssetRepository($db);
-        $draftOrder = new \ProjectedDraftOrder\ProjectedDraftOrderService(new \ProjectedDraftOrder\ProjectedDraftOrderRepository($db));
+        $assetRepo = new \TradeSuggestions\SuggestionAssetRepository($db, $leagueContext);
+        $draftOrder = new \ProjectedDraftOrder\ProjectedDraftOrderService(new \ProjectedDraftOrder\ProjectedDraftOrderRepository($db, $leagueContext));
         // One resolver for the loader, the provider and the service, so the
         // panel's mode line reads the run the provider just made.
         $modeResolver = new \TradeSuggestions\Engine\ModeResolver(
@@ -52,9 +53,9 @@ final class NewsFactory implements ModuleFactoryInterface
         );
         $snapshots = new \TradeSuggestions\Engine\CachedLeagueSnapshotProvider(
             new \TradeSuggestions\Engine\LeagueSnapshotLoader(
-                new \TradeSuggestions\Projection\ProjectionPlayerRepository($db),
-                new \TradeSuggestions\Valuation\ValuationTeamFactorsRepository($db),
-                new \Standings\StandingsRepository($db),
+                new \TradeSuggestions\Projection\ProjectionPlayerRepository($db, $leagueContext),
+                new \TradeSuggestions\Valuation\ValuationTeamFactorsRepository($db, $leagueContext),
+                new \Standings\StandingsRepository($db, $leagueContext),
                 $draftOrder,
                 $assetRepo,
                 $tradeFormRepo,
@@ -62,7 +63,7 @@ final class NewsFactory implements ModuleFactoryInterface
                 $season,
             ),
             new \Cache\DatabaseCache($db),
-            new \TradeSuggestions\Engine\SnapshotKeyRepository($db),
+            new \TradeSuggestions\Engine\SnapshotKeyRepository($db, $leagueContext),
             $modeResolver,
             $season,
         );
@@ -85,7 +86,7 @@ final class NewsFactory implements ModuleFactoryInterface
                 $tradeValidator,
                 new \Trading\TradeCapCalculator(
                     $this->services->teamIdentity(),
-                    new \Trading\BuyoutLedgerRepository($db),
+                    new \Trading\BuyoutLedgerRepository($db, $leagueContext),
                     $season,
                     $tradeValidator,
                 ),
@@ -95,7 +96,7 @@ final class NewsFactory implements ModuleFactoryInterface
             $tradeFormRepo,
             new \Settings\SettingsService($season),
             $modeResolver,
-            new \TradeSuggestions\Feedback\FeedbackRepository($db),
+            new \TradeSuggestions\Feedback\FeedbackRepository($db, $leagueContext),
             \TradeSuggestions\Feedback\PanelSessionState::current(),
         );
 

@@ -156,7 +156,7 @@ lock_is_stale() {
 # exactly. Older logs and slug=- logs fall back to the content match.
 log_names_slug() {
     local log="$1" slug="$2" id_slug
-    id_slug=$(sed -n 's/^plan-now: identity slug=\([^ ]*\) .*/\1/p' "$log" 2>/dev/null | head -n 1)
+    id_slug=$(awk '!f && match($0, /^plan-now: identity slug=[^ ]* /) { print substr($0, 25, RLENGTH - 25); f = 1 }' "$log" 2>/dev/null) || id_slug=''
     if [ -n "$id_slug" ] && [ "$id_slug" != "-" ]; then
         [ "$id_slug" = "$slug" ]; return
     fi

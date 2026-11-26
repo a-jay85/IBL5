@@ -185,13 +185,56 @@ def test_plan_gates_carry_plan_replay_timeout():
             assert spec.timeout == 0, path
 
 
+def _uncovered_check_scripts(root):
+    """Each bin/check-* under root that neither its own header nor REPLAY_SPECS covers."""
+    out = []
+    for script in sorted(glob.glob(os.path.join(root, "bin", "check-*"))):
+        rel = "bin/" + os.path.basename(script)
+        with open(script, encoding="utf-8") as fh:
+            text = fh.read()
+        state, _, reason = resolve_spec(rel, text)
+        if state not in ("replayable", "not-replayable"):
+            out.append(f"{rel} unspecified: {reason}")
+    return out
+
+
 def test_registry_covers_every_check_script():
     scripts = sorted(glob.glob(os.path.join(REPO_ROOT, "bin", "check-*")))
     assert scripts, "no bin/check-* found; REPO_ROOT is wrong"
-    for script in scripts:
-        rel = "bin/" + os.path.basename(script)
-        state, _, reason = resolve_spec(rel, "")
-        assert state in ("replayable", "not-replayable"), f"{rel} unspecified: {reason}"
+    assert _uncovered_check_scripts(REPO_ROOT) == []
+
+
+def _gate_root(tmp_path, text):
+    (tmp_path / "bin").mkdir()
+    (tmp_path / "bin" / "check-zzz").write_text(text, encoding="utf-8")
+    return str(tmp_path)
+
+
+def test_header_only_gate_counts_as_covered(tmp_path):
+    root = _gate_root(tmp_path, "#!/usr/bin/env bash\n# gate-backtest-argv: --since={base}\necho ok\n")
+    assert "bin/check-zzz" not in REPLAY_SPECS
+    assert _uncovered_check_scripts(root) == []
+
+
+def test_gate_without_header_or_entry_is_uncovered(tmp_path):
+    root = _gate_root(tmp_path, "#!/usr/bin/env bash\necho ok\n")
+    assert _uncovered_check_scripts(root) == [
+        "bin/check-zzz unspecified: no replay spec: add a '# gate-backtest-argv:' header"]
+
+
+def test_not_replayable_header_gate_is_uncovered(tmp_path):
+    root = _gate_root(tmp_path,
+                      "#!/usr/bin/env bash\n# gate-backtest: not-replayable because it needs a live db\n")
+    out = _uncovered_check_scripts(root)
+    assert len(out) == 1
+    assert out[0].startswith("bin/check-zzz unspecified: self-declared not replayable")
+
+
+def test_header_past_scan_window_is_uncovered(tmp_path):
+    # Shebang plus 40 pad lines puts the header on line 42, past HEADER_SCAN_LINES (40).
+    root = _gate_root(tmp_path,
+                      "#!/usr/bin/env bash\n" + "echo pad\n" * 40 + "# gate-backtest-argv: --since={base}\n")
+    assert len(_uncovered_check_scripts(root)) == 1
 
 
 def test_body_file_gates_replay_from_body_file():

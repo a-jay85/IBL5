@@ -5,7 +5,7 @@
 # script prints the last few entries, then follows the file and prints each new
 # one as it lands. Leave it running in a Ghostty tab.
 #
-# Usage: bin/dev-inbox [--last <n>] [--no-bell]
+# Usage: bin/dev-inbox [--last <n>] [--no-bell] [--once]
 #   --last <n>   entries to show before following (default 10)
 #   --no-bell    never ring the terminal bell
 #   --once       print the whole file and exit (no follow; bells still ring)
@@ -16,7 +16,7 @@
 # Ghostty's default bell adds 🔔 to the tab title and bounces the Dock icon
 # once, with no sound. The backlog shown at start never rings.
 # Env: DISCORD_DM_INBOX overrides the file path (the same variable discord-dm reads).
-#
+# ---
 # Exit: 0 normal · 2 usage error.
 
 [ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
@@ -34,7 +34,7 @@ while [ $# -gt 0 ]; do
                 LAST=$((10#$2)); shift 2 ;;
         --no-bell) BELL=0; shift ;;
         --once) ONCE=1; shift ;;
-        -h|--help) sed -n '/^# Usage:/,/^#$/p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '/^# Usage:/,/^# Exit:/p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "dev-inbox: unknown argument: $1" >&2; exit 2 ;;
     esac
 done

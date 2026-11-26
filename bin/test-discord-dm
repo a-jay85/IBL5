@@ -1162,6 +1162,13 @@ DISCORD_DM_SSH_BIN="$TMP/ssh-400" DISCORD_DM_SPOOL="$SPOOL" DISCORD_DM_SENT_LOG=
 { grep -q '^@@ .* undelivered ' "$INB" && grep -qF '  lost one' "$INB"; } \
     && ok "S2e failure: inbox entry with target undelivered" || fail "S2e inbox=[$(cat "$INB" 2>/dev/null)]"
 
+rm -f "$INB" "$SPOOL"
+DISCORD_DM_SSH_BIN="$TMP/ssh-400" DISCORD_DM_SPOOL="$SPOOL" DISCORD_DM_SENT_LOG="$SENT" DISCORD_DM_INBOX="$INB" \
+    "$DM" --attempts 1 --quiet --raw --route /discordApproveDM '{"a":1}' 2>/dev/null
+{ grep -q '^@@ .* undelivered ' "$INB" && grep -qF 'was NOT delivered' "$INB" \
+    && grep -qF '{"a":1}' "$INB" && ! grep -qF 'Open Discord to act on it.' "$INB"; } \
+    && ok "S2r failed raw send: inbox says not delivered, keeps the JSON" || fail "S2r inbox=[$(cat "$INB" 2>/dev/null)]"
+
 : > "$CAP"
 out=$(DM_CAPTURE="$CAP" DISCORD_DM_SSH_BIN="$SSH_OK" DISCORD_DM_SPOOL="$SPOOL" DISCORD_DM_SENT_LOG="$SENT" \
     DISCORD_DM_INBOX="$TMP/notadir/sub/inbox" "$DM" --to "$FAKE_TO" --attempts 1 --quiet "q" 2>&1)
@@ -1190,6 +1197,10 @@ r_bells=$(tr -cd "$BEL" <<< "$r_out" | wc -c | tr -d ' ')
 DISCORD_DM_INBOX="$TMP/r.log" "$DEV_INBOX" --last x >/dev/null 2>&1
 s2_rc=$?
 [ "$s2_rc" = 2 ] && ok "S2k bad --last exits 2" || fail "S2k rc=$s2_rc"
+r_help=$("$DEV_INBOX" --help)
+r_help_last=$(tail -n 1 <<< "$r_help")
+[[ "$r_help_last" == Exit:* ]] && ok "S2s dev-inbox --help ends at the Exit line" || fail "S2s help tail=[$r_help_last]"
+grep -qF -- '[--once]' <<< "$r_help" && ok "S2t dev-inbox usage line lists --once" || fail "S2t help=[$r_help]"
 
 # Follow mode. This tail stub adds an entry just before the viewer starts to
 # follow, then drops -F so the viewer reads to the end and exits.

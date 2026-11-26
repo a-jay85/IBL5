@@ -388,7 +388,10 @@ log_inbox() { # target
     mkdir -p "$(dirname "$inbox")"
     size=$(stat -c %s "$inbox" 2>/dev/null || stat -f %z "$inbox" 2>/dev/null || echo 0)
     [ "${size:-0}" -gt 5242880 ] && mv -f "$inbox" "$inbox.1"
-    if [ "$RAW" = 1 ]; then
+    if [ "$RAW" = 1 ] && [ "$target" = undelivered ]; then
+        # Nothing reached Discord, so keep the JSON: the inbox holds the only copy.
+        body="(Discord-only message for $ROUTE was NOT delivered. Payload:)"$'\n'"$FULL_MSG"
+    elif [ "$RAW" = 1 ]; then
         body="(Discord-only message for $ROUTE, such as buttons. Open Discord to act on it.)"
     else
         body="$FULL_MSG"

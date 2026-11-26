@@ -100,7 +100,8 @@ Steps:
    recommended option, take it.
 4. Write the brief to /tmp/<slug>.prompt with these parts, in this order:
    - a first line that starts with `/plan` and names the fix
-   - Branch slug: `<slug>`
+   - Branch slug: `<slug>`, the claimed slug as printed. It starts with
+     jsb-fix-, and bin/plan-now refuses a rule-block brief whose slug does not.
    - the output of `bin/check-parity-rule-guard --print-rule-block`, unchanged
    - your diagnosis
    - a line asking for plan-architect (Opus)

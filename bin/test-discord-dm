@@ -1175,6 +1175,15 @@ out=$(DM_CAPTURE="$CAP" DISCORD_DM_SSH_BIN="$SSH_OK" DISCORD_DM_SPOOL="$SPOOL" D
 s2_rc=$?
 { [ "$s2_rc" = 0 ] && [ -z "$out" ]; } && ok "S2f unwritable inbox: exit 0, quiet" || fail "S2f rc=$s2_rc out=[$out]"
 
+rm -f "$INB" "$INB.1"; : > "$CAP"
+head -c 5300000 /dev/zero | tr '\0' x > "$INB"
+DM_CAPTURE="$CAP" DISCORD_DM_SSH_BIN="$SSH_OK" DISCORD_DM_SPOOL="$SPOOL" DISCORD_DM_SENT_LOG="$SENT" \
+    DISCORD_DM_INBOX="$INB" "$DM" --to "$FAKE_TO" --attempts 1 --quiet "after rotate"
+s2_old=$(wc -c < "$INB.1" | tr -d ' ')
+s2_left=$(compgen -G "$INB.rot.*")
+{ [ "$s2_old" = 5300000 ] && [ "$(grep -c '^@@ ' "$INB")" = 1 ] && grep -qxF '  after rotate' "$INB" && [ -z "$s2_left" ]; } \
+    && ok "S2u past 5 MB: old file moves to .1, new entry starts fresh, no temp file" || fail "S2u old=$s2_old left=[$s2_left]"
+
 # bin/dev-inbox --once: the bell rings only on alert entries.
 BEL=$(printf '\007')
 printf '%s\n' '@@ 2026-11-25T11:00:00-0800 dev a' '  ✅ fine' \

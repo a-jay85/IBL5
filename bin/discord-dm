@@ -387,7 +387,16 @@ log_inbox() { # target
     inbox="${DISCORD_DM_INBOX:-$HOME/.claude/dev-inbox.log}"
     mkdir -p "$(dirname "$inbox")"
     size=$(stat -c %s "$inbox" 2>/dev/null || stat -f %z "$inbox" 2>/dev/null || echo 0)
-    [ "${size:-0}" -gt 5242880 ] && mv -f "$inbox" "$inbox.1"
+    # Move to a private name first, then check the size again. A parallel send may have
+    # rotated already, so this can be its fresh file: append that back and keep .1.
+    if [ "${size:-0}" -gt 5242880 ] && mv "$inbox" "$inbox.rot.$$"; then
+        size=$(stat -c %s "$inbox.rot.$$" 2>/dev/null || stat -f %z "$inbox.rot.$$" 2>/dev/null || echo 0)
+        if [ "${size:-0}" -gt 5242880 ]; then
+            mv -f "$inbox.rot.$$" "$inbox.1"
+        else
+            cat "$inbox.rot.$$" >> "$inbox" && rm -f "$inbox.rot.$$"
+        fi
+    fi
     if [ "$RAW" = 1 ] && [ "$target" = undelivered ]; then
         # Nothing reached Discord, so keep the JSON: the inbox holds the only copy.
         body="(Discord-only message for $ROUTE was NOT delivered. Payload:)"$'\n'"$FULL_MSG"

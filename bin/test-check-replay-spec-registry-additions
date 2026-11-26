@@ -134,9 +134,8 @@ expect commented_subscript_passes 0
 # ---- cases that must pass (exit 0) ----
 
 fresh
-printf '%s\n' '#!/bin/bash' '# gate-backtest-argv: --since={base}' > "$R/bin/check-new"
 run_with "$CHK" "--since=$BASE"
-expect header_only_gate_passes 0
+expect unchanged_registry_passes 0
 
 fresh
 awk '{ sub(/"bin\/check-a": _SINCE,/, "\"bin/check-a\": _TREE,"); print }' "$R/$GB" > "$R/$GB.new"

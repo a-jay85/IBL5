@@ -1526,7 +1526,8 @@ test_xm_no_timeout_is_prerequisite() {
         case "$p" in /*) ln -sf "$p" "$nt/$t" ;; esac
     done
     xm_plan 'grep -qx a ibl5/tracked.txt'
-    OUT=$(cd "$R" && PATH="$nt" /bin/bash "$GATE" --base master --plan "$PLAN" --stage exec-mutations 2>&1); RC=$?
+    # Run the bash linked above: macOS /bin/bash is 3.2 and fails the gate's bash 4 guard.
+    OUT=$(cd "$R" && PATH="$nt" "$nt/bash" "$GATE" --base master --plan "$PLAN" --stage exec-mutations 2>&1); RC=$?
     want_rc 3
     want_out "prerequisite missing: gtimeout or timeout (brew install coreutils)"
     [ "$(xm_tracked)" = a ] || note "tracked.txt is '$(xm_tracked)', not a"

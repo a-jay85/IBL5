@@ -39,7 +39,7 @@ The stage defends 21 bypass classes:
 6. A disabled tracer leaves lines unexecuted, and a `sys.settrace`, `sys.setprofile` or `sys.addaudithook` call inside a replayed call records a side effect.
 7. In-process stdout forgery stays a residual shared with the first stage.
 8. Dynamic dispatch (`globals()`, `eval`, computed `getattr`, `sys.modules`) holds as `fidelity-unresolvable-dispatch`.
-9. A module alias read as a value holds as `fidelity-unresolvable-reference`. The check resolves each name in its own scope, so a parameter named `fidelity` does not trip it. A dunder attribute such as `__dict__`, `__getattribute__` or `__globals__`, read through the module or a name imported from it, holds with the same reason because it can reach a def without naming it.
+9. A module alias read as a value holds as `fidelity-unresolvable-reference`. The check resolves each name in its own scope, so a parameter named `fidelity` does not trip it. A dunder attribute such as `__dict__`, `__getattribute__` or `__globals__`, read through the module or a name imported from it, holds with the same reason because it can reach a def without naming it. The `harness` package gets the same hold when code reads it as a value, as in `getattr(harness, "fidelity")`, or reads a dunder off it other than `__file__`, `__name__`, `__doc__`, `__package__` and `__path__`.
 10. A duplicate or shadowing def holds as `fidelity-duplicate-def`.
 11. The call graph is the union of both sides.
 12. Nested defs count as part of their top-level function.

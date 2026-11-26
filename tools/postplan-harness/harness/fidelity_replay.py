@@ -516,6 +516,10 @@ def _is_dunder(name: str) -> bool:
     return name.startswith("__") and name.endswith("__")
 
 
+# Dunders on the `harness` package that hold plain data and cannot reach a fidelity def.
+_PKG_DATA_DUNDERS = frozenset({"__file__", "__name__", "__doc__", "__package__", "__path__"})
+
+
 def _from_fidelity(value, bases: set, pkgs: set) -> bool:
     """True when the attribute chain `value` starts at a fidelity module or at a name imported
     from it."""
@@ -531,6 +535,7 @@ def _file_roots(rel: str, tree, out: dict) -> None:
     imported: set[str] = set()  # local names bound by `from <fidelity> import x`
     pkgs: set[str] = set()
     fid_imports: set[int] = set()  # ids of the import nodes that bind a fidelity alias
+    pkg_imports: set[int] = set()  # ids of the import nodes that bind the `harness` package
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for a in node.names:
@@ -540,12 +545,14 @@ def _file_roots(rel: str, tree, out: dict) -> None:
                     raise Unresolvable(f"fidelity-unresolvable-reference: {rel}")
                 if a.name == "harness":
                     pkgs.add(a.asname or "harness")
+                    pkg_imports.add(id(node))
                 if a.name == "harness.fidelity":
                     if a.asname:
                         aliases.add(a.asname)
                         fid_imports.add(id(node))
                     else:
                         pkgs.add("harness")
+                        pkg_imports.add(id(node))
         elif isinstance(node, ast.ImportFrom):
             mod = node.module or ""
             if mod == "bench" or mod.startswith("bench.") or mod.endswith(".bench"):
@@ -592,6 +599,17 @@ def _file_roots(rel: str, tree, out: dict) -> None:
             elif (node.attr == "fidelity" and isinstance(v, ast.Name) and v.id in pkgs
                   and id(node) not in values):
                 raise Unresolvable(f"fidelity-unresolvable-reference: {rel}")
+            # `harness.__dict__["fidelity"]` or `harness.__getattribute__("fidelity")` reach
+            # the module without naming it as an attribute.
+            elif (_is_dunder(node.attr) and node.attr not in _PKG_DATA_DUNDERS
+                  and isinstance(v, ast.Name) and v.id in pkgs
+                  and _loads_fidelity(tree, v, pkg_imports)):
+                raise Unresolvable(f"fidelity-unresolvable-reference: {rel}")
+        elif (isinstance(node, ast.Name) and node.id in pkgs
+              and isinstance(node.ctx, ast.Load) and id(node) not in values
+              and _loads_fidelity(tree, node, pkg_imports)):
+            # The package read as a value, as in `getattr(harness, "fidelity")`.
+            raise Unresolvable(f"fidelity-unresolvable-reference: {rel}")
         elif (isinstance(node, ast.Name) and node.id in aliases
               and isinstance(node.ctx, ast.Load) and id(node) not in values
               and _loads_fidelity(tree, node, fid_imports)):

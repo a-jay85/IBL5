@@ -512,8 +512,23 @@ def _is_test_or_bench(rel: str) -> bool:
 _SELF_DYNAMIC_OK = "harness/fidelity_replay.py"
 
 
+def _is_dunder(name: str) -> bool:
+    return name.startswith("__") and name.endswith("__")
+
+
+def _from_fidelity(value, bases: set, pkgs: set) -> bool:
+    """True when the attribute chain `value` starts at a fidelity module or at a name imported
+    from it."""
+    while isinstance(value, ast.Attribute):
+        if value.attr == "fidelity" and isinstance(value.value, ast.Name) and value.value.id in pkgs:
+            return True
+        value = value.value
+    return isinstance(value, ast.Name) and value.id in bases
+
+
 def _file_roots(rel: str, tree, out: dict) -> None:
     aliases: set[str] = set()
+    imported: set[str] = set()  # local names bound by `from <fidelity> import x`
     pkgs: set[str] = set()
     fid_imports: set[int] = set()  # ids of the import nodes that bind a fidelity alias
     for node in ast.walk(tree):
@@ -542,8 +557,9 @@ def _file_roots(rel: str, tree, out: dict) -> None:
                 raise Unresolvable(f"fidelity-unresolvable-reference: {rel}")
             if mod == "harness.fidelity" or (node.level == 1 and mod == "fidelity"):
                 for a in node.names:
-                    if a.name == "*":
+                    if a.name == "*" or _is_dunder(a.name):
                         raise Unresolvable(f"fidelity-unresolvable-reference: {rel}")
+                    imported.add(a.asname or a.name)
                     out.setdefault(a.name, set()).add(rel)
             elif mod == "harness" or (node.level == 1 and not mod):
                 for a in node.names:
@@ -559,12 +575,15 @@ def _file_roots(rel: str, tree, out: dict) -> None:
                     isinstance(n, ast.Constant) and isinstance(n.value, str) and "fidelity" in n.value
                     for n in ast.walk(node)):
                 raise Unresolvable(f"fidelity-unresolvable-reference: {rel}")
-    if not aliases and not pkgs:
+    if not aliases and not pkgs and not imported:
         return
     values = {id(n.value) for n in ast.walk(tree) if isinstance(n, ast.Attribute)}
     for node in ast.walk(tree):
         if isinstance(node, ast.Attribute):
             v = node.value
+            # `__dict__`, `__getattribute__` or `__globals__` reach a def without naming it.
+            if _is_dunder(node.attr) and _from_fidelity(v, aliases | imported, pkgs):
+                raise Unresolvable(f"fidelity-unresolvable-reference: {rel}")
             if isinstance(v, ast.Name) and v.id in aliases:
                 out.setdefault(node.attr, set()).add(rel)
             elif (isinstance(v, ast.Attribute) and v.attr == "fidelity"
@@ -650,8 +669,9 @@ _NON_PY_FIDELITY_REF = re.compile(
 
 def production_roots(files: dict) -> dict:
     """Each fidelity name -> the production relpaths that reference it. Test and bench files are
-    excluded; a bench import from production, a module alias used as a value, `import *`, or a
-    non-Python file that names the module raises."""
+    excluded; a bench import from production, a module alias used as a value, a dunder read
+    through the module or a name imported from it, `import *`, or a non-Python file that names
+    the module raises."""
     out: dict = {}
     for rel in sorted(files):
         if _is_test_or_bench(rel):

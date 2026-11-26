@@ -617,6 +617,17 @@ def test_static_analyzer_near_misses():
     with pytest.raises(Unresolvable):
         production_roots({"tools/x.py": lazy + "def h():\n    from harness import fidelity\n"
                                                "    return [fidelity]\n"})
+    for src in ('from harness import fidelity\nfidelity.__dict__["f"]()\n',
+                'from harness import fidelity\nfidelity.__getattribute__("f")()\n',
+                'import harness\nharness.fidelity.__dict__["f"]()\n',
+                'from harness import fidelity\nfidelity.f.__globals__["g"]()\n',
+                'from harness.fidelity import f\nf.__globals__["g"]()\n',
+                'from harness.fidelity import __dict__ as d\nd["f"]()\n'):
+        with pytest.raises(Unresolvable):
+            production_roots({"tools/x.py": src})
+    # A dunder read on something unrelated to fidelity does not hold.
+    unrelated = "import harness\nfrom harness import fidelity\nfidelity.y()\nharness.__file__\n"
+    assert production_roots({"tools/x.py": unrelated}) == {"y": {"tools/x.py"}}
     for src in ("from ..fidelity import f\nf()\n", "from .. import fidelity\nfidelity.f()\n"):
         with pytest.raises(Unresolvable):
             production_roots({"harness/adapters/x.py": src})

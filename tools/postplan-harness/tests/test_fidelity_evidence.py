@@ -8,6 +8,8 @@ import sys
 import time
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness import fidelity_evidence as fe
@@ -287,8 +289,16 @@ def test_corpus_skips_dirs_without_pr_number(tmp_path):
     bare.mkdir()
     (bare / "raw-plan-fidelity-review-attempt1.txt").write_text("x")
     good = out.resolve() / "good" / "raw-plan-fidelity-review-attempt1.txt"
-    assert fe._corpus(out) == {str(good): 11}
-    assert fe._corpus(tmp_path / "missing") == {}
+    assert fe._corpus(out) == ({str(good): 11}, False)
+    assert fe._corpus(tmp_path / "missing") == ({}, False)
+
+
+@pytest.mark.parametrize("total, capped", [(2, False), (3, True)])
+def test_corpus_capped_only_when_a_file_is_dropped(tmp_path, monkeypatch, total, capped):
+    monkeypatch.setattr(fe, "MAX_FILES", 2)
+    out = _toy_corpus(tmp_path, [(f"r{i}", 11 + i, "x") for i in range(total)])
+    found, dropped = fe._corpus(out)
+    assert (len(found), dropped) == (2, capped)
 
 
 def test_cli_rejects_unknown_flag(tmp_path):

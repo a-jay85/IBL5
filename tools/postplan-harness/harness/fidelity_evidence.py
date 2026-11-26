@@ -221,11 +221,14 @@ def _git(worktree, *args) -> str:
     return proc.stdout.strip()
 
 
-def _corpus(out_dir) -> dict:
-    """{absolute verdict path: PR number} over `out_dir`, newest run first, capped."""
+def _corpus(out_dir) -> tuple:
+    """({absolute verdict path: PR number}, capped) over `out_dir`, newest run first.
+
+    `capped` is true only when the MAX_FILES limit left a verdict file out.
+    """
     root = Path(out_dir).resolve()
     if not root.is_dir():
-        return {}
+        return {}, False
     runs = []
     for child in root.iterdir():
         if child.name == "state" or not child.is_dir():
@@ -246,9 +249,9 @@ def _corpus(out_dir) -> dict:
             continue
         for verdict in sorted(child.glob(VERDICT_GLOB)):
             if len(found) >= MAX_FILES:
-                return found
+                return found, True
             found[str(verdict)] = pr
-    return found
+    return found, False
 
 
 def _archive(worktree, sha, dest) -> None:
@@ -392,7 +395,6 @@ def _compare_sides(worktree, shas, file_pr, tmp, side_timeout, procs):
             return Result(kind="error", reason=reason)
     result = _score(file_pr, data["base"], data["head"], base_sigs, head_sigs)
     result.uncovered = outside
-    result.capped = len(file_pr) >= MAX_FILES
     return result
 
 
@@ -404,13 +406,14 @@ def compare(worktree, base_ref, out_dir, side_timeout=SIDE_TIMEOUT_S) -> tuple:
     try:
         head = _git(worktree, "rev-parse", "HEAD")
         base = _git(worktree, "merge-base", base_ref, "HEAD")
-        file_pr = _corpus(out_dir)
+        file_pr, capped = _corpus(out_dir)
         if not file_pr:
             result = Result(kind="zero", root=str(out_dir))
         else:
             tmp = tempfile.mkdtemp(prefix="fid-evidence-")
             result = _compare_sides(worktree, (("base", base), ("head", head)), file_pr, tmp,
                                     side_timeout, procs)
+            result.capped = capped
         return head, base, render(result)
     except Exception as exc:  # compare never raises
         reason = _sanitize(f"{type(exc).__name__}: {exc}")

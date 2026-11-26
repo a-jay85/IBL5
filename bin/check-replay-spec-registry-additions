@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 #
 # bin/check-replay-spec-registry-additions: keep new gates out of the REPLAY_SPECS registry.
 #
@@ -12,9 +13,13 @@
 # "# replay-spec-ok: <reason>" with a non-empty reason is exempt, for a spec field a header
 # cannot carry. A string-valued key (a not-replayable string in place of a spec) fails too.
 #
-# The key scan is an awk line match. Inside the REPLAY_SPECS block it reads a line that opens
-# with a quoted bin/ key, takes every key on that line (two keys on one line both count), and
-# also takes a key left alone on its line with its colon on the next one. Outside the block it
+# The key scan is an awk character scan. Inside the REPLAY_SPECS block it tracks bracket depth
+# and stops at a comment, so it reads only top-level keys: a quoted bin/ string in key position
+# (line start or after a comma) followed by a colon or by the end of the code on that line. Two
+# keys on one line both count, and a key left alone on its line with its colon on the next one
+# counts. A quoted bin/ path inside a value (a path in a reads=(...) tuple) or in a trailing
+# comment does not. The "# replay-spec-ok:" exemption applies to the head list only, so an
+# exempt base key whose marker moves or goes away is still an existing key. Outside the block it
 # reads a line-start subscript assignment: REPLAY_SPECS["<key>"] = ... It exits 2 when the block
 # is missing, so a renamed dict fails loudly and never passes silently. It does not parse
 # Python: a key built at run time, REPLAY_SPECS.update(...) and REPLAY_SPECS |= {...} get past
@@ -23,8 +28,6 @@
 # Extend-before-add (meta-tooling-bar.md): distinct trigger (one registry dict in one Python file); no sibling check reads gate_backtest.py.
 #
 # gate-backtest-argv: --since={base}
-#
-# Bash 3.2 safe (macOS /bin/bash): no mapfile, no associative arrays, no ${x,,}.
 #
 # Exit codes: 0 = pass, 1 = new key found, 2 = usage or git error.
 
@@ -68,25 +71,48 @@ trap 'rm -rf "$tmp"' EXIT
 P=tools/postplan-harness/harness/gate_backtest.py
 
 # List the REPLAY_SPECS keys found on stdin, one per line, sorted.
-# A key line opens (after indentation) with a quoted bin/ path followed by a colon or by
-# nothing. Every quoted bin/ path on that line followed by a colon, or ending the line, is a
-# key. Outside the block, a line-start REPLAY_SPECS["bin/..."] subscript is a key too.
-# Comment lines never match. A line ending in "# replay-spec-ok: <non-empty reason>" is skipped.
+# $1 = exempt (head side): skip a line ending in "# replay-spec-ok: <non-empty reason>".
+# $1 = all (base side): list every key, so an exempt base key never drops out of both lists.
+# Inside the block a key is a quoted bin/ string at bracket depth 0, in key position (line
+# start or after a depth-0 comma), followed by a colon, a comment or the end of the line.
+# Outside the block, a line-start REPLAY_SPECS["bin/..."] subscript is a key too.
 extract_keys() {
-    awk '
+    awk -v mode="$1" '
         function exempt(line) {
-            return line ~ /#[[:space:]]*replay-spec-ok:[[:space:]]*[^[:space:]]/
+            return mode == "exempt" && line ~ /#[[:space:]]*replay-spec-ok:[[:space:]]*[^[:space:]]/
         }
-        /^REPLAY_SPECS([: ].*)?=[[:space:]]*\{[[:space:]]*$/ { inblk = 1; found = 1; next }
-        inblk && /^\}/ { inblk = 0; next }
-        inblk && /^[[:space:]]*["'\'']bin\/[^"'\'']+["'\''][[:space:]]*(:.*)?$/ {
-            if (exempt($0)) next
-            rest = $0
-            while (match(rest, /["'\'']bin\/[^"'\'']+["'\'']/)) {
-                s = substr(rest, RSTART + 1, RLENGTH - 2)
-                rest = substr(rest, RSTART + RLENGTH)
-                if (rest ~ /^[[:space:]]*:/ || rest ~ /^[[:space:]]*$/) print s
+        # Print each top-level key on this line. depth carries across lines.
+        function scan(line,   i, n, c, q, str, want, rest) {
+            n = length(line); want = 1
+            for (i = 1; i <= n; i++) {
+                c = substr(line, i, 1)
+                if (c == "#") return
+                if (c == "\"" || c == SQ) {
+                    q = c; str = ""
+                    for (i++; i <= n; i++) {
+                        c = substr(line, i, 1)
+                        if (c == "\\") { str = str c substr(line, i + 1, 1); i++; continue }
+                        if (c == q) break
+                        str = str c
+                    }
+                    if (depth == 0 && want && str ~ /^bin\//) {
+                        rest = substr(line, i + 1)
+                        sub(/^[[:space:]]*/, "", rest)
+                        if (rest == "" || rest ~ /^[:#]/) print str
+                    }
+                    continue
+                }
+                if (c == "(" || c == "[" || c == "{") depth++
+                else if (c == ")" || c == "]" || c == "}") depth--
+                else if (depth == 0 && c == ",") want = 1
+                else if (depth == 0 && c == ":") want = 0
             }
+        }
+        BEGIN { SQ = sprintf("%c", 39) }
+        /^REPLAY_SPECS([: ].*)?=[[:space:]]*\{[[:space:]]*$/ { inblk = 1; found = 1; depth = 0; next }
+        inblk && /^\}/ { inblk = 0; next }
+        inblk {
+            if (!exempt($0)) scan($0)
             next
         }
         /^REPLAY_SPECS\[[[:space:]]*["'\'']bin\// {
@@ -103,13 +129,13 @@ if [ ! -f "$P" ]; then
     exit 0
 fi
 
-if ! extract_keys < "$P" > "$tmp/head.keys"; then
+if ! extract_keys exempt < "$P" > "$tmp/head.keys"; then
     die "no REPLAY_SPECS block in $P (renamed?)"
 fi
 
 if git cat-file -e "$mb:$P" 2>/dev/null; then
     git show "$mb:$P" > "$tmp/base.src" || die "cannot read $P at $mb"
-    if ! extract_keys < "$tmp/base.src" > "$tmp/base.keys"; then
+    if ! extract_keys all < "$tmp/base.src" > "$tmp/base.keys"; then
         die "no REPLAY_SPECS block in $P at the merge-base"
     fi
 else

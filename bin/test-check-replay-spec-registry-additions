@@ -175,6 +175,65 @@ add_after '"bin/check-a": _SINCE,' '    "bin/check-new": _SINCE,  # replay-spec-
 run_with "$CHK" "--since=$BASE"
 expect exempt_marker_passes 0
 
+# An exempt key already in the base stays an existing key when its marker moves off the key
+# line (a multi-line rewrap) or goes away. The exemption is read on the head side only.
+fresh
+add_after '"bin/check-a": _SINCE,' '    "bin/check-slow": ReplaySpec(argv=(), timeout=180),  # replay-spec-ok: needs timeout field'
+git -C "$R" -c user.name=t -c user.email=t@t commit -qam exempt-base
+BASE=$(git -C "$R" rev-parse HEAD)
+awk '
+    /"bin\/check-slow": ReplaySpec/ {
+        print "    \"bin/check-slow\": ReplaySpec("
+        print "        argv=(),"
+        print "        timeout=180,"
+        print "    ),  # replay-spec-ok: needs timeout field"
+        next
+    }
+    { print }
+' "$R/$GB" > "$R/$GB.new"
+mv "$R/$GB.new" "$R/$GB"
+run_with "$CHK" "--since=$BASE"
+expect exempt_base_key_rewrapped_passes 0
+awk '{ sub(/  # replay-spec-ok: needs timeout field$/, ""); print }' "$R/$GB" > "$R/$GB.new"
+mv "$R/$GB.new" "$R/$GB"
+run_with "$CHK" "--since=$BASE"
+expect exempt_base_key_marker_dropped_passes 0
+
+fresh
+awk '{ sub(/"bin\/check-a": _SINCE,$/, "\"bin/check-a\": _SINCE,  # was \"bin/check-old\""); print }' \
+    "$R/$GB" > "$R/$GB.new"
+mv "$R/$GB.new" "$R/$GB"
+run_with "$CHK" "--since=$BASE"
+expect trailing_comment_path_passes 0
+
+fresh
+add_after 'argv=("x",),' '        reads=('
+add_after '        reads=(' '            "bin/lib/zz.sh"'
+add_after '            "bin/lib/zz.sh"' '        ),'
+run_with "$CHK" "--since=$BASE"
+expect nested_value_path_passes 0
+
+fresh
+printf '%s\n' '#!/usr/bin/env bash' '# gate-backtest-argv: --since={base}' > "$R/bin/check-new"
+chmod +x "$R/bin/check-new"
+run_with "$CHK" "--since=$BASE"
+expect header_only_gate_passes 0
+# Mutation: list both key files in place of the head-only diff. The header-only case must
+# go red, so its pass depends on the comm -13 line.
+MUT2="$T/mutated-cat"
+sed -E 's/comm -13 /cat /' "$CHK" > "$MUT2"
+chmod +x "$MUT2"
+if cmp -s "$CHK" "$MUT2"; then
+    fail "header_only_mutation_proof (the sed mutation did not change the check)"
+else
+    run_with "$MUT2" "--since=$BASE"
+    if [ "$RC" = 1 ]; then
+        pass header_only_mutation_proof
+    else
+        fail "header_only_mutation_proof (the cat-mutated gate exited $RC, wanted 1: $OUT)"
+    fi
+fi
+
 # ---- error paths (exit 2) ----
 
 fresh

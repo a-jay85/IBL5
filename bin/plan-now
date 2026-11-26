@@ -207,6 +207,14 @@ else
 
     grep -q '^/plan' "$PROMPT_SRC" \
         || { echo "plan-now: '$PROMPT_SRC' has no line starting with '/plan' — that is not a plan prompt." >&2; exit 2; }
+
+    # A parity fixer brief carries the rule block. Its branch must be jsb-fix-*,
+    # because the CI rule guard and the rename check below only run on that prefix.
+    if grep -qxF '<<<PARITY-RULES' "$PROMPT_SRC"; then
+        _fix_slug=$(grep -ioE 'branch slug[^`]{0,24}`[^`]+`' "$PROMPT_SRC" | head -1 | grep -oE '`[^`]+`' | tr -d '`') || _fix_slug="" # pipefail-ok: a slugless brief leaves it empty and is refused below
+        [[ "$_fix_slug" =~ ^jsb-fix-[a-z0-9-]+$ ]] \
+            || { echo "plan-now: '$PROMPT_SRC' holds the parity rule block, but its branch slug '$_fix_slug' does not start with jsb-fix-. NOT run." >&2; exit 2; }
+    fi
 fi
 
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null) \

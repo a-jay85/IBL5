@@ -2514,6 +2514,31 @@ for f3_slug in jsb-fixer jsb-fix-; do
     kick_ran && fail "F3 near-miss slug $f3_slug: kicked" || ok "F3 near-miss slug $f3_slug: never kicked"
 done
 
+# F6 a brief with the parity rule block must name a jsb-fix-* branch slug, or the
+# CI rule guard never runs on its PR. Refused before any runner is written.
+F6_PROMPT="$KT/f5-prompt.md"
+for f6_slug in parity-tooling-fix jsb-fix- JSB-FIX-x ''; do
+    {
+        printf '/plan Fix a parity blocker\n'
+        [ -z "$f6_slug" ] || printf -- '- Branch slug: `%s`. Base: `master`.\n' "$f6_slug"
+        "$ROOT/bin/check-parity-rule-guard" --print-rule-block
+    } > "$F6_PROMPT"
+    run_preflight "$F6_PROMPT" --queue
+    [ "$PRE_RC" = 2 ] && ok "F6 rule-block brief slug '$f6_slug': exits 2" \
+        || fail "F6 rule-block brief slug '$f6_slug': exits 2 (got $PRE_RC)"
+    want    "F6 rule-block brief slug '$f6_slug': names the prefix" "$PRE_OUT" "does not start with jsb-fix-"
+    want_no "F6 rule-block brief slug '$f6_slug': no runner"         "$PRE_OUT" "runner:"
+done
+{
+    printf '/plan Fix a parity blocker\n'
+    printf -- '- Branch slug: `jsb-fix-capture-invalid-pl-0009-t1`. Base: `master`.\n'
+    "$ROOT/bin/check-parity-rule-guard" --print-rule-block
+} > "$F6_PROMPT"
+run_preflight "$F6_PROMPT" --queue
+want_no "F6 rule-block brief with jsb-fix-* slug: not refused" "$PRE_OUT" "does not start with jsb-fix-"
+[ "$PRE_RC" = 0 ] && ok "F6 rule-block brief with jsb-fix-* slug: exits 0" \
+    || fail "F6 rule-block brief with jsb-fix-* slug: exits 0 (got $PRE_RC)"
+
 # K2 a non-port plan queues and never kicks.
 kick_reset
 kick_run demo-slug

@@ -956,7 +956,11 @@ def test_committed_evidence_entries_pin_in_repo_captures():
             assert "capture_commit" not in entry, where
             assert str(Path(entry["capture"]).parent) == tp.CAPTURE_DIR, where
             assert (REPO / entry["capture"]).is_file(), where
-            assert tp._sha256((REPO / entry["capture"]).read_bytes()) == entry["capture_sha256"], where
+            # Hash only pinned `-<7hex>` copies. A later recapture overwrites a plain
+            # `pl-NNNN.jsonl`, so hashing it here would turn that capture PR red (thread
+            # 4697870450). `_check_capture` hashes every entry on its own port branch.
+            if tp.load_name(entry["capture"]) != Path(entry["capture"]).name:
+                assert tp._sha256((REPO / entry["capture"]).read_bytes()) == entry["capture_sha256"], where
 
 
 def test_jsb_native_dir_is_common_dir_parent(tmp_path):

@@ -637,8 +637,9 @@ main() {
         fi
         if fixer_armed && [[ "$FIXER_STAGES" == *" $s_stage "* ]] && ! fixer_known "stall:$s_stage:$s_row"; then
             age=$(fixer_wake_age "stall:$s_stage:$s_row")
+            # Enqueue at any age, so an unclaimed stall wakes again after REFIRE_S.
+            fixer_enqueue "stall:$s_stage:$s_row" "$key" "$key"
             if [ -z "$age" ] || [ "$age" -lt "$FIXER_ACK_S" ]; then
-                fixer_enqueue "stall:$s_stage:$s_row" "$key" "$key"
                 continue
             fi
         fi

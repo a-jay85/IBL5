@@ -735,6 +735,13 @@ case_fixer_stall_wakes_fixer_not_dm() {
     NOW=$((BASE + 3600)) run_watch
     h_eq "armed stall, one hour later: no DM" 0 "$(cnt discord-dm)"
     h_eq "armed stall, one hour later: no second wake" 0 "$(posts fixer)"
+    NOW=$((BASE + 10801)) run_watch
+    h_eq "armed stall unclaimed past 3h: one DM" 1 "$(cnt discord-dm)"
+    reset_logs
+    NOW=$((BASE + 21601)) run_watch
+    h_eq "armed stall unclaimed past 6h: wakes again" 1 "$(posts fixer)"
+    h_eq "armed stall unclaimed past 6h: no second DM" 0 "$(cnt discord-dm)"
+    h_contains "armed stall unclaimed past 6h: key still queued" "$(QUEUE)" "stall:no-trace:pl-0001"
 }
 
 case_fixer_claimed_stall_sends_no_dm() {

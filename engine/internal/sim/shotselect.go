@@ -36,20 +36,25 @@ func adjustedShotWeights(handler, defender onCourt) (oo, do, po float64) {
 }
 
 // selectShotType picks the offensive play type (outside / drive / post) by
-// weighted random over the adjusted ODPT weights. P(type) = adj / Σadj.
+// weighted random over the adjusted ODPT weights. It makes two randInt draws
+// bounded by the weight sum. The first is a re-pick whose result the second
+// always overwrites, so only its draw reaches later play. The second draw d
+// picks post when d > oo+do, drive when d > oo, and outside otherwise.
 func selectShotType(handler, defender onCourt, r *rng.RNG) playType {
 	oo, do, po := adjustedShotWeights(handler, defender)
-	sum := oo + do + po
+	w1, w2 := int(oo), int(do)
+	sum := w1 + w2 + int(po)
 	if sum <= 0 {
 		return playOutside
 	}
-	roll := r.Float64() * sum
+	_ = randInt(r, sum) // re-pick draw; the pick below overwrites its result
+	d := randInt(r, sum)
 	switch {
-	case roll <= oo:
-		return playOutside
-	case roll <= oo+do:
+	case d > w1+w2:
+		return playPost
+	case d > w1:
 		return playDrive
 	default:
-		return playPost
+		return playOutside
 	}
 }

@@ -27,7 +27,6 @@ var DrawSites = map[string]string{
 	"sim.selectDefender":                       "",
 	"sim.selectOutcome":                        "",
 	"sim.selectRebounder":                      "",
-	"sim.selectShotType":                       "",
 	"sim.simGameWith":                          "",
 	"sim.transitionTriggers":                   "FUN_004e42e0",
 	"sim.usageDominanceFlagsFor":               "",

@@ -30,27 +30,27 @@ final class TuningView implements TuningViewInterface
 <h1 class="ibl-title">Trade suggestions tuning</h1>
 <p id="tuning-sim" class="tuning-sim">Sim <?= HtmlSanitizer::e($report->simKey) ?></p>
 
-<form method="get" action="modules.php" class="ibl-filter-form tuning-filter">
+<form method="get" action="modules.php" class="d-card d-card-border bg-base-200 p-4 mb-6 tuning-filter">
     <input type="hidden" name="name" value="TradeSuggestionsTuning">
-    <div class="ibl-filter-form__row">
-        <div class="ibl-filter-form__group">
-            <label class="ibl-filter-form__label" for="tuning-team">Team</label>
-            <select name="team" id="tuning-team">
+    <div class="flex flex-wrap items-center justify-center gap-4">
+        <div class="flex items-center gap-2">
+            <label class="d-label" for="tuning-team">Team</label>
+            <select name="team" id="tuning-team" class="d-select w-auto">
                 <option value="all"<?= HtmlSanitizer::e($filter->tid === null ? ' selected' : '') ?>>All teams</option>
 <?php foreach ($report->teamNames as $tid => $name): ?>
                 <option value="<?= HtmlSanitizer::e($tid) ?>"<?= HtmlSanitizer::e($filter->tid === $tid ? ' selected' : '') ?>><?= HtmlSanitizer::e($name) ?></option>
 <?php endforeach; ?>
             </select>
         </div>
-        <div class="ibl-filter-form__group">
-            <label class="ibl-filter-form__label" for="tuning-status">Show</label>
-            <select name="status" id="tuning-status">
+        <div class="flex items-center gap-2">
+            <label class="d-label" for="tuning-status">Show</label>
+            <select name="status" id="tuning-status" class="d-select w-auto">
 <?php foreach (TuningStatus::cases() as $status): ?>
                 <option value="<?= HtmlSanitizer::e($status->value) ?>"<?= HtmlSanitizer::e($filter->status === $status ? ' selected' : '') ?>><?= HtmlSanitizer::e($status->label()) ?></option>
 <?php endforeach; ?>
             </select>
         </div>
-        <button type="submit" class="ibl-filter-form__submit">Run</button>
+        <button type="submit" class="d-btn d-btn-primary">Run</button>
     </div>
 </form>
 <?php if ($filter->ignored !== []): ?>

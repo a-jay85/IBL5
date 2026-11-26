@@ -97,7 +97,7 @@ final class TuningViewTest extends TestCase
     {
         $html = self::render();
 
-        preg_match('/<select name="team" id="tuning-team">(.*?)<\/select>/s', $html, $m);
+        preg_match('/<select name="team" id="tuning-team"[^>]*>(.*?)<\/select>/s', $html, $m);
         self::assertSame(29, substr_count($m[1] ?? '', '<option '));
     }
 

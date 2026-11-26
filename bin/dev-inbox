@@ -31,7 +31,7 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --last) [ $# -ge 2 ] || { echo "dev-inbox: --last needs a number" >&2; exit 2; }
                 case "$2" in ''|*[!0-9]*) echo "dev-inbox: --last needs a number" >&2; exit 2 ;; esac
-                LAST="$2"; shift 2 ;;
+                LAST=$((10#$2)); shift 2 ;;
         --no-bell) BELL=0; shift ;;
         --once) ONCE=1; shift ;;
         -h|--help) sed -n '/^# Usage:/,/^#$/p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;

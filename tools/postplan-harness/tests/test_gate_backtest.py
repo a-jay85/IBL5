@@ -248,6 +248,22 @@ def test_modified_header_only_gate_keeps_opt_out_from_base():
     assert g.state == "unspecified"
 
 
+def test_opt_out_beside_argv_header_never_exempts_a_later_edit():
+    # An ignored opt-out merged under an argv header must not switch the backtest off later,
+    # whether the next diff edits the gate or only a lib it calls.
+    rel = "bin/check-zz-argv-then-opt-out"
+    lib = "bin/lib/zz-helper.sh"
+    argv = "# gate-backtest-argv: --since={base}\n"
+    opt_out = "# gate-backtest: not-replayable later\n"
+    for headers in (argv + opt_out, opt_out + argv):
+        base = "#!/bin/bash\n" + headers + 'source "$here/lib/zz-helper.sh"\n'
+        edited = {rel: base + "exit 0\n"}
+        g = detect_gate_changes([("M", rel)], edited.get, {}, {rel: base}.get)[0]
+        assert g.state == "replayable" and g.spec.argv == ("--since={base}",), headers
+        g = _detect([("M", lib)], {}, {rel: base})[0]
+        assert (g.kind, g.state) == ("transitive", "replayable"), headers
+
+
 def test_header_flag_forms():
     _, spec, _ = resolve_spec("bin/check-zzz",
                               "# gate-backtest-argv:\n# gate-backtest-flag: exit=1,3\n")

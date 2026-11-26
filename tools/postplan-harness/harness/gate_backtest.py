@@ -408,11 +408,15 @@ def _references_lib(text: str, needle: str) -> bool:
 
 
 def base_had_opt_out(base_text: str | None) -> bool:
-    """True when the merge-base copy of a script already carried a reasoned opt-out header."""
+    """True when the merge-base copy of a script relied on a reasoned opt-out header.
+
+    An opt-out next to an argv header does not count. It may have been added to an existing
+    gate, where it was ignored and the argv header stayed in effect."""
     if not base_text:
         return False
     header = _parse_header(base_text)
-    return header is not None and header[0] == "not-replayable"
+    return (header is not None and header[0] == "not-replayable"
+            and _parse_header(base_text, honor_opt_out=False) is None)
 
 
 def detect_gate_changes(changed, read_candidate, check_sources,
@@ -436,9 +440,13 @@ def detect_gate_changes(changed, read_candidate, check_sources,
         out.setdefault(change.path, change)
 
     def resolved(path: str, kind: str, text: str | None) -> GateChange:
-        is_new = path in added or path not in touched
-        if not is_new and read_base is not None and base_had_opt_out(read_base(path)):
-            is_new = True
+        is_new = path in added
+        if not is_new:
+            if path not in touched:
+                base_text = text  # an unchanged script: this is also its merge-base text
+            else:
+                base_text = read_base(path) if read_base is not None else None
+            is_new = base_had_opt_out(base_text)
         state, spec, reason = resolve_spec(path, text or "", is_new=is_new)
         return GateChange(path, kind, state, spec, reason)
 

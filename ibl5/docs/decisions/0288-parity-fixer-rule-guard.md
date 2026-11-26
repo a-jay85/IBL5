@@ -1,6 +1,6 @@
 ---
 description: Parity-loop fixer PRs (jsb-fix-*) must pass a structural rule guard run from the base ref, and the jsb-native pull waits for that PR to merge.
-last_verified: 2026-11-25
+last_verified: 2026-11-26
 ---
 
 # ADR-0288: Rule Guard for Parity-Loop Fixer PRs
@@ -14,7 +14,7 @@ The JSB parity loop stops when a check refuses a port or a capture. A blocker fi
 
 ## Decision
 
-Every fixer PR (head ref `jsb-fix-*`) must pass `bin/check-parity-rule-guard`. The guard is structural. It refuses edits to a list of protected files, edits to lines holding protected fixed-string tokens, removed test lines and added skip markers. The `Meta checks` job in `.github/workflows/pr-meta-checks.yml` runs the copy of the guard taken from the base ref, and refuses when the base ref has no copy. The parity loop pulls new jsb-native commits only after the fix PR merges, and runs the same guard over the pulled commit range first. The caps live in the jsb-native file `tools/parity_loop/fixer.py`: 2 tries per blocker and 2 fixes per day. Fixer PRs follow the same merge rules as port PRs.
+Every fixer PR (head ref `jsb-fix-*`) must pass `bin/check-parity-rule-guard`. The guard is structural. It refuses edits to a list of protected files, edits to lines holding protected fixed-string tokens, removed test lines, deleted test files and added skip markers. The protected list uses directories and globs, so a new checker file is covered too. It includes test runner config such as `phpunit.xml` and `conftest.py`. Saved JSB captures are add-only. A test file is matched by its directory or by its name, such as `*.test.ts` or `test_*.py`, so a test beside its source counts. An added early exit in a test file also refuses. The `Meta checks` job in `.github/workflows/pr-meta-checks.yml` runs the copy of the guard taken from the base ref, and refuses when the base ref has no copy. The parity loop pulls new jsb-native commits only after the fix PR merges, and runs the same guard over the pulled commit range first. The caps live in the jsb-native file `tools/parity_loop/fixer.py`: 2 tries per blocker and 2 fixes per day. Fixer PRs follow the same merge rules as port PRs.
 
 ## Alternatives Considered
 

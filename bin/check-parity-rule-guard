@@ -50,24 +50,26 @@ RULES
 }
 
 # --- Protected files (R1) ------------------------------------------------------
-# An entry ending in "/" protects every path under it. Others match exactly.
+# An entry ending in "/" protects every path under it. An entry holding "*" is a
+# glob matched against "/<path>", so "*/CLAUDE.md" also covers the root file.
+# Others match exactly. Prefer a directory or a glob, so a new file is covered.
 
 IBL5_FILES=(
     'bin/check-parity-rule-guard'
     'bin/test-check-parity-rule-guard'
-    '.github/workflows/pr-meta-checks.yml'
-    '.github/workflows/harness-legs.txt'
+    '/bin/check-*'
+    'bin/lib/'
     'bin/run-meta-checks-local'
-    'bin/check-plan'
+    'bin/plan-now'
+    'bin/post-plan-now'
     'bin/jsb-parity-watch'
     'bin/jsb-parity-watch-setup'
     'bin/owner-approve'
-    'bin/lib/pr-armable.sh'
-    'tools/postplan-harness/harness/trace_pinned.py'
-    'tools/postplan-harness/harness/replay_progress.py'
-    'tools/postplan-harness/harness/armable.py'
-    'tools/postplan-harness/harness/gate_backtest.py'
+    '.github/'
+    'tools/postplan-harness/'
+    'engine/internal/jsbtrace/'
     'engine/docs/jsb-trace-capture.md'
+    '*/CLAUDE.md'
     '.claude/'
     'jsb-native/'
 )
@@ -82,6 +84,17 @@ JSBN_FILES=(
     'parity/vm.json'
     'cleanroom/'
 )
+
+# Test runner config can drop tests without touching a test file, so it is
+# protected in both repos, wherever it lives.
+RUNNER_CONFIG_FILES=(
+    '*/phpunit.xml*' '*/conftest.py' '*/pytest.ini' '*/tox.ini' '*/setup.cfg'
+    '*/pyproject.toml' '*/package.json' '*/vitest.config.*' '*/vitest.workspace.*'
+    '*/vite.config.*' '*/jest.config.*' '*/playwright.config.*' '*/.mocharc*'
+)
+
+# Saved captures are add-only: a new file passes, any other change refuses.
+IBL5_ADD_ONLY=('engine/testdata/jsb-captures/')
 
 # --- Protected tokens (R2) -----------------------------------------------------
 # Fixed strings matched as substrings, so a longer identifier refuses too.
@@ -98,8 +111,15 @@ JSBN_TOKENS=(
 # --- Add-only tests (R3) -------------------------------------------------------
 
 # Checked in order; a refusal names the first pattern that matched.
-TEST_PATHS=('ibl5/tests/' 'bin/test-' '/tests/' '_test.go')
-SKIP_RE='t\.Skip|markTestSkipped|@unittest\.skip|unittest\.skip|expectedFailure|pytest\.mark\.(skip|xfail)|\.skip\('
+# TEST_PATHS are substrings of "/<path>". TEST_NAMES are globs on the file name,
+# so a test that sits beside its source is covered wherever it lives.
+TEST_PATHS=('ibl5/tests/' 'bin/test-' '/tests/' '/test/' '/__tests__/' '_test.go')
+TEST_NAMES=('*.test.*' '*.spec.*' 'test_*.py' '*_test.py' '*Test.php')
+# Checked on every added line in every file.
+SKIP_RE='t\.Skip|markTestSkipped|markTestIncomplete|@unittest\.skip|unittest\.skip|skipTest|skip(If|Unless)|importorskip|expectedFailure|pytest\.mark\.(skip|xfail)|\.(skip|fixme|todo|only)[(.]|(^|[^[:alnum:]_])x(it|describe|test)[[:space:]]*\(|@requires|#\[Requires'
+# Checked on added lines in test files only. An early exit or a TestMain skips
+# the rest of the file, so any exit without a non-zero literal code refuses.
+TEST_EXIT_RE='(^|[^[:alnum:]_-])exit([[:space:]]*($|[;&|)#])|[[:space:]]+[^1-9[:space:]])|(sys|os|process|pytest)\.(_?exit|Exit)[[:space:]]*\(|TestMain[[:space:]]*\('
 
 # --- Brief wording -------------------------------------------------------------
 
@@ -130,9 +150,16 @@ finish() {
 
 # test_path_of <path>: print the first test pattern the path matches.
 test_path_of() {
-    local p
+    local p name="${1##*/}"
     for p in "${TEST_PATHS[@]}"; do
         if [[ "/$1" == *"$p"* ]]; then
+            printf '%s' "$p"
+            return 0
+        fi
+    done
+    for p in "${TEST_NAMES[@]}"; do
+        # shellcheck disable=SC2053  # $p is a glob on purpose
+        if [[ "$name" == $p ]]; then
             printf '%s' "$p"
             return 0
         fi
@@ -140,16 +167,34 @@ test_path_of() {
     return 0
 }
 
+# path_in <path> <entry>...: true when the path matches one entry (see R1).
+path_in() {
+    local path="$1" f
+    shift
+    for f in "$@"; do
+        if [[ "$f" == *'*'* ]]; then
+            # shellcheck disable=SC2053  # $f is a glob on purpose
+            if [[ "/$path" == $f ]]; then
+                return 0
+            fi
+        elif [[ "$path" == "$f" || ( "$f" == */ && "$path" == "$f"* ) ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
 # check_range <mode> <repo> <base> <head>
 check_range() {
     local mode="$1" repo="$2" base="$3" head="$4"
     local ref status path f t line sign text test_pat
-    local -a files tokens
+    local -a files tokens add_only
 
     case "$mode" in
-        ibl5) files=("${IBL5_FILES[@]}"); tokens=("${IBL5_TOKENS[@]}") ;;
-        *) files=("${JSBN_FILES[@]}"); tokens=("${JSBN_TOKENS[@]}") ;;
+        ibl5) files=("${IBL5_FILES[@]}"); tokens=("${IBL5_TOKENS[@]}"); add_only=("${IBL5_ADD_ONLY[@]}") ;;
+        *) files=("${JSBN_FILES[@]}"); tokens=("${JSBN_TOKENS[@]}"); add_only=() ;;
     esac
+    files+=("${RUNNER_CONFIG_FILES[@]}")
 
     [ -d "$repo" ] || cannot_tell "missing repo: $repo"
     for ref in "$base" "$head"; do
@@ -178,12 +223,12 @@ check_range() {
     done < "$TMP/numstat"
 
     while IFS= read -r -d '' status && IFS= read -r -d '' path; do
-        for f in "${files[@]}"; do
-            if [[ "$path" == "$f" || ( "$f" == */ && "$path" == "$f"* ) ]]; then
-                refuse protected-file "$path" "status $status"
-                break
-            fi
-        done
+        if path_in "$path" "${files[@]}"; then
+            refuse protected-file "$path" "status $status"
+        fi
+        if [ "$status" != A ] && [ "${#add_only[@]}" -gt 0 ] && path_in "$path" "${add_only[@]}"; then
+            refuse capture-not-add-only "$path" "status $status"
+        fi
 
         test_pat=$(test_path_of "$path")
         if [ -n "$test_pat" ] && [ "$status" = D ]; then
@@ -209,6 +254,9 @@ check_range() {
             fi
             if [ "$sign" = '+' ] && [[ "$text" =~ $SKIP_RE ]]; then
                 refuse test-skip-added "$path" "$line"
+            fi
+            if [ "$sign" = '+' ] && [ -n "$test_pat" ] && [[ "$text" =~ $TEST_EXIT_RE ]]; then
+                refuse test-exit-added "$path" "$line"
             fi
         done < "$TMP/lines"
     done < "$TMP/names"

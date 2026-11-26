@@ -220,6 +220,163 @@ case_ibl5_skip_added() {
     h_contains "skip added: refused" "$OUT" "REFUSE: test-skip-added ibl5/tests/FooTest.php"
 }
 
+# Review thread on the protected list: each of these edits passed before.
+case_ibl5_protected_list_widened() {
+    local base head p
+    local -a paths=(
+        engine/internal/jsbtrace/jsbtrace.go
+        bin/plan-now
+        tools/postplan-harness/harness/verify.py
+        tools/postplan-harness/harness/merge_danger.py
+        tools/postplan-harness/harness/review.py
+        bin/lib/plan-autonomy-contract
+        bin/lib/critical-files.sh
+        bin/lib/deleted-guards
+        bin/check-new-gate
+        .github/workflows/all-checks-settled.yml
+        .github/actions/setup-php-env/action.yml
+        CLAUDE.md
+        ibl5/CLAUDE.md
+        ibl5/phpunit.xml
+        ibl5/IBLbot/vitest.config.ts
+        tools/postplan-harness/tests/conftest.py
+        conftest.py
+        pytest.ini
+    )
+    new_repo protected_widened
+    for p in "${paths[@]}"; do
+        put "$p" 'one' 'two'
+    done
+    base=$(commit)
+    for p in "${paths[@]}"; do
+        put "$p" 'one'
+    done
+    head=$(commit)
+    guard --ibl5 "$base" "$head"
+    rc_is "widened list: exit 1" 1
+    for p in "${paths[@]}"; do
+        h_contains "widened list: $p refused" "$OUT" "REFUSE: protected-file $p: status M"
+    done
+
+    new_repo protected_new_conftest
+    base=$(commit)
+    put ibl5/tests/conftest.py 'collect_ignore_glob = ["*"]'
+    head=$(commit)
+    guard --ibl5 "$base" "$head"
+    rc_is "new conftest.py: exit 1" 1
+    h_contains "new conftest.py: refused" "$OUT" "REFUSE: protected-file ibl5/tests/conftest.py: status A"
+}
+
+# Saved JSB captures are add-only: a new capture passes, an edited one refuses.
+case_ibl5_captures_add_only() {
+    local base head
+    new_repo captures
+    put engine/testdata/jsb-captures/g1/expected.json '{"pts": 10}'
+    base=$(commit)
+    put engine/testdata/jsb-captures/g2/expected.json '{"pts": 12}'
+    head=$(commit)
+    guard --ibl5 "$base" "$head"
+    rc_is "new capture: exit 0" 0
+    h_eq "new capture: PASS" "PASS: ibl5" "$OUT"
+
+    put engine/testdata/jsb-captures/g1/expected.json '{"pts": 11}'
+    head=$(commit)
+    guard --ibl5 "$base" "$head"
+    rc_is "edited capture: exit 1" 1
+    h_contains "edited capture: refused" "$OUT" "REFUSE: capture-not-add-only engine/testdata/jsb-captures/g1/expected.json: status M"
+}
+
+# Review thread on skip forms: each added line passed before.
+case_skip_forms_widened() {
+    local base head line
+    local -a lines=(
+        '        self.skipTest("later")'
+        '@skipIf(True, "x")'
+        '@unittest.skipIf(True, "x")'
+        '@skipUnless(False, "x")'
+        'pytest.importorskip("numpy")'
+        '$this->markTestIncomplete("x");'
+        "describe.skipIf(true)('x', () => {});"
+        'test.fixme();'
+        "it.todo('x');"
+        "xit('x', () => {});"
+        "xdescribe('x', () => {});"
+        "it.only('x', () => {});"
+    )
+    for line in "${lines[@]}"; do
+        new_repo skip_form
+        put tools/postplan-harness/tests/test_x.py 'def test_a():' '    pass'
+        base=$(commit)
+        put tools/postplan-harness/tests/test_x.py 'def test_a():' "$line" '    pass'
+        head=$(commit)
+        guard --jsbn "$R" "$base" "$head"
+        rc_is "skip form '$line': exit 1" 1
+        h_contains "skip form '$line': refused" "$OUT" "REFUSE: test-skip-added"
+        rm -rf "$R"
+    done
+}
+
+# An early exit added to a test file skips the rest of it.
+case_test_early_exit_refuses() {
+    local base head
+    new_repo early_exit
+    put bin/test-foo '#!/usr/bin/env bash' 'case_a' 'h_done'
+    put pkg/a_test.go 'package a'
+    base=$(commit)
+    put bin/test-foo '#!/usr/bin/env bash' 'exit 0' 'case_a' 'h_done'
+    put pkg/a_test.go 'package a' 'func TestMain(m *testing.M) { os.Exit(0) }'
+    head=$(commit)
+    guard --jsbn "$R" "$base" "$head"
+    rc_is "early exit: exit 1" 1
+    h_contains "early exit: bin/test- exit 0" "$OUT" "REFUSE: test-exit-added bin/test-foo: +exit 0"
+    h_contains "early exit: TestMain" "$OUT" "REFUSE: test-exit-added pkg/a_test.go"
+
+    new_repo exit_outside_tests
+    put bin/plan-dup-check 'echo one'
+    base=$(commit)
+    put bin/plan-dup-check 'echo one' 'exit 0'
+    head=$(commit)
+    guard --ibl5 "$base" "$head"
+    rc_is "exit 0 outside a test: exit 0" 0
+}
+
+# Review thread on test paths: a test beside its source is add-only too.
+case_colocated_test_files() {
+    local base head p
+    local -a paths=(
+        ibl5/IBLbot/src/server/express.test.ts
+        ibl5/IBLbot/src/ui/panel.test.tsx
+        web/a.spec.js
+        tools/postplan-harness/harness/test_fidelity_budget_trim_hint.py
+        pkg/thing_test.py
+        ibl5/classes/FooTest.php
+    )
+    new_repo colocated_delete
+    for p in "${paths[@]}"; do
+        put "$p" 'one' 'two'
+    done
+    base=$(commit)
+    for p in "${paths[@]}"; do
+        git -C "$R" rm -q "$p"
+    done
+    head=$(commit)
+    guard --jsbn "$R" "$base" "$head"
+    rc_is "co-located delete: exit 1" 1
+    for p in "${paths[@]}"; do
+        h_contains "co-located delete: $p refused" "$OUT" "test-file-removed("
+        h_contains "co-located delete: $p named" "$OUT" " $p: status D"
+    done
+
+    new_repo colocated_line
+    put ibl5/IBLbot/src/server/express.test.ts 'it("a", () => {});' 'it("b", () => {});'
+    base=$(commit)
+    put ibl5/IBLbot/src/server/express.test.ts 'it("a", () => {});'
+    head=$(commit)
+    guard --ibl5 "$base" "$head"
+    rc_is "co-located line removed: exit 1" 1
+    h_contains "co-located line removed: refused" "$OUT" "REFUSE: test-line-removed(*.test.*) ibl5/IBLbot/src/server/express.test.ts"
+}
+
 case_rename_of_protected_refuses() {
     local base head
     new_repo rename

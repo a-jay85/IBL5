@@ -36,6 +36,7 @@
 #   armed, no ack 3h after the first wake             DM once
 #   fix PR merged                                     FIRE webhook (fix-merged:<slug>)
 #   fix PR closed or red                              DM once
+#   fix PR green, auto-merge not armed                DM once (held for owner)
 #   fix PR never opened in 48h                        DM once
 #
 # Usage:
@@ -452,9 +453,10 @@ fix_pr_dm() {
     fixer_dm "$kind:$key:$slug" "JSB parity fixer: $stage for $key ($slug). The loop stays blocked. Check git -C $jsbn log --oneline $base..origin/main and revert bad commits, then run: python3 $jsbn/tools/parity_loop/parity_loop.py fix release --key $key --ibl5 $MAIN_WT"
 }
 
-# fix_pr_verdict <slug>: merged, closed, red, open or none. "error" on a gh failure.
+# fix_pr_verdict <slug>: merged, closed, red, held:<number>, open or none. held means
+# green with auto-merge not armed. "error" on a gh failure.
 fix_pr_verdict() {
-    local slug="$1" prs pr state check
+    local slug="$1" prs pr state check armed number
     # Same subshell reason as row_verdict.
     trap - ERR
     if ! prs=$(gh pr list --repo a-jay85/IBL5 --head "$slug" --state all --json number,state,mergedAt,url,autoMergeRequest,statusCheckRollup,headRefOid 2>/dev/null) \
@@ -468,7 +470,15 @@ fix_pr_verdict() {
         CLOSED) echo "closed" ;;
         OPEN)
             check=$(printf '%s' "$pr" | jq -r --argjson failed "$FAILED_CONCLUSIONS" "$CHECK_FILTER")
-            if [ "$check" = "failed" ]; then echo "red"; else echo "open"; fi ;;
+            armed=$(printf '%s' "$pr" | jq -r 'if .autoMergeRequest == null then "no" else "yes" end')
+            number=$(printf '%s' "$pr" | jq -r '.number')
+            if [ "$check" = "failed" ]; then
+                echo "red"
+            elif [ "$check" = "green" ] && [ "$armed" = "no" ]; then
+                echo "held:$number"
+            else
+                echo "open"
+            fi ;;
         *) echo "open" ;;
     esac
 }
@@ -502,6 +512,9 @@ fixer_actions() {
                 fi ;;
             closed) fix_pr_dm fixer-pr-closed "fix PR closed without merge" "$key" "$slug" ;;
             red) fix_pr_dm fixer-pr-red "fix PR has a failed check" "$key" "$slug" ;;
+            held:*)
+                # Not fix_pr_dm: a green PR needs no revert or release.
+                fixer_dm "fixer-pr-held:$key:$slug" "JSB parity fixer: fix PR for $key ($slug) is held for owner. The loop stays blocked. It is green and auto-merge is not armed: https://github.com/a-jay85/IBL5/pull/${verdict#held:}" ;;
             none)
                 at=$(jq -r --arg k "$key" '.fixer.open[$k].at // 0 | floor' <<< "$FIXER_STATE") # pipefail-ok: jq filter pipe, not a shell pipe; a jq failure trips the ERR trap and the run takes no action
                 if [ $((NOW - at)) -gt "$FIXER_PR_STALE_S" ]; then
@@ -610,7 +623,7 @@ main() {
         [ -n "$slug" ] || continue
         verdict=$(fix_pr_verdict "$slug" </dev/null)
         case "$verdict" in
-            merged|closed|red|open|none) FIX_VERDICTS="${FIX_VERDICTS}$key $slug $verdict"$'\n' ;;
+            merged|closed|red|held:*|open|none) FIX_VERDICTS="${FIX_VERDICTS}$key $slug $verdict"$'\n' ;;
             *) GH_ERROR="$slug" ;;
         esac
     done <<< "$open_fixes"

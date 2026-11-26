@@ -956,6 +956,36 @@ case_fix_pr_red_dms_once() {
     fix_pr_dm_case "red fix PR" fixer-pr-red
 }
 
+case_fix_pr_held_dms_once() {
+    local dm
+    sandbox fix_held
+    quiet_row
+    one_fix "$BASE"
+    gh_pr "$FIX_SLUG" 99 OPEN no f1 "$GREEN"
+    run_watch
+    NOW=$((BASE + 3600)) run_watch
+    dm=$(slurp "$S/log/discord-dm.stdin")
+    h_eq "held fix PR: one DM across two runs" 1 "$(cnt discord-dm)"
+    h_eq "held fix PR: no parity POST" 0 "$(posts parity)"
+    h_contains "held fix PR: DM key recorded" "$(slurp "$S/home/.cache/jsb-parity-stalls.txt")" "fixer-pr-held:$FIX_KEY:$FIX_SLUG"
+    h_contains "held fix PR: DM names the slug" "$dm" "$FIX_SLUG"
+    h_contains "held fix PR: DM says held for owner" "$dm" "held for owner"
+    h_contains "held fix PR: DM links the PR" "$dm" "https://github.com/a-jay85/IBL5/pull/99"
+    h_not_contains "held fix PR: DM gives no release command" "$dm" "fix release"
+    sandbox fix_held_armed
+    quiet_row
+    one_fix "$BASE"
+    gh_pr "$FIX_SLUG" 99 OPEN yes f1 "$GREEN"
+    run_watch
+    no_actions "green fix PR with auto-merge armed"
+    sandbox fix_held_pending
+    quiet_row
+    one_fix "$BASE"
+    gh_pr "$FIX_SLUG" 99 OPEN no f1 "$PENDING"
+    run_watch
+    no_actions "pending fix PR"
+}
+
 case_fix_pr_stale_dms_once() {
     sandbox fix_young
     quiet_row

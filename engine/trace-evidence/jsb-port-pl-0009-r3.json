@@ -1,0 +1,18 @@
+{
+  "branch": "jsb-port-pl-0009-r3",
+  "schema": 2,
+  "tests": [
+    {
+      "capture": "engine/testdata/jsb-captures/pl-0009.jsonl",
+      "capture_sha256": "313818c1aecc94cf13496a475cac6235a3e2d128621235e99ca347e6d214cb0d",
+      "file": "engine/internal/sim/tracepinned_pl0009_test.go",
+      "package": "./internal/sim",
+      "ported_files": [
+        "engine/internal/sim/shotselect.go"
+      ],
+      "test": "TestTracePinnedPl0009Pick",
+      "test_blob": "18d8074734df519fdee0ddb9d1049619f7968060"
+    }
+  ],
+  "token": "trace-pinned"
+}

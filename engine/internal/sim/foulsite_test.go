@@ -9,10 +9,12 @@ import (
 	"github.com/a-jay85/IBL5/engine/internal/result"
 )
 
-// TestEveryFoulCarriesSite runs the golden fixture at its golden seed and
-// checks the J27 pass-3 foul-site tag: no EventFoul is left at
+// TestEveryFoulCarriesSite runs the golden fixture one seed past its golden
+// seed and checks the J27 pass-3 foul-site tag: no EventFoul is left at
 // FoulSiteUnknown, and both a 2pt shooting foul and a non-shooting foul
-// appear, so the callers pass distinct sites rather than one constant.
+// appear, so the callers pass distinct sites rather than one constant. The
+// seed is picked so one game holds both sites; the game at the golden seed
+// itself holds no 2pt shooting foul.
 func TestEveryFoulCarriesSite(t *testing.T) {
 	in, err := os.ReadFile(filepath.Join("testdata", "bundle.json"))
 	if err != nil {
@@ -22,7 +24,7 @@ func TestEveryFoulCarriesSite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decode fixture: %v", err)
 	}
-	res := Simulate(b, b.Seed)
+	res := Simulate(b, b.Seed+1)
 
 	counts := map[result.FoulSite]int{}
 	fouls := 0

@@ -1165,6 +1165,15 @@ grep -q '^@@ .* route:/otherDM ' "$INB" && ok "S2l plain text on another route k
 r_out=$(DISCORD_DM_INBOX="$INB" "$DEV_INBOX" --once)
 [[ "$r_out" != *$'\007'* ]] && ok "S2m a plain route: entry does not ring" || fail "S2m out=[$r_out]"
 
+rm -f "$INB" "$SENT"; : > "$CAP"
+DM_CAPTURE="$CAP" DISCORD_DM_SSH_BIN="$SSH_OK" DISCORD_DM_SPOOL="$SPOOL" DISCORD_DM_SENT_LOG="$SENT" \
+    DISCORD_DM_INBOX="$INB" DISCORD_DM_ERRORS_WEBHOOK_FILE="$TMP/absent-errors-webhook-url" \
+    "$DM" --to "$FAKE_TO" --attempts 1 --quiet --error "fell back"
+r_out=$(DISCORD_DM_INBOX="$INB" "$DEV_INBOX" --once)
+{ grep -q '^@@ .* errors ' "$INB" && [ "$(cut -f2 "$SENT")" = dm ] && [[ "$r_out" == *$'\007'* ]]; } \
+    && ok "S2y --error over the DM: inbox says errors and rings, sent log stays dm" \
+    || fail "S2y inbox=[$(cat "$INB")] sent=[$(cat "$SENT")]"
+
 rm -f "$INB" "$SPOOL"
 DISCORD_DM_SSH_BIN="$TMP/ssh-400" DISCORD_DM_SPOOL="$SPOOL" DISCORD_DM_SENT_LOG="$SENT" DISCORD_DM_INBOX="$INB" \
     "$DM" --to "$FAKE_TO" --attempts 1 --quiet "lost one" 2>/dev/null

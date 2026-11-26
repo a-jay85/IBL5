@@ -55,9 +55,9 @@
 # Inbox: every message, delivered or not, also appends its FULL text to
 # ${DISCORD_DM_INBOX:-~/.claude/dev-inbox.log} for bin/dev-inbox to show in a terminal.
 # Each entry is a `@@ <time> <target> <caller>` line, then the message with every line
-# indented two spaces. Target is the sent-log target (`raw:<path>` for --raw), or
-# `undelivered` on total failure. A --raw body is JSON for a Discord-only message
-# (buttons): the inbox notes that and shows its .digest text. Rotates past 5 MB.
+# indented two spaces. Target is the sent-log target (`raw:<path>` for --raw, `errors`
+# for any --error), or `undelivered` on total failure. A --raw body is JSON for a
+# Discord-only message (buttons): the inbox notes it, shows .digest. Rotates past 5 MB.
 #
 # Exit: 0 delivered · 1 undeliverable (spooled) · 2 usage/config error.
 
@@ -384,6 +384,8 @@ log_inbox() { # target
     target="$1"
     # dev-inbox rings for raw: (a button message), not for every non-default route.
     [ "$RAW" = 1 ] && [ "$target" != undelivered ] && target="raw:$ROUTE"
+    # An --error send that fell back to #dev or the DM must still ring in dev-inbox.
+    [ "$ERROR" = 1 ] && [ "$target" != undelivered ] && target="errors"
     inbox="${DISCORD_DM_INBOX:-$HOME/.claude/dev-inbox.log}"
     mkdir -p "$(dirname "$inbox")"
     size=$(stat -c %s "$inbox" 2>/dev/null || stat -f %z "$inbox" 2>/dev/null || echo 0)

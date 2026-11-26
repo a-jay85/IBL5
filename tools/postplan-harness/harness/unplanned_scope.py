@@ -301,12 +301,16 @@ def title_key(text: str) -> str:
     keeps the words before the first `: `, so the same finding matches its declared line
     and the owner's approved line. A title with no `: ` stops at its first sentence end
     (`. ` or a final `.`), because the reviewer also rewords the sentences after it
-    (PRs 4202 and 4213).
+    (PRs 4202 and 4213). The key also stops at the first ` (` followed by a backtick.
+    `render_kept_block` writes that path citation after each declared title, and a
+    reviewer may put the path and prose there too, so the finding still matches the
+    shorter declared and approved line (PR 4244). A ` (` with no backtick stays.
     """
     title = title_of(text) if is_unplanned_scope(text) else _BULLET_RE.sub("", text.splitlines()[0] if text else "")
     title = _LEAD_TAGS_RE.sub("", title.strip())
     title = title.split(": ", 1)[0].split(". Next action", 1)[0]
-    return title.split(". ", 1)[0].strip().rstrip(".").strip()
+    title = title.split(". ", 1)[0].strip().rstrip(".").strip()
+    return title.split(" (`", 1)[0].strip()
 
 
 def _listed_keys(span: str) -> set:

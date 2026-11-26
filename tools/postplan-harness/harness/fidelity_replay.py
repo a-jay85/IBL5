@@ -575,6 +575,10 @@ def _file_roots(rel: str, tree, out: dict) -> None:
                     if a.name == "fidelity":
                         aliases.add(a.asname or "fidelity")
                         fid_imports.add(id(node))
+            # Another dotted path to the module, or a re-export of it, leaves no edge: hold.
+            elif (mod.endswith(".fidelity") or any(a.name == "fidelity" for a in node.names)
+                  or (mod.endswith(".harness") and any(a.name == "*" for a in node.names))):
+                raise Unresolvable(f"fidelity-unresolvable-reference: {rel}")
         elif isinstance(node, ast.Call) and not rel.endswith(_SELF_DYNAMIC_OK):
             fn = node.func
             name = fn.id if isinstance(fn, ast.Name) else fn.attr if isinstance(fn, ast.Attribute) else ""

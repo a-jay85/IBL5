@@ -626,7 +626,11 @@ def test_static_analyzer_near_misses():
                 'import harness.fidelity\nharness.__dict__["fidelity"].f()\n',
                 'import harness\nharness.__getattribute__("fidelity").f()\n',
                 'import harness\ngetattr(harness, "fidelity").f()\n',
-                'import harness as h\nvars(h)["fidelity"].f()\n'):
+                'import harness as h\nvars(h)["fidelity"].f()\n',
+                'from a.harness.fidelity import f\nf()\n',
+                'from a.harness import fidelity\nfidelity.f()\n',
+                'from a.harness import *\nfidelity.f()\n',
+                'from runner import fidelity\nfidelity.f()\n'):
         with pytest.raises(Unresolvable):
             production_roots({"tools/x.py": src})
     # A dunder read on something unrelated to fidelity does not hold.

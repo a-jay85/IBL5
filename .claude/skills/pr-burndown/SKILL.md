@@ -175,7 +175,7 @@ Write the card in this shape:
 - <✅/⚠️/❌/⏳> **Review comments:** <open count; what each said; which commit fixed it>.
 - <✅/✅📝/⚠️/❌/⏳/🚨> **post-plan verdict:** <verdict>. <Current or stale>. <Its notes, short>.
 - <✅2️⃣/⚠️2️⃣/🚨1️⃣> **Merge danger:** <one-way or two-way door, blast radius, what a revert does and doesn't undo>.
-**Fidelity evidence:** <the `fidelity-evidence:` row verbatim; omit this line when the data has none>
+- <✅/⚠️> **Fidelity evidence:** <the `fidelity-evidence:` row verbatim; omit this line when the data has none>
 - <✅🔙/⚠️/🚨> **Conflicts:** <none / behind master, no clash / which files clash and with which PR; the job rebases>.
 - <✅/⚠️/❌/⏳> **Why it's held:** <each reason by number; mark stale ones as stale>.
 - <✅/⚠️/🚨> **Owner approvals:** <none / each approval: mode, head unchanged or moved past it, the condition, the amendment status>.

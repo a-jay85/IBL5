@@ -811,6 +811,31 @@ case_fixer_no_ack_dms_once() {
     h_contains "past 3h: DM names the blocker" "$(slurp "$S/log/discord-dm.stdin")" "no ack for days-empty"
     NOW=$((BASE + 14400)) run_watch
     h_eq "next run: still one DM" 1 "$(cnt discord-dm)"
+    # Resolve, then the same blocker returns and goes unacked again.
+    one_blocker replay-missing
+    NOW=$((BASE + 18000)) run_watch
+    one_blocker days-empty
+    reset_logs
+    NOW=$((BASE + 21600)) run_watch
+    h_eq "recurrence, first wake: no DM" 0 "$(cnt discord-dm)"
+    NOW=$((BASE + 32401)) run_watch
+    h_eq "recurrence past 3h: one new DM" 1 "$(cnt discord-dm)"
+    h_contains "recurrence: DM names the blocker" "$(slurp "$S/log/discord-dm.stdin")" "no ack for days-empty"
+    # A claim that is later released, with the blocker still active.
+    one_fix "$BASE"
+    NOW=$((BASE + 36000)) run_watch
+    one_blocker "$FIX_KEY"
+    reset_logs
+    NOW=$((BASE + 39600)) run_watch
+    NOW=$((BASE + 50401)) run_watch
+    h_eq "released claim, unacked past 3h: one DM" 1 "$(cnt discord-dm)"
+    one_fix "$BASE"
+    NOW=$((BASE + 54000)) run_watch
+    one_blocker "$FIX_KEY"
+    reset_logs
+    NOW=$((BASE + 57600)) run_watch
+    NOW=$((BASE + 68401)) run_watch
+    h_eq "released a second time: a new DM" 1 "$(cnt discord-dm)"
     sandbox fixer_no_ack_sent
     quiet_row
     arm_fixer
@@ -824,6 +849,17 @@ case_fixer_no_ack_dms_once() {
     NOW=$((BASE + 10801)) run_watch
     NOW=$((BASE + 14400)) run_watch
     h_eq "an unclaimed stall DMs once after 3h" 1 "$(cnt discord-dm)"
+    # The row recovers, then stalls again under the same key.
+    quiet_row
+    NOW=$((BASE + 18000)) run_watch
+    rm -f "$S/fix/"*jsb-port-pl-0001*
+    reset_logs
+    NOW=$((BASE + 21600)) run_watch
+    h_contains "recurring stall: same stall again" "$(out)" "STALL:no-trace"
+    h_eq "recurring stall, first wake: no DM" 0 "$(cnt discord-dm)"
+    NOW=$((BASE + 32401)) run_watch
+    NOW=$((BASE + 36000)) run_watch
+    h_eq "recurring stall past 3h: one new DM" 1 "$(cnt discord-dm)"
 }
 
 case_fix_merged_wakes_parity() {

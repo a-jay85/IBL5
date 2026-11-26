@@ -360,19 +360,21 @@ fixer_wake_age() {
     echo $((NOW - first))
 }
 
-# fixer_enqueue <key> <context>: queue the key, and ask for a wake when it is due.
+# fixer_enqueue <key> <context> <dm_key>: queue the key, and ask for a wake when it
+# is due. A key with no wake line starts afresh, so its old DM line is dropped.
 fixer_enqueue() {
-    local key="$1" context="$2" first last
+    local key="$1" context="$2" dm_key="$3" first last fresh=0
     context="${context//[$'\t\r\n']/ }"
     first=$(wake_field "$key" 2)
     last=$(wake_field "$key" 3)
-    [ -n "$first" ] || { first="$NOW"; last=""; }
+    [ -n "$first" ] || { first="$NOW"; last=""; fresh=1; }
     if [ -z "$last" ] || [ $((NOW - last)) -gt "$REFIRE_S" ]; then
         echo "fixer: wake $key"
         # fixer_mark_woken stamps the last wake once the POST succeeds.
         FIXER_DUE_KEYS="$FIXER_DUE_KEYS$key"$'\n'
     fi
     dry_guard "queue fixer key $key" || return 0
+    if [ "$fresh" = 1 ] && [ -s "$STALLS" ]; then put_line "$STALLS" "$dm_key"; fi
     put_line "$FIXER_QUEUE" "$key" "$context"
     put_line "$FIXER_WAKES" "$key" "$first"$'\t'"$last"
 }
@@ -426,6 +428,7 @@ fixer_prune() {
 }
 
 # fixer_dm <key> <text>: one error DM per key, deduped through the stalls file.
+# fixer_enqueue drops a no-ack line when its blocker starts a fresh wake.
 fixer_dm() {
     local key="$1" text="$2"
     if grep -qxF -- "$key" "$STALLS" 2>/dev/null; then return 0; fi
@@ -476,7 +479,7 @@ fixer_actions() {
             [ -n "$key" ] || continue
             if fixer_known "$key"; then continue; fi
             age=$(fixer_wake_age "$key")
-            fixer_enqueue "$key" "$fix"
+            fixer_enqueue "$key" "$fix" "fixer-no-ack:$key"
             if [ "$dm_sent" = "false" ] && [ -n "$age" ] && [ "$age" -gt "$FIXER_ACK_S" ]; then
                 fixer_dm "fixer-no-ack:$key" "JSB parity fixer: no ack for $key after $((age / 3600))h. The loop stays blocked. Check that the T3 fixer task is on. Blocker: $fix"
             fi
@@ -635,7 +638,7 @@ main() {
         if fixer_armed && [[ "$FIXER_STAGES" == *" $s_stage "* ]] && ! fixer_known "stall:$s_stage:$s_row"; then
             age=$(fixer_wake_age "stall:$s_stage:$s_row")
             if [ -z "$age" ] || [ "$age" -lt "$FIXER_ACK_S" ]; then
-                fixer_enqueue "stall:$s_stage:$s_row" "$key"
+                fixer_enqueue "stall:$s_stage:$s_row" "$key" "$key"
                 continue
             fi
         fi

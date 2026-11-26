@@ -20,12 +20,12 @@ Repo scripts send dev alerts through `bin/discord-dm`. The owner had to keep Dis
 `bin/discord-dm` appends every message to an inbox file, and `bin/dev-inbox` shows that file in a terminal tab.
 
 - The inbox lives at `~/.claude/dev-inbox.log`. `DISCORD_DM_INBOX` overrides the path for both scripts.
-- Each entry is a `@@ <time> <target> <caller>` header line. The message follows with every line indented two spaces, so a body line can never read as a header. Spaces in the caller become underscores.
-- A delivered message uses the sent-log target. A message that failed on every attempt uses the target `undelivered`.
+- Each entry is a `@@ <time> <target> <caller>` header line. The message follows with every line indented two spaces, so a body line can never read as a header. Spaces in the caller become underscores, and carriage returns are removed from the body.
+- A delivered message uses the sent-log target, except that a `--raw` message uses `raw:<path>`. A message that failed on every attempt uses the target `undelivered`.
 - A `--raw` body is JSON for a Discord-only button message. The inbox stores a note telling the owner to open Discord, and it leaves the JSON out.
 - The inbox write is best-effort, like the sent log. A write failure never changes the exit code or output of `bin/discord-dm`. Past 5 MB the file rotates to `.1`.
-- `bin/dev-inbox` prints the last 10 entries, then follows the file with `tail -F` so it survives the rotation. It rings the terminal bell on a new entry for the `errors` target, an `undelivered` entry, a `route:` entry, or a first line that starts with an alert mark. The backlog it prints at start never rings. `--no-bell` and `--once` cover quiet use and tests.
-- `bin/test-discord-dm` section S2 checks the header shape, the indent, the raw note, the undelivered entry, the unwritable-inbox case, and which entries ring the bell.
+- `bin/dev-inbox` prints the last 10 entries, then follows the file. One `tail -F` reads both, so an entry that arrives during startup is not lost, and the viewer survives the rotation. It rings the terminal bell on a new entry for the `errors` target, an `undelivered` entry, a `raw:` entry, or a first line that starts with an alert mark. The backlog it prints at start never rings. `--no-bell` and `--once` cover quiet use and tests.
+- `bin/test-discord-dm` section S2 checks the header shape, the indent, the raw note, the undelivered entry, the unwritable-inbox case, which entries ring the bell, and an entry added during viewer startup.
 
 ## Alternatives Considered
 

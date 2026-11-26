@@ -55,9 +55,9 @@
 # Inbox: every message, delivered or not, also appends its FULL text to
 # ${DISCORD_DM_INBOX:-~/.claude/dev-inbox.log} for bin/dev-inbox to show in a terminal.
 # Each entry is a `@@ <time> <target> <caller>` line, then the message with every line
-# indented two spaces. Target is the sent-log target, or `undelivered` on total failure.
-# A --raw body is JSON for a Discord-only message (buttons), so the inbox gets a note
-# saying so instead. Over 5 MB the file rotates to .1. Best-effort, like the sent log.
+# indented two spaces. Target is the sent-log target (`raw:<path>` for --raw), or
+# `undelivered` on total failure. A --raw body is JSON for a Discord-only message
+# (buttons), so the inbox notes that. Rotates to .1 past 5 MB. Best-effort.
 #
 # Exit: 0 delivered · 1 undeliverable (spooled) · 2 usage/config error.
 
@@ -380,7 +380,10 @@ resolve_target() {
 
 # Inbox: the full message for bin/dev-inbox. Best-effort, like the sent log.
 log_inbox() { # target
-    local inbox size body entry
+    local inbox size body entry target
+    target="$1"
+    # dev-inbox rings for raw: (a button message), not for every non-default route.
+    [ "$RAW" = 1 ] && [ "$target" != undelivered ] && target="raw:$ROUTE"
     inbox="${DISCORD_DM_INBOX:-$HOME/.claude/dev-inbox.log}"
     mkdir -p "$(dirname "$inbox")"
     size=$(stat -c %s "$inbox" 2>/dev/null || stat -f %z "$inbox" 2>/dev/null || echo 0)
@@ -392,7 +395,7 @@ log_inbox() { # target
     fi
     # One write per entry, so parallel sends cannot interleave. Bash's printf writes
     # line by line, so build the entry first and let cat append it. <<< adds the last \n.
-    printf -v entry '@@ %s %s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$1" "${CALLER// /_}"
+    printf -v entry '@@ %s %s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$target" "${CALLER// /_}"
     body=${body//$'\r'/}
     entry+="  ${body//$'\n'/$'\n  '}"
     cat <<< "$entry" >> "$inbox"

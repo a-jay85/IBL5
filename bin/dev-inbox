@@ -39,37 +39,45 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-# Render entries from stdin. bell=1 rings on an alert entry.
-render() { # bell
-    awk -v bell="$1" '
-        BEGIN { red = "\033[31m"; green = "\033[32m"; dim = "\033[2m"; bold = "\033[1m"; off = "\033[0m" }
-        /^@@ / {
-            ts = $2; kind = $3; caller = $4
-            t = substr(ts, 12, 5); d = substr(ts, 1, 10)
-            alert = (kind == "errors" || kind == "undelivered" || kind ~ /^route:/)
-            first = 1
-            print ""
-            printf "%s%s %s  %s  %s%s\n", dim, d, t, kind, caller, off
-            fflush(); next
+# Render entries from stdin. Entries up to number <skip> are dropped, and entries
+# up to number <quiet> never ring. bell=1 rings on a later alert entry. The
+# "watching" line prints after input line <mark_at> (-1: never).
+render() { # bell [skip quiet mark_at]
+    awk -v bell="$1" -v skip="${2:--1}" -v quiet="${3:-0}" -v mark_at="${4:--1}" -v inbox="$INBOX" '
+        function mark() { printf "\n\033[2m── watching %s ──\033[0m\n", inbox; fflush() }
+        BEGIN {
+            red = "\033[31m"; green = "\033[32m"; dim = "\033[2m"; bold = "\033[1m"; off = "\033[0m"
+            if (mark_at == 0) mark()
         }
-        {
-            line = substr($0, 3)
-            if (first) {
-                first = 0
-                if (line ~ /^(❌|❓|⚠|🚨|🔴|🛑|⏱|💥)/) alert = 1
-                if (alert) {
-                    printf "%s%s%s%s\n", bold, red, line, off
-                    if (bell == 1) printf "\007"
-                } else if (line ~ /^✅/) {
-                    printf "%s%s%s\n", green, line, off
+        /^@@ / { n++ }
+        n > skip {
+            if ($0 ~ /^@@ /) {
+                ts = $2; kind = $3; caller = $4
+                t = substr(ts, 12, 5); d = substr(ts, 1, 10)
+                alert = (kind == "errors" || kind == "undelivered" || kind ~ /^raw:/)
+                first = 1
+                print ""
+                printf "%s%s %s  %s  %s%s\n", dim, d, t, kind, caller, off
+            } else {
+                line = substr($0, 3)
+                if (first) {
+                    first = 0
+                    if (line ~ /^(❌|❓|⚠|🚨|🔴|🛑|⏱|💥)/) alert = 1
+                    if (alert) {
+                        printf "%s%s%s%s\n", bold, red, line, off
+                        if (bell == 1 && n > quiet) printf "\007"
+                    } else if (line ~ /^✅/) {
+                        printf "%s%s%s\n", green, line, off
+                    } else {
+                        print line
+                    }
                 } else {
                     print line
                 }
-            } else {
-                print line
             }
             fflush()
         }
+        NR == mark_at { mark() }
     '
 }
 
@@ -81,11 +89,9 @@ fi
 
 mkdir -p "$(dirname "$INBOX")" && touch "$INBOX"
 
-# Backlog: the last N entries, never ringing.
-starts=$(grep -c '^@@ ' "$INBOX") || starts=0
+# The backlog and new entries come through one tail, so an entry that lands during
+# startup is not lost. The count only marks where the backlog ends: the last N
+# entries show without a bell. -F keeps following across the 5 MB rotation.
+read -r starts lines < <(awk '/^@@ / { n++ } END { print n + 0, NR }' "$INBOX")
 skip=$(( starts > LAST ? starts - LAST : 0 ))
-awk -v skip="$skip" '/^@@ / { n++ } n > skip' "$INBOX" | render 0
-printf '\n\033[2m── watching %s ──\033[0m\n' "$INBOX"
-
-# New entries. -F keeps following across the 5 MB rotation.
-tail -n 0 -F "$INBOX" 2>/dev/null | render "$BELL"
+tail -n +1 -F "$INBOX" 2>/dev/null | render "$BELL" "$skip" "$starts" "$lines"

@@ -180,3 +180,68 @@ def test_reworded_finding_without_colon_matches_by_first_sentence():
     other = ("- [BLOCKING] [unplanned-scope] Scope range_hi widening to every marker. "
              "In `bin/check-x`, `mk_range` gained a third parameter.")
     assert not us.approval_covers(other, got)
+
+
+GO_FINDING = ("- [BLOCKING] [unplanned-scope] [GATE-EDIT] Review the engine-go.md capture-location "
+              "rule edit (`.claude/rules/engine-go.md` line 9 bumps `last_verified`, and line 18 now "
+              "says raw trace captures \"live in IBL5 under `engine/testdata/jsb-captures/` and are "
+              "public\"). No plan phase names this file.")
+GO_APPROVED = ("- [GATE-EDIT] Review the engine-go.md capture-location rule edit "
+               "(`.claude/rules/engine-go.md`)")
+CI_APPROVED = ('- [GATE-EDIT] Add capture and evidence paths to python-tests.yml triggers owner: '
+               '"CI path filters added for capture and evidence paths" '
+               '(`.github/workflows/python-tests.yml`)')
+GO_KEY = "Review the engine-go.md capture-location rule edit"
+
+
+def _go_approval():
+    return us.approval_from_comments([_comment(_body(span=(CI_APPROVED, GO_APPROVED)))], FP)
+
+
+def _go_declared():
+    return "\n".join([us.KEPT_BEGIN, "## Kept unplanned changes", CI_APPROVED, GO_APPROVED,
+                      us.KEPT_END])
+
+
+def test_path_parenthetical_title_matches_owner_approval():
+    """PR 4244: the finding's title carries the path plus prose inside ` (`...`)`, and the
+    approved and declared line is the short title plus ` (`path`)`. Both key to the
+    words before the first ` (` and backtick."""
+    assert us.title_key(GO_FINDING) == us.title_key(GO_APPROVED) == GO_KEY
+    got = _go_approval()
+    assert got is not None and us.approval_covers(GO_FINDING, got)
+    assert us._listed(GO_FINDING, _go_declared())
+
+
+def test_path_parenthetical_different_lead_words_do_not_match():
+    """Words that differ before the path citation still give a different key."""
+    other = GO_FINDING.replace("capture-location rule edit", "merge rule edit")
+    assert other != GO_FINDING
+    assert us.title_key(other) != GO_KEY
+    got = _go_approval()
+    assert got is not None and not us.approval_covers(other, got)
+    assert not us._listed(other, _go_declared())
+
+
+def test_colon_before_path_keeps_colon_key():
+    """A `: ` before the path still decides the key, as it did before PR 4244."""
+    colon = ("- [BLOCKING] [unplanned-scope] Widen the retry gate: `bin/foo` "
+             "(`bin/foo` line 3) now retries twice.")
+    assert us.title_key(colon) == "Widen the retry gate"
+    ci_finding = "- [BLOCKING] [unplanned-scope] " + CI_APPROVED[2:]
+    ci_key = "Add capture and evidence paths to python-tests.yml triggers owner"
+    assert us.title_key(ci_finding) == us.title_key(CI_APPROVED) == ci_key
+    got = _go_approval()
+    assert got is not None and us.approval_covers(ci_finding, got)
+
+
+def test_path_parenthetical_residual_different_path_matches():
+    """Accepted widening: same words before ` (` and backtick, a different cited path,
+    the same key. The other bounds (owner comment, diff fingerprint, declared kept
+    block, classify keep) still apply in downgrade_applies."""
+    other_path = GO_FINDING.replace("(`.claude/rules/engine-go.md` line 9",
+                                    "(`.claude/rules/other.md` line 9")
+    assert other_path != GO_FINDING
+    assert us.title_key(other_path) == GO_KEY
+    got = _go_approval()
+    assert got is not None and us.approval_covers(other_path, got)

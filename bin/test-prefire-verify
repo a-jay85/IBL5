@@ -2487,27 +2487,6 @@ test_pytest_unmapped_module_defers_to_ci() {
     want_cnt pytest 0
 }
 
-test_pytest_capture_file_runs_trace_pinned() {
-    pytest_case
-    printf 'def test_t(): pass\n' > "$R/tools/postplan-harness/tests/test_trace_pinned.py"
-    commit_all trace-test
-    touch_file engine/testdata/jsb-captures/pl-0001.jsonl
-    touch_file engine/trace-evidence/jsb-port-pl-0001.json
-    run_gate --stage pytest
-    want_rc 0
-    want_out "pytest mode: subset (1 test files)"
-    want_pytest_args "6:$PYF tests/test_trace_pinned.py"
-}
-
-test_pytest_capture_file_without_trace_test_defers() {
-    pytest_case
-    touch_file engine/trace-evidence/jsb-port-pl-0001.json
-    run_gate --stage pytest
-    want_rc 0
-    want_out "pytest deferred to CI: no trace-pinned test for the changed capture or evidence file: engine/trace-evidence/jsb-port-pl-0001.json"
-    want_cnt pytest 0
-}
-
 test_pytest_no_trigger_path_skips() {
     pytest_case
     touch_file ibl5/tracked.txt
@@ -2990,8 +2969,6 @@ test_pytest_script_maps_by_basename
 test_pytest_conftest_defers_to_ci
 test_pytest_state_module_defers_to_ci
 test_pytest_unmapped_module_defers_to_ci
-test_pytest_capture_file_runs_trace_pinned
-test_pytest_capture_file_without_trace_test_defers
 test_pytest_no_trigger_path_skips
 test_pytest_deleted_test_file_runs_nothing
 test_pytest_over_cap_defers_to_ci

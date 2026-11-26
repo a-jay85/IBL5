@@ -1,6 +1,6 @@
 ---
 description: ADR-0286. JSB trace captures live in IBL5 under engine/testdata/jsb-captures/. Retires the jsb-native capture host of ADR-0278 and adds a per-file size cap.
-last_verified: 2026-11-25
+last_verified: 2026-11-26
 ---
 
 # ADR-0286: JSB trace captures live in IBL5
@@ -18,13 +18,13 @@ Captures live at `engine/testdata/jsb-captures/`. `capture_host: jsb-native` is 
 
 The defense from ADR-0266 stays. The harness reads the capture bytes from the committed object on the base branch, checks `capture_sha256`, and requires the working tree to match. It offers no env override and no pointer to another repo.
 
-`_check_capture` enforces a per-file cap of 8 MiB (8388608 bytes) as hold reason `capture-too-large`. `test_every_committed_capture_under_size_cap` pins the cap against every committed capture. The largest capture today is 4468937 bytes.
+`_check_capture` enforces a per-file cap of 8 MiB (8388608 bytes) as hold reason `capture-too-large`. `test_every_committed_capture_under_size_cap` pins the cap against every committed capture. The largest capture today is `pl-0009.jsonl` at 7113143 bytes.
 
 **Base-branch rule.** A trace-pinned check reads the capture from base. A PR that adds a capture together with its evidence holds as `capture-in-diff` and can never clear `trace-pinned`. `allowlist_verdict` rejects the capture path before `_check_capture` runs. A capture file always routes to `golden-new` (ADR-0266), so that PR goes to the owner. The normal path is ADR-0266's two PRs. The owner-held capture PR lands first, then the port PR records against master.
 
 **Fresh-capture handoff.** The parity loop's `trace` and `record` write the capture into an IBL5 worktree named `jsb-capture-<row>`. That worktree ships as the owner-held capture PR. `port` refuses until the file is on IBL5 `origin/master` with the same sha256.
 
-**Capture content.** A scan of all ten files for IPv4 addresses, `192.168.`, `/Users/`, `C:\`, `password`, `utm`, `ssh` and `localhost` found nothing. The header carries `format`, `source`, `jsb_build`, `function` (a Ghidra `FUN_` name) and `address`. Records carry `caller` addresses. These fields belong to the capture format, and `engine/testdata/jsb-captures/README.md` requires `address`. They are accepted. The binary, decompiled C, the master reference, VM details and the whole-day replay recordings (ADR-0279) stay in jsb-native.
+**Capture content.** A scan of the ten files this change adds, for IPv4 addresses, `192.168.`, `/Users/`, `C:\`, `password`, `utm`, `ssh` and `localhost` found nothing. The header carries `format`, `source`, `jsb_build`, `function` (a Ghidra `FUN_` name) and `address`. Records carry `caller` addresses. These fields belong to the capture format, and `engine/testdata/jsb-captures/README.md` requires `address`. They are accepted. The binary, decompiled C, the master reference, VM details and the whole-day replay recordings (ADR-0279) stay in jsb-native.
 
 ## Alternatives Considered
 
@@ -38,6 +38,7 @@ The defense from ADR-0266 stays. The harness reads the capture bytes from the co
 - Positive: CI and the local harness check a capture the same way.
 - Negative: the capture files are public. The content scan above is the only review they get before the owner's capture PR.
 - Negative: jsb-native `captures/` keeps its history and receives no new files.
+- Negative: four older evidence files pin older copies that no test loads, so `trace_pinned` cannot verify them again. `engine/testdata/jsb-captures/README.md` lists them.
 
 ## Lineage
 

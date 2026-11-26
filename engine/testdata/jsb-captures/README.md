@@ -24,6 +24,12 @@ The env var `JSB_TRACE_CAPTURE_DIR` replaces this directory when it is non-empty
 
 A missing capture fails the test. No test skips for an absent file.
 
+## Older copies
+
+Four files end in a jsb-native commit id: `pl-0010-d322a86.jsonl`, `pl-0025-90b5298.jsonl`, `pl-0027-3c70714.jsonl` and `pl-0028-2ba5afc.jsonl`. Each holds the bytes that an older evidence file under `engine/trace-evidence/` pins. The tests load the plain names, such as `pl-0010.jsonl`, so no test reads these four copies.
+
+The evidence files `jsb-port-pl-0010.json`, `jsb-port-pl-0025.json`, `jsb-port-pl-0027-r1.json` and `jsb-port-pl-0028.json` are records of merged port branches. `trace_pinned` cannot verify them again. Each one names a `test_blob` that no longer matches its test file. A new `test_blob` would not be enough, because the perturbation run changes the older copy while the test reads the plain file.
+
 ## Review
 
 A capture committed to this directory lands in its own PR. Phase 6.5 always holds that PR for the owner (Phase 4 condition 5 detection).

@@ -2596,6 +2596,20 @@ want    "K7 recovered plan: log names the kick" "$KOUT" "plan-now: automouse kic
 [ "$(kick_args)" = "jsb-port-pl-0042-2" ] && ok "K7 recovered plan: exactly one kick for the slug" \
     || fail "K7 recovered plan: exactly one kick for the slug (got: $(kick_args))"
 
+# F4 a recovered fixer plan named like its branch slug queues and kicks once.
+kick_reset
+KICK_PROMPT="$KICK_FIX_PROMPT" kick_run_recovered jsb-fix-capture-invalid-pl-0009-t1.md
+want    "F4 recovered fix plan: queued"      "$KOUT" "queued for automouse (recovered plan)"
+[ "$(kick_args)" = "jsb-fix-capture-invalid-pl-0009-t1" ] && ok "F4 recovered fix plan: exactly one kick for the slug" \
+    || fail "F4 recovered fix plan: exactly one kick for the slug (got: $(kick_args))"
+# F5 recovery B can adopt <slug>-2.md, which would skip the CI rule guard.
+kick_reset
+KICK_PROMPT="$KICK_FIX_PROMPT" kick_run_recovered jsb-fix-capture-invalid-pl-0009-t1-2.md
+want    "F5 renamed recovered fix plan: log says why"  "$KOUT" "plan-now: fixer plan name differs from its branch slug; NOT queued."
+want_no "F5 renamed recovered fix plan: never queued"  "$KOUT" "automouse-queue (stub): queued"
+want    "F5 renamed recovered fix plan: DM asks you"   "$(dm)" "NOT queued, needs you"
+kick_ran && fail "F5 renamed recovered fix plan: the kick stub ran" || ok "F5 renamed recovered fix plan: the kick stub never ran"
+
 # K8 near-miss slugs reach the queue and never kick.
 for k8_slug in jsb-port-pl-12a x-jsb-port-pl-12 jsb-port-pl-12-final; do
     kick_reset

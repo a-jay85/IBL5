@@ -1137,6 +1137,11 @@ else
                     echo "plan-now: WARNING — check-plan passed but check-plan-staleness FAILED; the recovered plan cites a path that does not exist on master. On disk, NOT queued."
                     DM_VERDICT="degraded (recovered) — check-plan PASSED, but check-plan-staleness FAILED"
                     DM_NEXT="NOT queued, needs you"
+                # Same rename guard as the PLAN_FILE: path. Recovery B can adopt <slug>-<n>.md.
+                elif [[ "$(run_slug)" == jsb-fix-* && "$(basename "${recovered%.md}")" != "$(run_slug)" ]]; then
+                    echo "plan-now: fixer plan name differs from its branch slug; NOT queued."
+                    DM_VERDICT="degraded (recovered) — check-plan PASSED, but the fixer plan was renamed"
+                    DM_NEXT="NOT queued, needs you"
                 elif "$AUTOMOUSE_QUEUE" "$recovered"; then
                     echo "plan-now: queued for automouse (recovered plan) — it will implement this plan and open its PR."
                     echo "plan-now: to pull it back out: bin/automouse/queue remove $(basename "${recovered%.md}")"

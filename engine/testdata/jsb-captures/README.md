@@ -26,9 +26,9 @@ A missing capture fails the test. No test skips for an absent file.
 
 ## Older copies
 
-Four files end in a jsb-native commit id: `pl-0010-d322a86.jsonl`, `pl-0025-90b5298.jsonl`, `pl-0027-3c70714.jsonl` and `pl-0028-2ba5afc.jsonl`. Each holds the bytes that an older evidence file under `engine/trace-evidence/` pins. The tests load the plain names, such as `pl-0010.jsonl`, so no test reads these four copies.
+Four files end in a jsb-native commit id: `pl-0010-d322a86.jsonl`, `pl-0025-90b5298.jsonl`, `pl-0027-3c70714.jsonl` and `pl-0028-2ba5afc.jsonl`. Each holds the bytes that an older evidence file under `engine/trace-evidence/` pins. The tests load the plain names, such as `pl-0010.jsonl`. `trace_pinned` stages each older copy under its plain name, so the normal run and the perturbed run both read the bytes the entry pins.
 
-The evidence files `jsb-port-pl-0010.json`, `jsb-port-pl-0025.json`, `jsb-port-pl-0027-r1.json` and `jsb-port-pl-0028.json` are records of merged port branches. `trace_pinned` cannot verify them again. Each one names a `test_blob` that no longer matches its test file. A new `test_blob` would not be enough, because the perturbation run changes the older copy while the test reads the plain file.
+All seven evidence files under `engine/trace-evidence/` are records of merged port branches. Each one names a `test_blob` from an earlier version of its test file, so `trace_pinned` holds every one of them at the test-blob step.
 
 ## Review
 

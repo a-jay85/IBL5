@@ -283,6 +283,23 @@ def test_compare_reports_signature_change(tmp_path):
     assert "Not comparable: gate_edit_only (" in status, status
 
 
+def test_compare_address_text_in_a_verdict_file_stays_comparable(tmp_path):
+    echo = _swap(TOY, "def blocking_finding_texts(path):\n    return []",
+                 "def blocking_finding_texts(path):\n    return [{'text': open(path).read()}]")
+    runs = [("r1", 11, "<function foo at 0x10a3>")]
+    _h, _b, status = _compare(tmp_path, echo, base_src=echo, runs=runs)
+    assert status.startswith("same output on 1 past PRs (1 stored verdict files) for "
+                             + ", ".join(fe.COMPARED) + "."), status
+    assert "Not comparable" not in status
+
+
+def test_compare_returned_object_address_is_not_comparable(tmp_path):
+    leaky = _swap(TOY, "def gate_edit_only(path):\n    return False",
+                  "def gate_edit_only(path):\n    return [object()]")
+    _h, _b, status = _compare(tmp_path, leaky, base_src=leaky)
+    assert "Not comparable: gate_edit_only (" in status, status
+
+
 def test_corpus_skips_dirs_without_pr_number(tmp_path):
     out = _toy_corpus(tmp_path, [("good", 11, "x"), ("nopr", None, "x"), ("state", 13, "x")])
     bare = out / "noresult"

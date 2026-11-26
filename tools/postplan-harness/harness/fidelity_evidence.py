@@ -13,7 +13,7 @@ environment, a temp cwd and HOME, and a deadline. Network and filesystem access 
 user are not isolated.
 """
 import argparse, ast, copy, hashlib, importlib, io, json, shutil, subprocess, sys, tarfile, tempfile, time
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field, fields, is_dataclass, replace
 from pathlib import Path
 
 FIDELITY_PATH = "tools/postplan-harness/harness/fidelity.py"
@@ -285,6 +285,22 @@ def _spawn(side, root, list_path, out_path, tmp):
     return proc, err_path
 
 
+def _has_address(value) -> bool:
+    """True when `repr(value)` prints an object's memory address, which differs per process.
+
+    Strings never count: they carry verdict file text, which may quote such a repr.
+    """
+    if isinstance(value, (str, bytes)):
+        return False
+    if isinstance(value, dict):
+        return any(_has_address(item) for pair in value.items() for item in pair)
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return any(_has_address(item) for item in value)
+    if is_dataclass(value) and not isinstance(value, type):
+        return any(_has_address(getattr(value, f.name)) for f in fields(value) if f.repr)
+    return " at 0x" in repr(value)
+
+
 def _worker(root, files_path, out_path) -> int:
     """Runs inside the isolated child: hash every compared function's output per file."""
     sys.dont_write_bytecode = True
@@ -306,11 +322,11 @@ def _worker(root, files_path, out_path) -> int:
             try:
                 value = tuple(fn(path, *a) for a in CALL_ARGS.get(name, ((),)))
                 text = repr(value)
+                if _has_address(value):
+                    unstable[name] += 1
             except Exception as exc:
                 raises[name] += 1
                 text = "raise:" + type(exc).__name__
-            if " at 0x" in text:
-                unstable[name] += 1
             hashes[name][path] = hashlib.sha256(text.encode("utf-8", "backslashreplace")).hexdigest()
     Path(out_path).write_text(
         json.dumps({"hashes": hashes, "raises": raises, "unstable": unstable}), encoding="utf-8")

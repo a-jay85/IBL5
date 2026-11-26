@@ -1,6 +1,6 @@
 ---
 description: Schema reference and query patterns for IBL5 database work.
-last_verified: 2026-10-28
+last_verified: 2026-11-14
 ---
 
 # IBL5 Database Guide
@@ -11,14 +11,15 @@ last_verified: 2026-10-28
 **Always reference `ibl5/migrations/000_baseline_schema.sql` (and subsequent migrations) for table/column names and relationships.** Never assume database structures exist without verification. This prevents hallucination of non-existent tables.
 
 ### Current Status
-- **93 Base Tables** (all InnoDB) + **27 Views**
-- **Foreign Keys:** 33 constraints implemented
-- **Indexes:** 447+ (including primary keys)
+- **124 Base Tables** (all InnoDB) + **28 Views** (counted 2026-11-14 on a `ci-seed.sql` stack after migration 217)
+- **Foreign Keys:** 46 constraints implemented
+- **Indexes:** 619 (including primary keys)
 - **API Ready:** ✅ Complete (Timestamps, UUIDs, Views)
 
 ### Key Tables
 - **Players:** `ibl_plr` (main), `ibl_hist` (VIEW over `ibl_plr_snapshots`)
 - **Teams:** `ibl_team_info`, `ibl_standings`
+- **Trade suggestion feedback:** `ibl_trade_suggestion_feedback` (GM hide feedback on trade ideas; UNIQUE (`tid`, `deal_key`)).
 - **Retired franchise identities:** `ibl_franchise_era_branding` (`id`, `franchise_id`, `team_city`, `team_name`, `color1`, `color2`); UNIQUE on the era triple, FK `franchise_id` → `ibl_team_info.teamid` ON DELETE CASCADE. Holds colors for identities `ibl_team_info` no longer carries, such as the Seattle Supersonics. Seeded by migration 182 and read by the HeadToHeadRecords `teams` and `gms` matrices (ADR-0136).
 - **Games:** `ibl_schedule`, `ibl_box_scores`, `ibl_box_scores_teams`
 - **Contracts:** `ibl_fa_offers`, `ibl_trade_*` tables
@@ -31,13 +32,13 @@ last_verified: 2026-10-28
 ## Database Architecture
 
 ### Engine Status
-- **InnoDB Tables (93):** All base tables — ACID transactions, row-level locking
-- **Views (27):** Computed views replacing denormalized tables (stats, win/loss, awards, franchise history)
+- **InnoDB Tables (124):** All base tables. ACID transactions, row-level locking.
+- **Views (28):** Computed views replacing denormalized tables (stats, win/loss, awards, franchise history)
 
 ### API-Ready Features ✅
 1. **Timestamps:** 19 tables have `created_at`, `updated_at` for caching/ETags
 2. **UUIDs:** 5 critical tables (players, teams, games, etc.) for secure public IDs
-3. **Views:** 27 database views replacing denormalized tables and optimizing API queries
+3. **Views:** 28 database views replacing denormalized tables and optimizing API queries
    - `vw_player_current` - Current season player data
    - `vw_team_standings` - Real-time standings
    - `vw_team_awards` - All team awards (Div/Conf/Lottery from `ibl_team_awards`, IBL Champions from `vw_playoff_series_results`, HEAT Champions from `ibl_box_scores_teams`)
@@ -46,14 +47,14 @@ last_verified: 2026-10-28
    - `vw_current_salary` - Salary resolution (replaces CASE pattern)
    - `vw_career_totals` - Regular season career totals
    - `vw_series_records` - Head-to-head records
-   - Plus 15 additional views for stats, win/loss, and schedule data
+   - Plus 20 additional views for stats, win/loss, and schedule data
 
-### Foreign Key Relationships (33)
+### Foreign Key Relationships (46)
 Core data integrity constraints implemented:
 - `ibl_hist.pid` → `ibl_plr.pid`
 - `ibl_draft_picks.tid` → `ibl_team_info.teamid`
 - `ibl_box_scores.gameid` → `ibl_schedule.Date`
-- And 30 more... (see `000_baseline_schema.sql` for complete list)
+- And 43 more... (see `000_baseline_schema.sql` for complete list)
 
 ## Best Practices
 

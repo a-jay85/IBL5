@@ -89,6 +89,7 @@ Team -> Auth BasketballStats Cache Discord Extension Http League Player Reposito
 TeamOffDefStats -> BasketballStats League Season Security UI
 TeamSchedule -> BasketballStats League LeagueSchedule Season Security Team
 Topics -> Database Search Security
+TradeSuggestions -> Auth BasketballStats Cache Database League ProjectedDraftOrder Repositories Season Security Settings Standings Team Trading
 Trading -> Auth BasketballStats Database Discord EventLog League Player Repositories Season Security Team UI Validation
 TrainingCampRatingsDiff -> Database Player Repositories Security UI
 TransactionHistory -> Security

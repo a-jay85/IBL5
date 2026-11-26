@@ -44,6 +44,7 @@ final class ModuleFactorySecuritySurfaceTest extends TestCase
     private const GATED_BEFORE_WIRING = [
         'DraftInfo' => ['->isAdmin('],
         'LeagueControlPanel' => ['->isAuthenticated(', '->isAdmin('],
+        'TradeSuggestionsTuning' => ['->isAuthenticated(', '->isAdmin('],
         'NextSim' => ['->loginBox('],
         'TrainingCampRatingsDiff' => ['->loginBox('],
     ];
@@ -60,6 +61,7 @@ final class ModuleFactorySecuritySurfaceTest extends TestCase
         'DepthChartEntry' => 2,
         'DraftInfo' => 2,
         'LeagueControlPanel' => 9,
+        'TradeSuggestionsTuning' => 2,
         'NextSim' => 1,
         'OneOnOneGame' => 1,
         'Player' => 2,

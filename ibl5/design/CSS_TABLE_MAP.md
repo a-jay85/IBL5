@@ -189,6 +189,7 @@ Module-specific table styles live in `design/components/tables/<feature>.css`. E
 | `tables/season-highs.css` | `.stat-table`, `.season-highs-discrepancy-panel` |
 | `tables/voting.css` | `.voting-results-table`, `.voting-form-table`, `.voting-submission-feedback` |
 | `tables/trading.css` | Trading module: `.ibl-data-table` rosters, `.trade-offer-card*`, `.trading-*` layout/roster selectors |
+| `tables/trade-suggestions-tuning.css` | Admin tuning page: `.tuning-config*`, `.tuning-json`, `.tuning-counts`, `.tuning-count-line`, `.tuning-rows`/`.tuning-outcome` wrap rules, `.tuning-sim`, `.tuning-filter`, `.tuning-subtitle` |
 | `tables/draft-history.css` | `.draft-history-table` |
 | `tables/league-stats.css` | `.league-stats-table` |
 | `tables/contact-list.css` | `.contact-table` |

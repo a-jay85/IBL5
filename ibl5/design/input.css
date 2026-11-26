@@ -219,6 +219,7 @@
 @import './components/tables/season-highs.css';
 @import './components/tables/voting.css';
 @import './components/tables/trading.css';
+@import './components/tables/trade-suggestions-tuning.css';
 @import './components/tables/draft-history.css';
 @import './components/tables/league-stats.css';
 @import './components/tables/contact-list.css';
@@ -254,6 +255,7 @@
 @import './components/debug.css';
 @import './components/last-sim-recap.css';
 @import './components/on-this-day.css';
+@import './components/trade-suggestions.css';
 @import './components/game-boxscore.css';
 @import './components/head-to-head-records.css';
 

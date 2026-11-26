@@ -175,6 +175,17 @@ add_after '"bin/check-a": _SINCE,' '    "bin/check-new": _SINCE,  # replay-spec-
 run_with "$CHK" "--since=$BASE"
 expect exempt_marker_passes 0
 
+# An exempt key line that opens a multi-line value must still count its brackets. Otherwise
+# depth ends at -1 after the closing line, and every key added after it slips through.
+fresh
+add_after '"bin/check-a": _SINCE,' '    "bin/check-slow": ReplaySpec(  # replay-spec-ok: needs timeout field'
+add_after '"bin/check-slow": ReplaySpec(' '        argv=(),'
+add_after '        argv=(),' '        timeout=180,'
+add_after '        timeout=180,' '    ),'
+add_after '"bin/check-b": _TREE,' '    "bin/check-new": _SINCE,'
+run_with "$CHK" "--since=$BASE"
+expect exempt_multiline_then_added_key_fails 1 'bin/check-new'
+
 # An exempt key already in the base stays an existing key when its marker moves off the key
 # line (a multi-line rewrap) or goes away. The exemption is read on the head side only.
 fresh

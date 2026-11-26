@@ -57,7 +57,7 @@
 # Each entry is a `@@ <time> <target> <caller>` line, then the message with every line
 # indented two spaces. Target is the sent-log target (`raw:<path>` for --raw), or
 # `undelivered` on total failure. A --raw body is JSON for a Discord-only message
-# (buttons), so the inbox notes that. Rotates to .1 past 5 MB. Best-effort.
+# (buttons): the inbox notes that and shows its .digest text. Rotates past 5 MB.
 #
 # Exit: 0 delivered · 1 undeliverable (spooled) · 2 usage/config error.
 
@@ -380,7 +380,7 @@ resolve_target() {
 
 # Inbox: the full message for bin/dev-inbox. Best-effort, like the sent log.
 log_inbox() { # target
-    local inbox size body entry target
+    local inbox size body entry target digest
     target="$1"
     # dev-inbox rings for raw: (a button message), not for every non-default route.
     [ "$RAW" = 1 ] && [ "$target" != undelivered ] && target="raw:$ROUTE"
@@ -402,6 +402,9 @@ log_inbox() { # target
         body="(Discord-only message for $ROUTE was NOT delivered. Payload:)"$'\n'"$FULL_MSG"
     elif [ "$RAW" = 1 ]; then
         body="(Discord-only message for $ROUTE, such as buttons. Open Discord to act on it.)"
+        # .digest is the readable text under the buttons (bin/plan-now's verdict).
+        digest=$(jq -r '.digest | strings' <<< "$FULL_MSG" 2>/dev/null) || digest=""
+        [ -z "$digest" ] || body+=$'\n'"$digest"
     else
         body="$FULL_MSG"
     fi

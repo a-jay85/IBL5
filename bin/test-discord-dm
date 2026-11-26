@@ -1151,6 +1151,15 @@ DM_CAPTURE="$CAP" DISCORD_DM_SSH_BIN="$SSH_OK" DISCORD_DM_SPOOL="$SPOOL" DISCORD
 
 rm -f "$INB"; : > "$CAP"
 DM_CAPTURE="$CAP" DISCORD_DM_SSH_BIN="$SSH_OK" DISCORD_DM_SPOOL="$SPOOL" DISCORD_DM_SENT_LOG="$SENT" \
+    DISCORD_DM_INBOX="$INB" "$DM" --attempts 1 --quiet --raw --route /discordPlanReviewDM \
+    '{"slug":"s","digest":"plan-now: x\n@@ not a header\nlog: /tmp/l"}'
+{ grep -qF 'Open Discord to act on it.' "$INB" && grep -qxF '  plan-now: x' "$INB" \
+    && grep -qxF '  @@ not a header' "$INB" && grep -qxF '  log: /tmp/l' "$INB" \
+    && [ "$(grep -c '^@@ ' "$INB")" = 1 ] && ! grep -qF '"slug"' "$INB"; } \
+    && ok "S2x raw with digest: note plus the indented digest, not the JSON" || fail "S2x inbox=[$(cat "$INB")]"
+
+rm -f "$INB"; : > "$CAP"
+DM_CAPTURE="$CAP" DISCORD_DM_SSH_BIN="$SSH_OK" DISCORD_DM_SPOOL="$SPOOL" DISCORD_DM_SENT_LOG="$SENT" \
     DISCORD_DM_INBOX="$INB" "$DM" --to "$FAKE_TO" --attempts 1 --quiet --route /otherDM "✅ done"
 grep -q '^@@ .* route:/otherDM ' "$INB" && ok "S2l plain text on another route keeps the route: target" || fail "S2l inbox=[$(cat "$INB")]"
 r_out=$(DISCORD_DM_INBOX="$INB" "$DEV_INBOX" --once)

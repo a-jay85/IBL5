@@ -296,6 +296,14 @@ def _side_modules(root):
     return mods
 
 
+def _check_modules(root, known):
+    """Record each side module loaded or dropped since the import window closed. A module first
+    loaded during a record has no globals baseline, so a write to it would go unseen."""
+    now = set(_side_modules(root))
+    for name in sorted(now ^ known):
+        _hit(f"module-{'loaded' if name in now else 'dropped'}:{name}")
+
+
 def _freeze_globals(mods):
     """{(module, name): ("val", deepcopy) or ("id", id)} over non-dunder, non-module globals."""
     snap = {}
@@ -409,6 +417,9 @@ def main(argv):                    # argv: driver, corpus path, side package roo
         import harness.adapters.llm  # noqa: F401
     finally:
         _WATCH["phase"] = "between"
+    # Every side module a replayed call may touch is loaded by now. One that appears later, or
+    # leaves, is a hit: the per-record globals snapshot has no baseline for it.
+    known = frozenset(_side_modules(root))
 
     current = {"v1": None}
 
@@ -471,6 +482,7 @@ def main(argv):                    # argv: driver, corpus path, side package roo
                 out_rec = _record(rec, v1, v2, marker)
                 _WATCH["where"] = "record-state"
                 _untraced(_check_globals, mods, snap)
+                _untraced(_check_modules, root, known)
                 env_after = dict(os.environ)
                 if dict(os.environ) != env_before:
                     key = next(k for k in sorted(set(env_before) | set(env_after))
@@ -493,6 +505,7 @@ def main(argv):                    # argv: driver, corpus path, side package roo
         _WATCH["phase"] = "between"
     _WATCH["where"] = "exit"
     gc.collect()
+    _check_modules(root, known)
     for t in threading.enumerate():
         if t is not threading.main_thread() and t.is_alive():
             _hit(f"thread-alive:{t.name}")  # it could write after the output; __main__ kills it

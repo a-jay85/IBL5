@@ -526,6 +526,9 @@ def test_driver_runs_committed_corpus():
     fn = top_defs(ast.parse((REPO / FIDELITY).read_text(encoding="utf-8")))["reviewer_arming_holds"]
     body = set(range(fn.body[0].lineno, fn.end_lineno + 1))
     assert body & set(payload["executed"][FIDELITY])
+    # The unchanged tree loads every side module inside the import window. A new lazy import in
+    # fidelity.py would hold every replay as module-loaded, so it must fail here first.
+    assert payload["side_effects"] == []
 
 
 def test_driver_exits_nonzero_on_empty_verdict_text(tmp_path):
@@ -1192,3 +1195,179 @@ def test_branch_gap_fails_closed():
     assert "never matched 'b'" in _gap(2, full, {key: (frozenset({0}), True, False)})
     assert "outside the list" in _gap(2, full, {key: (frozenset({0, 1}), False, False)})
     assert _gap(2, full, {key: (frozenset({0, 1}), True, False)}) is None
+
+
+# --- review round 3: data flow into a branch, late-loaded side modules, type-blind equality ------
+
+def test_value_edited_above_a_one_way_branch_stays_held(tmp_path):
+    """Review thread PRRT_kwDODhWJRc68EMKs: the edit sits on the line above the branch that
+    reads it. No record sets the merge-danger hold, so the outputs match."""
+    v, text = _fid_replay(tmp_path, _fid_swap(
+        'md = fields["merge_danger"]', 'md = dict(fields["merge_danger"], hold=False)'))
+    assert v.cleared is False, text
+    assert "fidelity-unexercised-branch: reviewer_arming_holds:" in text
+    assert 'md["hold"] is True' in text
+
+
+def test_helper_return_edit_reaching_a_one_way_caller_branch_stays_held(tmp_path):
+    # The added `return False` has no jump and writes no name, and it only adds holds. No
+    # committed record has a landed item, so the caller's `if not _landed_for_arming(...)`
+    # never goes the other way. Only the caller check, which follows the return into each
+    # caller, can hold it. test_adding_a_reviewer_hold_clears is the same edit on a corpus
+    # that has landed items.
+    v, text = _fid_replay(tmp_path, lambda s: _insert_first_line(s, "_landed_later", "return False"))
+    assert v.cleared is False, text
+    assert "fidelity-unexercised-branch: _landed_later:" in text
+    assert "(its value reaches _landed_for_arming:" in text or \
+        "(its value reaches reviewer_arming_holds:" in text
+
+
+def test_subscript_write_above_a_one_way_branch_stays_held(tmp_path):
+    # The added line has no jump of its own, so only the data-flow check can hold it.
+    v, text = _fid_replay(tmp_path, _fid_swap(
+        '        md = fields["merge_danger"]\n',
+        '        md = dict(fields["merge_danger"])\n        md["hold"] = md.get("door") == "never"\n'))
+    assert v.cleared is False, text
+    assert "fidelity-unexercised-branch: reviewer_arming_holds:" in text
+    assert 'md["hold"] is True' in text
+
+
+_FLOW_SRC = '''\
+def f(d, xs):
+    g = d
+    k = 1
+    k = 2
+    if g["k"]:
+        return 1
+    if xs:
+        return 2
+    return 3
+'''
+
+
+def _flow(src, line, returns_compared=True, fid_defs=frozenset({"f", "helper"})):
+    fn = ast.parse(src).body[0]
+    return fidelity_replay.flow_lines(fn, line, set(fid_defs), returns_compared)[0]
+
+
+def _escapes(src, line, returns_compared=False):
+    fn = ast.parse(src).body[0]
+    return fidelity_replay.flow_lines(fn, line, {"f", "helper"}, returns_compared)[1]
+
+
+@pytest.mark.parametrize("stmt", [
+    'd["k"] = 0', "d.k = 0", "d.update(k=0)", 'setattr(d, "k", 0)', "d = {}",
+])
+def test_flow_lines_follow_a_write_into_a_later_branch(stmt):
+    src = _FLOW_SRC.replace("    k = 2\n", f"    {stmt}\n")
+    assert 5 in _flow(src, 4)  # `if g["k"]:` reads the alias of what line 4 wrote
+    assert 7 not in _flow(src, 4)
+
+
+def test_flow_lines_leave_unrelated_writes_alone():
+    assert _flow(_FLOW_SRC, 4) == set()
+
+
+@pytest.mark.parametrize("stmt, cond, reason", [
+    ("f().x = 0", "k", "a write through"),
+    ("k = 0", "helper(k)", "passes a changed value to helper"),
+    ("k = 0", "sorted([k], key=helper)", "passes a changed value to helper"),
+    ("k = 0", "d.cb(k) or cbs[0](k)", "passes a changed value to a computed callee"),
+])
+def test_flow_lines_fail_closed(stmt, cond, reason):
+    src = _FLOW_SRC.replace("    k = 2\n", f"    {stmt}\n").replace('if g["k"]:', f"if {cond}:")
+    with pytest.raises(fidelity_replay.FlowUnresolved, match=reason):
+        _flow(src, 4)
+
+
+def test_flow_lines_send_a_return_to_unchecked_callers_on_to_the_caller_check():
+    src = _FLOW_SRC.replace("    return 3\n", "    return k\n")
+    assert _flow(src, 4, returns_compared=True) == {9}
+    assert _escapes(src, 4, returns_compared=True) == set()
+    assert _escapes(src, 4) == {"return"}
+    assert _escapes(src, 9) == {"return"}  # the changed line is the return itself
+    assert _escapes(_FLOW_SRC.replace("    k = 2\n", '    d["k"] = 0\n'), 4) == {"param"}  # a mutated parameter
+    assert _escapes(_FLOW_SRC, 4) == set()
+
+
+def test_write_to_a_module_first_loaded_during_a_record_stays_held(tmp_path):
+    """Review thread PRRT_kwDODhWJRc68EMK7: `trace_pinned` was not in sys.modules before
+    record 1, so the per-record snapshot never had a baseline for it."""
+    v, text = _fid_replay(tmp_path, _fid_swap(
+        '    status = shadow.get("status")',
+        '    from . import trace_pinned; trace_pinned.INJECTED = True\n'
+        '    status = shadow.get("status")', "reviewer_arming_holds"))
+    assert v.cleared is False, text
+    assert "fidelity-side-effect-change" in text
+    assert "module-loaded:harness." in text
+
+
+def test_type_change_in_an_equal_output_is_looser():
+    """Review thread PRRT_kwDODhWJRc68EMLI: True and 1 compare equal in Python."""
+    assert fidelity_replay.looser_output("equal", {"ok": {"hold": True}}, {"ok": {"hold": 1}})
+    assert not fidelity_replay.looser_output("equal", {"ok": {"a": 1, "b": 2}},
+                                             {"ok": {"b": 2, "a": 1}})
+    old = fidelity_replay.FidSide("fidelity-replay/1", (("r", {"holds.args_after": {"ok": [True]}}),), {})
+    new = fidelity_replay.FidSide("fidelity-replay/1", (("r", {"holds.args_after": {"ok": [1]}}),), {})
+    _, shielded = fidelity_replay.compare_sides(old, new, {"reviewer_arming_holds"})
+    assert shielded == ["r:holds.args_after"]
+
+
+_CALLERS_SRC = '''\
+def leaf(x):
+    return x
+def mid(x):
+    if not leaf(x):
+        return False
+    return True
+def top(x):
+    y = mid(x)
+    if y:
+        return 1
+    return 2
+'''
+
+
+def _callers(src):
+    defs = fidelity_replay.top_defs(ast.parse(src))
+    return fidelity_replay.follow_callers({"old": defs, "new": defs}, "leaf", {"return"},
+                                          lambda n: n == "top", lambda f: False)
+
+
+def test_follow_callers_climbs_to_a_compared_root():
+    assert _callers(_CALLERS_SRC) == [("old", "mid", {4}), ("old", "top", {8, 9})]
+
+
+def test_follow_callers_judges_a_new_only_caller_on_the_new_side():
+    old = fidelity_replay.top_defs(ast.parse(_CALLERS_SRC))
+    new = fidelity_replay.top_defs(ast.parse(_CALLERS_SRC + "def extra(x):\n    if leaf(x):\n        return 1\n"))
+    got = fidelity_replay.follow_callers({"old": old, "new": new}, "leaf", {"return"},
+                                         lambda n: n in ("top", "extra"), lambda f: False)
+    assert ("new", "extra", {13}) in got
+
+
+@pytest.mark.parametrize("old, new, reason", [
+    ("    if not leaf(x):", "    if not sorted([x], key=leaf):", "other than by a direct call"),
+    ("    if not leaf(x):", "    if not (lambda: leaf(x))():", "inside a nested function"),
+    ("    if not leaf(x):", "    if not top(leaf(x)):", "passes a changed value to top"),
+    ("    if not leaf(x):", "    if not cb(leaf(x)):", "passes a changed value to cb"),
+])
+def test_follow_callers_fail_closed(old, new, reason):
+    with pytest.raises(fidelity_replay.FlowUnresolved, match=reason):
+        _callers(_CALLERS_SRC.replace(old, new))
+
+
+def test_follow_callers_follow_a_mutated_argument():
+    src = ("def leaf(d):\n    d['k'] = 0\n"
+           "def top(d):\n    leaf(d)\n    e = 1\n    if d['k']:\n        return 1\n    return 2\n")
+    defs = fidelity_replay.top_defs(ast.parse(src))
+    got = fidelity_replay.follow_callers({"old": defs, "new": defs}, "leaf", {"param"},
+                                         lambda n: n == "top", lambda f: False)
+    assert got == [("old", "top", {4, 6})]
+
+
+def test_follow_callers_hold_a_module_level_use():
+    defs = fidelity_replay.top_defs(ast.parse(_CALLERS_SRC))
+    with pytest.raises(fidelity_replay.FlowUnresolved, match="module-level code uses leaf"):
+        fidelity_replay.follow_callers({"old": defs, "new": defs}, "leaf", {"return"},
+                                       lambda n: n == "top", lambda f: f == "leaf")

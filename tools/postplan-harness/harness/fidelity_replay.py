@@ -18,6 +18,7 @@ harvested from real `out/live-*` runs by `python3 -m harness.fidelity_replay har
 from __future__ import annotations
 
 import ast
+import builtins
 import copy
 import dataclasses
 import dis
@@ -329,17 +330,23 @@ ORDERING = {  # driver output key -> (fidelity root the key measures, ordering)
 }
 
 
+def _differ(old, new) -> bool:
+    """Inequality by canonical JSON text. Python equality calls True and 1 the same, but a
+    consumer that tests `is True` does not."""
+    return json.dumps(old, sort_keys=True) != json.dumps(new, sort_keys=True)
+
+
 def _verdict_looser(old, new) -> bool:
     if not all(isinstance(v, (str, type(None))) for v in (old, new)):
-        return old != new
+        return _differ(old, new)
     if old not in VERDICT_RANK or new not in VERDICT_RANK:
-        return old != new
+        return _differ(old, new)
     return VERDICT_RANK[new] > VERDICT_RANK[old]
 
 
 def _set_looser(old, new) -> bool:
     if not isinstance(old, list) or not isinstance(new, list):
-        return old != new
+        return _differ(old, new)
     o = {json.dumps(x, sort_keys=True) for x in old}
     n = {json.dumps(x, sort_keys=True) for x in new}
     return not o <= n
@@ -347,15 +354,17 @@ def _set_looser(old, new) -> bool:
 
 def looser_output(kind: str, old: dict, new: dict) -> bool:
     if "ok" not in old or "ok" not in new:
-        return old != new  # exception divergence
+        return _differ(old, new)  # exception divergence
     a, b = old["ok"], new["ok"]
     if kind == "verdict":
         return _verdict_looser(a, b)
     if kind == "set":
         return _set_looser(a, b)
     if kind == "flag":
-        return bool(b) and not bool(a)
-    return a != b
+        if type(a) is not bool or type(b) is not bool:
+            return _differ(a, b)
+        return b and not a
+    return _differ(a, b)
 
 
 def compare_sides(old, new, must_equal: set) -> tuple[list[str], list[str]]:
@@ -363,7 +372,7 @@ def compare_sides(old, new, must_equal: set) -> tuple[list[str], list[str]]:
     for (rid, o_out), (_, n_out) in zip(old.results, new.results):
         for key, (root, kind) in ORDERING.items():
             o, n = o_out.get(key, {"absent": True}), n_out.get(key, {"absent": True})
-            if root in must_equal and o != n:
+            if root in must_equal and _differ(o, n):
                 shielded.append(f"{rid}:{key}")
             elif looser_output(kind, o, n):
                 loosened.append(f"{rid}:{key}")
@@ -857,6 +866,426 @@ def branch_gap(tree, module_code, src, line, result) -> str | None:
     return None
 
 
+# --- data flow from a changed line into a branch -----------------------------------------------
+# A value written on a changed line can decide a branch on a later line. The branch check on the
+# changed line alone never sees that branch, so every line in the same function that reads a
+# tainted name gets the branch check too. The taint runs over the whole top-level function,
+# nested defs included, and ignores statement order (over-approximate: it only adds holds).
+
+class FlowUnresolved(Exception):
+    """A data flow the analysis cannot follow; the message names it. `lines` holds the branch
+    lines found before the flow left the function, so their gaps still report first."""
+
+    def __init__(self, message, lines=frozenset()):
+        super().__init__(message)
+        self.lines = set(lines)
+
+
+_BUILTIN_NAMES = frozenset(dir(builtins))
+
+
+def _store_root(node):
+    """The Name a store or mutation target hangs off (`a` in `a.b[c].d`), else raise."""
+    cur = node
+    while isinstance(cur, (ast.Attribute, ast.Subscript, ast.Starred)):
+        cur = cur.value
+    if isinstance(cur, ast.Name):
+        return cur.id
+    raise FlowUnresolved(f"a write through `{ast.unparse(node)[:SEGMENT_CAP]}`")
+
+
+# Calls that never mutate their receiver or arguments. Any other call may, so its receiver and
+# its name-like arguments count as written.
+PURE_FUNCS = frozenset({"dict", "list", "tuple", "set", "frozenset", "str", "int", "float", "bool",
+                        "len", "isinstance", "sorted", "any", "all", "repr", "min", "max", "sum",
+                        "enumerate", "zip", "range", "type", "hasattr", "abs", "round", "bytes",
+                        "open"})  # `open` writes no argument; the audit watch sees its file mode
+PURE_METHODS = frozenset({"get", "strip", "lstrip", "rstrip", "startswith", "endswith", "split",
+                          "rsplit", "splitlines", "join", "lower", "upper", "casefold", "format",
+                          "replace", "partition", "rpartition", "find", "rfind", "count", "keys",
+                          "values", "items", "copy", "match", "search", "fullmatch", "group",
+                          "groups", "findall", "finditer", "sub", "isdigit", "isalnum", "isalpha",
+                          "isspace", "removeprefix", "removesuffix", "encode", "decode", "index"})
+
+
+def _pure_call(node) -> bool:
+    f = node.func
+    if isinstance(f, ast.Name):
+        return f.id in PURE_FUNCS
+    return isinstance(f, ast.Attribute) and f.attr in PURE_METHODS
+
+
+def _covers(node, line) -> bool:
+    start, end = getattr(node, "lineno", None), getattr(node, "end_lineno", None)
+    return start is not None and end is not None and start <= line <= end
+
+
+def _writes(nodes) -> tuple[set[str], set[str]]:
+    """(names rebound, names whose object may be mutated) by `nodes`. A call's receiver and
+    every argument that is a name, attribute or subscript count as mutated. A comprehension's
+    own loop variable is local to it, so it binds nothing outside."""
+    bound, mutated = set(), set()
+    local = {id(x) for n in nodes if isinstance(n, ast.comprehension) for x in ast.walk(n.target)
+             if isinstance(x, ast.Name)}
+    for node in nodes:
+        if isinstance(node, ast.Name) and isinstance(node.ctx, (ast.Store, ast.Del)):
+            if id(node) not in local:
+                bound.add(node.id)
+        elif (isinstance(node, (ast.Attribute, ast.Subscript))
+              and isinstance(node.ctx, (ast.Store, ast.Del))):
+            mutated.add(_store_root(node))
+        elif isinstance(node, (ast.Import, ast.ImportFrom)):
+            bound.update((a.asname or a.name).split(".")[0] for a in node.names)
+        elif isinstance(node, ast.ExceptHandler) and node.name:
+            bound.add(node.name)
+        elif isinstance(node, (ast.MatchAs, ast.MatchStar, ast.MatchMapping)):
+            raise FlowUnresolved("a `match` capture")
+        elif isinstance(node, ast.Call) and not _pure_call(node):
+            for arg in [node.func.value if isinstance(node.func, ast.Attribute) else None,
+                        *node.args, *(k.value for k in node.keywords)]:
+                if isinstance(arg, ast.Starred):
+                    arg = arg.value
+                if isinstance(arg, (ast.Name, ast.Attribute, ast.Subscript)):
+                    try:
+                        mutated.add(_store_root(arg))
+                    except FlowUnresolved:
+                        continue  # a call result passed on: nothing named is mutated
+    return bound, mutated
+
+
+def _deep_roots(nodes) -> set[str]:
+    """Roots of the writes in `nodes` that go into a nested object: a store target or a mutated
+    call receiver or argument that is itself an attribute or a subscript."""
+    out = set()
+    for node in nodes:
+        targets = []
+        if (isinstance(node, (ast.Attribute, ast.Subscript))
+                and isinstance(node.ctx, (ast.Store, ast.Del))):
+            targets.append(node.value)
+        elif isinstance(node, ast.Call) and not _pure_call(node):
+            if isinstance(node.func, ast.Attribute):
+                targets.append(node.func.value)
+            targets += [a.value if isinstance(a, ast.Starred) else a
+                        for a in [*node.args, *(k.value for k in node.keywords)]]
+        for t in targets:
+            if isinstance(t, (ast.Attribute, ast.Subscript)):
+                try:
+                    out.add(_store_root(t))
+                except FlowUnresolved:
+                    continue
+    return out
+
+
+def _reads(nodes) -> set[str]:
+    return {n.id for n in nodes if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load)}
+
+
+def _header(stmt) -> list:
+    """The nodes of a statement that run as the statement itself: a compound statement's
+    header, never its body."""
+    if isinstance(stmt, (ast.If, ast.While)):
+        parts = [stmt.test]
+    elif isinstance(stmt, (ast.For, ast.AsyncFor)):
+        parts = [stmt.target, stmt.iter]
+    elif isinstance(stmt, (ast.With, ast.AsyncWith)):
+        parts = list(stmt.items)
+    elif isinstance(stmt, ast.Match):
+        parts = [stmt.subject] + [c.pattern for c in stmt.cases] + [c.guard for c in stmt.cases if c.guard]
+    elif isinstance(stmt, (ast.Try, getattr(ast, "TryStar", ast.Try))):
+        parts = list(stmt.handlers)
+    elif isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+        parts = []
+    else:
+        parts = [stmt]
+    out = []
+    for p in parts:
+        if isinstance(p, ast.ExceptHandler):
+            out.append(p)
+            if p.type is not None:
+                out.extend(ast.walk(p.type))
+        else:
+            out.extend(ast.walk(p))
+    return out
+
+
+def _seed_nodes(func_node, line) -> list:
+    nodes = [n for n in ast.walk(func_node) if _covers(n, line)
+             and not isinstance(n, (ast.stmt, ast.excepthandler))]
+    nodes += [n for n in ast.walk(func_node) if isinstance(n, ast.stmt) and n.lineno == line
+              and not isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))]
+    for n in list(nodes):
+        if isinstance(n, ast.stmt):
+            nodes.extend(x for x in _header(n) if _covers(x, line))
+    return nodes
+
+
+def flow_lines(func_node, line, fid_defs, returns_compared) -> tuple[set[int], bool]:
+    """(lines, escapes). `lines`: the lines of `func_node` that read a name the changed `line`
+    writes, followed through every assignment in the function. `escapes`: how the changed value
+    leaves the function ("return" for a return or yield, "param" for a mutated parameter) while
+    the caller's use is not a compared output (`returns_compared` False: the function is not a replayed root, or other
+    fidelity code calls it), so the caller check must follow it. Raises FlowUnresolved when the
+    value leaves in a way no check follows: an argument to another top-level fidelity function,
+    or a return from a nested function."""
+    if fid_defs & PURE_FUNCS:
+        raise FlowUnresolved(f"fidelity.py redefines {sorted(fid_defs & PURE_FUNCS)[0]}")
+    nodes = _seed_nodes(func_node, line)
+    bound, mutated = _writes(nodes)
+    leaks = []
+    for n in nodes:  # the changed line's own value passed into another fidelity function
+        if isinstance(n, ast.Call):
+            leaks += _call_leaks(n, fid_defs, changed_args=True)
+    ret = returns_on_line(func_node, line)
+    if ret == "nested":
+        leaks.append(f"line {line} returns a changed value from a nested function")
+    out, escapes = _flow(func_node, bound | mutated, mutated, fid_defs, returns_compared, leaks)
+    if ret == "own" and not returns_compared:
+        escapes = escapes | {"return"}
+    return out, escapes
+
+
+def _comp_taint(head, tainted) -> set[str]:
+    """`tainted` plus every comprehension variable in `head` drawn from a tainted value."""
+    out = set(tainted)
+    gens = [g for n in head for g in getattr(n, "generators", ())]
+    grew = True
+    while grew:
+        grew = False
+        for g in gens:
+            if _reads(list(ast.walk(g.iter))) & out:
+                names = {x.id for x in ast.walk(g.target) if isinstance(x, ast.Name)}
+                if names - out:
+                    out |= names
+                    grew = True
+    return out
+
+
+# Nodes that branch, loop, catch or jump: a fidelity function with none of them, no call into
+# another fidelity function and no write outside its own names gives the same path for every
+# argument, so a changed value can pass through it.
+_BRANCHY = (ast.If, ast.IfExp, ast.While, ast.For, ast.AsyncFor, ast.Try, ast.Match, ast.BoolOp,
+            ast.comprehension, ast.Assert, ast.With, ast.AsyncWith, ast.Raise, ast.Global,
+            ast.Nonlocal, ast.Yield, ast.YieldFrom, ast.Await, ast.Lambda, ast.FunctionDef,
+            ast.AsyncFunctionDef, ast.ClassDef, ast.Break, ast.Continue)
+
+
+def _transparent(fn, names) -> bool:
+    for n in ast.walk(fn):
+        if n is fn:
+            continue
+        if isinstance(n, _BRANCHY) or type(n).__name__ == "TryStar":
+            return False
+        if isinstance(n, ast.Name) and n.id in names:
+            return False  # a call into, or a use of, another fidelity function
+        if isinstance(n, (ast.Attribute, ast.Subscript)) and isinstance(n.ctx, (ast.Store, ast.Del)):
+            return False
+        if isinstance(n, ast.Call) and not _pure_call(n):
+            return False
+    if fn.decorator_list or any(d is not None for d in [*fn.args.defaults, *fn.args.kw_defaults]):
+        return False
+    return True
+
+
+class _FidNames(frozenset):
+    """Opaque fidelity function names; `through` holds the straight-line ones."""
+    through: frozenset = frozenset()
+
+
+def opaque_defs(defs) -> _FidNames:
+    """Top-level fidelity functions the data-flow check cannot see through: all but the
+    straight-line ones (_transparent). A def that shadows a builtin stays opaque, so the
+    builtin checks never mistake it for the builtin."""
+    names = set(defs)
+    out = _FidNames(n for n, fn in defs.items()
+                    if n in _BUILTIN_NAMES or not _transparent(fn, names))
+    out.through = frozenset(names - out)
+    return out
+
+
+def _call_leaks(n, fid_defs, tainted=frozenset(), changed_args=False) -> list[str]:
+    """Why a call carries a changed value where the branch check cannot follow it. `fid_defs`
+    holds the fidelity functions the check cannot see through (opaque_defs)."""
+    args = [*n.args, *(k.value for k in n.keywords)]
+    if changed_args:
+        if not any(not isinstance(a, ast.Constant) for a in args):
+            return []
+    elif not _reads([x for a in args for x in ast.walk(a)]) & tainted:
+        return []
+    f = n.func
+    passed = {x.id for a in args for x in ast.walk(a) if isinstance(x, ast.Name) and x.id in fid_defs}
+    if passed:  # `sorted(xs, key=_helper)`: the builtin calls back into fidelity.py
+        return [f"line {n.lineno} passes a changed value to {sorted(passed)[0]}"]
+    if isinstance(f, ast.Name) and f.id in fid_defs:
+        return [f"line {n.lineno} passes a changed value to {f.id}"]
+    if changed_args:
+        return []  # the line's own call to anything else is judged by its outputs
+    if isinstance(f, ast.Name) and f.id in getattr(fid_defs, "through", ()):
+        return []  # a straight-line fidelity function: one path for every argument
+    if isinstance(f, ast.Attribute):
+        return []  # a method or another module's function: no fidelity.py branch to check
+    if isinstance(f, ast.Name) and f.id in _BUILTIN_NAMES:
+        return []
+    callee = f.id if isinstance(f, ast.Name) else "a computed callee"
+    return [f"line {n.lineno} passes a changed value to {callee}"]
+
+
+def _params(func_node) -> set[str]:
+    a = func_node.args
+    return {x.arg for x in a.posonlyargs + a.args + a.kwonlyargs + [a.vararg, a.kwarg] if x}
+
+
+def _head_lines(head) -> set[int]:
+    out: set[int] = set()
+    for n in head:
+        if isinstance(n, ast.excepthandler):
+            out.add(n.lineno)
+        elif getattr(n, "lineno", None) is not None and getattr(n, "end_lineno", None) is not None:
+            out.update(range(n.lineno, n.end_lineno + 1))
+    return out
+
+
+def _flow(func_node, tainted, mutated, fid_defs, returns_compared, leaks,
+          skip_calls=frozenset()) -> tuple[set[int], set[str]]:
+    tainted, mutated, leaks = set(tainted), set(mutated), list(leaks)
+    if not tainted:
+        if leaks:
+            raise FlowUnresolved(leaks[0])
+        return set(), set()
+    stmts = [s for s in ast.walk(func_node) if isinstance(s, (ast.stmt, ast.excepthandler))
+             and s is not func_node]
+    flows = []
+    for s in stmts:
+        head = _header(s) if isinstance(s, ast.stmt) else [s]
+        flows.append((s, head, _reads(head), *_writes(head)))
+    deep_at = [_deep_roots(f[1]) for f in flows]
+    changed = True
+    while changed:
+        before = (len(tainted), len(mutated))
+        # A write into a nested object (`a[k]["x"] = v`, `a.b.append(v)`) can reach any value
+        # stored into `a` earlier, so the stores into a mutated object then count as aliases too.
+        deep = any(d & mutated for d in deep_at)
+        for _s, _head, reads, w_bound, w_mut in flows:
+            if reads & tainted:  # a write fed by a tainted read
+                tainted |= w_bound | w_mut
+                if mutated:
+                    mutated |= w_bound | w_mut
+            if w_bound & mutated or (deep and w_mut & mutated):
+                # a name bound to a mutated object: every name read into it may alias it
+                mutated |= reads
+                tainted |= reads
+        changed = (len(tainted), len(mutated)) != before
+    own = {id(n) for n in _own_nodes(func_node)}
+    out: set[int] = set()
+    # A mutated parameter changes the caller's object.
+    escapes = {"param"} if not returns_compared and mutated & _params(func_node) else set()
+    for s, head, reads, _b, _m in flows:
+        if not reads & tainted:
+            continue
+        returns = isinstance(s, ast.Return) or any(isinstance(n, (ast.Yield, ast.YieldFrom))
+                                                   for n in head)
+        if returns and id(s) not in own:
+            leaks.append(f"line {s.lineno} returns a changed value from a nested function")
+        elif returns and not returns_compared:
+            escapes.add("return")
+        local = _comp_taint(head, tainted)
+        for n in head:
+            if isinstance(n, ast.Call) and id(n) not in skip_calls:
+                leaks += _call_leaks(n, fid_defs, local)
+        # Every line of the statement (a compound statement: its header) gets the branch check,
+        # so a jump on another line of a multi-line condition or comprehension is covered.
+        out |= _head_lines(head)
+    if leaks:
+        raise FlowUnresolved(sorted(leaks, key=lambda t: int(t.split()[1]))[0], out)
+    return out, escapes
+
+
+def returns_on_line(func_node, line) -> str | None:
+    """"own" when `line` sits in a return or yield of `func_node` itself, "nested" when it sits
+    in one of a nested function, else None."""
+    own = {id(n) for n in _own_nodes(func_node)}
+    found = None
+    for n in ast.walk(func_node):
+        if isinstance(n, (ast.Return, ast.Yield, ast.YieldFrom)) and _covers(n, line):
+            if id(n) not in own:
+                return "nested"
+            found = "own"
+    return found
+
+
+def follow_callers(defs, func, kinds, compared, module_uses,
+                   opaque=None) -> list[tuple[str, str, set[int]]]:
+    """[(side, caller, lines)] for every fidelity def a changed value in `func` reaches through
+    returns and mutated arguments (`kinds`, from flow_lines): each call statement's lines plus
+    every line its result or its mutated arguments reach, up through each caller whose own return is not a compared output. `defs` is
+    {side: top defs}; a caller is judged on the old side when it exists there. Raises
+    FlowUnresolved on a use of a followed function the check cannot read: a reference that is
+    not a direct call, a call inside a nested function or lambda, the call result passed to
+    another fidelity function or a computed callee, or a module-level reference."""
+    out: list = []
+    seen = {func}
+    todo = [(func, set(kinds))]
+    while todo:
+        cur, cur_kinds = todo.pop()
+        if module_uses(cur):
+            raise FlowUnresolved(f"module-level code uses {cur}")
+        for name in sorted(set(defs["old"]) | set(defs["new"])):
+            if name == cur:
+                continue
+            side = "old" if name in defs["old"] else "new"
+            g = defs[side][name]
+            fid_defs = opaque[side] if opaque is not None else set(defs[side])
+            refs = [n for n in ast.walk(g) if (isinstance(n, ast.Name) and n.id == cur)
+                    or (isinstance(n, ast.Attribute) and n.attr == cur)
+                    or (isinstance(n, ast.Constant) and n.value == cur)]
+            if not refs:
+                continue
+            own = {id(n) for n in _own_nodes(g)}
+            calls = {id(n.func): n for n in ast.walk(g) if isinstance(n, ast.Call)
+                     and isinstance(n.func, ast.Name) and n.func.id == cur}
+            for r in refs:
+                if id(r) not in calls:
+                    raise FlowUnresolved(f"{name} uses {cur} other than by a direct call")
+                if id(r) not in own:
+                    raise FlowUnresolved(f"{name} calls {cur} inside a nested function")
+            ids = {id(c) for c in calls.values()}
+            # A mutated parameter: every name-like argument of the call may be the changed object.
+            arg_roots = set()
+            if "param" in cur_kinds:
+                for c in calls.values():
+                    _b, m = _writes([c])
+                    arg_roots |= m
+            name_kinds = {"return"}
+            lines: set[int] = set()
+            for s in ast.walk(g):
+                if not isinstance(s, (ast.stmt, ast.excepthandler)) or s is g:
+                    continue
+                head = _header(s) if isinstance(s, ast.stmt) else [s]
+                if not any(id(x) in ids for x in head):
+                    continue
+                for n in head:  # the result handed straight to code no check follows
+                    if isinstance(n, ast.Call) and id(n) not in ids and any(
+                            id(x) in ids for a in [*n.args, *(k.value for k in n.keywords)]
+                            for x in ast.walk(a)):
+                        f = n.func
+                        if isinstance(f, ast.Attribute):
+                            continue
+                        if isinstance(f, ast.Name) and f.id in _BUILTIN_NAMES and f.id not in fid_defs:
+                            continue
+                        callee = f.id if isinstance(f, ast.Name) else "a computed callee"
+                        raise FlowUnresolved(f"line {n.lineno} passes a changed value to {callee}")
+                lines |= _head_lines(head)
+                bound = _writes(head)[0]
+                reach, esc = _flow(g, bound | arg_roots, set(arg_roots), fid_defs, compared(name),
+                                   [], skip_calls=ids)
+                lines |= reach
+                name_kinds |= esc
+            out.append((side, name, lines))
+            if not compared(name) and name not in seen:  # its whole return may change
+                seen.add(name)
+                todo.append((name, name_kinds))
+    return out
+
+
 def judge_fidelity(old, new, srcs, lines, roots) -> tuple[bool, str, list[str]]:
     """Clear a fidelity.py change only by the dead-in-production or replayed-only proof."""
     from harness import arming_replay  # lazy: arming_replay imports this module
@@ -900,6 +1329,13 @@ def judge_fidelity(old, new, srcs, lines, roots) -> tuple[bool, str, list[str]]:
     must_equal: set[str] = set()
     changed = 0
     gaps: list[str] = []
+    sources = {"old": srcs[0], "new": srcs[1]}
+    results = {"old": old, "new": new}
+    opaque = {side: opaque_defs(defs[side]) for side in defs}
+
+    def compared(name):  # a replayed root no fidelity code calls: its outputs are compared
+        return name in REPLAYED_ROOTS and not any(
+            name in dsts for src_name, dsts in graph.items() if src_name != name)
     for side, side_lines, result, src in (("old", lines[0], old, srcs[0]),
                                           ("new", lines[1], new, srcs[1])):
         owner = owners[side]
@@ -927,10 +1363,37 @@ def judge_fidelity(old, new, srcs, lines, roots) -> tuple[bool, str, list[str]]:
                 return False, f"fidelity-changed-line-hazard: {hazard} at {func}:{line}", detail
             must_equal |= shield
             detail.append(f"{side}:{line}: replayed {func}")
+            flow_gap = None
             try:
                 gap = branch_gap(trees[side], codes[side], src, line, result)
+                # A branch that reads a value this line writes must go both ways too, in this
+                # function and in every caller its return or a mutated argument reaches.
+                try:
+                    reads, escapes = flow_lines(defs[side][func], line, opaque[side],
+                                                compared(func))
+                except FlowUnresolved as e:
+                    flow_gap = f"a data flow the replay cannot follow: {e}"
+                    reads, escapes = e.lines, set()
+                checks = [(side, None, at) for at in sorted(reads - {line})]
+                if escapes:
+                    try:
+                        for c_side, caller, c_lines in follow_callers(
+                                defs, func, escapes, compared,
+                                lambda f: f in graph.get(MODULE_ROOT, ()), opaque):
+                            checks += [(c_side, caller, at) for at in sorted(c_lines)]
+                    except FlowUnresolved as e:
+                        flow_gap = flow_gap or f"a data flow the replay cannot follow: {e}"
+                for c_side, caller, at in checks:
+                    if gap is not None:
+                        break
+                    gap = branch_gap(trees[c_side], codes[c_side], sources[c_side], at,
+                                     results[c_side])
+                    if gap is not None:
+                        where = f"{caller}:{at}" if caller else f"line {at}"
+                        gap = f"(its value reaches {where}) {gap}"
             except Exception:  # noqa: BLE001 — a branch the check cannot read keeps the flag
                 gap = "a branch the replay cannot read"
+            gap = gap or flow_gap
             if gap is not None:
                 gaps.append(f"{func}:{line} {gap}")
     loosened, shielded = compare_sides(old, new, must_equal)

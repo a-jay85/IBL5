@@ -1,6 +1,6 @@
 ---
 description: The arming replay's second stage replays fidelity.py's deterministic readers over a committed corpus and clears a fidelity.py edit only when it is dead in production or reachable only through replayed roots.
-last_verified: 2026-11-25
+last_verified: 2026-11-26
 ---
 
 # ADR-0283: Fidelity arming replay
@@ -81,6 +81,23 @@ The branch check closes that hole. The driver records every branch event in the 
 - The check cannot read the line's branches. That covers a jump kind it does not know, a membership guard whose left side is not a bare name, a guard that is not the whole condition of its statement, a guard whose line also holds another statement or an `except` clause, two code objects it cannot tell apart, or an interpreter without branch events.
 
 This check runs last, so every earlier hold keeps its own reason. It only adds holds. It still sees only the corpus. Two values that both take the same branch look the same to it. A changed line inside a `finally` block or an `except` clause usually holds, because the corpus rarely takes the exception path.
+
+The branch check also follows the changed line's value. The judge collects every name the line rebinds or mutates, then every line in the same function that reads one of those names, through later assignments and aliases. Each of those lines gets the same both-ways check. So `md = dict(fields["merge_danger"], hold=False)` holds on the `if md["hold"] is True:` line below it. When the value leaves the function through a return, a yield or a mutated argument, and the function's output is not compared directly, the judge follows it into each caller. It checks each call line and every line the result reaches there, and it climbs until it reaches a replayed root that no other fidelity code calls. A caller that exists on the base side is judged there. A caller that only the candidate has is judged on the candidate side.
+
+The judge holds with `a data flow the replay cannot follow` when the value goes where this check cannot see:
+
+- an argument to a fidelity function that branches, loops or calls other fidelity code (a straight-line helper such as `_one_line` passes);
+- a fidelity function handed to a builtin as a value, such as `key=helper`;
+- a non-builtin or computed callee;
+- a return from a nested function or lambda;
+- a write through a call result, such as `f().x = 0`;
+- a `match` capture;
+- a followed function used other than by a direct call, called inside a nested function, used by module-level code, or whose result goes straight into one of the callees above;
+- a fidelity def that shadows a builtin.
+
+The flow is flow-insensitive, so it over-reaches and can hold an edit that is safe. A write into a nested object, such as `a[k]["x"] = v`, makes every value stored into `a` count as changed too.
+
+The driver now holds on a module that loads or drops under the side root after the import window. The globals snapshot had no baseline for such a module, so a write into it went unseen. The judge compares outputs by their canonical JSON text, so `True` and `1` count as different.
 
 The globals snapshot skips three things that never carry replay state: the driver's own module, module-valued names, and the `__future__` flag that `from __future__ import annotations` binds. That flag has no value equality, so a deepcopy of it never compares equal.
 

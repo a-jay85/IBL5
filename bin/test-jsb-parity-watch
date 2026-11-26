@@ -474,6 +474,35 @@ case_identity_near_miss_never_links() {
     h_eq "near miss: a base log never links to the -r1 row" "pl-0029:no-trace:none" "$(slurp "$S/$STALLS_REL")"
 }
 
+# Logs with no slug on an identity line fall back to the content match.
+case_legacy_retry_log_never_links_base_row() {
+    local log=plan-now-20261124-111400-23978.log first
+    for first in "" "$(idline -)"; do
+        sandbox "legacy_retry${first:+_dash}"
+        ledger "pl-0028:captured:jsb-port-pl-0028"
+        printf '%s\nBranch slug: jsb-port-pl-0028-r1\nplan-now: RESULT no-plan — x\n' "$first" > "$S/plannow/$log"
+        run_watch
+        h_eq "legacy -r1 log (${first:-no identity line}): never links to the base row" \
+            "pl-0028:no-trace:none" "$(slurp "$S/$STALLS_REL")"
+    done
+}
+
+case_legacy_suffixed_mention_still_links() {
+    local log=plan-now-20261124-111400-23978.log first tail
+    for first in "" "$(idline -)"; do
+        # The last three tails sit on the edges of the -r<digit> reject.
+        for tail in -blocked.md -no-plan.md -shared-context.md -replay -r -; do
+            sandbox "legacy_tail${first:+_dash}$tail"
+            ledger "pl-0028:captured:jsb-port-pl-0028-r1"
+            printf '%s\nreport: /r/jsb-port-pl-0028-r1%s\nplan-now: RESULT no-plan — x\n' \
+                "$first" "$tail" > "$S/plannow/$log"
+            run_watch
+            h_eq "legacy tail $tail (${first:-no identity line}): still links" \
+                "pl-0028:no-plan:$log" "$(slurp "$S/$STALLS_REL")"
+        done
+    done
+}
+
 case_no_plan_newest_log_wins() {
     sandbox newest_wins
     { idline jsb-port-pl-0001; printf 'plan-now: RESULT no-plan — old\n'; } > "$S/plannow/plan-now-20261123-010000-1.log"

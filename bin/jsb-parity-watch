@@ -153,14 +153,16 @@ lock_is_stale() {
 
 # log_names_slug <log> <slug>: 0 when the plan-now log belongs to <slug>. A log whose
 # identity line (bin/plan-now writes it first) carries a slug matches on that field
-# exactly. Older logs and slug=- logs fall back to the content match.
+# exactly. Older logs and slug=- logs fall back to the content match. That match
+# rejects a -r<digit> tail (a retry's slug) and keeps other tails, such as
+# <slug>-blocked.md, which may be an older log's only mention of its slug.
 log_names_slug() {
     local log="$1" slug="$2" id_slug
     id_slug=$(awk '!f && match($0, /^plan-now: identity slug=[^ ]* /) { print substr($0, 25, RLENGTH - 25); f = 1 }' "$log" 2>/dev/null) || id_slug=''
     if [ -n "$id_slug" ] && [ "$id_slug" != "-" ]; then
         [ "$id_slug" = "$slug" ]; return
     fi
-    grep -qE "${slug}([^A-Za-z0-9]|\$)" "$log" 2>/dev/null
+    grep -qE "${slug}(\$|[^A-Za-z0-9-]|-\$|-[^r]|-r\$|-r[^0-9])" "$log" 2>/dev/null
 }
 
 # row_verdict <id> <slug>: line 1 is the verdict; line 2 is the fingerprint fact

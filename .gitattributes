@@ -32,3 +32,4 @@ bin/lib/*.md merge=lastverified
 # produce from a non-append edit are caught by bin/check-numbering.
 ibl5/docs/decisions/README.md merge=union
 
+engine/testdata/jsb-captures/*.jsonl binary

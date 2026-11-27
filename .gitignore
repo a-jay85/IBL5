@@ -120,6 +120,7 @@ bin/__pycache__/
 # PR body template written by automouse impl — used by post-plan to open PR; not a repo artifact
 pr-body.md
 
-# Private jsb-native repo checked out beside IBL5 code. Its captures and loop
-# ledgers derive from jumpshot.exe and must never enter an IBL5 commit (ADR-0278).
+# Private jsb-native repo checked out beside IBL5 code. Its binary, decompiled C
+# and loop ledgers must never enter an IBL5 commit. Trace captures now live in
+# engine/testdata/jsb-captures/ (ADR-0286, which replaces ADR-0278's hosting).
 /jsb-native/

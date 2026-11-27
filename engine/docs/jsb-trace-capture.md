@@ -1,6 +1,6 @@
 ---
 description: Runbook for capturing per-call (input, output) pairs from the original JSB binary into a jsb-trace/1 JSONL file.
-last_verified: 2026-11-23
+last_verified: 2026-11-25
 ---
 
 # JSB per-call trace capture
@@ -25,11 +25,11 @@ The existing traces count events per team-game. See `engine/docs/j27-foul-volume
 
 A capture lands in its own PR, before the port PR that uses it. The owner reviews that PR.
 
-The jsb-native parity loop takes a second path. It commits `captures/pl-NNNN.jsonl` to the private jsb-native `main`, and the port PR records that file with `--capture-host jsb-native`. No IBL5 capture PR exists for it. ADR-0278 (`ibl5/docs/decisions/0278-jsb-native-hosted-trace-captures.md`) covers this path.
+The jsb-native parity loop writes its capture into an IBL5 worktree named `jsb-capture-<row>`, under `engine/testdata/jsb-captures/`. That worktree ships as an owner-held capture PR (ADR-0266). `port` refuses until the file is on IBL5 `origin/master` with the same sha256. A PR that adds a capture and its evidence together holds as `capture-in-diff`. ADR-0286 (`ibl5/docs/decisions/0286-in-repo-jsb-trace-captures.md`) records this path.
 
 ## Using a capture
 
-Write a test named `TestTracePinned...`. Load the file with `jsbtrace.MustLoad`. For a jsb-native capture, call `jsbtrace.SkipIfAbsent(t, name)` before `jsbtrace.MustLoad`. Feed each `in` to the ported function. Assert the result equals that record's `out`. The expected values live only in the capture.
+Write a test named `TestTracePinned...`. Load the file with `jsbtrace.MustLoad`. A missing capture fails the test. Feed each `in` to the ported function. Assert the result equals that record's `out`. The expected values live only in the capture.
 
 ## Trace-pinned evidence
 
@@ -39,13 +39,7 @@ A port PR that changes the golden snapshot can clear the owner hold with a `Test
         --test ./internal/sim:TestTracePinnedX --capture x.jsonl \
         --ported engine/internal/sim/x.go,engine/internal/result/result.go
 
-For a capture hosted in jsb-native, name the file under its `captures/` directory and add `--capture-host jsb-native`. The check pins the latest jsb-native `main` commit that touched the file:
-
-    cd tools/postplan-harness && python3 -m harness.trace_pinned record --branch <branch> \
-        --test ./internal/sim:TestTracePinnedPl0017 --capture pl-0017.jsonl \
-        --capture-host jsb-native --ported engine/internal/sim/x.go
-
-A hosted entry adds these hold reasons: `capture-bad-host`, `capture-commit-bad`, `capture-host-unavailable`, `capture-commit-off-main`, and `capture-not-at-commit`.
+The capture must sit under `engine/testdata/jsb-captures/` on the base branch, with the recorded sha256 and a size of at most 8 MiB. A capture over the cap holds as `capture-too-large`. An entry that names another capture host holds as `capture-bad-host`.
 
 List every non-test engine `.go` file the PR changes for that routine. The check holds the PR when a changed non-test engine `.go` file is in no list, or when the pinned test executes no added line of a listed file. A comment-only edit, a pure deletion, a rename, and any file under `engine/cmd/` therefore hold for the owner. The reason strings live in `tools/postplan-harness/harness/trace_pinned.py`.
 

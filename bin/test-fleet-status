@@ -519,6 +519,8 @@ cat <<'ROWS'
 6006	0	com.ibl5.plan-now-20260910-210000-70006
 6007	0	com.ibl5.plan-now-20260910-210000-70007
 6008	0	com.ibl5.plan-now-20260910-210000-70008
+6009	0	com.ibl5.plan-now-20260910-210000-70009
+6010	0	com.ibl5.plan-now-20260910-210000-70010
 99999	0	com.apple.something.unrelated
 ROWS
 [ -n "\${STUB_NO_AUTOMOUSE:-}" ] || printf -- '-\t0\tcom.ibl5.automouse\n'
@@ -676,22 +678,34 @@ plant_tx "12121212-1111-2222-3333-444444444444.jsonl" \
     '{"type":"user","message":{"content":[{"type":"text","text":"see ~/claude-plans/.drafts/peer-plan.draft.md"}]}}'
 plant_sidecar plan-now-20260910-200000-60005 '12121212-1111-2222-3333-444444444444'
 
-# Cases 14-16: bin/plan-now opens every log with an identity line, which is not
-# progress. 70006: identity (plus a blank line) and a transcript. 70007: identity,
-# later real output, and a transcript that must lose to it. 70008: identity only,
-# no transcript.
+# Cases 14-18: a plan-now log is not progress until the runner prints its
+# "claude exited" line. 70006: identity (plus a blank line) and a transcript.
+# 70007: identity, the exit line, later output, and a transcript that must lose to
+# it. 70008: identity only, no transcript. 70009: identity, pre-launch notices and
+# a transcript. 70010: identity and a pre-launch notice, no transcript.
 plan_idline() { printf 'plan-now: identity slug=%s resume_of=- brief=-\n' "$1"; }
 { plan_idline idline-tx; printf '\n'; } > "$LOGS/plan-now-20260910-210000-70006.log"
 plant_tx "13131313-1111-2222-3333-444444444444.jsonl" \
     "$(tx_text 'Phase 2: drafting the plan')" \
     "$(tx_tool Bash command 'bin/plan-index demo-plan')"
 plant_sidecar plan-now-20260910-210000-70006 '13131313-1111-2222-3333-444444444444'
-{ plan_idline idline-later; printf 'plan-now: RESULT later-output-marker\n'; } \
+{ plan_idline idline-later
+  printf 'plan-now: claude exited 0 after 5s\nplan-now: RESULT later-output-marker\n'; } \
     > "$LOGS/plan-now-20260910-210000-70007.log"
 plant_tx "14141414-1111-2222-3333-444444444444.jsonl" \
     "$(tx_text 'TRANSCRIPT MUST LOSE TO LOG OUTPUT')"
 plant_sidecar plan-now-20260910-210000-70007 '14141414-1111-2222-3333-444444444444'
 plan_idline idline-bare > "$LOGS/plan-now-20260910-210000-70008.log"
+{ plan_idline idline-notice
+  printf 'plan-now: tier-ok override was active: NOTICE-MUST-NOT-RENDER\n'
+  printf 'plan-now: resuming session NOTICE-MUST-NOT-RENDER from run x\n'; } \
+    > "$LOGS/plan-now-20260910-210000-70009.log"
+plant_tx "15151515-1111-2222-3333-444444444444.jsonl" \
+    "$(tx_text 'Phase 3: notice run still planning')"
+plant_sidecar plan-now-20260910-210000-70009 '15151515-1111-2222-3333-444444444444'
+{ plan_idline idline-notice-bare
+  printf 'plan-now: tier-ok override was active: NOTICE-MUST-NOT-RENDER\n'; } \
+    > "$LOGS/plan-now-20260910-210000-70010.log"
 
 # ── run ────────────────────────────────────────────────────────────────────────
 
@@ -1407,6 +1421,16 @@ assert_lacks "identity then output: transcript unused"  "$ROW_70007" 'TRANSCRIPT
 assert_has "identity-only, no transcript: placeholder" "$ROW_70008" 'no output yet'
 
 assert_lacks "identity line never renders as progress" "$OUTPUT" 'plan-now: identity'
+
+# Case 17 — pre-launch notices do not mask the live transcript.
+ROW_70009="$(launchd_row 210000-70009)"
+assert_has   "pre-launch notice: transcript phase renders" "$ROW_70009" 'Phase 3: notice run still planning'
+assert_lacks "pre-launch notice: notice not rendered"      "$ROW_70009" 'NOTICE-MUST-NOT-RENDER'
+
+# Case 18 — pre-launch notice and no transcript: the placeholder renders.
+ROW_70010="$(launchd_row 210000-70010)"
+assert_has   "notice, no transcript: placeholder"     "$ROW_70010" 'no output yet'
+assert_lacks "notice, no transcript: notice not rendered" "$ROW_70010" 'NOTICE-MUST-NOT-RENDER'
 
 # === transcript fixture cases (Phase 6) ===
 

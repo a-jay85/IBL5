@@ -434,6 +434,27 @@ card_main() {
     if [ "$view_ok" = 1 ]; then
         line="$(grep -m1 -E '^\*\*Merge danger:\*\*' <<< "$body" || true)"
         if [ -n "$line" ]; then echo "merge-danger: ${line#\*\*Merge danger:\*\* }"; else echo "merge-danger: missing"; fi
+        # Owner-card evidence for a fidelity.py edit, posted by post-plan. Display only.
+        local ev_touch ev_body ev_head ev_status
+        ev_touch="$(jq -r '[(.files // [])[].path] | index("tools/postplan-harness/harness/fidelity.py") != null' <<< "$view")"
+        if [ "$c_ok" != 1 ]; then
+            [ "$ev_touch" = true ] && card_unknown fidelity-evidence
+        else
+            ev_body="$(jq -r '[ .[] | select((.body // "") | startswith("<!-- fidelity-evidence head=")) ] | last | .body // empty' <<< "$trusted")"
+            if [ -n "$ev_body" ]; then
+                ev_head="$(head -1 <<< "$ev_body" | sed -nE 's/^<!-- fidelity-evidence head=([0-9a-f]{40}) base=[0-9a-f]{40} -->$/\1/p')"
+                ev_status="$(grep -m1 '^fidelity-evidence: ' <<< "$ev_body" | sed 's/^fidelity-evidence: //' || true)"
+                if [ -z "$ev_head" ] || [ -z "$ev_status" ]; then
+                    echo "fidelity-evidence: malformed evidence comment"
+                elif [ "$ev_head" = "$sha" ]; then
+                    echo "fidelity-evidence: $ev_status | CURRENT"
+                else
+                    echo "fidelity-evidence: $ev_status | STALE (computed for head ${ev_head:0:7}, PR head ${sha:0:7})"
+                fi
+            elif [ "$ev_touch" = true ]; then
+                echo "fidelity-evidence: missing (this PR edits fidelity.py and has no evidence comment)"
+            fi
+        fi
 
         local flat snap lc_ok=1 found="" label _p _s
         flat="$(printf '%s' "$branch" | tr -cs 'A-Za-z0-9._-' '-')"
@@ -455,6 +476,7 @@ card_main() {
         card_unknown merge-danger
         card_unknown live-run
         card_unknown worktree
+        card_unknown fidelity-evidence  # view failed: file list unknown
     fi
 
     # --- owner approvals: approve and fix-first markers, and whether each fix-first one

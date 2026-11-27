@@ -144,11 +144,12 @@ if [ "$MERGED" = 1 ]; then
 
     # Seconds to wait before the next check. Backs off while the GraphQL budget
     # that every gh tool shares runs low. The rate_limit call itself is free.
+    SLOW_POLL=300
     wait_secs() {
         local left
         left=$("$GH_BIN" api rate_limit --jq '.resources.graphql.remaining' 2>/dev/null) || left=""
         case "$left" in ''|*[!0-9]*) left=5000 ;; esac
-        if [ "$left" -lt 500 ]; then echo 300; else echo "$POLL"; fi
+        if [ "$left" -lt 500 ]; then echo "$SLOW_POLL"; else echo "$POLL"; fi
     }
 
     gh_failed() { # mark [what-happens-next]
@@ -159,15 +160,23 @@ if [ "$MERGED" = 1 ]; then
 
     {
         failed=0
-        next="trying again in ${POLL}s"
-        [ "$ONCE" = 1 ] && next=""
-        merged_entries "$LAST" || { gh_failed "" "$next"; failed=1; }
+        merged_entries "$LAST" || failed=1
         FIRST=0
-        [ "$ONCE" = 1 ] && exit "$failed"
-        printf '@@MARK merged PRs (every %ss)\n' "$POLL"
+        if [ "$ONCE" = 1 ]; then
+            [ "$failed" = 0 ] || gh_failed ""
+            exit "$failed"
+        fi
+        # delay holds a wait already shown to the user, so the sleep matches it.
+        delay=""
+        if [ "$failed" = 1 ]; then
+            delay=$(wait_secs)
+            gh_failed "" "trying again in ${delay}s"
+        fi
+        printf '@@MARK merged PRs (every %ss, every %ss while GitHub calls run low)\n' "$POLL" "$SLOW_POLL"
         polls=1
         while [ "$MAX_POLLS" = 0 ] || [ "$polls" -lt "$MAX_POLLS" ]; do
-            sleep "$(wait_secs)"
+            sleep "${delay:-$(wait_secs)}"
+            delay=""
             polls=$((polls + 1))
             if merged_entries 1000; then
                 failed=0

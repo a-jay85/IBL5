@@ -1371,7 +1371,7 @@ r_bells=$(tr -cd "$BEL" <<< "$r_out" | wc -c | tr -d ' ')
 
 ghs_reset; { ghs_row 1; ghs_row 2; } > "$GHS/rows.1"; { ghs_row 2; ghs_row 4; } > "$GHS/rows.2"
 r_out=$(DEV_INBOX_MAX_POLLS=2 ghs_run)
-{ [[ "$r_out" == *"#2 PR title 2"*"watching merged PRs (every 7s)"*"#4 PR title 4"* ]] \
+{ [[ "$r_out" == *"#2 PR title 2"*"watching merged PRs (every 7s, every 300s while GitHub calls run low)"*"#4 PR title 4"* ]] \
     && [ "$(grep -c '#2 PR title 2' <<< "$r_out")" = 1 ] && [ "$(cat "$GHS/slept")" = 7 ]; } \
     && ok "S2af --merged follow: a new merge prints once after the watching line" \
     || fail "S2af slept=[$(cat "$GHS/slept" 2>/dev/null)] out=[$r_out]"
@@ -1416,6 +1416,13 @@ ghs_reset; echo 120 > "$GHS/left"; ghs_row 1 > "$GHS/rows.1"
 DEV_INBOX_MAX_POLLS=2 ghs_run >/dev/null
 [ "$(cat "$GHS/slept")" = 300 ] && ok "S2ag --merged waits 5 minutes while under 500 GraphQL calls are left" \
     || fail "S2ag slept=[$(cat "$GHS/slept" 2>/dev/null)]"
+
+# Low quota and a failed first fetch: the message names the wait that really happens.
+ghs_reset; echo 120 > "$GHS/left"
+r_out=$(DEV_INBOX_MAX_POLLS=2 ghs_run)
+{ grep -qF "trying again in 300s" <<< "$r_out" && [ "$(cat "$GHS/slept")" = 300 ]; } \
+    && ok "S2aq --merged: a failed first fetch names the slow wait while calls run low" \
+    || fail "S2aq slept=[$(cat "$GHS/slept" 2>/dev/null)] out=[$r_out]"
 
 ghs_reset
 r_out=$(DEV_INBOX_MAX_POLLS=3 ghs_run); s2_rc=$?

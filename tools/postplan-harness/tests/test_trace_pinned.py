@@ -374,6 +374,30 @@ def test_capture_doc_heading_after_lone_cr_holds(tmp_path):
         == f"doc-change-outside-section: {CAPTURE_DOC}"
 
 
+@pytest.mark.parametrize("added", [
+    " ## Sneaky\n", "   ## Sneaky\n", "===\n", "---\n", "-\n", "   --- \n", "---\r\n",
+    "\nSneaky\n---\n",
+])
+def test_capture_doc_indented_or_setext_heading_holds(tmp_path, added):
+    head = CAPTURE_DOC_BASE.replace("thin to pin a port.\n", "thin to pin a port.\n" + added)
+    root, base = _doc_repo(tmp_path, head)
+    assert _verdict(root, base, changed=[*CHANGED, CAPTURE_DOC]) \
+        == f"doc-change-outside-section: {CAPTURE_DOC}"
+
+
+@pytest.mark.parametrize("before,after", [
+    ("port.\n\n---\n", "port.\n\nSneaky\n---\n"),
+    ("port.\n\n---\n", "port.\n---\n"),
+], ids=["text-added-above", "blank-removed-above"])
+def test_capture_doc_text_joined_to_existing_underline_holds(tmp_path, before, after):
+    old = CAPTURE_DOC_BASE.replace("port.\n", before)
+    root, base = _make_repo(tmp_path, base_files={CAPTURE_DOC: old})
+    _write(root, CAPTURE_DOC, old.replace(before, after))
+    _write_evidence(root)
+    assert _verdict(root, base, changed=[*CHANGED, CAPTURE_DOC]) \
+        == f"doc-change-outside-section: {CAPTURE_DOC}"
+
+
 def test_capture_doc_lone_cr_does_not_shift_the_section(tmp_path):
     """Five `\r` above the section would slide its span onto a later line if they split."""
     before = CAPTURE_DOC_BASE.replace("Check the header", "Check\r\r\r\r\r the header")

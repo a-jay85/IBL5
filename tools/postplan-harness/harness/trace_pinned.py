@@ -74,6 +74,9 @@ INERT_DOC_SECTIONS = {"engine/docs/jsb-trace-capture.md": "## Rows blocked on a 
 _OLD_NEW_HUNK = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
 _DRAW_SITE_ENTRY = re.compile(r'^\s*"sim\.[A-Za-z0-9_.()*]+":\s*"(FUN_[0-9a-f]{8})?",\s*$')
 _COVER_LINE = re.compile(r"^(.+\.go):(\d+)\.\d+,(\d+)\.\d+ \d+ (\d+)$")
+# Markdown allows up to 3 leading spaces; a `=` or `-` run turns the text above into a heading
+_SETEXT_UNDERLINE = re.compile(r"^ {0,3}(?:=+|-+)[ \t\r]*$")
+_MD_HEADING_LINE = re.compile(rf"^ {{0,3}}#|{_SETEXT_UNDERLINE.pattern}")
 
 
 def evidence_rel(branch) -> str:
@@ -533,7 +536,12 @@ def doc_section_verdict(root, base, path) -> str:
     for old_s, old_c, new_s, new_c, lines in hunks:
         if not (_inside(old_s, old_c, old_span) and _inside(new_s, new_c, new_span)):
             return f"doc-change-outside-section: {path}"
-        if any(line[1:].startswith("#") for line in lines):
+        if any(_MD_HEADING_LINE.match(line[1:]) for line in lines):
+            return f"doc-change-outside-section: {path}"
+        # an unchanged underline becomes a heading when the change puts text right above it
+        after = new_s + new_c - 1 if new_c else new_s  # 0-based line following the change
+        if 0 < after < len(new) and new[after - 1].strip() \
+                and _SETEXT_UNDERLINE.match(new[after]):
             return f"doc-change-outside-section: {path}"
         # Markdown ends a line at a lone `\r`, so one can open a heading mid-line
         if any("\r" in line.removesuffix("\r") for line in lines):

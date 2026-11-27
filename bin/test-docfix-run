@@ -29,7 +29,7 @@ bad()  { h_fail "$@"; }
 # --jq entirely. A shim that must return nothing returns "" not "[]".
 build_sandbox() {
     local SB; SB="$(mktemp -d)"
-    mkdir -p "$SB/bin/lib" "$SB/home/Library/LaunchAgents" "$SB/home/claude-plans" "$SB/shim"
+    mkdir -p "$SB/bin/lib" "$SB/home/Library/LaunchAgents" "$SB/home/claude-plans" "$SB/shim" "$SB/tmp"
     # NOTE: do NOT symlink docfix-run in — the test drives the REAL script with
     # IBL5_MAIN=$SB, exercising prod's own anchoring code.
     printf 'worktrees_parent_dir(){ echo "%s/wts"; }\n' "$SB" > "$SB/bin/lib/git-helpers.sh"
@@ -96,6 +96,28 @@ G
 # SHIM_GH_FAIL: simulate a transient gh outage (rate limit/network) — every call fails.
 [ -n "${SHIM_GH_FAIL:-}" ] && exit 1
 args="$*"
+# Opt-in raw mode: SHIM_GH_PR_LIST_JSON (every `pr list ... --jq`) and
+# SHIM_GH_FILES_JSON (`api .../files ... --jq`) hold RAW API JSON, and the shim
+# runs real jq -r with the --jq filter it received, so a case can see the filter.
+# Existing cases leave both unset and keep the post-jq convention.
+raw_jq() {
+    local json="$1" f="" prev="" a; shift
+    for a in "$@"; do [ "$prev" = "--jq" ] && f="$a"; prev="$a"; done
+    [ -n "$f" ] || f='.'
+    jq -r "$f" <<< "$json"
+}
+if [ "$1 $2" = "pr list" ] && [ -n "${SHIM_GH_PR_LIST_JSON:-}" ]; then
+    case "$args" in *"--limit 200 --json number,headRefName --jq"*)
+        [ -n "${SHIM_GH_REVIEW_LIST_FAIL:-}" ] && exit 1 ;; esac
+    raw_jq "$SHIM_GH_PR_LIST_JSON" "$@"; exit $?
+fi
+if [ "$1" = "api" ]; then
+    case "$2" in */files) ;; *) exit 0 ;; esac
+    [ -n "${SHIM_GH_API_FAIL:-}" ] && exit 1
+    printf '%s\n' "$2" >> "${SHIM_GH_CALLS:-/dev/null}"
+    if [ -n "${SHIM_GH_FILES_JSON:-}" ]; then raw_jq "$SHIM_GH_FILES_JSON" "$@"; exit $?; fi
+    printf '%s' "${SHIM_PR_REVIEW_FILES:-}"; exit 0
+fi
 case "$1 $2" in
   "issue list") printf '%s' "${SHIM_ISSUE_OUT:-}" ;;
   "issue view")
@@ -117,6 +139,10 @@ case "$1 $2" in
               *)                printf '%s' "${SHIM_PR_FOR_BRANCH:-0}" ;;
             esac ;;
         *"--state closed"*) printf '%s' "${SHIM_PR_CLOSED:-[]}" ;;
+        # docfix-run's open review-PR query (post-jq: PR numbers, one per line).
+        *"--limit 200 --json number,headRefName --jq"*)
+            [ -n "${SHIM_GH_REVIEW_LIST_FAIL:-}" ] && exit 1
+            printf '%s' "${SHIM_PR_REVIEW:-}" ;;
         *"number,headRefName,autoMergeRequest"*) printf '%s' "${SHIM_PR_DM:-}" ;;
         *autoMergeRequest*)                      printf '%s' "${SHIM_PR_UNARMED:-}" ;;
         *)                                       printf '%s' "${SHIM_PR_OPEN:-}" ;;
@@ -188,7 +214,8 @@ run_docfix() {
     if [ "${SHIM_LAUNCHCTL_SUBMIT_RC:-0}" != 0 ]; then
         printf '%s\n' "$SHIM_LAUNCHCTL_SUBMIT_RC" > "$SB/launchctl.submit_rc"
     fi
-    IBL5_MAIN="$SB" HOME="$SB/home" PATH="$SB/shim:$PATH" \
+    # TMPDIR keeps the exclude list docfix-run writes inside the sandbox.
+    IBL5_MAIN="$SB" HOME="$SB/home" PATH="$SB/shim:$PATH" TMPDIR="$SB/tmp" \
         SHIM_BRANCH_OUT="$2" SHIM_PR_OPEN="$3" \
         SHIM_PR_UNARMED="${SHIM_PR_UNARMED:-}" \
         SHIM_GH_FAIL="${SHIM_GH_FAIL:-}" \
@@ -265,10 +292,10 @@ SB="$(build_sandbox)"
 run_docfix "$SB" "" "" "4242" "ibl5/docs/foo.md,README.md" >/dev/null
 PLAN="$(plan_of "$SB")"; R="$(runner_of "$SB")"
 { [ -n "$R" ] && grep -q "cd '$SB/wts/docs-stale-refresh-[^/']*' && CLAUDE_HEADLESS=1" "$R" \
-    && grep -q 'Closes #4242' "$R" \
+    && grep -qF -- "'--issue=4242'" "$R" \
     && grep -q 'ibl5/docs/foo.md,README.md' "$R" \
     && grep -q 'claude-sonnet-5-5' "$R"; } \
-  && ok "(1) runner carries cd-to-worktree + doc-fix prompt + SIG + Closes #N" \
+  && ok "(1) runner carries cd-to-worktree + doc-fix prompt + SIG + the split's --issue=N" \
   || bad "(1) runner composition"
 { [ "$(submit_count "$SB")" = 1 ] && [ -n "$R" ] && [ -f "$R" ]; } \
   && ok "(1) [docfix_submit_on_launch] exactly one launchctl submit recorded; runner exists" \
@@ -900,10 +927,17 @@ PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
   && ok "(26) veronly: empty diff holds (rc 1)" \
   || bad "(26) veronly: empty diff"
 
-# --- Case 27: static — bin/docfix-run calls bin/docfix-check-veronly ---------
-grep -qF 'bin/docfix-check-veronly' "$REAL_DOCFIX" \
-  && ok "(27) veronly: bin/docfix-run calls bin/docfix-check-veronly" \
-  || bad "(27) veronly: bin/docfix-run missing docfix-check-veronly"
+# --- Case 27: static — bin/docfix-split calls veronly; the prompt never runs it -
+# The prompt names bin/post-plan-now and bin/docfix-check-veronly only in the one
+# sentence that forbids running them; the old instructions to run them are gone.
+PROMPT27="$(grep '^PROMPT=' "$REAL_DOCFIX")"
+PROMPT27_REST="${PROMPT27/Do not run bin\/post-plan-now or bin\/docfix-check-veronly/}"
+{ grep -qF 'docfix-check-veronly' "$REPO_ROOT/bin/docfix-split" \
+    && grep -qF 'Do not run bin/post-plan-now or bin/docfix-check-veronly' <<< "$PROMPT27" \
+    && ! grep -qF 'post-plan-now' <<< "$PROMPT27_REST" \
+    && ! grep -qF 'docfix-check-veronly' <<< "$PROMPT27_REST"; } \
+  && ok "(27) veronly: bin/docfix-split calls veronly; the prompt names neither bin/post-plan-now nor docfix-check-veronly outside its prohibition" \
+  || bad "(27) veronly: split lacks the veronly call, or the prompt still tells claude to run post-plan-now or veronly"
 
 # --- Cases 28-31: bin/docfix-run dedupe and fail-closed gates ----------------
 
@@ -1345,8 +1379,8 @@ RC23=$?
     && grep -qF '## Addendum' "$REAL_DOCFIX" \
     && grep -qF '## Content rewritten' "$REAL_DOCFIX" \
     && grep -qF 'ibl5/classes/*/README.md' "$REAL_DOCFIX" \
-    && grep -qF 'Tier 2 is agent-steering markdown' "$REAL_DOCFIX"; } \
-  && ok "(48) prompt: ADR append-only + figure-resubstitution + content-rewrite disclosure + allowlist + Tier 2 clauses present" \
+    && grep -qF 'Commit all of your work, then stop.' "$REAL_DOCFIX"; } \
+  && ok "(48) prompt: ADR append-only + figure-resubstitution + content-rewrite disclosure + allowlist + stop-at-commit clauses present" \
   || bad "(48) prompt: an append-only/disclosure clause was dropped from \$PROMPT"
 
 # --- Case 48b: static — launch keeps --effort low and the prompt demands a real check
@@ -2233,6 +2267,583 @@ if grep -qE 'ljob_write_runner_plist|ljob_bootstrap' "$REAL_DOCFIX"; then
 else
   ok "docfix_no_plist_helpers: $REAL_DOCFIX calls neither ljob_write_runner_plist nor ljob_bootstrap"
 fi
+
+# --- Characterization cases (Phase 1) --------------------------------------
+# Split fixture. $SB/main is the main checkout with a bare origin, and
+# $SB/wts/$SPLIT_SLUG is the auto worktree. $SB/tool/bin holds a copy of
+# bin/docfix-split, its libs and stubs for wt-new, wt-remove and veronly.
+# master carries a bin/post-plan-now stub, so both pile worktrees stay clean.
+SPLIT_SLUG="docs-stale-refresh-20990101"
+SPLIT_REV="docs-content-review-20990101"
+REAL_SPLIT="$REPO_ROOT/bin/docfix-split"
+build_split_repo() {
+    local SB M T
+    SB="$(mktemp -d)"; SB="$(cd "$SB" && pwd -P)"
+    M="$SB/main"; T="$SB/tool/bin"
+    mkdir -p "$SB/home/claude-plans" "$SB/wts" "$SB/hooks" "$T/lib"
+    h_git_repo "$M" --bare-origin --no-commit
+    git -C "$M" config core.hooksPath "$SB/hooks"
+    mkdir -p "$M/bin"
+    cat > "$M/bin/post-plan-now" <<'PPN'
+#!/usr/bin/env bash
+b="$(git rev-parse --abbrev-ref HEAD)"
+printf '%s|%s|%s\n' "$b" "$PWD" "$*" >> "$SPLIT_FIRES"
+case "$b" in docs-stale-refresh-*) exit "${SHIM_PPN_AUTO_RC:-0}" ;; esac
+exit 0
+PPN
+    chmod +x "$M/bin/post-plan-now"
+    git -C "$M" add bin/post-plan-now
+    git -C "$M" commit -qm "stub post-plan-now"
+    cp "$REAL_SPLIT" "$T/docfix-split"
+    cp "$REPO_ROOT/bin/lib/pr-armable.sh" "$REPO_ROOT/bin/lib/docfix-dm.sh" \
+       "$REPO_ROOT/bin/lib/plan-resolve.sh" "$T/lib/"
+    printf 'worktrees_parent_dir(){ echo "%s/wts"; }\n' "$SB" > "$T/lib/git-helpers.sh"
+    printf '#!/usr/bin/env bash\ngit worktree add -q -b "$1" "%s/wts/$1" origin/master >/dev/null 2>&1\n' "$SB" > "$T/wt-new"
+    cat > "$T/wt-remove" <<WTR
+#!/usr/bin/env bash
+echo "\$1" >> "$SB/wt-remove-calls"
+wt="$SB/wts/\$1"
+[ -d "\$wt" ] || exit 0
+if [ -z "\$(git -C "\$wt" status --porcelain)" ] && [ -z "\$(git -C "\$wt" rev-list origin/master..HEAD)" ]; then
+    git worktree remove --force "\$wt" && git branch -q -D "\$1"
+fi
+WTR
+    printf '#!/usr/bin/env bash\necho "$1" >> "%s/veronly-calls"\nexit 0\n' "$SB" > "$T/docfix-check-veronly"
+    chmod +x "$T/docfix-split" "$T/wt-new" "$T/wt-remove" "$T/docfix-check-veronly"
+    printf '%s' "$SB"
+}
+# split_doc <SB> <relpath> [extra frontmatter lines...]: a doc on master (uncommitted).
+split_doc() {
+    local SB="$1" f="$2"; shift 2
+    mkdir -p "$(dirname "$SB/main/$f")"
+    { echo '---'; echo 'description: fixture'; echo 'last_verified: 2026-01-01'
+      [ "$#" -gt 0 ] && printf '%s\n' "$@"; echo '---'; echo 'Body line.'; } > "$SB/main/$f"
+    git -C "$SB/main" add -- "$f"
+}
+# split_start <SB>: commit master, push, make the auto worktree and seed its plan
+# from the real bin/docfix-run heredoc (issue #7).
+split_start() {
+    local SB="$1"
+    git -C "$SB/main" commit -qm "fixture docs" >/dev/null 2>&1 || true
+    git -C "$SB/main" push -q origin master
+    git -C "$SB/main" fetch -q origin
+    git -C "$SB/main" worktree add -q -b "$SPLIT_SLUG" "$SB/wts/$SPLIT_SLUG" origin/master >/dev/null 2>&1
+    awk '/^cat > "\$PLAN_FILE" <<PLAN_EOF$/ { f = 1; next } /^PLAN_EOF$/ { f = 0 } f' "$REAL_DOCFIX" \
+        | sed -e "s/\\\$SLUG/$SPLIT_SLUG/g" -e 's/\$ISSUE_NUM/7/g' > "$SB/home/claude-plans/$SPLIT_SLUG.md"
+}
+# split_bump/split_edit <SB> <relpath>: a date bump (plus a body line for edit) in the auto worktree.
+split_bump() {
+    local f="$1/wts/$SPLIT_SLUG/$2"
+    sed -E 's/^last_verified: .*/last_verified: 2026-11-27/' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+}
+split_edit() { split_bump "$1" "$2"; echo 'Edited body.' >> "$1/wts/$SPLIT_SLUG/$2"; }
+split_commit() { # split_commit <SB> <message>
+    git -C "$1/wts/$SPLIT_SLUG" add -A
+    git -C "$1/wts/$SPLIT_SLUG" commit -q -m "$2" >/dev/null 2>&1
+}
+run_split() { # run_split <SB> [args...] -> SOUT, SRC
+    local SB="$1"; shift
+    SOUT="$( cd "$SB/main" && HOME="$SB/home" IBL5_MAIN="$SB/main" SPLIT_FIRES="$SB/fires" \
+        "$SB/tool/bin/docfix-split" "$@" 2>&1 )" && SRC=0 || SRC=$?
+}
+fire_count() { if [ -f "$1/fires" ]; then grep -c '' "$1/fires"; else echo 0; fi; }
+REPLAY_AUTO=(ibl5/classes/OneOnOneGame/README.md ibl5/classes/Voting/README.md
+    ibl5/docs/decisions/0007-nightly-autonomous-workflow.md
+    ibl5/docs/decisions/0052-non-sharded-mutator-isolation-job.md
+    ibl5/docs/decisions/0062-all-work-in-worktrees.md
+    ibl5/docs/decisions/0066-automouse-deliberate-skip-not-environmental.md
+    ibl5/docs/decisions/0067-unified-deployment-funnel.md
+    ibl5/docs/decisions/0070-single-source-playwright-version.md
+    ibl5/docs/decisions/0139-postplan-fail-dm-quiet.md)
+REPLAY_RULES=".claude/rules/headless-marker-contract-detail.md"
+# build_replay <rules-mode edit|bump> -> prints SB with the PR #4257 replay committed
+build_replay() {
+    local SB p
+    SB="$(build_split_repo)"
+    for p in "${REPLAY_AUTO[@]}" "$REPLAY_RULES"; do split_doc "$SB" "$p"; done
+    split_start "$SB"
+    for p in "${REPLAY_AUTO[@]}"; do split_edit "$SB" "$p"; done
+    if [ "$1" = edit ]; then split_edit "$SB" "$REPLAY_RULES"; else split_bump "$SB" "$REPLAY_RULES"; fi
+    split_commit "$SB" "docs: refresh stale docs"
+    printf '%s' "$SB"
+}
+# replay_failing <SB>: paths both condition (7) predicates reject, one per line.
+replay_failing() {
+    ( . "$REPO_ROOT/bin/lib/pr-armable.sh"
+      W="$1/wts/$SPLIT_SLUG"
+      git -C "$W" diff --no-ext-diff --no-color --src-prefix=a/ --dst-prefix=b/ master HEAD > "$1/replay.diff"
+      git -C "$W" diff --name-only master HEAD | while IFS= read -r p; do
+          if ! pr_docs_refresh_path_ok "$p" && ! pr_docs_refresh_rules_date_only "$p" "$1/replay.diff"; then echo "$p"; fi
+      done )
+}
+
+# replay-4257-predicates (row 1): exactly the rules file fails both predicates
+SB="$(build_replay edit)"
+RF="$(replay_failing "$SB")"
+[ "$RF" = "$REPLAY_RULES" ] \
+  && ok "replay-4257-predicates: only the rules file fails both predicates" \
+  || bad "replay-4257-predicates: failing paths were [$RF]"
+
+# replay-4257-rules-date-only-passes (row 1): a date-only rules bump fails nothing
+SB="$(build_replay bump)"
+RF="$(replay_failing "$SB")"
+[ -z "$RF" ] \
+  && ok "replay-4257-rules-date-only-passes: no failing paths" \
+  || bad "replay-4257-rules-date-only-passes: failing paths were [$RF]"
+
+# veronly-flips-claude-md-date-only (row 2): today veronly arms a date-only root CLAUDE.md
+SB2="$(build_veronly_repo)"; R="$SB2/repo"
+veronly_add_master "$R" "CLAUDE.md" '---' 'description: fixture' 'last_verified: 2026-01-01' '---' 'Body.'
+git -C "$R" branch -q -m "$VR_SLUG" docs-stale-refresh-20990101
+PLAN_V="$SB2/home/claude-plans/docs-stale-refresh-20990101.md"
+veronly_seed_ready_plan "$PLAN_V"
+sed -E 's/^last_verified: .*/last_verified: 2026-11-27/' "$R/CLAUDE.md" > "$R/CLAUDE.md.tmp" && mv "$R/CLAUDE.md.tmp" "$R/CLAUDE.md"
+git -C "$R" commit -qam "date bump" >/dev/null 2>&1
+( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" docs-stale-refresh-20990101 >/dev/null 2>&1 ) && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 0 ] && grep -q '^auto_merge: true$' "$PLAN_V" \
+    && ! grep -q '## Automouse Hold Justification' "$PLAN_V"; } \
+  && ok "veronly-flips-claude-md-date-only: plan flipped to auto_merge: true" \
+  || bad "veronly-flips-claude-md-date-only: rc=$VRC plan=$(head -3 "$PLAN_V" | tr '\n' ' ')"
+
+# hold-twin-review-branch (row 4): the shell twin names only the branch clause
+HT="$( . "$REPO_ROOT/bin/lib/pr-armable.sh"; pr_docs_refresh_hold docs-content-review-20990101 \
+    '[{"filename":"ibl5/docs/x.md","status":"modified"}]' TWO-WAY READY )"
+[ "$HT" = "docs-refresh:branch:docs-content-review-20990101" ] \
+  && ok "hold-twin-review-branch: only the branch reason" \
+  || bad "hold-twin-review-branch: got [$HT]"
+# PHASE1-CASES-END
+
+# --- docfix-split cases (Phases 2, 3, 5) ------------------------------------
+AP_OF() { printf '%s/home/claude-plans/%s.md' "$1" "$SPLIT_SLUG"; }
+RP_OF() { printf '%s/home/claude-plans/%s.md' "$1" "$SPLIT_REV"; }
+split_head() { git -C "$1/wts/$SPLIT_SLUG" rev-parse HEAD; }
+has_branch() { [ -n "$(git -C "$1/main" branch --list "$2")" ]; }
+# row2_cmd <plan>: the staleness row's command, with table pipes unescaped
+row2_cmd() { grep -- '--staleness-report' "$1" | awk -F' \\| ' '{ print $5 }' | sed -e 's/ |$//' -e 's/\\|/|/g'; }
+# row2_rc <plan> <stale json>: run the row against a check-docs stub
+row2_rc() {
+    local D; D="$(mktemp -d)"; mkdir -p "$D/bin"
+    printf '#!/usr/bin/env bash\nprintf "%%s" %q\n' "$2" > "$D/bin/check-docs"; chmod +x "$D/bin/check-docs"
+    ( cd "$D" && bash -c "$(row2_cmd "$1")" >/dev/null 2>&1 ) && echo 0 || echo 1
+}
+# build_mixed -> SB: one held rules content edit plus one auto docs edit, one commit
+build_mixed() {
+    local SB; SB="$(build_split_repo)"
+    split_doc "$SB" .claude/rules/held.md; split_doc "$SB" ibl5/docs/a.md
+    split_start "$SB"
+    split_edit "$SB" .claude/rules/held.md; split_edit "$SB" ibl5/docs/a.md
+    split_commit "$SB" "$(printf 'docs: refresh stale docs\n\nSee Closes #7 above\nCloses #7\n')"
+    printf '%s' "$SB"
+}
+build_all_auto() {
+    local SB; SB="$(build_split_repo)"
+    split_doc "$SB" ibl5/docs/a.md; split_start "$SB"
+    split_edit "$SB" ibl5/docs/a.md; split_commit "$SB" "docs: refresh stale docs"
+    printf '%s' "$SB"
+}
+
+# split-dry-run-replay-4257 (row 5): one REVIEW line, nine AUTO lines
+SB="$(build_replay edit)"
+run_split "$SB" --slug="$SPLIT_SLUG" --issue=7 --dry-run
+{ [ "$SRC" -eq 0 ] && [ "$(grep -c '^REVIEW ' <<< "$SOUT")" -eq 1 ] \
+    && grep -qxF "REVIEW $REPLAY_RULES" <<< "$SOUT" \
+    && [ "$(grep -c '^AUTO ' <<< "$SOUT")" -eq 9 ] \
+    && grep -qxF 'docfix-split: auto=9 review=1' <<< "$SOUT"; } \
+  && ok "split-dry-run-replay-4257: one REVIEW (the rules file), nine AUTO" \
+  || bad "split-dry-run-replay-4257: rc=$SRC out=[$SOUT]"
+
+# split-fail-closed-shapes (row 6): date-only CLAUDE.md, a rename into ibl5/docs/, a type change
+SB="$(build_split_repo)"
+split_doc "$SB" CLAUDE.md; split_doc "$SB" bin/x.md; split_doc "$SB" ibl5/docs/t.md
+split_start "$SB"
+W="$SB/wts/$SPLIT_SLUG"
+split_bump "$SB" CLAUDE.md
+git -C "$W" mv bin/x.md ibl5/docs/x.md
+rm "$W/ibl5/docs/t.md"; ln -s ../../CLAUDE.md "$W/ibl5/docs/t.md"
+split_commit "$SB" "docs: shapes"
+run_split "$SB" --slug="$SPLIT_SLUG" --issue=7 --dry-run
+for want_line in "REVIEW CLAUDE.md" "REVIEW bin/x.md" "REVIEW ibl5/docs/x.md" "REVIEW ibl5/docs/t.md"; do
+    grep -qxF "$want_line" <<< "$SOUT" \
+      && ok "split-fail-closed-shapes: $want_line" \
+      || bad "split-fail-closed-shapes: missing [$want_line] in [$SOUT]"
+done
+grep -q '^AUTO ' <<< "$SOUT" \
+  && bad "split-fail-closed-shapes: an AUTO line appeared: [$SOUT]" \
+  || ok "split-fail-closed-shapes: no AUTO line"
+
+# split-dependent-date-bump (row 7): a paths: entry and a -detail family move a
+# date-only bump to review; four controls stay AUTO
+SB="$(build_split_repo)"
+split_doc "$SB" .claude/rules/held.md
+split_doc "$SB" .claude/rules/held-detail.md
+split_doc "$SB" ibl5/docs/dep-paths.md 'paths:' '  - ".claude/rules/held.md"'
+split_doc "$SB" ibl5/docs/nondate.md 'paths: [".claude/rules/held.md"]'
+split_doc "$SB" ibl5/docs/held.md
+split_doc "$SB" .claude/skills/s/SKILL.md
+split_doc "$SB" ibl5/docs/skillref.md 'paths: ".claude/skills/s/SKILL.md"'
+split_doc "$SB" ibl5/docs/mention.md
+printf 'See .claude/rules/held.md for the rule.\n' >> "$SB/main/ibl5/docs/mention.md"
+git -C "$SB/main" add -A
+split_start "$SB"
+split_edit "$SB" .claude/rules/held.md
+for p in .claude/rules/held-detail.md ibl5/docs/dep-paths.md ibl5/docs/held.md \
+         .claude/skills/s/SKILL.md ibl5/docs/skillref.md ibl5/docs/mention.md; do split_bump "$SB" "$p"; done
+split_edit "$SB" ibl5/docs/nondate.md
+split_commit "$SB" "docs: dependents"
+run_split "$SB" --slug="$SPLIT_SLUG" --issue=7 --dry-run
+grep -qxF "REVIEW ibl5/docs/dep-paths.md" <<< "$SOUT" \
+  && ok "split-dependent-date-bump: paths: entry moves the date bump" \
+  || bad "split-dependent-date-bump: dep-paths.md not REVIEW: [$SOUT]"
+grep -qxF "REVIEW .claude/rules/held-detail.md" <<< "$SOUT" \
+  && ok "split-dependent-date-bump: -detail family moves the date bump" \
+  || bad "split-dependent-date-bump: held-detail.md not REVIEW: [$SOUT]"
+for ctl in ibl5/docs/nondate.md ibl5/docs/held.md ibl5/docs/skillref.md ibl5/docs/mention.md; do
+    grep -qxF "AUTO $ctl" <<< "$SOUT" \
+      && ok "split-dependent-date-bump: control $ctl stays AUTO" \
+      || bad "split-dependent-date-bump: control $ctl moved: [$SOUT]"
+done
+
+# split-rejects-bad-flags (row 8): usage errors exit 2 naming the flag; a dry run writes nothing
+SB="$(build_mixed)"
+bad_flag_case() { # bad_flag_case <label> <want text> <args...>
+    local label="$1" want_text="$2"; shift 2
+    run_split "$SB" "$@"
+    { [ "$SRC" -eq 2 ] && grep -qF -- "$want_text" <<< "$SOUT"; } \
+      && ok "split-rejects-bad-flags: $label exits 2 naming the flag" \
+      || bad "split-rejects-bad-flags: $label rc=$SRC out=[$SOUT]"
+}
+bad_flag_case "--bogus" "unknown flag: --bogus" --bogus --slug="$SPLIT_SLUG" --issue=7
+bad_flag_case "space-form --slug" "unknown flag: --slug" --slug "$SPLIT_SLUG" --issue=7
+bad_flag_case "--slug=feature-x" "--slug must match" --slug=feature-x --issue=7
+bad_flag_case "7-digit slug" "--slug must match" --slug=docs-stale-refresh-2099010 --issue=7
+bad_flag_case "missing --issue" "--issue is required" --slug="$SPLIT_SLUG"
+bad_flag_case "non-numeric issue" "--issue must be a number" --slug="$SPLIT_SLUG" --issue=7a
+printf 'not json' > "$SB/excl-bad.json"
+bad_flag_case "bad exclude file" "--exclude-file" --slug="$SPLIT_SLUG" --issue=7 --exclude-file="$SB/excl-bad.json"
+snap() { git -C "$SB/main" rev-parse "$SPLIT_SLUG"; git -C "$SB/main" worktree list --porcelain; ls -la "$SB/home/claude-plans"; cat "$SB/home/claude-plans"/*; }
+BEFORE="$(snap)"
+run_split "$SB" --slug="$SPLIT_SLUG" --issue=7 --dry-run
+{ [ "$SRC" -eq 0 ] && [ "$BEFORE" = "$(snap)" ] && [ "$(fire_count "$SB")" -eq 0 ]; } \
+  && ok "split-rejects-bad-flags: --dry-run leaves HEAD, worktree list and plans byte-identical" \
+  || bad "split-rejects-bad-flags: --dry-run changed state (rc=$SRC)"
+
+# split-empty-env (row 9): no unbound variable under env -i; no HOME is named
+SB="$(build_split_repo)"
+EO="$(env -i PATH=/usr/bin:/bin "$BASH" "$SB/tool/bin/docfix-split" --bogus 2>&1)" && ERC=0 || ERC=$?
+{ [ "$ERC" -eq 2 ] && ! grep -q 'unbound variable' <<< "$EO"; } \
+  && ok "split-empty-env: --bogus exits 2 with no unbound variable" \
+  || bad "split-empty-env: --bogus rc=$ERC out=[$EO]"
+EO="$(env -i PATH=/usr/bin:/bin "$BASH" "$SB/tool/bin/docfix-split" --slug="$SPLIT_SLUG" --issue=7 2>&1)" && ERC=0 || ERC=$?
+{ [ "$ERC" -eq 2 ] && grep -qF 'HOME is not set' <<< "$EO"; } \
+  && ok "split-empty-env: valid flags without HOME print HOME is not set" \
+  || bad "split-empty-env: no-HOME rc=$ERC out=[$EO]"
+
+# split-mixed-two-piles (row 10): two clean piles, the specified plans, scoped row 2
+SB="$(build_mixed)"
+BASE_M="$(git -C "$SB/main" rev-parse origin/master)"
+run_split "$SB" --slug="$SPLIT_SLUG" --issue=7
+AP="$(AP_OF "$SB")"; RP="$(RP_OF "$SB")"
+[ "$SRC" -eq 0 ] && ok "split-mixed-two-piles: rc 0" || bad "split-mixed-two-piles: rc=$SRC out=[$SOUT]"
+[ "$(git -C "$SB/main" diff --name-only "$BASE_M" "$SPLIT_SLUG")" = "ibl5/docs/a.md" ] \
+  && ok "split-mixed-two-piles: auto branch holds only the auto pile" \
+  || bad "split-mixed-two-piles: auto diff [$(git -C "$SB/main" diff --name-only "$BASE_M" "$SPLIT_SLUG")]"
+[ "$(git -C "$SB/main" diff --name-only origin/master "$SPLIT_REV" 2>/dev/null)" = ".claude/rules/held.md" ] \
+  && ok "split-mixed-two-piles: review branch holds only the review pile" \
+  || bad "split-mixed-two-piles: review diff [$(git -C "$SB/main" diff --name-only origin/master "$SPLIT_REV" 2>&1)]"
+{ [ -z "$(git -C "$SB/wts/$SPLIT_SLUG" status --porcelain)" ] && [ -z "$(git -C "$SB/wts/$SPLIT_REV" status --porcelain)" ]; } \
+  && ok "split-mixed-two-piles: both worktrees clean" || bad "split-mixed-two-piles: a worktree is dirty"
+{ grep -qx 'auto_merge: docs-only-ready' "$AP" && grep -qx '<!-- tracking-issue: refs #7 -->' "$AP"; } \
+  && ok "split-mixed-two-piles: auto plan stays docs-only-ready with a refs marker" \
+  || bad "split-mixed-two-piles: auto plan [$(head -5 "$AP" | tr '\n' ' ')]"
+{ grep -qx 'auto_merge: false' "$RP" && ! grep -q '^hold_trigger:' "$RP" \
+    && ! grep -q 'docs-only-ready' "$RP" \
+    && grep -qx '<!-- tracking-issue: closes #7 -->' "$RP" \
+    && grep -qxF 'Held for human merge: this pile carries the content edits the docs-refresh arming path would hold.' "$RP" \
+    && grep -qxF '**Decision:** Merge if the doc content in this pile is accurate.' "$RP" \
+    && [ "$(tail -1 "$RP")" = '**Decision:** Merge if the doc content in this pile is accurate.' ] \
+    && ! grep -q 'Phase 6.5 condition (7) reads this' "$RP"; } \
+  && ok "split-mixed-two-piles: review plan reads auto_merge: false, no hold_trigger, closes marker, new hold text" \
+  || bad "split-mixed-two-piles: review plan [$(cat "$RP" 2>/dev/null)]"
+[ "$(row2_rc "$AP" '[{"path":".claude/rules/held.md"}]')" = 0 ] \
+  && ok "split-mixed-two-piles: auto row 2 green when only the review pile is stale" \
+  || bad "split-mixed-two-piles: auto row 2 red on the other pile [$(row2_cmd "$AP")]"
+[ "$(row2_rc "$AP" '[{"path":"ibl5/docs/outside.md"}]')" = 1 ] \
+  && ok "split-mixed-two-piles: auto row 2 red on an outside stale path" \
+  || bad "split-mixed-two-piles: auto row 2 green on an outside path"
+[ "$(row2_rc "$RP" '[{"path":"ibl5/docs/a.md"}]')" = 0 ] \
+  && ok "split-mixed-two-piles: review row 2 green when only the auto pile is stale" \
+  || bad "split-mixed-two-piles: review row 2 red on the other pile [$(row2_cmd "$RP")]"
+[ "$(row2_rc "$RP" '[{"path":"ibl5/docs/outside.md"}]')" = 1 ] \
+  && ok "split-mixed-two-piles: review row 2 red on an outside stale path" \
+  || bad "split-mixed-two-piles: review row 2 green on an outside path"
+[ "$(fire_count "$SB")" -eq 2 ] && [ "$(head -1 "$SB/fires" | cut -d'|' -f1)" = "$SPLIT_SLUG" ] \
+  && ok "split-mixed-two-piles: two fires, auto first" || bad "split-mixed-two-piles: fires [$(cat "$SB/fires" 2>/dev/null)]"
+SB="$(build_mixed)"
+grep -v -- '--staleness-report' "$(AP_OF "$SB")" > "$SB/p.tmp" && mv "$SB/p.tmp" "$(AP_OF "$SB")"
+run_split "$SB" --slug="$SPLIT_SLUG" --issue=7
+{ [ "$SRC" -eq 3 ] && [ "$(fire_count "$SB")" -eq 0 ]; } \
+  && ok "split-mixed-two-piles: a seed missing its report row exits 3 with zero fires" \
+  || bad "split-mixed-two-piles: missing report row rc=$SRC fires=$(fire_count "$SB")"
+
+# split-all-auto (row 11): unchanged HEAD, no review branch or plan, closes, one fire
+SB="$(build_all_auto)"; ORIG_H="$(split_head "$SB")"
+run_split "$SB" --slug="$SPLIT_SLUG" --issue=7
+AP="$(AP_OF "$SB")"
+{ [ "$SRC" -eq 0 ] && [ "$(split_head "$SB")" = "$ORIG_H" ] && ! has_branch "$SB" "$SPLIT_REV" \
+    && [ ! -e "$(RP_OF "$SB")" ] && grep -qx '<!-- tracking-issue: closes #7 -->' "$AP" \
+    && grep -qF "jq -e 'length == 0'" "$AP" && [ "$(fire_count "$SB")" -eq 1 ]; } \
+  && ok "split-all-auto: HEAD unchanged, no review pile, closes marker, row 2 unchanged, one fire" \
+  || bad "split-all-auto: rc=$SRC fires=$(fire_count "$SB") out=[$SOUT]"
+SB="$(build_all_auto)"; ORIG_H="$(split_head "$SB")"
+printf '["ibl5/docs/held-elsewhere.md"]' > "$SB/excl.json"
+run_split "$SB" --slug="$SPLIT_SLUG" --issue=7 --exclude-file="$SB/excl.json"
+AP="$(AP_OF "$SB")"
+{ [ "$SRC" -eq 0 ] && [ "$(split_head "$SB")" = "$ORIG_H" ] && grep -qx '<!-- tracking-issue: refs #7 -->' "$AP" \
+    && [ "$(row2_rc "$AP" '[{"path":"ibl5/docs/held-elsewhere.md"}]')" = 0 ] \
+    && [ "$(row2_rc "$AP" '[{"path":"ibl5/docs/a.md"}]')" = 1 ]; } \
+  && ok "split-all-auto: an exclude list gives refs and a scoped row 2" \
+  || bad "split-all-auto: exclusions rc=$SRC plan=[$(head -6 "$AP" | tr '\n' ' ')]"
+
+# split-all-review (row 12): auto worktree, branch and plan gone; review closes; one fire
+SB="$(build_split_repo)"
+split_doc "$SB" .claude/rules/held.md; split_start "$SB"
+split_edit "$SB" .claude/rules/held.md; split_commit "$SB" "docs: held only"
+run_split "$SB" --slug="$SPLIT_SLUG" --issue=7
+{ [ "$SRC" -eq 0 ] && [ ! -d "$SB/wts/$SPLIT_SLUG" ] && ! has_branch "$SB" "$SPLIT_SLUG" \
+    && [ ! -e "$(AP_OF "$SB")" ] && grep -qx '<!-- tracking-issue: closes #7 -->' "$(RP_OF "$SB")" \
+    && [ "$(fire_count "$SB")" -eq 1 ] && [ "$(cut -d'|' -f1 "$SB/fires")" = "$SPLIT_REV" ]; } \
+  && ok "split-all-review: auto pile removed, review closes, one fire" \
+  || bad "split-all-review: rc=$SRC fires=[$(cat "$SB/fires" 2>/dev/null)] out=[$SOUT]"
+
+# split-markers-and-messages (row 13): closes/refs, Closes #7 line stripped, mid-sentence kept
+SB="$(build_mixed)"
+run_split "$SB" --slug="$SPLIT_SLUG" --issue=7
+RMSG="$(git -C "$SB/main" log -1 --format=%B "$SPLIT_REV" 2>/dev/null)"
+AMSG="$(git -C "$SB/main" log -1 --format=%B "$SPLIT_SLUG")"
+{ [ "$(head -1 <<< "$RMSG")" = "docs: content review for stale docs (20990101)" ] \
+    && grep -qxF 'Split run: this commit holds only the review pile.' <<< "$RMSG" \
+    && grep -qxF 'See Closes #7 above' <<< "$RMSG" && ! grep -qx 'Closes #7' <<< "$RMSG"; } \
+  && ok "split-markers-and-messages: review message strips the Closes line and keeps the mention" \
+  || bad "split-markers-and-messages: review message [$RMSG]"
+{ [ "$(head -1 <<< "$AMSG")" = "docs: refresh stale docs" ] \
+    && grep -qxF 'Split run: this commit holds only the auto pile.' <<< "$AMSG" \
+    && grep -qxF 'See Closes #7 above' <<< "$AMSG" && ! grep -qx 'Closes #7' <<< "$AMSG"; } \
+  && ok "split-markers-and-messages: auto message strips the Closes line and keeps the mention" \
+  || bad "split-markers-and-messages: auto message [$AMSG]"
+{ grep -qx '<!-- tracking-issue: closes #7 -->' "$(RP_OF "$SB")" && grep -qx '<!-- tracking-issue: refs #7 -->' "$(AP_OF "$SB")"; } \
+  && ok "split-markers-and-messages: review closes, auto refs" \
+  || bad "split-markers-and-messages: marker kinds"
+
+# split-apply-conflict-aborts (row 15): newer master conflicts with the held file
+SB="$(build_mixed)"; ORIG_H="$(split_head "$SB")"
+cp "$(AP_OF "$SB")" "$SB/ap.before"
+printf 'Master moved on.\n' >> "$SB/main/.claude/rules/held.md"
+git -C "$SB/main" commit -qam "master edit" && git -C "$SB/main" push -q origin master && git -C "$SB/main" fetch -q origin
+run_split "$SB" --slug="$SPLIT_SLUG" --issue=7
+{ [ "$SRC" -eq 3 ] && ! has_branch "$SB" "$SPLIT_REV" && [ ! -e "$(RP_OF "$SB")" ] && [ ! -d "$SB/wts/$SPLIT_REV" ] \
+    && cmp -s "$SB/ap.before" "$(AP_OF "$SB")" && [ "$(split_head "$SB")" = "$ORIG_H" ] \
+    && [ "$(fire_count "$SB")" -eq 0 ]; } \
+  && ok "split-apply-conflict-aborts: exit 3, no review branch or plan, auto plan unchanged, zero fires" \
+  || bad "split-apply-conflict-aborts: rc=$SRC fires=$(fire_count "$SB") out=[$SOUT]"
+
+# split-recheck-blocks-leak (row 16): a held file leaked into the auto commit, or a bad auto plan
+SB="$(build_split_repo)"
+split_doc "$SB" .claude/skills/s/SKILL.md; split_doc "$SB" ibl5/docs/a.md; split_start "$SB"
+split_edit "$SB" .claude/skills/s/SKILL.md; split_edit "$SB" ibl5/docs/a.md; split_commit "$SB" "docs: refresh"
+ORIG_H="$(split_head "$SB")"; cp "$(AP_OF "$SB")" "$SB/ap.before"
+cat > "$SB/hooks/pre-commit" <<'HOOK'
+#!/usr/bin/env bash
+case "$(git rev-parse --abbrev-ref HEAD)" in
+    docs-stale-refresh-*) echo 'leaked' >> .claude/skills/s/SKILL.md; git add .claude/skills/s/SKILL.md ;;
+esac
+HOOK
+chmod +x "$SB/hooks/pre-commit"
+run_split "$SB" --slug="$SPLIT_SLUG" --issue=7
+{ [ "$SRC" -eq 3 ] && [ "$(fire_count "$SB")" -eq 0 ] && [ "$(split_head "$SB")" = "$ORIG_H" ] \
+    && cmp -s "$SB/ap.before" "$(AP_OF "$SB")" && grep -q 'held file .claude/skills/s/SKILL.md is in the auto range' <<< "$SOUT"; } \
+  && ok "split-recheck-blocks-leak: a leaked held file exits 3, zero fires, head restored" \
+  || bad "split-recheck-blocks-leak: leak rc=$SRC fires=$(fire_count "$SB") out=[$SOUT]"
+SB="$(build_all_auto)"
+sed 's/^auto_merge: docs-only-ready$/auto_merge: true/' "$(AP_OF "$SB")" > "$SB/p.tmp" && mv "$SB/p.tmp" "$(AP_OF "$SB")"
+run_split "$SB" --slug="$SPLIT_SLUG" --issue=7
+{ [ "$SRC" -eq 3 ] && [ "$(fire_count "$SB")" -eq 0 ]; } \
+  && ok "split-recheck-blocks-leak: an auto plan reading true exits 3, zero fires" \
+  || bad "split-recheck-blocks-leak: plan true rc=$SRC fires=$(fire_count "$SB")"
+SB="$(build_all_auto)"; rm -f "$(AP_OF "$SB")"
+run_split "$SB" --slug="$SPLIT_SLUG" --issue=7
+{ [ "$SRC" -eq 3 ] && [ "$(fire_count "$SB")" -eq 0 ]; } \
+  && ok "split-recheck-blocks-leak: a missing auto plan exits 3, zero fires" \
+  || bad "split-recheck-blocks-leak: no plan rc=$SRC fires=$(fire_count "$SB")"
+
+# split-one-fire-refused (row 17): the auto fire exits 9, the review pile still fires, exit 4
+SB="$(build_mixed)"
+SOUT="$( cd "$SB/main" && HOME="$SB/home" IBL5_MAIN="$SB/main" SPLIT_FIRES="$SB/fires" SHIM_PPN_AUTO_RC=9 \
+    "$SB/tool/bin/docfix-split" --slug="$SPLIT_SLUG" --issue=7 2>&1 )" && SRC=0 || SRC=$?
+{ [ "$SRC" -eq 4 ] && [ "$(fire_count "$SB")" -eq 2 ] && grep -q "$SPLIT_REV" "$SB/fires" \
+    && grep -qF "$SPLIT_SLUG fire refused rc=9" <<< "$SOUT"; } \
+  && ok "split-one-fire-refused: review still fires, exit 4" \
+  || bad "split-one-fire-refused: rc=$SRC fires=[$(cat "$SB/fires" 2>/dev/null)]"
+
+# split-refuses-dirty-tree (row 18): an unstaged edit or an untracked file exits 3
+SB="$(build_all_auto)"; echo 'more' >> "$SB/wts/$SPLIT_SLUG/ibl5/docs/a.md"
+run_split "$SB" --slug="$SPLIT_SLUG" --issue=7
+{ [ "$SRC" -eq 3 ] && [ "$(fire_count "$SB")" -eq 0 ]; } \
+  && ok "split-refuses-dirty-tree: an unstaged edit exits 3" || bad "split-refuses-dirty-tree: unstaged rc=$SRC"
+SB="$(build_all_auto)"; echo 'new' > "$SB/wts/$SPLIT_SLUG/ibl5/docs/untracked.md"
+run_split "$SB" --slug="$SPLIT_SLUG" --issue=7
+{ [ "$SRC" -eq 3 ] && [ "$(fire_count "$SB")" -eq 0 ]; } \
+  && ok "split-refuses-dirty-tree: an untracked file exits 3" || bad "split-refuses-dirty-tree: untracked rc=$SRC"
+
+# split-veronly-gate (row 19): veronly runs once with the auto slug on all-auto, never on mixed
+SB="$(build_all_auto)"; run_split "$SB" --slug="$SPLIT_SLUG" --issue=7
+[ "$(cat "$SB/veronly-calls" 2>/dev/null)" = "$SPLIT_SLUG" ] \
+  && ok "split-veronly-gate: one veronly call with the auto slug on all-auto" \
+  || bad "split-veronly-gate: all-auto calls [$(cat "$SB/veronly-calls" 2>/dev/null)]"
+SB="$(build_mixed)"; run_split "$SB" --slug="$SPLIT_SLUG" --issue=7
+[ ! -e "$SB/veronly-calls" ] && [ "$SRC" -eq 0 ] \
+  && ok "split-veronly-gate: no veronly call on a mixed night" \
+  || bad "split-veronly-gate: mixed calls [$(cat "$SB/veronly-calls" 2>/dev/null)] rc=$SRC"
+# SPLIT-CASES-END
+
+# --- docfix-run split wiring and skip guard cases (Phases 6, 7) -------------
+# docfix_run_out "$SB" <issue> <sig> -> drives the REAL bin/docfix-run like run_docfix but
+# prints its combined output, then a final "rc=N" line. Inherits SHIM_* from the caller.
+docfix_run_out() {
+    local SB="$1" RC=0
+    IBL5_MAIN="$SB" HOME="$SB/home" PATH="$SB/shim:$PATH" TMPDIR="$SB/tmp" \
+        "$REAL_DOCFIX" "$2" "$3" 2>&1 || RC=$?
+    runner_of "$SB" >/dev/null 2>&1 || true
+    echo "rc=$RC"
+}
+
+# Case runner-calls-split-after-claude (row 21): the generated runner calls the trusted
+# split under MAIN only after a zero claude exit. rc=$? directly follows the claude line.
+# The runner prepends real tool dirs to PATH, so each copy drops the export PATH= line
+# before it runs with stub claude and caffeinate first on PATH (real perl execs the stub).
+SB="$(build_sandbox)"
+run_docfix "$SB" "" "" "4221" "ibl5/docs/foo.md" >/dev/null
+R21S="$(runner_of "$SB")"
+NEXT21="$(awk '/claude -p/{getline; print; exit}' "$R21S" 2>/dev/null)"
+[ "$NEXT21" = 'rc=$?' ] \
+  && ok "(runner-calls-split-after-claude) rc=\$? directly follows the claude line" \
+  || bad "(runner-calls-split-after-claude) line after claude is '$NEXT21'"
+mkdir -p "$SB/stub21"
+printf '#!/usr/bin/env bash\nexit "${CLAUDE_STUB_RC:-0}"\n' > "$SB/stub21/claude"
+printf '#!/usr/bin/env bash\n[ "$1" = "-s" ] && shift\nexec "$@"\n' > "$SB/stub21/caffeinate"
+printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >> "%s/split-calls"\n' "$SB" > "$SB/bin/docfix-split"
+chmod +x "$SB/stub21/claude" "$SB/stub21/caffeinate" "$SB/bin/docfix-split"
+grep -v '^export PATH=' "$R21S" > "$SB/run21-0.sh" 2>/dev/null || true
+cp "$SB/run21-0.sh" "$SB/run21-1.sh"
+EXCL21="$SB/tmp/docfix-exclude-docs-stale-refresh-$(date +%Y%m%d).json"
+CHK21=ok
+grep -q '^export PATH=' "$R21S" || CHK21="the real runner has no export PATH= line to drop"
+{ ! grep -q '^export PATH=' "$SB/run21-0.sh" && ! grep -q '^export PATH=' "$SB/run21-1.sh"; } \
+    || CHK21="export PATH= line still in the copies"
+[ -f "$EXCL21" ] || CHK21="exclude file $EXCL21 not written by docfix-run"
+if [ "$CHK21" = ok ]; then
+    OUT21_0="$(PATH="$SB/stub21:$PATH" CLAUDE_STUB_RC=0 HOME="$SB/home" bash "$SB/run21-0.sh" 2>&1)"
+    CALLS21_0="$(cat "$SB/split-calls" 2>/dev/null)"
+    OUT21_1="$(PATH="$SB/stub21:$PATH" CLAUDE_STUB_RC=1 HOME="$SB/home" bash "$SB/run21-1.sh" 2>&1)"
+    CALLS21_1="$(cat "$SB/split-calls" 2>/dev/null)"
+    [ "$CALLS21_0" = "--slug=docs-stale-refresh-$(date +%Y%m%d) --issue=4221 --exclude-file=$EXCL21" ] \
+        || CHK21="claude rc 0: split calls '$CALLS21_0'"
+    grep -qF 'docfix-run: docfix-split exited 0' <<< "$OUT21_0" || CHK21="claude rc 0: output '$OUT21_0'"
+    [ "$CALLS21_1" = "$CALLS21_0" ] || CHK21="claude rc 1 still called the split: '$CALLS21_1'"
+    grep -qF 'docfix-run: claude exited 1; split skipped, worktree left for docfix-poll' <<< "$OUT21_1" \
+        || CHK21="claude rc 1: output '$OUT21_1'"
+    [ ! -e "$EXCL21" ] || CHK21="runner left the exclude file behind"
+fi
+[ "$CHK21" = ok ] \
+  && ok "(runner-calls-split-after-claude) claude rc 0 runs the MAIN split once with slug, issue and exclude file; rc 1 skips it; exclude file removed" \
+  || bad "(runner-calls-split-after-claude) $CHK21"
+
+# Case veronly-refuses-review-slug (row 20): a date-only root CLAUDE.md bump that veronly
+# would arm on a docs-stale-refresh- branch holds on a docs-content-review- slug, and the
+# review plan's bytes stay unchanged.
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+RV20="docs-content-review-20990101"
+PLAN_RV20="$SB2/home/claude-plans/$RV20.md"
+git -C "$R" checkout -q master
+printf '%s\n' '---' 'last_verified: 2026-01-01' '---' '' '# CLAUDE' > "$R/CLAUDE.md"
+git -C "$R" add CLAUDE.md >/dev/null 2>&1
+git -C "$R" -c user.email=t@t -c user.name=t commit -qm claude >/dev/null 2>&1
+git -C "$R" checkout -q -b "$RV20"
+printf '%s\n' '---' 'last_verified: 2026-08-13' '---' '' '# CLAUDE' > "$R/CLAUDE.md"
+printf '%s\n' '---' 'auto_merge: false' '---' '' '# Content review' \
+    '' '## Automouse Hold Justification' '' 'auto_merge: false — hold.' > "$PLAN_RV20"
+SUM20_BEFORE="$(shasum < "$PLAN_RV20")"
+ERR20F="$(mktemp)"
+( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$RV20" >/dev/null 2>"$ERR20F" ) && VRC20=0 || VRC20=$?
+ERR20="$(cat "$ERR20F")"; rm -f "$ERR20F"
+{ [ "$VRC20" -eq 1 ] \
+    && grep -qF "HOLD: $RV20 is not a docs-stale-refresh- branch; plan left unchanged" <<< "$ERR20" \
+    && [ "$(shasum < "$PLAN_RV20")" = "$SUM20_BEFORE" ]; } \
+  && ok "(veronly-refuses-review-slug) review slug: exit 1, HOLD on stderr, plan bytes unchanged" \
+  || bad "(veronly-refuses-review-slug) rc=$VRC20 stderr: $ERR20"
+
+# Case skip-guard-review-pr (row 22, raw gh mode): an open unarmed review PR does not block
+# the run; its files and a rename's old path leave the worklist and land in the exclude
+# file; the near-miss ibl5/docs/a.mdx survives; a non-review PR's files are never read.
+DAY22="$(date +%Y%m%d)"
+LIST22='[{"number":77,"headRefName":"docs-content-review-20990101","autoMergeRequest":null},{"number":78,"headRefName":"feature-x","autoMergeRequest":null}]'
+FILES22='[{"filename":"ibl5/docs/a.md","status":"modified"},{"filename":"ibl5/docs/new.md","previous_filename":"ibl5/docs/old.md","status":"renamed"}]'
+SB="$(build_sandbox)"
+OUT22="$(SHIM_GH_PR_LIST_JSON="$LIST22" SHIM_GH_FILES_JSON="$FILES22" SHIM_GH_CALLS="$SB/gh-calls" \
+    docfix_run_out "$SB" 22 "ibl5/docs/a.md,ibl5/docs/a.mdx,ibl5/docs/old.md,ibl5/docs/keep.md")"
+R22="$(runner_of "$SB")"
+EXCL22="$SB/tmp/docfix-exclude-docs-stale-refresh-$DAY22.json"
+CHK22=ok
+[ "$(tail -1 <<< "$OUT22")" = "rc=0" ] || CHK22="exit: $(tail -1 <<< "$OUT22")"
+[ "$(submit_count "$SB")" = 1 ] || CHK22="submit count $(submit_count "$SB") (output: $OUT22)"
+grep -qF '(comma-separated): ibl5/docs/a.mdx,ibl5/docs/keep.md.' "$R22" 2>/dev/null \
+    || CHK22="prompt worklist is not 'ibl5/docs/a.mdx,ibl5/docs/keep.md'"
+[ "$(jq -c . "$EXCL22" 2>/dev/null)" = '["ibl5/docs/a.md","ibl5/docs/new.md","ibl5/docs/old.md"]' ] \
+    || CHK22="exclude file: $(cat "$EXCL22" 2>/dev/null)"
+grep -qF -- "'--exclude-file=$EXCL22'" "$R22" 2>/dev/null || CHK22="runner does not pass the exclude file"
+grep -qxF 'repos/a-jay85/IBL5/pulls/77/files' "$SB/gh-calls" 2>/dev/null || CHK22="review PR 77 files not read"
+! grep -qF 'pulls/78/' "$SB/gh-calls" 2>/dev/null || CHK22="non-review PR 78 files were read"
+[ "$CHK22" = ok ] \
+  && ok "(skip-guard-review-pr) open review PR does not block; its paths and the rename's old path excluded; a.mdx near-miss survives" \
+  || bad "(skip-guard-review-pr) $CHK22"
+
+# all-excluded: every worklist entry is held -> skip before wt-new, no submit
+SB="$(build_sandbox)"
+OUT22B="$(SHIM_GH_PR_LIST_JSON="$LIST22" SHIM_GH_FILES_JSON="$FILES22" \
+    docfix_run_out "$SB" 22 "ibl5/docs/a.md,ibl5/docs/old.md")"
+{ [ "$(tail -1 <<< "$OUT22B")" = "rc=0" ] && [ "$(submit_count "$SB")" = 0 ] \
+    && [ ! -d "$SB/wts/docs-stale-refresh-$DAY22" ] \
+    && grep -qF 'every worklist file is held in an open review PR; skipping' <<< "$OUT22B"; } \
+  && ok "(skip-guard-review-pr) all worklist files held: skips before wt-new, no submit" \
+  || bad "(skip-guard-review-pr) all-excluded: $OUT22B"
+
+# a failure of either call skips the run and names the call
+SB="$(build_sandbox)"
+OUT22C="$(SHIM_GH_PR_LIST_JSON="$LIST22" SHIM_GH_FILES_JSON="$FILES22" SHIM_GH_REVIEW_LIST_FAIL=1 \
+    docfix_run_out "$SB" 22 "ibl5/docs/keep.md")"
+{ [ "$(tail -1 <<< "$OUT22C")" = "rc=0" ] && [ "$(submit_count "$SB")" = 0 ] \
+    && grep -qF 'gh pr list failed' <<< "$OUT22C"; } \
+  && ok "(skip-guard-review-pr) review-PR list failure skips fail-closed, naming gh pr list" \
+  || bad "(skip-guard-review-pr) list failure: $OUT22C"
+SB="$(build_sandbox)"
+OUT22D="$(SHIM_GH_PR_LIST_JSON="$LIST22" SHIM_GH_FILES_JSON="$FILES22" SHIM_GH_API_FAIL=1 \
+    docfix_run_out "$SB" 22 "ibl5/docs/keep.md")"
+{ [ "$(tail -1 <<< "$OUT22D")" = "rc=0" ] && [ "$(submit_count "$SB")" = 0 ] \
+    && grep -qF 'gh api failed' <<< "$OUT22D"; } \
+  && ok "(skip-guard-review-pr) review-PR files failure skips fail-closed, naming gh api" \
+  || bad "(skip-guard-review-pr) files failure: $OUT22D"
+
+# a same-day review branch means today's run already fired and split
+SB="$(build_sandbox)"
+OUT22E="$(SHIM_BRANCH_OUT="docs-content-review-$DAY22" docfix_run_out "$SB" 22 "ibl5/docs/keep.md")"
+{ [ "$(tail -1 <<< "$OUT22E")" = "rc=0" ] && [ "$(submit_count "$SB")" = 0 ] \
+    && grep -qF "branch docs-content-review-$DAY22 already exists" <<< "$OUT22E"; } \
+  && ok "(skip-guard-review-pr) same-day review branch skips (no submit)" \
+  || bad "(skip-guard-review-pr) same-day review branch: $OUT22E"
+
+# WIRING-CASES-END
 
 REAL_AGENTS_NEW="$(comm -13 <(printf '%s\n' "$REAL_AGENTS_BEFORE") <(real_agents_names) | grep -v '^$' || true)"
 if [ -n "$REAL_AGENTS_NEW" ]; then

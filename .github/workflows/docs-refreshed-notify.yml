@@ -7,13 +7,15 @@ name: Docs Refreshed Notify
 # workflow_dispatch trigger already exists on the default branch. The first
 # real dispatch is therefore only possible after this PR merges onto master.
 #
-# The head-ref guard (docs-stale-refresh- prefix) has moved into
-# bin/lib/docfix-dm.sh where it is exercisable by the test harness.
+# The head-ref guard (docs-stale-refresh- or docs-content-review- prefix) has
+# moved into bin/lib/docfix-dm.sh where it is exercisable by the test harness.
+# A docs-content-review-* PR is the held pile bin/docfix-split opens; its DM
+# text starts with "Held for content review".
 on:
   workflow_dispatch:
     inputs:
       pr_number:
-        description: PR number of the docs-stale-refresh-* PR to notify about
+        description: PR number of the docs-stale-refresh-* or docs-content-review-* PR to notify about
         required: true
         type: string
 

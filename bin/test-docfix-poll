@@ -68,8 +68,19 @@ case "$_SUBCMD" in
     branch)
         if [ "${1:-}" = "-D" ]; then
             printf '%s\n' "${2:-}" >> "$_SB/git-branch-d-calls"
-        else
-            [ -n "${SHIM_BRANCH_OUT:-}" ] && printf '%s\n' "$SHIM_BRANCH_OUT" || true
+        elif [ -n "${SHIM_BRANCH_OUT:-}" ]; then
+            # Honor the --list patterns, so a caller that lists one prefix never
+            # sees a branch of the other (the reap loop vs. the wedged probe).
+            _pats=()
+            for _a in "$@"; do case "$_a" in --list|-*) ;; *) _pats+=("$_a") ;; esac; done
+            while IFS= read -r _b; do
+                [ -n "$_b" ] || continue
+                if [ "${#_pats[@]}" -eq 0 ]; then printf '%s\n' "$_b"; continue; fi
+                for _p in "${_pats[@]}"; do
+                    # shellcheck disable=SC2254  # the pattern is meant to glob
+                    case "$_b" in $_p) printf '%s\n' "$_b"; break ;; esac
+                done
+            done <<< "$SHIM_BRANCH_OUT"
         fi ;;
     status)
         [ -n "${SHIM_STATUS_OUT:-}" ] && printf '%s\n' "$SHIM_STATUS_OUT" || true ;;
@@ -95,6 +106,34 @@ GITSHIM
 #!/usr/bin/env bash
 [ -n "${SHIM_GH_FAIL:-}" ] && exit 1
 args="$*"
+# Raw mode (opt-in): SHIM_GH_PR_LIST_JSON holds a raw array of PR objects. `pr list`
+# and `pr view N --json statusCheckRollup` then run real jq with the received --jq
+# filter, after the --state and --head filtering GitHub does server-side. A case
+# on this mode proves the poller's own --jq filters, which the post-jq mode skips.
+if [ -n "${SHIM_GH_PR_LIST_JSON:-}" ] && { [ "$1 $2" = "pr list" ] || [ "$1 $2" = "pr view" ]; }; then
+    sub="$2"; num="${3:-}"; shift 2
+    state=all; head=""; filter="."
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --state) state="$2"; shift 2 ;;
+            --head)  head="$2"; shift 2 ;;
+            --jq)    filter="$2"; shift 2 ;;
+            *)       shift ;;
+        esac
+    done
+    if [ "$sub" = "view" ]; then
+        jq -r --argjson n "$num" ".[] | select(.number == \$n) | $filter" <<< "$SHIM_GH_PR_LIST_JSON"
+        exit $?
+    fi
+    sel='.'
+    case "$state" in
+        open)   sel='map(select(.state == "OPEN"))' ;;
+        closed) sel='map(select(.state != "OPEN"))' ;;
+    esac
+    jq -r --arg h "$head" "$sel | map(select(\$h == \"\" or .headRefName == \$h)) | $filter" \
+        <<< "$SHIM_GH_PR_LIST_JSON"
+    exit $?
+fi
 case "$1 $2" in
   "issue list") printf '%s' "${SHIM_ISSUE_OUT:-}" ;;
   "issue view")
@@ -855,5 +894,170 @@ OUT25E="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" \
 { grep -q '^alert=' <<< "$OUT25E" && ! grep -qxF 'kind=wedged' <<< "$OUT25E"; } \
   && ok "(25e) live job: 5h-old branch with a loaded docfix-run job is not wedged" \
   || bad "(25e) live job: health arm called a running branch wedged (or printed no report)"
+
+# ---------------------------------------------------------------------------
+# Test 26 (row 24): the poller joins docs-content-review-* PRs (bin/docfix-split's
+# held pile) at its counting, listing, health and wedge sites, and never reaps one.
+# Sites that filter inside --jq run on the raw-mode gh shim (SHIM_GH_PR_LIST_JSON),
+# so a reverted filter fails here instead of passing on a post-jq value.
+# ---------------------------------------------------------------------------
+R_OLD="docs-content-review-20260802"
+TS_1H="$(_ts_ago 3600)"
+STALE_AB='[{"path":"a.md"},{"path":"b.md"}]'
+RED_ROLLUP='[{"conclusion":"FAILURE"}]'
+# _pr NUM HEAD STATE MERGED_AT FILES_CSV ROLLUP CREATED -> one raw PR object
+_pr() {
+    jq -nc --argjson n "$1" --arg h "$2" --arg s "$3" --arg m "$4" --arg f "$5" \
+        --argjson r "$6" --arg c "$7" \
+        '{number:$n, headRefName:$h, state:$s, url:("https://example.test/pr/" + ($n|tostring)),
+          mergedAt:(if $m == "" then null else $m end), autoMergeRequest:null,
+          files:($f | split(",") | map(select(. != "")) | map({path:.})),
+          statusCheckRollup:$r, createdAt:$c}'
+}
+_prs() { jq -sc '.' <<< "$*"; }
+
+# (26a) declined: closed-unmerged refresh PR covered a.md and closed-unmerged review
+# PR covered b.md, so the union covers the whole stale set and the poll stays quiet.
+SB="$(build_sandbox)"
+RAW26A="$(_prs "$(_pr 10 docs-stale-refresh-20260801 CLOSED '' a.md '[]' "$TS_48H")" \
+               "$(_pr 11 "$R_OLD" CLOSED '' b.md '[]' "$TS_48H")")"
+SHIM_GH_PR_LIST_JSON="$RAW26A" SHIM_STALE_JSON="$STALE_AB" SHIM_ISSUE_OUT="77" \
+    SHIM_BRANCH_OUT="" SHIM_LAUNCHCTL_OUT="" run_poll_split "$SB"
+{ [ ! -f "$SB/docfix-calls" ] && grep -qF 'a human declined a refresh covering all 2' "$POLL_OUT_FILE"; } \
+  && ok "(26a) declined review PR's files join the declined set: poll stays quiet" \
+  || bad "(26a) declined review PR not counted ($(cat "$POLL_OUT_FILE" "$POLL_ERR_FILE"))"
+# Control: without the declined review PR, b.md is uncovered and the poll fires.
+SB="$(build_sandbox)"
+RAW26A2="$(_prs "$(_pr 10 docs-stale-refresh-20260801 CLOSED '' a.md '[]' "$TS_48H")")"
+SHIM_GH_PR_LIST_JSON="$RAW26A2" SHIM_STALE_JSON="$STALE_AB" SHIM_ISSUE_OUT="77" \
+    SHIM_BRANCH_OUT="" SHIM_LAUNCHCTL_OUT="" run_poll_split "$SB"
+[ -f "$SB/docfix-calls" ] \
+  && ok "(26a) control: refresh-only decline leaves b.md uncovered, poll fires" \
+  || bad "(26a) control: poll should fire when b.md is uncovered"
+
+# (26b) DM list: an open review PR is listed; an open feature-x PR is not.
+SB="$(build_sandbox)"
+CALLS26B="$SB/gh-calls"
+RAW26B="$(_prs "$(_pr 88 docs-content-review-20260803 OPEN '' a.md '[]' "$TS_1H")" \
+               "$(_pr 89 feature-x OPEN '' a.md '[]' "$TS_1H")")"
+SHIM_GH_PR_LIST_JSON="$RAW26B" SHIM_GH_CALLS="$CALLS26B" SHIM_STALE_JSON='[]' \
+    SHIM_BRANCH_OUT="" SHIM_LAUNCHCTL_OUT="" run_poll_split "$SB"
+{ grep -qF 'docs-refreshed-notify.yml -f pr_number=88' "$CALLS26B" \
+    && ! grep -qF 'pr_number=89' "$CALLS26B"; } \
+  && ok "(26b) DM list includes the open review PR #88 and skips feature-x #89" \
+  || bad "(26b) DM list ($(cat "$CALLS26B" 2>/dev/null))"
+
+# (26c) red CI on an open review PR is reported when nothing else alerted.
+SB="$(build_sandbox)"
+RAW26C="$(_prs "$(_pr 88 docs-content-review-20260803 OPEN '' a.md "$RED_ROLLUP" "$TS_1H")")"
+OUT="$(SHIM_GH_PR_LIST_JSON="$RAW26C" SHIM_STALE_JSON="$STALE_ONE" SHIM_LS_REMOTE="" \
+    SHIM_ISSUE_BODY="<!-- stale-since: $TS_48H -->" SHIM_BRANCH_OUT="" \
+    SHIM_REFLOG_OUT="" SHIM_LAUNCHCTL_OUT="" run_health "$SB" 77)"; RC=$?
+_if_case "26c" true "ci-red" "open review PR with red CI: alert=true kind=ci-red"
+grep -qxF 'detail=Content-review PR https://example.test/pr/88 has 1 failing check(s) — the held doc edits need a fix before you can merge them.' <<< "$OUT" \
+  && ok "(26c) ci-red detail names the review PR URL and the failing-check count" \
+  || bad "(26c) ci-red detail ($OUT)"
+
+# (26d) last_pr anchor: a review PR opened 1h ago counts as a run, so a 48h-old
+# stale episode does not alert never-ran. Control: no review PR -> never-ran.
+SB="$(build_sandbox)"
+RAW26D="$(_prs "$(_pr 12 docs-content-review-20260803 MERGED "$TS_1H" '' '[]' "$TS_1H")")"
+OUT="$(SHIM_GH_PR_LIST_JSON="$RAW26D" SHIM_STALE_JSON="$STALE_ONE" SHIM_LS_REMOTE="" \
+    SHIM_ISSUE_BODY="<!-- stale-since: $TS_48H -->" SHIM_BRANCH_OUT="" \
+    SHIM_REFLOG_OUT="" SHIM_LAUNCHCTL_OUT="" run_health "$SB" 77)"; RC=$?
+_if_case "26d" false "" "review PR opened 1h ago anchors last_pr: never-ran stays quiet"
+RAW26D2="$(_prs "$(_pr 13 feature-x MERGED "$TS_1H" '' '[]' "$TS_1H")")"
+OUT="$(SHIM_GH_PR_LIST_JSON="$RAW26D2" SHIM_STALE_JSON="$STALE_ONE" SHIM_LS_REMOTE="" \
+    SHIM_ISSUE_BODY="<!-- stale-since: $TS_48H -->" SHIM_BRANCH_OUT="" \
+    SHIM_REFLOG_OUT="" SHIM_LAUNCHCTL_OUT="" run_health "$SB" 77)"; RC=$?
+_if_case "26d" true "never-ran" "control: only a feature-x PR, 48h episode: never-ran fires"
+
+# (26e) never-ran stays quiet when every stale path is held in an open review PR
+# with green CI. Control: the review PR holds a different path -> never-ran.
+SB="$(build_sandbox)"
+RAW26E="$(_prs "$(_pr 88 docs-content-review-20260801 OPEN '' a.md '[]' "$TS_48H")")"
+OUT="$(SHIM_GH_PR_LIST_JSON="$RAW26E" SHIM_STALE_JSON="$STALE_ONE" SHIM_LS_REMOTE="" \
+    SHIM_ISSUE_BODY="<!-- stale-since: $TS_48H -->" SHIM_BRANCH_OUT="" \
+    SHIM_REFLOG_OUT="" SHIM_LAUNCHCTL_OUT="" run_health "$SB" 77)"; RC=$?
+_if_case "26e" false "" "every stale path held in an open review PR: never-ran stays quiet"
+RAW26E2="$(_prs "$(_pr 88 docs-content-review-20260801 OPEN '' b.md '[]' "$TS_48H")")"
+OUT="$(SHIM_GH_PR_LIST_JSON="$RAW26E2" SHIM_STALE_JSON="$STALE_ONE" SHIM_LS_REMOTE="" \
+    SHIM_ISSUE_BODY="<!-- stale-since: $TS_48H -->" SHIM_BRANCH_OUT="" \
+    SHIM_REFLOG_OUT="" SHIM_LAUNCHCTL_OUT="" run_health "$SB" 77)"; RC=$?
+_if_case "26e" true "never-ran" "control: a.md not held, 48h episode: never-ran fires"
+
+# (26f) the died alert still fires beside a red review PR (the review check runs
+# only while no alert has fired).
+SB="$(build_sandbox)"
+OUT="$(SHIM_GH_PR_LIST_JSON="$RAW26C" SHIM_STALE_JSON="$STALE_ONE" \
+    SHIM_LS_REMOTE="$(printf 'abc\trefs/heads/docs-stale-refresh-20260801')" \
+    SHIM_ISSUE_BODY="<!-- stale-since: $TS_48H -->" SHIM_BRANCH_OUT="" \
+    SHIM_REFLOG_OUT="" SHIM_LAUNCHCTL_OUT="" run_health "$SB" 77)"; RC=$?
+_if_case "26f" true "died" "orphaned refresh branch beside a red review PR: kind=died wins"
+
+# (26g) a leftover local review branch shows as wedged in health and is never
+# salvaged or reaped by the poll.
+SB="$(_wt_sandbox)"
+REFLOG_R_OLD="abc1234 ${R_OLD}@{${EPOCH_48H}}: branch: Created from master"
+OUT="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" SHIM_LS_REMOTE="" \
+    SHIM_PR_FOR_BRANCH=0 SHIM_BRANCH_OUT="$R_OLD" SHIM_REFLOG_OUT="$REFLOG_R_OLD" \
+    SHIM_LAUNCHCTL_OUT="" run_health "$SB" 77)"; RC=$?
+_if_case "26g" true "wedged" "leftover local review branch: kind=wedged"
+grep -qF "detail=Local branch $R_OLD has no origin ref" <<< "$OUT" \
+  && ok "(26g) wedged detail names the review branch" \
+  || bad "(26g) wedged detail ($OUT)"
+SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" SHIM_BRANCH_OUT="$R_OLD" \
+    SHIM_PR_STATE="NONE" SHIM_LS_REMOTE="" SHIM_REFLOG_OUT="$REFLOG_R_OLD" \
+    SHIM_WORKTREE_LIST="$(_wl "$SB" "$R_OLD")" SHIM_STATUS_OUT="" \
+    SHIM_LAUNCHCTL_OUT="" run_poll_split "$SB"
+{ [ ! -f "$SB/cleanup-calls" ] && [ ! -f "$SB/git-add-calls" ] \
+    && [ ! -f "$SB/wt-remove-calls" ] && [ ! -f "$SB/git-branch-d-calls" ] \
+    && ! grep -qF "$R_OLD" "$POLL_OUT_FILE" "$POLL_ERR_FILE"; } \
+  && ok "(26g) the poll never salvages, reaps or removes a review branch" \
+  || bad "(26g) review branch touched by the reap loop"
+
+# ---------------------------------------------------------------------------
+# Test 27 (row 25): bin/lib/docfix-dm.sh accepts an OPEN review PR and leads its
+# DM with the held wording; it refuses other branches and non-OPEN review PRs.
+# ---------------------------------------------------------------------------
+# _dm27 META OUT -> rc of docfix_dm_compose 88 OUT with a stub gh.
+_dm27() {
+    local d; d="$(mktemp -d)"
+    cat > "$d/gh" <<'DMGH'
+#!/usr/bin/env bash
+case "$*" in
+  *"headRefName,state,url"*) printf '%s' "$DM27_META" ;;
+  *"--json files"*)          printf 'ibl5/docs/a.md' ;;
+esac
+DMGH
+    chmod +x "$d/gh"
+    ( PATH="$d:$PATH" DM27_META="$1"
+      export DM27_META
+      # shellcheck source=bin/lib/docfix-dm.sh
+      source "$REPO_ROOT/bin/lib/docfix-dm.sh"
+      docfix_dm_compose 88 "$2" ) 2>/dev/null
+}
+D27="$(mktemp -d)"
+_dm27 $'docs-content-review-20260803\tOPEN\thttps://example.test/pr/88' "$D27/a"; RC27A=$?
+{ [ "$RC27A" -eq 0 ] \
+    && [ "$(head -n 1 "$D27/a")" = 'Held for content review: Claude refreshed your stale docs — ready for your review. PR #88:' ] \
+    && grep -qF 'https://example.test/pr/88' "$D27/a"; } \
+  && ok "(27a) DM lib: OPEN review PR accepted; text leads with 'Held for content review: '" \
+  || bad "(27a) DM lib review PR (rc $RC27A: $(cat "$D27/a" 2>/dev/null))"
+_dm27 $'docs-stale-refresh-20260803\tOPEN\thttps://example.test/pr/88' "$D27/r"; RC27R=$?
+{ [ "$RC27R" -eq 0 ] \
+    && [ "$(head -n 1 "$D27/r")" = 'Claude refreshed your stale docs — ready for your review. PR #88:' ]; } \
+  && ok "(27b) DM lib: refresh PR text keeps its unprefixed first line" \
+  || bad "(27b) DM lib refresh PR (rc $RC27R: $(cat "$D27/r" 2>/dev/null))"
+_dm27 $'feature-x\tOPEN\thttps://example.test/pr/88' "$D27/f"; RC27F=$?
+{ [ "$RC27F" -eq 1 ] && [ ! -e "$D27/f" ]; } \
+  && ok "(27c) DM lib: OPEN feature-x PR refused (rc 1, no out-file)" \
+  || bad "(27c) DM lib feature-x (rc $RC27F)"
+_dm27 $'docs-content-review-20260803\tCLOSED\thttps://example.test/pr/88' "$D27/c"; RC27C=$?
+{ [ "$RC27C" -eq 1 ] && [ ! -e "$D27/c" ]; } \
+  && ok "(27d) DM lib: CLOSED review PR refused (rc 1, no out-file)" \
+  || bad "(27d) DM lib CLOSED review PR (rc $RC27C)"
+rm -rf "$D27"
+
 
 h_done

@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-11-24
+last_verified: 2026-11-27
 ---
 
 # IBL5 Architecture Decision Records
@@ -128,6 +128,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0281](0281-homebrew-bash-floor.md) | Repo shell scripts need bash 4 or newer | Accepted | Every bash script uses `#!/usr/bin/env bash`, and executable ones carry a one-line version guard that exits 2 under bash 3.2. `bin/check-shell-portability` enforces both. The Mac runs Homebrew bash. Supersedes ADR-0268. |
 | [0282](0282-human-signoff-trigger-stub-workflow.md) | Human-signoff trigger stub plus workflow_run gate | Accepted | A no-permission `pull_request` stub starts master's `human-signoff.yml` through `workflow_run`, which judges the PR from master's lib and posts a `human-signoff` commit status, so a PR cannot rewrite the gate that judges it. |
 | [0286](0286-in-repo-jsb-trace-captures.md) | JSB trace captures live in IBL5 | Accepted | Captures sit in `engine/testdata/jsb-captures/`; `capture_host: jsb-native` holds as `capture-bad-host`. The harness reads the base-branch bytes, checks `capture_sha256`, and holds a capture over 8 MiB as `capture-too-large`. A capture PR lands before its port PR. Supersedes the hosting decision of ADR-0278. |
+| [0289](0289-docfix-split-review-pile.md) | Split the nightly docfix run into an auto-merge PR and a held review PR | Accepted | `bin/docfix-split` sends each changed file the condition (7) path clause accepts to the `docs-stale-refresh-` PR and every other file to a held `docs-content-review-` PR, and a `tracking-issue` plan marker puts `Closes` or `Refs` in each PR body. |
 
 ## When an ADR is Required
 

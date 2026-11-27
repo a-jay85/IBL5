@@ -1,6 +1,6 @@
 ---
 description: Index of shared library files sourced by bin/ scripts.
-last_verified: 2026-11-21
+last_verified: 2026-11-27
 ---
 
 # bin/lib — Shared Library Files
@@ -23,7 +23,7 @@ Sourced (not executed directly) by scripts in `bin/` and `bin/automouse/`. Each 
 | `restore-rowcount-compare.sh` | Pre-dump vs restored `COUNT(*)` check for the nightly backup in `.github/workflows/db-backup.yml`; subcommands `snapshot` / `extract` / `compare`, also piped to prod over `bash -s` (functions only, `main` is guarded) |
 | `hold-check-patterns.txt` | Ask-shaped-sentence patterns for `## Automouse Hold Justification` sections; one pattern per line, read by both `bin/lib/hold-check.sh` (POSIX ERE via `grep -E`) and `harness/planfile.py` (Python `re`) — see the file header for the two-language portable subset |
 | `hold-check.sh` | Hold-section extraction (`hold_check_section`), ask-shaped-sentence detection (`hold_check_violations`), the Decision paragraph reader (`hold_decision_paragraphs`), and the manual-confirmation block renderer (`hold_manual_confirmation_block`); sourced by `bin/check-plan` gate `[H]` (the renderer has no live caller; `tools/postplan-harness/tests/test_decision_render_parity.py` pins it to the harness render) |
-| `docfix-dm.sh` | Compose the docs-refreshed Discord DM for a docfix PR; holds the numeric-input, OPEN-state, and `docs-stale-refresh-` head-ref guards lifted out of `docs-refreshed-notify.yml` so they are exercisable by `bin/test-docfix-run` |
+| `docfix-dm.sh` | Compose the docs-refreshed Discord DM for a docfix PR; holds the numeric-input, OPEN-state, and head-ref guards lifted out of `docs-refreshed-notify.yml` so they are exercisable by `bin/test-docfix-run`; owns `DOCFIX_REVIEW_BRANCH_PREFIX` (`docs-content-review-`), the branch prefix of the held review PR that `bin/docfix-split` opens beside the `docs-stale-refresh-` PR |
 | `git-helpers.sh` | Shared git-layout helpers: canonical repo root resolution, `main_checkout_root`, and `register_last_verified_merge_driver` (idempotent `merge.lastverified.driver` registration, called by `bin/install-git-hooks` and `bin/wt-new`) |
 | `merge-last-verified` | Git merge driver (git executes it; nothing sources it) for markdown whose only conflict is the frontmatter `last_verified` date; keeps the newer date, else leaves standard markers and exits 1; exercised by `bin/test-merge-last-verified` |
 | `numbering.sh` | Shared ADR and migration numbering grammar: allocator name regexes, gate collision keys, and `numbering_next`. Sourced by `bin/next-number` and `bin/check-numbering`; source-safe (no `set`, no `exit`) |

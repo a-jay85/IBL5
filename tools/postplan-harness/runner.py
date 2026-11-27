@@ -39,7 +39,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 HARNESS_ROOT = os.path.dirname(os.path.abspath(__file__))
 
-from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, conformance, conformance_fix, fidelity, fix_round, gatefix, gitutil, heldmarker, history_shape, holdrepeat, how_to_revert, llm_calls,
+from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, conformance, conformance_fix, fidelity, fidelity_evidence, fix_round,gatefix, gitutil, heldmarker, history_shape, holdrepeat, how_to_revert, llm_calls,
                      manual_rows, manual_testing, metafix, outcome_log, outofscope, prosefix, rebase_cause, rules_budget_carveout,
                      reviewcache, same_run_threads, schemas, scope_conformance, statefile, usage_pause)
 from harness import fidelity_delta
@@ -1362,6 +1362,16 @@ def _run_pass(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             fid["review_owed"] = ro
             log(f"phase6.5 review-owed: {ro.get('verdict')} ({ro.get('reason')})"
                 + (f"; {ro['command']}" if ro.get("command") else ""))
+            # Owner-card evidence for a fidelity.py edit. Display only: nothing that
+            # arms, holds or exits reads it, and post_for_pr never raises.
+            if live and pr:
+                try:
+                    if fidelity_evidence.should_run(git.changed_files()):
+                        log("phase6.5: " + fidelity_evidence.post_for_pr(
+                            worktree, master_sha, pr,
+                            Path(__file__).resolve().parent / "out"))
+                except Exception as exc_:  # evidence must never touch the run
+                    log(f"phase6.5: fidelity evidence skipped ({type(exc_).__name__})")
         if decision.armed:
             gh.pr_merge_auto(pr)
         elif pr:

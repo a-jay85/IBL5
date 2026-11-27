@@ -15,7 +15,7 @@ from harness.state import Classification
 from harness import merge_danger as md
 from harness.gate_backtest import _ARMING_PATHS, detect_gate_changes
 from tests.test_armable import BODY_CLEARED, _CHARACTERIZATION_FIXTURES, inputs
-from tests.test_merge_danger import _derive
+from tests.test_merge_danger import _clear, _derive
 
 
 def _cond(decision, number):
@@ -134,3 +134,26 @@ def test_rearm_bin_path_is_arming_harness_not_replayable():
 def test_rearm_workflow_path_stays_ci_workflow():
     [g] = detect_gate_changes([("M", ".github/workflows/text-hold-recheck.yml")], lambda p: None, {})
     assert g.kind == "ci-workflow"
+
+
+@pytest.mark.parametrize("path", [
+    ".claude/agents/pr-second-reviewer.md",
+    ".claude/review-shared/_engineering-principles.md",
+])
+def test_review_seat_prose_alone_is_a_held_arming_change(path):
+    changed = [("M", path)]
+    gates = detect_gate_changes(changed, lambda p: None, {})
+    assert [(g.path, g.kind, g.state) for g in gates] == [(path, "arming-harness", "not-replayable")]
+    # No gate changes passed, so the trigger must come from the _ARMING_PATHS listing. A replay
+    # that would clear everything must not drop it.
+    d = md.derive_merge_danger(changed, "", [], lambda p: None, replay=_clear)
+    assert d.door == "two-way"
+    assert d.self_governing is True
+    assert f"arming-path:{path}" in d.triggers
+    assert d.replay_note.startswith("replay not run (")
+    two_way_body = "**Merge danger:** Door: two-way · Blast radius: module · Why: twenty chars of reason here"
+    state = md.classify_with_floor(two_way_body, _derive(changed, gates=gates))
+    assert state == "SELF-GOVERNING"
+    decision = evaluate(inputs(merge_danger_state=state))
+    assert not decision.armed
+    assert _cond(decision, 18).blocked

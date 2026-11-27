@@ -1,7 +1,7 @@
 ---
 name: pr-burndown
 description: "Burn down the open PRs that wait on the owner. Background headless jobs do the prep that needs no owner call (rebase, regenerate snapshots, write promised tests, fix review findings, re-fire post-plan). The owner sees only the decisions that are theirs: a status card per PR (CI on the current head, review threads, post-plan verdict, door and blast radius, conflicts, hold reasons, visual links) with a recommended option, answered in a batch."
-last_verified: 2026-11-23
+last_verified: 2026-11-26
 ---
 
 # /pr-burndown
@@ -144,6 +144,7 @@ It prints the live state the card needs:
 - **post-plan verdict:** the last `<!-- pr-ready-verdict -->` comment, marked `CURRENT`
   or `STALE` against the head. Commits after the review make it stale.
 - **Door and blast radius:** the `Merge danger:` line in the PR body.
+- **Fidelity evidence.** When the card data has a `fidelity-evidence:` row, print it verbatim. Post-plan writes it for a PR that edits `tools/postplan-harness/harness/fidelity.py`. It compares stored verdicts only and does not change the hold. Print STALE, missing, malformed, unknown and NOT RUN rows as they are.
 - **Visual links:** the `a-jay85.github.io/IBL5/...` URLs from the comments.
 - **Live run and worktree:** any live post-plan label, and the PR's worktree path.
 - **Owner approvals:** each `bin/owner-approve` comment, oldest first. Each row gives the mode, the approved head and whether the PR head moved past it, then the owner's words, the `condition:` line, any `kept:` bullets and, for a fix-first approval, `amendment: recorded`, `MISSING` or `no plan file`.
@@ -174,6 +175,7 @@ Write the card in this shape:
 - <✅/⚠️/❌/⏳> **Review comments:** <open count; what each said; which commit fixed it>.
 - <✅/✅📝/⚠️/❌/⏳/🚨> **post-plan verdict:** <verdict>. <Current or stale>. <Its notes, short>.
 - <✅2️⃣/⚠️2️⃣/🚨1️⃣> **Merge danger:** <one-way or two-way door, blast radius, what a revert does and doesn't undo>.
+- <✅/⚠️> **Fidelity evidence:** <the `fidelity-evidence:` row verbatim; omit this line when the data has none>
 - <✅🔙/⚠️/🚨> **Conflicts:** <none / behind master, no clash / which files clash and with which PR; the job rebases>.
 - <✅/⚠️/❌/⏳> **Why it's held:** <each reason by number; mark stale ones as stale>.
 - <✅/⚠️/🚨> **Owner approvals:** <none / each approval: mode, head unchanged or moved past it, the condition, the amendment status>.

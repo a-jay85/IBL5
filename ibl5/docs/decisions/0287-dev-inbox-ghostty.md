@@ -1,6 +1,6 @@
 ---
 description: ADR-0287. bin/discord-dm appends the full text of every message to a local inbox file, and the new bin/dev-inbox shows that file in a terminal tab and rings the bell on alert entries.
-last_verified: 2026-11-26
+last_verified: 2026-11-27
 ---
 
 > This ADR was drafted by the post-plan harness for this PR. A human must review and approve it before merging.
@@ -25,7 +25,7 @@ Repo scripts send dev alerts through `bin/discord-dm`. The owner had to keep Dis
 - A `--raw` body is JSON for a Discord-only button message. For a delivered one, the inbox stores a note telling the owner to open Discord, adds the JSON's `.digest` text when it has one, and leaves the rest of the JSON out. For a failed one, the inbox says it was not delivered and keeps the full JSON.
 - The inbox write is best-effort, like the sent log. A write failure never changes the exit code or output of `bin/discord-dm`. Past 5 MB the file rotates to `.1`.
 - `bin/dev-inbox` prints the last 10 entries, then follows the file. One `tail -F` reads both, so an entry that arrives during startup is not lost, and the viewer survives the rotation. It rings the terminal bell on a new entry for the `errors` target, an `undelivered` entry, a `raw:` entry, or a first line that starts with an alert mark. The backlog it prints at start never rings. `--no-bell` and `--once` cover quiet use and tests.
-- `bin/test-discord-dm` section S2 checks the header shape, the indent, the raw note and digest, the `--error` target, undelivered entries (including a failed raw send), the unwritable-inbox case, rotation, which entries ring the bell, a bad `--last` value, the `--help` text, an entry added during viewer startup, and a bad UTF-8 byte.
+- `bin/test-discord-dm` section S2 checks the header shape, the indent, the raw note and digest, the `--error` target, undelivered entries (including a failed raw send), the unwritable-inbox case, rotation (including two sends rotating at once), which entries ring the bell, control-byte stripping, a bad `--last` value, the `--help` text, an entry added during viewer startup, and a bad UTF-8 byte.
 
 ## Alternatives Considered
 

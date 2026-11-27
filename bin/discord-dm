@@ -390,12 +390,16 @@ log_inbox() { # target
     mkdir -p "$(dirname "$inbox")"
     size=$(stat -c %s "$inbox" 2>/dev/null || stat -f %z "$inbox" 2>/dev/null || echo 0)
     # Move to a private name first, then check the size again. A parallel send may have
-    # rotated already, so this can be its fresh file: append that back and keep .1.
+    # rotated already, so this can be its fresh file: put it back and keep .1.
     if [ "${size:-0}" -gt 5242880 ] && mv "$inbox" "$inbox.rot.$$"; then
         size=$(stat -c %s "$inbox.rot.$$" 2>/dev/null || stat -f %z "$inbox.rot.$$" 2>/dev/null || echo 0)
         if [ "${size:-0}" -gt 5242880 ]; then
             mv -f "$inbox.rot.$$" "$inbox.1"
+        elif ln "$inbox.rot.$$" "$inbox"; then
+            # A hard link keeps the inode, so dev-inbox's tail -F prints nothing twice.
+            rm -f "$inbox.rot.$$"
         else
+            # ln never overwrites: another send already made a new inbox, so append.
             cat "$inbox.rot.$$" >> "$inbox" && rm -f "$inbox.rot.$$"
         fi
     fi

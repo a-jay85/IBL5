@@ -1202,6 +1202,49 @@ s2_left=$(compgen -G "$INB.rot.*")
 { [ "$s2_old" = 5300000 ] && [ "$(grep -c '^@@ ' "$INB")" = 1 ] && grep -qxF '  after rotate' "$INB" && [ -z "$s2_left" ]; } \
     && ok "S2u past 5 MB: old file moves to .1, new entry starts fresh, no temp file" || fail "S2u old=$s2_old left=[$s2_left]"
 
+# Rotation race: the first size check sees a big inbox, but the moved file is small
+# because another send rotated in between. A stat stub fakes the big first size.
+# With S2_NEW_INBOX=1 that other send also makes a new inbox before the restore.
+# The stub is an exported function: discord-dm puts system dirs first on PATH.
+s2_inode() { stat -c %i "$1" 2>/dev/null || stat -f %i "$1"; }
+s2_race_send() (
+    stat() {
+        local last="${!#}"
+        if [ "$last" = "$DISCORD_DM_INBOX" ]; then echo 6000000; return 0; fi
+        case "$last" in
+            "$DISCORD_DM_INBOX".rot.*)
+                : > "$DISCORD_DM_INBOX.raced"
+                if [ "${S2_NEW_INBOX:-0}" = 1 ] && [ ! -e "$DISCORD_DM_INBOX" ]; then
+                    printf '%s\n' '@@ 2026-11-25T10:00:00-0800 dev other' '  other send' > "$DISCORD_DM_INBOX"
+                fi ;;
+        esac
+        command stat "$@"
+    }
+    export -f stat
+    DM_CAPTURE="$CAP" DISCORD_DM_SSH_BIN="$SSH_OK" DISCORD_DM_SPOOL="$SPOOL" DISCORD_DM_SENT_LOG="$SENT" \
+        DISCORD_DM_INBOX="$INB" "$DM" --to "$FAKE_TO" --attempts 1 --quiet "raced"
+)
+
+rm -f "$INB" "$INB.1" "$INB.raced"; : > "$CAP"
+printf '%s\n' '@@ 2026-11-25T09:00:00-0800 errors early' '  early entry' > "$INB"
+s2_ino=$(s2_inode "$INB")
+s2_race_send
+s2_ino_after=$(s2_inode "$INB")
+s2_left=$(compgen -G "$INB.rot.*")
+{ [ -e "$INB.raced" ] && [ "$s2_ino_after" = "$s2_ino" ] && [ "$(grep -c '^@@ ' "$INB")" = 2 ] \
+    && grep -qxF '  early entry' "$INB" && grep -qxF '  raced' "$INB" && [ ! -e "$INB.1" ] && [ -z "$s2_left" ]; } \
+    && ok "S2aa rotation race: the small inbox goes back under the same inode" \
+    || fail "S2aa inode=$s2_ino/$s2_ino_after left=[$s2_left] inbox=[$(cat "$INB")]"
+
+rm -f "$INB" "$INB.1" "$INB.raced"; : > "$CAP"
+printf '%s\n' '@@ 2026-11-25T09:00:00-0800 errors early' '  early entry' > "$INB"
+S2_NEW_INBOX=1 s2_race_send
+s2_left=$(compgen -G "$INB.rot.*")
+{ [ -e "$INB.raced" ] && [ "$(grep -c '^@@ ' "$INB")" = 3 ] && grep -qxF '  other send' "$INB" \
+    && grep -qxF '  early entry' "$INB" && grep -qxF '  raced' "$INB" && [ ! -e "$INB.1" ] && [ -z "$s2_left" ]; } \
+    && ok "S2ab rotation race with a new inbox: entries appended, nothing overwritten" \
+    || fail "S2ab left=[$s2_left] inbox=[$(cat "$INB")]"
+
 # bin/dev-inbox --once: the bell rings only on alert entries.
 BEL=$(printf '\007')
 printf '%s\n' '@@ 2026-11-25T11:00:00-0800 dev a' '  ✅ fine' \

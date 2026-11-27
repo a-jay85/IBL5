@@ -235,13 +235,21 @@ def test_colon_before_path_keeps_colon_key():
     assert got is not None and us.approval_covers(ci_finding, got)
 
 
-def test_path_parenthetical_residual_different_path_matches():
-    """Accepted widening: same words before ` (` and backtick, a different cited path,
-    the same key. The other bounds (owner comment, diff fingerprint, declared kept
-    block, classify keep) still apply in downgrade_applies."""
+def test_path_parenthetical_different_path_does_not_match():
+    """Same words before ` (` and backtick give the same key, but a different cited
+    path is a change the owner did not approve."""
     other_path = GO_FINDING.replace("(`.claude/rules/engine-go.md` line 9",
                                     "(`.claude/rules/other.md` line 9")
     assert other_path != GO_FINDING
     assert us.title_key(other_path) == GO_KEY
     got = _go_approval()
-    assert got is not None and us.approval_covers(other_path, got)
+    assert got is not None and not us.approval_covers(other_path, got)
+    assert not us._listed(other_path, _go_declared())
+
+
+def test_mid_title_citation_compares_the_cited_path():
+    approved = "- Remove the guard (`bin/check-a`) from the merge gate (`bin/check-a`)"
+    same = "- [BLOCKING] [unplanned-scope] Remove the guard (`bin/check-a:12`) from the gate"
+    other = "- [BLOCKING] [unplanned-scope] Remove the guard (`bin/check-b`) from the merge gate"
+    assert us._listed(same, approved)
+    assert not us._listed(other, approved)

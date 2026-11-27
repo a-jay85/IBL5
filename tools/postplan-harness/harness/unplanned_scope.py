@@ -305,26 +305,46 @@ def title_key(text: str) -> str:
     `render_kept_block` writes that path citation after each declared title, and a
     reviewer may put the path and prose there too, so the finding still matches the
     shorter declared and approved line (PR 4244). A ` (` with no backtick stays.
+    `_listed` separately compares the path that this last cut drops.
     """
+    return _key_sentence(text).split(" (`", 1)[0].strip()
+
+
+def _key_sentence(text: str) -> str:
+    """The title cut at the first `: ` and sentence end, path citation still attached."""
     title = title_of(text) if is_unplanned_scope(text) else _BULLET_RE.sub("", text.splitlines()[0] if text else "")
     title = _LEAD_TAGS_RE.sub("", title.strip())
     title = title.split(": ", 1)[0].split(". Next action", 1)[0]
-    title = title.split(". ", 1)[0].strip().rstrip(".").strip()
-    return title.split(" (`", 1)[0].strip()
+    return title.split(". ", 1)[0].strip().rstrip(".").strip()
 
 
-def _listed_keys(span: str) -> set:
-    """The title key of each bullet line in a kept block or an approval's kept span."""
-    return {title_key(ln) for ln in span.splitlines() if _BULLET_RE.match(ln)}
+_LINE_SUFFIX = r"(?::\d+(?:-\d+)?)?"
+
+
+def _key_citation(text: str) -> Optional[str]:
+    """The first backticked token `title_key` cuts off, minus a line number, else None."""
+    parts = _key_sentence(text).split(" (`", 1)
+    if len(parts) < 2:
+        return None
+    return re.sub(_LINE_SUFFIX + "$", "", parts[1].split("`", 1)[0])
 
 
 def _listed(text: str, span: str) -> bool:
-    """True when the finding's title, or its stable key, is listed in `span`."""
+    """True when the finding's title, or its stable key, is listed in `span`.
+
+    When the key cut off a path citation, the listed line must name that path too.
+    """
     title = title_of(text).strip()
     if len(title) >= MIN_TITLE_LEN and title in span:
         return True
     key = title_key(text)
-    return len(key) >= MIN_TITLE_LEN and key in _listed_keys(span)
+    if len(key) < MIN_TITLE_LEN:
+        return False
+    path = _key_citation(text)
+    cited = None if path is None else re.compile(f"`{re.escape(path)}{_LINE_SUFFIX}`")
+    return any(_BULLET_RE.match(ln) and title_key(ln) == key
+               and (cited is None or cited.search(ln) is not None)
+               for ln in span.splitlines())
 
 
 def render_kept_block(kept: Sequence[dict], ctx: Optional[dict]) -> str:

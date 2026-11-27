@@ -1,6 +1,6 @@
 ---
 description: ADR-0236. Two engines coexist, the faithful JSB port in engine/ and a clean-room engine in a private repo; bin/check-engine-freeze allows decompile tokens only under engine/ and jsb-native/
-last_verified: 2026-11-24
+last_verified: 2026-11-26
 ---
 
 # ADR-0236: Two engines, the faithful JSB port in engine/ and a clean-room engine elsewhere
@@ -75,3 +75,7 @@ Three homes follow from that choice:
 In the Clean-room hygiene section, "decompile material" that stays in this repo means decompile tokens, which are the symbol citations in the port. Pasted decompiled C, the binary and raw captures stay in jsb-native.
 
 The Allowlist entries section calls `jsb-native/` untracked. It is a separate private repo, cloned at `jsb-native/` inside the main checkout and listed in `.gitignore`. The `jsb-native/` allowlist entry still matches no tracked IBL5 file.
+
+## Addendum (2026-11-26): trace captures move into IBL5
+
+[ADR-0286](0286-in-repo-jsb-trace-captures.md) moved the raw JSB trace captures into IBL5 under `engine/testdata/jsb-captures/`. The owner accepted on 2026-11-24 that the capture files become public. The 2026-11-24 addendum above says captures stay in jsb-native under ADR-0278. That part no longer holds. The binary, pasted decompiled C, the master reference and the calibration corpus still stay in jsb-native.

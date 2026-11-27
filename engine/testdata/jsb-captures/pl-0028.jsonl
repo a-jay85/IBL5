@@ -1,0 +1,2 @@
+{"format":"jsb-trace/1","source":"frida","jsb_build":"5.60","function":"FUN_004e04d0","address":"0x004e04d0"}
+{"in":{"args":[294645792,294645761,294746984,175429796,1766388,294645792],"rand":[22741]},"out":{"ret":2}}

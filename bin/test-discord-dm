@@ -1130,5 +1130,201 @@ out=$(DM_CAPTURE="$CAP" DISCORD_DM_SSH_BIN="$SSH_OK" DISCORD_DM_SPOOL="$SPOOL" D
 [ -z "$out" ] && ok "S1n --quiet stays quiet when logging fails" || fail "S1n out=[$out]"
 "$DM" --help | tail -1 | grep -q '^Exit:' && ok "S1o --help ends at the Exit line" || fail "S1o help tail: $("$DM" --help | tail -1)"
 
+# ── S2: dev inbox (full message for bin/dev-inbox) ────────────────────────────
+printf '\n── S2: dev inbox ──\n'
+INB="$TMP/inbox.log"
+DEV_INBOX="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/dev-inbox"
+rm -f "$INB"; : > "$CAP"
+printf '@@ fake header\nline two' > "$TMP/s2msg.txt"
+DM_CAPTURE="$CAP" DISCORD_DM_SSH_BIN="$SSH_OK" DISCORD_DM_SPOOL="$SPOOL" DISCORD_DM_SENT_LOG="$SENT" \
+    DISCORD_DM_INBOX="$INB" DISCORD_DM_CALLER="my script" "$DM" --to "$FAKE_TO" --attempts 1 --quiet - < "$TMP/s2msg.txt"
+s2_hdr=$(head -n 1 "$INB")
+case "$s2_hdr" in "@@ "[0-9][0-9][0-9][0-9]-*" dm my_script") ok "S2a header: time, target, caller with no spaces" ;; *) fail "S2a header=[$s2_hdr]" ;; esac
+[ "$(sed -n 2,3p "$INB")" = "$(printf '  @@ fake header\n  line two')" ] && ok "S2b body indented, so a body line never reads as a header" || fail "S2b body=[$(sed -n 2,3p "$INB")]"
+[ "$(grep -c '^@@ ' "$INB")" = 1 ] && ok "S2c one header per message" || fail "S2c headers=$(grep -c '^@@ ' "$INB")"
+
+rm -f "$INB"; : > "$CAP"
+DM_CAPTURE="$CAP" DISCORD_DM_SSH_BIN="$SSH_OK" DISCORD_DM_SPOOL="$SPOOL" DISCORD_DM_SENT_LOG="$SENT" \
+    DISCORD_DM_INBOX="$INB" "$DM" --attempts 1 --quiet --raw --route /discordApproveDM '{"a":1}'
+{ grep -q '^@@ .* raw:/discordApproveDM ' "$INB" && grep -qF 'Open Discord to act on it.' "$INB" && ! grep -qF '{"a":1}' "$INB"; } \
+    && ok "S2d raw: a note to open Discord, not the JSON" || fail "S2d inbox=[$(cat "$INB")]"
+
+rm -f "$INB"; : > "$CAP"
+DM_CAPTURE="$CAP" DISCORD_DM_SSH_BIN="$SSH_OK" DISCORD_DM_SPOOL="$SPOOL" DISCORD_DM_SENT_LOG="$SENT" \
+    DISCORD_DM_INBOX="$INB" "$DM" --attempts 1 --quiet --raw --route /discordPlanReviewDM \
+    '{"slug":"s","digest":"plan-now: x\n@@ not a header\nlog: /tmp/l"}'
+{ grep -qF 'Open Discord to act on it.' "$INB" && grep -qxF '  plan-now: x' "$INB" \
+    && grep -qxF '  @@ not a header' "$INB" && grep -qxF '  log: /tmp/l' "$INB" \
+    && [ "$(grep -c '^@@ ' "$INB")" = 1 ] && ! grep -qF '"slug"' "$INB"; } \
+    && ok "S2x raw with digest: note plus the indented digest, not the JSON" || fail "S2x inbox=[$(cat "$INB")]"
+
+rm -f "$INB"; : > "$CAP"
+DM_CAPTURE="$CAP" DISCORD_DM_SSH_BIN="$SSH_OK" DISCORD_DM_SPOOL="$SPOOL" DISCORD_DM_SENT_LOG="$SENT" \
+    DISCORD_DM_INBOX="$INB" "$DM" --to "$FAKE_TO" --attempts 1 --quiet --route /otherDM "✅ done"
+grep -q '^@@ .* route:/otherDM ' "$INB" && ok "S2l plain text on another route keeps the route: target" || fail "S2l inbox=[$(cat "$INB")]"
+r_out=$(DISCORD_DM_INBOX="$INB" "$DEV_INBOX" --once)
+{ [[ "$r_out" != *$'\007'* ]] && grep -qF "✅ done" <<< "$r_out"; } && ok "S2m a plain route: entry does not ring" || fail "S2m out=[$r_out]"
+
+rm -f "$INB" "$SENT"; : > "$CAP"
+DM_CAPTURE="$CAP" DISCORD_DM_SSH_BIN="$SSH_OK" DISCORD_DM_SPOOL="$SPOOL" DISCORD_DM_SENT_LOG="$SENT" \
+    DISCORD_DM_INBOX="$INB" DISCORD_DM_ERRORS_WEBHOOK_FILE="$TMP/absent-errors-webhook-url" \
+    "$DM" --to "$FAKE_TO" --attempts 1 --quiet --error "fell back"
+r_out=$(DISCORD_DM_INBOX="$INB" "$DEV_INBOX" --once)
+{ grep -q '^@@ .* errors ' "$INB" && [ "$(cut -f2 "$SENT")" = dm ] && [[ "$r_out" == *$'\007'* ]]; } \
+    && ok "S2y --error over the DM: inbox says errors and rings, sent log stays dm" \
+    || fail "S2y inbox=[$(cat "$INB")] sent=[$(cat "$SENT")]"
+
+rm -f "$INB" "$SPOOL"
+DISCORD_DM_SSH_BIN="$TMP/ssh-400" DISCORD_DM_SPOOL="$SPOOL" DISCORD_DM_SENT_LOG="$SENT" DISCORD_DM_INBOX="$INB" \
+    "$DM" --to "$FAKE_TO" --attempts 1 --quiet "lost one" 2>/dev/null
+{ grep -q '^@@ .* undelivered ' "$INB" && grep -qF '  lost one' "$INB"; } \
+    && ok "S2e failure: inbox entry with target undelivered" || fail "S2e inbox=[$(cat "$INB" 2>/dev/null)]"
+
+rm -f "$INB" "$SPOOL"
+DISCORD_DM_SSH_BIN="$TMP/ssh-400" DISCORD_DM_SPOOL="$SPOOL" DISCORD_DM_SENT_LOG="$SENT" DISCORD_DM_INBOX="$INB" \
+    "$DM" --attempts 1 --quiet --raw --route /discordApproveDM '{"a":1}' 2>/dev/null
+{ grep -q '^@@ .* undelivered ' "$INB" && grep -qF 'was NOT delivered' "$INB" \
+    && grep -qF '{"a":1}' "$INB" && ! grep -qF 'Open Discord to act on it.' "$INB"; } \
+    && ok "S2r failed raw send: inbox says not delivered, keeps the JSON" || fail "S2r inbox=[$(cat "$INB" 2>/dev/null)]"
+
+: > "$CAP"
+out=$(DM_CAPTURE="$CAP" DISCORD_DM_SSH_BIN="$SSH_OK" DISCORD_DM_SPOOL="$SPOOL" DISCORD_DM_SENT_LOG="$SENT" \
+    DISCORD_DM_INBOX="$TMP/notadir/sub/inbox" "$DM" --to "$FAKE_TO" --attempts 1 --quiet "q" 2>&1)
+s2_rc=$?
+{ [ "$s2_rc" = 0 ] && [ -z "$out" ]; } && ok "S2f unwritable inbox: exit 0, quiet" || fail "S2f rc=$s2_rc out=[$out]"
+
+rm -f "$INB" "$INB.1"; : > "$CAP"
+head -c 5300000 /dev/zero | tr '\0' x > "$INB"
+DM_CAPTURE="$CAP" DISCORD_DM_SSH_BIN="$SSH_OK" DISCORD_DM_SPOOL="$SPOOL" DISCORD_DM_SENT_LOG="$SENT" \
+    DISCORD_DM_INBOX="$INB" "$DM" --to "$FAKE_TO" --attempts 1 --quiet "after rotate"
+s2_old=$(wc -c < "$INB.1" | tr -d ' ')
+{ [ "$s2_old" = 5300000 ] && [ "$(grep -c '^@@ ' "$INB")" = 1 ] && grep -qxF '  after rotate' "$INB" && [ ! -e "$INB.rotlock" ]; } \
+    && ok "S2u past 5 MB: old file moves to .1, new entry starts fresh, lock released" || fail "S2u old=$s2_old"
+
+# Rotation race and lock. A stat stub fakes a big size for the first S2_BIG_CALLS
+# checks of the inbox. An mv stub records any move. Both are exported functions:
+# discord-dm puts system dirs first on PATH.
+s2_race_send() (
+    stat() {
+        if [ "${!#}" = "$DISCORD_DM_INBOX" ]; then
+            echo x >> "$DISCORD_DM_INBOX.stats"
+            if [ "$(wc -l < "$DISCORD_DM_INBOX.stats")" -le "$S2_BIG_CALLS" ]; then echo 6000000; return 0; fi
+        fi
+        command stat "$@"
+    }
+    mv() { echo "$*" >> "$DISCORD_DM_INBOX.moved"; command mv "$@"; }
+    export -f stat mv
+    export S2_BIG_CALLS
+    DM_CAPTURE="$CAP" DISCORD_DM_SSH_BIN="$SSH_OK" DISCORD_DM_SPOOL="$SPOOL" DISCORD_DM_SENT_LOG="$SENT" \
+        DISCORD_DM_INBOX="$INB" "$DM" --to "$FAKE_TO" --attempts 1 --quiet "raced"
+)
+s2_race_reset() {
+    rm -f "$INB" "$INB.1" "$INB.stats" "$INB.moved" "$INB.rotlock"; : > "$CAP"
+    printf '%s\n' '@@ 2026-11-25T09:00:00-0800 errors early' '  early entry' > "$INB"
+}
+s2_untouched() {
+    [ ! -e "$INB.moved" ] && [ ! -e "$INB.1" ] && [ "$(grep -c '^@@ ' "$INB")" = 2 ] \
+        && grep -qxF '  early entry' "$INB" && grep -qxF '  raced' "$INB"
+}
+
+s2_race_reset
+S2_BIG_CALLS=1 s2_race_send
+{ [ "$(wc -l < "$INB.stats" | tr -d ' ')" -ge 2 ] && s2_untouched && [ ! -e "$INB.rotlock" ]; } \
+    && ok "S2aa rotation race: the second check sees a small inbox and never moves it" \
+    || fail "S2aa moved=[$(cat "$INB.moved" 2>/dev/null)] inbox=[$(cat "$INB")]"
+
+s2_race_reset; : > "$INB.rotlock"
+S2_BIG_CALLS=99 s2_race_send
+{ s2_untouched && [ -e "$INB.rotlock" ]; } \
+    && ok "S2ab another send holds the lock: append only, lock kept" \
+    || fail "S2ab moved=[$(cat "$INB.moved" 2>/dev/null)] inbox=[$(cat "$INB")]"
+
+s2_race_reset; : > "$INB.rotlock"; touch -t 202001010000 "$INB.rotlock"
+S2_BIG_CALLS=99 s2_race_send
+{ s2_untouched && [ ! -e "$INB.rotlock" ]; } \
+    && ok "S2ac stale lock: removed, this send only appends" \
+    || fail "S2ac moved=[$(cat "$INB.moved" 2>/dev/null)] inbox=[$(cat "$INB")]"
+S2_BIG_CALLS=99 s2_race_send
+{ grep -qxF '  early entry' "$INB.1" && [ "$(grep -c '^@@ ' "$INB")" = 1 ] && [ ! -e "$INB.rotlock" ]; } \
+    && ok "S2ad the next send rotates" || fail "S2ad inbox=[$(cat "$INB")]"
+rm -f "$INB.stats" "$INB.moved"
+
+# bin/dev-inbox --once: the bell rings only on alert entries.
+BEL=$(printf '\007')
+printf '%s\n' '@@ 2026-11-25T11:00:00-0800 dev a' '  ✅ fine' \
+    '@@ 2026-11-25T11:01:00-0800 dev b' '  ❓ need you' \
+    '@@ 2026-11-25T11:02:00-0800 errors c' '  boom' \
+    '@@ 2026-11-25T11:03:00-0800 dev d' '  plain' '  ❌ not first line' \
+    '@@ 2026-11-25T11:04:00-0800 dev e' '  🛑 STOPPED' \
+    '@@ 2026-11-25T11:05:00-0800 dev f' '  ⏱ TIMED OUT' \
+    '@@ 2026-11-25T11:06:00-0800 dev g' '  💥 runner exited rc=1' \
+    '@@ 2026-11-25T11:07:00-0800 raw:/discordApproveDM h' '  (button note)' \
+    '@@ 2026-11-25T11:08:00-0800 route:/otherDM i' '  ✅ done' > "$TMP/r.log"
+r_out=$(DISCORD_DM_INBOX="$TMP/r.log" "$DEV_INBOX" --once)
+r_bells=$(tr -cd "$BEL" <<< "$r_out" | wc -c | tr -d ' ')
+[ "$r_bells" = 6 ] && ok "S2g bell rings for ❓ 🛑 ⏱ 💥, #errors and raw: only" || fail "S2g bells=$r_bells"
+grep -qF "2026-11-25 11:01" <<< "$r_out" && ok "S2h date and time shown" || fail "S2h out=[$r_out]"
+grep -qxF "plain" <<< "$r_out" && ok "S2i body shown without its indent" || fail "S2i out=[$r_out]"
+r_out=$(DISCORD_DM_INBOX="$TMP/r.log" "$DEV_INBOX" --once --no-bell)
+r_bells=$(tr -cd "$BEL" <<< "$r_out" | wc -c | tr -d ' ')
+{ [ "$r_bells" = 0 ] && grep -qF "need you" <<< "$r_out"; } && ok "S2j --no-bell rings nothing" || fail "S2j bells=$r_bells out=[$r_out]"
+# Control bytes in a message never reach the terminal. Only the viewer's own
+# color codes may carry ESC, and UTF-8 bytes stay.
+ESC=$(printf '\033')
+printf '@@ 2026-11-25T11:00:00-0800 dev ev\033]52;c;aGk=\007il\n  hi \033[2J there \007 caf\303\251\n  second \033]0;title\007 line\n' > "$TMP/ctl.log"
+r_out=$(DISCORD_DM_INBOX="$TMP/ctl.log" "$DEV_INBOX" --once --no-bell)
+r_rest=$(sed -E "s/${ESC}\[(0|1|2|31|32)m//g" <<< "$r_out")
+{ [[ "$r_out" != *"$BEL"* ]] && [[ "$r_rest" != *"$ESC"* ]] && grep -qF "café" <<< "$r_out" \
+    && grep -qF "hi [2J there" <<< "$r_out" && grep -qF "second ]0;title line" <<< "$r_out" \
+    && grep -qF "ev]52;c;aGk=il" <<< "$r_out"; } \
+    && ok "S2z control bytes in header and body lines are stripped, UTF-8 kept" \
+    || fail "S2z out=[$(cat -v <<< "$r_out")]"
+DISCORD_DM_INBOX="$TMP/r.log" "$DEV_INBOX" --last x >/dev/null 2>&1
+s2_rc=$?
+[ "$s2_rc" = 2 ] && ok "S2k bad --last exits 2" || fail "S2k rc=$s2_rc"
+r_help=$("$DEV_INBOX" --help)
+r_help_last=$(tail -n 1 <<< "$r_help")
+[[ "$r_help_last" == Exit:* ]] && ok "S2s dev-inbox --help ends at the Exit line" || fail "S2s help tail=[$r_help_last]"
+grep -qF -- '[--once]' <<< "$r_help" && ok "S2t dev-inbox usage line lists --once" || fail "S2t help=[$r_help]"
+
+# Follow mode. This tail stub adds an entry just before the viewer starts to
+# follow, then drops -F so the viewer reads to the end and exits.
+mkdir -p "$TMP/s2bin"
+cat > "$TMP/s2bin/tail" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' '@@ 2026-11-25T12:02:00-0800 errors late' '  late boom' >> "$DISCORD_DM_INBOX"
+args=()
+for a in "$@"; do [ "$a" = -F ] || args+=("$a"); done
+exec "$REAL_TAIL" "${args[@]}"
+EOF
+chmod +x "$TMP/s2bin/tail"
+S2_TAIL=$(command -v tail)
+printf '%s\n' '@@ 2026-11-25T12:00:00-0800 errors a' '  old boom 1' \
+    '@@ 2026-11-25T12:01:00-0800 errors b' '  old boom 2' > "$TMP/f.log"
+r_out=$(PATH="$TMP/s2bin:$PATH" REAL_TAIL="$S2_TAIL" DISCORD_DM_INBOX="$TMP/f.log" "$DEV_INBOX" --last 1)
+r_bells=$(tr -cd "$BEL" <<< "$r_out" | wc -c | tr -d ' ')
+[[ "$r_out" == *"old boom 2"*"watching"*"late boom"* ]] \
+    && ok "S2n an entry added during startup shows after the watching line" || fail "S2n out=[$r_out]"
+[ "$r_bells" = 1 ] && ok "S2o only the startup-time entry rings, not the backlog" || fail "S2o bells=$r_bells"
+[[ "$r_out" != *"old boom 1"* ]] && ok "S2p --last trims the backlog" || fail "S2p out=[$r_out]"
+: > "$TMP/f.log"
+r_out=$(PATH="$TMP/s2bin:$PATH" REAL_TAIL="$S2_TAIL" DISCORD_DM_INBOX="$TMP/f.log" "$DEV_INBOX")
+r_bells=$(tr -cd "$BEL" <<< "$r_out" | wc -c | tr -d ' ')
+{ [[ "$r_out" == *"watching"*"late boom"* ]] && [ "$r_bells" = 1 ]; } \
+    && ok "S2q empty inbox: watching line first, new entry rings" || fail "S2q bells=$r_bells out=[$r_out]"
+
+# A cut-off multibyte character (bytes e2 80) must not stop the viewer. The UTF-8
+# locale is set here because macOS awk only fails on the byte under one.
+printf '%s\n' '@@ 2026-11-25T13:00:00-0800 dev a' $'  cut \342\200' \
+    '@@ 2026-11-25T13:01:00-0800 errors b' '  after bad byte' > "$TMP/u.log"
+r_out=$(LC_ALL=en_US.UTF-8 DISCORD_DM_INBOX="$TMP/u.log" "$DEV_INBOX" --once 2>&1)
+r_bells=$(LC_ALL=C tr -cd "$BEL" <<< "$r_out" | wc -c | tr -d ' ')
+{ [[ "$r_out" == *"after bad byte"* ]] && [ "$r_bells" = 1 ]; } \
+    && ok "S2v --once reads past a bad UTF-8 byte and still rings" || fail "S2v bells=$r_bells out=[$r_out]"
+r_out=$(LC_ALL=en_US.UTF-8 PATH="$TMP/s2bin:$PATH" REAL_TAIL="$S2_TAIL" DISCORD_DM_INBOX="$TMP/u.log" "$DEV_INBOX" 2>&1)
+r_bells=$(LC_ALL=C tr -cd "$BEL" <<< "$r_out" | wc -c | tr -d ' ')
+{ [[ "$r_out" == *"after bad byte"*"watching"*"late boom"* ]] && [ "$r_bells" = 1 ]; } \
+    && ok "S2w follow mode reads past a bad UTF-8 byte" || fail "S2w bells=$r_bells out=[$r_out]"
+
 # ── Summary ───────────────────────────────────────────────────────────────────
 h_done

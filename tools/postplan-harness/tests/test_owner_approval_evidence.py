@@ -245,6 +245,13 @@ def test_path_parenthetical_different_path_does_not_match():
     got = _go_approval()
     assert got is not None and not us.approval_covers(other_path, got)
     assert not us._listed(other_path, _go_declared())
+    # The approved path named later in the text does not stand in for the cited one.
+    also_names = other_path.replace("No plan phase names this file.",
+                                    "It also mentions `.claude/rules/engine-go.md`.")
+    assert also_names != other_path
+    assert us.title_key(also_names) == GO_KEY
+    assert not us.approval_covers(also_names, got)
+    assert not us._listed(also_names, _go_declared())
 
 
 GO_PATH = ".claude/rules/engine-go.md"

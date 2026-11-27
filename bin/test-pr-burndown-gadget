@@ -526,7 +526,10 @@ case_stale_no_live_risky() {
 }
 
 case_empty_env_runs() {
-    local out="$TMP/out/emptyenv.html" log doc row
+    local out="$TMP/out/emptyenv.html" log doc row src
+    # A read on a branch this render skips would pass the run below, so check the source too.
+    src="$(cat "$GADGET")" || return 1
+    lacks 'os.environ["HOME"]' "$src" "gadget source" || return 1
     log="$(env -i PATH=/usr/bin:/bin PR_BURNDOWN_TRIAGE_CMD="$STUB" FIX="$FIX" "$GADGET" \
         --judgment="$JUDGMENT" --out="$out" 2>&1)" || { echo "render failed: $log"; return 1; }
     [ -s "$out" ] || { echo "no out file: $log"; return 1; }

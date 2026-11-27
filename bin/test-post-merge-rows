@@ -203,6 +203,36 @@ h_eq "prose-text drops blockquote" 0 "$(grep -c 'quoted line' <<< "$_pt")"
 h_eq "prose-text drops comment" 0 "$(grep -c 'comment line' <<< "$_pt")"
 h_eq "prose-text keeps line after comment" 1 "$(grep -c 'after the comment' <<< "$_pt")"
 
+# A comment that closes on a `>` line must close; a `>` line outside a comment opens nothing.
+cat > "$SCRATCH/quote-close.md" <<'EOF'
+before the comment
+<!-- a note that spans
+> two lines and closes here -->
+after: run this after merge
+EOF
+_pt="$(pmr_prose_text "$SCRATCH/quote-close.md")"
+h_eq "prose-text comment closing on quote line keeps later prose" \
+    $'1\tbefore the comment\n4\tafter: run this after merge' "$_pt"
+_pt="$(pmr_prose_text "$SCRATCH/quote-close.md" 1)"
+h_eq "prose-text keep=1 output for quote-line close" \
+    $'1\tbefore the comment\n2\t<!-- a note that spans\n4\tafter: run this after merge' "$_pt"
+
+cat > "$SCRATCH/quote-open.md" <<'EOF'
+> quoted <!-- never closed
+later prose
+EOF
+_pt="$(pmr_prose_text "$SCRATCH/quote-open.md")"
+h_eq "prose-text unclosed comment in blockquote swallows nothing" $'2\tlater prose' "$_pt"
+
+cat > "$SCRATCH/quote-inside.md" <<'EOF'
+<!-- a note that spans
+> still inside the comment
+-->
+after the real close
+EOF
+_pt="$(pmr_prose_text "$SCRATCH/quote-inside.md")"
+h_eq "prose-text quote line inside comment prints nothing" $'4\tafter the real close' "$_pt"
+
 # --- waiver (matrix row 7) -----------------------------------------------------------
 printf 'no waiver here\n' > "$SCRATCH/w-none.md"
 printf '<!-- after-merge-prose-ok: 12345678901234 -->\n' > "$SCRATCH/w-14.md"

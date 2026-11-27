@@ -116,7 +116,7 @@ write_card "$FIX" 4260 mss=BLOCKED title='chore(held): keep 3f9e2b1 for review'
 
 cat > "$FIX/held.txt" <<'HELD'
 PR#  URL  TITLE  REASONS
-#4243  https://github.com/a-jay85/IBL5/pull/4243  feat(db): drop a column  (2) Code review found likely bugs;unresolved-finding:100;(18) This change is hard to undo: see notes
+#4243  https://github.com/a-jay85/IBL5/pull/4243  feat(db): drop a column  (2) Code review found likely bugs;unresolved-finding:100;(18) This change is hard to undo: see notes;body-hold;golden-changed;unresolved-findings-cap
 #4260  https://github.com/a-jay85/IBL5/pull/4260  chore(held): keep 3f9e2b1 for review  (7) The plan says a person must review and merge this PR.
 HELD
 
@@ -390,7 +390,15 @@ case_held_reasons_plain_words() {
     need_main || return 1
     card="$(line_of card 4243)" || return 1
     has 'Code review found likely bugs' "$card" "4243 card" || return 1
-    lacks '(2)' "$card" "4243 card"
+    lacks '(2)' "$card" "4243 card" || return 1
+    # pr-triage prints these tags with no colon, so the card must put them in words.
+    local tag
+    for tag in body-hold golden-changed unresolved-findings-cap; do
+        lacks "$tag" "$card" "4243 card" || return 1
+    done
+    has 'The PR description asks to hold the merge' "$card" "4243 card" || return 1
+    has 'The saved engine test results changed' "$card" "4243 card" || return 1
+    has 'Too many review findings to check them all' "$card" "4243 card"
 }
 
 case_held_machine_tokens_dropped() {

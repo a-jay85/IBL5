@@ -326,6 +326,22 @@ def parse_card(text: str):
     return values, extra
 
 
+# Hold tags pr-triage prints with no colon, so TOKEN_RE keeps them. Show words.
+PLAIN_REASONS = {
+    "body-hold": "The PR description asks to hold the merge",
+    "golden-changed": "The saved engine test results changed",
+    "ui-awaiting-signoff": "A visual change is waiting for your sign-off",
+    "ui-classifier-error": "Could not check for visual changes",
+    "pipeline-authored": "The bot wrote this PR on its own",
+    "pipeline-branch": "This is an automatic bug-fix branch",
+    "expected-red": "The PR description says a check will fail on purpose",
+    "unresolved-findings-api-error": "Could not check for open review findings",
+    "unresolved-findings-cap": "Too many review findings to check them all",
+    "open-threads-api-error": "Could not check for open review comments",
+    "open-threads-cap": "Too many review comments to check them all",
+}
+
+
 def parse_held(text: str) -> Dict[int, Held]:
     held: Dict[int, Held] = {}
     for line in text.split("\n"):
@@ -339,7 +355,7 @@ def parse_held(text: str) -> Dict[int, Held]:
             for item in columns[3].split(";"):
                 item = item.strip()
                 if item and not TOKEN_RE.match(item):
-                    reasons.append(HOLD_CODE_RE.sub("", item))
+                    reasons.append(PLAIN_REASONS.get(item) or HOLD_CODE_RE.sub("", item))
         held[number] = Held(columns[2] if len(columns) > 2 else "", reasons)
     return held
 

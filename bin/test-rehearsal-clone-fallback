@@ -380,6 +380,23 @@ expect_classify ssh-closed-port 0 "$SSHC" "Connection closed by $H port $P"
 expect_classify ssh-reset-port 0 "$SSHC" "Connection reset by $H port $P"
 case_end
 
+# The real ssh client ends its stderr lines with CRLF. Run 46070616151 printed
+# these two lines and got no-fallback, because the CR defeated every $ anchor.
+CR=$'\r'
+case_begin classify-ssh-crlf-lines
+expect_classify crlf-kex-reset 0 "$SSHC" \
+    "kex_exchange_identification: read: Connection reset by peer$CR"$'\n'"Connection reset by $H port $P$CR"
+expect_classify crlf-timeout 0 "$SSHC" "ssh: connect to host $H port $P: Connection timed out$CR"
+expect_classify crlf-hostkey-empty 0 "$SSHC" "Host key verification failed.$CR" --keyscan=empty
+expect_classify crlf-hostkey-present 1 "no-fallback: host key verification failed" \
+    "Host key verification failed.$CR" --keyscan=present
+expect_classify crlf-auth-wins 1 "no-fallback: ssh auth or hostname failure" \
+    "ssh: connect to host $H port $P: Connection timed out$CR"$'\n'"deploy@$H: Permission denied (publickey).$CR"
+expect_classify crlf-quoted-connect 1 "no-fallback:" \
+    "bash: line 7: ssh: connect to host $H port $P: Connection timed out$CR"
+expect_classify crlf-mid-line-cr 1 "no-fallback:" "Connection reset by $H port $P${CR}extra"
+case_end
+
 case_begin classify-ssh-hostkey-needs-empty-keyscan
 expect_classify hostkey-empty 0 "$SSHC" "Host key verification failed." --keyscan=empty
 expect_classify hostkey-present 1 "no-fallback: host key verification failed" "Host key verification failed." --keyscan=present

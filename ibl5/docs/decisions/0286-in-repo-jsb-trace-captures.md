@@ -1,6 +1,6 @@
 ---
 description: ADR-0286. JSB trace captures live in IBL5 under engine/testdata/jsb-captures/. Retires the jsb-native capture host of ADR-0278 and adds a per-file size cap.
-last_verified: 2026-11-26
+last_verified: 2026-11-27
 ---
 
 # ADR-0286: JSB trace captures live in IBL5
@@ -38,7 +38,7 @@ The defense from ADR-0266 stays. The harness reads the capture bytes from the co
 - Positive: CI and the local harness check a capture the same way.
 - Negative: the capture files are public. The content scan above is the only review they get before the owner's capture PR.
 - Negative: jsb-native `captures/` keeps its history and receives no new files.
-- Negative: all seven evidence files name a `test_blob` that no longer matches its test file, so `trace_pinned` cannot verify them again. Four of them pin older copies that `trace_pinned` stages under the name the test loads. `engine/testdata/jsb-captures/README.md` lists those copies.
+- Negative: all seven evidence files that this change rewrites name a `test_blob` that no longer matches its test file, so `trace_pinned` cannot verify them again. Four of them pin older copies that the pinned tests never load. Those copies keep each recorded sha256 matching a committed file. `engine/testdata/jsb-captures/README.md` lists them.
 
 ## Lineage
 

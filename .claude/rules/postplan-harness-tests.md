@@ -37,4 +37,4 @@ A plan's `check:` row follows the same rule. `.claude/skills/plan/_architect-con
 
 ## Replay specs for a new gate
 
-A new `bin/check-*` gate declares its replay spec in a `# gate-backtest-argv:` header in the script. Add a `REPLAY_SPECS` entry to `tools/postplan-harness/harness/gate_backtest.py` only when the spec needs `env`, `stdin`, `timeout`, `ok_exits` or `needs_plan` without a `{plan_file}` argv token, or when the backtest cannot replay the gate. `test_replay_specs_gains_no_header_expressible_key` in `tests/test_gate_backtest.py` fails on any other new entry.
+A new `bin/check-*` gate declares its replay spec in a `# gate-backtest-argv:` header in the script. Add a `REPLAY_SPECS` entry to `tools/postplan-harness/harness/gate_backtest.py` only when the spec needs `env`, `stdin`, `timeout`, `ok_exits` or `needs_plan` without a `{plan_file}` argv token, or when the backtest cannot replay the gate. `test_replay_specs_gains_no_header_expressible_key` in `tests/test_gate_backtest.py` fails on any other new `bin/check-*` entry. A new gate under `bin/lib/` still needs its entry, because the backtest finds a lib gate only through `REPLAY_SPECS`.

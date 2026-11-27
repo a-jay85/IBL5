@@ -270,6 +270,8 @@ def _header_inexpressible(spec):
 
 
 def _unjustified_new_keys(specs, frozen=FROZEN_REPLAY_SPEC_KEYS):
+    # detect_gate_changes finds a bin/lib gate only through its registry key, so keep those free to add.
+    specs = {k: v for k, v in specs.items() if k.startswith("bin/check-")}
     return sorted(k for k in set(specs) - frozen if not _header_inexpressible(specs[k]))
 
 
@@ -307,6 +309,11 @@ def test_freeze_allows_new_key_with_inexpressible_field():
 def test_freeze_ignores_removed_key():
     specs = {k: v for k, v in REPLAY_SPECS.items() if k != "bin/check-prose"}
     assert _unjustified_new_keys(specs) == []
+
+
+def test_new_lib_gate_key_is_not_frozen():
+    spec = ReplaySpec(argv=("--since={base}",))
+    assert _unjustified_new_keys({**REPLAY_SPECS, "bin/lib/zzz": spec}) == []
 
 
 def test_body_file_gates_replay_from_body_file():

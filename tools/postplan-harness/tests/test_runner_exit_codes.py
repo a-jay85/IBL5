@@ -498,6 +498,23 @@ def test_main_writes_no_blocked_ship_on_rc1(monkeypatch, tmp_path, capsys):
     assert not (out / "blocked-ship.txt").exists()
 
 
+def test_blocked_ship_uses_claimed_log_path(monkeypatch, tmp_path):
+    monkeypatch.setenv("POSTPLAN_LOG_PATH", "/tmp/run-1591.log")
+    runner._claim_log_path()
+    res = _res(TerminalState.FAILED, "local-gate", error=_ADR_DENIAL, slug="feat/x")
+    runner.write_blocked_ship(str(tmp_path), res, 3, "/wt")
+    assert "Log: /tmp/run-1591.log\n" in (tmp_path / "blocked-ship.txt").read_text()
+
+
+def test_main_claims_log_path(monkeypatch, tmp_path, capsys):
+    log = str(tmp_path / "run.log")
+    monkeypatch.setenv("POSTPLAN_LOG_PATH", log)
+    res = _res(TerminalState.FAILED, "push-failed", error="boom", slug="feat/x")
+    _drive_main(monkeypatch, tmp_path, res, capsys)
+    assert "POSTPLAN_LOG_PATH" not in os.environ
+    assert runner._claimed_log_path == log
+
+
 def test_blocked_ship_log_line_when_env_unset_or_empty(monkeypatch, tmp_path):
     res = _res(TerminalState.FAILED, "local-gate", error=_ADR_DENIAL, slug="feat/x")
     monkeypatch.delenv("POSTPLAN_LOG_PATH", raising=False)

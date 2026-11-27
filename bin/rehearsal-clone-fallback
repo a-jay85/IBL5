@@ -14,6 +14,7 @@
 #       "fallback: ssh-connect" and exits 0 when a whole stderr line is an ssh
 #       client network failure: connect timed out, refused, no route, network
 #       unreachable, or reset, or a connection closed or reset during key exchange.
+#       A trailing CR is dropped from each line first, since ssh writes CRLF.
 #       "Host key verification failed." counts only with --keyscan=empty (the
 #       runner holds no key for prod). The default is --keyscan=present. A
 #       "Permission denied" or "Could not resolve hostname" line always wins.
@@ -66,6 +67,14 @@ classify() {
         echo "no-fallback: empty stderr"
         exit 1
     fi
+    # The ssh client ends its own stderr lines with CRLF, so a trailing CR would
+    # defeat every $-anchored pattern below. Classify a copy with each line's
+    # trailing CR removed. A CR inside a line is kept, so lines are never joined.
+    local clean
+    clean=$(mktemp)
+    trap 'rm -f "$clean"' EXIT
+    sed $'s/\r$//' "$f" > "$clean"
+    f=$clean
     for re in \
         '(^|[^0-9A-Za-z])ERROR (1203|1040|2002|2003|2013) \([0-9A-Z]{5}\)' \
         'Got error: (1203|1040|2002|2003|2013): ' \

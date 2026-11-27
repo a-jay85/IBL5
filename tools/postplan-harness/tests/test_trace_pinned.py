@@ -6,6 +6,7 @@ for the Go toolchain, so the suite needs no Go install. The `go test -json` pars
 streams captured once from a real run (tests/fixtures/trace_pinned/)."""
 import json
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -870,142 +871,97 @@ def test_cover_pkgs_follow_declared_files(repo):
                                    "engine/main.go"]) == [MODULE, f"{MODULE}/internal/sim"]
 
 
-# ---- jsb-native-hosted captures ----
-
-HOSTED_NAME = "pl-0001.jsonl"
-HOSTED = f"captures/{HOSTED_NAME}"
+# ---- in-repo captures (ADR-0286) ----
 
 
-def _make_jsbn(tmp_path, text=None):
-    jsbn = tmp_path / "jsb-native"
-    jsbn.mkdir()
-    _git(jsbn, "init", "-q", "-b", "main")
-    _write(jsbn, HOSTED, text or _capture_text())
-    return jsbn, _commit(jsbn, "capture")
+def test_in_repo_capture_on_base_passes(repo):
+    root, base = repo
+    assert _verdict(root, base) == "ok"
 
 
-def _hosted_entry(root, jsbn, commit, **overrides):
-    data = _git_show(jsbn, commit, overrides.get("capture", HOSTED))
-    entry = _entry(root, capture=HOSTED, capture_host="jsb-native", capture_commit=commit,
-                   capture_sha256=tp._sha256(data) if data is not None else "")
-    entry.update(overrides)
-    return entry
+def test_in_repo_capture_sha_mismatch_held(repo):
+    root, base = repo
+    _write_evidence(root, capture_sha256="0" * 64)
+    assert _verdict(root, base) == "capture-hash-mismatch"
 
 
-def _git_show(root, commit, path):
-    proc = subprocess.run(["git", "show", f"{commit}:{path}"], cwd=root, capture_output=True)
-    return proc.stdout if proc.returncode == 0 else None
+def test_capture_only_in_working_tree_held(repo):
+    root, base = repo
+    new = f"{tp.CAPTURE_DIR}/new-capture.jsonl"
+    _write(root, new, _capture_text())
+    _write_evidence(root, capture=new, capture_sha256=tp._sha256((root / new).read_bytes()))
+    assert _verdict(root, base) == "capture-not-on-base"
 
 
-def _hosted_go(committed, normal="pass", perturbed="fail", calls=None):
-    """A fake run_go for hosted entries: both runs see a staged capture dir."""
-    def run_go(root, package, test, env=None, cover_profile=None, cover_pkgs=()):
-        staged = Path(env["JSB_TRACE_CAPTURE_DIR"]) / HOSTED_NAME
-        if calls is not None:
-            calls.append((bool(cover_profile), staged.read_bytes()))
-        if cover_profile:
-            assert staged.read_bytes() == committed
-            Path(cover_profile).write_text(_profile((ENGINE_FILE,)))
-            return normal
-        assert staged.read_bytes() != committed
-        return perturbed
-    return run_go
+def test_capture_missing_file_held(repo):
+    root, base = repo
+    _write_evidence(root, capture=f"{tp.CAPTURE_DIR}/absent.jsonl")
+    assert _verdict(root, base) == "capture-not-on-base"
 
 
-def _hosted_verdict(root, base, jsbn, entry, run_go=None):
-    data = {"schema": tp.SCHEMA, "token": "trace-pinned", "branch": BRANCH, "tests": [entry]}
-    committed = (_capture_text()).encode()
-    return tp.evaluate_data(root, BRANCH, base, CHANGED, data,
-                            run_go=run_go or _hosted_go(committed), jsbn_dir=jsbn)
+def test_capture_deleted_from_working_tree_held(repo):
+    root, base = repo
+    (root / CAPTURE).unlink()
+    assert _verdict(root, base) == "capture-hash-mismatch"
 
 
-@pytest.fixture
-def hosted(tmp_path):
-    root, base = _make_repo(tmp_path)
-    jsbn, commit = _make_jsbn(tmp_path)
-    return root, base, jsbn, commit
+def test_capture_over_size_cap_held(repo, monkeypatch):
+    root, base = repo
+    monkeypatch.setattr(tp, "MAX_CAPTURE_BYTES", len(_capture_text().encode()) - 1)
+    assert _verdict(root, base) == "capture-too-large"
 
 
-def test_hosted_capture_ok(hosted):
-    root, base, jsbn, commit = hosted
-    calls = []
-    run_go = _hosted_go(_capture_text().encode(), calls=calls)
-    assert _hosted_verdict(root, base, jsbn, _hosted_entry(root, jsbn, commit), run_go) == "ok"
-    assert [c[0] for c in calls] == [True, False]
+def test_capture_at_size_cap_passes(repo, monkeypatch):
+    root, base = repo
+    monkeypatch.setattr(tp, "MAX_CAPTURE_BYTES", len(_capture_text().encode()))
+    assert _verdict(root, base) == "ok"
 
 
-def test_hosted_capture_hash_mismatch_held(hosted):
-    root, base, jsbn, commit = hosted
-    entry = _hosted_entry(root, jsbn, commit, capture_sha256="0" * 64)
-    assert _hosted_verdict(root, base, jsbn, entry) == "capture-hash-mismatch"
+def test_jsb_native_host_entry_held_bad_host(repo):
+    root, base = repo
+    _write_evidence(root, capture="captures/x.jsonl", capture_host="jsb-native",
+                    capture_commit="a" * 40)
+    assert _verdict(root, base) == "capture-bad-host"
 
 
-def test_hosted_capture_missing_at_commit_held(hosted):
-    root, base, jsbn, commit = hosted
-    entry = _hosted_entry(root, jsbn, commit, capture="captures/pl-0002.jsonl")
-    assert _hosted_verdict(root, base, jsbn, entry) == "capture-not-at-commit"
+def test_record_rejects_capture_host_flag(tmp_path, monkeypatch, capsys):
+    root, _ = _make_repo(tmp_path)
+    monkeypatch.chdir(root)
+    with pytest.raises(SystemExit) as exc:
+        tp.main(["record", "--branch", BRANCH, "--test", f"{PACKAGE}:{TEST}",
+                 "--capture", CAPTURE_NAME, "--ported", ENGINE_FILE, "--capture-host", "repo"])
+    assert exc.value.code == 2
+    assert "unrecognized arguments" in capsys.readouterr().err
 
 
-def test_hosted_capture_commit_off_main_held(hosted):
-    root, base, jsbn, _ = hosted
-    _git(jsbn, "checkout", "-q", "-b", "side")
-    _write(jsbn, HOSTED, _capture_text(records=[RECORDS[0], RECORDS[0]]))
-    side = _commit(jsbn, "side capture")
-    _git(jsbn, "checkout", "-q", "main")
-    entry = _hosted_entry(root, jsbn, side)
-    assert _hosted_verdict(root, base, jsbn, entry) == "capture-commit-off-main"
+def test_check_passes_without_jsb_native_sibling(repo):
+    root, base = repo
+    assert not tp.jsb_native_dir(root).exists()
+    assert _verdict(root, base) == "ok"
 
 
-@pytest.mark.parametrize("commit", ["abc123", "A" * 40, "a" * 41, "main", "HEAD", "0" * 40, None],
-                         ids=["short", "uppercase", "41-chars", "branch-name", "head",
-                              "absent-object", "missing"])
-def test_hosted_capture_commit_bad_format_held(hosted, commit):
-    root, base, jsbn, good = hosted
-    entry = _hosted_entry(root, jsbn, good, capture_commit=commit)
-    assert _hosted_verdict(root, base, jsbn, entry) == "capture-commit-bad"
+def test_every_committed_capture_under_size_cap():
+    captures = sorted((REPO / tp.CAPTURE_DIR).glob("*.jsonl"))
+    assert captures
+    for capture in captures:
+        assert capture.stat().st_size <= tp.MAX_CAPTURE_BYTES, capture.name
 
 
-@pytest.mark.parametrize("path", ["captures/../x.jsonl", "capturesx/a.jsonl", "captures/a.json",
-                                  "captures/sub/a.jsonl", "engine/testdata/jsb-captures/a.jsonl"])
-def test_hosted_capture_bad_path_near_misses_held(hosted, path):
-    root, base, jsbn, commit = hosted
-    entry = _hosted_entry(root, jsbn, commit, capture=path)
-    assert _hosted_verdict(root, base, jsbn, entry) == "capture-bad-path"
-
-
-def test_hosted_capture_unknown_host_held(hosted):
-    root, base, jsbn, commit = hosted
-    entry = _hosted_entry(root, jsbn, commit, capture_host="github")
-    assert _hosted_verdict(root, base, jsbn, entry) == "capture-bad-host"
-
-
-def test_hosted_capture_host_unavailable_held(hosted, tmp_path):
-    root, base, jsbn, commit = hosted
-    entry = _hosted_entry(root, jsbn, commit)
-    assert _hosted_verdict(root, base, tmp_path / "absent", entry) == "capture-host-unavailable"
-
-
-def test_hosted_run_uses_committed_bytes(hosted):
-    root, base, jsbn, commit = hosted
-    committed = _capture_text().encode()
-    (jsbn / HOSTED).write_text(_capture_text(records=[RECORDS[1], RECORDS[1]]))
-    calls = []
-    entry = _hosted_entry(root, jsbn, commit)
-    assert _hosted_verdict(root, base, jsbn, entry, _hosted_go(committed, calls=calls)) == "ok"
-    assert calls[0] == (True, committed)
-
-
-def test_hosted_circular_still_held(hosted):
-    root, base, jsbn, commit = hosted
-    run_go = _hosted_go(_capture_text().encode(), perturbed="pass")
-    assert _hosted_verdict(root, base, jsbn, _hosted_entry(root, jsbn, commit), run_go) \
-        == f"circular: {TEST} passes with perturbed JSB outputs"
-
-
-def test_hosted_skip_is_held(hosted):
-    root, base, jsbn, commit = hosted
-    run_go = _hosted_go(_capture_text().encode(), normal="skip")
-    assert _hosted_verdict(root, base, jsbn, _hosted_entry(root, jsbn, commit), run_go) == "test-skip"
+def test_committed_evidence_entries_pin_in_repo_captures():
+    evidence_files = sorted((REPO / tp.EVIDENCE_DIR).glob("*.json"))
+    assert evidence_files
+    for evidence in evidence_files:
+        for entry in json.loads(evidence.read_text())["tests"]:
+            where = f"{evidence.name}:{entry['test']}"
+            assert entry.get("capture_host", "repo") == "repo", where
+            assert "capture_commit" not in entry, where
+            assert str(Path(entry["capture"]).parent) == tp.CAPTURE_DIR, where
+            assert (REPO / entry["capture"]).is_file(), where
+            # Hash only pinned `-<7hex>` copies. A later recapture overwrites a plain
+            # `pl-NNNN.jsonl`, so hashing it here would turn that capture PR red (thread
+            # 4697870450). `_check_capture` hashes every entry on its own port branch.
+            if re.search(r"-[0-9a-f]{7}\.jsonl$", entry["capture"]):
+                assert tp._sha256((REPO / entry["capture"]).read_bytes()) == entry["capture_sha256"], where
 
 
 def test_jsb_native_dir_is_common_dir_parent(tmp_path):
@@ -1018,35 +974,6 @@ def test_jsb_native_dir_is_common_dir_parent(tmp_path):
     want = (main / "jsb-native").resolve()
     assert tp.jsb_native_dir(tmp_path / "wt").resolve() == want
     assert tp.jsb_native_dir(main).resolve() == want
-
-
-def test_record_capture_host_jsb_native_pins_commit(hosted):
-    root, _, jsbn, commit = hosted
-    run_go = _hosted_go(_capture_text().encode())
-    assert tp.record(root, BRANCH, [f"{PACKAGE}:{TEST}"], [HOSTED_NAME], run_go=run_go,
-                     ported_specs=[ENGINE_FILE], capture_host="jsb-native", jsbn_dir=jsbn) == 0
-    entry = json.loads((root / EVIDENCE).read_text())["tests"][0]
-    assert entry["capture"] == HOSTED and entry["capture_host"] == "jsb-native"
-    assert entry["capture_commit"] == commit
-    assert entry["capture_sha256"] == tp._sha256(_capture_text().encode())
-
-
-def test_record_hosted_absent_capture_refused(hosted, capsys):
-    root, _, jsbn, _ = hosted
-    assert tp.record(root, BRANCH, [f"{PACKAGE}:{TEST}"], ["pl-0009.jsonl"],
-                     run_go=_hosted_go(b""), ported_specs=[ENGINE_FILE],
-                     capture_host="jsb-native", jsbn_dir=jsbn) == 1
-    assert "capture-commit-bad" in capsys.readouterr().err
-    assert not (root / EVIDENCE).exists()
-
-
-def test_record_rejects_unknown_capture_host(tmp_path, monkeypatch):
-    root, _ = _make_repo(tmp_path)
-    monkeypatch.chdir(root)
-    with pytest.raises(SystemExit) as exc:
-        tp.main(["record", "--branch", BRANCH, "--test", f"{PACKAGE}:{TEST}",
-                 "--capture", HOSTED_NAME, "--ported", ENGINE_FILE, "--capture-host", "github"])
-    assert exc.value.code == 2
 
 
 def test_repo_entry_without_host_unchanged(repo):

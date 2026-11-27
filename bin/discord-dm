@@ -52,6 +52,13 @@
 # preview. Caller = $DISCORD_DM_CALLER, else the parent script's basename, else
 # unknown. A logging failure never changes the exit code or output. See bin/dm-volume.
 #
+# Inbox: every message, delivered or not, also appends its FULL text to
+# ${DISCORD_DM_INBOX:-~/.claude/dev-inbox.log} for bin/dev-inbox to show in a terminal.
+# Each entry is a `@@ <time> <target> <caller>` line, then the message with every line
+# indented two spaces. Target is the sent-log target (`raw:<path>` for --raw, `errors`
+# for any --error), or `undelivered` on total failure. A --raw body is JSON for a
+# Discord-only message (buttons): the inbox notes it, shows .digest. Rotates past 5 MB.
+#
 # Exit: 0 delivered · 1 undeliverable (spooled) · 2 usage/config error.
 
 [ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
@@ -98,7 +105,7 @@ while [ $# -gt 0 ]; do
         --route)       ROUTE="${2:-}"; shift 2 ;;
         --raw)         RAW=1; shift ;;
         --error)       ERROR=1; shift ;;
-        -h|--help)     sed -n '2,55p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help)     sed -n '2,62p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         -)             MSG=$(cat); shift ;;
         --)            shift; MSG="$*"; break ;;
         -*)            echo "discord-dm: unknown option $1" >&2; exit 2 ;;
@@ -352,35 +359,92 @@ for chunk in "${CHUNKS[@]}"; do
     fi
 done
 
+# Target and caller for the sent log and the inbox. Sets KIND and CALLER.
+resolve_target() {
+    local args word
+    if [ "$USE_WEBHOOK" = 1 ]; then KIND="$WEBHOOK_KIND"
+    elif [ "$RAW" = 1 ] || [ "$ROUTE" != "/discordDM" ]; then KIND="route:$ROUTE"
+    else KIND="dm"; fi
+    CALLER="${DISCORD_DM_CALLER:-}"
+    if [ -z "$CALLER" ]; then
+        args=$(ps -o args= -p "$PPID" 2>/dev/null)
+        for word in $args; do
+            case "$word" in bin/*|*/bin/*) [ -f "$word" ] && { CALLER="${word##*/}"; break; } ;; esac
+        done
+        [ -n "$CALLER" ] || CALLER="${args%% *}"
+        CALLER="${CALLER##*/}"
+    fi
+    [ -n "$CALLER" ] || CALLER="unknown"
+    CALLER=$(printf '%s' "$CALLER" | tr '\t\r\n' '   ')
+}
+
+# Inbox: the full message for bin/dev-inbox. Best-effort, like the sent log.
+log_inbox() { # target
+    local inbox size body entry target digest lock
+    target="$1"
+    # dev-inbox rings for raw: (a button message), not for every non-default route.
+    [ "$RAW" = 1 ] && [ "$target" != undelivered ] && target="raw:$ROUTE"
+    # An --error send that fell back to #dev or the DM must still ring in dev-inbox.
+    [ "$ERROR" = 1 ] && [ "$target" != undelivered ] && target="errors"
+    inbox="${DISCORD_DM_INBOX:-$HOME/.claude/dev-inbox.log}"
+    mkdir -p "$(dirname "$inbox")"
+    size=$(stat -c %s "$inbox" 2>/dev/null || stat -f %z "$inbox" 2>/dev/null || echo 0)
+    # Rotate under a lock and check the size again there: a parallel send may have
+    # rotated already. Never move a small inbox, even to put it straight back: macOS
+    # tail -F (bin/dev-inbox) then prints the whole file again.
+    if [ "${size:-0}" -gt 5242880 ]; then
+        lock="$inbox.rotlock"
+        # noclobber creates the lock with O_EXCL, so one send owns it.
+        if (set -C; : > "$lock"); then
+            size=$(stat -c %s "$inbox" 2>/dev/null || stat -f %z "$inbox" 2>/dev/null || echo 0)
+            [ "${size:-0}" -gt 5242880 ] && mv -f "$inbox" "$inbox.1"
+            rm -f "$lock"
+        else
+            # Busy: skip. A killed send leaves its lock behind, so drop an old one
+            # and let a later send rotate.
+            find "$lock" -mmin +1 -delete
+        fi
+    fi
+    if [ "$RAW" = 1 ] && [ "$target" = undelivered ]; then
+        # Nothing reached Discord, so keep the JSON: the inbox holds the only copy.
+        body="(Discord-only message for $ROUTE was NOT delivered. Payload:)"$'\n'"$FULL_MSG"
+    elif [ "$RAW" = 1 ]; then
+        body="(Discord-only message for $ROUTE, such as buttons. Open Discord to act on it.)"
+        # .digest is the readable text under the buttons (bin/plan-now's verdict).
+        digest=$(jq -r '.digest | strings' <<< "$FULL_MSG" 2>/dev/null) || digest=""
+        [ -z "$digest" ] || body+=$'\n'"$digest"
+    else
+        body="$FULL_MSG"
+    fi
+    # Bash's printf writes line by line, so build the entry first and let cat append it.
+    # cat copies in buffer-sized chunks: a small entry goes in one write, but parallel
+    # sends of very large messages can mix their lines. <<< adds the last \n.
+    printf -v entry '@@ %s %s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$target" "${CALLER// /_}"
+    body=${body//$'\r'/}
+    entry+="  ${body//$'\n'/$'\n  '}"
+    cat <<< "$entry" >> "$inbox"
+}
+
 # Sent log: one line per delivered message. Best-effort by design: every failure is
 # swallowed so logging can never change a send's exit code or output.
 log_sent() {
-    local log kind caller args word preview
+    local log kind caller preview
     log="${DISCORD_DM_SENT_LOG:-$HOME/.claude/discord-dm-sent.log}"
-    if [ "$USE_WEBHOOK" = 1 ]; then kind="$WEBHOOK_KIND"
-    elif [ "$RAW" = 1 ] || [ "$ROUTE" != "/discordDM" ]; then kind="route:$ROUTE"
-    else kind="dm"; fi
-    caller="${DISCORD_DM_CALLER:-}"
-    if [ -z "$caller" ]; then
-        args=$(ps -o args= -p "$PPID" 2>/dev/null)
-        for word in $args; do
-            case "$word" in bin/*|*/bin/*) [ -f "$word" ] && { caller="${word##*/}"; break; } ;; esac
-        done
-        [ -n "$caller" ] || caller="${args%% *}"
-        caller="${caller##*/}"
-    fi
-    [ -n "$caller" ] || caller="unknown"
-    caller=$(printf '%s' "$caller" | tr '\t\r\n' '   ')
+    kind="$KIND"
+    caller="$CALLER"
     preview=$(printf '%s' "$FULL_MSG" | head -n 1 | tr '\t\r' '  ' | cut -c1-60)
     mkdir -p "$(dirname "$log")"
     printf '%s\t%s\t%s\t%s\t%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$kind" "$caller" \
         "$(printf '%s' "$FULL_MSG" | wc -c | tr -d ' ')" "$preview" >> "$log"
 }
 
+{ resolve_target; } >/dev/null 2>&1 || { KIND="dm"; CALLER="unknown"; }
 if [ "$DELIVERED" = 1 ]; then
     { log_sent; } >/dev/null 2>&1 || true
+    { log_inbox "$KIND"; } >/dev/null 2>&1 || true
     exit 0
 fi
+{ log_inbox undelivered; } >/dev/null 2>&1 || true
 
 # Total failure. The message is the whole point of the call, so never let it
 # evaporate: put it somewhere durable and somewhere visible, and exit non-zero so

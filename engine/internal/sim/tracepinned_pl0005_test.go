@@ -45,7 +45,6 @@ func requireKeys(t *testing.T, i int, side string, raw json.RawMessage, keys ...
 // and asserts the result equals the captured return exactly, from one raw draw
 // equal to in.rand[0].
 func TestTracePinnedPl0005RandInt(t *testing.T) {
-	jsbtrace.SkipIfAbsent(t, "pl-0005.jsonl")
 	c := jsbtrace.MustLoad(t, "pl-0005.jsonl")
 	if len(c.Records) == 0 {
 		t.Fatal("capture holds no records")

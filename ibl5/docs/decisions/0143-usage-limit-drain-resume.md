@@ -1,6 +1,6 @@
 ---
 description: Usage-limit drain, pause, and auto-resume for headless runners via an env-gated PreToolUse hook, pause markers, a drain token, and a launchd coordinator.
-last_verified: 2026-11-04
+last_verified: 2026-11-27
 ---
 
 # ADR-0143: Usage-limit drain, pause, and auto-resume
@@ -126,3 +126,15 @@ The Context section's mention of the 5-hour and weekly plan limits is history. I
 `restore_from_record` also returns success when the tree is already at `pre_tree`, so the harness's own discard still clears the record. Every other refusal stands.
 
 The harness test suite now strips the live gate context from its environment. A test that fed limit text to a real `ClaudeCli` had written a real pause marker for the post-plan run that launched it.
+
+## Addendum 2026-11-27: keep auto-resume after a kill report
+
+Backlog 1591 asked whether `bin/usage-gate-coordinator` should still resume a marker when `bin/post-plan-now` reported the run as killed. It should. The coordinator keeps auto-resume for that marker, and `usage_marker_eligible` accepts it.
+
+Two such events reached the log, both on 2026-11-04 (sessions 3214cbc4 and 348af89a). In each, the harness audit log shows `PAUSED: usage-pause: fidelity-remediation` in the same second as the kill report. Both were real usage pauses, so the kill reports were false. The coordinator's first resume of each run did real work. The resumed 3214cbc4 run finished the pipeline. The resumed 348af89a run worked until a second real usage pause. A harness test run by the fidelity fixer most likely inherited `POSTPLAN_LOG_PATH`, installed the real SIGTERM handler, and appended `RESULT: post-plan KILLED` to the live run log. That mechanism was reproduced on 2026-11-27; the two runs' own logs are gone. The runner now moves `POSTPLAN_LOG_PATH` out of its environment before it starts any child, and the harness tests clear it.
+
+A run that really was killed and still holds a marker gets resumed. A resume that reaches the marker clear in `bin/post-plan-now` removes the marker, so a later relaunch needs a new pause. A resume that exits earlier leaves the marker. `check_runaway` marks a marker stuck once its resume count reaches 5 and sends one DM. A usage window reset or a login switch later clears that count.
+
+Kill evidence still beats the marker in `postplan_postrun_pause`. The wrapper prints the killed result line and no paused line. This addendum settles only the coordinator's resume decision.
+
+`usage_limit_hit_marker` now logs `limit-hit-marker-written` after each marker it writes. The next marker that shows up with no writer line in `usage-gate.log` can then be traced.

@@ -114,11 +114,29 @@ def _last_audit_phase(audit) -> str:
     return "start"
 
 
+# The run log path, moved out of os.environ by main() so no child process inherits it.
+_claimed_log_path: str | None = None
+
+
+def _claim_log_path() -> None:
+    """Move POSTPLAN_LOG_PATH from os.environ into this module. Every child the runner
+    starts copies os.environ, and a child that installed the SIGTERM handler used to
+    append a false KILLED line to the live run log (backlog 1591)."""
+    global _claimed_log_path
+    _claimed_log_path = os.environ.pop("POSTPLAN_LOG_PATH", None)
+
+
+def _run_log_path() -> str:
+    """The run log path: the env value when set, else the one main() claimed. The env
+    comes first so a driver that installs the handler without main() still works."""
+    return os.environ.get("POSTPLAN_LOG_PATH") or _claimed_log_path or ""
+
+
 def _write_killed_line(signum: int) -> None:
-    """Append one `RESULT: post-plan KILLED` line to $POSTPLAN_LOG_PATH. stdout is only
+    """Append one `RESULT: post-plan KILLED` line to the run log (_run_log_path). stdout is only
     flushed at exit, so without this a killed run leaves an empty log. One os.write on an
     O_APPEND fd (no buffered file object); never raises."""
-    path = os.environ.get("POSTPLAN_LOG_PATH")
+    path = _run_log_path()
     if not path:
         return
     try:
@@ -5119,7 +5137,7 @@ def write_blocked_ship(out_dir: str, res: RunResult, rc: int, worktree: str) -> 
     Best effort: an OSError is swallowed so this text never changes the exit code."""
     if rc != 3:
         return
-    block = human_block(res, rc, worktree or "", os.environ.get("POSTPLAN_LOG_PATH", ""))
+    block = human_block(res, rc, worktree or "", _run_log_path())
     try:
         with open(os.path.join(out_dir, BLOCKED_SHIP_FILE), "w") as fh:
             fh.write(block + "\n")
@@ -5801,6 +5819,7 @@ def main() -> int:
     elif not args.worktree:
         ap.error("--worktree required in isolated mode")
 
+    _claim_log_path()
     _install_sigterm_handler()
     ledger = UsageLedger()
     if args.canned:

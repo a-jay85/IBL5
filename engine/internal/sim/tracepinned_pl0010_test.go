@@ -141,7 +141,6 @@ func decodePl0010(t *testing.T, i int, rec jsbtrace.Record) (pl0010In, pl0010Out
 // capture uses.
 func TestTracePinnedPl0010BallHandler(t *testing.T) {
 	const name = "pl-0010.jsonl"
-	jsbtrace.SkipIfAbsent(t, name)
 	c := jsbtrace.MustLoad(t, name)
 	if len(c.Records) == 0 {
 		t.Fatal("capture holds no records")
@@ -258,7 +257,6 @@ func TestTracePinnedPl0010BallHandler(t *testing.T) {
 // record, which shows it consumes every captured draw.
 func TestTracePinnedPl0010BallHandlerShortStream(t *testing.T) {
 	const name = "pl-0010.jsonl"
-	jsbtrace.SkipIfAbsent(t, name)
 	c := jsbtrace.MustLoad(t, name)
 	if len(c.Records) == 0 {
 		t.Fatal("capture holds no records")

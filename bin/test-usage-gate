@@ -3424,6 +3424,40 @@ test_postplan_pause_kill_beats_marker_3352() {
         "postrun-kill-beats-marker runner=post-plan-now sid=$SID_A rc=143"
 }
 
+test_limit_hit_marker_logs_1591() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    local rc
+    in_env "usage_limit_hit_marker post-plan-now $SID_A $PPN_BIN"
+    rc=$?
+    assert_eq lh_log_1591:rc 0 "$rc"
+    assert_contains lh_log_1591:logged "$(cat "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log")" \
+        "limit-hit-marker-written runner=post-plan-now sid=$SID_A zone="
+}
+
+test_limit_hit_marker_rejected_silent_1591() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    local rc
+    in_env "usage_limit_hit_marker post-plan-now not-a-sid $PPN_BIN"
+    rc=$?
+    assert_eq lh_log_1591:rejected-rc 1 "$rc"
+    assert_eq lh_log_1591:rejected-silent 0 \
+        "$(grep -c 'limit-hit-marker-written' "$IBL5_USAGE_GATE_STATE_DIR/usage-gate.log" 2>/dev/null || true)"
+}
+
+test_postplan_kill_marker_stays_eligible_1591() {
+    new_env
+    make_stub_bin "$STUB" "" "$BODY_B"
+    printf '%s' "$PP_KILLED" > "$T/log"
+    pp_seed_marker
+    in_env "postplan_postrun_pause $SID_A $PPN_BIN 143 1 $T/log" >/dev/null
+    local rc
+    in_env "usage_marker_eligible $SID_A $(date +%s)"
+    rc=$?
+    assert_eq pp_kill_1591:eligible 0 "$rc"
+}
+
 test_postplan_pause_killed_line_rc0() {
     new_env
     make_stub_bin "$STUB" "" "$BODY_B"

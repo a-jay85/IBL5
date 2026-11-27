@@ -285,7 +285,7 @@ if [ -n "$RESUME_ID" ]; then
     # than eval'd.
     OLD_MODEL=$(sed -n 's/^MODEL=//p' "$OLD_RUNNER" | head -1)
     OLD_DISPOSITION=$(sed -n 's/^DISPOSITION=//p' "$OLD_RUNNER" | head -1)
-    OLD_KICK=$(sed -n 's/^KICK_REQUESTED=//p' "$OLD_RUNNER" | head -1)
+    OLD_KICK=$(sed -n 's/^KICK_REQUESTED=//p' "$OLD_RUNNER" | head -1) # pipefail-ok: sed exits 0 with no match, and one runner line cannot fill a pipe
     case "$OLD_MODEL" in
         '' | *[!A-Za-z0-9._-]*) resume_refuse "runner $OLD_RUNNER has no parseable MODEL= line." ;;
     esac

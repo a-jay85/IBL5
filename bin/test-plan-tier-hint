@@ -297,8 +297,10 @@ if [ -e /usr/bin/claude ] || [ -e /bin/claude ]; then
     h_skip "J11 claude missing"
 else
     mkdir -p "$BASE_TMP/emptybin"
+    # Run under this harness's own bash: on macOS the stripped PATH would pick
+    # /bin/bash 3.2, which the hint's version guard rejects.
     env -u CI -u PLAN_TIER_HINT_CLAUDE PATH="$BASE_TMP/emptybin:/usr/bin:/bin" \
-        "$HINT" --explain --desc 'some task' </dev/null >"$OUT" 2>"$ERR"
+        "$BASH" "$HINT" --explain --desc 'some task' </dev/null >"$OUT" 2>"$ERR"
     expect_match "J11 no claude on PATH: default naming the missing CLI" \
         "^default${TAB}judge-failsafe: claude CLI not found" "$OUT"
 fi

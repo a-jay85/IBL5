@@ -233,6 +233,14 @@ EOF
 _pt="$(pmr_prose_text "$SCRATCH/quote-inside.md")"
 h_eq "prose-text quote line inside comment prints nothing" $'4\tafter the real close' "$_pt"
 
+cat > "$SCRATCH/quote-tail.md" <<'EOF'
+<!-- note
+> end --> quoted tail <!-- never closed
+later prose
+EOF
+_pt="$(pmr_prose_text "$SCRATCH/quote-tail.md")"
+h_eq "prose-text quote-line tail after close is dropped and opens nothing" $'3\tlater prose' "$_pt"
+
 # --- waiver (matrix row 7) -----------------------------------------------------------
 printf 'no waiver here\n' > "$SCRATCH/w-none.md"
 printf '<!-- after-merge-prose-ok: 12345678901234 -->\n' > "$SCRATCH/w-14.md"

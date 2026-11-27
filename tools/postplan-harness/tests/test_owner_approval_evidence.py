@@ -329,8 +329,27 @@ def test_exact_title_matches_with_only_tags_and_citations_around_it():
                  f"- {title} (`bin/check-a`, `bin/check-b`)\r", f"- {title} (no path cited)"):
         assert us._is_whole_bullet(title, line), line
     for line in (title, f"- Also {title}", f"- {title} for docs-only PRs",
-                 f"- {title} (for docs-only PRs)", f"- {title} (`bin/check-a`) for docs-only PRs"):
+                 f"- {title} (for docs-only PRs)", f"- {title} (`bin/check-a`) for docs-only PRs",
+                 f"- {title} (`bin/check-a` only for docs-only PRs)",
+                 f"- {title} (`bin/check-a` only for docs-only PRs) (`bin/check-a`)"):
         assert not us._is_whole_bullet(title, line), line
+
+
+def test_narrowing_words_inside_the_approved_parens_never_cover_other_words():
+    """The approved line narrows the change inside its parentheses, so a finding with
+    wider words there, or none, is not covered. An exact repeat still is."""
+    narrow = "- Relax the check (`bin/check-a` only for docs-only PRs)"
+    head = "- [BLOCKING] [unplanned-scope] Relax the check"
+    for line in (narrow, narrow + " (`bin/check-a`)"):
+        got = us.approval_from_comments([_comment(_body(span=(line,)))], FP)
+        assert got is not None
+        for tail in (" (`bin/check-a` for all PRs)", " (`bin/check-a`)", "",
+                     ": `bin/check-a` skips every PR"):
+            assert not us._listed(head + tail, line, ["bin/check-a"]), tail
+            assert not us.approval_covers(head + tail, got, ["bin/check-a"]), tail
+        same = head + narrow[len("- Relax the check"):]
+        assert us._listed(same, line, ["bin/check-a"])
+        assert us.approval_covers(same, got, ["bin/check-a"])
 
 
 def test_sentence_cut_inside_parens_keeps_the_words_after_them():

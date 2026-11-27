@@ -415,6 +415,24 @@ def _cites_one_of(text: str, dropped: Sequence[str]) -> bool:
     return not dropped or any(_names(text, token) for token in dropped)
 
 
+_CITATIONS_ONLY_RE = re.compile(r"(?: \((?:`[^`]+`(?:, `[^`]+`)*|no path cited)\))+")
+
+
+def _citations_only(tail: str) -> bool:
+    """True when `tail` is only path citation groups, with no other words inside or between."""
+    return _CITATIONS_ONLY_RE.fullmatch(tail) is not None
+
+
+def _key_drops_words(line: str) -> bool:
+    """True when `title_key` cuts more than path citations off `line`.
+
+    The bare ` owner` left of an `owner: "..."` quote does not count.
+    """
+    sentence = _key_sentence(line)
+    start = _annotation_start(sentence)
+    return start != -1 and not _citations_only(sentence[start:].removesuffix(" owner"))
+
+
 def _is_whole_bullet(title: str, line: str) -> bool:
     """True when the bullet `line` is `title`, give or take leading tags and path citations.
 
@@ -428,7 +446,7 @@ def _is_whole_bullet(title: str, line: str) -> bool:
     if not body.startswith(want):
         return False
     rest = body[len(want):]
-    return rest == "" or (rest.startswith((" (`", " (no path cited)")) and _runs_to_end(rest))
+    return rest == "" or _citations_only(rest)
 
 
 def _listed(text: str, span: str, changed_paths: Iterable[str] = ()) -> bool:
@@ -438,6 +456,8 @@ def _listed(text: str, span: str, changed_paths: Iterable[str] = ()) -> bool:
     That line must also name every changed path the finding cites anywhere in its text.
     When the key cut off a path citation, the line must name that path too. When only
     the line's key cut one off, the finding must name one of the line's cut citations.
+    A line whose key cut off other words never matches by key, because those words may
+    narrow the approved change.
     """
     named = cited_paths(text, changed_paths)
     lines = [ln for ln in span.splitlines() if all(_names(ln, path) for path in named)]
@@ -448,7 +468,7 @@ def _listed(text: str, span: str, changed_paths: Iterable[str] = ()) -> bool:
     if len(key) < MIN_TITLE_LEN:
         return False
     path = _key_citation(text)
-    return any(_BULLET_RE.match(ln) and title_key(ln) == key
+    return any(_BULLET_RE.match(ln) and title_key(ln) == key and not _key_drops_words(ln)
                and (_names(ln, path) if path is not None
                     else _cites_one_of(text, _dropped_citations(ln)))
                for ln in lines)

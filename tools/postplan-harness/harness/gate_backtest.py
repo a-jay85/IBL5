@@ -228,6 +228,9 @@ _ARMING_PATHS = (
     "bin/lib/text-hold-recheck.sh",
     ".github/workflows/text-hold-recheck.yml",
     ".github/workflows/text-hold-recheck-run.yml",
+    # The second-review seat and the plan architects read this file, so an edit to it is held
+    # like an edit to pr-second-reviewer.md.
+    ".claude/review-shared/_engineering-principles.md",
 )
 
 # runner.py builds ArmInputs and calls the seat, but most edits to it are not merge-rule

@@ -393,6 +393,28 @@ def _names(line: str, path: str) -> bool:
     return re.search(f"`{re.escape(path)}{_LINE_SUFFIX}`", line) is not None
 
 
+_CITATION_LIST_RE = re.compile(r" \((`[^`]+`(?:, `[^`]+`)*)")
+
+
+def _dropped_citations(line: str) -> list[str]:
+    """The cited tokens `title_key` cuts off `line`, minus line numbers.
+
+    Only the backticked list that opens each ` (` counts, not code in the prose after it.
+    """
+    sentence = _key_sentence(line)
+    start = _annotation_start(sentence)
+    if start == -1:
+        return []
+    return [re.sub(_LINE_SUFFIX + "$", "", token)
+            for group in _CITATION_LIST_RE.findall(sentence[start:])
+            for token in re.findall(r"`([^`]+)`", group)]
+
+
+def _cites_one_of(text: str, dropped: Sequence[str]) -> bool:
+    """True when nothing was dropped, or `text` names at least one dropped citation."""
+    return not dropped or any(_names(text, token) for token in dropped)
+
+
 def _is_whole_bullet(title: str, line: str) -> bool:
     """True when the bullet `line` is `title`, give or take leading tags and path citations.
 
@@ -414,7 +436,8 @@ def _listed(text: str, span: str, changed_paths: Iterable[str] = ()) -> bool:
 
     A title match must cover the whole bullet, so a shortened title never matches.
     That line must also name every changed path the finding cites anywhere in its text.
-    When the key cut off a path citation, the line must name that path too.
+    When the key cut off a path citation, the line must name that path too. When only
+    the line's key cut one off, the finding must name one of the line's cut citations.
     """
     named = cited_paths(text, changed_paths)
     lines = [ln for ln in span.splitlines() if all(_names(ln, path) for path in named)]
@@ -426,7 +449,8 @@ def _listed(text: str, span: str, changed_paths: Iterable[str] = ()) -> bool:
         return False
     path = _key_citation(text)
     return any(_BULLET_RE.match(ln) and title_key(ln) == key
-               and (path is None or _names(ln, path))
+               and (_names(ln, path) if path is not None
+                    else _cites_one_of(text, _dropped_citations(ln)))
                for ln in lines)
 
 

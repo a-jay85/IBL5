@@ -356,3 +356,24 @@ def test_stacked_trailing_citations_are_all_dropped():
     for suffix in ("(`bin/check-a`)", "(no path cited)"):
         line = f"- Relax the check (`bin/check-a` now calls `f()` (twice)) {suffix}"
         assert us.title_key(line) == "Relax the check", line
+
+
+def test_finding_without_a_citation_never_uses_a_citation_cut_from_the_approved_line():
+    """When only the approved line's key dropped a path, the finding must name it."""
+    approved = "- Relax the merge check (`bin/check-a`)"
+    changed = ["bin/check-a", "bin/check-b"]
+    got = us.approval_from_comments([_comment(_body(span=(approved,)))], FP)
+    assert got is not None
+    head = "- [BLOCKING] [unplanned-scope] Relax the merge check: "
+    for tail in ("`check-b` now exits 0 unconditionally", "skips every PR now"):
+        assert not us._listed(head + tail, approved, changed), tail
+        assert not us.approval_covers(head + tail, got, changed), tail
+    same = head + "`bin/check-a` now exits 0"
+    assert us._listed(same, approved, changed)
+    assert us.approval_covers(same, got, changed)
+
+
+def test_code_in_citation_prose_is_not_a_cut_citation():
+    approved = "- Relax the merge check (`bin/check-a` now returns `0`)"
+    finding = "- [BLOCKING] [unplanned-scope] Relax the merge check: `check-b` returns `0`"
+    assert not us._listed(finding, approved, ["bin/check-a", "bin/check-b"])

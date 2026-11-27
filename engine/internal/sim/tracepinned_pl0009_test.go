@@ -40,7 +40,6 @@ func decodePl0009In(t *testing.T, i int, raw json.RawMessage) pl0009In {
 // draws, in capture order, and the chosen type must equal the pick record's
 // captured type exactly.
 func TestTracePinnedPl0009Pick(t *testing.T) {
-	jsbtrace.SkipIfAbsent(t, "pl-0009.jsonl")
 	c := jsbtrace.MustLoad(t, "pl-0009.jsonl")
 	if len(c.Records) == 0 {
 		t.Fatal("capture holds no records")

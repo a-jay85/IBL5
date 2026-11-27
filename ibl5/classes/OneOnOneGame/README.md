@@ -1,6 +1,6 @@
 ---
 description: Fan-created one-on-one basketball mini-game (first to 21) with simulation engine, Discord result posting, and game replay support.
-last_verified: 2026-09-26
+last_verified: 2026-11-26
 ---
 
 # One-on-One Module
@@ -40,7 +40,7 @@ classes/OneOnOneGame/
 
 #### Data Transfer Objects (DTOs)
 
-- **OneOnOneGamePlayerStats**: Tracks player statistics during a game (FGM, FGA, 3PM, 3PA, ORB, REB, STL, BLK, TO, FOUL)
+- **OneOnOneGamePlayerStats**: Tracks player statistics during a game (FGM, FGA, FTM, FTA, 3PM, 3PA, ORB, REB, STL, BLK, TO, FOUL)
 - **OneOnOneGameResult**: Complete game result including scores, stats, play-by-play, and winner/loser info
 
 #### Core Classes
@@ -77,13 +77,23 @@ CREATE TABLE `ibl_one_on_one` (
   `gameid` int(11) NOT NULL DEFAULT 0,
   `playbyplay` mediumtext NOT NULL,
   `winner` varchar(32) NOT NULL DEFAULT '',
+  `winner_pid` int(11) DEFAULT NULL,
   `loser` varchar(32) NOT NULL DEFAULT '',
+  `loser_pid` int(11) DEFAULT NULL,
   `winscore` int(11) NOT NULL DEFAULT 0,
   `lossscore` int(11) NOT NULL DEFAULT 0,
   `owner` varchar(25) NOT NULL DEFAULT '',
-  PRIMARY KEY (`gameid`)
+  PRIMARY KEY (`gameid`),
+  KEY `idx_winner` (`winner`),
+  KEY `idx_loser` (`loser`),
+  KEY `idx_winner_pid` (`winner_pid`),
+  KEY `idx_loser_pid` (`loser_pid`),
+  CONSTRAINT `fk_one_on_one_winner_pid` FOREIGN KEY (`winner_pid`) REFERENCES `ibl_plr` (`pid`) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `fk_one_on_one_loser_pid` FOREIGN KEY (`loser_pid`) REFERENCES `ibl_plr` (`pid`) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
+
+`OneOnOneGameRepository::saveGame()` does not write `winner_pid` or `loser_pid`.
 
 ## Testing
 

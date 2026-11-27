@@ -1,6 +1,6 @@
 ---
 description: ADR for the automouse autonomous workflow (formerly "nightly") — headless Claude executes queued plans via launchd on a recurring schedule.
-last_verified: 2026-09-26
+last_verified: 2026-11-26
 ---
 
 # ADR-0007: Nightly Autonomous Workflow
@@ -20,6 +20,12 @@ Use macOS `launchd` to fire a headless `claude -p` process on a recurring schedu
 
 Enforcement: `launchd` plist at `~/Library/LaunchAgents/com.ibl5.automouse.plist`. Queue managed by `bin/automouse/queue`. Prompts authored in `bin/automouse/prompt-impl` and `bin/automouse/prompt-postplan`.
 
+## Addendum — post-plan phase and headless gate (2026-11-26) <!-- slop-ok -->
+
+This ADR recorded two agents, with a post-plan agent (`bin/automouse/prompt-postplan`) running `/post-plan`. On 2026-11-26 `bin/automouse/run` calls `bin/post-plan-now --foreground --plan <plan>`, which runs the compiled harness (ADR-0092, ADR-0284), and `bin/automouse/README.md` records that the runner no longer invokes `prompt-postplan`.
+
+This ADR also recorded that `CLAUDE_HEADLESS=1` gates `/post-plan` Phase 11. On 2026-11-26 the help text in `bin/automouse/run` says it gates Phase 10.
+
 ## Alternatives Considered
 
 - **CronCreate (durable, in-REPL)** — session-local cron that fires while the REPL is idle. Rejected because: requires keeping a Claude Code REPL running overnight; context window pollution from daytime conversation; multi-instance ambiguity.
@@ -38,7 +44,7 @@ Enforcement: `launchd` plist at `~/Library/LaunchAgents/com.ibl5.automouse.plist
 
 - `bin/automouse/queue` — symlink queue helper
 - `bin/automouse/prompt-impl` — implementation agent prompt (queue check through handoff file)
-- `bin/automouse/prompt-postplan` — post-plan agent prompt (reads handoff, runs /post-plan, reports)
+- `bin/automouse/prompt-postplan` — post-plan agent prompt (no longer invoked by the runner) <!-- slop-ok -->
 - `bin/automouse/run` — launchd wrapper script
 - `.claude/rules/automouse-workflow.md` — workflow documentation
-- `.claude/skills/post-plan/SKILL.md` — Phase 11 `$CLAUDE_HEADLESS` gate
+- `bin/post-plan-now` — the post-plan entry point the runner calls with `--foreground` <!-- slop-ok -->

@@ -1,6 +1,6 @@
 ---
 description: Isolate destructive global-state E2E specs into a dedicated non-sharded Playwright project and CI job to prevent cross-shard reader/mutator collisions.
-last_verified: 2026-09-26
+last_verified: 2026-11-26
 ---
 
 # ADR-0052: Non-sharded mutator isolation job for destructive global-state E2E specs
@@ -15,6 +15,12 @@ Two E2E specs — `ibl5/tests/e2e/smoke/updater-awards.spec.ts` and `ibl5/tests/
 ## Decision
 
 Add a dedicated Playwright project named `mutators` in `ibl5/playwright.config.ts` whose `testMatch` captures exactly those two spec files. Exclude both files from the `chromium` project's `testIgnore` so the sharded run is strictly reader-only. Add a CI job `e2e-mutators` in `.github/workflows/e2e-tests.yml` that runs `--project=mutators --workers=1` with its own fresh Docker DB (via the existing `.github/actions/setup-docker-e2e` composite action). Wire `e2e-mutators` into both `gate.needs` and `merge-reports.needs` so a red mutators job blocks merge and its blob artifact is included in the merged HTML report. All future destructive global-state specs must be added to the `mutators` project, not `chromium`.
+
+## Addendum — mutator spec and shard counts (2026-11-26) <!-- slop-ok -->
+
+This ADR recorded that the `mutators` project `testMatch` captures exactly two spec files. On 2026-11-26 it captures 13 spec files in `ibl5/playwright.config.ts`, because later destructive specs were added to the project as the Decision requires.
+
+This ADR also recorded four shards. On 2026-11-26 the `e2e-shards` matrix in `.github/workflows/e2e-tests.yml` is `shard-index: [1]`, because the sharded run was cut to one shard.
 
 ## Alternatives Considered
 

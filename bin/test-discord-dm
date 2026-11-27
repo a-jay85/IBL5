@@ -1221,6 +1221,17 @@ grep -qxF "plain" <<< "$r_out" && ok "S2i body shown without its indent" || fail
 r_out=$(DISCORD_DM_INBOX="$TMP/r.log" "$DEV_INBOX" --once --no-bell)
 r_bells=$(tr -cd "$BEL" <<< "$r_out" | wc -c | tr -d ' ')
 { [ "$r_bells" = 0 ] && grep -qF "need you" <<< "$r_out"; } && ok "S2j --no-bell rings nothing" || fail "S2j bells=$r_bells out=[$r_out]"
+# Control bytes in a message never reach the terminal. Only the viewer's own
+# color codes may carry ESC, and UTF-8 bytes stay.
+ESC=$(printf '\033')
+printf '@@ 2026-11-25T11:00:00-0800 dev ev\033]52;c;aGk=\007il\n  hi \033[2J there \007 caf\303\251\n  second \033]0;title\007 line\n' > "$TMP/ctl.log"
+r_out=$(DISCORD_DM_INBOX="$TMP/ctl.log" "$DEV_INBOX" --once --no-bell)
+r_rest=$(sed -E "s/${ESC}\[(0|1|2|31|32)m//g" <<< "$r_out")
+{ [[ "$r_out" != *"$BEL"* ]] && [[ "$r_rest" != *"$ESC"* ]] && grep -qF "café" <<< "$r_out" \
+    && grep -qF "hi [2J there" <<< "$r_out" && grep -qF "second ]0;title line" <<< "$r_out" \
+    && grep -qF "ev]52;c;aGk=il" <<< "$r_out"; } \
+    && ok "S2z control bytes in header and body lines are stripped, UTF-8 kept" \
+    || fail "S2z out=[$(cat -v <<< "$r_out")]"
 DISCORD_DM_INBOX="$TMP/r.log" "$DEV_INBOX" --last x >/dev/null 2>&1
 s2_rc=$?
 [ "$s2_rc" = 2 ] && ok "S2k bad --last exits 2" || fail "S2k rc=$s2_rc"

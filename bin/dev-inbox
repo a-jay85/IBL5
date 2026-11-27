@@ -52,6 +52,11 @@ render() { # bell [skip quiet mark_at]
         }
         /^@@ / { n++ }
         n > skip {
+            # Drop control bytes (all but tab, plus DEL) before adding color, so a
+            # message cannot ring the bell, clear the screen or write the clipboard.
+            # Bytes 0x80+ stay: under LC_ALL=C they are the parts of UTF-8 text.
+            # gsub on $0 also re-splits the header fields. awk never holds a NUL.
+            gsub(/[\001-\010\013-\037\177]/, "")
             if ($0 ~ /^@@ /) {
                 ts = $2; kind = $3; caller = $4
                 t = substr(ts, 12, 5); d = substr(ts, 1, 10)

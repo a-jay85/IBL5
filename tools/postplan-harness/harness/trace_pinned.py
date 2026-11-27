@@ -74,6 +74,9 @@ INERT_DOC_SECTIONS = {"engine/docs/jsb-trace-capture.md": "## Rows blocked on a 
 _OLD_NEW_HUNK = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
 _DRAW_SITE_ENTRY = re.compile(r'^\s*"sim\.[A-Za-z0-9_.()*]+":\s*"(FUN_[0-9a-f]{8})?",\s*$')
 _COVER_LINE = re.compile(r"^(.+\.go):(\d+)\.\d+,(\d+)\.\d+ \d+ (\d+)$")
+# Markdown allows up to 3 leading spaces; a `=` or `-` run turns the text above into a heading
+_SETEXT_UNDERLINE = re.compile(r"^ {0,3}(?:=+|-+)[ \t\r]*$")
+_MD_HEADING_LINE = re.compile(rf"^ {{0,3}}#|{_SETEXT_UNDERLINE.pattern}")
 
 
 def evidence_rel(branch) -> str:
@@ -104,6 +107,15 @@ def _sha256(data: bytes) -> str:
 def _git_bytes(args, cwd) -> bytes:
     proc = subprocess.run(["git", *args], cwd=str(cwd), check=True, capture_output=True)
     return proc.stdout
+
+
+def _git_lines(data: bytes) -> list[str]:
+    """`data` split where git splits it, on "\\n" only: a lone `\\r` ends no line, and a CRLF
+    line keeps its `\\r`. Raises UnicodeDecodeError."""
+    lines = data.decode("utf-8").split("\n")
+    if not lines[-1]:
+        lines.pop()
+    return lines
 
 
 # --- (a) path allowlist -----------------------------------------------------------------------
@@ -422,18 +434,22 @@ def parse_cover_profile(text, module):
 
 
 def added_lines(root, base, path):
-    """Line numbers `path` adds in the work tree vs `base`; None on a git error."""
+    """Line numbers `path` adds in the work tree vs `base`; None on a git or decode error."""
     try:
         _git(["cat-file", "-e", f"{base}:{path}"], cwd=str(root))
     except subprocess.CalledProcessError:
-        text = (Path(root) / path).read_text()
-        return set(range(1, len(text.splitlines()) + 1))
+        try:
+            count = len(_git_lines((Path(root) / path).read_bytes()))
+        except UnicodeDecodeError:
+            return None
+        return set(range(1, count + 1))
     try:
-        diff = _git(["diff", "-U0", "--no-color", "--no-renames", base, "--", path], cwd=str(root))
-    except (subprocess.CalledProcessError, OSError):
+        diff = _git_lines(_git_bytes(
+            ["diff", "-U0", "--no-color", "--no-renames", base, "--", path], root))
+    except (subprocess.CalledProcessError, OSError, UnicodeDecodeError):
         return None
     lines = set()
-    for line in diff.splitlines():
+    for line in diff:
         hunk = _HUNK.match(line)
         if hunk:
             start = int(hunk.group(1))
@@ -453,12 +469,12 @@ def _text_hunks(root, base, path):
         return f"inert-path-missing: {path}"
     try:
         _git(["cat-file", "-e", f"{base}:{path}"], cwd=str(root))
-        diff = _git(["diff", "-U0", "--no-color", "--no-renames", "--no-ext-diff",
-                     base, "--", path], cwd=str(root))
-    except (subprocess.CalledProcessError, OSError):
+        diff = _git_lines(_git_bytes(["diff", "-U0", "--no-color", "--no-renames",
+                                      "--no-ext-diff", base, "--", path], root))
+    except (subprocess.CalledProcessError, OSError, UnicodeDecodeError):
         return f"inert-path-unreadable: {path}"
     hunks = []
-    for line in diff.splitlines():
+    for line in diff:
         found = _OLD_NEW_HUNK.match(line)
         if found:
             old_s, old_c, new_s, new_c = (int(g) if g is not None else 1 for g in found.groups())
@@ -468,7 +484,7 @@ def _text_hunks(root, base, path):
                 return f"inert-path-unsafe-diff: {path}"
         elif line.startswith(("+", "-")):
             hunks[-1][4].append(line)
-    if diff.strip() and not hunks:
+    if any(line.strip() for line in diff) and not hunks:
         return f"inert-path-unsafe-diff: {path}"
     return hunks
 
@@ -510,8 +526,8 @@ def doc_section_verdict(root, base, path) -> str:
     if isinstance(hunks, str):
         return hunks
     try:
-        old = _git(["show", f"{base}:{path}"], cwd=str(root)).splitlines()
-        new = (Path(root) / path).read_text().splitlines()
+        old = _git_lines(_git_bytes(["show", f"{base}:{path}"], root))
+        new = _git_lines((Path(root) / path).read_bytes())
     except (subprocess.CalledProcessError, OSError, UnicodeDecodeError):
         return f"inert-path-unreadable: {path}"
     old_span, new_span = _section_span(old, heading), _section_span(new, heading)
@@ -520,24 +536,40 @@ def doc_section_verdict(root, base, path) -> str:
     for old_s, old_c, new_s, new_c, lines in hunks:
         if not (_inside(old_s, old_c, old_span) and _inside(new_s, new_c, new_span)):
             return f"doc-change-outside-section: {path}"
-        if any(line[1:].startswith("#") for line in lines):
+        if any(_MD_HEADING_LINE.match(line[1:]) for line in lines):
+            return f"doc-change-outside-section: {path}"
+        # an unchanged underline becomes a heading when the change puts text right above it
+        after = new_s + new_c - 1 if new_c else new_s  # 0-based line following the change
+        if 0 < after < len(new) and new[after - 1].strip() \
+                and _SETEXT_UNDERLINE.match(new[after]):
+            return f"doc-change-outside-section: {path}"
+        # Markdown ends a line at a lone `\r`, so one can open a heading mid-line
+        if any("\r" in line.removesuffix("\r") for line in lines):
             return f"doc-change-outside-section: {path}"
     return "ok"
+
+
+def _go_code_lines(source):
+    """1-based numbers of the lines of Go `source` that are non-blank without comments."""
+    # group 1 is a comment; literals are matched so a marker or quote inside one is inert
+    token = r"""(//[^\n]*|/\*.*?(?:\*/|\Z))|"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|`[^`]*`"""
+    bare = re.sub(token, lambda m: "\n" * m[0].count("\n") if m[1] else m[0], source, flags=re.S)
+    return {n for n, line in enumerate(bare.split("\n"), 1) if line.strip()}
 
 
 def coverage_verdict(root, base, ported, blocks) -> str:
     """ok when the run executed at least one added line of every declared file."""
     for path in sorted(ported):
-        added = added_lines(root, base, path)
+        try:
+            # bytes, not read_text(): a lone `\r` turned into `\n` shifts lines against git's
+            src = (Path(root) / path).read_bytes().decode()
+            added = added_lines(root, base, path)
+        except (OSError, UnicodeDecodeError):
+            return f"diff-unreadable: {path}"
         if added is None:
             return f"diff-unreadable: {path}"
-        try:
-            src = (Path(root) / path).read_text().splitlines()
-        except OSError:
-            return f"diff-unreadable: {path}"
-        # blank and `//`-only lines never count: a Go cover block spans lines between statements
-        added = {n for n in added if 0 < n <= len(src) and src[n - 1].strip()
-                 and not src[n - 1].strip().startswith("//")}
+        # blank and comment-only lines never count: a Go cover block spans lines between statements
+        added &= _go_code_lines(src)
         spans = blocks.get(path, ())
         if not any(c > 0 and s <= n <= e for n in added for s, e, c in spans):
             return f"unexercised-change: {path}"

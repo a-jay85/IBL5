@@ -1,6 +1,6 @@
 ---
 description: J27 live outcome-map port. The Go engine now reads play-outcome codes 1-4 the way live JSB 5.60 does. Code 3 is the foul handler, and code 4 is the turnover path with a 10% offensive foul and the FUN_004e2fc0 steal split. Lists the removed scales, before/after aggregates, re-pinned test literals, the open residuals, an archive walk against .sco and a per-type foul table against the live trace.
-last_verified: 2026-11-21
+last_verified: 2026-11-27
 ---
 
 # J27: live outcome-map port
@@ -155,6 +155,9 @@ Each was re-pinned from one run of this tree.
 | `engine/internal/sim/testdata/golden.json` | master snapshot | regenerated with `-update` |
 | `engine/internal/sim/testdata/golden_seeds.sha256` | (none) | new. `TestGolden` hashes 30 more seeds, because one golden game missed a 0.1 → 0.11 change to `offensiveFoulOnTurnover`. |
 | `engine/internal/validate/bands.go` literals | unchanged | unchanged (the validate tests pass as they stand) |
+| `TestSimulate_InjuryRateBand` upper bound (`sim_test.go`) | 0.30 | 0.38 |
+
+The injury upper bound came with backlog#1923, and it is derived rather than read off one run. The synthetic `richBundle` fixture runs about 44.7 turnovers per game. `injuryProbability` is 0.007 per turnover, so the expected rate is 0.007 × 44.72 = 0.313 injuries per game. Over 1200 games that is about 375.6 injuries. The binomial sigma is about 19.3 injuries, or 0.016 per game. The expected rate plus 4 sigma is about 0.377, and 0.38 rounds that up. On 2026-11-27 the test measured 0.3417 injuries per game (410 over 1200 games). That is about 1.8 sigma above the expected rate, and it fails the old 0.30 bound. 0.38 is a bound for this synthetic fixture only. It makes no claim that the real corpus injury rate rose. `engine/internal/sim/injury.go` cites a historical corpus rate of about 0.2 injuries per game.
 
 The `foulRateBands` width rule stays at ±10% with a floor of ±0.05. The path-mix band keeps the ±0.06 half-width the old band held around its 0.090 capture.
 

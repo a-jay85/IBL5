@@ -118,7 +118,15 @@ pmr_prose_text() {
             next
         }
         infence { next }
-        /^[[:space:]]*>/ { next }
+        # A `>` line is never printed. A `-->` on it closes an open comment. The rest of the
+        # line is quoted text, so a `<!--` on it opens nothing.
+        /^[[:space:]]*>/ {
+            if (incomment) {
+                line = $0; gsub(/`[^`]*`/, "CODE", line)
+                if (index(line, "-->")) incomment = 0
+            }
+            next
+        }
         {
             line = $0; gsub(/`[^`]*`/, "CODE", line)
             if (keep != 1) {

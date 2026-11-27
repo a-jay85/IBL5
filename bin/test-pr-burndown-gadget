@@ -21,6 +21,9 @@ STRAY="$ROOT/bin/zz-gadget-test.html"
 
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/pr-burndown-gadget.XXXXXX")" || exit 2
 trap 'rm -rf "$TMP"; rm -f "$STRAY" "$STRAY.tmp"' EXIT
+# The fixtures name pr-triage, a usage-gated entry point, so keep the usage gate off ~/.claude.
+# shellcheck source=bin/lib/usage-test-isolation.sh
+. "$ROOT/bin/lib/usage-test-isolation.sh"; usage_test_isolate "$TMP/usage"
 
 PASSED=0
 FAILED=0
@@ -538,7 +541,7 @@ case_empty_env_runs() {
     # A read on a branch this render skips would pass the run below, so check the source too.
     src="$(cat "$GADGET")" || return 1
     lacks 'os.environ["HOME"]' "$src" "gadget source" || return 1
-    log="$(env -i PATH=/usr/bin:/bin PR_BURNDOWN_TRIAGE_CMD="$STUB" FIX="$FIX" "$GADGET" \
+    log="$(env -i PATH=/usr/bin:/bin IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" IBL5_USAGE_GATE_TEST_MODE=1 PR_BURNDOWN_TRIAGE_CMD="$STUB" FIX="$FIX" "$GADGET" \
         --judgment="$JUDGMENT" --out="$out" 2>&1)" || { echo "render failed: $log"; return 1; }
     [ -s "$out" ] || { echo "no out file: $log"; return 1; }
     doc="$(cat "$out")" || return 1

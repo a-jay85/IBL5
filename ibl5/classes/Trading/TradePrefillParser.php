@@ -24,6 +24,7 @@ final class TradePrefillParser
      */
     public static function parse(mixed $raw, array $pageData): ?array
     {
+        /** @infection-ignore-all Equivalent: A string of exactly 200 characters cannot match the regex (at most 103 characters), so rejecting it here or at the regex gives the same null. */
         if (!is_string($raw) || strlen($raw) > self::MAX_LENGTH) {
             return null;
         }
@@ -39,6 +40,7 @@ final class TradePrefillParser
         }
 
         $allowed = self::buildAllowedKeys($pageData);
+        /** @infection-ignore-all Equivalent: The loop below and array_fill_keys give the same result with duplicates or gaps in the index, so array_unique and array_values change nothing. */
         $keys = array_values(array_unique(explode(',', $raw)));
 
         foreach ($keys as $key) {
@@ -68,6 +70,7 @@ final class TradePrefillParser
             foreach (self::rows($pageData, $listKey) as $row) {
                 $pid = $row['pid'] ?? null;
                 if (is_int($pid) || is_string($pid)) {
+                    /** @infection-ignore-all Equivalent: $allowed is only read through isset(), which is true for a false value too. */
                     $allowed['1:' . $pid] = true;
                 }
             }
@@ -76,6 +79,7 @@ final class TradePrefillParser
             foreach (self::rows($pageData, $listKey) as $row) {
                 $pickId = $row['pickid'] ?? null;
                 if (is_int($pickId) || is_string($pickId)) {
+                    /** @infection-ignore-all Equivalent: $allowed is only read through isset(), which is true for a false value too. */
                     $allowed['0:' . $pickId] = true;
                 }
             }

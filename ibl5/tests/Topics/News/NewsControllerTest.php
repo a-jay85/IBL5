@@ -285,6 +285,79 @@ class NewsControllerTest extends ModuleEntryPointTestCase
         $this->runMain($this->tradeController($service, $view));
     }
 
+    public function testTradeSuggestionsSkippedWhenEitherCollaboratorIsMissing(): void
+    {
+        $team = self::createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
+        $team->method('getTeamnameFromUsername')->willReturn('Lakers');
+        $team->method('getTidFromTeamname')->willReturn(5);
+
+        $service = self::createMock(\TradeSuggestions\Contracts\TradeSuggestionsServiceInterface::class);
+        $service->expects($this->never())->method('buildForTeam');
+        $html = $this->runMain($this->buildController(
+            auth: $this->authenticatedAs(['username' => 'gm1']),
+            team: $team,
+            suggestions: $service,
+            suggestionsView: null,
+        ));
+        $this->assertStringNotContainsString('trade-ideas', $html);
+
+        $view = self::createMock(\TradeSuggestions\Contracts\TradeSuggestionsViewInterface::class);
+        $view->expects($this->never())->method('render');
+        $html = $this->runMain($this->buildController(
+            auth: $this->authenticatedAs(['username' => 'gm1']),
+            team: $team,
+            suggestions: null,
+            suggestionsView: $view,
+        ));
+        $this->assertStringNotContainsString('trade-ideas', $html);
+    }
+
+    public function testTradeSuggestionsForNonGmLogsNothingAndRendersNothing(): void
+    {
+        $handler = new \Monolog\Handler\TestHandler();
+        \Logging\LoggerFactory::forTesting($handler);
+
+        try {
+            $service = self::createMock(\TradeSuggestions\Contracts\TradeSuggestionsServiceInterface::class);
+            $service->expects($this->never())->method('buildForTeam');
+            $view = self::createMock(\TradeSuggestions\Contracts\TradeSuggestionsViewInterface::class);
+            $view->expects($this->never())->method('render');
+
+            $html = $this->runMain($this->buildController(suggestions: $service, suggestionsView: $view));
+
+            $this->assertStringNotContainsString('trade-ideas', $html);
+            $this->assertSame([], $handler->getRecords());
+        } finally {
+            \Logging\LoggerFactory::reset();
+        }
+    }
+
+    public function testTradeSuggestionsFailureIsLoggedWithTidAndMessage(): void
+    {
+        $handler = new \Monolog\Handler\TestHandler();
+        \Logging\LoggerFactory::forTesting($handler);
+
+        try {
+            $service = self::createStub(\TradeSuggestions\Contracts\TradeSuggestionsServiceInterface::class);
+            $service->method('buildForTeam')->willThrowException(new \RuntimeException('db down'));
+            $view = self::createMock(\TradeSuggestions\Contracts\TradeSuggestionsViewInterface::class);
+            $view->expects($this->never())->method('render');
+
+            $this->runMain($this->tradeController($service, $view));
+
+            $records = $handler->getRecords();
+            $this->assertCount(1, $records);
+            $this->assertSame(\Monolog\Level::Error, $records[0]->level);
+            $this->assertSame('Trade suggestions panel failed', $records[0]->message);
+            $this->assertSame('app', $records[0]->channel);
+            $this->assertSame(5, $records[0]->context['tid']);
+            $this->assertSame('db down', $records[0]->context['error']);
+            $this->assertCount(2, $records[0]->context);
+        } finally {
+            \Logging\LoggerFactory::reset();
+        }
+    }
+
     private function tradePanel(): \TradeSuggestions\TradeSuggestionsPanelData
     {
         return new \TradeSuggestions\TradeSuggestionsPanelData(

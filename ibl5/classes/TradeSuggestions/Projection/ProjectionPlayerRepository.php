@@ -74,6 +74,7 @@ final class ProjectionPlayerRepository extends \Database\BaseMysqliRepository im
              FROM `ibl_plr` WHERE retired = 0"
         );
 
+        /** @infection-ignore-all Equivalent: fetchAll() already returns a list and RatingScale::fromRows() only iterates it, so array_values changes nothing. */
         return RatingScale::fromRows(array_values($rows));
     }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\TradeSuggestions\Projection;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Tests\WideUnit\Mocks\MockDatabase;
 use TradeSuggestions\ProductionSource;
@@ -122,6 +123,105 @@ final class ProjectionPlayerRepositoryTest extends TestCase
         foreach (Rating::ALL as $key) {
             self::assertMatchesRegularExpression('/MAX\(`?' . $key . '`?\)/', $sql, $key);
         }
+    }
+
+    public function testSalaryByYearCarriesAllSixYearsAndDepthKeepsEverySlot(): void
+    {
+        $this->db->onQuery('FROM ibl_plr', [self::row([
+            'salary_yr1' => 101, 'salary_yr2' => 102, 'salary_yr3' => 103, 'salary_yr4' => 104,
+            'salary_yr5' => 105, 'salary_yr6' => 106,
+            'pg_depth' => 1, 'dc_pg_depth' => 2,
+        ])]);
+        $this->db->onQuery('FROM ibl_hist', []);
+
+        $player = (new ProjectionPlayerRepository($this->db))->getLeaguePlayers(false, 2026)[1][0];
+
+        self::assertSame([1 => 101, 2 => 102, 3 => 103, 4 => 104, 5 => 105, 6 => 106], $player->salaryByYear);
+        self::assertSame(['PG' => 1, 'SG' => 0, 'SF' => 0, 'PF' => 0, 'C' => 0], $player->depth);
+        self::assertSame(['PG' => 2, 'SG' => 0, 'SF' => 0, 'PF' => 0, 'C' => 0], $player->dcDepth);
+    }
+
+    /**
+     * @return array<string, array{array<string, mixed>, bool, bool}>
+     */
+    public static function tradeableProvider(): array
+    {
+        return [
+            'ordinary contract' => [[], false, true],
+            'zero salary this year' => [['salary_yr1' => 0], false, false],
+            'unsigned (cy 0)' => [['cy' => 0], false, false],
+            'unsigned (cy 0) in offseason' => [['cy' => 0], true, false],
+            'cyt already behind cy still has a year' => [['cy' => 3, 'cyt' => 2, 'salary_yr3' => 500], false, true],
+            'offseason past year six' => [['cy' => 6, 'cyt' => 6, 'salary_yr6' => 500], true, false],
+            'on the waivers boundary' => [['ordinal' => 960], false, true],
+            'on waivers' => [['ordinal' => 961], false, false],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $overrides
+     */
+    #[DataProvider('tradeableProvider')]
+    public function testTradeableMirrorsTheValidator(array $overrides, bool $advances, bool $expected): void
+    {
+        $this->db->onQuery('FROM ibl_plr', [self::row($overrides)]);
+        $this->db->onQuery('FROM ibl_hist', []);
+
+        $player = (new ProjectionPlayerRepository($this->db))->getLeaguePlayers($advances, 2026)[1][0];
+
+        self::assertSame($expected, $player->tradeable);
+    }
+
+    public function testEveryPlayerGetsTheirOwnLastSeasonLine(): void
+    {
+        $this->db->onQuery('FROM ibl_plr', [
+            self::row(['pid' => 7, 'stats_min' => 100]),
+            self::row(['pid' => 8, 'stats_min' => 100]),
+        ]);
+        $this->db->onQuery('FROM ibl_hist', [
+            self::histRow(['pid' => 7, 'minutes' => 1500]),
+            self::histRow(['pid' => 8, 'minutes' => 1600]),
+        ]);
+
+        $players = (new ProjectionPlayerRepository($this->db))->getLeaguePlayers(false, 2026)[1];
+
+        self::assertSame(1500, $players[0]->production?->minutes);
+        self::assertSame(1600, $players[1]->production?->minutes);
+    }
+
+    public function testNoProductionMeansZeroFoulsEvenWithAThinLastSeasonLine(): void
+    {
+        $this->db->onQuery('FROM ibl_plr', [self::row(['pid' => 7, 'stats_min' => 100, 'stats_pf' => 9])]);
+        $this->db->onQuery('FROM ibl_hist', [self::histRow(['pid' => 7, 'minutes' => 200, 'pf' => 33])]);
+
+        $player = (new ProjectionPlayerRepository($this->db))->getLeaguePlayers(false, 2026)[1][0];
+
+        self::assertNull($player->production);
+        self::assertSame(0, $player->productionFouls);
+    }
+
+    public function testNoProductionAndNoHistoryMeansZeroFouls(): void
+    {
+        $this->db->onQuery('FROM ibl_plr', [self::row(['stats_min' => 100, 'stats_pf' => 9])]);
+        $this->db->onQuery('FROM ibl_hist', []);
+
+        $player = (new ProjectionPlayerRepository($this->db))->getLeaguePlayers(false, 2026)[1][0];
+
+        self::assertNull($player->production);
+        self::assertSame(0, $player->productionFouls);
+    }
+
+    /**
+     * @param array<string, mixed> $overrides
+     * @return array<string, mixed>
+     */
+    private static function histRow(array $overrides = []): array
+    {
+        return array_merge([
+            'pid' => 7, 'games' => 70, 'minutes' => 2000, 'fgm' => 400, 'fga' => 850, 'ftm' => 150,
+            'fta' => 190, 'tgm' => 60, 'tga' => 170, 'reb' => 300, 'ast' => 250, 'stl' => 70,
+            'blk' => 30, 'tvr' => 120, 'pf' => 140, 'pts' => 1010,
+        ], $overrides);
     }
 
     private function plrSelect(): string

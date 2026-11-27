@@ -50,6 +50,7 @@ final class RookieControl
      */
     public static function controlYearsLeft(int $draftRound, int $exp): int
     {
+        /** @infection-ignore-all Equivalent: isRookieScale caps exp at 3, so contractYears + 1 - exp is at least 1 and the max() floor value never decides the result. */
         return self::isRookieScale($draftRound, $exp)
             ? max(0, self::contractYears($draftRound) + 1 - $exp)
             : 0;

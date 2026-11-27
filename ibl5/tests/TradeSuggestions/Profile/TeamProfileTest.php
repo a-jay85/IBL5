@@ -198,4 +198,19 @@ final class TeamProfileTest extends TestCase
 
         return $out;
     }
+
+    public function testPlayerWithoutSampleDoesNotStopLaterPlayersCounting(): void
+    {
+        // Player 1 comes first in roster order and has no production and no per-36 line.
+        $lineup = ProjectionFactory::lineupFor(1, 0, [
+            ProjectionFactory::player(pid: 1, noProduction: true),
+            ProjectionFactory::player(pid: 2, production: ProjectionFactory::productionLine(['stats_min' => 1000])),
+        ]);
+
+        $values = TeamProfile::valuesFor($lineup, ProjectionFactory::ratingsOf([$lineup]), [2 => ['pts' => 10.0]]);
+
+        self::assertEqualsWithDelta(10.0, $values['pts'], 1e-9);
+        self::assertEqualsWithDelta(200 / 420, $values['fg_pct'], 1e-9);
+        self::assertEqualsWithDelta(110 / 420, $values['tpa_rate'], 1e-9);
+    }
 }

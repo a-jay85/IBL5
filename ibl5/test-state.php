@@ -984,6 +984,14 @@ if ($method === 'GET' && $action === 'get-trade-mode') {
 // reads MAX(updated_at) and seeds the exposure filter's partner pick, and earlier
 // specs rewrite those rows at wall-clock time. Unpinned, the acting team's cards
 // depend on when the run happened.
+//
+// &stage=over-cap also stages the rows TradeSuggestionsEngineInvariantTest
+// stages: a bench player (pid 200201, every depth slot 0) whose salary puts
+// franchise 1's payroll at 7100 in both contract years the engine can read
+// (salary_yr1 in season, salary_yr2 in the offseason), franchise 2 set to
+// rebuild, and a round 2 pick for next year owned by and from franchise 1.
+// The payroll comes from the same cap calculator the engine uses. Every call
+// first deletes those staged rows, so a plain call undoes a staged one.
 if ($method === 'POST' && $action === 'trade-suggestions-fixture') {
     $db->query("UPDATE ibl_team_info SET trade_mode = 'auto'");
     $db->query("UPDATE ibl_trade_info SET updated_at = '2026-01-01 00:00:00'");
@@ -996,7 +1004,77 @@ if ($method === 'POST' && $action === 'trade-suggestions-fixture') {
     $upsert->bind_param('sss', $key, $value, $league);
     $upsert->execute();
     $upsert->close();
-    echo json_encode(['reset' => 'ok']);
+
+    $dumpPid = 200201;
+    $pickNote = 'e2e-trade-suggestions-fixture';
+    $stagedPayroll = 7100;
+    $userTid = 1;
+    $rebuildTid = 2;
+    $db->query('DELETE FROM ibl_plr WHERE pid = ' . $dumpPid);
+    $deletePick = $db->prepare('DELETE FROM ibl_draft_picks WHERE notes = ?');
+    $deletePick->bind_param('s', $pickNote);
+    $deletePick->execute();
+    $deletePick->close();
+
+    if (($_GET['stage'] ?? '') !== 'over-cap') {
+        echo json_encode(['reset' => 'ok']);
+        $db->close();
+        exit;
+    }
+
+    $season = new \Season\Season($db);
+    $teamIdentity = new \Repositories\TeamIdentityRepository($db);
+    $userTeamName = $teamIdentity->getTeamnameFromTeamID($userTid) ?? '';
+    $payrollIn = static function (string $phase) use ($db, $season, $teamIdentity, $userTeamName, $userTid): int {
+        $season->phase = $phase;
+        $validator = new \Trading\TradeValidator($db, $season);
+        $filter = new \TradeSuggestions\SuggestionValidationFilter(
+            $validator,
+            new \Trading\TradeCapCalculator($teamIdentity, new \Trading\BuyoutLedgerRepository($db), $season, $validator),
+            new \Trading\TradeFormRepository($db),
+            $season,
+        );
+
+        return \League\League::HARD_CAP_MAX - $filter->capRoom($userTeamName, $userTid);
+    };
+    $dbPhase = $season->phase;
+    $inSeasonSalary = $stagedPayroll - $payrollIn('Regular Season');
+    $offseasonSalary = $stagedPayroll - $payrollIn('Free Agency');
+    $season->phase = $dbPhase;
+    if ($inSeasonSalary < 1 || $offseasonSalary < 1) {
+        http_response_code(409);
+        echo json_encode(['error' => 'franchise 1 payroll is already at or above the staged 7100']);
+        $db->close();
+        exit;
+    }
+
+    $name = 'Suggest Dump Bench';
+    $uuid = sprintf('test-%09d-0000-000000000001', $dumpPid);
+    $insertPlayer = $db->prepare(
+        "INSERT INTO ibl_plr (pid, name, age, teamid, pos, stamina, exp, bird, cy, cyt, salary_yr1, salary_yr2, salary_yr3, retired, ordinal, droptime, uuid, dc_pg_depth, dc_sg_depth, dc_sf_depth, dc_pf_depth, dc_c_depth, dc_minutes)
+         VALUES (?, ?, 30, ?, 'PG', 80, 5, 3, 1, 3, ?, ?, ?, 0, 1, 0, ?, 0, 0, 0, 0, 0, 0)"
+    );
+    $insertPlayer->bind_param('isiiiis', $dumpPid, $name, $userTid, $inSeasonSalary, $offseasonSalary, $offseasonSalary, $uuid);
+    $insertPlayer->execute();
+    $insertPlayer->close();
+
+    $db->query("UPDATE ibl_team_info SET trade_mode = 'rebuild' WHERE teamid = " . $rebuildTid);
+
+    $pickYear = $season->endingYear + 1;
+    $round = 2;
+    $insertPick = $db->prepare(
+        'INSERT INTO ibl_draft_picks (ownerofpick, owner_teamid, teampick, teampick_teamid, year, round, notes) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    );
+    $insertPick->bind_param('sisiiis', $userTeamName, $userTid, $userTeamName, $userTid, $pickYear, $round, $pickNote);
+    $insertPick->execute();
+    $insertPick->close();
+
+    echo json_encode([
+        'reset' => 'ok',
+        'staged' => 'over-cap',
+        'payroll' => ['in_season' => $payrollIn('Regular Season'), 'offseason' => $payrollIn('Free Agency')],
+    ]);
+    $season->phase = $dbPhase;
     $db->close();
     exit;
 }

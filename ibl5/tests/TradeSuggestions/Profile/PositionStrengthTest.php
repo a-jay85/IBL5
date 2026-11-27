@@ -80,6 +80,65 @@ final class PositionStrengthTest extends TestCase
         self::assertSame([], $league[3]['PG']->buriedPids);
     }
 
+    public function testPlayableDepthCountsExactlyFifteenMinutesPerGame(): void
+    {
+        // stats_min 600 over 40 games is exactly 15.0; dcMinutes 5 keeps him out of the rotation.
+        $lineups = [1 => ProjectionFactory::lineupFor(1, 0, [
+            ProjectionFactory::player(pid: 1, dcMinutes: 30),
+            ProjectionFactory::player(pid: 2, dcMinutes: 5, production: ProjectionFactory::productionLine(['stats_min' => 600])),
+        ])];
+        $table = SlotRankTable::build($lineups, ProjectionFactory::ratingsOf($lineups));
+
+        self::assertSame(15.0, $lineups[1]->minutesWeight[2]);
+        self::assertSame(2, PositionStrength::build(1, $lineups[1], $table)['PG']->playableDepth);
+    }
+
+    public function testNoBuriedTalentWhenStarterHasNoPoolRank(): void
+    {
+        $table = self::buriedTable();
+        // Starter 500 is unknown to the table; bench 100 is in the pool and would start somewhere.
+        $lineup = ProjectionFactory::lineupFor(9, 0, [
+            ProjectionFactory::player(pid: 500, tid: 9, dcMinutes: 30),
+            ProjectionFactory::player(pid: 100, tid: 9, dcMinutes: 20),
+        ]);
+
+        self::assertSame(500, $lineup->starterPid('PG'));
+        self::assertSame([100], $lineup->benchPids('PG'));
+        self::assertSame(2, $table->poolRank('PG', 100));
+        self::assertSame([], PositionStrength::build(9, $lineup, $table)['PG']->buriedPids);
+    }
+
+    public function testBuriedTalentIncludesBenchPlayerRankedExactlyAtWorstStarter(): void
+    {
+        $table = self::buriedTable();
+        // Pid 1 is the league's worst starter (pool rank 4); pid 3 is its best (rank 1).
+        $lineup = ProjectionFactory::lineupFor(9, 0, [
+            ProjectionFactory::player(pid: 3, tid: 9, dcMinutes: 30),
+            ProjectionFactory::player(pid: 1, tid: 9, dcMinutes: 20),
+        ]);
+
+        self::assertSame(4, $table->worstStarterPoolRank('PG'));
+        self::assertSame(4, $table->poolRank('PG', 1));
+        self::assertSame([1], PositionStrength::build(9, $lineup, $table)['PG']->buriedPids);
+    }
+
+    /**
+     * Pool ranks at PG: pid 3 = 1, pid 100 = 2, pid 2 = 3, pid 1 = 4.
+     */
+    private static function buriedTable(): SlotRankTable
+    {
+        $lineups = ProjectionFactory::leagueOf(3, static function (int $tid): array {
+            $players = [ProjectionFactory::player(pid: $tid, tid: $tid, dcMinutes: 30, ratings: ProjectionFactory::ratingSet([], 30.0 + 10 * $tid))];
+            if ($tid === 3) {
+                $players[] = ProjectionFactory::player(pid: 100, tid: 3, dcMinutes: 20, ratings: ProjectionFactory::ratingSet([], 55.0));
+            }
+
+            return $players;
+        });
+
+        return SlotRankTable::build($lineups, ProjectionFactory::ratingsOf($lineups));
+    }
+
     private static function strength(?int $starterRank): SlotStrength
     {
         return new SlotStrength('PG', $starterRank, null, 1, false, []);

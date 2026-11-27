@@ -28,6 +28,7 @@ final class PositionStrength
                 if (!in_array($slot, $player->slots(), true)) {
                     continue;
                 }
+                /** @infection-ignore-all Equivalent: A missing minutes weight of 0.0 or 1.0 is below PLAYABLE_MIN_MINUTES (15) either way, so the playable test is the same. */
                 $minutes = $lineup->minutesWeight[$pid] ?? 0.0;
                 if ($minutes >= self::PLAYABLE_MIN_MINUTES || in_array($pid, $rotation, true)) {
                     $playable++;
@@ -38,6 +39,7 @@ final class PositionStrength
             foreach ($rotation as $pid) {
                 if (isset($lineup->players[$pid]) && count($lineup->players[$pid]->slots()) >= 2) {
                     $multiPosition = true;
+                    /** @infection-ignore-all Equivalent: continue leaves $multiPosition true and only scans the rest of the rotation, so the result is the same as break. */
                     break;
                 }
             }

@@ -29,6 +29,7 @@ class TeamModeRepository extends \Database\BaseMysqliRepository implements TeamM
         );
 
         if ($row === null) {
+            /** @infection-ignore-all Equivalent: A null row falls through to null ?? null, tryFrom('') is null, and that gives Auto, the same value this early return gives. */
             return TeamModeSetting::Auto;
         }
 
@@ -53,6 +54,7 @@ class TeamModeRepository extends \Database\BaseMysqliRepository implements TeamM
                 continue;
             }
             $raw = $row['trade_mode'] ?? null;
+            /** @infection-ignore-all Equivalent: teamid is an INT column, so its decimal string such as "1" becomes the int key 1 in PHP even without the cast. */
             $settings[(int) $tidRaw] = TeamModeSetting::tryFrom(is_string($raw) ? $raw : '') ?? TeamModeSetting::Auto;
         }
 

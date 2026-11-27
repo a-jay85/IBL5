@@ -57,6 +57,7 @@ class SuggestionAssetRepository extends \Database\BaseMysqliRepository implement
     private function getLastSeasonLines(array $pids, int $year): array
     {
         if ($pids === []) {
+            /** @infection-ignore-all Equivalent: fetchAllInList() already returns [] for an empty id list, so skipping this early return still yields an empty $byPid. */
             return [];
         }
 

@@ -148,4 +148,28 @@ final class DominanceComparatorTest extends TestCase
             static fn (string $k): bool => $k !== 'r_tvr'
         ));
     }
+
+    public function testMirrorOfWorseIsBetter(): void
+    {
+        self::assertSame(Dominance::Better, Dominance::Worse->mirror());
+    }
+
+    public function testWorseNeedsSixtyPercentOfDecidedRatings(): void
+    {
+        // PG has 13 keys: b wins 4, a wins 3 (4/7 = 0.57 < 0.6), the rest tie.
+        $overrides = [];
+        foreach (self::pgHigherIsBetterKeys() as $i => $key) {
+            if ($i < 3) {
+                $overrides[$key] = 60.0;
+            } elseif ($i < 7) {
+                $overrides[$key] = 40.0;
+            }
+        }
+        $a = ProjectionFactory::ratingSet($overrides);
+        $b = ProjectionFactory::ratingSet();
+
+        self::assertSame(['wins' => 3, 'losses' => 4], DominanceComparator::record($a, $b, 'PG'));
+        self::assertSame(Dominance::Mixed, DominanceComparator::compare($a, $b, 'PG'));
+        self::assertSame(Dominance::Mixed, DominanceComparator::compare($b, $a, 'PG'));
+    }
 }

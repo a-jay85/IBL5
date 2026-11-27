@@ -247,6 +247,91 @@ class SuggestionAssetRepositoryTest extends DatabaseTestCase
         return $byPid;
     }
 
+    public function testPicksAreGroupedByOwnerAndSortedByYearRoundPickId(): void
+    {
+        // Team 2 is inserted first so an unsorted result would list team 2 first.
+        $t2a = $this->insertDraftPickRow(2, 3, 2091, 1);
+        $t2b = $this->insertDraftPickRow(2, 3, 2090, 2);
+        $t2c = $this->insertDraftPickRow(2, 3, 2090, 1);
+        $t2d = $this->insertDraftPickRow(2, 4, 2090, 1);
+        $t1a = $this->insertDraftPickRow(1, 3, 2092, 1);
+        $t1b = $this->insertDraftPickRow(1, 3, 2090, 2);
+        $t1c = $this->insertDraftPickRow(1, 3, 2090, 1);
+        $t1d = $this->insertDraftPickRow(1, 4, 2090, 1);
+
+        $picks = $this->repo->getPicksForTeams([1, 2], 2090);
+
+        self::assertSame([1, 2], array_keys($picks));
+        $ids = static fn (array $rows): array => array_map(static fn (array $row): int => $row['pickid'], $rows);
+        self::assertSame([$t1c, $t1d, $t1b, $t1a], $ids($picks[1]));
+        self::assertSame([$t2c, $t2d, $t2b, $t2a], $ids($picks[2]));
+    }
+
+    public function testRegularSeasonRecordsCoverEveryTeam(): void
+    {
+        $this->insertRow('ibl_team_season_records', ['team_id' => 1, 'year' => 2090, 'game_type' => 1, 'currentname' => 'Test', 'namethatyear' => 'Test', 'wins' => 60, 'losses' => 22]);
+        $this->insertRow('ibl_team_season_records', ['team_id' => 2, 'year' => 2090, 'game_type' => 1, 'currentname' => 'Test', 'namethatyear' => 'Test', 'wins' => 30, 'losses' => 52]);
+
+        self::assertSame(
+            [1 => ['wins' => 60, 'losses' => 22], 2 => ['wins' => 30, 'losses' => 52]],
+            $this->repo->getRegularSeasonRecords(2090)
+        );
+    }
+
+    public function testEveryPlayerGetsTheirOwnLastSeasonLine(): void
+    {
+        $this->insertTestPlayer(200000061, 'Suggest Hist A', ['teamid' => 1, 'stats_min' => 100]);
+        $this->insertTestPlayer(200000062, 'Suggest Hist B', ['teamid' => 1, 'stats_min' => 100]);
+        $this->insertRow('ibl_hist', ['pid' => 200000061, 'year' => self::LAST_SEASON, 'name' => 'Suggest Hist A', 'minutes' => 1500, 'pts' => 700]);
+        $this->insertRow('ibl_hist', ['pid' => 200000062, 'year' => self::LAST_SEASON, 'name' => 'Suggest Hist B', 'minutes' => 1600, 'pts' => 800]);
+
+        $players = self::byPid($this->repo->getRostersForTeams([1], false, self::LAST_SEASON)[1] ?? []);
+
+        self::assertSame(1500, $players[200000061]->production?->minutes);
+        self::assertSame(1600, $players[200000062]->production?->minutes);
+    }
+
+    public function testInjuredFlagFollowsInjuredDays(): void
+    {
+        $this->insertTestPlayer(200000071, 'Suggest Healthy', ['teamid' => 1, 'injured' => 0]);
+        $this->insertTestPlayer(200000072, 'Suggest Hurt', ['teamid' => 1, 'injured' => 5]);
+
+        $players = self::byPid($this->repo->getRostersForTeams([1], false, self::LAST_SEASON)[1] ?? []);
+
+        self::assertFalse($players[200000071]->injured);
+        self::assertTrue($players[200000072]->injured);
+    }
+
+    public function testUnsignedPlayerHasNoSalaryEvenWhenNextYearHasOne(): void
+    {
+        $this->insertTestPlayer(200000081, 'Suggest Unsigned Salary', ['teamid' => 1, 'cy' => 0, 'cyt' => 3, 'salary_yr1' => 500, 'salary_yr2' => 600]);
+
+        $inSeason = self::byPid($this->repo->getRostersForTeams([1], false, self::LAST_SEASON)[1] ?? [])[200000081];
+        $offseason = self::byPid($this->repo->getRostersForTeams([1], true, self::LAST_SEASON)[1] ?? [])[200000081];
+
+        foreach ([$inSeason, $offseason] as $player) {
+            self::assertSame(0, $player->currentSalary);
+            self::assertSame(0, $player->yearsRemaining);
+            self::assertSame(0, $player->futureSalary);
+            self::assertSame([], $player->laterSalaries);
+        }
+    }
+
+    public function testContractEdgeCases(): void
+    {
+        $this->insertTestPlayer(200000091, 'Suggest Behind', ['teamid' => 1, 'cy' => 3, 'cyt' => 2, 'salary_yr3' => 500]);
+        $this->insertTestPlayer(200000092, 'Suggest Year Six', ['teamid' => 1, 'cy' => 6, 'cyt' => 6, 'salary_yr6' => 700]);
+        $this->insertTestPlayer(200000093, 'Suggest Waiver Edge', ['teamid' => 1, 'ordinal' => \League\JsbConstants::WAIVERS_ORDINAL]);
+
+        $players = self::byPid($this->repo->getRostersForTeams([1], false, self::LAST_SEASON)[1] ?? []);
+
+        self::assertSame(1, $players[200000091]->yearsRemaining);
+        self::assertTrue($players[200000091]->tradeable);
+        self::assertSame(700, $players[200000092]->currentSalary);
+        self::assertTrue($players[200000092]->tradeable);
+        self::assertTrue($players[200000093]->tradeable);
+    }
+
     public function testPicksForTeamsFiltersYearAndRound(): void
     {
         $current = $this->insertDraftPickRow(1, 3, 2090, 1);

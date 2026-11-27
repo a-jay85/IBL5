@@ -407,6 +407,60 @@ class TradeSuggestionsViewTest extends TestCase
         );
     }
 
+    public function testModeLineRendersExactMarkup(): void
+    {
+        $html = $this->render(new TradeSuggestionsPanelData(
+            new ResolvedTeamMode(TeamMode::Rebuild, TeamMode::Rebuild, false),
+            [],
+        ));
+
+        self::assertStringContainsString(
+            '<p class="trade-suggestions__mode" data-testid="trade-suggestions-mode">Mode: Rebuild'
+            . ' <span class="trade-suggestions__mode-note">(our guess)</span></p>',
+            $html,
+        );
+    }
+
+    public function testSuggestionCardRendersSidesAndReasonsWithExactMarkup(): void
+    {
+        $html = $this->render(new TradeSuggestionsPanelData($this->autoMode(), [$this->itemWith()]));
+
+        self::assertStringContainsString(
+            '<div class="trade-suggestions__side"><span class="trade-suggestions__side-label">You give</span>'
+            . '<ul class="trade-suggestions__assets"><li>Player A</li></ul></div>',
+            $html,
+        );
+        self::assertStringContainsString(
+            '<div class="trade-suggestions__side"><span class="trade-suggestions__side-label">You get</span>'
+            . '<ul class="trade-suggestions__assets"><li>Player B</li></ul></div>',
+            $html,
+        );
+        self::assertStringContainsString(
+            '<p class="trade-suggestions__reason"><strong>Why you:</strong> Fills a hole.</p>'
+            . '<p class="trade-suggestions__reason"><strong>Why Heat:</strong> Adds upside.</p>'
+            . '<a class="trade-suggestions__open"',
+            $html,
+        );
+    }
+
+    public function testSideListsEveryLabelAsItsOwnItem(): void
+    {
+        $item = new SuggestionItem(
+            partnerTeamName: 'Heat',
+            giveLabels: ['Player A', 'Player C'],
+            getLabels: ['Player B'],
+            userReason: 'x',
+            partnerReason: 'y',
+            prefillUrl: 'modules.php?name=Trading',
+            dealKey: str_repeat('a', 40),
+            coreKey: str_repeat('b', 40),
+            profileLines: [],
+        );
+        $html = $this->render(new TradeSuggestionsPanelData($this->autoMode(), [$item]));
+
+        self::assertStringContainsString('<ul class="trade-suggestions__assets"><li>Player A</li><li>Player C</li></ul></div>', $html);
+    }
+
     public function testHideFormOpensWithSummaryThenFormAfterOpenLink(): void
     {
         $html = $this->render(new TradeSuggestionsPanelData($this->autoMode(), [$this->itemWith()]));

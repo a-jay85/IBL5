@@ -35,6 +35,7 @@ enum InjuryStatus: string
         if (!$regularSeason || $injuredDays <= 0) {
             return self::Healthy;
         }
+        /** @infection-ignore-all Equivalent: At gamesLeft 0 the guard above already left injuredDays above 0, so injuredDays >= gamesLeft is true and < 0 vs <= 0 cannot change the result. */
         if ($gamesLeft <= 0 || $injuredDays >= $gamesLeft) {
             return self::OutForYear;
         }

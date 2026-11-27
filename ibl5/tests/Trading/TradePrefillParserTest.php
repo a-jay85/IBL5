@@ -124,4 +124,43 @@ class TradePrefillParserTest extends TestCase
         $this->assertNotNull($result);
         $this->assertSame(['1:101' => true, '0:9' => true], $result['checkedItems']);
     }
+
+    public function testReturnsNullWhenPartnerTeamIdMissing(): void
+    {
+        $pageData = $this->pageData();
+        unset($pageData['partnerTeamId']);
+
+        $this->assertNull(TradePrefillParser::parse('1:101', $pageData));
+    }
+
+    public function testStringIdsInPageDataAreAllowed(): void
+    {
+        $pageData = [
+            'partnerTeamId' => 2,
+            'userPlayers' => [['pid' => '101']],
+            'userPicks' => [['pickid' => '7']],
+            'partnerPlayers' => [],
+            'partnerPicks' => [],
+        ];
+
+        $result = TradePrefillParser::parse('1:101,0:7', $pageData);
+
+        $this->assertNotNull($result);
+        $this->assertSame(['1:101' => true, '0:7' => true], $result['checkedItems']);
+    }
+
+    public function testNonScalarIdsInPageDataAreNotAllowed(): void
+    {
+        $pageData = [
+            'partnerTeamId' => 2,
+            'userPlayers' => [['pid' => 2.0], ['pid' => null], ['pid' => true], ['pid' => [1]]],
+            'userPicks' => [['pickid' => 2.0], ['pickid' => null], ['pickid' => true], ['pickid' => [1]]],
+            'partnerPlayers' => [],
+            'partnerPicks' => [],
+        ];
+
+        foreach (['1:1', '1:2', '0:1', '0:2'] as $raw) {
+            $this->assertNull(TradePrefillParser::parse($raw, $pageData), $raw);
+        }
+    }
 }

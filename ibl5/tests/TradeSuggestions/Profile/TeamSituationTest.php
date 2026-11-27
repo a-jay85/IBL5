@@ -156,4 +156,28 @@ final class TeamSituationTest extends TestCase
             'conference' => $conference,
         ];
     }
+
+    public function testSmallConferenceHasNoBubbleReference(): void
+    {
+        $standings = [
+            1 => self::row(40, 30, 'East'),
+            2 => self::row(39, 31, 'East'),
+            3 => self::row(38, 32, 'East'),
+        ];
+
+        self::assertFalse(self::situation(2, $standings)->playoffBubble);
+    }
+
+    public function testCoreAgeFallsBackToPlainMeanWhenNoMinutesKnown(): void
+    {
+        // No production and an unreliable chart: every minutes weight is 0.0.
+        $lineup = ProjectionFactory::lineupFor(1, 0, [
+            ProjectionFactory::player(pid: 1, age: 20, noProduction: true),
+            ProjectionFactory::player(pid: 2, age: 30, noProduction: true),
+        ]);
+
+        $situation = self::situation(1, [1 => self::row(10, 10, 'East')], $lineup);
+
+        self::assertSame(25.0, $situation->coreAge);
+    }
 }

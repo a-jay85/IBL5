@@ -88,6 +88,23 @@ class TeamModeControllerTest extends TestCase
         self::assertSame([], $repo->saves);
     }
 
+    public function testUnknownTeamNeverLooksUpTid(): void
+    {
+        $repo = $this->recordingRepo();
+        $post = $this->withValidCsrfToken(['trade_mode' => 'rebuild']);
+        $auth = self::createStub(AuthServiceInterface::class);
+        $auth->method('getUsername')->willReturn('ghost');
+        $identity = self::createMock(TeamIdentityRepositoryInterface::class);
+        $identity->method('getTeamnameFromUsername')->willReturn(null);
+        $identity->expects(self::never())->method('getTidFromTeamname');
+        $controller = new TeamModeController($auth, $identity, new TeamModeService($repo, new TeamModeGuesser()));
+
+        $url = $controller->handleSetMode('POST', $post);
+
+        self::assertSame(TeamModeController::HOME . '?trade_mode_error=auth', $url);
+        self::assertSame([], $repo->saves);
+    }
+
     public function testRejectsNonFranchiseTeam(): void
     {
         $repo = $this->recordingRepo();

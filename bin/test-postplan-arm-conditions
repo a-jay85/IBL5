@@ -907,6 +907,12 @@ expect_clearance_2arg "(1) type-agnostic sentinel + non-test file → CLEARED" "
 expect_clearance_2arg "(1) tail names e2e+unit, EMPTY changed_files → CLEARED (one-arg compat exit)" "CLEARED" \
     "$TAIL_BODY" ""
 
+E2E_ONLY_BODY="$(printf '## Manual Testing\n\nNo manual testing needed — covered by e2e tests\n')"
+expect_clearance_2arg "(1) e2e spec renamed away, new non-test path only → HELD (pr-triage passes new paths only)" "HELD" \
+    "$E2E_ONLY_BODY" "ibl5/docs/submit-trade-notes.md"
+expect_clearance_2arg "(1) e2e spec renamed away, old path also listed → CLEARED (why pr-triage keeps the new-path list)" "CLEARED" \
+    "$E2E_ONLY_BODY" "$(printf 'ibl5/tests/e2e/trades/submit-trade.spec.ts\nibl5/docs/submit-trade-notes.md')"
+
 # --- (1) static wording (backlog#877) -------------------------------------------
 # The runner writes MANUAL_TESTING_SENTINEL_STATIC when the plan's Verification
 # Matrix has zero executable rows. Read it from the harness so this fixture tracks

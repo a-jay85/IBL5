@@ -316,6 +316,36 @@ def test_guard_rejects_rewritten_parents(tmp_path, key):
     assert "keep-me" not in (Path(d) / "a.txt").read_text()
 
 
+def _guard_verdict(tmp_path, key, resolved):
+    """Run post_rung_guard directly on a merge commit holding `resolved`."""
+    d = tmp_path / "repo"
+    pre, master, _ = _build_merge_repo(
+        d, {"a.txt": "base\n"}, {"a.txt": "feature\n"}, {"a.txt": "master\n"}, resolved)
+    ctx = _ctx(d, key, pre, master, ("a.txt",), lambda: (True, ""))
+    return conflict_ladder.post_rung_guard(ctx, ())
+
+
+def test_guard_ignores_setext_heading_outside_conflict_set(tmp_path, key):
+    verdict = _guard_verdict(
+        tmp_path, key, {"a.txt": "master\n", "notes.md": "Title\n=======\n"})
+    assert verdict.ok is True
+
+
+def test_guard_rejects_bare_separator_in_conflicted_file(tmp_path, key):
+    verdict = _guard_verdict(tmp_path, key, {"a.txt": "master\n=======\n"})
+    assert verdict.ok is False
+    assert "conflict markers survive" in verdict.reason
+
+
+def test_guard_rejects_marker_hunk_outside_conflict_set(tmp_path, key):
+    verdict = _guard_verdict(
+        tmp_path, key,
+        {"a.txt": "master\n",
+         "outside.txt": "<<<<<<< HEAD\nx\n=======\ny\n>>>>>>> topic\n"})
+    assert verdict.ok is False
+    assert "conflict markers survive" in verdict.reason
+
+
 def test_expected_parents_override_guards_single_parent_head(tmp_path, key):
     d = tmp_path / "repo"
     d.mkdir()

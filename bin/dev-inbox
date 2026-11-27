@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+# dev-inbox — show dev alerts in a terminal tab, so Discord can stay closed.
+#
+# bin/discord-dm appends every message it sends to ~/.claude/dev-inbox.log. This
+# script prints the last few entries, then follows the file and prints each new
+# one as it lands. Leave it running in a Ghostty tab.
+#
+# Usage: bin/dev-inbox [--last <n>] [--no-bell] [--once]
+#   --last <n>   entries to show before following (default 10)
+#   --no-bell    never ring the terminal bell
+#   --once       print the whole file and exit (no follow; bells still ring)
+# ---
+# A new entry rings the bell when it is an error: the #errors target, an
+# undelivered message, a Discord-only button message, or a first line that
+# starts with an alert mark (❌ ❓ ⚠️ 🚨 🔴 🛑 ⏱ 💥). Other entries print with no bell.
+# Ghostty's default bell adds 🔔 to the tab title and bounces the Dock icon
+# once, with no sound. The backlog shown at start never rings.
+# Env: DISCORD_DM_INBOX overrides the file path (the same variable discord-dm reads).
+# ---
+# Exit: 0 normal · 2 usage error.
+
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
+set -uo pipefail
+
+INBOX="${DISCORD_DM_INBOX:-$HOME/.claude/dev-inbox.log}"
+LAST=10
+BELL=1
+ONCE=0
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --last) [ $# -ge 2 ] || { echo "dev-inbox: --last needs a number" >&2; exit 2; }
+                case "$2" in ''|*[!0-9]*) echo "dev-inbox: --last needs a number" >&2; exit 2 ;; esac
+                LAST=$((10#$2)); shift 2 ;;
+        --no-bell) BELL=0; shift ;;
+        --once) ONCE=1; shift ;;
+        -h|--help) sed -n '/^# Usage:/,/^# Exit:/p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        *) echo "dev-inbox: unknown argument: $1" >&2; exit 2 ;;
+    esac
+done
+
+# Render entries from stdin. Entries up to number <skip> are dropped, and entries
+# up to number <quiet> never ring. bell=1 rings on a later alert entry. The
+# "watching" line prints after input line <mark_at> (-1: never).
+# Both awk calls use LC_ALL=C: under a UTF-8 locale, macOS awk exits on one bad byte.
+render() { # bell [skip quiet mark_at]
+    LC_ALL=C awk -v bell="$1" -v skip="${2:--1}" -v quiet="${3:-0}" -v mark_at="${4:--1}" -v inbox="$INBOX" '
+        function mark() { printf "\n\033[2m── watching %s ──\033[0m\n", inbox; fflush() }
+        BEGIN {
+            red = "\033[31m"; green = "\033[32m"; dim = "\033[2m"; bold = "\033[1m"; off = "\033[0m"
+            if (mark_at == 0) mark()
+        }
+        /^@@ / { n++ }
+        n > skip {
+            # Drop control bytes (all but tab, plus DEL) before adding color, so a
+            # message cannot ring the bell, clear the screen or write the clipboard.
+            # Bytes 0x80+ stay: under LC_ALL=C they are the parts of UTF-8 text.
+            # gsub on $0 also re-splits the header fields. awk never holds a NUL.
+            gsub(/[\001-\010\013-\037\177]/, "")
+            if ($0 ~ /^@@ /) {
+                ts = $2; kind = $3; caller = $4
+                t = substr(ts, 12, 5); d = substr(ts, 1, 10)
+                alert = (kind == "errors" || kind == "undelivered" || kind ~ /^raw:/)
+                first = 1
+                print ""
+                printf "%s%s %s  %s  %s%s\n", dim, d, t, kind, caller, off
+            } else {
+                line = substr($0, 3)
+                if (first) {
+                    first = 0
+                    if (line ~ /^(❌|❓|⚠|🚨|🔴|🛑|⏱|💥)/) alert = 1
+                    if (alert) {
+                        printf "%s%s%s%s\n", bold, red, line, off
+                        if (bell == 1 && n > quiet) printf "\007"
+                    } else if (line ~ /^✅/) {
+                        printf "%s%s%s\n", green, line, off
+                    } else {
+                        print line
+                    }
+                } else {
+                    print line
+                }
+            }
+            fflush()
+        }
+        NR == mark_at { mark() }
+    '
+}
+
+if [ "$ONCE" = 1 ]; then
+    [ -f "$INBOX" ] || exit 0
+    render "$BELL" < "$INBOX"
+    exit 0
+fi
+
+mkdir -p "$(dirname "$INBOX")" && touch "$INBOX"
+
+# The backlog and new entries come through one tail, so an entry that lands during
+# startup is not lost. The count only marks where the backlog ends: the last N
+# entries show without a bell. -F keeps following across the 5 MB rotation.
+read -r starts lines < <(LC_ALL=C awk '/^@@ / { n++ } END { print n + 0, NR }' "$INBOX")
+skip=$(( starts > LAST ? starts - LAST : 0 ))
+tail -n +1 -F "$INBOX" 2>/dev/null | render "$BELL" "$skip" "$starts" "$lines"

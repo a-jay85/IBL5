@@ -478,16 +478,27 @@ run_pr_bypass_gate() {
 }
 
 # adr_append_only_step <queue|run>: check-adr-append-only's only bypass is an
-# adr-edit-ok marker in the PR body (PR_BODY env). The body comes from
-# --body-file, else from `gh pr view` when --pr is set. With a body the step is
-# hard, as in CI. With none it is advisory: a deliberate edit whose marker sits
-# in a PR body this run cannot see must not block the push.
+# adr-edit-ok marker in the PR body (PR_BODY env). The body comes from a
+# readable --body-file, else from `gh pr view` when --pr is set. With a body (an
+# empty one counts) the step is hard, as in CI. With none:
+#   pre-push  advisory: a deliberate edit whose marker sits in a PR body this
+#             run cannot see must not block the push.
+#   post-pr   hard FAIL without running the check: the PR exists, so a failed
+#             `gh pr view` or a missing gh must reach the FAILED status line.
 adr_append_only_step() {
-    local how="$1" body="" have=0 sev
+    local how="$1" body="" have=0 sev why="--body-file could not be read"
     if [ -n "$BODY_FILE" ] && [ -r "$BODY_FILE" ]; then
         body="$(cat "$BODY_FILE")" && have=1
     elif [ -n "$PR" ] && command -v gh >/dev/null 2>&1; then
+        why="gh pr view failed"
         body="$(gh pr view "$PR" --json body -q .body 2>/dev/null)" && have=1 || body=""
+    else
+        why="gh is not installed"
+    fi
+    if [ "$STAGE" = post-pr ] && [ "$have" = 0 ]; then
+        run_step "check-adr-append-only" hard sh -c 'printf "%s\n" "$1" >&2; exit 1' sh \
+            "cannot read the body of PR #$PR: $why. Re-run when gh works, or pass --body-file <path>."
+        return 0
     fi
     sev=advisory
     [ "$have" = 1 ] && sev=hard

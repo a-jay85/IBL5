@@ -358,8 +358,9 @@ absent "pbg-5 no DEFER" "$OUT" "DEFER "
 rm -f /tmp/ibl5-meta-checks-99997.status /tmp/ibl5-meta-checks-99996.status
 
 # ─── Case aao: check-adr-append-only is hard only when a PR body is available ──
-# Its only bypass is a marker in the PR body. With no body the step must warn,
-# not block; with --body-file it blocks as in CI.
+# Its only bypass is a marker in the PR body. With no body the pre-push step must
+# warn, not block; with --body-file it blocks as in CI. In post-pr, a body that
+# cannot be fetched fails the step.
 pbg_run "$FIXTURE_WORKFLOW_ALL" STUB_RC_check_adr_append_only=1 --
 want   "aao-1 no body: advisory WARN" "$OUT" "WARN  check-adr-append-only (advisory, not blocking)"
 absent "aao-1 no body: not failed" "$OUT" "META-CHECK-FAILED: check-adr-append-only"
@@ -368,7 +369,47 @@ printf 'body\n' > "$AAO_BODY"
 pbg_run "$FIXTURE_WORKFLOW_ALL" STUB_RC_check_adr_append_only=1 -- --body-file "$AAO_BODY"
 want   "aao-2 body file: hard FAIL" "$OUT" "META-CHECK-FAILED: check-adr-append-only"
 [ "$RC" -eq 1 ] && pass "aao-2 exit 1" || fail "aao-2 exit 1 (got $RC)"
-rm -f "$AAO_BODY"
+# The check stub passes in aao-3 and aao-4, so a FAIL can only come from the
+# missing body.
+AAO_GH_FAIL=$(mktemp -d); AAO_GH_OK=$(mktemp -d)
+printf '#!/bin/sh\nexit 1\n' > "$AAO_GH_FAIL/gh"
+printf '#!/bin/sh\nexit 0\n' > "$AAO_GH_OK/gh"
+chmod +x "$AAO_GH_FAIL/gh" "$AAO_GH_OK/gh"
+# aao-3 post-pr, gh pr view errors → hard FAIL, recorded in the status file
+AAO_STATUS=/tmp/ibl5-meta-checks-99995.status
+rm -f "$AAO_STATUS"
+pbg_run "$FIXTURE_WORKFLOW_ALL" PATH="$AAO_GH_FAIL:$PATH" -- --stage post-pr --pr 99995
+want   "aao-3 gh error: hard FAIL" "$OUT" "META-CHECK-FAILED: check-adr-append-only"
+want   "aao-3 gh error: reason printed" "$OUT" "cannot read the body of PR #99995: gh pr view failed"
+[ "$RC" -eq 1 ] && pass "aao-3 exit 1" || fail "aao-3 exit 1 (got $RC)"
+want   "aao-3 status file names the step" "$(cat "$AAO_STATUS" 2>/dev/null || true)" "check-adr-append-only"
+rm -f "$AAO_STATUS"
+# aao-4 post-pr, gh not installed → same hard FAIL. BASH_ENV hides gh from the
+# runner's `command -v` without dropping the PATH dirs it shares with other tools.
+printf 'command() { [ "$*" = "-v gh" ] && return 1; builtin command "$@"; }\n' > "$AAO_GH_FAIL/no-gh.sh"
+rm -f "$AAO_STATUS"
+pbg_run "$FIXTURE_WORKFLOW_ALL" BASH_ENV="$AAO_GH_FAIL/no-gh.sh" -- --stage post-pr --pr 99995
+want   "aao-4 no gh: hard FAIL" "$OUT" "META-CHECK-FAILED: check-adr-append-only"
+want   "aao-4 no gh: reason printed" "$OUT" "cannot read the body of PR #99995: gh is not installed"
+[ "$RC" -eq 1 ] && pass "aao-4 exit 1" || fail "aao-4 exit 1 (got $RC)"
+want   "aao-4 status file names the step" "$(cat "$AAO_STATUS" 2>/dev/null || true)" "check-adr-append-only"
+rm -f "$AAO_STATUS"
+# aao-5 post-pr, gh succeeds with an empty body → hard, runs the real check
+pbg_run "$FIXTURE_WORKFLOW_ALL" PATH="$AAO_GH_OK:$PATH" STUB_RC_check_adr_append_only=1 -- --stage post-pr --pr 99995
+want   "aao-5 empty body: real check hard FAIL" "$OUT" "stub check-adr-append-only failed"
+want   "aao-5 empty body: failed" "$OUT" "META-CHECK-FAILED: check-adr-append-only"
+rm -f "$AAO_STATUS"
+# aao-6 post-pr, readable --body-file wins over a failing gh
+pbg_run "$FIXTURE_WORKFLOW_ALL" PATH="$AAO_GH_FAIL:$PATH" -- --stage post-pr --pr 99995 --body-file "$AAO_BODY"
+want   "aao-6 body file wins: PASS" "$OUT" "PASS  check-adr-append-only"
+absent "aao-6 body file wins: not failed" "$OUT" "META-CHECK-FAILED: check-adr-append-only"
+rm -f "$AAO_STATUS"
+# aao-7 pre-push, gh pr view errors → still advisory
+pbg_run "$FIXTURE_WORKFLOW_ALL" PATH="$AAO_GH_FAIL:$PATH" STUB_RC_check_adr_append_only=1 -- --pr 99994
+want   "aao-7 pre-push gh error: advisory WARN" "$OUT" "WARN  check-adr-append-only (advisory, not blocking)"
+absent "aao-7 pre-push gh error: not failed" "$OUT" "META-CHECK-FAILED: check-adr-append-only"
+[ "$RC" -eq 0 ] && pass "aao-7 exit 0" || fail "aao-7 exit 0 (got $RC)"
+rm -rf "$AAO_BODY" "$AAO_GH_FAIL" "$AAO_GH_OK"
 
 # ─── Case l: bidirectional CI-parity assertion ────────────────────────────────
 # Extract bin/<name> from the real workflow's run: blocks only (not comments).

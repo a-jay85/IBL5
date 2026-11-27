@@ -79,7 +79,8 @@ def _oa_verdict_shell(tmp_path, sticky_body, head_tree):
     comments.write_text(json.dumps([{"user": {"login": "owner"}, "body": sticky_body}]))
     out = subprocess.run(
         ["bash", "-c", _OA_DRIVER],
-        env={"PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin", "HELD_PRS": str(HELD_PRS),
+        # Homebrew first: bin/lib/held-prs.sh needs bash 4+, and macOS /bin/bash is 3.2.
+        env={"PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin", "HELD_PRS": str(HELD_PRS),
              "OWNER_APPROVE": str(OWNER_APPROVE), "COMMENTS": str(comments),
              "HEAD_TREE": head_tree},
         capture_output=True, text=True, timeout=60, check=False)

@@ -1,7 +1,7 @@
 ---
 name: pr-burndown
 description: "Burn down the open PRs that wait on the owner. Background headless jobs do the prep that needs no owner call (rebase, regenerate snapshots, write promised tests, fix review findings, re-fire post-plan). The owner sees only the decisions that are theirs: a status card per PR (CI on the current head, review threads, post-plan verdict, door and blast radius, conflicts, hold reasons, visual links) with a recommended option, answered in a batch."
-last_verified: 2026-11-23
+last_verified: 2026-11-27
 ---
 
 # /pr-burndown
@@ -72,9 +72,12 @@ for n in $(gh pr list --state open --limit 100 --json number --jq '.[].number');
   gh pr view "$n" --json number,title,createdAt,additions,deletions,changedFiles,mergeable,mergeStateStatus,isDraft,autoMergeRequest,labels,body,comments,statusCheckRollup,headRefName,headRefOid > "$D/pr/$n.json" &
 done; wait
 bin/pr-triage --held > "$D/held.txt"
+bin/pr-triage | awk '$2=="OPEN-THREAD" && $3=="armed,"' > "$D/stalled.txt"
 ```
 
-`bin/pr-triage --held` lists each held PR with every hold reason.
+`bin/pr-triage --held` lists each held PR with every hold reason. It skips a PR with
+auto-merge on. `stalled.txt` lists those PRs when GitHub won't merge them because a
+review thread is still open. Step 2 § Stalled armed PRs says what to do with each.
 
 Each Bash call is a fresh shell, so `$D` is gone after this block. Print it
 (`echo "$D"`), note the path, and write that literal path into every later command and
@@ -112,6 +115,25 @@ Before you put a stale verdict's finding in Decide now, read the commits after t
 picked a side. On #3757 the finding offered two fixes, and the head commit had shipped
 one. A re-fire was all it needed.
 
+### Stalled armed PRs
+
+Each PR in `stalled.txt` has auto-merge on, but master won't take it while a review
+thread is open. Run `bin/pr-triage --card N` and check each open thread:
+
+- **Already fixed.** A later commit fixed the thread. Reply on the thread naming the
+  commit, then resolve it. This needs no owner call.
+- **No owner hold.** Post-plan armed the PR and the owner holds nothing on it. Put it in
+  Prep only and re-fire post-plan. Post-plan's fix round fixes open threads.
+- **Owner approved, thread unfixed.** Put it in Decide now. A fix changes the PR's own
+  lines, so the earlier approval no longer covers them. Offer:
+  1. **Fix it.** Run `gh pr merge N --disable-auto` first, so the PR can't merge before
+     the owner looks again. A Step 6 job fixes each thread, and the PR comes back for a
+     fresh OK.
+  2. **Defer to the backlog.** File an issue in `a-jay85/IBL5-backlog`, reply
+     "Deferred to a-jay85/IBL5-backlog#M" on the thread, and resolve it. The PR then
+     merges on the earlier approval.
+  3. **Hold.**
+
 Tell the owner the count in each pile and name the PRs in Decide now.
 
 ## Step 3: Build the card
@@ -144,6 +166,7 @@ It prints the live state the card needs:
 - **post-plan verdict:** the last `<!-- pr-ready-verdict -->` comment, marked `CURRENT`
   or `STALE` against the head. Commits after the review make it stale.
 - **Door and blast radius:** the `Merge danger:` line in the PR body.
+- **Fidelity evidence.** When the card data has a `fidelity-evidence:` row, print it verbatim. Post-plan writes it for a PR that edits `tools/postplan-harness/harness/fidelity.py`. It compares stored verdicts only and does not change the hold. Print STALE, missing, malformed, unknown and NOT RUN rows as they are.
 - **Visual links:** the `a-jay85.github.io/IBL5/...` URLs from the comments.
 - **Live run and worktree:** any live post-plan label, and the PR's worktree path.
 - **Owner approvals:** each `bin/owner-approve` comment, oldest first. Each row gives the mode, the approved head and whether the PR head moved past it, then the owner's words, the `condition:` line, any `kept:` bullets and, for a fix-first approval, `amendment: recorded`, `MISSING` or `no plan file`.
@@ -174,6 +197,7 @@ Write the card in this shape:
 - <✅/⚠️/❌/⏳> **Review comments:** <open count; what each said; which commit fixed it>.
 - <✅/✅📝/⚠️/❌/⏳/🚨> **post-plan verdict:** <verdict>. <Current or stale>. <Its notes, short>.
 - <✅2️⃣/⚠️2️⃣/🚨1️⃣> **Merge danger:** <one-way or two-way door, blast radius, what a revert does and doesn't undo>.
+- <✅/⚠️> **Fidelity evidence:** <the `fidelity-evidence:` row verbatim; omit this line when the data has none>
 - <✅🔙/⚠️/🚨> **Conflicts:** <none / behind master, no clash / which files clash and with which PR; the job rebases>.
 - <✅/⚠️/❌/⏳> **Why it's held:** <each reason by number; mark stale ones as stale>.
 - <✅/⚠️/🚨> **Owner approvals:** <none / each approval: mode, head unchanged or moved past it, the condition, the amendment status>.
@@ -434,7 +458,8 @@ the hold comes back. The PR stays armed but can't merge until someone adds the l
 When the owner stops or the list ends, list:
 
 - PRs merged or armed. An armed PR with an open review thread stays blocked, so list it
-  with its open threads.
+  with its open threads. Re-run the `stalled.txt` line from Step 1 and list every PR it
+  prints, including ones this run never touched.
 - PRs prepped and armed with no owner call
 - PRs still running, with their `.result` paths and who picks each one up (a watcher log
   or the next `/pr-burndown` run)

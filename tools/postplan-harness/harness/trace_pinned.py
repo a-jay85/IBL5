@@ -21,9 +21,9 @@ At arming time the runner calls `arm_input_value`. It returns exactly "ok" only 
     coverage gives a map literal no block, so it can never meet (c));
 (b) each named test starts with `TestTracePinned`, sits in a changed `_test.go` file, calls
     `jsbtrace.MustLoad(`, and its blob SHA matches the evidence;
-    each capture already exists on the base commit with the recorded sha256, or, for an
-    entry with `capture_host: jsb-native`, exists at the recorded jsb-native commit
-    reachable from that repo's `main`, with the recorded sha256;
+    each capture already exists on the base commit under `engine/testdata/jsb-captures/`
+    with the recorded sha256, matches the working tree, and is at most `MAX_CAPTURE_BYTES`
+    (ADR-0286). An entry that names another capture host holds as `capture-bad-host`;
 (c) each test passes under `go test -json -coverprofile`, executes at least one line the PR
     adds in every file its entry declares, and fails when every captured output is
     perturbed, which proves its expected values come from the capture.
@@ -52,10 +52,7 @@ from .sql_equivalence import _blob_sha, _git
 TOKEN = "trace-pinned"
 EVIDENCE_DIR = "engine/trace-evidence"
 CAPTURE_DIR = "engine/testdata/jsb-captures"
-CAPTURE_HOSTS = ("repo", "jsb-native")
-HOSTED_DIR = "captures"  # capture dir inside the private jsb-native repo
-JSB_NATIVE_MAIN = "refs/heads/main"
-_COMMIT = re.compile(r"^[0-9a-f]{40}$")
+MAX_CAPTURE_BYTES = 8 * 1024 * 1024  # per-file cap on a committed capture (ADR-0286)
 LOADER_DIR = "engine/internal/jsbtrace"  # the capture loader every pinned test trusts
 SCHEMA = 2
 TEST_PREFIX = "TestTracePinned"
@@ -74,6 +71,9 @@ INERT_DOC_SECTIONS = {"engine/docs/jsb-trace-capture.md": "## Rows blocked on a 
 _OLD_NEW_HUNK = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
 _DRAW_SITE_ENTRY = re.compile(r'^\s*"sim\.[A-Za-z0-9_.()*]+":\s*"(FUN_[0-9a-f]{8})?",\s*$')
 _COVER_LINE = re.compile(r"^(.+\.go):(\d+)\.\d+,(\d+)\.\d+ \d+ (\d+)$")
+# Markdown allows up to 3 leading spaces; a `=` or `-` run turns the text above into a heading
+_SETEXT_UNDERLINE = re.compile(r"^ {0,3}(?:=+|-+)[ \t\r]*$")
+_MD_HEADING_LINE = re.compile(rf"^ {{0,3}}#|{_SETEXT_UNDERLINE.pattern}")
 
 
 def evidence_rel(branch) -> str:
@@ -104,6 +104,15 @@ def _sha256(data: bytes) -> str:
 def _git_bytes(args, cwd) -> bytes:
     proc = subprocess.run(["git", *args], cwd=str(cwd), check=True, capture_output=True)
     return proc.stdout
+
+
+def _git_lines(data: bytes) -> list[str]:
+    """`data` split where git splits it, on "\\n" only: a lone `\\r` ends no line, and a CRLF
+    line keeps its `\\r`. Raises UnicodeDecodeError."""
+    lines = data.decode("utf-8").split("\n")
+    if not lines[-1]:
+        lines.pop()
+    return lines
 
 
 # --- (a) path allowlist -----------------------------------------------------------------------
@@ -327,43 +336,8 @@ def jsb_native_dir(root) -> Path:
     return Path(common.strip()).parent / "jsb-native"
 
 
-def _hosted_ok(jsbn, args) -> bool:
-    return subprocess.run(["git", "-C", str(jsbn), *args], capture_output=True).returncode == 0
-
-
-def _hosted_bytes(entry, jsbn) -> bytes:
-    """The capture bytes from the recorded jsb-native commit (never its working tree)."""
-    return _git_bytes(["-C", str(jsbn), "show", f"{entry['capture_commit']}:{entry['capture']}"], jsbn)
-
-
-def _check_hosted_capture(entry, jsbn) -> str:
-    capture, commit = entry.get("capture"), entry.get("capture_commit")
-    if not isinstance(capture, str) or str(Path(capture).parent) != HOSTED_DIR \
-            or not capture.endswith(".jsonl") or ".." in capture:
-        return "capture-bad-path"
-    if not isinstance(commit, str) or not _COMMIT.match(commit):
-        return "capture-commit-bad"
-    jsbn = Path(jsbn)
-    if not (jsbn / ".git").exists():
-        return "capture-host-unavailable"
-    if not _hosted_ok(jsbn, ["cat-file", "-e", f"{commit}^{{commit}}"]):
-        return "capture-commit-bad"
-    if not _hosted_ok(jsbn, ["merge-base", "--is-ancestor", commit, JSB_NATIVE_MAIN]):
-        return "capture-commit-off-main"
-    if not _hosted_ok(jsbn, ["cat-file", "-e", f"{commit}:{capture}"]):
-        return "capture-not-at-commit"
-    data = _hosted_bytes(entry, jsbn)
-    if _sha256(data) != entry.get("capture_sha256"):
-        return "capture-hash-mismatch"
-    if _capture_lines(data) is None:
-        return "capture-unreadable"
-    return "ok"
-
-
-def _check_capture(root, base, entry, jsbn_dir=None) -> str:
+def _check_capture(root, base, entry) -> str:
     host = entry.get("capture_host", "repo")
-    if host == "jsb-native":
-        return _check_hosted_capture(entry, jsbn_dir or jsb_native_dir(root))
     if host != "repo":
         return "capture-bad-host"
     capture = entry.get("capture")
@@ -375,6 +349,8 @@ def _check_capture(root, base, entry, jsbn_dir=None) -> str:
     except subprocess.CalledProcessError:
         return "capture-not-on-base"
     base_bytes = _git_bytes(["show", f"{base}:{capture}"], root)
+    if len(base_bytes) > MAX_CAPTURE_BYTES:
+        return "capture-too-large"
     work = Path(root) / capture
     work_sha = _sha256(work.read_bytes()) if work.is_file() else ""
     want = entry.get("capture_sha256")
@@ -422,18 +398,22 @@ def parse_cover_profile(text, module):
 
 
 def added_lines(root, base, path):
-    """Line numbers `path` adds in the work tree vs `base`; None on a git error."""
+    """Line numbers `path` adds in the work tree vs `base`; None on a git or decode error."""
     try:
         _git(["cat-file", "-e", f"{base}:{path}"], cwd=str(root))
     except subprocess.CalledProcessError:
-        text = (Path(root) / path).read_text()
-        return set(range(1, len(text.splitlines()) + 1))
+        try:
+            count = len(_git_lines((Path(root) / path).read_bytes()))
+        except UnicodeDecodeError:
+            return None
+        return set(range(1, count + 1))
     try:
-        diff = _git(["diff", "-U0", "--no-color", "--no-renames", base, "--", path], cwd=str(root))
-    except (subprocess.CalledProcessError, OSError):
+        diff = _git_lines(_git_bytes(
+            ["diff", "-U0", "--no-color", "--no-renames", base, "--", path], root))
+    except (subprocess.CalledProcessError, OSError, UnicodeDecodeError):
         return None
     lines = set()
-    for line in diff.splitlines():
+    for line in diff:
         hunk = _HUNK.match(line)
         if hunk:
             start = int(hunk.group(1))
@@ -453,12 +433,12 @@ def _text_hunks(root, base, path):
         return f"inert-path-missing: {path}"
     try:
         _git(["cat-file", "-e", f"{base}:{path}"], cwd=str(root))
-        diff = _git(["diff", "-U0", "--no-color", "--no-renames", "--no-ext-diff",
-                     base, "--", path], cwd=str(root))
-    except (subprocess.CalledProcessError, OSError):
+        diff = _git_lines(_git_bytes(["diff", "-U0", "--no-color", "--no-renames",
+                                      "--no-ext-diff", base, "--", path], root))
+    except (subprocess.CalledProcessError, OSError, UnicodeDecodeError):
         return f"inert-path-unreadable: {path}"
     hunks = []
-    for line in diff.splitlines():
+    for line in diff:
         found = _OLD_NEW_HUNK.match(line)
         if found:
             old_s, old_c, new_s, new_c = (int(g) if g is not None else 1 for g in found.groups())
@@ -468,7 +448,7 @@ def _text_hunks(root, base, path):
                 return f"inert-path-unsafe-diff: {path}"
         elif line.startswith(("+", "-")):
             hunks[-1][4].append(line)
-    if diff.strip() and not hunks:
+    if any(line.strip() for line in diff) and not hunks:
         return f"inert-path-unsafe-diff: {path}"
     return hunks
 
@@ -510,8 +490,8 @@ def doc_section_verdict(root, base, path) -> str:
     if isinstance(hunks, str):
         return hunks
     try:
-        old = _git(["show", f"{base}:{path}"], cwd=str(root)).splitlines()
-        new = (Path(root) / path).read_text().splitlines()
+        old = _git_lines(_git_bytes(["show", f"{base}:{path}"], root))
+        new = _git_lines((Path(root) / path).read_bytes())
     except (subprocess.CalledProcessError, OSError, UnicodeDecodeError):
         return f"inert-path-unreadable: {path}"
     old_span, new_span = _section_span(old, heading), _section_span(new, heading)
@@ -520,41 +500,48 @@ def doc_section_verdict(root, base, path) -> str:
     for old_s, old_c, new_s, new_c, lines in hunks:
         if not (_inside(old_s, old_c, old_span) and _inside(new_s, new_c, new_span)):
             return f"doc-change-outside-section: {path}"
-        if any(line[1:].startswith("#") for line in lines):
+        if any(_MD_HEADING_LINE.match(line[1:]) for line in lines):
+            return f"doc-change-outside-section: {path}"
+        # an unchanged underline becomes a heading when the change puts text right above it
+        after = new_s + new_c - 1 if new_c else new_s  # 0-based line following the change
+        if 0 < after < len(new) and new[after - 1].strip() \
+                and _SETEXT_UNDERLINE.match(new[after]):
+            return f"doc-change-outside-section: {path}"
+        # Markdown ends a line at a lone `\r`, so one can open a heading mid-line
+        if any("\r" in line.removesuffix("\r") for line in lines):
             return f"doc-change-outside-section: {path}"
     return "ok"
+
+
+def _go_code_lines(source):
+    """1-based numbers of the lines of Go `source` that are non-blank without comments."""
+    # group 1 is a comment; literals are matched so a marker or quote inside one is inert
+    token = r"""(//[^\n]*|/\*.*?(?:\*/|\Z))|"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|`[^`]*`"""
+    bare = re.sub(token, lambda m: "\n" * m[0].count("\n") if m[1] else m[0], source, flags=re.S)
+    return {n for n, line in enumerate(bare.split("\n"), 1) if line.strip()}
 
 
 def coverage_verdict(root, base, ported, blocks) -> str:
     """ok when the run executed at least one added line of every declared file."""
     for path in sorted(ported):
-        added = added_lines(root, base, path)
+        try:
+            # bytes, not read_text(): a lone `\r` turned into `\n` shifts lines against git's
+            src = (Path(root) / path).read_bytes().decode()
+            added = added_lines(root, base, path)
+        except (OSError, UnicodeDecodeError):
+            return f"diff-unreadable: {path}"
         if added is None:
             return f"diff-unreadable: {path}"
-        try:
-            src = (Path(root) / path).read_text().splitlines()
-        except OSError:
-            return f"diff-unreadable: {path}"
-        # blank and `//`-only lines never count: a Go cover block spans lines between statements
-        added = {n for n in added if 0 < n <= len(src) and src[n - 1].strip()
-                 and not src[n - 1].strip().startswith("//")}
+        # blank and comment-only lines never count: a Go cover block spans lines between statements
+        added &= _go_code_lines(src)
         spans = blocks.get(path, ())
         if not any(c > 0 and s <= n <= e for n in added for s, e, c in spans):
             return f"unexercised-change: {path}"
     return "ok"
 
 
-def _run_entry(root, base, entry, run_go, jsbn_dir=None) -> str:
+def _run_entry(root, base, entry, run_go) -> str:
     """Steps (c) and the perturbation run for one evidence entry."""
-    if entry.get("capture_host") == "jsb-native":
-        with tempfile.TemporaryDirectory(prefix="trace-pinned-hosted-") as stage_dir:
-            stage = Path(stage_dir)
-            name = Path(entry["capture"]).name
-            dest = stage / CAPTURE_DIR / name
-            dest.parent.mkdir(parents=True)
-            dest.write_bytes(_hosted_bytes(entry, jsbn_dir or jsb_native_dir(root)))
-            return _run_entry_at(root, base, entry, run_go, stage, f"{CAPTURE_DIR}/{name}",
-                                 {"JSB_TRACE_CAPTURE_DIR": str(stage / CAPTURE_DIR)})
     return _run_entry_at(root, base, entry, run_go, root, entry["capture"], None)
 
 
@@ -612,8 +599,8 @@ def evaluate_data(root, branch, base, changed_files, data, run_go=None, jsbn_dir
     for entry in tests:
         for step in (lambda: _check_ported(root, entry, changed),
                      lambda: _check_test_entry(root, entry, changed),
-                     lambda: _check_capture(root, base, entry, jsbn_dir),
-                     lambda: _run_entry(root, base, entry, run_go, jsbn_dir)):
+                     lambda: _check_capture(root, base, entry),
+                     lambda: _run_entry(root, base, entry, run_go)):
             note = step()
             if note != "ok":
                 return note
@@ -681,7 +668,7 @@ def _find_test_file(root, package, test) -> str:
 
 
 def record(root, branch, test_specs, capture_names, run_go=None, ported_specs=None,
-           capture_host="repo", jsbn_dir=None) -> int:
+           jsbn_dir=None) -> int:
     """Write the evidence file after every check passes. 0 written, 1 refused, 2 usage."""
     test_specs, capture_names = list(test_specs or ()), list(capture_names or ())
     ported_specs = list(ported_specs or ())
@@ -701,25 +688,11 @@ def record(root, branch, test_specs, capture_names, run_go=None, ported_specs=No
         entry = {"package": package, "test": test, "file": file,
                  "ported_files": ported.split(","),
                  "test_blob": _blob_sha(root, file) if file else ""}
-        if capture_host == "jsb-native":
-            capture = f"{HOSTED_DIR}/{name}"
-            jsbn = Path(jsbn_dir or jsb_native_dir(root))
-            commit = ""
-            if (jsbn / ".git").exists():
-                proc = subprocess.run(["git", "-C", str(jsbn), "log", "-1", "--format=%H",
-                                       JSB_NATIVE_MAIN, "--", capture],
-                                      capture_output=True, text=True)
-                commit = proc.stdout.strip() if proc.returncode == 0 else ""
-            entry.update({"capture": capture, "capture_host": "jsb-native",
-                          "capture_commit": commit, "capture_sha256": ""})
-            if commit and _hosted_ok(jsbn, ["cat-file", "-e", f"{commit}:{capture}"]):
-                entry["capture_sha256"] = _sha256(_hosted_bytes(entry, jsbn))
-        else:
-            capture = f"{CAPTURE_DIR}/{name}"
-            capture_file = Path(root) / capture
-            entry.update({"capture": capture,
-                          "capture_sha256": _sha256(capture_file.read_bytes())
-                          if capture_file.is_file() else ""})
+        capture = f"{CAPTURE_DIR}/{name}"
+        capture_file = Path(root) / capture
+        entry.update({"capture": capture,
+                      "capture_sha256": _sha256(capture_file.read_bytes())
+                      if capture_file.is_file() else ""})
         tests.append(entry)
     data = {"schema": SCHEMA, "token": TOKEN, "branch": branch, "tests": tests}
     base = resolve_base(root, branch)
@@ -742,8 +715,6 @@ def _parser() -> argparse.ArgumentParser:
     rec.add_argument("--branch", required=True)
     rec.add_argument("--test", action="append", default=[])
     rec.add_argument("--capture", action="append", default=[])
-    rec.add_argument("--capture-host", choices=CAPTURE_HOSTS, default="repo",
-                     help="where every --capture lives: this repo or jsb-native captures/")
     rec.add_argument("--ported", action="append", default=[],
                      help="comma-separated engine .go files the paired --test ports; one per --test")
     chk = sub.add_parser("check", help="print the arming verdict for this branch's evidence")
@@ -755,8 +726,7 @@ def main(argv) -> int:
     args = _parser().parse_args(argv)
     root = _git(["rev-parse", "--show-toplevel"]).strip()
     if args.command == "record":
-        return record(root, args.branch, args.test, args.capture, ported_specs=args.ported,
-                      capture_host=args.capture_host)
+        return record(root, args.branch, args.test, args.capture, ported_specs=args.ported)
     base = resolve_base(root, args.branch)
     verdict = (evaluate_evidence(root, args.branch, base, changed_files_since(root, base))
                if base else "base-unresolved")

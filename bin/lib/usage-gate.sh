@@ -660,7 +660,9 @@ usage_limit_hit_marker() {
         pct=$(usage_zone_pct "$body")
         resets=$(usage_resets_epoch "$body" "$w")
     fi
-    usage_marker_write "$sid" "$runner" "$rbin" limit-hit "$zone" "$pct" "$w" "$resets"
+    usage_marker_write "$sid" "$runner" "$rbin" limit-hit "$zone" "$pct" "$w" "$resets" || return 1
+    usage_log "limit-hit-marker-written runner=$runner sid=$sid zone=$zone"
+    return 0
 }
 
 # usage_postrun_pause <runner> <sid> <resume_bin> <rc> <log> [after_line]

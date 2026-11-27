@@ -698,8 +698,10 @@ func findBox(boxes []result.PlayerBox, pid int) *result.PlayerBox {
 //     injuryProbability), so |injuries − p·turnovers| ≤ 4σ where σ =
 //     sqrt(p·(1−p)·turnovers). The fixed seed makes this deterministic; 4σ is a
 //     principled bound, not a cuff around the observed value.
-//  3. Calibration, fixture-DEPENDENT: injuries/game lands in the corpus band
-//     [0.15, 0.30]. Upper bound WIDENED for J24 Phase 3 (0.25 -> 0.30): the
+//  3. Calibration, fixture-DEPENDENT: injuries/game lands in the fixture band
+//     [0.15, 0.38]. The band bounds the synthetic richBundle fixture. It is not
+//     the corpus injury rate, which injury.go cites as about 0.2/game.
+//     Upper bound WIDENED for J24 Phase 3 (0.25 -> 0.30): the
 //     steal-transition step class (gameloop.go, possession.go's possOutcome)
 //     drains the clock faster after a steal, so a season-sized run now packs
 //     more possessions/game — and, since turnovers are steal-dominant
@@ -713,9 +715,12 @@ func findBox(boxes []result.PlayerBox, pid int) *result.PlayerBox {
 //     Upper bound WIDENED for backlog#1923 (0.30 -> 0.38): after the J27 code-4
 //     port this fixture runs ~44.5 turnovers/game, so the expected rate is
 //     0.007 × 44.55 = 0.312/game, already above 0.30. Master passed at 0.2917
-//     by a low draw. Removing the stealer's RNG draw shifts the stream and lands
-//     0.3083, inside assertion 2's 4σ. 0.38 sits at the expected value plus 4σ
-//     per game (σ ≈ 0.016 over 1200 games).
+//     by a low draw. At PR #4134, removing the stealer's RNG draw shifted the
+//     stream and landed 0.3083, inside assertion 2's 4σ. On 2026-11-27 the tree
+//     measured 0.3417 (410 injuries over 1200 games, 44.72 turnovers/game).
+//     That is about 1.8σ above the expected 0.313. 0.38 is the expected value
+//     plus 4σ per game (σ ≈ 0.016 over 1200 games), rounded up. See
+//     engine/docs/j27-live-outcome-map-port.md.
 func TestSimulate_InjuryRateBand(t *testing.T) {
 	const n = 1200
 	base := richBundle()
@@ -754,13 +759,15 @@ func TestSimulate_InjuryRateBand(t *testing.T) {
 
 	perGame := float64(injuries) / float64(n)
 	// J25 faithful 16.0 re-center (baseTimeMid 17.7 -> 16.0, tempo.go) check:
-	// still within the Phase-3 band [0.15, 0.30], no re-baseline needed.
+	// at J25 the result was within that day's Phase-3 band [0.15, 0.30], so J25
+	// needed no re-baseline.
 	// At the retired 17.7 center this fixture/seed measured turnovers/game 27.71
 	// and injuries/game 0.1783 (the previously-documented ~31.9/~0.21 pair was
 	// stale). The J25 walkback to the faithful 16.0 raises them to
 	// turnovers/game 30.40, injuries/game 0.1833 — turnovers rise with possession
-	// count, as expected. Both remain comfortably inside the UNCHANGED [0.15,0.30]
-	// band with margin on both sides. See below for the observed value.
+	// count, as expected. Both J25 values sat comfortably inside the [0.15,0.30]
+	// band of that time, with margin on both sides. The current upper bound is
+	// 0.38 (see the header comment). See below for the observed value.
 	t.Logf("injuries/game = %.4f (turnovers/game = %.2f) — J25 faithful 16.0 center, band [0.15, 0.38]",
 		perGame, float64(turnovers)/float64(n))
 	if perGame < 0.15 || perGame > 0.38 {

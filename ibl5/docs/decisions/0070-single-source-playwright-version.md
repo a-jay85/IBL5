@@ -1,6 +1,6 @@
 ---
 description: Derive the Playwright Docker image tag from each package's package.json at runtime so the image and the installed client cannot drift; the drift guard becomes a no-hardcoded-literal regression guard.
-last_verified: 2026-09-26
+last_verified: 2026-11-26
 ---
 
 # ADR-0070: Single-source the Playwright version from each package.json
@@ -24,6 +24,14 @@ Derive the Docker image tag from each package's own `package.json` at runtime, s
 - The "Playwright version drift guard" job is repurposed into a regression guard (`bin/check-playwright-pinning`) that fails only if a hardcoded image literal is re-introduced into a derivation surface. Its job id and name are unchanged.
 - `ibl5/bun.lock` is dropped from guarding: CI runs `bun install` non-frozen, so the lockfile is a cache key, not a correctness gate; a stale entry is a harmless cache miss.
 - IBL6 stays manually version-managed and is intentionally NOT added to `.github/dependabot.yml`; only its derivation is fixed so an ibl5 bump cannot break it.
+
+## Addendum — IBL6 removal, tag derivation and guard location (2026-11-26) <!-- slop-ok -->
+
+This ADR recorded IBL6 E2E jobs that derive the image tag from `IBL6/package.json`. The IBL6 app was removed on 2026-07-24 (commit `2c9a8d0805`, PR 1639), so on 2026-11-26 those jobs and that derivation are gone.
+
+This ADR recorded a helper that derives the tag from `package.json`. On 2026-11-26 `bin/playwright-image-tag` prefers the installed `@playwright/test` version under `node_modules` and falls back to the exact pin in `package.json`.
+
+This ADR recorded that the "Playwright version drift guard" job id and name are unchanged. On 2026-11-26 the guard is a step of that name in `.github/workflows/tests.yml`, because it moved out of its own job in the E2E workflow.
 
 ## Alternatives Considered
 

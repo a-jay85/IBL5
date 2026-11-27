@@ -38,7 +38,6 @@ type pl0027Out struct {
 // that value is not pinned here; TestDayStartScaledPassTruncatesScaledDraw
 // pins the truncation rule.
 func TestTracePinnedPl0027DayStartPass(t *testing.T) {
-	jsbtrace.SkipIfAbsent(t, "pl-0027.jsonl")
 	c := jsbtrace.MustLoad(t, "pl-0027.jsonl")
 	if len(c.Records) == 0 {
 		t.Fatal("capture holds no records")

@@ -4,7 +4,8 @@ Opt in per module with `pytestmark = pytest.mark.usefixtures("stub_ambient_git_s
 `stub_ambient_git_show` is not autouse: `test_fidelity.py` and `test_fidelity_remediation.py`
 exercise the real `_git_show` through a `git` shim on PATH, and a repo-wide patch would
 defeat them. `standard_review_depth` and `pid_reap_witness` are opt-in the same way. Autouse fixtures: `no_real_pr_review_now`, `stub_prefire_gate`, `_reset_netretry_latch`,
-`isolate_live_reviewcache`, `_private_verdict_files`, `_private_log_dir`, and `no_ambient_usage_gate`.
+`isolate_live_reviewcache`, `_private_verdict_files`, `_private_log_dir`, `no_ambient_usage_gate`,
+and `no_ambient_run_log`.
 """
 from __future__ import annotations
 
@@ -78,6 +79,19 @@ def no_ambient_usage_gate(monkeypatch):
     for name in ("IBL5_USAGE_GATE", "IBL5_USAGE_GATE_MODEL", "IBL5_USAGE_GATE_RUNNER",
                  "IBL5_USAGE_GATE_RESUME_BIN", "IBL5_USAGE_GATE_SESSION_ID"):
         monkeypatch.delenv(name, raising=False)
+
+
+@pytest.fixture(autouse=True)
+def no_ambient_run_log(monkeypatch):
+    """Keep a live run's log path out of the tests.
+
+    bin/post-plan-now gives the harness POSTPLAN_LOG_PATH. A test that installs the real
+    SIGTERM handler and inherits it appends a KILLED line to the live run log, and the
+    wrapper then reports a usage pause as a kill. Tests that need a log path set their own.
+    """
+    monkeypatch.delenv("POSTPLAN_LOG_PATH", raising=False)
+    import runner
+    monkeypatch.setattr(runner, "_claimed_log_path", None)
 
 
 @pytest.fixture(autouse=True)

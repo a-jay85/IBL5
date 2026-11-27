@@ -45,7 +45,6 @@ func decodePl0028Record(inRaw, outRaw json.RawMessage) (pl0028In, pl0028Out, err
 // tipOffWinner. It asserts the returned index equals the capture's ret, and
 // that the port takes exactly the captured raw draws, every one logged as raw.
 func TestTracePinnedPl0028TipOff(t *testing.T) {
-	jsbtrace.SkipIfAbsent(t, "pl-0028.jsonl")
 	c := jsbtrace.MustLoad(t, "pl-0028.jsonl")
 	if len(c.Records) == 0 {
 		t.Fatal("capture holds no records")

@@ -1,6 +1,6 @@
 ---
 description: Unifies the deployment funnel so every PR-opening path flows through /post-plan; triage is a loaded rule, /plan auto-queues, /ship drops merge-intent tokens.
-last_verified: 2026-09-26
+last_verified: 2026-11-26
 ---
 
 # ADR-0067: Unified deployment funnel — one pipeline through /post-plan
@@ -21,6 +21,12 @@ Collapse the funnel to a single pipeline with one variable:
 - **`/plan` auto-queues queue-safe plans.** When `bin/check-plan` passes (which already enforces no-unresolved-decisions), `/plan` auto-invokes `bin/automouse/queue` unless the session opts to implement now. Queue-safety is independent of `auto_merge`.
 - **`/ship` collapses to a thin `/post-plan` wrapper.** The `--no-merge` / `--merge` tokens and the merge-intent resolution are removed; `/ship` fires bare `bin/post-plan-now` after its precondition gate. A reviewed-but-held PR still happens automatically whenever Phase 6.5 holds the work — no token to remember.
 
+## Addendum — post-plan engine and auto-queue gates (2026-11-26) <!-- slop-ok -->
+
+This ADR recorded that Phase 6.5 of `/post-plan` decides auto-merge arming. On 2026-11-26 `/post-plan` runs only as the compiled harness started by `bin/post-plan-now` (ADR-0284), and `tools/postplan-harness/harness/armable.py` is the sole arming authority.
+
+This ADR recorded one auto-queue gate, a passing `bin/check-plan`. On 2026-11-26 `.claude/skills/plan/SKILL.md` requires both `bin/check-plan` and `bin/check-plan-staleness` to pass.
+
 ## Alternatives Considered
 
 - **Docs-only direct-arm bypass (PR #1193).** A light path that armed `gh pr merge --auto` directly, skipping `/post-plan`, for Markdown-only diffs. Rejected and closed: a second arming path violates the single-pipeline model, and `/post-plan` already self-scales to near-nothing on a prose diff (Phase 3 `DOCS_ONLY`, Phase 4/5 agent + suite skips).
@@ -38,5 +44,5 @@ Collapse the funnel to a single pipeline with one variable:
 - `.claude/rules/workflow-continuity.md` — the implementation → `/post-plan` auto-fire handoff.
 - `.claude/skills/plan/SKILL.md` — `/plan` (auto-queue added in PR B).
 - `.claude/skills/ship/SKILL.md` — `/ship` (simplified in PR C).
-- `.claude/skills/post-plan/SKILL.md` — Phase 6.5, the single arming authority.
+- `tools/postplan-harness/harness/armable.py` — the Phase 6.5 arming conditions, the single arming authority (shell halves in `bin/lib/pr-armable.sh`). <!-- slop-ok -->
 - `bin/automouse/queue` — the queue command `/plan` invokes.

@@ -1,6 +1,6 @@
 ---
 description: The post-plan exit-3 Discord DM moves into bin/post-plan-fail-dm, which sends at once when no Claude session is live in the worktree and otherwise holds the DM 15 minutes in a launchd job, dropping it if the branch was re-fired.
-last_verified: 2026-09-26
+last_verified: 2026-11-26
 ---
 
 > This ADR was drafted by the post-plan harness for this PR. A human must review and approve it before merging.
@@ -18,6 +18,16 @@ last_verified: 2026-09-26
 ## Decision
 
 The exit-3 branch of `GATE_CLOSE` in `bin/post-plan-now` passes the message to `bin/post-plan-fail-dm`, which owns the DM from then on. The helper reads the Claude session registry and looks for an entry whose repo resolves to the worktree root and whose pid is alive. With no such session it DMs at once. With one, it touches a stamp file beside the run log, writes a plist, and bootstraps a launchd job that sleeps `FAILDM_DELAY` seconds (900 by default) and then re-invokes the helper with `--deferred`. The deferred run looks for a `post-plan-now` log for the same branch slug that is newer than the stamp. The filename match requires the date-shaped suffix, so branch `foo` never matches a log for `foo-bar`. A newer log means someone re-fired, and the held DM is dropped because that newer run DMs on its own if it also fails. No newer log means nobody acted, and the DM goes out prefixed with "Nobody re-ran it within 15 min". Every uncertain path fails open to an immediate DM: an unreadable registry counts as no session, and a failed `launchctl bootstrap` removes the plist and stamp and sends at once. The held job deletes its own plist and boots itself out when done. Enforcement is `bin/test-post-plan-fail-dm`, whose eight cases stub `launchctl` and `bin/discord-dm` and run as a step in `.github/workflows/tests.yml`. `test_exit3_dm_and_echo_send_the_same_single_string` in `tools/postplan-harness/tests/test_post_plan_now_fallback.py` pins that the echo and the helper receive the same single `$msg`.
+
+## Addendum — hold mechanism, callers and CI wiring (2026-11-26) <!-- slop-ok -->
+
+This ADR recorded the exit-3 branch of `GATE_CLOSE` as the caller of the helper. On 2026-11-26 the exit-3 branch sits in `OUTCOME_SEG` of `bin/post-plan-now`, and `FAILDM_SEG` also sends other failing exit codes (all except 0, 3, 75 and 143) through the helper.
+
+This ADR recorded a hold that writes a plist and bootstraps a launchd job. On 2026-11-26 the helper writes a script that deletes itself and submits it with `ljob_submit`.
+
+This ADR recorded that any live Claude session in the worktree triggers the hold. On 2026-11-26 headless `claude -p` / `--print` sessions do not count, and the session that fired the run does not count either. `bin/post-plan-now` records its own process ancestors in `FAILDM_FIRER_PIDS`, and the helper skips a registry entry whose pid is in that list.
+
+This ADR recorded eight test cases run as a step in `.github/workflows/tests.yml`. On 2026-11-26 `bin/test-post-plan-fail-dm` has grown beyond those eight and runs in leg 1 of the shell harness matrix listed in `.github/workflows/harness-legs.txt`.
 
 ## Alternatives Considered
 
@@ -39,10 +49,10 @@ The exit-3 branch of `GATE_CLOSE` in `bin/post-plan-now` passes the message to `
 ## References
 
 - `bin/post-plan-fail-dm`: the session check, the stamp and re-fire check, the launchd hold, and the fail-open fallbacks.
-- `bin/test-post-plan-fail-dm`: the eight regression cases with stubbed `launchctl` and DM command.
-- `bin/post-plan-now`: the `GATE_CLOSE` exit-3 branch that now calls the helper.
+- `bin/test-post-plan-fail-dm`: the regression cases with stubbed `launchctl` and DM command.
+- `bin/post-plan-now`: the `OUTCOME_SEG` and `FAILDM_SEG` segments that call the helper.
 - `bin/discord-dm`: the DM transport the helper still uses, with `--quiet --attempts 2`.
 - `tools/postplan-harness/tests/test_post_plan_now_fallback.py`: the single-string invariant for the exit-3 message.
-- `.github/workflows/tests.yml`: the CI step that runs `bin/test-post-plan-fail-dm`.
+- `.github/workflows/harness-legs.txt`: the matrix leg list that runs `bin/test-post-plan-fail-dm` in CI.
 - `.claude/rules/workflow-continuity-detail.md`: the engine notes describing when the exit-3 DM is sent or held.
 - `ibl5/docs/decisions/README.md`: the decision-record policy `bin/adr-check` enforces.

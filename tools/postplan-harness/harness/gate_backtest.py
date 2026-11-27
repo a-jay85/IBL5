@@ -200,6 +200,9 @@ _ARMING_PATHS = (
     "tools/postplan-harness/harness/owner_intent.py",
     ".claude/agents/pr-second-reviewer.md",
     "tools/postplan-harness/harness/fidelity.py",
+    # The owner reads this module's evidence line before approving a fidelity.py edit. A looser
+    # copy merged alone would mislead that approval, so its edits wait for the owner too.
+    "tools/postplan-harness/harness/fidelity_evidence.py",
     "tools/postplan-harness/harness/planfile.py",
     "bin/lib/ui-change-classifier.sh",
     "bin/lib/human-signoff-classifier.sh",
@@ -228,6 +231,9 @@ _ARMING_PATHS = (
     "bin/lib/text-hold-recheck.sh",
     ".github/workflows/text-hold-recheck.yml",
     ".github/workflows/text-hold-recheck-run.yml",
+    # The second-review seat and the plan architects read this file, so an edit to it is held
+    # like an edit to pr-second-reviewer.md.
+    ".claude/review-shared/_engineering-principles.md",
 )
 
 # runner.py builds ArmInputs and calls the seat, but most edits to it are not merge-rule

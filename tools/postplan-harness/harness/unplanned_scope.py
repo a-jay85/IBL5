@@ -301,12 +301,18 @@ def title_key(text: str) -> str:
     keeps the words before the first `: `, so the same finding matches its declared line
     and the owner's approved line. A title with no `: ` stops at its first sentence end
     (`. ` or a final `.`), because the reviewer also rewords the sentences after it
-    (PRs 4202 and 4213). The key also stops at the first ` (` followed by a backtick.
-    `render_kept_block` writes that path citation after each declared title, and a
-    reviewer may put the path and prose there too, so the finding still matches the
-    shorter declared and approved line (PR 4244). A ` (` with no backtick stays.
-    `_listed` separately compares the paths the key drops.
+    (PRs 4202 and 4213). The key also drops a trailing ` (` plus backtick
+    parenthetical. `render_kept_block` writes that path citation after each declared
+    title, and a reviewer may put the path and prose there too, so the finding still
+    matches the shorter declared and approved line (PR 4244). When words follow a
+    citation, the citation and those words stay in the key, because they say what the
+    change is. A ` (` with no backtick stays. `_listed` separately compares the path
+    the key drops.
     """
+    sentence = _key_sentence(text)
+    start = _annotation_start(sentence)
+    if start != sentence.find(" (`"):  # words follow a citation, so they stay
+        return sentence[:start] if start != -1 else sentence
     return _key_sentence(text).split(" (`", 1)[0].strip()
 
 
@@ -318,15 +324,50 @@ def _key_sentence(text: str) -> str:
     return title.split(". ", 1)[0].strip().rstrip(".").strip()
 
 
+def _runs_to_end(tail: str) -> bool:
+    """True when the parenthetical opening `tail` is the last thing in the title.
+
+    Only another ` (` plus backtick citation, or the rendered ` (no path cited)`, may
+    follow it. So may the bare ` owner` that the `: ` cut leaves of an `owner: "..."`
+    quote. A parenthetical the sentence cut left open also runs to the end. Parens
+    inside backticks are not counted.
+    """
+    depth, in_code = 0, False
+    for i, ch in enumerate(tail):
+        if ch == "`":
+            in_code = not in_code
+        elif in_code:
+            continue
+        elif ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth == 0:
+                rest = tail[i + 1:]
+                if rest in ("", " owner"):
+                    return True
+                return rest.startswith((" (`", " (no path cited)")) and _runs_to_end(rest)
+    return True
+
+
+def _annotation_start(sentence: str) -> int:
+    """Where the trailing ` (` plus backtick citation starts, else -1."""
+    start = sentence.find(" (`")
+    while start != -1 and not _runs_to_end(sentence[start:]):
+        start = sentence.find(" (`", start + 1)
+    return start
+
+
 _LINE_SUFFIX = r"(?::\d+(?:-\d+)?)?"
 
 
 def _key_citation(text: str) -> Optional[str]:
     """The first backticked token `title_key` cuts off, minus a line number, else None."""
-    parts = _key_sentence(text).split(" (`", 1)
-    if len(parts) < 2:
+    sentence = _key_sentence(text)
+    start = _annotation_start(sentence)
+    if start == -1:
         return None
-    return re.sub(_LINE_SUFFIX + "$", "", parts[1].split("`", 1)[0])
+    return re.sub(_LINE_SUFFIX + "$", "", sentence[start + len(" (`"):].split("`", 1)[0])
 
 
 def _names(line: str, path: str) -> bool:

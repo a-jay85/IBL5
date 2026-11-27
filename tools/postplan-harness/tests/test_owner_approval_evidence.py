@@ -292,7 +292,29 @@ def test_downgrade_passes_changed_paths_to_the_match(tmp_path):
 
 def test_mid_title_citation_compares_the_cited_path():
     approved = "- Remove the guard (`bin/check-a`) from the merge gate (`bin/check-a`)"
-    same = "- [BLOCKING] [unplanned-scope] Remove the guard (`bin/check-a:12`) from the gate"
+    same = "- [BLOCKING] [unplanned-scope] Remove the guard (`bin/check-a`) from the merge gate"
+    reworded = "- [BLOCKING] [unplanned-scope] Remove the guard (`bin/check-a`) from the gate"
     other = "- [BLOCKING] [unplanned-scope] Remove the guard (`bin/check-b`) from the merge gate"
     assert us._listed(same, approved)
+    assert not us._listed(reworded, approved)
     assert not us._listed(other, approved)
+
+
+def test_words_after_a_citation_stay_in_the_key():
+    """An approval for a narrow change never covers a wider one that differs only after
+    the cited path, with or without the rendered path suffix."""
+    approved = "- Relax the check (`bin/check-a`) for docs-only PRs (`bin/check-a`)"
+    wider = "- [BLOCKING] [unplanned-scope] Relax the check (`bin/check-a`) for all PRs"
+    assert us.title_key(approved) == "Relax the check (`bin/check-a`) for docs-only PRs"
+    assert us.title_key(wider) == "Relax the check (`bin/check-a`) for all PRs"
+    for line in (approved, "- Relax the check (`bin/check-a`) for docs-only PRs"):
+        assert not us._listed(wider, line)
+        assert not us._listed(wider + " (`bin/check-a` line 4)", line)
+
+
+def test_stacked_trailing_citations_are_all_dropped():
+    """A finding that ends in a path parenthetical gets the rendered path suffix after
+    it. Both trailing groups drop, including when the first one holds nested parens."""
+    for suffix in ("(`bin/check-a`)", "(no path cited)"):
+        line = f"- Relax the check (`bin/check-a` now calls `f()` (twice)) {suffix}"
+        assert us.title_key(line) == "Relax the check", line

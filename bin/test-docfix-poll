@@ -995,6 +995,31 @@ OUT="$(SHIM_GH_PR_LIST_JSON="$RAW26C" SHIM_STALE_JSON="$STALE_ONE" \
     SHIM_REFLOG_OUT="" SHIM_LAUNCHCTL_OUT="" run_health "$SB" 77)"; RC=$?
 _if_case "26f" true "died" "orphaned refresh branch beside a red review PR: kind=died wins"
 
+# (26h) several review PRs open at once: a green newest PR does not hide a red
+# older one, and every red PR is named. Control: all green stays quiet.
+_health_26h() {   # $1 = raw PR array; prints the health report
+    local SB; SB="$(build_sandbox)"
+    SHIM_GH_PR_LIST_JSON="$1" SHIM_STALE_JSON="$STALE_ONE" SHIM_LS_REMOTE="" \
+        SHIM_ISSUE_BODY="<!-- stale-since: $TS_48H -->" SHIM_BRANCH_OUT="" \
+        SHIM_REFLOG_OUT="" SHIM_LAUNCHCTL_OUT="" run_health "$SB" 77
+}
+GREEN_NEW="$(_pr 90 docs-content-review-20260804 OPEN '' a.md '[]' "$TS_1H")"
+OUT="$(_health_26h "$(_prs "$GREEN_NEW" \
+    "$(_pr 88 docs-content-review-20260803 OPEN '' a.md "$RED_ROLLUP" "$TS_48H")")")"; RC=$?
+_if_case "26h" true "ci-red" "green newest review PR, red older one: alert=true kind=ci-red"
+grep -qxF 'detail=Content-review PR https://example.test/pr/88 has 1 failing check(s) — the held doc edits need a fix before you can merge them.' <<< "$OUT" \
+  && ok "(26h) detail names only the red older PR" \
+  || bad "(26h) older red PR detail ($OUT)"
+OUT="$(_health_26h "$(_prs \
+    "$(_pr 90 docs-content-review-20260804 OPEN '' a.md "$RED_ROLLUP" "$TS_1H")" \
+    "$(_pr 88 docs-content-review-20260803 OPEN '' a.md "$RED_ROLLUP" "$TS_48H")")")"; RC=$?
+grep -qxF 'detail=Content-review PR https://example.test/pr/90 has 1 failing check(s); Content-review PR https://example.test/pr/88 has 1 failing check(s) — the held doc edits need a fix before you can merge them.' <<< "$OUT" \
+  && ok "(26h) two red review PRs are both named on one detail line" \
+  || bad "(26h) two red PRs detail ($OUT)"
+OUT="$(_health_26h "$(_prs "$GREEN_NEW" \
+    "$(_pr 88 docs-content-review-20260803 OPEN '' a.md '[]' "$TS_48H")")")"; RC=$?
+_if_case "26h" false "" "control: both review PRs green: stays quiet"
+
 # (26g) a leftover local review branch shows as wedged in health and is never
 # salvaged or reaped by the poll.
 SB="$(_wt_sandbox)"

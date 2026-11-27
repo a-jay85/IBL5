@@ -312,6 +312,27 @@ def test_words_after_a_citation_stay_in_the_key():
         assert not us._listed(wider + " (`bin/check-a` line 4)", line)
 
 
+def test_shortened_title_does_not_match_a_narrower_line_by_substring():
+    """A wider finding whose title is the front of an approved narrow line is not covered."""
+    approved = "- Relax the check (`bin/check-a`) for docs-only PRs (`bin/check-a`)"
+    wider = "- [BLOCKING] [unplanned-scope] Relax the check (`bin/check-a`)"
+    got = us.approval_from_comments([_comment(_body(span=(approved,)))], FP)
+    assert got is not None
+    assert not us._listed(wider, approved, ["bin/check-a"])
+    assert not us.approval_covers(wider, got, ["bin/check-a"])
+
+
+def test_exact_title_matches_with_only_tags_and_citations_around_it():
+    wider = "- [BLOCKING] [unplanned-scope] Relax the check (`bin/check-a`)"
+    title = us.title_of(wider)
+    for line in (f"- {title}", f"- [GATE-EDIT] {title} (`bin/check-a`)",
+                 f"- {title} (`bin/check-a`, `bin/check-b`)\r", f"- {title} (no path cited)"):
+        assert us._is_whole_bullet(title, line), line
+    for line in (title, f"- Also {title}", f"- {title} for docs-only PRs",
+                 f"- {title} (for docs-only PRs)", f"- {title} (`bin/check-a`) for docs-only PRs"):
+        assert not us._is_whole_bullet(title, line), line
+
+
 def test_sentence_cut_inside_parens_keeps_the_words_after_them():
     """A `. ` or `: ` inside the parentheses, or an unbalanced backtick there, never
     drops the words after the closing paren."""

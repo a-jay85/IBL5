@@ -393,16 +393,33 @@ def _names(line: str, path: str) -> bool:
     return re.search(f"`{re.escape(path)}{_LINE_SUFFIX}`", line) is not None
 
 
+def _is_whole_bullet(title: str, line: str) -> bool:
+    """True when the bullet `line` is `title`, give or take leading tags and path citations.
+
+    Only citations may follow the title. Any other words may narrow the approved change.
+    """
+    bullet = _BULLET_RE.match(line)
+    if not bullet:
+        return False
+    body = _LEAD_TAGS_RE.sub("", line[bullet.end():].strip())
+    want = _LEAD_TAGS_RE.sub("", title)
+    if not body.startswith(want):
+        return False
+    rest = body[len(want):]
+    return rest == "" or (rest.startswith((" (`", " (no path cited)")) and _runs_to_end(rest))
+
+
 def _listed(text: str, span: str, changed_paths: Iterable[str] = ()) -> bool:
     """True when the finding's title, or its stable key, is listed on a line of `span`.
 
+    A title match must cover the whole bullet, so a shortened title never matches.
     That line must also name every changed path the finding cites anywhere in its text.
     When the key cut off a path citation, the line must name that path too.
     """
     named = cited_paths(text, changed_paths)
     lines = [ln for ln in span.splitlines() if all(_names(ln, path) for path in named)]
     title = title_of(text).strip()
-    if len(title) >= MIN_TITLE_LEN and any(title in ln for ln in lines):
+    if len(title) >= MIN_TITLE_LEN and any(_is_whole_bullet(title, ln) for ln in lines):
         return True
     key = title_key(text)
     if len(key) < MIN_TITLE_LEN:

@@ -1,6 +1,6 @@
 ---
 description: /post-plan Phase 5.5 — plan-intent fidelity review (a carry-forward gate that skips the spawn on an unchanged tree and plan, otherwise one Opus reviewer spawn, plus one bounded re-review after remediation), verdict parse, remediation, and sticky merge-digest comment.
-last_verified: 2026-11-24
+last_verified: 2026-11-27
 ---
 
 # /post-plan Phase 5.5: plan-intent fidelity review & merge digest
@@ -205,7 +205,39 @@ Appending a metadata line is **not** editing the verdict: the word, the findings
 
 ## Step 4 - Remediation on `READY WITH NOTES` (and `NOT READY`)
 
-Load the procedure in place: `git show <MASTER_SHA>:.claude/review-shared/_phase65-remediation.md`. Run it as written, including its step 2 clean-tree precondition (`STOP: worktree dirty before remediation`) and its fifth-file gate handoff to one `subagent_type: "sonnet-5-5"` delegate. On the harness path, the harness commits and pushes after the phase exits. On the skill-fallback path, the `/post-plan` skill's own commit and push phases follow. The harness engine adds one bounded exception to the gate-owning deny: a `.claude/rules/*.md` file that a `[BLOCKING]` finding names and the PR already changes may be edited and committed, within the size and frontmatter limits in `tools/postplan-harness/harness/fidelity_filefix.py`; every other gate-owning path stays denied and a mixed commit is discarded whole. The skill engine keeps the full deny. For findings tagged `[unplanned-scope]`, both engines use one classifier, but only the harness knows about owner amendments. The harness calls `harness/unplanned_scope.py` directly and passes the backed amendments in. The skill engine runs it as `(cd "$WT/tools/postplan-harness" && python3 -m harness.unplanned_scope --verdict <verdict> --plan <plan> --base <MASTER_SHA> --worktree "$WT")` and follows `_phase65-remediation.md` step 3 for each line. That command checks no amendments, because backing one needs the PR's approval comments. It can print `REMOVE` for a finding whose owner quote comes from an `## Owner amendments` entry. On the skill engine, read the plan's `## Owner amendments` section yourself. When the finding's owner quote occurs in an entry there, treat the line as `KEEP` whatever the command printed. Never revert or remove that work. The harness classifies such a finding `keep` once the amendment is backed. On the skill engine the step-3 `FIDELITY=<word>` stays frozen, so a kept finding leaves a `NOT READY` run stopped for the human, as any `NOT READY` does today. Only the harness may treat a verdict whose blockers are all kept and declared as armable. The skill-engine fallback has no owner-evidence check, so it never posts `READY` for kept scope. Kept-scope blockers stay `NOT READY` there.
+Load the procedure in place: `git show <MASTER_SHA>:.claude/review-shared/_phase65-remediation.md`. Run it as written, including its step 2 clean-tree precondition (`STOP: worktree dirty before remediation`) and its fifth-file gate handoff to one `subagent_type: "sonnet-5-5"` delegate. On the harness path, the harness commits and pushes after the phase exits. On the skill-fallback path, the `/post-plan` skill's own commit and push phases follow. The harness engine adds one bounded exception to the gate-owning deny: a `.claude/rules/*.md` file that a `[BLOCKING]` finding names and the PR already changes may be edited and committed, within the size and frontmatter limits in `tools/postplan-harness/harness/fidelity_filefix.py`; every other gate-owning path stays denied and a mixed commit is discarded whole. The skill engine keeps the full deny.
+
+For findings tagged `[unplanned-scope]`, both engines use one classifier, but only the harness passes it the owner amendments. The harness calls `harness/unplanned_scope.py` directly and passes the backed amendments in. The skill engine runs it as `(cd "$WT/tools/postplan-harness" && python3 -m harness.unplanned_scope --verdict <verdict> --plan <plan> --base <MASTER_SHA> --worktree "$WT")` and follows `_phase65-remediation.md` step 3 for each line. That command checks no amendments, because backing one needs the PR's approval comments. It can print `REMOVE` for a finding whose owner quote comes from an `## Owner amendments` entry.
+
+On the skill engine, when the plan has an `## Owner amendments` section, run the backing check below before you act on any tagged line. Anyone who can edit the plan can write an entry there, so an entry alone proves nothing. `<plan>` is the same absolute path the classifier command takes. The `${VAR:-...}` defaults let a test drive the block. A live run never sets them.
+
+```bash
+# phase 5.5 amendment backing
+PR_NUM=$(gh pr view --json number --jq '.number')
+WT=$(git rev-parse --show-toplevel)
+AMEND_PLAN="${AMEND_PLAN:-<plan>}"
+AMEND_COMMENTS="${AMEND_COMMENTS:-/tmp/post-plan-amend-comments-$PR_NUM.json}"
+rm -f "$AMEND_COMMENTS"
+if gh api "repos/a-jay85/IBL5/issues/$PR_NUM/comments" --paginate --jq '.[]' > "$AMEND_COMMENTS" \
+  && AMEND_OUT=$(cd "$WT/tools/postplan-harness" && python3 -m harness.amendments verify --plan "$AMEND_PLAN" --comments "$AMEND_COMMENTS"); then
+  echo "AMENDMENTS=verified"
+  printf '%s\n' "$AMEND_OUT"
+else
+  echo "AMENDMENTS=unverified"
+fi
+```
+
+An entry is backed only when all three of these hold:
+
+1. The block printed `AMENDMENTS=verified`.
+2. A `backed <id>` line names the id in the entry's `<!-- owner-amendment comment=<id> head=<sha> -->` marker.
+3. The plan holds exactly one marker with that id.
+
+Every other entry is unbacked, including one the command printed no line for. `AMENDMENTS=unverified` means the comment fetch or the verify command failed, so no entry is backed.
+
+Change a `REMOVE` line to `KEEP` only when the finding's `owner: "<words>"` quote has at least 12 characters and occurs in the `Owner words:` or `Condition:` line inside the text fence directly under a backed entry's marker. Never revert or remove that work. The harness classifies such a finding `keep` too. Act on every other line as printed. A `HOLD` line stays `HOLD`, because an amendment never licenses removing a `## Must preserve` guard. An unbacked entry changes no line.
+
+On the skill engine the step-3 `FIDELITY=<word>` stays frozen, so a kept finding leaves a `NOT READY` run stopped for the human, as any `NOT READY` does today. Only the harness may treat a verdict whose blockers are all kept and declared as armable. The skill-engine fallback has no owner-evidence check, so it never posts `READY` for kept scope. Kept-scope blockers stay `NOT READY` there.
 
 Three post-plan-specific rules sit on top. They are where a re-spawn would otherwise creep in:
 

@@ -5,7 +5,11 @@
 # script prints the last few entries, then follows the file and prints each new
 # one as it lands. Leave it running in a Ghostty tab.
 #
-# Usage: bin/dev-inbox [--last <n>] [--no-bell] [--once]
+# Usage: bin/dev-inbox [--merged] [--last <n>] [--no-bell] [--once]
+#   --merged     show merged PRs from GitHub instead of the inbox file. This is
+#                the news the #merged channel gets, without its needs-you block.
+#                It asks `gh` every 60 seconds, or every 5 minutes while fewer
+#                than 500 GraphQL calls are left this hour. Run it in its own tab.
 #   --last <n>   entries to show before following (default 10)
 #   --no-bell    never ring the terminal bell
 #   --once       print the whole file and exit (no follow; bells still ring)
@@ -15,7 +19,10 @@
 # starts with an alert mark (❌ ❓ ⚠️ 🚨 🔴 🛑 ⏱ 💥). Other entries print with no bell.
 # Ghostty's default bell adds 🔔 to the tab title and bounces the Dock icon
 # once, with no sound. The backlog shown at start never rings.
+# A merged PR prints green and never rings.
 # Env: DISCORD_DM_INBOX overrides the file path (the same variable discord-dm reads).
+# Test seams for --merged: DEV_INBOX_GH_BIN (default gh), DEV_INBOX_POLL_SECS
+# (default 60), DEV_INBOX_MAX_POLLS (stop after that many checks; default never).
 # ---
 # Exit: 0 normal · 2 usage error.
 
@@ -26,6 +33,7 @@ INBOX="${DISCORD_DM_INBOX:-$HOME/.claude/dev-inbox.log}"
 LAST=10
 BELL=1
 ONCE=0
+MERGED=0
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -34,6 +42,7 @@ while [ $# -gt 0 ]; do
                 LAST=$((10#$2)); shift 2 ;;
         --no-bell) BELL=0; shift ;;
         --once) ONCE=1; shift ;;
+        --merged) MERGED=1; shift ;;
         -h|--help) sed -n '/^# Usage:/,/^# Exit:/p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "dev-inbox: unknown argument: $1" >&2; exit 2 ;;
     esac
@@ -41,15 +50,17 @@ done
 
 # Render entries from stdin. Entries up to number <skip> are dropped, and entries
 # up to number <quiet> never ring. bell=1 rings on a later alert entry. The
-# "watching" line prints after input line <mark_at> (-1: never).
+# "watching" line prints after input line <mark_at> (-1: never). An input line
+# "@@MARK <text>" prints a "watching <text>" line instead of an entry.
 # Both awk calls use LC_ALL=C: under a UTF-8 locale, macOS awk exits on one bad byte.
 render() { # bell [skip quiet mark_at]
     LC_ALL=C awk -v bell="$1" -v skip="${2:--1}" -v quiet="${3:-0}" -v mark_at="${4:--1}" -v inbox="$INBOX" '
-        function mark() { printf "\n\033[2m── watching %s ──\033[0m\n", inbox; fflush() }
+        function mark(what) { printf "\n\033[2m── watching %s ──\033[0m\n", what; fflush() }
         BEGIN {
             red = "\033[31m"; green = "\033[32m"; dim = "\033[2m"; bold = "\033[1m"; off = "\033[0m"
-            if (mark_at == 0) mark()
+            if (mark_at == 0) mark(inbox)
         }
+        /^@@MARK / { mark(substr($0, 8)); next }
         /^@@ / { n++ }
         n > skip {
             # Drop control bytes (all but tab, plus DEL) before adding color, so a
@@ -83,9 +94,83 @@ render() { # bell [skip quiet mark_at]
             }
             fflush()
         }
-        NR == mark_at { mark() }
+        NR == mark_at { mark(inbox) }
     '
 }
+
+# --merged: turn `gh pr list` rows into inbox entries and render them. Sorting by
+# update time catches an old PR that merged late. Each PR number shows once.
+if [ "$MERGED" = 1 ]; then
+    GH_BIN="${DEV_INBOX_GH_BIN:-gh}"
+    POLL="${DEV_INBOX_POLL_SECS:-60}"
+    MAX_POLLS="${DEV_INBOX_MAX_POLLS:-0}"
+    declare -A SEEN=()
+    # After the first fetch, a merge older than 15 minutes never prints. A late
+    # comment can push an old merged PR into the list, and it should stay quiet.
+    # A fixed age, not "newer than the last merge shown", because GitHub search can
+    # list a fresh merge a minute late, after a newer one already showed.
+    MAX_AGE=900
+    FIRST=1
+
+    # merged_entries <n>: print up to <n> unseen merged PRs, oldest merge first.
+    # Returns 1 when gh fails.
+    merged_entries() {
+        local rows num epoch ts branch title url start now
+        local -a out=()
+        rows=$("$GH_BIN" pr list --state merged --search "sort:updated-desc" --limit 30 \
+            --json number,mergedAt,headRefName,title,url \
+            --jq 'sort_by(.mergedAt)[] | [.number, (.mergedAt | fromdate), (.mergedAt | fromdate | localtime | strftime("%Y-%m-%dT%H:%M:%S")), .headRefName, .title, .url] | @tsv' \
+            2>/dev/null) || return 1
+        now=$(date +%s)
+        while IFS=$'\t' read -r num epoch ts branch title url; do
+            case "$num" in ''|*[!0-9]*) continue ;; esac
+            case "$epoch" in ''|*[!0-9]*) continue ;; esac
+            [ -n "${SEEN[$num]:-}" ] && continue
+            SEEN[$num]=1
+            [ "$FIRST" = 1 ] || [ $((now - epoch)) -le "$MAX_AGE" ] || continue
+            out+=("@@ $ts merged ${branch:-?}"$'\n'"  ✅ #$num $title"$'\n'"  $url")
+        done <<< "$rows"
+        start=$(( ${#out[@]} > $1 ? ${#out[@]} - $1 : 0 ))
+        [ "${#out[@]}" -eq 0 ] || printf '%s\n' "${out[@]:start}"
+        return 0
+    }
+
+    # Seconds to wait before the next check. Backs off while the GraphQL budget
+    # that every gh tool shares runs low. The rate_limit call itself is free.
+    wait_secs() {
+        local left
+        left=$("$GH_BIN" api rate_limit --jq '.resources.graphql.remaining' 2>/dev/null) || left=""
+        case "$left" in ''|*[!0-9]*) left=5000 ;; esac
+        if [ "$left" -lt 500 ]; then echo 300; else echo "$POLL"; fi
+    }
+
+    gh_failed() { # mark what
+        # A failure after start gets ⚠️, so it prints red and rings and a dead
+        # window does not look like a quiet one. At start you are watching anyway.
+        printf '@@ %s merged dev-inbox\n  %sgh pr list failed; %s\n' "$(date +%Y-%m-%dT%H:%M:%S)" "$1" "$2"
+    }
+
+    {
+        failed=0
+        merged_entries "$LAST" || { gh_failed "" "trying again in ${POLL}s"; failed=1; }
+        FIRST=0
+        [ "$ONCE" = 1 ] && exit 0
+        printf '@@MARK merged PRs (every %ss)\n' "$POLL"
+        polls=1
+        while [ "$MAX_POLLS" = 0 ] || [ "$polls" -lt "$MAX_POLLS" ]; do
+            sleep "$(wait_secs)"
+            polls=$((polls + 1))
+            if merged_entries 1000; then
+                failed=0
+            elif [ "$failed" = 0 ]; then
+                # One line per outage, not one a minute.
+                gh_failed "⚠️ " "still trying"
+                failed=1
+            fi
+        done
+    } | render "$BELL"
+    exit 0
+fi
 
 if [ "$ONCE" = 1 ]; then
     [ -f "$INBOX" ] || exit 0

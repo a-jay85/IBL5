@@ -180,3 +180,67 @@ def test_reworded_finding_without_colon_matches_by_first_sentence():
     other = ("- [BLOCKING] [unplanned-scope] Scope range_hi widening to every marker. "
              "In `bin/check-x`, `mk_range` gained a third parameter.")
     assert not us.approval_covers(other, got)
+
+
+# Helpers copied from test_kept_downgrade_owner_approval.py (no cross-module import).
+_DG_GOTCHAS = ".claude/rules/ci-gotchas.md"
+_DG_TITLE = ("[GATE-EDIT] Revert or approve the extra ci-gotchas.md trims. In `.claude/rules/ci-gotchas.md`, "
+             "diff lines 17-18 rewrite more of the `All checks settled` paragraph than Phase 5 Edit 3 "
+             "asked for")
+_DG_BLOCKER = (f"- [BLOCKING] [unplanned-scope] {_DG_TITLE}. Next action: revert the trims or have "
+               "the owner approve them.")
+_DG_BULLET = f"- {_DG_TITLE} (`{_DG_GOTCHAS}`)"
+
+
+def _dg_ctx(changed_paths=(_DG_GOTCHAS,)):
+    changed = list(changed_paths)
+    return {"changed_paths": changed,
+            "subjects_by_path": {p: ["chore: trim the lazy rule under its cap"] for p in changed},
+            "must_preserve": set(), "removed_guard_paths": set()}
+
+
+def _dg_verdict(tmp_path, *items, name="verdict.md"):
+    path = tmp_path / name
+    path.write_text("## FINDINGS\n" + "\n".join(items) + "\n\nNOT READY\n", encoding="utf-8")
+    return str(path)
+
+
+def _dg_body(block):
+    return f"intro\n\n{block}\n"
+
+
+def _dg_approval(span):
+    return us.OwnerApproval(words="ship it", kept_span=span, created_at="2026-11-19T10:00:00Z")
+
+
+def test_fix_first_mode_yields_no_approval():
+    marker = f"<!-- owner-approve mode=approve head={HEAD} diff={FP} -->"
+    body = _body().replace(marker, marker.replace("mode=approve", "mode=fix-first"))
+    assert "mode=fix-first" in body
+    assert us.approval_from_comments([_comment(body)], FP) is None
+
+
+def test_mismatched_fingerprint_yields_no_approval():
+    current_fp = "f" * 40
+    assert us.approval_from_comments([_comment(_body(diff=FP))], FP) is not None
+    assert us.approval_from_comments([_comment(_body(diff=FP))], current_fp) is None
+
+
+def test_declared_block_short_title_not_listed():
+    short = "x" * (us.MIN_TITLE_LEN - 1)
+    span = f"- {short}"
+    finding = f"- [BLOCKING] [unplanned-scope] {short}"
+    assert us._listed(finding, span) is False
+
+
+def test_downgrade_refuses_when_a_blocker_is_not_unplanned_scope(tmp_path):
+    ctx = _dg_ctx()
+    block = us.render_kept_block([{"text": _DG_BLOCKER}], ctx)
+    rendered = next(ln for ln in block.splitlines() if ln.startswith("- "))
+    assert rendered == _DG_BULLET
+    approval = _dg_approval(rendered)
+    # The approved item alone downgrades, so the refusal below comes from the plain bug.
+    alone = _dg_verdict(tmp_path, _DG_BLOCKER, name="alone.md")
+    assert us.downgrade_applies(alone, ctx, _dg_body(block), None, approval=approval) is True
+    path = _dg_verdict(tmp_path, _DG_BLOCKER, "- [BLOCKING] Plain bug in the same file")
+    assert us.downgrade_applies(path, ctx, _dg_body(block), None, approval=approval) is False

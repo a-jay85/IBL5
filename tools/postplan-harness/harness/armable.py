@@ -689,6 +689,7 @@ def holding_findings(findings) -> list:
 def evaluate(inp: ArmInputs) -> ArmDecision:
     cs: list[ConditionResult] = []
 
+    # New paths only, on purpose: a renamed-away spec's old path is no test evidence (backlog#1947).
     clearance = manual_testing_clearance(inp.pr_body, inp.classification.files)
     # Widened for the harness's deterministic tick pass: a section whose every
     # harness-shaped row is ticked clears, alongside the sentinel. Gated on HELD

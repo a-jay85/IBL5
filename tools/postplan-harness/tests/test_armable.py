@@ -106,6 +106,28 @@ def test_ui_paths_absent_falls_back_to_classification_files():
     assert not next(c for c in d.conditions if c.number == 8).blocked
 
 
+BODY_E2E_CLAIM = ("## Summary\nx\n\n## Manual Testing\n\n"
+                  "No manual testing needed — covered by e2e tests\n"
+                  "- [ ] eyeball the trade page\n")
+SPEC_OLD = "ibl5/tests/e2e/trades/submit-trade.spec.ts"
+SPEC_NEW = "ibl5/docs/submit-trade-notes.md"
+
+
+def test_clearance_renamed_away_e2e_spec_stays_held():
+    # The spec moved away from the e2e tree. Only ui_paths lists its old path.
+    d = evaluate(inputs(pr_body=BODY_E2E_CLAIM,
+                        classification=Classification(files=[SPEC_NEW]),
+                        ui_paths=[SPEC_OLD, SPEC_NEW]))
+    c1 = next(c for c in d.conditions if c.number == 1)
+    assert c1.blocked and "state=HELD" in c1.reason
+
+
+def test_clearance_e2e_spec_in_classification_files_clears():
+    d = evaluate(inputs(pr_body=BODY_E2E_CLAIM,
+                        classification=Classification(files=[SPEC_OLD])))
+    assert not next(c for c in d.conditions if c.number == 1).blocked
+
+
 def test_ui_hold_empty_files_fails_closed():
     assert ui_hold([], []) == "ui classifier error"
 

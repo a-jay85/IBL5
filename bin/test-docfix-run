@@ -2709,6 +2709,33 @@ SB="$(build_mixed)"; run_split "$SB" --slug="$SPLIT_SLUG" --issue=7
 [ ! -e "$SB/veronly-calls" ] && [ "$SRC" -eq 0 ] \
   && ok "split-veronly-gate: no veronly call on a mixed night" \
   || bad "split-veronly-gate: mixed calls [$(cat "$SB/veronly-calls" 2>/dev/null)] rc=$SRC"
+
+# split-git-diff-fails-closed: a failing name diff exits 3 with zero fires.
+# split_git_fail_shim <SB> <flag>: a git on PATH that exits 128 on a diff carrying <flag>.
+split_git_fail_shim() {
+    local real; real="$(command -v git)"; mkdir -p "$1/gitshim"
+    cat > "$1/gitshim/git" <<SHIM
+#!/usr/bin/env bash
+case " \$* " in *" diff "*"$2 "*) echo "fatal: shim diff failure" >&2; exit 128 ;; esac
+exec "$real" "\$@"
+SHIM
+    chmod +x "$1/gitshim/git"
+}
+run_split_shimmed() { # run_split_shimmed <SB> -> SOUT, SRC
+    SOUT="$( cd "$1/main" && PATH="$1/gitshim:$PATH" HOME="$1/home" IBL5_MAIN="$1/main" \
+        SPLIT_FIRES="$1/fires" "$1/tool/bin/docfix-split" --slug="$SPLIT_SLUG" --issue=7 2>&1 )" && SRC=0 || SRC=$?
+}
+SB="$(build_all_auto)"; split_git_fail_shim "$SB" --name-status; run_split_shimmed "$SB"
+{ [ "$SRC" -eq 3 ] && [ "$(fire_count "$SB")" -eq 0 ] \
+    && grep -qF 'git diff --name-status failed' <<< "$SOUT"; } \
+  && ok "split-git-diff-fails-closed: a failing classifier --name-status diff exits 3, zero fires" \
+  || bad "split-git-diff-fails-closed: name-status rc=$SRC fires=$(fire_count "$SB") out=[$SOUT]"
+SB="$(build_all_auto)"; ORIG_H="$(split_head "$SB")"
+split_git_fail_shim "$SB" --no-renames; run_split_shimmed "$SB"
+{ [ "$SRC" -eq 3 ] && [ "$(fire_count "$SB")" -eq 0 ] && [ "$(split_head "$SB")" = "$ORIG_H" ] \
+    && grep -qF 'git diff --name-only failed' <<< "$SOUT"; } \
+  && ok "split-git-diff-fails-closed: a failing pre-fire --name-only diff exits 3, zero fires, head restored" \
+  || bad "split-git-diff-fails-closed: name-only rc=$SRC fires=$(fire_count "$SB") out=[$SOUT]"
 # SPLIT-CASES-END
 
 # --- docfix-run split wiring and skip guard cases (Phases 6, 7) -------------

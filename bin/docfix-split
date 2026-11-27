@@ -111,8 +111,9 @@ classify_one() { # $1 path -> auto|review
 }
 
 NS_FIELDS=()
-while IFS= read -r -d '' f; do NS_FIELDS+=("$f"); done \
-    < <(git -C "$AUTO_WT" diff --name-status -z -M --no-ext-diff "$BASE" "$ORIG")
+git -C "$AUTO_WT" diff --name-status -z -M --no-ext-diff "$BASE" "$ORIG" > "$WORK/range.ns" \
+    || abort "git diff --name-status failed in $AUTO_WT"
+while IFS= read -r -d '' f; do NS_FIELDS+=("$f"); done < "$WORK/range.ns"
 i=0
 while [ "$i" -lt "${#NS_FIELDS[@]}" ]; do
     st="${NS_FIELDS[$i]}"
@@ -344,8 +345,9 @@ AUTO_HEAD="$(git -C "$AUTO_WT" rev-parse HEAD)"
 FINAL_AUTO=()
 if [ "$AUTO_HEAD" != "$BASE" ]; then
     git -C "$AUTO_WT" diff --no-ext-diff --no-color --src-prefix=a/ --dst-prefix=b/ "$BASE" "$AUTO_HEAD" > "$WORK/final.diff"
-    while IFS= read -r -d '' f; do FINAL_AUTO+=("$f"); done \
-        < <(git -C "$AUTO_WT" diff --name-only -z --no-renames --no-ext-diff "$BASE" "$AUTO_HEAD")
+    git -C "$AUTO_WT" diff --name-only -z --no-renames --no-ext-diff "$BASE" "$AUTO_HEAD" > "$WORK/final.names" \
+        || abort "git diff --name-only failed in $AUTO_WT"
+    while IFS= read -r -d '' f; do FINAL_AUTO+=("$f"); done < "$WORK/final.names"
     for p in "${FINAL_AUTO[@]}"; do
         split_path_is_auto "$p" "$WORK/final.diff" || abort "held file $p is in the auto range"
         if is_excluded "$p"; then abort "excluded file $p is in the auto range"; fi

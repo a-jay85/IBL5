@@ -4119,7 +4119,7 @@ assert_msg "gateZ-var-message-names-row-and-variable" 1 'offending variable $RD:
 '
 
 # ---------------------------------------------------------------------------
-# Gate [MT] fixtures (15 cases)
+# Gate [MT] fixtures (17 cases)
 # ---------------------------------------------------------------------------
 # :LINE suffix on a bare spec name (the phpstan-baseline-module-index-batch shape).
 assert_viol "gateMT-line-suffix-fires" 1 '[MT]' "$FM$YHDR"'
@@ -4129,6 +4129,16 @@ assert_viol "gateMT-line-suffix-fires" 1 '[MT]' "$FM$YHDR"'
 # :NN-NN range on a full path.
 assert_viol "gateMT-line-range-fires" 1 '[MT]' "$FM$YHDR"'
 | 1 | heading present at `ibl5/tests/e2e/auth-pages-extended.spec.ts:9-10` | E2E | post-impl | `ibl5/tests/e2e/auth-pages-extended.spec.ts` |
+'"$YROW"'
+'
+# A comma list of lines and ranges (the usage-gate-killed-run-marker-resume shape).
+assert_viol "gateMT-line-comma-list-fires" 1 '[MT]' "$FM$YHDR"'
+| 1 | existing cases at `test_post_plan_now_fallback.py:452-460,1369-1416` | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+# The comma-list message still names the bare path.
+assert_msg "gateMT-line-comma-list-message-names-bare-path" 1 'Cite the bare path `test_post_plan_now_fallback.py`' '[Z]' "$FM$YHDR"'
+| 1 | existing cases at `test_post_plan_now_fallback.py:452-460,1369-1416` | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
 '"$YROW"'
 '
 # The message names the bare path to cite instead.
@@ -4241,7 +4251,7 @@ assert_viol "gateMT-seam-unset-valid-plan-ok" 0 '[MT]' "$FM$YHDR"'
 '
 
 # ---------------------------------------------------------------------------
-# Gate [MT]/[MU] unrealisable-token fixtures (22 cases)
+# Gate [MT]/[MU] unrealisable-token fixtures (23 cases)
 # ---------------------------------------------------------------------------
 # A throwaway repo whose tracked text holds one bare :LINE literal and one scratch
 # path, for the tracked-token cases. Rejected-shape literals in the rows below are
@@ -4264,6 +4274,11 @@ assert_viol "gateMT-bare-line-after-arrow-fires" 1 '[MT]' "$FM$YHDR"'
 # [MT] a bare :LINE outside any Mutation clause.
 assert_viol "gateMT-bare-line-outside-mutation-fires" 1 '[MT]' "$FM$YHDR"'
 | 1 | the case fails at `'"$NT_CO"'4242` | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
+'"$YROW"'
+'
+# [MT] a bare comma list of lines with no path.
+assert_viol "gateMT-bare-line-comma-list-fires" 1 '[MT]' "$FM$YHDR"'
+| 1 | the case fails at `'"$NT_CO"'4242,4250-4260` | CLI-executable | post-impl | `cd ibl5 && composer run analyse` |
 '"$YROW"'
 '
 # [MT] a path-prefixed :LINE after the arrow (the trade-lock-skip-completed shape).

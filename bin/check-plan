@@ -1996,13 +1996,13 @@ done < "$MATRIX_FILE"
 # ---------------------------------------------------------------------------
 # Gate MT: a What-to-verify backtick token bin/lib/plan-matrix-assertions can never
 # realise, so Step 6.7 stops with UNREALISED-ASSERTION after implementation.
-#  (1) `<path>:NN` / `<path>:NN-NN`: arm 2c (_path_realised) needs a whole path or a
+#  (1) `<path>:NN`, `<path>:NN-NN` or a comma list (`<path>:NN-NN,NN`): arm 2c (_path_realised) needs a whole path or a
 #      /-aligned suffix, so the :LINE suffix makes the token unmatchable. Host:port
 #      tokens (`<name>.localhost:8080`, `iblhoops.net:443`) are exempt by extension.
 #  (2) a bare word equal to the stem of a tracked *-snapshots/*.png: it never enters
 #      arm 2c, and arm 3 saves it only when git grep finds it in tracked text, so it is
 #      rejected only when that grep finds nothing.
-#  (3) a bare :<digits> or :<digits>-<digits> token with no path: it names no file, so it
+#  (3) a bare :<digits>, :<digits>-<digits> or comma-list token with no path: it names no file, so it
 #      is rejected unless git grep over the whole repo finds it in tracked text, which
 #      is where the helper's tree arm would find it.
 # Rows come from $GATEP_MATRIX (fence-aware). A row ending in the one-time-check tag is
@@ -2017,8 +2017,8 @@ done < "$MATRIX_FILE"
 # no git and always runs; rule (3) rejects when git grep fails outside a repo.
 # ---------------------------------------------------------------------------
 _mt_root="${CHECK_PLAN_MT_GIT_ROOT:-$REPO_ROOT}"
-_mt_line_re='^[A-Za-z0-9_./-]+\.([A-Za-z][A-Za-z0-9]*):[0-9]+(-[0-9]+)?$'
-_mt_bare_line_re='^:[0-9]+(-[0-9]+)?$'
+_mt_line_re='^[A-Za-z0-9_./-]+\.([A-Za-z][A-Za-z0-9]*):[0-9]+(-[0-9]+)?(,[0-9]+(-[0-9]+)?)*$'
+_mt_bare_line_re='^:[0-9]+(-[0-9]+)?(,[0-9]+(-[0-9]+)?)*$'
 _mt_host_ext_re='^(localhost|local|test|com|net|org|io|dev)$'
 _mt_stem_re='^[A-Za-z0-9_-]+$'
 # Blank each Mutation clause the way bin/lib/plan-matrix-assertions does (keep this

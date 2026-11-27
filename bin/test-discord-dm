@@ -1163,7 +1163,7 @@ DM_CAPTURE="$CAP" DISCORD_DM_SSH_BIN="$SSH_OK" DISCORD_DM_SPOOL="$SPOOL" DISCORD
     DISCORD_DM_INBOX="$INB" "$DM" --to "$FAKE_TO" --attempts 1 --quiet --route /otherDM "✅ done"
 grep -q '^@@ .* route:/otherDM ' "$INB" && ok "S2l plain text on another route keeps the route: target" || fail "S2l inbox=[$(cat "$INB")]"
 r_out=$(DISCORD_DM_INBOX="$INB" "$DEV_INBOX" --once)
-[[ "$r_out" != *$'\007'* ]] && ok "S2m a plain route: entry does not ring" || fail "S2m out=[$r_out]"
+{ [[ "$r_out" != *$'\007'* ]] && grep -qF "✅ done" <<< "$r_out"; } && ok "S2m a plain route: entry does not ring" || fail "S2m out=[$r_out]"
 
 rm -f "$INB" "$SENT"; : > "$CAP"
 DM_CAPTURE="$CAP" DISCORD_DM_SSH_BIN="$SSH_OK" DISCORD_DM_SPOOL="$SPOOL" DISCORD_DM_SENT_LOG="$SENT" \
@@ -1220,7 +1220,7 @@ grep -qF "2026-11-25 11:01" <<< "$r_out" && ok "S2h date and time shown" || fail
 grep -qxF "plain" <<< "$r_out" && ok "S2i body shown without its indent" || fail "S2i out=[$r_out]"
 r_out=$(DISCORD_DM_INBOX="$TMP/r.log" "$DEV_INBOX" --once --no-bell)
 r_bells=$(tr -cd "$BEL" <<< "$r_out" | wc -c | tr -d ' ')
-[ "$r_bells" = 0 ] && ok "S2j --no-bell rings nothing" || fail "S2j bells=$r_bells"
+{ [ "$r_bells" = 0 ] && grep -qF "need you" <<< "$r_out"; } && ok "S2j --no-bell rings nothing" || fail "S2j bells=$r_bells out=[$r_out]"
 DISCORD_DM_INBOX="$TMP/r.log" "$DEV_INBOX" --last x >/dev/null 2>&1
 s2_rc=$?
 [ "$s2_rc" = 2 ] && ok "S2k bad --last exits 2" || fail "S2k rc=$s2_rc"

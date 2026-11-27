@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Callable, Optional, Sequence
 
 from . import labels
+from .classify import GOLDEN_PATHS, JSB_CAPTURE_PREFIX
 from .sql_comments import migration_sections, strip_added_sql_comments
 from .state import ArmDecision, Classification, ConditionResult, Finding
 
@@ -284,8 +285,20 @@ def touches_ui(files) -> bool:
 
 
 def _ui_paths(inp) -> list[str]:
-    """Paths the UI floor classifies: both sides of a rename when the caller supplies them."""
+    """Paths the UI floor and the golden hold classify: both sides of a rename when the caller supplies them."""
     return inp.ui_paths if inp.ui_paths is not None else inp.classification.files
+
+
+def _golden_flags(inp) -> tuple[bool, bool]:
+    """(golden snapshot changed, JSB capture changed) over both sides of a rename.
+
+    classify() sees a rename's new path only, so a rename away from a golden path
+    leaves its flags False. _ui_paths adds the old path; OR-ing the classification
+    flags keeps every hold the new-path list already raised."""
+    paths = _ui_paths(inp)
+    golden = inp.classification.golden_changed or any(p in GOLDEN_PATHS for p in paths)
+    jsb = inp.classification.jsb_capture_changed or any(p.startswith(JSB_CAPTURE_PREFIX) for p in paths)
+    return golden, jsb
 
 
 def plan_triggers_clearable(triggers, sql_equivalence_evidence: str) -> bool:
@@ -303,7 +316,7 @@ def trace_pinned_lifts(inp) -> bool:
     and no raw JSB capture changed. Fails closed."""
     return (set(inp.plan_hold_triggers or ()) == SELF_CLEARED_PLAN_TRIGGERS
             and inp.trace_pinned_evidence == "ok"
-            and not inp.classification.jsb_capture_changed)
+            and not _golden_flags(inp)[1])
 
 
 def second_review_candidates(inp, cs) -> dict[int, str]:
@@ -689,6 +702,7 @@ def holding_findings(findings) -> list:
 def evaluate(inp: ArmInputs) -> ArmDecision:
     cs: list[ConditionResult] = []
 
+    # New paths only, on purpose: a renamed-away spec's old path is no test evidence (backlog#1947).
     clearance = manual_testing_clearance(inp.pr_body, inp.classification.files)
     # Widened for the harness's deterministic tick pass: a section whose every
     # harness-shaped row is ticked clears, alongside the sentinel. Gated on HELD
@@ -724,13 +738,14 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
         p5_reason = ""
     cs.append(ConditionResult(4, "phase5-verify", p5_blocked, p5_reason))
 
-    golden = inp.classification.golden_changed or inp.classification.jsb_capture_changed
+    golden_hit, jsb_hit = _golden_flags(inp)
+    golden = golden_hit or jsb_hit
     lifted = golden and trace_pinned_lifts(inp)
     blocked = golden and inp.headless and not lifted
     # Name what actually changed, so the plain-words hold line (hold_text) can say it.
     what = " and ".join(name for name, hit in (
-        ("golden snapshot", inp.classification.golden_changed),
-        ("JSB capture", inp.classification.jsb_capture_changed)) if hit)
+        ("golden snapshot", golden_hit),
+        ("JSB capture", jsb_hit)) if hit)
     c5 = ConditionResult(5, "golden-snapshot-headless", blocked,
                          f"{what} changed in headless mode" if blocked else "")
     if lifted:

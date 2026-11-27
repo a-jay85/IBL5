@@ -3,6 +3,7 @@ import json
 import os
 import re
 import subprocess
+from types import SimpleNamespace
 
 from harness import armable
 from harness.classify import classify
@@ -99,6 +100,31 @@ def test_golden_hold_parity_capture_dir():
     paths = ["engine/testdata/jsb-captures/foul-roll.jsonl"]
     assert _golden(paths) == "golden-changed"
     assert classify(paths, "").jsb_capture_changed is True
+
+
+def _golden_rest(entries):
+    proc = subprocess.run(
+        ["bash", "-c", 'source "$0"; pr_golden_hold "$1"', LIB, json.dumps(entries)],
+        capture_output=True, text=True, check=True)
+    return proc.stdout.strip()
+
+
+def _rename_inp(old, new):
+    return SimpleNamespace(ui_paths=[old, new], classification=classify([new], ""))
+
+
+def test_golden_hold_parity_rename_away_golden():
+    old, new = "engine/internal/sim/testdata/golden.json", "engine/internal/sim/testdata/golden-retired.json"
+    assert _golden_rest([{"filename": new, "status": "renamed", "previous_filename": old}]) == "golden-changed"
+    assert classify([new], "").golden_changed is False
+    assert armable._golden_flags(_rename_inp(old, new)) == (True, False)
+
+
+def test_golden_hold_parity_rename_away_jsb_capture():
+    old, new = "engine/testdata/jsb-captures/foul-roll.jsonl", "engine/testdata/retired/foul-roll.jsonl"
+    assert _golden_rest([{"filename": new, "status": "renamed", "previous_filename": old}]) == "golden-changed"
+    assert classify([new], "").jsb_capture_changed is False
+    assert armable._golden_flags(_rename_inp(old, new)) == (False, True)
 
 
 def test_golden_hold_parity_unrelated_engine_file():

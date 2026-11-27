@@ -180,25 +180,6 @@ func parseRecord(line []byte) (Record, error) {
 	return r, nil
 }
 
-// SkipIfAbsent skips tb when JSB_TRACE_CAPTURE_DIR is unset or empty and the
-// default capture directory has no file called name. A capture hosted in the
-// private jsb-native repo has no copy in CI, so the test skips and says why.
-// A set JSB_TRACE_CAPTURE_DIR never skips: a missing file there is a failure.
-func SkipIfAbsent(tb testing.TB, name string) {
-	tb.Helper()
-	if os.Getenv("JSB_TRACE_CAPTURE_DIR") != "" {
-		return
-	}
-	dir, err := captureDir()
-	if err != nil {
-		return // MustLoad reports the error
-	}
-	if _, err := os.Stat(filepath.Join(dir, name)); err == nil {
-		return
-	}
-	tb.Skipf("jsbtrace: capture %q is not in %s and JSB_TRACE_CAPTURE_DIR is unset; it lives in the private jsb-native repo", name, dir)
-}
-
 // MustLoad is Load that fails the test on error.
 func MustLoad(tb testing.TB, name string) Capture {
 	tb.Helper()

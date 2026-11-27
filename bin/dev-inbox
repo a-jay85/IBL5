@@ -24,7 +24,7 @@
 # Test seams for --merged: DEV_INBOX_GH_BIN (default gh), DEV_INBOX_POLL_SECS
 # (default 60), DEV_INBOX_MAX_POLLS (stop after that many checks; default never).
 # ---
-# Exit: 0 normal · 2 usage error.
+# Exit: 0 normal · 1 gh failed under --merged --once · 2 usage error.
 
 [ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -uo pipefail
@@ -105,31 +105,38 @@ if [ "$MERGED" = 1 ]; then
     POLL="${DEV_INBOX_POLL_SECS:-60}"
     MAX_POLLS="${DEV_INBOX_MAX_POLLS:-0}"
     declare -A SEEN=()
-    # After the first fetch, a merge older than 15 minutes never prints. A late
-    # comment can push an old merged PR into the list, and it should stay quiet.
-    # A fixed age, not "newer than the last merge shown", because GitHub search can
+    # After the first fetch, a PR merged more than 15 minutes before the last good
+    # fetch never prints. A late comment can push an old merged PR into the list,
+    # and it should stay quiet. Merges made during a sleep or an outage still print.
+    # A margin, not "newer than the last merge shown", because GitHub search can
     # list a fresh merge a minute late, after a newer one already showed.
-    MAX_AGE=900
+    MARGIN=900
+    LAST_GOOD=$(date +%s)
     FIRST=1
+    # At least 100 rows (one GraphQL page), so merges made during a long gap fit.
+    LIMIT=$(( LAST > 100 ? LAST : 100 ))
 
     # merged_entries <n>: print up to <n> unseen merged PRs, oldest merge first.
     # Returns 1 when gh fails.
     merged_entries() {
         local rows num epoch ts branch title url start now
+        now=$(date +%s)
         local -a out=()
-        rows=$("$GH_BIN" pr list --state merged --search "sort:updated-desc" --limit 30 \
+        rows=$("$GH_BIN" pr list --repo a-jay85/IBL5 --state merged --search "sort:updated-desc" --limit "$LIMIT" \
             --json number,mergedAt,headRefName,title,url \
             --jq 'sort_by(.mergedAt)[] | [.number, (.mergedAt | fromdate), (.mergedAt | fromdate | localtime | strftime("%Y-%m-%dT%H:%M:%S")), .headRefName, .title, .url] | @tsv' \
             2>/dev/null) || return 1
-        now=$(date +%s)
         while IFS=$'\t' read -r num epoch ts branch title url; do
             case "$num" in ''|*[!0-9]*) continue ;; esac
             case "$epoch" in ''|*[!0-9]*) continue ;; esac
             [ -n "${SEEN[$num]:-}" ] && continue
             SEEN[$num]=1
-            [ "$FIRST" = 1 ] || [ $((now - epoch)) -le "$MAX_AGE" ] || continue
+            [ "$FIRST" = 1 ] || [ $((LAST_GOOD - epoch)) -le "$MARGIN" ] || continue
+            # Undo @tsv escapes. It doubles every backslash, so %b is safe here.
+            printf -v title '%b' "$title"
             out+=("@@ $ts merged ${branch:-?}"$'\n'"  ✅ #$num $title"$'\n'"  $url")
         done <<< "$rows"
+        LAST_GOOD=$now
         start=$(( ${#out[@]} > $1 ? ${#out[@]} - $1 : 0 ))
         [ "${#out[@]}" -eq 0 ] || printf '%s\n' "${out[@]:start}"
         return 0
@@ -144,17 +151,19 @@ if [ "$MERGED" = 1 ]; then
         if [ "$left" -lt 500 ]; then echo 300; else echo "$POLL"; fi
     }
 
-    gh_failed() { # mark what
+    gh_failed() { # mark [what-happens-next]
         # A failure after start gets ⚠️, so it prints red and rings and a dead
         # window does not look like a quiet one. At start you are watching anyway.
-        printf '@@ %s merged dev-inbox\n  %sgh pr list failed; %s\n' "$(date +%Y-%m-%dT%H:%M:%S)" "$1" "$2"
+        printf '@@ %s merged dev-inbox\n  %sgh pr list failed%s\n' "$(date +%Y-%m-%dT%H:%M:%S)" "$1" "${2:+; $2}"
     }
 
     {
         failed=0
-        merged_entries "$LAST" || { gh_failed "" "trying again in ${POLL}s"; failed=1; }
+        next="trying again in ${POLL}s"
+        [ "$ONCE" = 1 ] && next=""
+        merged_entries "$LAST" || { gh_failed "" "$next"; failed=1; }
         FIRST=0
-        [ "$ONCE" = 1 ] && exit 0
+        [ "$ONCE" = 1 ] && exit "$failed"
         printf '@@MARK merged PRs (every %ss)\n' "$POLL"
         polls=1
         while [ "$MAX_POLLS" = 0 ] || [ "$polls" -lt "$MAX_POLLS" ]; do
@@ -168,8 +177,9 @@ if [ "$MERGED" = 1 ]; then
                 failed=1
             fi
         done
+        exit 0
     } | render "$BELL"
-    exit 0
+    exit $?
 fi
 
 if [ "$ONCE" = 1 ]; then

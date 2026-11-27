@@ -1328,20 +1328,32 @@ r_bells=$(LC_ALL=C tr -cd "$BEL" <<< "$r_out" | wc -c | tr -d ' ')
 
 # bin/dev-inbox --merged. The gh stub prints what `gh pr list --jq` would print
 # (number, local merge time, branch, title, url) from $GHS/rows.<call>, or exits 1
-# when that file is missing. `gh api rate_limit` prints $GHS/left. The sleep stub
-# records each wait instead of waiting.
+# when that file is missing. It logs its list arguments to $GHS/args.
+# `gh api rate_limit` prints $GHS/left. The sleep stub records each wait instead of
+# waiting, and moves the clock $GHS/jump seconds ahead when that file exists.
+# The date stub adds that skew to `date +%s`.
 GHS="$TMP/ghs"; mkdir -p "$GHS"
 cat > "$GHS/gh" <<'EOF'
 #!/usr/bin/env bash
 if [ "$1" = api ]; then cat "$GHS/left"; exit 0; fi
+echo "$*" >> "$GHS/args"
 n=$(( $(cat "$GHS/calls" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$GHS/calls"
 [ -f "$GHS/rows.$n" ] || exit 1
 cat "$GHS/rows.$n"
 EOF
-printf '#!/usr/bin/env bash\necho "$1" >> "$GHS/slept"\n' > "$GHS/sleep"
-chmod +x "$GHS/gh" "$GHS/sleep"
+cat > "$GHS/sleep" <<'EOF'
+#!/usr/bin/env bash
+echo "$1" >> "$GHS/slept"
+[ ! -f "$GHS/jump" ] || cp "$GHS/jump" "$GHS/skew"
+EOF
+cat > "$GHS/date" <<'EOF'
+#!/usr/bin/env bash
+if [ "$*" = +%s ] && [ -f "$GHS/skew" ]; then echo $(( $(/bin/date +%s) + $(cat "$GHS/skew") )); exit 0; fi
+exec /bin/date "$@"
+EOF
+chmod +x "$GHS/gh" "$GHS/sleep" "$GHS/date"
 export GHS
-ghs_reset() { rm -f "$GHS"/rows.* "$GHS/calls" "$GHS/slept"; echo 4000 > "$GHS/left"; }
+ghs_reset() { rm -f "$GHS"/rows.* "$GHS/calls" "$GHS/slept" "$GHS/args" "$GHS/jump" "$GHS/skew"; echo 4000 > "$GHS/left"; }
 # ghs_row <n> [age-secs]: PR <n>, merged <age> seconds ago (default 60), shown as 14:0<n>.
 ghs_row() {
     printf '%s\t%s\t2026-11-27T14:%02d:00\tbr-%s\tPR title %s\thttps://x/pull/%s\n' \
@@ -1373,11 +1385,32 @@ r_out=$(DEV_INBOX_MAX_POLLS=2 ghs_run)
     && ok "S2ak --merged follow: an old merge bumped into the list stays quiet, a late-listed one prints" \
     || fail "S2ak out=[$r_out]"
 
+# One good fetch, then an hour passes with one failed fetch. PR 7 merged 10
+# minutes after the good fetch, so it is 50 minutes old when it shows up. It prints.
+ghs_reset; echo 3600 > "$GHS/jump"; ghs_row 1 > "$GHS/rows.1"
+{ ghs_row 7 -600; ghs_row 5 7200; ghs_row 1; } > "$GHS/rows.3"
+r_out=$(DEV_INBOX_MAX_POLLS=3 ghs_run)
+{ [[ "$r_out" == *"#7 PR title 7"* ]] && [[ "$r_out" != *"#5 "* ]]; } \
+    && ok "S2an --merged: a merge made during a long sleep or outage still prints" || fail "S2an out=[$r_out]"
+
 # First fetch fails: the next good fetch skips the old backlog and shows the new merge.
 ghs_reset; { ghs_row 1 7200; ghs_row 2 3600; ghs_row 8; } > "$GHS/rows.2"
 r_out=$(DEV_INBOX_MAX_POLLS=2 ghs_run)
 { [[ "$r_out" == *"#8 PR title 8"* ]] && [[ "$r_out" != *"#1 "* ]] && [[ "$r_out" != *"#2 "* ]]; } \
     && ok "S2al --merged: a failed first fetch does not dump the backlog later" || fail "S2al out=[$r_out]"
+
+ghs_reset; ghs_row 1 > "$GHS/rows.1"
+ghs_run --once --last 150 >/dev/null
+s2_args=$(cat "$GHS/args")
+{ grep -qF -- '--repo a-jay85/IBL5 ' <<< "$s2_args" && grep -qF -- '--limit 150 ' <<< "$s2_args"; } \
+    && ok "S2ao --merged names the repo and asks gh for at least --last rows" || fail "S2ao args=[$s2_args]"
+
+ghs_reset
+r_out=$(ghs_run --once); s2_rc=$?
+r_bells=$(tr -cd "$BEL" <<< "$r_out" | wc -c | tr -d ' ')
+{ [ "$s2_rc" = 1 ] && grep -qF "gh pr list failed" <<< "$r_out" \
+    && [[ "$r_out" != *"trying again"* ]] && [ "$r_bells" = 0 ]; } \
+    && ok "S2ap --merged --once: gh failing exits 1 and promises no retry" || fail "S2ap rc=$s2_rc bells=$r_bells out=[$r_out]"
 
 ghs_reset; echo 120 > "$GHS/left"; ghs_row 1 > "$GHS/rows.1"
 DEV_INBOX_MAX_POLLS=2 ghs_run >/dev/null
@@ -1397,11 +1430,16 @@ r_bells=$(tr -cd "$BEL" <<< "$r_out" | wc -c | tr -d ' ')
 { [ "$r_bells" = 1 ] && grep -qF "still trying" <<< "$r_out"; } \
     && ok "S2am --merged: gh failing mid-watch rings once" || fail "S2am bells=$r_bells out=[$r_out]"
 
-ghs_reset; printf '9\t0\t2026-11-27T14:09:00\tbr\tevil \033[2J title \007x\thttps://x/pull/9\n' > "$GHS/rows.1"
+# PR 10's title is what @tsv prints for `path C:\temp\new`: each backslash doubled.
+ghs_reset; {
+    printf '9\t0\t2026-11-27T14:09:00\tbr\tevil \033[2J title \007x\thttps://x/pull/9\n'
+    printf '10\t0\t2026-11-27T14:10:00\tbr\t%s\thttps://x/pull/10\n' 'path C:\\temp\\new'
+} > "$GHS/rows.1"
 r_out=$(ghs_run --once)
 r_rest=$(sed -E "s/${ESC}\[(0|1|2|31|32)m//g" <<< "$r_out")
-{ [[ "$r_out" != *"$BEL"* ]] && [[ "$r_rest" != *"$ESC"* ]] && grep -qF "evil [2J title x" <<< "$r_out"; } \
-    && ok "S2ai --merged strips control bytes from a PR title" || fail "S2ai out=[$(cat -v <<< "$r_out")]"
+{ [[ "$r_out" != *"$BEL"* ]] && [[ "$r_rest" != *"$ESC"* ]] && grep -qF "evil [2J title x" <<< "$r_out" \
+    && grep -qF '#10 path C:\temp\new' <<< "$r_out"; } \
+    && ok "S2ai --merged strips control bytes from a PR title and keeps its backslashes" || fail "S2ai out=[$(cat -v <<< "$r_out")]"
 grep -qF -- '[--merged]' <<< "$r_help" && ok "S2aj dev-inbox usage line lists --merged" || fail "S2aj help=[$r_help]"
 
 # ── Summary ───────────────────────────────────────────────────────────────────

@@ -12,7 +12,8 @@
 #                than 500 GraphQL calls are left this hour. Run it in its own tab.
 #   --last <n>   entries to show before following (default 10)
 #   --no-bell    never ring the terminal bell
-#   --once       print the whole file and exit (no follow; bells still ring)
+#   --once       print the whole file and exit (no follow; bells still ring).
+#                With --merged: one fetch, up to --last PRs, no bell.
 # ---
 # A new entry rings the bell when it is an error: the #errors target, an
 # undelivered message, a Discord-only button message, or a first line that

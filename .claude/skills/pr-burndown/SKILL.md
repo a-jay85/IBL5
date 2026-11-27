@@ -207,7 +207,7 @@ Write the judgment as JSON with one entry per PR you looked at this run, in rank
 - With `owner_call: true`, every field above is required except `why_next`, `notes` and `risks`. The `notes` keys are `tests`, `comments`, `bot_review`, `easy_undo` and `your_ok`, at most four words each. A note shows only on a ❌ or 🚨 cell.
 - Write no hold codes such as "(7)". The script refuses them and strips any SHA.
 
-Run the script in one block:
+Run `bin/pr-burndown-gadget --judgment=FILE --out=FILE` in one block:
 
 ```bash
 D="${TMPDIR:-/tmp}/pr-burndown-$(date +%Y%m%d-%H%M%S)"
@@ -215,7 +215,8 @@ mkdir -p "$D"
 cat > "$D/judgment.json" <<'JSON'
 <the judgment JSON>
 JSON
-bin/pr-burndown-gadget --judgment="$D/judgment.json" --out="$D/scoreboard.html"
+bin/pr-burndown-gadget \
+  --judgment="$D/judgment.json" --out="$D/scoreboard.html"
 ```
 
 It prints `wrote <path> shown=K hidden=H fetch_failed=F`. Exit 2 means the judgment broke a rule, and the message names the field. Fix that field and run it again. Show the file with the `html_render` tool (load it with ToolSearch). When `html_render` is not available, run the same command with `--format=markdown --out="$D/scoreboard.md"` and paste the file into your reply. The markdown table has the same columns.

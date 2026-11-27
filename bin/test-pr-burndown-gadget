@@ -551,6 +551,9 @@ case_skill_doc_matches_gadget() {
     local doc gone rc=0
     doc="$(cat "$SKILL")" || return 1
     has 'bin/pr-burndown-gadget --judgment=' "$doc" SKILL.md || rc=1
+    # check-docs skips fenced blocks, so pin the runnable command here.
+    grep -qxF 'bin/pr-burndown-gadget \' <<< "$doc" || { echo "SKILL.md: command line missing"; rc=1; }
+    has '--judgment="$D/judgment.json" --out="$D/scoreboard.html"' "$doc" SKILL.md || rc=1
     has 'PR, Tests, Comments, Bot review, Easy undo, Your OK, Your call' "$doc" SKILL.md || rc=1
     for gone in '🔙' '2️⃣' '1️⃣' '✅📝'; do
         lacks "$gone" "$doc" SKILL.md || rc=1

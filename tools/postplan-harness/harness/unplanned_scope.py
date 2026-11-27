@@ -305,7 +305,7 @@ def title_key(text: str) -> str:
     `render_kept_block` writes that path citation after each declared title, and a
     reviewer may put the path and prose there too, so the finding still matches the
     shorter declared and approved line (PR 4244). A ` (` with no backtick stays.
-    `_listed` separately compares the path that this last cut drops.
+    `_listed` separately compares the paths the key drops.
     """
     return _key_sentence(text).split(" (`", 1)[0].strip()
 
@@ -329,22 +329,29 @@ def _key_citation(text: str) -> Optional[str]:
     return re.sub(_LINE_SUFFIX + "$", "", parts[1].split("`", 1)[0])
 
 
-def _listed(text: str, span: str) -> bool:
-    """True when the finding's title, or its stable key, is listed in `span`.
+def _names(line: str, path: str) -> bool:
+    """True when `line` carries `path` in backticks, with or without a line number."""
+    return re.search(f"`{re.escape(path)}{_LINE_SUFFIX}`", line) is not None
 
-    When the key cut off a path citation, the listed line must name that path too.
+
+def _listed(text: str, span: str, changed_paths: Iterable[str] = ()) -> bool:
+    """True when the finding's title, or its stable key, is listed on a line of `span`.
+
+    That line must also name every changed path the finding cites anywhere in its text.
+    When the key cut off a path citation, the line must name that path too.
     """
+    named = cited_paths(text, changed_paths)
+    lines = [ln for ln in span.splitlines() if all(_names(ln, path) for path in named)]
     title = title_of(text).strip()
-    if len(title) >= MIN_TITLE_LEN and title in span:
+    if len(title) >= MIN_TITLE_LEN and any(title in ln for ln in lines):
         return True
     key = title_key(text)
     if len(key) < MIN_TITLE_LEN:
         return False
     path = _key_citation(text)
-    cited = None if path is None else re.compile(f"`{re.escape(path)}{_LINE_SUFFIX}`")
     return any(_BULLET_RE.match(ln) and title_key(ln) == key
-               and (cited is None or cited.search(ln) is not None)
-               for ln in span.splitlines())
+               and (path is None or _names(ln, path))
+               for ln in lines)
 
 
 def render_kept_block(kept: Sequence[dict], ctx: Optional[dict]) -> str:
@@ -388,10 +395,11 @@ def downgrade_applies(verdict_path: str, ctx: Optional[dict], body_text: str, pa
     kept = [t for t in texts if is_unplanned_scope(t)]
     if len(kept) != len(texts):
         return False   # a bug in kept code is its own blocking finding and blocks
+    changed = ctx["changed_paths"]
     return all(classify(t, **ctx) == "keep"
                and (amendment_covers(t, amendments)
-                    or (bool(declared) and _listed(t, declared)
-                        and (owner_evidence_ok(t, payload) or approval_covers(t, approval))))
+                    or (bool(declared) and _listed(t, declared, changed)
+                        and (owner_evidence_ok(t, payload) or approval_covers(t, approval, changed))))
                for t in kept)
 
 
@@ -469,11 +477,12 @@ def approval_from_comments(comments: list, current_fp: Optional[str]) -> Optiona
     return OwnerApproval(words=words, kept_span=span, created_at=created)
 
 
-def approval_covers(text: str, approval: Optional[OwnerApproval]) -> bool:
+def approval_covers(text: str, approval: Optional[OwnerApproval],
+                    changed_paths: Iterable[str] = ()) -> bool:
     """True when the finding's title is one the owner saw in the approval's kept span."""
     if approval is None:
         return False
-    return _listed(text, approval.kept_span)
+    return _listed(text, approval.kept_span, changed_paths)
 
 
 # A fix-first approval's scope, carried into the plan by `bin/owner-approve`. The plan

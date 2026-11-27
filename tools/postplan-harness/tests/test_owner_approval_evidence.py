@@ -247,6 +247,49 @@ def test_path_parenthetical_different_path_does_not_match():
     assert not us._listed(other_path, _go_declared())
 
 
+GO_PATH = ".claude/rules/engine-go.md"
+GO_CHANGED = [GO_PATH, "bin/check-x"]
+GO_EXTRA_PATH = ("- [BLOCKING] [unplanned-scope] [GATE-EDIT] Review the engine-go.md capture-location "
+                 f"rule edit (`{GO_PATH}` and `bin/check-x` line 4 now exits 0)")
+GO_NO_CITATION = f"- [BLOCKING] [unplanned-scope] {GO_KEY}: `bin/check-x` line 4 now exits 0"
+GO_EXACT_TITLE = ("- [BLOCKING] [unplanned-scope] " + GO_APPROVED[2:]
+                  + "\n  `bin/check-x` line 4 now exits 0")
+
+
+def test_extra_changed_path_is_not_covered():
+    """An approval for one file never covers a finding that also names another changed
+    file, whether the key cut a citation, cut at `: `, or the title matches exactly."""
+    got = _go_approval()
+    for text in (GO_EXTRA_PATH, GO_NO_CITATION, GO_EXACT_TITLE):
+        assert not us._listed(text, _go_declared(), GO_CHANGED), text
+        assert not us.approval_covers(text, got, GO_CHANGED), text
+
+
+def test_line_naming_every_changed_path_is_covered():
+    approved = f"- [GATE-EDIT] {GO_KEY} (`{GO_PATH}`, `bin/check-x`)"
+    got = us.approval_from_comments([_comment(_body(span=(approved,)))], FP)
+    for text in (GO_EXTRA_PATH, GO_NO_CITATION):
+        assert us._listed(text, approved, GO_CHANGED), text
+        assert us.approval_covers(text, got, GO_CHANGED), text
+    # The two paths must sit on the matching line, not elsewhere in the span.
+    split = GO_APPROVED + "\n- Another change entirely (`bin/check-x`)"
+    assert not us._listed(GO_EXTRA_PATH, split, GO_CHANGED)
+
+
+def test_downgrade_passes_changed_paths_to_the_match(tmp_path):
+    verdict = tmp_path / "verdict.md"
+    verdict.write_text("## FINDINGS\n"
+                       f'{GO_EXTRA_PATH} owner: "keep the engine rule edit"\n\nNOT READY\n',
+                       encoding="utf-8")
+    ctx = {"changed_paths": GO_CHANGED, "subjects_by_path": {},
+           "must_preserve": set(), "removed_guard_paths": set()}
+    payload = {"turns": [{"text": "keep the engine rule edit"}]}
+    one = _go_declared()
+    both = "\n".join([us.KEPT_BEGIN, f"- {GO_KEY} (`{GO_PATH}`, `bin/check-x`)", us.KEPT_END])
+    assert us.downgrade_applies(str(verdict), ctx, both, payload) is True
+    assert us.downgrade_applies(str(verdict), ctx, one, payload) is False
+
+
 def test_mid_title_citation_compares_the_cited_path():
     approved = "- Remove the guard (`bin/check-a`) from the merge gate (`bin/check-a`)"
     same = "- [BLOCKING] [unplanned-scope] Remove the guard (`bin/check-a:12`) from the gate"

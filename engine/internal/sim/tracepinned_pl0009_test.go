@@ -23,8 +23,8 @@ type pl0009Out struct {
 }
 
 // pl0009PickCount is the number of pick records in pl-0009.jsonl, counted on
-// the capture during planning.
-const pl0009PickCount = 1830
+// the committed capture. Update it when the capture is re-recorded.
+const pl0009PickCount = 524
 
 func decodePl0009In(t *testing.T, i int, raw json.RawMessage) pl0009In {
 	t.Helper()

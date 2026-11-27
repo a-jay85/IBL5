@@ -47,9 +47,10 @@
 # ---
 # EVERY terminal outcome DMs you through bin/discord-dm — icon, verdict, elapsed,
 # what to do next, the plan path and the log path — so learning that a run
-# finished never costs a `tail -f` again. That is the whole point of the DM: the
-# log is silent until the run exits (`claude -p` does not stream), and the case
-# you most need to hear about is the one that does NOT queue itself.
+# finished never costs a `tail -f` again. That is the whole point of the DM: until
+# claude exits the log holds only the identity line and any pre-launch notices
+# (`claude -p` does not stream), and the case you most need to hear about is the
+# one that does NOT queue itself.
 #
 # THIS JOB queues the plan — not the model it runs. The queue call lives in the
 # runner, downstream of the identity check and the check-plan verdict below, so a
@@ -1205,9 +1206,10 @@ if [ "$rc" -eq 0 ] && [ -n "$newfiles" ]; then
 fi
 
 # The whole reason this job exists in the background: tell the human it finished.
-# `claude -p` does not stream, so $LOG is empty until this point and there is no
-# earlier moment worth watching — which is what made `tail -f` the only way to
-# find out, and why every outcome notifies, not just the failures.
+# `claude -p` does not stream, so until claude exits $LOG holds only the identity
+# line and any pre-launch notices, and there is no earlier moment worth watching —
+# which is what made `tail -f` the only way to find out, and why every outcome
+# notifies, not just the failures.
 #
 # BEFORE the teardown, and that ordering is load-bearing: the ljob_submit wrapper
 # runs `launchctl remove` once this runner exits, which terminates the job, and
@@ -1336,8 +1338,8 @@ else
     echo "  notify: --no-dm — nothing will tell you when this finishes"
     echo "  watch:  $ROOT/bin/watch-run --log $LOG --label $LABEL"
     echo "          ^ arm THIS in a Monitor. Self-terminating. Never 'tail -f' the log:"
-    echo "            claude -p does not stream, so the log stays empty until it exits and a"
-    echo "            tail is silent for the whole run and then silent forever."
+    echo "            claude -p does not stream: until it exits the log holds only the identity"
+    echo "            line and any pre-launch notices, and 'tail -f' never ends on its own."
 fi
 echo "  log:    $LOG"
 echo "  prompt: $PROMPT"

@@ -1,6 +1,6 @@
 ---
 description: Companion to headless-marker-contract.md — attaches only when bin/plan-now or bin/test-plan-now is touched, never on a general bin/ edit. Contains the historical rationale for the headless marker rule and bin/plan-now draft-recovery fallback internals (Leg A and Leg B). Read when debugging a missing-marker failure or modifying bin/plan-now recovery logic.
-last_verified: 2026-09-26
+last_verified: 2026-11-26
 paths:
   - "bin/plan-now"
   - "bin/test-plan-now"
@@ -16,15 +16,15 @@ transcript containing only its closing message. The failure is fail-safe (never 
 green) and therefore easy to mistake for the model misbehaving.
 
 The other runners are already correct, by different routes — check the one you are
-editing against the table above rather than assuming:
+editing against the table in `.claude/rules/headless-marker-contract.md` rather than assuming:
 
 - `bin/bug-pipeline-tick` — `--output-format json`, reads `.result` (that field *is*
   the final message); the hunter uses `stream-json` and has its agent write results to
   a file rather than stdout.
 - `bin/automouse/run` — `stream-json --verbose` through `bin/lib/automouse-stream-filter.sh`;
-  it *passes* `PLAN_FILE=` into the prompt as input and parses nothing back out.
+  it *passes* `PLAN_FILE=` into the prompt as input and parses no plan path back out. `parse_judge_verdict()` does read a `JUDGE_VERDICT:` line from the stream-json result.
 - `bin/post-plan-now` — passes an optional `--plan <abs-path>` through to the harness (which
-  owns variant resolution in `harness/planfile.py`) and into the fallback prompt; `bin/docfix-run`
+  owns variant resolution in `harness/planfile.py`); `bin/docfix-run`
   derives the plan path from the branch slug in shell. Neither parses model output.
 
 `bin/test-plan-now` pins all of this for `plan-now` — the decorated shapes it accepts,

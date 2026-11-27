@@ -380,7 +380,7 @@ resolve_target() {
 
 # Inbox: the full message for bin/dev-inbox. Best-effort, like the sent log.
 log_inbox() { # target
-    local inbox size body entry target digest
+    local inbox size body entry target digest lock
     target="$1"
     # dev-inbox rings for raw: (a button message), not for every non-default route.
     [ "$RAW" = 1 ] && [ "$target" != undelivered ] && target="raw:$ROUTE"
@@ -389,18 +389,20 @@ log_inbox() { # target
     inbox="${DISCORD_DM_INBOX:-$HOME/.claude/dev-inbox.log}"
     mkdir -p "$(dirname "$inbox")"
     size=$(stat -c %s "$inbox" 2>/dev/null || stat -f %z "$inbox" 2>/dev/null || echo 0)
-    # Move to a private name first, then check the size again. A parallel send may have
-    # rotated already, so this can be its fresh file: put it back and keep .1.
-    if [ "${size:-0}" -gt 5242880 ] && mv "$inbox" "$inbox.rot.$$"; then
-        size=$(stat -c %s "$inbox.rot.$$" 2>/dev/null || stat -f %z "$inbox.rot.$$" 2>/dev/null || echo 0)
-        if [ "${size:-0}" -gt 5242880 ]; then
-            mv -f "$inbox.rot.$$" "$inbox.1"
-        elif ln "$inbox.rot.$$" "$inbox"; then
-            # A hard link keeps the inode, so dev-inbox's tail -F prints nothing twice.
-            rm -f "$inbox.rot.$$"
+    # Rotate under a lock and check the size again there: a parallel send may have
+    # rotated already. Never move a small inbox, even to put it straight back: macOS
+    # tail -F (bin/dev-inbox) then prints the whole file again.
+    if [ "${size:-0}" -gt 5242880 ]; then
+        lock="$inbox.rotlock"
+        # noclobber creates the lock with O_EXCL, so one send owns it.
+        if (set -C; : > "$lock"); then
+            size=$(stat -c %s "$inbox" 2>/dev/null || stat -f %z "$inbox" 2>/dev/null || echo 0)
+            [ "${size:-0}" -gt 5242880 ] && mv -f "$inbox" "$inbox.1"
+            rm -f "$lock"
         else
-            # ln never overwrites: another send already made a new inbox, so append.
-            cat "$inbox.rot.$$" >> "$inbox" && rm -f "$inbox.rot.$$"
+            # Busy: skip. A killed send leaves its lock behind, so drop an old one
+            # and let a later send rotate.
+            find "$lock" -mmin +1 -delete
         fi
     fi
     if [ "$RAW" = 1 ] && [ "$target" = undelivered ]; then

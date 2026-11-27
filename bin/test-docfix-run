@@ -2521,6 +2521,11 @@ bad_flag_case "missing --issue" "--issue is required" --slug="$SPLIT_SLUG"
 bad_flag_case "non-numeric issue" "--issue must be a number" --slug="$SPLIT_SLUG" --issue=7a
 printf 'not json' > "$SB/excl-bad.json"
 bad_flag_case "bad exclude file" "--exclude-file" --slug="$SPLIT_SLUG" --issue=7 --exclude-file="$SB/excl-bad.json"
+run_split "$SB" --help
+{ [ "$SRC" -eq 0 ] && grep -q '^Usage: bin/docfix-split' <<< "$SOUT" \
+    && grep -qF '4 at least one fire was refused.' <<< "$SOUT" && ! grep -q 'set -euo pipefail' <<< "$SOUT"; } \
+  && ok "split-rejects-bad-flags: --help prints only the usage block" \
+  || bad "split-rejects-bad-flags: --help rc=$SRC lines=$(wc -l <<< "$SOUT")"
 snap() { git -C "$SB/main" rev-parse "$SPLIT_SLUG"; git -C "$SB/main" worktree list --porcelain; ls -la "$SB/home/claude-plans"; cat "$SB/home/claude-plans"/*; }
 BEFORE="$(snap)"
 run_split "$SB" --slug="$SPLIT_SLUG" --issue=7 --dry-run

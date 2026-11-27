@@ -19,6 +19,7 @@
 # Exit codes: 0 every fire returned 0 (or nothing to fire), 2 usage,
 # 3 abort before any fire (the trap restores the auto branch and plan),
 # 4 at least one fire was refused.
+#
 [ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
 

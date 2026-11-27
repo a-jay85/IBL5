@@ -446,12 +446,15 @@ health_report() {
             detail="Refresh branch ${orphan} is on origin with no PR — the doc-fix run died mid-flight. Log: ls -t /tmp/docfix-run-*.log | head -1"
         elif wedged="$(wedged_local_refresh_branch)"; [ -n "$wedged" ]; then
             alert=true; kind="wedged"
-            # The poll runs once a day and tries to salvage a wedged branch each
-            # time, so a branch N days old has survived N salvage attempts. Round
-            # to whole days; floor at 1 because this alert only fires past the
-            # 4h wedge threshold (or on unknown age).
+            # The poll runs once a day and tries to salvage a wedged refresh branch
+            # each time, so a refresh branch N days old has survived N salvage
+            # attempts. Round to whole days; floor at 1 because this alert only
+            # fires past the 4h wedge threshold (or on unknown age). The poll never
+            # salvages a review branch, so its detail reports no attempts.
             wedged_age="$(branch_age_seconds "$wedged")"
-            if [ -n "$wedged_age" ]; then
+            if [[ "$wedged" == "$DOCFIX_REVIEW_BRANCH_PREFIX"* ]]; then
+                detail="Local branch ${wedged} has no origin ref and no in-flight launchd run — the content-review run died before pushing. The poll never salvages a review branch, so it needs a manual look."
+            elif [ -n "$wedged_age" ]; then
                 wedged_polls=$(( (wedged_age + 43200) / 86400 ))
                 [ "$wedged_polls" -ge 1 ] || wedged_polls=1
                 detail="Local branch ${wedged} has no origin ref and no in-flight launchd run — the doc-fix run died before pushing. It has survived ${wedged_polls} nightly salvage attempt(s) and needs a manual look."

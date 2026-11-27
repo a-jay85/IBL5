@@ -1028,8 +1028,8 @@ OUT="$(SHIM_STALE_JSON="$STALE_ONE" SHIM_PR_OPEN="" SHIM_LS_REMOTE="" \
     SHIM_PR_FOR_BRANCH=0 SHIM_BRANCH_OUT="$R_OLD" SHIM_REFLOG_OUT="$REFLOG_R_OLD" \
     SHIM_LAUNCHCTL_OUT="" run_health "$SB" 77)"; RC=$?
 _if_case "26g" true "wedged" "leftover local review branch: kind=wedged"
-grep -qF "detail=Local branch $R_OLD has no origin ref" <<< "$OUT" \
-  && ok "(26g) wedged detail names the review branch" \
+grep -qxF "detail=Local branch $R_OLD has no origin ref and no in-flight launchd run — the content-review run died before pushing. The poll never salvages a review branch, so it needs a manual look." <<< "$OUT" \
+  && ok "(26g) wedged detail names the review branch and claims no salvage attempt" \
   || bad "(26g) wedged detail ($OUT)"
 SHIM_STALE_JSON="$STALE_ONE" SHIM_ISSUE_OUT="77" SHIM_BRANCH_OUT="$R_OLD" \
     SHIM_PR_STATE="NONE" SHIM_LS_REMOTE="" SHIM_REFLOG_OUT="$REFLOG_R_OLD" \

@@ -62,7 +62,7 @@ def _git(root, *args) -> str:
 def _write(root, rel, body):
     path = Path(root) / rel
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(body)
+    path.write_bytes(body.encode())  # no newline translation: `\r` reaches the file as is
 
 
 def _commit(root, message) -> str:
@@ -339,6 +339,49 @@ def test_capture_doc_binary_content_holds(tmp_path):
     root, base = _doc_repo(tmp_path, head)
     assert _verdict(root, base, changed=[*CHANGED, CAPTURE_DOC]) \
         == f"inert-path-unsafe-diff: {CAPTURE_DOC}"
+
+
+@pytest.mark.parametrize("base_extra,head_extra", [
+    ("", '\t"sim.zzz": "",\r}; func evil() {}; var _ = map[string]string{\n'),
+    ('\t"sim.zzz": "",\rfunc keep() {}\n', ""),
+], ids=["added", "removed"])
+def test_draw_sites_code_after_lone_cr_holds(tmp_path, base_extra, head_extra):
+    root, base = _make_repo(tmp_path, base_files={tp.DRAW_SITES: DRAW_SITES_BASE + base_extra})
+    _write(root, tp.DRAW_SITES, DRAW_SITES_BASE + head_extra)
+    _write_evidence(root)
+    assert _verdict(root, base, changed=[*CHANGED, tp.DRAW_SITES]) \
+        == f"draw-sites-non-entry-change: {tp.DRAW_SITES}"
+
+
+def test_draw_sites_crlf_entry_change_is_ok(tmp_path):
+    root, base = _draw_sites_repo(tmp_path, DRAW_SITES_BASE + '\t"sim.zzz": "",\r\n')
+    assert _verdict(root, base, changed=[*CHANGED, tp.DRAW_SITES]) == "ok"
+
+
+def test_draw_sites_undecodable_content_holds(tmp_path):
+    root, base = _draw_sites_repo(tmp_path, DRAW_SITES_BASE)
+    (root / tp.DRAW_SITES).write_bytes(DRAW_SITES_BASE.encode() + b"\xff\n")
+    assert _verdict(root, base, changed=[*CHANGED, tp.DRAW_SITES]) \
+        == f"inert-path-unreadable: {tp.DRAW_SITES}"
+    assert tp.added_lines(root, base, tp.DRAW_SITES) is None
+
+
+def test_capture_doc_heading_after_lone_cr_holds(tmp_path):
+    head = CAPTURE_DOC_BASE.replace("- **pl-0027.** The capture carries no record values.\n",
+                                    "- x\r## Sneaky\n")
+    root, base = _doc_repo(tmp_path, head)
+    assert _verdict(root, base, changed=[*CHANGED, CAPTURE_DOC]) \
+        == f"doc-change-outside-section: {CAPTURE_DOC}"
+
+
+def test_capture_doc_lone_cr_does_not_shift_the_section(tmp_path):
+    """Five `\r` above the section would slide its span onto a later line if they split."""
+    before = CAPTURE_DOC_BASE.replace("Check the header", "Check\r\r\r\r\r the header")
+    root, base = _make_repo(tmp_path, base_files={CAPTURE_DOC: before})
+    _write(root, CAPTURE_DOC, before.replace("Tail text.", "Other text."))
+    _write_evidence(root)
+    assert _verdict(root, base, changed=[*CHANGED, CAPTURE_DOC]) \
+        == f"doc-change-outside-section: {CAPTURE_DOC}"
 
 
 def test_declared_draw_sites_takes_the_coverage_rule(tmp_path):
@@ -690,6 +733,57 @@ def test_comment_inside_covered_span_holds(repo):
     _write(root, ENGINE_FILE, code.replace("func", "// note\n\nfunc", 1))
     assert tp.added_lines(root, base, ENGINE_FILE) == {3, 4}
     assert _verdict(root, base) == f"unexercised-change: {ENGINE_FILE}"
+
+
+def _insert_verdict(tmp_path, added, above="", below=""):
+    """coverage_verdict for `added` inserted between `above` and `below`, all of it inside
+    one executed block."""
+    root, _ = _make_repo(tmp_path)
+    head = f"package sim\n\nfunc foulRoll() int {{\n\ta := 1\n{above}"
+    tail = f"{below}\treturn a\n}}\n"
+    _write(root, ENGINE_FILE, head + tail)
+    base = _commit(root, "wider base")
+    _write(root, ENGINE_FILE, head + added + tail)
+    start = head.count("\n") + 1
+    assert tp.added_lines(root, base, ENGINE_FILE) == set(range(start, start + added.count("\n")))
+    return tp.coverage_verdict(root, base, {ENGINE_FILE}, {ENGINE_FILE: [(1, 10000, 1)]})
+
+
+@pytest.mark.parametrize("added,above,below", [
+    ("\t/* note */\n", "", ""),
+    ("\t/* one */ /* two */ // three\n", "", ""),
+    ("\t/* start\n\t   interior\n\t * starred\n\n\t end */\n", "", ""),
+    ("\t   a = 2\n", "\t/*\n", "\t*/\n"),
+    ("\t/*/\n\t   a = 2\n\t*/\n", "", ""),
+    # a quote inside a comment opens no string
+    ("\t/* it's \" ` */\n\t// it's \" ` /*\n\t/* two */\n", "", ""),
+    # comment markers inside a literal neither open nor hide a comment
+    ("\t   a = 2\n", '\t_ = "//" /* open\n', "\t*/\n"),
+    ("\t// see */ below\n", '\t_ = "/*"\n', ""),
+    ("\t// see */ below\n", '\t_ = "\\"/*"\n', ""),
+    ("\t   a = 2\n", "\t_, _ = '\"', \"x\" /* open\n", "\t*/\n"),
+    ("\t   a = 2\n", "\t_ = `\n//` /* open\n", "\t*/\n"),
+    # a lone `\r` ends no line for git or Go: the rest of the comment is not a line of code
+    ("\t// note\n", "\t// x\ry\n", ""),
+    ("\t// note\r\n", "", ""),
+    # a lone `\r` forges no hunk header: line 4 (`a := 1`) was not added
+    ("\t// x\r@@ -1 +4 @@\n", "", ""),
+])
+def test_block_comment_inside_covered_span_holds(tmp_path, added, above, below):
+    assert _insert_verdict(tmp_path, added, above, below) == f"unexercised-change: {ENGINE_FILE}"
+
+
+@pytest.mark.parametrize("added,above,below", [
+    ("\ta++ /* x */\n", "", ""),
+    ("\t/* x */ a++\n", "", ""),
+    ("\t   end */ a++\n", "\t/* start\n", ""),
+    ("\ta++ /* open\n\t*/\n", "", ""),
+    ('\t_ = "/*"\n', "", ""),
+    ("\t   raw text\n", "\t_ = `/*\n", "`\n"),
+    ("\ta++\r\n", "", ""),
+])
+def test_code_beside_block_comment_counts(tmp_path, added, above, below):
+    assert _insert_verdict(tmp_path, added, above, below) == "ok"
 
 
 def test_missing_cover_profile_holds(repo):

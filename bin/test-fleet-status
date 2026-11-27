@@ -857,16 +857,20 @@ assert_lacks "plan-now: user-record draft path ignored" "$OUTPUT" 'peer-plan'
 assert_has   "progress: phase line wins"      "$OUTPUT" 'phase7: watching CI'
 assert_lacks "progress: outputs trailer lost" "$OUTPUT" 'that/is/not/progress'
 
-# 4 & 5 — both residue heartbeats rejected, and counted as stale.
-assert_has "automouse: 2 stale heartbeats counted" "$OUTPUT" '2 stale heartbeat'
-assert_lacks "automouse: dead-pid heartbeat hidden" "$OUTPUT" "pid $DEAD_PID "
-assert_lacks "automouse: reused-pid heartbeat hidden (PID reuse guard)" \
-    "$OUTPUT" "pid $UNRELATED_PID "
+# 22 — the queue section, bounded by the next section header.
+QUEUE_BLOCK="$(sed -n '/AUTOMOUSE QUEUE/,/UNACCOUNTED HEADLESS SESSIONS/p' <<< "$OUTPUT")"
 
-# 22 — characterization of the queue section's bounds and its negative guards.
+# 4 & 5 — both residue heartbeats rejected, and counted as stale. The pid checks
+# read the queue block only. The headless section lists every real `claude -p`
+# on the host, and a parallel CI harness can take the reaped DEAD_PID number.
+assert_has "automouse: 2 stale heartbeats counted" "$OUTPUT" '2 stale heartbeat'
+assert_lacks "automouse: dead-pid heartbeat hidden" "$QUEUE_BLOCK" "pid $DEAD_PID "
+assert_lacks "automouse: reused-pid heartbeat hidden (PID reuse guard)" \
+    "$QUEUE_BLOCK" "pid $UNRELATED_PID "
+
+# 22 — negative guards on the queue block.
 # The "stopped .*pid <live>" pattern matches the Phase 4 line shape, so it is
 # trivially green today and becomes the live-runner exclusion guard afterwards.
-QUEUE_BLOCK="$(sed -n '/AUTOMOUSE QUEUE/,/UNACCOUNTED HEADLESS SESSIONS/p' <<< "$OUTPUT")"
 assert_has   "queue block: bounded by the next section header" \
     "$QUEUE_BLOCK" 'UNACCOUNTED HEADLESS SESSIONS'
 assert_has   "queue block: stale heartbeats still counted inside it" \

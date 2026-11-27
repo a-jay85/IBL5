@@ -312,6 +312,23 @@ def test_words_after_a_citation_stay_in_the_key():
         assert not us._listed(wider + " (`bin/check-a` line 4)", line)
 
 
+def test_sentence_cut_inside_parens_keeps_the_words_after_them():
+    """A `. ` or `: ` inside the parentheses, or an unbalanced backtick there, never
+    drops the words after the closing paren."""
+    approved = "- Relax the check (`bin/check-a`)"
+    for inside in ("line 3", "e.g. line 3", "vs. line 3", "line 3: guard",
+                   "line 3. Also line 9", "line `3"):
+        wider = (f"- [BLOCKING] [unplanned-scope] Relax the check (`bin/check-a` {inside}) "
+                 "for all PRs and drop the signoff hold")
+        assert not us._listed(wider, approved), inside
+
+
+def test_sentence_cut_inside_parens_still_drops_a_trailing_citation():
+    for tail in ("", ". Later prose.", ": later prose"):
+        line = f"- Relax the check (`bin/check-a` e.g. line 3: guard. Also line 9){tail}"
+        assert us.title_key(line) == "Relax the check", line
+
+
 def test_stacked_trailing_citations_are_all_dropped():
     """A finding that ends in a path parenthetical gets the rendered path suffix after
     it. Both trailing groups drop, including when the first one holds nested parens."""

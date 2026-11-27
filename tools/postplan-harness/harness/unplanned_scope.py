@@ -301,7 +301,8 @@ def title_key(text: str) -> str:
     keeps the words before the first `: `, so the same finding matches its declared line
     and the owner's approved line. A title with no `: ` stops at its first sentence end
     (`. ` or a final `.`), because the reviewer also rewords the sentences after it
-    (PRs 4202 and 4213). The key also drops a trailing ` (` plus backtick
+    (PRs 4202 and 4213). Neither cut happens inside parentheses or backticks, so the
+    words after a closing paren are still seen. The key also drops a trailing ` (` plus backtick
     parenthetical. `render_kept_block` writes that path citation after each declared
     title, and a reviewer may put the path and prose there too, so the finding still
     matches the shorter declared and approved line (PR 4244). When words follow a
@@ -320,8 +321,25 @@ def _key_sentence(text: str) -> str:
     """The title cut at the first `: ` and sentence end, path citation still attached."""
     title = title_of(text) if is_unplanned_scope(text) else _BULLET_RE.sub("", text.splitlines()[0] if text else "")
     title = _LEAD_TAGS_RE.sub("", title.strip())
-    title = title.split(": ", 1)[0].split(". Next action", 1)[0]
-    return title.split(". ", 1)[0].strip().rstrip(".").strip()
+    title = _cut_outside_parens(title).split(". Next action", 1)[0]
+    return title.strip().rstrip(".").strip()
+
+
+def _cut_outside_parens(title: str) -> str:
+    """`title` up to the first `: ` or `. ` outside parentheses and backticks."""
+    depth, in_code = 0, False
+    for i, ch in enumerate(title):
+        if ch == "`":
+            in_code = not in_code
+        elif in_code:
+            continue
+        elif ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth = max(depth - 1, 0)
+        elif depth == 0 and title.startswith((": ", ". "), i):
+            return title[:i]
+    return title
 
 
 def _runs_to_end(tail: str) -> bool:
@@ -329,8 +347,8 @@ def _runs_to_end(tail: str) -> bool:
 
     Only another ` (` plus backtick citation, or the rendered ` (no path cited)`, may
     follow it. So may the bare ` owner` that the `: ` cut leaves of an `owner: "..."`
-    quote. A parenthetical the sentence cut left open also runs to the end. Parens
-    inside backticks are not counted.
+    quote. A parenthetical that never closes, say after an unbalanced backtick, does not
+    count, so the key drops nothing. Parens inside backticks are not counted.
     """
     depth, in_code = 0, False
     for i, ch in enumerate(tail):
@@ -347,7 +365,7 @@ def _runs_to_end(tail: str) -> bool:
                 if rest in ("", " owner"):
                     return True
                 return rest.startswith((" (`", " (no path cited)")) and _runs_to_end(rest)
-    return True
+    return False
 
 
 def _annotation_start(sentence: str) -> int:

@@ -516,6 +516,11 @@ cat <<'ROWS'
 6003	0	com.ibl5.plan-now-20260910-200000-60003
 6004	0	com.ibl5.plan-now-20260910-200000-60004
 6005	0	com.ibl5.plan-now-20260910-200000-60005
+6006	0	com.ibl5.plan-now-20260910-210000-70006
+6007	0	com.ibl5.plan-now-20260910-210000-70007
+6008	0	com.ibl5.plan-now-20260910-210000-70008
+6009	0	com.ibl5.plan-now-20260910-210000-70009
+6010	0	com.ibl5.plan-now-20260910-210000-70010
 99999	0	com.apple.something.unrelated
 ROWS
 [ -n "\${STUB_NO_AUTOMOUSE:-}" ] || printf -- '-\t0\tcom.ibl5.automouse\n'
@@ -673,6 +678,35 @@ plant_tx "12121212-1111-2222-3333-444444444444.jsonl" \
     '{"type":"user","message":{"content":[{"type":"text","text":"see ~/claude-plans/.drafts/peer-plan.draft.md"}]}}'
 plant_sidecar plan-now-20260910-200000-60005 '12121212-1111-2222-3333-444444444444'
 
+# Cases 14-18: a plan-now log is not progress until the runner prints its
+# "claude exited" line. 70006: identity (plus a blank line) and a transcript.
+# 70007: identity, the exit line, later output, and a transcript that must lose to
+# it. 70008: identity only, no transcript. 70009: identity, pre-launch notices and
+# a transcript. 70010: identity and a pre-launch notice, no transcript.
+plan_idline() { printf 'plan-now: identity slug=%s resume_of=- brief=-\n' "$1"; }
+{ plan_idline idline-tx; printf '\n'; } > "$LOGS/plan-now-20260910-210000-70006.log"
+plant_tx "13131313-1111-2222-3333-444444444444.jsonl" \
+    "$(tx_text 'Phase 2: drafting the plan')" \
+    "$(tx_tool Bash command 'bin/plan-index demo-plan')"
+plant_sidecar plan-now-20260910-210000-70006 '13131313-1111-2222-3333-444444444444'
+{ plan_idline idline-later
+  printf 'plan-now: claude exited 0 after 5s\nplan-now: RESULT later-output-marker\n'; } \
+    > "$LOGS/plan-now-20260910-210000-70007.log"
+plant_tx "14141414-1111-2222-3333-444444444444.jsonl" \
+    "$(tx_text 'TRANSCRIPT MUST LOSE TO LOG OUTPUT')"
+plant_sidecar plan-now-20260910-210000-70007 '14141414-1111-2222-3333-444444444444'
+plan_idline idline-bare > "$LOGS/plan-now-20260910-210000-70008.log"
+{ plan_idline idline-notice
+  printf 'plan-now: tier-ok override was active: NOTICE-MUST-NOT-RENDER\n'
+  printf 'plan-now: resuming session NOTICE-MUST-NOT-RENDER from run x\n'; } \
+    > "$LOGS/plan-now-20260910-210000-70009.log"
+plant_tx "15151515-1111-2222-3333-444444444444.jsonl" \
+    "$(tx_text 'Phase 3: notice run still planning')"
+plant_sidecar plan-now-20260910-210000-70009 '15151515-1111-2222-3333-444444444444'
+{ plan_idline idline-notice-bare
+  printf 'plan-now: tier-ok override was active: NOTICE-MUST-NOT-RENDER\n'; } \
+    > "$LOGS/plan-now-20260910-210000-70010.log"
+
 # ── run ────────────────────────────────────────────────────────────────────────
 
 printf 'test-fleet-status\n'
@@ -823,16 +857,20 @@ assert_lacks "plan-now: user-record draft path ignored" "$OUTPUT" 'peer-plan'
 assert_has   "progress: phase line wins"      "$OUTPUT" 'phase7: watching CI'
 assert_lacks "progress: outputs trailer lost" "$OUTPUT" 'that/is/not/progress'
 
-# 4 & 5 — both residue heartbeats rejected, and counted as stale.
-assert_has "automouse: 2 stale heartbeats counted" "$OUTPUT" '2 stale heartbeat'
-assert_lacks "automouse: dead-pid heartbeat hidden" "$OUTPUT" "pid $DEAD_PID "
-assert_lacks "automouse: reused-pid heartbeat hidden (PID reuse guard)" \
-    "$OUTPUT" "pid $UNRELATED_PID "
+# 22 — the queue section, bounded by the next section header.
+QUEUE_BLOCK="$(sed -n '/AUTOMOUSE QUEUE/,/UNACCOUNTED HEADLESS SESSIONS/p' <<< "$OUTPUT")"
 
-# 22 — characterization of the queue section's bounds and its negative guards.
+# 4 & 5 — both residue heartbeats rejected, and counted as stale. The pid checks
+# read the queue block only. The headless section lists every real `claude -p`
+# on the host, and a parallel CI harness can take the reaped DEAD_PID number.
+assert_has "automouse: 2 stale heartbeats counted" "$OUTPUT" '2 stale heartbeat'
+assert_lacks "automouse: dead-pid heartbeat hidden" "$QUEUE_BLOCK" "pid $DEAD_PID "
+assert_lacks "automouse: reused-pid heartbeat hidden (PID reuse guard)" \
+    "$QUEUE_BLOCK" "pid $UNRELATED_PID "
+
+# 22 — negative guards on the queue block.
 # The "stopped .*pid <live>" pattern matches the Phase 4 line shape, so it is
 # trivially green today and becomes the live-runner exclusion guard afterwards.
-QUEUE_BLOCK="$(sed -n '/AUTOMOUSE QUEUE/,/UNACCOUNTED HEADLESS SESSIONS/p' <<< "$OUTPUT")"
 assert_has   "queue block: bounded by the next section header" \
     "$QUEUE_BLOCK" 'UNACCOUNTED HEADLESS SESSIONS'
 assert_has   "queue block: stale heartbeats still counted inside it" \
@@ -1366,6 +1404,37 @@ assert_has "--help starts at the title line"  "$HELP" '^bin/fleet-status — one
 assert_has "--help reaches the usage block"   "$HELP" 'Usage: bin/fleet-status'
 assert_has "--help reaches the final line"    "$HELP" 'not a failure\.$'
 assert_lacks "--help stops before the code"   "$HELP" 'SCRIPT_DIR='
+
+# === plan-now identity line is not progress ===
+
+# One launchd row: from its bullet line to the next bullet or blank line.
+launchd_row() { awk -v id="$1" '/●/ { p = index($0, id) > 0 } /^$/ { p = 0 } p' <<< "$OUTPUT"; }
+ROW_70006="$(launchd_row 210000-70006)"
+ROW_70007="$(launchd_row 210000-70007)"
+ROW_70008="$(launchd_row 210000-70008)"
+
+# Case 14 — identity-only log: the transcript phase and tool lines render.
+assert_has "identity-only: transcript phase renders" "$ROW_70006" 'Phase 2: drafting the plan'
+assert_has "identity-only: transcript tool renders"  "$ROW_70006" '↳ Bash: bin/plan-index demo-plan'
+
+# Case 15 — later real output still wins over both the identity line and the transcript.
+assert_has   "identity then output: later line renders" "$ROW_70007" 'RESULT later-output-marker'
+assert_lacks "identity then output: transcript unused"  "$ROW_70007" 'TRANSCRIPT MUST LOSE'
+
+# Case 16 — identity-only log and no transcript: the placeholder renders.
+assert_has "identity-only, no transcript: placeholder" "$ROW_70008" 'no output yet'
+
+assert_lacks "identity line never renders as progress" "$OUTPUT" 'plan-now: identity'
+
+# Case 17 — pre-launch notices do not mask the live transcript.
+ROW_70009="$(launchd_row 210000-70009)"
+assert_has   "pre-launch notice: transcript phase renders" "$ROW_70009" 'Phase 3: notice run still planning'
+assert_lacks "pre-launch notice: notice not rendered"      "$ROW_70009" 'NOTICE-MUST-NOT-RENDER'
+
+# Case 18 — pre-launch notice and no transcript: the placeholder renders.
+ROW_70010="$(launchd_row 210000-70010)"
+assert_has   "notice, no transcript: placeholder"     "$ROW_70010" 'no output yet'
+assert_lacks "notice, no transcript: notice not rendered" "$ROW_70010" 'NOTICE-MUST-NOT-RENDER'
 
 # === transcript fixture cases (Phase 6) ===
 

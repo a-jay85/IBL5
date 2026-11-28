@@ -342,6 +342,18 @@ case_dirty_shows_conflict_behind_silent() {
     done
 }
 
+# The reply already says "Answer with one line per PR", so the Your call cell
+# holds only the call and its notes, with no per-row "Reply N: 1" hint.
+case_call_cell_has_no_reply_hint() {
+    local row call
+    need_main || return 1
+    row="$(line_of pr 4241)" || return 1
+    call="$(cell c-call "$row")" || return 1
+    has 'Merge it' "$call" "4241 c-call" || return 1
+    lacks 'Reply' "$call" "4241 c-call" || return 1
+    lacks '4241: 1' "$call" "4241 c-call"
+}
+
 case_no_sha_in_visible_text() {
     local visible tokens hits
     need_main || return 1
@@ -569,7 +581,8 @@ case_skill_doc_matches_gadget() {
 CASES=(
     green_row_all_fine bot_handled_row_hidden hidden_count_line one_way_door_risky_note
     not_ready_current_broken fetch_failed_never_fine fetch_failed_field_stays_visible
-    missing_line_stays_visible dirty_shows_conflict_behind_silent no_sha_in_visible_text
+    missing_line_stays_visible dirty_shows_conflict_behind_silent call_cell_has_no_reply_hint
+    no_sha_in_visible_text
     stale_paren_stripped html_escapes_model_and_github_text word_headers_fixed_order
     no_button_in_output held_reasons_plain_words held_machine_tokens_dropped
     held_pr_missing_from_judgment_shown held_fetch_failed_warns judgment_rejects_hold_code

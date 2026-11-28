@@ -1328,8 +1328,9 @@ r_bells=$(LC_ALL=C tr -cd "$BEL" <<< "$r_out" | wc -c | tr -d ' ')
 
 # bin/dev-inbox --merged. The gh stub prints what `gh pr list --jq` would print
 # (number, local merge time, branch, title, url) from $GHS/rows.<call>, or exits 1
-# when that file is missing. It logs its list arguments to $GHS/args.
-# `gh api rate_limit` prints $GHS/left. The sleep stub records each wait instead of
+# when that file is missing. When $GHS/json.<call> exists, it runs the --jq
+# expression over that file with real jq instead. It logs its list arguments to
+# $GHS/args. `gh api rate_limit` prints $GHS/left. The sleep stub records each wait instead of
 # waiting, and moves the clock $GHS/jump seconds ahead when that file exists.
 # The date stub adds that skew to `date +%s`.
 GHS="$TMP/ghs"; mkdir -p "$GHS"
@@ -1338,6 +1339,10 @@ cat > "$GHS/gh" <<'EOF'
 if [ "$1" = api ]; then cat "$GHS/left"; exit 0; fi
 echo "$*" >> "$GHS/args"
 n=$(( $(cat "$GHS/calls" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$GHS/calls"
+if [ -f "$GHS/json.$n" ]; then
+    while [ $# -gt 1 ] && [ "$1" != --jq ]; do shift; done
+    exec jq -r "${2:?no --jq expression}" "$GHS/json.$n"
+fi
 [ -f "$GHS/rows.$n" ] || exit 1
 cat "$GHS/rows.$n"
 EOF
@@ -1353,7 +1358,7 @@ exec /bin/date "$@"
 EOF
 chmod +x "$GHS/gh" "$GHS/sleep" "$GHS/date"
 export GHS
-ghs_reset() { rm -f "$GHS"/rows.* "$GHS/calls" "$GHS/slept" "$GHS/args" "$GHS/jump" "$GHS/skew"; echo 4000 > "$GHS/left"; }
+ghs_reset() { rm -f "$GHS"/rows.* "$GHS"/json.* "$GHS/calls" "$GHS/slept" "$GHS/args" "$GHS/jump" "$GHS/skew"; echo 4000 > "$GHS/left"; }
 # ghs_row <n> [age-secs]: PR <n>, merged <age> seconds ago (default 60), shown as 14:0<n>.
 ghs_row() {
     printf '%s\t%s\t2026-11-27T14:%02d:00\tbr-%s\tPR title %s\thttps://x/pull/%s\n' \
@@ -1368,6 +1373,17 @@ r_bells=$(tr -cd "$BEL" <<< "$r_out" | wc -c | tr -d ' ')
     && grep -qF "2026-11-27 14:03  merged  br-3" <<< "$r_out" && grep -qxF "https://x/pull/3" <<< "$r_out" \
     && [ "$r_bells" = 0 ] && [[ "$r_out" != *watching* ]]; } \
     && ok "S2ae --merged --once shows the last N merges, oldest first, no bell" || fail "S2ae bells=$r_bells out=[$r_out]"
+
+# Real jq runs dev-inbox's --jq expression over newest-first JSON. TZ=XXX5 is a
+# fixed UTC-5 zone, so the local time differs from the UTC input on every host.
+ghs_reset; cat > "$GHS/json.1" <<'EOF'
+[{"number":22,"mergedAt":"2026-11-27T20:30:00Z","headRefName":"br-late","title":"late one","url":"https://x/pull/22"},
+ {"number":21,"mergedAt":"2026-11-27T03:15:00Z","headRefName":"br-early","title":"path C:\\temp","url":"https://x/pull/21"}]
+EOF
+r_out=$(TZ=XXX5 ghs_run --once)
+[[ "$r_out" == *"2026-11-26 22:15  merged  br-early"*'#21 path C:\temp'*"https://x/pull/21"*"2026-11-27 15:30  merged  br-late"*"#22 late one"*"https://x/pull/22"* ]] \
+    && ok "S2ar --merged: the --jq expression sorts by merge time, orders columns, shows local time" \
+    || fail "S2ar out=[$r_out]"
 
 ghs_reset; { ghs_row 1; ghs_row 2; } > "$GHS/rows.1"; { ghs_row 2; ghs_row 4; } > "$GHS/rows.2"
 r_out=$(DEV_INBOX_MAX_POLLS=2 ghs_run)

@@ -624,6 +624,14 @@ probe c88-keep-then-single-label 1 3 'if true; then case $l in a) ssh h ;; esac;
 probe c103-keep-cmdsub-in-pattern 1 3 'case $l in a|$(ssh h)) : ;; esac'
 probe c104-keep-backtick-in-pattern 1 3 'case $l in a | `ssh h`) : ;; esac'
 probe c105-keep-reader-name-label 1 3 'if true; then case $l in ssh|bash) : ;; esac; fi'
+probe c106-keep-redirected-cmdsub-in-pattern 1 3 'case $l in a|$(ssh>/dev/null h)) : ;; esac'
+probe c107-keep-redirected-backtick-in-pattern 1 3 'case $l in a|`ssh>&2 h`) : ;; esac'
+# A word that only starts with done does not close the loop, so later and earlier hits stay.
+probe c108-done-assignment-in-arm-later-hit 1 5 $'ssh before\ncase $l in a) done=1 ;; esac\nssh after'
+probe c109-done-assignment-in-arm-earlier-hit 1 3 $'ssh before\ncase $l in a) done+=1 ;; esac'
+probe c110-done-prefixed-command-in-arm 1 6 $'case $l in\n  end) done-marker ;;\nesac\nssh after'
+probe c111-done-array-in-braced-arm 1 4 $'case $l in a) { done[0]=1; } ;; esac\nssh after'
+probe c112-done-dotted-command-own-line 1 4 $'done.sh\nssh after'
 # The reader is fed by a pipe: must stay rc 0.
 probe c89-pipe-subshell 0 '' '( echo x | ssh h )'
 probe c90-pipe-cmdsub 0 '' 'v=$(echo x | ssh h)'

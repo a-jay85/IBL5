@@ -266,7 +266,7 @@ function mark_case(m,    n, i, c, out, last, tok, j, pd, keep, k, t, pw) {
                 j++
             }
             if (j > n || c != ")") { ncase--; continue }   # no ) before ; or the line end: not a pattern list
-            k = split(substr(m, i, j - i), pw, /[ \t|()`;&]+/)
+            k = split(substr(m, i, j - i), pw, /[ \t|()`;&<>]+/)
             for (t = 1; t <= k; t++) { sub(/^.*\//, "", pw[t]); if (pw[t] in rd) keep = 1 }
             out = out sp(j - i) ";"; i = j + 1; last = j; cmode[ncase] = "body"
             continue
@@ -438,7 +438,8 @@ function process_line(m, r, ln,    t, c1, k, seg, rseg, p, fw, word, fed, redir,
         fw = word_at(seg, p)
         while (fw == "then" || fw == "else" || fw == "{") { p = skip_ws(seg, p + length(fw)); fw = word_at(seg, p) }
         # done) / done} close the loop; a case label `done) cmd ;;` has a command after it.
-        if (fw ~ /^done([^A-Za-z0-9_]|$)/ && !(fw ~ /^done\)/ && substr(seg, skip_ws(seg, p + length(fw))) ~ /^[A-Za-z_$]/)) {
+        # done=1, done-x, done.sh and done[0]=1 are ordinary words and leave the loop open.
+        if (fw ~ /^done([^A-Za-z0-9_=+.:,\/[-]|$)/ && !(fw ~ /^done\)/ && substr(seg, skip_ws(seg, p + length(fw))) ~ /^[A-Za-z_$]/)) {
             while (depth > 0 && fkind[depth] == "group") close_frame(0, 0)
             if (depth > 0) {
                 fed = done_feeds_stdin(seg) || frame_piped[depth]

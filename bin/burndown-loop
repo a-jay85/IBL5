@@ -24,6 +24,7 @@
 #   bin/burndown-loop start [--no-dm]
 #   bin/burndown-loop stop
 #   bin/burndown-loop status
+#   bin/burndown-loop unblock-base <branch>
 #   bin/burndown-loop run [--once] [--dry-run] [--no-dm]
 #   bin/burndown-loop --print-plist
 #   bin/burndown-loop --resume-paused <sid>
@@ -66,7 +67,7 @@
 #
 # Hard stop: launchctl bootout gui/$(id -u)/com.ibl5.burndown-loop
 #
-# Bash 3.2 / macOS compatible: no declare -A, no mapfile, no date -d/-v, no GNU timeout.
+# Bash 4+ and macOS compatible: no date -d/-v, no GNU timeout.
 
 [ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -euo pipefail
@@ -149,7 +150,7 @@ BL_SCOUT_RECHECK=900
 BL_SCOUT_PROMPT='Invoke the /reset-ready skill now and run every step to completion. No human is present: never ask questions or wait for input; print what you would have told the user and continue. Step 1 has no usage hook line here and the caller already checked pace, so treat usage as allowing work. In Step 6, skip the burndown-loop stop/start bullet because the loop is your caller; keep the other bullets. Pick no new frontend features. For picks that touch SQL, auth or destructive changes, weigh plan-architect-xhigh with the tier hint as the skill says. The tier is an Opus judgment. The caller reads only the last line of your final message (claude -p prints nothing else), so end your final message with exactly one of these lines: BURNDOWN-SCOUT: fired <n> (n = prompts handed to bin/plan-now), BURNDOWN-SCOUT: none, or BURNDOWN-SCOUT: aborted'
 BL_UNBLOCK_MAX=5
 BL_UNBLOCK_DENY='Bash(gh pr merge:*),Bash(gh api:*),Bash(bin/post-plan-now:*),Bash(bin/post-plan-fleet:*),Bash(bin/pr-cycle:*),Bash(bin/pr-cycle-tick:*),Bash(bin/pr-triage:*),Bash(bin/postplan-fix:*)'
-BL_UNBLOCK_PROMPT='Unattended unblock pass for open pull requests in a-jay85/IBL5. No human is present: never ask questions or wait for input; make the safe choice and continue. Work only on these PRs (number:reason): @PRS@. For each one, read its head branch with `gh pr view <n> --json headRefName`, use its worktree from `git worktree list`, or create one with `bin/wt-new --existing <branch>`. reason=conflict: run `git fetch origin`, then record <sha> as `git rev-parse origin/<branch>` and run `git merge-base --is-ancestor origin/<branch> HEAD`; if that check fails the local branch lacks remote commits, so skip the PR. Also skip the PR when `git rev-list --merges origin/master..HEAD` prints anything: a plain rebase drops merge commits and any edits made inside them. Then pick the replay target <target> and upstream <up>. Read the declared parent with `git config --get branch.<branch>.iblBase`. When it prints nothing or master, set <target> to origin/master and <up> to `git merge-base HEAD origin/master`. When it prints a parent branch <parent> and `gh pr list --head <parent> --state open --json number --jq length` prints a number above 0, the parent PR is still open: set <target> to origin/<parent> and <up> to `git merge-base HEAD origin/<parent>`. Otherwise the parent has merged: set <target> to origin/master and resolve the parent tip <ptip> with `git rev-parse --verify --quiet origin/<parent>`, or with `git rev-parse --verify --quiet <parent>` when the remote branch is gone; skip the PR when neither prints a SHA. When `git merge-base --is-ancestor <ptip> HEAD` succeeds and `git merge-base --is-ancestor <ptip> origin/master` fails, the parent was squash-merged and its own commits never reached master, so set <up> to <ptip>; otherwise set <up> to `git merge-base HEAD origin/master`. Before replaying, record <tip> as `git rev-parse HEAD`; when `git rev-list --count <up>..HEAD` prints more than 1, squash the commits of this branch into one with `git reset --soft <up>` followed by `git commit -C ORIG_HEAD`, so the replay stops at most once and leaves out the parent commits only if the parent branch was not rewritten after this branch forked; if that commit fails, run `git reset --hard <tip>` and skip the PR. Then run `git rebase --onto <target> <up>`; at each stop resolve every conflict keeping the intent of both sides, `git add` it and run `GIT_EDITOR=true git rebase --continue`; run the tests that cover the touched files; then push with `git push --force-with-lease="refs/heads/<branch>:<sha>" origin HEAD:refs/heads/<branch>`, where <sha> is the value you recorded before rebasing; never re-read it at push time. Always pass that explicit refs/heads lease. reason=red: read the failures with `gh pr checks <n>` and `gh run view <run-id> --log-failed`, fix the cause, rerun the failing test locally, commit, and `git push` without force. Skip a PR whose fix needs a product or design decision. Skip a reason=conflict PR when the file /tmp/postplan-conflict-resolved-<branch> exists and is not empty, where <branch> is the head branch with every / and : replaced by -; that file marks a conflict resolution still awaiting review, and a rebase would rewrite the commit it names and drop the hold. Hard rules: never enable auto-merge; never run `gh pr merge` or `gh api` in any form; never run bin/post-plan-now, bin/post-plan-fleet, bin/pr-cycle, bin/pr-cycle-tick, bin/pr-triage or bin/postplan-fix; never invoke the /post-plan or /ship skills; never mark a draft ready, close a PR, or push to master. The caller reads only the last line of your final message (claude -p prints nothing else), so end your final message with exactly one of these lines: BURNDOWN-UNBLOCK: pushed <n> (n = PRs you pushed a fix to), or BURNDOWN-UNBLOCK: none'
+BL_UNBLOCK_PROMPT='Unattended unblock pass for open pull requests in a-jay85/IBL5. No human is present: never ask questions or wait for input; make the safe choice and continue. Work only on these PRs (number:reason): @PRS@. For each one, read its head branch with `gh pr view <n> --json headRefName`, use its worktree from `git worktree list`, or create one with `bin/wt-new --existing <branch>`. reason=conflict: run `git fetch origin`, then record <sha> as `git rev-parse origin/<branch>` and run `git merge-base --is-ancestor origin/<branch> HEAD`; if that check fails the local branch lacks remote commits, so skip the PR. Also skip the PR when `git rev-list --merges origin/master..HEAD` prints anything: a plain rebase drops merge commits and any edits made inside them. Then pick the replay target <target> and upstream <up> by running `@LOOP@ unblock-base <branch>` in that worktree. It reads the declared parent from `git config --get branch.<branch>.iblBase`, checks the parent and master history for a parent rewritten after this branch forked, writes nothing, and prints one line. When that line starts with `UNBLOCK-BASE SKIP`, skip the PR. When the command exits nonzero or prints no line, skip the PR. Otherwise the line is `UNBLOCK-BASE <target> <up>`: use its second field as <target> and its third field as <up>, and never compute either one yourself. Before replaying, record <tip> as `git rev-parse HEAD`; when `git rev-list --count <up>..HEAD` prints more than 1, squash the commits of this branch into one with `git reset --soft <up>` followed by `git commit -C ORIG_HEAD`, so the replay stops at most once and leaves out the parent commits; if that commit fails, run `git reset --hard <tip>` and skip the PR. Then run `git rebase --onto <target> <up>`; at each stop resolve every conflict keeping the intent of both sides, `git add` it and run `GIT_EDITOR=true git rebase --continue`; run the tests that cover the touched files; then push with `git push --force-with-lease="refs/heads/<branch>:<sha>" origin HEAD:refs/heads/<branch>`, where <sha> is the value you recorded before rebasing; never re-read it at push time. Always pass that explicit refs/heads lease. reason=red: read the failures with `gh pr checks <n>` and `gh run view <run-id> --log-failed`, fix the cause, rerun the failing test locally, commit, and `git push` without force. Skip a PR whose fix needs a product or design decision. Skip a reason=conflict PR when the file /tmp/postplan-conflict-resolved-<branch> exists and is not empty, where <branch> is the head branch with every / and : replaced by -; that file marks a conflict resolution still awaiting review, and a rebase would rewrite the commit it names and drop the hold. Hard rules: never enable auto-merge; never run `gh pr merge` or `gh api` in any form; never run bin/post-plan-now, bin/post-plan-fleet, bin/pr-cycle, bin/pr-cycle-tick, bin/pr-triage or bin/postplan-fix; never invoke the /post-plan or /ship skills; never mark a draft ready, close a PR, or push to master. The caller reads only the last line of your final message (claude -p prints nothing else), so end your final message with exactly one of these lines: BURNDOWN-UNBLOCK: pushed <n> (n = PRs you pushed a fix to), or BURNDOWN-UNBLOCK: none'
 
 bl_usage() {
     cat <<'USAGE_EOF'
@@ -157,6 +158,7 @@ Usage: bin/burndown-loop <subcommand>
   start [--no-dm]                    launch detached under launchd
   stop                               finish the current batch, then exit
   status                             lock pid, liveness, recent log
+  unblock-base <branch>              replay target and upstream for unblock, or SKIP (read-only)
   run [--once] [--dry-run] [--no-dm] the loop body (what launchd runs)
   --print-plist                      emit the launchd unit on stdout
   --resume-paused <sid>              coordinator entry
@@ -842,11 +844,115 @@ bl_unblock_arm_check() {
 log: $LOOP_LOG"
 }
 
+# bl_ub_skip: the helper's SKIP line.
+bl_ub_skip() { echo "UNBLOCK-BASE SKIP $*"; }
+
+# bl_ub_twins <head> <up> <side-ref>...: prints "<sha> <kind>" for the first commit of
+# <up>..<head> that already exists in rewritten form on a side ref: same author email and
+# author date (amend and rebase keep both), or same stable patch-id. Prints nothing otherwise.
+# Returns 1 when any history read fails, so a broken scan never reads as "no twin".
+bl_ub_twins() {
+    local head="$1" up="$2" c key pid side_dates side_patches own_dates own_patches
+    shift 2
+    side_dates=$(git log --no-merges --format='%ae %at' "$@" --not "$head") || return 1
+    side_patches=$(git log -p --no-merges --no-color "$@" --not "$head" | git patch-id --stable) || return 1
+    own_dates=$(git log --no-merges --format='%H %ae %at' "$up..$head") || return 1
+    own_patches=$(git log -p --no-merges --no-color "$up..$head" | git patch-id --stable) || return 1
+    local -A side_keys=() side_pids=()
+    while read -r key; do
+        if [ -n "$key" ]; then side_keys["$key"]=1; fi
+    done <<< "$side_dates"
+    while read -r pid _; do
+        if [ -n "$pid" ]; then side_pids["$pid"]=1; fi
+    done <<< "$side_patches"
+    while read -r c key; do
+        [ -n "$key" ] || continue
+        if [ -n "${side_keys[$key]:-}" ]; then echo "$c author-date twin"; return 0; fi
+    done <<< "$own_dates"
+    while read -r pid c; do
+        [ -n "$pid" ] || continue
+        if [ -n "${side_pids[$pid]:-}" ]; then echo "$c patch-id twin"; return 0; fi
+    done <<< "$own_patches"
+    return 0
+}
+
+# bl_cmd_unblock_base <branch>: read-only. Picks the unblock replay target and upstream for
+# <branch> and prints one line: `UNBLOCK-BASE <target> <up>` or `UNBLOCK-BASE SKIP <why>`.
+# A parent rewritten after the branch forked, or a merged parent whose tip the branch no
+# longer contains, prints SKIP (backlog#1952). So does a parent with no open PR whose tip is
+# neither on origin/master nor in a PR merged into master. It never fetches and writes no ref
+# or config.
+bl_cmd_unblock_base() {
+    local branch="$1" head parent open target up ptip r s twin entries merged
+    local side=()
+    git check-ref-format --branch "$branch" >/dev/null 2>&1 || { bl_ub_skip "invalid branch name"; return 0; }
+    head=$(git rev-parse --verify --quiet "refs/heads/$branch^{commit}") || { bl_ub_skip "no local branch $branch"; return 0; }
+    parent=$(git config --get "branch.$branch.iblBase" || true)
+    if [ -z "$parent" ] || [ "$parent" = master ]; then
+        up=$(git merge-base "$head" origin/master) || { bl_ub_skip "no merge-base with origin/master"; return 0; }
+        echo "UNBLOCK-BASE origin/master $up"
+        return 0
+    fi
+    git check-ref-format --branch "$parent" >/dev/null 2>&1 || { bl_ub_skip "invalid iblBase $parent"; return 0; }
+    open=$(gh pr list --head "$parent" --state open --json number --jq length 2>/dev/null) || open=x
+    case "$open" in
+        ''|*[!0-9]*) bl_ub_skip "parent PR state unknown"; return 0 ;;
+    esac
+    for r in "refs/remotes/origin/$parent" "refs/heads/$parent"; do
+        if git rev-parse --verify --quiet "$r^{commit}" >/dev/null; then side+=("$r"); fi
+    done
+    if [ "$open" -gt 0 ]; then
+        target="origin/$parent"
+        ptip=$(git rev-parse --verify --quiet "refs/remotes/origin/$parent^{commit}") || { bl_ub_skip "open parent has no origin/$parent"; return 0; }
+        up=$(git merge-base "$head" "$ptip") || { bl_ub_skip "no merge-base with origin/$parent"; return 0; }
+    else
+        target=origin/master
+        [ "${#side[@]}" -gt 0 ] || { bl_ub_skip "merged parent tip not found"; return 0; }
+        ptip=$(git rev-parse "${side[0]}^{commit}")
+        if ! git merge-base --is-ancestor "$ptip" "$head"; then
+            bl_ub_skip "merged parent tip is not an ancestor of $branch; parent was rewritten after the branch forked"
+            return 0
+        fi
+        if git merge-base --is-ancestor "$ptip" origin/master; then
+            up=$(git merge-base "$head" origin/master)
+        else
+            # No open PR does not prove a merge: a PR merged into master must hold the tip.
+            merged=$(gh pr list --head "$parent" --base master --state merged --json headRefOid \
+                --jq '.[].headRefOid' 2>/dev/null) || { bl_ub_skip "parent PR state unknown"; return 0; }
+            up=''
+            while read -r s; do
+                if [ -n "$s" ] && git merge-base --is-ancestor "$ptip" "$s" 2>/dev/null; then up=$ptip; fi
+            done <<< "$merged"
+            [ -n "$up" ] || { bl_ub_skip "no PR merged into master holds the tip of $parent"; return 0; }
+        fi
+    fi
+    [ "$(git rev-list --count "$up..$head")" -gt 0 ] || { bl_ub_skip "nothing to replay above $up"; return 0; }
+    for r in "${side[@]}"; do
+        git reflog exists "$r" || continue
+        entries=$(git log -g --format=%H "$r") || { bl_ub_skip "cannot read the reflog of $r"; return 0; }
+        while read -r s; do
+            [ -n "$s" ] || continue
+            if git merge-base --is-ancestor "$s" "$head" && ! git merge-base --is-ancestor "$s" "$up"; then
+                bl_ub_skip "reflog of $r holds ${s:0:12} inside $up..$branch; parent was rewritten after the branch forked"
+                return 0
+            fi
+        done <<< "$entries"
+    done
+    twin=$(bl_ub_twins "$head" "$up" "${side[@]}" origin/master) || { bl_ub_skip "cannot scan parent and master history"; return 0; }
+    if [ -n "$twin" ]; then
+        bl_ub_skip "commit ${twin:0:12} has a rewritten ${twin#* } on the parent or master side"
+        return 0
+    fi
+    echo "UNBLOCK-BASE $target $up"
+}
+
 bl_on_unblock() {
-    local prs="${1##* prs=}" marker
+    local prs="${1##* prs=}" marker p
     # Cooldown starts at launch, so a crash or timeout never retries at once.
     bl_now > "$STATE/unblock.last"
-    bl_run_session unblock claude-sonnet-5-5 "${BL_UNBLOCK_PROMPT//@PRS@/$prs}" \
+    p=${BL_UNBLOCK_PROMPT//@PRS@/$prs}
+    p=${p//@LOOP@/"$ROOT/bin/burndown-loop"}
+    bl_run_session unblock claude-sonnet-5-5 "$p" \
         --disallowedTools "$BL_UNBLOCK_DENY"
     bl_unblock_arm_check "$prs"
     if usage_postrun_pause burndown-loop "$LOOP_SID" "$ROOT/bin/burndown-loop" "$SESSION_RC" "$SESSION_LOG"; then
@@ -1264,6 +1370,7 @@ main() {
         start) bl_cmd_start "$@" ;;
         stop) [ "$#" -eq 0 ] || bl_unknown "$1"; bl_cmd_stop ;;
         status) [ "$#" -eq 0 ] || bl_unknown "$1"; bl_cmd_status ;;
+        unblock-base) [ "$#" -eq 1 ] || { echo "burndown-loop: unblock-base needs exactly one branch" >&2; bl_usage >&2; exit 2; }; bl_cmd_unblock_base "$1" ;;
         --print-plist) [ "$#" -eq 0 ] || bl_unknown "$1"; bl_render_plist ;;
         -h|--help) bl_usage ;;
         *) bl_unknown "$cmd" ;;

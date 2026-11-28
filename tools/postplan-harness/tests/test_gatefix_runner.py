@@ -218,10 +218,11 @@ def _span(name):
 
 
 def test_commit_sites_use_gate_fix_wrapper():
-    s0, s1 = _span("_commit_with_gate_fix")
+    b0, b1 = _span("_commit_with_gate_fix_unrecorded")  # the body that calls remediation
     remediation = [p for p in _call_sites("_commit_with_gate_remediation")
-                   if not s0 <= p < s1]
+                   if not b0 <= p < b1]
     assert len(remediation) == 1       # run_meta_checks_local, deliberately unwired
+    s0, s1 = _span("_commit_with_gate_fix")
     fix = [p for p in _call_sites("_commit_with_gate_fix") if not s0 <= p < s1]
     assert len(fix) == 7               # includes the Phase 4.5b same-run pass, the Phase 5.0-pre fixer and the in-run fix round
 

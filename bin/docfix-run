@@ -4,7 +4,8 @@
 # Fired by bin/docfix-poll (launchd, daily) when the nightly audit has flagged
 # stale docs or dead `paths:` globs. Creates a worktree, seeds an auto_merge:docs-only-ready
 # hold plan, and launches a detached headless Claude run that fixes the flagged docs
-# and opens a PR (held for human merge) that Closes the stale-docs issue.
+# and commits. After Claude exits, the runner calls bin/docfix-split, which opens an
+# auto-merge PR and, for content edits, a held content-review PR.
 #
 # Detach mechanism cloned in structure from bin/post-plan-now:71-109 (launchd
 # RunAtLoad one-shot) — a plain `nohup … &` from the poll dies with it.
@@ -22,7 +23,8 @@ Mac-side headless doc remediation launcher. Fired by bin/docfix-poll
 (launchd, daily) when the nightly audit has flagged stale docs or dead
 paths: globs. Creates a worktree, seeds an auto_merge:docs-only-ready plan,
 and launches a detached headless Claude run that fixes flagged docs and
-opens a held PR that closes the stale-docs issue.
+commits. The runner then calls bin/docfix-split, which opens an auto-merge
+PR and, for content edits, a held content-review PR.
 
 Arguments:
   <issue-num>  GitHub issue number of the stale-docs audit issue.
@@ -55,6 +57,8 @@ fi
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib/plan-resolve.sh"
 # shellcheck source=bin/lib/launchd-job.sh
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib/launchd-job.sh"
+# shellcheck source=bin/lib/docfix-dm.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib/docfix-dm.sh"   # DOCFIX_REVIEW_BRANCH_PREFIX
 
 # --- 2. Anchor to the CANONICAL main checkout (NOT $0) ------------------------
 # The poller invokes us from $MAIN itself, but launchd sets an arbitrary cwd, and
@@ -71,6 +75,12 @@ if [ -n "$(git -C "$MAIN" branch --list "$SLUG")" ]; then
     echo "docfix-run: branch $SLUG already exists — today's run already fired; skipping."
     exit 0
 fi
+# A same-day review branch means today's run already fired and split.
+REV_SLUG="${DOCFIX_REVIEW_BRANCH_PREFIX}$(date +%Y%m%d)"
+if [ -n "$(git -C "$MAIN" branch --list "$REV_SLUG")" ]; then
+    echo "docfix-run: branch $REV_SLUG already exists — today's run already fired; skipping."
+    exit 0
+fi
 if ! PR_UNARMED="$(gh pr list --state open --json headRefName,autoMergeRequest \
      --jq '.[] | select(.headRefName | startswith("docs-stale-refresh-"))
                 | select(.autoMergeRequest == null) | .headRefName' 2>/dev/null)"; then
@@ -81,6 +91,52 @@ if [ -n "$PR_UNARMED" ]; then
     echo "docfix-run: unarmed open PR(s) pending human merge — skipping:"
     printf '  %s\n' $PR_UNARMED
     exit 0
+fi
+
+# --- 3b. Files held in open content-review PRs leave the worklist --------------
+# A held review PR (bin/docfix-split) waits for the owner and must not block the
+# next run, so the query above never names its prefix. Its files, and the old
+# path of each rename, are left out of this run so two PRs never edit one doc.
+# A failure of either call skips the run (fail-closed), naming the call.
+if ! REVIEW_PRS="$(gh pr list --state open --limit 200 --json number,headRefName \
+     --jq ".[] | select(.headRefName | startswith(\"$DOCFIX_REVIEW_BRANCH_PREFIX\")) | .number" 2>/dev/null)"; then
+    echo "docfix-run: could not list open review PRs (gh pr list failed) — skipping this cycle (fail-closed)."
+    exit 0
+fi
+EXCL_PATHS=""
+for n in $REVIEW_PRS; do
+    case "$n" in
+        ''|*[!0-9]*)
+            echo "docfix-run: gh pr list returned a non-numeric review PR '$n' — skipping this cycle (fail-closed)."
+            exit 0 ;;
+    esac
+    if ! PR_FILES="$(gh api "repos/a-jay85/IBL5/pulls/$n/files" --paginate \
+         --jq '.[] | .filename, (.previous_filename // empty)' 2>/dev/null)"; then
+        echo "docfix-run: could not read the files of review PR #$n (gh api failed) — skipping this cycle (fail-closed)."
+        exit 0
+    fi
+    EXCL_PATHS+="$PR_FILES"$'\n'
+done
+if ! EXCL_JSON="$(jq -Rnc '[inputs | select(length > 0)] | unique' <<< "$EXCL_PATHS")"; then
+    echo "docfix-run: could not build the review-PR exclude list (jq failed) — skipping this cycle (fail-closed)."
+    exit 0
+fi
+EXCL_FILE="${TMPDIR:-/tmp}/docfix-exclude-$SLUG.json"
+if [ "$EXCL_JSON" != "[]" ]; then
+    KEPT=""
+    IFS=',' read -r -a SIG_ITEMS <<< "$SIG"
+    for item in "${SIG_ITEMS[@]}"; do
+        if jq -e --arg p "$item" 'index($p) != null' <<< "$EXCL_JSON" >/dev/null; then
+            echo "docfix-run: $item is held in an open review PR; left out of this run."
+            continue
+        fi
+        KEPT="${KEPT:+$KEPT,}$item"
+    done
+    if [ -z "$KEPT" ]; then
+        echo "docfix-run: every worklist file is held in an open review PR; skipping"
+        exit 0
+    fi
+    SIG="$KEPT"
 fi
 
 # --- 4. Create the worktree (base = master) -----------------------------------
@@ -97,6 +153,7 @@ docfix_abort_cleanup() {
     local rc=$?
     if [ "$rc" != 0 ]; then
         [ -n "${RUNNER:-}" ] && rm -f "$RUNNER"
+        rm -f "$EXCL_FILE"
         cd "$MAIN" 2>/dev/null || cd /
         "$MAIN/bin/wt-remove" "$SLUG" --if-empty || true
         if [ ! -d "$WT_ROOT" ] && [ -n "${PLAN_FILE:-}" ]; then
@@ -106,6 +163,8 @@ docfix_abort_cleanup() {
     exit "$rc"
 }
 trap docfix_abort_cleanup EXIT
+# The split reads this list after claude exits; the runner removes it.
+printf '%s\n' "$EXCL_JSON" > "$EXCL_FILE"
 
 # --- 5. Seed the auto_merge:docs-only-ready plan (resolved by slug at post-plan) ----
 # The matrix is what bin/lib/prefire-verify runs before bin/post-plan-now fires. Without
@@ -154,7 +213,7 @@ write_session_sidecar "$LOG" "$SESSION_ID" \
 # value reads as tomorrow and fails "last_verified in the future".
 TODAY="$(date +%Y-%m-%d)"
 
-PROMPT="You are fixing doc findings with NO human present — never ask questions or wait for input; make the safe choice and continue. The findings are the nightly Doc Freshness Audit set for issue #$ISSUE_NUM. Work ONLY on these paths (comma-separated): $SIG. First run \`bin/check-docs --staleness-report\` and split its JSON with jq into entries whose \`reason\` is \`stale\` and entries whose \`reason\` is \`dead-glob\`; that command is the authoritative finding list, and the body of issue #$ISSUE_NUM shows the same two tables for reference. For each \`stale\` entry: re-verify its content against the current reality of the codebase, correct drifted content, and bump its \`last_verified\` to today ($TODAY). TWO HARD CONSTRAINTS GOVERN EVERY CONTENT CORRECTION. (1) DECISION RECORDS ARE APPEND-ONLY. Files under \`ibl5/docs/decisions/\` record what was true and what was decided AT THE TIME the ADR was written, so 'current reality' is NOT the standard they are judged against. Inside their \`## Context\`, \`## Decision\`, any \`Rationale\` heading, and \`## Alternatives Considered\` sections you MUST NOT overwrite a name, version, count, size or any other figure in place, even when today's codebase plainly disagrees — an in-place rewrite makes the ADR assert a decision that was never taken. You may still repair a dead file path there, and you must still bump \`last_verified\`. When reality has moved away from a figure in one of those sections, LEAVE THE ORIGINAL SENTENCE BYTE-FOR-BYTE UNCHANGED and instead append a new section headed \`## Addendum — TOPIC ($TODAY)\` immediately before \`## Alternatives Considered\` (or before \`## Consequences\` when no such heading exists) stating the original figure, today's figure, and one clause on what changed. The ONE permitted in-place edit to a frozen sentence is appending a bracketed stamp (\`[CORRECTED $TODAY — see § Addendum]\`) and ONLY when \`bin/check-docs\` fails on that exact line because the figure is a retired one; the sentence's own words still never change, and the stamp is never added pre-emptively. (2) NEVER SWAP A FIGURE WITHOUT RE-READING ITS SENTENCE. This applies to every doc, ADR or not. Before replacing any value, re-read the WHOLE surrounding sentence with the new value substituted and confirm the entire sentence is still true: a swap that leaves a comparative or derived claim (\`one-third of\`, \`twice\`, \`the largest\`, \`across N files\`) bound to the old value manufactures a NEW false statement out of a merely stale one. If the sentence cannot survive the substitution, rewrite it as dated history rather than swapping the value. Confirm also that the figure you are about to write measures THE SAME QUANTITY as the one you are replacing — never substitute a file count for a call-site count, or a per-file figure for a total. If you cannot establish the new value with a command whose output you have actually read, leave the sentence alone and say so in the PR body. For each \`dead-glob\` entry: the named file declares a \`paths:\` frontmatter glob matching no tracked file, so that rule can never load — PREFER correcting the glob so it matches the tracked files it was meant to cover, and delete the \`paths:\` entry only when no correction is identifiable. IF you delete a glob you MUST disclose it: add one line per deletion to the commit message body AND to the PR body under a heading reading \`## Dead globs deleted\`, in exactly this form: \`Dead glob deleted: in FILE_PATH, removed paths: entry GLOB — REASON\`, substituting the real repo-relative path, the exact glob text, and one clause saying why no correction was possible, so the maintainer can review the deletion without opening the diff. Never delete a whole file, and never remove a \`paths:\` key that still carries a working glob. IF you change any doc content other than a \`last_verified\` date you MUST disclose it exactly as you would a deleted glob: add one entry per rewritten sentence to the commit message body AND to the PR body under a heading reading \`## Content rewritten\`, in exactly this form: \`Content rewritten: in FILE_PATH — BEFORE: 'OLD SENTENCE' — AFTER: 'NEW SENTENCE' — EVIDENCE\`, quoting both sentences in full and naming in EVIDENCE the file you read or the command you ran to establish the new value, so the maintainer can review every content change without opening the diff. An appended \`## Addendum\` section counts as a content change and is disclosed the same way, with BEFORE reading 'n/a (appended section)'. Before reporting any fix done, run a real check that exercises it: the \`bin/check-docs\` commands named below, reading their output. A check command that failed to start does not count. If a check cannot run here, say which one you did not run and why in the PR body instead of reporting the fix as done. Then run \`bin/check-docs --fix-dates --since=master\` to bump any in-scope doc you changed but did not hand-bump, and re-run \`bin/check-docs --staleness-report\` to confirm every finding you were given is gone. Do NOT touch any doc outside the list above. Commit with a message whose body contains the line \`Closes #$ISSUE_NUM\`. Then run \`bin/docfix-check-veronly $SLUG\` from the worktree root: it arms the plan for this run for auto-merge only when every changed file is a tracked, status-M file in one of two tiers. Tier 1 is the docfix allowlist (under \`ibl5/docs/\`, or a class README at \`ibl5/classes/*/README.md\`): its changes must be a strictly-advancing \`last_verified:\` date bump and, optionally, same-line edits that change nothing but numbers. Tier 2 is agent-steering markdown (any \`.claude/\` \`.md\` file, root \`CLAUDE.md\`, root \`AGENTS.md\`): it passes ONLY when the file's entire diff is one strictly-advancing \`last_verified:\` bump on its frontmatter line; a numeric swap, a \`paths:\` edit, or any body text change in such a file holds the plan. Every other path holds. A \`HOLD\` verdict is a normal, expected outcome — it means the refresh changed real content and a human should read it. Never edit the plan file yourself and never re-run the helper to try to turn a HOLD into a PASS. Then fire \`bin/post-plan-now\` (NOT --auto) to open the PR; the PR body MUST include \`Closes #$ISSUE_NUM\` so merging it closes the stale-docs issue. Issue #$ISSUE_NUM lives in THIS repo (a-jay85/IBL5), not in a-jay85/IBL5-backlog: cite it everywhere as bare \`#$ISSUE_NUM\` and never rewrite it as an IBL5-backlog link, which points at an unrelated issue and closes nothing."
+PROMPT="You are fixing doc findings with NO human present — never ask questions or wait for input; make the safe choice and continue. The findings are the nightly Doc Freshness Audit set for issue #$ISSUE_NUM. Work ONLY on these paths (comma-separated): $SIG. First run \`bin/check-docs --staleness-report\` and split its JSON with jq into entries whose \`reason\` is \`stale\` and entries whose \`reason\` is \`dead-glob\`; that command is the authoritative finding list, and the body of issue #$ISSUE_NUM shows the same two tables for reference. For each \`stale\` entry: re-verify its content against the current reality of the codebase, correct drifted content, and bump its \`last_verified\` to today ($TODAY). TWO HARD CONSTRAINTS GOVERN EVERY CONTENT CORRECTION. (1) DECISION RECORDS ARE APPEND-ONLY. Files under \`ibl5/docs/decisions/\` record what was true and what was decided AT THE TIME the ADR was written, so 'current reality' is NOT the standard they are judged against. Inside their \`## Context\`, \`## Decision\`, any \`Rationale\` heading, and \`## Alternatives Considered\` sections you MUST NOT overwrite a name, version, count, size or any other figure in place, even when today's codebase plainly disagrees — an in-place rewrite makes the ADR assert a decision that was never taken. You may still repair a dead file path there, and you must still bump \`last_verified\`. When reality has moved away from a figure in one of those sections, LEAVE THE ORIGINAL SENTENCE BYTE-FOR-BYTE UNCHANGED and instead append a new section headed \`## Addendum — TOPIC ($TODAY)\` immediately before \`## Alternatives Considered\` (or before \`## Consequences\` when no such heading exists) stating the original figure, today's figure, and one clause on what changed. The ONE permitted in-place edit to a frozen sentence is appending a bracketed stamp (\`[CORRECTED $TODAY — see § Addendum]\`) and ONLY when \`bin/check-docs\` fails on that exact line because the figure is a retired one; the sentence's own words still never change, and the stamp is never added pre-emptively. (2) NEVER SWAP A FIGURE WITHOUT RE-READING ITS SENTENCE. This applies to every doc, ADR or not. Before replacing any value, re-read the WHOLE surrounding sentence with the new value substituted and confirm the entire sentence is still true: a swap that leaves a comparative or derived claim (\`one-third of\`, \`twice\`, \`the largest\`, \`across N files\`) bound to the old value manufactures a NEW false statement out of a merely stale one. If the sentence cannot survive the substitution, rewrite it as dated history rather than swapping the value. Confirm also that the figure you are about to write measures THE SAME QUANTITY as the one you are replacing — never substitute a file count for a call-site count, or a per-file figure for a total. If you cannot establish the new value with a command whose output you have actually read, leave the sentence alone and say so in the PR body. For each \`dead-glob\` entry: the named file declares a \`paths:\` frontmatter glob matching no tracked file, so that rule can never load — PREFER correcting the glob so it matches the tracked files it was meant to cover, and delete the \`paths:\` entry only when no correction is identifiable. IF you delete a glob you MUST disclose it: add one line per deletion to the commit message body AND to the PR body under a heading reading \`## Dead globs deleted\`, in exactly this form: \`Dead glob deleted: in FILE_PATH, removed paths: entry GLOB — REASON\`, substituting the real repo-relative path, the exact glob text, and one clause saying why no correction was possible, so the maintainer can review the deletion without opening the diff. Never delete a whole file, and never remove a \`paths:\` key that still carries a working glob. IF you change any doc content other than a \`last_verified\` date you MUST disclose it exactly as you would a deleted glob: add one entry per rewritten sentence to the commit message body AND to the PR body under a heading reading \`## Content rewritten\`, in exactly this form: \`Content rewritten: in FILE_PATH — BEFORE: 'OLD SENTENCE' — AFTER: 'NEW SENTENCE' — EVIDENCE\`, quoting both sentences in full and naming in EVIDENCE the file you read or the command you ran to establish the new value, so the maintainer can review every content change without opening the diff. An appended \`## Addendum\` section counts as a content change and is disclosed the same way, with BEFORE reading 'n/a (appended section)'. Before reporting any fix done, run a real check that exercises it: the \`bin/check-docs\` commands named below, reading their output. A check command that failed to start does not count. If a check cannot run here, say which one you did not run and why in the PR body instead of reporting the fix as done. Then run \`bin/check-docs --fix-dates --since=master\` to bump any in-scope doc you changed but did not hand-bump, and re-run \`bin/check-docs --staleness-report\` to confirm every finding you were given is gone. Do NOT touch any doc outside the list above. Commit all of your work, then stop. Leave no uncommitted change and no untracked file. Do not run bin/post-plan-now or bin/docfix-check-veronly, and never open a PR. After you exit, the runner splits your commits into an auto-merge PR and a held content-review PR and opens them. Wherever this prompt says PR body, write it in the commit message body. Issue #$ISSUE_NUM lives in THIS repo (a-jay85/IBL5), not in a-jay85/IBL5-backlog: cite it everywhere as bare \`#$ISSUE_NUM\` and never rewrite it as an IBL5-backlog link, which points at an unrelated issue and closes nothing."
 # The job's command lives in a generated runner script; ljob_submit's wrapper
 # only runs it. The runner is parsed once, by bash, so the prompt needs shq and
 # nothing else.
@@ -173,6 +232,21 @@ esac
     # _pf_timeout_argv in bin/postplan-fix).
     printf 'cd %s && CLAUDE_HEADLESS=1 caffeinate -s perl -e "alarm shift; exec @ARGV or exit 127" 7200 claude -p %s --dangerously-skip-permissions --model claude-sonnet-5-5 --session-id %s --effort low --name %s\n' \
         "$(shq "$WT_ROOT")" "$(shq "$PROMPT")" "$SESSION_ID" "$(shq "$LABEL")" # claude-perm-ok: unattended headless docfix run with no human to answer a prompt; edits docs in its worktree
+    # After claude exits, split its commits into the auto and review piles and fire
+    # each. The trusted copy under MAIN runs, never the copy in the worktree claude
+    # edited, and the runner leaves that worktree first so wt-remove can drop it.
+    # No set -e: a failed or timed-out claude reaches the else branch.
+    printf '%s\n' 'rc=$?'
+    printf 'cd %s\n' "$(shq "$MAIN")"
+    printf '%s\n' 'if [ "$rc" -eq 0 ]; then'
+    printf '    %s %s %s %s\n' "$(shq "$MAIN/bin/docfix-split")" "$(shq "--slug=$SLUG")" \
+        "$(shq "--issue=$ISSUE_NUM")" "$(shq "--exclude-file=$EXCL_FILE")"
+    printf '%s\n' '    echo "docfix-run: docfix-split exited $?"'
+    printf '%s\n' 'else'
+    printf '%s\n' '    echo "docfix-run: claude exited $rc; split skipped, worktree left for docfix-poll"'
+    printf '%s\n' 'fi'
+    printf 'rm -f %s\n' "$(shq "$EXCL_FILE")"
+    printf '%s\n' 'exit "$rc"'   # the job's status stays claude's own exit
 } > "$RUNNER"
 chmod 700 "$RUNNER"
 

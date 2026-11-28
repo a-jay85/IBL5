@@ -53,6 +53,13 @@ fi
 
 # --- Step 2.1: Resolvable inputs ---------------------------------------------
 SLUG="${1:-$(git rev-parse --abbrev-ref HEAD)}"
+# Only the auto pile's branch may be flipped. A docs-content-review- plan must keep
+# auto_merge: false, so any other slug holds and leaves its plan bytes alone.
+case "$SLUG" in
+    docs-stale-refresh-*) ;;
+    *) echo "docfix-check-veronly: HOLD: $SLUG is not a docs-stale-refresh- branch; plan left unchanged" >&2
+       exit 1 ;;
+esac
 PLAN_FILE="${PLAN_FILE:-$HOME/claude-plans/$SLUG.md}"
 BASE_REF="${DOCFIX_BASE_REF:-master}"
 

@@ -84,7 +84,7 @@ Findings are consumed unchanged by the Phase 4D scoring/filtering/posting pipeli
 
 **Flag pattern:** a **trailing `/` on the source directory** combined with a destination that names an existing remote directory. `scp -r dist/ host:/app/dist/` copies the *contents* of `dist` into the existing `/app/dist`, so files land one level shallower or deeper than intended; `scp -r dist host:/app/` creates `/app/dist` as intended. The failure is silent. scp exits 0 either way, and the only symptom is a wrong remote layout. Cross-reference `.claude/rules/scp-trailing-slash.md` for the full rule and the production incident it records.
 
-Live correct form to compare against: `.github/workflows/main.yml`, the "Deploy IBLbot dist to server" step (currently line 133). Its source is `ibl5/IBLbot/dist` with **no** trailing slash, and its destination is `…:www/ibl5/IBLbot/`.
+Live correct form to compare against: `.github/workflows/main.yml`, the "Deploy IBLbot dist to server" step (currently line 133). Its source is `ibl5/IBLbot/dist` (example) with **no** trailing slash, and its destination is `…:www/ibl5/IBLbot/`.
 
 **Do not flag:**
 - `rsync` with an intentional trailing slash on the source **and** a destination that does not already contain a directory of that name. That is rsync's normal "sync contents into" idiom.

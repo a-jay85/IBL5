@@ -1,6 +1,6 @@
 ---
 description: The conditional parts of plan/SKILL.md Steps 4.5 and 5 (the hold challenge, drift remediation, staleness remediation), each loaded by the /plan orchestrator one section at a time and only when its trigger fires.
-last_verified: 2026-11-23
+last_verified: 2026-11-27
 ---
 
 This file is Read-on-demand only, one section at a time. Never Read it whole. The SKILL.md Step 4.5 stub and two pointers in `_validate-and-write.md` § Step 5 each name a section and the `awk` command that loads it.
@@ -85,7 +85,7 @@ Re-sends sent after a drift remediation count toward the same cap of 2 per run, 
 | What the token actually is | Repair |
 |---|---|
 | A typo (the path exists at a different name) | Correct the path. No cue needed; a live path never flags. |
-| Created, moved or renamed by this plan | Add a same-line cue from `_architect-contract.md` § safe positions: `— NEW`, `Create`, `Write`, `moved from`, `→`. |
+| Created, moved or renamed by this plan | Add a same-line cue from `_architect-contract.md` § Any path a plan cites: `— NEW`, `Create`, `Write`, `moved from`, `→`. |
 | Cited only as an alternative this plan rejected | Move the line under a non-dependency heading (`## Out of Scope`, `## Non-Goals`, `## Rejected`, `## Alternatives`). |
 | Illustrative path, never real | Append `(example)` after the closing backtick (`bin/check-docs` convention). |
 | A path you cannot resolve to anything | Escalate (see below). |

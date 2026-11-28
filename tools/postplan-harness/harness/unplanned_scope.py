@@ -298,10 +298,9 @@ def title_key(text: str) -> str:
 
     The reviewer rewords the explanation after the first `: ` on every run, and it may
     add or drop a bracketed tag such as `[MERGE-RULE]`. The key drops leading tags and
-    keeps the words before the first `: `, so the same finding matches its declared line
-    and the owner's approved line. A title with no `: ` stops at its first sentence end
-    (`. ` or a final `.`), because the reviewer also rewords the sentences after it
-    (PRs 4202 and 4213).
+    keeps the words before the first `: `, so the same finding matches its declared line.
+    A title with no `: ` stops at its first sentence end (`. ` or a final `.`), because
+    the reviewer also rewords the sentences after it (PRs 4202 and 4213).
     """
     title = title_of(text) if is_unplanned_scope(text) else _BULLET_RE.sub("", text.splitlines()[0] if text else "")
     title = _LEAD_TAGS_RE.sub("", title.strip())
@@ -310,7 +309,7 @@ def title_key(text: str) -> str:
 
 
 def _listed_keys(span: str) -> set:
-    """The title key of each bullet line in a kept block or an approval's kept span."""
+    """The title key of each bullet line in a PR-body kept block."""
     return {title_key(ln) for ln in span.splitlines() if _BULLET_RE.match(ln)}
 
 
@@ -346,7 +345,8 @@ def downgrade_applies(verdict_path: str, ctx: Optional[dict], body_text: str, pa
     """True when a NOT READY verdict's blockers are all kept and owner-backed.
 
     Each blocker is either covered by a backed owner amendment in ctx["amendments"], or
-    declared in the PR body's kept block and quoted from the owner.
+    declared in the PR body's kept block and owner-backed: a quoted owner phrase, or a
+    bin/owner-approve approval line that cites every changed path the blocker cites.
     """
     from . import fidelity
 
@@ -367,7 +367,8 @@ def downgrade_applies(verdict_path: str, ctx: Optional[dict], body_text: str, pa
     return all(classify(t, **ctx) == "keep"
                and (amendment_covers(t, amendments)
                     or (bool(declared) and _listed(t, declared)
-                        and (owner_evidence_ok(t, payload) or approval_covers(t, approval))))
+                        and (owner_evidence_ok(t, payload)
+                             or approval_covers(t, approval, ctx.get("changed_paths", ())))))
                for t in kept)
 
 
@@ -445,11 +446,33 @@ def approval_from_comments(comments: list, current_fp: Optional[str]) -> Optiona
     return OwnerApproval(words=words, kept_span=span, created_at=created)
 
 
-def approval_covers(text: str, approval: Optional[OwnerApproval]) -> bool:
-    """True when the finding's title is one the owner saw in the approval's kept span."""
-    if approval is None:
+def _approval_cited(text: str, changed_paths: Iterable[str]) -> frozenset:
+    """The changed paths `text` cites, for matching an owner approval.
+
+    Narrower than cited_paths: an occurrence followed by `.` and a word character is
+    not a citation, so `bin/x.sh` never cites `bin/x`. A sentence-ending `bin/x.` and
+    a line suffix such as `a.py:2` still cite their path.
+    """
+    return frozenset(path for path in changed_paths
+                     if path and re.search(rf"(?<![\w./-]){re.escape(path)}(?![\w/-]|\.\w)", text))
+
+
+def approval_covers(text: str, approval: Optional[OwnerApproval],
+                    changed_paths: Iterable[str]) -> bool:
+    """True when one approved bullet line cites every changed path the finding cites.
+
+    The owner approves files at one diff fingerprint (approval_from_comments holds that
+    lock), so a reworded or re-tagged finding about the same files stays covered. A
+    finding that cites no changed path is never covered.
+    """
+    if approval is None:  # fail closed: no owner approval on this diff
         return False
-    return _listed(text, approval.kept_span)
+    changed = list(changed_paths)
+    wanted = _approval_cited(text, changed)
+    if not wanted:
+        return False
+    return any(wanted <= _approval_cited(ln, changed)
+               for ln in approval.kept_span.splitlines() if _BULLET_RE.match(ln))
 
 
 # A fix-first approval's scope, carried into the plan by `bin/owner-approve`. The plan

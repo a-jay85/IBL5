@@ -1,6 +1,6 @@
 ---
 description: Operative rules for the frontmatter schema (including `paths:` residency semantics, repo-relative only, never glob an always-loaded rule), 60-day staleness policy, on-touch verification rule, dead-reference rule, and retired-figure rule, the engine lint-pin rule, and required-status claims enforced by bin/check-docs. Rationale, history, and gate mechanics live in doc-freshness-detail.md (Read on demand). Decision-record append-only rule moved to .claude/rules/adr-append-only.md.
-last_verified: 2026-11-11
+last_verified: 2026-11-27
 paths:
   - "**/README.md"
   - ".claude/rules/*.md"
@@ -53,6 +53,8 @@ Never set a future date. The local `date +%F` (never `date -u`) is always the ri
 `bin/check-docs` scans doc bodies for repo-path tokens (`bin/<name>`, `ibl5/<path>`, `.claude/<path>`, `.github/<path>`) and fails on any token that does not resolve to an existing file or directory. Shell variables like `$FOO/bar` and paths with glob characters (`*`, `?`, `[`, `]`) are skipped. For intentional non-resolving literal paths, append `(example)` immediately after the closing backtick, e.g. `` `bin/some-path` (example) ``, and the reference is skipped.
 
 Source-file comments under `bin/`, `bin/lib/`, `ibl5/classes/`, `ibl5/phpstan-rules/`, and `ibl5/migrations/` are in scope too (full-scan only, never `--since`); test harnesses are excluded. Detail: `doc-freshness-detail.md` § Source-comment scanning.
+
+The full scan also reads `.claude/review-shared/*.md` and `bin/lib/README.md` for dead paths. Those files need no frontmatter. It also checks section pointers written as `<file> § <section>`. When the cited file exists in the repo, up to two words after the `§` must match the start of a heading, a bold lead-in, or a bold table cell there. The check compares as many words as the shorter side has, and it also reads a numbered heading without its number. A leading number such as `4.5` must appear in the file as a whole token, which also covers non-markdown files. Pointers to files outside the repo, pointers inside fenced code, and ADRs under `ibl5/docs/decisions/` are skipped. A line that only describes the syntax keeps the whole pointer inside one code span. Prose that contradicts code stays a review concern, because no static check can read it.
 
 ## Decision Records Are Append-Only
 

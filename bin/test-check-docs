@@ -741,6 +741,121 @@ else
     echo "  output: $OUT"
 fi
 
+# ── Reference-only docs and section pointers ─────────────────────────────────
+# Assert on the named labels only. The fixture's full scan also reports dead
+# references in the copied script's own comments, so exit codes prove nothing.
+
+# Case: reference-only doc with a dead path is flagged and needs no frontmatter.
+REPO=$(make_repo)
+mkdir -p "$REPO/.claude/review-shared"
+printf '%s\n' 'See `bin/gone-script` for details.' > "$REPO/.claude/review-shared/_x.md"
+OUT=$(cd "$REPO" && bin/check-docs --no-staleness 2>&1) || true
+rm -rf "$REPO"
+if grep -qF 'FAIL dead references in reference-only docs' <<< "$OUT" \
+    && grep -qF '.claude/review-shared/_x.md: dead reference `bin/gone-script`' <<< "$OUT" \
+    && ! grep -qxF 'FAIL .claude/review-shared/_x.md' <<< "$OUT"; then
+    pass "reference-only: dead path flagged with no frontmatter failure"
+else
+    fail "reference-only: expected the label, bin/gone-script, and no per-file FAIL header"
+    echo "  output: $OUT"
+fi
+
+# Case: reference-only doc honors the (example) marker.
+REPO=$(make_repo)
+mkdir -p "$REPO/.claude/review-shared"
+printf '%s\n' 'See `bin/gone-script` (example) for details.' > "$REPO/.claude/review-shared/_x.md"
+OUT=$(cd "$REPO" && bin/check-docs --no-staleness 2>&1) || true
+rm -rf "$REPO"
+if grep -qE 'docs verified|failure\(s\) across' <<< "$OUT" \
+    && ! grep -qF 'FAIL dead references in reference-only docs' <<< "$OUT"; then
+    pass "reference-only: (example) marker exempts the dead path"
+else
+    fail "reference-only: (example) marker should suppress the label on a completed scan"
+    echo "  output: $OUT"
+fi
+
+# Case: stale section pointer in an in-scope doc fails the full scan.
+REPO=$(make_repo)
+make_skill_md "$REPO" "${FM}"$'See `tools/x.py` § 4.5.\n'
+mkdir -p "$REPO/tools"
+printf '%s\n' '# 4.4 only' > "$REPO/tools/x.py"
+OUT=$(cd "$REPO" && bin/check-docs --no-staleness 2>&1) || true
+if grep -qF 'FAIL stale section pointers' <<< "$OUT" \
+    && grep -qF '.claude/skills/foo/SKILL.md:' <<< "$OUT"; then
+    pass "section pointer: missing section fails and names the citing doc"
+else
+    fail "section pointer: expected the label and the citing doc"
+    echo "  output: $OUT"
+fi
+printf '%s\n' '# 4.5 here' > "$REPO/tools/x.py"
+OUT=$(cd "$REPO" && bin/check-docs --no-staleness 2>&1) || true
+rm -rf "$REPO"
+if grep -qE 'docs verified|failure\(s\) across' <<< "$OUT" \
+    && ! grep -qF 'FAIL stale section pointers' <<< "$OUT"; then
+    pass "section pointer: passes once the target holds the section"
+else
+    fail "section pointer: label should clear once the target holds 4.5"
+    echo "  output: $OUT"
+fi
+
+# ── Section-pointer self-test catches broken code ────────────────────────────
+# Each case breaks the temp copy of check-docs and asserts that --self-test
+# notices. The broken copy must still parse, so a syntax error cannot pass.
+mutate_copy() {   # mutate_copy <repo> <old> <new>
+    local src
+    src=$(<"$1/bin/check-docs")
+    printf '%s\n' "${src/"$2"/"$3"}" > "$1/bin/check-docs"
+    grep -qF -- "$3" "$1/bin/check-docs" \
+        && ! grep -qF -- "$2" "$1/bin/check-docs" \
+        && php -l "$1/bin/check-docs" > /dev/null 2>&1
+}
+
+# Case: a heading regex that matches no real heading fails the live-heading case.
+IFS= read -r OLD <<'EOF'
+if (preg_match('/^#{1,6}\s+(.+)$/', $line, $m) === 1 // section-pointer heading
+EOF
+IFS= read -r NEW <<'EOF'
+if (preg_match('/^#{7}\s+(.+)$/', $line, $m) === 1 // section-pointer heading
+EOF
+REPO=$(make_repo)
+BEFORE=$(cd "$REPO" && bin/check-docs --self-test 2>&1) || true
+MUTATED=0
+mutate_copy "$REPO" "$OLD" "$NEW" && MUTATED=1
+AFTER=$(cd "$REPO" && bin/check-docs --self-test 2>&1) || true
+rm -rf "$REPO"
+if [ "$MUTATED" = 1 ] \
+    && grep -qxF 'ok   secptr:md-heading-live' <<< "$BEFORE" \
+    && grep -qxF 'ok   secptr:review-py-has-4.5' <<< "$AFTER" \
+    && ! grep -qxF 'ok   secptr:md-heading-live' <<< "$AFTER"; then
+    pass "mutation: a broken heading regex turns md-heading-live red"
+else
+    fail "mutation: broken heading regex not caught (applied=$MUTATED)"
+    echo "  output: $AFTER"
+fi
+
+# Case: dropping the suite from the dispatch tail removes every secptr line.
+IFS= read -r OLD <<'EOF'
+exit(max($rc, selfTestSectionPointers()));
+EOF
+IFS= read -r NEW <<'EOF'
+exit($rc);
+EOF
+REPO=$(make_repo)
+BEFORE=$(cd "$REPO" && bin/check-docs --self-test 2>&1) || true
+MUTATED=0
+mutate_copy "$REPO" "$OLD" "$NEW" && MUTATED=1
+AFTER_RC=0
+AFTER=$(cd "$REPO" && bin/check-docs --self-test 2>&1) || AFTER_RC=$?
+rm -rf "$REPO"
+if [ "$MUTATED" = 1 ] && [ "$AFTER_RC" = 0 ] \
+    && grep -q '^ok   secptr:' <<< "$BEFORE" \
+    && ! grep -q '^ok   secptr:' <<< "$AFTER"; then
+    pass "mutation: an unwired suite prints no secptr line"
+else
+    fail "mutation: unwired suite not detected (applied=$MUTATED rc=$AFTER_RC)"
+    echo "  output: $AFTER"
+fi
+
 # ── Results ───────────────────────────────────────────────────────────────────
 
 h_done

@@ -69,6 +69,17 @@ const SOURCE_SCAN_RUNTIME_ARTIFACTS = [
     'ibl5/bin/jsbsim',        // compiled native binary, gitignored
 ];
 
+// Docs scanned for dead references and section pointers only. No frontmatter
+// or last_verified rule applies to them (they are outside IN_SCOPE_GLOBS).
+const REFERENCE_ONLY_GLOBS = [
+    '.claude/review-shared/*.md',
+    'bin/lib/README.md',
+];
+
+const SECTION_POINTER_EXEMPT_PREFIXES = [
+    'ibl5/docs/decisions/',   // ADRs are append-only historical records
+];
+
 // Paths that are intentionally local-only, user-managed, or generated at runtime.
 // Keep this list tiny — prefer fixing references over extending the allowlist.
 const REFERENCE_ALLOWLIST = [
@@ -1250,6 +1261,53 @@ function retiredFigureHits(string $content): array
 }
 
 /**
+ * Docs that get the dead-reference and section-pointer scans only.
+ *
+ * @return list<string> absolute paths, sorted
+ */
+function collectReferenceOnlyFiles(string $repoRoot): array
+{
+    $files = [];
+    foreach (REFERENCE_ONLY_GLOBS as $entry) {
+        foreach (glob($repoRoot . '/' . $entry) ?: [] as $path) {
+            if (!is_file($path)) {
+                continue;
+            }
+            $rel = substr($path, strlen($repoRoot) + 1);
+            foreach (EXCLUDED_RELATIVE_FRAGMENTS as $frag) {
+                if (str_contains($rel, $frag)) {
+                    continue 2;
+                }
+            }
+            $files[] = $path;
+        }
+    }
+    sort($files);
+    return $files;
+}
+
+/**
+ * Dead repo-path references in the reference-only docs. Full-scan only.
+ *
+ * @return list<string>
+ */
+function checkReferenceOnlyDocs(string $repoRoot): array
+{
+    $issues = [];
+    foreach (collectReferenceOnlyFiles($repoRoot) as $path) {
+        $content = @file_get_contents($path);
+        if ($content === false) {
+            continue;
+        }
+        $rel = str_starts_with($path, $repoRoot . '/') ? substr($path, strlen($repoRoot) + 1) : $path;
+        foreach (scanReferences($content, $repoRoot) as $token) {
+            $issues[] = "{$rel}: dead reference `{$token}`";
+        }
+    }
+    return $issues;
+}
+
+/**
  * Non-markdown source files whose comment bodies are dead-ref-checked.
  *
  * @return list<string> absolute paths, sorted
@@ -1460,6 +1518,152 @@ function checkSourceCommentReferences(string $repoRoot): array
                 $entry['line'],
                 $tok,
                 trim($entry['text'])
+            );
+        }
+    }
+    return $issues;
+}
+
+/** @return list<string> */
+function normalizeSectionWords(string $text): array
+{
+    $text = strtolower(str_replace(['`', '*', '"', "'"], '', $text));
+    $words = [];
+    foreach (preg_split('/\s+/', trim($text)) ?: [] as $w) {
+        $w = rtrim(ltrim($w, '(['), '.:,;)]!?');
+        if ($w !== '') {
+            $words[] = $w;
+        }
+    }
+    return $words;
+}
+
+/** @return list<list<string>> headings, bold lead-ins, bold table cells */
+function markdownAnchors(string $content): array
+{
+    $anchors = [];
+    foreach (explode("\n", $content) as $line) {
+        if (preg_match('/^#{1,6}\s+(.+)$/', $line, $m) === 1 // section-pointer heading
+            || preg_match('/^\s*(?:[-*+]\s+|\d+\.\s+)?\*\*(.+?)\*\*/', $line, $m) === 1 // section-pointer bold lead-in
+            || preg_match('/\|\s*\*\*([^*|]+)\*\*/', $line, $m) === 1 // section-pointer bold table cell
+        ) {
+            $anchor = normalizeSectionWords($m[1]);
+            if ($anchor === []) { // section-pointer empty anchor skip
+                continue;
+            }
+            $anchors[] = $anchor;
+            if (count($anchor) > 1 && preg_match('/^\d+(?:\.\d+)*$/', $anchor[0]) === 1) {
+                $anchors[] = array_slice($anchor, 1); // section-pointer numbered heading
+            }
+        }
+    }
+    return $anchors;
+}
+
+function sectionOffsetInCodeSpan(string $line, int $offset): bool
+{
+    if (preg_match_all('/`[^`]*`/', $line, $spans, PREG_OFFSET_CAPTURE) > 0) {
+        foreach ($spans[0] as [$text, $start]) {
+            if ($offset > $start && $offset < $start + strlen($text)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/** @param list<string> $words */
+function sectionPointerResolves(array $words, string $targetContent, bool $isMarkdown): bool
+{
+    $lead = $words[0];
+    if (preg_match('/^\d+(?:\.\d+)*$/', $lead) === 1) {
+        return preg_match('/(?<![\d.])' . preg_quote($lead, '/') . '(?!\d)/', $targetContent) === 1; // section-pointer number token
+    }
+    if (!$isMarkdown) {
+        return str_contains(strtolower($targetContent), implode(' ', $words));
+    }
+    foreach (markdownAnchors($targetContent) as $anchor) {
+        $n = min(count($words), count($anchor)); // section-pointer compare length
+        if (array_slice($anchor, 0, $n) === array_slice($words, 0, $n)) { // section-pointer anchor compare
+            return true;
+        }
+    }
+    return false;
+}
+
+/** @return list<array{line:int,target:string,section:string,text:string}> */
+function sectionPointerHits(string $content, string $citingRel, string $repoRoot): array
+{
+    $hits = [];
+    $inFence = false;
+    foreach (explode("\n", $content) as $i => $line) {
+        if (preg_match('/^\s*(`{3}|~{3})/', $line) === 1) { // section-pointer fence toggle
+            $inFence = !$inFence;
+            continue;
+        }
+        if ($inFence || !str_contains($line, '§')) {
+            continue;
+        }
+        if (preg_match_all('/([A-Za-z0-9_.\/-]+\.(?:md|py|sh|ya?ml|php|go|ts))`?\)?\s*§§?\s*/u', $line, $mm, PREG_SET_ORDER | PREG_OFFSET_CAPTURE) < 1) {
+            continue;
+        }
+        foreach ($mm as $m) {
+            $target = (string) preg_replace('#^\./#', '', $m[1][0]);
+            $secOffset = (int) strpos($line, '§', $m[1][1]);
+            if (sectionOffsetInCodeSpan($line, $secOffset)) { // section-pointer code-span skip
+                continue;
+            }
+            $rest = substr($line, $m[0][1] + strlen($m[0][0]));
+            $parts = preg_split('/[,;:()|`]|\s[\x{2014}\x{2013}]|\.(?:\s|$)/u', $rest, 2) ?: ['']; // section-pointer sentence cut
+            $words = array_slice(normalizeSectionWords((string) $parts[0]), 0, 2);
+            if ($words === []) {
+                continue;
+            }
+            $targetPath = str_contains($target, '/')
+                ? $repoRoot . '/' . $target
+                : dirname($repoRoot . '/' . $citingRel) . '/' . $target;
+            $targetContent = is_file($targetPath) ? (string) file_get_contents($targetPath) : null; // section-pointer target read
+            if ($targetContent === null) {
+                continue;
+            }
+            if (sectionPointerResolves($words, $targetContent, str_ends_with($target, '.md'))) {
+                continue;
+            }
+            $hits[] = ['line' => $i + 1, 'target' => $target, 'section' => implode(' ', $words), 'text' => trim($line)];
+        }
+    }
+    return $hits;
+}
+
+/**
+ * `<file> § <section>` pointers whose in-repo target lacks the section.
+ * Corpus-wide, full-scan only, never --since.
+ *
+ * @param list<string> $files absolute paths
+ * @return list<string>
+ */
+function checkSectionPointers(array $files, string $repoRoot): array
+{
+    $issues = [];
+    foreach ($files as $path) {
+        $content = @file_get_contents($path);
+        if ($content === false) {
+            continue;
+        }
+        $rel = str_starts_with($path, $repoRoot . '/') ? substr($path, strlen($repoRoot) + 1) : $path;
+        foreach (SECTION_POINTER_EXEMPT_PREFIXES as $prefix) {
+            if (str_starts_with($rel, $prefix)) {
+                continue 2;
+            }
+        }
+        foreach (sectionPointerHits($content, $rel, $repoRoot) as $hit) {
+            $issues[] = sprintf(
+                "%s:%d cites %s § %s, and no heading, bold lead-in or bold table cell there starts with those words. Fix: point at a live section, or put the whole pointer in one code span when the line only describes the syntax.\n         > %s",
+                $rel,
+                $hit['line'],
+                $hit['target'],
+                $hit['section'],
+                $hit['text']
             );
         }
     }
@@ -2114,6 +2318,93 @@ function checkSkillDraftPlaceholder(string $repoRoot): array
     return $issues;
 }
 
+/**
+ * Fixtures for the section-pointer check and the reference-only doc set, each
+ * case in its own subdirectory of a throwaway dir under sys_get_temp_dir().
+ */
+function selfTestSectionPointers(): int
+{
+    $tmp = sys_get_temp_dir() . '/check-docs-secptr-selftest-' . getmypid();
+    exec('rm -rf ' . escapeshellarg($tmp));
+
+    $write = static function (string $path, string $content): void {
+        if (!is_dir(dirname($path))) {
+            mkdir(dirname($path), 0777, true);
+        }
+        file_put_contents($path, $content);
+    };
+
+    $citingRel = '.claude/review-shared/_posting-procedure.md';
+    $reviewPy = 'tools/postplan-harness/harness/review.py';
+    $docsA = '.claude/review-shared/docs-a.md';
+    $reproduced = "The runnable blocks live in `tools/postplan-harness/harness/review.py` § 4.5.\n";
+
+    // name => [target files, citing text, wanted hit count]
+    $cases = [
+        'review-py-missing-4.5' => [[$reviewPy => "# 4.4 Post findings\n# 4.6 Resolve threads\n"], $reproduced, 1],
+        'review-py-has-4.5' => [[$reviewPy => "# 4.5 Runnable blocks\n"], $reproduced, 0],
+        'number-near-miss' => [[$reviewPy => "# 14.5 and 4.50 only\n"], $reproduced, 1],
+        'md-heading-live' => [[$docsA => "## Why edit anchors are quoted\n"], "`docs-a.md` § Why edit anchors are quoted, not summarized.", 0],
+        'md-heading-removed' => [[$docsA => "## Why edit anchors are quoted\n"], "`docs-a.md` § Removed section.", 1],
+        'bold-lead-in' => [[$docsA => "- **Any path a plan cites that does *not* exist**\n"], "`docs-a.md` § Any path a plan cites", 0],
+        'bold-table-cell' => [[$docsA => "| **Haiku price cliff** | x |\n"], "`docs-a.md` § Haiku price cliff", 0],
+        'double-section-live' => [[$docsA => "## Why edit anchors\n"], "`docs-a.md` §§ Why, Fan out", 0],
+        'double-section-dead' => [[$docsA => "## Why edit anchors\n"], "`docs-a.md` §§ Gone, Why edit", 1],
+        'code-span-pointer' => [[$docsA => "## Why edit anchors\n"], "Write it as `docs-a.md § Gone section` in prose.", 0],
+        'syntax-describing-line' => [[$docsA => "## Why edit anchors\n"], "Every `docs-a.md §` and `docs-b.md §` pointer below is an address.", 0],
+        'fenced-pointer' => [[$docsA => "## Why edit anchors\n"], "~~~\n`docs-a.md` § Removed section\n~~~", 0],
+        'unresolved-target' => [[], "`missing-plan.md` § Anything at all", 0],
+        'sentence-cut' => [[$docsA => "## Removed section\n"], "`docs-a.md` § Removed. Why it matters", 0],
+        'trailing-prose' => [[$docsA => "## Tiers\n"], "`docs-a.md` § Tiers Opus row", 0],
+        'second-word-miss' => [[$docsA => "## Why edit anchors\n"], "`docs-a.md` § Why delete", 1],
+        'numbered-heading' => [[$docsA => "## 3. Rebase rules\n"], "`docs-a.md` § Rebase rules", 0],
+        'empty-anchor' => [[$docsA => "## **\n"], "`docs-a.md` § Gone section", 1],
+        'dash-cut' => [[$docsA => "## Rebase rules\n"], "`docs-a.md` § Rebase — read it first", 0],
+        'none-of-these-prose' => [[], "None of these § marks point anywhere, and checks 3 and 4 stay prose.", 0],
+    ];
+
+    $failed = 0;
+    $report = static function (string $name, int $want, int $got) use (&$failed): void {
+        if ($got === $want) {
+            printf("ok   secptr:%s\n", $name);
+            return;
+        }
+        echo "FAIL secptr:{$name}: want {$want} hit(s), got {$got}\n";
+        $failed++;
+    };
+
+    foreach ($cases as $name => [$targets, $citing, $want]) {
+        $root = $tmp . '/' . $name;
+        $write($root . '/' . $citingRel, $citing);
+        foreach ($targets as $rel => $content) {
+            $write($root . '/' . $rel, $content);
+        }
+        $report($name, $want, count(sectionPointerHits($citing, $citingRel, $root)));
+    }
+
+    foreach (['adr-exempt' => ['ibl5/docs/decisions/0001-x.md', 0], 'adr-control' => ['ibl5/docs/y.md', 1]] as $name => [$rel, $want]) {
+        $root = $tmp . '/' . $name;
+        $write($root . '/' . $reviewPy, "# 4.4 Post findings\n# 4.6 Resolve threads\n");
+        $write($root . '/' . $rel, $reproduced);
+        $report($name, $want, count(checkSectionPointers([$root . '/' . $rel], $root)));
+    }
+
+    $root = $tmp . '/reference-only-collect';
+    $write($root . '/' . $citingRel, "# doc\n");
+    $found = in_array($root . '/' . $citingRel, collectReferenceOnlyFiles($root), true);
+    $report('reference-only-collect', 1, $found ? 1 : 0);
+
+    exec('rm -rf ' . escapeshellarg($tmp));
+
+    $total = count($cases) + 3;
+    if ($failed === 0) {
+        echo "\nsection-pointer self-test: {$total} case(s) passed.\n";
+        return 0;
+    }
+    echo "\nsection-pointer self-test: {$failed}/{$total} case(s) FAILED.\n";
+    return 1;
+}
+
 // --- main ---
 
 $opts = ['fix_dates' => false, 'include_memory' => false, 'verbose' => false, 'since' => null, 'no_staleness' => false, 'staleness_report' => false, 'exclude_from' => null];
@@ -2159,7 +2450,9 @@ foreach (array_slice($argv, 1) as $arg) {
             echo "\n";
             $rc = max($rc, selfTestEngineLintPins());
             echo "\n";
-            exit(max($rc, selfTestRequiredClaims()));
+            $rc = max($rc, selfTestRequiredClaims());
+            echo "\n";
+            exit(max($rc, selfTestSectionPointers()));
         case '--help':
         case '-h':
             echo usage();
@@ -2303,6 +2596,24 @@ $sourceRefIssues = checkSourceCommentReferences($root);
 if ($sourceRefIssues !== []) {
     echo "FAIL dead references in source comments\n";
     foreach ($sourceRefIssues as $issue) {
+        echo "     - {$issue}\n";
+    }
+    $failures++;
+}
+
+$refOnlyIssues = checkReferenceOnlyDocs($root); // reference-only wiring
+if ($refOnlyIssues !== []) {
+    echo "FAIL dead references in reference-only docs\n";
+    foreach ($refOnlyIssues as $issue) {
+        echo "     - {$issue}\n";
+    }
+    $failures++;
+}
+
+$sectionIssues = checkSectionPointers(array_merge($files, collectReferenceOnlyFiles($root)), $root); // section-pointer wiring
+if ($sectionIssues !== []) {
+    echo "FAIL stale section pointers\n";
+    foreach ($sectionIssues as $issue) {
         echo "     - {$issue}\n";
     }
     $failures++;

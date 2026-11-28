@@ -165,13 +165,15 @@ chmod +x "$STUBBIN/automouse/run"
 # A fixture PID must not equal a launchd stub row's PID (4242, 6002, ...): that
 # row prints "pid <n> " too, and an assertion that greps the page for the
 # fixture's PID would see it. Linux CI hands out small PIDs, so collisions with
-# 6001 and 6002 did happen. Each fixture respawns until its PID is free of the
+# 6001, 6002 and 6007 did happen. Keep this list in step with every PID the
+# launchctl stub below prints. Each fixture respawns until its PID is free of the
 # stub's list.
 fixture_pid() {
     case " $1 " in
         *" 4242 "*|*" 4343 "*|*" 5151 "*|*" 5252 "*|*" 5353 "*) return 0 ;;
         *" 6001 "*|*" 6002 "*|*" 6003 "*|*" 6004 "*|*" 6005 "*) return 0 ;;
-        *" 99999 "*) return 0 ;;
+        *" 6006 "*|*" 6007 "*|*" 6008 "*|*" 6009 "*|*" 6010 "*) return 0 ;;
+        *" 7007 "*|*" 99999 "*) return 0 ;;
     esac
     return 1
 }

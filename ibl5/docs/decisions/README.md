@@ -129,6 +129,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0282](0282-human-signoff-trigger-stub-workflow.md) | Human-signoff trigger stub plus workflow_run gate | Accepted | A no-permission `pull_request` stub starts master's `human-signoff.yml` through `workflow_run`, which judges the PR from master's lib and posts a `human-signoff` commit status, so a PR cannot rewrite the gate that judges it. |
 | [0286](0286-in-repo-jsb-trace-captures.md) | JSB trace captures live in IBL5 | Accepted | Captures sit in `engine/testdata/jsb-captures/`; `capture_host: jsb-native` holds as `capture-bad-host`. The harness reads the base-branch bytes, checks `capture_sha256`, and holds a capture over 8 MiB as `capture-too-large`. A capture PR lands before its port PR. Supersedes the hosting decision of ADR-0278. |
 | [0289](0289-docfix-split-review-pile.md) | Split the nightly docfix run into an auto-merge PR and a held review PR | Accepted | `bin/docfix-split` sends each changed file the condition (7) path clause accepts to the `docs-stale-refresh-` PR and every other file to a held `docs-content-review-` PR, and a `tracking-issue` plan marker puts `Closes` or `Refs` in each PR body. |
+| [0290](0290-decline-sql-allowlist-scan.md) | Decline an allowlist scan for new SQL queries | Accepted | A premise count found that a strict allowlist fit 0 of 4 query-adding speed-ups, so every new query keeps the owner hold and the ADR-0248 rewrite lane stays unchanged. |
 
 ## When an ADR is Required
 

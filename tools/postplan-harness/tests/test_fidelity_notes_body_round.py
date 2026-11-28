@@ -9,6 +9,8 @@ import os
 import re
 import sys
 
+import pytest
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import runner
@@ -49,7 +51,7 @@ def test_eligibility_default_mode_still_declines_ready_with_notes():
     assert got == (None, "prior-verdict-unparsed")
 
 
-def _drive_notes(tmp_path, pr, notes, extra_scripts=None, bodies=None, git=None):
+def _drive_notes(tmp_path, pr, notes, extra_scripts=None, bodies=None, git=None, capture=None):
     gh = _BodySeqGh(str(tmp_path), bodies or ["BEFORE body prose"],
                     fixture={"pr_number": pr})
     git = git or _body_only_git()
@@ -60,6 +62,8 @@ def _drive_notes(tmp_path, pr, notes, extra_scripts=None, bodies=None, git=None)
     scripts.update(extra_scripts or {})
     llm = _RecheckLlm(UsageLedger(), scripts)
     res = _Res()
+    if capture is not None:
+        capture.update(gh=gh, res=res, llm=llm)
     runner._run_fidelity(llm, str(tmp_path), str(tmp_path), git, gh,
                          _found_plan(tmp_path), "diff", "original-body", pr,
                          "dead" * 10, TREE_1, False, lambda _m: None, res)
@@ -240,3 +244,28 @@ def test_fix_pr_copy_notes_envelope_declines(tmp_path):
         llm = _RecheckLlm(UsageLedger(), {"plan-fidelity-notes-body-fix-2": [reply]})
         assert fidelity.fix_pr_copy_notes(llm, "OLD body", ["F"], str(tmp_path),
                                           round_num=1) is None
+
+
+class _RecheckBoom(RuntimeError):
+    """Stands in for a git error or UsagePause raised inside body_recheck."""
+
+
+def test_notes_round_recheck_raises_restores_body(tmp_path, git_shim):
+    pr = 9966
+
+    def _raise(_prompt):
+        raise _RecheckBoom("recheck boom")
+
+    cap: dict = {}
+    try:
+        with pytest.raises(_RecheckBoom):
+            _drive_notes(tmp_path, pr, [_PR_COPY], {
+                FIX: [{"body": _FIXED_BODY}], RECHECK: [_raise]}, capture=cap)
+        gh, res = cap["gh"], cap["res"]
+        edits = _body_edits(gh)
+        assert any(e.startswith("FIXED body prose") for e in edits)
+        assert edits[-1] == "BEFORE body prose"
+        assert res.fidelity["notes_round"]["outcome"] == "recheck-raised"
+        assert res.fidelity.get("verdict_2") is None
+    finally:
+        _cleanup(pr, f"{pr}-2")

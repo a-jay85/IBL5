@@ -1,6 +1,6 @@
 ---
 description: Runbook for capturing per-call (input, output) pairs from the original JSB binary into a jsb-trace/1 JSONL file.
-last_verified: 2026-11-25
+last_verified: 2026-11-27
 ---
 
 # JSB per-call trace capture
@@ -76,4 +76,6 @@ On the recorder side, `record_hook.js` flushes every second, well inside the 16 
 
 A capture can be too thin to pin a port. Some records hold only the call's raw `args` and its `rand` draws in `in`, and only `ret` in `out`. Those records carry none of the record values the routine reads or writes. No Go port can be checked against such a capture, so the row stays at `captured` and gets no trace-pinned evidence.
 
-No row is blocked on a thin capture today. The pl-0027 recapture added the record block that the routine copies out and writes back, and `TestTracePinnedPl0027DayStartPass` in `engine/internal/sim/tracepinned_pl0027_test.go` now pins the Go port in `engine/internal/sim/daystartpass.go`. The Go engine still has no sim-day loop, so no game code calls that port.
+The pl-0027 recapture added the record block that the routine copies out and writes back, and `TestTracePinnedPl0027DayStartPass` in `engine/internal/sim/tracepinned_pl0027_test.go` now pins the Go port in `engine/internal/sim/daystartpass.go`. The Go engine still has no sim-day loop, so no game code calls that port.
+
+Row pl-0009 is blocked on a richer capture. Its shot-type pick is ported in `engine/internal/sim/shotselect.go`, and `TestTracePinnedPl0009Pick` in `engine/internal/sim/tracepinned_pl0009_test.go` pins it against every pick record. The whole-day replay of recording rec-20261123-0904 still first diverges on day 1, game 0, at draw 64, where the engine reads a double in `selectDefender`. The pl-0009 capture records only the shot-type re-pick and pick sites, so it cannot show what the original game draws there. Switching `selectDefender` to an integer draw would move the replay past draw 64 on the draw label alone. The row gets no further port until a recording that names the caller of each draw, or a capture of more draw sites, shows the order.

@@ -269,3 +269,42 @@ def test_notes_round_recheck_raises_restores_body(tmp_path, git_shim):
         assert res.fidelity.get("verdict_2") is None
     finally:
         _cleanup(pr, f"{pr}-2")
+
+
+def test_notes_round_ready_records_body_only_remediation(tmp_path, git_shim):
+    pr = 9967
+    try:
+        res, _llm, _gh, _git = _drive_notes(tmp_path, pr, [_PR_COPY], {
+            FIX: [{"body": _FIXED_BODY}], RECHECK: [_pass_all]})
+        fid = res.fidelity
+        assert fid["verdict_2"] == "READY"
+        # These two hold on master too; the notes round must leave them alone.
+        assert fid["findings_round"] == 0
+        assert fid["rounds_completed"] == 0
+        assert fid["remediation_sha"] == runner.BODY_ONLY_SHA
+        assert runner._last_remediation_commit(fid) is None
+        digest = ["**What changed:** a", "**Why:** b", "**Watch:** none",
+                  "**Touches:** c", "**Machine-authored fixes:** none"]
+        rows = fidelity.digest_rows_for_display(digest, fid)
+        assert rows[4] == "**Machine-authored fixes:** none (post-plan remediation: body-only)"
+    finally:
+        _cleanup(pr, f"{pr}-2")
+
+
+def test_notes_round_declined_leaves_remediation_unset(tmp_path, git_shim):
+    pr = 9968
+    unresolved = {"findings": [{"id": "F1", "status": "unresolved",
+                               "evidence": "the body still says 23"}], "hunks": []}
+
+    def _fail(prompt):
+        hids = re.findall(r"^(H\d+) \((?:insert|replace)\):", prompt, re.M)
+        return {**unresolved,
+                "hunks": [{"id": h, "status": "supported", "evidence": "ok"} for h in hids]}
+
+    try:
+        res, _llm, _gh, _git = _drive_notes(tmp_path, pr, [_PR_COPY], {
+            FIX: [{"body": _FIXED_BODY}], RECHECK: [_fail]})
+        assert res.fidelity["notes_round"]["outcome"] == "recheck-unresolved"
+        assert res.fidelity["remediation_sha"] is None
+    finally:
+        _cleanup(pr, f"{pr}-2")

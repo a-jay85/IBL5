@@ -265,7 +265,10 @@ def test_notes_round_recheck_raises_restores_body(tmp_path, git_shim):
         edits = _body_edits(gh)
         assert any(e.startswith("FIXED body prose") for e in edits)
         assert edits[-1] == "BEFORE body prose"
-        assert res.fidelity["notes_round"]["outcome"] == "recheck-raised"
+        outcome = res.fidelity["notes_round"]["outcome"]
+        assert outcome == "recheck-raised"
+        # A raise is its own outcome; it must never read as a skipped recheck.
+        assert outcome != "recheck-skipped"
         assert res.fidelity.get("verdict_2") is None
     finally:
         _cleanup(pr, f"{pr}-2")

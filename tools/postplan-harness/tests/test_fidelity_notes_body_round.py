@@ -9,6 +9,8 @@ import os
 import re
 import sys
 
+import pytest
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import runner
@@ -49,7 +51,7 @@ def test_eligibility_default_mode_still_declines_ready_with_notes():
     assert got == (None, "prior-verdict-unparsed")
 
 
-def _drive_notes(tmp_path, pr, notes, extra_scripts=None, bodies=None, git=None):
+def _drive_notes(tmp_path, pr, notes, extra_scripts=None, bodies=None, git=None, capture=None):
     gh = _BodySeqGh(str(tmp_path), bodies or ["BEFORE body prose"],
                     fixture={"pr_number": pr})
     git = git or _body_only_git()
@@ -60,6 +62,8 @@ def _drive_notes(tmp_path, pr, notes, extra_scripts=None, bodies=None, git=None)
     scripts.update(extra_scripts or {})
     llm = _RecheckLlm(UsageLedger(), scripts)
     res = _Res()
+    if capture is not None:
+        capture.update(gh=gh, res=res, llm=llm)
     runner._run_fidelity(llm, str(tmp_path), str(tmp_path), git, gh,
                          _found_plan(tmp_path), "diff", "original-body", pr,
                          "dead" * 10, TREE_1, False, lambda _m: None, res)
@@ -240,3 +244,89 @@ def test_fix_pr_copy_notes_envelope_declines(tmp_path):
         llm = _RecheckLlm(UsageLedger(), {"plan-fidelity-notes-body-fix-2": [reply]})
         assert fidelity.fix_pr_copy_notes(llm, "OLD body", ["F"], str(tmp_path),
                                           round_num=1) is None
+
+
+class _RecheckBoom(RuntimeError):
+    """Stands in for a git error or UsagePause raised inside body_recheck."""
+
+
+def test_notes_round_recheck_raises_restores_body(tmp_path, git_shim):
+    pr = 9966
+
+    def _raise(_prompt):
+        raise _RecheckBoom("recheck boom")
+
+    cap: dict = {}
+    try:
+        with pytest.raises(_RecheckBoom):
+            _drive_notes(tmp_path, pr, [_PR_COPY], {
+                FIX: [{"body": _FIXED_BODY}], RECHECK: [_raise]}, capture=cap)
+        gh, res = cap["gh"], cap["res"]
+        edits = _body_edits(gh)
+        assert any(e.startswith("FIXED body prose") for e in edits)
+        assert edits[-1] == "BEFORE body prose"
+        outcome = res.fidelity["notes_round"]["outcome"]
+        assert outcome == "recheck-raised"
+        # A raise is its own outcome; it must never read as a skipped recheck.
+        assert outcome != "recheck-skipped"
+        assert res.fidelity.get("verdict_2") is None
+    finally:
+        _cleanup(pr, f"{pr}-2")
+
+
+def test_notes_round_ready_records_body_only_remediation(tmp_path, git_shim):
+    pr = 9967
+    try:
+        res, _llm, _gh, _git = _drive_notes(tmp_path, pr, [_PR_COPY], {
+            FIX: [{"body": _FIXED_BODY}], RECHECK: [_pass_all]})
+        fid = res.fidelity
+        assert fid["verdict_2"] == "READY"
+        # These two hold on master too; the notes round must leave them alone.
+        assert fid["findings_round"] == 0
+        assert fid["rounds_completed"] == 0
+        assert fid["remediation_sha"] == runner.BODY_ONLY_SHA
+        assert runner._last_remediation_commit(fid) is None
+        digest = ["**What changed:** a", "**Why:** b", "**Watch:** none",
+                  "**Touches:** c", "**Machine-authored fixes:** none"]
+        rows = fidelity.digest_rows_for_display(digest, fid)
+        assert rows[4] == "**Machine-authored fixes:** none (post-plan remediation: body-only)"
+    finally:
+        _cleanup(pr, f"{pr}-2")
+
+
+def test_notes_round_declined_leaves_remediation_unset(tmp_path, git_shim):
+    pr = 9968
+    unresolved = {"findings": [{"id": "F1", "status": "unresolved",
+                               "evidence": "the body still says 23"}], "hunks": []}
+
+    def _fail(prompt):
+        hids = re.findall(r"^(H\d+) \((?:insert|replace)\):", prompt, re.M)
+        return {**unresolved,
+                "hunks": [{"id": h, "status": "supported", "evidence": "ok"} for h in hids]}
+
+    try:
+        res, _llm, _gh, _git = _drive_notes(tmp_path, pr, [_PR_COPY], {
+            FIX: [{"body": _FIXED_BODY}], RECHECK: [_fail]})
+        assert res.fidelity["notes_round"]["outcome"] == "recheck-unresolved"
+        assert res.fidelity["remediation_sha"] is None
+    finally:
+        _cleanup(pr, f"{pr}-2")
+
+
+_COMMIT_SHA = "c0ffee" * 6 + "abcd"
+
+
+def test_mark_notes_round_remediation_keeps_commit_sha():
+    fid = {"remediation_sha": _COMMIT_SHA, "rounds": [{"remediation_sha": _COMMIT_SHA}]}
+    runner._mark_notes_round_remediation(fid)
+    assert fid["remediation_sha"] == _COMMIT_SHA
+    assert runner._last_remediation_commit(fid) == _COMMIT_SHA
+
+
+@pytest.mark.parametrize("fid", [{}, {"remediation_sha": None}, {"remediation_sha": ""}])
+def test_mark_notes_round_remediation_fills_empty_slot(fid):
+    runner._mark_notes_round_remediation(fid)
+    assert fid["remediation_sha"] == runner.BODY_ONLY_SHA
+    assert "findings_round" not in fid
+    assert "rounds_completed" not in fid
+

@@ -528,7 +528,8 @@ _oa_carry() {  # ADR-0062 Update 2026-11-27
     author=$(gh pr view "$OA_PR" -R "$OA_REPO" --json author --jq .author.login 2>/dev/null) && [ -n "$author" ] \
         || _oa_refuse 4 "reason=delta-error: PR author unreadable."
     ui_v=$(UI_BASE_DIR="" UI_HEAD_DIR="" UI_MEMO_PATHS_FILE="" ui_workflow_verdict "$tmpd/pr-paths" "$author" _oa_no_gallery labeled human-approved 2>/dev/null | tail -n 1)
-    [ "$ui_v" = not-ui ] || _oa_refuse 4 "reason=ui-path: the PR touches UI paths, so only the owner can approve it."
+    # A renderable non-UI path reads vr-missing here, since the carry passes no VR gallery.
+    [ "$ui_v" = not-ui ] || _oa_refuse 4 "reason=ui-path: the UI check said ${ui_v:-nothing}, so only the owner can approve it."
     _oa_verdict final  # rule (b)
     if case "$labels" in *,human-approved,*) true ;; *) false ;; esac; then
         gh pr edit "$OA_PR" -R "$OA_REPO" --remove-label human-approved >/dev/null 2>&1 || _oa_refuse 4 "reason=label-failed: could not remove human-approved."

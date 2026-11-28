@@ -57,6 +57,9 @@ printf '%s\n' "$*" >> "$FX/gh.log"
 case "${1:-} ${2:-}" in
     "pr view")
         [ -e "$FX/fail.pr-view" ] && exit 1
+        case " $* " in
+            *" --json author "*) if [ -f "$FX/author" ]; then cat "$FX/author"; else echo a-jay85; fi; exit 0 ;;
+        esac
         left=0
         [ -f "$FX/pr.live.left" ] && left=$(cat "$FX/pr.live.left")
         src="$FX/pr.json"
@@ -81,7 +84,15 @@ case "${1:-} ${2:-}" in
         cp "$f" "$FX/posted.$n.md"
         jq -nc --rawfile b "$f" --argjson id "$((4000 + n))" --arg t "$(printf '2026-11-23T10:00:%02dZ' "$n")" \
             '{id:$id,created_at:$t,author_association:"OWNER",user:{login:"owner",type:"User"},body:$b}' >> "$FX/comments.ndjson" ;;
-    "pr edit") [ -e "$FX/fail.edit" ] && exit 1; exit 0 ;;
+    "pr edit")
+        [ -e "$FX/fail.edit" ] && exit 1
+        # A carry adds human-approved; CI then writes its record, and the head may move.
+        case " $* " in
+            *" --add-label human-approved "*)
+                [ -f "$FX/comments.after-label.ndjson" ] && cat "$FX/comments.after-label.ndjson" >> "$FX/comments.ndjson"
+                [ -f "$FX/pr.after-label.json" ] && cp "$FX/pr.after-label.json" "$FX/pr.json" ;;
+        esac
+        exit 0 ;;
     "pr merge") [ -e "$FX/fail.merge" ] && exit 1; exit 0 ;;
     "api user") echo owner ;;
     "api --paginate")
@@ -161,6 +172,8 @@ mkdir -p "$TMP/fix/bin"
 cp "${OA_SRC:-$REPO/bin/owner-approve}" "$TMP/fix/bin/owner-approve"
 cp "$REPO/bin/pr-refire-after-job" "$TMP/fix/bin/pr-refire-after-job"
 cp -R "$REPO/bin/lib" "$TMP/fix/bin/lib"
+# The --carry UI check runs ui_renderable, which calls bin/website-affecting; missing, it reads as UI.
+cp "$REPO/bin/website-affecting" "$TMP/fix/bin/website-affecting"
 mkdir -p "$TMP/fix/tools/postplan-harness"
 cp -R "$REPO/tools/postplan-harness/harness" "$TMP/fix/tools/postplan-harness/harness"
 cat > "$TMP/fix/bin/lib/prefire-verify" <<'STUB'
@@ -176,6 +189,9 @@ printf '%s\n' "$*" >> "$FX/refire.log"
 case "${REFIRE_MODE:-none}" in
     ready) word=READY ;;
     notready) word="NOT READY" ;;
+    moved) word=READY
+        jq -c --arg h "$(printf '%040d' 0 | tr 0 d)" '.headRefOid = $h' "$FX/pr.json" > "$FX/pr.moved.json"
+        mv "$FX/pr.moved.json" "$FX/pr.json" ;;
     *) exit "${REFIRE_RC:-0}" ;;
 esac
 n=$(( $(wc -l < "$FX/comments.ndjson") + 1 ))
@@ -1518,6 +1534,262 @@ prra_rejects_then_finish_value() {
     want_out "unknown arg"
 }
 
+# ---------------------------------------------------------------------------
+# --carry: post-plan carries an approval across its own fix commits (ADR-0062 Update 2026-11-27)
+# ---------------------------------------------------------------------------
+HA="" HB="" FA="" FB=""
+case_fp() { # <head>: the real hs_diff_fingerprint of the PR diff against its base
+    local base
+    base=$(cat "$FX/base")
+    (cd "$WT" && . "$REPO/bin/lib/human-signoff-classifier.sh" && git fetch -q origin "$base" && hs_diff_fingerprint "origin/$base" "$1")
+}
+case_commit() { # <message>: commits every change in the case worktree, sets H
+    git -C "$WT" add -A
+    git -C "$WT" commit -q -m "$1"
+    H=$(git -C "$WT" rev-parse HEAD)
+}
+ledger_file() { printf '%s/.git/ibl5-approval-ledger/case__%s.jsonl' "$TMP/fix" "$CASE"; }
+add_link() { # <kind> <from> <to> <sha> <files...>: one ledger line, written by the real CLI
+    local kind=$1 from=$2 to=$3 sha=$4
+    shift 4
+    printf '%s\n' "$@" > "$FX/link-files"
+    (cd "$TMP/fix/tools/postplan-harness" && python3 -m harness.approval_ledger append --worktree "$WT" \
+        --branch "case/$CASE" --kind "$kind" --from "$from" --to "$to" --sha "$sha" --files-file "$FX/link-files") \
+        || note "ledger append failed"
+}
+seed_approval() { # <mode> <head> <diff>: a genuine owner approval, older than every ledger line
+    jq -nc --arg b "Owner approved: \"go\". Head $2."$'\n\n'"<!-- owner-approve mode=$1 head=$2 diff=$3 -->" \
+        '{id:3001,created_at:"2026-11-20T00:00:00Z",author_association:"OWNER",user:{login:"owner",type:"User"},body:$b}' \
+        >> "$FX/comments.ndjson"
+}
+bot_record() { # <fp>: the CI human-approved-fingerprint record
+    jq -nc --arg b "<!-- hs-approved-diff: $1 -->" \
+        '{id:5001,created_at:"2026-11-27T12:00:00Z",author_association:"NONE",user:{login:"github-actions[bot]",type:"Bot"},body:$b}'
+}
+carry_c() { # <case> [--outside] [extra fix file...]: base fixture C, the #4244 11-27 shape
+    local outside=0 f from
+    fresh "$1"
+    shift
+    if [ "${1:-}" = --outside ]; then outside=1; shift; fi
+    use_origin
+    mkdir -p "$WT/docs"
+    printf 'stage\n' > "$WT/bin/stage-pinned-copy"
+    printf 'notes\n' > "$WT/docs/engine-notes.md"
+    printf '%s\n' "$CASE" > "$WT/docs/$CASE.md"  # a root-level file reads as a UI path
+    case_commit "approved $CASE"
+    HA=$H
+    FA=$(case_fp "$HA")
+    seed_approval approve "$HA" "$FA"
+    from=$FA
+    if [ "$outside" -eq 1 ]; then
+        printf 'outside edit\n' >> "$WT/docs/$CASE.md"
+        case_commit "outside $CASE"
+        from=$(case_fp "$H")
+    fi
+    git -C "$WT" rm -q bin/stage-pinned-copy
+    printf 'notes, fixed\n' >> "$WT/docs/engine-notes.md"
+    for f in "$@"; do
+        mkdir -p "$WT/$(dirname "$f")"
+        printf 'fix\n' >> "$WT/$f"
+    done
+    case_commit "post-plan fix $CASE"
+    HB=$H
+    FB=$(case_fp "$HB")
+    [ "${#FA}" -eq 40 ] && [ "${#FB}" -eq 40 ] || note "fixture fingerprints are '$FA' '$FB'"
+    write_pr "$HB" OPEN '[{"name":"human-approved"}]'
+    seed_ready
+    bot_record "$FB" > "$FX/comments.after-label.ndjson"
+    add_link fix "$from" "$FB" "$HB" bin/stage-pinned-copy docs/engine-notes.md "$@"
+}
+run_carry() { run_oa "$PR" --carry --poll=0; }
+want_not_carried() { # <reason text>
+    want_rc 4
+    want_out "$1"
+    want_out "RESULT: not-carried"
+}
+carry_postplan_fix_carries() {
+    carry_c carry_postplan_fix_carries
+    run_carry
+    want_rc 0
+    want_out "RESULT: carried"
+    want_posted "<!-- owner-approve-carry "
+    want_posted "$HA"
+    want_posted "$HB"
+    want_posted "bin/stage-pinned-copy"
+    want_posted "docs/engine-notes.md"
+}
+carry_relabels_when_label_present() {
+    carry_c carry_relabels_when_label_present
+    run_carry
+    want_out "RESULT: carried"
+    want_order "--remove-label human-approved" "--add-label human-approved"
+}
+carry_never_arms() {
+    carry_c carry_never_arms
+    run_carry
+    want_out "RESULT: carried"
+    refute_gh "pr merge"
+}
+carry_comment_is_inert() {
+    carry_c carry_comment_is_inert
+    run_carry
+    want_out "RESULT: carried"
+    local body last
+    body=$(cat "$FX"/posted.*.md 2>/dev/null)
+    last=$(printf '%s\n' "$body" | awk 'NF {l=$0} END {print l}')
+    [ -n "$last" ] || note "no carry comment posted"
+    if command grep -qE '^<!-- owner-approve mode=(approve|fix-first) head=([0-9a-f]{40})( diff=([0-9a-f]{40}|unread))? -->$' <<< "$last"; then
+        note "the carry marker matches the _oa_finish_record regex"
+    fi
+    (cd "$TMP/fix/tools/postplan-harness" && python3 -c 'import sys; from harness import unplanned_scope as u; sys.exit(1 if u.APPROVAL_MARKER_RE.match(sys.argv[1]) else 0)' "$last") \
+        || note "the carry marker matches APPROVAL_MARKER_RE"
+    if grep -qF 'Condition:' <<< "$body"; then note "the carry body holds a Condition: line"; fi
+}
+carry_gate_file_drops() {
+    carry_c carry_gate_file_drops tools/postplan-harness/runner.py
+    run_carry
+    want_not_carried "reason=gate-file"
+    refute_gh "--add-label"
+}
+carry_outside_commit_drops() {
+    carry_c carry_outside_commit_drops --outside
+    run_carry
+    want_not_carried "reason=outside-commit"
+}
+carry_new_blocking_finding_drops() {
+    carry_c carry_new_blocking_finding_drops
+    jq -c 'if (.body // "") | contains("pr-ready-verdict") then .body |= sub("^\\*\\*READY\\*\\*"; "**NOT READY**") else . end' \
+        "$FX/comments.ndjson" > "$FX/c.tmp" && mv "$FX/c.tmp" "$FX/comments.ndjson"
+    run_carry
+    want_not_carried "verdict is NOT READY"
+    refute_gh "--add-label"
+}
+carry_delta_error_drops() {
+    carry_c carry_delta_error_drops
+    printf '%s\n' '{"kind":"fix"' >> "$(ledger_file)"
+    run_carry
+    want_not_carried "reason=delta-error"
+}
+carry_ui_path_drops() {
+    carry_c carry_ui_path_drops ibl5/design/components/fixture.css
+    run_carry
+    want_not_carried "reason=ui-path"
+}
+carry_record_missing_drops() {
+    carry_c carry_record_missing_drops
+    rm -f "$FX/comments.after-label.ndjson"
+    run_carry
+    want_not_carried "reason=record-missing"
+}
+carry_head_moved_drops() {
+    carry_c carry_head_moved_drops
+    jq -c --arg h "$C40" '.headRefOid = $h' "$FX/pr.json" > "$FX/pr.after-label.json"
+    run_carry
+    want_not_carried "reason=head-moved"
+    want_order "--add-label human-approved" "--remove-label human-approved"
+}
+carry_unchanged_is_noop() {
+    carry_setup carry_unchanged_is_noop
+    HA=$H
+    FA=$(case_fp "$HA")
+    seed_approval approve "$HA" "$FA"
+    rebase_case
+    [ "$(case_fp "$H")" = "$FA" ] || note "the rebase changed the fingerprint"
+    write_pr "$H" OPEN '[{"name":"human-approved"}]'
+    seed_ready
+    run_carry
+    want_rc 0
+    want_out "RESULT: carry-unchanged"
+    refute_gh "pr comment"
+    refute_gh "--add-label"
+}
+carry_rejects_bad_flags() {
+    fresh carry_rejects_bad_flags
+    local args
+    for args in "--carry=x" "--carry words" "--carry --finish"; do
+        # shellcheck disable=SC2086 # each entry is a word list
+        run_oa "$PR" $args
+        [ "$RC" -eq 2 ] || note "'$args' exit $RC, want 2"
+        grep -qF "RESULT: usage" <<< "$OUT" || note "'$args' did not print RESULT: usage"
+    done
+    refute_gh "pr comment"
+}
+headless_plain_approval_refused() {
+    fresh headless_plain_approval_refused
+    run_oa_env CLAUDE_HEADLESS=1 "$OA" "$PR" "ok"
+    want_rc 3
+    want_out "RESULT: headless"
+}
+headless_carry_not_blocked() {
+    carry_c headless_carry_not_blocked
+    run_oa_env CLAUDE_HEADLESS=1 "$OA" "$PR" --carry --poll=0
+    want_out "RESULT: carried"
+}
+
+# Fix-first --finish ledger links: the #4248 shape, both runs real.
+H0="" H1="" F0="" F1=""
+ff_setup() { # <case>: a fix-first approval on H0, then the fix commit H1
+    fresh "$1"
+    use_origin
+    printf '%s\n' "$CASE" > "$WT/$CASE.txt"
+    printf 'inbox\n' > "$WT/bin/dev-inbox"
+    case_commit "approved $CASE"
+    write_pr "$H"
+    H0=$H
+    F0=$(case_fp "$H0")
+    run_oa "$PR" "go" "--fix-first=fix bin/discord-dm and bin/dev-inbox"
+    want_rc 6
+    printf 'dm fixed\n' >> "$WT/bin/discord-dm"
+    printf 'inbox fixed\n' >> "$WT/bin/dev-inbox"
+    printf 'test\n' > "$WT/bin/test-dev-inbox"
+    case_commit "fix $CASE"
+    write_pr "$H"
+    H1=$H
+    F1=$(case_fp "$H1")
+}
+want_links() { # <kind> <count>: lines of that kind, each F0 -> F1 at H1 with the three fix files
+    local all good
+    all=$(jq -c --arg k "$1" 'select(.kind == $k)' "$(ledger_file)" 2>/dev/null | wc -l | tr -d ' ')
+    good=$(jq -c --arg k "$1" --arg f "$F0" --arg t "$F1" --arg s "$H1" \
+        'select(.kind == $k and .from == $f and .to == $t and .sha == $s and .files == ["bin/dev-inbox","bin/discord-dm","bin/test-dev-inbox"])' \
+        "$(ledger_file)" 2>/dev/null | wc -l | tr -d ' ')
+    [ "$all" = "$2" ] || note "$all $1 lines, want $2"
+    [ "$good" = "$2" ] || note "$good well-formed $1 lines, want $2"
+}
+finish_fix_first_records_fix_scope() {
+    ff_setup finish_fix_first_records_fix_scope
+    seed_ready
+    run_oa "$PR" --finish
+    want_out "RESULT: armed"
+    want_links fix-first-scope 1
+    want_links fix-first-finish 1
+}
+finish_refused_records_no_finish_link() {
+    ff_setup finish_refused_records_no_finish_link
+    seed_sticky owner "NOT READY" "**Reviewed tree:** $A40"
+    run_oa "$PR" --finish
+    want_rc 4
+    want_links fix-first-scope 1
+    want_links fix-first-finish 0
+}
+finish_fix_first_not_ready_refires() {
+    ff_setup finish_fix_first_not_ready_refires
+    write_kept_body
+    seed_sticky owner "NOT READY" "**Reviewed tree:** $A40"
+    run_oa_env REFIRE_MODE=ready REFIRE_RC=0 "$OA" "$PR" --finish --poll=0 --timeout=30
+    want_out "RESULT: armed"
+    [ "$(refire_lines)" = 1 ] || note "post-plan-now ran $(refire_lines) times, want 1"
+}
+finish_fix_first_refire_head_moved() {
+    ff_setup finish_fix_first_refire_head_moved
+    write_kept_body
+    seed_sticky owner "NOT READY" "**Reviewed tree:** $A40"
+    run_oa_env REFIRE_MODE=moved REFIRE_RC=0 "$OA" "$PR" --finish --poll=0 --timeout=30
+    want_rc 4
+    want_posted "the re-review moved the head"
+    refute_gh "--add-label"
+}
+
 ALL_CASES="
 body_literal body_option ids_unset ids_empty headless_refuses headless_empty_proceeds
 usage_unknown_flag usage_space_form no_repo_writes
@@ -1545,6 +1817,12 @@ detach_child_fixfirst_wins detach_child_fixfirst_unread_head_wins detach_child_f
 detach_child_env_unset_arms detach_child_env_empty_arms
 prra_submits_launchd_job prra_busy prra_then_finish_headless_detached_refuses
 prra_then_finish_chains prra_then_finish_headless_launches_nothing prra_rejects_then_finish_value
+carry_postplan_fix_carries carry_relabels_when_label_present carry_never_arms carry_comment_is_inert
+carry_gate_file_drops carry_outside_commit_drops carry_new_blocking_finding_drops carry_delta_error_drops
+carry_ui_path_drops carry_record_missing_drops carry_head_moved_drops carry_unchanged_is_noop carry_rejects_bad_flags
+headless_plain_approval_refused headless_carry_not_blocked
+finish_fix_first_records_fix_scope finish_refused_records_no_finish_link
+finish_fix_first_not_ready_refires finish_fix_first_refire_head_moved
 "
 
 oa_mask() { sed -E -e "s#$TMP#<TMP>#g" -e 's#owner-approve\.[A-Za-z0-9]+#owner-approve.X#g' -e 's#[0-9a-f]{40}#<SHA>#g'; }

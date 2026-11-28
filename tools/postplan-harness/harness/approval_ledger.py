@@ -90,3 +90,8 @@ def main(argv=None) -> int:
     except OSError:
         return 1
     ok = append_link(args.worktree, args.branch, args.kind, getattr(args, "from"), args.to, args.sha, files)
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

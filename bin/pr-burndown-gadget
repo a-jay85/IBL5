@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Usage: bin/pr-burndown-gadget --judgment=FILE --out=FILE [--format=html|markdown]
+       bin/pr-burndown-gadget --format=discord-json --pr=N [--pr-json=FILE]
        bin/pr-burndown-gadget --help
 
 Render the /pr-burndown scoreboard: one row per PR that needs the owner, each with
@@ -8,10 +9,18 @@ an expandable card. Live state comes from `bin/pr-triage --card N` and
 (titles, calls, red-cell notes, card prose, options, pick). This script reads
 GitHub through bin/pr-triage and writes only the --out file.
 
+--format=discord-json --pr=N [--pr-json=FILE] covers one PR. It needs no judgment
+file, writes no file, and prints one JSON object on stdout: title, size, the five
+status cells, verdict and decision. --pr-json names a `gh pr view --json` result
+(title, changedFiles, additions, deletions, body). It exits 3 when a commit hash
+or a hold code would be visible.
+
 Flags (all take the = form):
   --judgment=FILE   judgment JSON: {"version": 1, "prs": [...]}
   --out=FILE        output file, outside the repo tree
-  --format=NAME     html (default) or markdown
+  --format=NAME     html (default), markdown or discord-json
+  --pr=N            discord-json only: the PR number
+  --pr-json=FILE    discord-json only: PR title, size counts and body as JSON
   -h, --help        print this text
 
 Environment:
@@ -68,8 +77,14 @@ ENTRY_KEYS = {"number", "owner_call", "conflict_needs_you", "title", "why_next",
               "does", "undo", "risks", "options", "recommend"}
 NOTE_KEYS = {"tests", "comments", "bot_review", "easy_undo", "your_ok"}
 REQUIRED_WHEN_CALL = ("title", "call", "does", "undo", "options", "recommend")
-FLAGS = ("--judgment", "--out", "--format")
-FORMATS = ("html", "markdown")
+FLAGS = ("--judgment", "--out", "--format", "--pr", "--pr-json")
+FORMATS = ("html", "markdown", "discord-json")
+DISCORD_ONLY = ("--pr", "--pr-json")
+DISCORD_TRIAGE_TIMEOUT = 20
+DISCORD_DECISION_TIMEOUT = 5
+DISCORD_CAPS = {"title": 256, "size": 64, "cell": 200, "verdict": 1024, "decision": 1024}
+DISCORD_HOLD_CODE_RE = re.compile(r" ?\(\d{1,2}[a-z]?(?:, ?\d{1,2}[a-z]?)*\)")
+NOTE_KEYS_ORDER = ("tests", "comments", "bot_review", "easy_undo", "your_ok")
 EMPTY_TEXT = "Nothing needs your call right now."
 HELD_FAILED_TEXT = "Could not list held PRs, so a held PR may be missing."
 
@@ -158,11 +173,20 @@ def parse_args(argv: List[str]) -> dict:
         if not sep:
             die_usage(f"use --flag=value form: {arg}")
         opts[name] = value
+    if opts["--format"] not in FORMATS:
+        die_usage(f"--format must be html, markdown or discord-json: {opts['--format']}")
+    if opts["--format"] == "discord-json":
+        if "--judgment" in opts or "--out" in opts:
+            die_usage("--format=discord-json takes no --judgment or --out")
+        if not re.fullmatch(r"[1-9][0-9]{0,5}", opts.get("--pr", "")):
+            die_usage("--pr=N is required with --format=discord-json")
+        return opts
+    for name in DISCORD_ONLY:
+        if name in opts:
+            die_usage(f"{name} needs --format=discord-json")
     for required in ("--judgment", "--out"):
         if not opts.get(required):
             die_usage(f"{required}=FILE is required")
-    if opts["--format"] not in FORMATS:
-        die_usage(f"--format must be html or markdown: {opts['--format']}")
     return opts
 
 
@@ -298,11 +322,11 @@ def load_judgment(path: str) -> List[dict]:
 
 # --- fetch and parse ------------------------------------------------------------
 
-def run_triage(triage: str, args: List[str]):
+def run_triage(triage: str, args: List[str], timeout: int = 120, cwd: Optional[str] = None):
     """(stdout, exit status was 0). A command that cannot run gives empty stdout."""
     try:
         proc = subprocess.run([triage, *args], capture_output=True, text=True,
-                              encoding="utf-8", errors="replace", timeout=120)
+                              encoding="utf-8", errors="replace", timeout=timeout, cwd=cwd)
     except (OSError, subprocess.TimeoutExpired):
         return "", False
     return proc.stdout, proc.returncode == 0
@@ -770,8 +794,162 @@ def assert_clean(doc: str, fmt: str) -> None:
         sys.exit(3)
 
 
+# --- discord-json: one PR, display text only ------------------------------------
+
+def display_text(text: str, cap: int) -> str:
+    """Scrub hashes and hold codes, collapse spaces, and clip to cap characters."""
+    clean = DISCORD_HOLD_CODE_RE.sub("", scrub(text))
+    clean = re.sub(r" {2,}", " ", clean).strip()
+    return clean if len(clean) <= cap else clean[:cap - 1] + "…"
+
+
+def cell_json(cell: Cell) -> dict:
+    return {"icon": cell.icon, "text": display_text(cell.note, DISCORD_CAPS["cell"])}
+
+
+def drop_sender_run(card: str, number: int) -> str:
+    """Remove this PR's own fleet label from the card's live-run line."""
+    own = f"com.ibl5.post-plan-fleet-{number}"
+
+    def fix(match):
+        kept = [x for x in (p.strip() for p in match.group(1).split(",")) if x and x != own]
+        return "live-run: " + (", ".join(kept) or "none")
+
+    return re.sub(r"^live-run: (.*)$", fix, card, flags=re.M)
+
+
+def sentence(text: str) -> str:
+    s = text.strip(" ·.;,")
+    if not s:
+        return ""
+    s = s[0].upper() + s[1:]
+    return s if s.endswith(("?", "!", "…")) else s + "."
+
+
+def discord_verdict_text(values: dict) -> str:
+    """The verdict word and review state, then why the PR is held and its blast radius."""
+    verdict = values.get("verdict")
+    if not isinstance(verdict, str) or verdict == "none" or " | " not in verdict:
+        return "Could not read"
+    banner, _sep, status = verdict.rpartition(" | ")
+    word = re.match(r"[A-Z]+(?: [A-Z]+)*", banner)
+    if word is None:
+        return "Could not read"
+    if status == "CURRENT":
+        head = f"{word.group()}, held for you."
+    elif status.startswith("STALE"):
+        head = f"{word.group()}, review stale, held for you."
+    else:
+        return "Could not read"
+    parts = [head]
+    danger = values.get("merge-danger")
+    if isinstance(danger, str) and danger != "missing":
+        why = re.search(r"\bWhy:\s*(.*?)\s*(?:·?\s*\bBlast radius:|$)", danger)
+        blast = re.search(r"\bBlast radius:\s*(.*?)\s*(?:·|\bWhy:|$)", danger)
+        if why:
+            parts.append(sentence(why.group(1)))
+        if blast:
+            parts.append(sentence("Blast radius: " + blast.group(1)))
+    return display_text(" ".join(p for p in parts if p), DISCORD_CAPS["verdict"])
+
+
+def decision_text(body: str) -> Optional[str]:
+    """The PR body's Decision block, printed by hold-check.sh's unchanged parse rule."""
+    if "**Decision:**" not in body:
+        return None
+    body = body.replace("\r\n", "\n")
+    begin_marker = "<!-- manual-confirmation:begin -->"
+    begin = body.find(begin_marker)
+    end = body.find("<!-- manual-confirmation:end -->")
+    if 0 <= begin < end:
+        body = body[begin + len(begin_marker):end]
+    lines = ["## Automouse Hold Justification"]
+    for raw in body.split("\n"):
+        line = re.sub(r"^ {0,3}> ?", "", raw)
+        lines.append("" if line.startswith("## ") or line.startswith("<!--") else line)
+    hold_check = os.path.join(os.path.dirname(os.path.realpath(__file__)), "lib", "hold-check.sh")
+    try:
+        proc = subprocess.run(
+            ["bash", "-c", 'source "$1" && hold_decision_paragraphs /dev/stdin', "_", hold_check],
+            input="\n".join(lines) + "\n", capture_output=True, text=True,
+            encoding="utf-8", errors="replace", timeout=DISCORD_DECISION_TIMEOUT)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if proc.returncode != 0 or not proc.stdout:
+        return None
+    out = re.sub(r"^ *\*\*Decision:\*\* *", "", proc.stdout, flags=re.M)
+    cap = DISCORD_CAPS["decision"]
+    text = "\n".join(display_text(line, cap) for line in out.split("\n")).strip()
+    if not text:
+        return None
+    return text if len(text) <= cap else text[:cap - 1] + "…"
+
+
+def pr_meta(path: str) -> tuple:
+    """(title, size line or None, body) from a `gh pr view --json` file."""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as handle:
+            data = json.load(handle)
+    except (OSError, ValueError):
+        return "", None, ""
+    if not isinstance(data, dict):
+        return "", None, ""
+    title = data.get("title") if isinstance(data.get("title"), str) else ""
+    body = data.get("body") if isinstance(data.get("body"), str) else ""
+    counts = [data.get(key) for key in ("changedFiles", "additions", "deletions")]
+    size = None
+    if all(type(n) is int and n >= 0 for n in counts):
+        files, added, removed = counts
+        size = f"{files} file{'' if files == 1 else 's'}, +{added} −{removed}"
+    return title, size, body
+
+
+def assert_clean_json(doc: dict) -> None:
+    """Same last stop as assert_clean, over every string in the JSON object."""
+    def strings(value: object):
+        if isinstance(value, str):
+            yield value
+        elif isinstance(value, dict):
+            for item in value.values():
+                yield from strings(item)
+
+    why = ""
+    for text in strings(doc):
+        if SHA_RE.search(text):
+            why = "a commit hash would be visible"
+        elif DISCORD_HOLD_CODE_RE.search(text):
+            why = "a hold code would be visible"
+    if why:
+        print(f"pr-burndown-gadget: internal render check failed: {why}", file=sys.stderr)
+        sys.exit(3)
+
+
+def main_discord(opts: dict) -> int:
+    default_triage = os.path.join(os.path.dirname(os.path.realpath(__file__)), "pr-triage")
+    triage = os.environ.get("PR_BURNDOWN_TRIAGE_CMD") or default_triage
+    number = int(opts["--pr"])
+    # pr-triage needs a repo cwd, and a launchd runner's cwd is not guaranteed.
+    root = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+    card, _ok = run_triage(triage, ["--card", str(number)], timeout=DISCORD_TRIAGE_TIMEOUT, cwd=root)
+    row = build_row(number, None, None, drop_sender_run(card, number))
+    title, size, body = pr_meta(opts.get("--pr-json", ""))
+    title = title or row.title
+    doc = {
+        "title": display_text(title, DISCORD_CAPS["title"]) or None,
+        "size": size,
+        "cells": {key: cell_json(row.cells[key]) for key in NOTE_KEYS_ORDER},
+        "verdict": discord_verdict_text(row.values),
+        "decision": decision_text(body),
+    }
+    assert_clean_json(doc)
+    print(json.dumps(doc, ensure_ascii=False))
+    return 0
+
+
 def main(argv: List[str]) -> int:
     opts = parse_args(argv)
+    if opts["--format"] == "discord-json":
+        return main_discord(opts)
     out = opts["--out"]
     refuse_out_inside_repo(out)
     entries = load_judgment(opts["--judgment"])

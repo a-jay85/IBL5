@@ -1,0 +1,28 @@
+{
+  "cells": {
+    "bot_review": {
+      "icon": "✅",
+      "text": ""
+    },
+    "comments": {
+      "icon": "✅",
+      "text": ""
+    },
+    "easy_undo": {
+      "icon": "✅",
+      "text": ""
+    },
+    "tests": {
+      "icon": "✅",
+      "text": ""
+    },
+    "your_ok": {
+      "icon": "",
+      "text": "none"
+    }
+  },
+  "decision": "Merge if the new DM looks right.",
+  "size": "3 files, +32 −10",
+  "title": "Fix the cap",
+  "verdict": "READY WITH NOTES, held for you. Edits the JSB trace capture runbook and a test script's fixture PID list, with no engine code change. Blast radius: site-wide."
+}

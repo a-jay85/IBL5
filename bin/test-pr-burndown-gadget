@@ -576,6 +576,254 @@ case_skill_doc_matches_gadget() {
     return "$rc"
 }
 
+# --- discord-json mode ----------------------------------------------------------
+
+DFIX="$TMP/fix-discord"
+GADGET_ABS="$ROOT/$GADGET"
+BOT_FIXTURE="$ROOT/ibl5/IBLbot/src/server/approve-dm-display.fixture.json"
+mkdir -p "$DFIX"
+
+# write_discord_card <fix-dir> <pr> [name=value ...]: the live `pr-triage --card` shape.
+write_discord_card() {
+    local dir="$1" n="$2" pair
+    local title='docs(engine): record why further pl-0009 porting is blocked'
+    local verdict='READY WITH NOTES — 2026-11-27 21:16:49 PST · auto-merge held | CURRENT'
+    local danger="Door: two-way · Blast radius: site-wide · Why: edits the JSB trace capture runbook and a test script's fixture PID list, with no engine code change."
+    local live='none'
+    shift 2
+    for pair in "$@"; do printf -v "${pair%%=*}" '%s' "${pair#*=}"; done
+    cat > "$dir/card-$n.txt" <<CARD
+head: 1dd468b mss=CLEAN mergeable=MERGEABLE auto-merge=off labels=plan-checks,auto-merge-held-by-plan title="$title" files=2 +8 -4 branch=jsb-port-pl-0009-r4
+ci: pass=48 fail=0 pending=0 real-failures: none | owner-gates: none
+threads: 0
+verdict: $verdict
+visual: none
+merge-danger: $danger
+live-run: $live
+worktree: /tmp/wt/jsb-port-pl-0009-r4
+Owner approvals: none
+CARD
+}
+
+# run_discord <fix-dir> <pr> [extra args ...]
+run_discord() {
+    local fix="$1" pr="$2"
+    shift 2
+    PR_BURNDOWN_TRIAGE_CMD="$STUB" FIX="$fix" "$GADGET_ABS" --format=discord-json --pr="$pr" "$@"
+}
+
+# discord_json <pr> [extra args ...]: stdout of a run that must exit 0.
+discord_json() {
+    local out rc=0
+    out="$(run_discord "$DFIX" "$@")" || rc=$?
+    if [ "$rc" != 0 ]; then
+        echo "discord-json rc=$rc: $out" >&2
+        return 1
+    fi
+    printf '%s\n' "$out"
+}
+
+# jq_ok <json> <label> <jq args ...>
+jq_ok() {
+    local json="$1" label="$2"
+    shift 2
+    jq -e "$@" <<< "$json" > /dev/null && return 0
+    echo "$label: filter false on $json"
+    return 1
+}
+
+case_discord_json_all_green() {
+    local out key
+    write_discord_card "$DFIX" 5001
+    out="$(discord_json 5001)" || return 1
+    for key in tests comments bot_review easy_undo; do
+        jq_ok "$out" "$key" --arg k "$key" '.cells[$k] == {"icon":"✅","text":""}' || return 1
+    done
+    jq_ok "$out" your_ok '.cells.your_ok.text == "none"' || return 1
+    jq_ok "$out" verdict --arg v "READY WITH NOTES, held for you. Edits the JSB trace capture runbook and a test script's fixture PID list, with no engine code change. Blast radius: site-wide." \
+        '.verdict == $v' || return 1
+    write_discord_card "$DFIX" 5101 verdict='READY — 2026-11-27 21:16:49 PST · auto-merge held | CURRENT'
+    out="$(discord_json 5101)" || return 1
+    jq_ok "$out" "plain ready" '.verdict | startswith("READY, held for you. ")'
+}
+
+case_discord_json_stale_review() {
+    local out
+    write_discord_card "$DFIX" 5002 \
+        verdict='READY WITH NOTES (re-review, round 1) — 2026-10-26 13:05:35 PDT · auto-merge held | STALE (reviewed tree 6a43aca, head tree 67e07e1)'
+    out="$(discord_json 5002)" || return 1
+    jq_ok "$out" bot_review '.cells.bot_review == {"icon":"🚨","text":"Review is stale"}' || return 1
+    jq_ok "$out" verdict '.verdict | startswith("READY WITH NOTES, review stale, held for you.")' || return 1
+    jq_ok "$out" "tree hashes" '.verdict | (contains("6a43aca") or contains("67e07e1")) | not'
+}
+
+case_discord_json_one_way_door() {
+    local out
+    write_discord_card "$DFIX" 5003 \
+        danger='Door: one-way · Blast radius: site-wide · Why: drops a column (7).'
+    out="$(discord_json 5003)" || return 1
+    jq_ok "$out" easy_undo '.cells.easy_undo == {"icon":"🚨","text":"Hard to undo"}' || return 1
+    jq_ok "$out" verdict '.verdict | contains("Drops a column. Blast radius: site-wide.")' || return 1
+    jq_ok "$out" "hold code and door" '.verdict | (contains("(7)") or contains("Door:")) | not'
+}
+
+case_discord_json_triage_fail() {
+    local out
+    echo 1 > "$DFIX/card-5004.rc"
+    out="$(discord_json 5004)" || return 1
+    jq_ok "$out" cells '(.cells | length) == 5 and ([.cells[].text] | all(. == "Could not read"))' || return 1
+    jq_ok "$out" verdict '.verdict == "Could not read"'
+}
+
+case_discord_json_no_decision() {
+    local out meta="$TMP/meta-nodecision.json"
+    write_discord_card "$DFIX" 5005
+    jq -n --arg body $'## Summary\n\nNo decision here.\n' '{body: $body}' > "$meta"
+    out="$(discord_json 5005 --pr-json="$meta")" || return 1
+    jq_ok "$out" "no decision" '.decision == null' || return 1
+    jq -n --arg body $'## Summary\n\n```\n**Decision:** inside a fence\n```\n' '{body: $body}' > "$meta"
+    out="$(discord_json 5005 --pr-json="$meta")" || return 1
+    jq_ok "$out" "fenced decision" '.decision == null'
+}
+
+case_discord_json_decision_present() {
+    local out body gone meta="$TMP/meta-decision.json"
+    local want="Merge if you're OK with the new DM at ."
+    write_discord_card "$DFIX" 5006
+    body=$'<!-- manual-confirmation:begin -->\n## Manual confirmation needed\n\n> **Decision:** Merge if you\'re OK with the new DM (7) at a9c6f71.\n<!-- manual-confirmation:end -->\n\n## Manual Testing\n\nOpen the page.\n'
+    jq -n --arg body "$body" '{body: $body}' > "$meta"
+    out="$(discord_json 5006 --pr-json="$meta")" || return 1
+    jq_ok "$out" "harness body" --arg d "$want" '.decision == $d' || return 1
+    for gone in '**Decision:**' '(7)' 'a9c6f71' '>' 'manual-confirmation' 'Manual Testing'; do
+        jq_ok "$out" "decision lacks $gone" --arg g "$gone" '.decision | contains($g) | not' || return 1
+    done
+    jq -n --arg body "${body//$'\n'/$'\r\n'}" '{body: $body}' > "$meta"
+    out="$(discord_json 5006 --pr-json="$meta")" || return 1
+    jq_ok "$out" "crlf body" --arg d "$want" '.decision == $d' || return 1
+    jq -n --arg body $'**Decision:** Merge it.\n' '{body: $body}' > "$meta"
+    out="$(discord_json 5006 --pr-json="$meta")" || return 1
+    jq_ok "$out" "unquoted body" '.decision == "Merge it."'
+}
+
+case_discord_json_hold_code_near_miss() {
+    local out
+    write_discord_card "$DFIX" 5007 \
+        danger='Door: two-way · Blast radius: site-wide · Why: checks 3 and 4, option (a), year (2026) (12b).'
+    out="$(discord_json 5007)" || return 1
+    jq_ok "$out" "near misses kept" '.verdict | contains("Checks 3 and 4, option (a), year (2026)")' || return 1
+    jq_ok "$out" "hold code removed" '.verdict | contains("(12b)") | not'
+}
+
+case_discord_json_no_sha_anywhere() {
+    local out meta="$TMP/meta-sha.json" full='3f9e2b1c4d5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c'
+    # A hash holds a digit and a letter, the rule the html and markdown pages use.
+    write_discord_card "$DFIX" 5008 title="fix: rework deadbee1 and $full handling" \
+        danger="Door: two-way · Blast radius: site-wide · Why: reverts deadbee1 and $full."
+    out="$(discord_json 5008)" || return 1
+    jq_ok "$out" "card hashes" '[.. | strings | test("[0-9a-f]{7,40}")] | any | not' || return 1
+    jq -n --arg title "Revert $full now" '{title: $title}' > "$meta"
+    out="$(discord_json 5008 --pr-json="$meta")" || return 1
+    jq_ok "$out" "pr-json hash" '.title == "Revert now"'
+}
+
+case_discord_json_size_and_title() {
+    local out meta="$TMP/meta-size.json"
+    write_discord_card "$DFIX" 5009
+    printf '%s\n' '{"title":"Fix the cap","changedFiles":3,"additions":32,"deletions":10}' > "$meta"
+    out="$(discord_json 5009 --pr-json="$meta")" || return 1
+    jq_ok "$out" "size and title" '.title == "Fix the cap" and .size == "3 files, +32 −10"' || return 1
+    printf '%s\n' '{"title":"Fix the cap","changedFiles":1,"additions":32,"deletions":10}' > "$meta"
+    out="$(discord_json 5009 --pr-json="$meta")" || return 1
+    jq_ok "$out" "one file" '.size == "1 file, +32 −10"' || return 1
+    printf '%s\n' '{"title":"Fix the cap","changedFiles":3,"deletions":10}' > "$meta"
+    out="$(discord_json 5009 --pr-json="$meta")" || return 1
+    jq_ok "$out" "missing additions" '.size == null' || return 1
+    out="$(discord_json 5009 --pr-json="$TMP/no-such-meta.json")" || return 1
+    jq_ok "$out" "unreadable pr-json" \
+        '.size == null and .title == "docs(engine): record why further pl-0009 porting is blocked"'
+}
+
+case_discord_json_caps() {
+    local out long
+    printf -v long '%*s' 3000 ''
+    write_discord_card "$DFIX" 5010 \
+        danger="Door: two-way · Blast radius: site-wide · Why: ${long// /x}"
+    out="$(discord_json 5010)" || return 1
+    jq_ok "$out" "verdict cap" '(.verdict | length) <= 1024 and (.verdict | endswith("…"))'
+}
+
+# discord_rejects <gadget args ...>: usage exit 2 and nothing on stdout.
+discord_rejects() {
+    local out rc=0
+    out="$(cd "$TMP/out" && PR_BURNDOWN_TRIAGE_CMD="$STUB" FIX="$DFIX" "$GADGET_ABS" "$@" 2>/dev/null)" || rc=$?
+    [ "$rc" = 2 ] && [ -z "$out" ] && return 0
+    echo "args [$*]: rc=$rc stdout=[$out]"
+    return 1
+}
+
+case_discord_json_flag_rejects() {
+    local f='--format=discord-json'
+    discord_rejects "$f" || return 1
+    discord_rejects "$f" --pr=abc || return 1
+    discord_rejects "$f" --pr=0 || return 1
+    discord_rejects "$f" --pr=1234567 || return 1
+    discord_rejects "$f" --pr 4286 || return 1
+    discord_rejects "$f" --pr=1 --judgment=x || return 1
+    discord_rejects --format=html --pr=1 --judgment=j --out=o
+}
+
+case_discord_json_writes_no_file() {
+    local scratch="$TMP/scratch-nofile" left
+    write_discord_card "$DFIX" 5012
+    mkdir -p "$scratch"
+    (cd "$scratch" && discord_json 5012 > /dev/null) || return 1
+    left="$(ls -A "$scratch")"
+    [ -z "$left" ] && return 0
+    echo "scratch dir not empty: $left"
+    return 1
+}
+
+case_discord_json_sender_run_hidden() {
+    local out
+    write_discord_card "$DFIX" 5013 live='com.ibl5.post-plan-fleet-5013'
+    out="$(discord_json 5013)" || return 1
+    jq_ok "$out" "own fleet label" '.cells.bot_review.icon == "✅"' || return 1
+    write_discord_card "$DFIX" 5013 \
+        live='com.ibl5.postplan-now-x-202611271200-120000-1, com.ibl5.post-plan-fleet-5013'
+    out="$(discord_json 5013)" || return 1
+    jq_ok "$out" "postplan-now run" '.cells.bot_review.icon == "⏳"' || return 1
+    write_discord_card "$DFIX" 5013 live='com.ibl5.post-plan-fleet-50130'
+    out="$(discord_json 5013)" || return 1
+    jq_ok "$out" "another PR fleet run" '.cells.bot_review.icon == "⏳"'
+}
+
+case_discord_json_triage_cwd() {
+    local stub="$TMP/stub/pr-triage-cwd" seen="$TMP/triage-cwd.txt" scratch="$TMP/scratch-cwd" want got
+    printf '#!/usr/bin/env bash\npwd -P > "$CWD_OUT"\n' > "$stub"
+    chmod +x "$stub"
+    mkdir -p "$scratch"
+    (cd "$scratch" && CWD_OUT="$seen" PR_BURNDOWN_TRIAGE_CMD="$stub" "$GADGET_ABS" \
+        --format=discord-json --pr=1 > /dev/null) || { echo "run failed"; return 1; }
+    want="$(cd "$(dirname "$GADGET_ABS")/.." && pwd -P)"
+    got="$(cat "$seen")" || return 1
+    [ "$got" = "$want" ] && return 0
+    echo "triage cwd [$got], want [$want]"
+    return 1
+}
+
+# The bot's parser test reads this same committed file, so a key renamed on either side fails.
+case_discord_json_matches_bot_fixture() {
+    local out got want meta="$TMP/meta-fixture.json"
+    write_discord_card "$DFIX" 5015
+    printf '%s\n' '{"title":"Fix the cap","changedFiles":3,"additions":32,"deletions":10,"body":"> **Decision:** Merge if the new DM looks right.\n"}' > "$meta"
+    out="$(discord_json 5015 --pr-json="$meta")" || return 1
+    got="$(jq -S . <<< "$out")" || return 1
+    want="$(jq -S . "$BOT_FIXTURE")" || { echo "cannot read $BOT_FIXTURE"; return 1; }
+    [ "$got" = "$want" ] && return 0
+    echo "gadget output differs from $BOT_FIXTURE: $got"
+    return 1
+}
+
 # --- run ------------------------------------------------------------------------
 
 CASES=(
@@ -590,7 +838,12 @@ CASES=(
     cli_rejects_space_form out_inside_repo_refused triage_env_unset_uses_sibling
     triage_env_empty_uses_sibling markdown_escapes_pipe zero_rows_message near_miss_sha_kept
     near_miss_hold_code_accepted owner_gates_only_ci_fine stale_no_live_risky empty_env_runs
-    skill_doc_matches_gadget
+    skill_doc_matches_gadget discord_json_all_green discord_json_stale_review
+    discord_json_one_way_door discord_json_triage_fail discord_json_no_decision
+    discord_json_decision_present discord_json_hold_code_near_miss discord_json_no_sha_anywhere
+    discord_json_size_and_title discord_json_caps discord_json_flag_rejects
+    discord_json_writes_no_file discord_json_sender_run_hidden discord_json_triage_cwd
+    discord_json_matches_bot_fixture
 )
 
 for name in "${CASES[@]}"; do

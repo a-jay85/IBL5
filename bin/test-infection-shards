@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Harness for ibl5/bin/infection-shards. Builds a hermetic fixture tree and
 # summary logs under a temp dir, runs the script, and asserts exit codes plus
-# one substring per token. The workflow_* and settle_ignore cases grep the real
-# workflow files.
+# one substring per token. The workflow_* cases and case_settle_ignore read the
+# real workflow files; the case_settle_ignore_* fixture cases run the same
+# settle_ignore_check on temp copies under $BASE.
 # Usage: bin/test-infection-shards [case ...]
 # Prints PASS <case> / FAIL <case>: <why>, then "<n> passed, <m> failed".
 # ---
@@ -14,6 +15,7 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 TOOL="$ROOT/ibl5/bin/infection-shards"
 WF="$ROOT/.github/workflows/mutation.yml"
 SETTLED="$ROOT/.github/workflows/all-checks-settled.yml"
+SHARDS="$ROOT/ibl5/infection-shards.json"
 BASE=$(mktemp -d)
 trap 'rm -rf "$BASE"' EXIT
 
@@ -317,6 +319,7 @@ case_workflow_notify() {
 
 case_workflow_module_name() {
     wf_has "startsWith(matrix.shard, 'module-') && 'Infection PHP' ||"
+    wf_has "format('Infection PHP {0}', matrix.shard)"
 }
 
 case_workflow_dm_bar() {
@@ -324,15 +327,141 @@ case_workflow_dm_bar() {
     wf_lacks 'MSI dropped below 100'
 }
 
+# Report-only mutation.yml job names that must sit in the settle --ignore list.
+# The module-X dispatch run renders the bare 'Infection PHP' name.
+SETTLE_REQUIRED=('Infection PHP' 'Aggregate MSI' 'Mutation coverage' 'Plan mutation shards' 'Notify Mutation Failure')
+SETTLE_MISS='all-checks-settled.yml ignore list missing:'
+
+# settle_ignore_check <settled-yml> <shards-json>: note() each settle-ignore drift.
+# It compares whole comma-separated entries of the one --ignore='...' value,
+# because bin/check-pr-checks-green matches ignore names exactly.
+settle_ignore_check() {
+    local settled=$1 shards=$2 lines n value e t s name
+    local -a entries=() shard_ids=()
+    local -A have=()
+    lines=$(grep -E -- "--ignore='" "$settled" 2>/dev/null || true)
+    n=$(grep -c . <<< "$lines")
+    if [ "$n" -eq 0 ]; then note "settle ignore: no --ignore= line"; return; fi
+    if [ "$n" -gt 1 ]; then note "settle ignore: $n --ignore= lines, want 1"; return; fi
+    value=${lines#*--ignore=\'}
+    value=${value%%\'*}
+    if [ -z "$value" ]; then note "settle ignore: empty --ignore= value"; return; fi
+    IFS=, read -ra entries <<< "$value"
+    for e in "${entries[@]}"; do
+        [ -n "$e" ] || continue
+        have["$e"]=1
+    done
+    for t in "${SETTLE_REQUIRED[@]}"; do
+        [ -n "${have[$t]:-}" ] || note "$SETTLE_MISS $t"
+    done
+    if [ ! -r "$shards" ]; then note "settle ignore: cannot read shards file"; return; fi
+    mapfile -t shard_ids < <(grep -oE '"shard"[[:space:]]*:[[:space:]]*"[^"]+"' "$shards" 2>/dev/null | sed -E 's/.*"([^"]+)"$/\1/')
+    if [ "${#shard_ids[@]}" -eq 0 ]; then note "settle ignore: no shards in shards file"; return; fi
+    for s in "${shard_ids[@]}"; do
+        name="Infection PHP $s"
+        [ -n "${have[$name]:-}" ] || note "$SETTLE_MISS $name"
+    done
+}
+
 case_settle_ignore() {
-    local ignore_lines t s
-    ignore_lines=$(grep -e '--ignore' "$SETTLED" || true)
-    for t in 'Infection PHP' 'Aggregate MSI' 'Mutation coverage' 'Plan mutation shards'; do
-        if ! grep -qF -- "$t" <<< "$ignore_lines"; then note "all-checks-settled.yml ignore list missing: $t"; fi
-    done
-    for s in $(grep -oE '"shard": "[^"]+"' "$ROOT/ibl5/infection-shards.json" | sed -E 's/.*: "([^"]+)"/\1/'); do
-        if ! grep -qF -- "Infection PHP $s" <<< "$ignore_lines"; then note "all-checks-settled.yml ignore list missing: Infection PHP $s"; fi
-    done
+    settle_ignore_check "$SETTLED" "$SHARDS"
+}
+
+# settle_expect <want> <settled-yml> <shards-json>: run settle_ignore_check on
+# fixture files. want=PASS needs no drift; any other want must equal the drift
+# text exactly, so a fixture that fails for the wrong reason still fails.
+settle_expect() {
+    local want=$1 saved=$FAILED_WHY got
+    FAILED_WHY=""
+    settle_ignore_check "$2" "$3"
+    got=$FAILED_WHY
+    FAILED_WHY=$saved
+    if [ "$want" = PASS ]; then
+        [ -z "$got" ] || note "fixture should pass, got: $got"
+    elif [ "$got" != "$want" ]; then
+        note "fixture should fail with [$want], got: [${got:-a pass}]"
+    fi
+}
+
+settle_dir() { mktemp -d "$BASE/settle.XXXXXX"; }
+
+# shards_json <id...>: print a minimal shards file naming each id (none: zero shards).
+shards_json() {
+    local id sep=""
+    printf '{"excluded": [], "shards": ['
+    for id in "$@"; do printf '%s{"shard": "%s", "members": []}' "$sep" "$id"; sep=", "; done
+    printf ']}\n'
+}
+
+# Issue occurrence 1: the module-X dispatch run renders the bare 'Infection PHP'.
+case_settle_ignore_missing_bare() {
+    local d; d=$(settle_dir)
+    sed 's/,Infection PHP,/,/' "$SETTLED" > "$d/s.yml"
+    settle_expect "$SETTLE_MISS Infection PHP" "$d/s.yml" "$SHARDS"
+}
+
+case_settle_ignore_missing_notify() {
+    local d; d=$(settle_dir)
+    sed "s/,Notify Mutation Failure'/'/" "$SETTLED" > "$d/s.yml"
+    settle_expect "$SETTLE_MISS Notify Mutation Failure" "$d/s.yml" "$SHARDS"
+}
+
+# Issue occurrence 2: a new shard s11 with no ignore entry.
+case_settle_ignore_new_shard_s11() {
+    local d; d=$(settle_dir)
+    shards_json s01 s11 > "$d/j.json"
+    settle_expect "$SETTLE_MISS Infection PHP s11" "$SETTLED" "$d/j.json"
+}
+
+# Shard s1 is a prefix of the listed 'Infection PHP s10'.
+case_settle_ignore_prefix_shard_s1() {
+    local d; d=$(settle_dir)
+    shards_json s1 s10 > "$d/j.json"
+    settle_expect "$SETTLE_MISS Infection PHP s1" "$SETTLED" "$d/j.json"
+}
+
+# Near miss: the list holds 'Infection PHP s10x', which contains the real name.
+case_settle_ignore_near_miss_entry() {
+    local d; d=$(settle_dir)
+    sed 's/,Infection PHP s10,/,Infection PHP s10x,/' "$SETTLED" > "$d/s.yml"
+    shards_json s10 > "$d/j.json"
+    settle_expect "$SETTLE_MISS Infection PHP s10" "$d/s.yml" "$d/j.json"
+}
+
+# Near miss: a "shard_count" key is not a shard id.
+case_settle_ignore_shard_key_near_miss() {
+    local d; d=$(settle_dir)
+    printf '%s\n' '{"shard_count": "s99", "shards": [{"shard": "s01", "members": []}]}' > "$d/j.json"
+    settle_expect PASS "$SETTLED" "$d/j.json"
+}
+
+case_settle_ignore_no_ignore_line() {
+    local d; d=$(settle_dir)
+    sed "/--ignore='/d" "$SETTLED" > "$d/s.yml"
+    settle_expect "settle ignore: no --ignore= line" "$d/s.yml" "$SHARDS"
+}
+
+case_settle_ignore_multiple_ignore_lines() {
+    local d; d=$(settle_dir)
+    sed "/--ignore='/p" "$SETTLED" > "$d/s.yml"
+    settle_expect "settle ignore: 2 --ignore= lines, want 1" "$d/s.yml" "$SHARDS"
+}
+
+case_settle_ignore_empty_value() {
+    local d; d=$(settle_dir)
+    sed -E "s/--ignore='[^']*'/--ignore=''/" "$SETTLED" > "$d/s.yml"
+    settle_expect "settle ignore: empty --ignore= value" "$d/s.yml" "$SHARDS"
+}
+
+case_settle_ignore_zero_shards() {
+    local d; d=$(settle_dir)
+    shards_json > "$d/j.json"
+    settle_expect "settle ignore: no shards in shards file" "$SETTLED" "$d/j.json"
+}
+
+case_settle_ignore_unreadable_shards() {
+    local d; d=$(settle_dir)
+    settle_expect "settle ignore: cannot read shards file" "$SETTLED" "$d/absent.json"
 }
 
 ALL_CASES="case_check_clean case_check_missing_entry case_check_duplicate_entry
@@ -343,7 +472,13 @@ case_aggregate_missing_shard case_aggregate_zero_mutants case_aggregate_total_dr
 case_aggregate_unknown_label case_aggregate_near_miss_total case_aggregate_report_only
 case_aggregate_skipped_ignored case_flags_space_form case_flags_unknown
 case_workflow_matrix case_workflow_shard_step case_workflow_aggregate case_workflow_module_name
-case_workflow_notify case_workflow_dm_bar case_settle_ignore"
+case_workflow_notify case_workflow_dm_bar case_settle_ignore
+case_settle_ignore_missing_bare case_settle_ignore_missing_notify
+case_settle_ignore_new_shard_s11 case_settle_ignore_prefix_shard_s1
+case_settle_ignore_near_miss_entry case_settle_ignore_shard_key_near_miss
+case_settle_ignore_no_ignore_line case_settle_ignore_multiple_ignore_lines
+case_settle_ignore_empty_value case_settle_ignore_zero_shards
+case_settle_ignore_unreadable_shards"
 
 if [ $# -gt 0 ]; then
     for c in "$@"; do

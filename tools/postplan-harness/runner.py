@@ -1649,6 +1649,18 @@ def _protected_lines_dropped(before: str, after: str) -> bool:
     return any(ln not in have for ln in keep)
 
 
+def _mark_notes_round_remediation(fid: dict) -> None:
+    """Record a READY notes round as a body-only remediation.
+
+    A commit round that already wrote a real sha keeps it: that round cleared the
+    blocking findings, and the terminal line names it. findings_round and
+    rounds_completed stay as the round loop left them, because the notes round
+    never appends to fid["rounds"] and both keys are read against that list.
+    """
+    if not fid.get("remediation_sha"):
+        fid["remediation_sha"] = BODY_ONLY_SHA
+
+
 def _notes_body_round(llm, git, gh, out_dir, worktree, plan, master_sha, pr, res,
                       prior_verdict_path, findings, round_num, log):
     """One PR-body-only pass for a READY WITH NOTES verdict whose notes are all pr-copy.
@@ -4747,6 +4759,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                 res.fidelity["review_items"].append(
                     {**fidelity.verdict_items(path_notes), "remediation_sha": BODY_ONLY_SHA})
                 log("phase5.5 notes round: every pr-copy note resolved; verdict READY")
+                _mark_notes_round_remediation(res.fidelity)
         if final_verdict == "READY WITH NOTES":
             filed_notes: list = []
             nums = fidelity.file_note_issues(gh, notes, pr, log=log, filed=filed_notes)

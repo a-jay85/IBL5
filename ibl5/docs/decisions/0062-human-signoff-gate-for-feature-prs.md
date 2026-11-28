@@ -1,6 +1,6 @@
 ---
 description: Feature PRs (conventional-commit `feat:`) cannot merge until a human applies the `human-approved` label — a required CI check, not a convention, blocks auto-merge.
-last_verified: 2026-11-24
+last_verified: 2026-11-27
 ---
 
 # ADR-0062: Human sign-off gate for feature PRs
@@ -169,3 +169,11 @@ A Dependabot-triggered `workflow_run` gets a read-only token, so its status POST
 
 - [backlog#1962](https://github.com/a-jay85/IBL5-backlog/issues/1962): nothing re-runs the gate when its verdict goes stale, as after a late VR gallery or a Dependabot run.
 - [backlog#1958](https://github.com/a-jay85/IBL5-backlog/issues/1958): any PR-triggered workflow job can still post its own `human-signoff` status, because the protection pin names the shared Actions app and not one workflow.
+
+## Update 2026-11-27: Dependabot dev-dependency minor bumps
+
+The Dependabot dev-dependency exemption from the 2026-11-13 Update now covers minor bumps as well as patch bumps. `UI_DEVPATCH_JQ` in `bin/lib/ui-change-classifier.sh` accepts a changed devDependencies version when the `^` or `~` prefix and the major number stay the same and the minor number goes up. It still accepts a version whose minor stays the same and whose patch goes up. When the major number is 0, the minor must stay the same, because a caret range on 0.x treats a minor bump as breaking. The composer carve-out uses the same 0.x rule.
+
+Every other condition stays. The author must be `dependabot[bot]`. The diff may touch only `ibl5/package.json` and `ibl5/bun.lock`. Nothing outside devDependencies may change, and no package may be added or removed. The packages that run inside the VR measurement (`pixelmatch`, `pngjs`, and any name containing `playwright`) still hold. The PR still waits on a clean VR gallery.
+
+The owner chose this on 2026-11-27 after [PR #4261](https://github.com/a-jay85/IBL5/pull/4261) (typescript-eslint 8.73.0 to 8.74.0) waited for a manual label. The owner rejected an exemption for every UI PR with a clean gallery, because the gallery does not screenshot every page. `bin/test-human-signoff-classifier` pins the minor, major, downgrade, prefix, 0.x and toolchain cases in its `dp_` rows.

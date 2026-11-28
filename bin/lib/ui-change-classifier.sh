@@ -126,10 +126,12 @@ if ($b | length) != 1 or ($h | length) != 1 then false else
       and sectok($b0["require-dev"]; $h0["require-dev"])
     end
   end'
-# Dependabot dev-dependency patch exemption (ADR-0062 Update 2026-11-13).
+# Dependabot dev-dependency patch or minor exemption (ADR-0062 Updates 2026-11-13 and 2026-11-27).
 # ui_dev_patch_exempt compares ibl5/package.json and ibl5/bun.lock between the
 # base checkout (UI_BASE_DIR) and the PR head checkout (UI_HEAD_DIR). One regex
 # validates and splits a version: an optional ^ or ~, then three numbers.
+# UI_DEVPATCH_JQ accepts a version that keeps the prefix and major and raises
+# the minor (major above 0 only), or keeps the minor and raises the patch.
 UI_DEVPATCH_SEMVER='^(?<p>[~^]?)(?<a>0|[1-9][0-9]{0,8})[.](?<i>0|[1-9][0-9]{0,8})[.](?<c>0|[1-9][0-9]{0,8})$'
 UI_DEVPATCH_JQ='
 if ($b | length) != 1 or ($h | length) != 1 then error("not one JSON document") else . end
@@ -145,7 +147,7 @@ if ($b | length) != 1 or ($h | length) != 1 then error("not one JSON document") 
 | if ($o | type) != "string" or ($n | type) != "string" then error("version is not a string: \($k)") else . end
 | if ($o | test($re) | not) or ($n | test($re) | not) then error("unparseable version: \($k)") else . end
 | ($o | capture($re)) as $x | ($n | capture($re)) as $y
-| if $x.p == $y.p and $x.a == $y.a and $x.i == $y.i and ($y.c | tonumber) > ($x.c | tonumber) then $k else error("not a patch bump: \($k)") end
+| if $x.p == $y.p and $x.a == $y.a and ((($y.i | tonumber) > ($x.i | tonumber) and $x.a != "0") or ($x.i == $y.i and ($y.c | tonumber) > ($x.c | tonumber))) then $k else error("not a patch or minor bump: \($k)") end
 '
 UI_PKG_DEP_RE='^    "[^"]+": "[^"]+",?$'
 UI_LOCK_WS_RE='^        "([^"]+)": "([^"]+)",?$'
@@ -298,7 +300,7 @@ _ui_lock_ok() {
 }
 
 # ui_dev_patch_exempt <paths_file> <pr_author>: rc 0 when the PR is a Dependabot
-# patch bump of ibl5 devDependencies that may skip the ui-paths verdict.
+# patch or minor bump of ibl5 devDependencies that may skip the ui-paths verdict.
 # Env: UI_BASE_DIR (trusted base checkout root), UI_HEAD_DIR (PR head root).
 # The head tree is data only. rc 1 on every other input and on any failure.
 ui_dev_patch_exempt() {
@@ -647,7 +649,7 @@ ui_approving_event() {
 # decides with no gallery, so it holds as vr-missing and records its
 # fingerprint at once. Every other event waits as before.
 # rc follows ui_decide (0 not-ui, 1 hold).
-# A Dependabot dev-dependency patch bump (ui_dev_patch_exempt) waits on the gallery like a non-UI PR.
+# A Dependabot dev-dependency patch or minor bump (ui_dev_patch_exempt) waits on the gallery like a non-UI PR.
 # A Dependabot composer patch or minor bump (ui_composer_exempt) also waits.
 # A PR whose UI path hits are all View, Renderer or Formatter class files also
 # waits, except on the approving run; ui_decide then checks renderedViewFiles.

@@ -755,21 +755,11 @@ final class Season2004BoxscoreRestoreTest extends DatabaseTestCase
     }
 
     /**
-     * Known accepted defect — do NOT fix.
-     *
-     * GameBoxscoreRepository::getGameInfo() computes awayScore and homeScore as
-     * `visitor_q1_points + visitor_q2_points + ... + COALESCE(visitor_ot_points, 0)`.
-     * When any quarter column is SQL NULL, the arithmetic chain evaluates to NULL, and
-     * GameBoxscoreService::getBoxscore() casts that as `(int)(NULL ?? 0) = 0`. The
-     * restored 2004-02-09 rows land NULL quarters by design (the source did not carry
-     * them), so the boxscore header will render 0–0 instead of 108–136.
-     *
-     * The correct final scores ARE accessible via calc_points (player totals), which
-     * is a separate generated column independent of the quarter columns; the totals row
-     * reflects those correctly. The header discrepancy is an intentional, out-of-scope
-     * gap documented in Season2004BoxscoreRestore's class docblock.
+     * The restored 2004-02-09 rows carry NULL quarters because the source did not
+     * have them. The quarter sum is then NULL, so GameBoxscoreRepository::getGameInfo()
+     * falls back to each team row's calc_points and the header shows 108 and 136.
      */
-    public function testKnownDefectNullQuarterHeaderRendersZero(): void
+    public function testNullQuarterHeaderShowsCalcPointsScores(): void
     {
         // Use two high-PID scratch players so T1 rollback cleans them.
         $scratchPid1 = 200001003;
@@ -780,8 +770,8 @@ final class Season2004BoxscoreRestoreTest extends DatabaseTestCase
         $this->cleanRestoredCoordinate();
         $this->insertRestoredTeamRowsWithNullQuarters();
 
-        // Insert two player rows so computeTotals() yields non-zero pts, making the
-        // contrast with the 0-header visible.
+        // Two player rows give computeTotals() non-zero pts. Their points differ from
+        // the team rows, so the header scores below can only come from the team rows.
         $this->insertPlayerBoxscoreRow(
             Season2004BoxscoreRestore::GAME_DATE,
             $scratchPid1,
@@ -823,13 +813,11 @@ final class Season2004BoxscoreRestoreTest extends DatabaseTestCase
 
         self::assertTrue($boxscore['found'], 'Boxscore must be found after seeding the restored rows');
 
-        // Defect: NULL quarter columns → awayScore = NULL → (int)(NULL ?? 0) = 0.
-        self::assertSame(0, $boxscore['awayTeam']['score'], 'Known defect: NULL quarters cause awayScore to render as 0 instead of the real Suns score');
-        self::assertSame(0, $boxscore['homeTeam']['score'], 'Known defect: NULL quarters cause homeScore to render as 0 instead of the real Heat score');
+        self::assertSame(108, $boxscore['awayTeam']['score'], 'Away header score must come from the Suns team row calc_points');
+        self::assertSame(136, $boxscore['homeTeam']['score'], 'Home header score must come from the Heat team row calc_points');
 
-        // Contrast: player-row totals (from calc_points) ARE non-zero, proving the
-        // data is present and the defect is isolated to the quarter-sum path.
-        self::assertGreaterThan(0, $boxscore['awayTotals']['pts'], 'Away totals from player rows must be non-zero despite the header defect');
-        self::assertGreaterThan(0, $boxscore['homeTotals']['pts'], 'Home totals from player rows must be non-zero despite the header defect');
+        // The totals row still sums the player rows.
+        self::assertGreaterThan(0, $boxscore['awayTotals']['pts'], 'Away totals from player rows must be non-zero');
+        self::assertGreaterThan(0, $boxscore['homeTotals']['pts'], 'Home totals from player rows must be non-zero');
     }
 }

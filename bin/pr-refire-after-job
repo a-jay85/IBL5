@@ -17,15 +17,17 @@
 #              check passes, so a moved head means it passed.
 #   --wt       the PR worktree (default: bin/pr-wt-resolve N).
 #   --log      log file (default: <dir of --result>/wN.out).
+#   --then-finish  after post-plan-now exits 0, run bin/owner-approve N --finish --detach.
 #
-# It detaches itself and returns at once, printing the log path. Then it:
+# It submits itself as launchd job com.ibl5.pr-refire-N and returns at once, printing the log path. Then it:
 #   1. waits until FILE is non-empty or the pid is gone, then 30s more;
 #   2. skips and DMs the owner if FILE starts with "blocked" or the head did not move;
 #   3. skips with no DM if a post-plan run is already live (that run DMs at its end);
 #   4. runs (cd WT && env -u CLAUDE_HEADLESS bin/post-plan-now --auto);
 #   5. DMs the owner if post-plan-now exits non-zero (exit 9 and 10 send no DM of their own).
+#   6. with --then-finish and post-plan-now exit 0, runs bin/owner-approve N --finish --detach (DM on non-zero).
 #
-# Exit codes (foreground call): 0 detached, 2 bad input.
+# Exit codes (foreground call): 0 detached, 2 bad input or launch failure, 3 --then-finish under CLAUDE_HEADLESS, 7 a waiter for N is already live.
 # Test knobs: PRRA_POLL (default 60) and PRRA_SETTLE (default 30) seconds,
 # PRRA_FOREGROUND=1 runs without detaching.
 [ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
@@ -37,7 +39,7 @@ if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
 fi
 
 N="${1:-}"; shift || true
-PID=""; RESULT=""; PRE=""; WT=""; LOG=""
+PID=""; RESULT=""; PRE=""; WT=""; LOG=""; THEN_FINISH=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --pid) PID="${2:-}"; shift 2 || exit 2 ;;
@@ -45,6 +47,7 @@ while [ $# -gt 0 ]; do
     --pre-sha) PRE="${2:-}"; shift 2 || exit 2 ;;
     --wt) WT="${2:-}"; shift 2 || exit 2 ;;
     --log) LOG="${2:-}"; shift 2 || exit 2 ;;
+    --then-finish) THEN_FINISH=1; shift ;;
     *) echo "pr-refire-after-job: unknown arg: $1" >&2; exit 2 ;;
   esac
 done
@@ -59,10 +62,36 @@ if [ -z "$WT" ]; then
 fi
 [ -n "$WT" ] && [ -d "$WT" ] || { echo "pr-refire-after-job: no worktree for #$N (pass --wt)" >&2; exit 2; }
 [ -n "$LOG" ] || LOG="$(dirname "$RESULT")/w$N.out"
+case "$RESULT" in /*) ;; *) RESULT="$PWD/$RESULT" ;; esac
+case "$LOG" in /*) ;; *) LOG="$PWD/$LOG" ;; esac
+WT=$(cd "$WT" && pwd)
+SELF="$(cd "$(dirname "$0")" && pwd)/${0##*/}"
 
 if [ "${PRRA_FOREGROUND:-}" != 1 ] && [ "${PRRA_CHILD:-}" != 1 ]; then
-  PRRA_CHILD=1 nohup "$0" "$N" --pid "$PID" --result "$RESULT" --pre-sha "$PRE" --wt "$WT" --log "$LOG" >/dev/null 2>&1 &
-  echo "pr-refire-after-job: waiting on #$N (pid $!). Log: $LOG"
+  # A nohup child dies with the Bash tool's process group; a launchctl submit job does not.
+  # launchd drops CLAUDE_HEADLESS, so a detached --then-finish would get past owner-approve's headless guard.
+  if [ "$THEN_FINISH" -eq 1 ] && [ -n "${CLAUDE_HEADLESS:-}" ]; then
+    echo "pr-refire-after-job: CLAUDE_HEADLESS is set. --then-finish needs an interactive session. Nothing started." >&2
+    printf 'RESULT: headless\n'
+    exit 3
+  fi
+  # shellcheck source=bin/lib/launchd-job.sh
+  . "$(dirname "$SELF")/lib/launchd-job.sh"
+  label="com.ibl5.pr-refire-$N"
+  dir="$HOME/Library/Caches/com.ibl5.pr-refire"
+  script="$dir/pr-refire-$N.sh"
+  snap=$(launchctl list 2>/dev/null) || { echo "pr-refire-after-job: launchctl list failed" >&2; exit 2; }
+  if awk -F'\t' -v l="$label" '$3 == l {f=1} END {exit !f}' <<< "$snap"; then
+    echo "pr-refire-after-job: waiter $label is already live on #$N. Nothing started." >&2
+    exit 7
+  fi
+  mkdir -p "$dir" || exit 2
+  rm -rf "$script.once"
+  extra=""; [ "$THEN_FINISH" -eq 1 ] && extra=" --then-finish"
+  printf '#!/usr/bin/env bash\nPRRA_CHILD=1 %s %s --pid %s --result %s --pre-sha %s --wt %s --log %s%s\nrc=$?\nrm -f "$0"\nexit "$rc"\n' \
+    "$(shq "$SELF")" "$N" "$PID" "$(shq "$RESULT")" "$PRE" "$(shq "$WT")" "$(shq "$LOG")" "$extra" > "$script" && chmod +x "$script" || exit 2
+  ljob_submit "$label" "$LOG" "$script" || { echo "pr-refire-after-job: launchctl submit failed for $label" >&2; exit 2; }
+  echo "pr-refire-after-job: waiting on #$N (launchd job $label). Log: $LOG"
   exit 0
 fi
 
@@ -103,4 +132,10 @@ log "firing post-plan-now on head $HEAD"
 rc=$?
 log "post-plan-now rc=$rc"
 [ "$rc" -ne 0 ] && dm "PR #$N: post-plan-now exited $rc. See $LOG"
+if [ "$rc" -eq 0 ] && [ "$THEN_FINISH" -eq 1 ]; then
+  "$(dirname "$SELF")/owner-approve" "$N" --finish --detach >> "$LOG" 2>&1
+  orc=$?
+  log "owner-approve --finish --detach rc=$orc"
+  [ "$orc" -ne 0 ] && dm "PR #$N: post-plan re-fired, but owner-approve --finish --detach exited $orc. See $LOG"
+fi
 exit 0

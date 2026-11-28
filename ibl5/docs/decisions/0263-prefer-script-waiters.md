@@ -1,6 +1,6 @@
 ---
 description: A detached shell script, bin/pr-refire-after-job, waits for a /pr-burndown prep job and re-fires post-plan, so a wait whose next step needs the owner wakes no Claude session.
-last_verified: 2026-11-17
+last_verified: 2026-11-27
 ---
 
 > This ADR was drafted by the post-plan harness for this PR. A human must review and approve it before merging.
@@ -42,3 +42,7 @@ When a wait ends in a step that needs the owner, a detached script does the foll
 - `.claude/rules/work-triage.md` (repeat-polling section)
 - `.claude/rules/work-triage-detail.md` (the readiness predicate)
 - `.claude/skills/pr-burndown/SKILL.md` (follow-up carriers)
+
+## Addendum (2026-11-27): the waiter detaches through launchd
+
+The Decision section records `nohup`. A `nohup` child dies with the Bash tool's process group, as the `bin/post-plan-now` header explains. `bin/pr-refire-after-job` now submits launchd job `com.ibl5.pr-refire-N`. Its `--then-finish` flag chains `bin/owner-approve N --finish --detach` after a re-fire that exits 0. The script refuses that flag under `CLAUDE_HEADLESS`.

@@ -21,7 +21,7 @@ mkdir -p "$TMP/shims" "$TMP/fx" "$TMP/wt"
 export PATH="$TMP/shims:$PATH"
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.invalid
 export GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.invalid
-unset CLAUDE_HEADLESS T3CODE_THREAD_ID CLAUDE_CODE_SESSION_ID OA_DETACHED_CHILD LJOB_LOCK_DIR LAUNCHCTL_CMD
+unset CLAUDE_HEADLESS T3CODE_THREAD_ID CLAUDE_CODE_SESSION_ID OA_DETACHED_CHILD LJOB_LOCK_DIR LAUNCHCTL_CMD PRRA_CHILD PRRA_FOREGROUND PRRA_POLL PRRA_SETTLE
 
 WHY=""      # failure reasons for the current case
 OUT=""      # combined stdout+stderr of the last run
@@ -59,12 +59,17 @@ case "${1:-} ${2:-}" in
         [ -e "$FX/fail.pr-view" ] && exit 1
         left=0
         [ -f "$FX/pr.live.left" ] && left=$(cat "$FX/pr.live.left")
+        src="$FX/pr.json"
         if [ "$left" -gt 0 ]; then
             echo $((left - 1)) > "$FX/pr.live.left"
-            cat "$FX/pr.live.json"
-        else
-            cat "$FX/pr.json"
-        fi ;;
+            src="$FX/pr.live.json"
+        fi
+        expr=""; prev=""
+        for x in "$@"; do
+            [ "$prev" = "--jq" ] && expr=$x
+            prev=$x
+        done
+        if [ -n "$expr" ]; then jq -r "$expr" "$src"; else cat "$src"; fi ;;
     "pr comment")
         f=""; prev=""
         for x in "$@"; do
@@ -1434,6 +1439,75 @@ detach_child_env_empty_arms() {
     want_armed
 }
 
+# ---------------------------------------------------------------------------
+# bin/pr-refire-after-job: launchd detach and --then-finish
+# ---------------------------------------------------------------------------
+PRRA="$TMP/fix/bin/pr-refire-after-job"
+prra_job_script() { printf '%s' "$FX/home/Library/Caches/com.ibl5.pr-refire/pr-refire-$PR.sh"; }
+run_prra() { # [extra args...]
+    run_oa_env HOME="$FX/home" "$PRRA" "$PR" --pid 1 --result "$FX/r.txt" --pre-sha abcdef1 --wt "$WT" "$@"
+}
+prra_submits_launchd_job() {
+    fresh prra_submits_launchd_job
+    local script
+    script=$(prra_job_script)
+    run_prra
+    want_rc 0
+    want_out "launchd job com.ibl5.pr-refire-$PR"
+    want_lc "submit -l com.ibl5.pr-refire-$PR "
+    refute_lc " ''"
+    grep -qF 'PRRA_CHILD=1' "$script" 2>/dev/null || note "job script lacks PRRA_CHILD=1"
+    grep -qF -- "$FX/r.txt" "$script" 2>/dev/null || note "job script lacks the --result path"
+    grep -qF -- "$FX/w$PR.out" "$script" 2>/dev/null || note "job script lacks the --log path"
+    run_oa_env HOME="$FX/home" "$PRRA" "$PR" --pid 1 --result rel/r.txt --log rel/w.out --pre-sha abcdef1 --wt "$WT"
+    want_rc 0
+    grep -qE -- "--result '?/[^ ]*/rel/r\.txt" "$script" 2>/dev/null || note "a relative --result was not made absolute"
+    grep -qE -- "--log '?/[^ ]*/rel/w\.out" "$script" 2>/dev/null || note "a relative --log was not made absolute"
+}
+prra_busy() {
+    fresh prra_busy
+    list_label "com.ibl5.pr-refire-$PR" 5
+    run_prra
+    want_rc 7
+    refute_lc "submit"
+}
+prra_then_finish_headless_detached_refuses() {
+    fresh prra_then_finish_headless_detached_refuses
+    run_oa_env HOME="$FX/home" CLAUDE_HEADLESS=1 "$PRRA" "$PR" --pid 1 --result "$FX/r.txt" --pre-sha abcdef1 --wt "$WT" --then-finish
+    want_rc 3
+    want_out "RESULT: headless"
+    refute_lc "submit"
+    run_oa_env HOME="$FX/home" CLAUDE_HEADLESS=1 "$PRRA" "$PR" --pid 1 --result "$FX/r.txt" --pre-sha abcdef1 --wt "$WT"
+    want_rc 0
+    want_lc "submit -l com.ibl5.pr-refire-$PR "
+}
+run_prra_fg() { # [env assignment]: the whole waiter in the foreground, head moved, job passed
+    local pre=1111111
+    case "$H" in 1111111*) pre=2222222 ;; esac
+    echo passed > "$FX/r.txt"
+    run_oa_env HOME="$FX/home" PRRA_FOREGROUND=1 PRRA_POLL=0 PRRA_SETTLE=0 ${1+"$1"} \
+        "$PRRA" "$PR" --pid 999999 --result "$FX/r.txt" --pre-sha "$pre" --wt "$WT" --then-finish
+    want_rc 0
+    grep -qF -- '--auto' "$FX/refire.log" 2>/dev/null || note "post-plan-now --auto did not run"
+}
+prra_then_finish_chains() {
+    fresh prra_then_finish_chains
+    run_prra_fg
+    want_lc "submit -l com.ibl5.owner-approve-$PR "
+}
+prra_then_finish_headless_launches_nothing() {
+    fresh prra_then_finish_headless_launches_nothing
+    run_prra_fg CLAUDE_HEADLESS=1
+    refute_lc "com.ibl5.owner-approve-$PR"
+    grep -qF 'owner-approve --finish --detach rc=3' "$FX/w$PR.out" 2>/dev/null || note "owner-approve did not refuse with exit 3"
+}
+prra_rejects_then_finish_value() {
+    fresh prra_rejects_then_finish_value
+    run_prra --then-finish=x
+    want_rc 2
+    want_out "unknown arg"
+}
+
 ALL_CASES="
 body_literal body_option ids_unset ids_empty headless_refuses headless_empty_proceeds
 usage_unknown_flag usage_space_form no_repo_writes
@@ -1459,6 +1533,8 @@ detach_launches_finish_child detach_finish_launches_no_post detach_submit_argv_e
 detach_child_not_self_live detach_child_refuse_dms detach_child_timeout_dms detach_child_arms_no_dm detach_child_crash_dms
 detach_child_fixfirst_wins detach_child_fixfirst_unread_head_wins detach_child_foreign_fixfirst_ignored
 detach_child_env_unset_arms detach_child_env_empty_arms
+prra_submits_launchd_job prra_busy prra_then_finish_headless_detached_refuses
+prra_then_finish_chains prra_then_finish_headless_launches_nothing prra_rejects_then_finish_value
 "
 
 oa_mask() { sed -E -e "s#$TMP#<TMP>#g" -e 's#owner-approve\.[A-Za-z0-9]+#owner-approve.X#g' -e 's#[0-9a-f]{40}#<SHA>#g'; }

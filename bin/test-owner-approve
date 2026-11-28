@@ -157,6 +157,7 @@ git init -q "$TMP/fix"
 git -C "$TMP/fix" symbolic-ref HEAD refs/heads/master
 git -C "$TMP/fix" config commit.gpgsign false
 mkdir -p "$TMP/fix/bin"
+# The ":-" form matters. With ${OA_SRC- an empty OA_SRC would be copied in place of the repo script.
 cp "${OA_SRC:-$REPO/bin/owner-approve}" "$TMP/fix/bin/owner-approve"
 cp "$REPO/bin/pr-refire-after-job" "$TMP/fix/bin/pr-refire-after-job"
 cp -R "$REPO/bin/lib" "$TMP/fix/bin/lib"
@@ -1234,7 +1235,7 @@ detach_second_run_busy() {
 }
 detach_busy_near_miss() {
     fresh detach_busy_near_miss
-    list_label "com.ibl5.owner-approve-${PR}7" 5
+    list_label "com.ibl5.owner-approve-7777" 5 # PR 777 plus one digit
     run_detach "ok" --detach
     want_rc 0
     want_out "RESULT: detached"
@@ -1329,6 +1330,13 @@ detach_child_not_self_live() {
     list_label "com.ibl5.owner-approve-$PR" 3
     printf '555 /usr/bin/env bash %s/bin/owner-approve %s --finish --timeout=30 --poll=0\n' "$WT" "$PR" > "$FX/pgrep.lf"
     echo 3 > "$FX/pgrep.left"
+    # Outside the worktree path, that line must name owner-approve and miss the live pattern.
+    # Then a _oa_live pattern widened to 'post-plan|postplan|owner-approve' turns this case red.
+    local argv
+    argv=$(cat "$FX/pgrep.lf")
+    argv=${argv//"$WT"/}
+    grep -Eq 'post-plan|postplan|owner-approve' <<< "$argv" || note "the pgrep line no longer names owner-approve"
+    if grep -Eq 'post-plan|postplan' <<< "$argv"; then note "the pgrep line matches the live pattern by itself"; fi
     run_oa_env HOME="$FX/home" OA_DETACHED_CHILD=1 "$OA" "$PR" --finish --poll=0 --timeout=30
     want_rc 0
     want_out "RESULT: armed"

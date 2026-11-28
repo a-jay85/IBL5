@@ -502,14 +502,6 @@ def call_notes(row: Row) -> List[str]:
     return notes
 
 
-def reply_line(row: Row) -> list:
-    count = len(row.entry["options"])
-    line = [("t", "Reply "), ("code", f"{row.number}: 1")]
-    if count > 1:
-        line += [("t", " to "), ("code", f"{row.number}: {count}")]
-    return line
-
-
 def readable(value: object) -> str:
     return value if isinstance(value, str) else "could not read"
 
@@ -662,7 +654,7 @@ def html_row(row: Row) -> str:
     cells += [html_cell(css, row.cells[key]) for key, css in STATUS_CELLS]
     call = []
     if row.owner_call:
-        call += [esc(row.entry["call"]), html_line(reply_line(row))]
+        call.append(esc(row.entry["call"]))
     call += [f'<span class="note">{esc(note)}</span>' for note in call_notes(row)]
     cells.append(f'<td class="c-call">{"<br>".join(call)}</td>')
     return one_line(f'<tr class="row" id="pr-{n}">{"".join(cells)}</tr>')
@@ -726,7 +718,7 @@ def md_row(row: Row) -> str:
         cells.append(" ".join(part for part in (cell.icon, md_cell(cell.note)) if part))
     call = []
     if row.owner_call:
-        call += [md_cell(row.entry["call"]), md_line(reply_line(row))]
+        call.append(md_cell(row.entry["call"]))
     call += [md_cell(note) for note in call_notes(row)]
     cells.append(" · ".join(call))
     return "| " + " | ".join(cells) + " |"

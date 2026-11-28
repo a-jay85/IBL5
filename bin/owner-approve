@@ -7,6 +7,7 @@
 #       [--timeout=<seconds>] [--poll=<seconds>]
 #   bin/owner-approve N --finish [--timeout=<seconds>] [--poll=<seconds>]
 #   bin/owner-approve N --record-amendments
+#   bin/owner-approve N --carry [--poll=<s>]   (post-plan harness only)
 #   bin/owner-approve N "<owner's words>" [--option=<picked>] --detach [--timeout=<s>] [--poll=<s>]
 #   bin/owner-approve N --finish --detach [--timeout=<s>] [--poll=<s>]
 #
@@ -28,7 +29,11 @@
 # From a Claude chat session pass --detach. The call posts the approval (nothing for
 # --finish), starts launchd job com.ibl5.owner-approve-N running "N --finish", prints the
 # log path and returns. Without --detach it waits in the foreground (bin/approve-click-tick).
-# The last stdout line is RESULT: armed|refused|timeout|fix-first-recorded|amendments-recorded|detached|busy|headless|usage.
+# The last stdout line is RESULT: armed|refused|timeout|fix-first-recorded|amendments-recorded|detached|busy|headless|usage|carried|carry-unchanged|not-carried.
+# --carry (ADR-0062 Update 2026-11-27) re-adds human-approved when the head moved only through
+# post-plan's own recorded fix commits that touch no gate file, the PR has no UI path, and the
+# verdict on the head is READY. It never arms and never waits. Exit 0 carried or carry-unchanged;
+# 4 not-carried, nothing posted; 2 usage. CLAUDE_HEADLESS does not block it.
 # Exit: 0 armed; 2 usage error, nothing posted; 3 CLAUDE_HEADLESS set, nothing
 # posted; 4 not armed, a reason comment posted whenever gh can post one; 5 a
 # post-plan run was still live at --timeout, reason comment posted; 6 fix-first
@@ -46,20 +51,17 @@ if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     exit 0
 fi
 
-if [ -n "${CLAUDE_HEADLESS:-}" ]; then
-    printf 'owner-approve: CLAUDE_HEADLESS is set. An owner approval needs an interactive session. Nothing posted.\n' >&2
-    printf 'RESULT: headless\n'
-    exit 3
-fi
-
 OA_REPO=a-jay85/IBL5
 OA_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=bin/lib/held-prs.sh
 . "$OA_ROOT/bin/lib/held-prs.sh"
 # shellcheck source=bin/lib/human-signoff-classifier.sh
 . "$OA_ROOT/bin/lib/human-signoff-classifier.sh"
+# shellcheck source=bin/lib/ui-change-classifier.sh
+. "$OA_ROOT/bin/lib/ui-change-classifier.sh"
 
-OA_PR="" OA_WORDS="" OA_OPTION="" OA_FIX="" OA_FINISH=0 OA_TIMEOUT=3600 OA_POLL=20 OA_WT="" OA_KEPT_ACCEPTED=0 OA_RECORD=0 OA_DETACH=0 oa_lock_held=0 oa_rec_n=0
+OA_PR="" OA_WORDS="" OA_OPTION="" OA_FIX="" OA_FINISH=0 OA_TIMEOUT=3600 OA_POLL=20 OA_WT="" OA_KEPT_ACCEPTED=0 OA_RECORD=0 OA_DETACH=0 oa_lock_held=0 oa_rec_n=0 OA_CARRY=0
+OA_CARRY_TRIES=20 OA_HARNESS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/tools/postplan-harness"
 head_tree_armed="" head="" branch="" state="" labels=",," rec_mode=approve rec_head="" rec_diff="" rec_kept=false me="" comments="" verdict_word=""
 _oa_usage() { printf 'owner-approve: %s\n' "$1" >&2; printf 'RESULT: usage\n'; exit 2; }
 pos=0
@@ -71,6 +73,8 @@ while [ $# -gt 0 ]; do
         --timeout=*) OA_TIMEOUT="${1#--timeout=}" ;;
         --poll=*) OA_POLL="${1#--poll=}" ;;
         --finish) OA_FINISH=1 ;;
+        --carry) OA_CARRY=1 ;;
+        --carry=*) _oa_usage "--carry takes no value" ;;
         --record-amendments) OA_RECORD=1 ;;
         --record-amendments=*) _oa_usage "--record-amendments takes no value" ;;
         --detach) OA_DETACH=1 ;;
@@ -87,13 +91,21 @@ while [ $# -gt 0 ]; do
     esac
     shift
 done
+if [ "$OA_CARRY" -eq 0 ] && [ -n "${CLAUDE_HEADLESS:-}" ]; then
+    printf 'owner-approve: CLAUDE_HEADLESS is set. An owner approval needs an interactive session. Nothing posted.\n' >&2
+    printf 'RESULT: headless\n'
+    exit 3
+fi
 case "$OA_PR" in ''|0*|*[!0-9]*) _oa_usage "the first argument must be a PR number" ;; esac
 case "$OA_TIMEOUT$OA_POLL" in *[!0-9]*) _oa_usage "--timeout and --poll take whole seconds" ;; esac
 if [ "$OA_DETACH" -eq 1 ] && [ "$OA_RECORD" -eq 1 ]; then _oa_usage "--detach cannot be combined with --record-amendments"; fi
 if [ "$OA_DETACH" -eq 1 ] && [ -n "$OA_FIX" ]; then _oa_usage "--detach cannot be combined with --fix-first (a fix-first never waits)"; fi
 OA_DETACH_LABEL="com.ibl5.owner-approve-$OA_PR"
 OA_DETACH_DIR="$HOME/Library/Caches/com.ibl5.owner-approve"
-if [ "$OA_RECORD" -eq 1 ]; then
+if [ "$OA_CARRY" -eq 1 ]; then
+    { [ "$OA_FINISH" -eq 0 ] && [ "$OA_RECORD" -eq 0 ] && [ "$OA_DETACH" -eq 0 ] && [ -z "$OA_FIX" ] && [ -z "$OA_WORDS" ] && [ -z "$OA_OPTION" ]; } \
+        || _oa_usage "--carry takes only a PR number, --poll= and --timeout="
+elif [ "$OA_RECORD" -eq 1 ]; then
     if [ "$OA_FINISH" -eq 1 ] || [ -n "$OA_FIX" ]; then _oa_usage "--record-amendments cannot be combined with --fix-first or --finish"; fi
     if [ -n "$OA_WORDS$OA_OPTION" ]; then _oa_usage "--record-amendments takes only the PR number"; fi
 elif [ "$OA_FINISH" -eq 1 ]; then
@@ -113,6 +125,7 @@ _oa_post() { # <body>: posts one PR comment through --body-file
     gh pr comment "$OA_PR" -R "$OA_REPO" --body-file "$tmpd/body.md" >/dev/null
 }
 _oa_refuse() { # <exit code> <reason>: posts the reason comment, then exits
+    if [ "$OA_CARRY" -eq 1 ]; then echo "owner-approve: not carried: $2"; echo "RESULT: not-carried"; exit 4; fi
     _oa_post "$(printf 'Not armed by bin/owner-approve: %s\n\n<!-- owner-approve:refused -->' "$2")" \
         || printf 'owner-approve: posting the reason comment failed too\n' >&2
     printf 'owner-approve: %s\n' "$2" >&2
@@ -457,6 +470,83 @@ _oa_head_carry() { # <context: "the head moved" or "the re-review moved the head
     fi
     _oa_refuse 4 "$1 from $rec_head (the one the owner approved) to $head, and the PR's own changes are not the approved ones. Approve the new head again: bin/owner-approve $OA_PR \"<words>\"."
 }
+
+_oa_no_gallery() { return 1; }  # path-only UI verdict: never read a gallery
+
+_oa_base_ref() {  # prints origin/<PR base>; 1 on any read error
+    local b
+    b=$(gh api "repos/$OA_REPO/pulls/$OA_PR" --jq .base.ref 2>/dev/null) && [ -n "$b" ] || return 1
+    git -C "$OA_WT" fetch --quiet origin "$b" 2>/dev/null || true
+    printf 'origin/%s' "$b"
+}
+
+_oa_pr_paths() {  # the PR's changed paths, one per line; 1 on any error
+    local base
+    base=$(_oa_base_ref) || return 1
+    git -C "$OA_WT" diff --name-only --no-renames "$base...$head"
+}
+
+_oa_carry_body() {  # <src_comment_id> <from_fp> <now_fp> <files_file> <old_head>
+    printf 'Approval carried by bin/owner-approve --carry from head %s to head %s. The head moved only through post-plan fix commits that touch no gate file, and the verdict is %s.\n\nFiles changed since that approval:\n' "$5" "$head" "$verdict_word"
+    sed 's/^/- `/; s/$/`/' "$4"
+    printf '\n<!-- owner-approve-carry head=%s diff=%s src=%s from=%s -->' "$head" "$3" "$1" "$2"
+}
+
+_oa_carry() {  # ADR-0062 Update 2026-11-27
+    local now_fp out src from old_head rec author ui_v carry_head i=0
+    _oa_read_pr || _oa_refuse 4 "reason=delta-error: could not read PR $OA_PR."
+    [ "$state" = OPEN ] || _oa_refuse 4 "reason=not-open: PR #$OA_PR is $state."
+    OA_WT=$(_oa_find_wt)
+    [ -n "$OA_WT" ] || _oa_refuse 4 "reason=delta-error: no worktree for $branch."
+    git -C "$OA_WT" fetch --quiet origin "$branch" 2>/dev/null || true
+    carry_head=$head
+    now_fp=$(_oa_diff_fp "$head")
+    hs_is_fingerprint "$now_fp" || _oa_refuse 4 "reason=delta-error: diff fingerprint unreadable."
+    _oa_comments
+    printf '%s' "$comments" | jq -s 'add // []' > "$tmpd/comments.json" || _oa_refuse 4 "reason=delta-error: comments unreadable."
+    rec=$(hs_recorded_fingerprint "$tmpd/comments.json")
+    if case "$labels" in *,human-approved,*) true ;; *) false ;; esac && hs_fingerprint_matches "$rec" "$now_fp"; then
+        echo "owner-approve: the CI approval record already matches the head."; echo "RESULT: carry-unchanged"; exit 0
+    fi
+    out=$(cd "$OA_HARNESS_DIR" && python3 -m harness.approval_carry check --comments "$tmpd/comments.json" \
+        --worktree "$OA_WT" --branch "$branch" --current-fp "$now_fp" --me "$me" --files-out "$tmpd/carry-files" | tail -n 1)
+    case "$out" in
+        "CARRY ok "*) ;;
+        "CARRY no reason=unchanged") echo "owner-approve: the approval already covers this diff."; echo "RESULT: carry-unchanged"; exit 0 ;;
+        "CARRY no "*) _oa_refuse 4 "${out#CARRY no }" ;;
+        *) _oa_refuse 4 "reason=delta-error: approval_carry printed no decision." ;;
+    esac
+    src=$(printf '%s' "$out" | sed -E 's/.* src=([^ ]*) .*/\1/')
+    from=$(printf '%s' "$out" | sed -E 's/.* from=([0-9a-f]{40}).*/\1/')
+    old_head=$(printf '%s' "$out" | sed -E 's/.* head=([0-9a-f]{40}).*/\1/')
+    _oa_pr_paths > "$tmpd/pr-paths" || _oa_refuse 4 "reason=delta-error: PR paths unreadable."
+    author=$(gh pr view "$OA_PR" -R "$OA_REPO" --json author --jq .author.login 2>/dev/null) && [ -n "$author" ] \
+        || _oa_refuse 4 "reason=delta-error: PR author unreadable."
+    ui_v=$(UI_BASE_DIR="" UI_HEAD_DIR="" UI_MEMO_PATHS_FILE="" ui_workflow_verdict "$tmpd/pr-paths" "$author" _oa_no_gallery labeled human-approved 2>/dev/null | tail -n 1)
+    [ "$ui_v" = not-ui ] || _oa_refuse 4 "reason=ui-path: the PR touches UI paths, so only the owner can approve it."
+    _oa_verdict final  # rule (b)
+    if case "$labels" in *,human-approved,*) true ;; *) false ;; esac; then
+        gh pr edit "$OA_PR" -R "$OA_REPO" --remove-label human-approved >/dev/null 2>&1 || _oa_refuse 4 "reason=label-failed: could not remove human-approved."
+    fi
+    gh pr edit "$OA_PR" -R "$OA_REPO" --add-label human-approved >/dev/null 2>&1 || _oa_refuse 4 "reason=label-failed: could not add human-approved."
+    while [ "$i" -lt "$OA_CARRY_TRIES" ]; do
+        _oa_comments
+        printf '%s' "$comments" | jq -s 'add // []' > "$tmpd/comments.json" || break
+        rec=$(hs_recorded_fingerprint "$tmpd/comments.json")
+        if hs_fingerprint_matches "$rec" "$now_fp"; then
+            if ! { _oa_read_pr && [ "$head" = "$carry_head" ]; }; then
+                gh pr edit "$OA_PR" -R "$OA_REPO" --remove-label human-approved >/dev/null 2>&1 || true
+                _oa_refuse 4 "reason=head-moved: the head left $carry_head during the carry, so human-approved was removed again."
+            fi
+            _oa_post "$(_oa_carry_body "$src" "$from" "$now_fp" "$tmpd/carry-files" "$old_head")"
+            echo "RESULT: carried"; exit 0
+        fi
+        i=$((i + 1)); sleep "$OA_POLL"
+    done
+    gh pr edit "$OA_PR" -R "$OA_REPO" --remove-label human-approved >/dev/null 2>&1 || true
+    _oa_refuse 4 "reason=record-missing: CI wrote no approval record for $now_fp, so human-approved was removed again."
+}
+if [ "$OA_CARRY" -eq 1 ]; then _oa_carry; fi
 
 # --detach. Claude Code kills the Bash tool's process group when a session ends, and a
 # nohup child dies with it (bin/post-plan-now header). A launchctl submit job does not.

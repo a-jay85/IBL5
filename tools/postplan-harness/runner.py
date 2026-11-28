@@ -46,6 +46,7 @@ from harness import fidelity_delta
 from harness import conflict, conflict_report, fidelity_filefix
 from harness import armable as _armable_mod
 from harness import approval_ledger
+from harness import approval_carry
 from harness import sql_equivalence
 from harness import trace_pinned
 from harness.armable import (AGGREGATOR_CONTEXT, ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
@@ -1391,6 +1392,12 @@ def _run_pass(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                             Path(__file__).resolve().parent / "out"))
                 except Exception as exc_:  # evidence must never touch the run
                     log(f"phase6.5: fidelity evidence skipped ({type(exc_).__name__})")
+        if live and pr:
+            # After the posted verdict (the carry reads it) and before arming.
+            inputs, decision = _rearm_after_carry(
+                gh, git, llm, log, res, inputs, decision, worktree=worktree, pr=pr, plan=plan,
+                slug=slug, state_dir=_state_dir(out_dir, live, state_dir),
+                post_sticky=_post_sticky, ci_line=ci_line)
         if decision.armed:
             gh.pr_merge_auto(pr)
         elif pr:
@@ -3507,7 +3514,68 @@ def _backed_amendments(gh, plan, pr, log) -> tuple[list, str | None]:
     return backed, unplanned_scope.strip_unbacked(text, backed)
 
 
-def _owner_approval_evidence(gh, git, worktree, pr, log):
+_CARRY_STATES = ("no-label", "mismatch", "no-record")
+_CARRY_POLL_S = 15
+_CARRY_TIMEOUT_S = 900
+
+
+def _try_owner_approval_carry(pr, worktree, log) -> str:
+    """Run bin/owner-approve --carry and return its last RESULT word. Never raises."""
+    tool = Path(_armable_mod.HS_CLASSIFIER).parents[1] / "owner-approve"
+    try:
+        proc = subprocess.run([str(tool), str(pr), "--carry", f"--poll={_CARRY_POLL_S}"], cwd=str(worktree),
+                              capture_output=True, text=True, timeout=_CARRY_TIMEOUT_S)
+    except Exception as exc:
+        log(f"approval carry: {type(exc).__name__}")
+        return "error"  # carry crashed: keep the dropped state
+    lines = proc.stdout.splitlines()
+    for ln in lines:
+        if ln.startswith("owner-approve: not carried:"):
+            log(ln)
+    words = [ln[len("RESULT: "):].strip() for ln in lines if ln.startswith("RESULT: ")]
+    return words[-1] if words else "error"
+
+
+def _rearm_after_carry(gh, git, llm, log, res, inputs, decision, *, worktree, pr, plan, slug,
+                       state_dir, post_sticky, ci_line):
+    """Phase 6.5: carry the owner approval onto this head once this run's verdict is posted.
+
+    `bin/owner-approve --carry` reads the posted verdict, so this runs after the first
+    post_sticky call. Returns (inputs, decision), both unchanged unless the carry succeeded.
+    """
+    if not callable(post_sticky) or inputs.owner_approval not in _CARRY_STATES:
+        return inputs, decision
+    if not any(c.number == 7 for c in decision.holds):
+        return inputs, decision  # (7) is not what holds this PR; skip the CI-record wait
+    if _try_owner_approval_carry(pr, worktree, log) != "carried":
+        return inputs, decision  # carry refused: the hold stands
+    labels = gh.pr_labels()  # the carry just added human-approved
+    plan_false = bool(plan.auto_merge_false or getattr(plan, "auto_merge_value", None) == "false")
+    new = dataclasses.replace(
+        inputs, pr_labels=labels, llm_safety_holds=[],
+        owner_approval=resolve_owner_approval(gh, git, pr, labels, worktree, plan_false))
+    preview = evaluate(new)
+    if preview.second_review_candidates:
+        new = second_review.review_pass(new, pr, git.head_tree, git.diff_vs_base, plan, log,
+                                        second_review.spawner(llm, worktree))
+        preview = evaluate(new)
+    if not preview.holds:
+        verdict = llm.call("safety-verdict", "haiku",
+                           llm_calls.safety_verdict_prompt(new.classification, new.pr_title, preview),
+                           schemas.validate_safety_verdict)
+        new.llm_safety_holds = verdict["holds"]
+    nd = evaluate(new)
+    res.arm = nd
+    log("phase6.5 carry re-arm: " + ("ARMED" if nd.armed else
+                                     "HELD — " + "; ".join(f"({c.number}) {c.reason or c.name}"
+                                                           for c in nd.holds)))
+    if holdrepeat.structural_key(nd.conditions) != holdrepeat.structural_key(decision.conditions):
+        res.hold_repeat = _record_hold_repeat(res, nd, slug, worktree, state_dir, log)
+    post_sticky(nd, ci_line, "phase6.5 carry")
+    return new, nd
+
+
+def _owner_approval_evidence(gh, git, worktree, pr, log, pr_body=None):
     """The owner-approve approval bound to the current diff, or None (fail closed)."""
     armable = _armable_mod
     try:
@@ -3517,7 +3585,11 @@ def _owner_approval_evidence(gh, git, worktree, pr, log):
         if fp is None:
             log("kept-downgrade: no diff fingerprint; owner approval not consulted")
             return None
-        return unplanned_scope.approval_from_comments(gh.pr_comments_json(pr), fp)
+        comments = gh.pr_comments_json(pr)
+        approval = unplanned_scope.approval_from_comments(comments, fp)
+        if approval is None:  # carry / fix-first scope fallback
+            approval = approval_carry.harness_evidence(comments, str(worktree), git.branch(), base_ref, fp, pr_body)
+        return approval
     except Exception as exc:  # fail closed: no approval
         log(f"kept-downgrade: owner approval unreadable: {exc}")
         return None
@@ -3549,7 +3621,7 @@ def _apply_kept_downgrade(inputs, res, git, gh, worktree, plan, master_sha, pr, 
         declares_kept = unplanned_scope.KEPT_BEGIN in (inputs.pr_body or "")
         if not declares_kept:
             return
-        approval = _owner_approval_evidence(gh, git, worktree, pr, log)
+        approval = _owner_approval_evidence(gh, git, worktree, pr, log, pr_body=inputs.pr_body)
         if approval is None or not unplanned_scope.downgrade_applies(
                 path, ctx, inputs.pr_body, payload, approval=approval):
             return

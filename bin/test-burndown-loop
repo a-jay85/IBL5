@@ -2164,6 +2164,327 @@ test_window_unblock_honours() {
     assert_not_contains window_unblock:no-pr-list "$(cat "$T/gh.calls" 2>/dev/null)" "pr list"
 }
 
+# ---------------------------------------------------------------- unblock-base fixtures
+# ub_git <dir> <git args...>: git with a fixed identity and no global or system config.
+ub_git() {
+    local d="$1"; shift
+    env GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null HOME="$T/ubhome" \
+        GIT_AUTHOR_NAME=ub GIT_AUTHOR_EMAIL=ub@example.invalid \
+        GIT_COMMITTER_NAME=ub GIT_COMMITTER_EMAIL=ub@example.invalid \
+        git -C "$d" "$@"
+}
+# ub_commit <dir> <file> <content> <msg> <epoch>: one commit with author and committer
+# date @<epoch>. Each call site passes a distinct epoch so no author-date twin is accidental.
+ub_commit() {
+    printf '%s\n' "$3" > "$1/$2"
+    ub_git "$1" add "$2"
+    GIT_AUTHOR_DATE="@$5 +0000" GIT_COMMITTER_DATE="@$5 +0000" ub_git "$1" commit -q -m "$4"
+}
+# ub_fixture [seed-ref]: master m1, parent "parent v1" pushed from pub, child forked in work
+# from the LOCAL parent ref (bin/wt-new:207 forks the same way) with commits c1 and c2, and
+# branch.child.iblBase=parent. With [seed-ref], local parent is first created there and then
+# moved to origin/parent. Sets UB, UB_M1, UB_V1, UB_C1, UB_C2.
+ub_fixture() {
+    local seed="${1:-origin/parent}"
+    UB="$T/ub"; mkdir -p "$UB" "$T/ubhome"
+    git init -q --bare -b master "$UB/origin.git"
+    ub_git "$UB" clone -q "$UB/origin.git" pub
+    ub_commit "$UB/pub" m.txt m1 m1 1700000100
+    ub_git "$UB/pub" push -q origin master
+    # Clone before parent exists. The later fetch then writes the origin/parent reflog entry
+    # for v1, as in a long-lived checkout. A clone taken after the push records no entry.
+    ub_git "$UB" clone -q "$UB/origin.git" work
+    ub_git "$UB/pub" checkout -q -b parent
+    ub_commit "$UB/pub" p.txt v1 "parent v1" 1700000200
+    ub_git "$UB/pub" push -q -u origin parent
+    ub_git "$UB/work" fetch -q origin
+    ub_git "$UB/work" branch -q parent "$seed"
+    ub_git "$UB/work" branch -q -f parent origin/parent
+    ub_git "$UB/work" checkout -q -b child parent
+    ub_git "$UB/work" config branch.child.iblBase parent
+    ub_commit "$UB/work" c.txt c1 c1 1700000300
+    ub_commit "$UB/work" c.txt c2 c2 1700000400
+    UB_M1=$(ub_git "$UB/pub" rev-parse master)
+    UB_V1=$(ub_git "$UB/pub" rev-parse parent)
+    UB_C1=$(ub_git "$UB/work" rev-parse child~1)
+    UB_C2=$(ub_git "$UB/work" rev-parse child)
+}
+# ub_amend_parent: pub rewrites parent v1 with changed content; the author date is kept by git.
+ub_amend_parent() {
+    printf 'v1b\n' > "$UB/pub/p.txt"; ub_git "$UB/pub" add p.txt
+    GIT_COMMITTER_DATE="@1700000500 +0000" ub_git "$UB/pub" commit -q --amend --no-edit
+    ub_git "$UB/pub" push -q --force origin parent
+}
+# ub_rebase_parent [extra rebase args]: master gets m2, parent is rebased onto it and force-pushed.
+ub_rebase_parent() {
+    ub_git "$UB/pub" checkout -q master
+    ub_commit "$UB/pub" m2.txt m2 m2 1700000600
+    ub_git "$UB/pub" push -q origin master
+    ub_git "$UB/pub" checkout -q parent
+    GIT_COMMITTER_DATE="@1700000700 +0000" ub_git "$UB/pub" rebase -q "$@" master
+    ub_git "$UB/pub" push -q --force origin parent
+}
+# ub_squash_merge_parent: master gets one squash commit of the current parent tip.
+ub_squash_merge_parent() {
+    ub_git "$UB/pub" checkout -q master
+    ub_git "$UB/pub" merge -q --squash parent
+    GIT_AUTHOR_DATE="@1700000800 +0000" GIT_COMMITTER_DATE="@1700000800 +0000" \
+        ub_git "$UB/pub" commit -q -m "parent (#1)"
+    ub_git "$UB/pub" push -q origin master
+}
+# ub_gh_open <0|1>: queue one gh `pr list` answer (the stub pops "<rc> <file>" from gh.queue).
+ub_gh_open() { printf '%s\n' "$1" > "$T/ub-open.$1"; printf '0 %s\n' "$T/ub-open.$1" >> "$T/gh.queue"; }
+# ub_run <args...>: run the helper inside work, with the stub dir first on PATH.
+ub_run() { (cd "$UB/work" && PATH="$STUB:$PATH" "$LOOP" unblock-base "$@"); }
+
+# ---------------------------------------------------------------- unblock-base cases
+
+# ub_fetch: bring the publisher's rewrite or advance into work.
+ub_fetch() { ub_git "$UB/work" fetch -q origin; }
+# ub_expire_all: delete the local parent and every reflog entry, so only commit data remains.
+ub_expire_all() {
+    ub_git "$UB/work" branch -q -D parent
+    ub_git "$UB/work" reflog expire --expire=now --all
+}
+# ub_snapshot: every piece of work's state that a read-only helper must leave alone.
+ub_snapshot() {
+    ub_git "$UB/work" for-each-ref --format='%(refname) %(objectname)'
+    ub_git "$UB/work" log -g --all --format='%H %gs'
+    ub_git "$UB/work" rev-parse HEAD
+    ub_git "$UB/work" config --list --local
+    ub_git "$UB/work" status --porcelain
+}
+
+test_unblock_base_amended_parent_skips() {
+    new_env
+    ub_fixture
+    ub_amend_parent
+    ub_fetch
+    ub_gh_open 1
+    local out
+    out=$(ub_run child)
+    assert_contains test_unblock_base_amended_parent_skips:line "$out" "UNBLOCK-BASE SKIP reflog of refs/remotes/origin/parent holds ${UB_V1:0:12}"
+}
+
+test_unblock_base_rebased_parent_skips() {
+    new_env
+    ub_fixture
+    ub_rebase_parent
+    ub_fetch
+    ub_gh_open 1
+    local out
+    out=$(ub_run child)
+    assert_contains test_unblock_base_rebased_parent_skips:line "$out" "UNBLOCK-BASE SKIP reflog of refs/remotes/origin/parent"
+}
+
+test_unblock_base_rebased_squash_merged_skips() {
+    new_env
+    ub_fixture
+    ub_rebase_parent
+    ub_squash_merge_parent
+    ub_fetch
+    ub_gh_open 0
+    local out
+    out=$(ub_run child)
+    assert_contains test_unblock_base_rebased_squash_merged_skips:line "$out" "UNBLOCK-BASE SKIP merged parent tip is not an ancestor of child"
+}
+
+test_unblock_base_advanced_parent_proceeds() {
+    new_env
+    ub_fixture
+    ub_commit "$UB/pub" p2.txt v2 "parent v2" 1700000900
+    ub_git "$UB/pub" push -q origin parent
+    ub_fetch
+    ub_gh_open 1
+    local out
+    out=$(ub_run child)
+    assert_eq test_unblock_base_advanced_parent_proceeds:line "UNBLOCK-BASE origin/parent $UB_V1" "$out"
+}
+
+test_unblock_base_squash_merged_unchanged_proceeds() {
+    new_env
+    ub_fixture
+    ub_squash_merge_parent
+    ub_fetch
+    ub_gh_open 0
+    local out
+    out=$(ub_run child)
+    assert_eq test_unblock_base_squash_merged_unchanged_proceeds:line "UNBLOCK-BASE origin/master $UB_V1" "$out"
+}
+
+test_unblock_base_no_reflog_skips() {
+    new_env
+    ub_fixture
+    ub_amend_parent
+    ub_fetch
+    ub_expire_all
+    assert_eq test_unblock_base_no_reflog_skips:no-entries "" "$(ub_git "$UB/work" log -g --format=%H refs/remotes/origin/parent)"
+    ub_gh_open 1
+    local out
+    out=$(ub_run child)
+    assert_contains test_unblock_base_no_reflog_skips:line "$out" "UNBLOCK-BASE SKIP commit ${UB_V1:0:12} has a rewritten author-date twin"
+}
+
+test_unblock_base_patch_id_twin_skips() {
+    new_env
+    ub_fixture
+    ub_rebase_parent --ignore-date
+    ub_fetch
+    ub_expire_all
+    local old_at new_at out
+    old_at=$(ub_git "$UB/work" log -1 --format=%at "$UB_V1")
+    new_at=$(ub_git "$UB/work" log -1 --format=%at refs/remotes/origin/parent)
+    if [ -n "$new_at" ] && [ "$old_at" != "$new_at" ]; then
+        pass test_unblock_base_patch_id_twin_skips:date-reset
+    else
+        fail test_unblock_base_patch_id_twin_skips:date-reset "author date unchanged: [$old_at] [$new_at]"
+    fi
+    ub_gh_open 1
+    out=$(ub_run child)
+    assert_contains test_unblock_base_patch_id_twin_skips:line "$out" "has a rewritten patch-id twin"
+}
+
+# Hazard 1: the old tip's reflog entry expired, a reachable older entry survived, so
+# fork-point answers with the stale master commit.
+test_unblock_base_stale_fork_point_skips() {
+    new_env
+    ub_fixture origin/master
+    ub_amend_parent
+    ub_fetch
+    ub_git "$UB/work" branch -q -f parent origin/parent
+    ub_git "$UB/work" reflog expire --expire-unreachable=now --expire=never refs/heads/parent refs/remotes/origin/parent
+    assert_eq test_unblock_base_stale_fork_point_skips:fork-point "$UB_M1" "$(ub_git "$UB/work" merge-base --fork-point refs/heads/parent child)"
+    ub_gh_open 1
+    local out
+    out=$(ub_run child)
+    assert_contains test_unblock_base_stale_fork_point_skips:line "$out" "has a rewritten author-date twin"
+}
+
+# Hazard 2: a child commit once sat on the parent ref, so fork-point lands inside the
+# child's own commits.
+test_unblock_base_child_commit_on_parent_ref_skips() {
+    new_env
+    ub_fixture
+    ub_git "$UB/work" branch -q -f parent "$UB_C1"
+    ub_git "$UB/work" branch -q -f parent "$UB_V1"
+    assert_eq test_unblock_base_child_commit_on_parent_ref_skips:fork-point "$UB_C1" "$(ub_git "$UB/work" merge-base --fork-point refs/heads/parent child)"
+    ub_gh_open 1
+    local out
+    out=$(ub_run child)
+    assert_contains test_unblock_base_child_commit_on_parent_ref_skips:line "$out" "UNBLOCK-BASE SKIP reflog of refs/heads/parent holds ${UB_C1:0:12}"
+}
+
+test_unblock_base_remote_reflog_only_skips() {
+    new_env
+    ub_fixture
+    ub_amend_parent
+    ub_fetch
+    ub_git "$UB/work" branch -q -D parent
+    ub_gh_open 1
+    local out
+    out=$(ub_run child)
+    assert_contains test_unblock_base_remote_reflog_only_skips:line "$out" "SKIP reflog of refs/remotes/origin/parent"
+}
+
+test_unblock_base_local_ref_only_skips() {
+    new_env
+    ub_fixture
+    ub_amend_parent
+    ub_fetch
+    ub_git "$UB/work" reflog expire --expire=now refs/remotes/origin/parent
+    ub_gh_open 1
+    local out
+    out=$(ub_run child)
+    assert_contains test_unblock_base_local_ref_only_skips:line "$out" "SKIP reflog of refs/heads/parent"
+}
+
+test_unblock_base_empty_range_skips() {
+    new_env
+    ub_fixture
+    ub_git "$UB/work" checkout -q -b bare parent
+    ub_git "$UB/work" config branch.bare.iblBase parent
+    ub_gh_open 1
+    local out
+    out=$(ub_run bare)
+    assert_contains test_unblock_base_empty_range_skips:line "$out" "UNBLOCK-BASE SKIP nothing to replay"
+}
+
+# A failed gh call, then the near-miss answer [] (the stub's empty-queue default).
+test_unblock_base_gh_unknown_skips() {
+    new_env
+    ub_fixture
+    : > "$T/ub-empty"
+    printf '1 %s\n' "$T/ub-empty" >> "$T/gh.queue"
+    local out
+    out=$(ub_run child)
+    assert_contains test_unblock_base_gh_unknown_skips:gh-failed "$out" "UNBLOCK-BASE SKIP parent PR state unknown"
+    out=$(ub_run child)
+    assert_contains test_unblock_base_gh_unknown_skips:non-integer "$out" "UNBLOCK-BASE SKIP parent PR state unknown"
+}
+
+test_unblock_base_invalid_parent_skips() {
+    new_env
+    ub_fixture
+    ub_git "$UB/work" config branch.child.iblBase 'a..b'
+    local out
+    out=$(ub_run child)
+    assert_contains test_unblock_base_invalid_parent_skips:line "$out" "UNBLOCK-BASE SKIP invalid iblBase a..b"
+    assert_not_contains test_unblock_base_invalid_parent_skips:no-pr-list "$(cat "$T/gh.calls" 2>/dev/null)" "pr list"
+}
+
+test_unblock_base_no_parent_matches_old() {
+    new_env
+    ub_fixture
+    ub_git "$UB/work" config --unset branch.child.iblBase
+    local out
+    out=$(ub_run child)
+    assert_eq test_unblock_base_no_parent_matches_old:unset "UNBLOCK-BASE origin/master $UB_M1" "$out"
+    ub_git "$UB/work" config branch.child.iblBase master
+    out=$(ub_run child)
+    assert_eq test_unblock_base_no_parent_matches_old:master "UNBLOCK-BASE origin/master $UB_M1" "$out"
+    assert_not_contains test_unblock_base_no_parent_matches_old:no-pr-list "$(cat "$T/gh.calls" 2>/dev/null)" "pr list"
+}
+
+test_unblock_base_read_only() {
+    new_env
+    ub_fixture
+    ub_commit "$UB/pub" p2.txt v2 "parent v2" 1700000900
+    ub_git "$UB/pub" push -q origin parent
+    ub_fetch
+    ub_gh_open 1
+    local before after out
+    before=$(ub_snapshot)
+    out=$(ub_run child)
+    after=$(ub_snapshot)
+    assert_eq test_unblock_base_read_only:state "$before" "$after"
+    case "$out" in
+        "UNBLOCK-BASE origin/parent"*) pass test_unblock_base_read_only:line ;;
+        *) fail test_unblock_base_read_only:line "got [$out]" ;;
+    esac
+}
+
+test_unblock_base_scan_failure_skips() {
+    new_env
+    ub_fixture
+    ub_git "$UB/work" update-ref -d refs/remotes/origin/master
+    ub_gh_open 1
+    local out
+    out=$(ub_run child 2>/dev/null)
+    assert_contains test_unblock_base_scan_failure_skips:line "$out" "UNBLOCK-BASE SKIP cannot scan parent and master history"
+}
+
+test_unblock_base_cli_rejects() {
+    new_env
+    ub_fixture
+    local err rc
+    err=$( (cd "$UB/work" && "$LOOP" unblock-base) 2>&1 >/dev/null ); rc=$?
+    assert_eq test_unblock_base_cli_rejects:no-branch-rc 2 "$rc"
+    assert_contains test_unblock_base_cli_rejects:no-branch-err "$err" "unblock-base needs exactly one branch"
+    err=$( (cd "$UB/work" && "$LOOP" unblock-base child extra) 2>&1 >/dev/null ); rc=$?
+    assert_eq test_unblock_base_cli_rejects:extra-rc 2 "$rc"
+    assert_contains test_unblock_base_cli_rejects:extra-err "$err" "unblock-base needs exactly one branch"
+}
+
 test_unblock_prompt_parent_tip() {
     local prompt_line
     prompt_line=$(grep '^BL_UNBLOCK_PROMPT=' "$LOOP")

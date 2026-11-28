@@ -463,7 +463,7 @@ want_no() { case "$2" in *"$3"*) fail "$1 — should NOT have seen: $3" ;; *) ok
 # They live in $RL because bin/plan-now --resume reads $PLAN_NOW_LOG_DIR.
 RES_TS="19700101-000000-$$"
 RES_UUID="0f0f0f0f-0f0f-4f0f-8f0f-0f0f0f0f0f0f"
-resume_fixture() {   # resume_fixture [nosession|norunner|nolog|oklog|noverdict|parkedlog]
+resume_fixture() {   # resume_fixture [nosession|norunner|nolog|oklog|noverdict|parkedlog|kickq|kickbad]
     rm -f "$RL"/plan-now-"$RES_TS".*
     printf 'MODEL=claude-opus-4-1\nDISPOSITION=implement\n' > "$RL/plan-now-$RES_TS.sh"
     printf '%s\n' "$RES_UUID" > "$RL/plan-now-$RES_TS.session"
@@ -477,6 +477,8 @@ resume_fixture() {   # resume_fixture [nosession|norunner|nolog|oklog|noverdict|
         oklog)     printf 'plan-now: RESULT ok — plan written and check-plan PASSED.\n' > "$RL/plan-now-$RES_TS.log" ;;
         noverdict) printf 'transcript only\n' > "$RL/plan-now-$RES_TS.log" ;;
         parkedlog) printf 'plan-now: RESULT parked — Claude login expired; no model call was made.\n' > "$RL/plan-now-$RES_TS.log" ;;
+        kickq)     printf 'MODEL=claude-opus-4-1\nDISPOSITION=queue\nKICK_REQUESTED=1\n' > "$RL/plan-now-$RES_TS.sh" ;;
+        kickbad)   printf 'MODEL=claude-opus-4-1\nDISPOSITION=queue\nKICK_REQUESTED=yes\n' > "$RL/plan-now-$RES_TS.sh" ;;
     esac
 }
 # run_resume <plan-now args...> → RES_RC, RES_OUT, RES_RUNNER (dry run; nothing launched)
@@ -2426,7 +2428,8 @@ kick_args() { cat "$KT/kick.args" 2>/dev/null; }
 
 # kick_run <slug> [VAR=value | -u VAR ...] -> KOUT (runner output), KRC (runner exit
 # status), KRUNNER_TEXT (the generated runner). $KSRC picks the plan the stub model
-# writes (default: one that passes check-plan); $KQFAIL=1 makes the queue stub fail.
+# writes (default: one that passes check-plan); $KQFAIL=1 makes the queue stub fail;
+# $KFLAG=--kick passes the flag.
 kick_run() {
     local slug="$1"; shift
     local plan="$PLANS/$slug.md" dry runner
@@ -2434,7 +2437,7 @@ kick_run() {
     : > "$DM_LOG"
     dry=$(env "$@" PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \
               PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
-              "$PLAN_NOW" --queue "$PROMPT" 2>&1)
+              "$PLAN_NOW" ${KFLAG:+"$KFLAG"} --queue "$PROMPT" 2>&1)
     runner=$(printf '%s\n' "$dry" | sed -n 's/^  runner: //p')
     [ -x "$runner" ] || { KOUT="no runner: $dry"; KRC=99; return 1; }
     rm -f "$KT/launchctl.calls"
@@ -2493,6 +2496,7 @@ want    "K2 non-port plan still queues"      "$KOUT" "automouse-queue (stub): qu
 want_no "K2 non-port plan: no kick in the log" "$KOUT" "automouse kick"
 want    "K2 non-port plan: DM says queued"   "$(dm)" "queued for automouse"
 want_no "K2 non-port plan: DM names no kick" "$(dm)" "kicked"
+want    "K2 no flag: runner bakes the kick off" "$KRUNNER_TEXT" "KICK_REQUESTED=0"
 kick_ran && fail "K2 non-port plan: the kick stub ran" || ok "K2 non-port plan: the kick stub never ran"
 
 # K3 a port plan that never reaches the queue is never kicked.
@@ -2602,6 +2606,122 @@ want    "K9 a stub value bakes its path"     "$KRUNNER_TEXT" "AUTOMOUSE_KICK=$KI
 PLAN_NOW_SRC_TEXT=$(cat "$PLAN_NOW")
 want_no "K9 the bake never defaults an unset seam to a word" "$PLAN_NOW_SRC_TEXT" '${PLAN_NOW_AUTOMOUSE_KICK-unset}'
 want_no "K9 the bake never keys on the seam being set"       "$PLAN_NOW_SRC_TEXT" '${PLAN_NOW_AUTOMOUSE_KICK+set}'
+
+# K10 --kick on a non-port plan that queues kicks once.
+kick_reset
+KFLAG=--kick kick_run demo-slug
+want    "K10 --kick: plan still queues"      "$KOUT" "automouse-queue (stub): queued $PLANS/demo-slug.md"
+want    "K10 --kick: start line"             "$KOUT" "plan-now: automouse kick started: run plan demo-slug, detached; the plan stays queued until that run claims it."
+want    "K10 --kick: DM names the kick"      "$(dm)" "kicked run plan demo-slug"
+want    "K10 --kick: runner bakes the flag"  "$KRUNNER_TEXT" "KICK_REQUESTED=1"
+[ "$(kick_args)" = "demo-slug" ] && ok "K10 --kick: stub called once with the slug" \
+    || fail "K10 --kick: stub called once with the slug (got: $(kick_args))"
+
+# K11 --kick never overrides a disarm.
+kick_reset
+KT_FUTURE=$(( $(date +%s) + 3600 ))
+printf 'rearm_epoch=%s\n' "$KT_FUTURE" > "$KT/state/.disarmed-until"
+KFLAG=--kick kick_run demo-slug
+want    "K11 --kick disarmed: skip line"     "$KOUT" "plan-now: automouse kick skipped: automouse is disarmed until epoch $KT_FUTURE; the plan stays queued."
+want    "K11 --kick disarmed: plan queued"   "$KOUT" "automouse-queue (stub): queued $PLANS/demo-slug.md"
+kick_ran && fail "K11 --kick disarmed: kicked" || ok "K11 --kick disarmed: no kick"
+
+# K12 --kick skips while another runner is live.
+kick_reset
+printf '/bin/bash /Users/x/GitHub/IBL5/bin/automouse/run plan jsb-port-pl-0007\n' > "$KT/procs"
+KFLAG=--kick kick_run demo-slug
+want    "K12 --kick runner live: skip line"  "$KOUT" "plan-now: automouse kick skipped: another automouse runner is live (pgrep exit 0); the plan stays queued."
+want    "K12 --kick runner live: plan queued" "$KOUT" "automouse-queue (stub): queued $PLANS/demo-slug.md"
+kick_ran && fail "K12 --kick runner live: kicked" || ok "K12 --kick runner live: no kick"
+
+# K13 --kick with --implement is a usage error, in either order.
+for k13args in "--kick --implement" "--implement --kick"; do
+    K13RC=0
+    # shellcheck disable=SC2086
+    K13OUT=$(PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \
+        "$PLAN_NOW" $k13args "$PROMPT" 2>&1) || K13RC=$?
+    [ "$K13RC" = 2 ] && ok "K13 $k13args: exit 2" || fail "K13 $k13args: exit 2 (got $K13RC)"
+    want "K13 $k13args: names the conflict" "$K13OUT" "plan-now: --kick starts an automouse run on a queued plan, and --implement never queues; drop one of them."
+done
+
+# res_bakes <label> <line>: the resumed runner exists and holds <line> verbatim.
+res_bakes() {
+    if [ ! -x "$RES_RUNNER" ]; then fail "$1 (no runner: $RES_OUT)"; return 0; fi
+    grep -qx "$2" "$RES_RUNNER" && ok "$1" || fail "$1"
+}
+res_drop() { [ -z "$RES_RUNNER" ] || rm -f "$RES_RUNNER"; }
+
+# K14 resuming a --kick run still kicks: the runner file carries the setting.
+# Invocation-2-only: the old runner is hand-built. K14b feeds a real one.
+kick_reset; rm -f "$PLANS"/*.md
+resume_fixture kickq
+run_resume --resume "$RES_TS"
+[ "$RES_RC" = 0 ] && ok "K14 resume of a kick run: exit 0" || fail "K14 resume of a kick run: exit 0 (got $RES_RC: $RES_OUT)"
+res_bakes "K14 resume bakes KICK_REQUESTED=1" 'KICK_REQUESTED=1'
+if [ -x "$RES_RUNNER" ]; then
+    KOUT=$(STUB_PLAN="$PLANS/demo-slug.md" STUB_TAIL="PLAN_FILE: $PLANS/demo-slug.md" STUB_PLAN_SRC="$GOOD_PLAN" \
+        bash "$RES_RUNNER" 2>&1) || true
+    [ "$(kick_args)" = "demo-slug" ] && ok "K14 resumed kick run kicks once" \
+        || fail "K14 resumed kick run kicks once (got: $(kick_args); $KOUT)"
+else
+    fail "K14 resumed kick run kicks once (no runner: $RES_OUT)"
+fi
+res_drop
+
+# K14b the round trip: the runner a real --kick run writes is what --resume reads.
+kick_reset; rm -f "$PLANS"/*.md; ndir_reset
+run_resume --kick --queue "$PROMPT"
+if [ -x "$RES_RUNNER" ]; then
+    K14B_TS=${RES_RUNNER##*/plan-now-}; K14B_TS=${K14B_TS%.sh}
+    printf '%s\n' "$RES_UUID" > "$RL/plan-now-$K14B_TS.session"
+    printf 'plan-now: RESULT failed — the run did not exit cleanly.\n' > "$RL/plan-now-$K14B_TS.log"
+    run_resume --resume "$K14B_TS"
+    res_bakes "K14b real --kick runner resumes with the kick on" 'KICK_REQUESTED=1'
+    res_drop
+    rm -f "$RL"/plan-now-"$K14B_TS".*
+else
+    fail "K14b real --kick runner resumes with the kick on (no runner: $RES_OUT)"
+fi
+
+# K15 a runner written before --kick existed resumes with the kick off.
+resume_fixture
+run_resume --resume "$RES_TS"
+[ "$RES_RC" = 0 ] && ok "K15 old runner without the line: resume not refused" || fail "K15 old runner without the line: resume not refused (got $RES_RC: $RES_OUT)"
+res_bakes "K15 old runner: bakes KICK_REQUESTED=0" 'KICK_REQUESTED=0'
+res_drop
+
+# K16 a malformed kick line is refused, like a malformed MODEL= line.
+resume_fixture kickbad
+run_resume --resume "$RES_TS"
+[ "$RES_RC" = 2 ] && ok "K16 malformed kick line: exit 2" || fail "K16 malformed kick line: exit 2 (got $RES_RC)"
+want "K16 malformed kick line: refusal names it" "$RES_OUT" "has no parseable KICK_REQUESTED= line."
+res_drop
+
+# K17 an inherited kick under an explicit --implement resolves to kick off.
+resume_fixture kickq
+run_resume --resume "$RES_TS" --implement
+[ "$RES_RC" = 0 ] && ok "K17 inherited kick + --implement: exit 0" || fail "K17 inherited kick + --implement: exit 0 (got $RES_RC: $RES_OUT)"
+res_bakes "K17 inherited kick + --implement: bakes KICK_REQUESTED=0" 'KICK_REQUESTED=0'
+res_drop
+
+# K18 explicit --kick on a resumed implement run is the usage error.
+resume_fixture
+run_resume --resume "$RES_TS" --kick
+[ "$RES_RC" = 2 ] && ok "K18 --kick on an implement resume: exit 2" || fail "K18 --kick on an implement resume: exit 2 (got $RES_RC)"
+want "K18 --kick on an implement resume: names the conflict" "$RES_OUT" "drop one of them."
+res_drop
+
+# K19 only /plan-prompt passes --kick; the automated callers stay queue-only.
+K19_ROOT=$(cd "$(dirname "$PLAN_NOW")/.." && pwd)
+grep -qF 'bin/plan-now --kick "$f"' "$K19_ROOT/.claude/skills/plan-prompt/SKILL.md" \
+    && ok "K19 plan-prompt fires with --kick" || fail "K19 plan-prompt fires with --kick"
+for k19 in reset-ready burndown; do
+    if grep -qF 'bin/plan-now --kick' "$K19_ROOT/.claude/skills/$k19/SKILL.md"; then
+        fail "K19 $k19 passes --kick"
+    else
+        ok "K19 $k19 never passes --kick"
+    fi
+done
 
 export PATH="$KICK_SAVE_PATH"
 if [ -n "$KICK_SAVE_TMPDIR" ]; then export TMPDIR="$KICK_SAVE_TMPDIR"; else unset TMPDIR; fi

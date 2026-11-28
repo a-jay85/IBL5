@@ -18,7 +18,7 @@ ENTRIES = ("armable", "merge_danger")
 _NON_DECISION_HELPERS = {
     "state": "dataclasses and enums (ArmDecision, Classification, ConditionResult, Finding)",
     "manual_rows": "reached only through state.py's TYPE_CHECKING import; type-only",
-    "classify": "reached only through planfile.py, which is listed; planfile reads one constant (BACKLOG_REPO)",
+    "classify": "constants only: planfile.py reads BACKLOG_REPO; armable.py reads GOLDEN_PATHS and JSB_CAPTURE_PREFIX",
     "outofscope": "reached only through planfile.py's local import; extracts deferral text for backlog filing, no hold reads it",
 }
 

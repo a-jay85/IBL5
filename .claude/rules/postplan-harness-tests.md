@@ -1,6 +1,6 @@
 ---
 description: Run only the post-plan harness test files you changed; CI runs the whole suite on every PR that touches the harness.
-last_verified: 2026-11-13
+last_verified: 2026-11-26
 paths:
   - "tools/postplan-harness/**"
   - "bin/post-plan-now"
@@ -34,3 +34,7 @@ python3 -m pytest -q tests/test_armable.py tests/test_runner_review_depth.py
 A file or nodeid argument keeps the run serial, so it starts no worker pool. When you change a shell script with no matching test file, find its tests with `grep -l <script-name> tests/*.py` and run those. When a change touches shared code such as `conftest.py` or `harness/state.py`, push and let CI run the whole suite.
 
 A plan's `check:` row follows the same rule. `.claude/skills/plan/_architect-contract-detail.md` § Slow checks says why.
+
+## Replay specs for a new gate
+
+A new `bin/check-*` gate declares its replay spec in a `# gate-backtest-argv:` header in the script. Add a `REPLAY_SPECS` entry to `tools/postplan-harness/harness/gate_backtest.py` only when the spec needs `env`, `stdin`, `timeout`, `ok_exits` or `needs_plan` without a `{plan_file}` argv token, or when the backtest cannot replay the gate. `test_replay_specs_gains_no_header_expressible_key` in `tests/test_gate_backtest.py` fails on any other new `bin/check-*` entry. A new gate under `bin/lib/` still needs its entry, because the backtest finds a lib gate only through `REPLAY_SPECS`.

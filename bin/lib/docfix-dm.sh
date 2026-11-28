@@ -2,22 +2,28 @@
 # Usage: source bin/lib/docfix-dm.sh
 # shellcheck shell=bash
 
+# Branch prefix of the held content-review PR that bin/docfix-split opens
+# beside the auto-merge docs-stale-refresh- PR. This file owns the constant.
+DOCFIX_REVIEW_BRANCH_PREFIX="docs-content-review-"
+
 # docfix_dm_compose <pr_number> <out_path>
 #
-# Validates <pr_number>, fetches PR metadata, guards on OPEN state and
-# docs-stale-refresh- head-ref prefix, then composes a Discord DM into <out_path>.
+# Validates <pr_number>, fetches PR metadata, guards on OPEN state and a
+# docs-stale-refresh- or docs-content-review- head-ref prefix, then composes a
+# Discord DM into <out_path>. A review-prefix PR is held for the owner, so its
+# DM text says so first.
 #
 # Exit codes:
 #   0 — message composed into <out_path>
-#   1 — REFUSED: input not a bare integer, PR not OPEN, or head ref lacks the
-#       docs-stale-refresh- prefix
+#   1 — REFUSED: input not a bare integer, PR not OPEN, or head ref has neither
+#       the docs-stale-refresh- nor the docs-content-review- prefix
 #   2 — environment error (gh call failed)
 #
 # On any refusal or environment error, <out_path> is not written.
 docfix_dm_compose() {
     local PR="$1"
     local out_path="$2"
-    local meta head_ref state url files ok
+    local meta head_ref state url files ok lead
 
     # Validate input: must be a bare integer. A workflow_dispatch input is
     # free-text; everything downstream interpolates it into a gh call and into
@@ -35,14 +41,19 @@ docfix_dm_compose() {
     # Parse the TSV into local vars. <<< keeps vars in scope (no subshell).
     IFS=$'\t' read -r head_ref state url <<< "$meta"
 
-    # Guard: refuse unless OPEN and docs-stale-refresh- prefix.
+    # Guard: refuse unless OPEN and a docfix branch prefix.
     # Emit one-line reason to stderr so a mistyped dispatch is self-diagnosing.
     ok=1
+    lead=""
     [ "$state" = "OPEN" ] || ok=0
-    case "$head_ref" in docs-stale-refresh-*) ;; *) ok=0 ;; esac
+    case "$head_ref" in
+        docs-stale-refresh-*) ;;
+        "$DOCFIX_REVIEW_BRANCH_PREFIX"*) lead='Held for content review: ' ;;
+        *) ok=0 ;;
+    esac
     if [ "$ok" -eq 0 ]; then
-        printf 'REFUSED: PR #%s (head ref: %s, state: %s) — must be OPEN with docs-stale-refresh- prefix\n' \
-            "$PR" "$head_ref" "$state" >&2
+        printf 'REFUSED: PR #%s (head ref: %s, state: %s) — must be OPEN with docs-stale-refresh- or %s prefix\n' \
+            "$PR" "$head_ref" "$state" "$DOCFIX_REVIEW_BRANCH_PREFIX" >&2
         return 1
     fi
 
@@ -52,7 +63,7 @@ docfix_dm_compose() {
     # Compose atomically: all validation passed before any write touches out_path.
     # PR title is deliberately excluded: it is author-controlled text.
     {
-        printf 'Claude refreshed your stale docs — ready for your review. PR #%s:\n' "$PR"
+        printf '%sClaude refreshed your stale docs — ready for your review. PR #%s:\n' "$lead" "$PR"
         # shellcheck disable=SC2001  # multiline prefix; ${var//} cannot do per-line prepend
         echo "$files" | sed 's/^/  /'
         printf 'Review and merge: %s\n' "$url"

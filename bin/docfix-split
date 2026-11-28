@@ -1,0 +1,402 @@
+#!/usr/bin/env bash
+# Usage: bin/docfix-split --slug=docs-stale-refresh-YYYYMMDD --issue=N \
+#            [--exclude-file=<abs path>] [--dry-run]
+# Splits the nightly docfix run's commits into two piles and fires
+# bin/post-plan-now once per non-empty pile. bin/docfix-run's generated runner
+# calls it after the headless Claude run exits 0.
+# ---
+# Auto pile: files the condition (7) docs-refresh path clause accepts
+# (pr_docs_refresh_path_ok or pr_docs_refresh_rules_date_only). It stays on the
+# docs-stale-refresh- branch with the seeded auto_merge: docs-only-ready plan.
+# Review pile: every other file, plus a date-only bump that depends on one of
+# them. It goes on a docs-content-review- branch with an auto_merge: false plan.
+# A file this script cannot classify goes to review.
+# ---
+# --exclude-file is a JSON array of paths held in open review PRs. Each listed
+# path goes to the review pile. Absent reads as [].
+# --dry-run prints the AUTO/REVIEW lines and the counts, then exits before any write.
+# ---
+# Exit codes: 0 every fire returned 0 (or nothing to fire), 2 usage,
+# 3 abort before any fire (the trap restores the auto branch and plan),
+# 4 at least one fire was refused.
+#
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
+set -euo pipefail
+
+usage_fail() { echo "docfix-split: $1" >&2; exit 2; }
+
+SLUG="" ISSUE="" EXCL_PATH="" HAVE_EXCL=0 DRY=0
+for arg in "$@"; do
+    case "$arg" in
+        --slug=*)         SLUG="${arg#--slug=}" ;;
+        --issue=*)        ISSUE="${arg#--issue=}" ;;
+        --exclude-file=*) EXCL_PATH="${arg#--exclude-file=}"; HAVE_EXCL=1 ;;
+        --dry-run)        DRY=1 ;;
+        -h|--help)        sed -n '/^# Usage:/,/^#$/p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        *)                usage_fail "unknown flag: $arg (flags take the --flag=value form)" ;;
+    esac
+done
+[ -n "$SLUG" ] || usage_fail "--slug is required"
+[ -n "$ISSUE" ] || usage_fail "--issue is required"
+[[ "$SLUG" =~ ^docs-stale-refresh-[0-9]{8}$ ]] || usage_fail "--slug must match docs-stale-refresh-YYYYMMDD: $SLUG"
+[[ "$ISSUE" =~ ^[0-9]+$ ]] || usage_fail "--issue must be a number: $ISSUE"
+[ -n "${HOME:-}" ] || { echo "docfix-split: HOME is not set" >&2; exit 2; }
+
+EXCL_JSON='[]'
+if [ "$HAVE_EXCL" -eq 1 ]; then
+    [ -n "$EXCL_PATH" ] && [ -r "$EXCL_PATH" ] || usage_fail "--exclude-file is not readable: $EXCL_PATH"
+    if ! EXCL_JSON="$(jq -ce 'if type == "array" and all(.[]; type == "string") then unique else error("shape") end' "$EXCL_PATH" 2>/dev/null)"; then
+        usage_fail "--exclude-file must hold a JSON array of strings: $EXCL_PATH"
+    fi
+fi
+
+SPLIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=bin/lib/pr-armable.sh
+. "$SPLIT_DIR/lib/pr-armable.sh"
+# shellcheck source=bin/lib/docfix-dm.sh
+. "$SPLIT_DIR/lib/docfix-dm.sh"
+# shellcheck source=bin/lib/plan-resolve.sh
+. "$SPLIT_DIR/lib/plan-resolve.sh"
+# shellcheck source=bin/lib/git-helpers.sh
+. "$SPLIT_DIR/lib/git-helpers.sh"
+
+MAIN="${IBL5_MAIN:-/Users/ajaynicolas/GitHub/IBL5}"
+WTS="$(worktrees_parent_dir "$MAIN")"
+AUTO_WT="$WTS/$SLUG"
+DATE="${SLUG#docs-stale-refresh-}"
+REV_SLUG="${DOCFIX_REVIEW_BRANCH_PREFIX}${DATE}"
+REV_WT="$WTS/$REV_SLUG"
+PLANS_DIR="$(plans_dir)"
+AUTO_PLAN="$PLANS_DIR/$SLUG.md"
+REV_PLAN="$PLANS_DIR/$REV_SLUG.md"
+
+abort() { echo "docfix-split: $1" >&2; exit 3; }
+log() { echo "docfix-split: $*" >&2; }
+
+# --- Preconditions (exit 3, nothing touched) ----------------------------------
+[ -d "$AUTO_WT" ] || abort "no worktree at $AUTO_WT"
+BRANCH="$(git -C "$AUTO_WT" rev-parse --abbrev-ref HEAD)" || abort "cannot read the branch of $AUTO_WT"
+[ "$BRANCH" = "$SLUG" ] || abort "$AUTO_WT is on branch $BRANCH, not $SLUG"
+DIRTY="$(git -C "$AUTO_WT" status --porcelain --untracked-files=all)" || abort "git status failed in $AUTO_WT"
+[ -z "$DIRTY" ] || abort "worktree $AUTO_WT has uncommitted or untracked files"
+BASE="$(git -C "$AUTO_WT" merge-base HEAD origin/master)" || abort "no merge-base with origin/master"
+ORIG="$(git -C "$AUTO_WT" rev-parse HEAD)"
+if [ "$BASE" = "$ORIG" ]; then
+    echo "docfix-split: no commits, nothing to fire"
+    exit 0
+fi
+
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/docfix-split.XXXXXX")"
+DIFF_FILE="$WORK/range.diff"
+
+# split_path_is_auto <path> <diff file>: the one copy of the split rule.
+split_path_is_auto() { # $1 path, $2 diff file
+    pr_docs_refresh_path_ok "$1" || pr_docs_refresh_rules_date_only "$1" "$2"
+}
+
+# --- Classifier ---------------------------------------------------------------
+git -C "$AUTO_WT" diff --no-ext-diff --no-color --src-prefix=a/ --dst-prefix=b/ "$BASE" "$ORIG" > "$DIFF_FILE"
+
+declare -A PILE=()
+is_excluded() { jq -e --arg p "$1" 'index($p) != null' <<< "$EXCL_JSON" >/dev/null; }
+classify_one() { # $1 path -> auto|review
+    if is_excluded "$1"; then
+        log "$1: held in open review PR"
+        echo review
+    elif split_path_is_auto "$1" "$DIFF_FILE"; then
+        echo auto
+    else
+        echo review
+    fi
+}
+
+NS_FIELDS=()
+git -C "$AUTO_WT" diff --name-status -z -M --no-ext-diff "$BASE" "$ORIG" > "$WORK/range.ns" \
+    || abort "git diff --name-status failed in $AUTO_WT"
+while IFS= read -r -d '' f; do NS_FIELDS+=("$f"); done < "$WORK/range.ns"
+i=0
+while [ "$i" -lt "${#NS_FIELDS[@]}" ]; do
+    st="${NS_FIELDS[$i]}"
+    case "$st" in
+        M|A|D)
+            p="${NS_FIELDS[$((i + 1))]}"
+            PILE["$p"]="$(classify_one "$p")"
+            i=$((i + 2)) ;;
+        R*)
+            old="${NS_FIELDS[$((i + 1))]}"; new="${NS_FIELDS[$((i + 2))]}"
+            if [ "$(classify_one "$old")" = auto ] && [ "$(classify_one "$new")" = auto ]; then
+                PILE["$old"]=auto; PILE["$new"]=auto
+            else
+                PILE["$old"]=review; PILE["$new"]=review
+            fi
+            i=$((i + 3)) ;;
+        C*)
+            PILE["${NS_FIELDS[$((i + 1))]}"]=review
+            PILE["${NS_FIELDS[$((i + 2))]}"]=review
+            i=$((i + 3)) ;;
+        *)
+            # T, U, X or any other letter: never auto.
+            PILE["${NS_FIELDS[$((i + 1))]}"]=review
+            i=$((i + 2)) ;;
+    esac
+done
+
+count_pile() { local n=0 p; for p in "${!PILE[@]}"; do [ "${PILE[$p]}" = "$1" ] && n=$((n + 1)); done; echo "$n"; }
+
+# --- Dependent date-bump pass -------------------------------------------------
+# is_date_only <path>: its own -U0 diff is one -last_verified: and one +last_verified: line.
+is_date_only() {
+    local body
+    body="$(git -C "$AUTO_WT" diff -U0 --no-ext-diff --no-color "$BASE" "$ORIG" -- "$1" \
+        | grep -E '^[-+]' | grep -vE '^(\+\+\+|---) ' || true)"
+    [ "$(grep -c '' <<< "$body")" -eq 2 ] \
+        && [ "$(grep -cE '^-last_verified:' <<< "$body")" -eq 1 ] \
+        && [ "$(grep -cE '^\+last_verified:' <<< "$body")" -eq 1 ]
+}
+# fm_paths <path>: the HEAD frontmatter paths: entries, one per line.
+fm_paths() {
+    git -C "$AUTO_WT" show "$ORIG:$1" 2>/dev/null | awk -v q="'" '
+        NR == 1 { if ($0 != "---") exit; next }
+        $0 == "---" { exit }
+        function emit(v) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", v); gsub(/^"|"$/, "", v); gsub("^" q "|" q "$", "", v); if (v != "") print v }
+        inlist && /^[[:space:]]*-[[:space:]]/ { v = $0; sub(/^[[:space:]]*-[[:space:]]*/, "", v); emit(v); next }
+        { inlist = 0 }
+        /^paths:/ {
+            v = $0; sub(/^paths:[[:space:]]*/, "", v)
+            if (v == "") { inlist = 1; next }
+            if (v ~ /^\[/) { gsub(/^\[|\][[:space:]]*$/, "", v); n = split(v, a, ","); for (k = 1; k <= n; k++) emit(a[k]) }
+            else emit(v)
+        }'
+}
+family_of() { # $1 path -> dir/stem
+    local d b
+    d="$(dirname "$1")"; b="$(basename "$1")"; b="${b%.md}"; b="${b%-detail}"
+    printf '%s/%s\n' "$d" "$b"
+}
+if [ "$(count_pile review)" -gt 0 ]; then
+    PULLERS=()
+    for p in "${!PILE[@]}"; do
+        [ "${PILE[$p]}" = review ] || continue
+        is_date_only "$p" || PULLERS+=("$p")
+    done
+    MOVES=()
+    for c in "${!PILE[@]}"; do
+        [ "${PILE[$c]}" = auto ] || continue
+        is_date_only "$c" || continue
+        entries="$(fm_paths "$c")"
+        for pu in "${PULLERS[@]}"; do
+            if grep -qxF -- "$pu" <<< "$entries" || [ "$(family_of "$c")" = "$(family_of "$pu")" ]; then
+                MOVES+=("$c"); log "$c: date bump depends on held $pu"; break
+            fi
+        done
+    done
+    for c in "${MOVES[@]}"; do PILE["$c"]=review; done
+fi
+
+# --- Output -------------------------------------------------------------------
+for p in "${!PILE[@]}"; do
+    if [ "${PILE[$p]}" = auto ]; then echo "AUTO $p"; else echo "REVIEW $p"; fi
+done | LC_ALL=C sort
+AUTO_COUNT="$(count_pile auto)"
+REVIEW_COUNT="$(count_pile review)"
+echo "docfix-split: auto=$AUTO_COUNT review=$REVIEW_COUNT"
+if [ "$DRY" -eq 1 ]; then rm -rf "$WORK"; exit 0; fi
+
+REVIEW_PATHS=()
+AUTO_PATHS=()
+for p in "${!PILE[@]}"; do
+    if [ "${PILE[$p]}" = review ]; then REVIEW_PATHS+=("$p"); else AUTO_PATHS+=("$p"); fi
+done
+
+# --- Cleanup trap (any nonzero exit before the first fire) ---------------------
+STEP="start"
+REV_CREATED=0
+AUTO_REWRITTEN=0
+AUTO_PLAN_BAK=""
+if [ -f "$AUTO_PLAN" ]; then AUTO_PLAN_BAK="$WORK/auto-plan.bak"; cp "$AUTO_PLAN" "$AUTO_PLAN_BAK"; fi
+split_abort() {
+    local rc=$?
+    trap - EXIT
+    if [ "$rc" -ne 0 ]; then
+        if [ "$REV_CREATED" -eq 1 ]; then
+            git -C "$REV_WT" reset -q --hard origin/master || true
+            (cd "$MAIN" && "$SPLIT_DIR/wt-remove" "$REV_SLUG" --if-empty) || true
+            if [ ! -d "$REV_WT" ]; then rm -f "$REV_PLAN"; fi
+        fi
+        if [ "$AUTO_REWRITTEN" -eq 1 ]; then
+            git -C "$AUTO_WT" reset -q --hard "$ORIG" || true
+        fi
+        if [ -n "$AUTO_PLAN_BAK" ] && [ -f "$AUTO_PLAN_BAK" ]; then cp "$AUTO_PLAN_BAK" "$AUTO_PLAN" || true; fi
+        echo "docfix-split: aborted at step '$STEP' (rc=$rc); Claude's commit kept at $ORIG on $SLUG" >&2
+    fi
+    rm -rf "$WORK"
+    exit "$rc"
+}
+trap split_abort EXIT
+
+# --- Commit messages ----------------------------------------------------------
+build_message() { # $1 subject, $2 pile, $3 out file
+    {
+        printf '%s\n\nSplit run: this commit holds only the %s pile.\n\n' "$1" "$2"
+        git -C "$AUTO_WT" log --format=%B --reverse "$BASE..$ORIG" \
+            | grep -Eiv '^(Closes|Fixes|Resolves|Refs) #[0-9]+[[:space:]]*$' || true
+    } > "$3"
+}
+
+if [ "$REVIEW_COUNT" -gt 0 ]; then
+    STEP="review worktree"
+    if git -C "$MAIN" rev-parse --verify -q "refs/heads/$REV_SLUG" >/dev/null; then abort "branch $REV_SLUG already exists"; fi
+    [ ! -e "$REV_PLAN" ] || abort "plan $REV_PLAN already exists"
+    (cd "$MAIN" && "$SPLIT_DIR/wt-new" "$REV_SLUG") || abort "wt-new $REV_SLUG failed"
+    REV_CREATED=1
+    [ -d "$REV_WT" ] || abort "wt-new made no worktree at $REV_WT"
+
+    STEP="apply review pile"
+    if ! git -C "$AUTO_WT" diff --binary --no-renames --no-ext-diff --no-color --src-prefix=a/ --dst-prefix=b/ \
+            "$BASE" "$ORIG" -- "${REVIEW_PATHS[@]}" > "$WORK/review.patch"; then
+        abort "could not write the review patch"
+    fi
+    git -C "$REV_WT" apply --index "$WORK/review.patch" || abort "review patch does not apply on $REV_SLUG"
+    build_message "docs: content review for stale docs ($DATE)" review "$WORK/review.msg"
+    STEP="commit review pile"
+    git -C "$REV_WT" commit -q -F "$WORK/review.msg" || abort "review commit failed"
+
+    STEP="rebuild auto pile"
+    AUTO_SUBJECT="$(git -C "$AUTO_WT" log -1 --format=%s "$ORIG")"
+    build_message "$AUTO_SUBJECT" auto "$WORK/auto.msg"
+    AUTO_REWRITTEN=1
+    for p in "${REVIEW_PATHS[@]}"; do
+        if git -C "$AUTO_WT" cat-file -e "$BASE:$p" 2>/dev/null; then
+            git -C "$AUTO_WT" checkout "$BASE" -- "$p"
+        else
+            git -C "$AUTO_WT" rm -q -f -- "$p"
+        fi
+    done
+    git -C "$AUTO_WT" reset -q --soft "$BASE"
+    if ! git -C "$AUTO_WT" diff --cached --quiet; then
+        STEP="commit auto pile"
+        git -C "$AUTO_WT" commit -q -F "$WORK/auto.msg" || abort "auto commit failed"
+    fi
+fi
+
+# --- Plans --------------------------------------------------------------------
+# insert_marker <plan> <closes|refs>: one line after the frontmatter.
+insert_marker() {
+    local tmp="$1.tmp.$$"
+    awk -v m="<!-- tracking-issue: $2 #$ISSUE -->" '
+        { print }
+        $0 == "---" { n++; if (n == 2 && !done) { print m; done = 1 } }
+        END { if (!done) exit 3 }' "$1" > "$tmp" || { rm -f "$tmp"; abort "no frontmatter in $1"; }
+    mv "$tmp" "$1"
+}
+# scope_row2 <plan> <excl json>: scope the staleness row to everything outside <excl json>.
+ROW2_FILTER='[.[] \| select(.path as $p \| ($x \| index($p)) == null)] \| length == 0'
+scope_row2() {
+    local plan="$1" x="$2" tmp="$1.tmp.$$" row
+    [ "$(grep -c -- '--staleness-report' "$plan" || true)" -eq 1 ] || abort "$plan has no single --staleness-report row"
+    if jq -e --arg q "'" 'any(.[]; contains($q) or contains("|") or contains("\n"))' <<< "$x" >/dev/null; then abort "an excluded path holds a quote, pipe or newline"; fi
+    row="| 2 | No stale doc or dead glob remains outside the other pile | CLI-executable | post-impl | bin/check-docs --staleness-report \\| jq -e --argjson x '$x' '$ROW2_FILTER' |"
+    ROW="$row" awk 'index($0, "--staleness-report") { print ENVIRON["ROW"]; next } { print }' "$plan" > "$tmp"
+    mv "$tmp" "$plan"
+}
+# other_excl <pile paths...>: sorted unique JSON of those paths plus the exclude list.
+other_excl() {
+    { printf '%s\n' "$@"; jq -r '.[]' <<< "$EXCL_JSON"; } | jq -Rsc 'split("\n") | map(select(. != "")) | unique'
+}
+
+STEP="write plans"
+EXCL_COUNT="$(jq 'length' <<< "$EXCL_JSON")"
+if [ -f "$AUTO_PLAN" ] && [ "$AUTO_COUNT" -gt 0 ]; then
+    if [ "$REVIEW_COUNT" -gt 0 ] || [ "$EXCL_COUNT" -gt 0 ]; then
+        if [ "$REVIEW_COUNT" -gt 0 ]; then scope_row2 "$AUTO_PLAN" "$(other_excl "${REVIEW_PATHS[@]}")"
+        else scope_row2 "$AUTO_PLAN" "$(other_excl)"; fi
+        insert_marker "$AUTO_PLAN" refs
+    else
+        insert_marker "$AUTO_PLAN" closes
+    fi
+fi
+if [ "$REVIEW_COUNT" -gt 0 ]; then
+    [ -f "$AUTO_PLAN" ] || abort "no seeded plan at $AUTO_PLAN to copy for the review pile"
+    SRC_PLAN="${AUTO_PLAN_BAK:-$AUTO_PLAN}"
+    awk -v held='Held for human merge: this pile carries the content edits the docs-refresh arming path would hold.' '
+        $0 == "auto_merge: docs-only-ready" && !fm { print "auto_merge: false"; fm++; next }
+        index($0, "Held for human merge unless Phase 6.5 finds it") == 1 { print held; h++; next }
+        $0 == "## Automouse Hold Justification" {
+            j++
+            print
+            print ""
+            print "auto_merge: false. This pile holds every changed file that the condition (7) docs-refresh path clause would hold, plus any date bump that depends on one of them."
+            print ""
+            print "**Decision:** Merge if the doc content in this pile is accurate."
+            skip = 1; next
+        }
+        skip { next }
+        { print }
+        END { if (fm != 1 || h != 1 || j != 1) exit 3 }' "$SRC_PLAN" > "$REV_PLAN" \
+        || abort "seeded plan $SRC_PLAN does not have the shape the review copy needs"
+    if [ "$AUTO_COUNT" -gt 0 ]; then scope_row2 "$REV_PLAN" "$(other_excl "${AUTO_PATHS[@]}")"
+    else scope_row2 "$REV_PLAN" "$(other_excl)"; fi
+    insert_marker "$REV_PLAN" closes
+fi
+
+# --- Pre-fire assertions (exit 3, zero fires) ----------------------------------
+STEP="pre-fire assertions"
+AUTO_HEAD="$(git -C "$AUTO_WT" rev-parse HEAD)"
+FINAL_AUTO=()
+if [ "$AUTO_HEAD" != "$BASE" ]; then
+    git -C "$AUTO_WT" diff --no-ext-diff --no-color --src-prefix=a/ --dst-prefix=b/ "$BASE" "$AUTO_HEAD" > "$WORK/final.diff"
+    git -C "$AUTO_WT" diff --name-only -z --no-renames --no-ext-diff "$BASE" "$AUTO_HEAD" > "$WORK/final.names" \
+        || abort "git diff --name-only failed in $AUTO_WT"
+    while IFS= read -r -d '' f; do FINAL_AUTO+=("$f"); done < "$WORK/final.names"
+    for p in "${FINAL_AUTO[@]}"; do
+        split_path_is_auto "$p" "$WORK/final.diff" || abort "held file $p is in the auto range"
+        if is_excluded "$p"; then abort "excluded file $p is in the auto range"; fi
+    done
+fi
+plan_auto_merge() { awk 'NR == 1 && $0 != "---" { exit } NR > 1 && $0 == "---" { exit } /^auto_merge:/ { print }' "$1"; }
+if [ "${#FINAL_AUTO[@]}" -gt 0 ]; then
+    [ -f "$AUTO_PLAN" ] || abort "auto pile has no plan at $AUTO_PLAN"
+    [ "$(plan_auto_merge "$AUTO_PLAN")" = "auto_merge: docs-only-ready" ] || abort "auto plan must read exactly auto_merge: docs-only-ready"
+fi
+if [ "$REVIEW_COUNT" -gt 0 ]; then
+    case "$REV_SLUG" in docs-stale-refresh-*) abort "review branch $REV_SLUG carries the auto prefix" ;; esac
+    [ -n "$(git -C "$REV_WT" diff --name-only origin/master HEAD)" ] || abort "review range is empty"
+    [ -f "$REV_PLAN" ] || abort "review pile has no plan at $REV_PLAN"
+    [ "$(plan_auto_merge "$REV_PLAN")" = "auto_merge: false" ] || abort "review plan must read auto_merge: false"
+    if grep -q '^hold_trigger:' "$REV_PLAN"; then abort "review plan must carry no hold_trigger"; fi
+fi
+
+# --- veronly (only when nothing is held) ---------------------------------------
+STEP="veronly"
+run_veronly() {
+    local rc=0
+    (cd "$AUTO_WT" && "$SPLIT_DIR/docfix-check-veronly" "$SLUG") || rc=$?
+    case "$rc" in
+        0|1|2) log "docfix-check-veronly exited $rc" ;;
+        *) abort "docfix-check-veronly exited $rc" ;;
+    esac
+}
+if [ "$REVIEW_COUNT" -eq 0 ]; then run_veronly; fi
+
+# --- Fire ---------------------------------------------------------------------
+trap - EXIT
+rm -rf "$WORK"
+FIRE_WTS=()
+if [ "${#FINAL_AUTO[@]}" -gt 0 ]; then
+    FIRE_WTS+=("$AUTO_WT")
+else
+    (cd "$MAIN" && "$SPLIT_DIR/wt-remove" "$SLUG" --if-empty) || log "wt-remove $SLUG failed"
+    if [ ! -d "$AUTO_WT" ]; then rm -f "$AUTO_PLAN"; fi
+fi
+[ "$REVIEW_COUNT" -gt 0 ] && FIRE_WTS+=("$REV_WT")
+FIRE_FAILED=0
+for wt in "${FIRE_WTS[@]}"; do
+    frc=0
+    (cd "$wt" && bin/post-plan-now) || frc=$?
+    if [ "$frc" -ne 0 ]; then
+        log "$(basename "$wt") fire refused rc=$frc; worktree kept at $wt"
+        FIRE_FAILED=1
+    fi
+done
+[ "$FIRE_FAILED" -eq 0 ] || exit 4
+exit 0

@@ -2488,15 +2488,33 @@ test_unblock_base_cli_rejects() {
 test_unblock_prompt_parent_tip() {
     local prompt_line
     prompt_line=$(grep '^BL_UNBLOCK_PROMPT=' "$LOOP")
-    assert_contains unblock_prompt:declared-parent "$prompt_line" 'Read the declared parent with `git config --get branch.<branch>.iblBase`.'
-    assert_contains unblock_prompt:squash-merged-parent "$prompt_line" 'the parent was squash-merged and its own commits never reached master, so set <up> to <ptip>'
     assert_contains unblock_prompt:pre-squash "$prompt_line" 'squash the commits of this branch into one with `git reset --soft <up>` followed by `git commit -C ORIG_HEAD`'
+    assert_contains unblock_prompt:helper-call "$prompt_line" 'Then pick the replay target <target> and upstream <up> by running `@LOOP@ unblock-base <branch>` in that worktree.'
+    assert_contains unblock_prompt:helper-skip "$prompt_line" 'When that line starts with `UNBLOCK-BASE SKIP`, skip the PR.'
+    assert_contains unblock_prompt:helper-fields "$prompt_line" 'use its second field as <target> and its third field as <up>, and never compute either one yourself'
+    assert_eq unblock_prompt:no-rewrite-caveat 0 "$(printf '%s\n' "$prompt_line" | grep -cF 'only if the parent branch was not rewritten')"
+    assert_eq unblock_prompt:no-inline-parent-base 0 "$(printf '%s\n' "$prompt_line" | grep -cF 'git merge-base HEAD origin/<parent>')"
     assert_contains unblock_prompt:rebase-onto-target "$prompt_line" 'Then run `git rebase --onto <target> <up>`; at each stop resolve every conflict keeping the intent of both sides'
     assert_contains unblock_prompt:hard-rules "$prompt_line" 'Hard rules: never enable auto-merge; never run `gh pr merge` or `gh api` in any form;'
     assert_contains unblock_prompt:published-guard "$prompt_line" 'record <sha> as `git rev-parse origin/<branch>` and run `git merge-base --is-ancestor origin/<branch> HEAD`'
     assert_contains unblock_prompt:last-line "$prompt_line" 'end your final message with exactly one of these lines: BURNDOWN-UNBLOCK: pushed <n> (n = PRs you pushed a fix to), or BURNDOWN-UNBLOCK: none'
     assert_eq unblock_prompt:old-upstream 0 "$(printf '%s\n' "$prompt_line" | grep -cF 'git rebase --onto origin/master "$(git merge-base HEAD origin/master)"')"
     assert_eq unblock_prompt:quotes 2 "$(printf '%s' "$prompt_line" | tr -cd "'" | wc -c | tr -d ' ')"
+}
+
+test_unblock_prompt_delivers_loop_path() {
+    capped_env
+    seed_usage 0 1
+    local fix calls_txt
+    fix=$(ceiling_fix)
+    gh_reply 0 "$fix"
+    gh_reply 0 "$fix"
+    queue unblock-none
+    stop_on_sleep
+    IBL5_BURNDOWN_LOOP=1 run_loop run
+    calls_txt=$(cat "$T/claude.calls" 2>/dev/null)
+    assert_contains unblock_path:absolute "$calls_txt" "$REPO_ROOT/bin/burndown-loop unblock-base <branch>"
+    assert_not_contains unblock_path:no-token "$calls_txt" "@LOOP@"
 }
 
 # ---------------------------------------------------------------- runner

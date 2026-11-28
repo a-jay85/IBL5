@@ -116,16 +116,25 @@ if [ "$MERGED" = 1 ]; then
     MARGIN=900
     LAST_GOOD=$(date +%s)
     FIRST=1
-    # At least 100 rows (one GraphQL page), so merges made during a long gap fit.
+    # The first fetch asks for at least 100 rows (one GraphQL page). Later fetches
+    # ask only for merges since that 15-minute cutoff, up to 1000 (the most GitHub
+    # search returns), so a long gap does not push merges off the end of the list.
     LIMIT=$(( LAST > 100 ? LAST : 100 ))
 
     # merged_entries <n>: print up to <n> unseen merged PRs, oldest merge first.
     # Returns 1 when gh fails.
     merged_entries() {
-        local rows num epoch ts branch title url start now
+        local rows num epoch ts branch title url start now since
+        local search="sort:updated-desc" limit="$LIMIT"
         now=$(date +%s)
+        if [ "$FIRST" != 1 ]; then
+            # bash formats the time itself, since BSD and GNU date flags differ.
+            since=$(export TZ=UTC0; printf '%(%Y-%m-%dT%H:%M:%S+00:00)T' "$((LAST_GOOD - MARGIN))")
+            search="merged:>=$since $search"
+            limit=1000
+        fi
         local -a out=()
-        rows=$("$GH_BIN" pr list --repo a-jay85/IBL5 --state merged --search "sort:updated-desc" --limit "$LIMIT" \
+        rows=$("$GH_BIN" pr list --repo a-jay85/IBL5 --state merged --search "$search" --limit "$limit" \
             --json number,mergedAt,headRefName,title,url \
             --jq 'sort_by(.mergedAt)[] | [.number, (.mergedAt | fromdate), (.mergedAt | fromdate | localtime | strftime("%Y-%m-%dT%H:%M:%S")), .headRefName, .title, .url] | @tsv' \
             2>/dev/null) || return 1

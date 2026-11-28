@@ -1421,6 +1421,23 @@ s2_args=$(cat "$GHS/args")
 { grep -qF -- '--repo a-jay85/IBL5 ' <<< "$s2_args" && grep -qF -- '--limit 150 ' <<< "$s2_args"; } \
     && ok "S2ao --merged names the repo and asks gh for at least --last rows" || fail "S2ao args=[$s2_args]"
 
+# A later fetch asks for every merge since 15 minutes before the last good fetch,
+# so a long gap cannot cut merges off. --last sizes only the first fetch. The
+# clock jumps an hour per wait and the second fetch fails, so the third fetch must
+# still count from the first. TZ=XXX5 checks that the search time is UTC.
+ghs_reset; echo 3600 > "$GHS/jump"; ghs_row 1 > "$GHS/rows.1"; ghs_row 7 -600 > "$GHS/rows.3"
+s2_before=$(date +%s)
+TZ=XXX5 DEV_INBOX_MAX_POLLS=3 ghs_run --last 150 >/dev/null
+s2_after=$(date +%s)
+s2_first=$(sed -n 1p "$GHS/args"); s2_third=$(sed -n 3p "$GHS/args")
+s2_since=""
+s2_re='--search merged:>=([0-9T:-]+)\+00:00 sort:updated-desc --limit 1000 '
+[[ "$s2_third" =~ $s2_re ]] && s2_since=$(jq -rn --arg t "${BASH_REMATCH[1]}Z" '$t | fromdate')
+{ [[ "$s2_first" == *"--search sort:updated-desc --limit 150 "* ]] && [ -n "$s2_since" ] \
+    && [ "$s2_since" -ge $((s2_before - 900)) ] && [ "$s2_since" -le $((s2_after - 900)) ]; } \
+    && ok "S2as --merged: a later fetch searches by merge time since the last good fetch" \
+    || fail "S2as before=$s2_before since=$s2_since first=[$s2_first] third=[$s2_third]"
+
 ghs_reset
 r_out=$(ghs_run --once); s2_rc=$?
 r_bells=$(tr -cd "$BEL" <<< "$r_out" | wc -c | tr -d ' ')

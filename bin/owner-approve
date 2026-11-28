@@ -7,6 +7,8 @@
 #       [--timeout=<seconds>] [--poll=<seconds>]
 #   bin/owner-approve N --finish [--timeout=<seconds>] [--poll=<seconds>]
 #   bin/owner-approve N --record-amendments
+#   bin/owner-approve N "<owner's words>" [--option=<picked>] --detach [--timeout=<s>] [--poll=<s>]
+#   bin/owner-approve N --finish --detach [--timeout=<s>] [--poll=<s>]
 #
 # Order: post the approval comment; wait up to --timeout seconds (default 3600,
 # polled every --poll, default 20) for any live post-plan run on N (a launchd label,
@@ -23,12 +25,16 @@
 # when the PR's merge-base diff fingerprint equals the one in the approval marker,
 # so the owner never re-approves unchanged work. A changed diff still refuses.
 #
-# Run it from a Claude session through the Bash tool with run_in_background: true.
-# The last stdout line is RESULT: armed|refused|timeout|fix-first-recorded|amendments-recorded|headless|usage.
+# From a Claude chat session pass --detach. The call posts the approval (nothing for
+# --finish), starts launchd job com.ibl5.owner-approve-N running "N --finish", prints the
+# log path and returns. Without --detach it waits in the foreground (bin/approve-click-tick).
+# The last stdout line is RESULT: armed|refused|timeout|fix-first-recorded|amendments-recorded|detached|busy|headless|usage.
 # Exit: 0 armed; 2 usage error, nothing posted; 3 CLAUDE_HEADLESS set, nothing
 # posted; 4 not armed, a reason comment posted whenever gh can post one; 5 a
 # post-plan run was still live at --timeout, reason comment posted; 6 fix-first
 # condition recorded, run --finish after the fix is pushed.
+# 7 --detach found a live detached waiter on this PR, nothing posted. With --detach, exit 0
+# prints RESULT: detached: the waiter started; it DMs the owner unless it arms.
 # A NOT READY verdict on an approval that lists kept unplanned changes and a diff
 # fingerprint first gets one bin/post-plan-now --state-changed re-review; exit 4
 # can follow that re-review. --finish on such an approval gets the same re-review.
@@ -53,7 +59,7 @@ OA_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=bin/lib/human-signoff-classifier.sh
 . "$OA_ROOT/bin/lib/human-signoff-classifier.sh"
 
-OA_PR="" OA_WORDS="" OA_OPTION="" OA_FIX="" OA_FINISH=0 OA_TIMEOUT=3600 OA_POLL=20 OA_WT="" OA_KEPT_ACCEPTED=0 OA_RECORD=0
+OA_PR="" OA_WORDS="" OA_OPTION="" OA_FIX="" OA_FINISH=0 OA_TIMEOUT=3600 OA_POLL=20 OA_WT="" OA_KEPT_ACCEPTED=0 OA_RECORD=0 OA_DETACH=0 oa_lock_held=0 oa_rec_n=0
 head_tree_armed="" head="" branch="" state="" labels=",," rec_mode=approve rec_head="" rec_diff="" rec_kept=false me="" comments="" verdict_word=""
 _oa_usage() { printf 'owner-approve: %s\n' "$1" >&2; printf 'RESULT: usage\n'; exit 2; }
 pos=0
@@ -67,6 +73,8 @@ while [ $# -gt 0 ]; do
         --finish) OA_FINISH=1 ;;
         --record-amendments) OA_RECORD=1 ;;
         --record-amendments=*) _oa_usage "--record-amendments takes no value" ;;
+        --detach) OA_DETACH=1 ;;
+        --detach=*) _oa_usage "--detach takes no value" ;;
         --option|--fix-first|--timeout|--poll) _oa_usage "$1 needs =<value>" ;;
         --*) _oa_usage "unknown flag: $1" ;;
         *)
@@ -81,6 +89,10 @@ while [ $# -gt 0 ]; do
 done
 case "$OA_PR" in ''|0*|*[!0-9]*) _oa_usage "the first argument must be a PR number" ;; esac
 case "$OA_TIMEOUT$OA_POLL" in *[!0-9]*) _oa_usage "--timeout and --poll take whole seconds" ;; esac
+if [ "$OA_DETACH" -eq 1 ] && [ "$OA_RECORD" -eq 1 ]; then _oa_usage "--detach cannot be combined with --record-amendments"; fi
+if [ "$OA_DETACH" -eq 1 ] && [ -n "$OA_FIX" ]; then _oa_usage "--detach cannot be combined with --fix-first (a fix-first never waits)"; fi
+OA_DETACH_LABEL="com.ibl5.owner-approve-$OA_PR"
+OA_DETACH_DIR="$HOME/Library/Caches/com.ibl5.owner-approve"
 if [ "$OA_RECORD" -eq 1 ]; then
     if [ "$OA_FINISH" -eq 1 ] || [ -n "$OA_FIX" ]; then _oa_usage "--record-amendments cannot be combined with --fix-first or --finish"; fi
     if [ -n "$OA_WORDS$OA_OPTION" ]; then _oa_usage "--record-amendments takes only the PR number"; fi
@@ -93,7 +105,8 @@ for tool in gh jq git; do
     command -v "$tool" >/dev/null 2>&1 || { printf 'owner-approve: %s not found. Nothing posted.\n' "$tool" >&2; printf 'RESULT: refused\n'; exit 4; }
 done
 tmpd=$(mktemp -d "${TMPDIR:-/tmp}/owner-approve.XXXXXX") || { printf 'owner-approve: mktemp failed. Nothing posted.\n' >&2; printf 'RESULT: refused\n'; exit 4; }
-trap 'rm -rf "$tmpd"' EXIT
+_oa_detach_unlock() { if [ "$oa_lock_held" -eq 1 ]; then ljob_slot_unlock "owner-approve-$OA_PR-"; oa_lock_held=0; fi; }
+trap 'rm -rf "$tmpd"; _oa_detach_unlock' EXIT
 
 _oa_post() { # <body>: posts one PR comment through --body-file
     printf '%s\n' "$1" > "$tmpd/body.md"
@@ -445,6 +458,51 @@ _oa_head_carry() { # <context: "the head moved" or "the re-review moved the head
     _oa_refuse 4 "$1 from $rec_head (the one the owner approved) to $head, and the PR's own changes are not the approved ones. Approve the new head again: bin/owner-approve $OA_PR \"<words>\"."
 }
 
+# --detach. Claude Code kills the Bash tool's process group when a session ends, and a
+# nohup child dies with it (bin/post-plan-now header). A launchctl submit job does not.
+_oa_detach_listed() { # 0 when this PR's detached waiter label is listed, else 1
+    local snap
+    snap=$(launchctl list 2>/dev/null) || { printf 'owner-approve: launchctl list failed, so a live detached waiter cannot be ruled out. Nothing posted.\n' >&2; printf 'RESULT: refused\n'; exit 4; }
+    awk -F'\t' -v l="$OA_DETACH_LABEL" '$3 == l {f=1} END {exit !f}' <<< "$snap"
+}
+_oa_detach_claim() { # one detached run per PR, decided before anything posts
+    # shellcheck source=bin/lib/launchd-job.sh
+    . "$OA_ROOT/bin/lib/launchd-job.sh"
+    ljob_slot_lock "owner-approve-$OA_PR-" || { printf 'owner-approve: could not take the per-PR lock. Nothing posted.\n' >&2; printf 'RESULT: refused\n'; exit 4; }
+    oa_lock_held=1
+    if _oa_detach_listed; then
+        printf 'owner-approve: detached waiter %s is already live on PR %s. Nothing posted.\n' "$OA_DETACH_LABEL" "$OA_PR" >&2
+        printf 'RESULT: busy\n'
+        exit 7
+    fi
+}
+_oa_detach_launch() { # hands the wait to launchd: the job runs "N --finish"
+    local script="$OA_DETACH_DIR/owner-approve-$OA_PR.sh" log="$OA_DETACH_DIR/owner-approve-$OA_PR.log" rc=0
+    mkdir -p "$OA_DETACH_DIR" || _oa_refuse 4 "could not create $OA_DETACH_DIR for the detached waiter."
+    rm -rf "$script.once"   # safe: the lock is held and the label is not listed
+    : > "$log"
+    cat > "$script" <<OA_JOB || _oa_refuse 4 "could not write the detached waiter script $script."
+#!/usr/bin/env bash
+# Written by bin/owner-approve --detach for PR $OA_PR. Deletes itself when done.
+log=$(shq "$log")
+OA_DETACHED_CHILD=1 $(shq "$OA_ROOT/bin/owner-approve") $OA_PR --finish --timeout=$OA_TIMEOUT --poll=$OA_POLL >> "\$log" 2>&1
+rc=\$?
+res=\$(grep '^RESULT: ' "\$log" | tail -n 1)
+if [ "\$rc" -ne 0 ]; then
+    $(shq "$OA_ROOT/bin/discord-dm") "PR #$OA_PR: owner-approve --detach did not arm (exit \$rc, \${res:-no RESULT line, so it crashed}). See \$log" >/dev/null 2>&1 || printf 'discord-dm failed\n' >> "\$log"
+fi
+rm -f "\$0"
+exit "\$rc"
+OA_JOB
+    chmod +x "$script" || _oa_refuse 4 "could not make $script executable."
+    ljob_submit "$OA_DETACH_LABEL" "$log" "$script" || rc=$?
+    [ "$rc" -eq 0 ] || _oa_refuse 4 "the detached waiter did not start (launchctl submit exit $rc). The approval stands. Run bin/owner-approve $OA_PR --finish --detach to retry."
+    _oa_detach_unlock
+    printf 'owner-approve: detached waiter %s started for PR %s. Log: %s\n' "$OA_DETACH_LABEL" "$OA_PR" "$log"
+    printf 'RESULT: detached\n'
+    exit 0
+}
+
 if [ "$OA_RECORD" -eq 1 ]; then
     _oa_read_pr || { printf 'owner-approve: could not read PR %s with gh pr view, so its branch is unknown. Nothing written.\n' "$OA_PR" >&2; printf 'RESULT: refused\n'; exit 1; }
     amend_rc=0
@@ -457,6 +515,7 @@ if [ "$OA_RECORD" -eq 1 ]; then
     printf 'RESULT: amendments-recorded\n'
     exit 0
 fi
+if [ "$OA_DETACH" -eq 1 ]; then _oa_detach_claim; fi
 pr_ok=1
 _oa_read_pr || pr_ok=0
 if [ "$OA_FINISH" -eq 0 ]; then rec_head=$head; fi
@@ -476,6 +535,7 @@ if [ "$OA_FINISH" -eq 0 ]; then
 fi
 [ "$pr_ok" -eq 1 ] || _oa_refuse 4 "could not read PR $OA_PR with gh pr view, so its head and state are unknown."
 [ "$state" = "OPEN" ] || _oa_refuse 4 "PR $OA_PR is $state, so there is nothing to arm."
+if [ "$OA_DETACH" -eq 1 ]; then _oa_detach_launch; fi
 if [ "$OA_FINISH" -eq 0 ] && [ -n "$OA_FIX" ]; then
     amend_rc=0
     _oa_record_amendments "$OA_PR" "$branch" || amend_rc=$?

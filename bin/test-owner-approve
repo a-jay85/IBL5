@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # Tests bin/owner-approve with a fixture repo and PATH shims for gh, launchctl,
-# pgrep and lsof. No case touches GitHub, launchd, or the real repo.
+# pgrep and lsof. No case touches GitHub, launchd, or the real repo, except that
+# detach_survives_group_kill (run by name only, macOS) submits a stand-in sleep job to the real launchd.
 #
 # Usage: bin/test-owner-approve [case_name ...]
 # With no arguments every case runs; with arguments only the named cases run.
 # Prints `PASS <name>` / `FAIL <name>: <why>` per case. Exit 0 iff all pass.
+# OA_SRC names another owner-approve to test. OA_CORPUS_DIR writes one file per case
+# (exit code, last RESULT line, gh and launchctl calls) so two scripts can be diffed.
 [ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
 set -uo pipefail
 
@@ -18,7 +21,7 @@ mkdir -p "$TMP/shims" "$TMP/fx" "$TMP/wt"
 export PATH="$TMP/shims:$PATH"
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.invalid
 export GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.invalid
-unset CLAUDE_HEADLESS T3CODE_THREAD_ID CLAUDE_CODE_SESSION_ID
+unset CLAUDE_HEADLESS T3CODE_THREAD_ID CLAUDE_CODE_SESSION_ID OA_DETACHED_CHILD LJOB_LOCK_DIR LAUNCHCTL_CMD
 
 WHY=""      # failure reasons for the current case
 OUT=""      # combined stdout+stderr of the last run
@@ -92,7 +95,8 @@ esac
 SHIM
 cat > "$TMP/shims/launchctl" <<'SHIM'
 #!/usr/bin/env bash
-printf '%s\n' "$*" >> "$FX/launchctl.log"
+printf '%q ' "$@" >> "$FX/launchctl.log"; printf '\n' >> "$FX/launchctl.log"
+if [ -x "$FX/launchctl.hook" ]; then "$FX/launchctl.hook"; rm -f "$FX/launchctl.hook"; fi
 printf 'PID\tStatus\tLabel\n'
 left=0
 [ -f "$FX/launchctl.left" ] && left=$(cat "$FX/launchctl.left")
@@ -148,7 +152,8 @@ git init -q "$TMP/fix"
 git -C "$TMP/fix" symbolic-ref HEAD refs/heads/master
 git -C "$TMP/fix" config commit.gpgsign false
 mkdir -p "$TMP/fix/bin"
-cp "$REPO/bin/owner-approve" "$TMP/fix/bin/owner-approve"
+cp "${OA_SRC:-$REPO/bin/owner-approve}" "$TMP/fix/bin/owner-approve"
+cp "$REPO/bin/pr-refire-after-job" "$TMP/fix/bin/pr-refire-after-job"
 cp -R "$REPO/bin/lib" "$TMP/fix/bin/lib"
 mkdir -p "$TMP/fix/tools/postplan-harness"
 cp -R "$REPO/tools/postplan-harness/harness" "$TMP/fix/tools/postplan-harness/harness"
@@ -173,7 +178,12 @@ jq -nc --arg b "$body" --argjson id "$n" \
     '{id:$id,updated_at:"2026-11-19T12:00:00Z",user:{login:"owner"},body:$b}' >> "$FX/comments.ndjson"
 exit "${REFIRE_RC:-0}"
 STUB
-chmod +x "$TMP/fix/bin/lib/prefire-verify" "$TMP/fix/bin/owner-approve" "$TMP/fix/bin/post-plan-now"
+cat > "$TMP/fix/bin/discord-dm" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$FX/dm.log"
+STUB
+chmod +x "$TMP/fix/bin/lib/prefire-verify" "$TMP/fix/bin/owner-approve" "$TMP/fix/bin/post-plan-now" \
+    "$TMP/fix/bin/pr-refire-after-job" "$TMP/fix/bin/discord-dm"
 git -C "$TMP/fix" add -A
 git -C "$TMP/fix" commit -q -m base
 
@@ -1166,6 +1176,134 @@ record_amendments_headless_refused() {
     cmp -s "$PLANF" "$FX/plan.before" || note "headless run changed the plan"
 }
 
+# ---------------------------------------------------------------------------
+# Detach cases: --detach hands the wait to launchd (the shim records the submit)
+# ---------------------------------------------------------------------------
+oa_job_script() { printf '%s' "$FX/home/Library/Caches/com.ibl5.owner-approve/owner-approve-$PR.sh"; }
+run_detach() { run_oa_env HOME="$FX/home" "$OA" "$PR" "$@"; }
+want_lc() { grep -qF -- "$1" "$FX/launchctl.log" 2>/dev/null || note "launchctl.log lacks '$1'"; }
+refute_lc() { if grep -qF -- "$1" "$FX/launchctl.log" 2>/dev/null; then note "launchctl.log unexpectedly has '$1'"; fi; }
+no_launchctl() { [ ! -e "$FX/launchctl.log" ] || note "launchctl ran but should not have"; }
+no_post() { if ls "$FX"/posted.*.md >/dev/null 2>&1; then note "a comment was posted"; fi; }
+list_label() { # <label> <how many list calls see it>
+    printf -- '-\t0\t%s\n' "$1" > "$FX/launchctl.out"
+    echo "$2" > "$FX/launchctl.left"
+}
+detach_rejects_value_form() {
+    fresh detach_rejects_value_form
+    run_detach "ok" --detach=x
+    want_rc 2
+    want_out "--detach takes no value"
+    no_gh
+    no_launchctl
+}
+detach_rejects_combos() {
+    fresh detach_rejects_combos
+    run_detach --record-amendments --detach
+    want_rc 2
+    want_out "--detach cannot be combined with --record-amendments"
+    no_gh
+    run_detach "ok" --fix-first=x --detach
+    want_rc 2
+    want_out "--detach cannot be combined with --fix-first"
+    no_gh
+}
+detach_headless_launches_nothing() {
+    fresh detach_headless_launches_nothing
+    run_oa_env HOME="$FX/home" CLAUDE_HEADLESS=1 "$OA" "$PR" "ok" --detach
+    want_rc 3
+    want_out "RESULT: headless"
+    no_gh
+    no_launchctl
+}
+detach_second_run_busy() {
+    fresh detach_second_run_busy
+    list_label "com.ibl5.owner-approve-$PR" 5
+    run_detach "ok" --detach
+    want_rc 7
+    want_out "RESULT: busy"
+    no_gh
+    refute_lc "submit"
+}
+detach_busy_near_miss() {
+    fresh detach_busy_near_miss
+    list_label "com.ibl5.owner-approve-${PR}7" 5
+    run_detach "ok" --detach
+    want_rc 0
+    want_out "RESULT: detached"
+}
+detach_launches_finish_child() {
+    fresh detach_launches_finish_child
+    local script
+    script=$(oa_job_script)
+    run_detach "ok" --detach --poll=0 --timeout=30
+    want_rc 0
+    want_out "RESULT: detached"
+    want_out "Log: ${script%.sh}.log"
+    want_posted "Owner approved"
+    refute_gh "pr merge"
+    refute_gh "pr edit"
+    want_lc "submit -l com.ibl5.owner-approve-$PR "
+    grep -qF 'OA_DETACHED_CHILD=1' "$script" 2>/dev/null || note "job script lacks OA_DETACHED_CHILD=1"
+    grep -qF "$PR --finish --timeout=30 --poll=0" "$script" 2>/dev/null || note "job script lacks the --finish call"
+    if grep -qw -- 'ok' "$script" 2>/dev/null; then note "the owner's words reached the job script"; fi
+    [ ! -e "$FX/home/Library/Caches/com.ibl5.ljob-locks/owner-approve-$PR-lock.d" ] || note "the per-PR lock was not released"
+}
+detach_finish_launches_no_post() {
+    fresh detach_finish_launches_no_post
+    run_detach --finish --detach
+    want_rc 0
+    want_out "RESULT: detached"
+    no_post
+    want_lc "submit -l com.ibl5.owner-approve-$PR "
+}
+detach_submit_argv_env() {
+    fresh detach_submit_argv_env
+    local line
+    run_detach "ok" --detach
+    want_rc 0
+    line=$(grep '^submit ' "$FX/launchctl.log" 2>/dev/null)
+    grep -qF 'PATH=/usr/local/bin:/opt/homebrew/bin' <<< "$line" || note "submit argv lacks the job PATH"
+    grep -qF "HOME=$FX/home" <<< "$line" || note "submit argv lacks HOME"
+    if grep -qF '$HOME' <<< "$line"; then note "submit argv holds an unexpanded \$HOME"; fi
+    if grep -qF " ''" <<< "$line"; then note "submit argv holds an empty argument"; fi
+}
+# Run by name only: it talks to the real launchd, with a stand-in sleep job.
+detach_survives_group_kill() {
+    if [ "$(uname -s)" != Darwin ]; then
+        printf 'SKIP detach_survives_group_kill: needs macOS launchd\n'
+        return 0
+    fi
+    fresh detach_survives_group_kill
+    local d="$TMP/survive" label="com.ibl5.oa-survive-test-$$" leader n=0 snap
+    mkdir -p "$d"
+    printf '#!/bin/sh\nsleep 120\n' > "$d/job.sh"
+    chmod +x "$d/job.sh"
+    perl -e 'setpgrp(0,0); exec @ARGV' bash -c '. "$1/bin/lib/launchd-job.sh"
+LAUNCHCTL_CMD=/bin/launchctl ljob_submit "$2" "$3/job.log" "$3/job.sh" && : > "$3/submitted"
+nohup sleep 121 >/dev/null 2>&1 &
+sleep 60' _ "$REPO" "$label" "$d" > "$d/leader.log" 2>&1 &
+    leader=$!
+    while [ "$n" -lt 50 ]; do
+        if [ -e "$d/submitted" ] && /usr/bin/pgrep -f '^sleep 121$' >/dev/null 2>&1; then break; fi
+        sleep 0.1; n=$((n + 1))
+    done
+    [ -e "$d/submitted" ] || note "ljob_submit did not succeed: $(cat "$d/leader.log")"
+    /usr/bin/pgrep -f '^sleep 121$' >/dev/null 2>&1 || note "the nohup counterfactual never started"
+    sleep 1
+    kill -TERM -- "-$leader" 2>/dev/null || note "could not signal process group $leader"
+    sleep 1
+    snap=$(/bin/launchctl list 2>/dev/null)
+    awk -F'\t' -v l="$label" '$3 == l {f=1} END {exit !f}' <<< "$snap" || note "the launchd job died with the process group"
+    if /usr/bin/pgrep -f '^sleep 121$' >/dev/null 2>&1; then
+        note "the nohup child survived the process-group kill"
+        /usr/bin/pkill -f '^sleep 121$' 2>/dev/null
+    fi
+    /bin/launchctl remove "$label" >/dev/null 2>&1
+    wait "$leader" 2>/dev/null
+    return 0
+}
+
 ALL_CASES="
 body_literal body_option ids_unset ids_empty headless_refuses headless_empty_proceeds
 usage_unknown_flag usage_space_form no_repo_writes
@@ -1186,7 +1324,23 @@ finish_kept_refire_arms finish_no_kept_no_refire
 docs_route_through_script
 fix_first_appends_amendment fix_first_second_run_appends_none fix_first_missing_plan_exit_unchanged
 record_amendments_backfills_once record_amendments_rejects_value_form record_amendments_headless_refused
+detach_rejects_value_form detach_rejects_combos detach_headless_launches_nothing detach_second_run_busy detach_busy_near_miss
+detach_launches_finish_child detach_finish_launches_no_post detach_submit_argv_env
 "
+
+oa_mask() { sed -E -e "s#$TMP#<TMP>#g" -e 's#owner-approve\.[A-Za-z0-9]+#owner-approve.X#g' -e 's#[0-9a-f]{40}#<SHA>#g'; }
+oa_corpus() { # <case>: its last exit code and RESULT line, plus the shim calls it made
+    mkdir -p "$OA_CORPUS_DIR"
+    {
+        printf 'rc=%s\n' "$RC"
+        grep '^RESULT: ' <<< "$OUT" | tail -n 1
+        printf -- '--- gh.log\n'
+        if [ -f "$FX/gh.log" ]; then oa_mask < "$FX/gh.log"; fi
+        # Distinct calls only: poll counts vary with timing, the set of calls cannot.
+        printf -- '--- launchctl.log\n'
+        if [ -f "$FX/launchctl.log" ]; then sort -u "$FX/launchctl.log" | oa_mask; fi
+    } > "$OA_CORPUS_DIR/$1"
+}
 
 if [ $# -gt 0 ]; then CASES="$*"; else CASES="$ALL_CASES"; fi
 
@@ -1198,6 +1352,7 @@ for name in ${OA_TEST_CASES:-$CASES}; do
     fi
     WHY=""
     "$name"
+    if [ -n "${OA_CORPUS_DIR:-}" ]; then oa_corpus "$name"; fi
     if [ -z "$WHY" ]; then
         echo "PASS $name"
         H_PASS=$((H_PASS + 1))

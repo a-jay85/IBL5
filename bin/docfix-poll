@@ -87,6 +87,9 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib/docfix-health.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/lib/launchd-job.sh"
 # shellcheck source=bin/lib/launchd-sched.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib/launchd-sched.sh"
+# DOCFIX_REVIEW_BRANCH_PREFIX: the held content-review branch bin/docfix-split opens.
+# shellcheck source=bin/lib/docfix-dm.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/docfix-dm.sh"
 
 # Single source of truth for the plist — shared by --print-schedule and
 # --install-schedule, so the MAIN-checkout derivation is exercised by tests.
@@ -189,12 +192,15 @@ iso_to_epoch() {
 # The ONE definition of "a human already declined a refresh covering these docs".
 # Coverage, not equality: --fix-dates can make the PR touch more docs than the
 # worklist, and if the stale set later grows beyond what was declined the pipeline
-# resumes on its own.
+# resumes on its own. A split night opens two PRs (bin/docfix-split), so the
+# declined set is the union of the newest closed-unmerged PR of each prefix.
 uncovered_count() {   # $1 = path to a --staleness-report JSON file
     local declined
     declined="$(gh pr list --state closed --limit 20 --json headRefName,mergedAt,files \
-      --jq '[.[] | select(.headRefName | startswith("docs-stale-refresh-"))
-                 | select(.mergedAt == null)] | .[0].files // [] | map(.path)' 2>/dev/null || echo '[]')"
+      --jq "[.[] | select(.mergedAt == null)] as \$c
+            | [(\"docs-stale-refresh-\", \"$DOCFIX_REVIEW_BRANCH_PREFIX\") as \$p
+               | (\$c | map(select(.headRefName | startswith(\$p))) | .[0].files // [] | map(.path))[]]
+            | unique" 2>/dev/null || echo '[]')"
     jq -r --argjson d "$declined" '[.[].path] - $d | length' "$1"
 }
 
@@ -335,8 +341,10 @@ salvage_wedged_branch() {   # $1 = branch name
     return 1
 }
 
-# Detects a local docs-stale-refresh-* branch with no origin ref, no PR, and age
-# past the 4h threshold. Returns (echoes) the branch name if found, empty if none.
+# Detects a local docs-stale-refresh-* or docs-content-review-* branch with no
+# origin ref, no PR, and age past the 4h threshold. It only reports: the reap loop
+# lists docs-stale-refresh-* alone, so a held review branch is never salvaged or reaped.
+# Returns (echoes) the branch name if found, empty if none.
 # This is the case orphaned_refresh_branch() cannot see (origin-only check).
 # IMPORTANT: declined PRs also leave local branches but WITH an origin ref (bin/cleanup
 # only reads origin/<branch>; GitHub delete_branch_on_merge covers MERGED; CLOSED
@@ -362,7 +370,8 @@ wedged_local_refresh_branch() {   # echoes branch name or empty; always exits 0
         pr_count="$(gh pr list --state all --head "$b" --json number --jq 'length' 2>/dev/null || echo 1)"
         [ "${pr_count:-1}" -eq 0 ] || continue
         printf '%s' "$b"; return
-    done < <(git -C "$MAIN" branch --list 'docs-stale-refresh-*' --format='%(refname:short)')
+    done < <(git -C "$MAIN" branch --list 'docs-stale-refresh-*' 'docs-content-review-*' \
+                 --format='%(refname:short)')
 }
 
 # Epoch at which the CURRENT stale set was first filed. NOT the issue's createdAt:
@@ -403,7 +412,7 @@ docfix_run_in_flight() {   # returns 0 = in flight; never prints
 }
 
 health_report() {
-    local alert=false kind="" detail="" report count pr_json pr_num red orphan wedged age_h episode last_pr last_pr_epoch wedged_age wedged_polls
+    local alert=false kind="" detail="" report count pr_json pr_num red orphan wedged age_h episode last_pr last_pr_epoch wedged_age wedged_polls held unheld rev_json rev_list rev_num rev_url reds
     report="$(mktemp)"; trap 'rm -f "$report"' RETURN
     "$MAIN/bin/check-docs" --staleness-report > "$report" \
         || { printf 'alert=false\nkind=\ndetail=\n'; return 0; }
@@ -437,12 +446,15 @@ health_report() {
             detail="Refresh branch ${orphan} is on origin with no PR — the doc-fix run died mid-flight. Log: ls -t /tmp/docfix-run-*.log | head -1"
         elif wedged="$(wedged_local_refresh_branch)"; [ -n "$wedged" ]; then
             alert=true; kind="wedged"
-            # The poll runs once a day and tries to salvage a wedged branch each
-            # time, so a branch N days old has survived N salvage attempts. Round
-            # to whole days; floor at 1 because this alert only fires past the
-            # 4h wedge threshold (or on unknown age).
+            # The poll runs once a day and tries to salvage a wedged refresh branch
+            # each time, so a refresh branch N days old has survived N salvage
+            # attempts. Round to whole days; floor at 1 because this alert only
+            # fires past the 4h wedge threshold (or on unknown age). The poll never
+            # salvages a review branch, so its detail reports no attempts.
             wedged_age="$(branch_age_seconds "$wedged")"
-            if [ -n "$wedged_age" ]; then
+            if [[ "$wedged" == "$DOCFIX_REVIEW_BRANCH_PREFIX"* ]]; then
+                detail="Local branch ${wedged} has no origin ref and no in-flight launchd run — the content-review run died before pushing. The poll never salvages a review branch, so it needs a manual look."
+            elif [ -n "$wedged_age" ]; then
                 wedged_polls=$(( (wedged_age + 43200) / 86400 ))
                 [ "$wedged_polls" -ge 1 ] || wedged_polls=1
                 detail="Local branch ${wedged} has no origin ref and no in-flight launchd run — the doc-fix run died before pushing. It has survived ${wedged_polls} nightly salvage attempt(s) and needs a manual look."
@@ -455,14 +467,27 @@ health_report() {
             # to "now" (age 0 → no alert) — fail-quiet like every guard above.
             episode="$(issue_episode_epoch "$issue_num")" && [ -n "$episode" ] \
                 || episode="$(date -u +%s)"
+            # A held content-review PR (bin/docfix-split) owns the docs it carries,
+            # and the next run leaves them out of its worklist. When every stale doc
+            # sits in an open review PR, nothing is broken: the owner has to merge
+            # it. A gh error leaves held empty, so the alert logic below still runs.
+            held="$(gh pr list --state open --limit 200 --json headRefName,files \
+              --jq "[.[] | select(.headRefName | startswith(\"$DOCFIX_REVIEW_BRANCH_PREFIX\")) | .files[].path] | unique")" \
+              || held=""
+            unheld=""
+            if [ -n "$held" ]; then
+                unheld="$(jq -r --argjson h "$held" '[.[].path] - $h | length' "$report" 2>/dev/null)" \
+                  || unheld=""
+            fi
             # The episode anchor alone false-alarms on a healthy poll: the issue
             # stays open (and its stale-since carries forward) as long as SOME doc
             # is stale each night, even while the poll opens and merges a refresh
             # PR daily. So also anchor on the newest refresh PR of any state — a
             # working poll has opened one within the grace window. -L 100 spans
             # several days of PR traffic. Fail-quiet: a gh error keeps the episode.
+            # A night that opened only a content-review PR counts as a run too.
             last_pr="$(gh pr list --state all -L 100 --json headRefName,createdAt \
-              --jq '[.[] | select(.headRefName | startswith("docs-stale-refresh-")) | .createdAt] | max // empty')" \
+              --jq "[.[] | select(.headRefName | (startswith(\"docs-stale-refresh-\") or startswith(\"$DOCFIX_REVIEW_BRANCH_PREFIX\"))) | .createdAt] | max // empty")" \
               || last_pr=""
             if [ -n "$last_pr" ] && last_pr_epoch="$(iso_to_epoch "$last_pr")" \
                 && [ -n "$last_pr_epoch" ] && [ "$last_pr_epoch" -gt "$episode" ]; then
@@ -476,9 +501,35 @@ health_report() {
             # that splits them. A missing log is not proof the poll is absent: /tmp
             # clears on macOS reboot, so the detail points at launchctl first.
             # Keep it ONE line: health output is parsed as key=value lines.
-            if [ "$age_h" -ge 36 ] && ! docfix_run_in_flight; then
+            if [ "$unheld" = "0" ]; then
+                : # every stale doc is held in an open content-review PR — stay quiet
+            elif [ "$age_h" -ge 36 ] && ! docfix_run_in_flight; then
                 alert=true; kind="never-ran"
                 detail="No refresh PR has been opened in ${age_h}h. Either the Mac poll is not installed or the last doc-fix run died before pushing (e.g. a Claude usage limit). On the Mac, check: ls -t /tmp/docfix-run-*.log | head -1 — tail that log for the cause. If there is no log, the poll may still be installed: /tmp is wiped on reboot, so a crashed run followed by a reboot also leaves no log. Run launchctl list | grep com.ibl5.docfix-poll; reinstall only if no docfix-poll job is listed: cd ~/GitHub/IBL5 && git pull && bin/docfix-poll --install-schedule"
+            fi
+        fi
+        # Held content-review PRs with red CI. Several can be open at once, so
+        # check every one. This runs only while no alert has fired, so it never
+        # hides the died, wedged or never-ran alerts above.
+        if [ "$alert" = false ]; then
+            rev_json="$(gh pr list --state open --limit 200 --json number,headRefName,url \
+              --jq ".[] | select(.headRefName | startswith(\"$DOCFIX_REVIEW_BRANCH_PREFIX\"))")" \
+              || rev_json=""
+            rev_list="$(jq -r '"\(.number) \(.url)"' <<<"$rev_json")" || rev_list=""
+            reds=""
+            while read -r rev_num rev_url; do
+                [ -n "$rev_num" ] || continue
+                red="$(gh pr view "$rev_num" --json statusCheckRollup \
+                  --jq '[.statusCheckRollup[]? | select(.conclusion == "FAILURE" or .conclusion == "TIMED_OUT"
+                         or .conclusion == "CANCELLED" or .conclusion == "ACTION_REQUIRED")] | length')" \
+                  || red=""
+                if [ "${red:-0}" -gt 0 ]; then
+                    reds="${reds:+$reds; }Content-review PR ${rev_url} has ${red} failing check(s)"
+                fi
+            done <<<"$rev_list"
+            if [ -n "$reds" ]; then
+                alert=true; kind="ci-red"
+                detail="${reds} — the held doc edits need a fix before you can merge them."
             fi
         fi
     fi
@@ -521,13 +572,14 @@ cd "$MAIN"
 
 # --- Lingering-unarmed-PR DM --------------------------------------------------
 # Send a once-per-PR DM for any open docfix PR that is not yet armed for
-# auto-merge. An armed PR self-ships; a DM there would be noise.  We do this
+# auto-merge. An armed PR self-ships; a DM there would be noise. A held
+# content-review PR is never armed, so this is how the owner hears of it.  We do this
 # BEFORE the staleness check so it fires even on nights with no new stale docs,
 # which are exactly the nights a lingering PR is most likely the only thing
 # outstanding.  Fail-quiet on gh errors: a missed notification retries tomorrow.
 if ! DM_PRS="$(gh pr list --state open --json number,headRefName,autoMergeRequest \
-     --jq '.[] | select(.headRefName | startswith("docs-stale-refresh-"))
-                | select(.autoMergeRequest == null) | .number' 2>/dev/null)"; then
+     --jq ".[] | select(.headRefName | (startswith(\"docs-stale-refresh-\") or startswith(\"$DOCFIX_REVIEW_BRANCH_PREFIX\")))
+                | select(.autoMergeRequest == null) | .number" 2>/dev/null)"; then
     DM_PRS=""   # fail-quiet, like every guard in this script
 fi
 

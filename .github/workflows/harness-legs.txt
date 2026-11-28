@@ -62,6 +62,7 @@
 1 bin/test-automouse-cost-rows
 1 bin/test-plan-exec-mutations
 1 bin/test-pr-triage
+1 bin/test-pr-burndown-gadget
 1 bin/test-launchd-health-check
 1 bin/test-ci-checks-green
 1 bin/test-bug-pipeline-hunt

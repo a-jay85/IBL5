@@ -391,6 +391,104 @@ def test_apply_backlog_closes_plan_blind_passthrough():
 
 
 # ---------------------------------------------------------------------------
+# _apply_tracking_issue: the plan's `<!-- tracking-issue: ... -->` marker
+# ---------------------------------------------------------------------------
+
+def _tracking_plan(tmp_path, *markers):
+    p = tmp_path / "plan.md"
+    p.write_text("---\nauto_merge: docs-only-ready\n---\n" + "".join(m + "\n" for m in markers)
+                 + "\n# Plan\n")
+    return PlanInfo(found=True, path=str(p))
+
+
+def test_tracking_issue_closes_appended(tmp_path):
+    import runner
+    plan = _tracking_plan(tmp_path, "<!-- tracking-issue: closes #7 -->")
+    out = runner._apply_backlog_closes("## Summary\n- docs\n", plan, lambda m: None)
+    assert out.rstrip().endswith("Closes #7")
+    assert out.count("Closes #7") == 1
+
+
+def test_tracking_issue_closes_kept_when_body_already_closes(tmp_path):
+    import runner
+    plan = _tracking_plan(tmp_path, "<!-- tracking-issue: closes #7 -->")
+    body = "## Summary\nFixes: #7\n"
+    assert runner._apply_backlog_closes(body, plan, lambda m: None) == body
+
+
+def test_tracking_issue_refs_rewrites_closing_phrase(tmp_path):
+    import runner
+    plan = _tracking_plan(tmp_path, "<!-- tracking-issue: refs #7 -->")
+    out = runner._apply_backlog_closes("## Summary\nCloses #7\nresolves #7 too\n", plan,
+                                       lambda m: None)
+    assert not re.search(r"(?i)\b(close|fix|resolve)\w*:?\s+#7\b", out)
+    assert out.count("Refs #7") == 2
+
+
+def test_tracking_issue_refs_appended_when_absent(tmp_path):
+    import runner
+    plan = _tracking_plan(tmp_path, "<!-- tracking-issue: refs #7 -->")
+    out = runner._apply_backlog_closes("## Summary\n", plan, lambda m: None)
+    assert out.rstrip().endswith("Refs #7")
+
+
+def test_tracking_issue_number_boundary(tmp_path):
+    import runner
+    plan = _tracking_plan(tmp_path, "<!-- tracking-issue: refs #7 -->")
+    body = "## Summary\nCloses #70\n"
+    out = runner._apply_backlog_closes(body, plan, lambda m: None)
+    assert "Closes #70" in out
+    assert out.rstrip().endswith("Refs #7")
+    plan_c = _tracking_plan(tmp_path, "<!-- tracking-issue: closes #7 -->")
+    out_c = runner._apply_backlog_closes(body, plan_c, lambda m: None)
+    assert out_c.rstrip().endswith("Closes #7")
+
+
+def test_tracking_issue_cross_repo_reference_untouched(tmp_path):
+    import runner
+    plan = _tracking_plan(tmp_path, "<!-- tracking-issue: refs #7 -->")
+    body = "## Summary\nCloses a-jay85/IBL5-backlog#7\n"
+    out = runner._apply_backlog_closes(body, plan, lambda m: None)
+    assert "Closes a-jay85/IBL5-backlog#7" in out
+
+
+def test_tracking_issue_no_marker_passthrough(tmp_path):
+    import runner
+    plan = _tracking_plan(tmp_path)
+    body = "## Summary\n"
+    assert runner._apply_backlog_closes(body, plan, lambda m: None) == body
+
+
+def test_tracking_issue_two_markers_passthrough(tmp_path):
+    import runner
+    plan = _tracking_plan(tmp_path, "<!-- tracking-issue: closes #7 -->",
+                          "<!-- tracking-issue: refs #8 -->")
+    body = "## Summary\n"
+    assert runner._apply_backlog_closes(body, plan, lambda m: None) == body
+
+
+def test_tracking_issue_unreadable_plan_passthrough(tmp_path):
+    import runner
+    plan = PlanInfo(found=True, path=str(tmp_path / "missing.md"))
+    body = "## Summary\n"
+    assert runner._apply_backlog_closes(body, plan, lambda m: None) == body
+
+
+def test_tracking_issue_none_plan_passthrough():
+    import runner
+    assert runner._apply_tracking_issue("x\n", None, lambda m: None) == "x\n"
+
+
+@pytest.mark.parametrize("kind", ["closes", "refs"])
+def test_tracking_issue_idempotent(tmp_path, kind):
+    import runner
+    plan = _tracking_plan(tmp_path, f"<!-- tracking-issue: {kind} #7 -->")
+    once = runner._apply_backlog_closes("## Summary\nCloses #7\n", plan, lambda m: None)
+    twice = runner._apply_backlog_closes(once, plan, lambda m: None)
+    assert once == twice
+
+
+# ---------------------------------------------------------------------------
 # Replay integration tests
 # ---------------------------------------------------------------------------
 

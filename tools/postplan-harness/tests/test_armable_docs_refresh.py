@@ -25,6 +25,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 PR_ARMABLE = REPO_ROOT / "bin" / "lib" / "pr-armable.sh"
 
 REFRESH_BRANCH = "docs-stale-refresh-20261015"
+REVIEW_BRANCH = "docs-content-review-20990101"
 QUALIFYING_FILES = [
     "ibl5/docs/decisions/0086-x.md",
     "ibl5/docs/guide.md",
@@ -474,3 +475,10 @@ def test_evaluate_docs_only_ready_rules_date_bump():
                                        docs_refresh_rules_diffs=None)))
     assert held.blocked
     assert "docs-refresh:paths:.claude/rules/x.md" in held.reason
+
+
+def test_review_branch_with_allowlisted_paths_holds_on_branch_clause():
+    """bin/docfix-split's held review pile: only allowlisted paths, but the branch
+    clause alone keeps condition (7) from arming it."""
+    assert docs_refresh_holds(REVIEW_BRANCH, ["ibl5/docs/x.md"], "TWO-WAY", "READY") == [
+        f"docs-refresh:branch:{REVIEW_BRANCH}"]

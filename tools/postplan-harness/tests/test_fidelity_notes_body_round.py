@@ -308,3 +308,22 @@ def test_notes_round_declined_leaves_remediation_unset(tmp_path, git_shim):
         assert res.fidelity["remediation_sha"] is None
     finally:
         _cleanup(pr, f"{pr}-2")
+
+
+_COMMIT_SHA = "c0ffee" * 6 + "abcd"
+
+
+def test_mark_notes_round_remediation_keeps_commit_sha():
+    fid = {"remediation_sha": _COMMIT_SHA, "rounds": [{"remediation_sha": _COMMIT_SHA}]}
+    runner._mark_notes_round_remediation(fid)
+    assert fid["remediation_sha"] == _COMMIT_SHA
+    assert runner._last_remediation_commit(fid) == _COMMIT_SHA
+
+
+@pytest.mark.parametrize("fid", [{}, {"remediation_sha": None}, {"remediation_sha": ""}])
+def test_mark_notes_round_remediation_fills_empty_slot(fid):
+    runner._mark_notes_round_remediation(fid)
+    assert fid["remediation_sha"] == runner.BODY_ONLY_SHA
+    assert "findings_round" not in fid
+    assert "rounds_completed" not in fid
+

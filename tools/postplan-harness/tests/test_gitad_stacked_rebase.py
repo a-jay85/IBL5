@@ -11,8 +11,13 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from harness.adapters.gitad import LiveGit, _CONFLICT_MARKER_RE
+from harness.adapters.gitad import LiveGit, _OPEN_CLOSE_MARKER_RE, _SEPARATOR_MARKER_RE
 from harness.state import HarnessError
+
+
+def _any_marker(line):
+    return bool(re.search(_OPEN_CLOSE_MARKER_RE, line) or re.search(_SEPARATOR_MARKER_RE, line))
+
 
 _REPO_ROOT = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -895,6 +900,139 @@ def test_rebase_onto_marker_sweep_rc_failure_fails_closed(monkeypatch):
         _cleanup_full(key, branch, d)
 
 
+# ── backlog#1614: bare separators are swept on conflicted paths only ──────────
+
+_SETEXT_HEADING = "Title\n=======\n"
+_FULL_HUNK = "<<<<<<< HEAD\nx\n=======\ny\n>>>>>>> topic\n"
+
+
+def _plant(d, rel, text):
+    """Amend HEAD to carry a committed file that is outside the conflict set."""
+    env = {
+        **os.environ,
+        "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+        "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t",
+    }
+    with open(os.path.join(d, rel), "w") as fh:
+        fh.write(text)
+    subprocess.run(["git", "-C", d, "add", rel],
+                   check=True, capture_output=True, env=env)
+    subprocess.run(["git", "-C", d, "commit", "--amend", "--no-edit"],
+                   check=True, capture_output=True, env=env)
+
+
+def _record_sweeps(monkeypatch):
+    """Record the argv of every marker-sweep grep, then run the real one."""
+    calls = []
+    real_run_out = LiveGit._run_out
+
+    def recording_run_out(self, *args):
+        if args[0] == "grep" and "HEAD" in args:
+            calls.append(args)
+        return real_run_out(self, *args)
+
+    monkeypatch.setattr(LiveGit, "_run_out", recording_run_out)
+    return calls
+
+
+def test_rebase_onto_ignores_setext_heading_outside_inventory():
+    d, base_sha, master_sha, key, branch = _make_simple_conflict_repo(
+        lostwork_script=_LOSTWORK_EQUIV
+    )
+    llm = _WritingLlm(d, "feature.txt", content="merged content\n")
+    try:
+        _plant(d, "notes.md", _SETEXT_HEADING)
+        g = LiveGit(d, llm=llm)
+        g.rebase_onto()
+        assert g.last_conflict_resolution is not None
+        assert g.last_conflict_resolution.auto_resolved is True
+        assert _sh(d, "status", "--porcelain").stdout.strip() == ""
+    finally:
+        _cleanup_full(key, branch, d)
+
+
+def test_rebase_onto_marker_hunk_outside_inventory_aborts():
+    d, base_sha, master_sha, key, branch = _make_simple_conflict_repo(
+        lostwork_script=_LOSTWORK_EQUIV
+    )
+    llm = _WritingLlm(d, "feature.txt", content="merged content\n")
+    try:
+        _plant(d, "outside.txt", _FULL_HUNK)
+        pre_head = _rev(d, "HEAD")
+        with pytest.raises(HarnessError) as exc:
+            LiveGit(d, llm=llm).rebase_onto()
+        assert exc.value.kind == "rebase-conflict"
+        assert "conflict markers survive" in exc.value.detail
+        assert _rev(d, "HEAD") == pre_head
+    finally:
+        _cleanup_full(key, branch, d)
+
+
+def test_rebase_onto_sweep_scopes_separator_to_inventory(monkeypatch):
+    d, base_sha, master_sha, key, branch = _make_simple_conflict_repo(
+        lostwork_script=_LOSTWORK_EQUIV
+    )
+    llm = _WritingLlm(d, "feature.txt", content="merged content\n")
+    calls = _record_sweeps(monkeypatch)
+    try:
+        LiveGit(d, llm=llm).rebase_onto()
+        assert any(_SEPARATOR_MARKER_RE in c and ":(literal)feature.txt" in c
+                   for c in calls), calls
+    finally:
+        _cleanup_full(key, branch, d)
+
+
+def test_stacked_rebase_ignores_setext_heading_outside_inventory():
+    d, parent_tip, master_sha, key, branch = _make_modify_conflict_repo(
+        lostwork_script=_LOSTWORK_EQUIV
+    )
+    llm = _WritingLlm(d, "feature.txt",
+                      content="merged content\n",
+                      review_reply="CONFLICT-REVIEW=CLEAN\n")
+    try:
+        _plant(d, "notes.md", _SETEXT_HEADING)
+        pre_head = _rev(d, "HEAD")
+        result = LiveGit(d, llm=llm).autoresolve_stacked_rebase()
+        assert result.resolved is True
+        assert result.auto_resolved is True
+        assert result.post_resolution_sha != pre_head
+    finally:
+        _cleanup_full(key, branch, d)
+
+
+def test_stacked_rebase_marker_hunk_outside_inventory_aborts():
+    d, parent_tip, master_sha, key, branch = _make_modify_conflict_repo(
+        lostwork_script=_LOSTWORK_EQUIV
+    )
+    llm = _WritingLlm(d, "feature.txt", content="merged content\n")
+    try:
+        _plant(d, "outside.txt", _FULL_HUNK)
+        pre_head = _rev(d, "HEAD")
+        with pytest.raises(HarnessError) as exc:
+            LiveGit(d, llm=llm).autoresolve_stacked_rebase()
+        assert exc.value.kind == "rebase-conflict"
+        assert "conflict markers survive" in exc.value.detail
+        assert _rev(d, "HEAD") == pre_head
+    finally:
+        _cleanup_full(key, branch, d)
+
+
+def test_stacked_rebase_sweep_scopes_separator_to_inventory(monkeypatch):
+    d, parent_tip, master_sha, key, branch = _make_modify_conflict_repo(
+        lostwork_script=_LOSTWORK_EQUIV
+    )
+    llm = _WritingLlm(d, "feature.txt",
+                      content="merged content\n",
+                      review_reply="CONFLICT-REVIEW=CLEAN\n")
+    calls = _record_sweeps(monkeypatch)
+    try:
+        LiveGit(d, llm=llm).autoresolve_stacked_rebase()
+        assert any(_SEPARATOR_MARKER_RE in c and ":(literal)feature.txt" in c
+                   for c in calls), calls
+    finally:
+        _cleanup_full(key, branch, d)
+
+
 # ── Bug 1: conflict marker regex tightness ────────────────────────────────────
 
 def test_conflict_marker_re_rejects_80char_equals_separator():
@@ -904,8 +1042,8 @@ def test_conflict_marker_re_rejects_80char_equals_separator():
     80-char separator fired a false-positive that blocked PRs #2453 and #2465.
     """
     separator = "=" * 80
-    assert re.search(_CONFLICT_MARKER_RE, separator, re.MULTILINE) is None, (
-        f"_CONFLICT_MARKER_RE should not match 80-char separator: {separator!r}"
+    assert not _any_marker(separator), (
+        f"_any_marker should not match 80-char separator: {separator!r}"
     )
 
 
@@ -920,8 +1058,8 @@ def test_conflict_marker_re_matches_real_markers():
         "||||||| base",
     ]
     for line in real_markers:
-        assert re.search(_CONFLICT_MARKER_RE, line, re.MULTILINE) is not None, (
-            f"_CONFLICT_MARKER_RE should match real conflict marker: {line!r}"
+        assert _any_marker(line), (
+            f"_any_marker should match real conflict marker: {line!r}"
         )
 
 
@@ -935,8 +1073,8 @@ def test_conflict_marker_re_rejects_non_marker_equals_prefixed():
         "======= with text",  # 7 = followed by space then text (not an exact-7-alone line)
     ]
     for line in non_markers:
-        assert re.search(_CONFLICT_MARKER_RE, line, re.MULTILINE) is None, (
-            f"_CONFLICT_MARKER_RE should not match non-marker line: {line!r}"
+        assert not _any_marker(line), (
+            f"_any_marker should not match non-marker line: {line!r}"
         )
 
 

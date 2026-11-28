@@ -757,7 +757,7 @@ while [ "$i" -lt "$PR_COUNT" ]; do
 
     # --- compute signals ---
     changed_paths="$(printf '%s' "$files" | jq -r '.[].path')"
-    clearance="$(pr_manual_testing_clearance "$body" "$changed_paths")"  # files-json-ok: mirrors harness classification.files (armable.py:691) for parity
+    clearance="$(pr_manual_testing_clearance "$body" "$changed_paths")"  # files-json-ok: new-path-only list on purpose; a renamed-away spec is no test evidence (armable.py evaluate condition 1)
     # The UI floor and the golden hold need the REST file list: only it carries
     # a rename's old path (`gh pr list --json files` drops it and caps at 100).
     # A failed read passes "" and both predicates fail closed.

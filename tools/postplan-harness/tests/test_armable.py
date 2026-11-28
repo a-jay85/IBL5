@@ -12,6 +12,7 @@ from harness.armable import (ArmInputs, SENTINEL_RE, dep_numbers, evaluate, ui_h
                              manual_testing_clearance, all_rows_ticked)
 from harness import removed_guards
 from harness.classify import _neutralize_checkboxes
+from harness.classify import classify, GOLDEN_PATH as CLS_GOLDEN_PATH, JSB_CAPTURE_PREFIX
 from harness.manual_rows import ManualRow, _assert_no_sentinel, render_rows
 from harness.state import Classification, Finding, HarnessError
 
@@ -104,6 +105,77 @@ def test_ui_paths_rename_source_holds_condition_8():
 def test_ui_paths_absent_falls_back_to_classification_files():
     d = evaluate(inputs(classification=Classification(files=["ibl5/classes/X.php"])))
     assert not next(c for c in d.conditions if c.number == 8).blocked
+
+
+BODY_E2E_CLAIM = ("## Summary\nx\n\n## Manual Testing\n\n"
+                  "No manual testing needed — covered by e2e tests\n"
+                  "- [ ] eyeball the trade page\n")
+SPEC_OLD = "ibl5/tests/e2e/trades/submit-trade.spec.ts"
+SPEC_NEW = "ibl5/docs/submit-trade-notes.md"
+
+
+def test_clearance_renamed_away_e2e_spec_stays_held():
+    # The spec moved away from the e2e tree. Only ui_paths lists its old path.
+    d = evaluate(inputs(pr_body=BODY_E2E_CLAIM,
+                        classification=Classification(files=[SPEC_NEW]),
+                        ui_paths=[SPEC_OLD, SPEC_NEW]))
+    c1 = next(c for c in d.conditions if c.number == 1)
+    assert c1.blocked and "state=HELD" in c1.reason
+
+
+def test_clearance_e2e_spec_in_classification_files_clears():
+    d = evaluate(inputs(pr_body=BODY_E2E_CLAIM,
+                        classification=Classification(files=[SPEC_OLD])))
+    assert not next(c for c in d.conditions if c.number == 1).blocked
+
+
+JSB_OLD = JSB_CAPTURE_PREFIX + "foul-roll.jsonl"
+JSB_NEW = "engine/testdata/retired/foul-roll.jsonl"
+GOLDEN_NEW = "engine/internal/sim/testdata/golden-retired.json"
+
+
+def _c5(d):
+    return next(c for c in d.conditions if c.number == 5)
+
+
+def test_c5_golden_renamed_away_holds_via_ui_paths():
+    d = evaluate(inputs(classification=classify([GOLDEN_NEW], ""),
+                        ui_paths=[CLS_GOLDEN_PATH, GOLDEN_NEW]))
+    assert _c5(d).blocked and "golden snapshot" in _c5(d).reason
+
+
+def test_c5_jsb_capture_renamed_away_holds_via_ui_paths():
+    d = evaluate(inputs(classification=classify([JSB_NEW], ""),
+                        ui_paths=[JSB_OLD, JSB_NEW]))
+    assert _c5(d).blocked and "JSB capture" in _c5(d).reason
+
+
+def test_trace_pinned_not_lifted_when_jsb_capture_renamed_away():
+    files = [CLS_GOLDEN_PATH, JSB_NEW]
+    d = evaluate(inputs(classification=classify(files, ""),
+                        ui_paths=[CLS_GOLDEN_PATH, JSB_OLD, JSB_NEW],
+                        plan_hold_triggers=("trace-pinned",),
+                        trace_pinned_evidence="ok"))
+    assert _c5(d).blocked
+
+
+def test_c5_interactive_jsb_rename_away_warns_not_blocks():
+    d = evaluate(inputs(classification=classify([JSB_NEW], ""),
+                        ui_paths=[JSB_OLD, JSB_NEW], headless=False))
+    assert not _c5(d).blocked and _c5(d).warning
+
+
+def test_c5_near_miss_paths_do_not_hold():
+    near = ["engine/testdata/jsb-captures-old/x.jsonl",
+            "engine/internal/sim/testdata/golden.json.bak",
+            "engine/golden.json"]
+    d = evaluate(inputs(classification=classify(near, ""), ui_paths=near))
+    assert not _c5(d).blocked
+
+
+def test_c5_classification_flag_alone_still_holds():
+    cls = Classification(files=["engine/internal/sim/foul.go"], golden_changed=True)
+    assert _c5(evaluate(inputs(classification=cls))).blocked
 
 
 def test_ui_hold_empty_files_fails_closed():

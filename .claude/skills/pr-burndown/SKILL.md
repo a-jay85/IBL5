@@ -1,6 +1,6 @@
 ---
 name: pr-burndown
-description: "Burn down the open PRs that wait on the owner. Background headless jobs do the prep that needs no owner call (rebase, regenerate snapshots, write promised tests, fix review findings, re-fire post-plan). The owner sees only the decisions that are theirs: a status card per PR (CI on the current head, review threads, post-plan verdict, door and blast radius, conflicts, hold reasons, visual links) with a recommended option, answered in a batch."
+description: "Burn down the open PRs that wait on the owner. Background headless jobs do the prep that needs no owner call (rebase, regenerate snapshots, write promised tests, fix review findings, re-fire post-plan). The owner sees only the decisions that are theirs: one scoreboard page with a status row per PR (tests, comments, bot review, easy undo, your OK, your call). Each row opens a full card with a recommended option, and the owner answers in a batch."
 last_verified: 2026-11-27
 ---
 
@@ -159,19 +159,19 @@ bin/pr-triage --card N
 
 It prints the live state the card needs:
 
-- **Head:** the head SHA, merge state, labels, and auto-merge.
+- **Head:** the merge state, labels, and auto-merge. The page never shows the SHA.
 - **CI:** real failures, split from the gate checks that only wait on the owner
   (`human-signoff`, `needs-a-human label`, `auto-mergeable label`).
 - **Review threads:** the open threads that are not outdated, each with its first line.
 - **post-plan verdict:** the last `<!-- pr-ready-verdict -->` comment, marked `CURRENT`
   or `STALE` against the head. Commits after the review make it stale.
 - **Door and blast radius:** the `Merge danger:` line in the PR body.
-- **Fidelity evidence.** When the card data has a `fidelity-evidence:` row, print it verbatim. Post-plan writes it for a PR that edits `tools/postplan-harness/harness/fidelity.py`. It compares stored verdicts only and does not change the hold. Print STALE, missing, malformed, unknown and NOT RUN rows as they are.
+- **Fidelity evidence.** When the card data has a `fidelity-evidence:` row, the page prints its status words with the SHAs removed. Post-plan writes it for a PR that edits `tools/postplan-harness/harness/fidelity.py`. It compares stored verdicts only and does not change the hold. The page keeps STALE, missing, malformed, unknown and NOT RUN statuses in words.
 - **Visual links:** the `a-jay85.github.io/IBL5/...` URLs from the comments.
 - **Live run and worktree:** any live post-plan label, and the PR's worktree path.
 - **Owner approvals:** each `bin/owner-approve` comment, oldest first. Each row gives the mode, the approved head and whether the PR head moved past it, then the owner's words, the `condition:` line, any `kept:` bullets and, for a fix-first approval, `amendment: recorded`, `MISSING` or `no plan file`.
 
-A field that prints `unknown (fetch failed)` gets ⚠️ on the card. Never fill it from an
+A field that prints `unknown (fetch failed)` gets ❌ on the page, and its row stays visible. Never fill it from an
 earlier fetch. Read the thread bodies or the full verdict only when the card needs more
 than the first line.
 
@@ -179,69 +179,65 @@ Check one more thing yourself:
 
 - **Does it do the job where it runs?** Read the diff against how the code deploys. For
   example, a Docker-only change does nothing on prod, which deploys by `git pull` onto a
-  plain server. Say so on the card when the PR misses its own goal.
+  plain server. Put it in the card's `risks` when the PR misses its own goal.
 
-Write the card in this shape:
+Show the cards as one page. `bin/pr-burndown-gadget` builds it from live `bin/pr-triage --card` and `bin/pr-triage --held` data, so the layout is the same every run. It fetches each card again as it builds the page. You write only the judgment: the plain title, your call, short notes for red cells, the card text, the options and your pick.
 
-```markdown
-## PR K of T: [#N](https://github.com/a-jay85/IBL5/pull/N), <plain title>
+Write the judgment as JSON with one entry per PR you looked at this run, in rank order:
 
-<One line: why this PR is next.>
-
-**What it does**
-- <GM-visible effect, in plain words>
-- Size: F files, +A/−D. Type is `<type>`.
-
-**State**
-- <✅/⚠️/❌/⏳> **CI:** <green / which real check failed>, on head `<sha>`.
-- <✅/⚠️/❌/⏳> **Review comments:** <open count; what each said; which commit fixed it>.
-- <✅/✅📝/⚠️/❌/⏳/🚨> **post-plan verdict:** <verdict>. <Current or stale>. <Its notes, short>.
-- <✅2️⃣/⚠️2️⃣/🚨1️⃣> **Merge danger:** <one-way or two-way door, blast radius, what a revert does and doesn't undo>.
-- <✅/⚠️> **Fidelity evidence:** <the `fidelity-evidence:` row verbatim; omit this line when the data has none>
-- <✅🔙/⚠️/🚨> **Conflicts:** <none / behind master, no clash / which files clash and with which PR; the job rebases>.
-- <✅/⚠️/❌/⏳> **Why it's held:** <each reason by number; mark stale ones as stale>.
-- <✅/⚠️/🚨> **Owner approvals:** <none / each approval: mode, head unchanged or moved past it, the condition, the amendment status>.
-
-👉 **What's left for you:** <the one decision>.
-
-**Options**
-1. **<Ship it / Approve>.** <what you'll do>
-2. **<Fix X first>.** <what you'll do; comes back to you>
-3. **Hold.**
-
-💡 I'd go with **<n>**. <One or two lines of why.>
+```json
+{"version": 1, "prs": [
+  {"number": 4244, "owner_call": true,
+   "title": "<plain title a GM would follow>",
+   "why_next": "<one line: why this PR is next>",
+   "call": "<the one decision, in a few plain words>",
+   "notes": {"bot_review": "<2 or 3 words>", "easy_undo": "<what can't be undone>"},
+   "does": ["<GM-visible effect>", "<who notices it>"],
+   "undo": "<what a revert does and doesn't undo>",
+   "risks": [{"risk": "<risk or open question>", "evidence": "<the live fact behind it>"}],
+   "options": [{"label": "Ship it", "does": "<what you'll do>"},
+               {"label": "Hold", "does": "<what happens then>"}],
+   "recommend": {"option": 1, "why": "<one or two lines>"}},
+  {"number": 4250, "owner_call": false}
+]}
 ```
+
+- Set `owner_call` to true when the owner has a decision on the PR (the Decide-now pile). Set it to false when the bot is handling the PR: a prep job, a live post-plan run, or a `bin/owner-approve N --finish`.
+- A merge conflict that needs the owner's call takes `owner_call: true`, `"conflict_needs_you": true` and an option for it. Leave the field out when the bot will rebase.
+- With `owner_call: true`, every field above is required except `why_next`, `notes` and `risks`. The `notes` keys are `tests`, `comments`, `bot_review`, `easy_undo` and `your_ok`, at most four words each. A note shows only on a ❌ or 🚨 cell.
+- Write no hold codes such as "(7)". The script refuses them and strips any SHA.
+
+Run `bin/pr-burndown-gadget --judgment=FILE --out=FILE` in one block:
+
+```bash
+D="${TMPDIR:-/tmp}/pr-burndown-$(date +%Y%m%d-%H%M%S)"
+mkdir -p "$D"
+cat > "$D/judgment.json" <<'JSON'
+<the judgment JSON>
+JSON
+bin/pr-burndown-gadget \
+  --judgment="$D/judgment.json" --out="$D/scoreboard.html"
+```
+
+It prints `wrote <path> shown=K hidden=H fetch_failed=F`. Exit 2 means the judgment broke a rule, and the message names the field. Fix that field and run it again. Show the file with the `html_render` tool (load it with ToolSearch). When `html_render` is not available, run the same command with `--format=markdown --out="$D/scoreboard.md"` and paste the file into your reply. The markdown table has the same columns.
+
+The page has one row per PR that needs the owner. Its columns, in this order, are PR, Tests, Comments, Bot review, Easy undo, Your OK, Your call. Each status cell holds one of four icons: ✅ fine, ⏳ running or waiting, ❌ broken, 🚨 risky. A ✅ or ⏳ cell holds the icon alone. A ❌ or 🚨 cell adds two or three red words. Easy undo is ✅ for a two-way door and 🚨 for a one-way door. A field that fetched as `unknown (fetch failed)` shows ❌ with "Could not read", and its row stays on the page. Rows with `owner_call: false` are hidden, and one line under the table counts them. A held PR missing from the judgment still gets a row. A branch that is only behind master shows nothing. A real conflict that needs your call shows "Conflicts with master" in red in Your call.
+
+Each row opens its full card: what the PR does, what undo means, each risk with its evidence, the live CI, comments, review verdict, fidelity evidence, visual links and owner approvals, the hold reasons in plain words, the numbered options and your 💡 pick. The card has the full shape the bullets at the top of this step ask for, so each card stands alone.
+
+Your reply carries only what the page does not show: the one-line status, any fetch failure the script printed, and the line "Answer with one line per PR, like `4244: 1`." Each answer names its PR, so one message can answer several cards. When the owner writes `N: k`, act on option k for PR N. When N is not on the page or k is not one of its options, ask again about that PR alone. A PR on the page with no answer stays open for the next run.
 
 Before you recommend an option, read the plan's Architectural trade-offs and "Must
 preserve" sections (`ls ~/claude-plans/<branch>.md`). If the plan already rejected the
 approach an option takes, say so on that option and don't recommend it. On #3760 a
 recommended `workflow_run` retrigger that the plan had rejected cost a full round.
 
-Legend for the emoji: ✅ fine, nothing to read. ⚠️ worth a look but does not block. ❌ blocks the
-merge or is a real problem. ⏳ still running or waiting. Pick the emoji from the live state
-you fetched. Do not guess. A line with no evidence gets ⚠️. Use 🚨 only for a
-line the owner must not miss: a one-way door, a data or prod risk, a stale verdict that
-hides a change, or a conflict that needs the owner's call. Keep ✅ lines to a few words so the eye skips them. Spend words only on
-⚠️, ❌, and 🚨 lines.
+The script picks every icon from the live card data by fixed rules. You never pick an icon or write one into the judgment.
 
-Three emoji rules on the State lines. On **Merge danger**, put 2️⃣ right after the status
-emoji for a two-way door and 1️⃣ for a one-way door, as in `✅2️⃣` and `🚨1️⃣`. On
-**Conflicts**, a branch that is only behind master with no clash gets `✅🔙`. On
-**post-plan verdict**, a current READY WITH NOTES verdict gets `✅📝`. A stale verdict
-still follows the ⚠️ and 🚨 rules above when it hides a change.
-
-A real conflict (`DIRTY`) gets ⚠️ on the Conflicts line and on the "merge conflict
-(DIRTY)" hold reason. A plain `BEHIND` branch with no clash gets `✅🔙` on the Conflicts
-line and is not a hold reason. Neither gets ❌. Neither makes a "fix conflicts first"
-option or a recommendation to wait. The pick the owner makes (Ship, Fix X) already
-covers it. Step 6 rebases a `DIRTY` PR, and the merge line updates a `BEHIND` one once
-the PR is armed. When the clash is with another approved PR in this run, say on the
-Conflicts line that this PR rebases after that one merges. The one exception is a
-conflict that needs the owner's call to resolve, such as two PRs that change the same
-rule in opposite ways. Mark that one 🚨 and put the call in the options.
+A branch that is only behind master shows nothing on the page, and it is not a hold reason. The merge line updates it once the PR is armed. Step 6 rebases a `DIRTY` PR, so the owner's pick already covers it. Neither state makes a "fix conflicts first" option or a recommendation to wait. When the clash is with another approved PR in this run, add a `risks` entry saying this PR rebases after that one merges. The one exception is a conflict that needs the owner's call to resolve, such as two PRs that change the same rule in opposite ways. Set `conflict_needs_you` and put the call in the options.
 
 Start every reply with a one-line status of each background job that has moved since the
-last card. Use the same emoji there: ✅ done or armed, ⏳ running, ❌ blocked.
+last card. Use these icons there: ✅ done or armed, ⏳ running, ❌ blocked.
 
 ## Step 4: Run the prep
 

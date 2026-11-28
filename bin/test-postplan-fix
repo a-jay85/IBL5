@@ -535,6 +535,22 @@ need "HEAD is the branch tip" test "$(git -C "$WTC" rev-parse HEAD)" = "$TIP"
 case_end headless-markers-remain
 fi
 
+# 20b
+if should_run "headless-stray-separator-unrelated-file"; then
+hl_reset
+printf 'Title\n=======\n\nBody\n' > "$WTC/notes.md"
+git -C "$WTC" add notes.md
+git -C "$WTC" -c user.name=t -c user.email=t@t commit -q -m 'setext heading in an unrelated file'
+export CLAUDE_STUB_REPLY="$TMP/reply-resolved" CLAUDE_STUB_EFFECT="$TMP/effects/resolve.sh"
+run_fix "$SUT" --headless "$B_CONFLICT"
+need "rc 0 (stderr: $ERR)" test "$RC" = 0
+need "stdout ends with the result word" ends_s "$STDOUT" "postplan-fix: headless result=committed"
+need "a.txt resolved" test "$(cat "$WTC/a.txt")" = "$(printf 'feature\nmaster')"
+need "stray ======= is not a marker (got: $ERR)" test -z "$(printf '%s' "$ERR" | grep -F 'conflict markers remain')"
+need "notes.md kept its heading" grep -qx '=======' "$WTC/notes.md"
+case_end headless-stray-separator-unrelated-file
+fi
+
 # 21
 if should_run "headless-moved-ref"; then
 hl_reset

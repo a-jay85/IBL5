@@ -185,13 +185,135 @@ def test_plan_gates_carry_plan_replay_timeout():
             assert spec.timeout == 0, path
 
 
+def _uncovered_check_scripts(root):
+    """Each bin/check-* under root that neither its own header nor REPLAY_SPECS covers."""
+    out = []
+    for script in sorted(glob.glob(os.path.join(root, "bin", "check-*"))):
+        rel = "bin/" + os.path.basename(script)
+        with open(script, encoding="utf-8") as fh:
+            text = fh.read()
+        state, _, reason = resolve_spec(rel, text)
+        if state not in ("replayable", "not-replayable"):
+            out.append(f"{rel} unspecified: {reason}")
+    return out
+
+
 def test_registry_covers_every_check_script():
     scripts = sorted(glob.glob(os.path.join(REPO_ROOT, "bin", "check-*")))
     assert scripts, "no bin/check-* found; REPO_ROOT is wrong"
-    for script in scripts:
-        rel = "bin/" + os.path.basename(script)
-        state, _, reason = resolve_spec(rel, "")
-        assert state in ("replayable", "not-replayable"), f"{rel} unspecified: {reason}"
+    assert _uncovered_check_scripts(REPO_ROOT) == []
+
+
+def _gate_root(tmp_path, text):
+    (tmp_path / "bin").mkdir()
+    (tmp_path / "bin" / "check-zzz").write_text(text, encoding="utf-8")
+    return str(tmp_path)
+
+
+def test_header_only_gate_counts_as_covered(tmp_path):
+    root = _gate_root(tmp_path, "#!/usr/bin/env bash\n# gate-backtest-argv: --since={base}\necho ok\n")
+    assert "bin/check-zzz" not in REPLAY_SPECS
+    assert _uncovered_check_scripts(root) == []
+
+
+def test_gate_without_header_or_entry_is_uncovered(tmp_path):
+    root = _gate_root(tmp_path, "#!/usr/bin/env bash\necho ok\n")
+    assert _uncovered_check_scripts(root) == [
+        "bin/check-zzz unspecified: no replay spec: add a '# gate-backtest-argv:' header"]
+
+
+def test_not_replayable_header_gate_is_uncovered(tmp_path):
+    root = _gate_root(tmp_path,
+                      "#!/usr/bin/env bash\n# gate-backtest: not-replayable because it needs a live db\n")
+    out = _uncovered_check_scripts(root)
+    assert len(out) == 1
+    assert out[0].startswith("bin/check-zzz unspecified: self-declared not replayable")
+
+
+def test_header_past_scan_window_is_uncovered(tmp_path):
+    # Shebang plus 40 pad lines puts the header on line 42, past HEADER_SCAN_LINES (40).
+    root = _gate_root(tmp_path,
+                      "#!/usr/bin/env bash\n" + "echo pad\n" * 40 + "# gate-backtest-argv: --since={base}\n")
+    assert len(_uncovered_check_scripts(root)) == 1
+
+
+# Every REPLAY_SPECS key on master at 2026-11-26. A new gate declares its spec in a
+# '# gate-backtest-argv:' header. The registry takes a new key only for a value no header can say.
+FROZEN_REPLAY_SPEC_KEYS = frozenset({
+    "bin/check-adr-append-only", "bin/check-ambient-env-fallback", "bin/check-boxscore-schedule",
+    "bin/check-ci-image-registry", "bin/check-claude-cli-invocation",
+    "bin/check-claude-dir-placement", "bin/check-column-rename-sweep",
+    "bin/check-composite-contracts", "bin/check-design-system", "bin/check-destructive-migrations",
+    "bin/check-digest-prose", "bin/check-docs", "bin/check-e2e-fa-offers-owner",
+    "bin/check-e2e-fixture-drift", "bin/check-e2e-hygiene", "bin/check-e2e-mutator-isolation",
+    "bin/check-engine-freeze", "bin/check-exit-code-handling",
+    "bin/check-gh-pr-files-rename-old-path", "bin/check-gitignore-negated-data-files",
+    "bin/check-hot-files", "bin/check-loop-stdin-consumed-by-child", "bin/check-master-ci-green",
+    "bin/check-model-pins", "bin/check-numbering", "bin/check-old-code-compat",
+    "bin/check-orphan-css", "bin/check-phpunit-hygiene", "bin/check-pipefail-assignment-guard",
+    "bin/check-pipefail-grep-q", "bin/check-plan", "bin/check-plan-staleness",
+    "bin/check-playwright-pinning", "bin/check-post-merge-recipe", "bin/check-pr-checks-green",
+    "bin/check-pr-collisions", "bin/check-pr-manual-testing", "bin/check-prose",
+    "bin/check-registry-trigger-rows", "bin/check-relative-path-used-after-cd",
+    "bin/check-reviewer-eval", "bin/check-rules-byte-budget", "bin/check-shell-portability",
+    "bin/check-skill-arguments", "bin/check-vr-gallery-refs", "bin/check-workflow-checkout",
+    "bin/check-workflow-run-interpolation", "bin/lib/plan-matrix-assertions",
+})
+
+
+def _header_inexpressible(spec):
+    """True when no gate-backtest header can declare this registry value."""
+    if isinstance(spec, str):  # a not-replayable reason
+        return True
+    return bool(spec.env or spec.stdin or spec.timeout or spec.ok_exits != frozenset({0})
+                or (spec.needs_plan and not any("{plan_file}" in t for t in spec.argv)))
+
+
+def _unjustified_new_keys(specs, frozen=FROZEN_REPLAY_SPEC_KEYS):
+    # detect_gate_changes finds a bin/lib gate only through its registry key, so keep those free to add.
+    specs = {k: v for k, v in specs.items() if k.startswith("bin/check-")}
+    return sorted(k for k in set(specs) - frozen if not _header_inexpressible(specs[k]))
+
+
+def test_replay_specs_gains_no_header_expressible_key():
+    assert _unjustified_new_keys(REPLAY_SPECS) == [], (
+        "new REPLAY_SPECS key with a header-expressible spec: put a '# gate-backtest-argv:' "
+        "header in the script instead")
+
+
+def test_freeze_flags_new_header_expressible_key():
+    variants = {
+        "argv": ReplaySpec(argv=("--since={base}",)),
+        "plan_file": ReplaySpec(argv=("{plan_file}",), needs_plan=True),
+        "flag_exits": ReplaySpec(argv=(), flag_exits=frozenset({1, 3})),
+        "stdout": ReplaySpec(argv=(), flag_exits=frozenset(), flag_stdout_re="^BAD"),
+        "reads": ReplaySpec(argv=("--since={base}",), reads=("docs/*.md",)),
+    }
+    for label, spec in variants.items():
+        assert _unjustified_new_keys({**REPLAY_SPECS, "bin/check-zzz": spec}) == ["bin/check-zzz"], label
+
+
+def test_freeze_allows_new_key_with_inexpressible_field():
+    variants = {
+        "reason": "needs a live database",
+        "env": ReplaySpec(argv=("--pr",), env=(("X_BASE_REF", "{base}"),)),
+        "stdin": ReplaySpec(argv=("--since={base}",), stdin="{body_file}"),
+        "timeout": ReplaySpec(argv=("--since={base}",), timeout=180),
+        "ok_exits": ReplaySpec(argv=(), ok_exits=frozenset({0, 3})),
+        "needs_plan": ReplaySpec(argv=("--since={base}",), needs_plan=True),
+    }
+    for label, spec in variants.items():
+        assert _unjustified_new_keys({**REPLAY_SPECS, "bin/check-zzz": spec}) == [], label
+
+
+def test_freeze_ignores_removed_key():
+    specs = {k: v for k, v in REPLAY_SPECS.items() if k != "bin/check-prose"}
+    assert _unjustified_new_keys(specs) == []
+
+
+def test_new_lib_gate_key_is_not_frozen():
+    spec = ReplaySpec(argv=("--since={base}",))
+    assert _unjustified_new_keys({**REPLAY_SPECS, "bin/lib/zzz": spec}) == []
 
 
 def test_body_file_gates_replay_from_body_file():

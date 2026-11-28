@@ -58,13 +58,31 @@ _MERGE_TARGET_RE = re.compile(r"origin/[A-Za-z0-9][A-Za-z0-9._/-]*")
 # bin/check-rules-byte-budget's summary line.
 _ZERO_SHA = "0" * 40
 
-# ERE passed to `git grep -E` for the whole-tree conflict-marker sweep.
-# Tightened to avoid false positives from separator lines like 80-char `====`:
-#   `<<<<<<<` and `>>>>>>>` must be followed by a space or EOL (they always
-#   precede a branch name or nothing).
-#   `=======` must stand alone on the line (no heading or trailing text).
-#   `|||||||` (diff3 base) follows the same space-or-EOL rule.
-_CONFLICT_MARKER_RE = r"^(<{7}( |$)|={7}$|>{7}( |$)|\|{7}( |$))"
+# EREs passed to `git grep -E` by conflict_marker_sweep. `<<<<<<<` and `>>>>>>>` open
+# and close every conflict hunk and must be followed by a space or EOL, so they are
+# swept across the whole tree. A bare `=======` is also a Markdown setext heading
+# underline, and `|||||||` (the diff3 base marker) can be an ASCII rule, so those two
+# are checked only on the paths git reported as conflicted (backlog#1614).
+_OPEN_CLOSE_MARKER_RE = r"^(<{7}( |$)|>{7}( |$))"
+_SEPARATOR_MARKER_RE = r"^(={7}$|\|{7}( |$))"
+
+
+def conflict_marker_sweep(run_out, paths):
+    """Sweep HEAD for surviving conflict markers and return git grep's (rc, output).
+
+    rc 0 means a marker survives, 1 means clean, and 2 or more means the sweep itself
+    failed, which every caller must treat as a failure. Open and close markers are
+    searched across the tree; bare separators only in `paths`. Each path is passed as
+    a `:(literal)` pathspec so a glob character in a file name matches only that file,
+    and a path absent from HEAD (a resolved modify/delete) matches nothing.
+    """
+    open_rc, open_out = run_out("grep", "-n", "-E", _OPEN_CLOSE_MARKER_RE, "HEAD", "--", ".")
+    if open_rc != 1:
+        return open_rc, open_out
+    scoped_paths = tuple(dict.fromkeys(f":(literal){p}" for p in paths if p))
+    if not scoped_paths:
+        return 1, open_out
+    return run_out("grep", "-n", "-E", _SEPARATOR_MARKER_RE, "HEAD", "--", *scoped_paths)
 
 # bin/pre-push-adr-hook's FIRST arm: the branch does not contain origin/master. It fires
 # before the ADR check and shares the hook's prefix, so without its own discriminator it
@@ -1552,11 +1570,10 @@ class LiveGit:
                                       pre_rebase_sha=pre_rebase_sha,
                                       reason=merge_reason)
 
-                # Whole-tree marker sweep. git grep exits 0 on a match, 1 on no match,
-                # and >=2 on its own failure, so branch on rc: reading stdout alone would
-                # let a rejected argv pass as "no markers found".
-                sweep_rc, sweep_out = self._run_out(
-                    "grep", "-n", "-E", _CONFLICT_MARKER_RE, "HEAD", "--", ".")
+                # Marker sweep (conflict_marker_sweep): open/close markers across the
+                # tree, bare separators on the conflicted paths only. git grep exits 0 on
+                # a match, 1 on no match, and >=2 on its own failure, so branch on rc.
+                sweep_rc, sweep_out = conflict_marker_sweep(self._run_out, [*inventory.files, *inventory.lockfiles])
                 if sweep_rc == 0:
                     abort_and_restore(self._run, worktree=self.worktree,
                                       pre_rebase_sha=pre_rebase_sha,
@@ -1955,11 +1972,10 @@ class LiveGit:
                                       pre_rebase_sha=pre_rebase_sha,
                                       reason=f"rebase --continue failed: {(cont_proc.stderr or cont_proc.stdout).strip()[:400]}")
 
-                # Whole-tree marker sweep. git grep exits 0 on a match, 1 on no match,
-                # and >=2 on its own failure, so branch on rc: reading stdout alone would
-                # let a rejected argv pass as "no markers found".
-                sweep_rc, sweep_out = self._run_out(
-                    "grep", "-n", "-E", _CONFLICT_MARKER_RE, "HEAD", "--", ".")
+                # Marker sweep (conflict_marker_sweep): open/close markers across the
+                # tree, bare separators on the conflicted paths only. git grep exits 0 on
+                # a match, 1 on no match, and >=2 on its own failure, so branch on rc.
+                sweep_rc, sweep_out = conflict_marker_sweep(self._run_out, inventory.files)
                 if sweep_rc == 0:
                     abort_and_restore(self._run, worktree=self.worktree,
                                       pre_rebase_sha=pre_rebase_sha,

@@ -107,7 +107,8 @@ final class TeamRecordRepository extends \Database\BaseMysqliRepository
                 WHEN t.teamid = bs.visitor_teamid THEN bs.home_teamid
                 ELSE bs.visitor_teamid END
             WHERE bs.visitor_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-                AND bs.home_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID
+                AND bs.home_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
+                AND " . $expression . " IS NOT NULL"
             // @phpstan-ignore ibl.orderByMissingTiebreaker ($safeOrder is a validated ASC/DESC constant; the full ORDER BY ends with the bs.id PK)
             . " ORDER BY value " . $safeOrder . ", bs.game_date ASC, bs.id ASC
             LIMIT 5";

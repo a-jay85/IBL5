@@ -97,6 +97,65 @@ final class TeamRecordRepositoryTest extends DatabaseTestCase
         );
     }
 
+    public function testGetTopTeamHalfScoreFirstHalfAscSkipsNullQuarterGame(): void
+    {
+        $this->seedHalfScoreGames();
+        $this->seedNullQuarterHalfGame('2098-01-08');
+
+        $records = $this->repo->getTopTeamHalfScore('first', 'ASC');
+
+        self::assertSame(
+            [
+                $this->halfRow(2, '2098-01-07', 0, 1, 0),
+                $this->halfRow(1, '2098-01-07', 0, 2, 1),
+            ],
+            array_slice($records, 0, 2),
+        );
+        self::assertNotContains('2098-01-08', array_column($records, 'date'));
+    }
+
+    public function testGetTopTeamHalfScoreSecondHalfAscSkipsNullQuarterGame(): void
+    {
+        $this->seedHalfScoreGames();
+        $this->seedNullQuarterHalfGame('2098-01-08');
+
+        $records = $this->repo->getTopTeamHalfScore('second', 'ASC');
+
+        self::assertSame(
+            [
+                $this->halfRow(2, '2098-01-05', 777, 1, 2),
+                $this->halfRow(1, '2098-01-05', 777, 2, 4),
+                $this->halfRow(2, '2098-01-06', 0, 1, 6),
+                $this->halfRow(1, '2098-01-06', 0, 2, 14),
+            ],
+            array_slice($records, 0, 4),
+        );
+        self::assertNotContains('2098-01-08', array_column($records, 'date'));
+    }
+
+    public function testGetTopTeamHalfScoreSecondHalfKeepsGameWithNullOvertimeOnly(): void
+    {
+        $this->seedHalfScoreGames();
+        // Real quarters with both OT columns left NULL; the visitor's second half is 0 + 1
+        $common = $this->nullQuarterColumns('2098-01-09') + [
+            'visitor_q1_points' => 30,
+            'visitor_q2_points' => 30,
+            'visitor_q3_points' => 0,
+            'visitor_q4_points' => 1,
+            'home_q1_points' => 10,
+            'home_q2_points' => 10,
+            'home_q3_points' => 10,
+            'home_q4_points' => 10,
+        ];
+        $this->insertRow('ibl_box_scores_teams', $common + ['name' => $this->names[1]]);
+        $this->insertRow('ibl_box_scores_teams', $common + ['name' => $this->names[2]]);
+
+        self::assertSame(
+            $this->halfRow(1, '2098-01-09', 0, 2, 1),
+            $this->repo->getTopTeamHalfScore('second', 'ASC')[0],
+        );
+    }
+
     public function testGetTopTeamHalfScoreUnknownOrderFallsBackToDesc(): void
     {
         $this->seedHalfScoreGames();
@@ -310,6 +369,51 @@ final class TeamRecordRepositoryTest extends DatabaseTestCase
         $this->insertScheduleRow(2098, '2098-01-05', 2, 0, 1, 0, 777);
         $this->seedGame('2098-01-06', 2, 1, [70, 70, 3, 3, 0], [65, 65, 5, 0, 9]);
         $this->seedGame('2098-01-07', 2, 1, [0, 0, 60, 60, 20], [0, 1, 50, 50, 30]);
+    }
+
+    /**
+     * T1 visitor at T2 home with every quarter and OT column NULL. The row names must
+     * match ibl_team_info, because the half-score query joins on the name.
+     */
+    private function seedNullQuarterHalfGame(string $date): void
+    {
+        $common = $this->nullQuarterColumns($date);
+        $this->insertRow('ibl_box_scores_teams', $common + ['name' => $this->names[1]]);
+        $this->insertRow('ibl_box_scores_teams', $common + ['name' => $this->names[2]]);
+    }
+
+    /**
+     * Game columns without any quarter or OT key, so those columns default to NULL.
+     *
+     * @return array<string, int|string>
+     */
+    private function nullQuarterColumns(string $date): array
+    {
+        return [
+            'game_date' => $date,
+            'game_of_that_day' => 1,
+            'visitor_teamid' => 1,
+            'home_teamid' => 2,
+            'attendance' => 10000,
+            'capacity' => 15000,
+            'visitor_wins' => 0,
+            'visitor_losses' => 0,
+            'home_wins' => 0,
+            'home_losses' => 0,
+            'game_2gm' => 45,
+            'game_ftm' => 12,
+            'game_fta' => 16,
+            'game_3gm' => 2,
+            'game_3ga' => 8,
+            'game_2ga' => 80,
+            'game_orb' => 10,
+            'game_drb' => 30,
+            'game_ast' => 20,
+            'game_stl' => 8,
+            'game_tov' => 12,
+            'game_blk' => 5,
+            'game_pf' => 18,
+        ];
     }
 
     /**

@@ -4,6 +4,8 @@ import type { Request, Response } from 'express';
 import { config } from '../config.js';
 import { DECISIONS_DIR } from './decision-store.js';
 import { claimClick, listPending, mintToken, revokeToken } from './approve-click-store.js';
+import { CELL_KEYS, CELL_NAMES, EMPTY_DISPLAY, parseDisplay } from './approve-dm-display.js';
+import type { Display } from './approve-dm-display.js';
 
 const SHA_RE = /^[0-9a-f]{40}$/;
 const NONCE_RE = /^[0-9a-f]{32}$/;
@@ -43,13 +45,23 @@ export function buildApproveRow(nonce: string, disabled = false): ActionRowBuild
     );
 }
 
+/** Display text only. Any parse fault degrades to the fallback render, never a 4xx/5xx. */
+function safeDisplay(raw: unknown): Display {
+    try {
+        return parseDisplay(raw);
+    } catch {
+        return EMPTY_DISPLAY;
+    }
+}
+
 /**
- * `POST /discordApproveDM` — `{ pr, head_sha }`. Mints a token, then DMs the
- * owner the button row. On a send failure the token is revoked and the answer is 502.
+ * `POST /discordApproveDM` — `{ pr, head_sha, display? }`. Mints a token, then DMs the
+ * owner the embed and button row. The optional `display` object is display text only.
+ * On a send failure the token is revoked and the answer is 502.
  */
 export function handleApproveDM(client: Client, dir: string = DECISIONS_DIR) {
     return (req: Request, res: Response): void => {
-        const body = req.body as { pr?: unknown; head_sha?: unknown } | undefined;
+        const body = req.body as { pr?: unknown; head_sha?: unknown; display?: unknown } | undefined;
         const pr = body?.pr;
         const headSha = body?.head_sha;
 
@@ -67,18 +79,30 @@ export function handleApproveDM(client: Client, dir: string = DECISIONS_DIR) {
 
         const { nonce } = mintToken(pr, headSha, Date.now(), dir);
 
+        const display = safeDisplay(body?.display);
+        const lines: string[] = [];
+        if (display.title) lines.push(display.title);
+        lines.push(`Head \`${headSha.slice(0, 7)}\`` + (display.size ? ` · ${display.size}` : ''));
         const embed = new EmbedBuilder()
             .setTitle(`PR #${pr} is held for you`)
-            .setDescription(
-                `Head ${headSha.slice(0, 7)}.\n` +
-                'Approve runs `bin/owner-approve` on the Mac.\n' +
-                `Fix first records a condition. Run \`bin/owner-approve ${pr} --finish\` once the fix is pushed.\n` +
-                'This button expires in 24h.',
+            .setDescription(lines.join('\n'))
+            .addFields(
+                ...CELL_KEYS.map((key) => ({ name: CELL_NAMES[key], value: display.cells[key], inline: true })),
+                { name: 'Verdict', value: display.verdict, inline: false },
+                ...(display.decision ? [{ name: 'Decision', value: display.decision, inline: false }] : []),
             )
+            .setFooter({
+                text: 'Approve runs bin/owner-approve on the Mac. Fix first records a condition. ' +
+                    `Run bin/owner-approve ${pr} --finish once the fix is pushed. This button expires in 24h.`,
+            })
             .setColor(0x5865f2)
             .setTimestamp();
 
-        client.users.send(owner, { embeds: [embed], components: [buildApproveRow(nonce)] })
+        client.users.send(owner, {
+            embeds: [embed],
+            components: [buildApproveRow(nonce)],
+            allowedMentions: { parse: [] },
+        })
             .then(() => {
                 console.log(`Approve buttons sent for PR #${pr}`);
                 res.json({ nonce });

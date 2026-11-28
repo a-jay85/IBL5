@@ -98,6 +98,15 @@ describe('handleApproveButton', () => {
         expect(JSON.stringify(second.reply.mock.calls[0]![0])).toContain('bin/owner-approve');
     });
 
+    it('Approve click update carries no embeds key', async () => {
+        const first = makeButton(`approve_ok_${NONCE}`);
+        await handleApproveButton(first as never);
+        expect(first.update).toHaveBeenCalledTimes(1);
+        const payload = first.update.mock.calls[0]![0] as unknown as Record<string, unknown>;
+        // Discord keeps the original embed only when the key is absent.
+        expect('embeds' in payload).toBe(false);
+    });
+
     it('Fix first shows the modal before any defer and writes nothing', async () => {
         const i = makeButton(`approve_fix_${NONCE}`);
         await handleApproveButton(i as never);

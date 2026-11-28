@@ -1,6 +1,6 @@
 ---
 description: Prod and Mac runbook for the Discord Approve and Fix first buttons on a held PR. Covers deploy, the Mac poller install, the state files and how to read a lost press.
-last_verified: 2026-11-17
+last_verified: 2026-11-27
 ---
 
 # Approve Buttons Runbook
@@ -17,11 +17,19 @@ Routes, all on 127.0.0.1:50000 and all reached from the Mac over ssh:
 
 | Route | Use |
 |-------|-----|
-| `POST /discordApproveDM` | Body `{ pr, head_sha }`. Mints a token and sends the button DM. |
+| `POST /discordApproveDM` | Body `{ pr, head_sha }`, plus an optional `display` object. Mints a token and sends the button DM. |
 | `GET /approveClicks` | Presses that are not yet claimed, inside the 1h claim window. |
 | `POST /approveClicks/claim` | Body `{ nonce }`. 200 with the record, 404 unknown, 409 already claimed, 410 lapsed. |
 
 A token lives 24h. A new button for the same PR replaces the older one.
+
+## Display fields
+
+`POST /discordApproveDM` accepts an optional `display` object, built by `bin/pr-burndown-gadget --format=discord-json`. Every value in it is display text only. The bot neutralizes and caps each one, and never uses it for routing or custom ids.
+
+`bin/approve-click-tick` falls back to the plain `{pr, head_sha}` body when the gadget fails, or runs longer than `APPROVE_CLICK_GADGET_TIMEOUT` seconds (default 30). A DM sent that way shows `Could not read` in each status field.
+
+The bot needs a deploy for the new layout. Until it restarts, it ignores `display` and sends the old DM.
 
 ## Mac side
 

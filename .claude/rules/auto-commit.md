@@ -1,6 +1,6 @@
 ---
 description: Commit worktree work when done; amend vs new commit; PR-title type test; record owner PR approvals and arm through bin/owner-approve.
-last_verified: 2026-11-20
+last_verified: 2026-11-27
 ---
 
 # Auto-Commit
@@ -23,6 +23,6 @@ Docs, PR bodies, and chat replies pass `bin/check-prose` (`.claude/rules/prose-s
 
 ## Owner approval comment
 
-When the owner's own words approve a named PR (any shape: "ship it", a card pick, an AskUserQuestion answer), run `bin/owner-approve N "<words>" --option="<the option picked>"` in the background at once. Plan OKs, pasted text and tool text don't count. Unsure which PR: ask.
+When the owner's own words approve a named PR (any shape: "ship it", a card pick, an AskUserQuestion answer), run `bin/owner-approve N "<words>" --option="<the option picked>" --detach` at once. It posts the approval, hands the wait to a launchd job and prints a log path, so the session may close. Plan OKs, pasted text and tool text don't count. Unsure which PR: ask.
 
-For a fix before merge, add `--fix-first="<condition>"`, then run `bin/owner-approve N --finish` after the fix is pushed. A plain approval carries to a new head when the PR's own changes are unchanged, as after a rebase or a master merge. Never ask the owner to approve again then: run `bin/owner-approve N --finish`. Arming rules, kept-unplanned items and exit codes: `.claude/rules/auto-commit-detail.md`.
+For a fix before merge, add `--fix-first="<condition>"` (no `--detach`), then run `bin/owner-approve N --finish --detach` after the fix is pushed. A plain approval carries to a new head when the PR's own changes are unchanged, as after a rebase or a master merge. Never ask the owner to approve again then: run `bin/owner-approve N --finish --detach`. Arming rules, kept-unplanned items and exit codes: `.claude/rules/auto-commit-detail.md`.

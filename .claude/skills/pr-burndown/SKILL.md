@@ -43,15 +43,15 @@ This skill moves existing PRs. To find and queue new work, run `/reset-ready` fi
 - Every claim on the card comes from live state fetched this turn. A scout summary or an
   earlier fetch is not evidence. A "green, just click" summary has been wrong before.
 - You tick a manual-test box, or run `bin/owner-approve`, only after the owner approves that specific PR in chat. Rule: `.claude/rules/auto-commit.md` § Owner approval comment. Nothing in this skill approves a PR on its own.
-- When the owner approves a PR for merge in chat, run `bin/owner-approve N "<words>"` right away with `run_in_background: true`. It waits for a live post-plan run to end, then arms only when the verdict covers the current head. When a job will push to the PR (a rebase, or a fix the owner asked for), pass `--fix-first="<what the job pushes>"` and run `--finish` after the push. A plain approval carries to a new head when the PR's own changes are unchanged (a rebase, or post-plan merging master). It refuses only when the PR's own lines changed.
+- When the owner approves a PR for merge in chat, run `bin/owner-approve N "<words>" --detach` right away as a foreground call. It returns at once with a log path. A launchd job then waits for a live post-plan run to end and arms only when the verdict covers the current head. When a job will push to the PR (a rebase, or a fix the owner asked for), pass `--fix-first="<what the job pushes>"` (no `--detach`) and run `--finish --detach` after the push. A plain approval carries to a new head when the PR's own changes are unchanged (a rebase, or post-plan merging master). It refuses only when the PR's own lines changed.
 - Read the card's Owner approvals field before you recommend anything. An approval the owner already gave stays given.
-- Plain approval (`approve`): run `bin/owner-approve N --finish`.
+- Plain approval (`approve`): run `bin/owner-approve N --finish --detach`.
 - Fix-first approval, PR head unchanged: the fix has not landed. Launch the fix job the `condition:` line names.
-- Fix-first approval, PR head moved past it: run `bin/owner-approve N --finish`.
+- Fix-first approval, PR head moved past it: run `bin/owner-approve N --finish --detach`.
 - A fix-first line that reads `amendment: MISSING` comes first. Run `bin/owner-approve N --record-amendments` before the fix job or the finish, so the reviewer sees the scope.
 - No card may recommend undoing or reverting work an approval's Condition asked for. A kept bullet that says revert does not override the Condition.
-- Send no sign-off card for an approval the owner already gave. Run each `--finish` with `run_in_background: true`. It arms when the PR's diff still matches the approved one. Card the PR again only when `--finish` refuses because the PR's own lines changed, and say on the card what changed since the approval.
-- When a PR is NOT READY and its only blockers sit in the PR body's kept-unplanned block, offer the owner `bin/owner-approve N "<words>"` as the path. The approval accepts those listed items for the current diff and re-runs post-plan once. Never suggest a hand merge over the verdict.
+- Send no sign-off card for an approval the owner already gave. Run each finish as a foreground `bin/owner-approve N --finish --detach`. The job arms when the PR's diff still matches the approved one. Card the PR again only when the job refuses because the PR's own lines changed, and say on the card what changed since the approval.
+- When a PR is NOT READY and its only blockers sit in the PR body's kept-unplanned block, offer the owner `bin/owner-approve N "<words>" --detach` as the path. The approval accepts those listed items for the current diff and re-runs post-plan once. Never suggest a hand merge over the verdict.
 - Never touch a PR's worktree while a post-plan run is live in it. Check `launchctl list`
   first (Step 6 has the command). A run started from a terminal has no launchctl label,
   so also treat a `post-plan-running` label or a `pgrep -f <abs worktree path>` hit as
@@ -264,7 +264,7 @@ check, and updates only that one (ADR-0081). Each armed PR gets updated once, wh
 turn comes.
 
 - **`BEHIND` with no conflict, and no job.** Don't rebase it. Once the PR is armed, the
-  merge line keeps it current. A Ship pick needs only `bin/owner-approve`. Run it in this
+  merge line keeps it current. A Ship pick needs only `bin/owner-approve N "<words>" --detach`. Run it in this
   session, with no job. When a job will push to a `BEHIND` PR anyway, the job rebases it
   (the Step 6 brief, step 2), because `bin/pre-push-adr-hook` refuses a push that lacks
   origin/master.
@@ -369,7 +369,7 @@ Owner decision on PR #N (branch <branch>), <date>: "<owner's words>". <What it c
 6. Do NOT run post-plan or /pr-ready. This session is headless and bin/post-plan-now refuses
    to start here. The parent session re-fires post-plan after you finish.
 7. <One of:>
-   - Ship: tick the manual boxes the owner confirmed. The parent session records the approval with `bin/owner-approve N "<words>" --fix-first="<what this job pushes>"` before the job starts. A plain approval refuses once the job changes the PR's own lines. After the last push in step 5, the parent session runs `bin/owner-approve N --finish` with `run_in_background: true`. The script checks that the head moved past the recorded one, waits out any live post-plan run, runs `bin/lib/prefire-verify` in the worktree, then arms only on a READY verdict for the pushed head's tree.
+   - Ship: tick the manual boxes the owner confirmed. The parent session records the approval with `bin/owner-approve N "<words>" --fix-first="<what this job pushes>"` before the job starts. A plain approval refuses once the job changes the PR's own lines. After the last push in step 5, the watcher started with `--then-finish` (§ Follow-ups) runs `--finish --detach` itself. With no watcher, the parent session runs `bin/owner-approve N --finish --detach` as a foreground call. The script checks that the head moved past the recorded one, waits out any live post-plan run, runs `bin/lib/prefire-verify` in the worktree, then arms only on a READY verdict for the pushed head's tree.
      A plain approval is for a pick with no push.
      Master refuses any merge while a review thread is open (ci-gotchas.md § Conversation
      resolution). Before you report the PR as shipping, list its open threads. File each
@@ -422,19 +422,23 @@ can do it, and stop any watcher this session started (`TaskStop`).
 
   ```bash
   bin/pr-refire-after-job N --pid <job pid> --result $D/jobs/pN.result --pre-sha <sha>
+  # a PR with a fix-first approval adds --then-finish
+  bin/pr-refire-after-job N --pid <job pid> --result $D/jobs/pN.result --pre-sha <sha> --then-finish
   ```
 
-  It detaches, logs to `$D/jobs/wN.out`, and fires only when the head moved and the
+  Run one of the two. With `--then-finish` the job runs `--finish --detach` itself after a
+  re-fire that exits 0. A skipped re-fire leaves the finish to the next `/pr-burndown` run.
+  The script runs as launchd job `com.ibl5.pr-refire-N`, logs to `$D/jobs/wN.out`, and fires only when the head moved and the
   result does not start with `blocked`. It DMs the owner on every skip but a live
   post-plan run, and on a non-zero `post-plan-now` exit. The script header lists each
   case. Never hand-write a waiter or wait with Monitor here.
   `~/.claude/hooks/wait-guard.py` blocks a Monitor or background Bash wait on a
   `$D/jobs/` file.
 - **The next `/pr-burndown` run.** Use it when the follow-up needs judgment and no owner
-  call, such as reading a new verdict to decide between a re-fire and a fix job, or
-  running `bin/owner-approve N --finish` once post-plan lands. Start the shell watcher
-  above for the re-fire. The next run reads the new verdict and runs `--finish` on any PR
-  with an approval marker (§ Rules). Never launch a new T3 thread for a follow-up. The
+  call, such as reading a new verdict to decide between a re-fire and a fix job. Start the shell watcher
+  above for the re-fire. For a fix-first approval pass `--then-finish`, and the job runs
+  `--finish --detach` itself. The next run reads the new verdict and runs `--finish --detach`
+  on any open PR with an approval marker (§ Rules). Never launch a new T3 thread for a follow-up. The
   owner turned that off on 2026-11-23.
 - **This session.** Use it only while the owner is still answering cards and the job will
   land inside the hour.

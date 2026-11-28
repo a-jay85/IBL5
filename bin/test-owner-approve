@@ -987,6 +987,8 @@ docs_route_through_script() {
     grep -qF 'bin/owner-approve' "$skill" || note "the skill never names bin/owner-approve"
     grep -qF "When the owner's own words approve a named PR (any shape:" "$rule" || note "the rule lost its trigger sentence"
     grep -qF 'bin/owner-approve N' "$rule" || note "the rule does not point at bin/owner-approve N"
+    grep -qF -- '--option="<the option picked>" --detach' "$rule" || note "the rule does not route chat approvals through --detach"
+    grep -qF -- 'bin/owner-approve N "<words>" --detach' "$skill" || note "the skill does not route chat approvals through --detach"
     if grep -qF 'gh pr comment N --body' "$rule"; then note "the manual comment command survives in the rule"; fi
 }
 

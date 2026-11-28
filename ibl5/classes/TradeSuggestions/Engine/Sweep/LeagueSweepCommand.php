@@ -11,7 +11,6 @@ use TradeSuggestions\Engine\DealScorer;
 use TradeSuggestions\Engine\LeagueSnapshot;
 use TradeSuggestions\SuggestionItem;
 use TradeSuggestions\TradeCandidate;
-use TradeSuggestions\Valuation\GainWeights;
 use TradeSuggestions\Veto\DealView;
 use TradeSuggestions\Veto\VetoSet;
 
@@ -49,7 +48,7 @@ final class LeagueSweepCommand
         foreach ($this->formRepo->getAllTeamsWithCity() as $team) {
             $tidByName[$team['team_name']] = $team['teamid'];
         }
-        $tids = array_values(array_filter($tidByName, static fn (int $tid): bool => $tid <= $maxTeams));
+        $tids = array_filter($tidByName, static fn (int $tid): bool => $tid <= $maxTeams);
         sort($tids);
 
         $teams = 0;
@@ -80,7 +79,7 @@ final class LeagueSweepCommand
                     $ids = [...$ids, ...$found];
                 }
             }
-            $ids = array_values(array_unique($ids));
+            $ids = array_unique($ids);
             sort($ids);
 
             $teams++;
@@ -156,12 +155,8 @@ final class LeagueSweepCommand
         $ids = $this->vetoes->evaluate(DealView::fromScoredDeal($s, $deal))->firedIds();
         if (!$deal->bothSidesPositive()) {
             $ids[] = self::NOT_BOTH_POSITIVE;
-        } else {
-            $u = $deal->user->total();
-            $p = $deal->partner->total();
-            if (max($u, $p) > GainWeights::LOPSIDED_RATIO * min($u, $p)) {
-                $ids[] = self::LOPSIDED;
-            }
+        } elseif ($deal->isLopsided()) {
+            $ids[] = self::LOPSIDED;
         }
 
         return $ids;

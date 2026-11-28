@@ -201,7 +201,8 @@ class SuggestionAssetRepository extends \Database\BaseMysqliRepository implement
             futureSalary: $futureSalary,
             laterSalaries: $laterSalaries,
             // Mirrors TradeValidator::canPlayerBeTraded(); the validator still decides.
-            tradeable: $cy !== 0 && $ordinal <= \League\JsbConstants::WAIVERS_ORDINAL && $yearsRemaining > 0,
+            // $yearsRemaining is only positive when $cy !== 0, so that check is folded in.
+            tradeable: $ordinal <= \League\JsbConstants::WAIVERS_ORDINAL && $yearsRemaining > 0,
             // Mirrors TradeFormRepository::getTeamPlayerCount(): in the offseason a
             // player counts only if next contract year's salary is nonzero.
             countsOnRoster: !$advancesContractYears || self::salaryForYear($row, $cy + 1) !== 0,

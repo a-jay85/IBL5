@@ -48,7 +48,7 @@ final readonly class SuggestionPlayer
     public function starterSlot(): ?string
     {
         foreach (self::SLOTS as $slot) {
-            if (($this->depth[$slot] ?? 0) === 1) {
+            if (($this->depth[$slot] ?? null) === 1) {
                 return $slot;
             }
         }

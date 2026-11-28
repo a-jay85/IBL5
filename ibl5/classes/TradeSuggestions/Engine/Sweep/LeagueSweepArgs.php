@@ -36,12 +36,13 @@ final class LeagueSweepArgs
         }
 
         $raw = $values['max-teams'];
-        if (preg_match('/^[0-9]+$/', $raw) !== 1 || (int) $raw < 1) {
+        $maxTeams = (int) $raw;
+        if (preg_match('/^[0-9]+$/', $raw) !== 1 || $maxTeams < 1) {
             throw new \InvalidArgumentException("--max-teams must be a positive integer, got '{$raw}'");
         }
 
         return [
-            'maxTeams' => (int) $raw,
+            'maxTeams' => $maxTeams,
             'host' => $values['host'],
             'db' => $values['db'],
             'user' => $values['user'],

@@ -55,6 +55,8 @@ final class LeagueSweepArgsTest extends TestCase
             'trailing junk max-teams' => ['--max-teams=3x'],
             'leading junk max-teams' => ['--max-teams=x3'],
             'empty max-teams' => ['--max-teams='],
+            'plus-signed max-teams' => ['--max-teams=+5'],
+            'space-prefixed max-teams' => ['--max-teams= 5'],
         ];
     }
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace TradeSuggestions\Engine;
 
 use TradeSuggestions\TradeCandidate;
+use TradeSuggestions\Valuation\GainWeights;
 
 /**
  * A candidate with both sides' gain tables and their before/after ranks.
@@ -34,5 +35,14 @@ final readonly class ScoredDeal
     public function bothSidesPositive(): bool
     {
         return $this->user->total() > 0.0 && $this->partner->total() > 0.0;
+    }
+
+    /** True when the larger side gains more than `GainWeights::LOPSIDED_RATIO` times the smaller. */
+    public function isLopsided(): bool
+    {
+        $u = $this->user->total();
+        $p = $this->partner->total();
+
+        return max($u, $p) > GainWeights::LOPSIDED_RATIO * min($u, $p);
     }
 }

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace TradeSuggestions\Engine;
 
-use TradeSuggestions\Valuation\GainWeights;
 use TradeSuggestions\Veto\DealView;
 use TradeSuggestions\Veto\VetoReport;
 use TradeSuggestions\Veto\VetoSet;
@@ -49,9 +48,7 @@ final class DealRanker
                 $trace?->record($i, RankOutcome::NotBothPositive, VetoReport::none(), null, null);
                 continue;
             }
-            $u = $deal->user->total();
-            $p = $deal->partner->total();
-            if (max($u, $p) > GainWeights::LOPSIDED_RATIO * min($u, $p)) {
+            if ($deal->isLopsided()) {
                 $lopsided++;
                 $trace?->record($i, RankOutcome::Lopsided, VetoReport::none(), null, null);
                 continue;

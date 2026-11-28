@@ -148,6 +148,7 @@ final class ProjectionPlayerRepositoryTest extends TestCase
     {
         return [
             'ordinary contract' => [[], false, true],
+            'minimum salary of one' => [['salary_yr1' => 1], false, true],
             'zero salary this year' => [['salary_yr1' => 0], false, false],
             'unsigned (cy 0)' => [['cy' => 0], false, false],
             'unsigned (cy 0) in offseason' => [['cy' => 0], true, false],

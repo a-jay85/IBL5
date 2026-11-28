@@ -90,7 +90,8 @@ final class PositionStrength
         $buried = [];
         foreach ($lineup->benchPids($slot) as $pid) {
             $rank = $ranks->poolRank($slot, $pid);
-            if ($rank !== null && $rank <= $worst && $starterRank < $rank) {
+            // Pool ranks are unique per pid and a bench pid never starts, so the starter's rank never equals $rank.
+            if ($rank !== null && $rank <= $worst && min($starterRank, $rank) === $starterRank) {
                 $buried[] = $pid;
             }
         }

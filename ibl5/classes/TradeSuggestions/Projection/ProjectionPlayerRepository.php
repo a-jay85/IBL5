@@ -110,7 +110,6 @@ final class ProjectionPlayerRepository extends \Database\BaseMysqliRepository im
     private static function toProjectionPlayer(array $row, bool $advancesContractYears, ?array $histRow): ProjectionPlayer
     {
         $cy = self::scalarToInt($row['cy'] ?? null);
-        $cyt = self::scalarToInt($row['cyt'] ?? null);
         $effectiveCy = $advancesContractYears ? $cy + 1 : $cy;
 
         $salaryByYear = [];
@@ -118,8 +117,6 @@ final class ProjectionPlayerRepository extends \Database\BaseMysqliRepository im
             $salaryByYear[$year] = self::scalarToInt($row['salary_yr' . $year] ?? null);
         }
 
-        $currentSalary = $cy !== 0 ? ($salaryByYear[$effectiveCy] ?? 0) : 0;
-        $yearsRemaining = $currentSalary > 0 ? max(1, $cyt - $effectiveCy + 1) : 0;
         $ordinal = self::scalarToInt($row['ordinal'] ?? null);
 
         $current = ProductionLine::fromCurrentRow($row);
@@ -172,8 +169,12 @@ final class ProjectionPlayerRepository extends \Database\BaseMysqliRepository im
             effectiveCy: $effectiveCy,
             salaryByYear: $salaryByYear,
             production: $production,
-            // Mirrors TradeValidator::canPlayerBeTraded(), as v2 toPlayer() does.
-            tradeable: $cy !== 0 && $ordinal <= \League\JsbConstants::WAIVERS_ORDINAL && $yearsRemaining > 0,
+            // Mirrors TradeValidator::canPlayerBeTraded(), as v2 toPlayer() does:
+            // a signed player with a nonzero salary in the effective year.
+            tradeable: $cy !== 0
+                && $ordinal <= \League\JsbConstants::WAIVERS_ORDINAL
+                && isset($salaryByYear[$effectiveCy])
+                && $salaryByYear[$effectiveCy] > 0,
             productionFouls: $fouls,
         );
     }

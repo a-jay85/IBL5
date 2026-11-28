@@ -100,13 +100,58 @@ def evaluate(comments, links, current_fp, me=None) -> CarryDecision:
     return CarryDecision(True, "eligible", files=files, **common)
 
 
+def _changed_paths(worktree, base_ref):
+    try:
+        out = subprocess.run(["git", "-C", worktree, "diff", "--name-only", f"{base_ref}...HEAD"],
+                             capture_output=True, text=True, timeout=60, check=True).stdout
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return [p for p in out.splitlines() if p]
+
+
+def fix_scope_evidence(comments, links, current_fp, pr_body, changed_paths):
+    """Kept-block lines whose cited paths all lie inside the fix-first fix count as owner-requested."""
+    if links is None or not approval_ledger._is_hex(current_fp):
+        return None  # unreadable ledger or fingerprint: fail closed
+    hit = genuine_approval(comments)
+    if hit is None or hit[2].group("mode") != "fix-first" or hit[2].group("diff") == "unread":
+        return None
+    created, _, m = hit
+    scoped = [k for k in links if k.kind == "fix-first-scope" and k.from_fp == m.group("diff") and k.ts >= created]
+    if not scoped:
+        return None
+    first = min(scoped, key=lambda k: k.ts)  # the first --finish: later ones also span bot commits
+    after = _chain_files(links, first.to_fp, current_fp, created)
+    if after is None or denied_local_gate_edits(after):
+        return None  # head left the recorded chain, or a gate file moved: fail closed
+    fix = set(first.files) - set(denied_local_gate_edits(first.files))
+    body = (pr_body or "").replace("\r", "")
+    if unplanned_scope.KEPT_BEGIN not in body or unplanned_scope.KEPT_END not in body:
+        return None
+    block = body.split(unplanned_scope.KEPT_BEGIN, 1)[1].split(unplanned_scope.KEPT_END, 1)[0]
+    kept = []
+    for line in (ln.strip() for ln in block.split("\n")):
+        cited = set(unplanned_scope._approval_cited(line, changed_paths)) if line else set()
+        if cited and cited <= fix:
+            kept.append(line)
+    if not kept:
+        return None
+    return unplanned_scope.OwnerApproval(words=f"fix-first fix scope: {', '.join(sorted(fix))}",
+                                         kept_span="\n".join(kept), created_at=first.ts)
+
+
 def harness_evidence(comments, worktree, branch, base_ref, current_fp, pr_body):
     """OwnerApproval for the kept-scope downgrade when the approval reached this head by carry; else None."""
     links = approval_ledger.read_links(worktree, branch)
     d = evaluate(comments, links, current_fp)
     if d.ok and d.src_mode == "approve":
         return unplanned_scope.approval_from_comments(comments, d.src_diff)
-    return None  # fix-first scope: Phase 6
+    if d.src_mode == "fix-first":
+        changed = _changed_paths(worktree, base_ref)
+        if changed is None:
+            return None  # changed paths unreadable: fail closed
+        return fix_scope_evidence(comments, links, current_fp, pr_body, changed)
+    return None
 
 
 def main(argv=None) -> int:

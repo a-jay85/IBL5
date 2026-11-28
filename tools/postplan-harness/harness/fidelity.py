@@ -196,6 +196,7 @@ LOCAL_GATE_PATH_PREFIXES = GATE_OWNING_PREFIXES + (
     "bin/lib/",                          # includes bin/lib/pr-armable.sh
     "bin/test-postplan-arm-conditions",
     "bin/post-plan-",                    # post-plan-now, post-plan-fail-dm launchers
+    "bin/owner-approve",                 # merge rule: how an owner approval arms
     "tools/postplan-harness/",           # runner.py and every harness module
 )
 

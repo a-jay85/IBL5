@@ -45,6 +45,8 @@ from harness import (adr_draft, body_numbers, cifix, cifix_ship, ciwatch, confor
 from harness import fidelity_delta
 from harness import conflict, conflict_report, fidelity_filefix
 from harness import armable as _armable_mod
+from harness import approval_ledger
+from harness import approval_carry
 from harness import sql_equivalence
 from harness import trace_pinned
 from harness.armable import (AGGREGATOR_CONTEXT, ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
@@ -640,7 +642,7 @@ def _run_pass(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         res.conformance_fix = conformance_fix.remediate_missing(
             llm, git, plan, worktree, out_dir, confix_items,
             commit=lambda msg: _commit_with_gate_fix(
-                git, worktree, msg, log, phase="phase5.0-fix", llm=llm, res=res),
+                git, worktree, msg, log, phase="phase5.0-fix", llm=llm, res=res, ledger=True),
             push=lambda: _push_with_gate_fix(git, log, "phase5.0-fix", llm=llm,
                                              worktree=worktree, out_dir=out_dir,
                                              res=res, gh=gh,
@@ -885,7 +887,7 @@ def _run_pass(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         sr = same_run_threads.run_same_run_pass(
             gh, llm, git, worktree or ".", pr, pre_posting_ids, out_dir, log,
             commit=lambda msg: _commit_with_gate_fix(
-                git, worktree, msg, log, phase="phase4.5b", llm=llm, res=res),
+                git, worktree, msg, log, phase="phase4.5b", llm=llm, res=res, ledger=True),
             push=lambda: _push_with_gate_fix(git, log, "phase4.5b", llm=llm,
                                              worktree=worktree, out_dir=out_dir,
                                              res=res, gh=gh,
@@ -1144,7 +1146,7 @@ def _run_pass(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
 
             def _fr_commit(msg):
                 return _commit_with_gate_fix(git, worktree, msg, log, phase="phase6.5-fix",
-                                             llm=None, res=res)
+                                             llm=None, res=res, ledger=True)
 
             def _fr_fidelity_fix(_remaining):
                 # `remediate` takes no timeout; the round's deadline check right after this
@@ -1390,6 +1392,12 @@ def _run_pass(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                             Path(__file__).resolve().parent / "out"))
                 except Exception as exc_:  # evidence must never touch the run
                     log(f"phase6.5: fidelity evidence skipped ({type(exc_).__name__})")
+        if live and pr:
+            # After the posted verdict (the carry reads it) and before arming.
+            inputs, decision = _rearm_after_carry(
+                gh, git, llm, log, res, inputs, decision, worktree=worktree, pr=pr, plan=plan,
+                slug=slug, state_dir=_state_dir(out_dir, live, state_dir),
+                post_sticky=_post_sticky, ci_line=ci_line)
         if decision.armed:
             gh.pr_merge_auto(pr)
         elif pr:
@@ -1861,7 +1869,7 @@ def _run_thread_ingestion_phase(gh, llm, git, worktree, pr, pre_posting_ids, out
             outcome_log_path=outcome_log_path,
             include_outdated=True,   # Phase 4.5 re-runs drain outdated trusted threads left by earlier runs
             commit=lambda msg: _commit_with_gate_fix(
-                git, worktree, msg, log, phase="phase4.5", llm=llm, res=res),
+                git, worktree, msg, log, phase="phase4.5", llm=llm, res=res, ledger=True),
             push=lambda: _push_with_gate_fix(git, log, "phase4.5", llm=llm,
                                              worktree=worktree, out_dir=out_dir,
                                              res=res, gh=gh,
@@ -2635,7 +2643,7 @@ def _ci_fix_loop(git, gh, llm, log, res, *, worktree, pr, sha, outcome, out_dir,
             stage = "commit"
             new = _commit_with_gate_fix(git, worktree,
                     cifix.CI_FIX_COMMIT_MSG.format(n=attempt), log, phase="phase7",
-                    llm=llm, res=res)
+                    llm=llm, res=res, ledger=True)
         except HarnessError as e:
             if e.kind in ("remote-head-diverged", _PR_MERGED_MID_FIX):
                 raise
@@ -3506,7 +3514,68 @@ def _backed_amendments(gh, plan, pr, log) -> tuple[list, str | None]:
     return backed, unplanned_scope.strip_unbacked(text, backed)
 
 
-def _owner_approval_evidence(gh, git, worktree, pr, log):
+_CARRY_STATES = ("no-label", "mismatch", "no-record")
+_CARRY_POLL_S = 15
+_CARRY_TIMEOUT_S = 900
+
+
+def _try_owner_approval_carry(pr, worktree, log) -> str:
+    """Run bin/owner-approve --carry and return its last RESULT word. Never raises."""
+    tool = Path(_armable_mod.HS_CLASSIFIER).parents[1] / "owner-approve"
+    try:
+        proc = subprocess.run([str(tool), str(pr), "--carry", f"--poll={_CARRY_POLL_S}"], cwd=str(worktree),
+                              capture_output=True, text=True, timeout=_CARRY_TIMEOUT_S)
+    except Exception as exc:
+        log(f"approval carry: {type(exc).__name__}")
+        return "error"  # carry crashed: keep the dropped state
+    lines = proc.stdout.splitlines()
+    for ln in lines:
+        if ln.startswith("owner-approve: not carried:"):
+            log(ln)
+    words = [ln[len("RESULT: "):].strip() for ln in lines if ln.startswith("RESULT: ")]
+    return words[-1] if words else "error"
+
+
+def _rearm_after_carry(gh, git, llm, log, res, inputs, decision, *, worktree, pr, plan, slug,
+                       state_dir, post_sticky, ci_line):
+    """Phase 6.5: carry the owner approval onto this head once this run's verdict is posted.
+
+    `bin/owner-approve --carry` reads the posted verdict, so this runs after the first
+    post_sticky call. Returns (inputs, decision), both unchanged unless the carry succeeded.
+    """
+    if not callable(post_sticky) or inputs.owner_approval not in _CARRY_STATES:
+        return inputs, decision
+    if not any(c.number == 7 for c in decision.holds):
+        return inputs, decision  # (7) is not what holds this PR; skip the CI-record wait
+    if _try_owner_approval_carry(pr, worktree, log) != "carried":
+        return inputs, decision  # carry refused: the hold stands
+    labels = gh.pr_labels()  # the carry just added human-approved
+    plan_false = bool(plan.auto_merge_false or getattr(plan, "auto_merge_value", None) == "false")
+    new = dataclasses.replace(
+        inputs, pr_labels=labels, llm_safety_holds=[],
+        owner_approval=resolve_owner_approval(gh, git, pr, labels, worktree, plan_false))
+    preview = evaluate(new)
+    if preview.second_review_candidates:
+        new = second_review.review_pass(new, pr, git.head_tree, git.diff_vs_base, plan, log,
+                                        second_review.spawner(llm, worktree))
+        preview = evaluate(new)
+    if not preview.holds:
+        verdict = llm.call("safety-verdict", "haiku",
+                           llm_calls.safety_verdict_prompt(new.classification, new.pr_title, preview),
+                           schemas.validate_safety_verdict)
+        new.llm_safety_holds = verdict["holds"]
+    nd = evaluate(new)
+    res.arm = nd
+    log("phase6.5 carry re-arm: " + ("ARMED" if nd.armed else
+                                     "HELD — " + "; ".join(f"({c.number}) {c.reason or c.name}"
+                                                           for c in nd.holds)))
+    if holdrepeat.structural_key(nd.conditions) != holdrepeat.structural_key(decision.conditions):
+        res.hold_repeat = _record_hold_repeat(res, nd, slug, worktree, state_dir, log)
+    post_sticky(nd, ci_line, "phase6.5 carry")
+    return new, nd
+
+
+def _owner_approval_evidence(gh, git, worktree, pr, log, pr_body=None):
     """The owner-approve approval bound to the current diff, or None (fail closed)."""
     armable = _armable_mod
     try:
@@ -3516,7 +3585,11 @@ def _owner_approval_evidence(gh, git, worktree, pr, log):
         if fp is None:
             log("kept-downgrade: no diff fingerprint; owner approval not consulted")
             return None
-        return unplanned_scope.approval_from_comments(gh.pr_comments_json(pr), fp)
+        comments = gh.pr_comments_json(pr)
+        approval = unplanned_scope.approval_from_comments(comments, fp)
+        if approval is None:  # carry / fix-first scope fallback
+            approval = approval_carry.harness_evidence(comments, str(worktree), git.branch(), base_ref, fp, pr_body)
+        return approval
     except Exception as exc:  # fail closed: no approval
         log(f"kept-downgrade: owner approval unreadable: {exc}")
         return None
@@ -3548,7 +3621,7 @@ def _apply_kept_downgrade(inputs, res, git, gh, worktree, plan, master_sha, pr, 
         declares_kept = unplanned_scope.KEPT_BEGIN in (inputs.pr_body or "")
         if not declares_kept:
             return
-        approval = _owner_approval_evidence(gh, git, worktree, pr, log)
+        approval = _owner_approval_evidence(gh, git, worktree, pr, log, pr_body=inputs.pr_body)
         if approval is None or not unplanned_scope.downgrade_applies(
                 path, ctx, inputs.pr_body, payload, approval=approval):
             return
@@ -3857,8 +3930,55 @@ def _attempt_gate_fix(e, *, llm, worktree, res, log, phase):
                                     failed_cmd=e.cmd or "git", log=log, redact=_redact)
 
 
-def _commit_with_gate_fix(git, worktree, message, log, phase="phase2", *, llm=None,
-                          res=None) -> str:
+def _ledger_fp(git, worktree):
+    """Diff fingerprint of HEAD for the approval ledger, or None. Never raises."""
+    try:
+        base = _merge_target(git)
+        git.fetch_base(base)
+        return _armable_mod.current_diff_fingerprint(base, "HEAD", str(worktree))
+    except Exception:  # fail closed: no fingerprint, no link
+        return None
+
+
+def _head_sha(worktree) -> str:
+    try:
+        return subprocess.run(["git", "-C", str(worktree), "rev-parse", "HEAD"], capture_output=True,
+                              text=True, timeout=30, check=True).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def _record_ledger_link(git, worktree, before, head_before, sha, log):
+    after = _ledger_fp(git, worktree)
+    if before is None or after is None:
+        log("approval ledger: fingerprint unavailable; no link recorded")
+        return
+    if before == after or not head_before:
+        return
+    try:
+        files = subprocess.run(["git", "-C", str(worktree), "diff", "--name-only", "--no-renames",
+                                head_before, sha], capture_output=True, text=True, timeout=60,
+                               check=True).stdout.splitlines()
+        branch = git.branch()
+    except (OSError, subprocess.SubprocessError):
+        log("approval ledger: changed files unreadable; no link recorded")
+        return
+    if not approval_ledger.append_link(str(worktree), branch, "fix", before, after, sha, files):
+        log("approval ledger: append failed; no link recorded")
+
+
+def _commit_with_gate_fix(git, worktree, message, log, *args, ledger: bool = False, **kwargs):
+    """Commit through the gate-fix path. ledger=True records the commit as post-plan's own."""
+    before = _ledger_fp(git, worktree) if ledger else None
+    head_before = _head_sha(worktree) if ledger else ""
+    sha = _commit_with_gate_fix_unrecorded(git, worktree, message, log, *args, **kwargs)
+    if ledger and sha:
+        _record_ledger_link(git, worktree, before, head_before, sha, log)
+    return sha
+
+
+def _commit_with_gate_fix_unrecorded(git, worktree, message, log, phase="phase2", *, llm=None,
+                                     res=None) -> str:
     """Commit-site gate fixer, outermost: same-commit fix, then ONE plain retry."""
     try:
         # Same call shape the unwrapped sites used: phase is passed only when non-default.
@@ -4520,7 +4640,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                     llm, git, out_dir, worktree or ".", packet, current_verdict_path,
                     master_sha, log=log,
                     commit=lambda msg: _commit_with_gate_fix(
-                        git, worktree, msg, log, phase="phase5.5", llm=llm, res=res),
+                        git, worktree, msg, log, phase="phase5.5", llm=llm, res=res, ledger=True),
                     # The same retrying push Phase 2 and both Phase 7 pushes (BEHIND, ci-fix) use, so a master that
                     # moved during the review + fix span gets one clean rebase per
                     # attempt instead of ending the loop on the hook's

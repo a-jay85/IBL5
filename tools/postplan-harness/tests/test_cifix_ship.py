@@ -170,6 +170,9 @@ def _run(monkeypatch, tmp_path, git, gh, llm, *, failed, commit=("b" * 40,),
         return outcomes.pop(0) if outcomes else CiOutcome(-1, [], "exhausted")
 
     monkeypatch.setattr(runner, "_commit_with_gate_remediation", fake_commit)
+    # The approval-ledger fingerprint fetches the base. These tests count only the
+    # stale-base catch-up fetch, so the ledger reads no fingerprint here.
+    monkeypatch.setattr(runner, "_ledger_fp", lambda git_, worktree: None)
     monkeypatch.setattr(runner.gitutil, "reconcile_remote_head",
                         lambda *a, **kw: SimpleNamespace(action="noop", remote_sha="",
                                                          evidence=""))

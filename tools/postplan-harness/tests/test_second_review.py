@@ -339,10 +339,14 @@ def test_runner_keeps_no_seat_glue():
 
 
 def test_runner_calls_seat_before_each_preview():
-    """Both arming paths run the seat pass and then the preview, in that order."""
+    """All three arming paths run the seat pass and then the preview, in that order.
+
+    The third is the owner-approval carry re-arm. It reuses the Phase 6.5 inputs on the
+    same tree, so it builds no new fidelity_gate_edit_only value.
+    """
     src = open(os.path.join(REPO, "tools/postplan-harness/runner.py")).read()
     pass_at = [m.start() for m in re.finditer(r"second_review\.review_pass\(", src)]
-    assert len(pass_at) == 2
+    assert len(pass_at) == 3
     for start in pass_at:
         tail = src[start:start + 400]
         assert re.search(r"preview = evaluate\((inputs|new)\)", tail), tail

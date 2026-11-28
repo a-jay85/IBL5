@@ -24,6 +24,10 @@
 #   APPROVE_OA_BIN           owner-approve                (default <script dir>/owner-approve)
 #   APPROVE_DM_BIN           discord-dm                   (default <script dir>/discord-dm)
 #   APPROVE_GH_BIN           gh                           (default gh)
+# ---
+# Display seams for --send-button (unset, empty or unusable uses the default, so the DM still sends):
+#   APPROVE_CLICK_GADGET_BIN      status-field gadget     (default <script dir>/pr-burndown-gadget)
+#   APPROVE_CLICK_GADGET_TIMEOUT  seconds, 1 to 120       (default 30)
 #
 # At-most-once: the ledger dir holds one directory per press, with O_EXCL marker files in the order
 # claimed, bot claim, checks, started, owner-approve. A crash anywhere leaves the press consumed and
@@ -84,6 +88,12 @@ fi
 OA_BIN="${APPROVE_OA_BIN:-$SCRIPT_DIR/owner-approve}"
 DM_BIN="${APPROVE_DM_BIN:-$SCRIPT_DIR/discord-dm}"
 GH_BIN="${APPROVE_GH_BIN:-gh}"
+# Empty means the default for these two, on purpose (no set-but-empty rejection):
+# a bad seam value must never stop the button DM.
+GADGET_BIN="${APPROVE_CLICK_GADGET_BIN:-$SCRIPT_DIR/pr-burndown-gadget}"
+GADGET_TIMEOUT="${APPROVE_CLICK_GADGET_TIMEOUT:-30}"
+case "$GADGET_TIMEOUT" in ''|0*|*[!0-9]*) GADGET_TIMEOUT=30 ;; esac
+[ "$GADGET_TIMEOUT" -le 120 ] || GADGET_TIMEOUT=30
 REPO_SLUG="a-jay85/IBL5"
 
 # The owner's Discord id. Pinned equal to OWNER_ID in bin/discord-dm; bin/test-plan-review-seam asserts both.
@@ -187,12 +197,36 @@ reconcile_local() {
     done
 }
 
+# fetch_display <pr> <pr-json-file>: print the gadget's display object as one JSON
+# line, or nothing. Never fails the caller; the button DM must still send. The
+# watchdog keeps a hung gadget from stalling post-plan-fleet.
+fetch_display() {
+    local pr="$1" pr_json="$2" out pid wd rc=0
+    out=$(mktemp "${TMPDIR:-/tmp}/approve-display.XXXXXX") || return 0
+    "$GADGET_BIN" --format=discord-json "--pr=$pr" "--pr-json=$pr_json" >"$out" 2>/dev/null </dev/null &
+    pid=$!
+    # Watchdog fds go to /dev/null: an inherited stdout would hold the caller's
+    # $(...) open for the full sleep.
+    ( sleep "$GADGET_TIMEOUT"; kill "$pid" 2>/dev/null ) >/dev/null 2>&1 </dev/null &
+    wd=$!
+    wait "$pid" || rc=$?
+    kill "$wd" 2>/dev/null || true
+    wait "$wd" 2>/dev/null || true
+    # The key list is the allow-list: no other gadget key reaches the POST body.
+    if [ "$rc" -eq 0 ] && jq -e 'type == "object"' "$out" >/dev/null 2>&1; then
+        jq -c '{title, size, cells, verdict, decision}' "$out" 2>/dev/null || true
+    else
+        log "PR #$pr display fields unavailable (gadget exit $rc); plain button DM"
+    fi
+    rm -f "$out"
+}
+
 # send_button <pr>: mint a button DM for an open PR at its current head.
 send_button() {
-    local pr="$1" gh_out btn_state sha body
+    local pr="$1" gh_out btn_state sha body display pr_json
     case "$pr" in ''|0*|*[!0-9]*) die_usage "--send-button needs a PR number" ;; esac
     [ "${#pr}" -le 6 ] || die_usage "--send-button needs a PR number of at most 6 digits"
-    if ! gh_out=$("$GH_BIN" pr view "$pr" -R "$REPO_SLUG" --json headRefOid,state </dev/null 2>/dev/null); then
+    if ! gh_out=$("$GH_BIN" pr view "$pr" -R "$REPO_SLUG" --json headRefOid,state,title,changedFiles,additions,deletions,body </dev/null 2>/dev/null); then
         log "gh pr view $pr failed; no button sent"
         return 1
     fi
@@ -204,7 +238,23 @@ send_button() {
     sha=$(jq -r '.headRefOid // ""' <<< "$gh_out" 2>/dev/null || printf '')
     case "$sha" in *[!0-9a-f]*|'') log "PR #$pr head SHA is not 40 hex; no button sent"; return 1 ;; esac
     [ "${#sha}" -eq 40 ] || { log "PR #$pr head SHA is not 40 hex; no button sent"; return 1; }
-    body=$(jq -cn --argjson pr "$pr" --arg sha "$sha" '{pr: $pr, head_sha: $sha}')
+    display=""
+    if pr_json=$(mktemp "${TMPDIR:-/tmp}/approve-pr.XXXXXX"); then
+        printf '%s\n' "$gh_out" > "$pr_json" || true
+        display=$(fetch_display "$pr" "$pr_json" || true)
+        rm -f "$pr_json"
+    fi
+    body=""
+    if [ -n "$display" ]; then
+        body=$(jq -cn --argjson pr "$pr" --arg sha "$sha" --argjson d "$display" \
+            '{pr: $pr, head_sha: $sha, display: $d}' 2>/dev/null || printf '')
+        if [ -n "$body" ] && [ "$(printf '%s' "$body" | LC_ALL=C wc -c | tr -d ' ')" -gt 8000 ]; then
+            log "PR #$pr display body over 8000 bytes; plain button DM"
+            body=""
+        fi
+    fi
+    # Fallback: the plain body. Every gadget failure lands here.
+    [ -n "$body" ] || body=$(jq -cn --argjson pr "$pr" --arg sha "$sha" '{pr: $pr, head_sha: $sha}')
     "$DM_BIN" --raw --route /discordApproveDM "$body" >/dev/null
 }
 

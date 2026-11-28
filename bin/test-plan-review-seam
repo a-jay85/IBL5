@@ -740,7 +740,13 @@ APOA
 #!/usr/bin/env bash
 printf '[%s]\n' "$@" >> "$AP_LOGS/dm.log"
 APDM
-    chmod +x "$AP_BIN/fake-ssh" "$AP_BIN/fake-gh" "$AP_BIN/fake-oa" "$AP_BIN/fake-dm"
+    # The real gadget calls GitHub, so every case gets a failing stub unless it names its own.
+    cat > "$AP_BIN/fake-gadget" <<'APGD'
+#!/usr/bin/env bash
+exit 1
+APGD
+    chmod +x "$AP_BIN/fake-ssh" "$AP_BIN/fake-gh" "$AP_BIN/fake-oa" "$AP_BIN/fake-dm" "$AP_BIN/fake-gadget"
+    export APPROVE_CLICK_GADGET_BIN="$AP_BIN/fake-gadget"
     export AP_LOGS FAKE_LIST_BODY FAKE_CLAIM_BODY FAKE_CLAIM_HTTP FAKE_GH_JSON FAKE_OA_RC FAKE_OA_RESULT SENTINEL
     export APPROVE_CLICK_SSH_BIN="$AP_BIN/fake-ssh"
     export APPROVE_CLICK_SSH_HOST=stub-host
@@ -960,6 +966,190 @@ seam_case_approve_send_closed() {
     want "approve-send-closed: the body holds the head SHA" "$(cat "$AP_LOGS/dm.log")" "$AP_SHA"
 }
 
+# ── status fields on the button DM: --send-button merges the gadget's object under `display` ──
+ap_body() { sed -n 's/^\[\({.*}\)\]$/\1/p' "$AP_LOGS/dm.log" | tail -n 1; }
+ap_posts() { ap_count "$AP_LOGS/dm.log" '[/discordApproveDM]'; }
+
+# ap_jq <label> <jq filter>: the POST body exists and satisfies the filter.
+ap_jq() {
+    local body
+    body="$(ap_body)"
+    if [ -n "$body" ] && jq -e "$2" <<< "$body" > /dev/null 2>&1; then
+        seam_ok "$1"
+    else
+        seam_fail "$1 (body: ${body:0:300})"
+    fi
+}
+
+# ap_gadget <name>: write the stub gadget whose script body arrives on stdin.
+ap_gadget() {
+    { printf '#!/usr/bin/env bash\n'; cat; } > "$AP_BIN/$1"
+    chmod +x "$AP_BIN/$1"
+}
+
+# ap_send <gadget path> [VAR=value...]: run --send-button against that gadget.
+ap_send() {
+    local gadget="$1"
+    shift
+    ap_run env APPROVE_CLICK_GADGET_BIN="$gadget" "$@" "$AP_TICK" --send-button=4242
+}
+
+ap_plain() { # label
+    ap_eq "$1: exit 0" "$AP_RC" "0"
+    ap_eq "$1: exactly one POST" "$(ap_posts)" "1"
+    ap_jq "$1: the POST is the plain body" 'keys == ["head_sha","pr"]'
+}
+
+# ap_display_object: the full gadget object (plus one unknown key) that the stubs print.
+ap_display_object() {
+    cat > "$AP_BIN/display.json" <<'APJSON'
+{"title":"T","size":"3 files, +32 −10","cells":{"tests":{"icon":"✅","text":""},"comments":{"icon":"✅","text":""},"bot_review":{"icon":"✅","text":""},"easy_undo":{"icon":"✅","text":""},"your_ok":{"icon":"","text":"none"}},"verdict":"READY, held for you.","decision":"D","extra":"x"}
+APJSON
+}
+
+seam_case_approve_send_display_merged() {
+    local start took
+    ap_reset
+    ap_display_object
+    ap_gadget gadget-ok <<'APG'
+cat "$(dirname "$0")/display.json"
+APG
+    start=$SECONDS
+    ap_send "$AP_BIN/gadget-ok"
+    took=$(( SECONDS - start ))
+    ap_eq "approve-send-display-merged: exit 0" "$AP_RC" "0"
+    ap_eq "approve-send-display-merged: exactly one POST" "$(ap_posts)" "1"
+    ap_jq "approve-send-display-merged: pr and head_sha are the sender's" ".pr == 4242 and .head_sha == \"$AP_SHA\""
+    ap_jq "approve-send-display-merged: display carries the title" '.display.title == "T"'
+    ap_jq "approve-send-display-merged: display carries all five cells" '.display.cells | [.tests, .comments, .bot_review, .easy_undo, .your_ok] | all(has("icon"))'
+    ap_jq "approve-send-display-merged: an unknown gadget key never reaches the body" '.display | has("extra") | not'
+    want "approve-send-display-merged: gh is asked for the PR fields the gadget reads" "$(cat "$AP_LOGS/gh.log")" "headRefOid,state,title,changedFiles,additions,deletions,body"
+    # A watchdog that inherits stdout holds the sender open for the whole 30 s timeout.
+    if [ "$took" -lt 10 ]; then
+        seam_ok "approve-send-display-merged: a fast gadget returns without waiting on the watchdog"
+    else
+        seam_fail "approve-send-display-merged: send took ${took}s with a fast gadget"
+    fi
+}
+
+seam_case_approve_send_gadget_fails() {
+    ap_reset
+    ap_send "$AP_BIN/fake-gadget"
+    ap_plain "approve-send-gadget-fails"
+}
+
+seam_case_approve_send_gadget_junk() {
+    ap_reset
+    ap_gadget gadget-junk <<'APG'
+echo 'not json'
+APG
+    ap_send "$AP_BIN/gadget-junk"
+    ap_plain "approve-send-gadget-junk"
+    ap_reset
+    ap_gadget gadget-array <<'APG'
+echo '[1,2]'
+APG
+    ap_send "$AP_BIN/gadget-array"
+    ap_plain "approve-send-gadget-array"
+}
+
+seam_case_approve_send_gadget_timeout() {
+    local start took
+    ap_reset
+    ap_display_object
+    ap_gadget gadget-hang <<'APG'
+sleep 10
+cat "$(dirname "$0")/display.json"
+APG
+    start=$SECONDS
+    ap_send "$AP_BIN/gadget-hang" APPROVE_CLICK_GADGET_TIMEOUT=1
+    took=$(( SECONDS - start ))
+    ap_plain "approve-send-gadget-timeout"
+    if [ "$took" -lt 5 ]; then
+        seam_ok "approve-send-gadget-timeout: the watchdog cuts a hung gadget in under 5 s"
+    else
+        seam_fail "approve-send-gadget-timeout: send took ${took}s"
+    fi
+}
+
+seam_case_approve_send_gadget_oversize() {
+    ap_reset
+    ap_gadget gadget-big <<'APG'
+big=$(printf 'x%.0s' {1..9000})
+jq -cn --arg d "$big" '{title: "T", size: "1 file", cells: {}, verdict: "V", decision: $d}'
+APG
+    ap_send "$AP_BIN/gadget-big"
+    ap_plain "approve-send-gadget-oversize"
+}
+
+seam_case_approve_send_gadget_pr_override() {
+    ap_reset
+    ap_gadget gadget-override <<'APG'
+echo '{"pr":1,"head_sha":"0000000000000000000000000000000000000000","title":"T"}'
+APG
+    ap_send "$AP_BIN/gadget-override"
+    ap_jq "approve-send-gadget-pr-override: pr and head_sha stay the sender's" ".pr == 4242 and .head_sha == \"$AP_SHA\""
+    ap_jq "approve-send-gadget-pr-override: display holds no pr or head_sha" '.display.title == "T" and (.display | (has("pr") or has("head_sha")) | not)'
+}
+
+seam_case_approve_send_timeout_env_empty() {
+    local value
+    ap_display_object
+    ap_gadget gadget-onesec <<'APG'
+sleep 1
+cat "$(dirname "$0")/display.json"
+APG
+    for value in '' abc; do
+        ap_reset
+        ap_send "$AP_BIN/gadget-onesec" "APPROVE_CLICK_GADGET_TIMEOUT=$value"
+        ap_jq "approve-send-timeout-env: APPROVE_CLICK_GADGET_TIMEOUT='$value' still posts display" '.display.title == "T"'
+    done
+}
+
+# The next two run the real sibling gadget. Its triage command is stubbed, so nothing calls GitHub.
+ap_triage_stub() {
+    ap_gadget triage-fail <<'APG'
+exit 1
+APG
+}
+
+seam_case_approve_send_gadget_bin_empty() {
+    ap_reset
+    ap_triage_stub
+    ap_send "" PR_BURNDOWN_TRIAGE_CMD="$AP_BIN/triage-fail"
+    ap_eq "approve-send-gadget-bin-empty: exit 0" "$AP_RC" "0"
+    ap_jq "approve-send-gadget-bin-empty: an empty APPROVE_CLICK_GADGET_BIN runs the real gadget" '.display.cells.tests.text == "Could not read"'
+}
+
+seam_case_approve_send_decision_from_body() {
+    local body
+    ap_reset
+    ap_triage_stub
+    body=$'<!-- manual-confirmation:begin -->\n## Manual confirmation needed\n\n> **Decision:** Merge if the new DM looks right.\n<!-- manual-confirmation:end -->\n'
+    FAKE_GH_JSON="$(jq -cn --arg s "$AP_SHA" --arg b "$body" '{headRefOid: $s, state: "OPEN", title: "T", changedFiles: 1, additions: 2, deletions: 3, body: $b}')"
+    ap_send "" PR_BURNDOWN_TRIAGE_CMD="$AP_BIN/triage-fail"
+    ap_jq "approve-send-decision-from-body: the quoted Decision line arrives without its label" '.display.decision == "Merge if the new DM looks right."'
+    ap_reset
+    FAKE_GH_JSON="$(jq -cn --arg s "$AP_SHA" '{headRefOid: $s, state: "OPEN", title: "T", changedFiles: 1, additions: 2, deletions: 3, body: "## Summary\n\nNo choice to make.\n"}')"
+    ap_send "" PR_BURNDOWN_TRIAGE_CMD="$AP_BIN/triage-fail"
+    ap_jq "approve-send-decision-from-body: no Decision line gives a null decision" 'has("display") and .display.decision == null'
+}
+
+seam_case_approve_send_closed_no_gadget() {
+    ap_reset
+    ap_gadget gadget-marker <<'APG'
+: > "$AP_LOGS/gadget.ran"
+exit 1
+APG
+    FAKE_GH_JSON="$(jq -cn --arg s "$AP_SHA" '{headRefOid: $s, state: "CLOSED"}')"
+    ap_send "$AP_BIN/gadget-marker"
+    ap_eq "approve-send-closed-no-gadget: no POST" "$(ap_posts)" "0"
+    ap_eq "approve-send-closed-no-gadget: the gadget never ran" "$([ -e "$AP_LOGS/gadget.ran" ] && echo ran || echo idle)" "idle"
+    FAKE_GH_JSON="$(jq -cn --arg s "$AP_SHA" '{headRefOid: $s, state: "OPEN"}')"
+    ap_send "$AP_BIN/gadget-marker"
+    ap_eq "approve-send-closed-no-gadget: the same stub does run for an OPEN PR" "$([ -e "$AP_LOGS/gadget.ran" ] && echo ran || echo idle)" "ran"
+}
+
 seam_case_approve_schedule() {
     local plist path_line
     plist="$("$HERE/approve-click-cron-setup" --print-schedule 2>&1)"
@@ -1011,6 +1201,16 @@ seam_case_approve_all() {
     seam_case_approve_actor
     seam_case_approve_claim_409
     seam_case_approve_send_closed
+    seam_case_approve_send_display_merged
+    seam_case_approve_send_gadget_fails
+    seam_case_approve_send_gadget_junk
+    seam_case_approve_send_gadget_timeout
+    seam_case_approve_send_gadget_oversize
+    seam_case_approve_send_gadget_pr_override
+    seam_case_approve_send_timeout_env_empty
+    seam_case_approve_send_gadget_bin_empty
+    seam_case_approve_send_decision_from_body
+    seam_case_approve_send_closed_no_gadget
     seam_case_approve_schedule
     seam_case_approve_cron_flag
     seam_case_approve_fleet_wiring

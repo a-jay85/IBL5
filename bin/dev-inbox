@@ -6,8 +6,10 @@
 # one as it lands. Leave it running in a Ghostty tab.
 #
 # Usage: bin/dev-inbox [--merged] [--last <n>] [--no-bell] [--once]
-#   --merged     show merged PRs from GitHub instead of the inbox file. This is
-#                the news the #merged channel gets, without its needs-you block.
+#   --merged     show merged PRs from GitHub instead of the inbox file. It lists
+#                only each PR's merge time, branch, number, title and link. It
+#                leaves out the #merged channel's danger warnings (one-way door,
+#                self-governing), What changed, Watch and needs-you block.
 #                It asks `gh` every 60 seconds, or every 5 minutes while fewer
 #                than 500 GraphQL calls are left this hour. Run it in its own tab.
 #   --last <n>   entries to show before following (default 10)

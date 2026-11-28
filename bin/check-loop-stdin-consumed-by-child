@@ -33,6 +33,13 @@
 # wrapper (for example `timeout 5 bash x`) is missed. A backgrounded command is
 # flagged: only an explicit </dev/null is certain.
 #
+# Case statements are followed across lines. A pattern list (after in, ;;, ;& or ;;&) is
+# read up to its closing ), so a | between labels is never taken for a pipe, with or
+# without blanks, and a case may follow do, then, else, {, ! or an earlier arm. A line
+# whose pattern list holds a bare reader name (a label, or a command substitution that
+# runs one) is scanned unchanged. A case word written in backticks is not followed and
+# falls back to the one-word label checks.
+#
 # docker is checked over its whole segment, so an -i that belongs to the inner command
 # (`docker exec c grep -i x`) is a false positive; add </dev/null or the marker.
 #
@@ -233,6 +240,76 @@ function split_segments(m, r,    n, i, c, nx, pv, start, sep, nsep, adv) {
     add_seg(m, r, start, n, sep)
 }
 
+# mark_case: same-length copy of the masked line m with each case pattern list blanked
+# and its closing ) turned into ;. A | between labels then never reads as a pipe, and
+# the arm's first command starts its own segment. ncase and cmode[] carry across lines:
+# "subj" wants the case word, "in" wants in, "pat" is before a pattern list, "body" runs
+# to ;; ;& ;;& or esac. A shape it cannot follow drops that case, so the older label
+# checks in split_segments and cmd_word still apply.
+# It must never hide a reader name. A pattern list can run one ($( ) or backticks) or use
+# one as a label, so when a list holds a reader name the whole line is returned unchanged.
+function mark_case(m,    n, i, c, out, last, tok, j, pd, keep, k, t, pw) {
+    if (ncase == 0 && m !~ /case/) return m
+    n = length(m); out = ""; i = 1; last = 0; keep = 0
+    while (i <= n) {
+        c = substr(m, i, 1)
+        if (c == " " || c == "\t") { out = out c; i++; continue }
+        if (ncase > 0 && cmode[ncase] == "pat") {
+            if (substr(m, i, 4) == "esac" && substr(m, i + 4, 1) !~ /[^ \t;&|)]/) { ncase--; out = out "esac"; i += 4; last = i - 1; continue }
+            j = i; pd = 0
+            if (c == "(") j++
+            while (j <= n) {
+                c = substr(m, j, 1)
+                if (c == ";") break
+                if (c == "(") pd++
+                else if (c == ")") { if (pd == 0) break; pd-- }
+                j++
+            }
+            if (j > n || c != ")") { ncase--; continue }   # no ) before ; or the line end: not a pattern list
+            k = split(substr(m, i, j - i), pw, /[ \t|()`;&]+/)
+            for (t = 1; t <= k; t++) { sub(/^.*\//, "", pw[t]); if (pw[t] in rd) keep = 1 }
+            out = out sp(j - i) ";"; i = j + 1; last = j; cmode[ncase] = "body"
+            continue
+        }
+        if (ncase > 0 && cmode[ncase] == "subj") {
+            j = i; pd = 0   # blanks inside $( ) and ${ } belong to the word
+            while (j <= n) {
+                c = substr(m, j, 1)
+                if (pd == 0 && index(" \t;<>", c) > 0) break
+                if (c == "(" || c == "{") pd++
+                else if (c == ")" || c == "}") pd--
+                j++
+            }
+            if (j == i) j = i + 1
+            out = out substr(m, i, j - i); i = j; cmode[ncase] = "in"
+            continue
+        }
+        if (ncase > 0 && cmode[ncase] == "in") {
+            if (substr(m, i, 2) == "in" && substr(m, i + 2, 1) !~ /[^ \t(]/) { out = out "in"; i += 2; last = i - 1; cmode[ncase] = "pat"; continue }
+            ncase--; continue
+        }
+        if (c == "(" && substr(m, i + 1, 1) == "(") {   # (( ... )): its ;; is arithmetic
+            j = index(substr(m, i + 2), "))")
+            j = (j == 0) ? n + 1 : i + j + 3
+            out = out substr(m, i, j - i); i = j; continue
+        }
+        if (index(";&|`(){}", c) > 0) {
+            if (c == ";" && ncase > 0 && cmode[ncase] == "body" && (substr(m, i + 1, 1) == ";" || substr(m, i + 1, 1) == "&")) {
+                j = (substr(m, i, 3) == ";;&") ? 3 : 2
+                out = out substr(m, i, j); i += j; last = i - 1; cmode[ncase] = "pat"; continue
+            }
+            out = out c; last = i; i++; continue
+        }
+        tok = substr(m, i); match(tok, /^[^ \t;&|`(){}]+/); tok = substr(tok, 1, RLENGTH)
+        if (substr(m, last + 1, i - last - 1) ~ CMDPOS_RE) {
+            if (tok == "case") { ncase++; cmode[ncase] = "subj" }
+            else if (tok == "esac" && ncase > 0 && cmode[ncase] == "body") ncase--
+        }
+        out = out tok; i += length(tok)
+    }
+    return keep ? m : out
+}
+
 # cmd_word: the command word of the segment from offset p, after keywords, assignments
 # and wrappers (sudo env time exec command nohup) with their options. WRAP[w] lists the
 # wrapper's options that take a separate value. Sets cw_end to the offset just past that word.
@@ -344,6 +421,7 @@ function close_frame(fed, redir,    b) {
 
 function process_line(m, r, ln,    t, c1, k, seg, rseg, p, fw, word, fed, redir, rr, entry) {
     raw_line = r
+    m = mark_case(m)
     t = trim(m)
     if (t == "") return
     if (depth == 0 && !pending && m !~ /(while|until|for|select|do|done)/) return
@@ -413,6 +491,8 @@ BEGIN {
     LABEL_RE = "^\\(?" LBL "(\\|" LBL ")*\\)$"
     CASE_PRE_RE = "^[ \t]*(case[ \t]+[^ \t]+[ \t]+in[ \t]+)?\\(?" LBL "$"
     CASE_POST_RE = "^" LBL "(\\|" LBL ")*\\)([ \t;]|$)"
+    # Text that may sit between a separator and a command word that opens a case.
+    CMDPOS_RE = "^([ \t]*(do|then|else|elif|if|!))*[ \t]*$"
     XS = "x"; SPC = " "
     for (i = 0; i < 10; i++) { XS = XS XS; SPC = SPC SPC }
 }
@@ -422,11 +502,11 @@ BEGIN {
     if (FNR == 1) {
         nfiles++
         isyml = (FILENAME ~ /\.ya?ml$/)
-        depth = 0; qs = ""; nest = 0; in_heredoc = 0; pending = 0; lraw = ""; lmask = ""
+        depth = 0; qs = ""; nest = 0; in_heredoc = 0; pending = 0; lraw = ""; lmask = ""; ncase = 0
     }
     if (in_heredoc) { if (trim(raw) == heredoc_end) in_heredoc = 0; next }
     if (isyml && raw ~ /^[[:space:]]*(- )?[A-Za-z0-9_.-]+:/) {
-        lraw = ""; lmask = ""; qs = ""; nest = 0
+        lraw = ""; lmask = ""; qs = ""; nest = 0; ncase = 0
         # A one-line run: step carries its script on the key line; scan that value.
         if (raw !~ /^[[:space:]]*(- )?run:[[:space:]]*[^|> \t]/) next
         sub(/^[[:space:]]*(- )?run:[[:space:]]*/, "", raw)

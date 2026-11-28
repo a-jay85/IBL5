@@ -55,8 +55,8 @@ Revisit this decision when a new count over the merged PRs finds at least 3 quer
 ## Consequences
 
 - Positive: IBL5 maintains no scanner, and review rounds have no new bypass surface to search.
-- Positive: the owner-held vocabulary is unchanged. Every new query still reaches the owner.
-- Negative: a speed-up PR that adds a query still waits for an owner merge, as the four PRs above did.
+- Positive: the owner-held vocabulary is unchanged. A plan that flags a new query still reaches the owner.
+- Negative: a speed-up PR whose plan flags a new query still waits for an owner merge. The plans for PRs 3815, 3870 and 3985 set that hold. The plan for PR 3944 reported no security surface, and that PR auto-merged on 2026-11-13.
 - Negative: the counts are approximate, so a reader who doubts them has to rerun the replay.
 
 ## References

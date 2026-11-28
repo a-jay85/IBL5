@@ -1646,7 +1646,7 @@ carry_comment_is_inert() {
     if grep -qF 'Condition:' <<< "$body"; then note "the carry body holds a Condition: line"; fi
 }
 carry_gate_file_drops() {
-    carry_c carry_gate_file_drops tools/postplan-harness/runner.py
+    carry_c carry_gate_file_drops tools/postplan-harness/harness/runner.py
     run_carry
     want_not_carried "reason=gate-file"
     refute_gh "--add-label"

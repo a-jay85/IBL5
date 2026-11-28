@@ -2234,6 +2234,8 @@ ub_squash_merge_parent() {
 }
 # ub_gh_open <0|1>: queue one gh `pr list` answer (the stub pops "<rc> <file>" from gh.queue).
 ub_gh_open() { printf '%s\n' "$1" > "$T/ub-open.$1"; printf '0 %s\n' "$T/ub-open.$1" >> "$T/gh.queue"; }
+# ub_gh_merged <oid>: queue the merged-PR answer, one head sha per line as --jq prints it.
+ub_gh_merged() { printf '%s\n' "$1" > "$T/ub-merged"; printf '0 %s\n' "$T/ub-merged" >> "$T/gh.queue"; }
 # ub_run <args...>: run the helper inside work, with the stub dir first on PATH.
 ub_run() { (cd "$UB/work" && PATH="$STUB:$PATH" "$LOOP" unblock-base "$@"); }
 
@@ -2307,9 +2309,44 @@ test_unblock_base_squash_merged_unchanged_proceeds() {
     ub_squash_merge_parent
     ub_fetch
     ub_gh_open 0
+    ub_gh_merged "$UB_V1"
     local out
     out=$(ub_run child)
     assert_eq test_unblock_base_squash_merged_unchanged_proceeds:line "UNBLOCK-BASE origin/master $UB_V1" "$out"
+    assert_contains test_unblock_base_squash_merged_unchanged_proceeds:query "$(cat "$T/gh.calls")" "--base master --state merged"
+}
+
+# The parent PR was closed unmerged or never opened: no open PR and no merged PR.
+test_unblock_base_unmerged_parent_skips() {
+    new_env
+    ub_fixture
+    ub_gh_open 0
+    ub_gh_merged ""
+    local out
+    out=$(ub_run child)
+    assert_contains test_unblock_base_unmerged_parent_skips:line "$out" "UNBLOCK-BASE SKIP no PR merged into master holds the tip of parent"
+}
+
+# A reused branch name: the merged PR's head does not hold the current parent tip.
+test_unblock_base_older_merged_pr_skips() {
+    new_env
+    ub_fixture
+    ub_gh_open 0
+    ub_gh_merged "$UB_M1"
+    local out
+    out=$(ub_run child)
+    assert_contains test_unblock_base_older_merged_pr_skips:line "$out" "UNBLOCK-BASE SKIP no PR merged into master holds the tip of parent"
+}
+
+test_unblock_base_merged_query_failed_skips() {
+    new_env
+    ub_fixture
+    ub_gh_open 0
+    : > "$T/ub-empty"
+    printf '1 %s\n' "$T/ub-empty" >> "$T/gh.queue"
+    local out
+    out=$(ub_run child)
+    assert_contains test_unblock_base_merged_query_failed_skips:line "$out" "UNBLOCK-BASE SKIP parent PR state unknown"
 }
 
 test_unblock_base_no_reflog_skips() {

@@ -879,9 +879,11 @@ bl_ub_twins() {
 # bl_cmd_unblock_base <branch>: read-only. Picks the unblock replay target and upstream for
 # <branch> and prints one line: `UNBLOCK-BASE <target> <up>` or `UNBLOCK-BASE SKIP <why>`.
 # A parent rewritten after the branch forked, or a merged parent whose tip the branch no
-# longer contains, prints SKIP (backlog#1952). It never fetches and writes no ref or config.
+# longer contains, prints SKIP (backlog#1952). So does a parent with no open PR whose tip is
+# neither on origin/master nor in a PR merged into master. It never fetches and writes no ref
+# or config.
 bl_cmd_unblock_base() {
-    local branch="$1" head parent open target up ptip r s twin entries
+    local branch="$1" head parent open target up ptip r s twin entries merged
     local side=()
     git check-ref-format --branch "$branch" >/dev/null 2>&1 || { bl_ub_skip "invalid branch name"; return 0; }
     head=$(git rev-parse --verify --quiet "refs/heads/$branch^{commit}") || { bl_ub_skip "no local branch $branch"; return 0; }
@@ -914,7 +916,14 @@ bl_cmd_unblock_base() {
         if git merge-base --is-ancestor "$ptip" origin/master; then
             up=$(git merge-base "$head" origin/master)
         else
-            up=$ptip
+            # No open PR does not prove a merge: a PR merged into master must hold the tip.
+            merged=$(gh pr list --head "$parent" --base master --state merged --json headRefOid \
+                --jq '.[].headRefOid' 2>/dev/null) || { bl_ub_skip "parent PR state unknown"; return 0; }
+            up=''
+            while read -r s; do
+                if [ -n "$s" ] && git merge-base --is-ancestor "$ptip" "$s" 2>/dev/null; then up=$ptip; fi
+            done <<< "$merged"
+            [ -n "$up" ] || { bl_ub_skip "no PR merged into master holds the tip of $parent"; return 0; }
         fi
     fi
     [ "$(git rev-list --count "$up..$head")" -gt 0 ] || { bl_ub_skip "nothing to replay above $up"; return 0; }

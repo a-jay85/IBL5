@@ -166,6 +166,18 @@ final class TeamRecordRepositoryTest extends DatabaseTestCase
         );
     }
 
+    public function testGetTopTeamHalfScoreExcludesGameWithNonFranchiseHomeTeam(): void
+    {
+        $this->seedHalfScoreGames();
+        // T1 visits the Free Agents (teamid 0); T1's 400-point first half would top the list
+        $this->seedGameWithNames('2098-01-10', 1, 0, $this->names[1], $this->teamName(0), [200, 200, 1, 1, 0], [1, 1, 1, 1, 0]);
+
+        $records = $this->repo->getTopTeamHalfScore('first', 'DESC');
+
+        self::assertSame($this->halfRow(2, '2098-01-05', 777, 1, 150), $records[0]);
+        self::assertNotContains('2098-01-10', array_column($records, 'date'));
+    }
+
     // --- getLargestMarginOfVictory ---
 
     public function testGetLargestMarginOfVictoryRanksByMarginThenDateAndExcludesOutOfScope(): void

@@ -128,6 +128,7 @@ $knownActions = [
     'get-allstar-ids',
     'get-allstar-name',
     'get-google-sheet-connection',
+    'get-trade-mode',
     'get-votes',
     'reset-allstar-names',
     'reset-demands',
@@ -151,6 +152,10 @@ $knownActions = [
     'set-leaders-htm',
     'set-player-name',
     'shadow-log',
+    'trade-suggestions-fixture',
+    'trade-suggestion-feedback-reset',
+    'trade-suggestions-feedback-seed',
+    'trade-suggestion-feedback',
 ];
 
 // A named-but-unrecognised action is a client mistake, not a method mistake.
@@ -937,6 +942,201 @@ if ($method === 'DELETE' && $action === 'reset-draft-pick') {
         'players_deleted' => $playersDeleted,
         'player' => $draftedName,
     ]);
+    $db->close();
+    exit;
+}
+
+// GET ?action=get-trade-mode&teamid=N — read back one franchise's trade-suggestion
+// team mode (ibl_team_info.trade_mode). teamid must be an int in 1..28, so a
+// typo'd or hostile value is a JSON 400 rather than a query. Used by
+// trade-suggestions.spec.ts to prove the mode POST wrote (or refused to write).
+if ($method === 'GET' && $action === 'get-trade-mode') {
+    $teamidRaw = filter_var($_GET['teamid'] ?? null, FILTER_VALIDATE_INT);
+    if ($teamidRaw === false || $teamidRaw < 1 || $teamidRaw > 28) {
+        http_response_code(400);
+        echo json_encode(['error' => 'get-trade-mode requires teamid as an integer in 1..28']);
+        $db->close();
+        exit;
+    }
+    $teamid = (int)$teamidRaw;
+    $stmt = $db->prepare('SELECT trade_mode FROM ibl_team_info WHERE teamid = ?');
+    $stmt->bind_param('i', $teamid);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if ($row === null) {
+        http_response_code(404);
+        echo json_encode(['error' => 'No ibl_team_info row for teamid ' . $teamid]);
+        $db->close();
+        exit;
+    }
+    echo json_encode(['teamid' => $teamid, 'trade_mode' => $row['trade_mode']]);
+    $db->close();
+    exit;
+}
+
+// POST ?action=trade-suggestions-fixture — reset the trade-suggestions panel to
+// a known state: every franchise back to trade_mode = 'auto' and 'Allow Trades'
+// = 'Yes' (the CI seed ships 'No', which hides the panel). The settings write is
+// the same upsert the plain settings POST branch uses. Called by the E2E
+// beforeEach and the VR `setup=` clause. No body or params are read.
+// It also pins ibl_trade_info.updated_at to the CI seed's value. The snapshot key
+// reads MAX(updated_at) and seeds the exposure filter's partner pick, and earlier
+// specs rewrite those rows at wall-clock time. Unpinned, the acting team's cards
+// depend on when the run happened.
+//
+// &stage=over-cap also stages the rows TradeSuggestionsEngineInvariantTest
+// stages: a bench player (pid 200201, every depth slot 0) whose salary puts
+// franchise 1's payroll at 7100 in both contract years the engine can read
+// (salary_yr1 in season, salary_yr2 in the offseason), franchise 2 set to
+// rebuild, and a round 2 pick for next year owned by and from franchise 1.
+// The payroll comes from the same cap calculator the engine uses. Every call
+// first deletes those staged rows, so a plain call undoes a staged one.
+if ($method === 'POST' && $action === 'trade-suggestions-fixture') {
+    $db->query("UPDATE ibl_team_info SET trade_mode = 'auto'");
+    $db->query("UPDATE ibl_trade_info SET updated_at = '2026-01-01 00:00:00'");
+    $upsert = $db->prepare(
+        'INSERT INTO ibl_settings (setting_key, setting_value, league) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)'
+    );
+    $key = 'Allow Trades';
+    $value = 'Yes';
+    $league = 'ibl';
+    $upsert->bind_param('sss', $key, $value, $league);
+    $upsert->execute();
+    $upsert->close();
+
+    $dumpPid = 200201;
+    $pickNote = 'e2e-trade-suggestions-fixture';
+    $stagedPayroll = 7100;
+    $userTid = 1;
+    $rebuildTid = 2;
+    $db->query('DELETE FROM ibl_plr WHERE pid = ' . $dumpPid);
+    $deletePick = $db->prepare('DELETE FROM ibl_draft_picks WHERE notes = ?');
+    $deletePick->bind_param('s', $pickNote);
+    $deletePick->execute();
+    $deletePick->close();
+
+    if (($_GET['stage'] ?? '') !== 'over-cap') {
+        echo json_encode(['reset' => 'ok']);
+        $db->close();
+        exit;
+    }
+
+    $season = new \Season\Season($db);
+    $teamIdentity = new \Repositories\TeamIdentityRepository($db);
+    $userTeamName = $teamIdentity->getTeamnameFromTeamID($userTid) ?? '';
+    $payrollIn = static function (string $phase) use ($db, $season, $teamIdentity, $userTeamName, $userTid): int {
+        $season->phase = $phase;
+        $validator = new \Trading\TradeValidator($db, $season);
+        $filter = new \TradeSuggestions\SuggestionValidationFilter(
+            $validator,
+            new \Trading\TradeCapCalculator($teamIdentity, new \Trading\BuyoutLedgerRepository($db), $season, $validator),
+            new \Trading\TradeFormRepository($db),
+            $season,
+        );
+
+        return \League\League::HARD_CAP_MAX - $filter->capRoom($userTeamName, $userTid);
+    };
+    $dbPhase = $season->phase;
+    $inSeasonSalary = $stagedPayroll - $payrollIn('Regular Season');
+    $offseasonSalary = $stagedPayroll - $payrollIn('Free Agency');
+    $season->phase = $dbPhase;
+    if ($inSeasonSalary < 1 || $offseasonSalary < 1) {
+        http_response_code(409);
+        echo json_encode(['error' => 'franchise 1 payroll is already at or above the staged 7100']);
+        $db->close();
+        exit;
+    }
+
+    $name = 'Suggest Dump Bench';
+    $uuid = sprintf('test-%09d-0000-000000000001', $dumpPid);
+    $insertPlayer = $db->prepare(
+        "INSERT INTO ibl_plr (pid, name, age, teamid, pos, stamina, exp, bird, cy, cyt, salary_yr1, salary_yr2, salary_yr3, retired, ordinal, droptime, uuid, dc_pg_depth, dc_sg_depth, dc_sf_depth, dc_pf_depth, dc_c_depth, dc_minutes)
+         VALUES (?, ?, 30, ?, 'PG', 80, 5, 3, 1, 3, ?, ?, ?, 0, 1, 0, ?, 0, 0, 0, 0, 0, 0)"
+    );
+    $insertPlayer->bind_param('isiiiis', $dumpPid, $name, $userTid, $inSeasonSalary, $offseasonSalary, $offseasonSalary, $uuid);
+    $insertPlayer->execute();
+    $insertPlayer->close();
+
+    $db->query("UPDATE ibl_team_info SET trade_mode = 'rebuild' WHERE teamid = " . $rebuildTid);
+
+    $pickYear = $season->endingYear + 1;
+    $round = 2;
+    $insertPick = $db->prepare(
+        'INSERT INTO ibl_draft_picks (ownerofpick, owner_teamid, teampick, teampick_teamid, year, round, notes) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    );
+    $insertPick->bind_param('sisiiis', $userTeamName, $userTid, $userTeamName, $userTid, $pickYear, $round, $pickNote);
+    $insertPick->execute();
+    $insertPick->close();
+
+    echo json_encode([
+        'reset' => 'ok',
+        'staged' => 'over-cap',
+        'payroll' => ['in_season' => $payrollIn('Regular Season'), 'offseason' => $payrollIn('Free Agency')],
+    ]);
+    $season->phase = $dbPhase;
+    $db->close();
+    exit;
+}
+
+// POST ?action=trade-suggestions-feedback-seed — write one hide for the tuning
+// page E2E: tid 8 (the fixture team, a constant), an `e2e-` key no generated
+// deal can have, and a script-tag note that must render as text. Old `e2e-`
+// rows for tid 8 go first, so reruns stay at one row. The feedback reset above
+// skips `e2e-` keys, so the panel spec cannot wipe it. The row's created_at is
+// pinned to 2026-01-01 00:00:00. No body or params are read.
+if ($method === 'POST' && $action === 'trade-suggestions-feedback-seed') {
+    $seedTid = 8;
+    $clear = $db->prepare("DELETE FROM `ibl_trade_suggestion_feedback` WHERE tid = ? AND deal_key LIKE 'e2e-%'");
+    $clear->bind_param('i', $seedTid);
+    $clear->execute();
+    $clear->close();
+    (new \TradeSuggestions\Feedback\FeedbackRepository($db))->record(
+        $seedTid,
+        1,
+        new \TradeSuggestions\Feedback\DealKey('e2e-tuning-script', 'e2e-tuning-script-core'),
+        '{}',
+        \TradeSuggestions\Feedback\HideReason::Other->value,
+        '<script>alert("tuning")</script> & co',
+    );
+    // Pin the "Hidden at" time. record() stamps CURRENT_TIMESTAMP, so unpinned
+    // the tuning page shows the wall-clock time of the run.
+    $db->query("UPDATE `ibl_trade_suggestion_feedback` SET created_at = '2026-01-01 00:00:00' WHERE tid = 8 AND deal_key LIKE 'e2e-%'");
+    echo json_encode(['ok' => true]);
+    $db->close();
+    exit;
+}
+
+// DELETE ?action=trade-suggestion-feedback-reset — clear every trade-idea hide
+// a test wrote. Rows keyed `e2e-...` are seeds owned by another spec, so they
+// stay; a real hide always writes a 40-hex key. No params are read.
+if ($method === 'DELETE' && $action === 'trade-suggestion-feedback-reset') {
+    $db->query("DELETE FROM `ibl_trade_suggestion_feedback` WHERE deal_key NOT LIKE 'e2e-%'");
+    echo json_encode(['cleared' => $db->affected_rows]);
+    $db->close();
+    exit;
+}
+
+// GET ?action=trade-suggestion-feedback&teamid=N — read back one team's
+// trade-idea hides, free text raw, so trade-suggestions.spec.ts can prove a hide
+// POST wrote (or refused to write). teamid must be an int in 1..28.
+if ($method === 'GET' && $action === 'trade-suggestion-feedback') {
+    $teamidRaw = filter_var($_GET['teamid'] ?? null, FILTER_VALIDATE_INT);
+    if ($teamidRaw === false || $teamidRaw < 1 || $teamidRaw > 28) {
+        http_response_code(400);
+        echo json_encode(['error' => 'trade-suggestion-feedback requires teamid as an integer in 1..28']);
+        $db->close();
+        exit;
+    }
+    $teamid = (int)$teamidRaw;
+    $stmt = $db->prepare(
+        "SELECT tid, deal_key, core_key, reason_codes, free_text FROM `ibl_trade_suggestion_feedback` WHERE tid = ? AND deal_key NOT LIKE 'e2e-%' ORDER BY id"
+    );
+    $stmt->bind_param('i', $teamid);
+    $stmt->execute();
+    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    echo json_encode(['rows' => $rows]);
     $db->close();
     exit;
 }

@@ -129,6 +129,259 @@ class NewsControllerTest extends ModuleEntryPointTestCase
         $this->runMain($controller);
     }
 
+    public function testRendersTradeSuggestionsAfterSimRecapForGm(): void
+    {
+        $team = self::createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
+        $team->method('getTeamnameFromUsername')->willReturn('Lakers');
+        $team->method('getTidFromTeamname')->willReturn(5);
+
+        $recapService = self::createStub(\LastSimRecap\Contracts\LastSimRecapServiceInterface::class);
+        $recapService->method('buildSlateForTeam')->willReturn(
+            new \LastSimRecap\Dto\RecapSlate(5, 'Los Angeles', 'Lakers', 1, '2026-01-01', '2026-01-07', 3, 1, 10, '+5', '-2', 3, 1, []),
+        );
+        $recapView = self::createStub(\LastSimRecap\Contracts\LastSimRecapViewInterface::class);
+        $recapView->method('render')->willReturn('<section data-test="recap-card"></section>');
+
+        $panel = new \TradeSuggestions\TradeSuggestionsPanelData(
+            new \TradeSuggestions\ResolvedTeamMode(\TradeSuggestions\TeamMode::WinNow, \TradeSuggestions\TeamMode::WinNow, false),
+            [],
+        );
+        $suggestions = self::createMock(\TradeSuggestions\Contracts\TradeSuggestionsServiceInterface::class);
+        $suggestions->expects($this->once())->method('buildForTeam')->with(5)->willReturn($panel);
+        $suggestionsView = self::createStub(\TradeSuggestions\Contracts\TradeSuggestionsViewInterface::class);
+        $suggestionsView->method('render')->willReturn('<section data-test="trade-ideas"></section>');
+
+        $controller = $this->buildController(
+            auth: $this->authenticatedAs(['username' => 'gm1']),
+            team: $team,
+            recapService: $recapService,
+            recapView: $recapView,
+            suggestions: $suggestions,
+            suggestionsView: $suggestionsView,
+        );
+
+        $html = $this->runMain($controller);
+
+        $recapPos = strpos($html, '<section data-test="recap-card"></section>');
+        $ideasPos = strpos($html, '<section data-test="trade-ideas"></section>');
+        $this->assertIsInt($recapPos);
+        $this->assertIsInt($ideasPos);
+        $this->assertLessThan($ideasPos, $recapPos);
+    }
+
+    public function testTradeSuggestionsFailureStillRendersTheRecap(): void
+    {
+        $team = self::createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
+        $team->method('getTeamnameFromUsername')->willReturn('Lakers');
+        $team->method('getTidFromTeamname')->willReturn(5);
+
+        $recapService = self::createStub(\LastSimRecap\Contracts\LastSimRecapServiceInterface::class);
+        $recapService->method('buildSlateForTeam')->willReturn(
+            new \LastSimRecap\Dto\RecapSlate(5, 'Los Angeles', 'Lakers', 1, '2026-01-01', '2026-01-07', 3, 1, 10, '+5', '-2', 3, 1, []),
+        );
+        $recapView = self::createStub(\LastSimRecap\Contracts\LastSimRecapViewInterface::class);
+        $recapView->method('render')->willReturn('<section data-test="recap-card"></section>');
+
+        $suggestions = self::createStub(\TradeSuggestions\Contracts\TradeSuggestionsServiceInterface::class);
+        $suggestions->method('buildForTeam')->willThrowException(new \RuntimeException('db down'));
+
+        $controller = $this->buildController(
+            auth: $this->authenticatedAs(['username' => 'gm1']),
+            team: $team,
+            recapService: $recapService,
+            recapView: $recapView,
+            suggestions: $suggestions,
+            suggestionsView: self::createStub(\TradeSuggestions\Contracts\TradeSuggestionsViewInterface::class),
+        );
+
+        $html = $this->runMain($controller);
+
+        $this->assertStringContainsString('<section data-test="recap-card"></section>', $html);
+    }
+
+    public function testSkipsTradeSuggestionsForAnonymousAndFreeAgents(): void
+    {
+        $suggestionsView = self::createStub(\TradeSuggestions\Contracts\TradeSuggestionsViewInterface::class);
+
+        $anonSuggestions = self::createMock(\TradeSuggestions\Contracts\TradeSuggestionsServiceInterface::class);
+        $anonSuggestions->expects($this->never())->method('buildForTeam');
+        $this->runMain($this->buildController(suggestions: $anonSuggestions, suggestionsView: $suggestionsView));
+
+        $faSuggestions = self::createMock(\TradeSuggestions\Contracts\TradeSuggestionsServiceInterface::class);
+        $faSuggestions->expects($this->never())->method('buildForTeam');
+        $this->runMain($this->buildController(
+            auth: $this->authenticatedAs(['username' => 'gm1']),
+            team: $this->freeAgentTeam(),
+            suggestions: $faSuggestions,
+            suggestionsView: $suggestionsView,
+        ));
+    }
+
+    public function testTradeSuggestionErrorParamReachesTheView(): void
+    {
+        $_GET = ['trade_suggestion_error' => 'stale'];
+        $service = self::createStub(\TradeSuggestions\Contracts\TradeSuggestionsServiceInterface::class);
+        $service->method('buildForTeam')->willReturn($this->tradePanel());
+        $view = self::createMock(\TradeSuggestions\Contracts\TradeSuggestionsViewInterface::class);
+        $view->expects($this->once())->method('render')
+            ->with(self::anything(), false, 'stale', null)
+            ->willReturn('<section data-test="trade-ideas"></section>');
+
+        $this->runMain($this->tradeController($service, $view));
+    }
+
+    public function testNonStringTradeSuggestionErrorBecomesEmptyString(): void
+    {
+        $_GET = ['trade_suggestion_error' => ['stale']];
+        $service = self::createStub(\TradeSuggestions\Contracts\TradeSuggestionsServiceInterface::class);
+        $service->method('buildForTeam')->willReturn($this->tradePanel());
+        $view = self::createMock(\TradeSuggestions\Contracts\TradeSuggestionsViewInterface::class);
+        $view->expects($this->once())->method('render')
+            ->with(self::anything(), false, '', null)
+            ->willReturn('<section data-test="trade-ideas"></section>');
+
+        $this->runMain($this->tradeController($service, $view));
+    }
+
+    public function testMissingTradeSuggestionErrorParamIsEmptyString(): void
+    {
+        $_GET = [];
+        $service = self::createStub(\TradeSuggestions\Contracts\TradeSuggestionsServiceInterface::class);
+        $service->method('buildForTeam')->willReturn($this->tradePanel());
+        $view = self::createMock(\TradeSuggestions\Contracts\TradeSuggestionsViewInterface::class);
+        $view->expects($this->once())->method('render')
+            ->with(self::anything(), false, '', null)
+            ->willReturn('<section data-test="trade-ideas"></section>');
+
+        $this->runMain($this->tradeController($service, $view));
+    }
+
+    public function testHiddenNoteIsFetchedOnlyWhenHiddenFlagIsOne(): void
+    {
+        $_GET = ['trade_suggestion_hidden' => '1'];
+        $note = ['deal_key' => str_repeat('a', 40), 'reason_codes' => 'TOO_OLD', 'free_text' => null, 'created_at' => '2026-11-01 10:00:00'];
+        $service = self::createMock(\TradeSuggestions\Contracts\TradeSuggestionsServiceInterface::class);
+        $service->method('buildForTeam')->willReturn($this->tradePanel());
+        $service->expects($this->once())->method('hiddenNote')->with(5)->willReturn($note);
+        $view = self::createMock(\TradeSuggestions\Contracts\TradeSuggestionsViewInterface::class);
+        $view->expects($this->once())->method('render')
+            ->with(self::anything(), false, '', $note)
+            ->willReturn('<section data-test="trade-ideas"></section>');
+
+        $this->runMain($this->tradeController($service, $view));
+    }
+
+    public function testHiddenNoteIsNotFetchedForOtherFlagValues(): void
+    {
+        $_GET = ['trade_suggestion_hidden' => '0'];
+        $service = self::createMock(\TradeSuggestions\Contracts\TradeSuggestionsServiceInterface::class);
+        $service->method('buildForTeam')->willReturn($this->tradePanel());
+        $service->expects($this->never())->method('hiddenNote');
+        $view = self::createMock(\TradeSuggestions\Contracts\TradeSuggestionsViewInterface::class);
+        $view->expects($this->once())->method('render')
+            ->with(self::anything(), false, '', null)
+            ->willReturn('<section data-test="trade-ideas"></section>');
+
+        $this->runMain($this->tradeController($service, $view));
+    }
+
+    public function testTradeSuggestionsSkippedWhenEitherCollaboratorIsMissing(): void
+    {
+        $team = self::createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
+        $team->method('getTeamnameFromUsername')->willReturn('Lakers');
+        $team->method('getTidFromTeamname')->willReturn(5);
+
+        $service = self::createMock(\TradeSuggestions\Contracts\TradeSuggestionsServiceInterface::class);
+        $service->expects($this->never())->method('buildForTeam');
+        $html = $this->runMain($this->buildController(
+            auth: $this->authenticatedAs(['username' => 'gm1']),
+            team: $team,
+            suggestions: $service,
+            suggestionsView: null,
+        ));
+        $this->assertStringNotContainsString('trade-ideas', $html);
+
+        $view = self::createMock(\TradeSuggestions\Contracts\TradeSuggestionsViewInterface::class);
+        $view->expects($this->never())->method('render');
+        $html = $this->runMain($this->buildController(
+            auth: $this->authenticatedAs(['username' => 'gm1']),
+            team: $team,
+            suggestions: null,
+            suggestionsView: $view,
+        ));
+        $this->assertStringNotContainsString('trade-ideas', $html);
+    }
+
+    public function testTradeSuggestionsForNonGmLogsNothingAndRendersNothing(): void
+    {
+        $handler = new \Monolog\Handler\TestHandler();
+        \Logging\LoggerFactory::forTesting($handler);
+
+        try {
+            $service = self::createMock(\TradeSuggestions\Contracts\TradeSuggestionsServiceInterface::class);
+            $service->expects($this->never())->method('buildForTeam');
+            $view = self::createMock(\TradeSuggestions\Contracts\TradeSuggestionsViewInterface::class);
+            $view->expects($this->never())->method('render');
+
+            $html = $this->runMain($this->buildController(suggestions: $service, suggestionsView: $view));
+
+            $this->assertStringNotContainsString('trade-ideas', $html);
+            $this->assertSame([], $handler->getRecords());
+        } finally {
+            \Logging\LoggerFactory::reset();
+        }
+    }
+
+    public function testTradeSuggestionsFailureIsLoggedWithTidAndMessage(): void
+    {
+        $handler = new \Monolog\Handler\TestHandler();
+        \Logging\LoggerFactory::forTesting($handler);
+
+        try {
+            $service = self::createStub(\TradeSuggestions\Contracts\TradeSuggestionsServiceInterface::class);
+            $service->method('buildForTeam')->willThrowException(new \RuntimeException('db down'));
+            $view = self::createMock(\TradeSuggestions\Contracts\TradeSuggestionsViewInterface::class);
+            $view->expects($this->never())->method('render');
+
+            $this->runMain($this->tradeController($service, $view));
+
+            $records = $handler->getRecords();
+            $this->assertCount(1, $records);
+            $this->assertSame(\Monolog\Level::Error, $records[0]->level);
+            $this->assertSame('Trade suggestions panel failed', $records[0]->message);
+            $this->assertSame('app', $records[0]->channel);
+            $this->assertSame(5, $records[0]->context['tid']);
+            $this->assertSame('db down', $records[0]->context['error']);
+            $this->assertCount(2, $records[0]->context);
+        } finally {
+            \Logging\LoggerFactory::reset();
+        }
+    }
+
+    private function tradePanel(): \TradeSuggestions\TradeSuggestionsPanelData
+    {
+        return new \TradeSuggestions\TradeSuggestionsPanelData(
+            new \TradeSuggestions\ResolvedTeamMode(\TradeSuggestions\TeamMode::WinNow, \TradeSuggestions\TeamMode::WinNow, false),
+            [],
+        );
+    }
+
+    private function tradeController(
+        \TradeSuggestions\Contracts\TradeSuggestionsServiceInterface $service,
+        \TradeSuggestions\Contracts\TradeSuggestionsViewInterface $view,
+    ): NewsController {
+        $team = self::createStub(\Repositories\Contracts\TeamIdentityRepositoryInterface::class);
+        $team->method('getTeamnameFromUsername')->willReturn('Lakers');
+        $team->method('getTidFromTeamname')->willReturn(5);
+
+        return $this->buildController(
+            auth: $this->authenticatedAs(['username' => 'gm1']),
+            team: $team,
+            suggestions: $service,
+            suggestionsView: $view,
+        );
+    }
+
     public function testTopicWithNullTopicTextRendersNoInfoBranch(): void
     {
         $news = self::createMock(\Topics\News\Contracts\NewsServiceInterface::class);
@@ -696,6 +949,8 @@ class NewsControllerTest extends ModuleEntryPointTestCase
         ?\LastSimRecap\Contracts\LastSimRecapViewInterface $recapView = null,
         ?\Topics\News\Contracts\NewsServiceInterface $news = null,
         ?\Topics\News\Contracts\NewsViewInterface $view = null,
+        ?\TradeSuggestions\Contracts\TradeSuggestionsServiceInterface $suggestions = null,
+        ?\TradeSuggestions\Contracts\TradeSuggestionsViewInterface $suggestionsView = null,
     ): NewsController {
         return new NewsController(
             $config ?? $this->config,
@@ -705,6 +960,8 @@ class NewsControllerTest extends ModuleEntryPointTestCase
             $recapView ?? $this->recapViewStub,
             $news ?? $this->newsServiceStub,
             $this->withRealChrome($view ?? $this->newsViewStub),
+            tradeSuggestionsService: $suggestions,
+            tradeSuggestionsView: $suggestionsView,
         );
     }
 

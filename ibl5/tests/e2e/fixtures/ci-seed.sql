@@ -1044,6 +1044,10 @@ INSERT INTO ibl_trade_info (tradeofferid, itemid, itemtype, trade_from, trade_to
   (7, 44, '1', 'Flames',     'Spurs',     'test'),
   (8, 32, '1', 'Minutemen',  'Royals',    'test'),
   (8, 33, '1', 'Royals',     'Minutemen', 'test');
+-- Pin updated_at. The trade-suggestions snapshot key reads MAX(updated_at), and the
+-- key seeds the exposure filter's partner pick. Left at load time, each CI run
+-- picks different partners, so a team's ideas (panel, tuning VR row) come and go.
+UPDATE ibl_trade_info SET updated_at = '2026-01-01 00:00:00';
 
 -- ============================================================
 -- Stories for search pagination (need >10 results for "the")

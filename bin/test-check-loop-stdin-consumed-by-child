@@ -562,6 +562,82 @@ done < f
 FIX
 expect c56-real-pipe-still-a-pipe "$T/c56.sh" 0
 
+# probe NAME WANT_RC LINE BODY: wrap BODY in a fed while-read loop (BODY's first line is
+# file line 3) and scan it. An empty LINE skips the line check.
+probe() {
+    printf '#!/usr/bin/env bash\nwhile read -r l; do\n%s\ndone < f\n' "$4" > "$T/$1.sh"
+    expect "$1" "$T/$1.sh" "$2" "$3"
+}
+
+# Backlog#1971: the two reported alternated-label shapes, verbatim.
+cat > "$T/c57-issue-spaced-alternation.sh" <<'FIX'
+#!/usr/bin/env bash
+while read -r l; do
+  case $l in a | b) ssh h ;; esac
+done < list
+FIX
+expect c57-issue-spaced-alternation "$T/c57-issue-spaced-alternation.sh" 1 3
+cat > "$T/c58-issue-one-line-do-case.sh" <<'FIX'
+#!/usr/bin/env bash
+while read -r l; do case $l in a|b) ssh h ;; esac; done < list
+FIX
+expect c58-issue-one-line-do-case "$T/c58-issue-one-line-do-case.sh" 1 2
+
+# Group 1: blanks around the labels.
+probe c59-g1-blank-both-sides 1 3 'case $l in a | b) ssh h ;; esac'
+probe c60-g1-blank-before-bar 1 3 'case $l in a |b) ssh h ;; esac'
+probe c61-g1-blank-after-bar 1 3 'case $l in a| b) ssh h ;; esac'
+probe c62-g1-leading-paren 1 3 'case $l in (a | b) ssh h ;; esac'
+probe c63-g1-three-labels 1 3 'case $l in a | b | c) ssh h ;; esac'
+probe c64-g1-quoted-labels 1 3 'case $l in "a" | "b") ssh h ;; esac'
+probe c65-g1-arm-own-line 1 4 $'case $l in\n  a | b) ssh h ;;\nesac'
+probe c66-g1-second-arm 1 3 'case $l in x) : ;; a | b) ssh h ;; esac'
+probe c67-g1-blank-before-paren 1 3 'case $l in a|b ) ssh h ;; esac'
+probe c68-g1-continued-label 1 3 $'case $l in a | \\\n  b) ssh h ;; esac'
+probe c69-g1-single-label-blank 1 3 'case $l in a ) ssh h ;; esac'
+# Group 2: a word before case.
+probe c70-g2-then-case 1 3 'if true; then case $l in a|b) ssh h ;; esac; fi'
+probe c71-g2-else-case 1 3 'if false; then :; else case $l in a|b) ssh h ;; esac; fi'
+probe c72-g2-brace-case 1 3 '{ case $l in a|b) ssh h ;; esac; }'
+probe c73-g2-bang-case 1 3 '! case $l in a|b) ssh h ;; esac'
+probe c74-g2-nested-case 1 3 'case $x in y) case $l in a|b) ssh h ;; esac ;; esac'
+probe c75-g2-function-body 1 3 'f() { case $l in a|b) ssh h ;; esac; }'
+# Group 3: label and word forms.
+probe c76-g3-param-labels 1 3 'case $l in $x|${y}) ssh h ;; esac'
+probe c77-g3-cmdsub-word-labels 1 3 'case $(echo $l) in a|b) ssh h ;; esac'
+probe c78-g3-cmdsub-word-single 1 3 'case $(echo $l) in a) ssh h ;; esac'
+probe c79-g3-in-next-line 1 4 $'case $l\nin a | b) ssh h ;; esac'
+probe c100-g3-brace-word-blank 1 3 'case ${l%% *} in a) ssh h ;; esac'
+probe c101-g3-brace-word-default 1 3 'case ${l:-a b} in a|b) ssh h ;; esac'
+probe c102-g3-glob-suffix-labels 1 3 'case $l in *.sh | *.bash) ssh h ;; esac'
+# Already flagged today; must stay flagged.
+probe c80-keep-subshell-case 1 3 '( case $l in a|b) ssh h ;; esac )'
+probe c81-keep-after-assignment 1 3 'x=1; case $l in a|b) ssh h ;; esac'
+probe c82-keep-after-and 1 3 'true && case $l in a|b) ssh h ;; esac'
+probe c83-keep-quoted-word 1 3 'case "$l x" in a|b) ssh h ;; esac'
+probe c84-keep-glob-labels 1 3 'case $l in a*|b?) ssh h ;; esac'
+probe c85-keep-empty-label 1 3 'case $l in ""|b) ssh h ;; esac'
+probe c86-keep-quoted-blank-label 1 3 'case $l in "a b"|c) ssh h ;; esac'
+probe c87-keep-param-label 1 3 'case $l in $x) ssh h ;; esac'
+probe c88-keep-then-single-label 1 3 'if true; then case $l in a) ssh h ;; esac; fi'
+# A pattern list can run a command or name a reader. These hits must never disappear.
+probe c103-keep-cmdsub-in-pattern 1 3 'case $l in a|$(ssh h)) : ;; esac'
+probe c104-keep-backtick-in-pattern 1 3 'case $l in a | `ssh h`) : ;; esac'
+probe c105-keep-reader-name-label 1 3 'if true; then case $l in ssh|bash) : ;; esac; fi'
+# The reader is fed by a pipe: must stay rc 0.
+probe c89-pipe-subshell 0 '' '( echo x | ssh h )'
+probe c90-pipe-cmdsub 0 '' 'v=$(echo x | ssh h)'
+probe c91-pipe-from-group 0 '' '{ echo x; } | ssh h'
+probe c92-plain-pipe 0 '' 'echo x | ssh h'
+probe c93-pipe-in-subshell-list 0 '' '(true; echo x | ssh h)'
+probe c94-pipe-in-spaced-arm 0 '' 'case $l in a | b) echo x | ssh h ;; esac'
+probe c95-pipe-after-closed-case 0 '' 'case $l in a) : ;; esac; echo x | ssh h'
+probe c96-case-word-as-argument 0 '' 'echo case x in a | ssh h'
+probe c97-pipe-into-paren-after-case 0 '' $'case $l in a) : ;; esac\n( { echo a; echo b; } | ssh h )'
+# Near misses: esac as an argument does not close the case; a pipe into ) inside an arm.
+probe c98-esac-as-argument 1 3 'case $l in a) echo esac ;; b | c) ssh h ;; esac'
+probe c99-pipe-into-paren-in-arm 0 '' $'case $l in\n  a) v=$( { echo a; echo b; } | ssh h ) ;;\nesac'
+
 echo ""
 echo "$PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

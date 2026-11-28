@@ -32,15 +32,34 @@ class GameBoxscoreRepository extends \Database\BaseMysqliRepository implements G
      */
     public function getGameInfo(string $date, int $gameOfThatDay): ?array
     {
-        $sql = "SELECT DISTINCT
+        // A NULL quarter falls back to that side's calc_points: the visitor row is the
+        // lower id of the game's pair, the home row the higher. CAST keeps the score an
+        // int, because COALESCE over these column types returns DECIMAL (a PHP string).
+        $sql = "SELECT
                 game.game_date,
                 game.visitor_teamid AS awayTeamId,
                 game.home_teamid    AS homeTeamId,
                 game.game_of_that_day,
-                (game.visitor_q1_points + game.visitor_q2_points + game.visitor_q3_points
-                    + game.visitor_q4_points + COALESCE(game.visitor_ot_points, 0)) AS awayScore,
-                (game.home_q1_points + game.home_q2_points + game.home_q3_points
-                    + game.home_q4_points + COALESCE(game.home_ot_points, 0))       AS homeScore,
+                CAST(COALESCE(
+                    game.visitor_q1_points + game.visitor_q2_points + game.visitor_q3_points
+                        + game.visitor_q4_points + COALESCE(game.visitor_ot_points, 0),
+                    (SELECT v.calc_points FROM `ibl_box_scores_teams` v
+                        WHERE v.game_date = game.game_date
+                          AND v.visitor_teamid = game.visitor_teamid
+                          AND v.home_teamid = game.home_teamid
+                        ORDER BY v.id ASC
+                        LIMIT 1)
+                ) AS SIGNED) AS awayScore,
+                CAST(COALESCE(
+                    game.home_q1_points + game.home_q2_points + game.home_q3_points
+                        + game.home_q4_points + COALESCE(game.home_ot_points, 0),
+                    (SELECT h.calc_points FROM `ibl_box_scores_teams` h
+                        WHERE h.game_date = game.game_date
+                          AND h.visitor_teamid = game.visitor_teamid
+                          AND h.home_teamid = game.home_teamid
+                        ORDER BY h.id DESC
+                        LIMIT 1)
+                ) AS SIGNED) AS homeScore,
                 away.team_name AS awayTeamName, away.team_city AS awayTeamCity,
                 away.color1    AS awayColor1,   away.color2    AS awayColor2,
                 home.team_name AS homeTeamName, home.team_city AS homeTeamCity,
@@ -49,6 +68,7 @@ class GameBoxscoreRepository extends \Database\BaseMysqliRepository implements G
             LEFT JOIN `ibl_team_info` home ON game.home_teamid    = home.teamid
             LEFT JOIN `ibl_team_info` away ON game.visitor_teamid = away.teamid
             WHERE game.game_date = ? AND game.game_of_that_day = ?
+            ORDER BY game.id ASC
             LIMIT 1";
 
         /** @var array<string, int|float|string|null>|null */

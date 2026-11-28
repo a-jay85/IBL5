@@ -12,7 +12,7 @@
 #   PR open, a check failed (new head SHA)            FIRE webhook (once per SHA)
 #   PR open, checks pending                           wait
 #   PR open, green, auto-merge armed                  wait
-#   PR open, green, auto-merge not armed              STALL (DM: held for owner)
+#   PR open, green, auto-merge not armed              STALL (#dev DM: your turn, with the reason)
 #   no PR, plan queued, automouse idle                KICK (schedule a run)
 #   no PR, plan queued, automouse running             wait
 #   no PR, a loaded plan-now job may own the slug     wait
@@ -90,6 +90,7 @@ AUTOMOUSE_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse"
 
 FIRE_REASONS=""
 STALL_KEYS=""
+declare -A HOLD_NOTES=()
 KICK=0
 GH_ERROR=""
 FACTS=""
@@ -166,14 +167,14 @@ log_names_slug() {
 # row_verdict <id> <slug>: line 1 is the verdict; line 2 is the fingerprint fact
 # (absent when the row has no PR).
 row_verdict() {
-    local id="$1" slug="$2" prs pr state number sha check armed f b log label newest r slug_re
+    local id="$1" slug="$2" prs pr state number sha check armed f b log label newest r slug_re hold=""
     # Runs in a command-substitution subshell. The inherited ERR trap would print its
     # log line into the captured output and exit 0. Cleared here, nothing leaks into
     # the output. Bash drops -e inside $(...), so a failed command just keeps going;
     # main instead checks that line 1 starts with a known verdict prefix.
     trap - ERR
     slug_re="${slug}([^A-Za-z0-9]|\$)"
-    if ! prs=$(gh pr list --repo a-jay85/IBL5 --head "$slug" --state all --json number,state,mergedAt,url,autoMergeRequest,statusCheckRollup,headRefOid 2>/dev/null) \
+    if ! prs=$(gh pr list --repo a-jay85/IBL5 --head "$slug" --state all --json number,state,mergedAt,url,autoMergeRequest,statusCheckRollup,headRefOid,labels,mergeStateStatus 2>/dev/null) \
         || ! pr=$(printf '%s' "$prs" | jq -c "$PR_PICK" 2>/dev/null); then
         echo "ERROR:gh"; return 0
     fi
@@ -192,12 +193,20 @@ row_verdict() {
                 case "$check" in
                     failed) if grep -qxF -- "$id:$sha" "$FIRED_SHAS" 2>/dev/null; then echo "WAIT:check-failed-seen"; else echo "FIRE:check-failed:$sha"; fi ;;
                     pending) echo "WAIT:checks-pending" ;;
-                    green) if [ "$armed" = "yes" ]; then echo "WAIT:auto-merge-armed"; else echo "STALL:held-for-owner:$number"; fi ;;
+                    green)
+                        if [ "$armed" = "yes" ]; then
+                            echo "WAIT:auto-merge-armed"
+                        else
+                            echo "STALL:held-for-owner:$number"
+                            hold=$(printf '%s' "$pr" | jq -r '"\([.labels[]?.name] | join(","))|\(.mergeStateStatus // "")"')
+                        fi ;;
                     *) echo "WAIT:check-unknown" ;;
                 esac ;;
             *) echo "WAIT:pr-state-unknown" ;;
         esac
         printf '%s=%s:%s:%s:%s\n' "$id" "$number" "$state" "$sha" "$check"
+        # Line 3, held-for-owner only: "<labels csv>|<mergeStateStatus>" for the DM text.
+        if [ -n "$hold" ]; then printf 'hold=%s\n' "$hold"; fi
         return 0
     fi
 
@@ -248,14 +257,34 @@ row_verdict() {
     return 0
 }
 
+# hold_reason <labels csv>: why a green PR waits for the owner, in plain words.
+hold_reason() {
+    case ",$1," in
+        *,auto-merge-held-by-plan,*) echo "the plan says a person must review and merge it." ;;
+        *,needs-a-human,*|*,needs-human,*) echo "a check marked it for a person to review." ;;
+        *) echo "the READY comment on the PR says why." ;;
+    esac
+}
+
+# merge_state_note <mergeStateStatus>: one extra sentence when the PR cannot merge as is.
+merge_state_note() {
+    case "$1" in
+        BEHIND) echo " It is behind master, so update the branch first." ;;
+        DIRTY) echo " It has merge conflicts, so fix those first." ;;
+        *) echo "" ;;
+    esac
+}
+
 # stall_message <key>: the DM text for one stall key (<id>:<stage>:<ref>).
 stall_message() {
-    local key="$1" id rest stage ref slug q
+    local key="$1" id rest stage ref slug q hold
     id="${key%%:*}"; rest="${key#*:}"; stage="${rest%%:*}"; ref="${rest#*:}"
     slug=$(jq -r --arg id "$id" '[.rows[] | select(.id == $id) | .plan_slug][0] // ""' "$PARITY_DIR/ledger.json" || echo "")
     case "$stage" in
         held-for-owner)
-            printf 'JSB parity watch: %s (%s) has PR https://github.com/a-jay85/IBL5/pull/%s. It is green and auto-merge is not armed.\n' "$id" "$slug" "$ref" ;;
+            hold="${HOLD_NOTES[$key]:-|}"
+            printf 'JSB parity watch: your turn on %s (%s). PR https://github.com/a-jay85/IBL5/pull/%s is green, and it waits for you to merge it. Why: %s%s\nRead it, then merge it or say "ship it". The parity loop waits on %s until it merges.\n' \
+                "$id" "$slug" "$ref" "$(hold_reason "${hold%%|*}")" "$(merge_state_note "${hold#*|}")" "$id" ;;
         plan-done)
             printf 'JSB parity watch: %s (%s) has no PR, but its plan is in done/: %s.\n' "$id" "$slug" "$ref" ;;
         plan-skipped)
@@ -311,7 +340,7 @@ fire_webhook() {
 }
 
 main() {
-    local lockdir ledger inflight recording id slug out verdict fact key msg when last_fp="" last_at=0
+    local lockdir ledger inflight recording id slug out verdict fact key msg when hold route last_fp="" last_at=0
 
     if [ "$DRY_RUN" = 1 ]; then
         echo "config: parity_dir=$PARITY_DIR bin=$JSB_BIN plannow_dir=$PLANNOW_DIR now=$NOW"
@@ -353,13 +382,20 @@ main() {
             *) fact="" ;;
         esac
         [ -n "$fact" ] || fact="$id=none"
+        case "$out" in
+            *$'\n'hold=*) hold="${out##*$'\n'hold=}"; hold="${hold%%$'\n'*}" ;;
+            *) hold="" ;;
+        esac
         ROW_LINES="${ROW_LINES}row $id $slug $verdict"$'\n'
         FACTS="${FACTS:+$FACTS,}$fact"
         case "$verdict" in
             ERROR:*) GH_ERROR="$slug" ;;
             FIRE:*) FIRE_REASONS="${FIRE_REASONS:+$FIRE_REASONS }$id:${verdict#FIRE:}" ;;
             KICK:*) KICK=1 ;;
-            STALL:*) STALL_KEYS="${STALL_KEYS:+$STALL_KEYS }$id:${verdict#STALL:}" ;;
+            STALL:*)
+                key="$id:${verdict#STALL:}"
+                STALL_KEYS="${STALL_KEYS:+$STALL_KEYS }$key"
+                if [ -n "$hold" ]; then HOLD_NOTES[$key]="$hold"; fi ;;
             WAIT:*) ;;
         esac
     done <<< "$inflight"
@@ -385,7 +421,9 @@ main() {
         fi
         if dry_guard "send stall DM $key"; then
             msg=$(stall_message "$key")
-            if printf '%s' "$msg" | "$JSB_BIN/discord-dm" --quiet --error - >/dev/null 2>&1; then
+            # A green PR waiting on the owner is a to-do, so it goes to #dev. Other stalls are breakages for #errors.
+            case "$key" in *:held-for-owner:*) route="" ;; *) route="--error" ;; esac
+            if printf '%s' "$msg" | "$JSB_BIN/discord-dm" --quiet ${route:+"$route"} - >/dev/null 2>&1; then
                 mkdir -p "$CACHE_DIR"
                 printf '%s\n' "$key" >> "$STALLS"
             else

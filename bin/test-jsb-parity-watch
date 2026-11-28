@@ -142,14 +142,17 @@ slurp() { if [ -f "$1" ]; then cat "$1"; fi; }
 out() { slurp "$S/out"; }
 rc_is() { h_eq "$1" "$2" "$(tr -d '[:space:]' < "$S/rc")"; }
 
-# gh_pr <slug> <number> <state> <armed yes|no> <sha> <rollup-json>
+# gh_pr <slug> <number> <state> <armed yes|no> <sha> <rollup-json> [labels csv] [mergeStateStatus]
 gh_pr() {
     jq -n --argjson n "$2" --arg st "$3" --arg armed "$4" --arg sha "$5" --argjson roll "$6" \
+        --arg labels "${7:-}" --arg mss "${8:-CLEAN}" \
         '[{number: $n, state: $st,
            mergedAt: (if $st == "MERGED" then "2026-11-22T00:00:00Z" else null end),
            url: ("https://github.com/a-jay85/IBL5/pull/" + ($n | tostring)),
            autoMergeRequest: (if $armed == "yes" then {enabledAt: "2026-11-22T00:00:00Z", mergeMethod: "SQUASH"} else null end),
-           statusCheckRollup: $roll, headRefOid: $sha}]' > "$S/fix/gh-$1.json"
+           statusCheckRollup: $roll, headRefOid: $sha,
+           labels: ($labels | split(",") | map(select(. != "") | {name: .})),
+           mergeStateStatus: $mss}]' > "$S/fix/gh-$1.json"
 }
 
 no_actions() {
@@ -278,11 +281,37 @@ case_open_green_unarmed_stall_dm() {
     run_watch
     h_eq "green unarmed: one DM" 1 "$(cnt discord-dm)"
     h_contains "DM names the PR" "$(slurp "$S/log/discord-dm.stdin")" "pull/42"
-    h_contains "stall DM goes to #errors" "$(slurp "$S/log/discord-dm.argv")" "--error"
+    h_contains "DM opens with the owner's turn" "$(slurp "$S/log/discord-dm.stdin")" "your turn on pl-0001"
+    h_contains "DM says what to do" "$(slurp "$S/log/discord-dm.stdin")" 'merge it or say "ship it"'
+    h_contains "no hold label: DM points at the READY comment" "$(slurp "$S/log/discord-dm.stdin")" "READY comment"
+    h_not_contains "clean PR: no branch-update note" "$(slurp "$S/log/discord-dm.stdin")" "behind master"
+    h_not_contains "held-for-owner DM goes to #dev" "$(slurp "$S/log/discord-dm.argv")" "--error"
     h_eq "stall key recorded" "pl-0001:held-for-owner:42" "$(slurp "$S/home/.cache/jsb-parity-stalls.txt")"
     reset_logs
     run_watch
     h_eq "rerun sends no second DM" 0 "$(cnt discord-dm)"
+}
+
+case_held_for_owner_names_reason() {
+    sandbox held_plan_behind
+    gh_pr jsb-port-pl-0001 42 OPEN no aaa "$GREEN" "plan-checks,auto-merge-held-by-plan" BEHIND
+    run_watch
+    h_eq "held by plan: one DM" 1 "$(cnt discord-dm)"
+    h_contains "held by plan: DM names the plan hold" "$(slurp "$S/log/discord-dm.stdin")" "the plan says a person must review and merge it"
+    h_contains "behind master: DM says update the branch" "$(slurp "$S/log/discord-dm.stdin")" "behind master, so update the branch first"
+    h_eq "held by plan: stall key unchanged" "pl-0001:held-for-owner:42" "$(slurp "$S/home/.cache/jsb-parity-stalls.txt")"
+    sandbox held_needs_human_dirty
+    gh_pr jsb-port-pl-0001 42 OPEN no aaa "$GREEN" "needs-a-human" DIRTY
+    run_watch
+    h_contains "needs-a-human: DM names the check hold" "$(slurp "$S/log/discord-dm.stdin")" "a check marked it for a person to review"
+    h_contains "dirty: DM says fix conflicts" "$(slurp "$S/log/discord-dm.stdin")" "merge conflicts"
+}
+
+case_other_stall_still_goes_to_errors() {
+    sandbox no_trace_errors
+    run_watch
+    h_eq "no-trace stall: one DM" 1 "$(cnt discord-dm)"
+    h_contains "no-trace stall DM still goes to #errors" "$(slurp "$S/log/discord-dm.argv")" "--error"
 }
 
 case_closed_fires() {

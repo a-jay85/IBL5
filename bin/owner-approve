@@ -503,6 +503,17 @@ OA_JOB
     exit 0
 }
 
+_oa_rec_count() { # this login's owner-approve markers in $comments; any head counts, "unread" too
+    printf '%s' "$comments" | jq -r -s --arg who "$me" '[add // [] | .[] | select(.user.login == $who) | .body // ""] | .[]' \
+        | grep -cE '^<!-- owner-approve mode=(approve|fix-first) head=' || true
+}
+_oa_child_recheck() { # a detached waiter yields to any approval or fix-first posted after it started
+    local n
+    _oa_comments
+    n=$(_oa_rec_count)
+    [ "$n" -le "$oa_rec_n" ] || _oa_refuse 4 "a newer owner-approve record (for example a --fix-first condition) was posted on PR $OA_PR while this detached waiter ran, so it did not arm. Run bin/owner-approve $OA_PR --finish --detach once the fix is pushed."
+}
+
 if [ "$OA_RECORD" -eq 1 ]; then
     _oa_read_pr || { printf 'owner-approve: could not read PR %s with gh pr view, so its branch is unknown. Nothing written.\n' "$OA_PR" >&2; printf 'RESULT: refused\n'; exit 1; }
     amend_rc=0
@@ -547,6 +558,7 @@ if [ "$OA_FINISH" -eq 0 ] && [ -n "$OA_FIX" ]; then
     exit 6
 fi
 if [ "$OA_FINISH" -eq 1 ]; then _oa_finish_record; fi
+if [ "${OA_DETACHED_CHILD:-}" = 1 ]; then oa_rec_n=$(_oa_rec_count); fi
 OA_WT=$(_oa_find_wt)
 _oa_wait
 # A plain approval covers the PR's own changes the owner saw. _oa_wait re-reads the
@@ -570,4 +582,5 @@ if [ "$rc" -eq 10 ]; then
     _oa_head_carry "the re-review moved the head"
     _oa_verdict final
 fi
+if [ "${OA_DETACHED_CHILD:-}" = 1 ]; then _oa_child_recheck; fi
 _oa_arm

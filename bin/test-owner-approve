@@ -1304,6 +1304,136 @@ sleep 60' _ "$REPO" "$label" "$d" > "$d/leader.log" 2>&1 &
     return 0
 }
 
+# ---------------------------------------------------------------------------
+# Detached child: it DMs on any non-zero exit and yields to a newer record
+# ---------------------------------------------------------------------------
+seed_plain_approval() { # a real plain approval that times out, leaving its marker comment
+    list_label "com.ibl5.post-plan-fleet-$PR" 99
+    run_oa "$PR" "go" --poll=1 --timeout=0
+    want_rc 5
+    : > "$FX/launchctl.out"
+    echo 0 > "$FX/launchctl.left"
+    rm -f "$FX/gh.log" "$FX/launchctl.log" "$FX"/posted.*.md
+}
+detach_child_not_self_live() {
+    fresh detach_child_not_self_live
+    seed_ready
+    seed_plain_approval
+    list_label "com.ibl5.owner-approve-$PR" 3
+    printf '555 /usr/bin/env bash %s/bin/owner-approve %s --finish --timeout=30 --poll=0\n' "$WT" "$PR" > "$FX/pgrep.lf"
+    echo 3 > "$FX/pgrep.left"
+    run_oa_env HOME="$FX/home" OA_DETACHED_CHILD=1 "$OA" "$PR" --finish --poll=0 --timeout=30
+    want_rc 0
+    want_out "RESULT: armed"
+    refute_out "waiting"
+}
+write_job() { # runs --detach so the job script exists
+    run_detach "ok" --detach --poll=0 --timeout=0
+    want_rc 0
+    [ -x "$(oa_job_script)" ] || note "no job script was written"
+}
+run_job() { run_oa_env HOME="$FX/home" "${1:-$(oa_job_script)}"; }
+want_dm() { grep -qF -- "$1" "$FX/dm.log" 2>/dev/null || note "dm.log lacks '$1'"; }
+want_one_dm() {
+    local n=0
+    if [ -f "$FX/dm.log" ]; then n=$(grep -c . "$FX/dm.log"); fi
+    [ "$n" -eq 1 ] || note "$n DMs sent, want 1"
+}
+want_job_gone() { [ ! -e "${1:-$(oa_job_script)}" ] || note "the job script did not delete itself"; }
+detach_child_refuse_dms() {
+    fresh detach_child_refuse_dms
+    write_job
+    run_job
+    want_rc 4
+    want_one_dm
+    want_dm "PR #$PR"
+    want_dm "exit 4"
+    want_dm "RESULT: refused"
+    want_job_gone
+}
+detach_child_timeout_dms() {
+    fresh detach_child_timeout_dms
+    seed_ready
+    write_job
+    list_label "com.ibl5.postplan-now-case-$CASE-20261112-101010-4242" 99
+    run_job
+    want_rc 5
+    want_one_dm
+    want_dm "PR #$PR"
+    want_dm "exit 5"
+    want_dm "RESULT: timeout"
+    want_job_gone
+}
+detach_child_arms_no_dm() {
+    fresh detach_child_arms_no_dm
+    seed_ready
+    write_job
+    run_job
+    want_rc 0
+    [ ! -e "$FX/dm.log" ] || note "a DM was sent for an armed run: $(cat "$FX/dm.log")"
+    want_gh "pr merge"
+    want_job_gone
+}
+detach_child_crash_dms() {
+    fresh detach_child_crash_dms
+    write_job
+    printf '#!/bin/sh\nexit 1\n' > "$FX/crash-stub"
+    chmod +x "$FX/crash-stub"
+    sed -E "s#^OA_DETACHED_CHILD=1 [^ ]+#OA_DETACHED_CHILD=1 $FX/crash-stub#" "$(oa_job_script)" > "$FX/crash.sh"
+    chmod +x "$FX/crash.sh"
+    grep -qF "OA_DETACHED_CHILD=1 $FX/crash-stub " "$FX/crash.sh" || note "the stub was not swapped in"
+    run_job "$FX/crash.sh"
+    want_rc 1
+    want_one_dm
+    want_dm "no RESULT line, so it crashed"
+    want_job_gone "$FX/crash.sh"
+}
+# <case> <marker login> <marker head fields> [env assignment]: a second record lands
+# while the child waits (posted by the launchctl hook on its first liveness check).
+child_later_record() {
+    fresh "$1"
+    seed_ready
+    seed_plain_approval
+    list_label "com.ibl5.postplan-now-case-$1-20261112-101010-4242" 1
+    jq -nc --arg u "$2" --arg b "fix this first"$'\n'"<!-- owner-approve mode=fix-first $3 -->" \
+        '{user:{login:$u},body:$b}' > "$FX/hook.comment"
+    printf '#!/bin/sh\ncat "$FX/hook.comment" >> "$FX/comments.ndjson"\n' > "$FX/launchctl.hook"
+    chmod +x "$FX/launchctl.hook"
+    run_oa_env HOME="$FX/home" ${4+"$4"} "$OA" "$PR" --finish --poll=0 --timeout=30
+    [ ! -e "$FX/launchctl.hook" ] || note "the launchctl hook never ran"
+}
+want_yielded() {
+    want_rc 4
+    want_out "a newer owner-approve record"
+    refute_gh "pr merge"
+    refute_gh "pr edit"
+}
+want_armed() {
+    want_rc 0
+    want_out "RESULT: armed"
+    want_gh "pr merge"
+}
+detach_child_fixfirst_wins() {
+    child_later_record detach_child_fixfirst_wins owner "head=$A40" OA_DETACHED_CHILD=1
+    want_yielded
+}
+detach_child_fixfirst_unread_head_wins() {
+    child_later_record detach_child_fixfirst_unread_head_wins owner "head=unread diff=unread" OA_DETACHED_CHILD=1
+    want_yielded
+}
+detach_child_foreign_fixfirst_ignored() {
+    child_later_record detach_child_foreign_fixfirst_ignored someone "head=$A40" OA_DETACHED_CHILD=1
+    want_armed
+}
+detach_child_env_unset_arms() {
+    child_later_record detach_child_env_unset_arms owner "head=$A40"
+    want_armed
+}
+detach_child_env_empty_arms() {
+    child_later_record detach_child_env_empty_arms owner "head=$A40" OA_DETACHED_CHILD=
+    want_armed
+}
+
 ALL_CASES="
 body_literal body_option ids_unset ids_empty headless_refuses headless_empty_proceeds
 usage_unknown_flag usage_space_form no_repo_writes
@@ -1326,6 +1456,9 @@ fix_first_appends_amendment fix_first_second_run_appends_none fix_first_missing_
 record_amendments_backfills_once record_amendments_rejects_value_form record_amendments_headless_refused
 detach_rejects_value_form detach_rejects_combos detach_headless_launches_nothing detach_second_run_busy detach_busy_near_miss
 detach_launches_finish_child detach_finish_launches_no_post detach_submit_argv_env
+detach_child_not_self_live detach_child_refuse_dms detach_child_timeout_dms detach_child_arms_no_dm detach_child_crash_dms
+detach_child_fixfirst_wins detach_child_fixfirst_unread_head_wins detach_child_foreign_fixfirst_ignored
+detach_child_env_unset_arms detach_child_env_empty_arms
 "
 
 oa_mask() { sed -E -e "s#$TMP#<TMP>#g" -e 's#owner-approve\.[A-Za-z0-9]+#owner-approve.X#g' -e 's#[0-9a-f]{40}#<SHA>#g'; }

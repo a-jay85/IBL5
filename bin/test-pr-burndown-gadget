@@ -1,0 +1,592 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-pr-burndown-gadget — regression harness for bin/pr-burndown-gadget.
+# Fully offline: a stub pr-triage serves fixture cards, no network.
+# Wired into the "Shell harness regression tests" job through
+# .github/workflows/harness-legs.txt.
+# Prints `PASS <case>` or `FAIL <case>: <detail>`, then `N passed, M failed`.
+# Run: bin/test-pr-burndown-gadget (exit 0 = all pass, 1 = a case failed)
+
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || { printf '%s: bash 4+ required (this is bash %s). Run: brew install bash\n' "${0##*/}" "${BASH_VERSION:-?}" >&2; exit 2; }
+set -uo pipefail
+# Git exports GIT_DIR to hooks; the gadget's repo-tree check must see this checkout.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT" || exit 2
+GADGET="bin/pr-burndown-gadget"
+SKILL=".claude/skills/pr-burndown/SKILL.md"
+STRAY="$ROOT/bin/zz-gadget-test.html"
+
+TMP="$(mktemp -d "${TMPDIR:-/tmp}/pr-burndown-gadget.XXXXXX")" || exit 2
+trap 'rm -rf "$TMP"; rm -f "$STRAY" "$STRAY.tmp"' EXIT
+# The fixtures name pr-triage, a usage-gated entry point, so keep the usage gate off ~/.claude.
+# shellcheck source=bin/lib/usage-test-isolation.sh
+. "$ROOT/bin/lib/usage-test-isolation.sh"; usage_test_isolate "$TMP/usage"
+
+PASSED=0
+FAILED=0
+h_pass() {
+    printf 'PASS %s\n' "$1"
+    PASSED=$((PASSED + 1))
+}
+h_fail() {
+    printf 'FAIL %s: %s\n' "$1" "${2//$'\n'/ }"
+    FAILED=$((FAILED + 1))
+}
+
+if [ ! -x "$GADGET" ]; then
+    echo "FAIL: $GADGET is missing or not executable" >&2
+    exit 1
+fi
+
+FIX="$TMP/fix"
+STUB="$TMP/stub/pr-triage"
+mkdir -p "$FIX" "$TMP/stub" "$TMP/out"
+
+# Stand-in for bin/pr-triage. empty_env_runs runs it under macOS /bin/bash 3.2.
+cat > "$STUB" <<'STUB'
+#!/usr/bin/env bash
+case "${1:-}" in
+    --card) body="$FIX/card-${2:-}.txt"; rcfile="$FIX/card-${2:-}.rc" ;;
+    --held) body="$FIX/held.txt"; rcfile="$FIX/held.rc" ;;
+    *) exit 2 ;;
+esac
+[ -f "$body" ] && cat "$body"
+rc=0
+[ -f "$rcfile" ] && rc="$(cat "$rcfile")"
+exit "$rc"
+STUB
+chmod +x "$STUB"
+
+# --- fixtures -------------------------------------------------------------------
+
+# write_card <fix-dir> <pr> [name=value ...]: one `--card` fixture in the live shape.
+# The defaults describe a green PR. An empty `visual` drops that line.
+write_card() {
+    local dir="$1" n="$2" pair
+    local mss=CLEAN title="fix(harness): fixture card $2"
+    local ci='pass=40 fail=0 pending=0 real-failures: none | owner-gates: none'
+    local threads='0'
+    local verdict='READY — 2026-11-27 10:00 UTC · auto-merge armed | CURRENT'
+    local visual='visual: none' door='two-way' fidelity='' live='none'
+    local approvals='Owner approvals: none'
+    shift 2
+    for pair in "$@"; do printf -v "${pair%%=*}" '%s' "${pair#*=}"; done
+    grep -v '^$' > "$dir/card-$n.txt" <<CARD
+head: a9c6f71 mss=$mss mergeable=MERGEABLE auto-merge=off labels=none title="$title" files=3 +241 -34 branch=fixture-$n
+ci: $ci
+threads: $threads
+verdict: $verdict
+$visual
+merge-danger: Door: $door · Blast radius: dev tooling · Why: fixture row.
+$fidelity
+live-run: $live
+worktree: none
+$approvals
+CARD
+}
+
+write_card "$FIX" 4241 \
+    approvals=$'Owner approvals:\n  1. 2026-11-27T10:00:00Z approve head a9c6f71 (PR head unchanged)\n     words: "ship it"'
+write_card "$FIX" 4242 \
+    ci='pass=38 fail=2 pending=0 real-failures: Meta checks, ShellCheck | owner-gates: none' \
+    threads=$'2 (100-thread page cap hit; list may be incomplete)\n  bin/alpha:3 claude: First open comment\n  bin/beta:9 claude: Second open comment' \
+    live='com.ibl5.post-plan-fleet-4242'
+write_card "$FIX" 4243 door='one-way' \
+    verdict='NOT READY — 2026-11-27 10:00 UTC · auto-merge held | CURRENT'
+: > "$FIX/card-4244.txt"
+echo 1 > "$FIX/card-4244.rc"
+write_card "$FIX" 4245 ci='unknown (fetch failed)' live='com.ibl5.post-plan-fleet-4245'
+echo 1 > "$FIX/card-4245.rc"
+write_card "$FIX" 4246 visual=''
+write_card "$FIX" 4247 mss=DIRTY
+write_card "$FIX" 4248 mss=BEHIND
+write_card "$FIX" 4249 title='fix(harness): rework 3f9e2b1 handling' \
+    verdict='READY — 2026-11-27 10:00 UTC · auto-merge armed | STALE (reviewed tree a9c6f71, head tree 3f9e2b1)' \
+    fidelity='fidelity-evidence: pass | STALE (computed for head a9c6f71, PR head 3f9e2b1)' \
+    approvals=$'Owner approvals:\n  1. 2026-11-27T09:00:00Z approve head a9c6f71 (PR head moved past it)\n     words: "ship 3f9e2b1c4d5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c"'
+write_card "$FIX" 4250 threads=$'1\n  bin/alpha:3 claude: <img src=x onerror=1>'
+write_card "$FIX" 4251 \
+    ci='pass=40 fail=1 pending=0 real-failures: none | owner-gates: human-signoff (fail)'
+write_card "$FIX" 4252 \
+    verdict='READY — 2026-11-27 10:00 UTC · auto-merge armed | STALE (reviewed tree a9c6f71, head tree 3f9e2b1)'
+write_card "$FIX" 4253
+write_card "$FIX" 4254 mss=DIRTY
+# Held but left out of the judgment, so its GitHub title is the one rendered.
+write_card "$FIX" 4260 mss=BLOCKED title='chore(held): keep 3f9e2b1 for review'
+
+cat > "$FIX/held.txt" <<'HELD'
+PR#  URL  TITLE  REASONS
+#4243  https://github.com/a-jay85/IBL5/pull/4243  feat(db): drop a column  (2) Code review found likely bugs;unresolved-finding:100;(18) This change is hard to undo: see notes;body-hold;golden-changed;unresolved-findings-cap
+#4260  https://github.com/a-jay85/IBL5/pull/4260  chore(held): keep 3f9e2b1 for review  (7) The plan says a person must review and merge this PR.
+HELD
+
+# call_entry <pr> <title> <call> [extra-members]: a full owner_call=true entry.
+call_entry() {
+    cat <<JSON
+{"number": $1, "owner_call": true, "title": "$2", "call": "$3",
+ "does": ["Changes one script"], "undo": "A revert restores the old script",
+ "options": [{"label": "Merge", "does": "The bot merges it"}],
+ "recommend": {"option": 1, "why": "Checks pass"}${4:+, $4}}
+JSON
+}
+
+bot_entry() { printf '{"number": %s, "owner_call": false}' "$1"; }
+
+# write_judgment <file> <entry-json> [...]
+write_judgment() {
+    local out="$1" sep="" entry
+    shift
+    {
+        printf '{"version": 1, "prs": ['
+        for entry in "$@"; do
+            printf '%s%s' "$sep" "$entry"
+            sep=","
+        done
+        printf ']}\n'
+    } > "$out"
+}
+
+JUDGMENT="$TMP/judgment.json"
+write_judgment "$JUDGMENT" \
+    "$(call_entry 4241 'Green fix' 'Merge it')" \
+    "$(bot_entry 4242)" \
+    "$(call_entry 4243 'Column drop' 'Merge or hold' '"notes": {"easy_undo": "Drops a column"}')" \
+    "$(bot_entry 4244)" \
+    "$(bot_entry 4245)" \
+    "$(bot_entry 4246)" \
+    "$(call_entry 4247 'Dirty flagged' 'Pick a side' '"conflict_needs_you": true')" \
+    "$(call_entry 4248 'Behind flagged' 'Merge it' '"conflict_needs_you": true')" \
+    "$(call_entry 4249 'Stale evidence' 'Rerun review' '"risks": [{"risk": "Old review", "evidence": "Reviewed at a9c6f71"}]')" \
+    "$(call_entry 4250 '<script>alert(1)</script> a | b' 'Merge it')" \
+    "$(call_entry 4251 'Owner gate only' 'Sign off')" \
+    "$(call_entry 4252 'Stale review' 'Wait for review')" \
+    "$(call_entry 4253 'Near misses' 'checks 3 and 4, option (a)' '"why_next": "Cap fix 20261127 deadbeef a9c6f71"')" \
+    "$(call_entry 4254 'Dirty unflagged' 'Merge it')"
+
+# --- helpers --------------------------------------------------------------------
+
+# run_gadget <fix-dir> <judgment> <out> [extra args ...]
+run_gadget() {
+    local fix="$1" judgment="$2" out="$3"
+    shift 3
+    PR_BURNDOWN_TRIAGE_CMD="$STUB" FIX="$fix" "$GADGET" \
+        --judgment="$judgment" --out="$out" "$@"
+}
+
+MAIN_OUT="$TMP/out/main.html"
+MAIN_RC=0
+MAIN_LOG="$(run_gadget "$FIX" "$JUDGMENT" "$MAIN_OUT" 2>&1)" || MAIN_RC=$?
+MAIN_HTML=""
+if [ -s "$MAIN_OUT" ]; then MAIN_HTML="$(cat "$MAIN_OUT")"; fi
+
+# An absent page would satisfy every "must not contain" check, so each case that
+# reads the main page calls this first.
+need_main() {
+    [ "$MAIN_RC" = 0 ] && [ -n "$MAIN_HTML" ] && return 0
+    echo "main render rc=$MAIN_RC: $MAIN_LOG"
+    return 1
+}
+
+# has <needle> <haystack> <where>
+has() {
+    grep -qF -- "$1" <<< "$2" && return 0
+    echo "$3: missing [$1]"
+    return 1
+}
+
+# lacks <needle> <haystack> <where>
+lacks() {
+    grep -qF -- "$1" <<< "$2" || return 0
+    echo "$3: unexpected [$1]"
+    return 1
+}
+
+# line_of <pr|card> <number> [page]: the one line holding id="<kind>-<number>".
+line_of() {
+    local doc="${3-$MAIN_HTML}" line
+    if ! line="$(grep -F "id=\"$1-$2\"" <<< "$doc")"; then
+        echo "no id=\"$1-$2\" line" >&2
+        return 1
+    fi
+    printf '%s\n' "$line"
+}
+
+# cell <css-class> <row-line>: the inner markup of that cell.
+cell() {
+    if ! grep -qF "<td class=\"$1\">" <<< "$2"; then
+        echo "no $1 cell" >&2
+        return 1
+    fi
+    sed -E "s/.*<td class=\"$1\">//; s/<\/td>.*//" <<< "$2"
+}
+
+# exits_with <actual-rc> <needle> <stderr>: exit 2 and the message names the cause.
+exits_with() {
+    [ "$1" = 2 ] || { echo "want exit 2, got $1: $3"; return 1; }
+    has "$2" "$3" stderr
+}
+
+no_file() {
+    [ ! -e "$1" ] && return 0
+    echo "out file written: $1"
+    return 1
+}
+
+# rejects_judgment <tag> <needle> <entry-json>
+rejects_judgment() {
+    local out="$TMP/out/$1.html" err rc=0
+    write_judgment "$TMP/$1.json" "$3"
+    err="$(run_gadget "$FIX" "$TMP/$1.json" "$out" 2>&1 >/dev/null)" || rc=$?
+    exits_with "$rc" "$2" "$err" || return 1
+    no_file "$out"
+}
+
+# sibling_renders <tag> <env args ...>: a copy of the gadget finds the pr-triage
+# beside it. PATH holds only system dirs, so no other pr-triage can answer.
+sibling_renders() {
+    local out="$TMP/out/$1.html" log doc row
+    shift
+    mkdir -p "$TMP/copy/bin"
+    cp -p "$GADGET" "$TMP/copy/bin/pr-burndown-gadget"
+    cp -p "$STUB" "$TMP/copy/bin/pr-triage"
+    if ! log="$(env "$@" PATH=/usr/bin:/bin FIX="$FIX" "$TMP/copy/bin/pr-burndown-gadget" \
+        --judgment="$JUDGMENT" --out="$out" 2>&1)"; then
+        echo "copy failed: $log"
+        return 1
+    fi
+    doc="$(cat "$out")" || return 1
+    row="$(line_of pr 4241 "$doc")" || return 1
+    has '<td class="c-tests">✅</td>' "$row" "4241 row"
+}
+
+# --- cases ----------------------------------------------------------------------
+
+case_green_row_all_fine() {
+    local row css
+    need_main || return 1
+    row="$(line_of pr 4241)" || return 1
+    for css in c-tests c-comments c-bot c-undo c-ok; do
+        has "<td class=\"$css\">✅</td>" "$row" "4241 row" || return 1
+    done
+}
+
+case_bot_handled_row_hidden() {
+    need_main || return 1
+    has 'pull/4241' "$MAIN_HTML" output || return 1
+    lacks 'pull/4242' "$MAIN_HTML" output
+}
+
+case_hidden_count_line() {
+    need_main || return 1
+    has '<p class="hidden-count">The bot is handling 1 more PR.</p>' "$MAIN_HTML" output || return 1
+    has 'shown=14 hidden=1 fetch_failed=3' "$MAIN_LOG" stdout
+}
+
+case_one_way_door_risky_note() {
+    local row undo
+    need_main || return 1
+    row="$(line_of pr 4243)" || return 1
+    undo="$(cell c-undo "$row")" || return 1
+    has '🚨' "$undo" c-undo || return 1
+    has 'Drops a column' "$undo" c-undo
+}
+
+case_not_ready_current_broken() {
+    local row bot
+    need_main || return 1
+    row="$(line_of pr 4243)" || return 1
+    bot="$(cell c-bot "$row")" || return 1
+    has '❌' "$bot" c-bot
+}
+
+case_fetch_failed_never_fine() {
+    local row
+    need_main || return 1
+    row="$(line_of pr 4244)" || return 1
+    lacks '✅' "$row" "4244 row"
+}
+
+case_fetch_failed_field_stays_visible() {
+    local row tests
+    need_main || return 1
+    row="$(line_of pr 4245)" || return 1
+    tests="$(cell c-tests "$row")" || return 1
+    has '❌' "$tests" c-tests || return 1
+    has 'Could not read' "$tests" c-tests || return 1
+    has '<td class="c-comments">✅</td>' "$row" "4245 row"
+}
+
+case_missing_line_stays_visible() {
+    local row css
+    need_main || return 1
+    row="$(line_of pr 4246)" || return 1
+    # Every status cell reads fine, so only the missing line keeps this row up.
+    for css in c-tests c-comments c-bot c-undo; do
+        has "<td class=\"$css\">✅</td>" "$row" "4246 row" || return 1
+    done
+}
+
+case_dirty_shows_conflict_behind_silent() {
+    local n row call
+    need_main || return 1
+    row="$(line_of pr 4247)" || return 1
+    call="$(cell c-call "$row")" || return 1
+    has 'Conflicts with master' "$call" "4247 c-call" || return 1
+    for n in 4248 4254; do
+        row="$(line_of pr "$n")" || return 1
+        call="$(cell c-call "$row")" || return 1
+        lacks 'Conflicts with master' "$call" "$n c-call" || return 1
+    done
+}
+
+case_no_sha_in_visible_text() {
+    local visible tokens hits
+    need_main || return 1
+    visible="$(sed -E 's/<[^>]*>/ /g' <<< "$MAIN_HTML")" || return 1
+    has 'Green fix' "$visible" "visible text" || return 1
+    tokens="$(grep -oE '[0-9A-Za-z]+' <<< "$visible")" || return 1
+    # No match is the passing result, so the pipeline's exit 1 is expected.
+    hits="$(grep -E '^[0-9a-f]{7,40}$' <<< "$tokens" | grep -E '[a-f]' | grep -E '[0-9]')" || true
+    [ -z "$hits" ] && return 0
+    echo "commit-hash tokens visible: $hits"
+    return 1
+}
+
+case_stale_paren_stripped() {
+    local card
+    need_main || return 1
+    lacks 'reviewed tree' "$MAIN_HTML" output || return 1
+    lacks 'computed for head' "$MAIN_HTML" output || return 1
+    card="$(line_of card 4249)" || return 1
+    has 'Plan-fidelity check: pass' "$card" "4249 card" || return 1
+    has 'stale' "$card" "4249 card"
+}
+
+case_html_escapes_model_and_github_text() {
+    need_main || return 1
+    has '&lt;script&gt;' "$MAIN_HTML" output || return 1
+    has '&lt;img' "$MAIN_HTML" output || return 1
+    lacks '<script' "$MAIN_HTML" output || return 1
+    lacks '<img' "$MAIN_HTML" output
+}
+
+case_word_headers_fixed_order() {
+    local cells heads
+    need_main || return 1
+    cells="$(grep -oE '<th>[^<]*</th>' <<< "$MAIN_HTML")" || { echo "no <th> cells"; return 1; }
+    heads="$(sed -E 's/<[^>]*>//g' <<< "$cells" | tr '\n' '|')" || return 1
+    [ "$heads" = 'PR|Tests|Comments|Bot review|Easy undo|Your OK|Your call|' ] && return 0
+    echo "headers: $heads"
+    return 1
+}
+
+case_no_button_in_output() {
+    need_main || return 1
+    lacks '<button' "$MAIN_HTML" output
+}
+
+case_held_reasons_plain_words() {
+    local card
+    need_main || return 1
+    card="$(line_of card 4243)" || return 1
+    has 'Code review found likely bugs' "$card" "4243 card" || return 1
+    lacks '(2)' "$card" "4243 card" || return 1
+    # pr-triage prints these tags with no colon, so the card must put them in words.
+    local tag
+    for tag in body-hold golden-changed unresolved-findings-cap; do
+        lacks "$tag" "$card" "4243 card" || return 1
+    done
+    has 'The PR description asks to hold the merge' "$card" "4243 card" || return 1
+    has 'The saved engine test results changed' "$card" "4243 card" || return 1
+    has 'Too many review findings to check them all' "$card" "4243 card"
+}
+
+case_held_machine_tokens_dropped() {
+    need_main || return 1
+    lacks 'unresolved-finding' "$MAIN_HTML" output || return 1
+    has 'This change is hard to undo: see notes' "$MAIN_HTML" output
+}
+
+case_held_pr_missing_from_judgment_shown() {
+    local row
+    need_main || return 1
+    row="$(line_of pr 4260)" || return 1
+    has 'No call written yet' "$row" "4260 row" || return 1
+    has 'chore(held): keep for review' "$row" "4260 row"
+}
+
+case_held_fetch_failed_warns() {
+    local dir="$TMP/fix-heldfail" out="$TMP/out/heldfail.html" log doc
+    need_main || return 1
+    lacks 'Could not list held PRs' "$MAIN_HTML" "main output" || return 1
+    cp -R "$FIX" "$dir" || return 1
+    echo 1 > "$dir/held.rc"
+    log="$(run_gadget "$dir" "$JUDGMENT" "$out" 2>&1)" || { echo "render failed: $log"; return 1; }
+    doc="$(cat "$out")" || return 1
+    has 'Could not list held PRs' "$doc" output
+}
+
+case_judgment_rejects_hold_code() {
+    rejects_judgment holdcode 'prs[0].call: holds a hold code' \
+        '{"number": 4241, "owner_call": false, "call": "Waiting on (7)"}'
+}
+
+case_judgment_requires_options() {
+    rejects_judgment nooptions 'options: required' \
+        '{"number": 4241, "owner_call": true, "title": "Green fix", "call": "Merge it", "does": ["Changes one script"], "undo": "A revert restores it"}'
+}
+
+case_judgment_rejects_unknown_key() {
+    rejects_judgment unknownkey 'unknown key' \
+        '{"number": 4241, "owner_call": false, "titel": "Green fix"}'
+}
+
+case_cli_rejects_unknown_flag() {
+    local out="$TMP/out/bogus.html" err rc=0
+    err="$(run_gadget "$FIX" "$JUDGMENT" "$out" --bogus=1 2>&1 >/dev/null)" || rc=$?
+    exits_with "$rc" 'unknown flag' "$err" || return 1
+    no_file "$out"
+}
+
+case_cli_rejects_space_form() {
+    local out="$TMP/out/space.html" err rc=0
+    err="$(PR_BURNDOWN_TRIAGE_CMD="$STUB" FIX="$FIX" "$GADGET" \
+        --judgment="$JUDGMENT" --out "$out" 2>&1 >/dev/null)" || rc=$?
+    exits_with "$rc" 'use --flag=value form' "$err" || return 1
+    no_file "$out"
+}
+
+case_out_inside_repo_refused() {
+    local err rc=0 wrote=0
+    rm -f "$STRAY"
+    err="$(run_gadget "$FIX" "$JUDGMENT" "$STRAY" 2>&1 >/dev/null)" || rc=$?
+    [ -e "$STRAY" ] && wrote=1
+    rm -f "$STRAY" "$STRAY.tmp"
+    exits_with "$rc" 'outside the repo tree' "$err" || return 1
+    [ "$wrote" = 0 ] && return 0
+    echo "out file written: $STRAY"
+    return 1
+}
+
+case_triage_env_unset_uses_sibling() {
+    sibling_renders sibling-unset -u PR_BURNDOWN_TRIAGE_CMD
+}
+
+case_triage_env_empty_uses_sibling() {
+    sibling_renders sibling-empty PR_BURNDOWN_TRIAGE_CMD=
+}
+
+case_markdown_escapes_pipe() {
+    local out="$TMP/out/main.md" log doc row
+    log="$(run_gadget "$FIX" "$JUDGMENT" "$out" --format=markdown 2>&1)" || { echo "render failed: $log"; return 1; }
+    doc="$(cat "$out")" || return 1
+    grep -qxF '| PR | Tests | Comments | Bot review | Easy undo | Your OK | Your call |' <<< "$doc" ||
+        { echo "markdown header line missing"; return 1; }
+    row="$(grep -F '| [#4250](' <<< "$doc")" || { echo "no 4250 markdown row"; return 1; }
+    has 'a \| b' "$row" "4250 row"
+}
+
+case_zero_rows_message() {
+    local dir="$TMP/fix-zero" out="$TMP/out/zero.html" log doc
+    need_main || return 1
+    lacks 'Nothing needs your call right now.' "$MAIN_HTML" "main output" || return 1
+    mkdir -p "$dir"
+    write_card "$dir" 4241
+    write_card "$dir" 4251
+    : > "$dir/held.txt"
+    write_judgment "$TMP/zero.json" "$(bot_entry 4241)" "$(bot_entry 4251)"
+    log="$(run_gadget "$dir" "$TMP/zero.json" "$out" 2>&1)" || { echo "render failed: $log"; return 1; }
+    doc="$(cat "$out")" || return 1
+    has 'Nothing needs your call right now.' "$doc" output || return 1
+    lacks 'id="pr-' "$doc" output
+}
+
+case_near_miss_sha_kept() {
+    local card
+    need_main || return 1
+    card="$(line_of card 4253)" || return 1
+    has '20261127' "$card" "4253 card" || return 1
+    has 'deadbeef' "$card" "4253 card" || return 1
+    lacks 'a9c6f71' "$card" "4253 card"
+}
+
+case_near_miss_hold_code_accepted() {
+    local row
+    need_main || return 1
+    row="$(line_of pr 4253)" || return 1
+    has 'checks 3 and 4, option (a)' "$row" "4253 row"
+}
+
+case_owner_gates_only_ci_fine() {
+    local row
+    need_main || return 1
+    row="$(line_of pr 4251)" || return 1
+    has '<td class="c-tests">✅</td>' "$row" "4251 row"
+}
+
+case_stale_no_live_risky() {
+    local row bot
+    need_main || return 1
+    row="$(line_of pr 4252)" || return 1
+    bot="$(cell c-bot "$row")" || return 1
+    has '🚨' "$bot" c-bot || return 1
+    has 'Review is stale' "$bot" c-bot
+}
+
+case_empty_env_runs() {
+    local out="$TMP/out/emptyenv.html" log doc row src
+    # A read on a branch this render skips would pass the run below, so check the source too.
+    src="$(cat "$GADGET")" || return 1
+    lacks 'os.environ["HOME"]' "$src" "gadget source" || return 1
+    log="$(env -i PATH=/usr/bin:/bin IBL5_USAGE_GATE_STATE_DIR="$IBL5_USAGE_GATE_STATE_DIR" IBL5_USAGE_GATE_TEST_MODE=1 PR_BURNDOWN_TRIAGE_CMD="$STUB" FIX="$FIX" "$GADGET" \
+        --judgment="$JUDGMENT" --out="$out" 2>&1)" || { echo "render failed: $log"; return 1; }
+    [ -s "$out" ] || { echo "no out file: $log"; return 1; }
+    doc="$(cat "$out")" || return 1
+    # A green cell proves the stub itself ran under the system bash.
+    row="$(line_of pr 4241 "$doc")" || return 1
+    has '<td class="c-tests">✅</td>' "$row" "4241 row"
+}
+
+case_skill_doc_matches_gadget() {
+    local doc gone rc=0
+    doc="$(cat "$SKILL")" || return 1
+    has 'bin/pr-burndown-gadget --judgment=' "$doc" SKILL.md || rc=1
+    # check-docs skips fenced blocks, so pin the runnable command here.
+    grep -qxF 'bin/pr-burndown-gadget \' <<< "$doc" || { echo "SKILL.md: command line missing"; rc=1; }
+    has '--judgment="$D/judgment.json" --out="$D/scoreboard.html"' "$doc" SKILL.md || rc=1
+    has 'PR, Tests, Comments, Bot review, Easy undo, Your OK, Your call' "$doc" SKILL.md || rc=1
+    for gone in '🔙' '2️⃣' '1️⃣' '✅📝'; do
+        lacks "$gone" "$doc" SKILL.md || rc=1
+    done
+    return "$rc"
+}
+
+# --- run ------------------------------------------------------------------------
+
+CASES=(
+    green_row_all_fine bot_handled_row_hidden hidden_count_line one_way_door_risky_note
+    not_ready_current_broken fetch_failed_never_fine fetch_failed_field_stays_visible
+    missing_line_stays_visible dirty_shows_conflict_behind_silent no_sha_in_visible_text
+    stale_paren_stripped html_escapes_model_and_github_text word_headers_fixed_order
+    no_button_in_output held_reasons_plain_words held_machine_tokens_dropped
+    held_pr_missing_from_judgment_shown held_fetch_failed_warns judgment_rejects_hold_code
+    judgment_requires_options judgment_rejects_unknown_key cli_rejects_unknown_flag
+    cli_rejects_space_form out_inside_repo_refused triage_env_unset_uses_sibling
+    triage_env_empty_uses_sibling markdown_escapes_pipe zero_rows_message near_miss_sha_kept
+    near_miss_hold_code_accepted owner_gates_only_ci_fine stale_no_live_risky empty_env_runs
+    skill_doc_matches_gadget
+)
+
+for name in "${CASES[@]}"; do
+    if detail="$("case_$name" 2>&1)"; then
+        h_pass "$name"
+    else
+        h_fail "$name" "${detail:-no detail}"
+    fi
+done
+
+printf '%s passed, %s failed\n' "$PASSED" "$FAILED"
+[ "$FAILED" -eq 0 ]

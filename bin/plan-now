@@ -11,6 +11,7 @@
 #                                           #   bin/automouse/run plan <slug> right away)
 #   bin/plan-now --implement <prompt-file>  # ... but leave the plan on disk, unqueued
 #   bin/plan-now --queue <prompt-file>      # explicit form of the default
+#   bin/plan-now --kick <prompt-file>       # queue, then start bin/automouse/run plan <slug> at once
 #   bin/plan-now --model opus <prompt-file> # orchestrator model (default claude-sonnet-5-5)
 #   bin/plan-now --no-dm <prompt-file>      # ... and skip the finish DM
 #   bin/plan-now --tier-ok "reason" ...     # suppress the tier mismatch gate with a reason
@@ -136,6 +137,8 @@ RESUME_ID=""        # old run's TS under --resume; empty on a normal fire
 RESUME_FRESH=0      # 1 when the resumed run paused before its first turn: no transcript, start fresh
 MODEL_SET=0         # 1 when --model was given explicitly (resume keeps the old value otherwise)
 DISPOSITION_SET=0   # 1 when --queue/--implement was given explicitly
+KICK_REQUESTED=0    # 1 when --kick was given, or a resumed --kick run carried it
+KICK_SET=0          # 1 when --kick was given explicitly
 
 # Source the usage gate beside THIS script (same reason as session-id.sh below).
 PLAN_NOW_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib"
@@ -169,6 +172,7 @@ while [ $# -gt 0 ]; do
         --resume-paused) echo "plan-now: --resume-paused must be the only argument" >&2; exit 2 ;;
         --queue)     DISPOSITION="queue"; DISPOSITION_SET=1; shift ;;
         --implement) DISPOSITION="implement"; DISPOSITION_SET=1; shift ;;
+        --kick)      KICK_REQUESTED=1; KICK_SET=1; shift ;;
         --model)     MODEL="${2:?--model needs a value}"; MODEL_SET=1; shift 2 ;;
         --no-dm)     NOTIFY=0; shift ;;
         --tier-ok)
@@ -190,6 +194,8 @@ while [ $# -gt 0 ]; do
             PROMPT_SRC="$1"; shift ;;
     esac
 done
+KICK_IMPLEMENT_ERR="plan-now: --kick starts an automouse run on a queued plan, and --implement never queues; drop one of them."
+if [ "$KICK_SET" = 1 ] && [ "$DISPOSITION" = implement ]; then echo "$KICK_IMPLEMENT_ERR" >&2; exit 2; fi
 
 if [ -n "$RESUME_ID" ]; then
     [ -z "$PROMPT_SRC" ] || { echo "plan-now: --resume takes no prompt file; the resumed session already holds its prompt." >&2; exit 2; }
@@ -203,7 +209,7 @@ if [ -n "$RESUME_ID" ]; then
         *[!0-9]*) echo "plan-now: --resume id '$RESUME_ID' is not a plan-now run id (expected YYYYMMDD-HHMMSS-PID)." >&2; exit 2 ;;
     esac
 else
-    [ -n "$PROMPT_SRC" ] || { echo "plan-now: usage: bin/plan-now [--queue|--implement] [--model M] [--no-dm] <prompt-file> | bin/plan-now --resume <run-id>" >&2; exit 2; }
+    [ -n "$PROMPT_SRC" ] || { echo "plan-now: usage: bin/plan-now [--queue|--implement] [--kick] [--model M] [--no-dm] <prompt-file> | bin/plan-now --resume <run-id>" >&2; exit 2; }
     [ -s "$PROMPT_SRC" ] || { echo "plan-now: prompt file '$PROMPT_SRC' is missing or empty." >&2; exit 2; }
 
     grep -q '^/plan' "$PROMPT_SRC" \
@@ -279,6 +285,7 @@ if [ -n "$RESUME_ID" ]; then
     # than eval'd.
     OLD_MODEL=$(sed -n 's/^MODEL=//p' "$OLD_RUNNER" | head -1)
     OLD_DISPOSITION=$(sed -n 's/^DISPOSITION=//p' "$OLD_RUNNER" | head -1)
+    OLD_KICK=$(sed -n 's/^KICK_REQUESTED=//p' "$OLD_RUNNER" | head -1) # pipefail-ok: sed exits 0 with no match, and one runner line cannot fill a pipe
     case "$OLD_MODEL" in
         '' | *[!A-Za-z0-9._-]*) resume_refuse "runner $OLD_RUNNER has no parseable MODEL= line." ;;
     esac
@@ -286,8 +293,16 @@ if [ -n "$RESUME_ID" ]; then
         queue | implement) ;;
         *) resume_refuse "runner $OLD_RUNNER has no parseable DISPOSITION= line." ;;
     esac
+    case "$OLD_KICK" in
+        '' | 0) OLD_KICK=0 ;;   # a runner written before --kick existed has no line: kick off
+        1) ;;
+        *) resume_refuse "runner $OLD_RUNNER has no parseable KICK_REQUESTED= line." ;;
+    esac
     [ "$MODEL_SET" = 1 ]       || MODEL="$OLD_MODEL"
     [ "$DISPOSITION_SET" = 1 ] || DISPOSITION="$OLD_DISPOSITION"
+    [ "$KICK_SET" = 1 ]        || KICK_REQUESTED="$OLD_KICK"
+    if [ "$KICK_SET" = 1 ] && [ "$DISPOSITION" = "implement" ]; then echo "$KICK_IMPLEMENT_ERR" >&2; exit 2; fi
+    if [ "$DISPOSITION" = implement ]; then KICK_REQUESTED=0; fi
     echo "plan-now: resuming run $RESUME_ID (session $RESUME_SESSION, model $MODEL, disposition $DISPOSITION)."
 fi
 
@@ -539,6 +554,7 @@ REVIEW_ROUTE_DEFAULT=$(grep -oE "'/discordPlanReviewDM'" \
     printf 'RESUME_FROM=%q\n'  "$RESUME_ID"
     printf 'CONTINUE_MSG=%q\n' "$CONTINUE_MSG"
     printf 'DISPOSITION=%q\n' "$DISPOSITION"
+    printf 'KICK_REQUESTED=%q\n' "$KICK_REQUESTED"
     printf 'LOG=%q\n'         "$LOG"
     printf 'NOTIFY=%q\n'         "$NOTIFY"
     printf 'TIER_OVERRIDE=%q\n'  "${TIER_OK_REASON:-}"
@@ -578,8 +594,9 @@ REVIEW_ROUTE_DEFAULT=$(grep -oE "'/discordPlanReviewDM'" \
     printf 'REVIEW_ROUTE=%q\n' "${PLAN_NOW_REVIEW_ROUTE:-$REVIEW_ROUTE_DEFAULT}"
     declare -f ljob_dm_ready ljob_dm_send
     cat <<'RUNNER_EOF'
-# --- automouse kick for JSB parity port plans --------------------------------
-# A queued jsb-port-pl-<digits>[-<n>|-r<n>] plan starts `bin/automouse/run plan <slug>`
+# --- automouse kick: --kick runs and JSB parity port plans -------------------
+# A queued plan from a --kick run, or a queued jsb-port-pl-<digits>[-<n>|-r<n>]
+# plan, starts `bin/automouse/run plan <slug>`
 # right away, detached under its own launchd label, instead of waiting for the
 # nightly run. Every skip leaves the plan queued, so the nightly run still takes it.
 # Returns 0 on launch or skip; nonzero only when the launch itself failed.
@@ -591,8 +608,9 @@ plan_now_kick_port() {
     kslug=$(basename "${kplan%.md}")
     # Guard 1: a dry-run runner with no stub never launches a real run.
     if [ "$KICK_DRY_RUN" = "1" ] && [ -z "$AUTOMOUSE_KICK" ]; then return 0; fi
-    # Guard 2: only parity port plans kick. Silent, so non-port logs are unchanged.
-    [[ "$kslug" =~ $KICK_PORT_RE ]] || return 0
+    # Guard 2: kick only a --kick run's plan or a parity port plan. Silent, so a
+    # plan that is neither keeps its log unchanged.
+    if [ "${KICK_REQUESTED:-0}" != 1 ] && ! [[ "$kslug" =~ $KICK_PORT_RE ]]; then return 0; fi
     # Guard 3: never override a disarm. An unreadable epoch fails safe (skip).
     if [ -f "$KICK_STATE_DIR/.disarmed-until" ]; then
         krearm=$(awk '/^rearm_epoch=/ && !f {sub(/^rearm_epoch=/, ""); print; f=1}' "$KICK_STATE_DIR/.disarmed-until")

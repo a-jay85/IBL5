@@ -1,6 +1,6 @@
 ---
 description: Post-plan engine internals — compiled harness only (a crash posts the failure comment and DM, then stops), what `--auto`'s skip gate does, and where the auto-merge arming decision is made.
-last_verified: 2026-11-24
+last_verified: 2026-11-27
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
@@ -135,6 +135,7 @@ the PR. Whether the PR then **auto-merges** is decided at `/post-plan` Phase 6.5
 honors a plan's `auto_merge: false` (see `/plan` Step 4) and otherwise leaves the PR open
 for a human to merge.
 A plan seeded by `bin/docfix-run` carries `auto_merge: docs-only-ready` instead; Phase 6.5 arms it only when the realized PR is a docs-only refresh with a two-way merge-danger line and a READY verdict, and holds it otherwise with the failed clause named.
+`bin/docfix-split` opens one PR per non-empty pile. The auto pile keeps the `docs-only-ready` plan. The held review pile goes on a `docs-content-review-` branch with `auto_merge: false`, so it never arms through `docs-only-ready`.
 
 ## Ad-hoc branches
 

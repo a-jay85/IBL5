@@ -15,7 +15,7 @@ queue/ ──► run ──► (per plan) claude -p impl  ──► handoff/<pla
 queue ◄──── queue-reorder-ui (browser drag-reorder UI, writes queue order)
 ```
 
-When `bin/plan-now` queues a JSB parity port plan (slug `jsb-port-pl-<n>`), it starts `bin/automouse/run plan <slug>` right away under its own launchd label. It skips that start while automouse is disarmed or another runner is live, and the plan then waits for the nightly run.
+When `bin/plan-now` queues a plan from a `--kick` call, or a JSB parity port plan (slug `jsb-port-pl-<n>`), it starts `bin/automouse/run plan <slug>` right away under its own launchd label. `/plan-prompt` passes `--kick`, and automated callers such as `/reset-ready` and `/burndown` do not. It skips that start while automouse is disarmed or another runner is live, and the plan then waits for the nightly run.
 
 ## Scripts
 

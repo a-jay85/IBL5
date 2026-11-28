@@ -1,0 +1,819 @@
+#!/usr/bin/env python3
+"""Usage: bin/pr-burndown-gadget --judgment=FILE --out=FILE [--format=html|markdown]
+       bin/pr-burndown-gadget --help
+
+Render the /pr-burndown scoreboard: one row per PR that needs the owner, each with
+an expandable card. Live state comes from `bin/pr-triage --card N` and
+`bin/pr-triage --held`. The judgment file holds only the words a model writes
+(titles, calls, red-cell notes, card prose, options, pick). This script reads
+GitHub through bin/pr-triage and writes only the --out file.
+
+Flags (all take the = form):
+  --judgment=FILE   judgment JSON: {"version": 1, "prs": [...]}
+  --out=FILE        output file, outside the repo tree
+  --format=NAME     html (default) or markdown
+  -h, --help        print this text
+
+Environment:
+  PR_BURNDOWN_TRIAGE_CMD  triage command. Unset or empty means the sibling pr-triage.
+
+Exit codes: 0 written, 2 usage or judgment error, 3 internal render check failed.
+"""
+from __future__ import annotations
+
+import html
+import json
+import os
+import re
+import subprocess
+import sys
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
+from typing import Dict, List, NamedTuple, Optional
+
+ICON_FINE, ICON_RUNNING, ICON_BROKEN, ICON_RISKY = "✅", "⏳", "❌", "🚨"
+UNKNOWN_ICON = ICON_BROKEN
+COLUMNS = ("PR", "Tests", "Comments", "Bot review", "Easy undo", "Your OK", "Your call")
+# (note key, css class), in the order the five status columns appear.
+STATUS_CELLS = (("tests", "c-tests"), ("comments", "c-comments"), ("bot_review", "c-bot"),
+                ("easy_undo", "c-undo"), ("your_ok", "c-ok"))
+CARD_FIELDS = ("head", "ci", "threads", "verdict", "visual", "merge-danger",
+               "fidelity-evidence", "live-run", "worktree", "Owner approvals")
+REQUIRED_FIELDS = tuple(f for f in CARD_FIELDS if f != "fidelity-evidence")
+UNKNOWN_TEXT = "unknown (fetch failed)"
+UNKNOWN = object()  # a field whose fetch failed
+
+SHA_RE = re.compile(r"(?<![0-9A-Za-z])(?=[0-9a-f]*[a-f])(?=[0-9a-f]*[0-9])[0-9a-f]{7,40}(?![0-9A-Za-z])")
+READY_RE = re.compile(r"^READY\b")
+VERDICT_STALE_RE = re.compile(r"\s*\(reviewed tree [^)]*\)")
+FIDELITY_STALE_RE = re.compile(r"\s*\(computed for head [^)]*\)")
+APPROVAL_HEAD_RE = re.compile(r"\bhead [0-9a-f]{7} ")
+HOLD_CODE_RE = re.compile(r"^\(\d+\)\s*")
+TOKEN_RE = re.compile(r"^[a-z][a-z-]*:\S+$")
+CODE_IN_TEXT_RE = re.compile(r"(?<!\w)\(\d{1,2}\)")
+FIELD_RE = re.compile(r"^(head|ci|threads|verdict|visual|merge-danger|fidelity-evidence"
+                      r"|live-run|worktree|Owner approvals): ?(.*)$")
+HEAD_RE = re.compile(r'^\S+ mss=(?P<mss>\S+) .*?labels=(?P<labels>.*?) title="(?P<title>.*)"'
+                     r" files=(?P<files>\d+) \+(?P<added>\d+) -(?P<removed>\d+)")
+CI_RE = re.compile(r"^pass=(?P<passed>\d+) fail=(?P<failed>\d+) pending=(?P<pending>\d+)"
+                   r" real-failures: (?P<real>.*?) \| owner-gates: (?P<gates>.*)$")
+APPROVAL_ROW_RE = re.compile(r"^  \d+\. .* (?P<mode>approve|fix-first) head [0-9a-f]{7,40}"
+                             r" \((?P<state>PR head unchanged|PR head moved past it)\)\s*$")
+VISUAL_URL_RE = re.compile(r'^https://a-jay85\.github\.io/IBL5/[^\s"<>]*$')
+MD_LINK_TARGET_RE = re.compile(r"\]\(https://(?:github\.com/a-jay85/IBL5/pull/\d+"
+                               r"|a-jay85\.github\.io/IBL5/[^\s()]*)\)")
+PR_URL = "https://github.com/a-jay85/IBL5/pull/{}"
+
+ENTRY_KEYS = {"number", "owner_call", "conflict_needs_you", "title", "why_next", "call", "notes",
+              "does", "undo", "risks", "options", "recommend"}
+NOTE_KEYS = {"tests", "comments", "bot_review", "easy_undo", "your_ok"}
+REQUIRED_WHEN_CALL = ("title", "call", "does", "undo", "options", "recommend")
+FLAGS = ("--judgment", "--out", "--format")
+FORMATS = ("html", "markdown")
+EMPTY_TEXT = "Nothing needs your call right now."
+HELD_FAILED_TEXT = "Could not list held PRs, so a held PR may be missing."
+
+STYLE = (
+    "<style>"
+    "body{margin:0;padding:0}"
+    "body{color:var(--foreground);font-family:system-ui,sans-serif}"
+    "table{border-collapse:collapse;width:100%}"
+    "th,td{border:1px solid var(--border);padding:6px 8px;text-align:left;vertical-align:top}"
+    ".note{color:var(--destructive)}"
+    ".muted,.hidden-count{color:var(--muted-foreground)}"
+    "tr.card td{background:var(--card)}"
+    "</style>"
+)
+
+
+class Cell(NamedTuple):
+    icon: str  # empty means a muted word with no icon
+    note: str
+    unknown: bool = False
+
+
+FINE = Cell(ICON_FINE, "")
+
+
+class Held(NamedTuple):
+    title: str
+    reasons: List[str]
+
+
+@dataclass
+class Row:
+    number: int
+    entry: dict  # empty for a held PR the judgment left out
+    held_only: bool
+    held_reasons: List[str]
+    values: dict
+    extra: Dict[str, List[str]]
+    head: Optional[re.Match]
+    title: str
+    mss: str
+    owner_call: bool
+    conflict_needs_you: bool
+    live_run_active: bool
+    cells: Dict[str, Cell]
+    any_unknown: bool
+    hidden: bool = False
+
+
+def die(message: str) -> None:
+    print(f"pr-burndown-gadget: {message}", file=sys.stderr)
+    sys.exit(2)
+
+
+def die_usage(message: str) -> None:
+    die(f"{message}\nrun with --help")
+
+
+# --- escaping: every rendered string goes through esc() or md_cell() ------------
+
+def scrub(text: str) -> str:
+    return re.sub(r" {2,}", " ", SHA_RE.sub("", text))
+
+
+def esc(s: str) -> str:
+    return html.escape(scrub(s), quote=True)
+
+
+def md_cell(s: str) -> str:
+    return html.escape(scrub(s), quote=False).replace("|", "\\|").replace("\n", " ")
+
+
+# --- command line ---------------------------------------------------------------
+
+def parse_args(argv: List[str]) -> dict:
+    opts = {"--format": "html"}
+    for arg in argv:
+        if arg in ("-h", "--help"):
+            print((__doc__ or "").strip())
+            sys.exit(0)
+        if not arg.startswith("--"):
+            die_usage(f"unexpected argument: {arg}")
+        name, sep, value = arg.partition("=")
+        if name not in FLAGS:
+            die_usage(f"unknown flag: {name}")
+        if not sep:
+            die_usage(f"use --flag=value form: {arg}")
+        opts[name] = value
+    for required in ("--judgment", "--out"):
+        if not opts.get(required):
+            die_usage(f"{required}=FILE is required")
+    if opts["--format"] not in FORMATS:
+        die_usage(f"--format must be html or markdown: {opts['--format']}")
+    return opts
+
+
+def refuse_out_inside_repo(out: str) -> None:
+    here = os.path.dirname(os.path.realpath(__file__))
+    try:
+        proc = subprocess.run(["git", "-C", here, "rev-parse", "--show-toplevel"],
+                              capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.TimeoutExpired):
+        return
+    if proc.returncode != 0:
+        return
+    root = os.path.realpath(proc.stdout.rstrip("\n"))
+    parent = os.path.realpath(os.path.dirname(out) or ".")
+    if parent == root or parent.startswith(root + os.sep):
+        die_usage("--out must be outside the repo tree")
+
+
+# --- judgment validation --------------------------------------------------------
+
+def bad(where: str, why: str) -> None:
+    die(f"judgment: {where}: {why}")
+
+
+def check_text(value: object, where: str, allow_empty: bool = False) -> None:
+    if not isinstance(value, str):
+        bad(where, "must be a string")
+    if not allow_empty and not value.strip():
+        bad(where, "must be a non-empty string")
+    if CODE_IN_TEXT_RE.search(value):
+        bad(where, "holds a hold code such as (7); write plain words")
+
+
+def check_object(value: object, where: str, keys: tuple) -> None:
+    if not isinstance(value, dict):
+        bad(where, "must be an object")
+    extra = sorted(set(value) - set(keys))
+    if extra:
+        bad(where, f"unknown key: {extra[0]}")
+    for key in keys:
+        if key not in value:
+            bad(f"{where}.{key}", "required")
+
+
+def check_list(value: object, where: str, allow_empty: bool = False) -> None:
+    if not isinstance(value, list):
+        bad(where, "must be a list")
+    if not allow_empty and not value:
+        bad(where, "must be a non-empty list")
+
+
+def check_entry_fields(entry: dict, where: str) -> None:
+    for key in ("title", "call", "undo"):
+        if key in entry:
+            check_text(entry[key], f"{where}.{key}")
+    if "why_next" in entry:
+        check_text(entry["why_next"], f"{where}.why_next", allow_empty=True)
+    if "conflict_needs_you" in entry and type(entry["conflict_needs_you"]) is not bool:
+        bad(f"{where}.conflict_needs_you", "must be true or false")
+    if "does" in entry:
+        check_list(entry["does"], f"{where}.does")
+        for i, item in enumerate(entry["does"]):
+            check_text(item, f"{where}.does[{i}]")
+    if "options" in entry:
+        check_list(entry["options"], f"{where}.options")
+        for i, option in enumerate(entry["options"]):
+            check_object(option, f"{where}.options[{i}]", ("label", "does"))
+            check_text(option["label"], f"{where}.options[{i}].label")
+            check_text(option["does"], f"{where}.options[{i}].does")
+    if "recommend" in entry:
+        pick = entry["recommend"]
+        check_object(pick, f"{where}.recommend", ("option", "why"))
+        count = len(entry.get("options", []))
+        if type(pick["option"]) is not int or not 1 <= pick["option"] <= count:
+            bad(f"{where}.recommend.option", f"must be a whole number from 1 to {count}")
+        check_text(pick["why"], f"{where}.recommend.why")
+    if "risks" in entry:
+        check_list(entry["risks"], f"{where}.risks", allow_empty=True)
+        for i, risk in enumerate(entry["risks"]):
+            check_object(risk, f"{where}.risks[{i}]", ("risk", "evidence"))
+            check_text(risk["risk"], f"{where}.risks[{i}].risk")
+            check_text(risk["evidence"], f"{where}.risks[{i}].evidence")
+    if "notes" in entry:
+        notes = entry["notes"]
+        if not isinstance(notes, dict):
+            bad(f"{where}.notes", "must be an object")
+        extra = sorted(set(notes) - NOTE_KEYS)
+        if extra:
+            bad(f"{where}.notes", f"unknown key: {extra[0]}")
+        for key, note in notes.items():
+            check_text(note, f"{where}.notes.{key}")
+            if len(note.split()) > 4:
+                bad(f"{where}.notes.{key}", "must be 1 to 4 words")
+
+
+def load_judgment(path: str) -> List[dict]:
+    try:
+        with open(path, encoding="utf-8") as handle:
+            data = json.load(handle)
+    except (OSError, ValueError) as error:
+        die(f"judgment: cannot read {path}: {error}")
+    if not isinstance(data, dict):
+        bad("top level", "must be an object")
+    stray = sorted(set(data) - {"version", "prs"})
+    if stray:
+        bad("top level", f"unknown key: {stray[0]}")
+    if type(data.get("version")) is not int or data["version"] != 1:
+        bad("version", "must be 1")
+    check_list(data.get("prs"), "prs", allow_empty=True)
+    seen = set()
+    for index, entry in enumerate(data["prs"]):
+        where = f"prs[{index}]"
+        if not isinstance(entry, dict):
+            bad(where, "must be an object")
+        unknown = set(entry) - ENTRY_KEYS
+        if unknown:
+            bad(where, f"unknown key: {sorted(unknown)[0]}")
+        number = entry.get("number")
+        if type(number) is not int or number <= 0:
+            bad(f"{where}.number", "required, a whole number above 0")
+        if number in seen:
+            bad(f"{where}.number", f"listed twice: {number}")
+        seen.add(number)
+        if type(entry.get("owner_call")) is not bool:
+            bad(f"{where}.owner_call", "required, true or false")
+        if entry["owner_call"]:
+            for key in REQUIRED_WHEN_CALL:
+                if key not in entry:
+                    bad(f"{where}.{key}", "required when owner_call is true")
+        check_entry_fields(entry, where)
+    return data["prs"]
+
+
+# --- fetch and parse ------------------------------------------------------------
+
+def run_triage(triage: str, args: List[str]):
+    """(stdout, exit status was 0). A command that cannot run gives empty stdout."""
+    try:
+        proc = subprocess.run([triage, *args], capture_output=True, text=True,
+                              encoding="utf-8", errors="replace", timeout=120)
+    except (OSError, subprocess.TimeoutExpired):
+        return "", False
+    return proc.stdout, proc.returncode == 0
+
+
+def parse_card(text: str):
+    values: dict = {}
+    extra: Dict[str, List[str]] = {}
+    current = None
+    for line in text.split("\n"):
+        match = FIELD_RE.match(line)
+        if match:
+            current = match.group(1)
+            raw = match.group(2).strip()
+            values[current] = UNKNOWN if raw == UNKNOWN_TEXT else raw
+            extra[current] = []
+        elif current is not None and line.startswith("  "):
+            extra[current].append(line)
+        else:
+            current = None
+    return values, extra
+
+
+# Hold tags pr-triage prints with no colon, so TOKEN_RE keeps them. Show words.
+PLAIN_REASONS = {
+    "body-hold": "The PR description asks to hold the merge",
+    "golden-changed": "The saved engine test results changed",
+    "ui-awaiting-signoff": "A visual change is waiting for your sign-off",
+    "ui-classifier-error": "Could not check for visual changes",
+    "pipeline-authored": "The bot wrote this PR on its own",
+    "pipeline-branch": "This is an automatic bug-fix branch",
+    "expected-red": "The PR description says a check will fail on purpose",
+    "unresolved-findings-api-error": "Could not check for open review findings",
+    "unresolved-findings-cap": "Too many review findings to check them all",
+    "open-threads-api-error": "Could not check for open review comments",
+    "open-threads-cap": "Too many review comments to check them all",
+}
+
+
+def parse_held(text: str) -> Dict[int, Held]:
+    held: Dict[int, Held] = {}
+    for line in text.split("\n"):
+        columns = re.split(r"\s{2,}", line.strip(), maxsplit=3)
+        try:
+            number = int(columns[0].lstrip("#"))
+        except ValueError:
+            continue  # the PR# header, blank lines
+        reasons = []
+        if len(columns) == 4:
+            for item in columns[3].split(";"):
+                item = item.strip()
+                if item and not TOKEN_RE.match(item):
+                    reasons.append(PLAIN_REASONS.get(item) or HOLD_CODE_RE.sub("", item))
+        held[number] = Held(columns[2] if len(columns) > 2 else "", reasons)
+    return held
+
+
+# --- icon mapping ---------------------------------------------------------------
+
+def unknown_cell() -> Cell:
+    return Cell(UNKNOWN_ICON, "Could not read", True)
+
+
+def map_tests(value: object, note: str) -> Cell:
+    match = CI_RE.match(value) if isinstance(value, str) else None
+    if match is None:
+        return unknown_cell()
+    # fail= also counts owner-only checks, so the icon keys on the real-failures list.
+    fail, pending = int(match.group("failed")), int(match.group("pending"))
+    real = match.group("real").strip()
+    if real != "none":
+        return Cell(ICON_BROKEN, note or "Tests failing")
+    if pending > 0:
+        return Cell(ICON_RUNNING, "")
+    return FINE
+
+
+def map_comments(value: object, note: str) -> Cell:
+    match = re.match(r"\d+", value) if isinstance(value, str) else None
+    if match is None:
+        return unknown_cell()
+    count = int(match.group())
+    if count == 0:
+        return FINE
+    default = "1 open comment" if count == 1 else f"{count} open comments"
+    return Cell(ICON_BROKEN, note or default)
+
+
+def map_bot_review(value: object, live_run_active: bool, note: str) -> Cell:
+    if not isinstance(value, str):
+        return unknown_cell()
+    banner, status = "", ""
+    if value != "none":
+        banner, sep, status = value.rpartition(" | ")
+        if not sep or not (status == "CURRENT" or status.startswith("STALE")):
+            return unknown_cell()
+    if live_run_active:
+        return Cell(ICON_RUNNING, "")
+    if value == "none":
+        return Cell(ICON_BROKEN, note or "No review yet")
+    if status.startswith("STALE"):
+        return Cell(ICON_RISKY, note or "Review is stale")
+    if READY_RE.search(banner):
+        return FINE
+    return Cell(ICON_BROKEN, note or "Not ready")
+
+
+def map_easy_undo(value: object, note: str) -> Cell:
+    if not isinstance(value, str) or not value:
+        return unknown_cell()
+    if re.match(r"Door: two-way(?![\w-])", value):
+        return FINE
+    if re.match(r"Door: one-way(?![\w-])", value):
+        return Cell(ICON_RISKY, note or "Hard to undo")
+    if value == "missing":
+        return Cell(ICON_RISKY, note or "Risk not stated")
+    return Cell(ICON_RISKY, note or "Risk unclear")
+
+
+def map_your_ok(value: object, lines: List[str], note: str) -> Cell:
+    if value == "none":
+        return Cell("", "none")
+    if value != "":
+        return unknown_cell()
+    approvals = [m for m in (APPROVAL_ROW_RE.match(line) for line in lines) if m]
+    if not approvals:
+        return unknown_cell()
+    if any(line.strip().startswith("amendment: MISSING") for line in lines):
+        return Cell(ICON_BROKEN, note or "Scope not recorded")
+    last = approvals[-1]
+    if last.group("mode") == "approve" and last.group("state") == "PR head unchanged":
+        return FINE
+    return Cell(ICON_RUNNING, "")
+
+
+# --- row model ------------------------------------------------------------------
+
+def is_hidden(row) -> bool:
+    if row.any_unknown:
+        return False
+    if row.held_only:
+        return False
+    return not row.owner_call
+
+
+def build_row(number: int, entry: Optional[dict], held: Optional[Held], card_text: str) -> Row:
+    held_only = entry is None
+    entry = entry or {}
+    values, extra = parse_card(card_text)
+    head_value = values.get("head")
+    head = HEAD_RE.match(head_value) if isinstance(head_value, str) else None
+    labels = head.group("labels").split(",") if head else []
+    live = values.get("live-run")
+    live_run_active = (isinstance(live, str) and live not in ("", "none")) or "post-plan-running" in labels
+    notes = entry.get("notes", {})
+    cells = {
+        "tests": map_tests(values.get("ci"), notes.get("tests", "")),
+        "comments": map_comments(values.get("threads"), notes.get("comments", "")),
+        "bot_review": map_bot_review(values.get("verdict"), live_run_active, notes.get("bot_review", "")),
+        "easy_undo": map_easy_undo(values.get("merge-danger"), notes.get("easy_undo", "")),
+        "your_ok": map_your_ok(values.get("Owner approvals"), extra.get("Owner approvals", []),
+                               notes.get("your_ok", "")),
+    }
+    any_unknown = (
+        any(values.get(name) is None or values.get(name) is UNKNOWN for name in REQUIRED_FIELDS)
+        or values.get("fidelity-evidence") is UNKNOWN
+        or (isinstance(head_value, str) and head is None)
+        or any(cell.unknown for cell in cells.values())
+    )
+    title = entry.get("title") or (head.group("title") if head else "") or (held.title if held else "")
+    row = Row(
+        number=number, entry=entry, held_only=held_only,
+        held_reasons=held.reasons if held else [], values=values, extra=extra, head=head,
+        title=title, mss=head.group("mss") if head else "",
+        owner_call=entry.get("owner_call", False),
+        conflict_needs_you=entry.get("conflict_needs_you", False),
+        live_run_active=live_run_active, cells=cells, any_unknown=any_unknown,
+    )
+    row.hidden = is_hidden(row)
+    return row
+
+
+# --- format-neutral content -----------------------------------------------------
+# A line is a list of tokens: ("t", text), ("code", text), ("b", text),
+# ("a", label, url or None). Each renderer escapes the tokens its own way.
+
+def text_line(text: str) -> list:
+    return [("t", text)]
+
+
+def call_notes(row: Row) -> List[str]:
+    notes = []
+    if row.mss == "DIRTY" and row.conflict_needs_you:
+        notes.append("Conflicts with master")
+    notes += ["Could not read live state"] if row.any_unknown else []
+    notes += ["No call written yet"] if row.held_only else []
+    return notes
+
+
+def reply_line(row: Row) -> list:
+    count = len(row.entry["options"])
+    line = [("t", "Reply "), ("code", f"{row.number}: 1")]
+    if count > 1:
+        line += [("t", " to "), ("code", f"{row.number}: {count}")]
+    return line
+
+
+def readable(value: object) -> str:
+    return value if isinstance(value, str) else "could not read"
+
+
+def undo_lines(row: Row) -> List[list]:
+    lines = [text_line(row.entry["undo"])] if "undo" in row.entry else []
+    lines.append(text_line("Merge danger: " + readable(row.values.get("merge-danger"))))
+    return lines
+
+
+def ci_lines(row: Row) -> List[list]:
+    value = row.values.get("ci")
+    match = CI_RE.match(value) if isinstance(value, str) else None
+    if match is None:
+        return [text_line("Checks: could not read")]
+    return [
+        text_line(f"Checks: {match.group('passed')} passed, {match.group('failed')} failed,"
+                  f" {match.group('pending')} pending."),
+        text_line("Real failures: " + match.group("real")),
+        text_line("Owner-only checks: " + match.group("gates")),
+    ]
+
+
+def verdict_text(value: object) -> str:
+    if not isinstance(value, str):
+        return "could not read"
+    if value == "none":
+        return "none yet"
+    banner, sep, status = VERDICT_STALE_RE.sub("", value).rpartition(" | ")
+    if not sep:
+        return status
+    status = status.replace("STALE", "stale: commits landed after the review")
+    return f"{banner}. {status.replace('CURRENT', 'current')}"
+
+
+def visual_line(value: object) -> list:
+    if not isinstance(value, str):
+        return text_line("Screenshots: could not read")
+    if value in ("", "none"):
+        return text_line("Screenshots: none")
+    line = [("t", "Screenshots:")]
+    for index, url in enumerate(value.split(), start=1):
+        line += [("t", " "), ("a", f"Screenshot {index}", url if VISUAL_URL_RE.match(url) else None)]
+    return line
+
+
+def live_lines(row: Row) -> List[list]:
+    lines = ci_lines(row)
+    threads = row.values.get("threads")
+    lines.append(text_line("Open comments: " + readable(threads)))
+    lines += [text_line(line.strip()) for line in row.extra.get("threads", [])]
+    lines.append(text_line("Review: " + verdict_text(row.values.get("verdict"))))
+    fidelity = row.values.get("fidelity-evidence")
+    if fidelity is not None:
+        text = FIDELITY_STALE_RE.sub("", fidelity) if isinstance(fidelity, str) else "could not read"
+        lines.append(text_line("Plan-fidelity check: " + text))
+    lines.append(visual_line(row.values.get("visual")))
+    if row.live_run_active:
+        run = "running"
+    else:
+        run = "none" if isinstance(row.values.get("live-run"), str) else "could not read"
+    lines.append(text_line("Bot run: " + run))
+    approvals = row.values.get("Owner approvals")
+    approval_rows = row.extra.get("Owner approvals", [])
+    if approval_rows:
+        lines.append(text_line("Owner approvals:"))
+        lines += [text_line(APPROVAL_HEAD_RE.sub("", line.strip())) for line in approval_rows]
+    else:
+        lines.append(text_line("Owner approvals: " + (readable(approvals) or "could not read")))
+    if row.held_reasons:
+        lines.append(text_line("Why it's held:"))
+        lines += [text_line(reason) for reason in row.held_reasons]
+    return lines
+
+
+def card_sections(row: Row) -> List[tuple]:
+    """(heading, kind, lines). kind is "p" for paragraphs and "ul" for a list."""
+    entry = row.entry
+    sections = []
+    if entry.get("why_next"):
+        sections.append(("", "p", [text_line(entry["why_next"])]))
+    does = [text_line(item) for item in entry.get("does", [])]
+    if row.head:
+        size = (f"Size: {row.head.group('files')} files,"
+                f" +{row.head.group('added')}/-{row.head.group('removed')}.")
+        kind = re.match(r"([A-Za-z]+)[(!:]", row.head.group("title"))
+        if kind:
+            size += f" Type is {kind.group(1)}."
+        does.append(text_line(size))
+    if does:
+        sections.append(("What it does", "ul", does))
+    sections.append(("What undo means", "p", undo_lines(row)))
+    if entry.get("risks"):
+        sections.append(("Risks", "ul", [
+            text_line(f"{r['risk']} Evidence: {r['evidence']}") for r in entry["risks"]]))
+    sections.append(("Live state", "ul", live_lines(row)))
+    if entry.get("options"):
+        sections.append(("Options", "ul", [
+            [("code", f"{row.number}: {k}"), ("t", " "), ("b", option["label"].rstrip(".") + "."),
+             ("t", " " + option["does"])]
+            for k, option in enumerate(entry["options"], start=1)]))
+    if entry.get("recommend"):
+        pick = entry["recommend"]
+        sections.append(("", "p", [[
+            ("t", "💡 I'd go with "), ("code", f"{row.number}: {pick['option']}"),
+            ("t", ". " + pick["why"])]]))
+    return sections
+
+
+def footer_lines(rows: List[Row], held_failed: bool) -> List[tuple]:
+    hidden_count = sum(1 for r in rows if r.hidden)
+    lines = []
+    if hidden_count:
+        noun = "PR" if hidden_count == 1 else "PRs"
+        lines.append(("hidden-count", f"The bot is handling {hidden_count} more {noun}."))
+    if held_failed:
+        lines.append(("note", HELD_FAILED_TEXT))
+    return lines
+
+
+# --- HTML -----------------------------------------------------------------------
+
+def html_line(line: list) -> str:
+    parts = []
+    for token in line:
+        if token[0] == "a":
+            label, url = esc(token[1]), token[2]
+            # The href keeps its URL as fetched; only visible text is scrubbed.
+            parts.append(f'<a href="{html.escape(url, quote=True)}">{label}</a>' if url else label)
+        elif token[0] == "t":
+            parts.append(esc(token[1]))
+        else:
+            parts.append(f"<{token[0]}>{esc(token[1])}</{token[0]}>")
+    return "".join(parts)
+
+
+def html_cell(css: str, cell: Cell) -> str:
+    if not cell.icon:
+        body = f'<span class="muted">{esc(cell.note)}</span>'
+    elif cell.note:
+        body = f'{cell.icon} <span class="note">{esc(cell.note)}</span>'
+    else:
+        body = cell.icon
+    return f'<td class="{css}">{body}</td>'
+
+
+def html_row(row: Row) -> str:
+    n = int(row.number)
+    cells = [f'<td class="c-pr"><a href="{PR_URL.format(n)}">#{n}</a> {esc(row.title)}</td>']
+    cells += [html_cell(css, row.cells[key]) for key, css in STATUS_CELLS]
+    call = []
+    if row.owner_call:
+        call += [esc(row.entry["call"]), html_line(reply_line(row))]
+    call += [f'<span class="note">{esc(note)}</span>' for note in call_notes(row)]
+    cells.append(f'<td class="c-call">{"<br>".join(call)}</td>')
+    return one_line(f'<tr class="row" id="pr-{n}">{"".join(cells)}</tr>')
+
+
+def one_line(markup: str) -> str:
+    return markup.replace("\r", " ").replace("\n", " ")
+
+
+def html_card(row: Row) -> str:
+    n = int(row.number)
+    parts = [f'<tr class="card" id="card-{n}"><td colspan="7">',
+             f"<details><summary>Open the full card for #{n}</summary>"]
+    for heading, kind, lines in card_sections(row):
+        if heading:
+            parts.append(f"<h4>{esc(heading)}</h4>")
+        if kind == "ul":
+            parts.append("<ul>" + "".join(f"<li>{html_line(line)}</li>" for line in lines) + "</ul>")
+        else:
+            parts += [f"<p>{html_line(line)}</p>" for line in lines]
+    parts.append("</details></td></tr>")
+    return one_line("".join(parts))
+
+
+def render_html(rows: List[Row], held_failed: bool) -> str:
+    shown_rows = [r for r in rows if not r.hidden]
+    lines = ["<!doctype html>", '<meta charset="utf-8">', STYLE, "<table>",
+             "<tr>" + "".join(f"<th>{esc(column)}</th>" for column in COLUMNS) + "</tr>"]
+    if not shown_rows:
+        lines.append(f'<tr><td colspan="7">{esc(EMPTY_TEXT)}</td></tr>')
+    for row in shown_rows:
+        lines += [html_row(row), html_card(row)]
+    lines.append("</table>")
+    lines += [f'<p class="{css}">{esc(text)}</p>' for css, text in footer_lines(rows, held_failed)]
+    return "\n".join(lines) + "\n"
+
+
+# --- markdown -------------------------------------------------------------------
+
+def md_line(line: list) -> str:
+    parts = []
+    for token in line:
+        if token[0] == "a":
+            label, url = md_cell(token[1]), token[2]
+            if url:
+                target = url.replace("(", "%28").replace(")", "%29")
+                parts.append(f"[{label}]({target})")
+            else:
+                parts.append(label)
+            continue
+        wrap = {"t": "", "code": "`", "b": "**"}[token[0]]
+        parts.append(f"{wrap}{md_cell(token[1])}{wrap}")
+    return "".join(parts)
+
+
+def md_row(row: Row) -> str:
+    n = int(row.number)
+    cells = [f"[#{n}]({PR_URL.format(n)}) {md_cell(row.title)}"]
+    for key, _css in STATUS_CELLS:
+        cell = row.cells[key]
+        cells.append(" ".join(part for part in (cell.icon, md_cell(cell.note)) if part))
+    call = []
+    if row.owner_call:
+        call += [md_cell(row.entry["call"]), md_line(reply_line(row))]
+    call += [md_cell(note) for note in call_notes(row)]
+    cells.append(" · ".join(call))
+    return "| " + " | ".join(cells) + " |"
+
+
+def markdown_header() -> str:
+    return "| " + " | ".join(COLUMNS) + " |"
+
+
+def render_markdown(rows: List[Row], held_failed: bool) -> str:
+    shown_rows = [r for r in rows if not r.hidden]
+    lines = [markdown_header(), "|" + " --- |" * len(COLUMNS)]
+    empty_row = "| " + md_cell(EMPTY_TEXT) + " |" + "  |" * (len(COLUMNS) - 1)
+    lines += [md_row(row) for row in shown_rows] or [empty_row]
+    for row in shown_rows:
+        lines += ["", f"### #{int(row.number)} {md_cell(row.title)}"]
+        for heading, kind, body in card_sections(row):
+            lines.append("")
+            if heading:
+                lines += [f"**{md_cell(heading)}**", ""]
+            if kind == "ul":
+                lines += ["- " + md_line(line) for line in body]
+            else:  # a blank line keeps consecutive paragraphs apart
+                lines.append("\n\n".join(md_line(line) for line in body))
+    for _css, text in footer_lines(rows, held_failed):
+        lines += ["", md_cell(text)]
+    return "\n".join(lines) + "\n"
+
+
+# --- self-check and main --------------------------------------------------------
+
+def assert_clean(doc: str, fmt: str) -> None:
+    """Last stop before the owner sees it: no commit hash, no button, fixed headers."""
+    visible = re.sub(r"<[^>]*>", " ", doc)
+    why = ""
+    if fmt == "markdown":
+        visible = MD_LINK_TARGET_RE.sub("]", visible)
+        headers_ok = markdown_header() in doc.split("\n")
+    else:
+        headers_ok = re.findall(r"<th>(.*?)</th>", doc) == list(COLUMNS)
+    if SHA_RE.search(visible):
+        why = "a commit hash would be visible"
+    elif "<button" in doc:
+        why = "the page holds a button"
+    elif not headers_ok:
+        why = "the header cells differ from the fixed columns"
+    if why:
+        print(f"pr-burndown-gadget: internal render check failed: {why}", file=sys.stderr)
+        sys.exit(3)
+
+
+def main(argv: List[str]) -> int:
+    opts = parse_args(argv)
+    out = opts["--out"]
+    refuse_out_inside_repo(out)
+    entries = load_judgment(opts["--judgment"])
+
+    default_triage = os.path.join(os.path.dirname(os.path.realpath(__file__)), "pr-triage")
+    triage = os.environ.get("PR_BURNDOWN_TRIAGE_CMD") or default_triage
+    held_text, held_ok = run_triage(triage, ["--held"])
+    held = parse_held(held_text)
+    held_failed = not held_ok
+
+    by_number = {entry["number"]: entry for entry in entries}
+    judged_numbers = set(by_number)
+    held_numbers = set(held)
+    numbers = [entry["number"] for entry in entries]
+    for n in sorted(held_numbers - judged_numbers):
+        numbers.append(n)
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        cards = list(pool.map(lambda n: run_triage(triage, ["--card", str(n)])[0], numbers))
+    rows = [build_row(n, by_number.get(n), held.get(n), card) for n, card in zip(numbers, cards)]
+
+    render = render_markdown if opts["--format"] == "markdown" else render_html
+    doc = render(rows, held_failed)
+    assert_clean(doc, opts["--format"])
+    try:
+        with open(out + ".tmp", "w", encoding="utf-8", errors="replace") as handle:
+            handle.write(doc)
+        os.replace(out + ".tmp", out)
+    except OSError as error:
+        die(f"cannot write {out}: {error}")
+    shown = sum(1 for r in rows if not r.hidden)
+    failed = sum(1 for r in rows if r.any_unknown)
+    print(f"wrote {os.path.abspath(out)} shown={shown} hidden={len(rows) - shown} fetch_failed={failed}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

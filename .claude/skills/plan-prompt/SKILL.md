@@ -1,7 +1,7 @@
 ---
 name: plan-prompt
 description: "Draft a /plan prompt distilled from the current conversation — ground-truth pointers, already-measured evidence, scope, constraints, verification, and the Step-3 architect tier — then, unless the Step-1.5 size triage says the work clears the ad-hoc bar, fire it as a detached headless Sonnet 5.5 run via bin/plan-now. Use after a design discussion when the planning run should be offloaded off the expensive session."
-last_verified: 2026-11-16
+last_verified: 2026-11-27
 ---
 
 # Draft a `/plan` handoff prompt and fire it headless
@@ -236,10 +236,12 @@ step 3.
 2. Fire it — the file from step 1 is the argument:
 
    ```bash
-   bin/plan-now "$f"                    # default: queue for automouse if the plan passes
+   bin/plan-now --kick "$f"             # default: queue for automouse and start its run at once
    bin/plan-now --implement "$f"        # write the plan but leave it unqueued for review
-   bin/plan-now --model opus "$f"       # when Step 4 said the ORCHESTRATOR wants Opus
+   bin/plan-now --kick --model opus "$f"  # when Step 4 said the ORCHESTRATOR wants Opus
    ```
+
+   Only this skill passes `--kick`, so its plan starts implementing as soon as it queues unless a kick guard skips it. Automated callers such as `/reset-ready`, `/burndown` and the parity loop must not pass it. JSB parity port plans still kick by slug name without the flag. With several blocks, a kick skips while another automouse runner is live, and a skipped plan waits for the nightly run.
 
    This runs `/plan` in a **detached headless Sonnet 5.5 session** (launchd; it
    survives closing Claude Code), then runs `bin/check-plan` on the produced plan and
@@ -268,7 +270,7 @@ step 3.
    bases on `master`, so none of them waits on a branch that does not exist:
 
    ```bash
-   for f in "$f1" "$f2" "$f3"; do bin/plan-now "$f"; done
+   for f in "$f1" "$f2" "$f3"; do bin/plan-now --kick "$f"; done
    ```
 
    No spacing between the calls is needed: each `bin/plan-now` launchd label carries

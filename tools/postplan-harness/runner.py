@@ -3028,6 +3028,49 @@ def _apply_backlog_closes(body: str, plan, log) -> str:
     new = normalize_backlog_closes(body, closes, refs)
     if new != body:
         log(f"phase2: backlog closes normalized (closes={closes} refs={refs})")
+    return _apply_tracking_issue(new, plan, log)
+
+
+# One `<!-- tracking-issue: closes #N -->` or `refs #N` line in the plan names a
+# same-repo issue (the nightly docfix stale-docs issue) this PR closes or only
+# references. bin/docfix-split writes it into each pile's seeded plan.
+_TRACKING_ISSUE_RE = re.compile(r"^<!-- tracking-issue: (closes|refs) #([0-9]+) -->$", re.M)
+
+
+def _tracking_closing_re(num: str):
+    """A closing keyword (optional colon) before a bare same-repo `#num`. The
+    lookbehind skips `owner/repo#num`; the lookahead skips `#num0`."""
+    return re.compile(
+        r"\b(?:close[sd]?|fix(?:es|ed)?|resolve[sd]?):?\s+(?<![\w/-])#"
+        + num + r"(?![0-9])", re.I)
+
+
+def _apply_tracking_issue(body: str, plan, log) -> str:
+    """Write `Closes #N` or `Refs #N` from the plan's single tracking-issue marker.
+    No plan, an unreadable plan file, or other than exactly one marker => passthrough.
+    Idempotent: a second call changes nothing."""
+    if plan is None or not plan.found or not plan.path:
+        return body
+    try:
+        with open(plan.path, encoding="utf-8") as fh:
+            text = fh.read()
+    except OSError:
+        return body
+    found = _TRACKING_ISSUE_RE.findall(text)
+    if len(found) != 1:
+        return body
+    kind, num = found[0]
+    closing = _tracking_closing_re(num)
+    if kind == "closes":
+        if closing.search(body):
+            return body
+        new = body.rstrip("\n") + f"\n\nCloses #{num}\n"
+    else:
+        new = closing.sub(f"Refs #{num}", body)
+        if not re.search(r"(?<![\w/-])Refs #" + num + r"(?![0-9])", new):
+            new = new.rstrip("\n") + f"\n\nRefs #{num}\n"
+    if new != body:
+        log(f"phase2: tracking issue #{num} written as {kind}")
     return new
 
 

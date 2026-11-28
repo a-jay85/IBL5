@@ -2286,65 +2286,26 @@ test_unblock_base_rebased_squash_merged_skips() {
     ub_squash_merge_parent
     ub_fetch
     ub_gh_open 0
-    ub_gh_merged "$(ub_git "$UB/pub" rev-parse parent) $(ub_git "$UB/pub" rev-parse master)"
     local out
     out=$(ub_run child)
     assert_contains test_unblock_base_rebased_squash_merged_skips:line "$out" "UNBLOCK-BASE SKIP merged parent tip is not an ancestor of child"
 }
 
-# ub_replay_child: squash child's own commits and replay them onto master, as an unblock pass
-# does. iblBase stays "parent".
-ub_replay_child() {
+# An earlier unblock pass replayed child onto master and iblBase still names the parent.
+# The helper skips it: the branch no longer contains the parent tip.
+test_unblock_base_already_replayed_skips() {
+    new_env
+    ub_fixture
+    ub_squash_merge_parent
+    ub_fetch
     ub_git "$UB/work" reset -q --soft "$UB_V1"
     GIT_COMMITTER_DATE="@1700000900 +0000" ub_git "$UB/work" commit -q -C ORIG_HEAD
     GIT_COMMITTER_DATE="@1700001000 +0000" ub_git "$UB/work" rebase -q --onto origin/master "$UB_V1"
-}
-
-test_unblock_base_already_replayed_proceeds() {
-    new_env
-    ub_fixture
-    ub_squash_merge_parent
-    ub_fetch
-    ub_replay_child
-    local squash out
-    squash=$(ub_git "$UB/pub" rev-parse master)
-    # Master moves on, so the answer is the merge-base and not the origin/master tip.
-    ub_commit "$UB/pub" m3.txt m3 m3 1700001100
-    ub_git "$UB/pub" push -q origin master
-    ub_fetch
     ub_gh_open 0
-    ub_gh_merged "$UB_V1 $squash"
-    out=$(ub_run child)
-    assert_eq test_unblock_base_already_replayed_proceeds:line "UNBLOCK-BASE origin/master $squash" "$out"
-    assert_contains test_unblock_base_already_replayed_proceeds:query "$(cat "$T/gh.calls")" "--json headRefOid,mergeCommit"
-}
-
-# A reused branch name: the landed PR in master's history does not hold the parent tip.
-test_unblock_base_replayed_older_merged_pr_skips() {
-    new_env
-    ub_fixture
-    ub_squash_merge_parent
-    ub_fetch
-    ub_replay_child
-    ub_gh_open 0
-    ub_gh_merged "$UB_M1 $UB_M1"
+    ub_gh_merged "$UB_V1"
     local out
     out=$(ub_run child)
-    assert_contains test_unblock_base_replayed_older_merged_pr_skips:line "$out" "UNBLOCK-BASE SKIP merged parent tip is not an ancestor of child"
-}
-
-test_unblock_base_replayed_query_failed_skips() {
-    new_env
-    ub_fixture
-    ub_squash_merge_parent
-    ub_fetch
-    ub_replay_child
-    ub_gh_open 0
-    : > "$T/ub-empty"
-    printf '1 %s\n' "$T/ub-empty" >> "$T/gh.queue"
-    local out
-    out=$(ub_run child)
-    assert_contains test_unblock_base_replayed_query_failed_skips:line "$out" "UNBLOCK-BASE SKIP parent PR state unknown"
+    assert_contains test_unblock_base_already_replayed_skips:line "$out" "UNBLOCK-BASE SKIP merged parent tip is not an ancestor of child"
 }
 
 test_unblock_base_advanced_parent_proceeds() {
